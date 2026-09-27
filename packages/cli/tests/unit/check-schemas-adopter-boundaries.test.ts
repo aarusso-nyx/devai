@@ -180,7 +180,7 @@ function invokeCommand(options: CommandOptions): {
 describe('complete schema canon filesystem checks', () => {
   it('accepts the complete source catalogue without expanding the runtime roster', () => {
     const report = checkSchemaCanon(canonFixture());
-    expect(ROSTER).toHaveLength(91);
+    expect(ROSTER).toHaveLength(92);
     expect(report).toMatchObject({ ok: true, canonical_total: 106, findings: [] });
   });
   it.each(['missing-source-only', 'missing-runtime', 'unexpected'] as const)(
