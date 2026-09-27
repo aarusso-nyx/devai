@@ -1,0 +1,216 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/data-handling.schema.json",
+  "title": "Data handling declaration",
+  "description": "Architect-authored declaration of what data a repository stores and whether any of it is personal data, stored at law/security/data-handling.json (ADR-SCR-0004). The inventory data handling sensor reads this declaration instead of scanning for personal-data columns that do not exist; a repository that stores no personal data says so here, store by store, so the absence is a declared fact rather than an unmeasured one.",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "title",
+    "status",
+    "authority",
+    "date",
+    "subject",
+    "personal_data",
+    "stores",
+    "invariants"
+  ],
+  "$defs": {
+    "invariant_ref": {
+      "$ref": "common-defs.schema.json#/$defs/id_invariant"
+    },
+    "decision_ref": {
+      "type": "string",
+      "pattern": "^ADR-(?:[0-9]{3}|[A-Z]{3}-[0-9]{4})$"
+    },
+    "store": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "kind", "description", "personal_data"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+",
+          "description": "Repository-relative path prefix of the store."
+        },
+        "kind": {
+          "enum": [
+            "law",
+            "product",
+            "code",
+            "tests",
+            "docs",
+            "config",
+            "state",
+            "evidence",
+            "scratch"
+          ]
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "personal_data": {
+          "type": "boolean",
+          "description": "True only when the store holds data about an identifiable natural person."
+        },
+        "categories": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "contact",
+              "identity",
+              "credentials",
+              "financial",
+              "location",
+              "personal",
+              "health",
+              "ip"
+            ]
+          },
+          "description": "Personal-data categories present, using the inventory data handling sensor's vocabulary. Empty or absent when personal_data is false."
+        }
+      }
+    }
+  },
+  "properties": {
+    "$schema": {
+      "const": "../schemas/data-handling.schema.json"
+    },
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": ["draft", "active"]
+    },
+    "authority": {
+      "const": "Architect"
+    },
+    "date": {
+      "type": "string",
+      "format": "date"
+    },
+    "subject": {
+      "type": "string",
+      "minLength": 1
+    },
+    "personal_data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stored", "statement"],
+      "properties": {
+        "stored": {
+          "type": "boolean",
+          "description": "Whether any store in this repository holds personal data."
+        },
+        "statement": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The declaration in one sentence, as the sensor reports it."
+        },
+        "attribution_note": {
+          "type": "string",
+          "minLength": 1,
+          "description": "How authorship metadata (git identity, role declarations) is treated, so the declaration is not misread as denying that commits carry names."
+        }
+      }
+    },
+    "stores": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/store"
+      }
+    },
+    "processors": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "External parties that receive repository data through a governed effect. Empty when none."
+    },
+    "invariants": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/invariant_ref"
+      }
+    },
+    "decisions": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/decision_ref"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "personal_data": {
+            "properties": {
+              "stored": {
+                "const": false
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "stores": {
+            "items": {
+              "properties": {
+                "personal_data": {
+                  "const": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "id": "data-handling",
+      "title": "Example data handling declaration",
+      "status": "active",
+      "authority": "Architect",
+      "date": "2026-09-27",
+      "subject": "example repository",
+      "personal_data": {
+        "stored": false,
+        "statement": "This repository stores no personal data."
+      },
+      "stores": [
+        {
+          "path": "law/",
+          "kind": "law",
+          "description": "Constitution, decisions, schemas, invariants, and policy sources.",
+          "personal_data": false
+        }
+      ],
+      "processors": [],
+      "invariants": ["INV-DATA-001"],
+      "decisions": ["ADR-SCR-0004"]
+    }
+  ]
+}
