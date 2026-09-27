@@ -2128,6 +2128,7 @@
                   ".devai/state/sensor-readings/",
                   "record/proofs/compliance/scorecards/",
                   "record/derived/inventory/",
+                  "record/proofs/chain.json",
                   "docs/dev/operations/self-scorecard-campaign/README.md",
                   "docs/theory/framework/scorecard.md"
                 ],
@@ -2135,7 +2136,7 @@
               },
               "deliverables": [
                 "Readings for every sweep member recorded through sense record under the inspector role with write consent, plus the build, unit, integration, and e2e readings and the regenerated inventory.",
-                "audit observe at the exact merged head writes the scorecard, assessment, and backlog under record/, and audit scorecard --at that head reports the measured verdicts: N/A only from the ledger (F1:T1, F4:T5) and from surfaces declared absent, every other cell carrying its reading, with each non-PASS cell and its finding listed in the campaign guide as a follow-up.",
+                "audit observe at the exact merged head writes the observation, whose scorecard, assessment, and backlog are copied under record/proofs/compliance/scorecards/ and committed with the proofs chain, and audit scorecard --at that head reports the measured verdicts: N/A only from the ledger (F1:T1, F4:T5) and from surfaces declared absent, every other cell carrying its reading, with each non-PASS cell and its finding listed in the campaign guide as a follow-up.",
                 "The campaign guide records the scorecard id, the head, and the command sequence; the theory page links the first record."
               ],
               "acceptance_commands": [
@@ -2164,7 +2165,7 @@
               "commit_types": ["plan(scorecard)", "docs(dev)"],
               "prompt": {
                 "path": "prompts/TASK-0261.md",
-                "sha256": "97d1ccb627629e9c4a86600fbdb2f2895900b5e5637acc52458736c50a53b37f"
+                "sha256": "55b5bf1d3b4852f8fd9130c85d79fa26637c4453e619bd07b2b7c8bf69b655f4"
               },
               "pull_request": null,
               "merged_as": null,
