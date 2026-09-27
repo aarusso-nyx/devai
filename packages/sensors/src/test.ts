@@ -6,6 +6,12 @@ export type TestSuite = 'unit' | 'integration' | 'regression' | 'e2e' | 'all';
 export interface TestOptions {
   readonly cwd: string;
   readonly suite: TestSuite;
+  /**
+   * Declared suite command, executable first, run without a shell
+   * (ADR-SCR-0005). When absent or empty the suite's default vitest
+   * configuration is the fallback.
+   */
+  readonly argv?: readonly string[];
   readonly timeoutMs?: number;
 }
 
@@ -48,7 +54,10 @@ export function parseVitestSummary(output: string): VitestSummary | null {
 }
 
 export function senseTest(opts: TestOptions): SensorReading {
-  const args = [...defaultCommand(opts.suite)];
+  const args =
+    opts.argv !== undefined && opts.argv.length > 0
+      ? [...opts.argv]
+      : [...defaultCommand(opts.suite)];
   const result = runCommand(args, { cwd: opts.cwd, timeoutMs: opts.timeoutMs ?? 600_000 });
 
   const summary = parseVitestSummary(result.stdout) ?? parseVitestSummary(result.stderr);
