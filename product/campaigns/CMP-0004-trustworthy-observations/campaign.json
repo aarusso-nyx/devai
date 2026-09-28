@@ -1,0 +1,1476 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "CMP-0004",
+  "title": "Trustworthy observations",
+  "type": "campaign",
+  "status": "proposed",
+  "date": "2026-09-28",
+  "authority": "Architect",
+  "mandate": {
+    "kind": "maintainer-decision",
+    "ref": "docs/dev/operations/harness-convergence-proposals.md"
+  },
+  "goal": "Make the framework's observations and evidence trustworthy: exact broker admission for the build and Pages sensing shapes, a governed e2e configuration and a bounded database-free coverage producer, immutable readings with an ordered recording protocol and a validated observation backlog, a canonical closure index sealed by membership, proof-line anchoring with bounded historical declarations, export that reconstructs the expected policy from a pinned release intent, and a CI sampling contract followed by the second scorecard (maintainer brainstorm of 2026-09-28, reconciled with the independent Codex review).",
+  "records": [
+    "ADR-AUT-0002",
+    "ADR-SCR-0007",
+    "ADR-SCR-0008",
+    "ADR-EVI-0001",
+    "ADR-EVI-0002",
+    "ADR-REL-0031",
+    "ADR-SCR-0010"
+  ],
+  "constraints": {
+    "self_dogfood": true,
+    "human_invoked_only": true,
+    "one_role_per_session": true,
+    "remote_effects": "forbidden"
+  },
+  "owner_effects": [
+    {
+      "id": "OE-01",
+      "description": "Supply the DETRAN closures and the proof-line baseline (119 lines, 67 anchored, 52 orphaned) as fixtures for ADR-EVI-0001 and ADR-EVI-0002, sanitized of any credential or absolute host path.",
+      "required_before": "R-0403",
+      "performed_at": null
+    },
+    {
+      "id": "OE-02",
+      "description": "Provide no test database for the next scorecard (decided 2026-09-28); ADR-SCR-0007 measures the declared local population instead.",
+      "required_before": "R-0401",
+      "performed_at": "2026-09-28T00:00:00Z"
+    }
+  ],
+  "prompts": {
+    "preamble": "prompts/preamble.md"
+  },
+  "models": {
+    "schemaVersion": "1.0.0",
+    "hosts": ["claude", "codex"],
+    "tiers": {
+      "architect": {
+        "rank": 1,
+        "claude": "Fable 5.1",
+        "codex": "Astra 6",
+        "default_effort": "high",
+        "use_for": "orchestration, contracts, schemas, policy, decision records"
+      },
+      "worker-high": {
+        "rank": 2,
+        "claude": "Opus 5.5",
+        "codex": "Sol 6",
+        "default_effort": "high",
+        "use_for": "implementation across several modules, broker, sensor, and evidence changes, tests of runtime semantics"
+      },
+      "worker": {
+        "rank": 3,
+        "claude": "Sonnet 5",
+        "codex": "Sol 6",
+        "default_effort": "medium",
+        "use_for": "bounded tests, documentation, single-module changes"
+      },
+      "clerk": {
+        "rank": 4,
+        "claude": "Haiku 4.5",
+        "codex": "Luna 6",
+        "default_effort": "low",
+        "use_for": "mechanical edits, regeneration, mirrors, formatting"
+      }
+    },
+    "escalation": {
+      "trigger": "one failed iteration, a blocked report, or a time budget exceeded without a pull request",
+      "step": "one-rank-up",
+      "ceiling": "architect",
+      "authority": "orchestrator"
+    }
+  },
+  "rounds": [
+    {
+      "id": "R-0401",
+      "title": "Sensing process admission and measurable test cells",
+      "goal": "The build and site_drift sensors produce readings under exact broker admission; e2e runs the governed RC e2e configuration and coverage is measured on a declared database-free population; F2:T4, F2:T9, F3:T1, and F3:T2 carry measured verdicts.",
+      "status": "planned",
+      "records": ["ADR-AUT-0002", "ADR-SCR-0007"],
+      "depends_on": [],
+      "attestation_reissue": true,
+      "owner_effects_required": [],
+      "close_checks": ["law:validate", "test:cli", "test:sensors"],
+      "waves": [
+        {
+          "id": "CTG-0411",
+          "title": "Sensing process admission",
+          "type": "coupled-triplet",
+          "records": ["ADR-AUT-0002"],
+          "depends_on": [],
+          "lock_scopes": [
+            "law/policy/subprocess-effects.json",
+            ".devai/config/subprocess-effects.json",
+            "packages/cli/src/authority/",
+            "packages/sensors/src/build.ts",
+            "packages/sensors/src/site-drift.ts",
+            "law/schemas/sensor-inputs.schema.json",
+            ".devai/config/sensor-inputs.json",
+            "packages/sensors/src/harness/"
+          ],
+          "gates": ["schemas", "test:cli", "test:sensors"],
+          "tasks": [
+            {
+              "id": "TASK-0411",
+              "title": "Declare the build precedence and the two Pages GET shapes",
+              "discipline": "architect",
+              "coupled_pipeline_position": "architect",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F1", "F5"],
+              "boundary": {
+                "paths": [
+                  "law/policy/subprocess-effects.json",
+                  ".devai/config/subprocess-effects.json",
+                  "law/schemas/subprocess-effects.schema.json",
+                  "law/policy/sensor-notes/build.md",
+                  "docs/adopters/sensor-inputs.md",
+                  "law/schemas/sensor-inputs.schema.json",
+                  ".devai/config/sensor-inputs.json",
+                  "law/policy/sensor-notes/site_drift.md"
+                ],
+                "forbidden": [".github/workflows/", "packages/", "tests/"]
+              },
+              "deliverables": [
+                "subprocess-effects.json declares the build sensor's harness-write template with the precedence between the test-tasks build node and any declared input, and two exact read-only gh api GET templates (deployments listing, Pages intent journal) with repository, endpoint, method, and query fixed (#155, #162 item 1).",
+                "The build sensor note records the reproduction finding; the adopter page documents the shapes."
+              ],
+              "acceptance_commands": [
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "schemas",
+                  "--format",
+                  "json"
+                ],
+                ["node", "scripts/check-policy-materialization.mjs"],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "docs-links",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": ["law(subprocess)", "law(sensors)", "docs(adopters)"],
+              "prompt": {
+                "path": "prompts/TASK-0411.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "architect",
+                "effort": "high",
+                "time_budget_minutes": 90
+              }
+            },
+            {
+              "id": "TASK-0412",
+              "title": "Prove exact admission and refusal of every widened shape",
+              "discipline": "inspector",
+              "coupled_pipeline_position": "inspector",
+              "upstream_task_id": "TASK-0411",
+              "status": "planned",
+              "target_substrates": ["F3"],
+              "boundary": {
+                "paths": [
+                  "packages/cli/tests/unit/authority-broker-sensing-shapes.test.ts",
+                  "packages/sensors/tests/build-invocation.test.ts",
+                  "packages/sensors/tests/site-drift-provenance.test.ts"
+                ],
+                "forbidden": [
+                  "law/",
+                  "product/",
+                  ".github/workflows/",
+                  "packages/cli/src/",
+                  "packages/skills/src/",
+                  "packages/sensors/src/",
+                  "packages/loop/src/",
+                  "packages/evidence/src/"
+                ]
+              },
+              "deliverables": [
+                "The broker admits exactly the declared build argv and the two GET shapes and refuses a different endpoint, a write-changing option, a POST, or a different repository; sense run build and sense run site_drift produce readings with the declared inputs."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "packages/cli/tests/unit/authority-broker-sensing-shapes.test.ts",
+                  "packages/sensors/tests/build-invocation.test.ts",
+                  "packages/sensors/tests/site-drift-provenance.test.ts"
+                ]
+              ],
+              "commit_types": ["test(cli)", "test(sensors)"],
+              "prompt": {
+                "path": "prompts/TASK-0412.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 90
+              }
+            },
+            {
+              "id": "TASK-0413",
+              "title": "Admit the declared shapes in the broker and read Pages provenance",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": "TASK-0412",
+              "status": "planned",
+              "target_substrates": ["F2", "F3"],
+              "boundary": {
+                "paths": [
+                  "packages/cli/src/authority/broker.ts",
+                  "packages/cli/src/authority/broker-targets.ts",
+                  "packages/sensors/src/build.ts",
+                  "packages/sensors/src/site-drift.ts",
+                  "packages/cli/src/commands/sense/adapters.ts",
+                  "docs/reference/error-codes.md",
+                  "packages/sensors/src/harness/gh-api.ts"
+                ],
+                "forbidden": ["law/", "product/", ".github/workflows/"]
+              },
+              "deliverables": [
+                "The broker's literal admission list carries the declared build precedence and the two GET shapes; site_drift reads the deployments and the journal through them; the build sensor's refusal cause is fixed."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "packages/cli/tests/unit/authority-broker-sensing-shapes.test.ts",
+                  "packages/sensors/tests/build-invocation.test.ts",
+                  "packages/sensors/tests/site-drift-provenance.test.ts"
+                ],
+                ["pnpm", "run", "test:sensors"],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "sense",
+                  "run",
+                  "build",
+                  "--repo-root",
+                  ".",
+                  "--as-role",
+                  "inspector",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": ["feat(authority)", "fix(sensors)", "docs(reference)"],
+              "prompt": {
+                "path": "prompts/TASK-0413.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 180
+              }
+            }
+          ]
+        },
+        {
+          "id": "CTG-0412",
+          "title": "E2E and bounded coverage",
+          "type": "coupled-triplet",
+          "records": ["ADR-SCR-0007"],
+          "depends_on": ["CTG-0411"],
+          "lock_scopes": [
+            ".devai/config/sensor-inputs.json",
+            "tests/config/",
+            "package.json",
+            "test-tasks.json",
+            "packages/cli/src/authority/broker.ts"
+          ],
+          "gates": ["test:cli", "test:root", "test:sensors"],
+          "tasks": [
+            {
+              "id": "TASK-0414",
+              "title": "Declare the e2e configuration and the coverage population",
+              "discipline": "architect",
+              "coupled_pipeline_position": "architect",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F1", "F5"],
+              "boundary": {
+                "paths": [
+                  ".devai/config/sensor-inputs.json",
+                  "law/policy/sensor-notes/e2e_test.md",
+                  "law/policy/sensor-notes/test_coverage_depth.md",
+                  "docs/adopters/sensor-inputs.md",
+                  "law/schemas/sensor-inputs.schema.json",
+                  "law/policy/subprocess-effects.json",
+                  ".devai/config/subprocess-effects.json"
+                ],
+                "forbidden": [".github/workflows/", "packages/", "tests/"]
+              },
+              "deliverables": [
+                "The e2e argv names tests/config/rc.e2e.config.ts; coveragePath names scratch/coverage/local/coverage-final.json; the two sensor notes state the declared population and exclusions (#156, #161)."
+              ],
+              "acceptance_commands": [
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "schemas",
+                  "--format",
+                  "json"
+                ],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "docs-links",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": ["law(sensors)", "docs(adopters)"],
+              "prompt": {
+                "path": "prompts/TASK-0414.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "architect",
+                "effort": "high",
+                "time_budget_minutes": 60
+              }
+            },
+            {
+              "id": "TASK-0415",
+              "title": "Author the local coverage configuration and prove measured outcomes",
+              "discipline": "inspector",
+              "coupled_pipeline_position": "inspector",
+              "upstream_task_id": "TASK-0414",
+              "status": "planned",
+              "target_substrates": ["F3"],
+              "boundary": {
+                "paths": [
+                  "tests/config/local.coverage.config.ts",
+                  "tests/contract/sensor-inputs.contract.test.ts",
+                  "packages/sensors/tests/e2e-and-coverage-outcomes.test.ts",
+                  "packages/cli/tests/unit/check-test-task-workspace-selectors.test.ts",
+                  "tests/config/rc.e2e.config.ts"
+                ],
+                "forbidden": [
+                  "law/",
+                  "product/",
+                  ".github/workflows/",
+                  "packages/cli/src/",
+                  "packages/skills/src/",
+                  "packages/sensors/src/",
+                  "packages/loop/src/",
+                  "packages/evidence/src/"
+                ]
+              },
+              "deliverables": [
+                "tests/config/local.coverage.config.ts produces the declared file without a database; the contract test pins the declared argv; a failing e2e fixture reads FAIL and a missing prerequisite reads a diagnostic, never error for a missing file."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "tests/contract/sensor-inputs.contract.test.ts",
+                  "packages/sensors/tests/e2e-and-coverage-outcomes.test.ts",
+                  "packages/cli/tests/unit/check-test-task-workspace-selectors.test.ts"
+                ]
+              ],
+              "commit_types": ["test(config)", "test(sensors)", "test(cli)"],
+              "prompt": {
+                "path": "prompts/TASK-0415.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 90
+              }
+            },
+            {
+              "id": "TASK-0416",
+              "title": "Admit the RC e2e configuration and wire the local coverage script",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": "TASK-0415",
+              "status": "planned",
+              "target_substrates": ["F2", "F3"],
+              "boundary": {
+                "paths": [
+                  "packages/cli/src/authority/broker.ts",
+                  "package.json",
+                  "test-tasks.json",
+                  "scripts/check-test-task-workspace-selectors.mjs",
+                  "packages/sensors/src/test-coverage-depth.ts",
+                  "packages/sensors/src/test.ts"
+                ],
+                "forbidden": ["law/", "product/", ".github/workflows/"]
+              },
+              "deliverables": [
+                "The broker's governed configuration list admits tests/config/rc.e2e.config.ts; package.json gains test:coverage:local; the descriptor and the selector check follow; the coverage sensor reports the declared population in its reading."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "tests/contract/sensor-inputs.contract.test.ts",
+                  "packages/sensors/tests/e2e-and-coverage-outcomes.test.ts",
+                  "packages/cli/tests/unit/check-test-task-workspace-selectors.test.ts"
+                ],
+                ["node", "scripts/check-test-task-workspace-selectors.mjs"],
+                ["pnpm", "run", "test:sensors"]
+              ],
+              "commit_types": ["feat(authority)", "build(scripts)", "fix(sensors)"],
+              "prompt": {
+                "path": "prompts/TASK-0416.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker",
+                "effort": "high",
+                "time_budget_minutes": 120
+              }
+            }
+          ]
+        }
+      ],
+      "closure": null
+    },
+    {
+      "id": "R-0402",
+      "title": "Immutable readings and recording order",
+      "goal": "Recorded readings are immutable instances linked by supersession, the sweep stays read-only with an ordered second pass, sense record appends the chain entry the alignment sensor counts, the observation backlog validates, the hook reads the bound store, and the two inventory cells are decided per cell.",
+      "status": "planned",
+      "records": ["ADR-SCR-0008"],
+      "depends_on": ["R-0401"],
+      "attestation_reissue": false,
+      "owner_effects_required": [],
+      "close_checks": ["law:validate", "docs:validate", "test:cli", "test:sensors", "test:skills"],
+      "waves": [
+        {
+          "id": "CTG-0421",
+          "title": "Readings, recording, backlog, applicability",
+          "type": "coupled-triplet",
+          "records": ["ADR-SCR-0008"],
+          "depends_on": [],
+          "lock_scopes": [
+            "law/policy/sense-presets.json",
+            "law/policy/self-dogfood.json",
+            "law/schemas/observation-backlog.schema.json",
+            "law/policy/scorecard-na.json",
+            "packages/cli/src/commands/sense/",
+            "packages/sensors/src/",
+            "packages/skills/src/post-merge-auditor/"
+          ],
+          "gates": ["schemas", "test:cli", "test:sensors", "test:skills"],
+          "tasks": [
+            {
+              "id": "TASK-0421",
+              "title": "Declare the second sweep pass, the chain row, the backlog schema, and per-cell applicability",
+              "discipline": "architect",
+              "coupled_pipeline_position": "architect",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F1", "F5"],
+              "boundary": {
+                "paths": [
+                  "law/policy/sense-presets.json",
+                  ".devai/config/sense-presets.json",
+                  "law/policy/self-dogfood.json",
+                  "law/schemas/observation-backlog.schema.json",
+                  "law/policy/scorecard-na.json",
+                  ".devai/config/scorecard-na.json",
+                  "law/policy/sensor-notes/inventory_performance.md",
+                  "law/policy/sensor-notes/inventory_adherence.md",
+                  "law/policy/sensor-notes/inventory_regeneration.md",
+                  "law/policy/sensor-notes/harness_invariant_alignment.md",
+                  "packages/cli/src/commands/check/schemas.ts",
+                  "docs/theory/framework/scorecard.md",
+                  "law/schemas/sensor-reading.schema.json"
+                ],
+                "forbidden": [".github/workflows/", "packages/", "tests/"]
+              },
+              "deliverables": [
+                "The sweep preset declares an ordered second pass for store-reading sensors; the self-dogfood policy covers the chain path for sense record; observation-backlog.schema.json is catalogued; scorecard-na.json carries the per-cell decision for F4:T4 and leaves F4:T9 measured (#157, #158, #159, #160)."
+              ],
+              "acceptance_commands": [
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "schemas",
+                  "--format",
+                  "json"
+                ],
+                ["node", "scripts/check-policy-materialization.mjs"],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "docs-links",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": [
+                "law(sensors)",
+                "law(self-dogfood)",
+                "law(scorecard)",
+                "refactor(schemas)",
+                "docs(theory)"
+              ],
+              "prompt": {
+                "path": "prompts/TASK-0421.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "architect",
+                "effort": "high",
+                "time_budget_minutes": 120
+              }
+            },
+            {
+              "id": "TASK-0422",
+              "title": "Prove supersession, the ordered protocol, chain repair, backlog validity, and hook store resolution",
+              "discipline": "inspector",
+              "coupled_pipeline_position": "inspector",
+              "upstream_task_id": "TASK-0421",
+              "status": "planned",
+              "target_substrates": ["F3"],
+              "boundary": {
+                "paths": [
+                  "packages/cli/tests/unit/sense-record-supersession.test.ts",
+                  "packages/cli/tests/unit/sense-run-set-two-pass.test.ts",
+                  "packages/sensors/tests/harness-invariant-alignment-store.test.ts",
+                  "packages/skills/tests/unit/observation-backlog-schema.test.ts",
+                  "packages/skills/tests/unit/post-merge-auditor-store-resolution.test.ts"
+                ],
+                "forbidden": [
+                  "law/",
+                  "product/",
+                  ".github/workflows/",
+                  "packages/cli/src/",
+                  "packages/skills/src/",
+                  "packages/sensors/src/",
+                  "packages/loop/src/",
+                  "packages/evidence/src/"
+                ]
+              },
+              "deliverables": [
+                "A later reading of the same kind and candidate is a new instance linked by supersedes and selection takes it; a same-id different-body write still conflicts; a missing chain entry is repaired by re-recording; the ordered protocol on a fresh worktree yields substrate-reflecting readings for F4:T7 and F5:T4; backlog.json validates; the hook resolves the bound checkout's store."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "packages/cli/tests/unit/sense-record-supersession.test.ts",
+                  "packages/cli/tests/unit/sense-run-set-two-pass.test.ts",
+                  "packages/sensors/tests/harness-invariant-alignment-store.test.ts",
+                  "packages/skills/tests/unit/observation-backlog-schema.test.ts",
+                  "packages/skills/tests/unit/post-merge-auditor-store-resolution.test.ts"
+                ]
+              ],
+              "commit_types": ["test(cli)", "test(sensors)", "test(skills)"],
+              "prompt": {
+                "path": "prompts/TASK-0422.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 120
+              }
+            },
+            {
+              "id": "TASK-0423",
+              "title": "Implement reading instances, the second pass, the chain entry, and bound store resolution",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": "TASK-0422",
+              "status": "planned",
+              "target_substrates": ["F2", "F3"],
+              "boundary": {
+                "paths": [
+                  "packages/cli/src/commands/sense/record.ts",
+                  "packages/cli/src/commands/sense/run-set.ts",
+                  "packages/cli/src/commands/sense/shared.ts",
+                  "packages/sensors/src/sensor-reading.ts",
+                  "packages/sensors/src/harness-invariant-alignment-evidence.ts",
+                  "packages/sensors/src/inventory-adherence.ts",
+                  "packages/skills/src/post-merge-auditor/observation-bundle.ts",
+                  "packages/skills/src/post-merge-auditor/index.ts",
+                  "packages/loop/src/scorecard/latest.ts",
+                  "packages/schemas/src/roster.ts",
+                  "docs/reference/error-codes.md",
+                  "packages/loop/src/scorecard/inputs.ts",
+                  "packages/skills/src/operations/backlog.ts",
+                  "packages/sensors/src/inventory-performance.ts",
+                  "packages/cli/src/commands/sense/readings-rebuild.ts"
+                ],
+                "forbidden": ["law/", "product/", ".github/workflows/"]
+              },
+              "deliverables": [
+                "sense record writes immutable instances with supersedes links and the chain entry naming the file digest; run-set executes the declared second pass after recording; the alignment sensor counts store readings with candidate binding; the auditor bundle resolves the bound store; the roster counts the backlog schema."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "packages/cli/tests/unit/sense-record-supersession.test.ts",
+                  "packages/cli/tests/unit/sense-run-set-two-pass.test.ts",
+                  "packages/sensors/tests/harness-invariant-alignment-store.test.ts",
+                  "packages/skills/tests/unit/observation-backlog-schema.test.ts",
+                  "packages/skills/tests/unit/post-merge-auditor-store-resolution.test.ts"
+                ],
+                ["pnpm", "run", "test:cli"],
+                ["pnpm", "run", "test:sensors"],
+                ["pnpm", "run", "test:skills"]
+              ],
+              "commit_types": [
+                "feat(sense)",
+                "fix(sensors)",
+                "fix(auditor)",
+                "refactor(schemas)",
+                "docs(reference)"
+              ],
+              "prompt": {
+                "path": "prompts/TASK-0423.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 210
+              }
+            }
+          ]
+        }
+      ],
+      "closure": null
+    },
+    {
+      "id": "R-0403",
+      "title": "Evidence closure, proof anchoring, and intent export",
+      "goal": "The rounds index is rendered from phase closures and sealed by exact membership; chain verification cross-checks every proof line with bounded historical declarations; the exporter reconstructs the expected task policy from a pinned release intent.",
+      "status": "planned",
+      "records": ["ADR-EVI-0001", "ADR-EVI-0002", "ADR-REL-0031"],
+      "depends_on": ["R-0401"],
+      "attestation_reissue": false,
+      "owner_effects_required": ["OE-01"],
+      "close_checks": [
+        "law:validate",
+        "docs:validate",
+        "test:evidence",
+        "test:loop",
+        "test:cli",
+        "release:static-integrity"
+      ],
+      "waves": [
+        {
+          "id": "CTG-0431",
+          "title": "Canonical closure index",
+          "type": "coupled-triplet",
+          "records": ["ADR-EVI-0001"],
+          "depends_on": [],
+          "lock_scopes": [
+            "packages/loop/src/governance-ledger/",
+            "packages/loop/src/round-lifecycle/",
+            "packages/cli/src/commands/docs/governance-render.ts",
+            "packages/cli/src/commands/evidence/facade.ts",
+            "packages/evidence/src/closure/",
+            "record/derived/indexes/"
+          ],
+          "gates": ["test:loop", "test:cli", "test:evidence"],
+          "tasks": [
+            {
+              "id": "TASK-0431",
+              "title": "Specify the canonical rounds index and the seal membership rule",
+              "discipline": "architect",
+              "coupled_pipeline_position": "architect",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F1", "F5"],
+              "boundary": {
+                "paths": [
+                  "docs/reference/cli/evidence-render.md",
+                  "docs/theory/framework/loop.md",
+                  "record/derived/indexes/README.md"
+                ],
+                "forbidden": [".github/workflows/", "packages/", "tests/"]
+              },
+              "deliverables": [
+                "A reference page defines the index row shape (closure id, round, supersedes, merged_as), the deterministic order, the rejection rules, the --check mode, and the exact-membership seal rule (#169)."
+              ],
+              "acceptance_commands": [
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "docs-links",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": ["docs(reference)", "docs(theory)", "plan(record)"],
+              "prompt": {
+                "path": "prompts/TASK-0431.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "architect",
+                "effort": "high",
+                "time_budget_minutes": 60
+              }
+            },
+            {
+              "id": "TASK-0432",
+              "title": "Prove deterministic rendering, every rejection, and exact seal membership",
+              "discipline": "inspector",
+              "coupled_pipeline_position": "inspector",
+              "upstream_task_id": "TASK-0431",
+              "status": "planned",
+              "target_substrates": ["F3"],
+              "boundary": {
+                "paths": [
+                  "packages/cli/tests/unit/evidence-render-rounds.test.ts",
+                  "packages/loop/tests/round-lifecycle-seal-membership.test.ts",
+                  "packages/evidence/tests/closure-index.test.ts",
+                  "tests/fixtures/closures/README.md"
+                ],
+                "forbidden": [
+                  "law/",
+                  "product/",
+                  ".github/workflows/",
+                  "packages/cli/src/",
+                  "packages/skills/src/",
+                  "packages/sensors/src/",
+                  "packages/loop/src/",
+                  "packages/evidence/src/"
+                ]
+              },
+              "deliverables": [
+                "A fixture with superseding closures renders byte-identically twice and seals; a file name that differs from its id, a duplicate, a crossed link, a cycle, and two terminals per round are each rejected; --check writes nothing; a substring match without membership does not seal."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "packages/cli/tests/unit/evidence-render-rounds.test.ts",
+                  "packages/loop/tests/round-lifecycle-seal-membership.test.ts",
+                  "packages/evidence/tests/closure-index.test.ts"
+                ]
+              ],
+              "commit_types": ["test(cli)", "test(loop)", "test(evidence)", "test(fixtures)"],
+              "prompt": {
+                "path": "prompts/TASK-0432.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 90
+              }
+            },
+            {
+              "id": "TASK-0433",
+              "title": "Render the index from closures and seal by membership",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": "TASK-0432",
+              "status": "planned",
+              "target_substrates": ["F2", "F3"],
+              "boundary": {
+                "paths": [
+                  "packages/loop/src/governance-ledger/render.ts",
+                  "packages/cli/src/commands/docs/governance-render.ts",
+                  "packages/cli/src/commands/evidence/facade.ts",
+                  "packages/loop/src/round-lifecycle/index.ts",
+                  "packages/evidence/src/closure/index.ts",
+                  "docs/reference/error-codes.md",
+                  "record/derived/indexes/rounds.md"
+                ],
+                "forbidden": ["law/", "product/", ".github/workflows/"]
+              },
+              "deliverables": [
+                "evidence render --kind rounds writes the canonical index from the closure reader with the rejection rules and --check; the narrative renderer stays under its own kind; round seal checks exact membership and terminal status."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "packages/cli/tests/unit/evidence-render-rounds.test.ts",
+                  "packages/loop/tests/round-lifecycle-seal-membership.test.ts",
+                  "packages/evidence/tests/closure-index.test.ts"
+                ],
+                ["pnpm", "run", "test:loop"],
+                ["pnpm", "run", "test:evidence"]
+              ],
+              "commit_types": ["feat(evidence)", "fix(loop)", "docs(reference)"],
+              "prompt": {
+                "path": "prompts/TASK-0433.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 150
+              }
+            }
+          ]
+        },
+        {
+          "id": "CTG-0432",
+          "title": "Proof-line anchoring",
+          "type": "coupled-triplet",
+          "records": ["ADR-EVI-0002"],
+          "depends_on": ["CTG-0431"],
+          "lock_scopes": [
+            "packages/evidence/src/evidence/",
+            "packages/cli/src/commands/evidence/",
+            "law/schemas/proof-orphan-declaration.schema.json",
+            "record/proofs/README.md",
+            "record/proofs/anchor-baseline.json"
+          ],
+          "gates": ["schemas", "test:evidence", "test:cli"],
+          "tasks": [
+            {
+              "id": "TASK-0434",
+              "title": "Declare the anchoring rules, the baseline, and the historical declaration proof",
+              "discipline": "architect",
+              "coupled_pipeline_position": "architect",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F1", "F5"],
+              "boundary": {
+                "paths": [
+                  "law/schemas/proof-orphan-declaration.schema.json",
+                  "packages/cli/src/commands/check/schemas.ts",
+                  "record/proofs/README.md",
+                  "docs/reference/cli/evidence-verify.md",
+                  "law/schemas/proof-anchor-baseline.schema.json"
+                ],
+                "forbidden": [".github/workflows/", "packages/", "tests/"]
+              },
+              "deliverables": [
+                "A schema for the append-only historical declaration proof (canonical path, sequence, line digest, Architect authorization, cutoff); the proofs README and a reference page define canonical path, sequence namespace, newline handling, byte hashing, the baseline the first verification records, and the crash-recovery rule (#168)."
+              ],
+              "acceptance_commands": [
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "schemas",
+                  "--format",
+                  "json"
+                ],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "docs-links",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": [
+                "law(evidence)",
+                "refactor(schemas)",
+                "plan(record)",
+                "docs(reference)"
+              ],
+              "prompt": {
+                "path": "prompts/TASK-0434.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "architect",
+                "effort": "high",
+                "time_budget_minutes": 90
+              }
+            },
+            {
+              "id": "TASK-0435",
+              "title": "Prove bidirectional anchoring, rejections, declarations, and crash recovery",
+              "discipline": "inspector",
+              "coupled_pipeline_position": "inspector",
+              "upstream_task_id": "TASK-0434",
+              "status": "planned",
+              "target_substrates": ["F3"],
+              "boundary": {
+                "paths": [
+                  "packages/evidence/tests/proof-line-anchoring.test.ts",
+                  "packages/cli/tests/unit/evidence-verify-anchors.test.ts",
+                  "tests/fixtures/proof-baseline/README.md"
+                ],
+                "forbidden": [
+                  "law/",
+                  "product/",
+                  ".github/workflows/",
+                  "packages/cli/src/",
+                  "packages/skills/src/",
+                  "packages/sensors/src/",
+                  "packages/loop/src/",
+                  "packages/evidence/src/"
+                ]
+              },
+              "deliverables": [
+                "Every anchor resolves to one line and every line to one anchor or one declaration; duplicates, malformed notes, missing lines, changed bytes, duplicate declarations, and new undeclared orphans are rejected; a declaration for a line after the cutoff is rejected; an unanchored newest line reports its remediation; chain cryptography is unchanged."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "packages/evidence/tests/proof-line-anchoring.test.ts",
+                  "packages/cli/tests/unit/evidence-verify-anchors.test.ts"
+                ]
+              ],
+              "commit_types": ["test(evidence)", "test(cli)", "test(fixtures)"],
+              "prompt": {
+                "path": "prompts/TASK-0435.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 120
+              }
+            },
+            {
+              "id": "TASK-0436",
+              "title": "Cross-check proof lines, record the baseline, and accept declarations",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": "TASK-0435",
+              "status": "planned",
+              "target_substrates": ["F2", "F3"],
+              "boundary": {
+                "paths": [
+                  "packages/evidence/src/evidence/chain.ts",
+                  "packages/evidence/src/evidence/verb-evidence.ts",
+                  "packages/evidence/src/evidence/anchors.ts",
+                  "packages/cli/src/commands/evidence/facade.ts",
+                  "packages/cli/src/commands/evidence/facade-collect-record.ts",
+                  "packages/schemas/src/roster.ts",
+                  "docs/reference/error-codes.md",
+                  "packages/evidence/src/evidence/proof-epoch.ts",
+                  "record/proofs/anchor-baseline.json"
+                ],
+                "forbidden": ["law/", "product/", ".github/workflows/"]
+              },
+              "deliverables": [
+                "evidence verify --scope chain cross-checks in both directions, new anchors carry the line digest, the first verification records the append-only baseline, declarations are validated and Architect-authorized before the cutoff, and the two-step writer reports an unanchored newest line."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "packages/evidence/tests/proof-line-anchoring.test.ts",
+                  "packages/cli/tests/unit/evidence-verify-anchors.test.ts"
+                ],
+                ["pnpm", "run", "test:evidence"],
+                ["pnpm", "run", "test:cli"]
+              ],
+              "commit_types": ["feat(evidence)", "refactor(schemas)", "docs(reference)"],
+              "prompt": {
+                "path": "prompts/TASK-0436.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 210
+              }
+            }
+          ]
+        },
+        {
+          "id": "CTG-0433",
+          "title": "Export reconstructs intent policy",
+          "type": "coupled-triplet",
+          "records": ["ADR-REL-0031"],
+          "depends_on": [],
+          "lock_scopes": [
+            "packages/cli/vendor/evidence-verification/",
+            "law/policy/trusted-local-rc-verifier-package.json",
+            "docs/dev/operations/release-discipline.md"
+          ],
+          "gates": ["test:cli", "release:static-integrity"],
+          "tasks": [
+            {
+              "id": "TASK-0437",
+              "title": "Specify intent reconstruction and the verifier-source boundary",
+              "discipline": "architect",
+              "coupled_pipeline_position": "architect",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F1", "F5"],
+              "boundary": {
+                "paths": [
+                  "docs/dev/operations/release-discipline.md",
+                  "law/policy/trusted-local-rc-verifier-package.json"
+                ],
+                "forbidden": [".github/workflows/", "packages/", "tests/"]
+              },
+              "deliverables": [
+                "The release discipline page defines what the exporter reconstructs from a pinned intent (intent, policy, descriptor, toolchain, environment, base, candidate, stage), the rejection set, and the order in which the verifier source changes and is vendored with new provenance (#69)."
+              ],
+              "acceptance_commands": [
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "docs-links",
+                  "--format",
+                  "json"
+                ],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "schemas",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": ["docs(operations)", "law(release)"],
+              "prompt": {
+                "path": "prompts/TASK-0437.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "architect",
+                "effort": "high",
+                "time_budget_minutes": 60
+              }
+            },
+            {
+              "id": "TASK-0438",
+              "title": "Prove intent export and every rejection",
+              "discipline": "inspector",
+              "coupled_pipeline_position": "inspector",
+              "upstream_task_id": "TASK-0437",
+              "status": "planned",
+              "target_substrates": ["F3"],
+              "boundary": {
+                "paths": [
+                  "packages/cli/tests/unit/evidence-export-intent-receipt.test.ts",
+                  "tests/fixtures/export-intent/README.md",
+                  "packages/cli/vendor/evidence-verification/test/policy-builder.test.js",
+                  "packages/cli/vendor/evidence-verification/test/export.test.js"
+                ],
+                "forbidden": [
+                  "law/",
+                  "product/",
+                  ".github/workflows/",
+                  "packages/cli/src/",
+                  "packages/skills/src/",
+                  "packages/sensors/src/",
+                  "packages/loop/src/",
+                  "packages/evidence/src/"
+                ]
+              },
+              "deliverables": [
+                "The certify receipt of a release-intent run exports without a second RC execution; an altered intent, a wrong stage, a stale policy, a wrong base, and an incomplete population are each refused with their code; a path passed as a profile id is distinguished from an unknown id."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "packages/cli/tests/unit/evidence-export-intent-receipt.test.ts"
+                ]
+              ],
+              "commit_types": ["test(cli)", "test(fixtures)"],
+              "prompt": {
+                "path": "prompts/TASK-0438.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 90
+              }
+            },
+            {
+              "id": "TASK-0439",
+              "title": "Reconstruct the expected policy from the pinned intent and repin the verifier",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": "TASK-0438",
+              "status": "planned",
+              "target_substrates": ["F2", "F3"],
+              "boundary": {
+                "paths": [
+                  "packages/cli/vendor/evidence-verification/src/policy-builder.js",
+                  "packages/cli/vendor/evidence-verification/src/export-cli.js",
+                  "packages/cli/vendor/evidence-verification/provenance.json",
+                  "packages/cli/package.json",
+                  "docs/reference/error-codes.md",
+                  "packages/cli/vendor/evidence-verification/src/export.js"
+                ],
+                "forbidden": ["law/", "product/", ".github/workflows/"]
+              },
+              "deliverables": [
+                "policy-builder.js reconstructs the expected task policy from the pinned intent independently of the receipt's task set; export-cli distinguishes PROFILE_UNKNOWN cases; the vendored package is repinned with immutable provenance."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "packages/cli/tests/unit/evidence-export-intent-receipt.test.ts"
+                ],
+                ["pnpm", "run", "release:static-integrity"],
+                ["pnpm", "run", "test:cli"]
+              ],
+              "commit_types": ["fix(release)", "build(release)", "docs(reference)"],
+              "prompt": {
+                "path": "prompts/TASK-0439.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 180
+              }
+            }
+          ]
+        }
+      ],
+      "closure": null
+    },
+    {
+      "id": "R-0404",
+      "title": "CI sampling contract and the second scorecard",
+      "goal": "The harness sensors declare their population and read UNKNOWN below the minimum sample; a second scorecard is recorded beside the first once the sample matures and the delta is noted.",
+      "status": "planned",
+      "records": ["ADR-SCR-0010"],
+      "depends_on": ["R-0402", "R-0403"],
+      "attestation_reissue": false,
+      "owner_effects_required": [],
+      "close_checks": ["law:validate", "docs:validate", "test:sensors"],
+      "waves": [
+        {
+          "id": "CTG-0441",
+          "title": "CI sampling contract",
+          "type": "coupled-triplet",
+          "records": ["ADR-SCR-0010"],
+          "depends_on": [],
+          "lock_scopes": [
+            "law/schemas/sensor-inputs.schema.json",
+            ".devai/config/sensor-inputs.json",
+            "packages/sensors/src/harness-green-main.ts",
+            "packages/sensors/src/harness-performance.ts",
+            "packages/sensors/src/harness-robustness.ts",
+            "packages/cli/src/authority/broker.ts",
+            "law/policy/subprocess-effects.json"
+          ],
+          "gates": ["schemas", "test:sensors"],
+          "tasks": [
+            {
+              "id": "TASK-0441",
+              "title": "Declare the harness sensor population",
+              "discipline": "architect",
+              "coupled_pipeline_position": "architect",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F1", "F5"],
+              "boundary": {
+                "paths": [
+                  "law/schemas/sensor-inputs.schema.json",
+                  ".devai/config/sensor-inputs.json",
+                  "law/policy/adopter-defaults/sensor-inputs.json",
+                  "law/policy/sensor-notes/harness_green_main.md",
+                  "law/policy/sensor-notes/harness_performance.md",
+                  "law/policy/sensor-notes/harness_robustness.md",
+                  "docs/adopters/sensor-inputs.md",
+                  "law/policy/subprocess-effects.json",
+                  ".devai/config/subprocess-effects.json"
+                ],
+                "forbidden": [".github/workflows/", "packages/", "tests/"]
+              },
+              "deliverables": [
+                "The sensor inputs schema declares the population of the three harness sensors (workflow, event, head and base branch, attempts, cancelled runs, lookback, minimum sample, excluded workflow and job pairs) and DEVAI declares its own (#154)."
+              ],
+              "acceptance_commands": [
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "schemas",
+                  "--format",
+                  "json"
+                ],
+                ["node", "scripts/check-policy-materialization.mjs"],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "docs-links",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": ["law(sensors)", "docs(adopters)"],
+              "prompt": {
+                "path": "prompts/TASK-0441.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "architect",
+                "effort": "high",
+                "time_budget_minutes": 60
+              }
+            },
+            {
+              "id": "TASK-0442",
+              "title": "Prove population filtering and the insufficient-sample reading",
+              "discipline": "inspector",
+              "coupled_pipeline_position": "inspector",
+              "upstream_task_id": "TASK-0441",
+              "status": "planned",
+              "target_substrates": ["F3"],
+              "boundary": {
+                "paths": [
+                  "packages/sensors/tests/harness-sampling.test.ts",
+                  "tests/contract/sensor-inputs.contract.test.ts"
+                ],
+                "forbidden": [
+                  "law/",
+                  "product/",
+                  ".github/workflows/",
+                  "packages/cli/src/",
+                  "packages/skills/src/",
+                  "packages/sensors/src/",
+                  "packages/loop/src/",
+                  "packages/evidence/src/"
+                ]
+              },
+              "deliverables": [
+                "Runs outside the declared workflow, event, or branch are excluded; excluded workflow and job pairs never count; fewer runs than the minimum read UNKNOWN with the sample size in the finding, never FAIL."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "packages/sensors/tests/harness-sampling.test.ts",
+                  "tests/contract/sensor-inputs.contract.test.ts"
+                ]
+              ],
+              "commit_types": ["test(sensors)"],
+              "prompt": {
+                "path": "prompts/TASK-0442.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker",
+                "effort": "high",
+                "time_budget_minutes": 90
+              }
+            },
+            {
+              "id": "TASK-0443",
+              "title": "Sample the declared population in the harness sensors",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": "TASK-0442",
+              "status": "planned",
+              "target_substrates": ["F2", "F3"],
+              "boundary": {
+                "paths": [
+                  "packages/sensors/src/harness-green-main.ts",
+                  "packages/sensors/src/harness-performance.ts",
+                  "packages/sensors/src/harness-robustness.ts",
+                  "packages/sensors/src/harness/gh-api.ts",
+                  "packages/cli/src/commands/sense/adapters.ts",
+                  "packages/cli/src/authority/broker.ts"
+                ],
+                "forbidden": ["law/", "product/", ".github/workflows/"]
+              },
+              "deliverables": [
+                "The three sensors read the declared population through the admitted gh run list shape, exclude the declared pairs, and read UNKNOWN below the minimum sample."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "packages/sensors/tests/harness-sampling.test.ts",
+                  "tests/contract/sensor-inputs.contract.test.ts"
+                ],
+                ["pnpm", "run", "test:sensors"]
+              ],
+              "commit_types": ["feat(sensors)"],
+              "prompt": {
+                "path": "prompts/TASK-0443.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker",
+                "effort": "high",
+                "time_budget_minutes": 120
+              }
+            }
+          ]
+        },
+        {
+          "id": "CTG-0442",
+          "title": "Second scorecard",
+          "type": "single-role",
+          "records": ["ADR-SCR-0010"],
+          "depends_on": ["CTG-0441"],
+          "lock_scopes": [
+            ".devai/state/sensor-readings/",
+            "record/proofs/compliance/scorecards/",
+            "docs/dev/operations/trustworthy-observations-campaign/README.md"
+          ],
+          "gates": ["docs-links"],
+          "tasks": [
+            {
+              "id": "TASK-0444",
+              "title": "Record the second scorecard and note the delta",
+              "discipline": "inspector",
+              "coupled_pipeline_position": "inspector",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F4", "F5"],
+              "boundary": {
+                "paths": [
+                  ".devai/state/sensor-readings/",
+                  "record/proofs/compliance/scorecards/",
+                  "record/proofs/chain.json",
+                  "docs/dev/operations/trustworthy-observations-campaign/README.md"
+                ],
+                "forbidden": [".github/workflows/", "packages/", "law/"]
+              },
+              "deliverables": [
+                "With at least the declared minimum sample on main, the ordered protocol of ADR-SCR-0008 is run, the observation is recorded at the merged head, the scorecard is copied beside SC-20260927T205906-001, and the campaign guide notes the per-cell delta (#154)."
+              ],
+              "acceptance_commands": [
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "audit",
+                  "scorecard",
+                  "--repo-root",
+                  ".",
+                  "--at",
+                  "HEAD_SHA",
+                  "--format",
+                  "human"
+                ],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "docs-links",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": ["plan(scorecard)", "docs(dev)"],
+              "prompt": {
+                "path": "prompts/TASK-0444.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 120
+              }
+            }
+          ]
+        }
+      ],
+      "closure": null
+    }
+  ]
+}

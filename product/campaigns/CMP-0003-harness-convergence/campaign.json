@@ -1,0 +1,1977 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "CMP-0003",
+  "title": "Harness convergence",
+  "type": "campaign",
+  "status": "proposed",
+  "date": "2026-09-28",
+  "authority": "Architect",
+  "mandate": {
+    "kind": "maintainer-decision",
+    "ref": "docs/dev/operations/harness-convergence-proposals.md"
+  },
+  "goal": "Make the development flow trustworthy: a planning lane that validates plans without building the product, serialized integration through the merge queue, model review contracts with schema-validated replies, versioned model defaults, canonical host instructions with generated skill projections, owned configuration projection, non-recursive authorization maintenance, a consolidated release approval topology with resumable site publication, and one reference page per admitted workflow (maintainer brainstorm of 2026-09-28, reconciled with the independent Codex review).",
+  "records": [
+    "ADR-CHK-0003",
+    "ADR-CFG-0002",
+    "ADR-GOV-0020",
+    "ADR-GOV-0022",
+    "ADR-CHK-0004",
+    "ADR-GOV-0023",
+    "ADR-MDL-0002",
+    "ADR-MDL-0001",
+    "ADR-REL-0030",
+    "ADR-REL-0032",
+    "ADR-GOV-0021"
+  ],
+  "constraints": {
+    "self_dogfood": true,
+    "human_invoked_only": true,
+    "one_role_per_session": true,
+    "remote_effects": "forbidden"
+  },
+  "owner_effects": [
+    {
+      "id": "OE-01",
+      "description": "Verify that the merge queue supports the rebase method with linear history and the required devai-release-gate check, then enable it on main; allow_update_branch is optional. If the queue is incompatible, record the serialized-admission fallback instead.",
+      "required_before": "R-0304",
+      "performed_at": null
+    },
+    {
+      "id": "OE-02",
+      "description": "Reconfigure the release environments from the before/after matrix of ADR-REL-0030: one reviewer stop each on devai-ledger-verification, devai-rc-release, and devai-rc-publication; no reviewer on github-pages, which keeps its variables.",
+      "required_before": "R-0306",
+      "performed_at": null
+    },
+    {
+      "id": "OE-03",
+      "description": "Repoint DEVAI_PROCESS_CONTROL_COMMIT to an explicit reviewed SHA before the next rehearsal, and again after R-0306 lands (#162 item 2).",
+      "required_before": "R-0306",
+      "performed_at": null
+    },
+    {
+      "id": "OE-04",
+      "description": "Reissue the Pages migration audit (DEVAI_PAGES_MIGRATION_AUDIT_JSON and its SHA-256 in the github-pages environment) for the next tag (#162 item 3).",
+      "required_before": "R-0306",
+      "performed_at": null
+    },
+    {
+      "id": "OE-05",
+      "description": "Supply one rejected PASS review reply from an orchestrator session as the first fixture of ADR-MDL-0001.",
+      "required_before": "R-0305",
+      "performed_at": null
+    },
+    {
+      "id": "OE-06",
+      "description": "Raise every maintainer host to a Claude Code release that reads AGENTS.md natively (documented as 2.1.277 or later); precondition for the later record that removes CLAUDE.md, not for this campaign.",
+      "required_before": "R-0307",
+      "performed_at": null
+    }
+  ],
+  "prompts": {
+    "preamble": "prompts/preamble.md"
+  },
+  "models": {
+    "schemaVersion": "1.0.0",
+    "hosts": ["claude", "codex"],
+    "tiers": {
+      "architect": {
+        "rank": 1,
+        "claude": "Fable 5.1",
+        "codex": "Astra 6",
+        "default_effort": "high",
+        "use_for": "orchestration, contracts, schemas, policy, decision records"
+      },
+      "worker-high": {
+        "rank": 2,
+        "claude": "Opus 5.5",
+        "codex": "Sol 6",
+        "default_effort": "high",
+        "use_for": "implementation across several modules, broker, sensor, and evidence changes, tests of runtime semantics"
+      },
+      "worker": {
+        "rank": 3,
+        "claude": "Sonnet 5",
+        "codex": "Sol 6",
+        "default_effort": "medium",
+        "use_for": "bounded tests, documentation, single-module changes"
+      },
+      "clerk": {
+        "rank": 4,
+        "claude": "Haiku 4.5",
+        "codex": "Luna 6",
+        "default_effort": "low",
+        "use_for": "mechanical edits, regeneration, mirrors, formatting"
+      }
+    },
+    "escalation": {
+      "trigger": "one failed iteration, a blocked report, or a time budget exceeded without a pull request",
+      "step": "one-rank-up",
+      "ceiling": "architect",
+      "authority": "orchestrator"
+    }
+  },
+  "rounds": [
+    {
+      "id": "R-0301",
+      "title": "Planning lane and semantic validation",
+      "goal": "A pull request whose changed paths all classify as plan executes the planning lane (preflight, plan:validate with the campaign and scorecard-page checks, format, schema members) with the bootstrap restored from cache; docs:validate runs every docs-class member; the campaign policy is accepted and the campaign checker enforces Owner-effect closure.",
+      "status": "planned",
+      "records": ["ADR-CHK-0003"],
+      "depends_on": [],
+      "attestation_reissue": true,
+      "owner_effects_required": [],
+      "close_checks": ["law:validate", "docs:validate", "test:cli"],
+      "waves": [
+        {
+          "id": "CTG-0311",
+          "title": "Planning lane, campaign check, docs governance",
+          "type": "coupled-triplet",
+          "records": ["ADR-CHK-0003"],
+          "depends_on": [],
+          "lock_scopes": [
+            "test-tasks.json",
+            ".github/workflows/pull-request-checks.yml",
+            "scripts/check-campaign.mjs",
+            "packages/cli/src/services/check-runner/",
+            "law/policy/campaign-execution.json",
+            ".devai/config/project.json"
+          ],
+          "gates": ["schemas", "test:cli", "test:root"],
+          "tasks": [
+            {
+              "id": "TASK-0311",
+              "title": "Accept the campaign policy, bind work/, declare the repository kind and builder",
+              "discipline": "architect",
+              "coupled_pipeline_position": "architect",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F1", "F5"],
+              "boundary": {
+                "paths": [
+                  "law/policy/campaign-execution.json",
+                  "law/policy/adopter-defaults/change-taxonomy-binding.json",
+                  ".devai/config/change-taxonomy-binding.json",
+                  ".devai/config/project.json",
+                  "docs/dev/operations/workflow-economy-proposals.md",
+                  "docs/adopters/docs-layout.md"
+                ],
+                "forbidden": [".github/workflows/", "packages/", "tests/"]
+              },
+              "deliverables": [
+                "campaign-execution.json carries status accepted and a gates.round_close entry requiring every Owner effect in owner_effects_required to carry performed_at.",
+                "work/ is bound to the plan class in both the adopter default and the materialized binding.",
+                "project.json declares repo.kind library and docs.builder docusaurus, following docs/adopters/docs-layout.md, whose publication-boundary section now says publication goes only through the governed Pages journal (#166, #167).",
+                "workflow-economy-proposals.md is annotated as delivered with a one-paragraph residue pointing at ADR-CHK-0003."
+              ],
+              "acceptance_commands": [
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "schemas",
+                  "--format",
+                  "json"
+                ],
+                ["node", "scripts/check-policy-materialization.mjs"],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "docs-links",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": [
+                "law(campaign)",
+                "law(taxonomy)",
+                "law(config)",
+                "docs(operations)",
+                "docs(adopters)"
+              ],
+              "prompt": {
+                "path": "prompts/TASK-0311.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "architect",
+                "effort": "high",
+                "time_budget_minutes": 90
+              }
+            },
+            {
+              "id": "TASK-0312",
+              "title": "Prove lane selection, the campaign and scorecard-page members, and Owner-effect closure",
+              "discipline": "inspector",
+              "coupled_pipeline_position": "inspector",
+              "upstream_task_id": "TASK-0311",
+              "status": "planned",
+              "target_substrates": ["F3"],
+              "boundary": {
+                "paths": [
+                  "packages/cli/tests/unit/check-runner-planning-lane.test.ts",
+                  "tests/contract/campaign-plan.contract.test.ts",
+                  "tests/contract/pull-request-workflow.contract.test.ts",
+                  "packages/cli/tests/unit/docs-governance-framework-repository.test.ts"
+                ],
+                "forbidden": [
+                  "law/",
+                  "product/",
+                  ".github/workflows/",
+                  "packages/cli/src/",
+                  "packages/skills/src/",
+                  "packages/sensors/src/",
+                  "packages/loop/src/",
+                  "packages/evidence/src/"
+                ]
+              },
+              "deliverables": [
+                "A fixture diff of one prompt and the ledger selects exactly preflight, plan:validate, format, and the schema members; a fixture that adds a package source selects the affected profile.",
+                "check-campaign refuses a closed round whose required Owner effect has no performed_at, and refuses a campaign whose prompt acceptance block drifts from the ledger.",
+                "The workflow-shape contract pins the bootstrap cache step and the single affected invocation; docs-governance passes on the framework checkout."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "packages/cli/tests/unit/check-runner-planning-lane.test.ts",
+                  "packages/cli/tests/unit/docs-governance-framework-repository.test.ts",
+                  "tests/contract/campaign-plan.contract.test.ts",
+                  "tests/contract/pull-request-workflow.contract.test.ts"
+                ]
+              ],
+              "commit_types": ["test(cli)", "test(workflows)", "test(campaign)"],
+              "prompt": {
+                "path": "prompts/TASK-0312.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 90
+              }
+            },
+            {
+              "id": "TASK-0313",
+              "title": "Select the planning lane by class, add the campaign and scorecard-page members, cache the bootstrap",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": "TASK-0312",
+              "status": "planned",
+              "target_substrates": ["F2", "F3"],
+              "boundary": {
+                "paths": [
+                  "test-tasks.json",
+                  "packages/cli/src/services/check-runner/policy.ts",
+                  "packages/cli/src/services/check-runner/policy-descriptor.ts",
+                  "packages/cli/src/commands/check/adapters.ts",
+                  "scripts/check-campaign.mjs",
+                  "scripts/run-pr-release-gate.mjs",
+                  ".github/workflows/pull-request-checks.yml",
+                  "packages/cli/src/commands/check/docs-governance-publish-checks.ts",
+                  "docs/reference/cli/check-suites.md",
+                  "docs/dev/operations/remote-preflight-contract.md"
+                ],
+                "forbidden": ["law/", "product/", ".github/workflows/"]
+              },
+              "deliverables": [
+                "test-tasks.json uses kind class selectors so a plan-only diff selects no node that depends on build; plan:validate runs journeys, the campaign check, and the scorecard-page check; docs:validate runs every docs-class member.",
+                "The workflow restores .devai/state/pr-bootstrap from a cache keyed by the digest of the TypeScript inputs and no longer invokes check --affected after release:pr-gate.",
+                "check-campaign enforces Owner-effect closure; the no-ci-publish rule text names the governed Pages journal."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "packages/cli/tests/unit/check-runner-planning-lane.test.ts",
+                  "packages/cli/tests/unit/docs-governance-framework-repository.test.ts",
+                  "tests/contract/campaign-plan.contract.test.ts",
+                  "tests/contract/pull-request-workflow.contract.test.ts"
+                ],
+                ["pnpm", "run", "test:cli"],
+                ["pnpm", "run", "campaign:check"],
+                ["node", "scripts/check-workflows.mjs"]
+              ],
+              "commit_types": [
+                "feat(check)",
+                "refactor(check)",
+                "ci(workflows)",
+                "ci(scripts)",
+                "fix(docs-governance)",
+                "docs(reference)",
+                "docs(operations)"
+              ],
+              "prompt": {
+                "path": "prompts/TASK-0313.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 180
+              }
+            }
+          ]
+        }
+      ],
+      "closure": null
+    },
+    {
+      "id": "R-0302",
+      "title": "Owned configuration and host projections",
+      "goal": "init bind projects the blocks it owns authoritatively with atomic receipts; AGENTS.md is the canonical instruction contract with CLAUDE.md as its import; adopter guidance survives --force; recipes keep one source with generated projections and converged front matter.",
+      "status": "planned",
+      "records": ["ADR-CFG-0002", "ADR-GOV-0020"],
+      "depends_on": ["R-0301"],
+      "attestation_reissue": false,
+      "owner_effects_required": [],
+      "close_checks": ["law:validate", "docs:validate", "test:cli", "test:skills"],
+      "waves": [
+        {
+          "id": "CTG-0321",
+          "title": "Owned configuration projection",
+          "type": "coupled-triplet",
+          "records": ["ADR-CFG-0002"],
+          "depends_on": [],
+          "lock_scopes": [
+            "packages/cli/src/services/",
+            "packages/cli/src/commands/init/",
+            "packages/skills/src/bootstrap/",
+            ".devai/config/adopter-policy-binding.json",
+            "docs/adopters/install.md"
+          ],
+          "gates": ["test:cli", "test:skills", "docs-links"],
+          "tasks": [
+            {
+              "id": "TASK-0321",
+              "title": "Document the ownership matrix and the retirement contract for projected configuration",
+              "discipline": "architect",
+              "coupled_pipeline_position": "architect",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F1", "F5"],
+              "boundary": {
+                "paths": ["docs/adopters/install.md", "docs/adopters/ci-economy.md"],
+                "forbidden": [".github/workflows/", "packages/", "tests/"]
+              },
+              "deliverables": [
+                "The adopter install page carries the ownership matrix as a table: every project.json key and nested block that init bind --adopter-policy owns, with absent-means-retired semantics for owned keys only, atomic receipts, and the retirement report (#68); the ci-economy page shows retiring ci_economy as the worked example."
+              ],
+              "acceptance_commands": [
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "docs-links",
+                  "--format",
+                  "json"
+                ],
+                ["pnpm", "run", "format:check:all"]
+              ],
+              "commit_types": ["docs(adopters)"],
+              "prompt": {
+                "path": "prompts/TASK-0321.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "architect",
+                "effort": "high",
+                "time_budget_minutes": 60
+              }
+            },
+            {
+              "id": "TASK-0322",
+              "title": "Prove retirement, atomic receipts, and idempotent binding",
+              "discipline": "inspector",
+              "coupled_pipeline_position": "inspector",
+              "upstream_task_id": "TASK-0321",
+              "status": "planned",
+              "target_substrates": ["F3"],
+              "boundary": {
+                "paths": [
+                  "packages/cli/tests/unit/adopter-policy-retirement.test.ts",
+                  "packages/cli/tests/unit/adopter-policy-binding-atomicity.test.ts",
+                  "packages/skills/tests/unit/bootstrap-reconcile-ownership.test.ts",
+                  "packages/cli/tests/unit/adopter-policy-ci-economy-boundary.test.ts",
+                  "packages/cli/tests/unit/adopter-policy-materialization-depth.test.ts"
+                ],
+                "forbidden": [
+                  "law/",
+                  "product/",
+                  ".github/workflows/",
+                  "packages/cli/src/",
+                  "packages/skills/src/",
+                  "packages/sensors/src/",
+                  "packages/loop/src/",
+                  "packages/evidence/src/"
+                ]
+              },
+              "deliverables": [
+                "Retiring ci_economy from the adopter policy and rebinding leaves no ci_economy block, lists it in the receipt, and a second bind changes nothing.",
+                "An adopter declaration outside the matrix survives; a receipt whose digest no longer matches the file is refused; the stale scorecard-na digest reproduction fails before the fix."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "packages/cli/tests/unit/adopter-policy-retirement.test.ts",
+                  "packages/cli/tests/unit/adopter-policy-binding-atomicity.test.ts",
+                  "packages/skills/tests/unit/bootstrap-reconcile-ownership.test.ts"
+                ]
+              ],
+              "commit_types": ["test(cli)", "test(skills)"],
+              "prompt": {
+                "path": "prompts/TASK-0322.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 90
+              }
+            },
+            {
+              "id": "TASK-0323",
+              "title": "Project owned keys authoritatively and rematerialize the framework binding",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": "TASK-0322",
+              "status": "planned",
+              "target_substrates": ["F2", "F3"],
+              "boundary": {
+                "paths": [
+                  "packages/cli/src/services/adopter-policy.ts",
+                  "packages/cli/src/services/adopter-policy-ownership.ts",
+                  "packages/cli/src/services/adopter-policy-binding.ts",
+                  "packages/skills/src/bootstrap/index.ts",
+                  "packages/cli/src/commands/init/bind-package.ts",
+                  "packages/cli/src/commands/init/bind-adapters.ts",
+                  ".devai/config/adopter-policy-binding.json",
+                  "docs/reference/error-codes.md"
+                ],
+                "forbidden": ["law/", "product/", ".github/workflows/"]
+              },
+              "deliverables": [
+                "adopter-policy.ts replaces owned keys from the ownership matrix and preserves the rest; the receipt lists retired keys and is written atomically with the projection.",
+                "The framework binding is rematerialized so the scorecard-na.json digest matches the file (#162 item 4)."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "packages/cli/tests/unit/adopter-policy-retirement.test.ts",
+                  "packages/cli/tests/unit/adopter-policy-binding-atomicity.test.ts",
+                  "packages/skills/tests/unit/bootstrap-reconcile-ownership.test.ts"
+                ],
+                ["pnpm", "run", "test:cli"],
+                ["node", "scripts/check-policy-materialization.mjs"]
+              ],
+              "commit_types": ["fix(init)", "refactor(init)", "law(config)", "docs(reference)"],
+              "prompt": {
+                "path": "prompts/TASK-0323.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 150
+              }
+            }
+          ]
+        },
+        {
+          "id": "CTG-0322",
+          "title": "Canonical instructions and host projections",
+          "type": "coupled-triplet",
+          "records": ["ADR-GOV-0020"],
+          "depends_on": ["CTG-0321"],
+          "lock_scopes": [
+            "CLAUDE.md",
+            "packages/skills/src/bootstrap/",
+            "packages/skills/src/recipes/",
+            "packages/skills/resources/recipes/",
+            "packages/cli/src/commands/doctor-environment-checks.ts",
+            "AGENTS.md"
+          ],
+          "gates": ["test:skills", "test:cli", "docs-links"],
+          "tasks": [
+            {
+              "id": "TASK-0324",
+              "title": "Make CLAUDE.md the AGENTS.md import and converge the recipe front matter contract",
+              "discipline": "architect",
+              "coupled_pipeline_position": "architect",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F1", "F5"],
+              "boundary": {
+                "paths": [
+                  "CLAUDE.md",
+                  "docs/adopters/install.md",
+                  "docs/reference/recipes/README.md",
+                  "packages/skills/resources/recipes/devai-round/SKILL.md",
+                  "packages/skills/resources/recipes/devai-verify/SKILL.md",
+                  "packages/skills/resources/recipes/devai-triage/SKILL.md",
+                  "packages/skills/resources/recipes/devai-audit/SKILL.md",
+                  "packages/skills/resources/recipes/devai-release/SKILL.md",
+                  "packages/skills/resources/recipes/devai-init/SKILL.md",
+                  "packages/skills/resources/recipes/devai-sense/SKILL.md",
+                  "AGENTS.md"
+                ],
+                "forbidden": [".github/workflows/", "packages/", "tests/"]
+              },
+              "deliverables": [
+                "CLAUDE.md contains exactly the line @AGENTS.md; the install page explains the import, the version floor, and the guidance-preservation rule of --force (#70).",
+                "Every recipe SKILL.md carries the Agent Skills core front matter (name equal to the directory, description, license, compatibility, metadata) and no invocation glyph in its body; the recipes README states the generated-projection model."
+              ],
+              "acceptance_commands": [
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "docs-links",
+                  "--format",
+                  "json"
+                ],
+                ["pnpm", "run", "format:check:all"]
+              ],
+              "commit_types": [
+                "docs(agents)",
+                "docs(adopters)",
+                "docs(reference)",
+                "docs(recipes)"
+              ],
+              "prompt": {
+                "path": "prompts/TASK-0324.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "architect",
+                "effort": "high",
+                "time_budget_minutes": 90
+              }
+            },
+            {
+              "id": "TASK-0325",
+              "title": "Prove guidance preservation, the import check, and identical projections",
+              "discipline": "inspector",
+              "coupled_pipeline_position": "inspector",
+              "upstream_task_id": "TASK-0324",
+              "status": "planned",
+              "target_substrates": ["F3"],
+              "boundary": {
+                "paths": [
+                  "packages/skills/tests/unit/bootstrap-guidance-preservation.test.ts",
+                  "packages/skills/tests/unit/bootstrap-runtime-boundaries.test.ts",
+                  "packages/cli/tests/unit/doctor-agents-claude-import.test.ts",
+                  "packages/skills/tests/recipes/adapters.test.ts",
+                  "packages/skills/tests/recipes/front-matter.test.ts",
+                  "packages/skills/tests/unit/bootstrap.test.ts",
+                  "packages/skills/tests/unit/adopter-bootstrap-contract.test.ts"
+                ],
+                "forbidden": [
+                  "law/",
+                  "product/",
+                  ".github/workflows/",
+                  "packages/cli/src/",
+                  "packages/skills/src/",
+                  "packages/sensors/src/",
+                  "packages/loop/src/",
+                  "packages/evidence/src/"
+                ]
+              },
+              "deliverables": [
+                "init apply --force on a fixture with edited AGENTS.md, CLAUDE.md, and law README files leaves them untouched and reports replace for every other existing file it overwrites.",
+                "The doctor check passes when CLAUDE.md is the import and AGENTS.md carries the required content, and passes on this checkout; both host projections carry identical bodies and core front matter."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "packages/skills/tests/unit/bootstrap-guidance-preservation.test.ts",
+                  "packages/skills/tests/unit/bootstrap-runtime-boundaries.test.ts",
+                  "packages/cli/tests/unit/doctor-agents-claude-import.test.ts",
+                  "packages/skills/tests/recipes/adapters.test.ts",
+                  "packages/skills/tests/recipes/front-matter.test.ts"
+                ]
+              ],
+              "commit_types": ["test(skills)", "test(cli)"],
+              "prompt": {
+                "path": "prompts/TASK-0325.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 90
+              }
+            },
+            {
+              "id": "TASK-0326",
+              "title": "Preserve guidance under --force, check the import in doctor, validate the converged front matter",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": "TASK-0325",
+              "status": "planned",
+              "target_substrates": ["F2", "F3"],
+              "boundary": {
+                "paths": [
+                  "packages/skills/src/bootstrap/index.ts",
+                  "packages/cli/src/commands/init/apply.ts",
+                  "packages/cli/src/commands/doctor-environment-checks.ts",
+                  "packages/cli/src/commands/doctor-support.ts",
+                  "packages/skills/src/recipes/loader.ts",
+                  "packages/skills/src/recipes/adapters.ts",
+                  "docs/reference/error-codes.md"
+                ],
+                "forbidden": ["law/", "product/", ".github/workflows/"]
+              },
+              "deliverables": [
+                "The bootstrap writes AGENTS.md and the one-line CLAUDE.md, plans replace for existing files it will overwrite, and never overwrites adopter guidance under --force.",
+                "doctor verifies the import form and the AGENTS.md content; the recipe loader validates the core front matter and refuses an invocation glyph in a body."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "packages/skills/tests/unit/bootstrap-guidance-preservation.test.ts",
+                  "packages/skills/tests/unit/bootstrap-runtime-boundaries.test.ts",
+                  "packages/cli/tests/unit/doctor-agents-claude-import.test.ts",
+                  "packages/skills/tests/recipes/adapters.test.ts",
+                  "packages/skills/tests/recipes/front-matter.test.ts"
+                ],
+                ["pnpm", "run", "test:skills"],
+                ["pnpm", "run", "test:cli"]
+              ],
+              "commit_types": ["fix(init)", "feat(doctor)", "refactor(recipes)", "docs(reference)"],
+              "prompt": {
+                "path": "prompts/TASK-0326.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 150
+              }
+            }
+          ]
+        }
+      ],
+      "closure": null
+    },
+    {
+      "id": "R-0303",
+      "title": "Authorization registry maintenance",
+      "goal": "Recording a forbidden-action authorization receipt is registry maintenance, not a finding, in every inspection the scanner performs; everything else the registry protects stays protected.",
+      "status": "planned",
+      "records": ["ADR-GOV-0022"],
+      "depends_on": ["R-0301"],
+      "attestation_reissue": false,
+      "owner_effects_required": [],
+      "close_checks": ["law:validate", "test:skills"],
+      "waves": [
+        {
+          "id": "CTG-0331",
+          "title": "Registry maintenance without recursive findings",
+          "type": "coupled-triplet",
+          "records": ["ADR-GOV-0022"],
+          "depends_on": [],
+          "lock_scopes": [
+            "law/policy/forbidden-actions.json",
+            ".devai/config/forbidden-actions.json",
+            "packages/skills/src/forbidden-actions/"
+          ],
+          "gates": ["schemas", "forbidden-actions", "test:skills"],
+          "tasks": [
+            {
+              "id": "TASK-0331",
+              "title": "Declare registry maintenance in the forbidden-actions policy",
+              "discipline": "architect",
+              "coupled_pipeline_position": "architect",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F1", "F5"],
+              "boundary": {
+                "paths": [
+                  "law/policy/forbidden-actions.json",
+                  ".devai/config/forbidden-actions.json",
+                  "law/schemas/forbidden-actions.schema.json",
+                  "docs/adopters/install.md"
+                ],
+                "forbidden": [".github/workflows/", "packages/", "tests/"]
+              },
+              "deliverables": [
+                "The policy declares the authorization registry path as maintenance-exempt from FORBID-MUTATE-INVARIANTS when the change is append-only and schema-valid, and the mirror matches byte for byte.",
+                "The adopter page explains how to record receipts without --no-verify (#67)."
+              ],
+              "acceptance_commands": [
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "schemas",
+                  "--format",
+                  "json"
+                ],
+                ["node", "scripts/check-policy-materialization.mjs"],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "docs-links",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": ["law(forbidden-actions)", "docs(adopters)"],
+              "prompt": {
+                "path": "prompts/TASK-0331.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "architect",
+                "effort": "high",
+                "time_budget_minutes": 90
+              }
+            },
+            {
+              "id": "TASK-0332",
+              "title": "Prove the append-only exemption and every remaining finding",
+              "discipline": "inspector",
+              "coupled_pipeline_position": "inspector",
+              "upstream_task_id": "TASK-0331",
+              "status": "planned",
+              "target_substrates": ["F3"],
+              "boundary": {
+                "paths": [
+                  "packages/skills/tests/unit/forbidden-actions-registry-maintenance.test.ts",
+                  "packages/skills/tests/unit/forbidden-actions.test.ts",
+                  "packages/skills/tests/unit/forbidden-registry-boundaries.test.ts",
+                  "packages/skills/tests/unit/forbidden-authorization-boundaries.test.ts",
+                  "packages/skills/tests/unit/forbidden-git-paths.test.ts"
+                ],
+                "forbidden": [
+                  "law/",
+                  "product/",
+                  ".github/workflows/",
+                  "packages/cli/src/",
+                  "packages/skills/src/",
+                  "packages/sensors/src/",
+                  "packages/loop/src/",
+                  "packages/evidence/src/"
+                ]
+              },
+              "deliverables": [
+                "Eight receipts recorded in one commit yield zero findings with --strict; a commit that deletes or alters a receipt, or touches another law path with the registry, yields a finding; a schema-invalid registry yields a finding."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "packages/skills/tests/unit/forbidden-actions-registry-maintenance.test.ts",
+                  "packages/skills/tests/unit/forbidden-actions.test.ts"
+                ]
+              ],
+              "commit_types": ["test(skills)"],
+              "prompt": {
+                "path": "prompts/TASK-0332.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker",
+                "effort": "high",
+                "time_budget_minutes": 90
+              }
+            },
+            {
+              "id": "TASK-0333",
+              "title": "Exempt validated registry maintenance in every scanner pass",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": "TASK-0332",
+              "status": "planned",
+              "target_substrates": ["F2", "F3"],
+              "boundary": {
+                "paths": [
+                  "packages/skills/src/forbidden-actions/scan.ts",
+                  "packages/skills/src/forbidden-actions/authorizations.ts",
+                  "docs/reference/error-codes.md"
+                ],
+                "forbidden": ["law/", "product/", ".github/workflows/"]
+              },
+              "deliverables": [
+                "The name-status pass and the patch pass both treat a schema-valid append-only registry change as maintenance; every other pattern and path keeps its finding."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "packages/skills/tests/unit/forbidden-actions-registry-maintenance.test.ts",
+                  "packages/skills/tests/unit/forbidden-actions.test.ts"
+                ],
+                ["pnpm", "run", "test:skills"],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "forbidden-actions",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": ["fix(forbidden-actions)", "docs(reference)"],
+              "prompt": {
+                "path": "prompts/TASK-0333.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker",
+                "effort": "high",
+                "time_budget_minutes": 120
+              }
+            }
+          ]
+        }
+      ],
+      "closure": null
+    },
+    {
+      "id": "R-0304",
+      "title": "Serialized integration",
+      "goal": "The pull-request gate runs under merge_group with the queue's base and head, admission and eviction are documented, and the merge queue or the serialized fallback is the mechanism that keeps pull requests from invalidating each other.",
+      "status": "planned",
+      "records": ["ADR-CHK-0004"],
+      "depends_on": ["R-0301"],
+      "attestation_reissue": false,
+      "owner_effects_required": ["OE-01"],
+      "close_checks": ["law:validate", "docs:validate", "test:cli"],
+      "waves": [
+        {
+          "id": "CTG-0341",
+          "title": "Queue admission and the merge_group gate",
+          "type": "coupled-triplet",
+          "records": ["ADR-CHK-0004"],
+          "depends_on": [],
+          "lock_scopes": [
+            ".github/workflows/pull-request-checks.yml",
+            "scripts/check-workflows.mjs",
+            "packages/cli/src/services/check-runner/preflight.ts",
+            "docs/dev/operations/remote-preflight-contract.md",
+            "scripts/run-pr-release-gate.mjs",
+            "law/policy/campaign-execution.json"
+          ],
+          "gates": ["test:cli", "test:root"],
+          "tasks": [
+            {
+              "id": "TASK-0341",
+              "title": "Write the queue admission contract and the fallback rule",
+              "discipline": "architect",
+              "coupled_pipeline_position": "architect",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F1", "F5"],
+              "boundary": {
+                "paths": [
+                  "docs/dev/operations/remote-preflight-contract.md",
+                  ".devai/config/preflight-probes.json",
+                  "law/policy/adopter-defaults/preflight-probes.json",
+                  "law/policy/campaign-execution.json"
+                ],
+                "forbidden": [".github/workflows/", "packages/", "tests/"]
+              },
+              "deliverables": [
+                "The remote preflight contract states the two boundaries, the admission rule, the eviction rule, the rebase-method prerequisite, and the serialized-admission fallback the maintainer accepted.",
+                "The base-up-to-date probe declaration names the merge_group base as an admitted base source."
+              ],
+              "acceptance_commands": [
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "docs-links",
+                  "--format",
+                  "json"
+                ],
+                ["node", "scripts/check-policy-materialization.mjs"]
+              ],
+              "commit_types": ["docs(operations)", "law(preflight)"],
+              "prompt": {
+                "path": "prompts/TASK-0341.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "architect",
+                "effort": "high",
+                "time_budget_minutes": 60
+              }
+            },
+            {
+              "id": "TASK-0342",
+              "title": "Pin the merge_group trigger, base resolution, and eviction semantics",
+              "discipline": "inspector",
+              "coupled_pipeline_position": "inspector",
+              "upstream_task_id": "TASK-0341",
+              "status": "planned",
+              "target_substrates": ["F3"],
+              "boundary": {
+                "paths": [
+                  "tests/contract/pull-request-workflow.contract.test.ts",
+                  "packages/cli/tests/unit/preflight-merge-group-base.test.ts"
+                ],
+                "forbidden": [
+                  "law/",
+                  "product/",
+                  ".github/workflows/",
+                  "packages/cli/src/",
+                  "packages/skills/src/",
+                  "packages/sensors/src/",
+                  "packages/loop/src/",
+                  "packages/evidence/src/"
+                ]
+              },
+              "deliverables": [
+                "The workflow-shape contract requires both triggers, the merge_group base expression, identical check names, and per-entry concurrency; the preflight resolves a merge_group base and refuses a base that is not an ancestor of the queue head."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "tests/contract/pull-request-workflow.contract.test.ts",
+                  "packages/cli/tests/unit/preflight-merge-group-base.test.ts"
+                ]
+              ],
+              "commit_types": ["test(workflows)", "test(cli)"],
+              "prompt": {
+                "path": "prompts/TASK-0342.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker",
+                "effort": "high",
+                "time_budget_minutes": 90
+              }
+            },
+            {
+              "id": "TASK-0343",
+              "title": "Run the gate under merge_group and resolve the queue base",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": "TASK-0342",
+              "status": "planned",
+              "target_substrates": ["F2", "F3"],
+              "boundary": {
+                "paths": [
+                  ".github/workflows/pull-request-checks.yml",
+                  "scripts/check-workflows.mjs",
+                  "packages/cli/src/services/check-runner/preflight.ts",
+                  "docs/reference/error-codes.md",
+                  "scripts/run-pr-release-gate.mjs"
+                ],
+                "forbidden": ["law/", "product/", ".github/workflows/"]
+              },
+              "deliverables": [
+                "pull-request-checks.yml accepts merge_group with the queue base and head, keeps the devai-release-gate check name, and uses per-entry concurrency; check-workflows pins the shape; the preflight resolves the merge_group base."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "tests/contract/pull-request-workflow.contract.test.ts",
+                  "packages/cli/tests/unit/preflight-merge-group-base.test.ts"
+                ],
+                ["node", "scripts/check-workflows.mjs"],
+                ["pnpm", "run", "test:cli"]
+              ],
+              "commit_types": [
+                "ci(workflows)",
+                "ci(scripts)",
+                "feat(preflight)",
+                "docs(reference)"
+              ],
+              "prompt": {
+                "path": "prompts/TASK-0343.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 120
+              }
+            }
+          ]
+        }
+      ],
+      "closure": null
+    },
+    {
+      "id": "R-0305",
+      "title": "Review boundaries and model contracts",
+      "goal": "A campaign may delegate model evaluation of a pull request under a human-initiated session while ratification, merge, and dispatch stay human; a repository default tier map with pinned resolution replaces the per-campaign copies; every model reply is validated against a consumer-specific schema through one shared extractor.",
+      "status": "planned",
+      "records": ["ADR-GOV-0023", "ADR-MDL-0002", "ADR-MDL-0001"],
+      "depends_on": ["R-0301"],
+      "attestation_reissue": false,
+      "owner_effects_required": [],
+      "close_checks": ["law:validate", "docs:validate", "test:sensors", "test:loop", "test:skills"],
+      "waves": [
+        {
+          "id": "CTG-0351",
+          "title": "Review mode and versioned model defaults",
+          "type": "coupled-triplet",
+          "records": ["ADR-GOV-0023", "ADR-MDL-0002"],
+          "depends_on": [],
+          "lock_scopes": [
+            "law/schemas/campaign.schema.json",
+            "law/policy/campaign-execution.json",
+            "law/policy/model-tiers.json",
+            "law/schemas/model-tiers.schema.json",
+            "scripts/check-campaign.mjs",
+            "packages/schemas/src/roster.ts",
+            "law/policy/model-runtime-registry.json"
+          ],
+          "gates": ["schemas", "test:root", "test:schemas"],
+          "tasks": [
+            {
+              "id": "TASK-0351",
+              "title": "Declare review.mode, the default tier map, and pinned resolution",
+              "discipline": "architect",
+              "coupled_pipeline_position": "architect",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F1", "F5"],
+              "boundary": {
+                "paths": [
+                  "law/schemas/campaign.schema.json",
+                  "law/policy/campaign-execution.json",
+                  "law/policy/model-tiers.json",
+                  "law/schemas/model-tiers.schema.json",
+                  "packages/cli/src/commands/check/schemas.ts",
+                  "docs/dev/operations/workflow-economy-campaign/README.md",
+                  "docs/reference/cli/round-task-executors.md",
+                  "law/policy/model-runtime-registry.json",
+                  "docs/reference/cli/model-runtime.md"
+                ],
+                "forbidden": [".github/workflows/", "packages/", "tests/"]
+              },
+              "deliverables": [
+                "campaign.schema.json admits review.mode (human, model-advisory), makes models optional, and adds the pinned resolved map on a task; campaign-execution.json states the four review steps and which one a campaign may delegate.",
+                "law/policy/model-tiers.json with its schema holds the default tiers keyed by host id with a policy_version; the guide and the executors page name the tier-to-alias mapping and the runtime:model registry id form."
+              ],
+              "acceptance_commands": [
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "schemas",
+                  "--format",
+                  "json"
+                ],
+                ["pnpm", "run", "campaign:check"],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "docs-links",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": [
+                "law(campaign)",
+                "law(models)",
+                "refactor(schemas)",
+                "docs(operations)",
+                "docs(reference)"
+              ],
+              "prompt": {
+                "path": "prompts/TASK-0351.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "architect",
+                "effort": "high",
+                "time_budget_minutes": 90
+              }
+            },
+            {
+              "id": "TASK-0352",
+              "title": "Prove tier resolution, pinning, review-mode gating, and unchanged closed campaigns",
+              "discipline": "inspector",
+              "coupled_pipeline_position": "inspector",
+              "upstream_task_id": "TASK-0351",
+              "status": "planned",
+              "target_substrates": ["F3"],
+              "boundary": {
+                "paths": [
+                  "tests/contract/campaign-plan.contract.test.ts",
+                  "tests/contract/model-tiers.contract.test.ts",
+                  "packages/schemas/tests/contract/schema-roster.test.ts"
+                ],
+                "forbidden": [
+                  "law/",
+                  "product/",
+                  ".github/workflows/",
+                  "packages/cli/src/",
+                  "packages/skills/src/",
+                  "packages/sensors/src/",
+                  "packages/loop/src/",
+                  "packages/evidence/src/"
+                ]
+              },
+              "deliverables": [
+                "Both closed campaigns validate unchanged; a campaign with only a worker override validates; an unknown host fails with unknown-host; a task in pre_merge under model-advisory without a recorded verdict cannot merge; a started task keeps its pinned map after the default changes."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "tests/contract/campaign-plan.contract.test.ts",
+                  "tests/contract/model-tiers.contract.test.ts",
+                  "packages/schemas/tests/contract/schema-roster.test.ts"
+                ]
+              ],
+              "commit_types": ["test(campaign)", "test(schemas)"],
+              "prompt": {
+                "path": "prompts/TASK-0352.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker",
+                "effort": "high",
+                "time_budget_minutes": 90
+              }
+            },
+            {
+              "id": "TASK-0353",
+              "title": "Resolve tiers through the merged map and enforce review mode in the checker",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": "TASK-0352",
+              "status": "planned",
+              "target_substrates": ["F2", "F3"],
+              "boundary": {
+                "paths": [
+                  "scripts/check-campaign.mjs",
+                  "packages/schemas/src/roster.ts",
+                  "packages/cli/src/commands/check/schemas.ts",
+                  "docs/reference/error-codes.md"
+                ],
+                "forbidden": ["law/", "product/", ".github/workflows/"]
+              },
+              "deliverables": [
+                "check-campaign resolves every task tier through the default map merged with the campaign override, pins the resolved map at task start, and refuses a merged transition without a recorded verdict under model-advisory; the schema roster counts the new schema."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "tests/contract/campaign-plan.contract.test.ts",
+                  "tests/contract/model-tiers.contract.test.ts",
+                  "packages/schemas/tests/contract/schema-roster.test.ts"
+                ],
+                ["pnpm", "run", "campaign:check"],
+                ["pnpm", "run", "test:schemas"]
+              ],
+              "commit_types": ["feat(scripts)", "refactor(schemas)", "docs(reference)"],
+              "prompt": {
+                "path": "prompts/TASK-0353.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker",
+                "effort": "high",
+                "time_budget_minutes": 120
+              }
+            }
+          ]
+        },
+        {
+          "id": "CTG-0352",
+          "title": "Structured review contracts",
+          "type": "coupled-triplet",
+          "records": ["ADR-MDL-0001"],
+          "depends_on": ["CTG-0351"],
+          "lock_scopes": [
+            "law/schemas/review-verdict.schema.json",
+            "law/schemas/triage-breaker.schema.json",
+            "packages/skills/src/model-bridge/",
+            "packages/sensors/src/judge.ts",
+            "packages/loop/src/loop/triage.ts",
+            "packages/schemas/src/roster.ts"
+          ],
+          "gates": ["schemas", "test:sensors", "test:loop", "test:skills"],
+          "tasks": [
+            {
+              "id": "TASK-0354",
+              "title": "Declare the verdict and breaker schemas and the orchestrator review step",
+              "discipline": "architect",
+              "coupled_pipeline_position": "architect",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F1", "F5"],
+              "boundary": {
+                "paths": [
+                  "law/schemas/review-verdict.schema.json",
+                  "law/schemas/triage-breaker.schema.json",
+                  "law/policy/sensor-notes/llm_judge.md",
+                  "packages/skills/resources/recipes/devai-verify/SKILL.md",
+                  "packages/cli/src/commands/check/schemas.ts",
+                  "docs/theory/framework/scorecard.md",
+                  "tests/fixtures/review-replies/README.md",
+                  "packages/skills/resources/recipes/devai-verify/devai.recipe.json"
+                ],
+                "forbidden": [".github/workflows/", "packages/", "tests/"]
+              },
+              "deliverables": [
+                "Two schemas: review-verdict (verdict, confidence, rationale, findings) and triage-breaker (classification, confidence, rationale), catalogued as source-only.",
+                "The llm_judge sensor note records this Architect disposition; the devai-verify recipe gains the orchestrator review step that validates a subagent reply through the shared extractor; the fixtures README explains where the maintainer's rejected reply goes."
+              ],
+              "acceptance_commands": [
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "schemas",
+                  "--format",
+                  "json"
+                ],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "docs-links",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": [
+                "law(review)",
+                "refactor(schemas)",
+                "docs(theory)",
+                "docs(recipes)",
+                "test(fixtures)"
+              ],
+              "prompt": {
+                "path": "prompts/TASK-0354.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "architect",
+                "effort": "high",
+                "time_budget_minutes": 90
+              }
+            },
+            {
+              "id": "TASK-0355",
+              "title": "Prove extraction, rejection, truncation, and bounded diagnostics",
+              "discipline": "inspector",
+              "coupled_pipeline_position": "inspector",
+              "upstream_task_id": "TASK-0354",
+              "status": "planned",
+              "target_substrates": ["F3"],
+              "boundary": {
+                "paths": [
+                  "packages/skills/tests/model-bridge/structured-extraction.test.ts",
+                  "packages/sensors/tests/unit/judge-response-boundaries.test.ts",
+                  "packages/loop/tests/triage-breaker-schema.test.ts",
+                  "tests/fixtures/review-replies/rejected-pass-reply.txt"
+                ],
+                "forbidden": [
+                  "law/",
+                  "product/",
+                  ".github/workflows/",
+                  "packages/cli/src/",
+                  "packages/skills/src/",
+                  "packages/sensors/src/",
+                  "packages/loop/src/",
+                  "packages/evidence/src/"
+                ]
+              },
+              "deliverables": [
+                "Prose around a valid document yields the verdict; an invalid document, two conflicting objects, a provider error, and a length finish each yield error with a redacted excerpt and the SHA-256 of the reply; response.json is validated too; the rejected PASS reply fixture parses as pass."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "packages/skills/tests/model-bridge/structured-extraction.test.ts",
+                  "packages/sensors/tests/unit/judge-response-boundaries.test.ts",
+                  "packages/loop/tests/triage-breaker-schema.test.ts"
+                ]
+              ],
+              "commit_types": ["test(skills)", "test(sensors)", "test(loop)", "test(fixtures)"],
+              "prompt": {
+                "path": "prompts/TASK-0355.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 90
+              }
+            },
+            {
+              "id": "TASK-0356",
+              "title": "Implement the shared extractor, schema-constrained requests, and real finish reasons",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": "TASK-0355",
+              "status": "planned",
+              "target_substrates": ["F2", "F3"],
+              "boundary": {
+                "paths": [
+                  "packages/skills/src/model-bridge/index.ts",
+                  "packages/skills/src/model-bridge/extract.ts",
+                  "packages/sensors/src/judge.ts",
+                  "packages/loop/src/loop/triage.ts",
+                  "packages/schemas/src/roster.ts",
+                  "packages/cli/src/commands/sense/adapters.ts",
+                  "docs/reference/error-codes.md",
+                  "packages/schemas/src/index.ts"
+                ],
+                "forbidden": ["law/", "product/", ".github/workflows/"]
+              },
+              "deliverables": [
+                "The bridge requests schema-constrained output per provider, reports a real finish_reason from the CLI transports, and exposes one extractor that accepts exactly one unambiguous document; the judge and the tie-breaker validate through getValidator and keep bounded diagnostics."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "packages/skills/tests/model-bridge/structured-extraction.test.ts",
+                  "packages/sensors/tests/unit/judge-response-boundaries.test.ts",
+                  "packages/loop/tests/triage-breaker-schema.test.ts"
+                ],
+                ["pnpm", "run", "test:sensors"],
+                ["pnpm", "run", "test:loop"],
+                ["pnpm", "run", "test:skills"]
+              ],
+              "commit_types": [
+                "feat(model-bridge)",
+                "fix(sensors)",
+                "fix(loop)",
+                "refactor(schemas)",
+                "docs(reference)"
+              ],
+              "prompt": {
+                "path": "prompts/TASK-0356.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 180
+              }
+            }
+          ]
+        }
+      ],
+      "closure": null
+    },
+    {
+      "id": "R-0306",
+      "title": "Release approval topology and Pages re-runs",
+      "goal": "A rehearsal stops twice and a publication twice, from a complete job and credential matrix, with the exact Owner authorization untouched; a site-only re-run resumes its own submitted or verified record and an unknown submission stays closed with a documented recovery path.",
+      "status": "planned",
+      "records": ["ADR-REL-0030", "ADR-REL-0032"],
+      "depends_on": ["R-0304"],
+      "attestation_reissue": false,
+      "owner_effects_required": ["OE-02", "OE-03", "OE-04"],
+      "close_checks": ["law:validate", "docs:validate", "test:root"],
+      "waves": [
+        {
+          "id": "CTG-0361",
+          "title": "Release approval topology",
+          "type": "coupled-triplet",
+          "records": ["ADR-REL-0030"],
+          "depends_on": [],
+          "lock_scopes": [
+            ".github/workflows/release.yml",
+            ".github/workflows/site-publish.yml",
+            "scripts/check-workflows.mjs",
+            "law/policy/credential-requirements.json",
+            "docs/dev/operations/release-discipline.md"
+          ],
+          "gates": ["test:root", "schemas"],
+          "tasks": [
+            {
+              "id": "TASK-0361",
+              "title": "Draw the job, environment, and credential matrix and restate the site-only clauses",
+              "discipline": "architect",
+              "coupled_pipeline_position": "architect",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F1", "F5"],
+              "boundary": {
+                "paths": [
+                  "docs/dev/operations/release-discipline.md",
+                  "law/policy/credential-requirements.json",
+                  ".devai/config/credential-requirements.json"
+                ],
+                "forbidden": [".github/workflows/", "packages/", "tests/"]
+              },
+              "deliverables": [
+                "release-discipline.md holds the before and after matrix of jobs, environments, secrets and variables per job, and reviewer stops, plus the restated site-only clauses ADR-REL-0030 keeps from ADR-REL-0029 and the two-stop counts.",
+                "The credential manifest names the merged jobs as consumers."
+              ],
+              "acceptance_commands": [
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "docs-links",
+                  "--format",
+                  "json"
+                ],
+                ["node", "scripts/check-policy-materialization.mjs"],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "schemas",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": ["docs(operations)", "law(credentials)"],
+              "prompt": {
+                "path": "prompts/TASK-0361.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "architect",
+                "effort": "high",
+                "time_budget_minutes": 90
+              }
+            },
+            {
+              "id": "TASK-0362",
+              "title": "Pin the merged jobs, environments, and stop counts",
+              "discipline": "inspector",
+              "coupled_pipeline_position": "inspector",
+              "upstream_task_id": "TASK-0361",
+              "status": "planned",
+              "target_substrates": ["F3"],
+              "boundary": {
+                "paths": [
+                  "tests/contract/release-workflow.contract.test.ts",
+                  "tests/contract/site-publication-workflow.contract.test.ts"
+                ],
+                "forbidden": [
+                  "law/",
+                  "product/",
+                  ".github/workflows/",
+                  "packages/cli/src/",
+                  "packages/skills/src/",
+                  "packages/sensors/src/",
+                  "packages/loop/src/",
+                  "packages/evidence/src/"
+                ]
+              },
+              "deliverables": [
+                "The workflow-shape contracts require exactly the merged job set, one environment per stop, the credential consumers per job, and the unchanged publish input and tag verification."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "tests/contract/release-workflow.contract.test.ts",
+                  "tests/contract/site-publication-workflow.contract.test.ts"
+                ]
+              ],
+              "commit_types": ["test(workflows)"],
+              "prompt": {
+                "path": "prompts/TASK-0362.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker",
+                "effort": "high",
+                "time_budget_minutes": 90
+              }
+            },
+            {
+              "id": "TASK-0363",
+              "title": "Merge the gated jobs and print the control commit before the first stop",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": "TASK-0362",
+              "status": "planned",
+              "target_substrates": ["F2", "F3"],
+              "boundary": {
+                "paths": [
+                  ".github/workflows/release.yml",
+                  ".github/workflows/site-publish.yml",
+                  "scripts/check-workflows.mjs",
+                  "scripts/process/release-prerequisites.mjs",
+                  "scripts/process/publish-site.mjs",
+                  "scripts/process/pages-publication.mjs",
+                  "scripts/process/github-pages-journal.mjs"
+                ],
+                "forbidden": ["law/", "product/", ".github/workflows/"]
+              },
+              "deliverables": [
+                "release.yml stops twice on rehearsal and twice on publication with the exact Owner authorization untouched; the control commit is printed in the run summary before the first stop; check-workflows pins the new shape."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "tests/contract/release-workflow.contract.test.ts",
+                  "tests/contract/site-publication-workflow.contract.test.ts"
+                ],
+                ["node", "scripts/check-workflows.mjs"],
+                ["pnpm", "run", "test:root"]
+              ],
+              "commit_types": ["ci(workflows)", "ci(scripts)"],
+              "prompt": {
+                "path": "prompts/TASK-0363.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 150
+              }
+            }
+          ]
+        },
+        {
+          "id": "CTG-0362",
+          "title": "Pages re-run identity",
+          "type": "coupled-triplet",
+          "records": ["ADR-REL-0032"],
+          "depends_on": ["CTG-0361"],
+          "lock_scopes": [
+            "scripts/process/publish-site.mjs",
+            "scripts/process/pages-publication.mjs",
+            "scripts/process/github-pages-journal.mjs",
+            "docs/dev/operations/release-discipline.md"
+          ],
+          "gates": ["test:root"],
+          "tasks": [
+            {
+              "id": "TASK-0364",
+              "title": "Document the site-only and release recovery paths",
+              "discipline": "architect",
+              "coupled_pipeline_position": "architect",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F1", "F5"],
+              "boundary": {
+                "paths": ["docs/dev/operations/release-discipline.md"],
+                "forbidden": [".github/workflows/", "packages/", "tests/"]
+              },
+              "deliverables": [
+                "release-discipline.md states what a re-run does for a submitted record, a verified record, and an intent with unknown submission, and the manual reconciliation for the last case, for both identity modes (#165)."
+              ],
+              "acceptance_commands": [
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "docs-links",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": ["docs(operations)"],
+              "prompt": {
+                "path": "prompts/TASK-0364.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "architect",
+                "effort": "high",
+                "time_budget_minutes": 45
+              }
+            },
+            {
+              "id": "TASK-0365",
+              "title": "Pin resume-on-rerun and refuse-unknown-submission",
+              "discipline": "inspector",
+              "coupled_pipeline_position": "inspector",
+              "upstream_task_id": "TASK-0364",
+              "status": "planned",
+              "target_substrates": ["F3"],
+              "boundary": {
+                "paths": [
+                  "tests/contract/site-publication-cli.test.ts",
+                  "tests/contract/pages-publication.test.ts",
+                  "tests/contract/github-pages-journal.test.ts"
+                ],
+                "forbidden": [
+                  "law/",
+                  "product/",
+                  ".github/workflows/",
+                  "packages/cli/src/",
+                  "packages/skills/src/",
+                  "packages/sensors/src/",
+                  "packages/loop/src/",
+                  "packages/evidence/src/"
+                ]
+              },
+              "deliverables": [
+                "A new attempt of the same run resumes a submitted record by observing and recording verified, treats a verified record with matching bytes as a no-op, and refuses an intent with unknown submission with SUBMISSION_UNKNOWN; the release identity keeps its attempt."
+              ],
+              "acceptance_commands": [
+                ["pnpm", "exec", "vitest", "run", "tests/contract/site-publication-cli.test.ts"]
+              ],
+              "commit_types": ["test(process)"],
+              "prompt": {
+                "path": "prompts/TASK-0365.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker",
+                "effort": "high",
+                "time_budget_minutes": 90
+              }
+            },
+            {
+              "id": "TASK-0366",
+              "title": "Drop sourceAttempt from the site-only identity and resume submitted records",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": "TASK-0365",
+              "status": "planned",
+              "target_substrates": ["F2", "F3"],
+              "boundary": {
+                "paths": [
+                  "scripts/process/publish-site.mjs",
+                  "scripts/process/pages-publication.mjs",
+                  "scripts/process/github-pages-journal.mjs"
+                ],
+                "forbidden": ["law/", "product/", ".github/workflows/"]
+              },
+              "deliverables": [
+                "The site-only identity keeps sourceRun and drops sourceAttempt; a re-run resumes a submitted or verified record and fails closed on an unknown submission."
+              ],
+              "acceptance_commands": [
+                ["pnpm", "exec", "vitest", "run", "tests/contract/site-publication-cli.test.ts"],
+                ["pnpm", "run", "test:root"]
+              ],
+              "commit_types": ["fix(process)"],
+              "prompt": {
+                "path": "prompts/TASK-0366.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker",
+                "effort": "high",
+                "time_budget_minutes": 90
+              }
+            }
+          ]
+        }
+      ],
+      "closure": null
+    },
+    {
+      "id": "R-0307",
+      "title": "Workflow reference pages",
+      "goal": "Every admitted workflow has a reference page under a completeness gate of the documentation information architecture, the ADR catalogue is generated, and the stale operations statements are corrected.",
+      "status": "planned",
+      "records": ["ADR-GOV-0021"],
+      "depends_on": ["R-0306"],
+      "attestation_reissue": false,
+      "owner_effects_required": [],
+      "close_checks": ["law:validate", "docs:validate", "test:loop"],
+      "waves": [
+        {
+          "id": "CTG-0371",
+          "title": "Workflow reference and generated catalogue",
+          "type": "coupled-triplet",
+          "records": ["ADR-GOV-0021"],
+          "depends_on": [],
+          "lock_scopes": [
+            "docs/dev/operations/workflows/",
+            "law/policy/documentation-information-architecture.json",
+            "law/adr/README.md",
+            "packages/loop/src/governance-ledger/render.ts",
+            "scripts/check-workflows.mjs",
+            "law/policy/adr-validation.json"
+          ],
+          "gates": ["docs-links", "adrs", "test:root", "test:loop"],
+          "tasks": [
+            {
+              "id": "TASK-0371",
+              "title": "Write the workflow reference pages and the IA completeness gate",
+              "discipline": "architect",
+              "coupled_pipeline_position": "architect",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F1", "F5"],
+              "boundary": {
+                "paths": [
+                  "docs/dev/operations/workflows/README.md",
+                  "docs/dev/operations/workflows/pull-request-checks.md",
+                  "docs/dev/operations/workflows/release.md",
+                  "docs/dev/operations/workflows/site-publish.md",
+                  "docs/dev/operations/workflows/devai-ledger-verify.md",
+                  "docs/dev/operations/README.md",
+                  "docs/adopters/sensor-inputs.md",
+                  "docs/dev/operations/remote-preflight-contract.md",
+                  "law/policy/documentation-information-architecture.json",
+                  "law/adr/README.md",
+                  "law/policy/adr-validation.json",
+                  "docs/adopters/docs-layout.md"
+                ],
+                "forbidden": [".github/workflows/", "packages/", "tests/"]
+              },
+              "deliverables": [
+                "One page per admitted workflow with a metadata block (workflow file, triggers, jobs) and the sections the record lists; an index; the operations README, sensor-inputs page, and remote preflight contract corrected.",
+                "The information architecture declares the workflows page entry with a completeness gate of one page per workflow file; law/adr/README.md is the generated catalogue (#162 item 5)."
+              ],
+              "acceptance_commands": [
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "docs-links",
+                  "--format",
+                  "json"
+                ],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "adrs",
+                  "--format",
+                  "json"
+                ],
+                ["pnpm", "run", "format:check:all"]
+              ],
+              "commit_types": [
+                "docs(operations)",
+                "docs(adopters)",
+                "law(documentation)",
+                "law(adr)"
+              ],
+              "prompt": {
+                "path": "prompts/TASK-0371.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "architect",
+                "effort": "high",
+                "time_budget_minutes": 150
+              }
+            },
+            {
+              "id": "TASK-0372",
+              "title": "Pin page completeness, metadata drift, and catalogue freshness",
+              "discipline": "inspector",
+              "coupled_pipeline_position": "inspector",
+              "upstream_task_id": "TASK-0371",
+              "status": "planned",
+              "target_substrates": ["F3"],
+              "boundary": {
+                "paths": [
+                  "tests/contract/workflow-reference-pages.contract.test.ts",
+                  "packages/loop/tests/adr-catalogue-freshness.test.ts"
+                ],
+                "forbidden": [
+                  "law/",
+                  "product/",
+                  ".github/workflows/",
+                  "packages/cli/src/",
+                  "packages/skills/src/",
+                  "packages/sensors/src/",
+                  "packages/loop/src/",
+                  "packages/evidence/src/"
+                ]
+              },
+              "deliverables": [
+                "A workflow file without a page fails the IA gate; a page whose metadata block names triggers or jobs the file does not have fails the drift check; a record added without regenerating the catalogue fails the freshness check."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "tests/contract/workflow-reference-pages.contract.test.ts",
+                  "packages/loop/tests/adr-catalogue-freshness.test.ts"
+                ]
+              ],
+              "commit_types": ["test(workflows)", "test(loop)"],
+              "prompt": {
+                "path": "prompts/TASK-0372.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker",
+                "effort": "high",
+                "time_budget_minutes": 90
+              }
+            },
+            {
+              "id": "TASK-0373",
+              "title": "Enforce the IA gate, the metadata drift check, and the generated catalogue",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": "TASK-0372",
+              "status": "planned",
+              "target_substrates": ["F2", "F3"],
+              "boundary": {
+                "paths": [
+                  "packages/cli/src/commands/check/docs-ia.ts",
+                  "scripts/check-workflows.mjs",
+                  "packages/loop/src/governance-ledger/render.ts",
+                  "packages/cli/src/commands/docs/governance-render.ts",
+                  "docs/reference/error-codes.md"
+                ],
+                "forbidden": ["law/", "product/", ".github/workflows/"]
+              },
+              "deliverables": [
+                "The IA gate requires one page per workflow file; check-workflows compares each page's metadata block with the file; the decision index renderer writes law/adr/README.md and a freshness check compares bytes."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "tests/contract/workflow-reference-pages.contract.test.ts",
+                  "packages/loop/tests/adr-catalogue-freshness.test.ts"
+                ],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "docs-links",
+                  "--format",
+                  "json"
+                ],
+                ["node", "scripts/check-workflows.mjs"],
+                ["pnpm", "run", "test:loop"]
+              ],
+              "commit_types": ["feat(docs)", "ci(scripts)", "feat(loop)", "docs(reference)"],
+              "prompt": {
+                "path": "prompts/TASK-0373.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker",
+                "effort": "high",
+                "time_budget_minutes": 120
+              }
+            }
+          ]
+        }
+      ],
+      "closure": null
+    }
+  ]
+}
