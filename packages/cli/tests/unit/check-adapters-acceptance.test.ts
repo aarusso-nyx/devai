@@ -48,13 +48,40 @@ describe('canonical check adapter acceptance', () => {
     }
   });
 
-  it('retains only the two suite members referenced by the public suite population', () => {
+  it('declares the two suite members and the two planning-lane members, and no other', () => {
     const policy = JSON.parse(readFileSync(join(ROOT, 'law/policy/check-suites.json'), 'utf8')) as {
       member_definitions: Array<{ id: string; binding: unknown }>;
+      suites: Array<{ members: string[] }>;
     };
     expect(policy.member_definitions.map((entry) => entry.id)).toEqual([
       'ledger-local',
       'ledger-rc',
+      'campaign',
+      'scorecard-page',
+    ]);
+    expect([...new Set(policy.suites.flatMap((suite) => suite.members))].sort()).toEqual([
+      'ledger-local',
+      'ledger-rc',
+    ]);
+    // ADR-CHK-0003: the planning-lane members bind the exact argv the adapter runs.
+    expect(policy.member_definitions.slice(2)).toEqual([
+      {
+        id: 'campaign',
+        binding: { kind: 'literal-argv', argv: ['node', 'scripts/check-campaign.mjs'] },
+        effect: 'read',
+        cost: 'low',
+        output: 'action-envelope-plus-campaign-report',
+      },
+      {
+        id: 'scorecard-page',
+        binding: {
+          kind: 'literal-argv',
+          argv: ['node', 'scripts/generate-scorecard-page.mjs', '--check'],
+        },
+        effect: 'read',
+        cost: 'low',
+        output: 'action-envelope-plus-scorecard-page-report',
+      },
     ]);
   });
 

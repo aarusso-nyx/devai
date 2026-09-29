@@ -129,6 +129,19 @@ describe('authority broker read-only process values', () => {
     expect(allowed(executable, args)).toBe(result);
   });
 
+  it('permits only the exact planning-lane check argvs under check (ADR-CHK-0003)', () => {
+    expect(allowed('node', ['scripts/check-campaign.mjs'], 'check')).toBe(true);
+    expect(allowed('/usr/bin/node', ['scripts/check-campaign.mjs'], 'check')).toBe(true);
+    expect(allowed('node', ['scripts/generate-scorecard-page.mjs', '--check'], 'check')).toBe(true);
+    expect(allowed('node', ['scripts/check-campaign.mjs'])).toBe(false);
+    expect(allowed('node', ['scripts/check-campaign.mjs'], 'sense run')).toBe(false);
+    expect(allowed('other', ['scripts/check-campaign.mjs'], 'check')).toBe(false);
+    expect(allowed('node', ['scripts/check-campaign.mjs', '--fix'], 'check')).toBe(false);
+    expect(allowed('node', ['scripts/generate-scorecard-page.mjs'], 'check')).toBe(false);
+    expect(allowed('node', ['./scripts/check-campaign.mjs'], 'check')).toBe(false);
+    expect(allowed('node', ['scripts/check-workflows.mjs'], 'check')).toBe(false);
+  });
+
   it('permits only exact package audit forms', () => {
     expect(allowed('pnpm', ['audit', '--json'])).toBe(true);
     expect(allowed('pnpm', ['audit'])).toBe(false);
