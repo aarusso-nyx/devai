@@ -12,7 +12,7 @@ const basePolicy = {
   schemaVersion: '1.0.0',
   policy_id: 'fixture.adopter-policy',
   policy_version: '1.0.0',
-  // ADR-CFG-0002: /project_type is an owned row; a source without it is refused.
+  // ADR-CFG-0002: /project_type is an owned row; the source declares it here.
   project: { project_type: 'framework' },
 } as const;
 
