@@ -209,12 +209,15 @@ function initApplyDefinition(segment: InitSegment) {
           }
           return `ci scaffold: ${componentResult['written'] === true ? 'wrote' : 'skipped'} ${String(componentPlan['path'])}`;
         });
+        // ADR-GOV-0020: name every file --force kept (edited guidance, populated
+        // provenance) so the adopter sees what the re-application did not touch.
+        const preservedHuman = result.preserved.map((path) => `\n  = ${path} (preserved)`).join('');
         emit(
           introspection === null
             ? { plan, result, included }
             : { introspection, plan, result, included },
           options.human === true,
-          `init apply ${segment}: ${String(result.created.length)} created, ${String(result.overwritten.length)} overwritten, ${String(result.skipped.length)} skipped, ${String(result.preserved.length)} preserved${included.length > 0 ? `, ${String(included.length)} included component(s)\n${includedHuman.join('\n')}` : ''}`,
+          `init apply ${segment}: ${String(result.created.length)} created, ${String(result.overwritten.length)} overwritten, ${String(result.skipped.length)} skipped, ${String(result.preserved.length)} preserved${included.length > 0 ? `, ${String(included.length)} included component(s)\n${includedHuman.join('\n')}` : ''}${preservedHuman}`,
         );
         process.exitCode = EXIT_PASS;
       });
