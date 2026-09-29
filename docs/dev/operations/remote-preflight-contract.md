@@ -10,11 +10,15 @@ ledger. A transient preflight receipt coordinates the current run; it is not upl
 An unsigned local cache record from an untrusted run is not signing authority.
 
 One required `devai-release-gate` runs on every pull-request head and on every
-merge-queue entry (ADR-CHK-0004). Its lane is three steps: install, preflight check,
-affected check. The preflight check executes the `preflight-v1` node of
-`test-tasks.json` against the event base, which is the pull-request base under
-`pull_request` and the queue base under `merge_group`, and the affected check executes
-the unconditional cheap floor plus affected selection on Linux. It proves only
+merge-queue entry (ADR-CHK-0004). Its lane, step by step on the
+[workflow page](workflows/pull-request-checks.md), restores or compiles the check runner
+bootstrap, runs the preflight probes, then runs the affected checks. The preflight step
+runs `check --preflight --run` against the event base, which is the pull-request base
+under `pull_request` and the queue base under `merge_group`, executing the preflight
+probes of `test-tasks.json` (verifier-package materialization, toolchain identity, base
+freshness) as DAG nodes (ADR-CHK-0001); the affected step runs `release:pr-gate` and
+then `check --affected --run`, the unconditional cheap floor plus affected selection on
+Linux. It proves only
 execution outcomes and consistency on that runner. It does not prove the local RC
 closure executed, and a signed local claim does not prove Linux execution. These
 observations answer different questions.
@@ -122,12 +126,15 @@ deferred and why; the fallback is then the standing rule rather than an interim 
 
 ## Own-repository workflow set
 
-| File                      | Required purpose                                                     |
-| ------------------------- | -------------------------------------------------------------------- |
-| `pull-request-checks.yml` | Unprivileged merge preflight on pull-request heads and queue entries |
-| `devai-ledger-verify.yml` | Protected post-merge observation and explicit dispatch               |
-| `release.yml`             | Candidate rehearsal, tag validation, authorized artifact promotion   |
-| `site-publish.yml`        | Owner-dispatched documentation site publication from main            |
+Each admitted file has a [reference page](workflows/README.md) that states its
+triggers, jobs, environments, credentials, effects, and recovery paths.
+
+| File                      | Required purpose                                                          |
+| ------------------------- | ------------------------------------------------------------------------- |
+| `pull-request-checks.yml` | Unprivileged merge preflight on pull-request heads and queue entries      |
+| `devai-ledger-verify.yml` | Explicit dispatch of the protected ledger verification against one commit |
+| `release.yml`             | Tag validation, candidate rehearsal, authorized artifact promotion        |
+| `site-publish.yml`        | Owner-dispatched documentation site publication from main                 |
 
 The PR lane has `contents: read`, no environment, secrets or protected variables,
 pinned actions, exact candidate checkout without persisted credentials, Linux runners
