@@ -995,7 +995,9 @@
                 "paths": [
                   "tests/contract/pull-request-workflow.contract.test.ts",
                   "packages/cli/tests/unit/preflight-merge-group-base.test.ts",
-                  "tests/contract/campaign-plan.contract.test.ts"
+                  "tests/contract/campaign-plan.contract.test.ts",
+                  "tests/contract/preflight-lane-parity.contract.test.ts",
+                  "packages/cli/tests/unit/live-ledger-workflow.test.ts"
                 ],
                 "forbidden": [
                   "law/",
@@ -1024,7 +1026,7 @@
               "commit_types": ["test(workflows)", "test(cli)", "test(campaign)"],
               "prompt": {
                 "path": "prompts/TASK-0342.md",
-                "sha256": "5ab038be4f4a1198354fe336b0534d6bf428c63c94b73948f95e3f22332ee80f"
+                "sha256": "a56a5eeec6feb1f533d782cbd5c4fd2bad3669bfc1fa05a24577a313765fa829"
               },
               "pull_request": null,
               "merged_as": null,
