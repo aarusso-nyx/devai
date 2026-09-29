@@ -439,7 +439,7 @@ describe('S06-B docs governance filesystem and process effects', () => {
       message:
         'Found CI docs-publish workflow(s) — documentation publishing must be an explicitly authorized local effect; see docs/adopters/docs-layout.md#publication-boundary',
       remediation:
-        'Remove or disable the GH Actions documentation-deployment workflow. CI validates freshness and does not publish the site.',
+        'Remove or disable the GH Actions documentation-deployment workflow. The site is published only through the governed Pages journal, never by a pull-request or push workflow.',
       locations: ['.github/workflows/release.yaml'],
     });
   });
@@ -867,5 +867,59 @@ describe('S06-B docs governance aggregate and public command', () => {
     expect(emitted).toMatch(new RegExp(`^check docs-governance: ${label} \\(`));
     expect(emitted).toContain(`  [${icon}] `);
     expect(emitted.endsWith('\n')).toBe(true);
+  });
+});
+
+// ADR-CHK-0003, second Inspector iteration of TASK-0312: a framework that
+// publishes its site only through the governed Pages journal satisfies the
+// gh-pages-branch advisory without a gh-pages branch on origin; the journal is
+// the publication workflow and its process script, both present.
+describe('S06-B docs governance gh-pages branch under the governed Pages journal', () => {
+  const JOURNAL = ['.github/workflows/site-publish.yml', 'scripts/process/publish-site.mjs'];
+  const ORIGIN_OUTCOMES = [
+    ['has no gh-pages branch', 0, ''],
+    ['cannot be reached', 3, ''],
+  ] as const;
+
+  function journal(paths: readonly string[]): void {
+    for (const path of paths) write(path, '# governed Pages journal fixture\n');
+  }
+
+  function origin(status: number, stdout: string): void {
+    authority.spawnSync.mockImplementation((command: string) =>
+      command === 'git' ? processResult(status, stdout) : processResult(0),
+    );
+  }
+
+  it.each(ORIGIN_OUTCOMES)(
+    'passes when origin %s and both journal files exist',
+    (_label, status, stdout) => {
+      validDocusaurusFixture();
+      journal(JOURNAL);
+      origin(status, stdout);
+      expect(finding('docs-governance.gh-pages-branch', { noPublishCheck: false })).toMatchObject({
+        ruleId: 'docs-governance.gh-pages-branch',
+        severity: 'pass',
+      });
+      expect(report({ noPublishCheck: false })).toMatchObject({
+        verdict: 'pass',
+        fail_count: 0,
+        warn_count: 0,
+      });
+    },
+  );
+
+  it.each([
+    ['only the publication workflow', [JOURNAL[0] ?? '']],
+    ['only the publication script', [JOURNAL[1] ?? '']],
+    ['no journal file', []],
+  ] as const)('still warns without a gh-pages branch given %s', (_label, paths) => {
+    validDocusaurusFixture();
+    journal(paths);
+    origin(0, '');
+    expect(finding('docs-governance.gh-pages-branch', { noPublishCheck: false })).toMatchObject({
+      ruleId: 'docs-governance.gh-pages-branch',
+      severity: 'warn',
+    });
   });
 });

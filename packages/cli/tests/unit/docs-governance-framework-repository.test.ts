@@ -3,9 +3,12 @@
 // and docs.builder (#166); removing either declaration fails it, and the
 // failure reaches the gate because docs:validate runs every member the docs
 // class lists. The no-ci-publish rule says publication goes only through the
-// governed Pages journal (#167).
+// governed Pages journal (#167), whose two files are present here; the
+// gh-pages-branch advisory is satisfied by that journal instead of by a branch
+// (cli-shard06-docs-governance-residual.test.ts pins the rule itself).
 import { spawnSync } from 'node:child_process';
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -26,6 +29,7 @@ import { selectorMatches } from '../../src/services/check-runner/policy.js';
 const REPOSITORY_ROOT = resolve(import.meta.dirname, '../../../..');
 const PROJECT_CONFIG = '.devai/config/project.json';
 const DOCS_PATH = 'docs/adopters/docs-layout.md';
+const PAGES_JOURNAL = ['.github/workflows/site-publish.yml', 'scripts/process/publish-site.mjs'];
 
 const temporary: string[] = [];
 afterEach(() =>
@@ -176,5 +180,10 @@ describe('docs-governance on the framework repository (ADR-CHK-0003)', () => {
     expect(`${finding.message} ${finding.remediation ?? ''}`).not.toContain(
       'does not publish the site',
     );
+  });
+
+  it('publishes through the governed Pages journal on the framework checkout', () => {
+    const missing = PAGES_JOURNAL.filter((path) => !existsSync(join(REPOSITORY_ROOT, path)));
+    expect(missing, 'governed Pages journal files').toEqual([]);
   });
 });
