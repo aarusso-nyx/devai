@@ -2,7 +2,7 @@
 id: ADR-GOV-0020
 title: AGENTS.md is the canonical instruction contract and hosts receive generated projections
 type: adr
-status: proposed
+status: accepted
 date: 2026-09-28
 authority: Architect
 supersedes: []
@@ -33,9 +33,9 @@ inspector_acceptance:
 
 ## Status
 
-Proposed on 2026-09-28 from the harness convergence brainstorm and its
-independent review. Binds nothing until the Architect sets it to accepted
-before the round that implements it opens. Changes the bootstrap's
+Accepted on 2026-09-29 by the Architect before the round that implements it
+opened; proposed on 2026-09-28 from the harness convergence brainstorm and its
+independent review. Changes the bootstrap's
 instruction pair, the `--force` overwrite rule, the `agents-claude-sync`
 doctor check, and the recipe front matter; the recipe installer's symlink
 refusal is kept.
