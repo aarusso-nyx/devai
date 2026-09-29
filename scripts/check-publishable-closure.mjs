@@ -210,12 +210,15 @@ for (const task of tasks.tasks) {
   }
 }
 
+// The two ledger members are the suite population; the two planning-lane
+// members (ADR-CHK-0003) are declared for `check --only` and belong to no suite.
 const suites = json('law/policy/check-suites.json');
 const definedMembers = suites.member_definitions.map((entry) => entry.id).sort();
 const referencedMembers = [...new Set(suites.suites.flatMap((suite) => suite.members))].sort();
 if (
-  JSON.stringify(definedMembers) !== JSON.stringify(['ledger-local', 'ledger-rc']) ||
-  JSON.stringify(definedMembers) !== JSON.stringify(referencedMembers)
+  JSON.stringify(definedMembers) !==
+    JSON.stringify(['campaign', 'ledger-local', 'ledger-rc', 'scorecard-page']) ||
+  JSON.stringify(referencedMembers) !== JSON.stringify(['ledger-local', 'ledger-rc'])
 ) {
   fail('PUBLISHABLE_CHECK_SUITE_POPULATION_INVALID', definedMembers.join(','));
 }
