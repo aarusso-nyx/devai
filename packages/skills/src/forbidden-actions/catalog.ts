@@ -11,6 +11,17 @@
  * configured otherwise.
  */
 
+/**
+ * ADR-GOV-0022: a governed file whose schema-valid append-only change is registry
+ * maintenance, not an invariant mutation.
+ */
+export interface ForbiddenMaintenanceExemption {
+  readonly path: string;
+  readonly schema: string;
+  readonly change: 'append-only';
+  readonly collection: string;
+}
+
 export interface ForbiddenActionEntry {
   readonly id: string;
   readonly action: string;
@@ -18,6 +29,7 @@ export interface ForbiddenActionEntry {
   readonly severity: 'critical' | 'high' | 'medium';
   readonly detect_patterns?: readonly string[];
   readonly allowed_change_line_patterns?: readonly string[];
+  readonly maintenance_exemptions?: readonly ForbiddenMaintenanceExemption[];
   readonly safer_alternative?: string;
 }
 
@@ -166,6 +178,14 @@ export const CANONICAL_FORBIDDEN_ACTIONS: readonly ForbiddenActionEntry[] = [
     severity: 'critical',
     detect_patterns: [
       '\\b(?:git\\s+(?:add|rm)|rm)\\s+[^\\n]*(?:law/|product/|record/|\\.devai/(?:config|local/rounds)/)',
+    ],
+    maintenance_exemptions: [
+      {
+        path: 'law/policy/forbidden-action-authorizations.json',
+        schema: 'law/schemas/forbidden-action-authorizations.schema.json',
+        change: 'append-only',
+        collection: '/authorizations',
+      },
     ],
     safer_alternative: 'Use Architect authority and record the current rationale',
   },

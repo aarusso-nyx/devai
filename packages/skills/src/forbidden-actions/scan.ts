@@ -4,7 +4,10 @@ import { join } from 'node:path';
 import type { ForbiddenActionEntry } from './catalog.js';
 import {
   activeAdrAffectedRules,
+  appendOnlyMaintenanceExemptions,
+  isAppendOnlyMaintenance,
   loadForbiddenAuthorizations,
+  type AppendOnlyMaintenanceExemption,
   type ForbiddenActionAuthorizationSummary,
 } from './authorizations.js';
 import { firstUnallowedChangeMatch, hasValidPatterns } from './patterns.js';
@@ -37,6 +40,68 @@ export interface ScanForbiddenResult {
 
 const GIT_INSPECTION_MAX_BUFFER = 16 * 1024 * 1024;
 const FORBIDDEN_AUTHORIZATION_PATH = 'law/policy/forbidden-action-authorizations.json';
+
+function gitOutput(repoRoot: string, args: readonly string[]): string {
+  return execFileSync('git', [...args], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    maxBuffer: GIT_INSPECTION_MAX_BUFFER,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+}
+
+/**
+ * Read one path from a commit tree. Returns `null` when the path is absent and
+ * throws when it is present as anything other than a regular file.
+ */
+function regularFileAt(repoRoot: string, commit: string, path: string): string | null {
+  const listing = gitOutput(repoRoot, ['ls-tree', '-z', '--full-tree', commit, '--', path]);
+  const records = listing.split('\0').filter((record) => record.length > 0);
+  const match = records
+    .map((record) => /^(\d{6}) (\w+) ([0-9a-f]+)\t([\s\S]*)$/u.exec(record))
+    .find((parts) => parts?.[4] === path);
+  if (match === undefined || match === null) return null;
+  if (match[2] !== 'blob' || (match[1] !== '100644' && match[1] !== '100755')) {
+    throw new Error('Registry path is not a regular file');
+  }
+  return gitOutput(repoRoot, ['cat-file', 'blob', match[3] ?? '']);
+}
+
+/**
+ * ADR-GOV-0022: the declared registry paths whose change in this commit is
+ * schema-valid append-only maintenance against every parent. An added file or a
+ * root commit is an empty parent collection; a rename, copy, delete, or type
+ * change of the path is never maintenance.
+ */
+function maintenancePathsOf(
+  repoRoot: string,
+  sha: string,
+  parents: readonly string[],
+  changes: readonly { status: string; paths: readonly string[] }[],
+  exemptions: readonly AppendOnlyMaintenanceExemption[],
+): ReadonlySet<string> {
+  const maintained = new Set<string>();
+  for (const exemption of exemptions) {
+    const touching = changes.filter(({ paths }) => paths.includes(exemption.path));
+    if (touching.length === 0) continue;
+    if (touching.some(({ status }) => status !== 'A' && status !== 'M')) continue;
+    let appendOnly: boolean;
+    try {
+      const child = regularFileAt(repoRoot, sha, exemption.path);
+      appendOnly =
+        child !== null &&
+        (parents.length === 0 ? [undefined] : parents).every((parent) => {
+          const parentBytes =
+            parent === undefined ? null : regularFileAt(repoRoot, parent, exemption.path);
+          return isAppendOnlyMaintenance(exemption, parentBytes ?? undefined, child);
+        });
+    } catch {
+      appendOnly = false;
+    }
+    if (appendOnly) maintained.add(exemption.path);
+  }
+  return maintained;
+}
 
 /**
  * Scan recent commits for forbidden-pattern matches in messages and
@@ -176,6 +241,9 @@ export function scanForbiddenActions(opts: ScanForbiddenOptions): ScanForbiddenR
       ],
     };
   }
+  const maintenanceExemptions = appendOnlyMaintenanceExemptions(
+    registry.find((entry) => entry.id === 'FORBID-MUTATE-INVARIANTS'),
+  );
   const authorizationKeys = new Set(
     authorizationLoad.receipts.map((receipt) => `${receipt.forbidden_id}@${receipt.commit}`),
   );
@@ -236,6 +304,7 @@ export function scanForbiddenActions(opts: ScanForbiddenOptions): ScanForbiddenR
     let semanticPatch: string;
     let changedPaths: string[];
     let addedPaths: Set<string>;
+    let maintenancePaths: ReadonlySet<string> = new Set();
     try {
       let treeIdenticalToParent = false;
       if (parents.length > 1) {
@@ -293,7 +362,15 @@ export function scanForbiddenActions(opts: ScanForbiddenOptions): ScanForbiddenR
         addedPaths = new Set(
           changes.filter(({ status }) => status === 'A').flatMap(({ paths }) => paths),
         );
+        maintenancePaths = maintenancePathsOf(
+          opts.repoRoot,
+          sha,
+          parents,
+          changes,
+          maintenanceExemptions,
+        );
         operations = changes
+          .filter(({ paths }) => !paths.every((path) => maintenancePaths.has(path)))
           .map(({ status, paths }) => {
             const line = [status, ...paths].join('\t');
             if (status.startsWith('R') || status.startsWith('C')) {
@@ -318,6 +395,7 @@ export function scanForbiddenActions(opts: ScanForbiddenOptions): ScanForbiddenR
             ':(exclude)law/policy/forbidden-actions.json',
             `:(exclude)${FORBIDDEN_AUTHORIZATION_PATH}`,
             ':(exclude).devai/config/forbidden-actions.json',
+            ...[...maintenancePaths].map((path) => `:(exclude,literal)${path}`),
           ],
           {
             cwd: opts.repoRoot,
@@ -339,6 +417,8 @@ export function scanForbiddenActions(opts: ScanForbiddenOptions): ScanForbiddenR
     }
     for (const entry of compiled) {
       const protectedPaths = changedPaths.filter((path) => {
+        // Validated append-only registry maintenance is not an invariant mutation.
+        if (entry.id === 'FORBID-MUTATE-INVARIANTS' && maintenancePaths.has(path)) return false;
         const bootstrapMaterialization =
           addedPaths.has(path) &&
           (path.startsWith('.devai/config/') ||
