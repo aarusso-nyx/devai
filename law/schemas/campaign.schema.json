@@ -708,8 +708,9 @@
           "properties": {
             "verdict": {
               "type": "object",
-              "required": ["verdict"],
-              "description": "The verdict document extracted from the evaluator reply through the shared extractor, in the shape law/schemas/review-verdict.schema.json (ADR-MDL-0001) declares; the campaign check validates it against that schema. Only the verdict member is restated here.",
+              "additionalProperties": false,
+              "required": ["verdict", "confidence", "rationale"],
+              "description": "The verdict document extracted from the evaluator reply through the shared extractor, restated member for member from law/schemas/review-verdict.schema.json (ADR-MDL-0001) so the campaign check refuses a partial or foreign document without a cross-file reference; the reply schema stays the contract and this restatement follows it.",
               "properties": {
                 "verdict": {
                   "enum": ["pass", "review", "fail", "unknown"]
@@ -724,7 +725,33 @@
                   "minLength": 1
                 },
                 "findings": {
-                  "type": "array"
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["severity", "code", "message"],
+                    "properties": {
+                      "severity": {
+                        "enum": ["info", "warning", "error", "critical"]
+                      },
+                      "code": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "message": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "file": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "line": {
+                        "type": "integer",
+                        "minimum": 1
+                      }
+                    }
+                  }
                 }
               }
             },
