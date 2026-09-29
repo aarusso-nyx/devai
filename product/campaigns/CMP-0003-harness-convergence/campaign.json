@@ -989,12 +989,13 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0341",
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
                   "tests/contract/pull-request-workflow.contract.test.ts",
-                  "packages/cli/tests/unit/preflight-merge-group-base.test.ts"
+                  "packages/cli/tests/unit/preflight-merge-group-base.test.ts",
+                  "tests/contract/campaign-plan.contract.test.ts"
                 ],
                 "forbidden": [
                   "law/",
@@ -1023,7 +1024,7 @@
               "commit_types": ["test(workflows)", "test(cli)"],
               "prompt": {
                 "path": "prompts/TASK-0342.md",
-                "sha256": null
+                "sha256": "5ab038be4f4a1198354fe336b0534d6bf428c63c94b73948f95e3f22332ee80f"
               },
               "pull_request": null,
               "merged_as": null,
@@ -1047,7 +1048,8 @@
                   "scripts/check-workflows.mjs",
                   "packages/cli/src/services/check-runner/preflight.ts",
                   "docs/reference/error-codes.md",
-                  "scripts/run-pr-release-gate.mjs"
+                  "scripts/run-pr-release-gate.mjs",
+                  "scripts/check-campaign.mjs"
                 ],
                 "forbidden": ["law/", "product/"]
               },
@@ -1074,7 +1076,7 @@
               ],
               "prompt": {
                 "path": "prompts/TASK-0343.md",
-                "sha256": null
+                "sha256": "ed1dd4227c71c1a9646ed151e7066c080664ea256c6d0684f2d4608282901445"
               },
               "pull_request": null,
               "merged_as": null,
