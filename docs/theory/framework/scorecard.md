@@ -138,6 +138,8 @@ Soft-gate verdicts are tri-state (PASS / REVIEW / FAIL). REVIEW triggers the [ti
 
 Per Article 18, **soft-gate evaluation is performed by a model distinct from the working agent** — at minimum a different model instance with no shared context, preferably a different model family from the tie-breaker ladder. This prevents an agent from being evaluator of its own output.
 
+Each soft-gate reading comes from a model reply that carries one structured verdict document in the shape `law/schemas/review-verdict.schema.json` declares: `verdict`, `confidence`, `rationale`, and `findings` (ADR-MDL-0001). The `llm_judge` emitter reads it through the shared extractor in the model bridge, which accepts exactly one unambiguous candidate object in the reply, fenced or not, and refuses conflicting candidates, echoed examples, malformed fields, provider errors, and truncated replies. A refused reply is an `error` reading with a bounded redacted excerpt and the SHA-256 of the full reply, never a silent `unknown`; `unknown` remains the model's own explicit uncertainty under Article 39.
+
 ## Threshold defaults
 
 Default thresholds live in `.devai/scorecard/thresholds.json`. Per-cell thresholds are sensor-specific; the framework ships defaults with rationale, and clients may tighten or loosen via pack config (per-pack tightening is encouraged; per-pack loosening surfaces as a scorecard finding the Auditor reviews).
@@ -161,6 +163,8 @@ When two disciplines disagree on whether a change satisfies a specification, or 
 The concrete model families and the ladder's tier ordering are F5 policy configuration, not constitutional text (Article 23 as amended at 0.3.0); in the supported harness each model invocation is human-initiated.
 
 The ladder applies to soft-gate scoring disputes, RGR ambiguity classification, triage classification confidence below threshold, and any other case where stochastic judgment governs.
+
+The cross-family breaker of step 1 replies with a document in the shape `law/schemas/triage-breaker.schema.json` declares: `classification`, `confidence`, and `rationale` (ADR-MDL-0001), read through the same extractor. A vote that matches one candidate resolves the tie in that candidate's favour; any other vote, including `inconclusive`, escalates to a human. The breaker refuses a review verdict and the judge refuses a breaker vote: neither consumer accepts the other's document.
 
 ## Cycle stages
 
