@@ -41,6 +41,7 @@ export const ROSTER = [
   'local-evidence-manifest.schema.json',
   'meta.schema.json',
   'model-runtime-registry.schema.json',
+  'model-tiers.schema.json',
   'module-blueprint.schema.json',
   'mutation-assurance-policy-v2.schema.json',
   'mutation-assurance-v2.schema.json',
