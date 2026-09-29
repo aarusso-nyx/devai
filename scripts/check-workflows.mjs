@@ -203,11 +203,30 @@ const PREFLIGHT_ALLOWED_SCRIPTS = [
 // each must carry.
 const PREFLIGHT_STEP_ID = 'preflight';
 const PREFLIGHT_LANE_STEP_IDS = ['install', PREFLIGHT_STEP_ID, 'affected'];
-const PREFLIGHT_BASE = '--base ${{ github.event.pull_request.base.sha }}';
+// Per-event bindings (ADR-CHK-0004, remote-preflight-contract.md Queue
+// admission): the merge_group head and base under merge_group, the pull
+// request head and base otherwise; the job binds the base once and every base
+// argument reads it.
+const PREFLIGHT_TRIGGERS = ['merge_group', 'pull_request'];
+const PREFLIGHT_TRIGGER_FILTERS = ['paths', 'paths-ignore', 'branches', 'branches-ignore'];
+const PREFLIGHT_CANDIDATE_REF =
+  "${{ github.event_name == 'merge_group' && github.event.merge_group.head_sha || github.event.pull_request.head.sha }}";
+const PREFLIGHT_BASE_VARIABLE = 'DEVAI_PREFLIGHT_BASE';
+const PREFLIGHT_BASE_BINDING =
+  "${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || github.event.pull_request.base.sha }}";
+// One group per queue entry, keyed by its head sha, and one per pull request, so
+// no queue entry cancels another and a new head of a pull request cancels the
+// previous one.
+const PREFLIGHT_CONCURRENCY_GROUP =
+  "${{ github.event_name == 'merge_group' && format('{0}-mq-{1}', github.workflow, github.event.merge_group.head_sha) || format('{0}-pr-{1}', github.workflow, github.event.pull_request.number) }}";
+const PREFLIGHT_BASE = `--base "$${PREFLIGHT_BASE_VARIABLE}"`;
 const PREFLIGHT_LANE_COMMANDS = {
   install: ['pnpm install --frozen-lockfile', 'pnpm run release:bootstrap'],
   [PREFLIGHT_STEP_ID]: [`check --preflight --run ${PREFLIGHT_BASE}`],
-  affected: [`check --affected --run ${PREFLIGHT_BASE}`, 'pnpm run release:pr-gate'],
+  affected: [
+    `check --affected --run ${PREFLIGHT_BASE}`,
+    `pnpm run release:pr-gate -- "$${PREFLIGHT_BASE_VARIABLE}"`,
+  ],
 };
 const PREFLIGHT_EVIDENCE_TOKENS =
   /\b(?:evidence|receipt|attest(?:ation)?|verifier|provenance|ledger|sign(?:ing|ed)?)\b/iu;
@@ -865,15 +884,29 @@ function checkWorkflow(file, source, findings, pins) {
  * See docs/dev/operations/remote-preflight-contract.md.
  */
 function checkPreflightWorkflow(file, workflow, source, findings, pins) {
-  const triggerNames = Object.keys(object(workflow.on)).sort();
-  if (triggerNames.length !== 1 || triggerNames[0] !== 'pull_request') {
+  const triggers = object(workflow.on);
+  const triggerNames = Object.keys(triggers).sort();
+  if (JSON.stringify(triggerNames) !== JSON.stringify(PREFLIGHT_TRIGGERS)) {
     findings.push(
       finding(
         'CI_PREFLIGHT_TRIGGER_INVALID',
         file,
-        'preflight must trigger on pull_request only; push, schedule, and workflow_dispatch would reach a protected ref',
+        'preflight must trigger on exactly pull_request and merge_group; push, schedule, and workflow_dispatch would reach a protected ref',
       ),
     );
+  }
+  for (const name of PREFLIGHT_TRIGGERS) {
+    const filters = Object.keys(object(triggers[name])).filter((key) =>
+      PREFLIGHT_TRIGGER_FILTERS.includes(key),
+    );
+    if (filters.length > 0)
+      findings.push(
+        finding(
+          'CI_PREFLIGHT_TRIGGER_INVALID',
+          file,
+          `${name} must carry no ${filters.join(', ')} filter; a filter lets a candidate suppress the gate`,
+        ),
+      );
   }
 
   const permissions = object(workflow.permissions);
@@ -886,13 +919,13 @@ function checkPreflightWorkflow(file, workflow, source, findings, pins) {
   const concurrency = object(workflow.concurrency);
   if (
     concurrency['cancel-in-progress'] !== true ||
-    concurrency.group !== '${{ github.workflow }}-pr-${{ github.event.pull_request.number }}'
+    concurrency.group !== PREFLIGHT_CONCURRENCY_GROUP
   ) {
     findings.push(
       finding(
         'CI_PREFLIGHT_CONCURRENCY_INVALID',
         file,
-        'preflight must declare concurrency with cancel-in-progress: true',
+        `preflight must declare concurrency group ${PREFLIGHT_CONCURRENCY_GROUP} with cancel-in-progress: true, so one queue entry never cancels another`,
       ),
     );
   }
@@ -969,6 +1002,28 @@ function checkPreflightWorkflow(file, workflow, source, findings, pins) {
         finding('CI_PREFLIGHT_GATE_INVALID', file, `step ${String(step.id)} must not be optional`),
       );
   }
+  if (object(jobs.preflight?.env)[PREFLIGHT_BASE_VARIABLE] !== PREFLIGHT_BASE_BINDING)
+    findings.push(
+      finding(
+        'CI_PREFLIGHT_GATE_INVALID',
+        file,
+        `jobs.preflight.env.${PREFLIGHT_BASE_VARIABLE} must be ${PREFLIGHT_BASE_BINDING}`,
+      ),
+    );
+  const checkout = (Array.isArray(jobs.preflight?.steps) ? jobs.preflight.steps : [])
+    .map(object)
+    .find((step) => typeof step.uses === 'string' && step.uses.startsWith('actions/checkout@'));
+  if (
+    object(checkout?.with).ref !== PREFLIGHT_CANDIDATE_REF ||
+    String(object(checkout?.with)['fetch-depth']) !== '0'
+  )
+    findings.push(
+      finding(
+        'CI_PREFLIGHT_GATE_INVALID',
+        file,
+        `the checkout must take ref ${PREFLIGHT_CANDIDATE_REF} with fetch-depth: 0`,
+      ),
+    );
   for (const [id, required] of Object.entries(PREFLIGHT_LANE_COMMANDS)) {
     const step = laneSteps.find((candidate) => candidate.id === id);
     for (const text of required) {
