@@ -4,8 +4,20 @@ import { join } from 'node:path';
 import type { ProjectConfig, GovernanceFinding, Builder } from './docs-governance-config-checks.js';
 
 /**
+ * The governed Pages journal: the publication workflow and the process script
+ * it runs. A repository that carries both publishes its site only through that
+ * journal, so the gh-pages branch is its output, not a prerequisite
+ * (ADR-CHK-0003).
+ */
+const GOVERNED_PAGES_JOURNAL = [
+  '.github/workflows/site-publish.yml',
+  'scripts/process/publish-site.mjs',
+] as const;
+
+/**
  * Rule 7 — gh-pages branch exists on origin.
- * git ls-remote origin gh-pages → any ref. WARN if missing.
+ * PASS when the governed Pages journal is present, whatever origin reports;
+ * otherwise git ls-remote origin gh-pages → any ref, WARN if missing.
  */
 export function checkGhPagesBranch(
   repoRoot: string,
@@ -17,6 +29,14 @@ export function checkGhPagesBranch(
       ruleId: 'docs-governance.gh-pages-branch',
       severity: 'pass',
       message: 'gh-pages branch check skipped via --skip-publish-check',
+    };
+  }
+
+  if (GOVERNED_PAGES_JOURNAL.every((path) => existsSync(join(repoRoot, path)))) {
+    return {
+      ruleId: 'docs-governance.gh-pages-branch',
+      severity: 'pass',
+      message: `Site publishes through the governed Pages journal (${GOVERNED_PAGES_JOURNAL.join(', ')})`,
     };
   }
 
@@ -110,7 +130,7 @@ export function checkNoCiPublish(repoRoot: string): GovernanceFinding {
       severity: 'fail',
       message: `Found CI docs-publish workflow(s) — documentation publishing must be an explicitly authorized local effect; see docs/adopters/docs-layout.md#publication-boundary`,
       remediation:
-        'Remove or disable the GH Actions documentation-deployment workflow. CI validates freshness and does not publish the site.',
+        'Remove or disable the GH Actions documentation-deployment workflow. The site is published only through the governed Pages journal, never by a pull-request or push workflow.',
       locations: violations.map((v) => `.github/workflows/${v.split(':')[0] ?? v}`),
     };
   }
