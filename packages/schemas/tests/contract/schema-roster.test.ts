@@ -10,7 +10,7 @@ const ROOT = resolve(import.meta.dirname, '../../../..');
 // preceded it plus that one. EXPECTED-RED until TASK-0353.
 describe('schema roster', () => {
   it('holds the previous roster plus model-tiers', () => {
-    expect(ROSTER).toHaveLength(93);
+    expect(ROSTER).toHaveLength(95);
     expect(ROSTER).toContain('model-tiers.schema.json');
   });
 
