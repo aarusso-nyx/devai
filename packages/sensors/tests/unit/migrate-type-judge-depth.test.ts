@@ -228,7 +228,7 @@ describe('LLM judge sensor depth', () => {
     expect(reading).toMatchObject({ status: 'error', metrics: { input_tokens: 2 } });
   });
 
-  it('normalizes verdict, rationale, findings, metadata, and confidence', async () => {
+  it('copies verdict, rationale, findings, metadata, and confidence', async () => {
     const reading = await senseJudge(
       {
         aspect: 'depth',
@@ -244,8 +244,7 @@ describe('LLM judge sensor depth', () => {
           rationale: 'needs attention',
           findings: [
             { severity: 'critical', code: 'A', message: 'a' },
-            { severity: 'other', code: 'B', message: 'b' },
-            { severity: 'error', code: 1, message: 'ignored' },
+            { severity: 'info', code: 'B', message: 'b' },
           ],
         },
       }),
@@ -254,11 +253,32 @@ describe('LLM judge sensor depth', () => {
     expect(reading.findings?.map((finding) => finding.code)).toEqual(['rationale', 'A', 'B']);
   });
 
-  it('parses text JSON and maps an unsupported verdict to UNKNOWN', async () => {
+  it('parses text JSON and reports an unsupported verdict as an error, never UNKNOWN', async () => {
     const reading = await senseJudge(
       { aspect: 'depth', rubric: 'r', evidence: 'e' },
       client({ text: '{"verdict":"invented"}' }),
     );
-    expect(reading).toMatchObject({ status: 'unknown', metrics: { confidence: 0 } });
+    expect(reading).toMatchObject({
+      status: 'error',
+      findings: [{ severity: 'critical', code: 'judge_invalid_response' }],
+    });
+  });
+
+  it('refuses malformed findings instead of normalizing or dropping them', async () => {
+    const reading = await senseJudge(
+      { aspect: 'depth', rubric: 'rubric', evidence: 'evidence' },
+      client({
+        json: {
+          verdict: 'review',
+          confidence: 0.75,
+          rationale: 'needs attention',
+          findings: [
+            { severity: 'other', code: 'B', message: 'b' },
+            { severity: 'error', code: 1, message: 'ignored' },
+          ],
+        },
+      }),
+    );
+    expect(reading).toMatchObject({ status: 'error' });
   });
 });
