@@ -19,6 +19,8 @@ describe('adopter policy CI economy boundary', () => {
         schemaVersion: '1.0.0',
         policy_id: 'fixture.adopter-policy',
         policy_version: '1.0.0',
+        // ADR-CFG-0002: /project_type is an owned row, so the source declares it.
+        project: { project_type: 'framework' },
         ci_economy: ciEconomy,
       },
       currentProject: {
