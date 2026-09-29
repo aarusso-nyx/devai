@@ -22,14 +22,31 @@ import { parse } from 'yaml';
 const ROOT = resolve('.');
 const WORKFLOW = join(ROOT, '.github/workflows/pull-request-checks.yml');
 const BOOTSTRAP_CLI = join(ROOT, '.devai/state/pr-bootstrap/cli/bin.js');
-const BASE_EXPRESSION = /\$\{\{\s*github\.event\.pull_request\.base\.sha\s*\}\}/gu;
+// The lane binds the base as a pull_request event does: an expression reads
+// github.event.pull_request.base.sha directly, or through a job or step env
+// variable whose expression selects it by event (merge_group reads its own base).
+const EXPRESSION = /\$\{\{([\s\S]*?)\}\}/gu;
+const BASE_REFERENCE = 'github.event.pull_request.base.sha';
+const EVENT_TEST = /^github\.event_name\s*==\s*'([a-z_]+)'$/u;
 const CHECK_INVOCATION = /(?:pr-bootstrap\/cli\/bin\.js|\bdevai)\s+check\s+([^\n;&|]*)/u;
 
-type WorkflowStep = Readonly<{ name?: string; id?: string; run?: string; uses?: string }>;
-type Workflow = Readonly<{ jobs?: Readonly<Record<string, { steps?: readonly WorkflowStep[] }>> }>;
+type Environment = Readonly<Record<string, unknown>>;
+type WorkflowStep = Readonly<{
+  name?: string;
+  id?: string;
+  run?: string;
+  uses?: string;
+  env?: Environment;
+}>;
+type Workflow = Readonly<{
+  env?: Environment;
+  jobs?: Readonly<Record<string, { env?: Environment; steps?: readonly WorkflowStep[] }>>;
+}>;
 type LaneStep = Readonly<{
   kind: 'install' | 'check:preflight' | 'check:affected' | 'other';
   run: string;
+  /** Workflow, job, then step env, uninterpolated; later scopes win. */
+  env: Environment;
 }>;
 
 function git(args: readonly string[]): string {
@@ -40,26 +57,80 @@ function git(args: readonly string[]): string {
 
 function laneRunSteps(): readonly LaneStep[] {
   const workflow = parse(readFileSync(WORKFLOW, 'utf8')) as Workflow;
-  const steps = Object.values(workflow.jobs ?? {}).flatMap((job) => job.steps ?? []);
+  const steps = Object.values(workflow.jobs ?? {}).flatMap((job) =>
+    (job.steps ?? []).map((step) => ({
+      step,
+      env: { ...workflow.env, ...job.env, ...step.env },
+    })),
+  );
   return steps
-    .filter((step): step is WorkflowStep & { run: string } => typeof step.run === 'string')
-    .map((step) => {
+    .filter(
+      (entry): entry is { step: WorkflowStep & { run: string }; env: Environment } =>
+        typeof entry.step.run === 'string',
+    )
+    .map(({ step, env }) => {
       const run = step.run.trim();
       const check = CHECK_INVOCATION.exec(run)?.[1] ?? '';
       if (/\bpnpm install --frozen-lockfile\b/u.test(run) && check === '') {
-        return { kind: 'install', run };
+        return { kind: 'install', run, env };
       }
-      if (/(?:^|\s)--preflight(?:\s|$)/u.test(check)) return { kind: 'check:preflight', run };
-      if (/(?:^|\s)--affected(?:\s|$)/u.test(check)) return { kind: 'check:affected', run };
-      return { kind: 'other', run };
+      if (/(?:^|\s)--preflight(?:\s|$)/u.test(check)) {
+        return { kind: 'check:preflight', run, env };
+      }
+      if (/(?:^|\s)--affected(?:\s|$)/u.test(check)) return { kind: 'check:affected', run, env };
+      return { kind: 'other', run, env };
     });
 }
 
+/**
+ * Evaluates one expression body as a pull_request event on the local base: the
+ * `a && b || c` form over `github.event_name == '<event>'` tests and the pull
+ * request base. Anything else stays unresolved.
+ */
+function pullRequestExpression(inner: string, base: string): string | undefined {
+  for (const alternative of inner.split('||')) {
+    let value: string | boolean | undefined = true;
+    for (const operand of alternative.split('&&').map((text) => text.trim())) {
+      const event = EVENT_TEST.exec(operand);
+      if (event !== null) value = event[1] === 'pull_request';
+      else if (operand === BASE_REFERENCE) value = base;
+      else return undefined;
+      if (value === false) break;
+    }
+    if (typeof value === 'string') return value;
+  }
+  return undefined;
+}
+
+/** Replaces each `${{ }}` the local base resolves; leaves the others for the refusal below. */
+function interpolate(text: string, base: string): string {
+  return text.replace(
+    EXPRESSION,
+    (all, inner: string) => pullRequestExpression(inner, base) ?? all,
+  );
+}
+
+/** One shell word: a literal, or `$VAR` / `${VAR}` (optionally quoted) from the step env. */
+function shellWord(word: string, environment: Readonly<Record<string, string>>): string {
+  const unquoted = word.replace(/^(["'])(.*)\1$/u, '$2');
+  const variable = /^\$(?:\{([A-Za-z_][A-Za-z0-9_]*)\}|([A-Za-z_][A-Za-z0-9_]*))$/u.exec(unquoted);
+  if (variable === null) return unquoted;
+  return environment[variable[1] ?? variable[2] ?? ''] ?? unquoted;
+}
+
 /** The check argument vector of a lane step, bound to a local base, as a plan-only call. */
-function laneCheckArguments(run: string, base: string): readonly string[] {
-  const match = CHECK_INVOCATION.exec(run.replace(BASE_EXPRESSION, base));
+function laneCheckArguments(step: LaneStep, base: string): readonly string[] {
+  const { run } = step;
+  const environment = Object.fromEntries(
+    Object.entries(step.env).map(([name, value]) => [name, interpolate(String(value), base)]),
+  );
+  const match = CHECK_INVOCATION.exec(interpolate(run, base));
   if (match?.[1] === undefined) throw new Error(`no bootstrap CLI check invocation in: ${run}`);
-  const args = match[1].trim().split(/\s+/u).filter(Boolean);
+  const args = match[1]
+    .trim()
+    .split(/\s+/u)
+    .filter(Boolean)
+    .map((word) => shellWord(word, environment));
   const unresolved = args.find((arg) => arg.includes('${{') || arg.startsWith('$'));
   if (unresolved !== undefined)
     throw new Error(`unresolved lane expression ${unresolved} in: ${run}`);
@@ -164,7 +235,7 @@ describe('preflight lane parity (ADR-CHK-0001 IA-003)', () => {
     const step = laneRunSteps().find((candidate) => candidate.kind === kind);
     expect(step, `the lane carries a ${kind} step`).toBeDefined();
     if (step === undefined) return;
-    const laneArgs = laneCheckArguments(step.run, base);
+    const laneArgs = laneCheckArguments(step, base);
     const lane = plannedNodeSet(laneArgs, base);
     expect(plannedNodeSet(laneArgs, base), `consecutive lane ${kind} plans`).toBe(lane);
     const local = plannedNodeSet(['check', target, '--task-plan', '--base', base], base);
