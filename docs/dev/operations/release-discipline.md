@@ -230,10 +230,13 @@ The job set of `release.yml` is exactly `build-release`, `control-commit-summary
 `site-publish.yml` is exactly `publish-site`. Job by job:
 
 - `control-commit-summary` declares no `environment` and no `if`, has
-  `permissions: contents: read`, checks nothing out, and references no secret. Its one
-  step reads `vars.DEVAI_PROCESS_CONTROL_COMMIT` into `CONTROL_COMMIT`, fails unless the
-  value matches `^[a-f0-9]{40}$`, and appends the line
-  `DEVAI_PROCESS_CONTROL_COMMIT=<sha>` to `$GITHUB_STEP_SUMMARY`. Because `verify-ledger`
+  `permissions: contents: read`, and references no secret. Its only checkout is a
+  sparse, credential-free one (`persist-credentials: false`) of
+  `scripts/process/release-prerequisites.mjs` at the workflow commit. Its one run step
+  reads `vars.DEVAI_PROCESS_CONTROL_COMMIT` into `CONTROL_COMMIT` and runs
+  `release-prerequisites.mjs control-commit`, which fails unless the value matches
+  `^[a-f0-9]{40}$` and appends the line `DEVAI_PROCESS_CONTROL_COMMIT=<sha>` to
+  `$GITHUB_STEP_SUMMARY`. Because `verify-ledger`
   needs it, the summary shows the control commit before the first reviewer stop opens
   (ADR-REL-0030 IA-005). It does not replace the checkout and binding of the same
   variable that every gated job still performs.
