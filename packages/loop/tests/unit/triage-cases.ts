@@ -75,6 +75,7 @@ function breaker(
       model: 'fixture',
       usage: { input_tokens: 1, output_tokens: 1, cost_usd: 0 },
       latency_ms: 1,
+      finish_reason: 'stop',
       ...(options?.asText ? {} : { json: result }),
     }),
   };
@@ -252,7 +253,7 @@ describe('Article-23 ladder', () => {
     });
     expect(invalid).toMatchObject({
       classification: 'inconclusive',
-      confidence: { score: 0.5 },
+      confidence: { score: 0 },
     });
   });
 
@@ -274,8 +275,8 @@ describe('Article-23 ladder', () => {
 
     expect(result).toMatchObject({
       classification: 'inconclusive',
-      confidence: { score: 0.5 },
+      confidence: { score: 0 },
     });
-    expect(result.rationale).toContain('chose inconclusive');
+    expect(result.rationale).toContain('reply rejected');
   });
 });

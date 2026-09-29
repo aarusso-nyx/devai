@@ -122,6 +122,7 @@ function recordingBreaker(reply: {
         model: reply.model ?? 'breaker-fixture',
         usage: { input_tokens: 12, output_tokens: 8, cost_usd: 0.0001 },
         latency_ms: 42,
+        finish_reason: 'stop' as const,
         ...('json' in reply ? { json: reply.json } : {}),
       });
     },
@@ -750,7 +751,7 @@ describe('Article-23 ladder prompt construction', () => {
     expect(lines[10]).toBe('rationale: ');
   });
 
-  it('identifies itself and demands deterministic JSON from the breaker', async () => {
+  it('identifies itself and asks the breaker for the triage-breaker schema', async () => {
     const { first, second } = disagreeingPair();
     const client = recordingBreaker({ json: { classification: 'policy_issue', confidence: 0.7 } });
 
@@ -758,9 +759,9 @@ describe('Article-23 ladder prompt construction', () => {
 
     expect(client.calls[0]?.meta).toEqual({ caller: 'tieBreakWithLadder' });
     expect(client.calls[0]?.opts).toEqual({
-      response_format_json: true,
       temperature: 0,
       max_output_tokens: 512,
+      response_schema: 'triage-breaker.schema.json',
     });
   });
 
@@ -798,11 +799,11 @@ describe('Article-23 ladder response handling', () => {
     expect(result.confidence.method).toBe('article-23-cross-family-breaker');
   });
 
-  it('falls back to the text body when json is not an object', async () => {
+  it('refuses a json field that is not an object instead of falling back to the text body', async () => {
     const { first, second } = disagreeingPair();
     const client = recordingBreaker({
       json: 'policy_issue',
-      text: JSON.stringify({ classification: 'policy_issue', confidence: 0.8 }),
+      text: JSON.stringify({ classification: 'policy_issue', confidence: 0.8, rationale: 'r' }),
     });
 
     const result = await tieBreakWithLadder({
@@ -812,14 +813,16 @@ describe('Article-23 ladder response handling', () => {
       timestamp: TIMESTAMP,
     });
 
-    expect(result.classification).toBe('policy_issue');
+    expect(result.classification).toBe('inconclusive');
+    expect(result.recommended_route.action).toBe('escalate_to_human');
+    expectSchemaConformant(result);
   });
 
   it('prefers the structured json body over a conflicting text body', async () => {
     const { first, second } = disagreeingPair();
     const client = recordingBreaker({
-      json: { classification: 'sensor_error', confidence: 0.99 },
-      text: JSON.stringify({ classification: 'policy_issue', confidence: 0.1 }),
+      json: { classification: 'sensor_error', confidence: 0.99, rationale: 'adapter crashed' },
+      text: JSON.stringify({ classification: 'policy_issue', confidence: 0.1, rationale: 'r' }),
     });
 
     const result = await tieBreakWithLadder({
@@ -845,14 +848,16 @@ describe('Article-23 ladder response handling', () => {
 
     expect(result.classification).toBe('inconclusive');
     expect(result.confidence).toEqual({
-      score: 0.5,
+      score: 0,
       method: 'article-23-cross-family-breaker',
     });
   });
 
   it('accepts a breaker confidence of exactly zero', async () => {
     const { first, second } = disagreeingPair();
-    const client = recordingBreaker({ json: { classification: 'reference_gap', confidence: 0 } });
+    const client = recordingBreaker({
+      json: { classification: 'reference_gap', confidence: 0, rationale: 'unsure' },
+    });
 
     const result = await tieBreakWithLadder({
       first,
@@ -868,7 +873,9 @@ describe('Article-23 ladder response handling', () => {
 
   it('accepts a breaker confidence of exactly one', async () => {
     const { first, second } = disagreeingPair();
-    const client = recordingBreaker({ json: { classification: 'reference_gap', confidence: 1 } });
+    const client = recordingBreaker({
+      json: { classification: 'reference_gap', confidence: 1, rationale: 'certain' },
+    });
 
     const result = await tieBreakWithLadder({
       first,
@@ -881,10 +888,10 @@ describe('Article-23 ladder response handling', () => {
     expectSchemaConformant(result);
   });
 
-  it('refuses a negative breaker confidence and falls back to the midpoint', async () => {
+  it('refuses a negative breaker confidence and escalates without a substituted midpoint', async () => {
     const { first, second } = disagreeingPair();
     const client = recordingBreaker({
-      json: { classification: 'reference_gap', confidence: -0.5 },
+      json: { classification: 'reference_gap', confidence: -0.5, rationale: 'r' },
     });
 
     const result = await tieBreakWithLadder({
@@ -894,13 +901,14 @@ describe('Article-23 ladder response handling', () => {
       timestamp: TIMESTAMP,
     });
 
-    expect(result.confidence.score).toBe(0.5);
+    expect(result.classification).toBe('inconclusive');
+    expect(result.confidence.score).toBe(0);
     expectSchemaConformant(result);
   });
 
-  it('falls back to the midpoint when the breaker omits its confidence', async () => {
+  it('escalates without a substituted midpoint when the breaker omits its confidence', async () => {
     const { first, second } = disagreeingPair();
-    const client = recordingBreaker({ json: { classification: 'reference_gap' } });
+    const client = recordingBreaker({ json: { classification: 'reference_gap', rationale: 'r' } });
 
     const result = await tieBreakWithLadder({
       first,
@@ -909,7 +917,8 @@ describe('Article-23 ladder response handling', () => {
       timestamp: TIMESTAMP,
     });
 
-    expect(result.confidence.score).toBe(0.5);
+    expect(result.classification).toBe('inconclusive');
+    expect(result.confidence.score).toBe(0);
   });
 });
 
@@ -945,7 +954,7 @@ describe('Article-23 ladder resolution', () => {
   it('keeps the winner confidence when the breaker is less certain', async () => {
     const { first, second } = disagreeingPair();
     const client = recordingBreaker({
-      json: { classification: 'sensor_error', confidence: 0.2 },
+      json: { classification: 'sensor_error', confidence: 0.2, rationale: 'adapter crashed' },
     });
 
     const result = await tieBreakWithLadder({
@@ -958,7 +967,7 @@ describe('Article-23 ladder resolution', () => {
     expect(result.confidence.score).toBe(0.9);
   });
 
-  it('leaves the winner rationale untouched when the breaker supplies none', async () => {
+  it('escalates instead of resolving when the breaker supplies no rationale', async () => {
     const { first, second } = disagreeingPair();
     const client = recordingBreaker({ json: { classification: 'policy_issue', confidence: 0.7 } });
 
@@ -969,8 +978,10 @@ describe('Article-23 ladder resolution', () => {
       timestamp: TIMESTAMP,
     });
 
-    expect(result.rationale).toBe(second.rationale);
-    expect(result.rationale).not.toContain('breaker(');
+    expect(result.classification).toBe('inconclusive');
+    expect(result.recommended_route.action).toBe('escalate_to_human');
+    expect(result.rationale).toContain('reply_invalid');
+    expectSchemaConformant(result);
   });
 
   it('still attributes the breaker when the winner has no rationale', async () => {
@@ -992,7 +1003,7 @@ describe('Article-23 ladder resolution', () => {
   it('escalates with a full account when the breaker names a third class', async () => {
     const { first, second } = disagreeingPair();
     const client = recordingBreaker({
-      json: { classification: 'reference_gap', confidence: 0.66 },
+      json: { classification: 'reference_gap', confidence: 0.66, rationale: 'no spec exists yet' },
     });
 
     const result = await tieBreakWithLadder({
@@ -1010,8 +1021,7 @@ describe('Article-23 ladder resolution', () => {
       confidence: { score: 0.66, method: 'article-23-cross-family-breaker' },
       summary:
         'Article-23 breaker disagreed with both candidates (chose reference_gap); escalating per Article 19.',
-      rationale:
-        'breaker(independent/breaker-fixture) chose reference_gap; candidates were sensor_error and policy_issue.',
+      rationale: 'no spec exists yet',
       recommended_route: { discipline: 'harness_review', action: 'escalate_to_human' },
       tie_breaker_invoked: true,
       tie_breaker_evidence_refs: [first.subject_evidence_ref, second.subject_evidence_ref],
@@ -1060,7 +1070,7 @@ describe('Article-23 ladder resource failures', () => {
     });
 
     expect(result.classification).toBe('inconclusive');
-    expect(result.confidence.score).toBe(0.5);
+    expect(result.confidence.score).toBe(0);
     expectSchemaConformant(result);
   });
 
@@ -1076,13 +1086,13 @@ describe('Article-23 ladder resource failures', () => {
     });
 
     expect(result.classification).toBe('inconclusive');
-    expect(result.summary).toContain('chose inconclusive');
+    expect(result.summary).toContain('rejected (reply_invalid)');
   });
 
   it('escalates when the breaker returns a classification outside the enum', async () => {
     const { first, second } = disagreeingPair();
     const client = recordingBreaker({
-      json: { classification: 'PLANT_BUG', confidence: 0.9 },
+      json: { classification: 'PLANT_BUG', confidence: 0.9, rationale: 'r' },
     });
 
     const result = await tieBreakWithLadder({
@@ -1093,7 +1103,7 @@ describe('Article-23 ladder resource failures', () => {
     });
 
     expect(result.classification).toBe('inconclusive');
-    expect(result.confidence.score).toBe(0.9);
+    expect(result.confidence.score).toBe(0);
   });
 });
 
