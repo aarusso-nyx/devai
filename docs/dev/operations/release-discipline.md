@@ -120,7 +120,7 @@ that the existing Release and registry tag match that identity.
 A signed annotated version-tag push validates identity without rebuilding or publishing.
 Rehearsal is an explicit dispatch with `publish: false`, an exact `candidate_commit`
 on main, and an intended `release_tag` matching the package version. No tag need exist.
-Every required rehearsal job, including Linux adoption, must pass before a completion
+Every required rehearsal step, including Linux adoption, must pass before a completion
 record binds the run/attempt, workflow commit, source identity and retained artifact digests.
 Artifacts and completion records are retained for 30 days.
 
@@ -134,7 +134,10 @@ verification identities require another rehearsal. Existing immutable assets are
 replaced. A failed remote read is unknown, not proof that a publication is absent.
 
 Protected jobs load repository-local process helpers from the separately approved
-`DEVAI_PROCESS_CONTROL_COMMIT`. Candidate files cannot select that revision.
+`DEVAI_PROCESS_CONTROL_COMMIT`, a repository variable. Candidate files cannot select that
+revision. The first job of every run prints the variable to the run summary before any
+reviewer stop opens, so a stale control commit is visible to the reviewer who approves the
+first environment; every protected job still checks out and binds that exact revision itself.
 See [process simplification rollout](process-simplification-rollout.md) for staged setup.
 
 The release build also runs `npm --prefix docs/site run security:check`. DEVAI temporarily vendors
@@ -149,34 +152,218 @@ lists every currently observed moderate or high advisory by exact advisory and p
 or lockfile change must remove the applicable waiver or obtain a new explicitly recorded decision.
 
 Repository settings are separate Owner-authorized effects: enable immutable Releases,
-prohibit update/deletion of `v*` tags, require signed annotated release tags, protect the
-release and Pages environments, and select GitHub Actions as the Pages source. None of those
-settings is changed by the source workflow itself.
+prohibit update/deletion of `v*` tags, require signed annotated release tags, configure the
+release and Pages environments as the matrix below states, and select GitHub Actions as the
+Pages source. None of those settings is changed by the source workflow itself.
+
+## Approval stops and credential matrix
+
+[ADR-REL-0030](../../../law/adr/ADR-REL-0030-release-approval-topology.md) makes this
+page the reference for every job of `release.yml` and `site-publish.yml`: the environment
+each job runs in, every secret and variable it reads, its permissions, and who stops
+there. A job may read a credential only inside the environment the matrix binds it to;
+`scripts/check-workflows.mjs` pins the rows below against
+`law/policy/credential-requirements.json`, so adding a credential read to a job is a
+governed change. In both matrices `GITHUB_TOKEN` is the job-scoped Actions token, spelled
+`secrets.GITHUB_TOKEN` or `github.token`, bound to the job's declared `permissions` rather
+than to an environment. The nine ledger secrets (`DEVAI_LEDGER_ENVELOPE_B64`,
+`DEVAI_LEDGER_RESULTS_TGZ_B64`, `DEVAI_LEDGER_ARTIFACTS_TGZ_B64`,
+`DEVAI_LEDGER_TASK_POLICY_B64`, `DEVAI_LEDGER_TRUST_STORE_B64`,
+`DEVAI_LEDGER_TOOLCHAIN_B64`, `DEVAI_LEDGER_ENVIRONMENT_B64`, `DEVAI_RELEASE_SIGNERS_B64`,
+`DEVAI_EVIDENCE_READ_TOKEN`) and the four ledger variables
+(`DEVAI_LEDGER_VERIFIER_PROVENANCE_SHA256`, `DEVAI_LEDGER_POLICY_DIGEST`,
+`DEVAI_LEDGER_TRANSPORT`, `DEVAI_LEDGER_BUNDLE_SHA256`) are read only inside
+`devai-ledger-verification`. The two Pages audit variables
+(`DEVAI_PAGES_MIGRATION_AUDIT_JSON`, `DEVAI_PAGES_MIGRATION_AUDIT_SHA256`) are read only
+inside `github-pages`. `DEVAI_PROCESS_CONTROL_COMMIT` is a repository variable that any
+job may read. "Every run" means a `v*` tag push, a rehearsal dispatch, and a publication
+dispatch alike.
+
+### Before: the topology ADR-REL-0030 replaces
+
+This is `.github/workflows/release.yml` and `.github/workflows/site-publish.yml` as they
+stand until the implementing round lands. A rehearsal stops three times, a publication
+stops four times with `publish_pages: true` and three without it, and a site-only
+publication stops once.
+
+| Job                                 | Runs in                                | Environment                 | Secrets                                 | Variables                                                                                                | Permissions                                                               | Stop                                 |
+| ----------------------------------- | -------------------------------------- | --------------------------- | --------------------------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------ |
+| `verify-ledger`                     | every run                              | `devai-ledger-verification` | the nine ledger secrets                 | the four ledger variables, `DEVAI_PROCESS_CONTROL_COMMIT`                                                | `contents: read`                                                          | rehearsal 1 of 3, publication 1 of 4 |
+| `build-release`                     | rehearsal                              | `devai-rc-release`          | none                                    | none                                                                                                     | `contents: read`                                                          | rehearsal 2 of 3                     |
+| `verify-linux-adopter`              | rehearsal                              | none                        | none                                    | none                                                                                                     | `contents: read`                                                          | none                                 |
+| `rehearsal-summary`                 | rehearsal                              | `devai-rc-release`          | none                                    | `DEVAI_PROCESS_CONTROL_COMMIT`                                                                           | `contents: read`                                                          | rehearsal 3 of 3                     |
+| `promote-assets`                    | publication                            | `devai-ledger-verification` | `GITHUB_TOKEN` (`github.token`)         | `DEVAI_PROCESS_CONTROL_COMMIT`                                                                           | `contents: read`, `actions: read`                                         | publication 2 of 4                   |
+| `finalize-release`                  | publication                            | `devai-rc-publication`      | `GITHUB_TOKEN` (`secrets.GITHUB_TOKEN`) | `DEVAI_PROCESS_CONTROL_COMMIT`                                                                           | `contents: write`, `packages: write`                                      | publication 3 of 4                   |
+| `deploy-pages`                      | publication with `publish_pages: true` | `github-pages`              | `GITHUB_TOKEN` (`github.token`)         | `DEVAI_PROCESS_CONTROL_COMMIT`, `DEVAI_PAGES_MIGRATION_AUDIT_JSON`, `DEVAI_PAGES_MIGRATION_AUDIT_SHA256` | `contents: read`, `pages: write`, `deployments: write`, `id-token: write` | publication 4 of 4                   |
+| `publish-site` (`site-publish.yml`) | Owner dispatch from `main`             | `github-pages`              | `GITHUB_TOKEN` (`github.token`)         | none                                                                                                     | `contents: read`, `pages: write`, `deployments: write`, `id-token: write` | site-only 1 of 1                     |
+
+Two of those stops reopen an environment that an earlier job of the same run already
+opened: `rehearsal-summary` reopens `devai-rc-release` after `build-release`, and
+`promote-assets` reopens `devai-ledger-verification` after `verify-ledger`. The two
+`github-pages` stops protect no secret: the only credential either job holds is the
+job-scoped token, and the site-only path is already guarded by the Owner dispatch, the
+`main` guard, and the journal. The run summary shows `DEVAI_PROCESS_CONTROL_COMMIT` only
+after a protected job has been approved.
+
+### After: the topology the implementing round builds to
+
+Jobs that share an environment are merged into one gated job, and the work that sat
+between them moves into the merged job, so a rehearsal stops exactly twice and a
+publication stops exactly twice whether or not `publish_pages` is set. `deploy-pages`
+keeps its `github-pages` declaration for the deployment binding, the deployment branch
+policy, and the audit variables, but the environment carries no reviewer, so the job runs
+under the publication stop and never waits. No job other than the three gated ones
+declares an environment.
+
+| Job                                 | Runs in                                | Needs                               | Environment                 | Secrets                                                                           | Variables                                                                                                | Permissions                                                               | Stop                                 |
+| ----------------------------------- | -------------------------------------- | ----------------------------------- | --------------------------- | --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------ |
+| `control-commit-summary`            | every run                              | none                                | none                        | none                                                                              | `DEVAI_PROCESS_CONTROL_COMMIT`                                                                           | `contents: read`                                                          | none                                 |
+| `verify-ledger`                     | every run                              | `control-commit-summary`            | `devai-ledger-verification` | the nine ledger secrets; `GITHUB_TOKEN` (`github.token`) in the publication steps | the four ledger variables, `DEVAI_PROCESS_CONTROL_COMMIT`                                                | `contents: read`, `actions: read`                                         | rehearsal 1 of 2, publication 1 of 2 |
+| `build-release`                     | rehearsal                              | `verify-ledger`                     | `devai-rc-release`          | none                                                                              | `DEVAI_PROCESS_CONTROL_COMMIT`                                                                           | `contents: read`                                                          | rehearsal 2 of 2                     |
+| `finalize-release`                  | publication                            | `verify-ledger`                     | `devai-rc-publication`      | `GITHUB_TOKEN` (`secrets.GITHUB_TOKEN`)                                           | `DEVAI_PROCESS_CONTROL_COMMIT`                                                                           | `contents: write`, `packages: write`                                      | publication 2 of 2                   |
+| `deploy-pages`                      | publication with `publish_pages: true` | `finalize-release`, `verify-ledger` | `github-pages`, no reviewer | `GITHUB_TOKEN` (`github.token`)                                                   | `DEVAI_PROCESS_CONTROL_COMMIT`, `DEVAI_PAGES_MIGRATION_AUDIT_JSON`, `DEVAI_PAGES_MIGRATION_AUDIT_SHA256` | `contents: read`, `pages: write`, `deployments: write`, `id-token: write` | none                                 |
+| `publish-site` (`site-publish.yml`) | Owner dispatch from `main`             | none                                | `github-pages`, no reviewer | `GITHUB_TOKEN` (`github.token`)                                                   | none                                                                                                     | `contents: read`, `pages: write`, `deployments: write`, `id-token: write` | none                                 |
+
+The job set of `release.yml` is exactly `build-release`, `control-commit-summary`,
+`deploy-pages`, `finalize-release`, and `verify-ledger`; `promote-assets`,
+`rehearsal-summary`, and `verify-linux-adopter` no longer exist as jobs. The job set of
+`site-publish.yml` is exactly `publish-site`. Job by job:
+
+- `control-commit-summary` declares no `environment` and no `if`, has
+  `permissions: contents: read`, checks nothing out, and references no secret. Its one
+  step reads `vars.DEVAI_PROCESS_CONTROL_COMMIT` into `CONTROL_COMMIT`, fails unless the
+  value matches `^[a-f0-9]{40}$`, and appends the line
+  `DEVAI_PROCESS_CONTROL_COMMIT=<sha>` to `$GITHUB_STEP_SUMMARY`. Because `verify-ledger`
+  needs it, the summary shows the control commit before the first reviewer stop opens
+  (ADR-REL-0030 IA-005). It does not replace the checkout and binding of the same
+  variable that every gated job still performs.
+- `verify-ledger` keeps its `environment: devai-ledger-verification`, its outputs, and
+  its steps in their current order (check out the exact release commit, set up the
+  verifier runtime, probe declared credential prerequisites, materialize the protected
+  verifier package, check out and bind the approved process controls, materialize the
+  protected ledger inputs, bind and verify exact release evidence), and gains
+  `needs: control-commit-summary`, `permissions: contents: read` plus `actions: read`, and
+  the two former `promote-assets` steps, each guarded by
+  `if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}`. The first,
+  `Verify selected rehearsal`, reads `GH_TOKEN: ${{ github.token }}`, the
+  `rehearsal_run_id` and `rehearsal_attempt` inputs, the commit, tree, and ledger JSON
+  from `steps.bindings.outputs`, `github.workflow_sha`, and
+  `vars.DEVAI_PROCESS_CONTROL_COMMIT`, and runs
+  `release-control/scripts/process/rehearsal.mjs promote`. The second,
+  `Retain verified promotion assets` with `id: retain`, uploads `release-assets/*` as
+  `devai-release-assets-${{ github.run_attempt }}` with `if-no-files-found: error` and
+  `retention-days: 30`. The job exposes
+  `release_asset_id: ${{ steps.retain.outputs.artifact-id }}`, empty in a rehearsal. The
+  probe step is unchanged: `GITHUB_TOKEN` is a `gh-auth` credential, so
+  `release-prerequisites.mjs credentials` does not expect a presence flag for it. No
+  build command may appear in this job.
+- `build-release` keeps `environment: devai-rc-release`,
+  `if: ${{ github.event_name == 'workflow_dispatch' && !inputs.publish }}`,
+  `needs: verify-ledger`, `permissions: contents: read`, and its current steps through
+  `Upload release candidate assets` (`id: upload`). After the upload it runs, in order,
+  the former `verify-linux-adopter` steps, `Download exact release assets` from
+  `devai-release-assets-${{ github.run_attempt }}` into `release-assets` and then the
+  unchanged `Exercise fresh npm adoption, execution, and reuse` in `$RUNNER_TEMP`, and
+  then the former `rehearsal-summary` steps: `Check out approved process controls` to
+  `release-control` at `${{ vars.DEVAI_PROCESS_CONTROL_COMMIT }}` without persisted
+  credentials, `Bind approved process controls`, `Record completed rehearsal` with the
+  artifact id and digest from `steps.upload.outputs`, and `Retain rehearsal completion`
+  as `devai-rehearsal-${{ github.run_attempt }}`. The completion record therefore still binds
+  only after Linux adoption has passed, and its timeout covers all three former jobs.
+- `finalize-release` keeps `environment: devai-rc-publication`, its publication guard,
+  `permissions: contents: write` and `packages: write`, its `secrets.GITHUB_TOKEN` reads,
+  and its steps; `needs` becomes `verify-ledger` and `Download exact release assets` reads
+  `artifact-ids: ${{ needs.verify-ledger.outputs.release_asset_id }}` with
+  `merge-multiple: true`.
+- `deploy-pages` keeps `environment: { name: github-pages, url: ${{ steps.deployment.outputs.page_url }} }`,
+  its `publish_pages` guard, its `devai-pages-publication` concurrency group, its
+  permissions, its `github.token` and audit-variable reads, and its steps; `needs` becomes
+  `finalize-release` then `verify-ledger`, and `Download canonical release assets` reads
+  `artifact-ids: ${{ needs.verify-ledger.outputs.release_asset_id }}`.
+- `publish-site` is unchanged in every pin: the `workflow_dispatch` trigger without
+  inputs, `permissions: contents: read` at the workflow level, the
+  `devai-pages-publication` concurrency group, the single job, the `main` guard, the
+  `github-pages` environment name and URL, the build sequence, and the publication
+  steps. The only change is outside the file: the environment carries no reviewer.
+
+Unchanged across the restructure: the `v*` tag push trigger; the `workflow_dispatch`
+inputs `release_tag`, `publish`, `publish_pages`, `candidate_commit`, `rehearsal_run_id`,
+and `rehearsal_attempt`; the workflow-level `permissions: contents: read`; the
+`devai-release-<tag>` concurrency group; the `env` block; and the tag verification in
+`verify-ledger`, which on a tag push or a publication requires an annotated tag, verifies
+its SSH signature against the allowed-signers file materialized from
+`DEVAI_RELEASE_SIGNERS_B64`, and requires the tag to point at the exact candidate commit.
+`publish: true` remains a separate, single-use Owner dispatch and the tag is still signed
+by hand (ADR-GOV-0012, ADR-GOV-0013).
+
+Stop counts after the restructure: a rehearsal waits at `devai-ledger-verification`
+(`verify-ledger`) and `devai-rc-release` (`build-release`); a publication waits at
+`devai-ledger-verification` (`verify-ledger`) and `devai-rc-publication`
+(`finalize-release`), and `deploy-pages` runs under that second stop; a site-only
+publication waits nowhere.
+
+### Owner effects the target topology depends on
+
+The workflows change none of these, and none of them has been performed at the time of
+this writing. The campaign ledger records each one when the Owner performs it, before
+the implementing round closes:
+
+- OE-02: reconfigure the environments to the after matrix. `devai-ledger-verification`,
+  `devai-rc-release`, and `devai-rc-publication` keep one required reviewer each;
+  `github-pages` keeps its deployment branch policy, which must admit `main`, and its
+  two audit variables, and loses its reviewer.
+- OE-03: repoint `DEVAI_PROCESS_CONTROL_COMMIT` to an explicit reviewed sha before the
+  next rehearsal, and again once the restructured process scripts land.
+- OE-04: reissue the Pages migration audit, `DEVAI_PAGES_MIGRATION_AUDIT_JSON` and its
+  SHA-256 in `DEVAI_PAGES_MIGRATION_AUDIT_SHA256`, for the next tag and control commit.
+
+Until OE-02 is performed the live environments still stop as the before matrix shows.
+The after matrix is the specification the workflows and the workflow checker are built
+to, not a claim about the live repository.
 
 ## Publish the documentation site without a release
 
 A change that touches only the documentation site, with no semantic or product
-effect, may reach the live site without a version, tag, or rehearsal
-([ADR-REL-0029](../../../law/adr/ADR-REL-0029-site-only-pages-publication.md)).
-The `site-publish.yml` workflow runs only on an explicit `workflow_dispatch` from
-`main`; it has no inputs and reads no repository secret or variable. Its single
-`publish-site` job checks out the dispatched commit without persisted credentials,
-binds the source ref, commit, and tree, then runs `npm --prefix docs/site ci`, the
-site `security:check`, `typecheck`, and `build`, and verifies the local bytes before
-uploading the exact Pages artifact.
+effect, may reach the live site without a version, tag, or rehearsal. The path was
+introduced by
+[ADR-REL-0029](../../../law/adr/ADR-REL-0029-site-only-pages-publication.md), which
+[ADR-REL-0030](../../../law/adr/ADR-REL-0030-release-approval-topology.md) supersedes
+as a whole record while restating every clause of it except the approval clause. The
+clauses that stay in force are these:
 
-Deployment goes through `scripts/process/publish-site.mjs`, which records a
-site-only identity in the same Pages journal the release path uses and shares the
-`devai-pages-publication` concurrency group, so a site-only publication and a
-release deploy never interleave. A site-only publication requires a verified
-release deployment already in the journal, and any submitted but unverified
-publication of either mode blocks the other until it is resolved. The job retains
-its publication record for 30 days and verifies the live bytes after deployment.
+- `site-publish.yml` is the fourth admitted workflow. It runs only on an explicit
+  `workflow_dispatch` from `main`, has no inputs, and reads no repository secret or
+  variable; its only credential is the job-scoped `GITHUB_TOKEN`, declared as a
+  consumer in `law/policy/credential-requirements.json`.
+- Its single `publish-site` job checks out the dispatched commit without persisted
+  credentials, binds the source ref, commit, and tree, builds the site from `docs/site`
+  with its own lockfile (`npm --prefix docs/site ci`), runs the site `security:check`
+  and `typecheck`, runs `build`, verifies the local bytes, and uploads the exact Pages
+  artifact.
+- Deployment goes through `scripts/process/publish-site.mjs`, which records a
+  site-only identity in the single-writer Pages journal of
+  `scripts/process/github-pages-journal.mjs` and shares the `devai-pages-publication`
+  concurrency group with the release path, so a site-only publication and a release
+  deploy never interleave.
+- A site-only publication requires a verified release-mode deployment already in the
+  journal, so the first publication of any site remains a release; any submitted but
+  unverified publication of either mode blocks the other with
+  `OTHER_PUBLICATION_UNRESOLVED` until it is resolved.
+- The job retains its publication record for 30 days and verifies the live bytes after
+  deployment. Scripts run from the dispatched `main` commit rather than from the approved
+  control commit, which is acceptable because the path publishes only documentation
+  bytes and can never publish packages, releases, or tags.
+- The workflow checker keeps its pins on the trigger, permissions, concurrency group,
+  job set, `main` guard, environment name, build sequence, and publication steps, and
+  drops only the expectation that the environment carries a reviewer.
 
-The Owner dispatches with `gh workflow run site-publish.yml --ref main` and approves
-the pending `github-pages` environment deployment. That environment's deployment
-branch policy must admit `main`. Use a release instead whenever the change alters
-product behavior, policy, schemas, or package contents.
+The approval clause is what changes. The `github-pages` environment keeps its
+deployment binding, its deployment branch policy, which must admit `main`, and its
+audit variables, but no reviewer, so the Owner dispatches with
+`gh workflow run site-publish.yml --ref main` and the run deploys on that dispatch
+alone; no environment approval follows. Until OE-02 is performed the live environment
+still holds its reviewer and the run still waits there. Use a release instead whenever
+the change alters product behavior, policy, schemas, or package contents.
 
 ## Installed host publication controls
 
