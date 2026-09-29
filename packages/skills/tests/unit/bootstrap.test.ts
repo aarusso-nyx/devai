@@ -32,15 +32,20 @@ describe('executeBootstrapPlan --force preserves provenance', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it('overwrites empty chain + counters when --force is set (fresh init)', () => {
+  it('does not preserve empty chain + counters when --force is set (fresh init)', () => {
     const plan = buildBootstrapPlan({ targetRoot: dir });
     executeBootstrapPlan(plan, { force: false }); // first init lays the files
-    // second init --force with the same plan should overwrite (they're empty).
+    // Second init --force: empty provenance is template state, not provenance.
     const replan = buildBootstrapPlan({ targetRoot: dir });
     const result = executeBootstrapPlan(replan, { force: true });
     expect(result.preserved).toEqual([]);
-    expect(result.overwritten).toContain('record/proofs/chain.json');
-    expect(result.overwritten).toContain('.devai/state/counters.json');
+    for (const path of ['record/proofs/chain.json', '.devai/state/counters.json']) {
+      const entry = replan.entries.find((item) => item.path === path);
+      // ADR-GOV-0020: the plan says replace exactly when the execution overwrites.
+      const planned: string | undefined = entry?.action;
+      expect(planned === 'replace').toBe(result.overwritten.includes(path));
+      expect(readFileSync(join(dir, path), 'utf8')).toBe(entry?.content);
+    }
   });
 
   it('preserves a populated evidence chain even with --force', () => {
@@ -173,6 +178,9 @@ describe('executeBootstrapPlan --force preserves provenance', () => {
     const plan = buildBootstrapPlan({ targetRoot: dir });
     const result = executeBootstrapPlan(plan, { force: true });
 
+    expect(plan.entries.find((entry) => entry.path === 'product/README.md')?.action).toBe(
+      'replace',
+    );
     expect(result.overwritten).toContain('product/README.md');
     expect(result.preserved).not.toContain('product/README.md');
   });
@@ -648,10 +656,15 @@ describe('buildBootstrapPlan: deterministic seed content and summary', () => {
     expect(plan.summary).toEqual({
       create: tally('create'),
       overwrite: tally('overwrite'),
+      replace: tally('replace'),
       skip: tally('skip-exists'),
     });
     expect(plan.summary.create).toBeGreaterThan(0);
-    expect(plan.summary.skip).toBe(1);
+    // ADR-GOV-0020: an existing file --force would overwrite is a planned replace.
+    expect(plan.entries.find((entry) => entry.path === 'product/README.md')?.action).toBe(
+      'replace',
+    );
+    expect(plan.summary).toMatchObject({ replace: 1, skip: 0 });
   });
 });
 
@@ -679,8 +692,9 @@ describe('executeBootstrapPlan: provenance recheck at write time', () => {
   it('relays the genesis chain when the planned file was deleted before execution', () => {
     executeBootstrapPlan(buildBootstrapPlan({ targetRoot: dir }));
     const plan = buildBootstrapPlan({ targetRoot: dir });
-    expect(plan.entries.find((entry) => entry.path === 'record/proofs/chain.json')?.action).toBe(
-      'skip-exists',
+    // The file exists at planning, so the plan never says create for it.
+    expect(['skip-exists', 'replace']).toContain(
+      plan.entries.find((entry) => entry.path === 'record/proofs/chain.json')?.action,
     );
     rmSync(chain);
     let result: ReturnType<typeof executeBootstrapPlan> | undefined;
@@ -688,7 +702,9 @@ describe('executeBootstrapPlan: provenance recheck at write time', () => {
       result = executeBootstrapPlan(plan, { force: true });
     }).not.toThrow();
     expect(result?.preserved).not.toContain('record/proofs/chain.json');
-    expect(result?.overwritten).toContain('record/proofs/chain.json');
+    expect([...(result?.created ?? []), ...(result?.overwritten ?? [])]).toContain(
+      'record/proofs/chain.json',
+    );
     expect(existsSync(chain)).toBe(true);
     expect(JSON.parse(readFileSync(chain, 'utf8'))).toEqual({ head: null, records: [] });
   });
