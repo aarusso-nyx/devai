@@ -792,8 +792,62 @@
       }
     },
     {
-      "nodeId": "plan:validate",
+      "nodeId": "plan:campaign",
       "dependencies": [],
+      "argv": ["node", "scripts/check-campaign.mjs"],
+      "cwd": ".",
+      "runner": "node-builtin-v1",
+      "inputSelectors": [
+        {
+          "kind": "class",
+          "pattern": "plan"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/check-campaign.mjs"
+        },
+        {
+          "kind": "exact",
+          "pattern": "law/schemas/campaign.schema.json"
+        }
+      ],
+      "toolchainKeys": ["node"],
+      "allowlistedEnv": [],
+      "outputContract": {
+        "kind": "command-result",
+        "requiredResult": "pass"
+      }
+    },
+    {
+      "nodeId": "plan:scorecard-page",
+      "dependencies": [],
+      "argv": ["node", "scripts/generate-scorecard-page.mjs", "--check"],
+      "cwd": ".",
+      "runner": "node-builtin-v1",
+      "inputSelectors": [
+        {
+          "kind": "class",
+          "pattern": "plan"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/generate-scorecard-page.mjs"
+        },
+        {
+          "kind": "exact",
+          "pattern": "docs/reference/scorecard.md"
+        }
+      ],
+      "toolchainKeys": ["node"],
+      "allowlistedEnv": [],
+      "outputContract": {
+        "kind": "command-result",
+        "requiredResult": "pass"
+      }
+    },
+    {
+      "nodeId": "plan:validate",
+      "dependencies": ["plan:campaign", "plan:scorecard-page"],
       "argv": [
         "node",
         ".devai/state/pr-bootstrap/cli/bin.js",
@@ -807,12 +861,8 @@
       "runner": "node-builtin-v1",
       "inputSelectors": [
         {
-          "kind": "prefix",
-          "pattern": "product/"
-        },
-        {
-          "kind": "prefix",
-          "pattern": "record/"
+          "kind": "class",
+          "pattern": "plan"
         }
       ],
       "toolchainKeys": ["node"],
@@ -866,8 +916,93 @@
       }
     },
     {
-      "nodeId": "docs:validate",
+      "nodeId": "docs:links",
       "dependencies": [],
+      "argv": [
+        "node",
+        ".devai/state/pr-bootstrap/cli/bin.js",
+        "check",
+        "--only",
+        "docs-links",
+        "--format",
+        "json"
+      ],
+      "cwd": ".",
+      "runner": "node-builtin-v1",
+      "inputSelectors": [
+        {
+          "kind": "class",
+          "pattern": "docs"
+        }
+      ],
+      "toolchainKeys": ["node"],
+      "allowlistedEnv": [],
+      "outputContract": {
+        "kind": "command-result",
+        "requiredResult": "pass"
+      }
+    },
+    {
+      "nodeId": "docs:governance",
+      "dependencies": [],
+      "argv": [
+        "node",
+        ".devai/state/pr-bootstrap/cli/bin.js",
+        "check",
+        "--only",
+        "docs-governance",
+        "--format",
+        "json"
+      ],
+      "cwd": ".",
+      "runner": "node-builtin-v1",
+      "inputSelectors": [
+        {
+          "kind": "class",
+          "pattern": "docs"
+        },
+        {
+          "kind": "exact",
+          "pattern": ".devai/config/project.json"
+        }
+      ],
+      "toolchainKeys": ["node"],
+      "allowlistedEnv": [],
+      "outputContract": {
+        "kind": "command-result",
+        "requiredResult": "pass"
+      }
+    },
+    {
+      "nodeId": "docs:ci-economy",
+      "dependencies": [],
+      "argv": [
+        "node",
+        ".devai/state/pr-bootstrap/cli/bin.js",
+        "check",
+        "--only",
+        "ci-economy",
+        "--format",
+        "json"
+      ],
+      "cwd": ".",
+      "runner": "node-builtin-v1",
+      "inputSelectors": [
+        {
+          "kind": "class",
+          "pattern": "docs"
+        }
+      ],
+      "toolchainKeys": ["node"],
+      "allowlistedEnv": [],
+      "outputContract": {
+        "kind": "command-result",
+        "requiredResult": "pass"
+      }
+    },
+    {
+      "nodeId": "docs:validate",
+      "dependencies": ["docs:links", "docs:governance", "docs:ci-economy"],
       "argv": [
         "node",
         ".devai/state/pr-bootstrap/cli/bin.js",
@@ -881,36 +1016,8 @@
       "runner": "node-builtin-v1",
       "inputSelectors": [
         {
-          "kind": "prefix",
-          "pattern": "docs/"
-        },
-        {
-          "kind": "exact",
-          "pattern": "README.md"
-        },
-        {
-          "kind": "exact",
-          "pattern": "CLAUDE.md"
-        },
-        {
-          "kind": "exact",
-          "pattern": "AGENTS.md"
-        },
-        {
-          "kind": "exact",
-          "pattern": "CHANGELOG.md"
-        },
-        {
-          "kind": "exact",
-          "pattern": "LICENSE"
-        },
-        {
-          "kind": "exact",
-          "pattern": "NOTICE"
-        },
-        {
-          "kind": "exact",
-          "pattern": "scratch/README.md"
+          "kind": "class",
+          "pattern": "docs"
         }
       ],
       "toolchainKeys": ["node"],
@@ -1243,13 +1350,23 @@
         "test:package-staging",
         "plan:validate",
         "law:validate",
-        "docs:validate"
+        "docs:validate",
+        "plan:campaign",
+        "plan:scorecard-page",
+        "docs:links",
+        "docs:governance",
+        "docs:ci-economy"
       ]
     },
     {
       "profileId": "rc",
       "mode": "fixed",
       "requiredNodes": ["lint", "typecheck", "test:coverage:rc"]
+    },
+    {
+      "profileId": "planning",
+      "mode": "fixed",
+      "requiredNodes": ["plan:validate", "format"]
     }
   ]
 }
