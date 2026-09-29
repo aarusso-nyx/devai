@@ -2300,7 +2300,7 @@
       "id": "R-0307",
       "title": "Workflow reference pages",
       "goal": "Every admitted workflow has a reference page under a completeness gate of the documentation information architecture, the ADR catalogue is generated, and the stale operations statements are corrected.",
-      "status": "planned",
+      "status": "open",
       "records": ["ADR-GOV-0021"],
       "depends_on": ["R-0306"],
       "attestation_reissue": false,
@@ -2329,7 +2329,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -2344,7 +2344,8 @@
                   "law/policy/documentation-information-architecture.json",
                   "law/adr/README.md",
                   "law/policy/adr-validation.json",
-                  "docs/adopters/docs-layout.md"
+                  "docs/adopters/docs-layout.md",
+                  "law/schemas/documentation-information-architecture.schema.json"
                 ],
                 "forbidden": [".github/workflows/", "packages/", "tests/"]
               },
@@ -2381,14 +2382,53 @@
               ],
               "prompt": {
                 "path": "prompts/TASK-0371.md",
-                "sha256": null
+                "sha256": "ed62d0e2672c856a5141e587fe319c9db0f976101d5e38931cc2754089f3d875"
               },
               "pull_request": null,
               "merged_as": null,
               "execution": {
                 "tier": "architect",
                 "effort": "high",
-                "time_budget_minutes": 150
+                "time_budget_minutes": 150,
+                "resolved": {
+                  "policy_version": "1.0.0",
+                  "pinned_at": "2026-09-29T19:42:35Z",
+                  "tiers": {
+                    "architect": {
+                      "rank": 1,
+                      "hosts": {
+                        "claude": "claude-cli:fable",
+                        "codex": "codex-cli:gpt-6-astra"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker-high": {
+                      "rank": 2,
+                      "hosts": {
+                        "claude": "claude-cli:opus",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker": {
+                      "rank": 3,
+                      "hosts": {
+                        "claude": "claude-cli:sonnet",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "medium"
+                    },
+                    "clerk": {
+                      "rank": 4,
+                      "hosts": {
+                        "claude": "claude-cli:haiku",
+                        "codex": "codex-cli:gpt-6-luna"
+                      },
+                      "default_effort": "low"
+                    }
+                  },
+                  "ceiling": "architect"
+                }
               }
             },
             {
