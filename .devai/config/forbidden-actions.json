@@ -140,6 +140,14 @@
       "detect_patterns": [
         "\\b(?:git\\s+(?:add|rm)|rm)\\s+[^\\n]*(?:law/|product/|record/|\\.devai/(?:config|local/rounds)/)"
       ],
+      "maintenance_exemptions": [
+        {
+          "path": "law/policy/forbidden-action-authorizations.json",
+          "schema": "law/schemas/forbidden-action-authorizations.schema.json",
+          "change": "append-only",
+          "collection": "/authorizations"
+        }
+      ],
       "safer_alternative": "Use Architect authority and record the current rationale"
     }
   ]
