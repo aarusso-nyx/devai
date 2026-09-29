@@ -111,6 +111,71 @@ pnpm exec devai init bind \
 Invalid schemas, source paths outside `law/policy`, immutable-domain collisions, or incomplete
 writes leave the prior resolved configuration unchanged.
 
+### What `--adopter-policy` owns in `project.json`
+
+The other five bound files are projected whole from the source and the installed canonical
+defaults. `.devai/config/project.json` is shared: `init bind --constitution` pins the constitution
+and profile, `init bind --tracking-adapter` binds tracking, and you may declare keys of your own.
+An ownership matrix, declared once in the CLI and stated here, settles which `project.json` keys
+the adopter-policy bind owns
+([ADR-CFG-0002](../../law/adr/ADR-CFG-0002-owned-configuration-projection.md)). The bind replaces
+an owned key with the value the source declares, as a whole, and retires it when the source no
+longer declares it. It never reads or writes a key the matrix does not name.
+
+| `project.json` key           | Source in `law/policy/devai-adoption.json` | Members                                                                                                     | Absent from the source                                                                                                            |
+| ---------------------------- | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `/project_type`              | `project.project_type`                     | one of `runtime-host`, `platform-package`, `docs-archive`, `framework`                                      | Retired; the project schema requires it, so the bind refuses the projection (`ADOPTER_POLICY_PROJECT_INVALID`) and writes nothing |
+| `/repo`                      | `project.repo`                             | `kind`                                                                                                      | Retired                                                                                                                           |
+| `/docs`                      | `project.docs`                             | `builder`, `build_command`, `output_dir`, `publish_target`, `gh_pages_branch`, `custom_domain`              | Retired                                                                                                                           |
+| `/docs/ia`                   | `project.docs.ia`                          | `collapsed_sections`, `path_overrides`                                                                      | Retired                                                                                                                           |
+| `/ci_economy`                | `ci_economy`                               | `profile`                                                                                                   | Retired                                                                                                                           |
+| `/ci_economy/local_evidence` | `ci_economy.local_evidence`                | `manifest_path`, `max_age_hours`, `required_jobs`, `allowed_platforms`, `forbidden_paths`, `require_docker` | Retired                                                                                                                           |
+| `/ci_economy/attested_rc`    | `ci_economy.attested_rc`                   | `profile`, `transport`, `tag_prefix`, `binding`, `required_check`, `failure_mode`, `local_only_nodes`       | Retired                                                                                                                           |
+| `/devai_version`             | the installed `@aarusso-nyx/devai` version | machine-managed version string                                                                              | Not applicable; every bind stamps it                                                                                              |
+
+Every other key is an adopter declaration or the output of another bind segment: `schemaVersion`,
+`name`, `profile`, `adopted_at`, `constitution`, `invariant_filters`, `feature_flags`,
+`authority_enforcement`, `governance_tracking`, and any key a later schema admits. The
+adopter-policy bind never reads them from the source and never removes them; they survive every
+bind byte for byte. The bootstrap's own reconciliation of `project.json` follows the same matrix, so
+`init apply` and `init bind` never disagree about which keys are owned.
+
+### Retiring a declaration
+
+Absent means retired, for owned keys only. Delete the key or block from the policy source, bump
+`policy_version`, and rebind with the command above; that is the only path. The bind removes the
+key from `project.json` instead of carrying the old value forward, so `doctor` stops evaluating a
+declaration nobody holds. Before ADR-CFG-0002 the bind deep-merged the source over the current
+file and a retired block never left (issue #68); the only recovery was a hand edit to a generated
+file, which the adoption contract forbids.
+
+The projection and its receipt are one atomic write. The bind resolves every target and
+`.devai/config/adopter-policy-binding.json` first, stages them, and renames them into place
+together, so an interrupted bind leaves either the previous complete pair or the new complete
+pair, never a projection without its receipt. After an interruption, rerun the same command;
+there is nothing to repair by hand.
+
+The receipt is the retirement report. Beside the source digest and the digest of every
+materialized target, it lists the owned keys the bind retired as JSON pointers under
+`retired_keys`, and the bind result echoes the receipt. A whole key is reported as `/ci_economy`;
+a nested block retired on its own is reported by its row in the matrix, for example
+`/ci_economy/local_evidence`.
+
+```json
+{ "retired_keys": ["/ci_economy"] }
+```
+
+A bind is idempotent. Against an unchanged source and an unchanged `project.json` it writes no
+byte to any target and records an empty `retired_keys`, so a second bind is observable only
+through its unchanged receipt.
+
+`doctor` keeps the receipt honest through `policy-materialization-current`: it recomputes the
+projection from the source and the current `project.json` and compares every digest the receipt
+carries with the file on disk. A receipt whose digests no longer match, because the source moved,
+a target was edited, or a declaration was added to `project.json` by hand after the bind, is a
+failure until the next bind rematerializes it. The remedy is always a rebind, never an edit to
+`.devai/config`.
+
 ### Upgrading DEVAI
 
 Bump the pinned package version, then re-run both policy binding commands:
