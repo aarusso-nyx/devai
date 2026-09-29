@@ -1634,7 +1634,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0355",
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F2", "F3"],
               "boundary": {
                 "paths": [
@@ -1645,7 +1645,14 @@
                   "packages/schemas/src/roster.ts",
                   "packages/cli/src/commands/sense/adapters.ts",
                   "docs/reference/error-codes.md",
-                  "packages/schemas/src/index.ts"
+                  "packages/schemas/src/index.ts",
+                  "packages/schemas/src/reply-extract.ts",
+                  "packages/loop/tests/unit/triage-input-boundaries.test.ts",
+                  "packages/loop/tests/unit/triage-cases.ts",
+                  "packages/sensors/tests/unit/judge-finding-population.test.ts",
+                  "packages/sensors/tests/unit/judge-request-metadata.test.ts",
+                  "packages/sensors/tests/unit/migrate-type-judge-depth.test.ts",
+                  "packages/cli/tests/unit/sense-adapters-depth.test.ts"
                 ],
                 "forbidden": ["law/", "product/", ".github/workflows/"]
               },
@@ -1675,14 +1682,53 @@
               ],
               "prompt": {
                 "path": "prompts/TASK-0356.md",
-                "sha256": null
+                "sha256": "505d8af1b1ea8c2891d1cde9fc4c91d713f1443803adf52a188914a562ef6946"
               },
               "pull_request": null,
               "merged_as": null,
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
-                "time_budget_minutes": 180
+                "time_budget_minutes": 180,
+                "resolved": {
+                  "policy_version": "1.0.0",
+                  "pinned_at": "2026-09-29T17:37:59Z",
+                  "tiers": {
+                    "architect": {
+                      "rank": 1,
+                      "hosts": {
+                        "claude": "claude-cli:fable",
+                        "codex": "codex-cli:gpt-6-astra"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker-high": {
+                      "rank": 2,
+                      "hosts": {
+                        "claude": "claude-cli:opus",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker": {
+                      "rank": 3,
+                      "hosts": {
+                        "claude": "claude-cli:sonnet",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "medium"
+                    },
+                    "clerk": {
+                      "rank": 4,
+                      "hosts": {
+                        "claude": "claude-cli:haiku",
+                        "codex": "codex-cli:gpt-6-luna"
+                      },
+                      "default_effort": "low"
+                    }
+                  },
+                  "ceiling": "architect"
+                }
               }
             }
           ]
