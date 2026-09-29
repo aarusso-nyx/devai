@@ -46,6 +46,13 @@ export interface ProjectConfigReconciliationOptions {
  * Reconcile framework-managed project metadata without discarding adopter-owned
  * declarations. An absent profile is materialized as the schema's strict tier3
  * default so the effective adoption decision is always explicit on disk.
+ *
+ * The rows of the adopter-policy ownership matrix (ADR-CFG-0002, exported by the CLI
+ * as ADOPTER_POLICY_OWNERSHIP_MATRIX and stated in docs/adopters/install.md) belong
+ * to `init bind --adopter-policy`: /repo, /docs, /docs/ia, /ci_economy and its nested
+ * rows are carried through unchanged, never invented and never retired here, and
+ * /project_type is only defaulted when the schema would otherwise refuse the file.
+ * /devai_version is stamped exactly as every bind stamps it.
  */
 export function reconcileProjectConfig(
   current: unknown,
