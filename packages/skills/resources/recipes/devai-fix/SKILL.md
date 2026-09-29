@@ -1,6 +1,11 @@
 ---
 name: devai-fix
 description: Repair one failing engineering concern with explicit file bounds and focused verification.
+license: Apache-2.0
+compatibility: Invoked by a host that reads Agent Skills from .agents/skills or .claude/skills; needs the adjacent devai.recipe.json and devai.operations.json and the project-local @aarusso-nyx/devai package.
+metadata:
+  devai-status: stable
+  devai-recipe-schema: '1'
 ---
 
 # DEVAI fix

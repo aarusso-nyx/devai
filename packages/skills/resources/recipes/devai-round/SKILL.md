@@ -1,6 +1,11 @@
 ---
 name: devai-round
 description: Preview a local round workflow with explicit phases and runtime-state-only coordination.
+license: Apache-2.0
+compatibility: Invoked by a host that reads Agent Skills from .agents/skills or .claude/skills; needs the adjacent devai.recipe.json and devai.operations.json and the project-local @aarusso-nyx/devai package.
+metadata:
+  devai-status: preview
+  devai-recipe-schema: '1'
 ---
 
 # DEVAI round preview
