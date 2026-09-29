@@ -73,6 +73,37 @@
               "minLength": 1
             }
           },
+          "maintenance_exemptions": {
+            "type": "array",
+            "minItems": 1,
+            "description": "Optional registry-maintenance exemptions for this action (ADR-GOV-0022). Each item names one governed file whose validated, append-only change is maintenance rather than a mutation. A commit changes that path as maintenance only when the resulting file validates against the named schema and the change is append-only: every member of the parent version of the collection is present in the child version with identical bytes and in the same order, the child appends zero or more members after them, and every other root member of the file is unchanged. Both versions are read from the commit trees, never from the working tree. For a maintenance change the scanner omits the path from the operation lines it matches for this action in every inspection pass, both the name-status pass that synthesizes git add and git rm lines and the patch pass. Any other change to the path, every other path in the same commit, and a commit-message match keep their findings.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["path", "schema", "change", "collection"],
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "pattern": "^(?!(?:.*/)?\\.\\.(?:/|$))[A-Za-z0-9_.@-]+(?:/[A-Za-z0-9_.@-]+)*\\.json$",
+                  "description": "Repository-relative path of the one JSON file the exemption covers. Exactly one file, never a glob or a directory."
+                },
+                "schema": {
+                  "type": "string",
+                  "pattern": "^(?!(?:.*/)?\\.\\.(?:/|$))[A-Za-z0-9_.@-]+(?:/[A-Za-z0-9_.@-]+)*\\.schema\\.json$",
+                  "description": "Repository-relative path of the JSON Schema the resulting file must validate against for the change to count as maintenance."
+                },
+                "change": {
+                  "const": "append-only",
+                  "description": "The only maintenance shape: members appended to the collection, none removed, altered, or reordered."
+                },
+                "collection": {
+                  "type": "string",
+                  "pattern": "^/[^/~]+$",
+                  "description": "JSON Pointer to the root-level array whose members may be appended. Every other root member, including schemaVersion, must be byte-identical between the parent and child versions."
+                }
+              }
+            }
+          },
           "safer_alternative": {
             "type": "string"
           }
