@@ -411,6 +411,18 @@ function readOnlyProcess(
       return true;
     }
   }
+  if (parentAction === 'check' && basename(executable) === 'node') {
+    // The planning-lane members of law/policy/check-suites.json (ADR-CHK-0003):
+    // the exact literal argv each member declares. Both scripts only read the
+    // tree; --check compares the rendered page and never writes it.
+    const planningLaneArgvs = [
+      ['scripts/check-campaign.mjs'],
+      ['scripts/generate-scorecard-page.mjs', '--check'],
+    ];
+    if (planningLaneArgvs.some((declared) => JSON.stringify(declared) === JSON.stringify(args))) {
+      return true;
+    }
+  }
   if (['true', 'false'].includes(basename(executable)) && args.length === 0) return true;
   if (
     basename(executable) === 'node' &&
