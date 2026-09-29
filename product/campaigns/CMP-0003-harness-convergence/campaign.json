@@ -324,7 +324,7 @@
               ],
               "prompt": {
                 "path": "prompts/TASK-0313.md",
-                "sha256": "9d758ad7224a7cd65a04a99aaa22a321776766d8c942d16a5d9a4d677cf00c6f"
+                "sha256": "f13c1e8ebe473b8a41faed795027f7b39acec9b19cd0233cc0749ccf9cc23606"
               },
               "pull_request": null,
               "merged_as": null,
