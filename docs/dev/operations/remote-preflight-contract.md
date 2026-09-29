@@ -17,6 +17,20 @@ Linux. It proves only execution outcomes and consistency on that runner. It does
 prove the local RC closure executed, and a signed local claim does not prove Linux
 execution. These observations answer different questions.
 
+The affected plan runs once per head. `release:pr-gate` precedes the affected check in
+the same step and keeps commit-range hygiene, the bump floor and, for a
+version-changing pull request, the release profile preflight; it no longer plans the
+affected target a second time (ADR-CHK-0003).
+
+When every changed path is an addition or modification that the change taxonomy
+classifies as `plan` under both the base and the candidate binding, the affected check
+plans the planning lane instead of the affected floor: the preflight nodes,
+`plan:validate` (journeys, the campaign check and the scorecard-page check) and
+`format`, none of which depends on `generate` or `build`. A rename, a deletion, a path
+of any other class, or a candidate that rebinds the taxonomy falls back to the
+affected profile. The lane is selected from the taxonomy, never from a workflow path
+filter, so the pull-request trigger carries none.
+
 ## Own-repository workflow set
 
 | File                      | Required purpose                                                   |
