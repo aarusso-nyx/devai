@@ -38,7 +38,6 @@ const identity = {
     .update(JSON.stringify(siteMembers(site)))
     .digest('hex'),
   sourceRun: env.GITHUB_RUN_ID,
-  sourceAttempt: env.GITHUB_RUN_ATTEMPT,
   controlCommit: env.GITHUB_SHA,
 };
 mkdirSync(recordDirectory, { recursive: true, mode: 0o700 });
