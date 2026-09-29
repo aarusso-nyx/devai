@@ -3,9 +3,10 @@
 // Validates every campaign plan under product/campaigns against
 // law/schemas/campaign.schema.json and the structural rules of
 // law/policy/campaign-execution.json: unique ids, resolvable acyclic
-// dependencies, record coverage, pipeline order, prompt presence, prompt
-// role and task naming, acceptance parity between plan and prompt, and
-// the absence of credential shapes in prompts.
+// dependencies, record coverage, Owner-effect closure of closed rounds,
+// pipeline order, prompt presence, prompt role and task naming, acceptance
+// parity between plan and prompt, and the absence of credential shapes in
+// prompts.
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -73,8 +74,13 @@ export function checkCampaign(root, campaignDir) {
         problem(`${round.id} record ${record} not on campaign`);
     }
     for (const effect of round.owner_effects_required) {
-      if (!campaign.owner_effects.some((candidate) => candidate.id === effect)) {
+      const declared = campaign.owner_effects.find((candidate) => candidate.id === effect);
+      if (declared === undefined) {
         problem(`${round.id} unknown owner effect ${effect}`);
+      } else if (round.status === 'closed' && !declared.performed_at) {
+        // Owner-effect closure (ADR-CHK-0003): a closed round carries every
+        // Owner effect it requires as performed.
+        problem(`${round.id} is closed but required owner effect ${effect} has no performed_at`);
       }
     }
     const waveIds = new Set(round.waves.map((wave) => wave.id));
