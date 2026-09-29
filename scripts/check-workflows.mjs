@@ -1398,24 +1398,51 @@ function checkReleaseWorkflow(file, workflow, source, findings, pins) {
   }
 
   const jobs = object(workflow.jobs);
+  // ADR-REL-0030: jobs that shared an environment are merged, so a rehearsal and a
+  // publication each stop exactly twice, and the control commit is summarized by an
+  // ungated first job before the first stop.
   const expectedJobs = [
     'build-release',
+    'control-commit-summary',
     'deploy-pages',
     'finalize-release',
-    'promote-assets',
-    'rehearsal-summary',
     'verify-ledger',
-    'verify-linux-adopter',
   ];
-  if (JSON.stringify(Object.keys(jobs).sort()) !== JSON.stringify(expectedJobs)) {
-    findings.push(finding('RELEASE_JOB_SET_INVALID', file, Object.keys(jobs).sort().join(',')));
+  if (
+    JSON.stringify(Object.keys(jobs).sort()) !== JSON.stringify(expectedJobs) ||
+    Object.keys(jobs)[0] !== 'control-commit-summary'
+  ) {
+    findings.push(finding('RELEASE_JOB_SET_INVALID', file, Object.keys(jobs).join(',')));
   }
+  const summary = object(jobs['control-commit-summary']);
   const verify = object(jobs['verify-ledger']);
   const build = object(jobs['build-release']);
   const finalize = object(jobs['finalize-release']);
   const pages = object(jobs['deploy-pages']);
-  const rehearsal = object(jobs['rehearsal-summary']);
-  const linuxAdopter = object(jobs['verify-linux-adopter']);
+  const summarySteps = Array.isArray(summary.steps) ? summary.steps.map(object) : [];
+  const summaryRun = String(summarySteps[0]?.run ?? '');
+  if (
+    summary.environment !== undefined ||
+    summary.if !== undefined ||
+    summary.needs !== undefined ||
+    JSON.stringify(object(summary.permissions)) !== JSON.stringify({ contents: 'read' }) ||
+    summarySteps.length !== 1 ||
+    summarySteps.some((step) => typeof step.uses === 'string') ||
+    credentialReferences(summary).size !== 0 ||
+    object(summarySteps[0]?.env).CONTROL_COMMIT !== '${{ vars.DEVAI_PROCESS_CONTROL_COMMIT }}' ||
+    !summaryRun.includes('set -euo pipefail') ||
+    !summaryRun.includes('^[a-f0-9]{40}$') ||
+    !summaryRun.includes('scripts/process/release-prerequisites.mjs" control-commit') ||
+    !summaryRun.includes('"DEVAI_PROCESS_CONTROL_COMMIT=$CONTROL_COMMIT" "$GITHUB_STEP_SUMMARY"')
+  ) {
+    findings.push(
+      finding(
+        'RELEASE_CONTROL_COMMIT_SUMMARY_INVALID',
+        file,
+        'an ungated, read-only, secret-free first job must summarize the 40-hex control commit before the first stop',
+      ),
+    );
+  }
   if (verify.environment !== pins.ledgerEnvironment) {
     findings.push(finding('RELEASE_LEDGER_ENVIRONMENT_INVALID', file, String(verify.environment)));
   }
@@ -1443,50 +1470,82 @@ function checkReleaseWorkflow(file, workflow, source, findings, pins) {
       ),
     );
   }
+  // The completion record binds only after Linux adoption of the exact uploaded
+  // assets has passed, all inside the one devai-rc-release stop.
+  const buildSteps = Array.isArray(build.steps) ? build.steps.map(object) : [];
+  const buildOrder = [
+    'Upload release candidate assets',
+    'Download exact release assets',
+    'Exercise fresh npm adoption, execution, and reuse',
+    'Check out approved process controls',
+    'Bind approved process controls',
+    'Record completed rehearsal',
+    'Retain rehearsal completion',
+  ].map((name) => buildSteps.findIndex((step) => step.name === name));
+  const buildDownload = buildSteps[buildOrder[1]];
   if (
-    rehearsal.if !== rehearsalCondition ||
-    JSON.stringify(rehearsal.needs) !==
-      JSON.stringify(['verify-ledger', 'build-release', 'verify-linux-adopter']) ||
-    JSON.stringify(object(rehearsal.permissions)) !== JSON.stringify({ contents: 'read' })
+    build.if !== rehearsalCondition ||
+    build.needs !== 'verify-ledger' ||
+    JSON.stringify(object(build.permissions)) !== JSON.stringify({ contents: 'read' }) ||
+    buildOrder.some((position, index) => position < 0 || position !== buildOrder[0] + index) ||
+    buildSteps[buildOrder[0]]?.id !== 'upload' ||
+    object(buildDownload?.with).name !== 'devai-release-assets-${{ github.run_attempt }}' ||
+    object(buildDownload?.with).path !== 'release-assets' ||
+    !JSON.stringify(buildSteps[buildOrder[5]] ?? {}).includes('steps.upload.outputs.artifact-id') ||
+    object(buildSteps[buildOrder[6]]?.with).name !== 'devai-rehearsal-${{ github.run_attempt }}'
   ) {
     findings.push(
       finding(
         'RELEASE_REHEARSAL_JOB_INVALID',
         file,
-        'tag pushes and non-publishing dispatches end in a read-only rehearsal summary after the exact build',
+        'a non-publishing dispatch builds, adopts on Linux, and records completion in one read-only devai-rc-release job',
       ),
     );
   }
   if (
-    linuxAdopter['runs-on'] !== 'ubuntu-latest' ||
-    JSON.stringify(linuxAdopter.needs) !== JSON.stringify('build-release') ||
-    JSON.stringify(object(linuxAdopter.permissions)) !== JSON.stringify({ contents: 'read' }) ||
-    JSON.stringify(finalize.needs) !== JSON.stringify(['verify-ledger', 'promote-assets']) ||
-    JSON.stringify(pages.needs) !== JSON.stringify(['finalize-release', 'promote-assets'])
+    verify.needs !== 'control-commit-summary' ||
+    verify.if !== undefined ||
+    JSON.stringify(object(verify.permissions)) !==
+      JSON.stringify({ contents: 'read', actions: 'read' }) ||
+    finalize.needs !== 'verify-ledger' ||
+    JSON.stringify(pages.needs) !== JSON.stringify(['finalize-release', 'verify-ledger'])
   ) {
     findings.push(
       finding(
-        'RELEASE_LINUX_ADOPTER_JOB_INVALID',
+        'RELEASE_JOB_GRAPH_INVALID',
         file,
-        'publication must depend on the read-only ubuntu npm adopter quickstart',
+        'verify-ledger needs control-commit-summary; build-release and finalize-release need verify-ledger; deploy-pages needs finalize-release and verify-ledger',
       ),
     );
   }
 
-  const promotion = object(jobs['promote-assets']);
-  const promotionOutputs = object(promotion.outputs);
+  const verifySteps = Array.isArray(verify.steps) ? verify.steps.map(object) : [];
+  const verifyNames = verifySteps.map((step) => step.name);
+  const promotionVerify = verifySteps.find((step) => step.name === 'Verify selected rehearsal');
+  const promotionRetain = verifySteps.find(
+    (step) => step.name === 'Retain verified promotion assets',
+  );
   const finalizeSteps = Array.isArray(finalize.steps) ? finalize.steps : [];
   const finalizeAssets = finalizeSteps.find(
     (step) => step.name === 'Download exact release assets',
   );
   if (
     build.if !== rehearsalCondition ||
-    linuxAdopter.if !== rehearsalCondition ||
-    promotion.if !== publishCondition ||
-    promotion.needs !== 'verify-ledger' ||
-    promotionOutputs.release_asset_id !== '${{ steps.retain.outputs.artifact-id }}' ||
+    promotionVerify?.if !== publishCondition ||
+    promotionRetain?.if !== publishCondition ||
+    promotionRetain?.id !== 'retain' ||
+    verifyNames.indexOf('Verify selected rehearsal') <=
+      verifyNames.indexOf('Bind and verify exact release evidence') ||
+    verifyNames.indexOf('Retain verified promotion assets') !==
+      verifyNames.indexOf('Verify selected rehearsal') + 1 ||
+    object(promotionRetain?.with).name !== 'devai-release-assets-${{ github.run_attempt }}' ||
+    object(promotionRetain?.with).path !== 'release-assets/*' ||
+    object(verify.outputs).release_asset_id !== '${{ steps.retain.outputs.artifact-id }}' ||
+    verifySteps
+      .filter((step) => credentialReferences(step).has('GITHUB_TOKEN'))
+      .some((step) => step !== promotionVerify) ||
     finalizeAssets?.with?.['artifact-ids'] !==
-      '${{ needs.promote-assets.outputs.release_asset_id }}' ||
+      '${{ needs.verify-ledger.outputs.release_asset_id }}' ||
     finalizeAssets?.with?.['merge-multiple'] !== true
   ) {
     findings.push(
@@ -1497,18 +1556,12 @@ function checkReleaseWorkflow(file, workflow, source, findings, pins) {
       ),
     );
   }
-  for (const name of ['promote-assets', 'finalize-release', 'deploy-pages']) {
+  for (const name of ['verify-ledger', 'finalize-release', 'deploy-pages']) {
     const body = JSON.stringify(jobs[name]);
     if (/pnpm (?:run )?build|stage-release-package|double-pack|npm (?:run )?build/u.test(body))
       findings.push(finding('RELEASE_PROMOTION_REBUILD_FORBIDDEN', file, name));
   }
-  for (const name of [
-    'verify-ledger',
-    'rehearsal-summary',
-    'promote-assets',
-    'finalize-release',
-    'deploy-pages',
-  ]) {
+  for (const name of ['verify-ledger', 'build-release', 'finalize-release', 'deploy-pages']) {
     const jobSteps = jobs[name]?.steps ?? [];
     const checkout = jobSteps.find((step) => step.with?.path === 'release-control');
     if (
@@ -1547,8 +1600,7 @@ function checkReleaseWorkflow(file, workflow, source, findings, pins) {
     ) ||
     pagesArtifact?.with?.['retention-days'] !== 30 ||
     pagesArtifact?.with?.name !== 'github-pages-${{ github.run_attempt }}' ||
-    pagesAssets?.with?.['artifact-ids'] !==
-      '${{ needs.promote-assets.outputs.release_asset_id }}' ||
+    pagesAssets?.with?.['artifact-ids'] !== '${{ needs.verify-ledger.outputs.release_asset_id }}' ||
     pagesAssets?.with?.['merge-multiple'] !== true ||
     pagesRecord?.if !== '${{ always() }}' ||
     pagesRecord?.with?.['retention-days'] !== 30 ||
@@ -1620,7 +1672,7 @@ function checkReleaseWorkflow(file, workflow, source, findings, pins) {
     'release-channel.mjs',
     'RELEASE_IS_PRERELEASE',
     'sbom_subject_sha256',
-    'Verify npm adopter quickstart on Linux',
+    'Exercise fresh npm adoption, execution, and reuse',
     'init bind --target . --tier tier1 --constitution',
     "task.disposition === 'reused'",
     'npm publish',
