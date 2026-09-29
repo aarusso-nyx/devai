@@ -45,6 +45,9 @@ const SKIP_PATH_SUFFIXES = [
   'docs/site/build',
   'docs/site/.docusaurus',
   'docs/site/node_modules',
+  // Vendored third-party packages carry their own READMEs, whose links
+  // resolve inside their upstream repositories, not this site.
+  'docs/site/vendor',
   // R14 W05: Docusaurus versioned-docs introduces docs/site/versioned_docs/
   // (per-version snapshots) and docs/site/versioned_sidebars/ (per-version
   // sidebar configs). The snapshots reference paths at their version's
