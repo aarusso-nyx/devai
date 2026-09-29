@@ -3,7 +3,7 @@
   "id": "CMP-0003",
   "title": "Harness convergence",
   "type": "campaign",
-  "status": "proposed",
+  "status": "active",
   "date": "2026-09-28",
   "authority": "Architect",
   "mandate": {
@@ -116,7 +116,7 @@
       "id": "R-0301",
       "title": "Planning lane and semantic validation",
       "goal": "A pull request whose changed paths all classify as plan executes the planning lane (preflight, plan:validate with the campaign and scorecard-page checks, format, schema members) with the bootstrap restored from cache; docs:validate runs every docs-class member; the campaign policy is accepted and the campaign checker enforces Owner-effect closure.",
-      "status": "planned",
+      "status": "open",
       "records": ["ADR-CHK-0003"],
       "depends_on": [],
       "attestation_reissue": true,
@@ -145,7 +145,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "ready",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
