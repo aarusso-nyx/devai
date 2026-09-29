@@ -21,7 +21,10 @@ function client(): JudgeLlmClient {
       expect(messages.user).toBe('evidence body');
       expect(messages.system).toContain('[RUBRIC]\napply rubric');
       expect(meta).toMatchObject({ caller: 'sense judge' });
-      expect(options).toMatchObject({ response_format_json: true, temperature: 0 });
+      expect(options).toMatchObject({
+        temperature: 0,
+        response_schema: 'review-verdict.schema.json',
+      });
       return { ...responseBase, text: '', json: responseJson };
     },
   };
@@ -37,7 +40,7 @@ afterEach(() => {
 });
 
 describe('judge finding population', () => {
-  it('awaits the client and normalizes valid severities while dropping malformed findings', async () => {
+  it('awaits the client and copies every valid severity in order', async () => {
     responseJson = {
       verdict: 'review',
       confidence: 0.75,
@@ -47,9 +50,6 @@ describe('judge finding population', () => {
         { severity: 'error', code: 'ERROR_CASE', message: 'error message' },
         { severity: 'warning', code: 'WARNING_CASE', message: 'warning message' },
         { severity: 'info', code: 'INFO_CASE', message: 'info message' },
-        { severity: 'unexpected', code: 'UNKNOWN_SEVERITY', message: 'defaults to info' },
-        { severity: 'error', code: 42, message: 'invalid code' },
-        { severity: 'error', code: 'INVALID_MESSAGE', message: 42 },
       ],
     };
 
@@ -87,11 +87,37 @@ describe('judge finding population', () => {
       { severity: 'error', code: 'ERROR_CASE', message: 'error message' },
       { severity: 'warning', code: 'WARNING_CASE', message: 'warning message' },
       { severity: 'info', code: 'INFO_CASE', message: 'info message' },
-      { severity: 'info', code: 'UNKNOWN_SEVERITY', message: 'defaults to info' },
     ]);
   });
 
-  it('does not synthesize a rationale finding for an empty rationale', async () => {
+  it.each([
+    ['an unknown severity', { severity: 'unexpected', code: 'UNKNOWN_SEVERITY', message: 'm' }],
+    ['a numeric code', { severity: 'error', code: 42, message: 'invalid code' }],
+    ['a numeric message', { severity: 'error', code: 'INVALID_MESSAGE', message: 42 }],
+  ])(
+    'returns an error reading for a finding with %s instead of dropping it',
+    async (_label, bad) => {
+      responseJson = {
+        verdict: 'review',
+        confidence: 0.75,
+        rationale: 'needs attention',
+        findings: [{ severity: 'critical', code: 'CRITICAL_CASE', message: 'kept' }, bad],
+      };
+
+      const reading = await senseJudge(
+        { aspect: 'coherence', rubric: 'apply rubric', evidence: 'evidence body' },
+        client(),
+      );
+
+      expect(calls).toBe(1);
+      expect(reading).toMatchObject({
+        status: 'error',
+        findings: [{ severity: 'critical', code: 'judge_invalid_response' }],
+      });
+    },
+  );
+
+  it('returns an error reading for an empty rationale instead of a verdict', async () => {
     responseJson = { verdict: 'pass', confidence: 1, rationale: '', findings: [] };
 
     const reading = await senseJudge(
@@ -106,11 +132,13 @@ describe('judge finding population', () => {
 
     expect(calls).toBe(1);
     expect(reading).toMatchObject({
-      status: 'pass',
+      status: 'error',
       sensor: { name: 'judge.depth', kind: 'llm_judge' },
       evidence_path: 'record/proofs/judge/depth.json',
-      metrics: { aspect_label: 'depth', confidence: 1 },
+      metrics: { aspect_label: 'depth' },
     });
-    expect(reading.findings).toEqual([]);
+    expect(reading.findings).toMatchObject([
+      { severity: 'critical', code: 'judge_invalid_response' },
+    ]);
   });
 });

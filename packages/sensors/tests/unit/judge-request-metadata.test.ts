@@ -21,7 +21,7 @@ function client(capture: Capture): JudgeLlmClient {
       capture.user = messages.user;
       return {
         text: '',
-        json: { verdict: 'pass', confidence: 0.9, findings: [] },
+        json: { verdict: 'pass', confidence: 0.9, rationale: 'fixture rationale', findings: [] },
         family: 'fixture-family',
         model: 'fixture-model',
         usage: { input_tokens: 3, output_tokens: 2, cost_usd: 0.01 },
@@ -33,7 +33,7 @@ function client(capture: Capture): JudgeLlmClient {
 }
 
 describe('judge request metadata', () => {
-  it('forwards prompt composition and stack metadata with the fixed JSON request options', async () => {
+  it('forwards prompt composition and stack metadata with the review-verdict schema request', async () => {
     const capture: Capture = {
       calls: 0,
       meta: undefined,
@@ -60,7 +60,10 @@ describe('judge request metadata', () => {
       prompt_pc_id: 'PC-wave29',
       stack_sha256: 'a'.repeat(64),
     });
-    expect(capture.options).toEqual({ response_format_json: true, temperature: 0 });
+    expect(capture.options).toEqual({
+      temperature: 0,
+      response_schema: 'review-verdict.schema.json',
+    });
     expect(capture.system).toContain('[RUBRIC]\napply rubric');
     expect(capture.user).toBe('evidence body');
     expect(reading).toMatchObject({
@@ -92,7 +95,10 @@ describe('judge request metadata', () => {
 
     expect(capture.calls).toBe(1);
     expect(capture.meta).toEqual({ caller: 'sense judge' });
-    expect(capture.options).toEqual({ response_format_json: true, temperature: 0 });
+    expect(capture.options).toEqual({
+      temperature: 0,
+      response_schema: 'review-verdict.schema.json',
+    });
     expect(reading).toMatchObject({
       status: 'pass',
       sensor: { name: 'judge.depth', kind: 'llm_judge' },
