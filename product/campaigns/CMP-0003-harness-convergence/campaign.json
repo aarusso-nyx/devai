@@ -212,7 +212,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0311",
-              "status": "ready",
+              "status": "in_progress",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -252,7 +252,7 @@
               "commit_types": ["test(cli)", "test(workflows)", "test(campaign)"],
               "prompt": {
                 "path": "prompts/TASK-0312.md",
-                "sha256": null
+                "sha256": "d5314ede1c7fa61cda6405d7936f1711162871e46ea774f354cdf60fde339ca1"
               },
               "pull_request": null,
               "merged_as": null,
