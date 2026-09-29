@@ -132,3 +132,30 @@ Backlog observed while closing R-0302 and R-0303, outside every task boundary:
   orchestrator signs ledger commits as `DEVAI Owner` and law commits as
   `DEVAI Architect`, and the Owner records receipts for the earlier findings
   at the campaign close.
+
+Backlog observed while running R-0305, outside every task boundary:
+
+- The Codex `--output-schema` path and OpenAI strict structured outputs may
+  require every property in `required`; `review-verdict.schema.json` keeps
+  `findings`, `file` and `line` optional and the bridge sends the governed
+  schema unchanged. A live host run must confirm both hosts accept it before
+  a campaign runs under `review.mode: model-advisory`.
+- The `claude -p` envelope fields the bridge maps to a finish reason
+  (`stop_reason`, `is_error`, `subtype`) come from the Inspector's fixtures and
+  are not yet checked against a live CLI.
+- A rejected tie-breaker reply now escalates with confidence 0 instead of the
+  retired 0.5 midpoint; the calibration pages that quote the midpoint need a
+  pass.
+- `docs/reference/error-codes.md` is generated from the CLI, authority and
+  utils sources only; the campaign checker's kebab-case codes and the loop's
+  `TASK_REGISTRY_IDENTITY_MISMATCH` have no home there until the generator's
+  scope widens.
+- When the affected check fails in the gate, its JSON report is one long
+  stdout line that the GitHub log does not show, so the failing node is only
+  recoverable by a local reproduction (about ten minutes). The gate step
+  should print a compact per-node summary on failure or upload the report as
+  an artifact; a `ci` task for a later campaign.
+- The two ledger-derived contract tests of TASK-0352 first read the live task
+  states and broke as soon as the wave moved to `pre_merge`; they now build
+  their fixtures from a normalized copy. A contract test never depends on the
+  momentary state of a moving ledger.
