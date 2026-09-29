@@ -1745,7 +1745,7 @@
       "id": "R-0306",
       "title": "Release approval topology and Pages re-runs",
       "goal": "A rehearsal stops twice and a publication twice, from a complete job and credential matrix, with the exact Owner authorization untouched; a site-only re-run resumes its own submitted or verified record and an unknown submission stays closed with a documented recovery path.",
-      "status": "open",
+      "status": "closing",
       "records": ["ADR-REL-0030", "ADR-REL-0032"],
       "depends_on": ["R-0304"],
       "attestation_reissue": false,
@@ -2061,7 +2061,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": ["docs/dev/operations/release-discipline.md"],
@@ -2086,8 +2086,8 @@
                 "path": "prompts/TASK-0364.md",
                 "sha256": "3b41131bcb3339f6691fcd49b1b1436975073dac2a04176b324289dde29dc37d"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/193",
+              "merged_as": "5eda694f6fe5f467f8dc3b3d85fbabfe22070a8e",
               "execution": {
                 "tier": "architect",
                 "effort": "high",
@@ -2139,7 +2139,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0364",
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -2169,8 +2169,8 @@
                 "path": "prompts/TASK-0365.md",
                 "sha256": "b743760f25959e6384c0cfc673a1b723b0f6a586e266e0d683089cd561500399"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/193",
+              "merged_as": "5eda694f6fe5f467f8dc3b3d85fbabfe22070a8e",
               "execution": {
                 "tier": "worker",
                 "effort": "high",
@@ -2222,7 +2222,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0365",
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F2", "F3"],
               "boundary": {
                 "paths": [
@@ -2244,8 +2244,8 @@
                 "path": "prompts/TASK-0366.md",
                 "sha256": "8d7427857c6c8295e84473837dba305403684f646504aea7812e8db9cc76d9b3"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/193",
+              "merged_as": "5eda694f6fe5f467f8dc3b3d85fbabfe22070a8e",
               "execution": {
                 "tier": "worker",
                 "effort": "high",
@@ -2526,7 +2526,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0372",
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F2", "F3"],
               "boundary": {
                 "paths": [
@@ -2534,7 +2534,11 @@
                   "scripts/check-workflows.mjs",
                   "packages/loop/src/governance-ledger/render.ts",
                   "packages/cli/src/commands/docs/governance-render.ts",
-                  "docs/reference/error-codes.md"
+                  "docs/reference/error-codes.md",
+                  "packages/cli/src/commands/check/docs-governance-ia-checks.ts",
+                  "packages/cli/src/commands/check/docs-governance.ts",
+                  "packages/loop/src/governance-ledger/index.ts",
+                  "packages/loop/tests/unit/governance-ledger-cases.ts"
                 ],
                 "forbidden": ["law/", "product/", ".github/workflows/"]
               },
@@ -2565,14 +2569,53 @@
               "commit_types": ["feat(docs)", "ci(scripts)", "feat(loop)", "docs(reference)"],
               "prompt": {
                 "path": "prompts/TASK-0373.md",
-                "sha256": null
+                "sha256": "d389ec8ade8f0d912107f4bbd179a715aa55575d70828c160611ee06451c88c7"
               },
               "pull_request": null,
               "merged_as": null,
               "execution": {
                 "tier": "worker",
                 "effort": "high",
-                "time_budget_minutes": 120
+                "time_budget_minutes": 120,
+                "resolved": {
+                  "policy_version": "1.0.0",
+                  "pinned_at": "2026-09-29T19:52:04Z",
+                  "tiers": {
+                    "architect": {
+                      "rank": 1,
+                      "hosts": {
+                        "claude": "claude-cli:fable",
+                        "codex": "codex-cli:gpt-6-astra"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker-high": {
+                      "rank": 2,
+                      "hosts": {
+                        "claude": "claude-cli:opus",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker": {
+                      "rank": 3,
+                      "hosts": {
+                        "claude": "claude-cli:sonnet",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "medium"
+                    },
+                    "clerk": {
+                      "rank": 4,
+                      "hosts": {
+                        "claude": "claude-cli:haiku",
+                        "codex": "codex-cli:gpt-6-luna"
+                      },
+                      "default_effort": "low"
+                    }
+                  },
+                  "ceiling": "architect"
+                }
               }
             }
           ]
