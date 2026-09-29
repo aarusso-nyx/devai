@@ -112,12 +112,15 @@ Close checks are the campaign's standing set (`adrs`, `schemas`, `docs-links`,
 detached worktree at the merged head after `pnpm run build` and
 `pnpm run release:bootstrap`.
 
-| Round  | Merged head | Pull requests | State                                                                                                                                   |
-| ------ | ----------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| R-0301 | `e5cfdb77`  | #173, #176    | `closing`: waits for the single RC attestation (decision 1); check-suite declaration due at its close (decision 3)                      |
-| R-0302 | `12d52fa5`  | #179, #181    | `closed`: close checks green on the merged head; `test-tasks.json` unchanged, so no attestation is owed                                 |
-| R-0303 | `0a66e13a`  | #183          | `closed`: close checks green on the merged head (990 skills tests, 3480 CLI tests); the eight-receipt acceptance was proven in the wave |
-| R-0304 | see ledger  | #188          | `closing`: waits for the single RC attestation and for OE-01 (queue enabled or the serialized fallback recorded)                        |
+| Round  | Merged head | Pull requests    | State                                                                                                                                                                        |
+| ------ | ----------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| R-0301 | `e5cfdb77`  | #173, #176       | `closing`: waits for the single RC attestation (decision 1); the check-suite declaration (decision 3) is pull request #194, held for the Owner's yes on its broker admission |
+| R-0302 | `12d52fa5`  | #179, #181       | `closed`: close checks green on the merged head; `test-tasks.json` unchanged, so no attestation is owed                                                                      |
+| R-0303 | `0a66e13a`  | #183             | `closed`: close checks green on the merged head (990 skills tests, 3480 CLI tests); the eight-receipt acceptance was proven in the wave                                      |
+| R-0304 | `468de683`  | #188             | `closing`: implementation in `main`; waits for the single RC attestation and for OE-01 (queue enabled or the serialized fallback recorded)                                   |
+| R-0305 | `04b141fe`  | #189, #190, #191 | `closing`: review mode, the versioned tier default, pinned resolution, the shared reply extractor; waits for the attestation and OE-05                                       |
+| R-0306 | `5eda694f`  | #192, #193       | `closing`: merged gated release jobs, control commit before the first stop, Pages resume-on-rerun; waits for OE-02, OE-03, OE-04                                             |
+| R-0307 | `90d5fc7d`  | #195             | `closing`: workflow reference pages, the IA completeness gate, the generated decision catalogue; waits for OE-06                                                             |
 
 Backlog observed while closing R-0302 and R-0303, outside every task boundary:
 
@@ -159,3 +162,16 @@ Backlog observed while running R-0305, outside every task boundary:
   states and broke as soon as the wave moved to `pre_merge`; they now build
   their fixtures from a normalized copy. A contract test never depends on the
   momentary state of a moving ledger.
+
+Close state on 2026-09-29, after wave CTG-0371 merged as `90d5fc7d`: every
+task of the seven rounds is `merged`; R-0302 and R-0303 are `closed`; the
+other five rounds are `closing` and cannot reach `closed` until the Owner
+performs the effects the ledger names (OE-01 to OE-06), re-issues the single
+RC attestation for the merged head, and records receipts for the
+forbidden-actions findings the scanner reports at that head. On `90d5fc7d`
+the scanner reports three, all `FORBID-CI-WITHOUT-ADR` on the three R-0307
+law commits that cite `.github/workflows/` paths inside the information
+architecture policy and schema without touching a workflow file; the earlier
+Engineer-identity ledger findings have left the scan window. The close checks
+of this campaign ran on `90d5fc7d` in a detached worktree; their result is
+recorded in the closing pull request.
