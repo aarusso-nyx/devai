@@ -15,6 +15,15 @@ export type { CanonFinding } from './schema-canon.js';
 
 export { ROSTER } from './roster.js';
 export type { SchemaName } from './roster.js';
+export { extractStructuredReply, REPLY_EXCERPT_MAX_CHARS } from './reply-extract.js';
+export type {
+  ReplyErrorCode,
+  ReplyExtraction,
+  ReplyExtractionError,
+  ReplyFinishReason,
+  ReplySchemaName,
+  StructuredReply,
+} from './reply-extract.js';
 
 /** Assembly replaces only this fixed function with checked package asset literals. */
 function bundledPackageAssets(): Readonly<Record<string, string>> | undefined {
