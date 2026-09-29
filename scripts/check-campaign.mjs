@@ -170,6 +170,24 @@ export function checkCampaign(root, campaignDir) {
     done.add(id);
   };
   for (const round of campaign.rounds) visit(round.id);
+  // Serialized admission (ADR-CHK-0004, isolation.serialized_admission of
+  // law/policy/campaign-execution.json): while the merge queue Owner effect
+  // OE-01 is unperformed, at most one pull request is in pre_merge. A coupled
+  // wave ships as one pull request, so all of its pre_merge tasks count once.
+  const mergeQueue = campaign.owner_effects.find((effect) => effect.id === 'OE-01');
+  if (!mergeQueue?.performed_at) {
+    const pullRequests = campaign.rounds.flatMap((round) =>
+      round.waves
+        .map((wave) => wave.tasks.filter((task) => task.status === 'pre_merge'))
+        .filter((tasks) => tasks.length > 0)
+        .map((tasks) => tasks.map((task) => task.id).join('+')),
+    );
+    if (pullRequests.length > 1) {
+      problem(
+        `concurrent-pre-merge-under-serialized-admission: ${pullRequests.join(', ')} are in pre_merge as ${pullRequests.length} pull requests while OE-01 has no performed_at`,
+      );
+    }
+  }
   const promptDir = join(campaignDir, 'prompts');
   if (existsSync(promptDir)) {
     const referenced = new Set(
