@@ -1966,7 +1966,9 @@
                   "scripts/process/publish-site.mjs",
                   "scripts/process/pages-publication.mjs",
                   "scripts/process/github-pages-journal.mjs",
-                  "packages/cli/tests/unit/live-ledger-workflow.test.ts"
+                  "packages/cli/tests/unit/live-ledger-workflow.test.ts",
+                  "tests/contract/release-workflow.contract.test.ts",
+                  "docs/dev/operations/release-discipline.md"
                 ],
                 "forbidden": ["law/", "product/"]
               },
@@ -1988,7 +1990,7 @@
               "commit_types": ["ci(workflows)", "ci(scripts)"],
               "prompt": {
                 "path": "prompts/TASK-0363.md",
-                "sha256": "6682f96710674ee4223120185f04e929b5f403f6990d07e65f65f57f14368632"
+                "sha256": "ca07368e1299b34dfe26abdfeedcfb1e4ea64119aadc3f58512ac5193a19633a"
               },
               "pull_request": null,
               "merged_as": null,
