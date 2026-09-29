@@ -51,13 +51,13 @@
       "id": "OE-03",
       "description": "Repoint DEVAI_PROCESS_CONTROL_COMMIT to an explicit reviewed SHA before the next rehearsal, and again after R-0306 lands (#162 item 2).",
       "required_before": "R-0306",
-      "performed_at": null
+      "performed_at": "2026-09-29T21:42:36Z"
     },
     {
       "id": "OE-04",
       "description": "Reissue the Pages migration audit (DEVAI_PAGES_MIGRATION_AUDIT_JSON and its SHA-256 in the github-pages environment) for the next tag (#162 item 3).",
       "required_before": "R-0306",
-      "performed_at": null
+      "performed_at": "2026-09-29T21:42:36Z"
     },
     {
       "id": "OE-05",
@@ -1755,7 +1755,7 @@
       "id": "R-0306",
       "title": "Release approval topology and Pages re-runs",
       "goal": "A rehearsal stops twice and a publication twice, from a complete job and credential matrix, with the exact Owner authorization untouched; a site-only re-run resumes its own submitted or verified record and an unknown submission stays closed with a documented recovery path.",
-      "status": "closing",
+      "status": "closed",
       "records": ["ADR-REL-0030", "ADR-REL-0032"],
       "depends_on": ["R-0304"],
       "attestation_reissue": false,
@@ -2304,7 +2304,12 @@
           ]
         }
       ],
-      "closure": null
+      "closure": {
+        "merged_head": "5eda694f6fe5f467f8dc3b3d85fbabfe22070a8e",
+        "closed_at": "2026-09-29T21:42:38Z",
+        "task_policy_digest": null,
+        "phase_closure": null
+      }
     },
     {
       "id": "R-0307",
