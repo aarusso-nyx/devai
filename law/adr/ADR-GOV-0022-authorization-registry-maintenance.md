@@ -2,7 +2,7 @@
 id: ADR-GOV-0022
 title: Validated append-only authorization registry maintenance is not an invariant mutation
 type: adr
-status: proposed
+status: accepted
 date: 2026-09-28
 authority: Architect
 supersedes: []
@@ -30,9 +30,9 @@ inspector_acceptance:
 
 ## Status
 
-Proposed on 2026-09-28 from the harness convergence brainstorm and its
-independent review. Binds nothing until the Architect sets it to accepted
-before the round that implements it opens. Narrows one finding of the
+Accepted on 2026-09-29 by the Architect before the round that implements it
+opened; proposed on 2026-09-28 from the harness convergence brainstorm and its
+independent review. Narrows one finding of the
 forbidden-actions scanner for one path under one validated condition; every
 other rule of the scanner and of Article 6 is unchanged.
 
