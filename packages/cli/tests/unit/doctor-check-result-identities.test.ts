@@ -382,7 +382,7 @@ describe('Doctor whole CheckResult identities', () => {
               {
                 "actual_sha256": "missing",
                 "file": "forbidden-actions.json",
-                "installed_sha256": "f4691c88c7ad74c27e6100ad0c958d79d3112853964d2ff362e7b4ccb495cf74",
+                "installed_sha256": "1b7dbdda65108802ebfb86344ded1f34c73ee737c00544b3e7b1a2c2922f07db",
                 "target": "<repo>/.devai/config/forbidden-actions.json",
               },
               {
