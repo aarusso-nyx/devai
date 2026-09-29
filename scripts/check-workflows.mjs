@@ -1420,26 +1420,34 @@ function checkReleaseWorkflow(file, workflow, source, findings, pins) {
   const finalize = object(jobs['finalize-release']);
   const pages = object(jobs['deploy-pages']);
   const summarySteps = Array.isArray(summary.steps) ? summary.steps.map(object) : [];
-  const summaryRun = String(summarySteps[0]?.run ?? '');
+  const summaryCheckout = object(summarySteps[0]?.with);
+  const summaryStep = summarySteps[1];
   if (
     summary.environment !== undefined ||
     summary.if !== undefined ||
     summary.needs !== undefined ||
     JSON.stringify(object(summary.permissions)) !== JSON.stringify({ contents: 'read' }) ||
-    summarySteps.length !== 1 ||
-    summarySteps.some((step) => typeof step.uses === 'string') ||
+    summarySteps.length !== 2 ||
+    typeof summarySteps[0]?.uses !== 'string' ||
+    !summarySteps[0].uses.startsWith('actions/checkout@') ||
+    JSON.stringify(summaryCheckout) !==
+      JSON.stringify({
+        ref: '${{ github.workflow_sha }}',
+        'persist-credentials': false,
+        'sparse-checkout': 'scripts/process/release-prerequisites.mjs',
+        'sparse-checkout-cone-mode': false,
+      }) ||
+    summaryStep?.uses !== undefined ||
     credentialReferences(summary).size !== 0 ||
-    object(summarySteps[0]?.env).CONTROL_COMMIT !== '${{ vars.DEVAI_PROCESS_CONTROL_COMMIT }}' ||
-    !summaryRun.includes('set -euo pipefail') ||
-    !summaryRun.includes('^[a-f0-9]{40}$') ||
-    !summaryRun.includes('scripts/process/release-prerequisites.mjs" control-commit') ||
-    !summaryRun.includes('"DEVAI_PROCESS_CONTROL_COMMIT=$CONTROL_COMMIT" "$GITHUB_STEP_SUMMARY"')
+    object(summaryStep?.env).CONTROL_COMMIT !== '${{ vars.DEVAI_PROCESS_CONTROL_COMMIT }}' ||
+    summaryStep?.run !==
+      'set -euo pipefail\nnode scripts/process/release-prerequisites.mjs control-commit'
   ) {
     findings.push(
       finding(
         'RELEASE_CONTROL_COMMIT_SUMMARY_INVALID',
         file,
-        'an ungated, read-only, secret-free first job must summarize the 40-hex control commit before the first stop',
+        'an ungated, read-only, secret-free first job must sparse-check out only the prerequisites script without persisted credentials and summarize the control commit before the first stop',
       ),
     );
   }

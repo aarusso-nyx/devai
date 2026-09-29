@@ -50,24 +50,22 @@ jobs:
     permissions:
       contents: read
     steps:
+      # ADR-REL-0030 IA-005: no environment, no secret, no persisted credential; only
+      # the prerequisites script is materialized from the workflow commit.
+      - name: Check out the prerequisites script from the workflow commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+          sparse-checkout: scripts/process/release-prerequisites.mjs
+          sparse-checkout-cone-mode: false
       - name: Print approved process control commit before the first stop
         shell: bash
-        # ADR-REL-0030 IA-005: no checkout, no secret, no environment. Only the
-        # prerequisites script is fetched, anonymously, from the workflow commit.
         env:
           CONTROL_COMMIT: ${{ vars.DEVAI_PROCESS_CONTROL_COMMIT }}
         run: |-
           set -euo pipefail
-          if [[ ! "$CONTROL_COMMIT" =~ ^[a-f0-9]{40}$ ]]; then
-            echo 'CONTROL_COMMIT_INVALID: DEVAI_PROCESS_CONTROL_COMMIT must be a full 40-hex commit sha.' >&2
-            exit 1
-          fi
-          source="$RUNNER_TEMP/devai-workflow-source"
-          git init --quiet "$source"
-          git -C "$source" fetch --quiet --depth 1 --no-tags "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" "$GITHUB_WORKFLOW_SHA"
-          git -C "$source" checkout --quiet FETCH_HEAD -- scripts/process/release-prerequisites.mjs
-          node "$source/scripts/process/release-prerequisites.mjs" control-commit
-          grep -Fxq "DEVAI_PROCESS_CONTROL_COMMIT=$CONTROL_COMMIT" "$GITHUB_STEP_SUMMARY"
+          node scripts/process/release-prerequisites.mjs control-commit
   verify-ledger:
     name: Verify protected RC ledger
     runs-on: ubuntu-latest
