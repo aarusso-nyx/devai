@@ -1,7 +1,22 @@
 # DEVAI v1.0rc development contract
 
+This file is the only instruction contract for every host. `CLAUDE.md` beside it
+holds the single line `@AGENTS.md`, the Claude Code import that loads this file once
+and never twice; edit guidance here and nowhere else (ADR-GOV-0020).
+
 This repository is the release-candidate source. DEVAI does not govern its own
 development: human maintainers choose scope, review changes, and decide releases.
+
+## Roles and reading order
+
+Declare one of the five roles at session start and keep it: Owner, Architect,
+Inspector, Engineer, or Auditor. Constitution Article 6 fixes write authority by
+path and Article 7 fixes what each role may author; a session never infers or
+elevates its role. Before changing governed repository state, read `README.md`,
+`law/constitution.md`, the decision records under `law/adr`, and the schemas under
+`law/schemas`, in that order.
+
+## Working rules
 
 - Work in a dedicated branch or worktree and preserve unrelated user changes.
 - Treat `law/constitution.md`, current `law/policy/`, and current `law/schemas/` as
