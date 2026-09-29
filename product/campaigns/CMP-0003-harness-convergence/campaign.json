@@ -371,7 +371,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": ["docs/adopters/install.md", "docs/adopters/ci-economy.md"],
@@ -397,8 +397,8 @@
                 "path": "prompts/TASK-0321.md",
                 "sha256": "9012700ae437e77ed8f1222eb79d9d0173516b18c2d8e515ff697a31b799834e"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/179",
+              "merged_as": "20d4592212d26a06795ab654107de6b92b89fdb1",
               "execution": {
                 "tier": "architect",
                 "effort": "high",
@@ -411,7 +411,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0321",
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -456,8 +456,8 @@
                 "path": "prompts/TASK-0322.md",
                 "sha256": "d6164af04a49a5fa996726592a45d709be4bfc38ed9c02f71a8e25ffcc03b21f"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/179",
+              "merged_as": "20d4592212d26a06795ab654107de6b92b89fdb1",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -470,7 +470,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0322",
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F2", "F3"],
               "boundary": {
                 "paths": [
@@ -516,8 +516,8 @@
                 "path": "prompts/TASK-0323.md",
                 "sha256": "8c2385c01f2b6607011eda5d551d31cb3505a2a499483f536ccb589616a15f28"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/179",
+              "merged_as": "20d4592212d26a06795ab654107de6b92b89fdb1",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
