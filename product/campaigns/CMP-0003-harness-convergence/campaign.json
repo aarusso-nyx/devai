@@ -283,7 +283,7 @@
                   "docs/reference/cli/check-suites.md",
                   "docs/dev/operations/remote-preflight-contract.md"
                 ],
-                "forbidden": ["law/", "product/", ".github/workflows/"]
+                "forbidden": ["law/", "product/"]
               },
               "deliverables": [
                 "test-tasks.json uses kind class selectors so a plan-only diff selects no node that depends on build; plan:validate runs journeys, the campaign check, and the scorecard-page check; docs:validate runs every docs-class member.",
@@ -1023,7 +1023,7 @@
                   "docs/reference/error-codes.md",
                   "scripts/run-pr-release-gate.mjs"
                 ],
-                "forbidden": ["law/", "product/", ".github/workflows/"]
+                "forbidden": ["law/", "product/"]
               },
               "deliverables": [
                 "pull-request-checks.yml accepts merge_group with the queue base and head, keeps the devai-release-gate check name, and uses per-entry concurrency; check-workflows pins the shape; the preflight resolves the merge_group base."
@@ -1600,7 +1600,7 @@
                   "scripts/process/pages-publication.mjs",
                   "scripts/process/github-pages-journal.mjs"
                 ],
-                "forbidden": ["law/", "product/", ".github/workflows/"]
+                "forbidden": ["law/", "product/"]
               },
               "deliverables": [
                 "release.yml stops twice on rehearsal and twice on publication with the exact Owner authorization untouched; the control commit is printed in the run summary before the first stop; check-workflows pins the new shape."
