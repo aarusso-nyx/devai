@@ -145,7 +145,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "in_progress",
+              "status": "pre_merge",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -154,7 +154,8 @@
                   ".devai/config/change-taxonomy-binding.json",
                   ".devai/config/project.json",
                   "docs/dev/operations/workflow-economy-proposals.md",
-                  "docs/adopters/docs-layout.md"
+                  "docs/adopters/docs-layout.md",
+                  "law/schemas/campaign-execution-policy.schema.json"
                 ],
                 "forbidden": [".github/workflows/", "packages/", "tests/"]
               },
@@ -190,11 +191,12 @@
                 "law(taxonomy)",
                 "law(config)",
                 "docs(operations)",
-                "docs(adopters)"
+                "docs(adopters)",
+                "spec(schemas)"
               ],
               "prompt": {
                 "path": "prompts/TASK-0311.md",
-                "sha256": "3ce128ab1a06479a7f39c4f5527e124b48d538be28012b26b44cae152d4f5180"
+                "sha256": "716176171e3e43d4513cf2a5db6f2e28026e181fc3fb2188ce2f8f7ae5fe132d"
               },
               "pull_request": null,
               "merged_as": null,
