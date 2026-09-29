@@ -20,18 +20,72 @@ Its structure is `law/schemas/campaign.schema.json`; its semantics are
 
 ## Models, effort, and time
 
-Every task carries an `execution` block with a tier and an effort. The
-tiers are the only model names prompts use; `models.tiers` in the campaign
-document maps each tier to a Claude model and a Codex model, and that map is
-the place to change when models evolve. Today: architect is Fable 5.1 or
-Astra 6, worker-high is Opus 5.5 or Sol 6, worker is Sonnet 5 or Terra 6,
-clerk is Haiku 4.5 or Luna 6. The orchestrator runs at the architect tier.
+Every task carries an `execution` block with a tier and an effort. Tiers are
+the only model names prompts use. The tier map is the repository default in
+[`law/policy/model-tiers.json`](../../../../law/policy/model-tiers.json),
+validated by
+[`law/schemas/model-tiers.schema.json`](../../../../law/schemas/model-tiers.schema.json)
+(ADR-MDL-0002): each tier has a rank, one host alias per host, and a default
+effort, and the document carries a `policy_version` that every change bumps.
+At policy version 1.0.0 the default is:
+
+| Tier          | Rank | Claude alias | Codex alias   | Default effort |
+| ------------- | ---- | ------------ | ------------- | -------------- |
+| `architect`   | 1    | `fable`      | `gpt-6-astra` | high           |
+| `worker-high` | 2    | `opus`       | `gpt-6-sol`   | high           |
+| `worker`      | 3    | `sonnet`     | `gpt-6-sol`   | medium         |
+| `clerk`       | 4    | `haiku`      | `gpt-6-luna`  | low            |
+
+The aliases are the names the Claude Code and Codex CLIs accept; the Claude
+host resolves through the `claude-cli` runtime and the Codex host through
+`codex-cli` in
+[`law/policy/model-runtime-registry.json`](../../../../law/policy/model-runtime-registry.json).
+The tier named `architect` is a capability rank and the escalation ceiling,
+not the Architect discipline; the name is kept because the closed campaigns
+reference it. The orchestrator runs at the architect tier.
+
+A campaign declares nothing about models unless it needs a different alias
+for one tier. Its optional `models.tiers` block overrides the default by tier
+name, and a tier it does not name resolves to the default. A campaign never
+introduces a host. An unknown tier, an effort outside `low`, `medium`,
+`high`, `max`, a host the default does not declare, or an alias the host
+does not declare fails `pnpm run campaign:check`. Closed campaigns keep their
+own `models` blocks byte-for-byte as evidence.
+
+At task start the orchestrator pins the merged map on the task as
+`execution.resolved`, together with the default's `policy_version`. Every
+pinned entry is in the `runtime:model` registry id form the executor code
+enforces: the runtime id, a colon, and the alias, for example
+`claude-cli:fable` or `codex-cli:gpt-6-astra`. A later change to the default
+or to the override never reinterprets a started task; only a task started
+after the change resolves the new map.
 
 Escalation is the orchestrator's call: after one failed iteration, a blocked
 report, or a time budget exceeded without a pull request, rerun the task one
-rank up, up to the architect tier. A second failure at the ceiling is a gap
-for a human. Every prompt states that time matters and that partial progress
-beats perfection.
+rank up the pinned map, up to its ceiling. A second failure at the ceiling is
+a gap for a human. Every prompt states that time matters and that partial
+progress beats perfection.
+
+## Review mode
+
+Review of a task pull request has four steps (ADR-GOV-0023): model
+evaluation, gate ratification, merge, and dispatch of any remote effect.
+Only the first may be delegated, and the campaign says so with
+`review.mode`. `human`, the default when the field is absent, delegates
+nothing. `model-advisory` lets a model instance distinct from the task's
+working agent evaluate the pull request inside the human-initiated
+orchestrator session and produce an advisory verdict in the shape
+ADR-MDL-0001 declares.
+
+Under `model-advisory`, before the human ratifies the gate, the orchestrator
+records a `review` block on the task: the verdict document, the SHA-256 of
+the reply it was extracted from, the evaluator in `runtime:model` form, and
+the time. A task in `pre_merge` without that block, with a verdict that fails
+the verdict schema, or with a digest that does not match cannot move to
+`merged`, and `pnpm run campaign:check` names the task. The verdict is advice
+to the ratifying human and nothing else: it never satisfies a gate, merges,
+or authorizes an effect, and the ledger shows a human actor on the gate, the
+merge, and every remote effect.
 
 ## Opening a round
 
@@ -48,9 +102,13 @@ beats perfection.
    is merged.
 2. Open a session with the task's discipline declared. Paste
    `prompts/preamble.md`, then the task's prompt file, verbatim.
-3. Record the prompt file's sha256 on the task before work starts.
+3. Record the prompt file's sha256 on the task before work starts, and pin
+   the resolved tier map as `execution.resolved` with the default's
+   `policy_version`.
 4. When the pull request is open and the acceptance commands pass, set the
-   task to `pre_merge`. After merge, record `pull_request` and `merged_as`.
+   task to `pre_merge`. Under `review.mode` `model-advisory`, record the
+   `review` block before ratifying the gate. After merge, record
+   `pull_request` and `merged_as`.
 5. After the last task of a round merges, run the universal close checks and
    the round's `close_checks` on the merged head, perform any owner effect the
    round requires, re-issue the attestation when the round says so, and record
