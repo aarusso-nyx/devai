@@ -555,14 +555,14 @@
                   "CLAUDE.md",
                   "docs/adopters/install.md",
                   "docs/reference/recipes/README.md",
+                  "AGENTS.md",
+                  "packages/skills/resources/recipes/devai-assess/SKILL.md",
+                  "packages/skills/resources/recipes/devai-docs/SKILL.md",
+                  "packages/skills/resources/recipes/devai-fix/SKILL.md",
+                  "packages/skills/resources/recipes/devai-plan/SKILL.md",
                   "packages/skills/resources/recipes/devai-round/SKILL.md",
-                  "packages/skills/resources/recipes/devai-verify/SKILL.md",
-                  "packages/skills/resources/recipes/devai-triage/SKILL.md",
-                  "packages/skills/resources/recipes/devai-audit/SKILL.md",
-                  "packages/skills/resources/recipes/devai-release/SKILL.md",
-                  "packages/skills/resources/recipes/devai-init/SKILL.md",
-                  "packages/skills/resources/recipes/devai-sense/SKILL.md",
-                  "AGENTS.md"
+                  "packages/skills/resources/recipes/devai-scaffold/SKILL.md",
+                  "packages/skills/resources/recipes/devai-verify/SKILL.md"
                 ],
                 "forbidden": [".github/workflows/", "packages/", "tests/"]
               },
@@ -586,7 +586,7 @@
                 "docs(agents)",
                 "docs(adopters)",
                 "docs(reference)",
-                "docs(recipes)"
+                "refactor(recipes)"
               ],
               "prompt": {
                 "path": "prompts/TASK-0324.md",
@@ -606,7 +606,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0324",
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -649,7 +649,7 @@
               "commit_types": ["test(skills)", "test(cli)"],
               "prompt": {
                 "path": "prompts/TASK-0325.md",
-                "sha256": null
+                "sha256": "a92efd47252b29c930f21b17981fd7977e9eb3481efa9890a0f082aaba7e081b"
               },
               "pull_request": null,
               "merged_as": null,
