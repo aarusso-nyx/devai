@@ -219,7 +219,9 @@
                   "packages/cli/tests/unit/check-runner-planning-lane.test.ts",
                   "tests/contract/campaign-plan.contract.test.ts",
                   "tests/contract/pull-request-workflow.contract.test.ts",
-                  "packages/cli/tests/unit/docs-governance-framework-repository.test.ts"
+                  "packages/cli/tests/unit/docs-governance-framework-repository.test.ts",
+                  "packages/cli/tests/unit/cli-shard06-docs-governance-residual.test.ts",
+                  "packages/cli/tests/unit/ci-economy-class-lane.test.ts"
                 ],
                 "forbidden": [
                   "law/",
@@ -252,7 +254,7 @@
               "commit_types": ["test(cli)", "test(workflows)", "test(campaign)"],
               "prompt": {
                 "path": "prompts/TASK-0312.md",
-                "sha256": "d5314ede1c7fa61cda6405d7936f1711162871e46ea774f354cdf60fde339ca1"
+                "sha256": "bc2ce37d63902c74c98a8e36948f1c761fe6f9d928496f81f8d4602e75a0f275"
               },
               "pull_request": null,
               "merged_as": null,
@@ -283,7 +285,8 @@
                   "docs/reference/cli/check-suites.md",
                   "docs/dev/operations/remote-preflight-contract.md",
                   "docs/site/sidebars.ts",
-                  "packages/cli/src/commands/docs/links.ts"
+                  "packages/cli/src/commands/docs/links.ts",
+                  "packages/cli/src/commands/check/ci-economy.ts"
                 ],
                 "forbidden": ["law/", "product/"]
               },
@@ -316,11 +319,12 @@
                 "docs(reference)",
                 "docs(operations)",
                 "fix(docs)",
-                "docs(site)"
+                "docs(site)",
+                "fix(ci-economy)"
               ],
               "prompt": {
                 "path": "prompts/TASK-0313.md",
-                "sha256": "0e6955b942217da43d74fc7082b5feb3a2c4cd50d239f462f5c235059bc2fedc"
+                "sha256": "9d758ad7224a7cd65a04a99aaa22a321776766d8c942d16a5d9a4d677cf00c6f"
               },
               "pull_request": null,
               "merged_as": null,
