@@ -71,7 +71,10 @@ function fixture({
   writeFileSync(join(site, 'index.html'), 'retained site');
   const state = join(root, 'api-state.json'),
     calls = join(root, 'api-calls.jsonl');
-  const journal = seeded ? baseline() : { deployments: [], seededStatuses: {} };
+  const journal: {
+    deployments: Record<string, unknown>[];
+    seededStatuses: Record<string, unknown>;
+  } = seeded ? baseline() : { deployments: [], seededStatuses: {} };
   // A record of the interrupted attempt of run 789 (attempt 1), seeded as the
   // fixture's own deployment 9 so a later attempt can resume or refuse it.
   const statuses: Record<string, unknown>[] = [];
