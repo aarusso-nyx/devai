@@ -23,9 +23,11 @@ interface CampaignCheck {
 }
 interface Task {
   id: string;
+  status?: string;
   acceptance_commands: string[][];
 }
 interface Wave {
+  id?: string;
   records: string[];
   tasks: Task[];
 }
@@ -363,5 +365,79 @@ describe('campaign plan contract', () => {
       expect(stale.status, `${task.nodeId} fails on a stale page`).not.toBe(0);
       expect(stale.output).toContain('SCORECARD_PAGE_DRIFT');
     }
+  });
+});
+
+// ADR-CHK-0004, Inspector Adversarial Acceptance IA-005 (serialized fallback):
+// while isolation.serialized_admission of law/policy/campaign-execution.json is
+// in force (the merge queue Owner effect OE-01 of CMP-0003 is unperformed), at
+// most one pull request targeting the integration branch is in pre_merge, and
+// the campaign check refuses a second (fail_closed
+// concurrent-pre-merge-under-serialized-admission). A coupled wave shipped as
+// one pull request is one pull request, however many of its tasks are in
+// pre_merge.
+describe('serialized admission (ADR-CHK-0004 IA-005)', () => {
+  const convergence = join(root, 'product/campaigns/CMP-0003-harness-convergence');
+
+  /** Every task of the plan in pre_merge moves back to in_progress, then the named ones enter pre_merge. */
+  function preMerge(dir: string, ids: readonly string[]): void {
+    mutatePlan(dir, (plan) => {
+      const effect = plan.owner_effects.find((candidate) => candidate.id === 'OE-01');
+      expect(effect?.performed_at ?? null, 'the merge queue is not enabled').toBeNull();
+      const tasks = plan.rounds.flatMap((round) => round.waves.flatMap((wave) => wave.tasks));
+      for (const task of tasks) {
+        if (task.status === 'pre_merge') task.status = 'in_progress';
+      }
+      for (const id of ids) {
+        const task = tasks.find((candidate) => candidate.id === id);
+        if (task === undefined) throw new Error(`fixture task ${id} missing`);
+        task.status = 'pre_merge';
+      }
+    });
+  }
+
+  it('records the rule in the campaign execution policy', () => {
+    const policy = JSON.parse(
+      readFileSync(join(root, 'law/policy/campaign-execution.json'), 'utf8'),
+    ) as {
+      isolation?: Readonly<Record<string, unknown>>;
+      gates?: Readonly<Record<string, readonly string[]>>;
+      fail_closed?: readonly string[];
+    };
+    expect(typeof policy.isolation?.serialized_admission).toBe('string');
+    expect(policy.fail_closed).toContain('concurrent-pre-merge-under-serialized-admission');
+    expect(
+      (policy.gates?.task_pre_merge ?? []).some((member) => /serialized admission/u.test(member)),
+    ).toBe(true);
+  });
+
+  it('refuses two task pull requests in pre_merge, naming both tasks', () => {
+    const dir = copyCampaign(convergence);
+    // Two tasks of different waves open two pull requests against main.
+    preMerge(dir, ['TASK-0321', 'TASK-0331']);
+    const result = checkCampaign(root, dir);
+    expect(result.ok).toBe(false);
+    expect(
+      result.problems.filter(
+        (problem) => problem.includes('TASK-0321') && problem.includes('TASK-0331'),
+      ),
+      `a problem names TASK-0321 and TASK-0331: ${JSON.stringify(result.problems)}`,
+    ).not.toEqual([]);
+  });
+
+  it('accepts one task pull request in pre_merge', () => {
+    const dir = copyCampaign(convergence);
+    preMerge(dir, ['TASK-0331']);
+    const result = checkCampaign(root, dir);
+    expect(result.problems).toEqual([]);
+    expect(result.ok).toBe(true);
+  });
+
+  it('accepts one coupled wave in pre_merge as one pull request', () => {
+    const dir = copyCampaign(convergence);
+    preMerge(dir, ['TASK-0321', 'TASK-0322', 'TASK-0323']);
+    const result = checkCampaign(root, dir);
+    expect(result.problems).toEqual([]);
+    expect(result.ok).toBe(true);
   });
 });
