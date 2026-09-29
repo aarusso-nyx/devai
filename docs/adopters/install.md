@@ -220,6 +220,38 @@ Optional hook material is selected explicitly with `--include hooks` and the
 corresponding hook/command options shown by `--help`. The default hook invokes the
 project-local `./node_modules/.bin/devai`, never a presumed global executable.
 
+### Instruction files
+
+On the `tier3` profile the architect segment writes one instruction contract and one
+import ([ADR-GOV-0020](../../law/adr/ADR-GOV-0020-canonical-instructions-and-host-projections.md)):
+
+- `AGENTS.md` carries the guidance every host reads. `doctor` (check `agents-claude-sync`)
+  requires it to reference Constitution Article 6, name the five roles Owner, Architect,
+  Inspector, Engineer, and Auditor, and name the reading-order sources `README.md`,
+  `law/constitution.md`, `law/adr`, and `law/schemas` (or their `docs.ia.path_overrides`
+  targets).
+- `CLAUDE.md` contains exactly one line, `@AGENTS.md`. That is the Claude Code import
+  form: the imported file is expanded into context at launch, and Claude Code never loads
+  an `AGENTS.md` twice, whichever project-instructions setting a session uses. The same
+  check fails on any other `CLAUDE.md` content, including a copy of `AGENTS.md`.
+
+Edit `AGENTS.md` and nothing else; the projection of a recipe under `.claude/skills/` is
+generated the same way (see [Recipes](../reference/recipes/README.md)).
+
+Version floor: Claude Code reads `AGENTS.md` natively from v2.1.277 (v2.1.281 for sessions
+that could not load it before, such as Amazon Bedrock or telemetry-disabled sessions), so a
+host at that release would load the contract with no `CLAUDE.md` at all. The import stays
+until every maintainer host has reached that floor; its removal is a later decision record,
+not this one. Verified against the published Claude Code documentation on 2026-09-29.
+
+Guidance preservation under `--force`: `init apply --force` never overwrites `AGENTS.md`,
+`CLAUDE.md`, or a `README.md` under `law/` once the file differs from the template the
+bootstrap would write. A fresh plan reports `replace` for every existing file the execution
+will overwrite and never `create` or `skip-exists` for such a file, so the plan and the
+execution report agree before the first byte is written, and a preserved file is named as
+preserved in the execution report. Before this rule the plan said `skip-exists` while
+`--force` overwrote the guidance (issue #70).
+
 After the package and policy are bound, install each selected host adapter through the binding
 facade. Bind GitHub Actions before the local post-merge adapter when both are required so the
 selected host-policy identity is the local adapter while `doctor` continues to verify both:
