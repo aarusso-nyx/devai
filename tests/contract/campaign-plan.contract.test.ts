@@ -78,19 +78,23 @@ function copyCampaign(source = campaignDir): string {
  * mode is human. The live ledger moves every wave, so a case selects its task
  * by a fixed id and sets the status, pin and review it needs on top of this.
  */
+/** A task back to its unstarted shape: planned, no pull request, no merge record, no pin, no review. */
+function resetTask(task: Plan['rounds'][number]['waves'][number]['tasks'][number]): void {
+  task.status = 'planned';
+  const loose = task as unknown as Record<string, unknown> & { execution: { resolved?: unknown } };
+  loose.merged_as = null;
+  loose.pull_request = null;
+  delete loose.review;
+  delete loose.execution.resolved;
+}
+
 function copyConvergence(): string {
   const dir = copyCampaign(join(root, 'product/campaigns/CMP-0003-harness-convergence'));
   mutatePlan(dir, (plan) => {
     (plan as unknown as { review: unknown }).review = { mode: 'human' };
     for (const task of plan.rounds.flatMap((round) => round.waves.flatMap((wave) => wave.tasks))) {
       if (task.status === 'merged') continue;
-      task.status = 'planned';
-      const loose = task as unknown as {
-        review?: unknown;
-        execution: { resolved?: unknown };
-      };
-      delete loose.review;
-      delete loose.execution.resolved;
+      resetTask(task);
     }
   });
   return dir;
@@ -344,6 +348,7 @@ describe('campaign plan contract', () => {
         .flatMap((round) => round.waves.flatMap((wave) => wave.tasks))
         .find((candidate) => candidate.id === 'TASK-0352');
       if (task === undefined) throw new Error('fixture task TASK-0352 missing');
+      resetTask(task);
       task.status = 'in_progress';
       delete (task as unknown as { execution: { resolved?: unknown } }).execution.resolved;
     });
@@ -361,6 +366,7 @@ describe('campaign plan contract', () => {
         .flatMap((round) => round.waves.flatMap((wave) => wave.tasks))
         .find((candidate) => candidate.id === 'TASK-0352');
       if (task === undefined) throw new Error('fixture task TASK-0352 missing');
+      resetTask(task);
       task.status = 'pre_merge';
     });
     const result = checkCampaign(root, dir);
