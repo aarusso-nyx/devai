@@ -805,7 +805,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0331",
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -842,7 +842,7 @@
               "commit_types": ["test(skills)"],
               "prompt": {
                 "path": "prompts/TASK-0332.md",
-                "sha256": null
+                "sha256": "8cd8163e443cd124e98181207d1a66cfee63ba4901a9e2ec4de14e9876ef60a9"
               },
               "pull_request": null,
               "merged_as": null,
@@ -864,7 +864,8 @@
                 "paths": [
                   "packages/skills/src/forbidden-actions/scan.ts",
                   "packages/skills/src/forbidden-actions/authorizations.ts",
-                  "docs/reference/error-codes.md"
+                  "docs/reference/error-codes.md",
+                  "packages/skills/src/forbidden-actions/catalog.ts"
                 ],
                 "forbidden": ["law/", "product/", ".github/workflows/"]
               },
@@ -894,7 +895,7 @@
               "commit_types": ["fix(forbidden-actions)", "docs(reference)"],
               "prompt": {
                 "path": "prompts/TASK-0333.md",
-                "sha256": null
+                "sha256": "dc00d35caf5473b574359de9215a46affcd8b446ab33231b0635205ee052d634"
               },
               "pull_request": null,
               "merged_as": null,
