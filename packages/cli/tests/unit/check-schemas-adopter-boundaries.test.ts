@@ -178,7 +178,7 @@ function invokeCommand(options: CommandOptions): {
 }
 
 describe('complete schema canon filesystem checks', () => {
-  it('accepts the complete source catalogue without expanding the runtime roster', () => {
+  it('counts the model-tiers schema in the runtime roster once TASK-0353 moves it', () => {
     const report = checkSchemaCanon(canonFixture());
     expect(ROSTER).toHaveLength(93);
     expect(report).toMatchObject({ ok: true, canonical_total: 110, findings: [] });
