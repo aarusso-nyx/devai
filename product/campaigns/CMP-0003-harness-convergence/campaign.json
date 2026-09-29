@@ -126,7 +126,7 @@
       "id": "R-0301",
       "title": "Planning lane and semantic validation",
       "goal": "A pull request whose changed paths all classify as plan executes the planning lane (preflight, plan:validate with the campaign and scorecard-page checks, format, schema members) with the bootstrap restored from cache; docs:validate runs every docs-class member; the campaign policy is accepted and the campaign checker enforces Owner-effect closure.",
-      "status": "closing",
+      "status": "closed",
       "records": ["ADR-CHK-0003"],
       "depends_on": [],
       "attestation_reissue": true,
@@ -347,7 +347,12 @@
           ]
         }
       ],
-      "closure": null
+      "closure": {
+        "merged_head": "e5cfdb77a74217ce9288296c93022df96c1021db",
+        "closed_at": "2026-09-29T22:00:58Z",
+        "task_policy_digest": "4d284d804badf9b0971313a65af8539dc380160fc724555bac2ba1872d1cd5d1",
+        "phase_closure": null
+      }
     },
     {
       "id": "R-0302",
@@ -934,7 +939,7 @@
       "id": "R-0304",
       "title": "Serialized integration",
       "goal": "The pull-request gate runs under merge_group with the queue's base and head, admission and eviction are documented, and the merge queue or the serialized fallback is the mechanism that keeps pull requests from invalidating each other.",
-      "status": "closing",
+      "status": "closed",
       "records": ["ADR-CHK-0004"],
       "depends_on": ["R-0301"],
       "attestation_reissue": false,
@@ -1111,7 +1116,12 @@
           ]
         }
       ],
-      "closure": null
+      "closure": {
+        "merged_head": "468de683d953f9ccc416919775c68e6901a806e5",
+        "closed_at": "2026-09-29T22:00:59Z",
+        "task_policy_digest": "4d284d804badf9b0971313a65af8539dc380160fc724555bac2ba1872d1cd5d1",
+        "phase_closure": null
+      }
     },
     {
       "id": "R-0305",
