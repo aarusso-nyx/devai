@@ -103,6 +103,16 @@ Recorded on 2026-09-29, after R-0301 reached `closing` and R-0302 opened:
 4. **No release in this campaign.** Version rollover and publication are left
    to a later cycle; the campaign closes on `main` without a tag.
 
+5. **OE-01 resolved by the fallback.** On 2026-09-29 the Owner attempted to
+   create a `main` ruleset with a rebase merge queue; the API refused the
+   `merge_queue` rule because the repository is owned by a user account and
+   GitHub offers merge queues only to organization-owned repositories. Per
+   the effect's own text, the serialized-admission fallback of
+   `law/policy/campaign-execution.json` (one pull request in `pre_merge` at a
+   time, enforced by the campaign check since R-0304) is the recorded outcome;
+   the `merge_group` trigger stays in the gate workflow for a future move to an
+   organization.
+
 ## 6. Round log
 
 Recorded by the orchestrator as each round reached `closing` or `closed`.
