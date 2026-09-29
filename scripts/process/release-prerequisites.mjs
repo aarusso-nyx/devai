@@ -2,6 +2,7 @@
 import { createHash, createPrivateKey, createPublicKey } from 'node:crypto';
 import {
   accessSync,
+  appendFileSync,
   constants,
   existsSync,
   lstatSync,
@@ -406,10 +407,42 @@ function runCredentials(workflow, job) {
   process.exitCode = report.ok ? 0 : 1;
 }
 
+/**
+ * ADR-REL-0030 IA-005: the first release job names the approved process control
+ * commit in the run summary before any reviewer stop opens. The value is a
+ * repository variable, never a secret; it must be a full lowercase 40-hex commit
+ * sha, and the job fails closed when it is not.
+ */
+export function summarizeControlCommit(environment = process.env) {
+  const commit = environment.CONTROL_COMMIT;
+  requireValue(
+    typeof commit === 'string' && /^[a-f0-9]{40}$/u.test(commit),
+    'CONTROL_COMMIT_INVALID',
+  );
+  const summary = environment.GITHUB_STEP_SUMMARY;
+  requireValue(typeof summary === 'string' && summary !== '', 'STEP_SUMMARY_UNAVAILABLE');
+  appendFileSync(summary, `DEVAI_PROCESS_CONTROL_COMMIT=${commit}\n`);
+  return { schemaVersion: '1.0.0', phase: 'control-commit', ok: true, commit };
+}
+
+function runControlCommit() {
+  try {
+    process.stdout.write(`${JSON.stringify(summarizeControlCommit())}\n`);
+  } catch (error) {
+    const code = error instanceof Error ? error.message : 'CONTROL_COMMIT_INVALID';
+    process.stderr.write(`${code}\n`);
+    process.exitCode = 1;
+  }
+}
+
 function run() {
   const [phase, configPath, receiptPath] = process.argv.slice(2);
   if (phase === 'credentials') {
     runCredentials(configPath, receiptPath);
+    return;
+  }
+  if (phase === 'control-commit') {
+    runControlCommit();
     return;
   }
   requireValue(
