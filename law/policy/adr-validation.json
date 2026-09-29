@@ -148,7 +148,10 @@
             "ordering": "rfc8785-jcs-utf8-byte-lexicographic-ascending",
             "unique": true
           },
-          { "name": "effective_head", "type": "adr-reference" }
+          {
+            "name": "effective_head",
+            "type": "adr-reference"
+          }
         ],
         "definition": "one entry for every deterministic weakly connected accepted subject-lineage"
       },
@@ -231,7 +234,7 @@
     "digest_algorithm": "sha256",
     "canonical_form": "utf8-rfc8785-jcs-of-entries-array-in-utf8-path-order",
     "ordering": "utf8-bytes-ascending-by-path",
-    "catalog_digest_sha256": "71cf6c001a7b638094298f252723e852db08fd9642bc3e89d36e67baf4601160",
+    "catalog_digest_sha256": "df15a050f6b4f6e4a0015067f7ee12dc481b24c241e7312ff0acab0855240da9",
     "entries": [
       {
         "path": "ADR-014-release-verification-profiles.md",
@@ -293,7 +296,7 @@
       },
       {
         "path": "README.md",
-        "sha256": "fb346ee0a9c1e6f41261ebea9e2d6beaaa1776ef5a939327c392b027e1e5c764",
+        "sha256": "88d894d59c9e9fe249bcab1f8febcea7c38afd908443dd242c41776cd95ca595",
         "disposition": "non-record",
         "reason": "Generated decision catalogue rendered by renderDecisionIndex from the record frontmatter (ADR-GOV-0021). It is not a decision record and carries no identity; each regeneration re-pins this digest."
       }
