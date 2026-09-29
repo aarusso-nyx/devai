@@ -83,3 +83,22 @@ closing rounds. Two rules are specific to this campaign:
   to keep gate runs few.
 
 CMP-0004 depends on R-0301 and, where its prompts resolve tiers, on R-0305.
+
+## 5. Owner decisions
+
+Recorded on 2026-09-29, after R-0301 reached `closing` and R-0302 opened:
+
+1. **One attestation.** The RC attestation is re-issued once, for the merged
+   head at the end of the campaign, and covers every round whose tasks changed
+   the task descriptor (R-0301, R-0304, R-0305). Those rounds stay `closing`
+   until then; their implementation is in `main` and their close checks have
+   run on their merged heads.
+2. **OE-03 dates the CMP-0002 effect too.** CMP-0002's OE-01 (repoint
+   `DEVAI_PROCESS_CONTROL_COMMIT`) is the same action as this campaign's
+   OE-03; when OE-03 is performed, its date is recorded on both ledgers.
+3. **Check-suite declaration at the R-0301 close.** The Architect declares the
+   `campaign` and `scorecard-page` check services in
+   `law/policy/check-suites.json` when R-0301 closes, so `check --only`
+   reaches them.
+4. **No release in this campaign.** Version rollover and publication are left
+   to a later cycle; the campaign closes on `main` without a tag.
