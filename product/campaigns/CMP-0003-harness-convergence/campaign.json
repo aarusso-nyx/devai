@@ -77,29 +77,29 @@
     "tiers": {
       "architect": {
         "rank": 1,
-        "claude": "Fable 5.1",
-        "codex": "Astra 6",
+        "claude": "fable",
+        "codex": "gpt-6-astra",
         "default_effort": "high",
         "use_for": "orchestration, contracts, schemas, policy, decision records"
       },
       "worker-high": {
         "rank": 2,
-        "claude": "Opus 5.5",
-        "codex": "Sol 6",
+        "claude": "opus",
+        "codex": "gpt-6-sol",
         "default_effort": "high",
         "use_for": "implementation across several modules, broker, sensor, and evidence changes, tests of runtime semantics"
       },
       "worker": {
         "rank": 3,
-        "claude": "Sonnet 5",
-        "codex": "Sol 6",
+        "claude": "sonnet",
+        "codex": "gpt-6-sol",
         "default_effort": "medium",
         "use_for": "bounded tests, documentation, single-module changes"
       },
       "clerk": {
         "rank": 4,
-        "claude": "Haiku 4.5",
-        "codex": "Luna 6",
+        "claude": "haiku",
+        "codex": "gpt-6-luna",
         "default_effort": "low",
         "use_for": "mechanical edits, regeneration, mirrors, formatting"
       }
@@ -1203,13 +1203,14 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0351",
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
                   "tests/contract/campaign-plan.contract.test.ts",
                   "tests/contract/model-tiers.contract.test.ts",
-                  "packages/schemas/tests/contract/schema-roster.test.ts"
+                  "packages/schemas/tests/contract/schema-roster.test.ts",
+                  "packages/cli/tests/unit/check-schemas-adopter-boundaries.test.ts"
                 ],
                 "forbidden": [
                   "law/",
@@ -1239,14 +1240,53 @@
               "commit_types": ["test(campaign)", "test(schemas)"],
               "prompt": {
                 "path": "prompts/TASK-0352.md",
-                "sha256": null
+                "sha256": "f204592436d4dcc42ab52903d3718e807c5060e4b1508c2d42923183e580ea60"
               },
               "pull_request": null,
               "merged_as": null,
               "execution": {
                 "tier": "worker",
                 "effort": "high",
-                "time_budget_minutes": 90
+                "time_budget_minutes": 90,
+                "resolved": {
+                  "policy_version": "1.0.0",
+                  "pinned_at": "2026-09-29T17:07:18Z",
+                  "tiers": {
+                    "architect": {
+                      "rank": 1,
+                      "hosts": {
+                        "claude": "claude-cli:fable",
+                        "codex": "codex-cli:gpt-6-astra"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker-high": {
+                      "rank": 2,
+                      "hosts": {
+                        "claude": "claude-cli:opus",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker": {
+                      "rank": 3,
+                      "hosts": {
+                        "claude": "claude-cli:sonnet",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "medium"
+                    },
+                    "clerk": {
+                      "rank": 4,
+                      "hosts": {
+                        "claude": "claude-cli:haiku",
+                        "codex": "codex-cli:gpt-6-luna"
+                      },
+                      "default_effort": "low"
+                    }
+                  },
+                  "ceiling": "architect"
+                }
               }
             },
             {

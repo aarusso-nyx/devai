@@ -49,29 +49,29 @@
     "tiers": {
       "architect": {
         "rank": 1,
-        "claude": "Fable 5.1",
-        "codex": "Astra 6",
+        "claude": "fable",
+        "codex": "gpt-6-astra",
         "default_effort": "high",
         "use_for": "orchestration, contracts, schemas, policy, decision records"
       },
       "worker-high": {
         "rank": 2,
-        "claude": "Opus 5.5",
-        "codex": "Sol 6",
+        "claude": "opus",
+        "codex": "gpt-6-sol",
         "default_effort": "high",
         "use_for": "implementation across several modules, broker, sensor, and evidence changes, tests of runtime semantics"
       },
       "worker": {
         "rank": 3,
-        "claude": "Sonnet 5",
-        "codex": "Sol 6",
+        "claude": "sonnet",
+        "codex": "gpt-6-sol",
         "default_effort": "medium",
         "use_for": "bounded tests, documentation, single-module changes"
       },
       "clerk": {
         "rank": 4,
-        "claude": "Haiku 4.5",
-        "codex": "Luna 6",
+        "claude": "haiku",
+        "codex": "gpt-6-luna",
         "default_effort": "low",
         "use_for": "mechanical edits, regeneration, mirrors, formatting"
       }
