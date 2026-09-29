@@ -2300,7 +2300,7 @@
       "id": "R-0307",
       "title": "Workflow reference pages",
       "goal": "Every admitted workflow has a reference page under a completeness gate of the documentation information architecture, the ADR catalogue is generated, and the stale operations statements are corrected.",
-      "status": "open",
+      "status": "closing",
       "records": ["ADR-GOV-0021"],
       "depends_on": ["R-0306"],
       "attestation_reissue": false,
@@ -2329,7 +2329,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -2384,8 +2384,8 @@
                 "path": "prompts/TASK-0371.md",
                 "sha256": "ed62d0e2672c856a5141e587fe319c9db0f976101d5e38931cc2754089f3d875"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/195",
+              "merged_as": "90d5fc7dcab4e85a64528253531a3aefc3c9f93f",
               "execution": {
                 "tier": "architect",
                 "effort": "high",
@@ -2437,7 +2437,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0371",
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -2476,8 +2476,8 @@
                 "path": "prompts/TASK-0372.md",
                 "sha256": "adbc11df49b747dc974fd5a8121e192f7fb92b56fd4326ae30e1a0c4ee1b5822"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/195",
+              "merged_as": "90d5fc7dcab4e85a64528253531a3aefc3c9f93f",
               "execution": {
                 "tier": "worker",
                 "effort": "high",
@@ -2529,7 +2529,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0372",
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F2", "F3"],
               "boundary": {
                 "paths": [
@@ -2574,8 +2574,8 @@
                 "path": "prompts/TASK-0373.md",
                 "sha256": "d389ec8ade8f0d912107f4bbd179a715aa55575d70828c160611ee06451c88c7"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/195",
+              "merged_as": "90d5fc7dcab4e85a64528253531a3aefc3c9f93f",
               "execution": {
                 "tier": "worker",
                 "effort": "high",
