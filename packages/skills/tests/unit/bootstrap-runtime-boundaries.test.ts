@@ -192,16 +192,23 @@ describe('buildBootstrapPlan: seeded adopter content', () => {
     expect(bytes).toBe(`${JSON.stringify(JSON.parse(bytes), null, 2)}\n`);
   });
 
-  it('seeds identical, non-empty agent instructions for both host entry points', () => {
+  it('seeds the full contract into AGENTS.md and the one-line import into CLAUDE.md', () => {
     const plan = buildBootstrapPlan({ targetRoot: target(), version: '1.2.1', profile: 'tier3' });
-    const agents = plannedContent(plan, 'AGENTS.md');
-    expect(agents).toBe(plannedContent(plan, 'CLAUDE.md'));
-    expect(agents).toBe(
+    expect(plannedContent(plan, 'AGENTS.md')).toBe(
       '# Agent instructions\n\n' +
         'Follow Constitution Article 6 role separation: Owner, Architect, Inspector,\n' +
         'Engineer, and Auditor. Read README.md, law/constitution.md, law/adr, and\n' +
         'law/schemas before changing governed repository state.\n',
     );
+    // ADR-GOV-0020: CLAUDE.md is exactly the import line, never a second copy.
+    expect(plannedContent(plan, 'CLAUDE.md')).toBe('@AGENTS.md\n');
+  });
+
+  it('writes that instruction pair to disk on a fresh target', () => {
+    const root = target();
+    executeBootstrapPlan(buildBootstrapPlan({ targetRoot: root, version: '1.2.1' }));
+    expect(readFileSync(join(root, 'CLAUDE.md'), 'utf8')).toBe('@AGENTS.md\n');
+    expect(readFileSync(join(root, 'AGENTS.md'), 'utf8')).toContain('Article 6');
   });
 
   it.each([
@@ -257,6 +264,16 @@ describe('executeBootstrapPlan: deterministic result rosters', () => {
     executeBootstrapPlan(
       buildBootstrapPlan({ targetRoot: root, version: '1.2.1', profile: 'tier3' }),
     );
+    // Stale non-guidance files, so the roster does not depend on whether a
+    // byte-identical re-lay counts as an overwrite.
+    writeFileSync(join(root, '.gitignore'), 'node_modules/\n');
+    for (const path of [
+      'record/proofs/README.md',
+      'product/README.md',
+      'docs/dev/operations/README.md',
+    ]) {
+      writeFileSync(join(root, path), `# stale ${path}\n`);
+    }
     const plan = buildBootstrapPlan({ targetRoot: root, version: '1.2.1', profile: 'tier3' });
     const result = executeBootstrapPlan(plan, { force: true });
     expect(result.overwritten.length).toBeGreaterThan(1);
