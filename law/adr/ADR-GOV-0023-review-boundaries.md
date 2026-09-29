@@ -2,7 +2,7 @@
 id: ADR-GOV-0023
 title: Delegate model evaluation of task pull requests and keep ratification, merge, and dispatch human
 type: adr
-status: proposed
+status: accepted
 date: 2026-09-28
 authority: Architect
 supersedes: []
@@ -31,9 +31,9 @@ inspector_acceptance:
 
 ## Status
 
-Proposed on 2026-09-28 from the harness convergence brainstorm and its
-independent review. Binds nothing until the Architect sets it to accepted
-before the round that implements it opens. Adds a review mode to the campaign
+Accepted on 2026-09-29 by the Architect before the round that implements it
+opened; proposed on 2026-09-28 from the harness convergence brainstorm and its
+independent review. Adds a review mode to the campaign
 plan schema and its policy; it changes which of four review steps a campaign
 may delegate to a model and leaves the constitution untouched.
 
