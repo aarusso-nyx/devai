@@ -1021,7 +1021,7 @@
                   "packages/cli/tests/unit/preflight-merge-group-base.test.ts"
                 ]
               ],
-              "commit_types": ["test(workflows)", "test(cli)"],
+              "commit_types": ["test(workflows)", "test(cli)", "test(campaign)"],
               "prompt": {
                 "path": "prompts/TASK-0342.md",
                 "sha256": "5ab038be4f4a1198354fe336b0534d6bf428c63c94b73948f95e3f22332ee80f"
@@ -1040,7 +1040,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0342",
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F2", "F3"],
               "boundary": {
                 "paths": [
@@ -1076,7 +1076,7 @@
               ],
               "prompt": {
                 "path": "prompts/TASK-0343.md",
-                "sha256": "ed1dd4227c71c1a9646ed151e7066c080664ea256c6d0684f2d4608282901445"
+                "sha256": "01a06df1012ceb5d67c376b710e7360eacba50296e09a99af0ea0d024a880f2f"
               },
               "pull_request": null,
               "merged_as": null,
