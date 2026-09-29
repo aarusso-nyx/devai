@@ -282,6 +282,58 @@ as one rollback-capable transaction. A preflight conflict writes nothing. If the
 process is forcibly terminated, inspect the fresh `init plan`, remove only files that
 match that plan and were created by the interrupted attempt, then rerun the segment.
 
+### Record forbidden-action receipts without bypassing the hook
+
+The pre-push hook runs `devai check --only forbidden-actions --strict` over the outgoing commits.
+When it reports a finding the Owner has reviewed and authorized, record that decision as a receipt
+in `law/policy/forbidden-action-authorizations.json`; the receipt format and its fail-closed rules
+are on [Exact forbidden-action authorizations](forbidden-action-authorizations.md). Never bypass the
+hook with the no-verify flag: the flag is itself a finding (`FORBID-NO-VERIFY`), and the flow below
+needs no bypass.
+
+1. Read the finding from the check output: its `forbidden_id` and the full 40-character commit
+   SHA in `ref`. A receipt binds exactly that pair.
+2. Obtain the Owner's authorization for that exact action and commit.
+3. As the Architect, append one receipt per finding to the `authorizations` array of
+   `law/policy/forbidden-action-authorizations.json`; create the file from the example on the
+   authorizations page when it does not exist yet. Change nothing else in the file and nothing
+   else in the commit.
+4. Commit and push. The hook re-runs the check: the receipts apply to the original findings and
+   the receipt commit itself produces none.
+
+The receipt commit is clean because the canonical `forbidden-actions.json` policy declares the
+registry maintenance-exempt from `FORBID-MUTATE-INVARIANTS`
+([ADR-GOV-0022](../../law/adr/ADR-GOV-0022-authorization-registry-maintenance.md)). The
+`FORBID-MUTATE-INVARIANTS` entry carries one `maintenance_exemptions` item naming the registry
+`path`, its `schema`, the `append-only` change shape, and the `/authorizations` collection. The
+scanner reads the parent's and the commit's version of the registry from the commit's own trees,
+never from the working tree, and classifies the change as maintenance only when both conditions
+hold:
+
+- the resulting file validates against `law/schemas/forbidden-action-authorizations.schema.json`;
+- the change is append-only: every receipt in the parent's version is present in the commit's
+  version with identical bytes and in the same order, zero or more receipts follow them, and
+  `schemaVersion` and every other root member are unchanged.
+
+Maintenance produces no `FORBID-MUTATE-INVARIANTS` finding in either inspection pass, neither the
+name-status pass that synthesizes a `git add <path>` line for every changed path nor the patch
+pass. Everything else keeps its finding, so no receipt ever covers the commit that introduces it:
+
+- removing, editing, or reordering an existing receipt, or changing `schemaVersion` or a root key;
+- a resulting file that fails the schema, including an unknown field or a partial SHA;
+- any other `law/`, `product/`, `record/`, or `.devai/config/` path in the same commit, which is a
+  finding for that path;
+- a commit message that matches a forbidden pattern.
+
+Withdrawing an unused receipt is therefore not maintenance. Make it in its own Architect-owned
+commit; when the check reports that commit, record the Owner's receipt for it the same way.
+
+Adopters do not edit `.devai/config/forbidden-actions.json` to obtain the exemption: the
+declaration ships in the canonical policy and reaches the repository through
+`init bind --operational-law` as a byte-identical materialization. Releases that predate
+ADR-GOV-0022 (1.6.0 and earlier) report the receipt commit as a finding (#67); upgrade rather
+than bypass.
+
 ## 4. Diagnose and inventory
 
 ```bash
