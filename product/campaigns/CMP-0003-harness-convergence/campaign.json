@@ -1137,7 +1137,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "in_progress",
+              "status": "pre_merge",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -1242,7 +1242,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0351",
-              "status": "in_progress",
+              "status": "pre_merge",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -1334,7 +1334,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0352",
-              "status": "in_progress",
+              "status": "pre_merge",
               "target_substrates": ["F2", "F3"],
               "boundary": {
                 "paths": [
@@ -1361,10 +1361,10 @@
                 ["pnpm", "run", "campaign:check"],
                 ["pnpm", "run", "test:schemas"]
               ],
-              "commit_types": ["feat(scripts)", "refactor(schemas)", "docs(reference)"],
+              "commit_types": ["ci(scripts)", "refactor(schemas)", "docs(reference)"],
               "prompt": {
                 "path": "prompts/TASK-0353.md",
-                "sha256": "3e07fc6a59f5608d000191c0828133b04e93169b176a7971e39244392da9ffa0"
+                "sha256": "b26153bd6aaaa63ff9a269386d91da9822b423a6fa9dfe23d36bee150de18ab1"
               },
               "pull_request": null,
               "merged_as": null,
