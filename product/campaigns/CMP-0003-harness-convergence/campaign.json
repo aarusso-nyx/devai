@@ -268,7 +268,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0312",
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F2", "F3"],
               "boundary": {
                 "paths": [
@@ -281,7 +281,9 @@
                   ".github/workflows/pull-request-checks.yml",
                   "packages/cli/src/commands/check/docs-governance-publish-checks.ts",
                   "docs/reference/cli/check-suites.md",
-                  "docs/dev/operations/remote-preflight-contract.md"
+                  "docs/dev/operations/remote-preflight-contract.md",
+                  "docs/site/sidebars.ts",
+                  "packages/cli/src/commands/docs/links.ts"
                 ],
                 "forbidden": ["law/", "product/"]
               },
@@ -312,11 +314,13 @@
                 "ci(scripts)",
                 "fix(docs-governance)",
                 "docs(reference)",
-                "docs(operations)"
+                "docs(operations)",
+                "fix(docs)",
+                "docs(site)"
               ],
               "prompt": {
                 "path": "prompts/TASK-0313.md",
-                "sha256": null
+                "sha256": "0e6955b942217da43d74fc7082b5feb3a2c4cd50d239f462f5c235059bc2fedc"
               },
               "pull_request": null,
               "merged_as": null,
