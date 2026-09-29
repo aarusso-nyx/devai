@@ -1549,7 +1549,9 @@
                   "packages/loop/tests/triage-breaker-schema.test.ts",
                   "tests/fixtures/review-replies/rejected-pass-reply.txt",
                   "packages/cli/tests/unit/check-schemas-adopter-boundaries.test.ts",
-                  "tests/fixtures/review-replies/cmp-0002-rejected-pass.txt"
+                  "tests/fixtures/review-replies/cmp-0002-rejected-pass.txt",
+                  "tests/contract/model-tiers.contract.test.ts",
+                  "tests/contract/campaign-plan.contract.test.ts"
                 ],
                 "forbidden": [
                   "law/",
@@ -1579,7 +1581,7 @@
               "commit_types": ["test(skills)", "test(sensors)", "test(loop)", "test(fixtures)"],
               "prompt": {
                 "path": "prompts/TASK-0355.md",
-                "sha256": "8e65fc46d7bf8c3bb6f45c0dd9f84939a57da3cedaf8bdbddd5ab0cb7d1167f0"
+                "sha256": "4601758c9b15de6136c4cbb05f3623c4dddd26e3e3b2c28cc99fabffc8e51f35"
               },
               "pull_request": null,
               "merged_as": null,
