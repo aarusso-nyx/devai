@@ -29,7 +29,6 @@ const siteIdentity = {
   tree: 'b'.repeat(40),
   siteSha256: 'd'.repeat(64),
   sourceRun: '789',
-  sourceAttempt: '1',
   controlCommit: 'f'.repeat(40),
 };
 function auditFor(audited: Record<string, unknown>) {
@@ -516,4 +515,176 @@ it('reads a verified site-only publication with the highest id as site_drift pro
     tag: siteIdentity.tag,
     intentId: '9',
   });
+});
+
+/** ADR-REL-0032: a re-run attempt of the same run finds its own record. */
+const rerunOf = (f: JournalFixture, next: Record<string, unknown>, attempt = '2') => ({
+  identity: next,
+  artifactId: '47',
+  controls: githubPagesControls({ ...f.options, ...auditFor(next), identity: next, attempt }),
+});
+const writes = (f: JournalFixture) => f.calls.filter((c) => c.method !== 'GET');
+const named = (f: JournalFixture) =>
+  f.calls.filter((c) => c.url.endsWith('/pages/deployments/pages-17'));
+const attemptUrl = (attempt: string, run = '456') =>
+  `https://github.com/aarusso-nyx/devai/actions/runs/${run}/attempts/${attempt}`;
+it.each([
+  ['release', () => identity, false],
+  ['site-only', () => siteIdentity, true],
+])(
+  '%s: a new attempt resumes a submitted record by observing the named deployment',
+  async (_label, pick, baseline) => {
+    const f = fixture(pick());
+    if (baseline) seedVerifiedRelease(f);
+    f.setPagesState('deployment_failed');
+    await expect(publishPages(f.args)).rejects.toThrow('DEPLOYMENT_UNRESOLVED');
+    f.setPagesState('succeed');
+    f.calls.length = 0;
+    expect(await publishPages(rerunOf(f, pick()))).toMatchObject({
+      outcome: 'verified',
+      pagesId: 'pages-17',
+      buildInvocations: 0,
+    });
+    expect(pagesPosts(f)).toHaveLength(0);
+    expect(named(f)).toHaveLength(1);
+    expect(f.deployments.filter((d) => d.task === 'devai:pages-publication')).toHaveLength(
+      baseline ? 2 : 1,
+    );
+    expect(f.statuses).toHaveLength(2);
+    expect(f.statuses.at(-1)).toMatchObject({
+      state: 'success',
+      description: 'devai-pages:verified:pages-17',
+      log_url: attemptUrl('2'),
+    });
+    expect(f.statuses[0]).toMatchObject({ log_url: attemptUrl('1') });
+  },
+);
+it('site-only: a new attempt closes a submitted record with matching bytes as a no-op', async () => {
+  const f = fixture(siteIdentity);
+  seedVerifiedRelease(f);
+  f.setPagesState('deployment_failed');
+  await expect(publishPages(f.args)).rejects.toThrow('DEPLOYMENT_UNRESOLVED');
+  f.setPagesState('succeed');
+  f.setLive();
+  f.calls.length = 0;
+  expect(await publishPages(rerunOf(f, siteIdentity))).toMatchObject({
+    outcome: 'no-op',
+    buildInvocations: 0,
+  });
+  expect(pagesPosts(f)).toHaveLength(0);
+  expect(named(f)).toHaveLength(1);
+  expect(f.statuses.at(-1)).toMatchObject({ description: 'devai-pages:verified:pages-17' });
+});
+it('site-only: an intent payload keeps the attempt as provenance, never in the identity', async () => {
+  const f = fixture(siteIdentity);
+  seedVerifiedRelease(f);
+  await publishPages(f.args);
+  const payload = f.deployments.find((d) => d.id === 9)?.payload as Record<string, unknown>;
+  expect(payload).toMatchObject({ runId: '456', attempt: '1' });
+  expect(Object.keys(payload.identity as object)).toEqual(Object.keys(siteIdentity));
+  expect(payload.identity).not.toHaveProperty('sourceAttempt');
+});
+it.each([
+  ['release', () => identity, false],
+  ['site-only', () => siteIdentity, true],
+])(
+  '%s: a verified record with matching bytes is a no-op with no journal or Pages write',
+  async (_label, pick, baseline) => {
+    const f = fixture(pick());
+    if (baseline) seedVerifiedRelease(f);
+    await publishPages(f.args);
+    f.setLive();
+    f.calls.length = 0;
+    f.options.getOidcToken.mockClear();
+    expect(await publishPages(rerunOf(f, pick()))).toMatchObject({
+      outcome: 'no-op',
+      buildInvocations: 0,
+    });
+    expect(writes(f)).toEqual([]);
+    expect(named(f)).toHaveLength(0);
+    expect(f.options.getOidcToken).not.toHaveBeenCalled();
+    expect(f.statuses).toHaveLength(2);
+    expect(f.options.retainRecord).toHaveBeenCalledTimes(f.records.length);
+  },
+);
+it.each([
+  ['release', () => identity, false],
+  ['site-only', () => siteIdentity, true],
+])(
+  '%s: a verified record whose bytes are gone refuses a new attempt and sends nothing',
+  async (_label, pick, baseline) => {
+    const f = fixture(pick());
+    if (baseline) seedVerifiedRelease(f);
+    await publishPages(f.args);
+    f.setLive(false);
+    f.calls.length = 0;
+    await expect(publishPages(rerunOf(f, pick()))).rejects.toThrow(
+      'PAGES_PUBLICATION_VERIFIED_EFFECT_MISSING',
+    );
+    expect(writes(f)).toEqual([]);
+    expect(f.statuses).toHaveLength(2);
+  },
+);
+it.each([
+  ['release, matching bytes', () => identity, false, true],
+  ['release, other bytes', () => identity, false, false],
+  ['site-only, matching bytes', () => siteIdentity, true, true],
+  ['site-only, other bytes', () => siteIdentity, true, false],
+])(
+  '%s: a new attempt refuses an intent with unknown submission',
+  async (_label, pick, baseline, matching) => {
+    const f = fixture(pick());
+    if (baseline) seedVerifiedRelease(f);
+    f.loseSubmission();
+    await expect(publishPages(f.args)).rejects.toThrow('API_OUTCOME_UNKNOWN');
+    if (matching) f.setLive();
+    f.calls.length = 0;
+    await expect(publishPages(rerunOf(f, pick()))).rejects.toThrow(
+      'PAGES_PUBLICATION_SUBMISSION_UNKNOWN',
+    );
+    expect(writes(f)).toEqual([]);
+    expect(f.statuses).toHaveLength(0);
+    expect(pagesPosts(f)).toHaveLength(0);
+  },
+);
+it('site-only: an open record of another run still blocks a new run identity', async () => {
+  const f = fixture(siteIdentity);
+  seedVerifiedRelease(f);
+  f.setPagesState('deployment_failed');
+  await expect(publishPages(f.args)).rejects.toThrow('DEPLOYMENT_UNRESOLVED');
+  const otherRun = { ...siteIdentity, sourceRun: '790' };
+  await expect(publishPages(rerunOf(f, otherRun, '1'))).rejects.toThrow(
+    'OTHER_PUBLICATION_UNRESOLVED',
+  );
+  expect(pagesPosts(f)).toHaveLength(1);
+});
+it('site-only: a legacy record carrying sourceAttempt blocks the run identity as another publication', async () => {
+  const f = fixture(siteIdentity);
+  seedVerifiedRelease(f);
+  const legacy = { ...siteIdentity, sourceAttempt: '1' };
+  f.deployments.push({
+    id: 6,
+    task: 'devai:pages-publication',
+    environment,
+    sha: siteIdentity.commit,
+    payload: {
+      kind: 'devai-pages-publication-intent',
+      schemaVersion: '1.0.0',
+      identity: legacy,
+      artifactId: '44',
+      runId: '789',
+      attempt: '1',
+    },
+  });
+  f.statusesOf(6).push({
+    id: 1,
+    state: 'in_progress',
+    environment,
+    deployment_url: `${root}/deployments/6`,
+    description: 'devai-pages:submitted:pages-6',
+  });
+  await expect(publishPages(rerunOf(f, siteIdentity, '2'))).rejects.toThrow(
+    'OTHER_PUBLICATION_UNRESOLVED',
+  );
+  expect(pagesPosts(f)).toHaveLength(0);
 });

@@ -1,9 +1,13 @@
+import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { afterEach, expect, it } from 'vitest';
+const { siteMembers } = await import(
+  pathToFileURL(resolve('scripts/process/verify-pages-bytes.mjs')).href
+);
 
 // ADR-REL-0029: the site-only publication CLI runs against the same deterministic
 // API boundary as the release CLI; every subprocess/build command is forbidden.
@@ -53,7 +57,13 @@ function baseline() {
     },
   };
 }
-function fixture({ live = false, loseResponse = false, seeded = true } = {}) {
+type Phase = 'intent' | 'submitted' | 'verified';
+function fixture({
+  live = false,
+  loseResponse = false,
+  seeded = true,
+  record,
+}: { live?: boolean; loseResponse?: boolean; seeded?: boolean; record?: Phase } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'devai Site ação-'));
   roots.push(root);
   const site = join(root, 'site');
@@ -62,9 +72,50 @@ function fixture({ live = false, loseResponse = false, seeded = true } = {}) {
   const state = join(root, 'api-state.json'),
     calls = join(root, 'api-calls.jsonl');
   const journal = seeded ? baseline() : { deployments: [], seededStatuses: {} };
+  // A record of the interrupted attempt of run 789 (attempt 1), seeded as the
+  // fixture's own deployment 9 so a later attempt can resume or refuse it.
+  const statuses: Record<string, unknown>[] = [];
+  if (record) {
+    const identity = {
+      repository: 'aarusso-nyx/devai',
+      mode: 'site-only',
+      tag: `v${version}`,
+      commit,
+      tree: 'b'.repeat(40),
+      siteSha256: createHash('sha256')
+        .update(JSON.stringify(siteMembers(site)))
+        .digest('hex'),
+      sourceRun: '789',
+      controlCommit: commit,
+    };
+    journal.deployments.push({
+      id: 9,
+      task: 'devai:pages-publication',
+      environment: 'devai-pages-publication',
+      sha: commit,
+      payload: {
+        kind: 'devai-pages-publication-intent',
+        schemaVersion: '1.0.0',
+        identity,
+        artifactId: '46',
+        runId: '789',
+        attempt: '1',
+      },
+    });
+    const seed = (id: number, phase: string, status: string) =>
+      statuses.push({
+        id,
+        state: status,
+        environment: 'devai-pages-publication',
+        deployment_url: 'https://api.github.com/repos/aarusso-nyx/devai/deployments/9',
+        description: `devai-pages:${phase}:pages-17`,
+      });
+    if (record !== 'intent') seed(1, 'submitted', 'in_progress');
+    if (record === 'verified') seed(2, 'verified', 'success');
+  }
   writeFileSync(
     state,
-    JSON.stringify({ live, loseResponse, ...journal, statuses: [], submissions: 0 }),
+    JSON.stringify({ live, loseResponse, ...journal, statuses, submissions: 0 }),
   );
   writeFileSync(calls, '');
   let invocation = 0;
@@ -132,7 +183,6 @@ it('publishes the site-only identity through the actual CLI while subprocesses a
     'tree',
     'siteSha256',
     'sourceRun',
-    'sourceAttempt',
     'controlCommit',
   ]);
   expect(intent.payload.identity).toMatchObject({
@@ -141,8 +191,12 @@ it('publishes the site-only identity through the actual CLI while subprocesses a
     commit,
     controlCommit: commit,
     sourceRun: '789',
-    sourceAttempt: '1',
   });
+  expect(intent.payload.identity).not.toHaveProperty('sourceAttempt');
+  expect(intent.payload).toMatchObject({ runId: '789', attempt: '1' });
+  expect(state.statuses.at(-1).log_url).toBe(
+    'https://github.com/aarusso-nyx/devai/actions/runs/789/attempts/1',
+  );
   expect(intent.payload.identity.siteSha256).toMatch(/^[a-f0-9]{64}$/u);
   expect(state.statuses.at(-1)).toMatchObject({ description: 'devai-pages:verified:pages-17' });
   expect(readFileSync(f.outputs, 'utf8')).toBe('page_url=https://aarusso-nyx.github.io/devai/\n');
@@ -193,9 +247,92 @@ it('preserves a lost response across fresh CLI invocations without resubmission'
   expect(retry.records).toContain('PAGES_PUBLICATION_SUBMISSION_UNKNOWN');
   expect(first.result.stderr).not.toContain('fixture-secret');
   expect(first.records).not.toContain('fixture-secret');
-  // A re-run attempt is a new identity: the unresolved intent blocks it, fail closed.
+  // ADR-REL-0032: a re-run attempt of the same dispatch computes the same identity,
+  // finds its own intent and refuses it as an unknown submission, not as another publication.
   const rerun = f.run({ GITHUB_RUN_ATTEMPT: '2' });
   expect(rerun.result.status).toBe(1);
-  expect(rerun.records).toContain('PAGES_JOURNAL_OTHER_PUBLICATION_UNRESOLVED');
+  expect(rerun.result.stderr).toContain(
+    'SITE_PUBLICATION_INCOMPLETE_RECONCILE_RETAINED_IDENTIFIERS',
+  );
+  expect(rerun.records).toContain('PAGES_PUBLICATION_SUBMISSION_UNKNOWN');
+  expect(rerun.records).not.toContain('PAGES_JOURNAL_OTHER_PUBLICATION_UNRESOLVED');
   expect(f.api().submissions).toBe(1);
+});
+const rerunAttempt = { GITHUB_RUN_ATTEMPT: '2' };
+const posts = (calls: string) =>
+  readFileSync(calls, 'utf8')
+    .split('\n')
+    .filter((line) => line.includes('"method":"POST"'));
+it('a new attempt of the same run resumes a submitted record by observing and verifying it', () => {
+  const f = fixture({ record: 'submitted' });
+  const { result } = f.run(rerunAttempt);
+  expect(result.status, result.stderr).toBe(0);
+  expect(JSON.parse(result.stdout)).toMatchObject({
+    outcome: 'verified',
+    pagesId: 'pages-17',
+    buildInvocations: 0,
+  });
+  const state = f.api();
+  expect(state.submissions).toBe(0);
+  expect(state.deployments.filter((d: { id: number }) => d.id === 9)).toHaveLength(1);
+  expect(state.statuses.at(-1)).toMatchObject({
+    state: 'success',
+    description: 'devai-pages:verified:pages-17',
+    log_url: 'https://github.com/aarusso-nyx/devai/actions/runs/789/attempts/2',
+  });
+  expect(posts(f.calls)).toHaveLength(1);
+  expect(readFileSync(f.calls, 'utf8')).toContain('/pages/deployments/pages-17');
+});
+it('a new attempt closes a submitted record whose live bytes already match as a no-op', () => {
+  const f = fixture({ record: 'submitted', live: true });
+  const { result } = f.run(rerunAttempt);
+  expect(result.status, result.stderr).toBe(0);
+  expect(JSON.parse(result.stdout).outcome).toBe('no-op');
+  const state = f.api();
+  expect(state.submissions).toBe(0);
+  expect(state.statuses.at(-1)).toMatchObject({ description: 'devai-pages:verified:pages-17' });
+  expect(readFileSync(f.calls, 'utf8')).toContain('/pages/deployments/pages-17');
+  expect(posts(f.calls)).toHaveLength(1);
+});
+it('a new attempt treats a verified record with matching bytes as a no-op with zero API writes', () => {
+  const f = fixture({ record: 'verified', live: true });
+  const { result } = f.run(rerunAttempt);
+  expect(result.status, result.stderr).toBe(0);
+  expect(JSON.parse(result.stdout)).toMatchObject({ outcome: 'no-op', buildInvocations: 0 });
+  expect(posts(f.calls)).toEqual([]);
+  expect(f.api().statuses).toHaveLength(2);
+  expect(f.api().submissions).toBe(0);
+});
+it('a new attempt refuses a verified record whose bytes are no longer live', () => {
+  const f = fixture({ record: 'verified' });
+  const { result, records } = f.run(rerunAttempt);
+  expect(result.status).toBe(1);
+  expect(records).toContain('PAGES_PUBLICATION_VERIFIED_EFFECT_MISSING');
+  expect(posts(f.calls)).toEqual([]);
+  expect(f.api().submissions).toBe(0);
+});
+it.each([
+  ['matching', true],
+  ['non-matching', false],
+])(
+  'a new attempt refuses an intent with unknown submission when live bytes are %s',
+  (_label, live) => {
+    const f = fixture({ record: 'intent', live });
+    const { result, records } = f.run(rerunAttempt);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('SITE_PUBLICATION_INCOMPLETE_RECONCILE_RETAINED_IDENTIFIERS');
+    expect(records).toContain('PAGES_PUBLICATION_SUBMISSION_UNKNOWN');
+    expect(records).toContain('"reconciliationRequired":true');
+    expect(posts(f.calls)).toEqual([]);
+    expect(f.api().submissions).toBe(0);
+    expect(f.api().statuses).toHaveLength(0);
+  },
+);
+it('a different dispatch of the same source is a new run identity blocked by an open record', () => {
+  const f = fixture({ record: 'submitted' });
+  const { result, records } = f.run({ GITHUB_RUN_ID: '790' });
+  expect(result.status).toBe(1);
+  expect(records).toContain('PAGES_JOURNAL_OTHER_PUBLICATION_UNRESOLVED');
+  expect(posts(f.calls)).toEqual([]);
+  expect(f.api().submissions).toBe(0);
 });
