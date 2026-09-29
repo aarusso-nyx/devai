@@ -72,6 +72,30 @@ function copyCampaign(source = campaignDir): string {
   return dir;
 }
 
+/**
+ * A copy of the live CMP-0003 ledger normalized to a fixed baseline: every task
+ * that is not merged is planned, carries no pin and no review, and the review
+ * mode is human. The live ledger moves every wave, so a case selects its task
+ * by a fixed id and sets the status, pin and review it needs on top of this.
+ */
+function copyConvergence(): string {
+  const dir = copyCampaign(join(root, 'product/campaigns/CMP-0003-harness-convergence'));
+  mutatePlan(dir, (plan) => {
+    (plan as unknown as { review: unknown }).review = { mode: 'human' };
+    for (const task of plan.rounds.flatMap((round) => round.waves.flatMap((wave) => wave.tasks))) {
+      if (task.status === 'merged') continue;
+      task.status = 'planned';
+      const loose = task as unknown as {
+        review?: unknown;
+        execution: { resolved?: unknown };
+      };
+      delete loose.review;
+      delete loose.execution.resolved;
+    }
+  });
+  return dir;
+}
+
 function mutatePlan(dir: string, mutate: (plan: Plan) => void): void {
   const path = join(dir, 'campaign.json');
   const plan = JSON.parse(readFileSync(path, 'utf8')) as Plan;
@@ -288,7 +312,7 @@ describe('campaign plan contract', () => {
   });
 
   it('refuses a ledger whose acceptance commands drift from the prompt', () => {
-    const dir = copyCampaign(join(root, 'product/campaigns/CMP-0003-harness-convergence'));
+    const dir = copyConvergence();
     mutatePlan(dir, (plan) => {
       const task = plan.rounds
         .flatMap((round) => round.waves.flatMap((wave) => wave.tasks))
@@ -314,12 +338,13 @@ describe('campaign plan contract', () => {
 
   // EXPECTED-RED until TASK-0353: a started task carries its pinned tier map.
   it('refuses a started task that carries no pinned resolution', () => {
-    const dir = copyCampaign(join(root, 'product/campaigns/CMP-0003-harness-convergence'));
+    const dir = copyConvergence();
     mutatePlan(dir, (plan) => {
       const task = plan.rounds
         .flatMap((round) => round.waves.flatMap((wave) => wave.tasks))
-        .find((candidate) => candidate.status === 'in_progress');
-      if (task === undefined) throw new Error('fixture in_progress task missing');
+        .find((candidate) => candidate.id === 'TASK-0352');
+      if (task === undefined) throw new Error('fixture task TASK-0352 missing');
+      task.status = 'in_progress';
       delete (task as unknown as { execution: { resolved?: unknown } }).execution.resolved;
     });
     const result = checkCampaign(root, dir);
@@ -329,13 +354,13 @@ describe('campaign plan contract', () => {
 
   // EXPECTED-RED until TASK-0353: under model-advisory a pre_merge task needs a verdict.
   it('refuses a pre_merge task under model-advisory without a recorded review', () => {
-    const dir = copyCampaign(join(root, 'product/campaigns/CMP-0003-harness-convergence'));
+    const dir = copyConvergence();
     mutatePlan(dir, (plan) => {
       (plan as unknown as { review: unknown }).review = { mode: 'model-advisory' };
       const task = plan.rounds
         .flatMap((round) => round.waves.flatMap((wave) => wave.tasks))
-        .find((candidate) => candidate.status === 'in_progress');
-      if (task === undefined) throw new Error('fixture in_progress task missing');
+        .find((candidate) => candidate.id === 'TASK-0352');
+      if (task === undefined) throw new Error('fixture task TASK-0352 missing');
       task.status = 'pre_merge';
     });
     const result = checkCampaign(root, dir);
@@ -453,7 +478,7 @@ describe('serialized admission (ADR-CHK-0004 IA-005)', () => {
   });
 
   it('refuses two task pull requests in pre_merge, naming both tasks', () => {
-    const dir = copyCampaign(convergence);
+    const dir = copyConvergence();
     // Two tasks of different waves open two pull requests against main.
     preMerge(dir, ['TASK-0321', 'TASK-0331']);
     const result = checkCampaign(root, dir);
@@ -467,7 +492,7 @@ describe('serialized admission (ADR-CHK-0004 IA-005)', () => {
   });
 
   it('accepts one task pull request in pre_merge', () => {
-    const dir = copyCampaign(convergence);
+    const dir = copyConvergence();
     preMerge(dir, ['TASK-0331']);
     const result = checkCampaign(root, dir);
     expect(result.problems).toEqual([]);
@@ -475,7 +500,7 @@ describe('serialized admission (ADR-CHK-0004 IA-005)', () => {
   });
 
   it('accepts one coupled wave in pre_merge as one pull request', () => {
-    const dir = copyCampaign(convergence);
+    const dir = copyConvergence();
     preMerge(dir, ['TASK-0321', 'TASK-0322', 'TASK-0323']);
     const result = checkCampaign(root, dir);
     expect(result.problems).toEqual([]);

@@ -58,6 +58,7 @@ function fixture(
   cpSync(ACTIVE, dir, { recursive: true });
   const path = join(dir, 'campaign.json');
   const plan = readJson(path);
+  normalize(plan);
   for (const task of tasksOf(plan)) {
     if (task.status !== 'planned' && task.execution.resolved === undefined) {
       task.execution.resolved = pinFrom(policy);
@@ -66,6 +67,39 @@ function fixture(
   mutate(plan);
   writeFileSync(path, JSON.stringify(plan));
   return dir;
+}
+
+/**
+ * The live ledger moves every wave, so a fixture never depends on its momentary
+ * task states: every task that is not merged is planned with no pin and no
+ * review, and the review mode is human. A case selects a task by a fixed id and
+ * sets the status, pin and review it needs.
+ */
+function normalize(plan: Json): void {
+  plan.review = { mode: 'human' };
+  for (const task of tasksOf(plan)) {
+    if (task.status === 'merged') continue;
+    task.status = 'planned';
+    delete task.review;
+    delete task.execution.resolved;
+  }
+}
+
+/** Model-advisory mode; the merged tasks of the ledger carry a recorded review. */
+function advisory(plan: Json, verdict = 'pass'): void {
+  plan.review = { mode: 'model-advisory' };
+  for (const task of tasksOf(plan)) {
+    if (task.status === 'merged') task.review = reviewOf(verdict);
+  }
+}
+
+function reviewOf(verdict = 'pass'): Json {
+  return {
+    verdict: { verdict },
+    reply_sha256: 'b'.repeat(64),
+    evaluator: 'claude-cli:opus',
+    recorded_at: '2026-09-29T18:00:00Z',
+  };
 }
 
 function tasksOf(plan: Json): Json[] {
@@ -262,7 +296,10 @@ describe('tier resolution through the merged map (EXPECTED-RED until TASK-0353)'
 
   it('names unknown-host for a pin that carries a host the default does not declare', () => {
     const dir = fixture((plan) => {
-      taskOf(plan, 'TASK-0352').execution.resolved.tiers.worker.hosts.gemini = 'gemini-cli:pro';
+      const task = taskOf(plan, 'TASK-0352');
+      task.status = 'in_progress';
+      task.execution.resolved = pinFrom(defaults());
+      task.execution.resolved.tiers.worker.hosts.gemini = 'gemini-cli:pro';
     });
     const result = checkCampaign(root, dir);
     expect(result.ok).toBe(false);
@@ -335,16 +372,9 @@ describe('pin at task start (EXPECTED-RED until TASK-0353)', () => {
 });
 
 describe('review mode gating (EXPECTED-RED until TASK-0353)', () => {
-  const review = (verdict = 'pass'): Json => ({
-    verdict: { verdict },
-    reply_sha256: 'b'.repeat(64),
-    evaluator: 'claude-cli:opus',
-    recorded_at: '2026-09-29T18:00:00Z',
-  });
-
   it('refuses a pre_merge task under model-advisory without a recorded review', () => {
     const dir = fixture((plan) => {
-      plan.review = { mode: 'model-advisory' };
+      advisory(plan);
       taskOf(plan, 'TASK-0352').status = 'pre_merge';
     });
     const result = checkCampaign(root, dir);
@@ -355,7 +385,7 @@ describe('review mode gating (EXPECTED-RED until TASK-0353)', () => {
 
   it('refuses a merged task under model-advisory without a recorded review', () => {
     const dir = fixture((plan) => {
-      plan.review = { mode: 'model-advisory' };
+      advisory(plan);
       taskOf(plan, 'TASK-0352').status = 'merged';
     });
     const result = checkCampaign(root, dir);
@@ -364,10 +394,10 @@ describe('review mode gating (EXPECTED-RED until TASK-0353)', () => {
 
   it('admits a pre_merge task under model-advisory with a recorded review', () => {
     const dir = fixture((plan) => {
-      plan.review = { mode: 'model-advisory' };
+      advisory(plan);
       const task = taskOf(plan, 'TASK-0352');
       task.status = 'pre_merge';
-      task.review = review();
+      task.review = reviewOf();
     });
     const result = checkCampaign(root, dir);
     expect(codes(result)).not.toContain('review-verdict');
@@ -375,10 +405,10 @@ describe('review mode gating (EXPECTED-RED until TASK-0353)', () => {
 
   it('records a fail verdict as advice: it does not by itself satisfy or block the shape', () => {
     const dir = fixture((plan) => {
-      plan.review = { mode: 'model-advisory' };
+      advisory(plan);
       const task = taskOf(plan, 'TASK-0352');
       task.status = 'pre_merge';
-      task.review = review('fail');
+      task.review = reviewOf('fail');
     });
     expect(codes(checkCampaign(root, dir))).not.toContain('review-verdict-missing');
   });
