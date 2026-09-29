@@ -273,7 +273,7 @@ describe('Doctor observable filesystem boundaries', () => {
     expect(version.errors?.join('\n')).toContain('does not match');
   });
 
-  it('reports exact AGENTS and CLAUDE omissions and accepts the complete reading contract', async () => {
+  it('reports exact AGENTS omissions, refuses a CLAUDE.md copy, and accepts the AGENTS.md import', async () => {
     const repo = root();
     put(repo, '.devai/config/project.json', {
       schemaVersion: '1.0.0',
@@ -288,12 +288,12 @@ describe('Doctor observable filesystem boundaries', () => {
     expect(missing.ok).toBe(false);
     expect(missing.errors).toEqual(
       expect.arrayContaining([
-        'CLAUDE.md: missing Constitution Article 6 reference',
-        "CLAUDE.md: missing role 'Owner'",
+        'AGENTS.md: missing Constitution Article 6 reference',
         "AGENTS.md: missing role 'Auditor'",
         "AGENTS.md: missing reading-order source 'law/constitution.md'",
       ]),
     );
+    expect(missing.errors?.some((error) => error.includes('CLAUDE.md'))).toBe(true);
     expect(check(value, 'f1-paths-present').info).toMatchObject({
       paths: expect.arrayContaining(['docs/runbooks']),
       path_overrides: { 'dev/operations': 'runbooks' },
@@ -307,8 +307,16 @@ describe('Doctor observable filesystem boundaries', () => {
       'law/adr',
       'law/schemas',
     ].join('\n');
-    put(repo, 'CLAUDE.md', complete);
     put(repo, 'AGENTS.md', complete);
+    put(repo, 'CLAUDE.md', complete);
+    value = (await report(repo)).report;
+    const copy = check(value, 'agents-claude-sync');
+    expect(copy.ok).toBe(false);
+    expect(copy.errors?.length).toBeGreaterThan(0);
+    expect(copy.errors?.some((error) => error.includes('CLAUDE.md'))).toBe(true);
+    expect(copy.errors?.some((error) => error.startsWith('AGENTS.md'))).toBe(false);
+
+    put(repo, 'CLAUDE.md', '@AGENTS.md\n');
     value = (await report(repo)).report;
     expect(check(value, 'agents-claude-sync')).toEqual({
       name: 'agents-claude-sync',
