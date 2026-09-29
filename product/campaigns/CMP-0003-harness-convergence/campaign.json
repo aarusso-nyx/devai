@@ -2310,7 +2310,7 @@
       "id": "R-0307",
       "title": "Workflow reference pages",
       "goal": "Every admitted workflow has a reference page under a completeness gate of the documentation information architecture, the ADR catalogue is generated, and the stale operations statements are corrected.",
-      "status": "closing",
+      "status": "closed",
       "records": ["ADR-GOV-0021"],
       "depends_on": ["R-0306"],
       "attestation_reissue": false,
@@ -2634,7 +2634,12 @@
           ]
         }
       ],
-      "closure": null
+      "closure": {
+        "merged_head": "90d5fc7dcab4e85a64528253531a3aefc3c9f93f",
+        "closed_at": "2026-09-29T21:22:15Z",
+        "task_policy_digest": null,
+        "phase_closure": null
+      }
     },
     {
       "id": "R-0308",
