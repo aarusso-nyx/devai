@@ -470,7 +470,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0322",
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F2", "F3"],
               "boundary": {
                 "paths": [
@@ -514,7 +514,7 @@
               ],
               "prompt": {
                 "path": "prompts/TASK-0323.md",
-                "sha256": "f4e40d6027a4ffa710142c20cf13e7c877fce85c7f91e16b6eaa8de59ff82839"
+                "sha256": "8c2385c01f2b6607011eda5d551d31cb3505a2a499483f536ccb589616a15f28"
               },
               "pull_request": null,
               "merged_as": null,
