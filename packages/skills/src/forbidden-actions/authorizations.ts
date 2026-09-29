@@ -1,6 +1,10 @@
+import { getValidator, type SchemaName } from '@devai-nyx/schemas';
 import { validateAdrs } from '@devai-nyx/spec';
+import { canonicalJson } from '@devai-nyx/utils';
 import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
+import type { ForbiddenActionEntry, ForbiddenMaintenanceExemption } from './catalog.js';
 
 export interface ForbiddenActionAuthorization {
   readonly forbidden_id: string;
@@ -102,4 +106,94 @@ export function activeAdrAffectedRules(repoRoot: string): ReadonlySet<string> {
     }
   }
   return affected;
+}
+
+/** A declared exemption the scanner can enforce: one top-level collection, append-only. */
+export interface AppendOnlyMaintenanceExemption {
+  readonly path: string;
+  readonly schemaName: string;
+  readonly collectionKey: string;
+}
+
+/**
+ * ADR-GOV-0022: read the append-only maintenance exemptions declared on a policy
+ * entry. A malformed declaration grants nothing, so the scanner keeps its finding.
+ */
+export function appendOnlyMaintenanceExemptions(
+  entry: ForbiddenActionEntry | undefined,
+): readonly AppendOnlyMaintenanceExemption[] {
+  const declared: unknown = entry?.maintenance_exemptions;
+  if (!Array.isArray(declared)) return [];
+  const exemptions: AppendOnlyMaintenanceExemption[] = [];
+  for (const value of declared as unknown[]) {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) continue;
+    const exemption = value as Partial<Record<keyof ForbiddenMaintenanceExemption, unknown>>;
+    const { path, schema, change, collection } = exemption;
+    if (
+      change !== 'append-only' ||
+      typeof path !== 'string' ||
+      path.length === 0 ||
+      path.startsWith('/') ||
+      path.split('/').some((segment) => segment === '' || segment === '.' || segment === '..') ||
+      typeof schema !== 'string' ||
+      !schema.endsWith('.schema.json') ||
+      typeof collection !== 'string' ||
+      !/^\/[^/~]+$/u.test(collection)
+    ) {
+      continue;
+    }
+    exemptions.push({ path, schemaName: basename(schema), collectionKey: collection.slice(1) });
+  }
+  return exemptions;
+}
+
+type RegistryDocument = Record<string, unknown>;
+
+function parseRegistryDocument(bytes: string): RegistryDocument | undefined {
+  try {
+    const parsed: unknown = JSON.parse(bytes);
+    return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
+      ? (parsed as RegistryDocument)
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Classify one registry change as append-only maintenance. The child must validate
+ * against the runtime's bundled schema (never a schema read from the commit tree),
+ * every root member other than the collection must equal the parent's, and the
+ * parent collection must equal the child's leading elements in order by canonical
+ * JSON. An absent parent (an added file or a root commit) is an empty collection.
+ */
+export function isAppendOnlyMaintenance(
+  exemption: AppendOnlyMaintenanceExemption,
+  parentBytes: string | undefined,
+  childBytes: string,
+): boolean {
+  const child = parseRegistryDocument(childBytes);
+  if (child === undefined) return false;
+  let valid: boolean;
+  try {
+    valid = getValidator(exemption.schemaName as SchemaName)(child) === true;
+  } catch {
+    return false;
+  }
+  if (!valid) return false;
+  const childCollection = child[exemption.collectionKey];
+  if (!Array.isArray(childCollection)) return false;
+  if (parentBytes === undefined) return true;
+  const parent = parseRegistryDocument(parentBytes);
+  if (parent === undefined) return false;
+  const parentCollection = parent[exemption.collectionKey];
+  if (!Array.isArray(parentCollection) || parentCollection.length > childCollection.length) {
+    return false;
+  }
+  const withoutCollection = (document: RegistryDocument) =>
+    Object.fromEntries(Object.entries(document).filter(([key]) => key !== exemption.collectionKey));
+  if (!isDeepStrictEqual(withoutCollection(parent), withoutCollection(child))) return false;
+  return parentCollection.every(
+    (element, index) => canonicalJson(element) === canonicalJson(childCollection[index]),
+  );
 }
