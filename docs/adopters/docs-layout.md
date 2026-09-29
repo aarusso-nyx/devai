@@ -47,9 +47,14 @@ mapping under `docs.ia.path_overrides` rather than maintaining a parallel tree.
 
 ## Publication boundary
 
-The documentation publication branch is inspected as repository state. A CI
-workflow must not publish documentation: publishing is an explicitly authorized
-local external effect. Build and link checks do not grant publication authority.
+The documentation publication branch is inspected as repository state.
+Publication goes only through the governed Pages journal: the admitted
+site-publish workflow is dispatched by hand from the integration branch and
+records a site-only identity in the same single-writer journal the release
+path uses, so the two never interleave. No other workflow may publish
+documentation, and the `docs-governance.no-ci-publish` rule fails a candidate
+that adds one. Build and link checks do not grant publication authority;
+publication remains a separately authorized external effect (#166, #167).
 
 ## Upstream decision records
 
