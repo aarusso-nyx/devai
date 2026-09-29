@@ -1107,7 +1107,7 @@
       "id": "R-0305",
       "title": "Review boundaries and model contracts",
       "goal": "A campaign may delegate model evaluation of a pull request under a human-initiated session while ratification, merge, and dispatch stay human; a repository default tier map with pinned resolution replaces the per-campaign copies; every model reply is validated against a consumer-specific schema through one shared extractor.",
-      "status": "open",
+      "status": "closing",
       "records": ["ADR-GOV-0023", "ADR-MDL-0002", "ADR-MDL-0001"],
       "depends_on": ["R-0301"],
       "attestation_reissue": false,
@@ -1437,7 +1437,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -1487,8 +1487,8 @@
                 "path": "prompts/TASK-0354.md",
                 "sha256": "025ded9ed001abc3d013e9b8b79f8cba6ec9c606bfe0897a3ebf52e64660bb9b"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/191",
+              "merged_as": "04b141fef447d84fae496391ec36133db4365447",
               "execution": {
                 "tier": "architect",
                 "effort": "high",
@@ -1540,7 +1540,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0354",
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -1583,8 +1583,8 @@
                 "path": "prompts/TASK-0355.md",
                 "sha256": "4601758c9b15de6136c4cbb05f3623c4dddd26e3e3b2c28cc99fabffc8e51f35"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/191",
+              "merged_as": "04b141fef447d84fae496391ec36133db4365447",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -1636,7 +1636,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0355",
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F2", "F3"],
               "boundary": {
                 "paths": [
@@ -1689,8 +1689,8 @@
                 "path": "prompts/TASK-0356.md",
                 "sha256": "fc3871472b883e3d8dbd5a67cbaeda2b0631ef3b1b74ad9f1a56970680610e00"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/191",
+              "merged_as": "04b141fef447d84fae496391ec36133db4365447",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -1773,7 +1773,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "in_progress",
+              "status": "pre_merge",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -1866,7 +1866,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0361",
-              "status": "in_progress",
+              "status": "pre_merge",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -1955,7 +1955,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0362",
-              "status": "in_progress",
+              "status": "pre_merge",
               "target_substrates": ["F2", "F3"],
               "boundary": {
                 "paths": [
