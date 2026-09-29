@@ -272,13 +272,17 @@ export function checkDocsIaWorkflowPageSet(repoRoot: string): GovernanceFinding 
   if (!existsSync(workflowsDir) && !existsSync(pagesDir)) {
     return { ruleId, severity: 'pass', message: 'Skipped — no workflows or workflow pages' };
   }
-  const stems = (dir: string, pattern: RegExp): string[] =>
-    existsSync(dir)
-      ? readdirSync(dir)
-          .filter((name) => pattern.test(name) && name !== 'README.md')
-          .map((name) => name.replace(pattern, ''))
-          .sort()
-      : [];
+  const stems = (dir: string, pattern: RegExp): string[] => {
+    try {
+      return readdirSync(dir)
+        .filter((name) => pattern.test(name) && name !== 'README.md')
+        .map((name) => name.replace(pattern, ''))
+        .sort();
+    } catch {
+      // An absent or unreadable directory contributes no stems; the other side then decides.
+      return [];
+    }
+  };
   const workflows = stems(workflowsDir, /\.ya?ml$/u);
   const pages = stems(pagesDir, /\.md$/u);
   const problems = [
