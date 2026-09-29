@@ -263,14 +263,27 @@ mismatch blocks before provider invocation.
 {
   "kind": "agent",
   "runtime": "codex-cli",
-  "model": "gpt-5.6-sol",
+  "model": "gpt-6-sol",
   "effort": "high",
   "selection": {
     "mode": "exact",
-    "registry_id": "codex-cli"
+    "registry_id": "codex-cli:gpt-6-sol"
   }
 }
 ```
+
+`selection.registry_id` is the `runtime:model` registry id form the router derives and compares:
+the runtime id from the registry, a colon, and the exact host model identity, so
+`codex-cli:gpt-6-sol` for the request above. A `registry_id` that differs from that string is a
+`TASK_REGISTRY_IDENTITY_MISMATCH` before any provider is contacted.
+
+A campaign task obtains its model identity from its pinned tier map rather than from a prompt.
+[`law/policy/model-tiers.json`](../../../law/policy/model-tiers.json) maps each tier (`architect`,
+`worker-high`, `worker`, `clerk`) to one alias per host: `fable`, `opus`, `sonnet`, and `haiku`
+resolve through `claude-cli`; `gpt-6-astra`, `gpt-6-sol`, and `gpt-6-luna` through `codex-cli`. At
+task start the merged map is pinned on the task in this same `runtime:model` form, for example
+`claude-cli:fable`; see the
+[campaign guide](../../dev/operations/workflow-economy-campaign/README.md#models-effort-and-time).
 
 Runtime capabilities and availability metadata are generated in the
 [model/runtime reference](./model-runtime.md). Declared availability does not prove host

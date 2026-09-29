@@ -9,6 +9,13 @@ must supply the exact model identity and requested effort. Every attempt still r
 credential or login, provider reachability, and identity preflight. DEVAI never substitutes a
 model. Edit the registry or renderer, never the bytes between markers.
 
+A resolved selection is identified in the `runtime:model` form: the runtime id listed below, a
+colon, and the exact host model identity the host accepts, for example `claude-cli:fable` or
+`codex-cli:gpt-6-astra`. The executor's `selection.registry_id` must equal that string. Campaign
+tiers resolve to this form through
+[`law/policy/model-tiers.json`](../../../law/policy/model-tiers.json); see
+[rounds, tasks, and executors](./round-task-executors.md#select-exactly).
+
 <!-- devai:generated-reference:start category="runtimes" -->
 
 ## Runtimes
