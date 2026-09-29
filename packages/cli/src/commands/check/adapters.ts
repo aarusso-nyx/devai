@@ -140,6 +140,16 @@ async function directService(
       return provenanceReadinessReport(repoRoot);
     case 'workflow-reference':
       return executeArgv(member, ['node', 'scripts/check-workflows.mjs'], repoRoot);
+    // Planning-lane members (ADR-CHK-0003): the campaign contract and the
+    // rendered scorecard page, checked without generate or build.
+    case 'campaign':
+      return executeArgv(member, ['node', 'scripts/check-campaign.mjs'], repoRoot);
+    case 'scorecard-page':
+      return executeArgv(
+        member,
+        ['node', 'scripts/generate-scorecard-page.mjs', '--check'],
+        repoRoot,
+      );
     case 'cli-reference':
       return fromValue(buildCanonicalDescriptorHandoffReport(repoRoot));
     case 'docs-links': {

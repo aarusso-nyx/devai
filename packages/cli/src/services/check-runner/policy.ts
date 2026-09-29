@@ -19,9 +19,11 @@ import {
   isHarnessMutatedPath,
   RELEASE_INPUT_PROJECTION,
 } from './policy-git.js';
+import { CHANGE_TAXONOMY_BINDING_PATHS } from '../change-taxonomy.js';
 import {
   type PathClassifier,
   anySelectorMatches,
+  selectorMatches,
   isPreflightNode,
   withoutMutationTestTasks,
   descriptorClassifier,
@@ -123,9 +125,122 @@ interface PolicyBuildOptions {
   }>;
 }
 
+/**
+ * The fixed descriptor profile the affected target plans when every changed
+ * path classifies as plan (ADR-CHK-0003).
+ */
+export const PLANNING_LANE_PROFILE = 'planning';
+
+/** The only change class the planning lane admits. */
+const PLANNING_LANE_CLASS = 'plan';
+
+/** Name-status letters the planning lane admits: added and modified paths only. */
+const PLANNING_LANE_STATUSES = new Set(['A', 'M']);
+
+type ChangedEntry = Readonly<{ status: string; path: string }>;
+
+/**
+ * Changed entries with their Git status, through the same closed Git grammar
+ * as changedPaths. A rename or copy is reported under its own status, and
+ * untracked worktree paths count as additions.
+ */
+function changedEntries(
+  repoRoot: string,
+  base: string,
+  candidate: string,
+  clean: boolean,
+): readonly ChangedEntry[] {
+  const fields = gitText(repoRoot, [
+    'diff',
+    '--name-status',
+    '-z',
+    '-M',
+    '--find-renames',
+    base,
+    clean ? candidate : '--',
+  ]).split('\0');
+  const entries: ChangedEntry[] = [];
+  let index = 0;
+  while (index < fields.length && fields[index] !== '') {
+    const status = fields[index++] ?? '';
+    const paths = /^[RC]/u.test(status) ? 2 : 1;
+    for (let offset = 0; offset < paths; offset += 1) {
+      const path = fields[index++];
+      if (path === undefined) throw new Error('CHECK_RUNNER_GIT: change truncated');
+      entries.push({ status: status.charAt(0), path });
+    }
+  }
+  if (!clean) {
+    gitText(repoRoot, ['ls-files', '-z', '--others', '--exclude-standard'])
+      .split('\0')
+      .filter((path) => path !== '')
+      .forEach((path) => entries.push({ status: 'A', path }));
+  }
+  return entries;
+}
+
+/**
+ * Classifier over the change-taxonomy binding committed at the base, so a
+ * candidate cannot move its own paths into the plan class. An unreadable or
+ * malformed base binding classifies nothing.
+ */
+function baseCommitClassifier(repoRoot: string, base: string): PathClassifier {
+  let bindings: readonly Readonly<{
+    selector: Readonly<{ kind: 'exact' | 'prefix' | 'glob'; pattern: string }>;
+    class: string;
+  }>[] = [];
+  for (const path of CHANGE_TAXONOMY_BINDING_PATHS) {
+    let text: string;
+    try {
+      text = gitText(repoRoot, ['cat-file', 'blob', `${base}:${path}`]);
+    } catch {
+      continue;
+    }
+    try {
+      const document = JSON.parse(text) as { bindings?: unknown };
+      if (Array.isArray(document.bindings)) bindings = document.bindings as typeof bindings;
+    } catch {
+      bindings = [];
+    }
+    break;
+  }
+  return (path) => {
+    const hits = bindings.filter(
+      (entry) =>
+        typeof entry.selector?.pattern === 'string' && selectorMatches(entry.selector, path),
+    );
+    return hits.length === 1 ? hits[0]?.class : undefined;
+  };
+}
+
+/**
+ * True when the affected target should plan the planning lane: the descriptor
+ * declares the planning profile, the diff is not empty, every changed path is
+ * an addition or modification, and every path classifies as plan under both
+ * the candidate's and the base's taxonomy binding. A rename, a deletion, or
+ * any path of another class falls back to the affected profile.
+ */
+function selectsPlanningLane(
+  descriptor: TaskDescriptor,
+  entries: readonly ChangedEntry[],
+  candidateClassifier: PathClassifier | undefined,
+  baseClassifier: () => PathClassifier,
+): boolean {
+  const profile = descriptor.profiles.find((entry) => entry.profileId === PLANNING_LANE_PROFILE);
+  if (profile?.mode !== 'fixed' || entries.length === 0 || candidateClassifier === undefined) {
+    return false;
+  }
+  if (entries.some((entry) => !PLANNING_LANE_STATUSES.has(entry.status))) return false;
+  if (entries.some((entry) => candidateClassifier(entry.path) !== PLANNING_LANE_CLASS)) {
+    return false;
+  }
+  const atBase = baseClassifier();
+  return entries.every((entry) => atBase(entry.path) === PLANNING_LANE_CLASS);
+}
+
 function selectedNodeIds(
   descriptor: TaskDescriptor,
-  target: TaskTarget,
+  target: TaskTarget | typeof PLANNING_LANE_PROFILE,
   changes: readonly string[],
   releaseRequiredNodes: readonly string[] = [],
   releaseAffectedSelection = false,
@@ -263,6 +378,7 @@ export function buildTaskPlan(options: PolicyBuildOptions): TaskPlan {
     throw new Error('CHECK_RELEASE_CANDIDATE_WORKTREE_MISMATCH');
   }
   let changes: readonly string[] = [];
+  let entriesWithStatus: readonly ChangedEntry[] = [];
   if (target === 'affected' || target === 'release') {
     if (options.baseCommit === undefined) {
       throw new Error('CHECK_RUNNER_BASE_REQUIRED: affected and release targets require --base');
@@ -275,6 +391,9 @@ export function buildTaskPlan(options: PolicyBuildOptions): TaskPlan {
       throw new Error('CHECK_RUNNER_BASE_NOT_ANCESTOR');
     }
     changes = changedPaths(repoRoot, options.baseCommit, commit, clean);
+    if (target === 'affected') {
+      entriesWithStatus = changedEntries(repoRoot, options.baseCommit, commit, clean);
+    }
   } else if (target === 'preflight' && options.baseCommit !== undefined) {
     assertCommit(repoRoot, options.baseCommit, 'BASE');
     if (!clean) changes = changedPaths(repoRoot, commit, commit, false);
@@ -286,9 +405,16 @@ export function buildTaskPlan(options: PolicyBuildOptions): TaskPlan {
     (entry) => !isHarnessMutatedPath(entry.path),
   );
   const classifyPath = descriptorClassifier(repoRoot, descriptor);
+  const baseCommit = options.baseCommit;
+  const planningLane =
+    target === 'affected' &&
+    baseCommit !== undefined &&
+    selectsPlanningLane(descriptor, entriesWithStatus, classifyPath, () =>
+      baseCommitClassifier(repoRoot, baseCommit),
+    );
   const selected = selectedNodeIds(
     descriptor,
-    target,
+    planningLane ? PLANNING_LANE_PROFILE : target,
     changes,
     options.releaseRequiredNodes?.filter(
       (node) =>
