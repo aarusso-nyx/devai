@@ -4,7 +4,7 @@
   "id": "campaign-execution",
   "status": "accepted",
   "authority": "Architect",
-  "policy_version": "1.1.0",
+  "policy_version": "1.2.0",
   "plan_schema": "law/schemas/campaign.schema.json",
   "containment": {
     "levels": ["campaign", "round", "wave", "task"],
@@ -125,7 +125,7 @@
         {
           "from": "pre_merge",
           "to": ["merged", "in_progress"],
-          "when": "the pull-request gate is green and a human merges, or review requests a change"
+          "when": "the pull-request gate is green, under review.mode model-advisory the task carries a recorded review block whose verdict validates and whose reply digest matches, and a human ratifies and merges; or review requests a change"
         },
         {
           "from": "blocked",
@@ -150,14 +150,16 @@
     "task_start": [
       "the upstream task is merged or the task is the architect position",
       "the prompt file sha256 is recorded on the task",
-      "the session role equals the task discipline"
+      "the session role equals the task discipline",
+      "the tier map is resolved from law/policy/model-tiers.json merged with the campaign models override and pinned on the task as execution.resolved with the default policy_version"
     ],
     "task_pre_merge": [
       "every acceptance command exits zero on the branch head",
       "every wave gate check member passes on the branch head",
       "every commit on the branch satisfies the commit rules below",
       "the diff touches only boundary paths",
-      "under serialized admission, no other pull request targeting the integration branch is in pre_merge"
+      "under serialized admission, no other pull request targeting the integration branch is in pre_merge",
+      "under review.mode model-advisory, the advisory verdict, the SHA-256 of the reply it was extracted from, the evaluator, and the time are recorded on the task before the human ratifies"
     ],
     "round_close_universal": [
       "adrs",
@@ -172,7 +174,51 @@
       "every Owner effect in owner_effects_required carries performed_at; an effect whose required_before names the round and lacks performed_at is owner-effect-not-performed and the round cannot close",
       "when attestation_reissue is true, the new task-policy digest is recorded in closure and the attestation is re-issued for it before any release plan uses the head"
     ],
-    "gate_evaluation": "a human evaluates and records; no gate is inferred from a green check alone"
+    "review": {
+      "steps": {
+        "model_evaluation": {
+          "performer": "model",
+          "delegable": true,
+          "where": "inside the human-initiated orchestrator session, by a model instance distinct from the working agent of the task (law/constitution.md Article 18)",
+          "output": "an advisory verdict in the shape law/schemas/review-verdict.schema.json (ADR-MDL-0001) declares"
+        },
+        "gate_ratification": {
+          "performer": "human",
+          "delegable": false,
+          "where": "the ratifying human reads the advisory verdict, when one exists, and records the gate"
+        },
+        "merge": {
+          "performer": "human",
+          "delegable": false,
+          "where": "the integration effect of law/constitution.md Article 28; a human role under ADR-GOV-0002"
+        },
+        "dispatch": {
+          "performer": "human",
+          "delegable": false,
+          "where": "every remote effect is human, exact, and single-use as ADR-GOV-0012 and the authorization ledger require"
+        }
+      },
+      "modes": {
+        "human": "the default when review.mode is absent; no step is delegated and no task carries a review block",
+        "model-advisory": "model_evaluation is delegated; the other three steps are unchanged; the campaign declares it in review.mode and every task in pre_merge carries the review block before the human ratifies"
+      },
+      "recording_rule": "under model-advisory the orchestrator records on the task, before the human ratifies the gate, the verdict document, the SHA-256 digest of the reply it was extracted from, the evaluator in the runtime:model form, and the time; a task in pre_merge whose review block is missing, whose verdict fails the verdict schema, or whose digest does not match the recorded reply cannot transition to merged, and the checker names the task",
+      "advisory_only": "a model verdict is advice to the ratifying human and to no one else; it never satisfies a gate, triggers a merge, or authorizes an effect; a review verdict is routed through the law/constitution.md Article 23 ladder by the human who ratifies; the ledger shows a human actor on the gate, the merge, and every remote effect",
+      "session": "a verdict produced outside a human-initiated orchestrator session is refused",
+      "record": "ADR-GOV-0023"
+    },
+    "tier_resolution": {
+      "default": "law/policy/model-tiers.json, validated by law/schemas/model-tiers.schema.json; law that changes only through a law commit that bumps its policy_version",
+      "override": "a campaign models block overrides the default by tier name only; a tier it does not name resolves to the default; a campaign never introduces a host",
+      "fail_closed": "an unknown tier name is unknown-tier, an effort outside the tier grammar is effort-outside-tier-grammar, a host the default does not declare is unknown-host, and an alias the host does not declare is unknown-model-alias; each fails closed at the campaign check",
+      "pin": "the merged map is pinned on the task at task_start as execution.resolved, every entry in the runtime:model registry id form, with the default policy_version; a task that starts without the pin is resolution-not-pinned",
+      "immutability": "a later change to the default or to the override never reinterprets a started task; a task started before the change keeps its pinned map and policy_version, and only a task started after resolves the new default",
+      "escalation": "law/constitution.md Article 19 escalation climbs the pinned map, one rank up to its ceiling",
+      "registry": "every host alias the default names resolves through law/policy/model-runtime-registry.json by the runtime id the host declares; a default naming a runtime the registry does not declare, or a family that does not match, fails the law check",
+      "closed_campaigns": "a closed campaign keeps its own models block byte-for-byte as evidence and validates unchanged because the block remains admitted",
+      "record": "ADR-MDL-0002"
+    },
+    "gate_evaluation": "a human evaluates and records; no gate is inferred from a green check alone, and none from a model verdict"
   },
   "isolation": {
     "worktree": "one dedicated worktree per task; never the root checkout",
@@ -200,7 +246,7 @@
       "absolute-host-path"
     ],
     "role_declaration": "the prompt states exactly one role and the session declares the same role",
-    "model_and_effort": "every task prompt states its tier and effort from the campaign models map; the host model behind a tier is resolved from that map, never named in the prompt",
+    "model_and_effort": "every task prompt states its tier and effort from the tier map, law/policy/model-tiers.json merged with the campaign models override; the host model behind a tier is resolved from the map pinned on the task, never named in the prompt",
     "time_bound": "every prompt states that time matters: deliver the declared scope within the time budget, report partial progress rather than pursue perfection, and never widen scope to chase an unrelated improvement"
   },
   "commits": {
@@ -223,10 +269,11 @@
     "automatic_retry": "forbidden",
     "dependent_after_failure": "a downstream task never starts on a failed or blocked upstream",
     "rollback": "as law/policy/round-execution.json rollback: unmerged branches are abandoned, merged work is reverted by a new authorized commit",
-    "escalation": "after one failed iteration or a blocked report the orchestrator re-runs the task one tier rank up, up to the ceiling; a second failure at the ceiling is a gap for a human"
+    "escalation": "after one failed iteration or a blocked report the orchestrator re-runs the task one tier rank up the map pinned on the task, up to its ceiling; a second failure at the ceiling is a gap for a human"
   },
   "evidence": {
-    "task_merge": ["pull_request", "merged_as"],
+    "task_start": ["prompt.sha256", "execution.resolved"],
+    "task_merge": ["pull_request", "merged_as", "review when review.mode is model-advisory"],
     "round_close": [
       "merged_head",
       "closed_at",
@@ -292,6 +339,13 @@
     "attestation-not-reissued",
     "unknown-tier",
     "effort-outside-tier-grammar",
-    "concurrent-pre-merge-under-serialized-admission"
+    "concurrent-pre-merge-under-serialized-admission",
+    "unknown-host",
+    "unknown-model-alias",
+    "resolution-not-pinned",
+    "review-verdict-missing",
+    "review-verdict-invalid",
+    "review-digest-mismatch",
+    "review-outside-session"
   ]
 }
