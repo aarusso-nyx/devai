@@ -343,7 +343,7 @@
       "id": "R-0302",
       "title": "Owned configuration and host projections",
       "goal": "init bind projects the blocks it owns authoritatively with atomic receipts; AGENTS.md is the canonical instruction contract with CLAUDE.md as its import; adopter guidance survives --force; recipes keep one source with generated projections and converged front matter.",
-      "status": "closing",
+      "status": "closed",
       "records": ["ADR-CFG-0002", "ADR-GOV-0020"],
       "depends_on": ["R-0301"],
       "attestation_reissue": false,
@@ -718,13 +718,18 @@
           ]
         }
       ],
-      "closure": null
+      "closure": {
+        "merged_head": "12d52fa57eff5278806e5b8c5108046da7bd58be",
+        "closed_at": "2026-09-29T16:51:15Z",
+        "task_policy_digest": null,
+        "phase_closure": null
+      }
     },
     {
       "id": "R-0303",
       "title": "Authorization registry maintenance",
       "goal": "Recording a forbidden-action authorization receipt is registry maintenance, not a finding, in every inspection the scanner performs; everything else the registry protects stays protected.",
-      "status": "closing",
+      "status": "closed",
       "records": ["ADR-GOV-0022"],
       "depends_on": ["R-0301"],
       "attestation_reissue": false,
@@ -908,13 +913,18 @@
           ]
         }
       ],
-      "closure": null
+      "closure": {
+        "merged_head": "0a66e13ae4c4230f26d6e2cb7a2ac6017820b3e1",
+        "closed_at": "2026-09-29T16:51:15Z",
+        "task_policy_digest": null,
+        "phase_closure": null
+      }
     },
     {
       "id": "R-0304",
       "title": "Serialized integration",
       "goal": "The pull-request gate runs under merge_group with the queue's base and head, admission and eviction are documented, and the merge queue or the serialized fallback is the mechanism that keeps pull requests from invalidating each other.",
-      "status": "open",
+      "status": "closing",
       "records": ["ADR-CHK-0004"],
       "depends_on": ["R-0301"],
       "attestation_reissue": false,
@@ -943,7 +953,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -975,8 +985,8 @@
                 "path": "prompts/TASK-0341.md",
                 "sha256": "cc8723cf628b7de5827ce3eaec8a953c720fbb36a17b118a385c7df500a49a52"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/188",
+              "merged_as": "468de683d953f9ccc416919775c68e6901a806e5",
               "execution": {
                 "tier": "architect",
                 "effort": "high",
@@ -989,7 +999,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0341",
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -1028,8 +1038,8 @@
                 "path": "prompts/TASK-0342.md",
                 "sha256": "a56a5eeec6feb1f533d782cbd5c4fd2bad3669bfc1fa05a24577a313765fa829"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/188",
+              "merged_as": "468de683d953f9ccc416919775c68e6901a806e5",
               "execution": {
                 "tier": "worker",
                 "effort": "high",
@@ -1042,7 +1052,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0342",
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F2", "F3"],
               "boundary": {
                 "paths": [
@@ -1080,8 +1090,8 @@
                 "path": "prompts/TASK-0343.md",
                 "sha256": "01a06df1012ceb5d67c376b710e7360eacba50296e09a99af0ea0d024a880f2f"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/188",
+              "merged_as": "468de683d953f9ccc416919775c68e6901a806e5",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -1097,7 +1107,7 @@
       "id": "R-0305",
       "title": "Review boundaries and model contracts",
       "goal": "A campaign may delegate model evaluation of a pull request under a human-initiated session while ratification, merge, and dispatch stay human; a repository default tier map with pinned resolution replaces the per-campaign copies; every model reply is validated against a consumer-specific schema through one shared extractor.",
-      "status": "planned",
+      "status": "open",
       "records": ["ADR-GOV-0023", "ADR-MDL-0002", "ADR-MDL-0001"],
       "depends_on": ["R-0301"],
       "attestation_reissue": false,
@@ -1127,7 +1137,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -1177,7 +1187,7 @@
               ],
               "prompt": {
                 "path": "prompts/TASK-0351.md",
-                "sha256": null
+                "sha256": "870de5d3041898338164dca31037ce934ab5b0ac3296170977703fea288581cf"
               },
               "pull_request": null,
               "merged_as": null,
