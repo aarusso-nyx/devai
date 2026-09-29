@@ -22,7 +22,11 @@
     "ADR-MDL-0001",
     "ADR-REL-0030",
     "ADR-REL-0032",
-    "ADR-GOV-0021"
+    "ADR-GOV-0021",
+    "ADR-SCR-0011",
+    "ADR-REL-0033",
+    "ADR-EVI-0003",
+    "ADR-CHK-0005"
   ],
   "constraints": {
     "self_dogfood": true,
@@ -65,6 +69,12 @@
       "id": "OE-06",
       "description": "Raise every maintainer host to a Claude Code release that reads AGENTS.md natively (documented as 2.1.277 or later); precondition for the later record that removes CLAUDE.md, not for this campaign.",
       "required_before": "R-0307",
+      "performed_at": null
+    },
+    {
+      "id": "OE-07",
+      "description": "Publish the immutable release that carries the ADR-SCR-0011 schema admission and the scorecard store resolver (268bb838), from the exact packed artifact the rehearsal verified, and tell DETRAN the version so it can pin, rehearse a clone, and measure real cells (#185).",
+      "required_before": "R-0308",
       "performed_at": null
     }
   ],
@@ -2619,6 +2629,592 @@
                   },
                   "ceiling": "architect"
                 }
+              }
+            }
+          ]
+        }
+      ],
+      "closure": null
+    },
+    {
+      "id": "R-0308",
+      "title": "Adopter unblock: schema admission, publication proof, and sealed status",
+      "goal": "Every read kind the sweep preset selects is admitted by the packaged SensorReading schema; a packed candidate proves, in a disposable adopter, that a recorded reading reaches audit scorecard from the one readings store; and round status reports a sealed round's lifecycle without an active task round.",
+      "status": "planned",
+      "records": ["ADR-SCR-0011", "ADR-REL-0033", "ADR-EVI-0003"],
+      "depends_on": ["R-0301"],
+      "attestation_reissue": false,
+      "owner_effects_required": ["OE-07"],
+      "close_checks": [
+        "schemas",
+        "test:sensors",
+        "test:loop",
+        "test:cli",
+        "release:static-integrity"
+      ],
+      "waves": [
+        {
+          "id": "CTG-0381",
+          "title": "Sweep kinds admitted by the packaged schema and proven from the pack",
+          "type": "coupled-triplet",
+          "records": ["ADR-SCR-0011", "ADR-REL-0033"],
+          "depends_on": [],
+          "lock_scopes": [
+            "law/schemas/sensor-reading.schema.json",
+            "law/policy/sensor-registry.json",
+            "law/policy/sense-presets.json",
+            "packages/sensors/src/sensor-reading.ts",
+            "packages/schemas/src/",
+            "packages/cli/src/commands/audit/",
+            "scripts/rehearse-packed-adopter.mjs"
+          ],
+          "gates": ["schemas", "test:schemas", "test:sensors", "test:cli"],
+          "tasks": [
+            {
+              "id": "TASK-0381",
+              "title": "Admit the four sweep kinds in the schema and declare the registry-schema invariant and the publication proof",
+              "discipline": "architect",
+              "coupled_pipeline_position": "architect",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F1", "F4"],
+              "boundary": {
+                "paths": [
+                  "law/schemas/sensor-reading.schema.json",
+                  "law/policy/sensor-registry.json",
+                  "law/policy/sense-presets.json",
+                  "docs/reference/cli/sensor-kinds.md",
+                  "docs/adopters/pack-resolution.md",
+                  "docs/adopters/sensor-inputs.md"
+                ],
+                "forbidden": [".github/workflows/", "packages/", "tests/", "scripts/"]
+              },
+              "deliverables": [
+                "The kind enum admits decision_record_integrity, decision_citation_resolution, archive_immutability, and round_record_integrity; the schema stays closed and every other required field is unchanged; the four carry no scorecard cell mapping (#184).",
+                "The registry and preset contract states that every selectable read kind in sweep must be schema-admitted and that an intentionally unsupported entry fails before a run; the five schema-only legacy values are listed with the Architect's retire-or-keep decision.",
+                "The pack-resolution page defines the packed-adopter publication proof: sense run, sense record --write, audit scorecard --at <HEAD> twice with identical output, the persisted reading consumed from .devai/state/sensor-readings, an empty store reading UNKNOWN, and invalid readings never counting as PASS (#185)."
+              ],
+              "acceptance_commands": [
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "schemas",
+                  "--format",
+                  "json"
+                ],
+                ["node", "scripts/check-policy-materialization.mjs"],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "docs-links",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": [
+                "law(schemas)",
+                "law(sensor-registry)",
+                "docs(adopters)",
+                "docs(reference)"
+              ],
+              "prompt": {
+                "path": "prompts/TASK-0381.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "architect",
+                "effort": "high",
+                "time_budget_minutes": 90
+              }
+            },
+            {
+              "id": "TASK-0382",
+              "title": "Prove schema admission of every sweep read kind and the packed-adopter scorecard route",
+              "discipline": "inspector",
+              "coupled_pipeline_position": "inspector",
+              "upstream_task_id": "TASK-0381",
+              "status": "planned",
+              "target_substrates": ["F3"],
+              "boundary": {
+                "paths": [
+                  "packages/sensors/tests/unit/sensor-registry-schema-admission.test.ts",
+                  "packages/sensors/tests/unit/sensor-reading.test.ts",
+                  "packages/sensors/tests/unit/sensor-registry-runtime-boundaries.test.ts",
+                  "packages/cli/tests/unit/cli-shard09-audit-scorecard-input-surface.test.ts",
+                  "tests/integration/packed-adopter-scorecard.integration.test.ts",
+                  "tests/fixtures/sensor-readings/"
+                ],
+                "forbidden": [
+                  "law/",
+                  "product/",
+                  ".github/workflows/",
+                  "scripts/",
+                  "packages/cli/src/",
+                  "packages/schemas/src/",
+                  "packages/sensors/src/",
+                  "packages/loop/src/",
+                  "packages/evidence/src/"
+                ]
+              },
+              "deliverables": [
+                "A source-level invariant test computes the registry-minus-schema set for every read kind in sweep and asserts it is empty; each of the four kinds is emitted through sense run and validated at the installed JSON Schema boundary with command_hash, status, kind, effect, and the required fields checked; an unknown kind still fails; a failed or skipped sensor is never promoted to PASS.",
+                "The packed-adopter integration test extracts the tarball into a disposable fixture, compares its registry, preset, and schema to source, validates all sweep read-kind readings against the packed schema, confirms no effectful kind is in the read-only sweep, and proves the scorecard route: a recorded reading is consumed from .devai/state/sensor-readings on two identical audit scorecard --at <HEAD> runs, an empty store reads UNKNOWN, and invalid JSON or an invalid SensorReading is rejected."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "packages/sensors/tests/unit/sensor-registry-schema-admission.test.ts",
+                  "packages/sensors/tests/unit/sensor-reading.test.ts"
+                ],
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "tests/integration/packed-adopter-scorecard.integration.test.ts",
+                  "packages/cli/tests/unit/cli-shard09-audit-scorecard-input-surface.test.ts"
+                ]
+              ],
+              "commit_types": ["test(sensors)", "test(cli)", "test(integration)"],
+              "prompt": {
+                "path": "prompts/TASK-0382.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 120
+              }
+            },
+            {
+              "id": "TASK-0383",
+              "title": "Admit the kinds in the runtime validator and script the packed-adopter rehearsal",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": "TASK-0382",
+              "status": "planned",
+              "target_substrates": ["F2", "F4"],
+              "boundary": {
+                "paths": [
+                  "packages/sensors/src/sensor-reading.ts",
+                  "packages/schemas/src/index.ts",
+                  "packages/schemas/src/roster.ts",
+                  "scripts/rehearse-packed-adopter.mjs",
+                  "package.json",
+                  "docs/reference/error-codes.md",
+                  "docs/reference/scripts.md"
+                ],
+                "forbidden": ["law/", "product/", ".github/workflows/", "tests/"]
+              },
+              "deliverables": [
+                "The runtime SensorReading validator and the packaged schema agree on the kind set; the sweep emits the four kinds as schema-valid readings without a hand-written substitute.",
+                "scripts/rehearse-packed-adopter.mjs packs the candidate, runs the publication proof of ADR-REL-0033 in a disposable adopter, and exits non-zero with a named code on any divergence; package.json exposes it as release:packed-adopter and the scripts reference documents it."
+              ],
+              "acceptance_commands": [
+                ["pnpm", "run", "test:sensors"],
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "tests/integration/packed-adopter-scorecard.integration.test.ts"
+                ],
+                ["node", "scripts/rehearse-packed-adopter.mjs", "--format", "json"],
+                ["pnpm", "run", "release:static-integrity"]
+              ],
+              "commit_types": ["fix(sensors)", "fix(schemas)", "ci(scripts)", "docs(reference)"],
+              "prompt": {
+                "path": "prompts/TASK-0383.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 150
+              }
+            }
+          ]
+        },
+        {
+          "id": "CTG-0382",
+          "title": "Sealed round lifecycle read",
+          "type": "coupled-triplet",
+          "records": ["ADR-EVI-0003"],
+          "depends_on": [],
+          "lock_scopes": [
+            "packages/loop/src/round-lifecycle/",
+            "packages/loop/src/loop/task-services.ts",
+            "packages/cli/src/commands/round/workflow.ts"
+          ],
+          "gates": ["test:loop", "test:cli", "docs-links"],
+          "tasks": [
+            {
+              "id": "TASK-0384",
+              "title": "Reproduce the sealed-round refusal and document the lifecycle read contract",
+              "discipline": "architect",
+              "coupled_pipeline_position": "architect",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F1"],
+              "boundary": {
+                "paths": ["docs/reference/cli.md", "docs/adopters/governance-tracking.md"],
+                "forbidden": [".github/workflows/", "packages/", "tests/", "law/"]
+              },
+              "deliverables": [
+                "The refusal is reproduced on a sealed fixture round and the reproduction steps are recorded on the governance-tracking page; if it does not reproduce on main, the task reports blocked with the observed output instead of documenting a contract.",
+                "The round status reference states that the governed lifecycle (including closed) is returned without an active task round, that the task summary is optional and never gates the lifecycle, that seal evidence is append-only and untouched, and that TASK_ROUND_INACTIVE applies only to task dispatch (#175)."
+              ],
+              "acceptance_commands": [
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "docs-links",
+                  "--format",
+                  "json"
+                ],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "cli-reference",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": ["docs(reference)", "docs(adopters)"],
+              "prompt": {
+                "path": "prompts/TASK-0384.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "architect",
+                "effort": "medium",
+                "time_budget_minutes": 60
+              }
+            },
+            {
+              "id": "TASK-0385",
+              "title": "Prove round status on a sealed round and the unchanged task precondition",
+              "discipline": "inspector",
+              "coupled_pipeline_position": "inspector",
+              "upstream_task_id": "TASK-0384",
+              "status": "planned",
+              "target_substrates": ["F3"],
+              "boundary": {
+                "paths": [
+                  "packages/loop/tests/unit/round-lifecycle-sealed-status.test.ts",
+                  "packages/cli/tests/unit/round-workflow-depth.test.ts",
+                  "packages/cli/tests/unit/round-tracking-closure-depth.test.ts"
+                ],
+                "forbidden": [
+                  "law/",
+                  "product/",
+                  ".github/workflows/",
+                  "packages/cli/src/",
+                  "packages/loop/src/",
+                  "packages/evidence/src/"
+                ]
+              },
+              "deliverables": [
+                "After round seal --write on a fixture round, round status --format json exits 0 with lifecycle closed and the close-state bytes unchanged; an active round still returns its task summary; round run and task dispatch on a sealed round still refuse with TASK_ROUND_INACTIVE."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "packages/loop/tests/unit/round-lifecycle-sealed-status.test.ts",
+                  "packages/cli/tests/unit/round-workflow-depth.test.ts",
+                  "packages/cli/tests/unit/round-tracking-closure-depth.test.ts"
+                ]
+              ],
+              "commit_types": ["test(loop)", "test(cli)"],
+              "prompt": {
+                "path": "prompts/TASK-0385.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker",
+                "effort": "medium",
+                "time_budget_minutes": 60
+              }
+            },
+            {
+              "id": "TASK-0386",
+              "title": "Make the lifecycle read independent of the active-task precondition",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": "TASK-0385",
+              "status": "planned",
+              "target_substrates": ["F2"],
+              "boundary": {
+                "paths": [
+                  "packages/cli/src/commands/round/workflow.ts",
+                  "packages/loop/src/round-lifecycle/index.ts",
+                  "packages/loop/src/loop/task-services.ts"
+                ],
+                "forbidden": [
+                  "law/",
+                  "product/",
+                  ".github/workflows/",
+                  "tests/",
+                  "packages/evidence/src/"
+                ]
+              },
+              "deliverables": [
+                "round status returns governedRoundStatus for every governed round and attaches the task summary only when the task round is active; no seal, close-state, or chain file is written or rewritten."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "packages/loop/tests/unit/round-lifecycle-sealed-status.test.ts",
+                  "packages/cli/tests/unit/round-workflow-depth.test.ts",
+                  "packages/cli/tests/unit/round-tracking-closure-depth.test.ts"
+                ],
+                ["pnpm", "run", "test:loop"]
+              ],
+              "commit_types": ["fix(round)", "fix(loop)"],
+              "prompt": {
+                "path": "prompts/TASK-0386.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker",
+                "effort": "medium",
+                "time_budget_minutes": 60
+              }
+            }
+          ]
+        }
+      ],
+      "closure": null
+    },
+    {
+      "id": "R-0309",
+      "title": "Check member applicability in adopters",
+      "goal": "Every check member declares where it applies; a framework-only member run in an adopter returns a structured not-applicable result that is distinct from PASS, REVIEW, and execution error and stable across reruns; missing required adopter inputs, malformed explicit inputs, and genuine self-check failures stay failures; no empty population reports ok.",
+      "status": "planned",
+      "records": ["ADR-CHK-0005"],
+      "depends_on": ["R-0301"],
+      "attestation_reissue": false,
+      "owner_effects_required": [],
+      "close_checks": ["schemas", "test:cli", "docs-links"],
+      "waves": [
+        {
+          "id": "CTG-0391",
+          "title": "Declared applicability and the not-applicable result class",
+          "type": "coupled-triplet",
+          "records": ["ADR-CHK-0005"],
+          "depends_on": [],
+          "lock_scopes": [
+            "law/policy/check-suites.json",
+            "law/schemas/check-suites.schema.json",
+            "packages/cli/src/commands/check/",
+            "packages/cli/src/commands/spec/validate-action-coverage.ts"
+          ],
+          "gates": ["schemas", "test:cli", "docs-links"],
+          "tasks": [
+            {
+              "id": "TASK-0391",
+              "title": "Declare applicability per check member and define the not-applicable result",
+              "discipline": "architect",
+              "coupled_pipeline_position": "architect",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F1", "F5"],
+              "boundary": {
+                "paths": [
+                  "law/policy/check-suites.json",
+                  "law/schemas/check-suites.schema.json",
+                  "docs/reference/cli/check-suites.md",
+                  "docs/adopters/install.md",
+                  "docs/adopters/ci-economy.md"
+                ],
+                "forbidden": [".github/workflows/", "packages/", "tests/", "scripts/"]
+              },
+              "deliverables": [
+                "Every check member declares applicability self, adopter, or both; action-coverage is both, action-effects and cli-reference are self unless a package-owned input mode is declared; the schema rejects a member without a declaration.",
+                "The reference defines the not-applicable result (member, detected repository kind, how the kind was identified, which input source was selected, reason, evidence), states that it is distinct from PASS, REVIEW, and execution error in machine JSON, human output, and aggregate status, and that missing required adopter sources, invalid explicit paths, and policy errors never become not-applicable (#187).",
+                "The adopter pages say which members apply to adopters and how to test the classification."
+              ],
+              "acceptance_commands": [
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "schemas",
+                  "--format",
+                  "json"
+                ],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "docs-links",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": [
+                "law(check-suites)",
+                "law(schemas)",
+                "docs(reference)",
+                "docs(adopters)"
+              ],
+              "prompt": {
+                "path": "prompts/TASK-0391.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "architect",
+                "effort": "high",
+                "time_budget_minutes": 90
+              }
+            },
+            {
+              "id": "TASK-0392",
+              "title": "Prove self execution, adopter classification, explicit-source validation, and aggregate parity",
+              "discipline": "inspector",
+              "coupled_pipeline_position": "inspector",
+              "upstream_task_id": "TASK-0391",
+              "status": "planned",
+              "target_substrates": ["F3"],
+              "boundary": {
+                "paths": [
+                  "packages/cli/tests/unit/check-adapters-applicability.test.ts",
+                  "packages/cli/tests/unit/action-coverage-depth.test.ts",
+                  "packages/cli/tests/unit/check-adapters-acceptance.test.ts",
+                  "packages/cli/tests/unit/check-schemas-adopter-boundaries.test.ts",
+                  "tests/fixtures/adopter-policy/"
+                ],
+                "forbidden": [
+                  "law/",
+                  "product/",
+                  ".github/workflows/",
+                  "scripts/",
+                  "packages/cli/src/",
+                  "packages/skills/src/",
+                  "packages/sensors/src/",
+                  "packages/loop/src/",
+                  "packages/evidence/src/"
+                ]
+              },
+              "deliverables": [
+                "In a DEVAI self fixture each of action-coverage, action-effects, and cli-reference executes its substantive check and a deliberately broken action, effect, catalogue, or CLI reference still fails; in a minimal adopter fixture each produces the declared applicability result with no ENOENT and no invented files; action-coverage in an adopter with no substantive population reports that explicitly rather than an empty PASS.",
+                "An adopter that opts into a supported explicit source has that source validated and fails on an invalid one with no fallback to not-applicable; check and --only classify identically; the aggregate never reports ok true from an empty population; reruns are byte-stable."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "packages/cli/tests/unit/check-adapters-applicability.test.ts",
+                  "packages/cli/tests/unit/action-coverage-depth.test.ts",
+                  "packages/cli/tests/unit/check-adapters-acceptance.test.ts",
+                  "packages/cli/tests/unit/check-schemas-adopter-boundaries.test.ts"
+                ]
+              ],
+              "commit_types": ["test(cli)"],
+              "prompt": {
+                "path": "prompts/TASK-0392.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 120
+              }
+            },
+            {
+              "id": "TASK-0393",
+              "title": "Classify members by declared applicability and drop the forced self scope",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": "TASK-0392",
+              "status": "planned",
+              "target_substrates": ["F2", "F5"],
+              "boundary": {
+                "paths": [
+                  "packages/cli/src/commands/check/adapters-reports.ts",
+                  "packages/cli/src/commands/check/adapters.ts",
+                  "packages/cli/src/commands/check/action-effects.ts",
+                  "packages/cli/src/commands/check/contracts.ts",
+                  "packages/cli/src/commands/check/facade.ts",
+                  "packages/cli/src/commands/spec/validate-action-coverage.ts",
+                  "docs/reference/error-codes.md"
+                ],
+                "forbidden": ["law/", "product/", ".github/workflows/", "tests/"]
+              },
+              "deliverables": [
+                "The check dispatcher reads each member's declared applicability, detects the repository kind from the bound project configuration, and returns the structured not-applicable result for a self-only member in an adopter; action-coverage passes the detected scope instead of the forced self scope and reports an empty adopter population explicitly; action-effects and cli-reference no longer read framework-only paths beneath an adopter root.",
+                "Aggregate status, --only, machine JSON, and human output carry the new result class; the error-codes reference names it."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "packages/cli/tests/unit/check-adapters-applicability.test.ts",
+                  "packages/cli/tests/unit/action-coverage-depth.test.ts",
+                  "packages/cli/tests/unit/check-adapters-acceptance.test.ts",
+                  "packages/cli/tests/unit/check-schemas-adopter-boundaries.test.ts"
+                ],
+                ["pnpm", "run", "test:cli"],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "action-coverage",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": ["fix(check)", "docs(reference)"],
+              "prompt": {
+                "path": "prompts/TASK-0393.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 150
               }
             }
           ]
