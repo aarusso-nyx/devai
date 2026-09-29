@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://devai.nyxk.com.br/schemas/documentation-information-architecture.schema.json",
   "title": "Documentation information architecture",
-  "description": "Canonical routing, page manifest, generated-reference boundary, semantic-field contract, and completeness gates for current CLI documentation.",
+  "description": "Canonical routing, page manifest, generated-reference boundary, semantic-field contract, and completeness gates for current CLI documentation and the workflow reference pages.",
   "schema_version": "1.0.0",
   "type": "object",
   "additionalProperties": false,
@@ -75,7 +75,7 @@
   "$defs": {
     "repositoryPath": {
       "type": "string",
-      "pattern": "^(?:docs|law)/[A-Za-z0-9._/#*-]+$"
+      "pattern": "^(?:docs|law|\\.github/workflows)/[A-Za-z0-9._/#*-]+$"
     },
     "sourceRef": {
       "type": "object",
@@ -147,7 +147,7 @@
         },
         "planned_path": {
           "type": "string",
-          "pattern": "^docs/reference/cli/[a-z0-9-]+\\.md$"
+          "pattern": "^docs/(?:reference/cli/[a-z0-9-]+|dev/operations/workflows/(?:README|[a-z0-9-]+))\\.md$"
         },
         "title": {
           "type": "string",
