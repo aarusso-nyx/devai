@@ -393,7 +393,7 @@ describe('S06-B docs governance report', () => {
     const report = governance();
     expect(report).toMatchObject({
       verdict: 'fail',
-      rules_checked: 14,
+      rules_checked: 15,
       fail_count: 2,
       warn_count: 0,
     });
@@ -412,6 +412,7 @@ describe('S06-B docs governance report', () => {
       'docs-ia.sidebar-curated',
       'docs-ia.framework-meta-split',
       'docs-ia.dashboard-current',
+      'docs-ia.workflow-page-set',
     ]);
   });
 

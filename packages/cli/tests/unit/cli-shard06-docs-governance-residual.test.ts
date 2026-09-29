@@ -117,7 +117,7 @@ function finding(ruleId: string, options?: { noPublishCheck?: boolean }): Govern
 describe('S06-B docs governance configuration decisions', () => {
   it('returns the complete missing-configuration findings and aggregate', () => {
     const value = report();
-    expect(value).toMatchObject({ verdict: 'fail', rules_checked: 14 });
+    expect(value).toMatchObject({ verdict: 'fail', rules_checked: 15 });
     expect(value.findings[0]).toEqual({
       ruleId: 'docs-governance.classification',
       severity: 'fail',
@@ -772,7 +772,7 @@ describe('S06-B docs governance aggregate and public command', () => {
     validDocusaurusFixture();
     expect(report()).toEqual({
       verdict: 'pass',
-      rules_checked: 14,
+      rules_checked: 15,
       findings: expect.any(Array),
       fail_count: 0,
       warn_count: 0,
@@ -896,6 +896,24 @@ describe('S06-B docs governance gh-pages branch under the governed Pages journal
     (_label, status, stdout) => {
       validDocusaurusFixture();
       journal(JOURNAL);
+      // The journal workflow is a workflow file, so it carries its reference page (ADR-GOV-0021).
+      write(
+        'docs/dev/operations/workflows/site-publish.md',
+        [
+          '# site-publish.yml',
+          '',
+          '<!-- devai:workflow-metadata -->',
+          '',
+          '```yaml',
+          'workflow: .github/workflows/site-publish.yml',
+          'triggers:',
+          '  - workflow_dispatch',
+          'jobs:',
+          '  - publish',
+          '```',
+          '',
+        ].join('\n'),
+      );
       origin(status, stdout);
       expect(finding('docs-governance.gh-pages-branch', { noPublishCheck: false })).toMatchObject({
         ruleId: 'docs-governance.gh-pages-branch',
