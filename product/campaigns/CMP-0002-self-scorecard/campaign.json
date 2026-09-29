@@ -30,7 +30,7 @@
       "id": "OE-01",
       "description": "Repoint DEVAI_PROCESS_CONTROL_COMMIT to the merged head of R-0202 so the Pages provenance change is the approved process control before the next release.",
       "required_before": "R-0206",
-      "performed_at": null
+      "performed_at": "2026-09-29T21:42:36Z"
     }
   ],
   "prompts": {
