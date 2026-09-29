@@ -2,7 +2,7 @@
 id: ADR-REL-0030
 title: One approval stop per environment per run from a complete job and credential matrix
 type: adr
-status: proposed
+status: accepted
 date: 2026-09-28
 authority: Architect
 supersedes:
@@ -35,9 +35,9 @@ inspector_acceptance:
 
 ## Status
 
-Proposed on 2026-09-28 from the harness convergence brainstorm and its
-independent review. Binds nothing until the Architect sets it to accepted
-before the round that implements it opens. Supersedes ADR-REL-0029 as a
+Accepted on 2026-09-29 by the Architect before the round that implements it
+opened; proposed on 2026-09-28 from the harness convergence brainstorm and its
+independent review. Supersedes ADR-REL-0029 as a
 whole record while restating every clause of it except the approval clause,
 which it replaces: the `github-pages` environment keeps its deployment
 binding and its audit variables and loses its reviewer.
