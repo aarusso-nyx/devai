@@ -1,0 +1,24 @@
+{
+  "$schema": "https://devai.nyxk.com.br/schemas/forbidden-action-authorizations.schema.json",
+  "schemaVersion": "1.0.0",
+  "authorizations": [
+    {
+      "forbidden_id": "FORBID-CI-WITHOUT-ADR",
+      "commit": "d1278868f50b012642da7198ddb95ec681d213ab",
+      "authorized_by": "Owner",
+      "reason": "Owner reviewed the R-0307 law commit that declares the workflow page-set and metadata-drift gates under ADR-GOV-0021; it cites .github/workflows/ paths inside the information architecture policy and changes no workflow file."
+    },
+    {
+      "forbidden_id": "FORBID-CI-WITHOUT-ADR",
+      "commit": "0334d4ec4edc7b80aa4dacbfb9b99004b4cde3e4",
+      "authorized_by": "Owner",
+      "reason": "Owner reviewed the R-0307 schema commit that admits workflow reference pages and .github/workflows/ source refs in the information architecture schema under ADR-GOV-0021; it changes no workflow file."
+    },
+    {
+      "forbidden_id": "FORBID-CI-WITHOUT-ADR",
+      "commit": "979074f7d93be9c1270ea3a0eb6a4524cbc833ca",
+      "authorized_by": "Owner",
+      "reason": "Owner reviewed the R-0307 law commit that declares the workflows page entry with its completeness gate under ADR-GOV-0021; it cites .github/workflows/ source refs and changes no workflow file."
+    }
+  ]
+}
