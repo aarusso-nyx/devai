@@ -6,7 +6,12 @@
 // dependencies, record coverage, Owner-effect closure of closed rounds,
 // pipeline order, prompt presence, prompt role and task naming, acceptance
 // parity between plan and prompt, and the absence of credential shapes in
-// prompts.
+// prompts. For a campaign that is not closed it also resolves every task tier
+// through the default tier map (law/policy/model-tiers.json, read relative to
+// the given root) merged with the campaign override, requires the merged map
+// pinned on started tasks, and requires a recorded review verdict before
+// pre_merge and merged under review.mode model-advisory (ADR-MDL-0002,
+// ADR-GOV-0023).
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -32,6 +37,69 @@ function adrIds(root) {
   );
 }
 
+function checkTierMap(campaign, policy, problem) {
+  // Fail-closed resolution of the campaign override against the default map.
+  const hostNames = Object.keys(policy.hosts);
+  for (const host of campaign.models?.hosts ?? []) {
+    if (!hostNames.includes(host)) {
+      problem(`unknown-host: models.hosts names ${host}, which the default map does not declare`);
+    }
+  }
+  for (const [tier, override] of Object.entries(campaign.models?.tiers ?? {})) {
+    const base = policy.tiers[tier];
+    if (base === undefined) {
+      problem(`unknown-tier: models.tiers names ${tier}, which the default map does not declare`);
+      continue;
+    }
+    if (override.rank !== undefined && override.rank !== base.rank) {
+      problem(`unknown-tier: models.tiers.${tier}.rank ${override.rank} differs from the default`);
+    }
+    for (const host of ['claude', 'codex']) {
+      if (override[host] === undefined) continue;
+      const declared = policy.hosts[host];
+      if (declared === undefined) {
+        problem(
+          `unknown-host: models.tiers.${tier} names ${host}, which the default map does not declare`,
+        );
+      } else if (!declared.aliases.includes(override[host])) {
+        problem(
+          `unknown-model-alias: models.tiers.${tier}.${host} ${override[host]} is not an alias of host ${host}`,
+        );
+      }
+    }
+  }
+}
+
+function checkPin(task, policy, problem) {
+  const resolved = task.execution.resolved;
+  if (resolved === undefined) {
+    // A task that already carries merged_as started before ADR-MDL-0002 and is
+    // evidence, whatever status a later edit gives it.
+    const started = task.status === 'in_progress' || task.status === 'pre_merge';
+    if (started && (task.merged_as ?? null) === null) {
+      problem(
+        `resolution-not-pinned: ${task.id} is ${task.status} without execution.resolved (the merged tier map is pinned at task start)`,
+      );
+    }
+    return;
+  }
+  if (
+    policy.tiers[task.execution.tier] !== undefined &&
+    resolved.tiers[task.execution.tier] === undefined
+  ) {
+    problem(`resolution-not-pinned: ${task.id} pin does not carry its tier ${task.execution.tier}`);
+  }
+  for (const [tier, entry] of Object.entries(resolved.tiers)) {
+    for (const host of Object.keys(entry.hosts ?? {})) {
+      if (policy.hosts[host] === undefined) {
+        problem(
+          `unknown-host: ${task.id} pin tier ${tier} carries host ${host} the default map does not declare`,
+        );
+      }
+    }
+  }
+}
+
 export function checkCampaign(root, campaignDir) {
   const problems = [];
   const problem = (message) => problems.push(message);
@@ -47,6 +115,11 @@ export function checkCampaign(root, campaignDir) {
     }
     return { ok: false, problems };
   }
+  const policyPath = join(root, 'law/policy/model-tiers.json');
+  const policy =
+    campaign.status !== 'closed' && existsSync(policyPath) ? readJson(policyPath) : undefined;
+  if (policy !== undefined) checkTierMap(campaign, policy, problem);
+  const advisory = campaign.review?.mode === 'model-advisory';
   const known = adrIds(root);
   const ids = new Map();
   const declare = (id, kind) => {
@@ -118,9 +191,26 @@ export function checkCampaign(root, campaignDir) {
         if (!body.includes(task.id)) problem(`${task.id} prompt does not name the task`);
         const role = task.discipline[0].toUpperCase() + task.discipline.slice(1);
         if (!body.includes(`Role: ${role}`)) problem(`${task.id} prompt does not declare ${role}`);
-        if (campaign.models.tiers[task.execution.tier] === undefined) {
+        if (policy !== undefined) {
+          if (policy.tiers[task.execution.tier] === undefined) {
+            problem(
+              `unknown-tier: ${task.id} execution tier ${task.execution.tier} is not declared in the default tier map`,
+            );
+          }
+          checkPin(task, policy, problem);
+        } else if (campaign.models?.tiers?.[task.execution.tier] === undefined) {
           problem(
             `${task.id} execution tier ${task.execution.tier} is not declared in models.tiers`,
+          );
+        }
+        if (
+          advisory &&
+          (task.status === 'pre_merge' ||
+            (task.status === 'merged' && (task.merged_as ?? null) === null)) &&
+          task.review?.verdict === undefined
+        ) {
+          problem(
+            `review-verdict-missing: ${task.id} is ${task.status} under review.mode model-advisory without a recorded review verdict`,
           );
         }
         if (!body.includes(`Tier: ${task.execution.tier}`)) {
