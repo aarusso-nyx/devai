@@ -8,8 +8,10 @@
 // Red until the implementing task merges the jobs: the workflow still carries
 // promote-assets, rehearsal-summary and verify-linux-adopter and has no
 // control-commit-summary job.
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { parse } from 'yaml';
 import { describe, expect, it } from 'vitest';
 
@@ -45,6 +47,7 @@ interface Workflow {
 }
 
 const WORKFLOW_PATH = '.github/workflows/release.yml';
+const PREREQUISITES_SCRIPT = 'scripts/process/release-prerequisites.mjs';
 const workflow = parse(readFileSync(resolve(ROOT, WORKFLOW_PATH), 'utf8')) as Workflow;
 const jobs = workflow.jobs;
 
@@ -203,16 +206,38 @@ describe('control-commit-summary', () => {
   it('reads the control commit variable, requires a 40-hex sha and appends it to the step summary', () => {
     expect(variablesRead('control-commit-summary')).toEqual([CONTROL]);
     const steps = job('control-commit-summary').steps ?? [];
-    expect(steps).toHaveLength(1);
-    const step = steps[0] as Step;
+    expect(steps).toHaveLength(2);
+    expect((steps[0] as Step).uses?.startsWith('actions/checkout') === true).toBe(true);
+    const step = steps[1] as Step;
+    expect(step.uses).toBeUndefined();
     expect(step.env?.CONTROL_COMMIT).toBe('${{ vars.DEVAI_PROCESS_CONTROL_COMMIT }}');
     const run = step.run ?? '';
-    expect(run).toContain('^[a-f0-9]{40}$');
-    expect(run).toMatch(
-      /DEVAI_PROCESS_CONTROL_COMMIT=\$CONTROL_COMMIT|DEVAI_PROCESS_CONTROL_COMMIT=\$\{CONTROL_COMMIT\}/,
-    );
-    expect(run).toContain('$GITHUB_STEP_SUMMARY');
     expect(run).toContain('set -euo pipefail');
+    expect(run).toContain('node scripts/process/release-prerequisites.mjs control-commit');
+    const directory = mkdtempSync(join(tmpdir(), 'devai-control-commit-'));
+    try {
+      const summary = join(directory, 'summary.md');
+      writeFileSync(summary, '');
+      const sha = 'a'.repeat(40);
+      const invoke = (environment: Record<string, string>) =>
+        spawnSync(process.execPath, [PREREQUISITES_SCRIPT, 'control-commit'], {
+          cwd: ROOT,
+          encoding: 'utf8',
+          env: { PATH: process.env.PATH ?? '', ...environment },
+        });
+      const valid = invoke({ CONTROL_COMMIT: sha, GITHUB_STEP_SUMMARY: summary });
+      expect(valid.status, valid.stderr).toBe(0);
+      expect(readFileSync(summary, 'utf8')).toBe(`DEVAI_PROCESS_CONTROL_COMMIT=${sha}\n`);
+      const invalid = invoke({ CONTROL_COMMIT: 'abc', GITHUB_STEP_SUMMARY: summary });
+      expect(invalid.status).toBe(1);
+      expect(invalid.stderr).toContain('CONTROL_COMMIT_INVALID');
+      const unavailable = invoke({ CONTROL_COMMIT: sha });
+      expect(unavailable.status).toBe(1);
+      expect(unavailable.stderr).toContain('STEP_SUMMARY_UNAVAILABLE');
+      expect(readFileSync(summary, 'utf8')).toBe(`DEVAI_PROCESS_CONTROL_COMMIT=${sha}\n`);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 });
 
