@@ -40,8 +40,31 @@ function write(base: string, rel: string, source: string): string {
   writeFileSync(path, source);
   return path;
 }
-const HEADER =
-  '# Governance decision records\n\n<!-- generated from canonical record frontmatter; do not edit -->\n\n| ID | Title | Status | Round | Date |\n|---|---|---|---|---|\n';
+const TITLE = '# Governance decision records\n\n';
+const MARKER = '<!-- generated from canonical record frontmatter; do not edit -->\n\n';
+const COLUMNS = ['ID', 'Title', 'Status', 'Round', 'Date'];
+/** The generated table in prettier's aligned layout: cells padded to the widest cell (minimum 3). */
+function alignedTable(rows: readonly (readonly string[])[]): string {
+  const widths = COLUMNS.map((name, column) =>
+    Math.max(3, name.length, ...rows.map((row) => (row[column] ?? '').length)),
+  );
+  const line = (cells: readonly string[]): string =>
+    `| ${widths.map((width, column) => (cells[column] ?? '').padEnd(width)).join(' | ')} |\n`;
+  return [line(COLUMNS), line(widths.map((width) => '-'.repeat(width))), ...rows.map(line)].join(
+    '',
+  );
+}
+/** Splits a rendered index into the text before the table (preamble included) and the table. */
+function parts(index: string): { readonly head: string; readonly table: string } {
+  const start = index.search(/^\|/mu);
+  return { head: index.slice(0, start), table: index.slice(start) };
+}
+function expectIndex(index: string, rows: readonly (readonly string[])[]): void {
+  const { head, table } = parts(index);
+  expect(head.startsWith(TITLE)).toBe(true);
+  expect(head.endsWith(MARKER)).toBe(true);
+  expect(table).toBe(alignedTable(rows));
+}
 describe('derived governance views preserve canonical identities and content', () => {
   it('links to an accepted suffixed filename rather than inventing an ID-only path', () => {
     const base = root();
@@ -51,10 +74,9 @@ describe('derived governance views preserve canonical identities and content', (
       record('ADR-001', 'Reviewed decision', '# Canonical body'),
     );
     const before = readFileSync(file);
-    expect(renderDecisionIndex({ repoRoot: base })).toBe(
-      HEADER +
-        '| [ADR-001](./ADR-001-reviewed.md) | Reviewed decision | draft | R-0007 | 2026-09-08 |\n',
-    );
+    expectIndex(renderDecisionIndex({ repoRoot: base }), [
+      ['[ADR-001](./ADR-001-reviewed.md)', 'Reviewed decision', 'draft', 'R-0007', '2026-09-08'],
+    ]);
     expect(readFileSync(file)).toEqual(before);
   });
   it('encodes spaces, Unicode and parentheses in the actual filename', () => {
@@ -67,10 +89,9 @@ describe('derived governance views preserve canonical identities and content', (
   it('keeps pipe and multiline title content inside one metadata cell', () => {
     const base = root();
     write(base, 'law/adr/ADR-003.md', record('ADR-003', 'Read | write\nSecond line', '# Body'));
-    expect(renderDecisionIndex({ repoRoot: base })).toBe(
-      HEADER +
-        '| [ADR-003](./ADR-003.md) | Read \\| write<br>Second line | draft | R-0007 | 2026-09-08 |\n',
-    );
+    expectIndex(renderDecisionIndex({ repoRoot: base }), [
+      ['[ADR-003](./ADR-003.md)', 'Read \\| write<br>Second line', 'draft', 'R-0007', '2026-09-08'],
+    ]);
   });
   it('renders exact bodies in filename order without frontmatter or recursive archives', () => {
     const base = root();
@@ -82,24 +103,26 @@ describe('derived governance views preserve canonical identities and content', (
       '# Design Decisions\n\n<!-- generated from canonical records; do not edit -->\n\n# Second\n\nKeep | body text.\n\n# Tenth\n\nKeep **markdown**.\n',
     );
     const index = renderDecisionIndex({ repoRoot: base });
-    expect(index).toBe(
-      HEADER +
-        '| [ADR-002](./ADR-002.md) | Second | draft | R-0007 | 2026-09-08 |\n| [ADR-010](./ADR-010.md) | Tenth | draft | R-0007 | 2026-09-08 |\n',
-    );
+    expectIndex(index, [
+      ['[ADR-002](./ADR-002.md)', 'Second', 'draft', 'R-0007', '2026-09-08'],
+      ['[ADR-010](./ADR-010.md)', 'Tenth', 'draft', 'R-0007', '2026-09-08'],
+    ]);
   });
   it('honors custom decision roots and leaves absent roots empty', () => {
     const base = root();
     write(base, 'custom/ADR-001.md', record('ADR-001', 'Custom', '# Custom'));
-    expect(renderDecisionIndex({ repoRoot: base })).toBe(HEADER);
+    const absent = renderDecisionIndex({ repoRoot: base });
+    expectIndex(absent, []);
+    expect(parts(absent).table).toBe(
+      '| ID  | Title | Status | Round | Date |\n| --- | ----- | ------ | ----- | ---- |\n',
+    );
     expect(renderDecisionIndex({ repoRoot: base, recordsDir: 'custom' })).toContain('| Custom |');
     expect(renderDecisionRecords({ repoRoot: base, recordsDir: 'custom' })).toContain('# Custom');
   });
   it('uses blank cells for absent optional metadata while retaining the source filename', () => {
     const base = root();
     write(base, 'law/adr/empty.md', '---\nother: data\n---\n# Body\n');
-    expect(renderDecisionIndex({ repoRoot: base })).toBe(
-      HEADER + '| [](./empty.md) |  |  |  |  |\n',
-    );
+    expectIndex(renderDecisionIndex({ repoRoot: base }), [['[](./empty.md)', '', '', '', '']]);
   });
   it('refuses malformed frontmatter rather than silently omitting the record', () => {
     const base = root();
