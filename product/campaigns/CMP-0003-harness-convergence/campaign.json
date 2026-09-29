@@ -616,7 +616,9 @@
                   "packages/skills/tests/recipes/adapters.test.ts",
                   "packages/skills/tests/recipes/front-matter.test.ts",
                   "packages/skills/tests/unit/bootstrap.test.ts",
-                  "packages/skills/tests/unit/adopter-bootstrap-contract.test.ts"
+                  "packages/skills/tests/unit/adopter-bootstrap-contract.test.ts",
+                  "packages/cli/tests/unit/doctor-observable-boundaries.test.ts",
+                  "packages/skills/tests/recipes/loader-header-contract.test.ts"
                 ],
                 "forbidden": [
                   "law/",
@@ -649,7 +651,7 @@
               "commit_types": ["test(skills)", "test(cli)"],
               "prompt": {
                 "path": "prompts/TASK-0325.md",
-                "sha256": "a92efd47252b29c930f21b17981fd7977e9eb3481efa9890a0f082aaba7e081b"
+                "sha256": "b263007786f624bcf9ae1d1dbb5a2859133eda2b8e7658c6e3c21890ec089309"
               },
               "pull_request": null,
               "merged_as": null,
@@ -665,7 +667,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0325",
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F2", "F3"],
               "boundary": {
                 "paths": [
@@ -675,7 +677,8 @@
                   "packages/cli/src/commands/doctor-support.ts",
                   "packages/skills/src/recipes/loader.ts",
                   "packages/skills/src/recipes/adapters.ts",
-                  "docs/reference/error-codes.md"
+                  "docs/reference/error-codes.md",
+                  "packages/cli/src/commands/init/plan.ts"
                 ],
                 "forbidden": ["law/", "product/", ".github/workflows/"]
               },
@@ -701,7 +704,7 @@
               "commit_types": ["fix(init)", "feat(doctor)", "refactor(recipes)", "docs(reference)"],
               "prompt": {
                 "path": "prompts/TASK-0326.md",
-                "sha256": null
+                "sha256": "32e3bf3e5d1465fd0f9eb6a5586c54b4eb429c0bd3c7d25ca8f99431d400693e"
               },
               "pull_request": null,
               "merged_as": null,
