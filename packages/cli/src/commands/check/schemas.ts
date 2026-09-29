@@ -52,14 +52,12 @@ const SOURCE_ONLY_SCHEMAS = [
   'inv-override.schema.json',
   'preflight-probe.schema.json',
   'prompt-composition.schema.json',
-  'review-verdict.schema.json',
   'stack-adapter.schema.json',
   'targets.schema.json',
   'task-freshness.schema.json',
   'test-task-descriptor.schema.json',
   'threat-model.schema.json',
   'toolchain-manifest.schema.json',
-  'triage-breaker.schema.json',
 ] as const;
 
 export function checkSchemaCanon(repoRoot: string): SchemaCanonReport {
