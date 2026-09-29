@@ -1,0 +1,74 @@
+{
+  "$schema": "../schemas/model-tiers.schema.json",
+  "schemaVersion": "1.0.0",
+  "id": "model-tiers",
+  "status": "active",
+  "authority": "Architect",
+  "policy_version": "1.0.0",
+  "description": "Repository default of the campaign models block (ADR-MDL-0002). Tiers are the only model names prompts and tasks use; the host models behind a tier change here, in a law commit that bumps policy_version, without touching any prompt. A campaign that declares a models block overrides this default by tier name only and never introduces a host. The tier named architect shares its name with the architect discipline of Constitution Article 7; the two are distinct: the tier is a capability rank that a task of any discipline may run at and the ceiling of Article 19 escalation, while the discipline is the authority the session declares. The name is kept, not fixed, because the closed campaigns CMP-0001 and CMP-0002 reference the tier and its ceiling and their ledgers are evidence.",
+  "alias_verification": {
+    "verified_on": "2026-09-28",
+    "source": "host documentation of the Claude Code and Codex CLIs",
+    "reverify": "round-open"
+  },
+  "hosts": {
+    "claude": {
+      "runtime": "claude-cli",
+      "aliases": ["fable", "opus", "sonnet", "haiku"]
+    },
+    "codex": {
+      "runtime": "codex-cli",
+      "aliases": ["gpt-6-astra", "gpt-6-sol", "gpt-6-luna"]
+    }
+  },
+  "tiers": {
+    "architect": {
+      "rank": 1,
+      "hosts": {
+        "claude": "fable",
+        "codex": "gpt-6-astra"
+      },
+      "default_effort": "high",
+      "use_for": "orchestration, contracts, schemas, policy, decision records"
+    },
+    "worker-high": {
+      "rank": 2,
+      "hosts": {
+        "claude": "opus",
+        "codex": "gpt-6-sol"
+      },
+      "default_effort": "high",
+      "use_for": "implementation across several modules, runner, broker, sensor, and evidence changes, tests of runtime semantics"
+    },
+    "worker": {
+      "rank": 3,
+      "hosts": {
+        "claude": "sonnet",
+        "codex": "gpt-6-sol"
+      },
+      "default_effort": "medium",
+      "use_for": "bounded tests, documentation, single-module changes"
+    },
+    "clerk": {
+      "rank": 4,
+      "hosts": {
+        "claude": "haiku",
+        "codex": "gpt-6-luna"
+      },
+      "default_effort": "low",
+      "use_for": "mechanical edits, regeneration, mirrors, rollovers, formatting"
+    }
+  },
+  "escalation": {
+    "trigger": "one failed iteration, a blocked report, or a time budget exceeded without a pull request",
+    "step": "one-rank-up",
+    "ceiling": "architect",
+    "authority": "orchestrator"
+  },
+  "resolution": {
+    "pinned_at": "task_start",
+    "id_form": "runtime:model",
+    "override": "a campaign models block overrides by tier name; a tier it does not name resolves to this default; an unknown tier name, an effort outside the tier grammar, a host this default does not declare, or an alias the host does not declare fails closed at the campaign check; the merged map is pinned on the task as execution.resolved with this policy_version, and escalation climbs the pinned map, never a later default",
+    "registry": "law/policy/model-runtime-registry.json"
+  }
+}
