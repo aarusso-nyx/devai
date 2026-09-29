@@ -53,6 +53,26 @@
       "effect": "local-write",
       "cost": "high",
       "output": "action-envelope-plus-rc-task-ledger-report"
+    },
+    {
+      "id": "campaign",
+      "binding": {
+        "kind": "literal-argv",
+        "argv": ["node", "scripts/check-campaign.mjs"]
+      },
+      "effect": "read",
+      "cost": "low",
+      "output": "action-envelope-plus-campaign-report"
+    },
+    {
+      "id": "scorecard-page",
+      "binding": {
+        "kind": "literal-argv",
+        "argv": ["node", "scripts/generate-scorecard-page.mjs", "--check"]
+      },
+      "effect": "read",
+      "cost": "low",
+      "output": "action-envelope-plus-scorecard-page-report"
     }
   ]
 }
