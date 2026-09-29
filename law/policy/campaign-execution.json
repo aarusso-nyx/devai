@@ -2,7 +2,7 @@
   "$schema": "../schemas/campaign-execution-policy.schema.json",
   "schemaVersion": "1.0.0",
   "id": "campaign-execution",
-  "status": "proposed",
+  "status": "accepted",
   "authority": "Architect",
   "policy_version": "1.0.0",
   "plan_schema": "law/schemas/campaign.schema.json",
@@ -168,7 +168,7 @@
     "round_close": [
       "every task is merged or cancelled",
       "the universal close checks and the round close_checks pass on the merged head",
-      "every owner effect in owner_effects_required has performed_at set",
+      "every Owner effect in owner_effects_required carries performed_at; an effect whose required_before names the round and lacks performed_at is owner-effect-not-performed and the round cannot close",
       "when attestation_reissue is true, the new task-policy digest is recorded in closure and the attestation is re-issued for it before any release plan uses the head"
     ],
     "gate_evaluation": "a human evaluates and records; no gate is inferred from a green check alone"
