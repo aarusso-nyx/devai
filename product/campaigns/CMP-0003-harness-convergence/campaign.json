@@ -145,7 +145,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -198,8 +198,8 @@
                 "path": "prompts/TASK-0311.md",
                 "sha256": "716176171e3e43d4513cf2a5db6f2e28026e181fc3fb2188ce2f8f7ae5fe132d"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/173",
+              "merged_as": "57988dc0d5207225ec21c0bec56199e1b092b56d",
               "execution": {
                 "tier": "architect",
                 "effort": "high",
@@ -212,7 +212,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0311",
-              "status": "planned",
+              "status": "ready",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
