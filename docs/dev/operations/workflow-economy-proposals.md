@@ -1,8 +1,23 @@
 # Workflow economy proposals
 
-Status: proposed decision set from the 2026-09-26 maintainer brainstorm. Every
-record below is `proposed`; none binds until accepted under Architect
-authority, and the two repository-setting changes are separate Owner effects.
+Status: delivered. This decision set came from the 2026-09-26 maintainer
+brainstorm; every record below was accepted under Architect authority and
+landed through campaign CMP-0001, and the two repository-setting changes were
+performed as separate Owner effects. The page is kept as the provenance of
+those records and is not maintained further.
+
+## Residue
+
+The root cause below was narrowed, not removed. The taxonomy of ADR-GOV-0017
+classifies every tracked path, but a plan-only pull request still executes the
+unconditional floor of the `affected` profile, from `generate` and `build`
+through `release:closure`, after compiling the check runner, and the one check
+a plan change needs, `scripts/check-campaign.mjs`, does not run in that lane.
+[ADR-CHK-0003](../../../law/adr/ADR-CHK-0003-planning-lane-and-semantic-validation.md)
+takes the residue: it selects a planning lane for the whole `plan` class from
+the taxonomy, adds the campaign and scorecard-page checks to `plan:validate`,
+caches the runner bootstrap, binds `work/` to `plan`, and accepts the campaign
+execution policy that governed CMP-0001 and CMP-0002.
 
 ## Root cause observed
 
