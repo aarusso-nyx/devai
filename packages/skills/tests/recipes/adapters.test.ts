@@ -1,8 +1,10 @@
 import {
   cpSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -119,6 +121,9 @@ describe('v1 RC recipe adapters', () => {
     expect(() => installRecipeAdapters({ repoRoot: repo })).toThrow(
       /RECIPE_INSTALL_SYMLINK_REFUSED/u,
     );
+    // Nothing is written: not through the link, and not under the other host root.
+    expect(readdirSync(outside)).toEqual([]);
+    expect(existsSync(join(repo, '.claude'))).toBe(false);
   });
 
   it('refuses a symlink at an exact adapter file target', () => {
@@ -133,6 +138,84 @@ describe('v1 RC recipe adapters', () => {
       /RECIPE_INSTALL_SYMLINK_REFUSED/u,
     );
     expect(readFileSync(outside, 'utf8')).toBe('outside\n');
+    expect(readdirSync(join(repo, '.agents/skills'))).toEqual(['devai-assess']);
+    expect(readdirSync(join(repo, '.agents/skills/devai-assess'))).toEqual(['SKILL.md']);
+    expect(existsSync(join(repo, '.claude'))).toBe(false);
+  });
+
+  it('refuses a symlink at a Claude projection path and writes no projection (IA-005)', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'devai-recipes-claude-link-'));
+    const outside = mkdtempSync(join(tmpdir(), 'devai-recipes-claude-outside-'));
+    mkdirSync(join(repo, '.claude'), { recursive: true });
+    symlinkSync(outside, join(repo, '.claude/skills'));
+
+    expect(() => installRecipeAdapters({ repoRoot: repo })).toThrow(
+      /RECIPE_INSTALL_SYMLINK_REFUSED/u,
+    );
+    expect(readdirSync(outside)).toEqual([]);
+    expect(existsSync(join(repo, '.agents'))).toBe(false);
+  });
+});
+
+/** Front matter and body of one installed SKILL.md. */
+function splitSkill(markdown: string): { header: Record<string, unknown>; body: string } {
+  const match = /^---\n([\s\S]*?)\n---\n([\s\S]*)$/u.exec(markdown);
+  if (match === null) throw new Error('installed SKILL.md has no front matter');
+  return { header: parseYaml(match[1] ?? '') as Record<string, unknown>, body: match[2] ?? '' };
+}
+
+describe('generated host projections (IA-004)', () => {
+  it('installs both projections of every recipe with identical bodies and core front matter', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'devai-recipes-projections-'));
+    try {
+      const result = installRecipeAdapters({ repoRoot: repo });
+      expect(result.written).toHaveLength(49);
+      const recipes = loadRecipes();
+      expect(readdirSync(join(repo, '.claude/skills')).sort()).toEqual(
+        recipes.map((recipe) => recipe.manifest.name).sort(),
+      );
+      expect(readdirSync(join(repo, '.agents/skills')).sort()).toEqual(
+        recipes.map((recipe) => recipe.manifest.name).sort(),
+      );
+      for (const recipe of recipes) {
+        const name = recipe.manifest.name;
+        const claude = readFileSync(join(repo, '.claude/skills', name, 'SKILL.md'), 'utf8');
+        const codex = readFileSync(join(repo, '.agents/skills', name, 'SKILL.md'), 'utf8');
+        const claudeSkill = splitSkill(claude);
+        const codexSkill = splitSkill(codex);
+        expect(codexSkill.body).toBe(claudeSkill.body);
+        expect(codexSkill.header).toStrictEqual(claudeSkill.header);
+        expect(Object.keys(claudeSkill.header)).toEqual([
+          'name',
+          'description',
+          'license',
+          'compatibility',
+          'metadata',
+        ]);
+        expect(claudeSkill.header['name']).toBe(name);
+        expect(claudeSkill.body).not.toMatch(/(?:^|[^\w./-])[/$]devai-[a-z]+/mu);
+        // The projections differ in nothing but their root, plus the Codex metadata file.
+        expect(readdirSync(join(repo, '.claude/skills', name)).sort()).toEqual([
+          'SKILL.md',
+          'devai.operations.json',
+          'devai.recipe.json',
+        ]);
+        expect(readdirSync(join(repo, '.agents/skills', name)).sort()).toEqual([
+          'SKILL.md',
+          'agents',
+          'devai.operations.json',
+          'devai.recipe.json',
+        ]);
+        for (const file of ['SKILL.md', 'devai.recipe.json', 'devai.operations.json']) {
+          expect(readFileSync(join(repo, '.agents/skills', name, file))).toEqual(
+            readFileSync(join(repo, '.claude/skills', name, file)),
+          );
+        }
+        expect(claude).toBe(recipe.skill_markdown);
+      }
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
   });
 });
 
