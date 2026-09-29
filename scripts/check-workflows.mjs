@@ -427,6 +427,68 @@ function checkCompositeActionPins(root, pins, findings) {
   }
 }
 
+// ADR-GOV-0021: each workflow page carries a metadata block (the first fenced yaml block after the
+// marker) naming its workflow file, triggers, and jobs; it is compared with the file, never the prose.
+export const WORKFLOW_PAGES_DIRECTORY = 'docs/dev/operations/workflows';
+const WORKFLOW_METADATA_MARKER = '<!-- devai:workflow-metadata -->';
+
+function keyList(value) {
+  return Object.keys(object(value));
+}
+
+function checkWorkflowPageMetadata(root, sources, findings) {
+  for (const [file, source] of sources) {
+    const stem = file.replace(/\.ya?ml$/u, '');
+    const pagePath = `${WORKFLOW_PAGES_DIRECTORY}/${stem}.md`;
+    const absolute = join(root, pagePath);
+    if (!existsSync(absolute)) continue; // the docs-ia page-set gate owns a missing page
+    const drift = (detail) =>
+      findings.push(finding('DOCS_WORKFLOW_METADATA_DRIFT', pagePath, detail));
+    const page = readFileSync(absolute, 'utf8');
+    const marker = page.indexOf(WORKFLOW_METADATA_MARKER);
+    const block =
+      marker < 0
+        ? null
+        : /^\s*```ya?ml\r?\n([\s\S]*?)\r?\n```/u.exec(
+            page.slice(marker + WORKFLOW_METADATA_MARKER.length),
+          )?.[1];
+    if (block === null || block === undefined) {
+      drift(`${pagePath} has no metadata block after ${WORKFLOW_METADATA_MARKER}`);
+      continue;
+    }
+    const metadataDocument = parseDocument(block, { uniqueKeys: true });
+    const workflowDocument = parseDocument(source);
+    if (metadataDocument.errors.length > 0 || workflowDocument.errors.length > 0) {
+      if (metadataDocument.errors.length > 0)
+        drift(`metadata block is not valid YAML: ${metadataDocument.errors[0].message}`);
+      continue; // an invalid workflow file is reported by checkWorkflow
+    }
+    const metadata = object(metadataDocument.toJS());
+    const workflow = object(workflowDocument.toJS());
+    // YAML 1.1 loaders read a bare `on` as true; the yaml package keeps the string key.
+    const actualTriggers = keyList(workflow.on ?? workflow[true]);
+    const actualJobs = keyList(workflow.jobs);
+    if (metadata.workflow !== `.github/workflows/${file}`) {
+      drift(`workflow is ${JSON.stringify(metadata.workflow)}; expected .github/workflows/${file}`);
+    }
+    for (const [key, actual] of [
+      ['triggers', actualTriggers],
+      ['jobs', actualJobs],
+    ]) {
+      const listed = Array.isArray(metadata[key]) ? metadata[key].map(String) : [];
+      if (listed.join('\n') === actual.join('\n')) continue;
+      const absent = actual.filter((name) => !listed.includes(name));
+      const extra = listed.filter((name) => !actual.includes(name));
+      const parts = [
+        ...absent.map((name) => `${key.slice(0, -1)} ${name} is in ${file} but not on the page`),
+        ...extra.map((name) => `${key.slice(0, -1)} ${name} is on the page but not in ${file}`),
+      ];
+      if (parts.length === 0) parts.push(`${key} order differs: file has ${actual.join(', ')}`);
+      drift(parts.join('; '));
+    }
+  }
+}
+
 export function checkWorkflowTree(root = process.cwd()) {
   const findings = [];
   const pins = rootPins(root, findings);
@@ -456,6 +518,7 @@ export function checkWorkflowTree(root = process.cwd()) {
     sources.set(file, source);
     checkWorkflow(file, source, findings, pins);
   }
+  checkWorkflowPageMetadata(root, sources, findings);
   checkCredentialBijection(root, sources, findings);
   checkCompositeActionPins(root, pins, findings);
   return { ok: findings.length === 0, files, findings };
