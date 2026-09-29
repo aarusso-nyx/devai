@@ -1540,14 +1540,16 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0354",
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
                   "packages/skills/tests/model-bridge/structured-extraction.test.ts",
                   "packages/sensors/tests/unit/judge-response-boundaries.test.ts",
                   "packages/loop/tests/triage-breaker-schema.test.ts",
-                  "tests/fixtures/review-replies/rejected-pass-reply.txt"
+                  "tests/fixtures/review-replies/rejected-pass-reply.txt",
+                  "packages/cli/tests/unit/check-schemas-adopter-boundaries.test.ts",
+                  "tests/fixtures/review-replies/cmp-0002-rejected-pass.txt"
                 ],
                 "forbidden": [
                   "law/",
@@ -1577,14 +1579,53 @@
               "commit_types": ["test(skills)", "test(sensors)", "test(loop)", "test(fixtures)"],
               "prompt": {
                 "path": "prompts/TASK-0355.md",
-                "sha256": null
+                "sha256": "8e65fc46d7bf8c3bb6f45c0dd9f84939a57da3cedaf8bdbddd5ab0cb7d1167f0"
               },
               "pull_request": null,
               "merged_as": null,
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
-                "time_budget_minutes": 90
+                "time_budget_minutes": 90,
+                "resolved": {
+                  "policy_version": "1.0.0",
+                  "pinned_at": "2026-09-29T17:29:27Z",
+                  "tiers": {
+                    "architect": {
+                      "rank": 1,
+                      "hosts": {
+                        "claude": "claude-cli:fable",
+                        "codex": "codex-cli:gpt-6-astra"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker-high": {
+                      "rank": 2,
+                      "hosts": {
+                        "claude": "claude-cli:opus",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker": {
+                      "rank": 3,
+                      "hosts": {
+                        "claude": "claude-cli:sonnet",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "medium"
+                    },
+                    "clerk": {
+                      "rank": 4,
+                      "hosts": {
+                        "claude": "claude-cli:haiku",
+                        "codex": "codex-cli:gpt-6-luna"
+                      },
+                      "default_effort": "low"
+                    }
+                  },
+                  "ceiling": "architect"
+                }
               }
             },
             {
