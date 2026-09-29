@@ -161,6 +161,32 @@ The cost classes are relative workload classes, not duration promises. They do n
 authorize skipping a required member or substituting cached, transported, or prior
 results for current execution.
 
+## Suites and gate nodes
+
+The check suites above are distinct from the nodes of `test-tasks.json`, which the
+check runner plans for `--affected`, `--local` and `--rc`. Several gate nodes run one
+check member each, so a change of one class reaches every member that class lists in
+the change taxonomy:
+
+| Gate node             | Runs                                                | Selected by  |
+| --------------------- | --------------------------------------------------- | ------------ |
+| `plan:validate`       | `check --only journeys`, after the two below        | `plan` class |
+| `plan:campaign`       | `node scripts/check-campaign.mjs`                   | `plan` class |
+| `plan:scorecard-page` | `node scripts/generate-scorecard-page.mjs --check`  | `plan` class |
+| `docs:validate`       | `check --only cli-reference`, after the three below | `docs` class |
+| `docs:links`          | `check --only docs-links`                           | `docs` class |
+| `docs:governance`     | `check --only docs-governance`                      | `docs` class |
+| `docs:ci-economy`     | `check --only ci-economy`                           | `docs` class |
+
+A diff whose every path is an added or modified `plan`-class path plans the fixed
+`planning` profile of `test-tasks.json` (`plan:validate` and `format`, plus the
+preflight nodes) instead of the affected floor, so no `generate` or `build` runs for a
+ledger, prompt or scorecard record. The campaign check also refuses a closed round
+whose required Owner effect carries no `performed_at`.
+
+The `campaign` and `scorecard-page` services run the same two scripts through
+`devai check --only` once the check-suite policy declares them as members.
+
 ## Canonical descriptor
 
 - [Check-suite policy](../../../law/policy/check-suites.json) — exact descriptors,
