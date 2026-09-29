@@ -626,7 +626,7 @@ describe('live ledger-verification workflow', () => {
     };
     expect(parsed.jobs?.['finalize-release']?.if).toBe(EXPLICIT_PUBLISH_CONDITION);
     expect(parsed.jobs?.['deploy-pages']?.if).toBe(EXPLICIT_PAGES_CONDITION);
-    expect(parsed.jobs?.['rehearsal-summary']?.if).toBe(REHEARSAL_CONDITION);
+    expect(parsed.jobs?.['build-release']?.if).toBe(REHEARSAL_CONDITION);
     expect(release).toContain('environment: devai-rc-publication');
     expect(release).toContain('devai adopter espaço não-ASCII');
     expect(release).toContain('name: "devai-linux-adopter"');
@@ -649,7 +649,7 @@ describe('live ledger-verification workflow', () => {
     }
     expect(release).toContain('--binding exact-tree');
     expect(release).toContain('sbom_subject_sha256');
-    expect(release).toContain('Verify npm adopter quickstart on Linux');
+    expect(release).toContain('Exercise fresh npm adoption, execution, and reuse');
     expect(release).toContain("task.disposition === 'reused'");
     expect(release).not.toContain('--package-lock-only');
     expect(release).toContain('--tag "$PACKAGE_DIST_TAG"');
