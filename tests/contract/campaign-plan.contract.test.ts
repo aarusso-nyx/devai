@@ -443,8 +443,6 @@ describe('campaign plan contract', () => {
 // one pull request is one pull request, however many of its tasks are in
 // pre_merge.
 describe('serialized admission (ADR-CHK-0004 IA-005)', () => {
-  const convergence = join(root, 'product/campaigns/CMP-0003-harness-convergence');
-
   /** Every task of the plan in pre_merge moves back to in_progress, then the named ones enter pre_merge. */
   function preMerge(dir: string, ids: readonly string[]): void {
     mutatePlan(dir, (plan) => {
