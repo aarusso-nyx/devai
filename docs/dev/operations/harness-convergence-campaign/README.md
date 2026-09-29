@@ -102,3 +102,33 @@ Recorded on 2026-09-29, after R-0301 reached `closing` and R-0302 opened:
    reaches them.
 4. **No release in this campaign.** Version rollover and publication are left
    to a later cycle; the campaign closes on `main` without a tag.
+
+## 6. Round log
+
+Recorded by the orchestrator as each round reached `closing` or `closed`.
+Close checks are the campaign's standing set (`adrs`, `schemas`, `docs-links`,
+`docs-governance`, `ci-economy`, `cli-reference`, `journeys`, `forbidden-actions`,
+`format:check:all`, `action-registry:check`, `test:skills`, `test:cli`) run in a
+detached worktree at the merged head after `pnpm run build` and
+`pnpm run release:bootstrap`.
+
+| Round  | Merged head | Pull requests | State                                                                                                                                   |
+| ------ | ----------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| R-0301 | `e5cfdb77`  | #173, #176    | `closing`: waits for the single RC attestation (decision 1); check-suite declaration due at its close (decision 3)                      |
+| R-0302 | `12d52fa5`  | #179, #181    | `closed`: close checks green on the merged head; `test-tasks.json` unchanged, so no attestation is owed                                 |
+| R-0303 | `0a66e13a`  | #183          | `closed`: close checks green on the merged head (990 skills tests, 3480 CLI tests); the eight-receipt acceptance was proven in the wave |
+| R-0304 | see ledger  | #188          | `closing`: waits for the single RC attestation and for OE-01 (queue enabled or the serialized fallback recorded)                        |
+
+Backlog observed while closing R-0302 and R-0303, outside every task boundary:
+
+- Three test nodes are load-sensitive and pass when run alone:
+  `cli-shard09-verify-translation-c-overlay-boundaries`, the `test:skills`
+  teardown (`ENOTEMPTY` on a temporary directory), and the check-runner
+  timeout case. They deserve a fixture isolation task in a later campaign.
+- The forbidden-actions scanner reports every campaign-ledger commit under
+  `product/` and every policy commit under `law/` that the orchestrator
+  authored with the Engineer commit identity (23 findings at `0a66e13a`). The
+  scanner's author rule is right; the identity was wrong. From R-0305 on, the
+  orchestrator signs ledger commits as `DEVAI Owner` and law commits as
+  `DEVAI Architect`, and the Owner records receipts for the earlier findings
+  at the campaign close.
