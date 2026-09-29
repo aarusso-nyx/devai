@@ -125,3 +125,72 @@ The `ci_economy` project configuration selects the full or staged enforcement pr
 Its optional `local_evidence` declaration is fail-closed: a missing declaration never
 accepts claimed local evidence, and policy-sensitive changes always force the protected
 remote path.
+
+## Retiring `ci_economy`
+
+`ci_economy` and its nested blocks are owned by `init bind --adopter-policy` (see the ownership
+matrix in [Install and adopt](install.md#what---adopter-policy-owns-in-projectjson)), so retiring
+the capability is a change to the policy source followed by a rebind, never an edit to
+`.devai/config/project.json`. This is the reproduction from issue #68, which on 1.4.5 through 1.6.0
+left the block in place.
+
+A repository that ran trusted local RC evidence declares it in `law/policy/devai-adoption.json`:
+
+```json
+{
+  "schemaVersion": "1.0.0",
+  "policy_id": "acme.devai-adoption",
+  "policy_version": "1.3.0",
+  "ci_economy": {
+    "profile": "full",
+    "attested_rc": {
+      "profile": "rc",
+      "transport": "protected-tag-v1",
+      "tag_prefix": "devai-local-evidence/",
+      "binding": "exact-tree",
+      "required_check": "verified-local-rc",
+      "failure_mode": "fail-closed",
+      "local_only_nodes": ["test:mutation"]
+    }
+  }
+}
+```
+
+and the bound `project.json` carries the same block. To retire the capability, delete `ci_economy`
+from the source, bump `policy_version` to `1.4.0`, and rebind:
+
+```bash
+pnpm exec devai init bind \
+  --target . \
+  --adopter-policy law/policy/devai-adoption.json \
+  --as-role architect \
+  --write
+```
+
+The projected `project.json` now has no `ci_economy` key. Every key the matrix does not name,
+such as `profile`, `constitution`, `authority_enforcement`, and your own declarations, is
+unchanged. The receipt reports the retirement beside the digests it already carries:
+
+```json
+{
+  "policy_id": "acme.devai-adoption",
+  "policy_version": "1.4.0",
+  "source_path": "law/policy/devai-adoption.json",
+  "source_digest_sha256": "<sha256 of the edited source>",
+  "retired_keys": ["/ci_economy"],
+  "materialized": {
+    ".devai/config/project.json": "<sha256 of the projected file>"
+  }
+}
+```
+
+`doctor` then evaluates the repository as one without trusted local RC evidence:
+`trusted-local-rc-boundary` no longer fails against a declaration nobody holds, and
+`policy-materialization-current` passes on the fresh receipt. Run the bind a second time and
+nothing changes: no target file changes bytes and `retired_keys` is empty.
+
+Retiring one nested block works the same way. Delete only `ci_economy.local_evidence` and the
+receipt lists `/ci_economy/local_evidence`, while `ci_economy.profile` and `attested_rc` are
+projected again exactly as the source declares them. Because the bind replaces `ci_economy` as a
+whole, a member left out of the source is gone from the projection; there is no partial merge to
+fall back on.
