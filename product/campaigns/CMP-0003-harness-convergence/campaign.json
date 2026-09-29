@@ -1652,7 +1652,10 @@
                   "packages/sensors/tests/unit/judge-finding-population.test.ts",
                   "packages/sensors/tests/unit/judge-request-metadata.test.ts",
                   "packages/sensors/tests/unit/migrate-type-judge-depth.test.ts",
-                  "packages/cli/tests/unit/sense-adapters-depth.test.ts"
+                  "packages/cli/tests/unit/sense-adapters-depth.test.ts",
+                  "packages/cli/src/commands/check/schemas.ts",
+                  "packages/cli/tests/unit/check-schemas-adopter-boundaries.test.ts",
+                  "packages/schemas/tests/contract/schema-roster.test.ts"
                 ],
                 "forbidden": ["law/", "product/", ".github/workflows/"]
               },
@@ -1682,7 +1685,7 @@
               ],
               "prompt": {
                 "path": "prompts/TASK-0356.md",
-                "sha256": "505d8af1b1ea8c2891d1cde9fc4c91d713f1443803adf52a188914a562ef6946"
+                "sha256": "fc3871472b883e3d8dbd5a67cbaeda2b0631ef3b1b74ad9f1a56970680610e00"
               },
               "pull_request": null,
               "merged_as": null,
