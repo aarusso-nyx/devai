@@ -5,12 +5,19 @@ name: Pull request preflight
 # supplement a candidate receipt. A transient preflight receipt only gates the
 # current run; a green run is a contradiction check, not a release claim.
 
+# Under merge_group the candidate is the queue entry's head and the base is the
+# queue base; under pull_request they are the pull request's head and base
+# (remote-preflight-contract.md, Queue admission). Each queue entry has its own
+# concurrency group, so no entry cancels another; a new head of the same pull
+# request still cancels the previous one (ADR-CHK-0004).
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
+  merge_group:
+    types: [checks_requested]
 
 concurrency:
-  group: ${{ github.workflow }}-pr-${{ github.event.pull_request.number }}
+  group: ${{ github.event_name == 'merge_group' && format('{0}-mq-{1}', github.workflow, github.event.merge_group.head_sha) || format('{0}-pr-{1}', github.workflow, github.event.pull_request.number) }}
   cancel-in-progress: true
 
 permissions:
@@ -21,11 +28,13 @@ jobs:
     name: devai-release-gate
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      DEVAI_PREFLIGHT_BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || github.event.pull_request.base.sha }}
     steps:
       - name: Check out exact candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event_name == 'merge_group' && github.event.merge_group.head_sha || github.event.pull_request.head.sha }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -118,8 +127,8 @@ jobs:
           echo "version=1.5.1" >> "$GITHUB_OUTPUT"
           echo "provenance_sha256=$actual_provenance_sha256" >> "$GITHUB_OUTPUT"
           node .devai/state/pr-bootstrap/cli/bin.js init bind --target . --as-role architect --write --format json
-          node .devai/state/pr-bootstrap/cli/bin.js check --preflight --run --base ${{ github.event.pull_request.base.sha }} --as-role inspector --write --format json
+          node .devai/state/pr-bootstrap/cli/bin.js check --preflight --run --base "$DEVAI_PREFLIGHT_BASE" --as-role inspector --write --format json
 
       - name: Affected checks and profile-selected candidate preflight
         id: affected
-        run: pnpm run release:pr-gate -- ${{ github.event.pull_request.base.sha }} && node .devai/state/pr-bootstrap/cli/bin.js check --affected --run --base ${{ github.event.pull_request.base.sha }} --as-role inspector --write --format json
+        run: pnpm run release:pr-gate -- "$DEVAI_PREFLIGHT_BASE" && node .devai/state/pr-bootstrap/cli/bin.js check --affected --run --base "$DEVAI_PREFLIGHT_BASE" --as-role inspector --write --format json
