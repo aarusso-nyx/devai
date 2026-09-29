@@ -23,6 +23,12 @@ export const READING_ORDER_SOURCES = [
 ] as const;
 export const FIVE_ROLES = ['Owner', 'Architect', 'Inspector', 'Engineer', 'Auditor'] as const;
 
+/**
+ * ADR-GOV-0020: the whole of CLAUDE.md is this one line, the Claude Code import
+ * of AGENTS.md, so the single contract is never copied into a second file.
+ */
+export const CLAUDE_AGENTS_IMPORT = '@AGENTS.md';
+
 export interface DoctorOptions {
   readonly repoRoot?: string;
   readonly chain?: string;
