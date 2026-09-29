@@ -123,10 +123,10 @@ for `type_check`,
 `pnpm vitest run --config tests/config/rc.performance.config.ts tests/regression` (the
 performance configuration over the regression suite) as `perf_test`'s `argv`, `5` for `harness_idiomaticity`'s `minWorkflowsForReusableCheck`,
 and `packages/cli/src/generated/**` for `plant_depth`'s `excludeGlobs`.
-DEVAI's CI is three single-purpose workflows (`devai-ledger-verify`, `pull-request-checks`,
-`release`) that share their setup steps through a composite action, and none of them has a
-job the others would reuse; factoring one of the three out as a reusable workflow would not
-earn its keep at this size. Five is the point where it would, so below it the sensor drops
+DEVAI's CI is four single-purpose workflows (`pull-request-checks`, `release`,
+`site-publish`, `devai-ledger-verify`), three of which share their setup steps through a
+composite action, and none of them has a job the others would reuse; factoring one of the
+four out as a reusable workflow would not earn its keep at this size. Five is the point where it would, so below it the sensor drops
 the reusable-workflow signal instead of grading DEVAI's CI against a shape it has not grown
 into. The generated action registry view under `packages/cli/src/generated/` is rendered from
 `law/policy/action-registry.json` and checked against it, so it is a derived F4 artifact, not

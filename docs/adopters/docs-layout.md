@@ -81,14 +81,14 @@ The package-owned documentation-governance check evaluates these nine rules. The
 severity below is the rule's failure severity; successful evaluation is reported as
 `pass`.
 
-| Rule                                          | Requirement                                                    | Severity |
-| --------------------------------------------- | -------------------------------------------------------------- | -------- |
-| `docs-governance.classification`              | `repo.kind` is `library` or `application`                      | `fail`   |
-| `docs-governance.builder-declared`            | `docs.builder` is `docusaurus` or `jekyll`                     | `fail`   |
-| `docs-governance.library-docusaurus-required` | Libraries use Docusaurus                                       | `fail`   |
-| `docs-governance.opt-out-adr-required`        | An application using Jekyll supplies the required opt-out ADR  | `fail`   |
-| `docs-governance.site-dir-shape`              | `docs/site/` has the files required by the selected builder    | `fail`   |
-| `docs-governance.build-toolchain`             | The configured documentation build command dry-validates       | `warn`   |
-| `docs-governance.gh-pages-branch`             | The configured publication branch exists on `origin`           | `warn`   |
-| `docs-governance.no-ci-publish`               | No GitHub Actions workflow publishes documentation             | `fail`   |
-| `docs-governance.config-not-placeholder`      | Docusaurus configuration has no scaffold or placeholder values | `fail`   |
+| Rule                                          | Requirement                                                                                        | Severity |
+| --------------------------------------------- | -------------------------------------------------------------------------------------------------- | -------- |
+| `docs-governance.classification`              | `repo.kind` is `library` or `application`                                                          | `fail`   |
+| `docs-governance.builder-declared`            | `docs.builder` is `docusaurus` or `jekyll`                                                         | `fail`   |
+| `docs-governance.library-docusaurus-required` | Libraries use Docusaurus                                                                           | `fail`   |
+| `docs-governance.opt-out-adr-required`        | An application using Jekyll supplies the required opt-out ADR                                      | `fail`   |
+| `docs-governance.site-dir-shape`              | `docs/site/` has the files required by the selected builder                                        | `fail`   |
+| `docs-governance.build-toolchain`             | The configured documentation build command dry-validates                                           | `warn`   |
+| `docs-governance.gh-pages-branch`             | The configured publication branch exists on `origin`                                               | `warn`   |
+| `docs-governance.no-ci-publish`               | Documentation is published only through the governed Pages journal; no other workflow publishes it | `fail`   |
+| `docs-governance.config-not-placeholder`      | Docusaurus configuration has no scaffold or placeholder values                                     | `fail`   |
