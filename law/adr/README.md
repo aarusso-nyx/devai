@@ -1,5 +1,7 @@
 # Governance decision records
 
+This catalogue lists every decision record in this directory. An adopter adds its own records here as `ADR-<SCOPE>-<NNNN>-<slug>.md` files with the canonical frontmatter, then regenerates this file instead of editing it.
+
 <!-- generated from canonical record frontmatter; do not edit -->
 
 | ID                                                                                        | Title                                                                                                   | Status   | Round | Date       |
