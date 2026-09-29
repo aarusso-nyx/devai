@@ -50,6 +50,7 @@ const SOURCE_ONLY_SCHEMAS = [
   'data-handling.schema.json',
   'documentation-information-architecture.schema.json',
   'inv-override.schema.json',
+  'model-tiers.schema.json',
   'preflight-probe.schema.json',
   'prompt-composition.schema.json',
   'stack-adapter.schema.json',
