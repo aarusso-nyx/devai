@@ -180,7 +180,7 @@ function invokeCommand(options: CommandOptions): {
 describe('complete schema canon filesystem checks', () => {
   it('counts the model-tiers schema in the runtime roster once TASK-0353 moves it', () => {
     const report = checkSchemaCanon(canonFixture());
-    expect(ROSTER).toHaveLength(93);
+    expect(ROSTER).toHaveLength(95);
     expect(report).toMatchObject({ ok: true, canonical_total: 112, findings: [] });
   });
   it.each(['missing-source-only', 'missing-runtime', 'unexpected'] as const)(
