@@ -16,7 +16,9 @@ function exactKeys(value, keys) {
 }
 // A site-only identity publishes the documentation site from a main commit
 // without a release: no rehearsal, no manifest; the tag is the package version
-// string the site documents and the source run replaces the rehearsal run.
+// string the site documents and the source run replaces the rehearsal run. The
+// run attempt is provenance only (journal payload and status log URL), never
+// identity, so a re-run of the same dispatch finds and resumes its own record.
 function siteOnlyIdentityBytes(identity) {
   const keys = [
     'repository',
@@ -26,7 +28,6 @@ function siteOnlyIdentityBytes(identity) {
     'tree',
     'siteSha256',
     'sourceRun',
-    'sourceAttempt',
     'controlCommit',
   ];
   if (
@@ -37,7 +38,7 @@ function siteOnlyIdentityBytes(identity) {
     !/^v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u.test(identity.tag) ||
     ['commit', 'tree', 'controlCommit'].some((key) => !/^[a-f0-9]{40}$/u.test(identity[key])) ||
     !/^[a-f0-9]{64}$/u.test(identity.siteSha256) ||
-    ['sourceRun', 'sourceAttempt'].some((key) => !/^[1-9][0-9]*$/u.test(identity[key]))
+    !/^[1-9][0-9]*$/u.test(identity.sourceRun)
   )
     fail('IDENTITY_INVALID');
   return JSON.stringify(Object.fromEntries(keys.map((key) => [key, identity[key]])));
@@ -120,6 +121,9 @@ export async function publishPages({ identity, artifactId, controls }) {
   let record = journal.records.length ? journalRecord(journal.records[0], identity) : null;
   const effect = await controls.readEffect(identity);
   if (!['matching', 'confirmed-missing', 'unknown'].includes(effect)) fail('EFFECT_UNKNOWN');
+  // An intent without a recorded Pages deployment is an unknown submission; it
+  // stops before any matching-bytes branch, for release and site-only identities.
+  if (record?.phase === 'intent') fail('SUBMISSION_UNKNOWN');
   if (effect === 'matching') {
     // Bytes that already serve still leave a submitted intent open, and an open
     // intent blocks every later publication as OTHER_PUBLICATION_UNRESOLVED.
@@ -131,7 +135,6 @@ export async function publishPages({ identity, artifactId, controls }) {
     return { outcome: 'no-op', identitySha256: digest, buildInvocations: 0 };
   }
   if (record?.phase === 'verified') fail('VERIFIED_EFFECT_MISSING');
-  if (record?.phase === 'intent') fail('SUBMISSION_UNKNOWN');
   if (!record) {
     if (effect !== 'confirmed-missing') fail('EFFECT_UNKNOWN');
     const intentId = await controls.createIntent({ schemaVersion: '1.0.0', identity, artifactId });
