@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { canonicalJson } from '@devai-nyx/utils';
 import { ADOPTER_POLICY_TARGETS, isJsonObject } from './adopter-policy.js';
+import { RETIRABLE_OWNED_POINTERS } from './adopter-policy-ownership.js';
 
 export interface AdopterPolicyBinding {
   readonly schemaVersion: '1.0.0';
@@ -9,6 +10,11 @@ export interface AdopterPolicyBinding {
   readonly source_path: string;
   readonly source_digest_sha256: string;
   readonly materialized: Readonly<Record<string, string>>;
+  /**
+   * Owned project.json rows the bind retired, as JSON pointers at the ownership
+   * matrix rows (ADR-CFG-0002). Optional so receipts written before the field parse.
+   */
+  readonly retired_keys?: readonly string[];
 }
 
 /** Parse the existing closed v1 receipt without selecting files or repairing inputs. */
@@ -33,11 +39,24 @@ export function parseAdopterPolicyBinding(
     'source_digest_sha256',
     'source_path',
   ];
+  const optionalKeys = ['retired_keys'];
   if (
-    Object.keys(parsed).length !== bindingKeys.length ||
-    bindingKeys.some((key) => !Object.hasOwn(parsed, key))
+    bindingKeys.some((key) => !Object.hasOwn(parsed, key)) ||
+    Object.keys(parsed).some((key) => !bindingKeys.includes(key) && !optionalKeys.includes(key))
   ) {
     return { reason: 'BINDING_MALFORMED' };
+  }
+  if (Object.hasOwn(parsed, 'retired_keys')) {
+    const retired = parsed['retired_keys'];
+    if (
+      !Array.isArray(retired) ||
+      !retired.every(
+        (pointer) => typeof pointer === 'string' && RETIRABLE_OWNED_POINTERS.includes(pointer),
+      ) ||
+      new Set(retired).size !== retired.length
+    ) {
+      return { reason: 'BINDING_MALFORMED' };
+    }
   }
   const materialized = parsed['materialized'];
   const digest = /^[a-f0-9]{64}$/u;

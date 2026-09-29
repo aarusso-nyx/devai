@@ -3,6 +3,8 @@ import {
   mkdirSync,
   readFileSync,
   realpathSync,
+  renameSync,
+  rmSync,
   runAuthorityHostEffectsWithRollback,
   writeFileSync,
 } from '@devai-nyx/authority';
@@ -35,14 +37,129 @@ import {
   verifyGithubActionsAdapter,
 } from '../../services/github-actions-adapter/index.js';
 import {
+  ADOPTER_POLICY_TARGETS,
+  isJsonObject,
   jsonBytes,
-  resolveAdopterPolicyMaterialization,
+  resolveAdopterPolicyProjection,
   type JsonObject,
 } from '../../services/adopter-policy.js';
 import { DEFAULT_REPO_ROOT, emit, type InitBindOptions } from './shared.js';
 
 function sha256Bytes(value: string | Buffer): string {
   return createHash('sha256').update(value).digest('hex');
+}
+
+const ADOPTER_POLICY_RECEIPT = '.devai/config/adopter-policy-binding.json';
+const ADOPTER_POLICY_JOURNAL = '.devai/config/adopter-policy-binding.journal.json';
+const ADOPTER_POLICY_STAGED_SUFFIX = '.devai-bind-staged';
+const ADOPTER_POLICY_PAIR: readonly string[] = [...ADOPTER_POLICY_TARGETS, ADOPTER_POLICY_RECEIPT];
+
+interface AdopterPolicyJournalEntry {
+  readonly path: string;
+  readonly previous: string | null;
+}
+
+function readTextIfPresent(path: string): string | null {
+  return existsSync(path) ? readFileSync(path, 'utf8') : null;
+}
+
+/** Land bytes on a final path by staging them beside it and renaming into place. */
+function landByRename(path: string, bytes: string): void {
+  const staged = `${path}${ADOPTER_POLICY_STAGED_SUFFIX}`;
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(staged, bytes);
+  renameSync(staged, path);
+}
+
+/**
+ * Finish a bind a previous process left interrupted. A journal next to the receipt
+ * marks a committed write set; its presence means some renames may have landed, so
+ * every journaled path is rolled back to its previous bytes and the new bind below
+ * recomputes the projection from that complete previous pair. Staged files without a
+ * journal never reached a final path and are discarded.
+ */
+function recoverInterruptedAdopterPolicyBind(targetRoot: string): 'rolled-back' | null {
+  const journalPath = join(targetRoot, ADOPTER_POLICY_JOURNAL);
+  const stagedPaths = ADOPTER_POLICY_PAIR.map(
+    (path) => `${join(targetRoot, path)}${ADOPTER_POLICY_STAGED_SUFFIX}`,
+  );
+  const journalBytes = readTextIfPresent(journalPath);
+  let recovered: 'rolled-back' | null = null;
+  if (journalBytes !== null) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(journalBytes);
+    } catch {
+      // A torn journal was never committed: no rename follows an incomplete journal.
+      parsed = undefined;
+    }
+    if (parsed !== undefined) {
+      const entries = isJsonObject(parsed) ? parsed['entries'] : undefined;
+      if (
+        !Array.isArray(entries) ||
+        !entries.every(
+          (entry): entry is AdopterPolicyJournalEntry =>
+            isJsonObject(entry) &&
+            typeof entry['path'] === 'string' &&
+            ADOPTER_POLICY_PAIR.includes(entry['path']) &&
+            (entry['previous'] === null || typeof entry['previous'] === 'string'),
+        )
+      ) {
+        throw new Error('ADOPTER_POLICY_BINDING_JOURNAL_INVALID');
+      }
+      for (const entry of entries) {
+        const finalPath = join(targetRoot, entry.path);
+        const current = readTextIfPresent(finalPath);
+        if (current === entry.previous) continue;
+        if (entry.previous === null) rmSync(finalPath, { force: true });
+        else landByRename(finalPath, entry.previous);
+      }
+      recovered = 'rolled-back';
+    }
+  }
+  for (const staged of stagedPaths) {
+    if (existsSync(staged)) rmSync(staged, { force: true });
+  }
+  if (journalBytes !== null) rmSync(journalPath, { force: true });
+  return recovered;
+}
+
+/**
+ * Stage every file of the write set, commit the set with a journal of the previous
+ * bytes, rename each staged file into place, and drop the journal. A process killed
+ * at any point leaves either the previous complete pair or a journal the next bind
+ * rolls back (ADR-CFG-0002, IA-003).
+ */
+function writeAdopterPolicyPairAtomically(
+  targetRoot: string,
+  writes: ReadonlyMap<string, string>,
+): void {
+  const journalPath = join(targetRoot, ADOPTER_POLICY_JOURNAL);
+  const entries = [...writes.keys()].map((path) => ({
+    path,
+    final: join(targetRoot, path),
+    staged: `${join(targetRoot, path)}${ADOPTER_POLICY_STAGED_SUFFIX}`,
+  }));
+  runAuthorityHostEffectsWithRollback(
+    [journalPath, ...entries.flatMap((entry) => [entry.final, entry.staged])],
+    () => {
+      for (const entry of entries) {
+        mkdirSync(dirname(entry.final), { recursive: true });
+        writeFileSync(entry.staged, writes.get(entry.path) ?? '');
+      }
+      writeFileSync(
+        journalPath,
+        jsonBytes({
+          entries: entries.map((entry): AdopterPolicyJournalEntry => ({
+            path: entry.path,
+            previous: readTextIfPresent(entry.final),
+          })),
+        }),
+      );
+      for (const entry of entries) renameSync(entry.staged, entry.final);
+      rmSync(journalPath, { force: true });
+    },
+  );
 }
 
 function materializeAdopterPolicy(targetRoot: string, sourceArgument: string) {
@@ -56,6 +173,7 @@ function materializeAdopterPolicy(targetRoot: string, sourceArgument: string) {
   ) {
     throw new Error('ADOPTER_POLICY_SOURCE_OUTSIDE_LAW_POLICY');
   }
+  const recovery = recoverInterruptedAdopterPolicyBind(targetRoot);
   const sourceBytes = readFileSync(sourcePath, 'utf8');
   const policy: unknown = JSON.parse(sourceBytes);
   const document = policy as JsonObject;
@@ -63,15 +181,11 @@ function materializeAdopterPolicy(targetRoot: string, sourceArgument: string) {
   const currentProject = existsSync(projectPath)
     ? (JSON.parse(readFileSync(projectPath, 'utf8')) as JsonObject)
     : {};
-  const resolved = resolveAdopterPolicyMaterialization({
+  const { files: resolved, retired_keys: retiredKeys } = resolveAdopterPolicyProjection({
     policy,
     currentProject,
     frameworkVersion: resolveCliVersion(),
   });
-  const outputs = new Map<string, string>(
-    [...resolved].map(([path, bytes]) => [join(targetRoot, path), bytes]),
-  );
-  const receiptPath = join(targetRoot, '.devai/config/adopter-policy-binding.json');
   const receipt = {
     schemaVersion: '1.0.0',
     policy_id: document['policy_id'],
@@ -79,20 +193,41 @@ function materializeAdopterPolicy(targetRoot: string, sourceArgument: string) {
     source_path: relative(targetRoot, sourcePath).split(sep).join('/'),
     source_digest_sha256: sha256Bytes(sourceBytes),
     materialized: Object.fromEntries(
-      [...outputs].map(([path, bytes]) => [
-        relative(targetRoot, path).split(sep).join('/'),
-        sha256Bytes(bytes),
-      ]),
+      [...resolved].map(([path, bytes]) => [path, sha256Bytes(bytes)]),
     ),
+    retired_keys: retiredKeys,
   };
-  outputs.set(receiptPath, jsonBytes(receipt));
-  runAuthorityHostEffectsWithRollback([...outputs.keys()], () => {
-    for (const [path, bytes] of outputs) {
-      mkdirSync(dirname(path), { recursive: true });
-      writeFileSync(path, bytes);
+  const receiptBytes = jsonBytes(receipt);
+  const targetsChanged = [...resolved].some(
+    ([path, bytes]) => readTextIfPresent(join(targetRoot, path)) !== bytes,
+  );
+  const writes = new Map<string, string>();
+  if (targetsChanged) {
+    // A projection that moves lands every target with its receipt as one set.
+    for (const [path, bytes] of resolved) writes.set(path, bytes);
+    writes.set(ADOPTER_POLICY_RECEIPT, receiptBytes);
+  } else {
+    // Unchanged targets are never written. The receipt stands when it already records
+    // this projection; its retired_keys then report the bind that last moved it.
+    const currentReceipt = readTextIfPresent(join(targetRoot, ADOPTER_POLICY_RECEIPT));
+    let recordedRetired: unknown;
+    try {
+      const parsed: unknown = currentReceipt === null ? undefined : JSON.parse(currentReceipt);
+      recordedRetired = isJsonObject(parsed) ? parsed['retired_keys'] : undefined;
+    } catch {
+      recordedRetired = undefined;
     }
-  });
-  return { receipt_path: relative(targetRoot, receiptPath).split(sep).join('/'), receipt };
+    const standing =
+      Array.isArray(recordedRetired) &&
+      currentReceipt === jsonBytes({ ...receipt, retired_keys: recordedRetired });
+    if (!standing) writes.set(ADOPTER_POLICY_RECEIPT, receiptBytes);
+  }
+  if (writes.size > 0) writeAdopterPolicyPairAtomically(targetRoot, writes);
+  return {
+    receipt_path: ADOPTER_POLICY_RECEIPT,
+    receipt,
+    ...(recovery !== null ? { recovered_interrupted_bind: recovery } : {}),
+  };
 }
 
 /** Validate and bind an Architect-owned adopter policy source (--adopter-policy). */

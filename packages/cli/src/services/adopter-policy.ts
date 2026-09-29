@@ -1,6 +1,13 @@
 import { getValidator } from '@devai-nyx/schemas';
 import { canonicalJson } from '@devai-nyx/utils';
 import { resolveCanonicalPolicyContent, validateCanonicalPolicyContent } from '@devai-nyx/skills';
+import { projectOwnedProjectConfig } from './adopter-policy-ownership.js';
+
+export {
+  ADOPTER_POLICY_OWNERSHIP_MATRIX,
+  RETIRABLE_OWNED_POINTERS,
+  type AdopterPolicyOwnershipRow,
+} from './adopter-policy-ownership.js';
 
 export type JsonObject = Record<string, unknown>;
 
@@ -42,6 +49,8 @@ export function jsonBytes(value: unknown): string {
   return `${JSON.stringify(value, null, 2)}\n`;
 }
 
+export type AdopterPolicyTarget = (typeof ADOPTER_POLICY_TARGETS)[number];
+
 /**
  * Deterministically resolves adopter policy into the five bound config files.
  * This function has no filesystem effects and is shared by init bind and Doctor.
@@ -53,7 +62,25 @@ export function resolveAdopterPolicyMaterialization(
     readonly frameworkVersion: string;
   },
   sources?: AdopterPolicyMaterializationSources,
-): ReadonlyMap<(typeof ADOPTER_POLICY_TARGETS)[number], string> {
+): ReadonlyMap<AdopterPolicyTarget, string> {
+  return resolveAdopterPolicyProjection(input, sources).files;
+}
+
+/**
+ * Resolves the bound files together with the owned project.json rows the projection
+ * retires (ADR-CFG-0002), reported as JSON pointers at the ownership-matrix rows.
+ */
+export function resolveAdopterPolicyProjection(
+  input: {
+    readonly policy: unknown;
+    readonly currentProject: unknown;
+    readonly frameworkVersion: string;
+  },
+  sources?: AdopterPolicyMaterializationSources,
+): {
+  readonly files: ReadonlyMap<AdopterPolicyTarget, string>;
+  readonly retired_keys: readonly string[];
+} {
   const validator = sources === undefined ? getValidator : sources.getValidator;
   const readPolicy = sources === undefined ? resolveCanonicalPolicyContent : sources.readPolicy;
   const validatePolicy = validator('adopter-policy.schema.json');
@@ -92,15 +119,13 @@ export function resolveAdopterPolicyMaterialization(
   validateCanonicalPolicyContent('scorecard-na.json', jsonBytes(scorecardNa), validator);
   validateCanonicalPolicyContent('glob-guards.json', jsonBytes(globGuards), validator);
 
-  const projectOverrides = isJsonObject(document['project']) ? { ...document['project'] } : {};
-  if (isJsonObject(document['ci_economy'])) projectOverrides['ci_economy'] = document['ci_economy'];
-  const project = {
-    ...(deepMerge(
-      isJsonObject(input.currentProject) ? input.currentProject : {},
-      projectOverrides,
-    ) as JsonObject),
-    devai_version: input.frameworkVersion,
-  };
+  // Owned rows are replaced as a whole or retired; every other key is an adopter
+  // declaration and survives unchanged (ADR-CFG-0002).
+  const { project, retired_keys: retiredKeys } = projectOwnedProjectConfig({
+    policy: document,
+    currentProject: isJsonObject(input.currentProject) ? input.currentProject : {},
+    frameworkVersion: input.frameworkVersion,
+  });
   const validateProject = validator('project-config.schema.json');
   if (validateProject(project) !== true) {
     throw new Error(`ADOPTER_POLICY_PROJECT_INVALID:${JSON.stringify(validateProject.errors)}`);
@@ -134,7 +159,7 @@ export function resolveAdopterPolicyMaterialization(
     }
     return canonicalJson(parsed) === canonicalJson(value) ? canonical : jsonBytes(value);
   };
-  const resolved = new Map<(typeof ADOPTER_POLICY_TARGETS)[number], string>([
+  const resolved = new Map<AdopterPolicyTarget, string>([
     ['.devai/config/project.json', jsonBytes(project)],
     ['.devai/config/domains.json', unchanged('domains.json', domains)],
     ['.devai/config/thresholds.json', unchanged('thresholds.json', thresholds)],
@@ -147,5 +172,5 @@ export function resolveAdopterPolicyMaterialization(
       unchanged('release-verification.json', releaseVerification),
     );
   }
-  return resolved;
+  return { files: resolved, retired_keys: retiredKeys };
 }
