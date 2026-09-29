@@ -2,7 +2,7 @@
 id: ADR-CHK-0004
 title: Serialize integration through a merge queue gated on the queue candidate
 type: adr
-status: proposed
+status: accepted
 date: 2026-09-28
 authority: Architect
 supersedes: []
@@ -32,9 +32,9 @@ inspector_acceptance:
 
 ## Status
 
-Proposed on 2026-09-28 from the harness convergence brainstorm and its
-independent review. Binds nothing until the Architect sets it to accepted
-before the round that implements it opens. Adds a second validation boundary
+Accepted on 2026-09-29 by the Architect before the round that implements it
+opened; proposed on 2026-09-28 from the harness convergence brainstorm and its
+independent review. Adds a second validation boundary
 at queue admission beside the local preflight of ADR-CHK-0001, which it leaves
 in force as the condition for opening a pull request.
 
