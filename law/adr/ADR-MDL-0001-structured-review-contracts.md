@@ -2,7 +2,7 @@
 id: ADR-MDL-0001
 title: Structured review contracts with consumer-specific schemas and one shared extractor
 type: adr
-status: proposed
+status: accepted
 date: 2026-09-28
 authority: Architect
 supersedes: []
@@ -39,9 +39,9 @@ inspector_acceptance:
 
 ## Status
 
-Proposed on 2026-09-28 from the harness convergence brainstorm and its
-independent review. Binds nothing until the Architect sets it to accepted
-before the round that implements it opens. Replaces the ad hoc reply parsing
+Accepted on 2026-09-29 by the Architect before the round that implements it
+opened; proposed on 2026-09-28 from the harness convergence brainstorm and its
+independent review. Replaces the ad hoc reply parsing
 in the judge sensor, the triage tie-breaker, and the campaign orchestrator
 with two declared schemas and one extractor, and is the Architect disposition
 that the `llm_judge` sensor note requires for a change to its emitter.

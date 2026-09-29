@@ -2,7 +2,7 @@
 id: ADR-MDL-0002
 title: A versioned repository default for model tiers, overridden by reference and pinned at task start
 type: adr
-status: proposed
+status: accepted
 date: 2026-09-28
 authority: Architect
 supersedes: []
@@ -36,9 +36,9 @@ inspector_acceptance:
 
 ## Status
 
-Proposed on 2026-09-28 from the harness convergence brainstorm and its
-independent review. Binds nothing until the Architect sets it to accepted
-before the round that implements it opens. Moves the model tier map from a
+Accepted on 2026-09-29 by the Architect before the round that implements it
+opened; proposed on 2026-09-28 from the harness convergence brainstorm and its
+independent review. Moves the model tier map from a
 required block copied into every campaign to a versioned repository default
 under `law/policy`, with campaign overrides by tier name and resolution
 pinned on each task when it starts.
