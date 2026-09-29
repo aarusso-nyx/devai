@@ -720,7 +720,7 @@
       "id": "R-0303",
       "title": "Authorization registry maintenance",
       "goal": "Recording a forbidden-action authorization receipt is registry maintenance, not a finding, in every inspection the scanner performs; everything else the registry protects stays protected.",
-      "status": "planned",
+      "status": "open",
       "records": ["ADR-GOV-0022"],
       "depends_on": ["R-0301"],
       "attestation_reissue": false,
@@ -746,7 +746,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -785,7 +785,7 @@
               "commit_types": ["law(forbidden-actions)", "docs(adopters)"],
               "prompt": {
                 "path": "prompts/TASK-0331.md",
-                "sha256": null
+                "sha256": "dfe84037ba82ffb40855cdf29a2ec53cd3266e4b827ddbadd871992a9751b1bb"
               },
               "pull_request": null,
               "merged_as": null,
