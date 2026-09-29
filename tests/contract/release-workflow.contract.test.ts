@@ -184,16 +184,20 @@ describe('release workflow job set and graph (ADR-REL-0030)', () => {
 });
 
 describe('control-commit-summary', () => {
-  it('has no environment, no guard, no secret, read-only permissions and no checkout', () => {
+  it('has no environment, no guard, no secret, read-only permissions and only a credential-free sparse checkout of the script', () => {
     const summary = job('control-commit-summary');
     expect(summary.environment).toBeUndefined();
     expect(summary.if).toBeUndefined();
     expect(summary.permissions).toEqual({ contents: 'read' });
     expect(secretsRead('control-commit-summary')).toEqual([]);
     expect(usesGithubToken('control-commit-summary')).toBe(false);
-    expect(
-      (summary.steps ?? []).some((step) => step.uses?.startsWith('actions/checkout') === true),
-    ).toBe(false);
+    const checkouts = (summary.steps ?? []).filter(
+      (step) => step.uses?.startsWith('actions/checkout') === true,
+    );
+    expect(checkouts).toHaveLength(1);
+    const checkout = checkouts[0] as Step;
+    expect(checkout.with?.['persist-credentials']).toBe(false);
+    expect(checkout.with?.['sparse-checkout']).toBe('scripts/process/release-prerequisites.mjs');
   });
 
   it('reads the control commit variable, requires a 40-hex sha and appends it to the step summary', () => {
