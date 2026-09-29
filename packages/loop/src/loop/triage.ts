@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { extractStructuredReply } from '@devai-nyx/schemas';
 import type { SensorReading, SensorFinding } from '@devai-nyx/sensors';
 
 /** Classification enum (schema-conformant, underscored). */
@@ -220,6 +221,7 @@ export interface BreakerClient {
     },
     opts?: {
       readonly response_format_json?: boolean;
+      readonly response_schema?: 'triage-breaker.schema.json';
       readonly temperature?: number;
       readonly max_output_tokens?: number;
     },
@@ -233,6 +235,7 @@ export interface BreakerClient {
       readonly cost_usd: number;
     };
     readonly latency_ms: number;
+    readonly finish_reason: 'stop' | 'length' | 'tool_use' | 'error';
     readonly json?: unknown;
   }>;
 }
@@ -248,19 +251,12 @@ export interface TieBreakLadderOptions extends TieBreakOptions {
   readonly timestamp?: string;
 }
 
-interface BreakerResponse {
-  readonly classification?: string;
-  readonly confidence?: number;
-  readonly rationale?: string;
+/** The triage-breaker.schema.json document, as the extractor returns it validated. */
+interface BreakerVote {
+  readonly classification: TriageClass;
+  readonly confidence: number;
+  readonly rationale: string;
 }
-
-const VALID_CLASSIFICATIONS: ReadonlySet<TriageClass> = new Set([
-  'plant_bug',
-  'sensor_error',
-  'policy_issue',
-  'reference_gap',
-  'inconclusive',
-]);
 
 /**
  * Article-23 cross-family tie-breaker.
@@ -326,38 +322,46 @@ export async function tieBreakWithLadder(opts: TieBreakLadderOptions): Promise<T
   const response = await opts.breakerClient.complete(
     { system, user },
     { caller: 'tieBreakWithLadder' },
-    { response_format_json: true, temperature: 0.0, max_output_tokens: 512 },
+    { temperature: 0.0, max_output_tokens: 512, response_schema: 'triage-breaker.schema.json' },
   );
-  let parsed: BreakerResponse | null = null;
-  if (response.json !== undefined && response.json !== null && typeof response.json === 'object') {
-    parsed = response.json as BreakerResponse;
-  } else {
-    try {
-      parsed = JSON.parse(response.text) as BreakerResponse;
-    } catch {
-      parsed = null;
-    }
+  const generatedAt = opts.timestamp ?? new Date().toISOString();
+  // ADR-MDL-0001: the vote is read through the one shared extractor. An extractor
+  // error escalates to a human (Article 19) and keeps only the reply digest and a
+  // bounded redacted excerpt, never the whole reply.
+  const extracted = extractStructuredReply(response, 'triage-breaker.schema.json');
+  if (!extracted.ok) {
+    const { code, message, excerpt, reply_sha256 } = extracted.error;
+    return {
+      schemaVersion: '1.0.0',
+      id: triageId(opts.first.subject_evidence_ref, 'inconclusive'),
+      generated_at: generatedAt,
+      subject_evidence_ref: opts.first.subject_evidence_ref,
+      classification: 'inconclusive',
+      confidence: { score: 0, method: 'article-23-cross-family-breaker' },
+      summary: `Article-23 breaker reply was rejected (${code}); escalating per Article 19.`,
+      rationale: [
+        `breaker(${opts.breakerClient.family}/${opts.breakerClient.model}) reply rejected: ${code}: ${message.slice(0, 256)}`,
+        `reply_sha256: ${reply_sha256}`,
+        `reply_excerpt: ${excerpt}`,
+        `candidates were ${opts.first.classification} and ${opts.second.classification}.`,
+      ].join(' | '),
+      recommended_route: { discipline: 'harness_review', action: 'escalate_to_human' },
+      tie_breaker_invoked: true,
+      tie_breaker_evidence_refs: [
+        opts.first.subject_evidence_ref,
+        opts.second.subject_evidence_ref,
+      ],
+    };
   }
-  const breakerClass =
-    parsed !== null &&
-    typeof parsed.classification === 'string' &&
-    VALID_CLASSIFICATIONS.has(parsed.classification as TriageClass)
-      ? (parsed.classification as TriageClass)
-      : 'inconclusive';
-  const breakerScore =
-    parsed !== null &&
-    typeof parsed.confidence === 'number' &&
-    parsed.confidence >= 0 &&
-    parsed.confidence <= 1
-      ? parsed.confidence
-      : 0.5;
+  const parsed = extracted.document as unknown as BreakerVote;
+  const breakerClass = parsed.classification;
+  const breakerScore = parsed.confidence;
 
   // The breaker's own classification is now the resolution.
   // - If it matches one of the inputs, that input "wins" (preserving its rationale).
   // - If it doesn't, we return an 'inconclusive' verdict that routes to escalate_to_human.
   const matchesFirst = breakerClass === opts.first.classification;
   const matchesSecond = breakerClass === opts.second.classification;
-  const generatedAt = opts.timestamp ?? new Date().toISOString();
 
   if (matchesFirst || matchesSecond) {
     const winner = matchesFirst ? opts.first : opts.second;
@@ -370,10 +374,7 @@ export async function tieBreakWithLadder(opts: TieBreakLadderOptions): Promise<T
         method: 'article-23-cross-family-breaker',
       },
       summary: winner.summary,
-      rationale:
-        parsed?.rationale !== undefined
-          ? `${winner.rationale ?? ''} | breaker(${opts.breakerClient.family}/${opts.breakerClient.model}): ${parsed.rationale}`
-          : winner.rationale,
+      rationale: `${winner.rationale ?? ''} | breaker(${opts.breakerClient.family}/${opts.breakerClient.model}): ${parsed.rationale}`,
       tie_breaker_invoked: true,
       tie_breaker_evidence_refs: [loser.subject_evidence_ref],
     };
@@ -387,9 +388,7 @@ export async function tieBreakWithLadder(opts: TieBreakLadderOptions): Promise<T
     classification: 'inconclusive',
     confidence: { score: breakerScore, method: 'article-23-cross-family-breaker' },
     summary: `Article-23 breaker disagreed with both candidates (chose ${breakerClass}); escalating per Article 19.`,
-    rationale:
-      parsed?.rationale ??
-      `breaker(${opts.breakerClient.family}/${opts.breakerClient.model}) chose ${breakerClass}; candidates were ${opts.first.classification} and ${opts.second.classification}.`,
+    rationale: parsed.rationale,
     recommended_route: { discipline: 'harness_review', action: 'escalate_to_human' },
     tie_breaker_invoked: true,
     tie_breaker_evidence_refs: [opts.first.subject_evidence_ref, opts.second.subject_evidence_ref],
