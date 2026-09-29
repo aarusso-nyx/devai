@@ -343,7 +343,7 @@
       "id": "R-0302",
       "title": "Owned configuration and host projections",
       "goal": "init bind projects the blocks it owns authoritatively with atomic receipts; AGENTS.md is the canonical instruction contract with CLAUDE.md as its import; adopter guidance survives --force; recipes keep one source with generated projections and converged front matter.",
-      "status": "open",
+      "status": "closing",
       "records": ["ADR-CFG-0002", "ADR-GOV-0020"],
       "depends_on": ["R-0301"],
       "attestation_reissue": false,
@@ -548,7 +548,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -592,8 +592,8 @@
                 "path": "prompts/TASK-0324.md",
                 "sha256": "525df0e9fa9bf1d03abd37be037394cd893e7b879df22f40fbf263abfbf6f55f"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/181",
+              "merged_as": "12d52fa57eff5278806e5b8c5108046da7bd58be",
               "execution": {
                 "tier": "architect",
                 "effort": "high",
@@ -606,7 +606,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0324",
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -654,8 +654,8 @@
                 "path": "prompts/TASK-0325.md",
                 "sha256": "a6dbec1c4194a631de15e8f0e2901cbc87f05353549c7c833a5e916b2c5e826e"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/181",
+              "merged_as": "12d52fa57eff5278806e5b8c5108046da7bd58be",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -668,7 +668,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0325",
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F2", "F3"],
               "boundary": {
                 "paths": [
@@ -707,8 +707,8 @@
                 "path": "prompts/TASK-0326.md",
                 "sha256": "32e3bf3e5d1465fd0f9eb6a5586c54b4eb429c0bd3c7d25ca8f99431d400693e"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/181",
+              "merged_as": "12d52fa57eff5278806e5b8c5108046da7bd58be",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
