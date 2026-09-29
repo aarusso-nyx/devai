@@ -858,7 +858,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0332",
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F2", "F3"],
               "boundary": {
                 "paths": [
@@ -895,7 +895,7 @@
               "commit_types": ["fix(forbidden-actions)", "docs(reference)"],
               "prompt": {
                 "path": "prompts/TASK-0333.md",
-                "sha256": "dc00d35caf5473b574359de9215a46affcd8b446ab33231b0635205ee052d634"
+                "sha256": "3faba4ef1ed9427837cc6286b20d8c6d85cf90a1d0fd0cdada7039b1386dbad5"
               },
               "pull_request": null,
               "merged_as": null,
