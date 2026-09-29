@@ -5,8 +5,8 @@ exactly as they were returned. Each fixture holds the full reply text, bytes
 unchanged, so its SHA-256 is the digest a task's `review.reply_sha256` carries and
 the excerpt an `error` outcome keeps can be checked against it.
 
-| Fixture | Origin | Expected outcome through the shared extractor |
-| ------- | ------ | --------------------------------------------- |
+| Fixture                      | Origin                                                                                      | Expected outcome through the shared extractor                                             |
+| ---------------------------- | ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
 | `cmp-0002-rejected-pass.txt` | OE-05: the PASS reply that the CMP-0002 orchestrator session rejected by parsing it by hand | a `pass` verdict document that validates against `law/schemas/review-verdict.schema.json` |
 
 `cmp-0002-rejected-pass.txt` is not in this directory yet. The maintainer supplies
