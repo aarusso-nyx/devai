@@ -371,7 +371,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "in_progress",
+              "status": "pre_merge",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": ["docs/adopters/install.md", "docs/adopters/ci-economy.md"],
@@ -411,7 +411,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0321",
-              "status": "in_progress",
+              "status": "pre_merge",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -470,7 +470,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0322",
-              "status": "in_progress",
+              "status": "pre_merge",
               "target_substrates": ["F2", "F3"],
               "boundary": {
                 "paths": [
