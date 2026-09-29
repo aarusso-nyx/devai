@@ -2,7 +2,7 @@
 id: ADR-GOV-0021
 title: One reference page per admitted workflow, a generated decision catalogue, and documented recovery paths
 type: adr
-status: proposed
+status: accepted
 date: 2026-09-28
 authority: Architect
 supersedes: []
@@ -40,9 +40,9 @@ inspector_acceptance:
 
 ## Status
 
-Proposed on 2026-09-28 from the harness convergence brainstorm and its
-independent review. Binds nothing until the Architect sets it to accepted
-before the round that implements it opens. Adds a page family and a
+Accepted on 2026-09-29 by the Architect before the round that implements it
+opened; proposed on 2026-09-28 from the harness convergence brainstorm and its
+independent review. Adds a page family and a
 completeness gate to the documentation information architecture, turns the
 decision index into a generated catalogue, and corrects four stale
 statements; it is sequenced last in its campaign so the pages describe the
