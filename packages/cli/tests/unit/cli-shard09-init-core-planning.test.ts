@@ -221,12 +221,17 @@ describe('CLI shard 09 init core planning', () => {
       target_root: string;
       devai_version: string;
       entries: Array<{ path: string; action: string }>;
-      summary: { create: number; overwrite: number; skip: number };
+      summary: { create: number; overwrite: number; replace: number; skip: number };
     };
     expect(plan.target_root).toBe(root);
     expect(plan.devai_version).toBe('9.8.7');
     expect(plan.entries).toHaveLength(15);
-    expect(plan.summary).toEqual({ create: plan.entries.length, overwrite: 0, skip: 0 });
+    expect(plan.summary).toEqual({
+      create: plan.entries.length,
+      overwrite: 0,
+      replace: 0,
+      skip: 0,
+    });
 
     const human = await invoke(initPlan, [
       'init-plan',
@@ -250,11 +255,14 @@ describe('CLI shard 09 init core planning', () => {
     const result = await invoke(initPlan, ['init-plan', '--target', root, '--tier', 'tier2']);
     expect(result.exit, result.stderr).toBe(0);
     const plan = JSON.parse(result.stdout) as {
-      entries: Array<{ path: string; action: 'create' | 'overwrite' | 'skip-exists' }>;
+      entries: Array<{ path: string; action: 'create' | 'overwrite' | 'replace' | 'skip-exists' }>;
       segments: Array<{
         segment: 'owner' | 'architect' | 'harness';
-        entries: Array<{ path: string; action: 'create' | 'overwrite' | 'skip-exists' }>;
-        summary: { create: number; overwrite: number; skip: number };
+        entries: Array<{
+          path: string;
+          action: 'create' | 'overwrite' | 'replace' | 'skip-exists';
+        }>;
+        summary: { create: number; overwrite: number; replace: number; skip: number };
       }>;
     };
     expect(plan.segments.map(({ segment }) => segment)).toEqual(['owner', 'architect', 'harness']);
@@ -265,6 +273,7 @@ describe('CLI shard 09 init core planning', () => {
       expect(summary).toEqual({
         create: entries.filter(({ action }) => action === 'create').length,
         overwrite: entries.filter(({ action }) => action === 'overwrite').length,
+        replace: entries.filter(({ action }) => action === 'replace').length,
         skip: entries.filter(({ action }) => action === 'skip-exists').length,
       });
       for (const { path } of entries) {
