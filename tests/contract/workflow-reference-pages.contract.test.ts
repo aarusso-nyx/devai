@@ -87,6 +87,11 @@ const workflowRule = (report: Awaited<ReturnType<typeof governance>>) =>
     (finding) => finding.ruleId.startsWith('docs-ia.') && /workflow/iu.test(finding.ruleId),
   );
 
+function must<T>(value: T | undefined, message: string): T {
+  if (value === undefined) throw new Error(message);
+  return value;
+}
+
 const text = (finding: { message: string; remediation?: string }) =>
   `${finding.message} ${finding.remediation ?? ''}`;
 
@@ -111,7 +116,9 @@ describe('workflow page-set gate through docs-governance (docs-workflow-page-set
     expect(missing.length).toBeGreaterThan(0);
     const named = missing.find((finding) => text(finding).includes('DOCS_WORKFLOW_PAGE_MISSING'));
     expect(named, 'finding carries DOCS_WORKFLOW_PAGE_MISSING').toBeDefined();
-    expect(text(named!)).toContain('nightly-audit');
+    expect(text(must(named, 'finding carries DOCS_WORKFLOW_PAGE_MISSING'))).toContain(
+      'nightly-audit',
+    );
   });
 
   it.each(workflowStems())('fails when the page for %s is removed', async (stem) => {
@@ -124,7 +131,7 @@ describe('workflow page-set gate through docs-governance (docs-workflow-page-set
         finding.severity === 'fail' && text(finding).includes('DOCS_WORKFLOW_PAGE_MISSING'),
     );
     expect(named, 'finding carries DOCS_WORKFLOW_PAGE_MISSING').toBeDefined();
-    expect(text(named!)).toContain(stem);
+    expect(text(must(named, 'finding carries DOCS_WORKFLOW_PAGE_MISSING'))).toContain(stem);
   });
 
   it('fails an orphan page that has no workflow file', async () => {
