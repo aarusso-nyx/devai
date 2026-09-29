@@ -2239,10 +2239,10 @@
                 ["pnpm", "exec", "vitest", "run", "tests/contract/site-publication-cli.test.ts"],
                 ["pnpm", "run", "test:root"]
               ],
-              "commit_types": ["fix(process)"],
+              "commit_types": ["ci(process)"],
               "prompt": {
                 "path": "prompts/TASK-0366.md",
-                "sha256": "760e77f5a8f58bc55d3915d8f8b81e03fd0df30ed8ada0d1febabc23af557651"
+                "sha256": "8d7427857c6c8295e84473837dba305403684f646504aea7812e8db9cc76d9b3"
               },
               "pull_request": null,
               "merged_as": null,
