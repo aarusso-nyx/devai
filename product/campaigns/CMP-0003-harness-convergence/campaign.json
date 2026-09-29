@@ -548,7 +548,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -590,7 +590,7 @@
               ],
               "prompt": {
                 "path": "prompts/TASK-0324.md",
-                "sha256": null
+                "sha256": "525df0e9fa9bf1d03abd37be037394cd893e7b879df22f40fbf263abfbf6f55f"
               },
               "pull_request": null,
               "merged_as": null,
