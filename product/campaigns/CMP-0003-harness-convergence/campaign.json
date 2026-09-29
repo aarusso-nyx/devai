@@ -724,7 +724,7 @@
       "id": "R-0303",
       "title": "Authorization registry maintenance",
       "goal": "Recording a forbidden-action authorization receipt is registry maintenance, not a finding, in every inspection the scanner performs; everything else the registry protects stays protected.",
-      "status": "open",
+      "status": "closing",
       "records": ["ADR-GOV-0022"],
       "depends_on": ["R-0301"],
       "attestation_reissue": false,
@@ -750,7 +750,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -791,8 +791,8 @@
                 "path": "prompts/TASK-0331.md",
                 "sha256": "dfe84037ba82ffb40855cdf29a2ec53cd3266e4b827ddbadd871992a9751b1bb"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/183",
+              "merged_as": "0a66e13ae4c4230f26d6e2cb7a2ac6017820b3e1",
               "execution": {
                 "tier": "architect",
                 "effort": "high",
@@ -805,7 +805,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0331",
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -844,8 +844,8 @@
                 "path": "prompts/TASK-0332.md",
                 "sha256": "8cd8163e443cd124e98181207d1a66cfee63ba4901a9e2ec4de14e9876ef60a9"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/183",
+              "merged_as": "0a66e13ae4c4230f26d6e2cb7a2ac6017820b3e1",
               "execution": {
                 "tier": "worker",
                 "effort": "high",
@@ -858,7 +858,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0332",
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F2", "F3"],
               "boundary": {
                 "paths": [
@@ -897,8 +897,8 @@
                 "path": "prompts/TASK-0333.md",
                 "sha256": "3faba4ef1ed9427837cc6286b20d8c6d85cf90a1d0fd0cdada7039b1386dbad5"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/183",
+              "merged_as": "0a66e13ae4c4230f26d6e2cb7a2ac6017820b3e1",
               "execution": {
                 "tier": "worker",
                 "effort": "high",
@@ -943,7 +943,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "in_progress",
+              "status": "pre_merge",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -989,7 +989,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0341",
-              "status": "in_progress",
+              "status": "pre_merge",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -1042,7 +1042,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0342",
-              "status": "in_progress",
+              "status": "pre_merge",
               "target_substrates": ["F2", "F3"],
               "boundary": {
                 "paths": [
