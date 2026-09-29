@@ -493,6 +493,8 @@ describe('IA-004: idempotent binding', () => {
     const mutations = [...seam.log];
     disarm();
 
+    // Only the targets are forbidden a write; the receipt may be rewritten as long as
+    // its bytes are unchanged, which bytesOf(PAIR) below pins.
     const targetPaths = new Set(TARGETS.map((path) => join(repo, path)));
     expect(
       mutations.filter((mutation) => mutation.paths.some((path) => targetPaths.has(path))),
@@ -647,6 +649,44 @@ describe('IA-005: stale scorecard-na.json digest', () => {
       [SCORECARD]: sha256(fs.readFileSync(join(repo, SCORECARD))),
     });
     expect((await doctorCheck(repo, 'policy-materialization-current')).ok).toBe(true);
+  });
+
+  it('a rebind of the framework checkout changes only the project.json version stamp and the receipt', () => {
+    // The adoption source declares scorecard_na and glob_guards equal to the law
+    // mirrors, so projecting it over the committed project.json reproduces every
+    // committed target except the devai_version stamp; the receipt is the other change.
+    const checkout = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
+    const receipt = JSON.parse(fs.readFileSync(join(checkout, BINDING), 'utf8')) as JsonObject;
+    const source = JSON.parse(
+      fs.readFileSync(join(checkout, String(receipt['source_path'])), 'utf8'),
+    ) as JsonObject;
+    const committedProject = JSON.parse(
+      fs.readFileSync(join(checkout, PROJECT), 'utf8'),
+    ) as JsonObject;
+    const installed = String(
+      (
+        JSON.parse(
+          fs.readFileSync(join(checkout, 'packages/cli/package.json'), 'utf8'),
+        ) as JsonObject
+      )['version'],
+    );
+
+    const rebound = resolveAdopterPolicyMaterialization({
+      policy: source,
+      currentProject: committedProject,
+      frameworkVersion: installed,
+    });
+
+    expect([...rebound.keys()].sort()).toEqual(
+      Object.keys(receipt['materialized'] as JsonObject).sort(),
+    );
+    for (const [path, bytes] of rebound) {
+      if (path === PROJECT) {
+        expect(JSON.parse(bytes), path).toEqual({ ...committedProject, devai_version: installed });
+      } else {
+        expect(bytes, path).toBe(fs.readFileSync(join(checkout, path), 'utf8'));
+      }
+    }
   });
 
   it('the framework checkout carries a binding whose digests match the committed files (#162 item 4)', () => {

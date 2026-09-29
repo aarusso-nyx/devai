@@ -349,7 +349,9 @@ describe('adopter-safe check and binding contracts', () => {
     expect(JSON.stringify(result.value)).not.toContain('packages/schemas/dist');
   });
 
-  it('binds TEAT documentation fields by deep merge and replays byte-identically', async () => {
+  // ADR-CFG-0002: /docs is an owned row replaced as a whole, so output_dir, which the
+  // source omits, is dropped; the source omits project_type, which keeps its value.
+  it('binds TEAT documentation fields by whole replacement and replays byte-identically', async () => {
     const repo = root();
     await withAuthorityHostTestScope(() =>
       executeBootstrapPlan(buildBootstrapPlan({ targetRoot: repo, version: '1.2.1' })),
@@ -385,15 +387,16 @@ describe('adopter-safe check and binding contracts', () => {
     const first = await invoke(initBind, argv);
     expect(first.exit, first.stderr).toBe(0);
     const firstBytes = readFileSync(projectPath);
-    expect(JSON.parse(firstBytes.toString())).toMatchObject({
+    const bound = JSON.parse(firstBytes.toString()) as Record<string, unknown>;
+    expect(bound).toMatchObject({
       name: 'TEAT',
       feature_flags: { adopter_owned_toggle: true },
-      docs: {
-        builder: 'docusaurus',
-        output_dir: 'site/build',
-        publish_target: 'gh-pages',
-        gh_pages_branch: 'gh-pages',
-      },
+      project_type: project['project_type'],
+    });
+    expect(bound['docs']).toEqual({
+      builder: 'docusaurus',
+      publish_target: 'gh-pages',
+      gh_pages_branch: 'gh-pages',
     });
     const second = await invoke(initBind, argv);
     expect(second.exit, second.stderr).toBe(0);

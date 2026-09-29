@@ -2,7 +2,8 @@
 // Inspector acceptance for ADR-CFG-0002 (owned configuration projection): the
 // adopter-policy bind owns exactly the project.json rows of the ownership matrix
 // documented in docs/adopters/install.md. An owned key absent from the source is
-// retired, an owned key the source declares is replaced as a whole, and every key
+// retired (the schema-required /project_type keeps its current value instead), an
+// owned key the source declares is replaced as a whole, and every key
 // the matrix does not name is an adopter declaration that survives every bind.
 // The 1.4.5 reproduction from issue #68 is IA-001; declaration survival is IA-002.
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -160,32 +161,35 @@ describe('owned projection: absent in the source means absent in project.json', 
 
     expect(result['docs']).toEqual({ builder: 'docusaurus' });
   });
+});
 
-  it('refuses the projection when the source no longer declares /project_type (schema-required)', () => {
-    expect(() =>
-      projected({
-        policy: {
-          schemaVersion: '1.0.0',
-          policy_id: 'fixture.devai-adoption',
-          policy_version: '1.0.0',
-          project: { repo: { kind: 'library' } },
-        },
-        currentProject: project(),
-      }),
-    ).toThrow(/^ADOPTER_POLICY_PROJECT_INVALID:/u);
+describe('owned projection: /project_type is schema-required and keeps its current value', () => {
+  it('keeps the current /project_type when the source project block does not declare it', () => {
+    const result = projected({
+      policy: {
+        schemaVersion: '1.0.0',
+        policy_id: 'fixture.devai-adoption',
+        policy_version: '1.0.0',
+        project: { repo: { kind: 'library' } },
+      },
+      currentProject: project({ project_type: 'runtime-host' }),
+    });
+
+    expect(result['project_type']).toBe('runtime-host');
+    expect(result['repo']).toEqual({ kind: 'library' });
   });
 
-  it('refuses the projection when the source carries no project block at all', () => {
-    expect(() =>
-      projected({
-        policy: {
-          schemaVersion: '1.0.0',
-          policy_id: 'fixture.devai-adoption',
-          policy_version: '1.0.0',
-        },
-        currentProject: project(),
-      }),
-    ).toThrow(/^ADOPTER_POLICY_PROJECT_INVALID:/u);
+  it('keeps the current /project_type when the source carries no project block at all', () => {
+    const result = projected({
+      policy: {
+        schemaVersion: '1.0.0',
+        policy_id: 'fixture.devai-adoption',
+        policy_version: '1.0.0',
+      },
+      currentProject: project({ project_type: 'docs-archive' }),
+    });
+
+    expect(result['project_type']).toBe('docs-archive');
   });
 });
 
@@ -552,24 +556,25 @@ describe('IA-002: adopter declarations outside the matrix survive every bind', (
   });
 });
 
-describe('/project_type is schema-required: a source without it is refused and writes nothing', () => {
-  it('refuses the bind with ADOPTER_POLICY_PROJECT_INVALID and leaves every bound file untouched', async () => {
-    const repo = adopterRepo(project({ repo: { kind: 'library' } }));
+describe('/project_type is schema-required: a source without it keeps the current value', () => {
+  it('binds, keeps /project_type in place, and never reports it as retired', async () => {
+    const repo = adopterRepo(project({ project_type: 'runtime-host', repo: { kind: 'library' } }));
     await expectBound(
       repo,
-      policy({ project: { project_type: 'framework', repo: { kind: 'library' } } }),
+      policy({ project: { project_type: 'runtime-host', repo: { kind: 'library' } } }),
     );
-    const before = snapshot(repo);
 
-    const refused = await bind(repo, {
+    const kept = await expectBound(repo, {
       schemaVersion: '1.0.0',
       policy_id: 'fixture.devai-adoption',
       policy_version: '1.0.1',
       project: { repo: { kind: 'library' } },
     });
 
-    expect(refused.exit).not.toBe(0);
-    expect(refused.stderr).toContain('ADOPTER_POLICY_PROJECT_INVALID');
-    expect(snapshot(repo)).toEqual(before);
+    expect(readJson(repo, PROJECT)).toEqual(
+      project({ project_type: 'runtime-host', repo: { kind: 'library' } }),
+    );
+    expect(retiredKeys(repo)).toEqual([]);
+    expect(kept.output?.['receipt']).toMatchObject({ retired_keys: [] });
   });
 });
