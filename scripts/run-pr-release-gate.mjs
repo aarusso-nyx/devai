@@ -74,21 +74,26 @@ function invoke(args) {
 }
 // Materialize the existing local authority binding through its approved boundary.
 invoke(['init', 'bind', '--target', root, '--as-role', 'architect', '--write']);
-function run(options) {
-  const args = ['check', '--run', '--as-role', 'inspector', '--write', '--base', base];
-  if (options.target === 'affected') args.push('--affected');
-  else {
-    const intentPath = join(root, '.devai/state/pr-bootstrap/release-intent.json');
-    writeFileSync(intentPath, JSON.stringify(options.releaseIntent));
-    args.push(
-      '--release-intent',
-      intentPath,
-      '--release-profile',
-      join(root, 'law/policy/release-verification.json'),
-      '--release-stage',
-      'preflight',
-    );
-  }
+// The affected plan runs once, as the workflow's own `check --affected` step
+// (ADR-CHK-0003); this gate plans only the release profile preflight.
+function runReleasePreflight(releaseIntent) {
+  const intentPath = join(root, '.devai/state/pr-bootstrap/release-intent.json');
+  writeFileSync(intentPath, JSON.stringify(releaseIntent));
+  const args = [
+    'check',
+    '--run',
+    '--as-role',
+    'inspector',
+    '--write',
+    '--base',
+    base,
+    '--release-intent',
+    intentPath,
+    '--release-profile',
+    join(root, 'law/policy/release-verification.json'),
+    '--release-stage',
+    'preflight',
+  ];
   const { report, status } = invoke(args);
   process.stdout.write(
     `${JSON.stringify({ nonAttesting: true, tasks: report.execution, exitCode: report.exitCode })}\n`,
@@ -168,7 +173,7 @@ if (currentVersion === targetVersion) {
   process.exit(1);
 }
 
-if (currentVersion === targetVersion) process.exit(run({ target: 'affected' }));
+if (currentVersion === targetVersion) process.exit(0);
 
 // Release intent derives from the change-class set of the changed paths
 // (ADR-GOV-0017). The law policy declares the class vocabulary and the adopter
@@ -234,15 +239,4 @@ const intent = {
   candidate: { commit: candidateCommit, tree: candidateTree },
   base: { commit: base, tree: baseTree },
 };
-const preflight = run({
-  target: 'release',
-  releaseIntent: intent,
-  releaseProfile: JSON.parse(
-    readFileSync(join(root, 'law/policy/release-verification.json'), 'utf8'),
-  ),
-  releaseStage: 'preflight',
-});
-// Profile preflight establishes the floor; affected selection runs afterwards
-// against the same cache and reuses only exact matching keys.
-const affected = run({ target: 'affected' });
-process.exitCode = preflight || affected;
+process.exitCode = runReleasePreflight(intent);
