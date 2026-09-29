@@ -3,10 +3,10 @@
     "id": "base-up-to-date",
     "class": "extrinsic",
     "probe": { "kind": "git", "check": "base-up-to-date" },
-    "expected": "the candidate contains the freshly fetched base",
+    "expected": "the candidate contains the base named by --base: the freshly fetched origin/main locally, github.event.pull_request.base.sha under pull_request, and github.event.merge_group.base_sha under merge_group",
     "observed": null,
     "status": "pass",
-    "remediation": "Run git fetch origin main, then rebase the candidate onto origin/main and pass --base origin/main.",
+    "remediation": "Locally, run git fetch origin main, rebase the candidate onto origin/main, and pass --base origin/main. In the lane the base comes from the event; a blocked probe under merge_group means the queue base is not an ancestor of the entry, so the entry is evicted and re-enters the queue from a green head instead of being retried.",
     "depends_on": []
   },
   {
