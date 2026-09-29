@@ -699,7 +699,7 @@ describe('ADR-v3 public result and semantic authority', () => {
     ).toEqual(['ADR-014', 'ADR-MUT-0005', 'ADR-REL-0017']);
     expect(records.filter((record) => record.adr_id === 'ADR-014')).toHaveLength(1);
     expect(result.files_scanned).toBe(91);
-    expect(result.subject_authorities).toHaveLength(283);
+    expect(result.subject_authorities).toHaveLength(296);
     expect(result.effective_authorities).toEqual([
       'ADR-014',
       'ADR-AUT-0001',
@@ -721,6 +721,7 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-GOV-0018',
       'ADR-GOV-0019',
       'ADR-GOV-0020',
+      'ADR-GOV-0021',
       'ADR-GOV-0022',
       'ADR-GOV-0023',
       'ADR-MDL-0001',
