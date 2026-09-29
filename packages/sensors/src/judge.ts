@@ -1,3 +1,4 @@
+import { extractStructuredReply } from '@devai-nyx/schemas';
 import {
   buildSensorReading,
   type FindingSeverity,
@@ -25,6 +26,7 @@ export interface JudgeLlmClient {
       readonly max_output_tokens?: number;
       readonly temperature?: number;
       readonly response_format_json?: boolean;
+      readonly response_schema?: 'review-verdict.schema.json';
     },
   ): Promise<{
     readonly text: string;
@@ -55,18 +57,19 @@ export interface JudgeOptions {
   readonly stack_sha256?: string;
 }
 
-interface JudgeStructuredResponse {
-  readonly verdict?: string;
-  readonly confidence?: number;
-  readonly rationale?: string;
+/** The review-verdict.schema.json document, as the extractor returns it validated. */
+interface ReviewVerdict {
+  readonly verdict: 'pass' | 'review' | 'fail' | 'unknown';
+  readonly confidence: number;
+  readonly rationale: string;
   readonly findings?: ReadonlyArray<{
-    readonly severity?: string;
-    readonly code?: string;
-    readonly message?: string;
+    readonly severity: FindingSeverity;
+    readonly code: string;
+    readonly message: string;
+    readonly file?: string;
+    readonly line?: number;
   }>;
 }
-
-const VALID_VERDICTS = new Set(['pass', 'review', 'fail', 'unknown']);
 
 /**
  * Soft-gate LLM evaluator with an LLM-backed
@@ -109,21 +112,14 @@ export async function senseJudge(
     (meta as Record<string, unknown>).stack_sha256 = opts.stack_sha256;
   }
   const response = await client.complete({ system, user: opts.evidence }, meta, {
-    response_format_json: true,
     temperature: 0.0,
+    response_schema: 'review-verdict.schema.json',
   });
-  // Parse the structured response.
-  let parsed: JudgeStructuredResponse | null = null;
-  if (response.json !== undefined && response.json !== null && typeof response.json === 'object') {
-    parsed = response.json as JudgeStructuredResponse;
-  } else {
-    try {
-      parsed = JSON.parse(response.text) as JudgeStructuredResponse;
-    } catch {
-      parsed = null;
-    }
-  }
-  if (parsed === null) {
+  // ADR-MDL-0001: one shared extractor, validated against review-verdict.schema.json.
+  // A failure is an error reading with a bounded redacted excerpt and the reply digest;
+  // `unknown` is only the model's explicit uncertainty, never a parse fallback.
+  const extracted = extractStructuredReply(response, 'review-verdict.schema.json');
+  if (!extracted.ok) {
     return buildSensorReading({
       sensorName: `judge.${opts.aspect}`,
       sensorKind: 'llm_judge',
@@ -136,7 +132,7 @@ export async function senseJudge(
         {
           severity: 'critical',
           code: 'judge_invalid_response',
-          message: 'LLM response did not parse as JSON',
+          message: `LLM reply rejected (${extracted.error.code}): ${extracted.error.message}`,
         },
       ],
       metrics: {
@@ -144,31 +140,24 @@ export async function senseJudge(
         input_tokens: response.usage.input_tokens,
         output_tokens: response.usage.output_tokens,
         cost_usd: response.usage.cost_usd,
+        latency_ms: response.latency_ms,
+        reply_sha256: extracted.error.reply_sha256,
+        reply_excerpt: extracted.error.excerpt,
       },
     });
   }
-  const verdict =
-    typeof parsed.verdict === 'string' && VALID_VERDICTS.has(parsed.verdict)
-      ? (parsed.verdict as 'pass' | 'review' | 'fail' | 'unknown')
-      : 'unknown';
-  const findings: SensorFinding[] = (parsed.findings ?? [])
-    .filter(
-      (f): f is { severity?: string; code: string; message: string } =>
-        typeof f.code === 'string' && typeof f.message === 'string',
-    )
-    .map((f) => {
-      const severity: FindingSeverity =
-        f.severity === 'critical' ||
-        f.severity === 'error' ||
-        f.severity === 'warning' ||
-        f.severity === 'info'
-          ? f.severity
-          : 'info';
-      return { severity, code: f.code, message: f.message };
-    });
-  if (typeof parsed.rationale === 'string' && parsed.rationale.length > 0) {
-    findings.unshift({ severity: 'info', code: 'rationale', message: parsed.rationale });
-  }
+  const parsed = extracted.document as unknown as ReviewVerdict;
+  const verdict = parsed.verdict;
+  const findings: SensorFinding[] = [
+    { severity: 'info', code: 'rationale', message: parsed.rationale },
+    ...(parsed.findings ?? []).map((f) => ({
+      severity: f.severity,
+      code: f.code,
+      message: f.message,
+      ...(f.file !== undefined && { file: f.file }),
+      ...(f.line !== undefined && { line: f.line }),
+    })),
+  ];
   return buildSensorReading({
     sensorName: `judge.${opts.aspect}`,
     sensorKind: 'llm_judge',
@@ -180,7 +169,7 @@ export async function senseJudge(
     findings,
     metrics: {
       aspect_label: opts.aspect,
-      confidence: typeof parsed.confidence === 'number' ? parsed.confidence : 0,
+      confidence: parsed.confidence,
       input_tokens: response.usage.input_tokens,
       output_tokens: response.usage.output_tokens,
       cost_usd: response.usage.cost_usd,
