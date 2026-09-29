@@ -1745,7 +1745,7 @@
       "id": "R-0306",
       "title": "Release approval topology and Pages re-runs",
       "goal": "A rehearsal stops twice and a publication twice, from a complete job and credential matrix, with the exact Owner authorization untouched; a site-only re-run resumes its own submitted or verified record and an unknown submission stays closed with a documented recovery path.",
-      "status": "planned",
+      "status": "open",
       "records": ["ADR-REL-0030", "ADR-REL-0032"],
       "depends_on": ["R-0304"],
       "attestation_reissue": false,
@@ -1773,7 +1773,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -1811,14 +1811,53 @@
               "commit_types": ["docs(operations)", "law(credentials)"],
               "prompt": {
                 "path": "prompts/TASK-0361.md",
-                "sha256": null
+                "sha256": "eddfcdce16ebd895b2ef41020fd146e99fb1c6e7553de1cad037e46d07314f3a"
               },
               "pull_request": null,
               "merged_as": null,
               "execution": {
                 "tier": "architect",
                 "effort": "high",
-                "time_budget_minutes": 90
+                "time_budget_minutes": 90,
+                "resolved": {
+                  "policy_version": "1.0.0",
+                  "pinned_at": "2026-09-29T18:41:04Z",
+                  "tiers": {
+                    "architect": {
+                      "rank": 1,
+                      "hosts": {
+                        "claude": "claude-cli:fable",
+                        "codex": "codex-cli:gpt-6-astra"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker-high": {
+                      "rank": 2,
+                      "hosts": {
+                        "claude": "claude-cli:opus",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker": {
+                      "rank": 3,
+                      "hosts": {
+                        "claude": "claude-cli:sonnet",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "medium"
+                    },
+                    "clerk": {
+                      "rank": 4,
+                      "hosts": {
+                        "claude": "claude-cli:haiku",
+                        "codex": "codex-cli:gpt-6-luna"
+                      },
+                      "default_effort": "low"
+                    }
+                  },
+                  "ceiling": "architect"
+                }
               }
             },
             {
@@ -1827,7 +1866,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0361",
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -1861,14 +1900,53 @@
               "commit_types": ["test(workflows)"],
               "prompt": {
                 "path": "prompts/TASK-0362.md",
-                "sha256": null
+                "sha256": "0fb7a402de05cf1ce90cce33ecfcea0c5fc2619ef9aa3d0718e81ac56d08e7c8"
               },
               "pull_request": null,
               "merged_as": null,
               "execution": {
                 "tier": "worker",
                 "effort": "high",
-                "time_budget_minutes": 90
+                "time_budget_minutes": 90,
+                "resolved": {
+                  "policy_version": "1.0.0",
+                  "pinned_at": "2026-09-29T18:41:06Z",
+                  "tiers": {
+                    "architect": {
+                      "rank": 1,
+                      "hosts": {
+                        "claude": "claude-cli:fable",
+                        "codex": "codex-cli:gpt-6-astra"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker-high": {
+                      "rank": 2,
+                      "hosts": {
+                        "claude": "claude-cli:opus",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker": {
+                      "rank": 3,
+                      "hosts": {
+                        "claude": "claude-cli:sonnet",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "medium"
+                    },
+                    "clerk": {
+                      "rank": 4,
+                      "hosts": {
+                        "claude": "claude-cli:haiku",
+                        "codex": "codex-cli:gpt-6-luna"
+                      },
+                      "default_effort": "low"
+                    }
+                  },
+                  "ceiling": "architect"
+                }
               }
             },
             {
