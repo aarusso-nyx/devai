@@ -2,7 +2,7 @@
 id: ADR-CHK-0003
 title: Select a planning lane from the change taxonomy and validate plans semantically
 type: adr
-status: proposed
+status: accepted
 date: 2026-09-28
 authority: Architect
 supersedes: []
@@ -38,10 +38,10 @@ inspector_acceptance:
 
 ## Status
 
-Proposed on 2026-09-28 from the harness convergence brainstorm and its
-independent review. Binds nothing until the Architect sets it to accepted
-before the round that implements it opens. Narrows the lane plan-class
-changes take, adds the two checks they need, and accepts the campaign policy.
+Accepted on 2026-09-29 by the Architect, opening round R-0301 of campaign
+CMP-0003; proposed on 2026-09-28 from the harness convergence brainstorm and
+its independent review. Narrows the lane plan-class changes take, adds the
+two checks they need, and accepts the campaign policy.
 
 ## Context
 
