@@ -20,8 +20,7 @@
     "constraints",
     "owner_effects",
     "prompts",
-    "rounds",
-    "models"
+    "rounds"
   ],
   "properties": {
     "schemaVersion": {
@@ -138,6 +137,18 @@
         }
       }
     },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode"],
+      "description": "Which of the four review steps of law/policy/campaign-execution.json gates.review the campaign delegates to a model (ADR-GOV-0023). Absent, the campaign resolves to human. Gate ratification, merge, and dispatch of any remote effect are human in every mode.",
+      "properties": {
+        "mode": {
+          "enum": ["human", "model-advisory"],
+          "description": "human: no step is delegated and no task carries a review block. model-advisory: model evaluation of the task pull request runs inside the human-initiated orchestrator session, by a model instance distinct from the working agent, and the orchestrator records its advisory verdict on the task before the human ratifies the gate; the verdict never satisfies a gate, merges, or authorizes an effect."
+        }
+      }
+    },
     "disposition": {
       "type": "string",
       "minLength": 1,
@@ -153,8 +164,8 @@
     "models": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["schemaVersion", "hosts", "tiers", "escalation"],
-      "description": "Evolvable model map. Tiers are the only names prompts and tasks use; the host models behind a tier change here without touching any prompt.",
+      "required": ["schemaVersion", "tiers"],
+      "description": "Optional override of the repository default in law/policy/model-tiers.json, by tier name (ADR-MDL-0002). A tier the block does not name resolves to the default; an unknown tier name, an effort outside the tier grammar, or a host the default does not declare fails closed at the campaign check. A campaign never introduces a host. A closed campaign keeps its block byte-for-byte as evidence. Tiers are the only names prompts and tasks use; the host models behind a tier change in the default, not in a prompt.",
       "properties": {
         "schemaVersion": {
           "const": "1.0.0"
@@ -165,7 +176,8 @@
           "uniqueItems": true,
           "items": {
             "enum": ["claude", "codex"]
-          }
+          },
+          "description": "The hosts the campaign runs on; a subset of the hosts law/policy/model-tiers.json declares."
         },
         "tiers": {
           "type": "object",
@@ -175,22 +187,21 @@
             "^[a-z][a-z0-9-]*$": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["rank", "claude", "codex", "default_effort", "use_for"],
               "properties": {
                 "rank": {
                   "type": "integer",
                   "minimum": 1,
-                  "description": "1 is the highest capability. Escalation moves to a lower rank number."
+                  "description": "1 is the highest capability. Escalation moves to a lower rank number. When present it must equal the rank of the same tier in the default."
                 },
                 "claude": {
                   "type": "string",
                   "minLength": 1,
-                  "description": "Claude model name and version, for example Opus 5.5."
+                  "description": "The Claude alias for this tier, one that law/policy/model-tiers.json declares for the claude host, for example fable. Ledgers written before the default existed carry a display name; a closed ledger is never edited."
                 },
                 "codex": {
                   "type": "string",
                   "minLength": 1,
-                  "description": "Codex model name and version, for example Sol 6."
+                  "description": "The Codex alias for this tier, one that law/policy/model-tiers.json declares for the codex host, for example gpt-6-astra. Ledgers written before the default existed carry a display name; a closed ledger is never edited."
                 },
                 "default_effort": {
                   "enum": ["low", "medium", "high", "max"]
@@ -199,7 +210,8 @@
                   "type": "string",
                   "minLength": 1
                 }
-              }
+              },
+              "minProperties": 1
             }
           }
         },
@@ -223,7 +235,8 @@
             "authority": {
               "const": "orchestrator"
             }
-          }
+          },
+          "description": "Optional; absent, the default escalation rule applies. When present, the ceiling must be a tier the merged map declares."
         }
       }
     }
@@ -263,6 +276,23 @@
     "adr_reference": {
       "type": "string",
       "pattern": "^ADR-[A-Z][A-Z0-9]{1,15}(?:-[A-Z][A-Z0-9]{1,15})*-[0-9]{4}$"
+    },
+    "tier_name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "host_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "runtime_model_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*:[a-z][a-z0-9._-]*$",
+      "description": "The registry id form the executor code enforces: the runtime id from law/policy/model-runtime-registry.json, a colon, and the host model alias, for example claude-cli:fable or codex-cli:gpt-6-astra."
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
     },
     "relativePath": {
       "type": "string",
@@ -599,7 +629,7 @@
             "tier": {
               "type": "string",
               "pattern": "^[a-z][a-z0-9-]*$",
-              "description": "A tier name declared in models.tiers."
+              "description": "A tier name declared in law/policy/model-tiers.json or in models.tiers of this campaign."
             },
             "effort": {
               "enum": ["low", "medium", "high", "max"]
@@ -608,6 +638,108 @@
               "type": "integer",
               "minimum": 5,
               "description": "Soft budget after which the worker reports partial progress instead of continuing."
+            },
+            "resolved": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["policy_version", "pinned_at", "tiers", "ceiling"],
+              "description": "The tier map this task resolved at task_start: the default of law/policy/model-tiers.json merged with the campaign override, every alias in the runtime:model registry id form, with the default policy_version (ADR-MDL-0002). Absent until the task starts. A later change to the default or to the override never reinterprets this task; Article 19 escalation climbs this map.",
+              "properties": {
+                "policy_version": {
+                  "type": "string",
+                  "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+                  "description": "The policy_version of law/policy/model-tiers.json the map was resolved from."
+                },
+                "pinned_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "tiers": {
+                  "type": "object",
+                  "minProperties": 1,
+                  "additionalProperties": false,
+                  "propertyNames": {
+                    "$ref": "#/$defs/tier_name"
+                  },
+                  "patternProperties": {
+                    "^[a-z][a-z0-9-]*$": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["rank", "hosts", "default_effort"],
+                      "properties": {
+                        "rank": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "hosts": {
+                          "type": "object",
+                          "minProperties": 1,
+                          "additionalProperties": false,
+                          "propertyNames": {
+                            "$ref": "#/$defs/host_id"
+                          },
+                          "patternProperties": {
+                            "^[a-z][a-z0-9-]*$": {
+                              "$ref": "#/$defs/runtime_model_id"
+                            }
+                          },
+                          "description": "One resolved registry id per host, keyed by host id."
+                        },
+                        "default_effort": {
+                          "enum": ["low", "medium", "high", "max"]
+                        }
+                      }
+                    }
+                  }
+                },
+                "ceiling": {
+                  "$ref": "#/$defs/tier_name",
+                  "description": "The escalation ceiling of the pinned map."
+                }
+              }
+            }
+          }
+        },
+        "review": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["verdict", "reply_sha256", "evaluator", "recorded_at"],
+          "description": "Present only when the campaign review.mode is model-advisory: the advisory verdict the orchestrator recorded before the human ratified the gate (ADR-GOV-0023). Under model-advisory a task in pre_merge without this block, with a verdict that fails law/schemas/review-verdict.schema.json, or with a digest that does not match the reply cannot transition to merged. The block is advice to the ratifying human; it never satisfies a gate, merges, or authorizes an effect, and the ledger still shows a human actor on the gate, the merge, and every remote effect.",
+          "properties": {
+            "verdict": {
+              "type": "object",
+              "required": ["verdict"],
+              "description": "The verdict document extracted from the evaluator reply through the shared extractor, in the shape law/schemas/review-verdict.schema.json (ADR-MDL-0001) declares; the campaign check validates it against that schema. Only the verdict member is restated here.",
+              "properties": {
+                "verdict": {
+                  "enum": ["pass", "review", "fail", "unknown"]
+                },
+                "confidence": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "rationale": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "findings": {
+                  "type": "array"
+                }
+              }
+            },
+            "reply_sha256": {
+              "$ref": "#/$defs/sha256",
+              "description": "SHA-256 of the full reply bytes the verdict was extracted from."
+            },
+            "evaluator": {
+              "$ref": "#/$defs/runtime_model_id",
+              "description": "The model instance that produced the verdict, distinct from the working agent of the task as Constitution Article 18 requires."
+            },
+            "recorded_at": {
+              "type": "string",
+              "format": "date-time",
+              "description": "When the orchestrator recorded the verdict; before the human ratified the gate."
             }
           }
         }
@@ -638,6 +770,9 @@
       "owner_effects": [],
       "prompts": {
         "preamble": "prompts/preamble.md"
+      },
+      "review": {
+        "mode": "human"
       },
       "rounds": [
         {

@@ -1,0 +1,263 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/model-tiers.schema.json",
+  "title": "Model tier defaults",
+  "description": "Contract for law/policy/model-tiers.json, the repository default of the campaign models block under ADR-MDL-0002. The document declares the hosts a campaign may run on, each with the runtime bridge from law/policy/model-runtime-registry.json it resolves through and the model aliases that host publishes; the tiers with their rank, one alias per declared host keyed by host id, a default effort, and a use_for text; the Article 19 escalation rule; and a policy_version. A campaign overrides the default by tier name only and never introduces a host. The resolved map is pinned on each task at task_start together with policy_version, so a later change to this document never reinterprets a started task. The default is law and changes only through a law commit that bumps policy_version.",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "id",
+    "status",
+    "authority",
+    "policy_version",
+    "description",
+    "alias_verification",
+    "hosts",
+    "tiers",
+    "escalation",
+    "resolution"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "../schemas/model-tiers.schema.json"
+    },
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "id": {
+      "const": "model-tiers"
+    },
+    "status": {
+      "const": "active"
+    },
+    "authority": {
+      "const": "Architect"
+    },
+    "policy_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "Bumped by every change to a host, an alias, a tier, or the escalation rule. Pinned on each task at task_start."
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human text; it documents, among other things, the collision between the tier named architect and the discipline named architect."
+    },
+    "alias_verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["verified_on", "source", "reverify"],
+      "properties": {
+        "verified_on": {
+          "type": "string",
+          "format": "date"
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reverify": {
+          "const": "round-open"
+        }
+      }
+    },
+    "hosts": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "propertyNames": {
+        "$ref": "#/$defs/host_id"
+      },
+      "patternProperties": {
+        "^[a-z][a-z0-9-]*$": {
+          "$ref": "#/$defs/host"
+        }
+      },
+      "description": "Every host a campaign task may run on, keyed by host id. A campaign cannot introduce a host; host admission is a registry and credential decision."
+    },
+    "tiers": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "propertyNames": {
+        "$ref": "#/$defs/tier_name"
+      },
+      "patternProperties": {
+        "^[a-z][a-z0-9-]*$": {
+          "$ref": "#/$defs/tier"
+        }
+      },
+      "description": "The tiers, keyed by tier name. Tier names are the only model names prompts and tasks use."
+    },
+    "escalation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["trigger", "step", "ceiling", "authority"],
+      "properties": {
+        "trigger": {
+          "type": "string",
+          "minLength": 1
+        },
+        "step": {
+          "const": "one-rank-up"
+        },
+        "ceiling": {
+          "$ref": "#/$defs/tier_name",
+          "description": "Tier name past which no escalation happens. Must be a declared tier."
+        },
+        "authority": {
+          "const": "orchestrator"
+        }
+      }
+    },
+    "resolution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pinned_at", "id_form", "override", "registry"],
+      "properties": {
+        "pinned_at": {
+          "const": "task_start"
+        },
+        "id_form": {
+          "const": "runtime:model",
+          "description": "The registry id form of a resolved entry: the runtime id from law/policy/model-runtime-registry.json, a colon, and the host alias, for example claude-cli:fable."
+        },
+        "override": {
+          "type": "string",
+          "minLength": 1
+        },
+        "registry": {
+          "const": "law/policy/model-runtime-registry.json"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "host_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "tier_name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "model_alias": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9._-]*$",
+      "description": "A model alias the host publishes, as the host CLI accepts it."
+    },
+    "effort": {
+      "enum": ["low", "medium", "high", "max"],
+      "description": "The tier effort grammar. An effort outside it fails closed."
+    },
+    "host": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runtime", "aliases"],
+      "properties": {
+        "runtime": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "description": "The id of the runtime bridge in law/policy/model-runtime-registry.json this host resolves through. It must exist there and its family must match the host."
+        },
+        "aliases": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/model_alias"
+          },
+          "description": "The aliases this host publishes. Every tier entry for the host names one of them."
+        }
+      }
+    },
+    "tier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rank", "hosts", "default_effort", "use_for"],
+      "properties": {
+        "rank": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "1 is the highest capability. Escalation moves to a lower rank number. Ranks are unique across tiers."
+        },
+        "hosts": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": false,
+          "propertyNames": {
+            "$ref": "#/$defs/host_id"
+          },
+          "patternProperties": {
+            "^[a-z][a-z0-9-]*$": {
+              "$ref": "#/$defs/model_alias"
+            }
+          },
+          "description": "One alias per declared host, keyed by host id. Every declared host appears, and every alias is one the host declares."
+        },
+        "default_effort": {
+          "$ref": "#/$defs/effort"
+        },
+        "use_for": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "$schema": "../schemas/model-tiers.schema.json",
+      "schemaVersion": "1.0.0",
+      "id": "model-tiers",
+      "status": "active",
+      "authority": "Architect",
+      "policy_version": "1.0.0",
+      "description": "Example default with one host and two tiers.",
+      "alias_verification": {
+        "verified_on": "2026-09-28",
+        "source": "host documentation",
+        "reverify": "round-open"
+      },
+      "hosts": {
+        "claude": {
+          "runtime": "claude-cli",
+          "aliases": ["fable", "sonnet"]
+        }
+      },
+      "tiers": {
+        "architect": {
+          "rank": 1,
+          "hosts": {
+            "claude": "fable"
+          },
+          "default_effort": "high",
+          "use_for": "contracts and orchestration"
+        },
+        "worker": {
+          "rank": 2,
+          "hosts": {
+            "claude": "sonnet"
+          },
+          "default_effort": "medium",
+          "use_for": "bounded changes"
+        }
+      },
+      "escalation": {
+        "trigger": "one failed iteration or a blocked task",
+        "step": "one-rank-up",
+        "ceiling": "architect",
+        "authority": "orchestrator"
+      },
+      "resolution": {
+        "pinned_at": "task_start",
+        "id_form": "runtime:model",
+        "override": "a campaign overrides by tier name; a tier it does not name resolves to this default",
+        "registry": "law/policy/model-runtime-registry.json"
+      }
+    }
+  ]
+}
