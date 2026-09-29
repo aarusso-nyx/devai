@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from '@devai-nyx/authority';
+import { existsSync, readdirSync, readFileSync } from '@devai-nyx/authority';
 import { join } from 'node:path';
 import type { GovernanceFinding, Builder } from './docs-governance-config-checks.js';
 
@@ -257,5 +257,56 @@ export function checkDocsIaDashboardCurrent(
     ruleId: 'docs-ia.dashboard-current',
     severity: 'pass',
     message: 'Dashboards current (or absent)',
+  };
+}
+
+/**
+ * Rule docs-ia.workflow-page-set (ADR-GOV-0021) — every file under .github/workflows/ has one
+ * reference page docs/dev/operations/workflows/<stem>.md and every page (README.md is the index)
+ * has its workflow file. Repositories without either directory are out of scope.
+ */
+export function checkDocsIaWorkflowPageSet(repoRoot: string): GovernanceFinding {
+  const ruleId = 'docs-ia.workflow-page-set';
+  const workflowsDir = join(repoRoot, '.github/workflows');
+  const pagesDir = join(repoRoot, 'docs/dev/operations/workflows');
+  if (!existsSync(workflowsDir) && !existsSync(pagesDir)) {
+    return { ruleId, severity: 'pass', message: 'Skipped — no workflows or workflow pages' };
+  }
+  const stems = (dir: string, pattern: RegExp): string[] =>
+    existsSync(dir)
+      ? readdirSync(dir)
+          .filter((name) => pattern.test(name) && name !== 'README.md')
+          .map((name) => name.replace(pattern, ''))
+          .sort()
+      : [];
+  const workflows = stems(workflowsDir, /\.ya?ml$/u);
+  const pages = stems(pagesDir, /\.md$/u);
+  const problems = [
+    ...workflows
+      .filter((stem) => !pages.includes(stem))
+      .map(
+        (stem) =>
+          `DOCS_WORKFLOW_PAGE_MISSING: .github/workflows/${stem} has no page docs/dev/operations/workflows/${stem}.md`,
+      ),
+    ...pages
+      .filter((stem) => !workflows.includes(stem))
+      .map(
+        (stem) =>
+          `DOCS_WORKFLOW_PAGE_MISSING: docs/dev/operations/workflows/${stem}.md has no workflow file .github/workflows/${stem}.yml`,
+      ),
+  ];
+  if (problems.length > 0) {
+    return {
+      ruleId,
+      severity: 'fail',
+      message: problems.join('; '),
+      remediation:
+        'Add or remove the page docs/dev/operations/workflows/<stem>.md so it pairs one to one with .github/workflows/<stem>.yml.',
+    };
+  }
+  return {
+    ruleId,
+    severity: 'pass',
+    message: `Workflow page set complete (${workflows.length} workflows)`,
   };
 }

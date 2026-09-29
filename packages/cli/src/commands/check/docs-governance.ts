@@ -24,6 +24,7 @@ import {
   checkDocsIaSidebarCurated,
   checkDocsIaFrameworkMetaSplit,
   checkDocsIaDashboardCurrent,
+  checkDocsIaWorkflowPageSet,
 } from './docs-governance-ia-checks.js';
 export type {
   GovernanceFinding,
@@ -51,6 +52,7 @@ export function checkDocsGovernance(opts: CheckDocsGovernanceOptions = {}): Docs
   const ruleIa3 = checkDocsIaSidebarCurated(repoRoot, rule2.builder);
   const ruleIa4 = checkDocsIaFrameworkMetaSplit(repoRoot, rule2.builder);
   const ruleIa5 = checkDocsIaDashboardCurrent(repoRoot, rule2.builder);
+  const ruleIa6 = checkDocsIaWorkflowPageSet(repoRoot);
 
   const allFindings: GovernanceFinding[] = [
     rule1.finding,
@@ -67,6 +69,7 @@ export function checkDocsGovernance(opts: CheckDocsGovernanceOptions = {}): Docs
     ruleIa3,
     ruleIa4,
     ruleIa5,
+    ruleIa6,
   ];
 
   const failCount = allFindings.filter((f) => f.severity === 'fail').length;
