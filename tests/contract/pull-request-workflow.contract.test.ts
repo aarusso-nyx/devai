@@ -1,8 +1,9 @@
 // ADR-CHK-0003, Inspector Adversarial Acceptance IA-001 and IA-002 (workflow
 // side): the pull-request workflow restores the check-runner bootstrap from a
 // cache keyed by the digest of the TypeScript inputs it compiles, compiles
-// only on a cache miss, runs the affected plan once, and carries no path
-// filter a candidate could edit to suppress checks.
+// only on a cache miss, runs the affected plan in one step (never from the
+// release gate script), and carries no path filter a candidate could edit to
+// suppress checks.
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -15,7 +16,7 @@ const PINNED_CACHE_ACTION = /^actions\/cache(?:\/restore)?@[0-9a-f]{40}$/u;
 const BOOTSTRAP_COMPILE = /\brelease:bootstrap\b|scripts\/process\/bootstrap-check-runner\.mjs/u;
 const BOOTSTRAP_CLI = /pr-bootstrap\/cli\/bin\.js/u;
 const AFFECTED_CHECK = /(?:pr-bootstrap\/cli\/bin\.js|\bdevai)\s+check\b[^\n;&|]*\s--affected\b/gu;
-const PR_GATE = /\brelease:pr-gate\b|scripts\/run-pr-release-gate\.mjs/gu;
+const GATE_SCRIPT = join(ROOT, 'scripts/run-pr-release-gate.mjs');
 
 type Step = Readonly<{
   name?: string;
@@ -88,7 +89,7 @@ describe('pull-request workflow shape (ADR-CHK-0003)', () => {
     const compiling = steps.filter((step) => BOOTSTRAP_COMPILE.test(step.run ?? ''));
     expect(compiling, 'a step compiles the bootstrap').not.toEqual([]);
     const hitOutput = new RegExp(
-      `steps\\.${String(cacheId).replace(/[.*+?^${}()|[\]\\-]/gu, '\\$&')}\\.outputs\\.cache-hit`,
+      `steps\\.${String(cacheId).replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')}\\.outputs\\.cache-hit`,
       'u',
     );
     for (const step of compiling) {
@@ -98,14 +99,22 @@ describe('pull-request workflow shape (ADR-CHK-0003)', () => {
     }
   });
 
-  it('runs the affected plan exactly once', () => {
-    const invocations = steps.flatMap((step) => {
-      const run = step.run ?? '';
-      return [...run.matchAll(PR_GATE), ...run.matchAll(AFFECTED_CHECK)].map((match) => match[0]);
-    });
-    expect(invocations, 'affected invocations: release:pr-gate or check --affected').toHaveLength(
-      1,
-    );
+  it('runs the affected plan in exactly one workflow step', () => {
+    const affected = steps.filter((step) => [...(step.run ?? '').matchAll(AFFECTED_CHECK)].length);
+    expect(
+      affected.map((step) => step.name ?? step.id ?? ''),
+      'workflow steps that run check --affected',
+    ).toHaveLength(1);
+    expect([...(affected[0]?.run ?? '').matchAll(AFFECTED_CHECK)]).toHaveLength(1);
+  });
+
+  it('leaves the affected plan out of the pull-request release gate script', () => {
+    // The gate stays in the workflow for the commit range, the bump floor, and
+    // the release-profile preflight; only its code, not its comments, is read.
+    const code = readFileSync(GATE_SCRIPT, 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//gu, '')
+      .replace(/^\s*\/\/.*$/gmu, '');
+    expect(code, 'the gate script invokes no --affected plan').not.toMatch(/--affected\b/u);
   });
 
   it('still runs the preflight probes', () => {
