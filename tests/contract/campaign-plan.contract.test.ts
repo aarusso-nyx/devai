@@ -302,6 +302,47 @@ describe('campaign plan contract', () => {
     );
   });
 
+  // ADR-MDL-0002: closed ledgers keep their display-name models block and validate unchanged.
+  it.each(['CMP-0001-workflow-economy', 'CMP-0002-self-scorecard'])(
+    'validates closed campaign %s unchanged',
+    (name) => {
+      const result = checkCampaign(root, join(root, 'product/campaigns', name));
+      expect(result.problems).toEqual([]);
+      expect(result.ok).toBe(true);
+    },
+  );
+
+  // EXPECTED-RED until TASK-0353: a started task carries its pinned tier map.
+  it('refuses a started task that carries no pinned resolution', () => {
+    const dir = copyCampaign(join(root, 'product/campaigns/CMP-0003-harness-convergence'));
+    mutatePlan(dir, (plan) => {
+      const task = plan.rounds
+        .flatMap((round) => round.waves.flatMap((wave) => wave.tasks))
+        .find((candidate) => candidate.status === 'in_progress');
+      if (task === undefined) throw new Error('fixture in_progress task missing');
+      delete (task as unknown as { execution: { resolved?: unknown } }).execution.resolved;
+    });
+    const result = checkCampaign(root, dir);
+    expect(result.ok).toBe(false);
+    expect(result.problems.join('\n')).toContain('resolution-not-pinned');
+  });
+
+  // EXPECTED-RED until TASK-0353: under model-advisory a pre_merge task needs a verdict.
+  it('refuses a pre_merge task under model-advisory without a recorded review', () => {
+    const dir = copyCampaign(join(root, 'product/campaigns/CMP-0003-harness-convergence'));
+    mutatePlan(dir, (plan) => {
+      (plan as unknown as { review: unknown }).review = { mode: 'model-advisory' };
+      const task = plan.rounds
+        .flatMap((round) => round.waves.flatMap((wave) => wave.tasks))
+        .find((candidate) => candidate.status === 'in_progress');
+      if (task === undefined) throw new Error('fixture in_progress task missing');
+      task.status = 'pre_merge';
+    });
+    const result = checkCampaign(root, dir);
+    expect(result.ok).toBe(false);
+    expect(result.problems.join('\n')).toContain('review-verdict-missing');
+  });
+
   it('loads the campaign execution policy with status accepted (IA-004)', () => {
     const policy = JSON.parse(
       readFileSync(join(root, 'law/policy/campaign-execution.json'), 'utf8'),
