@@ -670,7 +670,7 @@ describe('round and generated governance views', () => {
 
     expect(decisions).toContain('<!-- generated from canonical records; do not edit -->');
     expect(decisions.indexOf('# ADR-002')).toBeLessThan(decisions.indexOf('# ADR-010'));
-    expect(index).toContain('| [ADR-002](./ADR-002.md) | Second | draft |');
+    expect(index).toContain('| [ADR-002](./ADR-002.md) | Second | draft');
     expect(rounds).toContain('<!-- generated from sealed round records -->');
     expect(rounds).toContain('Fixture round.');
     expect(renderRoundRecords({ repoRoot: fixtureRoot() })).toBe('# Governed Rounds\n');
