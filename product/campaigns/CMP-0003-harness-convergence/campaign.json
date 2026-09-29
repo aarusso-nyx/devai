@@ -39,7 +39,7 @@
       "id": "OE-01",
       "description": "Verify that the merge queue supports the rebase method with linear history and the required devai-release-gate check, then enable it on main; allow_update_branch is optional. If the queue is incompatible, record the serialized-admission fallback instead.",
       "required_before": "R-0304",
-      "performed_at": null
+      "performed_at": "2026-09-29T21:41:52Z"
     },
     {
       "id": "OE-02",
