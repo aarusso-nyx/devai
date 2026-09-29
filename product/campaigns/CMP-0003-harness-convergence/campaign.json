@@ -618,7 +618,8 @@
                   "packages/skills/tests/unit/bootstrap.test.ts",
                   "packages/skills/tests/unit/adopter-bootstrap-contract.test.ts",
                   "packages/cli/tests/unit/doctor-observable-boundaries.test.ts",
-                  "packages/skills/tests/recipes/loader-header-contract.test.ts"
+                  "packages/skills/tests/recipes/loader-header-contract.test.ts",
+                  "packages/cli/tests/unit/cli-shard09-init-core-planning.test.ts"
                 ],
                 "forbidden": [
                   "law/",
@@ -651,7 +652,7 @@
               "commit_types": ["test(skills)", "test(cli)"],
               "prompt": {
                 "path": "prompts/TASK-0325.md",
-                "sha256": "b263007786f624bcf9ae1d1dbb5a2859133eda2b8e7658c6e3c21890ec089309"
+                "sha256": "a6dbec1c4194a631de15e8f0e2901cbc87f05353549c7c833a5e916b2c5e826e"
               },
               "pull_request": null,
               "merged_as": null,
