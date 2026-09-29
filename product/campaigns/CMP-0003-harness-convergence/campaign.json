@@ -2442,7 +2442,10 @@
               "boundary": {
                 "paths": [
                   "tests/contract/workflow-reference-pages.contract.test.ts",
-                  "packages/loop/tests/adr-catalogue-freshness.test.ts"
+                  "packages/loop/tests/adr-catalogue-freshness.test.ts",
+                  "packages/loop/tests/unit/governance-rendering-boundaries.test.ts",
+                  "packages/cli/tests/unit/cli-shard06-docs-governance-residual.test.ts",
+                  "packages/cli/tests/unit/cli-shard06-documentation-runtime.test.ts"
                 ],
                 "forbidden": [
                   "law/",
@@ -2471,7 +2474,7 @@
               "commit_types": ["test(workflows)", "test(loop)"],
               "prompt": {
                 "path": "prompts/TASK-0372.md",
-                "sha256": "af588d6f8a8f1c5cf05005a589227f4319d584c3c1a58aabc0e7ef4851712c53"
+                "sha256": "adbc11df49b747dc974fd5a8121e192f7fb92b56fd4326ae30e1a0c4ee1b5822"
               },
               "pull_request": null,
               "merged_as": null,
