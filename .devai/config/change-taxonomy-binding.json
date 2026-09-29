@@ -14,6 +14,7 @@
     { "selector": { "kind": "prefix", "pattern": "law/schemas/" }, "class": "spec" },
     { "selector": { "kind": "prefix", "pattern": "product/" }, "class": "plan" },
     { "selector": { "kind": "prefix", "pattern": "record/" }, "class": "plan" },
+    { "selector": { "kind": "prefix", "pattern": "work/" }, "class": "plan" },
     { "selector": { "kind": "prefix", "pattern": "packages/authority/src/" }, "class": "code" },
     { "selector": { "kind": "prefix", "pattern": "packages/cli/src/authority/" }, "class": "code" },
     { "selector": { "kind": "prefix", "pattern": "packages/cli/src/commands/" }, "class": "code" },
