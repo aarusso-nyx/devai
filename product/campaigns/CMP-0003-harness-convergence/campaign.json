@@ -116,7 +116,7 @@
       "id": "R-0301",
       "title": "Planning lane and semantic validation",
       "goal": "A pull request whose changed paths all classify as plan executes the planning lane (preflight, plan:validate with the campaign and scorecard-page checks, format, schema members) with the bootstrap restored from cache; docs:validate runs every docs-class member; the campaign policy is accepted and the campaign checker enforces Owner-effect closure.",
-      "status": "open",
+      "status": "closing",
       "records": ["ADR-CHK-0003"],
       "depends_on": [],
       "attestation_reissue": true,
@@ -212,7 +212,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0311",
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -256,8 +256,8 @@
                 "path": "prompts/TASK-0312.md",
                 "sha256": "bc2ce37d63902c74c98a8e36948f1c761fe6f9d928496f81f8d4602e75a0f275"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/176",
+              "merged_as": "e5cfdb77a74217ce9288296c93022df96c1021db",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -270,7 +270,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0312",
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F2", "F3"],
               "boundary": {
                 "paths": [
@@ -326,8 +326,8 @@
                 "path": "prompts/TASK-0313.md",
                 "sha256": "f13c1e8ebe473b8a41faed795027f7b39acec9b19cd0233cc0749ccf9cc23606"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/176",
+              "merged_as": "e5cfdb77a74217ce9288296c93022df96c1021db",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
