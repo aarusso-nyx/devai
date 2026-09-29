@@ -45,7 +45,7 @@
       "id": "OE-02",
       "description": "Reconfigure the release environments from the before/after matrix of ADR-REL-0030: one reviewer stop each on devai-ledger-verification, devai-rc-release, and devai-rc-publication; no reviewer on github-pages, which keeps its variables.",
       "required_before": "R-0306",
-      "performed_at": null
+      "performed_at": "2026-09-29T21:16:15Z"
     },
     {
       "id": "OE-03",
@@ -69,7 +69,7 @@
       "id": "OE-06",
       "description": "Raise every maintainer host to a Claude Code release that reads AGENTS.md natively (documented as 2.1.277 or later); precondition for the later record that removes CLAUDE.md, not for this campaign.",
       "required_before": "R-0307",
-      "performed_at": null
+      "performed_at": "2026-09-29T21:16:15Z"
     },
     {
       "id": "OE-07",
