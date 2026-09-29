@@ -343,7 +343,7 @@
       "id": "R-0302",
       "title": "Owned configuration and host projections",
       "goal": "init bind projects the blocks it owns authoritatively with atomic receipts; AGENTS.md is the canonical instruction contract with CLAUDE.md as its import; adopter guidance survives --force; recipes keep one source with generated projections and converged front matter.",
-      "status": "planned",
+      "status": "open",
       "records": ["ADR-CFG-0002", "ADR-GOV-0020"],
       "depends_on": ["R-0301"],
       "attestation_reissue": false,
@@ -371,7 +371,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": ["docs/adopters/install.md", "docs/adopters/ci-economy.md"],
@@ -395,7 +395,7 @@
               "commit_types": ["docs(adopters)"],
               "prompt": {
                 "path": "prompts/TASK-0321.md",
-                "sha256": null
+                "sha256": "9012700ae437e77ed8f1222eb79d9d0173516b18c2d8e515ff697a31b799834e"
               },
               "pull_request": null,
               "merged_as": null,
