@@ -80,6 +80,7 @@ interface WorkflowFacts {
   readonly hasConcurrencyKey: boolean;
   readonly hasCancelInProgress: boolean;
   readonly hasPathFilters: boolean;
+  readonly pushNamesOnlyTags: boolean;
   readonly referencesMacos: boolean;
   readonly hasPostgresService: boolean;
   readonly hasEvidenceMarker: boolean;
@@ -194,6 +195,74 @@ export function parseTriggers(text: string): Set<string> {
 const CANCEL_IN_PROGRESS_SATISFIED =
   /cancel-in-progress:\s*(?:true|\$\{\{\s*github\.event_name\s*==\s*(['"])pull_request(?:_target)?\1\s*\}\})/u;
 
+/**
+ * True when the block-form `push:` trigger carries only `tags`/`tags-ignore`
+ * filters (at least `tags`). GitHub ignores path filters on tag pushes, so a
+ * path filter there saves nothing and the advisory does not apply. An inline
+ * `push` or a push naming `branches` (or nothing) is not tag-only.
+ */
+export function pushNamesOnlyTags(text: string): boolean {
+  const lines = text.split(/\r?\n/);
+  const onIndex = lines.findIndex((line) => /^(?:on|"on"|'on'):\s*(?:#.*)?$/.test(line));
+  if (onIndex < 0) return false;
+  for (let i = onIndex + 1; i < lines.length; i++) {
+    const line = lines[i] ?? '';
+    if (line.trim() === '' || line.trim().startsWith('#')) continue;
+    if (/^[^\s#]/.test(line)) return false;
+    const pm = /^(\s+)push:\s*(?:#.*)?$/.exec(line);
+    if (pm === null) continue;
+    const pushIndent = (pm[1] ?? '').length;
+    const keys = new Set<string>();
+    let childIndent: number | null = null;
+    for (let j = i + 1; j < lines.length; j++) {
+      const child = lines[j] ?? '';
+      if (child.trim() === '' || child.trim().startsWith('#')) continue;
+      const indent = /^(\s*)/.exec(child)?.[1]?.length ?? 0;
+      if (indent <= pushIndent) break;
+      childIndent ??= indent;
+      if (indent !== childIndent) continue;
+      const km = /^\s+([A-Za-z_-]+):/.exec(child);
+      if (km !== null) keys.add(km[1] ?? '');
+    }
+    return keys.has('tags') && [...keys].every((key) => key === 'tags' || key === 'tags-ignore');
+  }
+  return false;
+}
+
+/**
+ * True when the repository's `test-tasks.json` is a readable descriptor whose
+ * task input selectors include a `kind: class` selector: the pull-request lane
+ * is then selected from the change taxonomy, and a workflow path filter would
+ * duplicate that selection and let a candidate suppress checks by editing the
+ * filter (ADR-CHK-0003). Missing or unreadable descriptors return false.
+ */
+export function laneSelectedByClass(repoRoot: string): boolean {
+  const descriptorPath = join(repoRoot, 'test-tasks.json');
+  if (!existsSync(descriptorPath)) return false;
+  let descriptor: unknown;
+  try {
+    descriptor = JSON.parse(readFileSync(descriptorPath, 'utf8'));
+  } catch {
+    return false;
+  }
+  if (typeof descriptor !== 'object' || descriptor === null) return false;
+  const tasks = (descriptor as { tasks?: unknown }).tasks;
+  if (!Array.isArray(tasks)) return false;
+  return tasks.some((task: unknown) => {
+    if (typeof task !== 'object' || task === null) return false;
+    const selectors = (task as { inputSelectors?: unknown }).inputSelectors;
+    return (
+      Array.isArray(selectors) &&
+      selectors.some(
+        (selector: unknown) =>
+          typeof selector === 'object' &&
+          selector !== null &&
+          (selector as { kind?: unknown }).kind === 'class',
+      )
+    );
+  });
+}
+
 function collectFacts(dir: string, file: string): WorkflowFacts {
   const text = readFileSync(join(dir, file), 'utf8');
   const triggers = parseTriggers(text);
@@ -209,6 +278,7 @@ function collectFacts(dir: string, file: string): WorkflowFacts {
     hasConcurrencyKey: /^concurrency:/m.test(text),
     hasCancelInProgress: CANCEL_IN_PROGRESS_SATISFIED.test(text),
     hasPathFilters: /^\s+paths(-ignore)?:/m.test(text),
+    pushNamesOnlyTags: pushNamesOnlyTags(text),
     referencesMacos: /\bmacos-/i.test(text) || /runs-on:.*macos/i.test(text),
     hasPostgresService: /image:\s*['"]?postgres/.test(text),
     hasEvidenceMarker:
@@ -371,9 +441,13 @@ export function checkCiEconomy(opts: CheckCiEconomyOptions): CiEconomyReport {
   }
 
   // ── Advisory — ci-economy.path-filters ───────────────────────────────
+  // Not raised for a pull-request trigger whose lane is selected by class in
+  // test-tasks.json, nor for a push that names only tags; an unfiltered branch
+  // push, or a pull-request lane without class selectors, keeps the advisory.
+  const classSelected = laneSelectedByClass(opts.repoRoot);
   const unfiltered = facts.filter(
     (f) =>
-      (hasPrTrigger(f) || f.triggers.has('push')) &&
+      ((hasPrTrigger(f) && !classSelected) || (f.triggers.has('push') && !f.pushNamesOnlyTags)) &&
       !f.hasPathFilters &&
       !f.triggers.has('workflow_call'),
   );
