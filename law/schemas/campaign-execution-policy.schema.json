@@ -38,7 +38,7 @@
       "const": "campaign-execution"
     },
     "status": {
-      "enum": ["proposed", "active"]
+      "enum": ["proposed", "accepted", "active"]
     },
     "authority": {
       "const": "Architect"
