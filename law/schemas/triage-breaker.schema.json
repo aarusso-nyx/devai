@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/triage-breaker.schema.json",
+  "title": "Triage tie-breaker reply",
+  "description": "The document the Article 23 cross-family tie-breaker reply must carry under ADR-MDL-0001. Its one consumer is tieBreakWithLadder in packages/loop/src/loop/triage.ts, which asks a model from another family to vote between two disagreeing triage classifications and validates the reply through the one shared extractor in the model bridge. The classification vocabulary is the triage.schema.json classification enum; a vote that matches one candidate makes that candidate the resolution, and any other vote, including inconclusive, escalates to a human under Article 19. The confidence is a bare number, not the score object a recorded triage verdict carries, because the breaker reply is a vote and not a verdict record. The document is closed so a review verdict or any other shape is refused rather than read as inconclusive; an extractor error outcome keeps a bounded redacted excerpt and the SHA-256 of the full reply.",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["classification", "confidence", "rationale"],
+  "properties": {
+    "classification": {
+      "enum": ["plant_bug", "sensor_error", "policy_issue", "reference_gap", "inconclusive"],
+      "description": "The breaker's independent classification of the failure. inconclusive is a permitted vote when neither candidate is clearly right; it escalates to a human under Article 19."
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "The breaker's confidence in its vote, a bare number in [0, 1]. The resolved verdict carries the greater of the winner's score and this value under the method article-23-cross-family-breaker."
+    },
+    "rationale": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Short prose justification of the vote. The resolution appends it to the winning candidate's rationale, attributed to the breaker family and model."
+    }
+  },
+  "examples": [
+    {
+      "classification": "plant_bug",
+      "confidence": 0.8,
+      "rationale": "Both findings are assertion failures in product code with no configuration or specification reference."
+    },
+    {
+      "classification": "inconclusive",
+      "confidence": 0.35,
+      "rationale": "The findings mention a threshold and an invariant in equal measure; neither candidate is clearly right."
+    }
+  ]
+}

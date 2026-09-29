@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/review-verdict.schema.json",
+  "title": "Review verdict reply",
+  "description": "The document a model-evaluated review reply must carry under ADR-MDL-0001. Two consumers validate it through the one shared extractor in the model bridge: the llm_judge sensor (packages/sensors/src/judge.ts), which maps the verdict onto its reading status, and the campaign model_evaluation step that ADR-GOV-0023 admits, where the orchestrator records the extracted document on the task review block together with the SHA-256 of the full reply. The extractor accepts a provider json field or exactly one unambiguous candidate object in the reply text, fenced or not, and returns either a document that validates here or an error outcome with a bounded redacted excerpt and the reply digest; it never returns a partial document and never guesses between candidates. The document is closed so a triage classification, an echoed example with extra members, or any other shape is refused. The verdict vocabulary is the sensor-reading status subset the judge emits: the execution status core plus unknown, the explicit uncertainty of Constitution Article 39, so it is declared locally rather than through common-defs.",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["verdict", "confidence", "rationale"],
+  "properties": {
+    "verdict": {
+      "enum": ["pass", "review", "fail", "unknown"],
+      "description": "The evaluator's verdict on the evidence against the rubric. review triggers the Article 23 tie-breaker ladder; unknown is explicit uncertainty (Article 39) and never a parse fallback, which is an error outcome of the extractor instead."
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "The evaluator's confidence in the verdict, a bare number in [0, 1]. The judge records it as the confidence metric of its reading; the orchestrator records it on the task review block."
+    },
+    "rationale": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Short prose justification of the verdict. The judge emits it as the first finding of its reading, code rationale, severity info."
+    },
+    "findings": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/finding"
+      },
+      "description": "Individual findings behind the verdict. Absent or empty when the evaluator has nothing to itemize; every present item is a complete finding, never a bare string."
+    }
+  },
+  "$defs": {
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["severity", "code", "message"],
+      "description": "One finding in the shape the sensor-reading finding carries, so the judge copies it onto its reading without translation.",
+      "properties": {
+        "severity": {
+          "enum": ["info", "warning", "error", "critical"]
+        },
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "description": "A stable machine code for the finding, for example missing_test or stale_reference."
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        },
+        "file": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Repository-relative path the finding points at, when it points at one."
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "verdict": "pass",
+      "confidence": 0.92,
+      "rationale": "The change stays inside its declared boundary and every acceptance command reads as measured.",
+      "findings": []
+    },
+    {
+      "verdict": "review",
+      "confidence": 0.55,
+      "rationale": "The schema restatement in the campaign contract is looser than the reply contract it names.",
+      "findings": [
+        {
+          "severity": "warning",
+          "code": "restated_contract_drift",
+          "message": "campaign.schema.json restates the verdict document without the confidence bound.",
+          "file": "law/schemas/campaign.schema.json"
+        }
+      ]
+    },
+    {
+      "verdict": "unknown",
+      "confidence": 0.2,
+      "rationale": "The evidence names a test run whose output is not attached, so the rubric cannot be applied."
+    }
+  ]
+}
