@@ -15,8 +15,15 @@ export type { CanonicalPolicyFile } from './policy-content.js';
 
 export interface BootstrapPlanEntry {
   readonly path: string;
-  readonly action: 'create' | 'overwrite' | 'skip-exists';
-  /** File content (newly created) or null when action is skip-exists. */
+  /**
+   * `create` for an absent path, `replace` for an existing file that
+   * `executeBootstrapPlan(plan, { force: true })` would overwrite, `skip-exists`
+   * for an existing file the execution keeps (byte-identical, protected
+   * guidance, or populated provenance), and `overwrite` for the always-applied
+   * project.json reconciliation (ADR-GOV-0020).
+   */
+  readonly action: 'create' | 'overwrite' | 'replace' | 'skip-exists';
+  /** Template content the entry would write. */
   readonly content: string | null;
   readonly bytes: number;
 }
@@ -28,11 +35,20 @@ export interface BootstrapPlan {
   readonly summary: {
     readonly create: number;
     readonly overwrite: number;
+    /**
+     * Existing files `--force` would overwrite (ADR-GOV-0020). Every built plan
+     * carries it; it is optional only so a hand-built plan from before the
+     * replace action still type-checks.
+     */
+    readonly replace?: number;
     readonly skip: number;
   };
 }
 
 const DEFAULT_VERSION = '0.0.0';
+
+/** The whole of an adopter CLAUDE.md: the import of AGENTS.md (ADR-GOV-0020). */
+const CLAUDE_IMPORT = '@AGENTS.md\n';
 
 export const MATERIALIZED_POLICY_FILES = [...POLICY_FILES, 'subprocess-effects.json'] as const;
 
@@ -93,8 +109,10 @@ export function reconcileProjectConfig(
  *   .devai/{pin,config,state}/
  *   law/, product/, work/, record/, and scratch/ according to profile
  *
- * Existing files are flagged 'skip-exists' (deny-by-default). The caller
- * can apply with `executeBootstrapPlan(plan, { force })` to overwrite.
+ * An existing file is planned `replace` when `executeBootstrapPlan(plan,
+ * { force: true })` would overwrite it and `skip-exists` when the execution
+ * keeps it, so the plan and the execution report agree before the first byte
+ * is written (ADR-GOV-0020). Without `force` nothing existing is written.
  */
 export function buildBootstrapPlan(opts: {
   readonly targetRoot: string;
@@ -194,55 +212,46 @@ law/schemas before changing governed repository state.
   if (profile === 'tier3') {
     plan.push(
       { path: 'AGENTS.md', content: agentInstructions },
-      { path: 'CLAUDE.md', content: agentInstructions },
+      // ADR-GOV-0020: CLAUDE.md is the import of the single contract, never a copy.
+      { path: 'CLAUDE.md', content: CLAUDE_IMPORT },
     );
   }
 
   let create = 0;
   let overwrite = 0;
+  let replace = 0;
   let skip = 0;
   for (const item of plan) {
     const abs = join(opts.targetRoot, item.path);
-    const exists = existsSync(abs);
-    if (exists) {
-      if (
-        item.path === '.devai/config/project.json' &&
-        !isDeepStrictEqual(existingProjectConfig, reconciledProjectConfig)
-      ) {
-        entries.push({
-          path: item.path,
-          action: 'overwrite',
-          content: item.content,
-          bytes: Buffer.byteLength(item.content, 'utf8'),
-        });
-        overwrite++;
-        continue;
-      }
-      // Carry the fresh content so `executeBootstrapPlan(plan, { force: true })`
-      // has something to write. Without this, `--force` would silently be a
-      // no-op for existing files (the previous bug).
-      entries.push({
-        path: item.path,
-        action: 'skip-exists',
-        content: item.content,
-        bytes: Buffer.byteLength(item.content, 'utf8'),
-      });
-      skip++;
-    } else {
-      entries.push({
-        path: item.path,
-        action: 'create',
-        content: item.content,
-        bytes: Buffer.byteLength(item.content, 'utf8'),
-      });
+    const bytes = Buffer.byteLength(item.content, 'utf8');
+    if (!existsSync(abs)) {
+      entries.push({ path: item.path, action: 'create', content: item.content, bytes });
       create++;
+      continue;
+    }
+    if (
+      item.path === '.devai/config/project.json' &&
+      !isDeepStrictEqual(existingProjectConfig, reconciledProjectConfig)
+    ) {
+      entries.push({ path: item.path, action: 'overwrite', content: item.content, bytes });
+      overwrite++;
+      continue;
+    }
+    // Carry the template content either way: the execution rechecks the file
+    // at write time, because a reviewed plan may outlive an adopter write.
+    if (forcedDisposition(abs, item.path, item.content) === 'write') {
+      entries.push({ path: item.path, action: 'replace', content: item.content, bytes });
+      replace++;
+    } else {
+      entries.push({ path: item.path, action: 'skip-exists', content: item.content, bytes });
+      skip++;
     }
   }
   return {
     target_root: opts.targetRoot,
     devai_version: version,
     entries,
-    summary: { create, overwrite, skip },
+    summary: { create, overwrite, replace, skip },
   };
 }
 
@@ -279,8 +288,10 @@ export interface ExecuteResult {
    * Paths that were preserved despite `--force`. The bootstrap plan
    * refuses to overwrite the evidence chain or counters once they
    * contain real data (chain.records.length > 0 or counter > 0), per
-   * Constitution Article 32. `--force` is for re-laying template files
-   * onto a fresh repo, not for resetting provenance.
+   * Constitution Article 32, and refuses to overwrite adopter guidance
+   * (AGENTS.md, CLAUDE.md, and every README.md under law/) once it differs
+   * from the template, per ADR-GOV-0020. `--force` is for re-laying template
+   * files onto a fresh repo, not for resetting provenance or guidance.
    */
   readonly preserved: readonly string[];
 }
@@ -295,6 +306,35 @@ const PRESERVE_WHEN_POPULATED: ReadonlySet<string> = new Set([
   'record/proofs/chain.json',
   '.devai/state/counters.json',
 ]);
+
+/** Adopter guidance that `--force` never overwrites once it differs from the template. */
+function isGuidancePath(relativePath: string): boolean {
+  return (
+    relativePath === 'AGENTS.md' ||
+    relativePath === 'CLAUDE.md' ||
+    (relativePath.startsWith('law/') && relativePath.endsWith('/README.md'))
+  );
+}
+
+/**
+ * What `--force` does to an existing file: keep it byte-identical (`identical`),
+ * keep it because it is populated provenance or edited guidance (`preserve`), or
+ * overwrite it (`write`). The plan and the execution share this one rule.
+ */
+function forcedDisposition(
+  absPath: string,
+  relativePath: string,
+  template: string,
+): 'identical' | 'preserve' | 'write' {
+  const current = readFileSync(absPath, 'utf8');
+  const next = relativePath === '.gitignore' ? mergeGitignore(current, template) : template;
+  if (next === current) return 'identical';
+  if (PRESERVE_WHEN_POPULATED.has(relativePath) && isPopulated(absPath, relativePath)) {
+    return 'preserve';
+  }
+  if (isGuidancePath(relativePath)) return 'preserve';
+  return 'write';
+}
 
 function mergeGitignore(current: string, canonical: string): string {
   const lines = new Set(current.split(/\r?\n/u));
@@ -342,32 +382,35 @@ export function executeBootstrapPlan(
   for (const entry of plan.entries) {
     const abs = join(plan.target_root, entry.path);
     const dir = dirname(abs);
-    // A reviewed plan may outlive an adopter write. Reconcile newly existing
-    // paths through the same force and provenance rules as files seen at planning.
-    if (entry.action === 'skip-exists' || (entry.action === 'create' && existsSync(abs))) {
-      if (opts.force === true && entry.content !== null) {
-        // Provenance-critical files (Article 32): refuse to overwrite
-        // when they already contain real data. This closes the
-        // `init --execute --force` foot-gun that would otherwise
-        // silently delete the evidence chain.
-        if (PRESERVE_WHEN_POPULATED.has(entry.path) && isPopulated(abs, entry.path)) {
-          preserved.push(entry.path);
-          continue;
-        }
+    // A reviewed plan may outlive an adopter write. Reconcile every path that
+    // exists at write time through the same force, guidance, and provenance
+    // rules the plan applied, whatever the plan said about it.
+    if (entry.action !== 'overwrite' && existsSync(abs)) {
+      if (opts.force !== true || entry.content === null) {
+        skipped.push(entry.path);
+        continue;
+      }
+      const disposition = forcedDisposition(abs, entry.path, entry.content);
+      if (disposition === 'identical') {
+        skipped.push(entry.path);
+      } else if (disposition === 'preserve') {
+        preserved.push(entry.path);
+      } else {
         mkdirSync(dir, { recursive: true });
-        const next =
+        writeFileSync(
+          abs,
           entry.path === '.gitignore'
             ? mergeGitignore(readFileSync(abs, 'utf8'), entry.content)
-            : entry.content;
-        if (entry.path === '.gitignore' && next === readFileSync(abs, 'utf8')) {
-          skipped.push(entry.path);
-        } else {
-          writeFileSync(abs, next);
-          overwritten.push(entry.path);
-        }
-      } else {
-        skipped.push(entry.path);
+            : entry.content,
+        );
+        overwritten.push(entry.path);
       }
+      continue;
+    }
+    // A file that existed at planning and vanished before execution is laid
+    // again only under --force; without it nothing the plan saw is touched.
+    if ((entry.action === 'replace' || entry.action === 'skip-exists') && opts.force !== true) {
+      skipped.push(entry.path);
       continue;
     }
     if (entry.content === null) continue;

@@ -64,6 +64,7 @@ export function segmentedPlan(plan: ReturnType<typeof buildBootstrapPlan>, segme
     summary: {
       create: entries.filter((entry) => entry.action === 'create').length,
       overwrite: entries.filter((entry) => entry.action === 'overwrite').length,
+      replace: entries.filter((entry) => entry.action === 'replace').length,
       skip: entries.filter((entry) => entry.action === 'skip-exists').length,
     },
   };
@@ -110,7 +111,10 @@ export const initPlan = defineCommand({
           introspection === null ? plan : { introspection, plan },
           options.human === true,
           `init plan: ${String(plan.summary.create)} would be created, ${String(plan.summary.skip)} already exist\n${plan.entries
-            .map((entry) => `  ${entry.action === 'create' ? '+' : '·'} ${entry.path}`)
+            .map(
+              (entry) =>
+                `  ${entry.action === 'create' ? '+' : entry.action === 'skip-exists' ? '·' : '~'} ${entry.path}`,
+            )
             .join('\n')}`,
         );
         process.exitCode = EXIT_PASS;
