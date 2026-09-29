@@ -913,7 +913,7 @@
       "id": "R-0304",
       "title": "Serialized integration",
       "goal": "The pull-request gate runs under merge_group with the queue's base and head, admission and eviction are documented, and the merge queue or the serialized fallback is the mechanism that keeps pull requests from invalidating each other.",
-      "status": "planned",
+      "status": "open",
       "records": ["ADR-CHK-0004"],
       "depends_on": ["R-0301"],
       "attestation_reissue": false,
@@ -942,7 +942,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -972,7 +972,7 @@
               "commit_types": ["docs(operations)", "law(preflight)"],
               "prompt": {
                 "path": "prompts/TASK-0341.md",
-                "sha256": null
+                "sha256": "cc8723cf628b7de5827ce3eaec8a953c720fbb36a17b118a385c7df500a49a52"
               },
               "pull_request": null,
               "merged_as": null,
