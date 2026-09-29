@@ -411,7 +411,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0321",
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -450,7 +450,7 @@
               "commit_types": ["test(cli)", "test(skills)"],
               "prompt": {
                 "path": "prompts/TASK-0322.md",
-                "sha256": null
+                "sha256": "e9213491f7cf8dbfa43922e3e07e1bb539666083a2c87a417ee87813944d2aa4"
               },
               "pull_request": null,
               "merged_as": null,
@@ -501,7 +501,7 @@
               "commit_types": ["fix(init)", "refactor(init)", "law(config)", "docs(reference)"],
               "prompt": {
                 "path": "prompts/TASK-0323.md",
-                "sha256": null
+                "sha256": "47dd41912c215811fe93b398dd9a2eb304e0b7a4edcbd99cf4712728d3774cb8"
               },
               "pull_request": null,
               "merged_as": null,
