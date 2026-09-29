@@ -14,6 +14,7 @@ import {
   type CheckResult,
   readPathOverrides,
   applyPathOverride,
+  CLAUDE_AGENTS_IMPORT,
   FIVE_ROLES,
   READING_ORDER_SOURCES,
   type CliProbe,
@@ -49,6 +50,13 @@ export function checkConstitutionBinding(repoRoot: string): CheckResult {
   };
 }
 
+/**
+ * ADR-GOV-0020: AGENTS.md is the only instruction contract and CLAUDE.md is
+ * exactly the single import line `@AGENTS.md`. The required content (the
+ * Article 6 reference, the five roles, and the reading-order sources) is
+ * checked in AGENTS.md alone; any other CLAUDE.md, including a full copy of
+ * AGENTS.md from an older bootstrap, fails.
+ */
 export function checkAgentsClaudeSync(repoRoot: string): CheckResult {
   const claudePath = join(repoRoot, 'CLAUDE.md');
   const agentsPath = join(repoRoot, 'AGENTS.md');
@@ -63,23 +71,23 @@ export function checkAgentsClaudeSync(repoRoot: string): CheckResult {
   const agentsText = readFileSync(agentsPath, 'utf8');
   const overrides = readPathOverrides(repoRoot);
   const errors: string[] = [];
-  for (const f of [
-    { name: 'CLAUDE.md', text: claudeText },
-    { name: 'AGENTS.md', text: agentsText },
-  ]) {
-    if (!f.text.includes('Article 6')) {
-      errors.push(`${f.name}: missing Constitution Article 6 reference`);
+  if (!isAgentsImport(claudeText)) {
+    errors.push(
+      `CLAUDE.md: must be exactly the single line '${CLAUDE_AGENTS_IMPORT}' (ADR-GOV-0020); move any guidance into AGENTS.md and replace the whole of CLAUDE.md, including a full copy of AGENTS.md written by an older bootstrap, with that one line`,
+    );
+  }
+  if (!agentsText.includes('Article 6')) {
+    errors.push('AGENTS.md: missing Constitution Article 6 reference');
+  }
+  for (const role of FIVE_ROLES) {
+    if (!agentsText.includes(role)) {
+      errors.push(`AGENTS.md: missing role '${role}'`);
     }
-    for (const role of FIVE_ROLES) {
-      if (!f.text.includes(role)) {
-        errors.push(`${f.name}: missing role '${role}'`);
-      }
-    }
-    for (const src of READING_ORDER_SOURCES) {
-      const resolvedSrc = applyPathOverride(src, overrides);
-      if (!f.text.includes(resolvedSrc)) {
-        errors.push(`${f.name}: missing reading-order source '${resolvedSrc}'`);
-      }
+  }
+  for (const src of READING_ORDER_SOURCES) {
+    const resolvedSrc = applyPathOverride(src, overrides);
+    if (!agentsText.includes(resolvedSrc)) {
+      errors.push(`AGENTS.md: missing reading-order source '${resolvedSrc}'`);
     }
   }
   return {
@@ -87,6 +95,15 @@ export function checkAgentsClaudeSync(repoRoot: string): CheckResult {
     ok: errors.length === 0,
     ...(errors.length > 0 && { errors }),
   };
+}
+
+/** True when the text is the import line alone, with at most one line ending. */
+function isAgentsImport(text: string): boolean {
+  return [
+    CLAUDE_AGENTS_IMPORT,
+    `${CLAUDE_AGENTS_IMPORT}\n`,
+    `${CLAUDE_AGENTS_IMPORT}\r\n`,
+  ].includes(text);
 }
 
 export function checkChainPathWritableDir(chainPath: string): CheckResult {
