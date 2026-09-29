@@ -530,6 +530,20 @@
       "scope": "page-manifest",
       "condition": "every planned page exists at its exact path with all generated links and no undeclared competing canonical CLI page",
       "failure": "DOCS_PAGE_SET_INCOMPLETE"
+    },
+    {
+      "gate_id": "docs-workflow-page-set",
+      "phase": "current",
+      "scope": "page-manifest",
+      "condition": "every file under .github/workflows/ has exactly one page docs/dev/operations/workflows/<file stem>.md that the index docs/dev/operations/workflows/README.md links, and no page exists without its workflow file; a workflow file added without its page fails",
+      "failure": "DOCS_WORKFLOW_PAGE_MISSING"
+    },
+    {
+      "gate_id": "docs-workflow-metadata-drift",
+      "phase": "current",
+      "scope": "page-manifest",
+      "condition": "the metadata block of each workflow page, the first fenced yaml block after the comment <!-- devai:workflow-metadata --> with exactly the keys workflow, triggers, and jobs, names that page's workflow file path, the keys of the file's on: mapping in file order, and the keys of the file's jobs: mapping in file order; the page's tables and prose are never parsed",
+      "failure": "DOCS_WORKFLOW_METADATA_DRIFT"
     }
   ]
 }
