@@ -20,7 +20,12 @@ import {
   renderDecisionRecords,
   renderRoundRecords,
 } from './render.js';
-export { renderDecisionIndex, renderDecisionRecords, renderRoundRecords } from './render.js';
+export {
+  isDecisionIndexStale,
+  renderDecisionIndex,
+  renderDecisionRecords,
+  renderRoundRecords,
+} from './render.js';
 
 export { archiveImmutability } from './archive.js';
 

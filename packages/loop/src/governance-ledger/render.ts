@@ -1,4 +1,4 @@
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import { parseGovernanceRecord } from './records.js';
 
@@ -30,6 +30,9 @@ export function renderDecisionRecords(options: {
   ].join('\n');
 }
 
+const DECISION_INDEX_PREAMBLE =
+  'This catalogue lists every decision record in this directory. An adopter adds its own records here as `ADR-<SCOPE>-<NNNN>-<slug>.md` files with the canonical frontmatter, then regenerates this file instead of editing it.';
+
 function markdownTableText(value: string): string {
   return value
     .replace(/\\/g, '\\\\')
@@ -55,19 +58,53 @@ export function renderDecisionIndex(options: {
       ),
     ];
   });
+  const header = ['ID', 'Title', 'Status', 'Round', 'Date'];
+  const body = rows.map(
+    ([id = '', title = '', status = '', round = '', date = '', filename = '']) => [
+      `[${markdownTableText(id)}](./${filename})`,
+      markdownTableText(title),
+      markdownTableText(status),
+      markdownTableText(round),
+      markdownTableText(date),
+    ],
+  );
+  // Column widths follow prettier's markdown table layout so the bytes are format-stable.
+  const widths = header.map((cell, column) =>
+    Math.max(3, cell.length, ...body.map((row) => (row[column] ?? '').length)),
+  );
+  const line = (cells: readonly string[]): string =>
+    `| ${cells.map((cell, column) => cell.padEnd(widths[column] ?? 0)).join(' | ')} |`;
   return [
     '# Governance decision records',
     '',
+    DECISION_INDEX_PREAMBLE,
+    '',
     '<!-- generated from canonical record frontmatter; do not edit -->',
     '',
-    '| ID | Title | Status | Round | Date |',
-    '|---|---|---|---|---|',
-    ...rows.map(
-      ([id = '', title = '', status = '', round = '', date = '', filename]) =>
-        `| [${markdownTableText(id)}](./${filename}) | ${[title, status, round, date].map(markdownTableText).join(' | ')} |`,
-    ),
+    line(header),
+    line(widths.map((width) => '-'.repeat(width))),
+    ...body.map(line),
     '',
   ].join('\n');
+}
+
+/**
+ * True when the bytes at `indexPath` (default `<recordsDir>/README.md`) differ from the
+ * rendered decision index, or the file is absent.
+ */
+export function isDecisionIndexStale(options: {
+  readonly repoRoot: string;
+  readonly recordsDir?: string;
+  readonly indexPath?: string;
+}): boolean {
+  const recordsDir = options.recordsDir ?? DEFAULT_RECORDS_DIR;
+  const indexPath = resolve(options.repoRoot, options.indexPath ?? join(recordsDir, 'README.md'));
+  if (!existsSync(indexPath)) return true;
+  const rendered = renderDecisionIndex({
+    repoRoot: options.repoRoot,
+    recordsDir,
+  });
+  return readFileSync(indexPath, 'utf8') !== rendered;
 }
 
 export function renderRoundRecords(options: {
