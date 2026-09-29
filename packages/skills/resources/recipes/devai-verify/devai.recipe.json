@@ -5,7 +5,7 @@
   "description": "Review code, documentation, or evidence without modifying product files.",
   "variants": {
     "change": {
-      "description": "Review a bounded change and its focused evidence.",
+      "description": "Review a bounded change and its focused evidence, ending the reply with one review verdict document in the shape law/schemas/review-verdict.schema.json declares.",
       "effect": "read",
       "write_policy": { "mode": "none" },
       "operations": ["check.inspect", "evidence.verify"]
