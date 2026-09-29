@@ -79,10 +79,24 @@ function normalize(plan: Json): void {
   plan.review = { mode: 'human' };
   for (const task of tasksOf(plan)) {
     if (task.status === 'merged') continue;
-    task.status = 'planned';
-    delete task.review;
-    delete task.execution.resolved;
+    resetTask(task);
   }
+}
+
+/** A task back to its unstarted shape: planned, no pull request, no merge record, no pin, no review. */
+function resetTask(task: Json): void {
+  task.status = 'planned';
+  task.merged_as = null;
+  task.pull_request = null;
+  delete task.review;
+  delete task.execution.resolved;
+}
+
+/** The task a case starts from, reset fully whatever state the live ledger holds for it. */
+function freshTask(plan: Json, id: string): Json {
+  const task = taskOf(plan, id);
+  resetTask(task);
+  return task;
 }
 
 /** Model-advisory mode; the merged tasks of the ledger carry a recorded review. */
@@ -95,7 +109,11 @@ function advisory(plan: Json, verdict = 'pass'): void {
 
 function reviewOf(verdict = 'pass'): Json {
   return {
-    verdict: { verdict },
+    verdict: {
+      verdict,
+      confidence: 0.9,
+      rationale: 'the fixture review records a full verdict document',
+    },
     reply_sha256: 'b'.repeat(64),
     evaluator: 'claude-cli:opus',
     recorded_at: '2026-09-29T18:00:00Z',
@@ -220,20 +238,20 @@ describe('campaign schema admits the override and review shapes', () => {
   it('rejects a verdict outside pass, review, fail, unknown', () => {
     const plan = base();
     plan.review = { mode: 'model-advisory' };
-    taskOf(plan, 'TASK-0352').review = {
-      verdict: { verdict: 'approve' },
-      reply_sha256: 'a'.repeat(64),
-      evaluator: 'claude-cli:fable',
-      recorded_at: '2026-09-29T18:00:00Z',
-    };
+    const task = freshTask(plan, 'TASK-0352');
+    task.review = { ...reviewOf(), evaluator: 'claude-cli:fable' };
+    task.review.verdict.verdict = 'approve';
     expect(validate(plan)).toBe(false);
-    taskOf(plan, 'TASK-0352').review.verdict.verdict = 'pass';
+    task.review.verdict.verdict = 'pass';
     expect(validate(plan), JSON.stringify(validate.errors)).toBe(true);
   });
 
   it('rejects a pin whose model id is not in the runtime:model form', () => {
     const plan = base();
-    taskOf(plan, 'TASK-0352').execution.resolved.tiers.worker.hosts.claude = 'sonnet';
+    const task = freshTask(plan, 'TASK-0352');
+    task.status = 'in_progress';
+    task.execution.resolved = pinFrom(defaults());
+    task.execution.resolved.tiers.worker.hosts.claude = 'sonnet';
     expect(validate(plan)).toBe(false);
   });
 });
@@ -296,7 +314,7 @@ describe('tier resolution through the merged map (EXPECTED-RED until TASK-0353)'
 
   it('names unknown-host for a pin that carries a host the default does not declare', () => {
     const dir = fixture((plan) => {
-      const task = taskOf(plan, 'TASK-0352');
+      const task = freshTask(plan, 'TASK-0352');
       task.status = 'in_progress';
       task.execution.resolved = pinFrom(defaults());
       task.execution.resolved.tiers.worker.hosts.gemini = 'gemini-cli:pro';
@@ -321,7 +339,7 @@ describe('pin at task start (EXPECTED-RED until TASK-0353)', () => {
     'names resolution-not-pinned for a %s task without execution.resolved',
     (status) => {
       const dir = fixture((plan) => {
-        const task = taskOf(plan, 'TASK-0352');
+        const task = freshTask(plan, 'TASK-0352');
         task.status = status;
         delete task.execution.resolved;
       });
@@ -343,7 +361,7 @@ describe('pin at task start (EXPECTED-RED until TASK-0353)', () => {
     changed.tiers.worker.hosts.claude = 'haiku';
     changed.tiers.worker.default_effort = 'low';
     const dir = fixture((plan) => {
-      const task = taskOf(plan, 'TASK-0352');
+      const task = freshTask(plan, 'TASK-0352');
       task.status = 'in_progress';
       // pinned under 1.0.0, before the default changed
       task.execution.resolved = pinFrom(defaults());
@@ -363,7 +381,7 @@ describe('pin at task start (EXPECTED-RED until TASK-0353)', () => {
     expect(pin.policy_version).toBe('1.1.0');
     expect(pin.tiers.worker.hosts.claude).toBe('claude-cli:haiku');
     const dir = fixture((plan) => {
-      const task = taskOf(plan, 'TASK-0352');
+      const task = freshTask(plan, 'TASK-0352');
       task.status = 'in_progress';
       task.execution.resolved = pin;
     }, changed);
@@ -375,7 +393,7 @@ describe('review mode gating (EXPECTED-RED until TASK-0353)', () => {
   it('refuses a pre_merge task under model-advisory without a recorded review', () => {
     const dir = fixture((plan) => {
       advisory(plan);
-      taskOf(plan, 'TASK-0352').status = 'pre_merge';
+      freshTask(plan, 'TASK-0352').status = 'pre_merge';
     });
     const result = checkCampaign(root, dir);
     expect(result.ok).toBe(false);
@@ -386,7 +404,7 @@ describe('review mode gating (EXPECTED-RED until TASK-0353)', () => {
   it('refuses a merged task under model-advisory without a recorded review', () => {
     const dir = fixture((plan) => {
       advisory(plan);
-      taskOf(plan, 'TASK-0352').status = 'merged';
+      freshTask(plan, 'TASK-0352').status = 'merged';
     });
     const result = checkCampaign(root, dir);
     expect(codes(result)).toContain('review-verdict-missing');
@@ -395,7 +413,7 @@ describe('review mode gating (EXPECTED-RED until TASK-0353)', () => {
   it('admits a pre_merge task under model-advisory with a recorded review', () => {
     const dir = fixture((plan) => {
       advisory(plan);
-      const task = taskOf(plan, 'TASK-0352');
+      const task = freshTask(plan, 'TASK-0352');
       task.status = 'pre_merge';
       task.review = reviewOf();
     });
@@ -406,7 +424,7 @@ describe('review mode gating (EXPECTED-RED until TASK-0353)', () => {
   it('records a fail verdict as advice: it does not by itself satisfy or block the shape', () => {
     const dir = fixture((plan) => {
       advisory(plan);
-      const task = taskOf(plan, 'TASK-0352');
+      const task = freshTask(plan, 'TASK-0352');
       task.status = 'pre_merge';
       task.review = reviewOf('fail');
     });
@@ -418,7 +436,7 @@ describe('review mode gating (EXPECTED-RED until TASK-0353)', () => {
       const dir = fixture((plan) => {
         if (mode === undefined) delete plan.review;
         else plan.review = { mode };
-        taskOf(plan, 'TASK-0352').status = 'pre_merge';
+        freshTask(plan, 'TASK-0352').status = 'pre_merge';
       });
       expect(codes(checkCampaign(root, dir))).not.toContain('review-verdict-missing');
     }
