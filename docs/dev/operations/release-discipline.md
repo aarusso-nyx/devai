@@ -368,6 +368,234 @@ alone; no environment approval follows. Until OE-02 is performed the live enviro
 still holds its reviewer and the run still waits there. Use a release instead whenever
 the change alters product behavior, policy, schemas, or package contents.
 
+## Recover an interrupted Pages publication
+
+[ADR-REL-0032](../../../law/adr/ADR-REL-0032-pages-rerun-identity.md) fixes what a
+re-run of an interrupted Pages publication does and what a human does when the re-run
+cannot proceed (#165). Both publication modes, the release deploy of
+`scripts/process/publish-pages.mjs` and the site-only publication of
+`scripts/process/publish-site.mjs`, run the same `publishPages` control in
+`scripts/process/pages-publication.mjs` against the same journal in
+`scripts/process/github-pages-journal.mjs`, so the re-run table below is shared. The
+two modes differ only in what their identity binds, which is why their recovery paths
+are stated side by side here and must never be confused: the site-only identity is
+the same across every attempt of one run, the release identity is bound to one
+rehearsal attempt.
+
+### What the journal records
+
+The journal is the repository's deployments in the `devai-pages-publication`
+environment with task `devai:pages-publication`. One deployment is one intent; its
+payload carries the exact publication identity, the Pages artifact id, and the
+provenance `runId` and `attempt` of the run that created it. Its statuses carry the
+phase, and a record is in exactly one of three phases, which only move forward:
+
+| Phase       | Journal state                                                                                               | Meaning                                                                                      |
+| ----------- | ----------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `intent`    | the deployment exists and has no status; `pagesId` is `null`                                                | the run recorded that it would submit; whether the Pages submission happened is not recorded |
+| `submitted` | one status with `state: in_progress` and description `devai-pages:submitted:<pagesId>`                      | the Pages deployment `<pagesId>` was created for this intent and is not yet verified live    |
+| `verified`  | a later status with `state: success` and description `devai-pages:verified:<pagesId>`, the same `<pagesId>` | the live bytes were verified against the artifact; the record is closed                      |
+
+A run resolves its record by identity equality: every key of the run's identity must
+equal the payload's identity and the payload must carry no other key. A record whose
+identity differs and whose phase is not `verified` belongs to another publication,
+of either mode, and the run stops before any effect read with
+`PAGES_JOURNAL_OTHER_PUBLICATION_UNRESOLVED`. The first status of an intent must be
+`submitted` and only `verified` may follow it; any other status shape, including an
+`inactive` status, fails every reader with `PAGES_JOURNAL_STATUS_INVALID` until it is
+removed.
+
+Every run also retains a local record beside the journal, `site-publication.jsonl`
+in the artifact `devai-site-publication-<run attempt>` for a site-only run and
+`pages-publication.jsonl` in `devai-pages-publication-<run attempt>` for a release
+deploy, kept for 30 days. Its lines are appended in order: `start` with the identity
+and artifact id, `request-intent`, `intent-created` with the `intentId`,
+`pages-created` with the `intentId`, `pagesId`, and `artifactId`, the journal record
+before each status write, and finally `complete` with the result or `incomplete` with
+the `reason` and `reconciliationRequired: true`. When a run fails, the reason is the
+exact error code and the job exits with
+`SITE_PUBLICATION_INCOMPLETE_RECONCILE_RETAINED_IDENTIFIERS` (site-only) or
+`PAGES_PUBLICATION_INCOMPLETE_RECONCILE_RETAINED_IDENTIFIERS` (release); the
+identifiers a human needs are in the retained record, never in the log.
+
+### What a re-run does
+
+A re-run is "Re-run all jobs" or "Re-run failed jobs" on the same run from the Actions
+page. It keeps `GITHUB_RUN_ID` and increments `GITHUB_RUN_ATTEMPT`. A run that computes
+the same identity bytes as the interrupted attempt finds its own record and acts on the
+record's phase and on the live bytes, in this order: read the journal, read the live
+bytes, then decide. It never builds anything (`buildInvocations` is always `0`) and it
+never submits a second Pages deployment against an existing record.
+
+| Record found | Live bytes match the artifact | The re-run                                                                                                                                                                                                                                   | Outcome                                                   |
+| ------------ | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| none         | no                            | creates the intent, proves it durable with a read-after-write (`PAGES_PUBLICATION_INTENT_NOT_DURABLE` otherwise), submits the artifact, writes `submitted`, observes the Pages deployment, verifies the live bytes, writes `verified`        | `verified`                                                |
+| `submitted`  | yes                           | observes the Pages deployment the record names (`GET /repos/aarusso-nyx/devai/pages/deployments/<pagesId>` until `succeed`, at most 60 reads five seconds apart) and writes `verified` once the live bytes match the artifact; no submission | `no-op`                                                   |
+| `submitted`  | no                            | observes that same deployment, then verifies the live bytes and writes `verified`; no submission                                                                                                                                             | `verified`                                                |
+| `verified`   | yes                           | nothing: no submission, no journal write, no API write of any kind                                                                                                                                                                           | `no-op`                                                   |
+| `verified`   | no                            | stops; the bytes the record verified are no longer live and this run may not put them back                                                                                                                                                   | `PAGES_PUBLICATION_VERIFIED_EFFECT_MISSING`, nothing sent |
+| `intent`     | either                        | stops and submits nothing: the intent says a submission was about to happen and nothing says whether it did, so a second submission could publish twice against one intent                                                                   | `PAGES_PUBLICATION_SUBMISSION_UNKNOWN`, nothing sent      |
+
+Two more stops belong to the resume path. A named Pages deployment that reaches any
+state other than `succeed` or a documented in-flight state, or that is still in flight
+after the last read, stops the run with `PAGES_PUBLICATION_DEPLOYMENT_UNRESOLVED`; the
+record stays `submitted` and the next re-run observes it again. Live bytes that never
+match after a successful deployment stop the run with the verification error of
+`scripts/process/verify-pages-bytes.mjs`, retained as `PAGES_PUBLICATION_UNVERIFIED`;
+the record stays `submitted` as well.
+
+A `verified` record whose bytes are no longer live is not recovered: a later
+publication replaced the site, which is the normal state of an old run. Publish the
+wanted bytes again through a new run instead of re-running the old one.
+
+### The site-only identity
+
+The site-only identity is exactly `repository`, `mode: site-only`, `tag`, `commit`,
+`tree`, `siteSha256`, `sourceRun`, and `controlCommit`, where `sourceRun` is
+`GITHUB_RUN_ID` and `tag` is `v` plus the package version the site documents. It
+carries no attempt: `pages-publication.mjs` rejects a site-only identity that carries
+`sourceAttempt`, `rehearsalRun`, `rehearsalAttempt`, or `manifestSha256` with
+`PAGES_PUBLICATION_IDENTITY_INVALID`. The run attempt is kept only as provenance, in
+the intent payload's `attempt` and in the `log_url` of every status, which names
+`https://github.com/aarusso-nyx/devai/actions/runs/<sourceRun>/attempts/<attempt>`.
+
+Every attempt of one dispatch therefore computes the same identity bytes, provided the
+re-run builds the same site from the same commit: `siteSha256` is the digest of the
+built members, so a rebuild whose bytes differ is a different identity, and the open
+record of the first attempt blocks it with `PAGES_JOURNAL_OTHER_PUBLICATION_UNRESOLVED`
+exactly as it blocks any other publication. An interrupted site-only publication is
+recovered by re-running the same run from the Actions page, with no journal edit, and
+the table above applies as written. Never recover by dispatching
+`gh workflow run site-publish.yml --ref main` again while a record of the interrupted
+run is open: a new dispatch is a new `sourceRun`, so a new identity, and the open
+record refuses it with `PAGES_JOURNAL_OTHER_PUBLICATION_UNRESOLVED` until the
+reconciliation below closes it. The one case a re-run cannot resolve on its own is an
+`intent` whose submission is unknown, which needs the manual reconciliation below.
+
+Site-only records written before ADR-REL-0032 carry a `sourceAttempt` key. They are
+read as history and never rewritten: a `verified` one is skipped as another identity,
+and an unverified one blocks every later publication with
+`PAGES_JOURNAL_OTHER_PUBLICATION_UNRESOLVED` until the same manual reconciliation
+closes it. A re-run of such a record's run computes the new identity and does not
+resume it.
+
+### The release identity
+
+The release identity is exactly `repository`, `tag`, `commit`, `tree`,
+`rehearsalRun`, `rehearsalAttempt`, `manifestSha256`, `siteSha256`, and
+`controlCommit`. It keeps its attempt because the assets and the rehearsal bind per
+attempt: `rehearsalRun` and `rehearsalAttempt` are the publication inputs
+`rehearsal_run_id` and `rehearsal_attempt`, the retained assets are the artifact
+`devai-release-assets-<rehearsal attempt>` of that rehearsal, the manifest digest and
+the site digest come from those assets, and `controlCommit` is the
+`DEVAI_PROCESS_CONTROL_COMMIT` the run bound. The publication run's own attempt is
+not part of the identity; it is provenance, as for the site-only mode.
+
+A re-run of the same publication run, with the same inputs and an unchanged control
+commit, therefore computes the same identity, and `deploy-pages` follows the re-run
+table as written: a `submitted` record is observed and verified, a `verified` record
+with matching bytes is a no-op, an `intent` stops with
+`PAGES_PUBLICATION_SUBMISSION_UNKNOWN`. What differs from the site-only path is what
+the re-run costs and what a new identity means:
+
+- "Re-run failed jobs" re-runs `deploy-pages` alone, reusing the outputs of the earlier
+  `verify-ledger` and `finalize-release`, and waits at no reviewer, because
+  `github-pages` has none. "Re-run all jobs" re-enters the `devai-ledger-verification`
+  and `devai-rc-publication` stops; the Release and registry steps of
+  `finalize-release` are then a no-op on byte-identical assets and a hard refusal on
+  any mismatch, as stated under "Publish a public release".
+- The re-run downloads the same rehearsal assets and uploads a fresh Pages artifact
+  `github-pages-<run attempt>`; the record's own `artifactId` is what was submitted,
+  and the fresh artifact is never submitted against an existing record.
+- A publication dispatched against another rehearsal attempt, or after
+  `DEVAI_PROCESS_CONTROL_COMMIT` was repointed (OE-03), is a new identity. An open
+  record of the earlier identity refuses it with
+  `PAGES_JOURNAL_OTHER_PUBLICATION_UNRESOLVED` until that record is verified by a
+  re-run of its own run or closed by the reconciliation below. A repointed control
+  commit also needs the Pages migration audit reissued for it (OE-04), or the deploy
+  stops with `PAGES_JOURNAL_MIGRATION_AUDIT_INVALID` before it reads the journal.
+
+The operator recovers a release deploy, in this order: re-run the same publication run
+while a `submitted` record is open; reconcile by hand when the record is an `intent`;
+dispatch a new publication only when no record of the earlier identity is open, and
+then only against the rehearsal attempt whose assets that publication names.
+
+### Reconcile an intent with unknown submission
+
+This is the one recovery the workflow cannot perform, in either mode, because it needs
+an observation the run cannot make and the journal is single-writer for the workflows.
+It is a human Owner effect, performed with the Owner's own `gh` session, and the two
+status writes below are the only writes a human ever makes to the journal. Reads use
+the two governed `gh api` GET shapes that ADR-AUT-0002 admits for the harness sensors;
+the writes are outside the broker and never become sensor shapes.
+
+1. Read the retained record of the failed attempt: download
+   `devai-site-publication-<attempt>` or `devai-pages-publication-<attempt>` from the
+   run and read its `intent-created` line for the `intentId`, its `pages-created` line
+   for the `pagesId` when the response arrived but the status write did not, and its
+   `start` line for the identity and the `commit`.
+2. Read the journal through the governed GET and confirm the intent is still an
+   `intent`:
+
+   ```bash
+   gh api '/repos/aarusso-nyx/devai/deployments?environment=devai-pages-publication&per_page=100'
+   gh api '/repos/aarusso-nyx/devai/deployments/<intentId>/statuses?per_page=100'
+   ```
+
+   The first listing shows the intent with the identity of step 1 in its payload; the
+   second is empty. A non-empty second listing means the record is already
+   `submitted` or `verified`, and a re-run of its run resolves it without this
+   procedure.
+
+3. Observe whether a Pages deployment exists for the intent. With a `pagesId` from
+   step 1, read it directly; without one, read it by the Git SHA the submission was
+   built from, which the scripts set to the identity's `commit`:
+
+   ```bash
+   gh api /repos/aarusso-nyx/devai/pages/deployments/<pagesId>
+   gh api /repos/aarusso-nyx/devai/pages/deployments/<commit>
+   ```
+
+   A `status` of `succeed`, or one of the in-flight states the scripts wait on
+   (`queued`, `waiting`, `building`, `deployment_in_progress`, `syncing_files`,
+   `finished_file_sync`, `updating_pages`, `purging_cdn`), is an observed deployment.
+   With no `pagesId`, a not-found reply by SHA is confirmed absence only together
+   with live bytes that are not the artifact's; compare them with
+   `node scripts/process/verify-pages-bytes.mjs live <extracted artifact directory>`
+   after downloading the run's `github-pages-<attempt>` artifact. A failed read alone
+   is unknown, not absence; stop and read again later rather than guess.
+
+4. Either record the observed deployment against the intent, as a `submitted` status
+   with the id the observation used, so that the re-run observes and verifies it:
+
+   ```bash
+   gh api --method POST /repos/aarusso-nyx/devai/deployments/<intentId>/statuses \
+     -f state=in_progress \
+     -f environment=devai-pages-publication \
+     -f description='devai-pages:submitted:<pagesId>' \
+     -f log_url='https://github.com/aarusso-nyx/devai/actions/runs/<run id>/attempts/<attempt>' \
+     -F auto_inactive=false
+   ```
+
+   Never write `verified` by hand: the journal accepts only `submitted` after
+   `intent`, and `verified` is earned by the run's live-byte verification. Or close the
+   intent as abandoned, when step 3 confirmed absence. The journal has no abandoned
+   phase, so closure is the removal of the intent deployment, in two writes that must
+   both complete because an `inactive` status left behind fails every reader with
+   `PAGES_JOURNAL_STATUS_INVALID`:
+
+   ```bash
+   gh api --method POST /repos/aarusso-nyx/devai/deployments/<intentId>/statuses -f state=inactive
+   gh api --method DELETE /repos/aarusso-nyx/devai/deployments/<intentId>
+   ```
+
+5. Read the journal again through the governed GET of step 2 and confirm the outcome:
+   the intent now carries exactly one `in_progress` status
+   `devai-pages:submitted:<pagesId>`, or it is absent from the listing. Only then act
+   again: re-run the interrupted run to resume a recorded submission, or dispatch a
+   new publication after a closed intent. Record the effect in the campaign ledger like
+   any other Owner effect.
+
 ## Installed host publication controls
 
 The 1.5 installed host runner exposes the existing `release evidence-publish` and
