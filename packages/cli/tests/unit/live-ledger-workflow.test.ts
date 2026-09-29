@@ -948,7 +948,7 @@ describe('remote preflight workflow', () => {
       permissions?: Record<string, unknown>;
       concurrency?: Record<string, unknown>;
     };
-    expect(Object.keys(workflow.on ?? {})).toEqual(['pull_request']);
+    expect(Object.keys(workflow.on ?? {})).toEqual(['pull_request', 'merge_group']);
     expect(workflow.permissions).toEqual({ contents: 'read' });
     expect(workflow.concurrency?.['cancel-in-progress']).toBe(true);
   });
@@ -1018,7 +1018,7 @@ describe('remote preflight workflow', () => {
       name: 'remote execution of the attested RC closure',
       mutate: (source: string) =>
         source.replace(
-          'run: pnpm run release:pr-gate -- ${{ github.event.pull_request.base.sha }}',
+          'run: pnpm run release:pr-gate -- "$DEVAI_PREFLIGHT_BASE"',
           'run: pnpm run test:coverage:rc',
         ),
       diagnostic: 'CI_PREFLIGHT_ATTESTED_CLOSURE_FORBIDDEN',
