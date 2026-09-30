@@ -64,6 +64,8 @@ function exitValues() {
   const value = (name) =>
     Number(new RegExp(`export const ${name} = (\\d+);`, 'u').exec(source)?.[1]);
   return {
+    pass: value('EXIT_PASS'),
+    review: value('EXIT_REVIEW'),
     fail: value('EXIT_FAIL'),
     usage: value('EXIT_USAGE'),
     precondition: value('EXIT_PRECONDITION'),
@@ -71,6 +73,9 @@ function exitValues() {
 }
 
 function classify(code, exits) {
+  // ADR-CHK-0005: not-applicable is its own result class, never a failure.
+  if (code === 'CHECK_MEMBER_NOT_APPLICABLE') return ['not-applicable', exits.pass];
+  if (code === 'CHECK_MEMBER_POPULATION_EMPTY') return ['review', exits.review];
   if (code.startsWith('AUTHORITY_') || code === 'POLICY_DENY')
     return ['routing-authority', exits.usage];
   if (
@@ -107,6 +112,14 @@ function remediation(code) {
     return 'Correct `test-tasks.json`; for `--local`, declare `test:local-full`.';
   if (code === 'CHECK_RC_DB_TESTS_REQUIRED')
     return 'Set `DEVAI_DB_TESTS=1` and a reachable `DEVAI_DB_URL`.';
+  if (code === 'CHECK_MEMBER_NOT_APPLICABLE')
+    return 'None: the member does not apply to the detected repository kind, so read its own `status` rather than the aggregate `ok` when a CI list requires it to pass.';
+  if (code === 'CHECK_MEMBER_POPULATION_EMPTY')
+    return 'Reference the DEVAI actions the adopter uses in its workflows or scripts, or claim them in an invariant `measurable_via`, then rerun the member.';
+  if (code === 'CHECK_REPOSITORY_KIND_INVALID')
+    return 'Bind the adopter policy so `.devai/config/adopter-policy-binding.json` exists and carries a string `policy_id`, then retry.';
+  if (code === 'CHECK_MEMBER_APPLICABILITY_UNDECLARED')
+    return 'Declare `applicability` for the member or selector in `law/policy/check-suites.json`.';
   if (code === 'TASK_ROUND_INACTIVE')
     return 'Applies to `round run` and task dispatch only; `round status` reads a sealed round without it. Open or reactivate the task round before dispatching.';
   if (code.startsWith('AUTHORITY_') || code === 'POLICY_DENY')
