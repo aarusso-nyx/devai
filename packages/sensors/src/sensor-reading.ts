@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { validators } from '@devai-nyx/schemas';
-import type { SensorKind } from './sensor-registry.js';
+import { assertSensorKindSchemaAdmitted, type SensorKind } from './sensor-registry.js';
 
 export type { SensorKind } from './sensor-registry.js';
 
@@ -88,6 +88,8 @@ export interface SensorReading {
 const HEAD_LIMIT = 2048;
 
 export function buildSensorReading(input: SensorReadingInput): SensorReading {
+  // ADR-SCR-0011: a registry entry declared schema-unsupported never yields a reading.
+  assertSensorKindSchemaAdmitted(input.sensorKind);
   const command = input.command.join(' ');
   const command_hash = createHash('sha256').update(command).digest('hex');
   const timestamp = input.timestamp ?? new Date().toISOString();
