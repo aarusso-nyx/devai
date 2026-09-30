@@ -790,6 +790,34 @@ describe('ADR-v3 public result and semantic authority', () => {
         .map((authority) => authority.subject)
         .sort(),
     ).toEqual([...(descriptorKinds?.affected_rules ?? [])].sort());
+    // ADR-GOV-0024 and ADR-AUT-0003 (CMP-0005): each accepted record is effective and is the
+    // sole lineage head of every subject it declares, including the shared adopter schema.
+    for (const adrId of ['ADR-GOV-0024', 'ADR-AUT-0003']) {
+      const declared = records.find((record) => record.adr_id === adrId);
+      expect(declared?.affected_rules.length, adrId).toBeGreaterThan(0);
+      expect(result.adrs.find((row) => row.adr_id === adrId)).toMatchObject({
+        effective: true,
+        effective_affected_rules: [...(declared?.affected_rules ?? [])].sort(),
+      });
+      expect(
+        result.subject_authorities
+          .filter((authority) => authority.effective_head === adrId)
+          .map((authority) => ({ subject: authority.subject, members: authority.lineage_members }))
+          .sort((left, right) => left.subject.localeCompare(right.subject)),
+        adrId,
+      ).toEqual(
+        [...(declared?.affected_rules ?? [])]
+          .sort((left, right) => left.localeCompare(right))
+          .map((subject) => ({ subject, members: [adrId] })),
+      );
+    }
+    expect(
+      result.subject_authorities
+        .filter((authority) => authority.subject === 'law/schemas/adopter-policy.schema.json')
+        .map((authority) => authority.effective_head)
+        .filter((head) => head === 'ADR-GOV-0024' || head === 'ADR-AUT-0003')
+        .sort(),
+    ).toEqual(['ADR-AUT-0003', 'ADR-GOV-0024']);
     expect(validateAdrResult(result), JSON.stringify(validateAdrResult.errors)).toBe(true);
     expect(matchesAdrSemantics(records, result, markdownFiles(adrRoot).length)).toBe(true);
   });
