@@ -32,6 +32,34 @@ for that run only; the sweep dry run prints the effective inputs per member.
 }
 ```
 
+## Admitted kinds
+
+A kind is selectable only when the packaged schema admits it. The `sensor.kind` enum of
+[`law/schemas/sensor-reading.schema.json`](../../law/schemas/sensor-reading.schema.json) is
+closed, and every read kind the `sweep` preset selects from
+[`law/policy/sensor-registry.json`](../../law/policy/sensor-registry.json) is in it: the sweep
+members minus the enum is the empty set
+([ADR-SCR-0011](../../law/adr/ADR-SCR-0011-sweep-kinds-admitted-by-the-packaged-schema.md)). The
+invariant is written on the preset contract
+([`law/policy/sense-presets.json`](../../law/policy/sense-presets.json), `selection_effect_rule`)
+and is held by a source-level test, so the registry, the preset, and the schema an adopter
+extracts from the package agree on the admitted set; an adopter preflight that compares the
+packaged registry with the packaged schema finds no kind on one side only.
+
+If a registry entry is ever intentionally unsupported by the schema, the entry says so
+(`schema_admission` equal to `unsupported`) and `sense run` refuses that sensor before it starts
+with `SENSOR_KIND_SCHEMA_UNSUPPORTED`; no reading is emitted for it, so no invalid reading reaches
+a store. A failed or skipped sensor of an admitted kind records `fail` or `skipped` and is never
+promoted to `pass`.
+
+The four diagnostic kinds `decision_record_integrity`, `decision_citation_resolution`,
+`archive_immutability`, and `round_record_integrity` are admitted under ADR-SCR-0011; they map to
+no scorecard cell. The five schema-only values `api_test`, `contract_validation`, `db_test`,
+`journey_test`, and `mutation_test` name no registry entry and are kept as legacy, listed on the
+[sensor-kind catalog](../reference/cli/sensor-kinds.md#admitted-kinds-and-schema-only-legacy-values);
+they take no declared input, and naming one under `inputs` is refused as a kind the registry does
+not hold.
+
 ## Keys
 
 | Kind                                                                                                   | Key                            | Sensor default                                                                                                                       | What it changes                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
