@@ -375,8 +375,11 @@ declarations and the result contract are on
   failure with its named code; it never becomes not-applicable.
 
 DEVAI identifies the repository kind from the bound configuration, not from the directories
-you have: your tree is an adopter unless `.devai/config/adopter-policy-binding.json` carries the
-framework's own `policy_id`, `devai.devai-adoption`. Keep your `policy_id` in your own namespace.
+you have: your tree is an adopter when `.devai/config/adopter-policy-binding.json` carries a
+`policy_id` other than the framework's own `devai.devai-adoption`. Keep your `policy_id` in your
+own namespace. A checkout with no binding receipt is not classified: every member declared
+`self` or `adopter` fails with `CHECK_REPOSITORY_KIND_INVALID`, and nothing defaults to adopter
+or to not-applicable, so bind a policy before you test the classification.
 
 Test the classification once after binding and again after each upgrade. Run each of the three
 members through `--only`, read `status`, `code`, and `value.repository_kind` from the result, run
