@@ -144,17 +144,17 @@ Close checks are the campaign's standing set (`adrs`, `schemas`, `docs-links`,
 detached worktree at the merged head after `pnpm run build` and
 `pnpm run release:bootstrap`.
 
-| Round  | Merged head | Pull requests    | State                                                                                                                                                                                                                                 |
-| ------ | ----------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| R-0301 | `e5cfdb77`  | #173, #176, #194 | `closed`: the check-suite declaration (decision 3) merged as #194 (`722cb5a6`) after the Owner accepted its broker widening; the single RC attestation ran on that head and its task-policy digest is in the closure                  |
-| R-0302 | `12d52fa5`  | #179, #181       | `closed`: close checks green on the merged head; `test-tasks.json` unchanged, so no attestation is owed                                                                                                                               |
-| R-0303 | `0a66e13a`  | #183             | `closed`: close checks green on the merged head (990 skills tests, 3480 CLI tests); the eight-receipt acceptance was proven in the wave                                                                                               |
-| R-0304 | `468de683`  | #188             | `closing`: OE-01 resolved by the serialized fallback (decision 5), which the ledger cannot yet record as performed without disabling the serialized-admission check; the RC task-policy digest of the run on `722cb5a6` is `4d284d80` |
-| R-0305 | `04b141fe`  | #189, #190, #191 | `closed`: review mode, the versioned tier default, pinned resolution, the shared reply extractor; the attestation is covered by the run on `722cb5a6`; OE-05 performed with the fixture `cmp-0003-rejected-pass.txt`                  |
-| R-0306 | `5eda694f`  | #192, #193       | `closed`: OE-02, OE-03, and OE-04 performed on 2026-09-29 (control commit `722cb5a6`; the audit for tag v1.6.0 reissued against it)                                                                                                   |
-| R-0307 | `90d5fc7d`  | #195             | `closed`: OE-06 performed (Claude Code 2.1.277); the three `FORBID-CI-WITHOUT-ADR` findings on its law commits carry Owner receipts in `law/policy/forbidden-action-authorizations.json`                                              |
-| R-0308 |             | #197             | `planned`: waits for the Architect's acceptance of ADR-SCR-0011, ADR-REL-0033, and ADR-EVI-0003 (section 7)                                                                                                                           |
-| R-0309 |             | #197             | `planned`: waits for the acceptance of ADR-CHK-0005 (section 7)                                                                                                                                                                       |
+| Round  | Merged head | Pull requests    | State                                                                                                                                                                                                                                                                                           |
+| ------ | ----------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| R-0301 | `e5cfdb77`  | #173, #176, #194 | `closed`: the check-suite declaration (decision 3) merged as #194 (`722cb5a6`) after the Owner accepted its broker widening; the single RC attestation ran on that head and its task-policy digest is in the closure                                                                            |
+| R-0302 | `12d52fa5`  | #179, #181       | `closed`: close checks green on the merged head; `test-tasks.json` unchanged, so no attestation is owed                                                                                                                                                                                         |
+| R-0303 | `0a66e13a`  | #183             | `closed`: close checks green on the merged head (990 skills tests, 3480 CLI tests); the eight-receipt acceptance was proven in the wave                                                                                                                                                         |
+| R-0304 | `468de683`  | #188             | `closing`: OE-01 resolved by the serialized fallback (decision 5), which the ledger cannot yet record as performed without disabling the serialized-admission check; the RC task-policy digest of the run on `722cb5a6` is `4d284d80`                                                           |
+| R-0305 | `04b141fe`  | #189, #190, #191 | `closed`: review mode, the versioned tier default, pinned resolution, the shared reply extractor; the attestation is covered by the run on `722cb5a6`; OE-05 performed with the fixture `cmp-0003-rejected-pass.txt`                                                                            |
+| R-0306 | `5eda694f`  | #192, #193       | `closed`: OE-02, OE-03, and OE-04 performed on 2026-09-29 (control commit `722cb5a6`; the audit for tag v1.6.0 reissued against it)                                                                                                                                                             |
+| R-0307 | `90d5fc7d`  | #195             | `closed`: OE-06 performed (Claude Code 2.1.277); the three `FORBID-CI-WITHOUT-ADR` findings on its law commits carry Owner receipts in `law/policy/forbidden-action-authorizations.json`                                                                                                        |
+| R-0308 | `bda28a33`  | #199, #200, #201 | `closing`: the four adopter records accepted (#199); wave CTG-0382 (#175) merged as #200 and wave CTG-0381 (#184, #185) as #201; close checks green on the merged head (`schemas` pass, `test:sensors` 1124, `test:loop` 1052, `test:cli` 3510, `release:static-integrity` ok); waits for OE-07 |
+| R-0309 |             | #199             | `open`: TASK-0391 in progress since 2026-09-30                                                                                                                                                                                                                                                  |
 
 Backlog observed while closing R-0302 and R-0303, outside every task boundary:
 
@@ -236,6 +236,22 @@ Backlog observed while performing the Owner effects and the OE-05 experiment
   (`test:root`, three cases). The schema needs an `outcome` (`performed` or
   `fallback`) so a required effect can close its round without widening what
   the checker enforces; a `plan` and `law` task for a later round.
+- The error-code generator scans only `packages/{cli,authority,utils}/src`, so
+  the `RELEASE_PACKED_ADOPTER_*` codes of the rehearsal script and
+  `SENSOR_KIND_NOT_IN_SCHEMA` of the schemas package cannot appear on the
+  generated page; they are named on the pack-resolution page instead.
+- `sense run --preset=<name>` is recognised only by the schema-admission
+  refusal; the selection code still rejects the inline form with
+  `SENSE_SELECTION_INVALID`. Pre-existing; decide whether the inline form is a
+  supported selection.
+- `action_effect_inference` emits no reading in a clean adopter (ENOENT on the
+  framework's effects policy), so the packed sweep validates every emitted
+  reading but cannot demand one from every member; R-0309 territory.
+- Two more `test:cli` cases are load-sensitive when another suite runs
+  concurrently (`authority-command-boundary-finalization`, the `check-runner`
+  fifteen-second timeout); both pass alone. `package.json` is class
+  `toolchain`, so a `ci(scripts)` commit that also adds a package script fails
+  the commit-range probe (#201 needed a `build(package)` split).
 - `attestation_reissue` is `true` only on R-0301 although decision 1 names
   R-0304 and R-0305 as descriptor-changing rounds; the closures of R-0301 and
   R-0304 carry the digest of the one run anyway. The campaign schema should
