@@ -336,3 +336,20 @@ Article 9 makes a change to Articles 6 to 10 a constitutional amendment with
 a new version. Decision 7 makes it a campaign of its own, proposed after
 ADR-CFG-0002 (R-0302) on which its materialization depends, starting from the
 sketch in the extension proposal.
+
+## 8. Release and close
+
+On 2026-09-30 the Owner authorized OE-07 and round R-0311 and delegated every
+environment approval through the final publication. The first rehearsals of
+v1.7.0 exposed four defects, each fixed before publication: the shared
+composite action cannot resolve in jobs that check out under a path (#208);
+the committed descriptor used a selector kind the pinned 1.5.4 verifier does
+not admit (R-0311, ADR-CHK-0006, #209); the repository-wide decision record
+scan outgrew its 15 s test limit (#210); the release lint report was one log
+line the runner dropped (#211); advisories published after v1.6.0 in the
+documentation site needed the compatible fixes and new Owner waivers (#212);
+and the installed smoke still expected a value ADR-CFG-0002 now retires (#213).
+The RC attestation was re-issued on `da5253e1` (task-policy digest `95fc800e`),
+its evidence published as an immutable bundle, and the rehearsal (run 36693375074) and publication (run 36693968122) passed. `v1.7.0` is a stable
+release (`latest`) signed with the release tag key; OE-07 is performed,
+R-0308 and R-0311 are closed, and the campaign is closed.
