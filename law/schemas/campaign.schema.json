@@ -121,6 +121,10 @@
           "performed_at": {
             "type": ["string", "null"],
             "format": "date-time"
+          },
+          "outcome": {
+            "enum": ["performed", "fallback"],
+            "description": "How the effect was resolved. performed: the effect described was carried out; this is the meaning when outcome is absent and performed_at is set. fallback: the effect was resolved by the fallback its description names, and performed_at then records when the fallback was recorded, not when the described effect happened. A required effect closes its round with either outcome once performed_at is set; a rule that depends on the described effect itself, such as the merge queue that lifts serialized admission, stays in force while the outcome is fallback."
           }
         }
       },
