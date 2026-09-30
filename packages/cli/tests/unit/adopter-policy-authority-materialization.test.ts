@@ -229,16 +229,30 @@ describe('IA-004: binding is byte-stable and names the extension it materialized
   });
 
   it('a block without a test class takes the package default selectors', async () => {
-    const reference = await boundRepository();
-    await expectBound(reference, fixture('reference.json'));
-    const defaults = await boundRepository();
-    await expectBound(defaults, fixture('default-test-class.json'));
-
-    const digest = (repo: string) =>
+    // Rules embed the repository id, so the comparison stays within one repository.
+    const repo = await boundRepository();
+    const digest = () =>
       (json(repo, RECEIPT)['authority_extension'] as JsonObject | undefined)?.['digest_sha256'];
-    expect(digest(reference)).toMatch(SHA256);
-    expect(digest(defaults)).toBe(digest(reference));
-    expect(adopterExtension(defaults)).toEqual(adopterExtension(reference));
+    const extensionRules = () =>
+      (json(repo, POLICY)['rules'] as JsonObject[]).filter((rule) =>
+        String(rule['rule_id']).startsWith('adopter-path-'),
+      );
+    await expectBound(repo, fixture('reference.json'));
+    const reference = {
+      digest: digest(),
+      extension: adopterExtension(repo),
+      rules: extensionRules(),
+      resolved: json(repo, POLICY)['resolved_digest_sha256'],
+    };
+    expect(reference.digest).toMatch(SHA256);
+    expect(reference.rules).toHaveLength(REFERENCE_RULE_COUNT);
+
+    await expectBound(repo, fixture('default-test-class.json'));
+
+    expect(digest()).toBe(reference.digest);
+    expect(adopterExtension(repo)).toEqual(reference.extension);
+    expect(extensionRules()).toEqual(reference.rules);
+    expect(json(repo, POLICY)['resolved_digest_sha256']).toBe(reference.resolved);
   });
 
   it('changing one selector changes the extension digest, the resolved digest, and the receipt', async () => {
