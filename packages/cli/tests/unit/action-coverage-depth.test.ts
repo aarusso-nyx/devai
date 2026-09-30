@@ -1,8 +1,10 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { loadDomains } from '../../../spec/src/spec/domains-loader.js';
+import { executeCheckMember } from '../../src/commands/check/adapters.js';
+import { resolveCheckPlan, runCheckPlan } from '../../src/commands/check/contracts.js';
 import { runActionCoverageCheck } from '../../src/commands/spec/validate-action-coverage.js';
 
 const repositoryRoot = resolve(import.meta.dirname, '../../../..');
@@ -128,5 +130,117 @@ describe('action coverage scope and discovery boundaries', () => {
     );
     expect(result.adopterFacingAuthorities).toEqual(['sensor', 'specifier']);
     expect(result.unclaimed).toEqual(['sense record']);
+  });
+});
+
+const RECEIPT = '.devai/config/adopter-policy-binding.json';
+
+/** A repository whose kind is bound only by its adopter-policy receipt (ADR-CHK-0005). */
+function boundFixture(policyId: string): ReturnType<typeof fixture> {
+  const value = fixture();
+  mkdirSync(join(value.root, '.devai/config'), { recursive: true });
+  writeFileSync(
+    join(value.root, '.devai/config/domains.json'),
+    readFileSync(join(repositoryRoot, '.devai/config/domains.json')),
+  );
+  writeFileSync(
+    join(value.root, RECEIPT),
+    `${JSON.stringify({ schemaVersion: '1.0.0', policy_id: policyId, policy_version: '1.0.0' })}\n`,
+  );
+  return value;
+}
+
+async function dispatchCoverage(root: string) {
+  const plan = resolveCheckPlan(root, { only: 'action-coverage' });
+  const report = await runCheckPlan(plan, (member) =>
+    executeCheckMember(member, { repoRoot: root }),
+  );
+  const [result] = report.results;
+  if (result === undefined) throw new Error('action-coverage returned no result');
+  return { report, result };
+}
+
+describe('action coverage through check evaluates the detected repository kind', () => {
+  it('evaluates the adopter scope from the receipt even beside framework markers', async () => {
+    const value = boundFixture('acme.devai-adoption');
+    mkdirSync(join(value.root, 'packages/cli/src'), { recursive: true });
+    writeFileSync(join(value.root, 'packages/cli/src/bin.ts'), 'export {};\n');
+    mkdirSync(join(value.root, 'examples/redox-pack-fixture'), { recursive: true });
+    mkdirSync(join(value.root, 'scripts'), { recursive: true });
+    writeFileSync(join(value.root, 'scripts/check.sh'), 'pnpm exec devai sense inventory\n');
+
+    const { result } = await dispatchCoverage(value.root);
+
+    expect(result.status).toBe('fail');
+    expect(result.value).toMatchObject({
+      ok: false,
+      scope: 'adopter',
+      unclaimed: ['sense inventory'],
+      inScopeCount: 1,
+    });
+  });
+
+  it('evaluates the self scope from the framework receipt without framework markers', async () => {
+    const value = boundFixture('devai.devai-adoption');
+
+    const { result } = await dispatchCoverage(value.root);
+
+    expect(result.status).toBe('fail');
+    expect(result.value).toMatchObject({ ok: false, scope: 'self', inScopeCount: 61 });
+  });
+
+  it('passes an adopter whose referenced action is claimed by an invariant', async () => {
+    const value = boundFixture('acme.devai-adoption');
+    const invariant = JSON.parse(
+      readFileSync(join(repositoryRoot, 'law/invariants/INV-CORE-002.json'), 'utf8'),
+    ) as Record<string, unknown>;
+    writeFileSync(
+      join(value.invariants, 'INV-CORE-002.json'),
+      `${JSON.stringify({ ...invariant, measurable_via: ['sense inventory'] }, null, 2)}\n`,
+    );
+    mkdirSync(join(value.root, '.github/workflows'), { recursive: true });
+    writeFileSync(
+      join(value.root, '.github/workflows/check.yml'),
+      'steps:\n  - run: pnpm exec devai sense inventory\n',
+    );
+
+    expect(run(value, { scope: 'adopter' })).toMatchObject({
+      ok: true,
+      unclaimed: [],
+      claimedCount: 1,
+      inScopeCount: 1,
+    });
+    const { report, result } = await dispatchCoverage(value.root);
+
+    expect(result.status).toBe('pass');
+    expect(result.value).toMatchObject({
+      ok: true,
+      scope: 'adopter',
+      unclaimed: [],
+      claimedCount: 1,
+    });
+    expect(report.ok).toBe(true);
+  });
+
+  it('reports an adopter with no action in scope as an explicit empty population', async () => {
+    const value = boundFixture('acme.devai-adoption');
+
+    const { report, result } = await dispatchCoverage(value.root);
+
+    expect(result).toMatchObject({
+      id: 'action-coverage',
+      status: 'review',
+      code: 'CHECK_MEMBER_POPULATION_EMPTY',
+    });
+    expect(result.value).toMatchObject({
+      member: 'action-coverage',
+      applicability: 'both',
+      repository_kind: 'adopter',
+      kind_evidence: { source: RECEIPT, pointer: '/policy_id', value: 'acme.devai-adoption' },
+      input_source: 'repository',
+      scope: 'adopter',
+      population: 0,
+    });
+    expect(report).toMatchObject({ ok: false, readiness_status: 'review', exit_code: 1 });
   });
 });
