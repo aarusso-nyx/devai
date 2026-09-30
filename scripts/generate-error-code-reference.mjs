@@ -106,6 +106,8 @@ function remediation(code) {
     return 'Correct `test-tasks.json`; for `--local`, declare `test:local-full`.';
   if (code === 'CHECK_RC_DB_TESTS_REQUIRED')
     return 'Set `DEVAI_DB_TESTS=1` and a reachable `DEVAI_DB_URL`.';
+  if (code === 'TASK_ROUND_INACTIVE')
+    return 'Applies to `round run` and task dispatch only; `round status` reads a sealed round without it. Open or reactivate the task round before dispatching.';
   if (code.startsWith('AUTHORITY_') || code === 'POLICY_DENY')
     return 'Follow the structured envelope remediation without widening the declared authority.';
   if (code.startsWith('CHECK_'))
