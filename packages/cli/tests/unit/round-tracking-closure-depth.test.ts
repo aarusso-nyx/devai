@@ -346,7 +346,7 @@ describe.sequential('round status and dispatch on a sealed round (ADR-EVI-0003)'
       tasks?: unknown;
     };
     expect(body.lifecycle).toMatchObject({ id: SEALED_ROUND, location: 'closed' });
-    if (body.tasks !== undefined) expect(JSON.stringify(body.tasks)).toMatch(/inactive/iu);
+    expect(body).not.toHaveProperty('tasks');
     expect(sha(root, CLOSE_STATE)).toBe(before);
   });
 
@@ -398,11 +398,16 @@ describe.sequential('round status and dispatch on a sealed round (ADR-EVI-0003)'
     expect(sha(root, CLOSE_STATE)).toBe(before);
   });
 
-  it('IA-004 fails an unknown round without reporting closed', async () => {
+  it('IA-004 fails an unknown round with ROUND_RECORD_NOT_FOUND without reporting closed', async () => {
     const root = repository();
     const result = await invokeCommand(roundStatus, argvFor('round-status', root, 'R-0099'));
     expect(result.exit).not.toBe(0);
     expect(result.stdout).not.toMatch(/closed/u);
-    expect(JSON.parse(result.stderr)).toMatchObject({ operation: 'status', exit: 5 });
+    expect(JSON.parse(result.stderr)).toEqual({
+      code: 'ROUND_RECORD_NOT_FOUND',
+      operation: 'status',
+      exit: 2,
+    });
+    expect(result.exit).toBe(2);
   });
 });
