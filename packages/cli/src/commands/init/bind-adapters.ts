@@ -13,6 +13,7 @@ import { dirname, join, relative, resolve, sep } from 'node:path';
 import { getValidator } from '@devai-nyx/schemas';
 import { EXIT_FAIL, EXIT_PASS, EXIT_USAGE } from '@devai-nyx/utils';
 import { executeAuthorityPolicyMaterialization } from '../../authority/command-capabilities.js';
+import type { AdopterAuthorityExtension } from '../../authority/policy-adopter-extension.js';
 import { resolveCliVersion } from '../../version.js';
 import {
   loadTrackingPolicyDefaults,
@@ -38,6 +39,7 @@ import {
 } from '../../services/github-actions-adapter/index.js';
 import {
   ADOPTER_POLICY_TARGETS,
+  compileAdopterPolicyAuthority,
   isJsonObject,
   jsonBytes,
   resolveAdopterPolicyProjection,
@@ -181,10 +183,19 @@ function materializeAdopterPolicy(targetRoot: string, sourceArgument: string) {
   const currentProject = existsSync(projectPath)
     ? (JSON.parse(readFileSync(projectPath, 'utf8')) as JsonObject)
     : {};
-  const { files: resolved, retired_keys: retiredKeys } = resolveAdopterPolicyProjection({
+  const projectionInput = {
     policy,
     currentProject,
     frameworkVersion: resolveCliVersion(),
+    targetRoot,
+  };
+  const { files: resolved, retired_keys: retiredKeys } =
+    resolveAdopterPolicyProjection(projectionInput);
+  // ADR-AUT-0003: the extension this source compiles to. Its id, version, and rule count
+  // do not depend on the repository identity; its digest does, so the receipt records it
+  // from the authority policy once that is materialized (recordAuthorityExtension).
+  const authorityExtension = compileAdopterPolicyAuthority(projectionInput, {
+    repositoryId: 'adopter-repository',
   });
   const receipt = {
     schemaVersion: '1.0.0',
@@ -226,8 +237,55 @@ function materializeAdopterPolicy(targetRoot: string, sourceArgument: string) {
   return {
     receipt_path: ADOPTER_POLICY_RECEIPT,
     receipt,
+    authorityExtension,
     ...(recovery !== null ? { recovered_interrupted_bind: recovery } : {}),
   };
+}
+
+/**
+ * Record in the receipt the adopter extension the authority policy now carries
+ * (ADR-AUT-0003): its id, version, the digest the materialized policy lists for it, and its
+ * rule count. The digest is read back from the policy the trusted sources just derived, so
+ * the receipt and the policy name the same bytes without a second repository-identity
+ * lookup. From then on the trusted sources hold the source to this receipt strictly.
+ */
+function recordAuthorityExtension(
+  targetRoot: string,
+  receipt: Readonly<Record<string, unknown>>,
+  extension: AdopterAuthorityExtension | undefined,
+): Readonly<Record<string, unknown>> {
+  if (extension === undefined) return receipt;
+  const policy: unknown = JSON.parse(
+    readFileSync(join(targetRoot, '.devai/config/authority-policy.json'), 'utf8'),
+  );
+  const listed = isJsonObject(policy) ? policy['additive_extensions'] : undefined;
+  const entry = Array.isArray(listed)
+    ? listed.find(
+        (candidate: unknown) =>
+          isJsonObject(candidate) &&
+          candidate['extension_id'] === extension.extension_id &&
+          candidate['extension_version'] === extension.extension_version,
+      )
+    : undefined;
+  if (!isJsonObject(entry) || typeof entry['digest_sha256'] !== 'string') {
+    throw new Error(
+      `AUTHORITY_POLICY_DIGEST_MISMATCH:authority-policy.json lists no adopter extension ${extension.extension_id}`,
+    );
+  }
+  const recorded = {
+    ...receipt,
+    authority_extension: {
+      extension_id: extension.extension_id,
+      extension_version: extension.extension_version,
+      digest_sha256: entry['digest_sha256'],
+      rule_count: extension.rules.length,
+    },
+  };
+  const bytes = jsonBytes(recorded);
+  if (readTextIfPresent(join(targetRoot, ADOPTER_POLICY_RECEIPT)) !== bytes) {
+    writeAdopterPolicyPairAtomically(targetRoot, new Map([[ADOPTER_POLICY_RECEIPT, bytes]]));
+  }
+  return recorded;
 }
 
 /** Validate and bind an Architect-owned adopter policy source (--adopter-policy). */
@@ -245,10 +303,14 @@ export function bindAdopterPolicy(
     return;
   }
   try {
-    const result = materializeAdopterPolicy(targetRoot, options.adopterPolicy);
+    const { authorityExtension, ...result } = materializeAdopterPolicy(
+      targetRoot,
+      options.adopterPolicy,
+    );
     const artifact = executeAuthorityPolicyMaterialization();
+    const receipt = recordAuthorityExtension(targetRoot, result.receipt, authorityExtension);
     emit(
-      { ...result, authority_policy: artifact },
+      { ...result, receipt, authority_policy: artifact },
       options.human === true,
       `init bind --adopter-policy: ${result.receipt_path}`,
     );

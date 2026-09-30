@@ -15,6 +15,37 @@ export interface AdopterPolicyBinding {
    * matrix rows (ADR-CFG-0002). Optional so receipts written before the field parse.
    */
   readonly retired_keys?: readonly string[];
+  /**
+   * Provenance of the adopter path-authority extension the bind materialized into
+   * authority-policy.json (ADR-AUT-0003). Present only when the source declares an
+   * `authority` block; optional so receipts written before the field parse.
+   */
+  readonly authority_extension?: AdopterAuthorityExtensionProvenance;
+}
+
+export interface AdopterAuthorityExtensionProvenance {
+  readonly extension_id: string;
+  readonly extension_version: string;
+  readonly digest_sha256: string;
+  readonly rule_count: number;
+}
+
+function authorityExtensionValid(value: unknown): boolean {
+  const keys = ['digest_sha256', 'extension_id', 'extension_version', 'rule_count'];
+  return (
+    isJsonObject(value) &&
+    Object.keys(value).length === keys.length &&
+    keys.every((key) => Object.hasOwn(value, key)) &&
+    typeof value['extension_id'] === 'string' &&
+    value['extension_id'].length > 0 &&
+    typeof value['extension_version'] === 'string' &&
+    value['extension_version'].length > 0 &&
+    typeof value['digest_sha256'] === 'string' &&
+    /^[a-f0-9]{64}$/u.test(value['digest_sha256']) &&
+    typeof value['rule_count'] === 'number' &&
+    Number.isSafeInteger(value['rule_count']) &&
+    value['rule_count'] > 0
+  );
 }
 
 /** Parse the existing closed v1 receipt without selecting files or repairing inputs. */
@@ -39,7 +70,7 @@ export function parseAdopterPolicyBinding(
     'source_digest_sha256',
     'source_path',
   ];
-  const optionalKeys = ['retired_keys'];
+  const optionalKeys = ['authority_extension', 'retired_keys'];
   if (
     bindingKeys.some((key) => !Object.hasOwn(parsed, key)) ||
     Object.keys(parsed).some((key) => !bindingKeys.includes(key) && !optionalKeys.includes(key))
@@ -57,6 +88,12 @@ export function parseAdopterPolicyBinding(
     ) {
       return { reason: 'BINDING_MALFORMED' };
     }
+  }
+  if (
+    Object.hasOwn(parsed, 'authority_extension') &&
+    !authorityExtensionValid(parsed['authority_extension'])
+  ) {
+    return { reason: 'BINDING_MALFORMED' };
   }
   const materialized = parsed['materialized'];
   const digest = /^[a-f0-9]{64}$/u;
