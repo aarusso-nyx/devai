@@ -48,7 +48,62 @@
     },
     "thresholds": { "type": "object", "additionalProperties": true },
     "scorecard_na": { "$ref": "scorecard-na-config.schema.json" },
-    "glob_guards": { "$ref": "glob-guards.schema.json" }
+    "glob_guards": { "$ref": "glob-guards.schema.json" },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["roots"],
+      "description": "Optional adopter path-authority extension admitted by Constitution 1.0.2 Article 6 (ADR-GOV-0024) and declared by ADR-AUT-0003: explicitly declared roots under a fixed class ladder, architecture over test over the Engineer root remainder. Materialized only through init bind --adopter-policy and refused while the bound constitution is below 1.0.2.",
+      "properties": {
+        "extension_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9.-]+$",
+          "description": "Identifier of the compiled additive extension; defaults to <policy_id>.path-authority and must differ from devai-adopter-authority."
+        },
+        "roots": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.-]*$" },
+          "description": "Single path segments declared explicitly: no separator, no dot segment, no glob metacharacter, never equal to or a prefix of a core-table row, and no root a prefix of another."
+        },
+        "classes": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "The two path classes of the fixed ladder. test is optional and defaults to the package selectors in law/policy/adopter-defaults/path-authority-classes.json; architecture has no default.",
+          "properties": {
+            "test": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["selectors"],
+              "description": "Inspector class at precedence 700: test directories and colocated test files under each root.",
+              "properties": {
+                "selectors": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": { "type": "string", "minLength": 1 },
+                  "description": "Root-relative minimatch globs applied under every declared root; never absolute, never starting with a root segment, and free of .., backslashes, braces, and extglobs."
+                }
+              }
+            },
+            "architecture": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["selectors"],
+              "description": "Architect class at precedence 750: schema definitions, blueprints, and the architectural specifications the adopter names under each root.",
+              "properties": {
+                "selectors": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": { "type": "string", "minLength": 1 },
+                  "description": "Root-relative minimatch globs applied under every declared root; never absolute, never starting with a root segment, and free of .., backslashes, braces, and extglobs."
+                }
+              }
+            }
+          }
+        }
+      }
+    }
   },
   "schema_version": "1.0.0",
   "examples": [
@@ -56,6 +111,19 @@
       "schemaVersion": "1.0.0",
       "policy_id": "teat.devai-adoption",
       "policy_version": "1.0.0"
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "policy_id": "detran.devai-adoption",
+      "policy_version": "1.1.0",
+      "authority": {
+        "extension_id": "detran.path-authority",
+        "roots": ["apps", "backend", "frontend", "mobile", "portal", "src"],
+        "classes": {
+          "test": { "selectors": ["**/*.spec.*", "**/*.test.*", "**/test/**", "**/tests/**"] },
+          "architecture": { "selectors": ["**/ddl/**/*.sql", "**/blueprints/**"] }
+        }
+      }
     }
   ]
 }
