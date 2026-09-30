@@ -262,10 +262,17 @@ export function checkCampaign(root, campaignDir) {
   for (const round of campaign.rounds) visit(round.id);
   // Serialized admission (ADR-CHK-0004, isolation.serialized_admission of
   // law/policy/campaign-execution.json): while the merge queue Owner effect
-  // OE-01 is unperformed, at most one pull request is in pre_merge. A coupled
-  // wave ships as one pull request, so all of its pre_merge tasks count once.
+  // OE-01 is unperformed, or was resolved by its fallback outcome, at most one
+  // pull request is in pre_merge. Admission is lifted only when performed_at is
+  // set and the outcome is performed or absent. A coupled wave ships as one
+  // pull request, so all of its pre_merge tasks count once.
   const mergeQueue = campaign.owner_effects.find((effect) => effect.id === 'OE-01');
-  if (!mergeQueue?.performed_at) {
+  const serializedReason = !mergeQueue?.performed_at
+    ? 'OE-01 has no performed_at'
+    : mergeQueue.outcome === 'fallback'
+      ? 'OE-01 was resolved by its fallback'
+      : undefined;
+  if (serializedReason !== undefined) {
     const pullRequests = campaign.rounds.flatMap((round) =>
       round.waves
         .map((wave) => wave.tasks.filter((task) => task.status === 'pre_merge'))
@@ -274,7 +281,7 @@ export function checkCampaign(root, campaignDir) {
     );
     if (pullRequests.length > 1) {
       problem(
-        `concurrent-pre-merge-under-serialized-admission: ${pullRequests.join(', ')} are in pre_merge as ${pullRequests.length} pull requests while OE-01 has no performed_at`,
+        `concurrent-pre-merge-under-serialized-admission: ${pullRequests.join(', ')} are in pre_merge as ${pullRequests.length} pull requests while ${serializedReason}`,
       );
     }
   }
