@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "path-authority-classes",
+  "authority": "Architect",
+  "classes": {
+    "test": {
+      "selectors": ["**/*.spec.*", "**/*.test.*", "**/test/**", "**/tests/**"]
+    }
+  }
+}
