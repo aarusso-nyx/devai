@@ -36,7 +36,7 @@ import { validateInvariantStrategies, type InvariantLike } from '@devai-nyx/spec
 import { runActionCoverageCheck } from '../spec/validate-action-coverage.js';
 import { trackedPaths } from '../../services/check-runner/policy.js';
 import { loadChangeTaxonomy } from '../../services/change-taxonomy.js';
-import type { CheckStatus } from './contracts.js';
+import type { CheckApplicability, CheckStatus, RepositoryKindDetection } from './contracts.js';
 import {
   type CheckExecutionOptions,
   type RawExecution,
@@ -105,25 +105,78 @@ export function strategyReport(repoRoot: string): unknown {
   return validateInvariantStrategies(invariants);
 }
 
-export function actionCoverageReport(repoRoot: string): unknown {
+/**
+ * Evaluate action coverage in the scope the binding receipt detected (ADR-CHK-0005). An
+ * adopter with no action in scope is an explicit empty population, never an empty pass.
+ */
+export function actionCoverageReport(
+  repoRoot: string,
+  applicability: CheckApplicability,
+  detection: RepositoryKindDetection,
+): RawExecution {
   const domains = loadDomains(join(repoRoot, '.devai/config/domains.json'));
   const report = runActionCoverageCheck({
     repoRoot,
     invariantsDir: join(repoRoot, 'law/invariants'),
     domains,
-    scope: 'self',
+    scope: detection.kind,
   });
-  return { ...report, ok: report.ok };
+  if (report.scope === 'adopter' && report.inScopeCount === 0) {
+    return {
+      status: 'review',
+      code: 'CHECK_MEMBER_POPULATION_EMPTY',
+      message: 'action-coverage found no adopter action in scope; nothing was evaluated',
+      value: {
+        member: 'action-coverage',
+        applicability,
+        repository_kind: detection.kind,
+        kind_evidence: detection.evidence,
+        input_source: 'repository',
+        scope: report.scope,
+        population: 0,
+        reason:
+          'no workflow, script, or invariant measurable_via claim of the adopter references a DEVAI action',
+      },
+    };
+  }
+  return fromValue({ ...report, ok: report.ok });
+}
+
+/** Read one explicitly named JSON input; a missing or unparsable path is a named failure. */
+function explicitJson(
+  repoRoot: string,
+  option: string,
+  path: string,
+): {
+  readonly absolute: string;
+  readonly value: unknown;
+} {
+  const absolute = resolve(repoRoot, path);
+  if (!existsSync(absolute)) {
+    throw new Error(`CHECK_INPUT_PATH_INVALID: ${option} ${path} does not exist`);
+  }
+  try {
+    return { absolute, value: JSON.parse(readFileSync(absolute, 'utf8')) as unknown };
+  } catch {
+    throw new Error(`CHECK_INPUT_PATH_INVALID: ${option} ${path} is not readable JSON`);
+  }
 }
 
 export function schemaInstanceReport(options: CheckExecutionOptions): unknown {
   if (options.schema === undefined || options.instance === undefined) {
     throw new Error('CHECK_SCHEMA_INPUT_REQUIRED: --schema and --instance are required');
   }
-  const schemaPath = resolve(options.repoRoot, options.schema);
-  const instancePath = resolve(options.repoRoot, options.instance);
-  const schema = JSON.parse(readFileSync(schemaPath, 'utf8')) as AnySchema;
-  const instance = JSON.parse(readFileSync(instancePath, 'utf8')) as unknown;
+  const { absolute: schemaPath, value: schemaValue } = explicitJson(
+    options.repoRoot,
+    '--schema',
+    options.schema,
+  );
+  const { absolute: instancePath, value: instance } = explicitJson(
+    options.repoRoot,
+    '--instance',
+    options.instance,
+  );
+  const schema = schemaValue as AnySchema;
   const ajv = new Ajv2020({ allErrors: true, allowUnionTypes: true, strict: false });
   addFormats(ajv);
   const validate = ajv.compile(schema);
@@ -141,6 +194,15 @@ export function blueprintReport(options: CheckExecutionOptions): unknown {
   if (options.file === undefined)
     throw new Error('CHECK_BLUEPRINT_FILE_REQUIRED: --file is required');
   const loaded = loadBlueprint(resolve(options.repoRoot, options.file));
+  if (!loaded.ok) {
+    // loadBlueprint names an unreadable path in its error text; the schema errors are pointers.
+    const unreadable = loaded.errors.find((error) =>
+      /^(blueprint file not found|failed to read|JSON parse error)/u.test(error),
+    );
+    if (unreadable !== undefined) {
+      throw new Error(`CHECK_INPUT_PATH_INVALID: --file ${options.file}: ${unreadable}`);
+    }
+  }
   if (!loaded.ok || loaded.blueprint === undefined) {
     return { ok: false, schema_errors: loaded.errors, violations: [] };
   }
@@ -196,8 +258,14 @@ export function forbiddenActionsReport(options: CheckExecutionOptions): unknown 
 
 export function prComplianceReport(options: CheckExecutionOptions): unknown {
   let body: string;
-  if (options.prBodyFile !== undefined) body = readFileSync(options.prBodyFile, 'utf8');
-  else if (!process.stdin.isTTY) body = readFileSync(0, 'utf8');
+  if (options.prBodyFile !== undefined) {
+    if (!existsSync(options.prBodyFile)) {
+      throw new Error(
+        `CHECK_INPUT_PATH_INVALID: --pr-body-file ${options.prBodyFile} does not exist`,
+      );
+    }
+    body = readFileSync(options.prBodyFile, 'utf8');
+  } else if (!process.stdin.isTTY) body = readFileSync(0, 'utf8');
   else throw new Error('CHECK_PR_BODY_REQUIRED: --pr-body-file or stdin is required');
   const invariantIds = new Set<string>();
   for (const name of readdirSync(join(options.repoRoot, 'law/invariants'))) {

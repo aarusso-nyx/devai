@@ -7,6 +7,8 @@ import { EXIT_FAIL, EXIT_PASS, EXIT_REVIEW } from '@devai-nyx/utils';
 export type CheckSuiteName = 'quick' | 'standard' | 'full' | 'release';
 export type CheckCost = 'low' | 'medium' | 'high';
 export type CheckStatus = 'pass' | 'review' | 'fail' | 'unknown' | 'na' | 'error';
+/** Where a check member applies (ADR-CHK-0005). */
+export type CheckApplicability = 'self' | 'adopter' | 'both';
 
 export interface CheckBinding {
   readonly kind: 'package-script' | 'action' | 'runtime-gate' | 'test-file' | 'literal-argv';
@@ -20,6 +22,15 @@ export interface CheckMemberDefinition {
   readonly effect: ExecutorEffect;
   readonly cost: CheckCost;
   readonly output: string;
+  /** Absent only when the policy omits it; dispatch then fails closed. */
+  readonly applicability?: CheckApplicability;
+}
+
+/** One `--only` selector dispatched without a suite member definition. */
+export interface CheckSelectorDefinition {
+  readonly id: string;
+  /** Absent only when the policy omits it; dispatch then fails closed. */
+  readonly applicability?: CheckApplicability;
 }
 
 export interface CheckSuiteDefinition {
@@ -38,6 +49,7 @@ export interface CheckSuitePolicy {
   readonly prerequisites: readonly string[];
   readonly suites: readonly CheckSuiteDefinition[];
   readonly member_definitions: readonly CheckMemberDefinition[];
+  readonly selector_definitions: readonly CheckSelectorDefinition[];
 }
 
 export interface ResolvedCheckMember extends CheckMemberDefinition {
@@ -68,6 +80,21 @@ export interface CheckMemberResult {
   readonly exit_code?: number | null;
   readonly code?: string;
   readonly message?: string;
+}
+
+/** The repository kind a check run detected from its binding receipt (ADR-CHK-0005). */
+export type RepositoryKind = 'self' | 'adopter';
+
+/** How the repository kind was identified: the receipt, the JSON pointer, the value read. */
+export interface RepositoryKindEvidence {
+  readonly source: string;
+  readonly pointer: string;
+  readonly value: string;
+}
+
+export interface RepositoryKindDetection {
+  readonly kind: RepositoryKind;
+  readonly evidence: RepositoryKindEvidence;
 }
 
 export interface CheckAggregate {
@@ -103,6 +130,7 @@ const BINDING_KINDS = new Set<CheckBinding['kind']>([
 ]);
 const EFFECTS = new Set<ExecutorEffect>(['read', 'harness-write', 'local-write', 'remote-write']);
 const COSTS = new Set<CheckCost>(['low', 'medium', 'high']);
+const APPLICABILITIES = new Set<unknown>(['self', 'adopter', 'both']);
 
 function record(value: unknown, code: string): Record<string, unknown> {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
@@ -159,7 +187,8 @@ export function loadCheckSuitePolicy(repoRoot: string): CheckSuitePolicy {
       !BINDING_KINDS.has(binding['kind'] as CheckBinding['kind']) ||
       !EFFECTS.has(member['effect'] as ExecutorEffect) ||
       !COSTS.has(member['cost'] as CheckCost) ||
-      typeof member['output'] !== 'string'
+      typeof member['output'] !== 'string' ||
+      (member['applicability'] !== undefined && !APPLICABILITIES.has(member['applicability']))
     ) {
       throw new Error(`CHECK_POLICY_MEMBER_INVALID:${String(index)}`);
     }
@@ -180,6 +209,9 @@ export function loadCheckSuitePolicy(repoRoot: string): CheckSuitePolicy {
       effect: member['effect'] as ExecutorEffect,
       cost: member['cost'] as CheckCost,
       output: member['output'],
+      ...(member['applicability'] !== undefined && {
+        applicability: member['applicability'] as CheckApplicability,
+      }),
     };
   });
   unique(
@@ -213,6 +245,8 @@ export function loadCheckSuitePolicy(repoRoot: string): CheckSuitePolicy {
   });
   if (suites.length !== SUITES.length) throw new Error('CHECK_POLICY_SUITES_INVALID');
 
+  const selectors = loadSelectorDefinitions(policy['selector_definitions'], byId);
+
   return {
     schemaVersion: '1.0.0',
     id: 'check-suites',
@@ -223,7 +257,71 @@ export function loadCheckSuitePolicy(repoRoot: string): CheckSuitePolicy {
     prerequisites,
     suites,
     member_definitions: members,
+    selector_definitions: selectors,
   };
+}
+
+/**
+ * Read the `--only` selector declarations (ADR-CHK-0005). A malformed section, an id
+ * the CLI does not dispatch, a duplicate, or an id that is also a suite member is a
+ * policy error. A selector the section omits is not a load error: dispatching it fails
+ * with CHECK_MEMBER_APPLICABILITY_UNDECLARED.
+ */
+function loadSelectorDefinitions(
+  raw: unknown,
+  members: ReadonlyMap<string, CheckMemberDefinition>,
+): readonly CheckSelectorDefinition[] {
+  if (!Array.isArray(raw)) throw new Error('CHECK_POLICY_SELECTORS_INVALID: expected array');
+  const selectors = raw.map((entry, index): CheckSelectorDefinition => {
+    const selector = record(entry, `CHECK_POLICY_SELECTORS_INVALID:${String(index)}`);
+    const id = selector['id'];
+    const applicability = selector['applicability'];
+    if (typeof id !== 'string' || !CURRENT_ONLY_SELECTORS.has(id) || members.has(id)) {
+      throw new Error(`CHECK_POLICY_SELECTORS_INVALID:${String(index)}: unknown selector id`);
+    }
+    if (applicability !== undefined && !APPLICABILITIES.has(applicability)) {
+      throw new Error(`CHECK_POLICY_SELECTORS_INVALID:${id}: applicability`);
+    }
+    return {
+      id,
+      ...(applicability !== undefined && {
+        applicability: applicability as CheckApplicability,
+      }),
+    };
+  });
+  unique(
+    selectors.map((selector) => selector.id),
+    'CHECK_POLICY_SELECTORS_INVALID',
+  );
+  return selectors;
+}
+
+/**
+ * The declared applicability of a dispatched member (ADR-CHK-0005): the suite member
+ * definition for a policy member, the selector declaration for an `--only` selector.
+ * Returns undefined for an internal service id that the CLI never dispatches by name.
+ * Throws CHECK_MEMBER_APPLICABILITY_UNDECLARED when a dispatched id has no declaration.
+ */
+export function declaredCheckApplicability(
+  policy: CheckSuitePolicy,
+  member: Pick<ResolvedCheckMember, 'id' | 'source'>,
+): CheckApplicability | undefined {
+  const definition = policy.member_definitions.find((entry) => entry.id === member.id);
+  const dispatched =
+    definition !== undefined ||
+    member.source === 'suite-policy' ||
+    CURRENT_ONLY_SELECTORS.has(member.id);
+  if (!dispatched) return undefined;
+  const applicability =
+    definition !== undefined
+      ? definition.applicability
+      : policy.selector_definitions.find((entry) => entry.id === member.id)?.applicability;
+  if (applicability === undefined) {
+    throw new Error(
+      `CHECK_MEMBER_APPLICABILITY_UNDECLARED:${member.id}: law/policy/check-suites.json declares no applicability`,
+    );
+  }
+  return applicability;
 }
 
 const CURRENT_SELECTOR_ALIASES: Readonly<Record<string, string>> = {

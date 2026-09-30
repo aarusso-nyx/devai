@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 import { checkPromptOverlays, loadRecipes } from '#runtime-core';
@@ -19,12 +19,21 @@ import { checkGlobGuards } from './glob-guards.js';
 import { checkSchemasForRepository } from './schemas.js';
 import { checkSensorIntegrity } from './sensor-integrity.js';
 import { buildCanonicalDescriptorHandoffReport } from './documentation-report.js';
-import type { CheckBinding, CheckMemberResult, ResolvedCheckMember } from './contracts.js';
+import {
+  declaredCheckApplicability,
+  loadCheckSuitePolicy,
+  type CheckApplicability,
+  type CheckBinding,
+  type CheckMemberResult,
+  type RepositoryKindDetection,
+  type ResolvedCheckMember,
+} from './contracts.js';
 import {
   type CheckExecutionOptions,
   type RawExecution,
   fromValue,
   executeArgv,
+  record,
 } from './adapters-execution.js';
 import {
   invariantReport,
@@ -50,9 +59,112 @@ import {
 } from './adapters-reports.js';
 export type { CheckExecutionOptions } from './adapters-execution.js';
 
+const BINDING_RECEIPT = '.devai/config/adopter-policy-binding.json';
+/** The policy identity law/policy/devai-adoption.json declares for the DEVAI source repository. */
+const SELF_POLICY_ID = 'devai.devai-adoption';
+const NOT_APPLICABLE = 'CHECK_MEMBER_NOT_APPLICABLE';
+
+/** Framework inputs a `self` member would read, named in its not-applicable reason. */
+const NOT_APPLICABLE_REASONS: Readonly<Record<string, string>> = {
+  'action-effects':
+    'reads law/policy/subprocess-effects.json and tests/config/tsconfig.effects.json of the DEVAI source repository; an adopter holds neither',
+  'cli-reference':
+    'compares the canonical descriptors of the DEVAI source repository with its docs/reference through law/policy/documentation-information-architecture.json; an adopter holds neither',
+  'prompt-overlays':
+    'audits the recipe manifests shipped inside the DEVAI package, which measures the framework rather than the repository under check',
+  campaign:
+    'runs scripts/check-campaign.mjs of the DEVAI source repository against its campaign records; an adopter holds neither',
+  'scorecard-page':
+    'runs scripts/generate-scorecard-page.mjs of the DEVAI source repository against its scorecard records; an adopter holds neither',
+};
+
+/**
+ * Detect the repository kind from the adopter-policy binding receipt only, never from the
+ * presence of a directory (ADR-CHK-0005). An absent, unparsable, or unbound receipt fails
+ * closed with CHECK_REPOSITORY_KIND_INVALID; it never defaults to either kind.
+ */
+export function detectRepositoryKind(repoRoot: string): RepositoryKindDetection {
+  const path = join(repoRoot, BINDING_RECEIPT);
+  if (!existsSync(path)) {
+    throw new Error(
+      `CHECK_REPOSITORY_KIND_INVALID: ${BINDING_RECEIPT} is absent; bind the adopter policy before running a member that needs the repository kind`,
+    );
+  }
+  let receipt: unknown;
+  try {
+    receipt = JSON.parse(readFileSync(path, 'utf8')) as unknown;
+  } catch {
+    throw new Error(`CHECK_REPOSITORY_KIND_INVALID: ${BINDING_RECEIPT} is not readable JSON`);
+  }
+  const policyId = record(receipt)?.['policy_id'];
+  if (typeof policyId !== 'string' || policyId.length === 0) {
+    throw new Error(
+      `CHECK_REPOSITORY_KIND_INVALID: ${BINDING_RECEIPT} carries no string policy_id`,
+    );
+  }
+  return {
+    kind: policyId === SELF_POLICY_ID ? 'self' : 'adopter',
+    evidence: { source: BINDING_RECEIPT, pointer: '/policy_id', value: policyId },
+  };
+}
+
+interface MemberContext {
+  readonly applicability?: CheckApplicability;
+  readonly detection?: RepositoryKindDetection;
+}
+
+type Classification =
+  | { readonly applies: true; readonly context: MemberContext }
+  | { readonly applies: false; readonly result: RawExecution };
+
+/**
+ * Classify a dispatched member by its declared applicability before any input is read.
+ * The kind is needed by every `self` or `adopter` member and by action-coverage, whose
+ * scope is the detected kind; the other `both` members execute without it.
+ */
+function classifyMember(member: ResolvedCheckMember, repoRoot: string): Classification {
+  const applicability = declaredCheckApplicability(loadCheckSuitePolicy(repoRoot), member);
+  if (applicability === undefined) return { applies: true, context: {} };
+  if (applicability === 'both' && member.service_id !== 'action-coverage') {
+    return { applies: true, context: { applicability } };
+  }
+  const detection = detectRepositoryKind(repoRoot);
+  if (applicability === 'both' || applicability === detection.kind) {
+    return { applies: true, context: { applicability, detection } };
+  }
+  return {
+    applies: false,
+    result: {
+      status: 'na',
+      code: NOT_APPLICABLE,
+      message: `${member.id} applies to ${applicability}; the repository kind is ${detection.kind}`,
+      value: {
+        member: member.id,
+        applicability,
+        repository_kind: detection.kind,
+        kind_evidence: detection.evidence,
+        input_source: 'none',
+        reason:
+          NOT_APPLICABLE_REASONS[member.id] ??
+          (applicability === 'self'
+            ? 'reads only inputs of the DEVAI source repository'
+            : 'reads only inputs of an adopter repository'),
+      },
+    },
+  };
+}
+
+/** Named failure codes that surface as the result code instead of CHECK_SERVICE_ERROR. */
+const NAMED_FAILURES = new Set([
+  'CHECK_INPUT_PATH_INVALID',
+  'CHECK_MEMBER_APPLICABILITY_UNDECLARED',
+  'CHECK_REPOSITORY_KIND_INVALID',
+]);
+
 async function directService(
   member: ResolvedCheckMember,
   options: CheckExecutionOptions,
+  context: MemberContext,
 ): Promise<RawExecution> {
   const repoRoot = resolve(options.repoRoot);
   switch (member.service_id) {
@@ -99,7 +211,11 @@ async function directService(
     case 'invariant-strategies':
       return fromValue(strategyReport(repoRoot));
     case 'action-coverage':
-      return fromValue(actionCoverageReport(repoRoot));
+      return actionCoverageReport(
+        repoRoot,
+        context.applicability ?? 'both',
+        context.detection ?? detectRepositoryKind(repoRoot),
+      );
     case 'full-tests':
       return executeArgv(member, ['pnpm', 'vitest', 'run'], repoRoot);
     case 'inventory-integrity':
@@ -211,13 +327,24 @@ export async function executeCheckMember(
 ): Promise<CheckMemberResult> {
   const started = performance.now();
   let raw: RawExecution;
+  // Nothing executes before classification; a result decided there reports 0ms, so a
+  // not-applicable or unclassifiable member is byte-identical across reruns.
+  let executed = false;
   try {
-    raw = await directService(member, options);
+    const classification = classifyMember(member, resolve(options.repoRoot));
+    if (classification.applies) {
+      executed = true;
+      raw = await directService(member, options, classification.context);
+    } else {
+      raw = classification.result;
+    }
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const named = /^([A-Z][A-Z0-9_]+)/u.exec(message)?.[1];
     raw = {
       status: 'error',
-      code: 'CHECK_SERVICE_ERROR',
-      message: error instanceof Error ? error.message : String(error),
+      code: named !== undefined && NAMED_FAILURES.has(named) ? named : 'CHECK_SERVICE_ERROR',
+      message,
     };
   }
   return {
@@ -225,7 +352,7 @@ export async function executeCheckMember(
     status: raw.status,
     effect: member.effect as ExecutorEffect,
     binding: member.binding as CheckBinding,
-    duration_ms: Math.max(0, Math.round(performance.now() - started)),
+    duration_ms: executed ? Math.max(0, Math.round(performance.now() - started)) : 0,
     ...(raw.value !== undefined && { value: raw.value }),
     ...(raw.stdout !== undefined && { stdout: raw.stdout }),
     ...(raw.stderr !== undefined && { stderr: raw.stderr }),
