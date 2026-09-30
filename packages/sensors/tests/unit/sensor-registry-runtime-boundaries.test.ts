@@ -4,17 +4,20 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   assertBundledSensorRegistry,
+  assertSensorKindSchemaAdmitted,
   DIAGNOSTIC_SENSOR_KINDS,
   isSensorKind,
   renderSensorRegistryMarkdown,
   SENSOR_CELLS_BY_KIND,
   SENSOR_DESCRIPTORS,
   SENSOR_ENTRIES_BY_KIND,
+  SENSOR_KIND_SCHEMA_UNSUPPORTED,
   SENSOR_KINDS_BY_TIER,
   SENSOR_READING_KINDS,
   SENSOR_REGISTRY,
   sensorCellMap,
   sensorDescriptor,
+  schemaUnsupportedKinds,
   sensorTierKinds,
   type SensorRegistry,
 } from '../../src/sensor-registry.js';
@@ -167,5 +170,62 @@ describe('runtime sensor registry binds immutable views to approved law bytes', 
     expect(() => assertBundledSensorRegistry(new Uint8Array())).toThrow(
       'rpl-package-identity-mismatch',
     );
+  });
+});
+
+describe('ADR-SCR-0011 IA-005: an entry declared schema-unsupported is refused by name', () => {
+  const marked = (kind: string): Pick<SensorRegistry, 'entries'> => ({
+    entries: SENSOR_REGISTRY.entries.map((entry) =>
+      entry.kind === kind ? { ...entry, schema_admission: 'unsupported' as const } : entry,
+    ),
+  });
+  const sweep = sensorTierKinds('SWEEP');
+
+  it('names the refusal code SENSOR_KIND_SCHEMA_UNSUPPORTED', () => {
+    expect(SENSOR_KIND_SCHEMA_UNSUPPORTED).toBe('SENSOR_KIND_SCHEMA_UNSUPPORTED');
+  });
+
+  it('refuses the marked kind by name and throws the named code with the kind', () => {
+    const registry = marked('inventory_api');
+    expect(schemaUnsupportedKinds(['inventory_api'], registry)).toEqual(['inventory_api']);
+    expect(() => assertSensorKindSchemaAdmitted('inventory_api', registry)).toThrow(
+      'SENSOR_KIND_SCHEMA_UNSUPPORTED:inventory_api',
+    );
+  });
+
+  it('refuses exactly the marked kind within a preset population', () => {
+    const registry = marked('inventory_api');
+    expect(sweep).toContain('inventory_api');
+    expect(schemaUnsupportedKinds(sweep, registry)).toEqual(['inventory_api']);
+  });
+
+  it('does not refuse an admitted kind in a registry that marks another', () => {
+    const registry = marked('inventory_api');
+    expect(schemaUnsupportedKinds(['build', 'type_check'], registry)).toEqual([]);
+    expect(() => assertSensorKindSchemaAdmitted('build', registry)).not.toThrow();
+  });
+
+  it('treats an explicit admitted marker as admitted', () => {
+    const registry: Pick<SensorRegistry, 'entries'> = {
+      entries: SENSOR_REGISTRY.entries.map((entry) => ({
+        ...entry,
+        schema_admission: 'admitted' as const,
+      })),
+    };
+    expect(schemaUnsupportedKinds(SENSOR_READING_KINDS, registry)).toEqual([]);
+  });
+
+  it('refuses nothing in a registry with no marker, including the approved law registry', () => {
+    const unmarked: Pick<SensorRegistry, 'entries'> = {
+      entries: SENSOR_REGISTRY.entries.map((entry) => {
+        const { schema_admission: _omitted, ...rest } = entry;
+        return rest;
+      }),
+    };
+    expect(schemaUnsupportedKinds(SENSOR_READING_KINDS, unmarked)).toEqual([]);
+    expect(schemaUnsupportedKinds(SENSOR_READING_KINDS)).toEqual([]);
+    for (const kind of SENSOR_READING_KINDS) {
+      expect(() => assertSensorKindSchemaAdmitted(kind)).not.toThrow();
+    }
   });
 });
