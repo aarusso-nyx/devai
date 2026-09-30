@@ -6,6 +6,7 @@ role-owned segment you authorize. Use `devai doctor`, `devai check`, and `devai 
 to inspect the resulting repository.
 
 - [Install and adopt](install.md)
+- [Path authority for multi-stack roots](path-authority.md)
 - [Exact forbidden-action authorizations](forbidden-action-authorizations.md)
 - [Opt-in GitHub Issues governance tracking](governance-tracking.md)
 - [Stack-pack inventory](pack-resolution.md)
