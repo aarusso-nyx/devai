@@ -3625,7 +3625,7 @@
       "id": "R-0310",
       "title": "Owner-effect outcome",
       "goal": "An Owner effect resolved by its declared fallback can be recorded as performed with outcome fallback, so the round that requires it closes while the campaign checker keeps enforcing serialized admission; R-0304 closes on that record.",
-      "status": "open",
+      "status": "closing",
       "records": ["ADR-CHK-0003", "ADR-CHK-0004"],
       "depends_on": ["R-0301"],
       "attestation_reissue": false,
@@ -3653,7 +3653,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F1"],
               "boundary": {
                 "paths": ["law/schemas/campaign.schema.json", "law/policy/campaign-execution.json"],
@@ -3680,8 +3680,8 @@
                 "path": "prompts/TASK-03101.md",
                 "sha256": "6ed3649471d8f4ed64197532d0d68a8ebc730d12ad3572c20acc119747e5bd78"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/206",
+              "merged_as": "b8c975f5506cd1aad8c7bb667100aae1126f4c7f",
               "execution": {
                 "tier": "architect",
                 "effort": "medium",
@@ -3733,7 +3733,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-03101",
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": ["tests/contract/campaign-plan.contract.test.ts"],
@@ -3759,8 +3759,8 @@
                 "path": "prompts/TASK-03102.md",
                 "sha256": "1e95feeeb9ee91992f7645982ea94c744f1cab0aee68bc0c43ed4672467eca2e"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/206",
+              "merged_as": "b8c975f5506cd1aad8c7bb667100aae1126f4c7f",
               "execution": {
                 "tier": "worker",
                 "effort": "medium",
@@ -3812,7 +3812,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-03102",
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F5"],
               "boundary": {
                 "paths": ["scripts/check-campaign.mjs"],
@@ -3838,8 +3838,8 @@
                 "path": "prompts/TASK-03103.md",
                 "sha256": "799bbeff3ee551a0d94a99b66a043f8b7e52621ba761a101643dd1130bbcac08"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/206",
+              "merged_as": "b8c975f5506cd1aad8c7bb667100aae1126f4c7f",
               "execution": {
                 "tier": "worker",
                 "effort": "medium",
