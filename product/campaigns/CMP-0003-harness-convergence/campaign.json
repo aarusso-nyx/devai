@@ -2660,7 +2660,7 @@
       "id": "R-0308",
       "title": "Adopter unblock: schema admission, publication proof, and sealed status",
       "goal": "Every read kind the sweep preset selects is admitted by the packaged SensorReading schema; a packed candidate proves, in a disposable adopter, that a recorded reading reaches audit scorecard from the one readings store; and round status reports a sealed round's lifecycle without an active task round.",
-      "status": "planned",
+      "status": "open",
       "records": ["ADR-SCR-0011", "ADR-REL-0033", "ADR-EVI-0003"],
       "depends_on": ["R-0301"],
       "attestation_reissue": false,
@@ -2696,7 +2696,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F1", "F4"],
               "boundary": {
                 "paths": [
@@ -2743,14 +2743,53 @@
               ],
               "prompt": {
                 "path": "prompts/TASK-0381.md",
-                "sha256": null
+                "sha256": "df3270c58e36771cada0ffe298ddc15c7f7b101a6b4b66281e1f0e055ab55bfc"
               },
               "pull_request": null,
               "merged_as": null,
               "execution": {
                 "tier": "architect",
                 "effort": "high",
-                "time_budget_minutes": 90
+                "time_budget_minutes": 90,
+                "resolved": {
+                  "policy_version": "1.0.0",
+                  "pinned_at": "2026-09-30T01:16:48Z",
+                  "tiers": {
+                    "architect": {
+                      "rank": 1,
+                      "hosts": {
+                        "claude": "claude-cli:fable",
+                        "codex": "codex-cli:gpt-6-astra"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker-high": {
+                      "rank": 2,
+                      "hosts": {
+                        "claude": "claude-cli:opus",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker": {
+                      "rank": 3,
+                      "hosts": {
+                        "claude": "claude-cli:sonnet",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "medium"
+                    },
+                    "clerk": {
+                      "rank": 4,
+                      "hosts": {
+                        "claude": "claude-cli:haiku",
+                        "codex": "codex-cli:gpt-6-luna"
+                      },
+                      "default_effort": "low"
+                    }
+                  },
+                  "ceiling": "architect"
+                }
               }
             },
             {
@@ -2887,7 +2926,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F1"],
               "boundary": {
                 "paths": ["docs/reference/cli.md", "docs/adopters/governance-tracking.md"],
@@ -2920,14 +2959,53 @@
               "commit_types": ["docs(reference)", "docs(adopters)"],
               "prompt": {
                 "path": "prompts/TASK-0384.md",
-                "sha256": null
+                "sha256": "3651798aa557d971a8f0ded02d9012e3c844c8cecc332501a9092f97635a599d"
               },
               "pull_request": null,
               "merged_as": null,
               "execution": {
                 "tier": "architect",
                 "effort": "medium",
-                "time_budget_minutes": 60
+                "time_budget_minutes": 60,
+                "resolved": {
+                  "policy_version": "1.0.0",
+                  "pinned_at": "2026-09-30T01:16:49Z",
+                  "tiers": {
+                    "architect": {
+                      "rank": 1,
+                      "hosts": {
+                        "claude": "claude-cli:fable",
+                        "codex": "codex-cli:gpt-6-astra"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker-high": {
+                      "rank": 2,
+                      "hosts": {
+                        "claude": "claude-cli:opus",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker": {
+                      "rank": 3,
+                      "hosts": {
+                        "claude": "claude-cli:sonnet",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "medium"
+                    },
+                    "clerk": {
+                      "rank": 4,
+                      "hosts": {
+                        "claude": "claude-cli:haiku",
+                        "codex": "codex-cli:gpt-6-luna"
+                      },
+                      "default_effort": "low"
+                    }
+                  },
+                  "ceiling": "architect"
+                }
               }
             },
             {
