@@ -612,6 +612,7 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-CHK-0003',
       'ADR-CHK-0004',
       'ADR-CHK-0005',
+      'ADR-CHK-0006',
       'ADR-EVI-0001',
       'ADR-EVI-0002',
       'ADR-EVI-0003',
@@ -697,13 +698,13 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-SCR-0011',
       'ADR-SEC-0001',
     ]);
-    expect(records).toHaveLength(94);
+    expect(records).toHaveLength(95);
     expect(
       records.filter((record) => record.format === 'legacy-catalog').map((record) => record.adr_id),
     ).toEqual(['ADR-014', 'ADR-MUT-0005', 'ADR-REL-0017']);
     expect(records.filter((record) => record.adr_id === 'ADR-014')).toHaveLength(1);
-    expect(result.files_scanned).toBe(95);
-    expect(result.subject_authorities).toHaveLength(326);
+    expect(result.files_scanned).toBe(96);
+    expect(result.subject_authorities).toHaveLength(331);
     expect(result.effective_authorities).toEqual([
       'ADR-014',
       'ADR-AUT-0001',
@@ -714,6 +715,7 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-CHK-0003',
       'ADR-CHK-0004',
       'ADR-CHK-0005',
+      'ADR-CHK-0006',
       'ADR-EVI-0003',
       'ADR-GOV-0002',
       'ADR-GOV-0004',
@@ -775,6 +777,15 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-SCR-0011',
       'ADR-SEC-0001',
     ]);
+    // ADR-CHK-0006 IA-005: the record is the effective head of every subject it declares.
+    const descriptorKinds = records.find((record) => record.adr_id === 'ADR-CHK-0006');
+    expect(descriptorKinds?.affected_rules.length).toBeGreaterThan(0);
+    expect(
+      result.subject_authorities
+        .filter((authority) => authority.effective_head === 'ADR-CHK-0006')
+        .map((authority) => authority.subject)
+        .sort(),
+    ).toEqual([...(descriptorKinds?.affected_rules ?? [])].sort());
     expect(validateAdrResult(result), JSON.stringify(validateAdrResult.errors)).toBe(true);
     expect(matchesAdrSemantics(records, result, markdownFiles(adrRoot).length)).toBe(true);
   });
