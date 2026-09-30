@@ -4132,14 +4132,16 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-03112",
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F2", "F5"],
               "boundary": {
                 "paths": [
                   "test-tasks.json",
                   "packages/cli/src/services/check-runner/policy-descriptor.ts",
                   "packages/cli/src/services/check-runner/policy.ts",
-                  "scripts/check-test-task-workspace-selectors.mjs"
+                  "scripts/check-test-task-workspace-selectors.mjs",
+                  "packages/cli/src/commands/check/ci-economy.ts",
+                  "Orchestrator note (2026-09-30): ci-economy detects a taxonomy-selected lane by the presence of class selectors in the descriptor; after materialization it must also recognise the declared planning profile, so the file is admitted with commit type fix(check)."
                 ],
                 "forbidden": [
                   "law/",
@@ -4183,14 +4185,53 @@
               "commit_types": ["ci(scripts)", "fix(check)"],
               "prompt": {
                 "path": "prompts/TASK-03113.md",
-                "sha256": "eb8c9dbbd013de6f5f7efb68965486a67fe90175d534176bba5b1144d989b42a"
+                "sha256": "3036bc0e570f02892f356ab0613babf6a61b3466df168eaac27c176169f79416"
               },
               "pull_request": null,
               "merged_as": null,
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
-                "time_budget_minutes": 150
+                "time_budget_minutes": 150,
+                "resolved": {
+                  "policy_version": "1.0.0",
+                  "pinned_at": "2026-09-30T06:13:33Z",
+                  "tiers": {
+                    "architect": {
+                      "rank": 1,
+                      "hosts": {
+                        "claude": "claude-cli:fable",
+                        "codex": "codex-cli:gpt-6-astra"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker-high": {
+                      "rank": 2,
+                      "hosts": {
+                        "claude": "claude-cli:opus",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker": {
+                      "rank": 3,
+                      "hosts": {
+                        "claude": "claude-cli:sonnet",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "medium"
+                    },
+                    "clerk": {
+                      "rank": 4,
+                      "hosts": {
+                        "claude": "claude-cli:haiku",
+                        "codex": "codex-cli:gpt-6-luna"
+                      },
+                      "default_effort": "low"
+                    }
+                  },
+                  "ceiling": "architect"
+                }
               }
             }
           ]
