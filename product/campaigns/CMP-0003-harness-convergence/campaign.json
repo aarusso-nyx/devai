@@ -3,7 +3,7 @@
   "id": "CMP-0003",
   "title": "Harness convergence",
   "type": "campaign",
-  "status": "active",
+  "status": "closed",
   "date": "2026-09-28",
   "authority": "Architect",
   "mandate": {
@@ -77,7 +77,7 @@
       "id": "OE-07",
       "description": "Publish the immutable release that carries the ADR-SCR-0011 schema admission and the scorecard store resolver (268bb838), from the exact packed artifact the rehearsal verified, and tell DETRAN the version so it can pin, rehearse a clone, and measure real cells (#185).",
       "required_before": "R-0308",
-      "performed_at": null
+      "performed_at": "2026-09-30T09:08:28Z"
     }
   ],
   "prompts": {
@@ -2667,7 +2667,7 @@
       "id": "R-0308",
       "title": "Adopter unblock: schema admission, publication proof, and sealed status",
       "goal": "Every read kind the sweep preset selects is admitted by the packaged SensorReading schema; a packed candidate proves, in a disposable adopter, that a recorded reading reaches audit scorecard from the one readings store; and round status reports a sealed round's lifecycle without an active task round.",
-      "status": "closing",
+      "status": "closed",
       "records": ["ADR-SCR-0011", "ADR-REL-0033", "ADR-EVI-0003"],
       "depends_on": ["R-0301"],
       "attestation_reissue": false,
@@ -3289,7 +3289,12 @@
           ]
         }
       ],
-      "closure": null
+      "closure": {
+        "merged_head": "bda28a33dd4e8f5d4d3f78b8b5761208f73a2b0b",
+        "closed_at": "2026-09-30T09:15:00Z",
+        "task_policy_digest": null,
+        "phase_closure": null
+      }
     },
     {
       "id": "R-0309",
@@ -3899,13 +3904,18 @@
       "id": "R-0311",
       "title": "Descriptor selector kinds trail the trusted verifier",
       "goal": "The committed task descriptor is accepted by the pinned trusted verifier's policy builder, so a release rehearsal reconstructs the task policy from it; class selectors are materialized as their binding expansion until a published verifier admits them, the planning lane keeps its class semantics, and the descriptor check refuses undeclared kinds before any rehearsal.",
-      "status": "closing",
+      "status": "closed",
       "records": ["ADR-CHK-0006"],
       "depends_on": ["R-0301"],
       "attestation_reissue": true,
       "owner_effects_required": [],
       "close_checks": ["schemas", "test:cli", "test:root", "ci-economy"],
-      "closure": null,
+      "closure": {
+        "merged_head": "ff5190f84436879f0a9b8a98b4927e1544183643",
+        "closed_at": "2026-09-30T09:15:00Z",
+        "task_policy_digest": "95fc800ef9aed6887b0c97248f9b810039110912e7363f8a33ae4b2e52238cf6",
+        "phase_closure": null
+      },
       "waves": [
         {
           "id": "CTG-03111",
