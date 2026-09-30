@@ -537,6 +537,16 @@ describe('serialized admission (ADR-CHK-0004 IA-005)', () => {
     effect.performed_at = state === 'unperformed' ? null : '2026-01-01T00:00:00Z';
     if (state === 'fallback') effect.outcome = 'fallback';
     if (state === 'performed') effect.outcome = 'performed';
+    if (state === 'unperformed') {
+      // Self-consistent fixture: a round that requires the unperformed effect cannot be closed,
+      // whatever the live ledger says about that round.
+      for (const round of plan.rounds) {
+        if (round.status === 'closed' && round.owner_effects_required.includes('OE-01')) {
+          round.status = 'closing';
+          (round as unknown as { closure: unknown }).closure = null;
+        }
+      }
+    }
   }
 
   /** Every task of the plan in pre_merge moves back to in_progress, then the named ones enter pre_merge. */
