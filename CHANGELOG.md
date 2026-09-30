@@ -1,5 +1,42 @@
 # Changelog
 
+## 1.7.0 — 2026-09-30
+
+- ADR-SCR-0011: admit every sweep read kind in the packaged `SensorReading` schema
+  (`decision_record_integrity`, `decision_citation_resolution`, `archive_immutability`,
+  `round_record_integrity`), keep the five schema-only legacy values as legacy, declare the
+  registry-schema admission invariant with an intentionally-unsupported marker refused before a
+  sensor starts, and keep the file enum as the runtime authority (#184).
+- ADR-REL-0033: prove the scorecard readings route from the packed artifact in a disposable
+  adopter (`release:packed-adopter`); the scorecard store rejects unparseable and schema-invalid
+  readings with named codes instead of counting them (#185).
+- ADR-EVI-0003: `round status` reads a sealed round's lifecycle without an active task round,
+  validates the close state, and attaches the task summary only when the task round is active;
+  `TASK_ROUND_INACTIVE` applies to dispatch only (#175).
+- ADR-CHK-0005: every check member declares where it applies; a framework-only member reports a
+  structured `not-applicable` result in an adopter, `action-coverage` evaluates the detected
+  scope and reports an empty population explicitly, the repository kind comes from the bound
+  adopter-policy receipt and fails closed when unbound (#187).
+- ADR-CHK-0003, ADR-CHK-0004: a planning lane validates plan-class pull requests with the check
+  runner restored from cache and the campaign check, and integration is serialized by the
+  campaign checker while the merge queue is unavailable (#166).
+- ADR-CFG-0002, ADR-GOV-0020, ADR-GOV-0022: `init bind` projects owned keys from the ownership
+  matrix and lands the binding atomically, `CLAUDE.md` is the `@AGENTS.md` import with skills
+  generated from one canonical source, and validated append-only registry maintenance is exempt
+  from the forbidden-actions scanner (#68, #70, #67).
+- ADR-GOV-0023, ADR-MDL-0001, ADR-MDL-0002: campaign review mode with schema-validated model
+  replies read through one shared extractor, and versioned model tier defaults pinned at task
+  start.
+- ADR-REL-0030, ADR-REL-0032, ADR-GOV-0021: merged gated release jobs with the control commit
+  shown before the first stop, resumable Pages publication from the deployments journal, one
+  reference page per workflow under a completeness gate, and a generated decision catalogue
+  (#165, #167, #162).
+- Self-scorecard sensing: `sense run` resolves declared inputs and surfaces for the bound sensors,
+  runs the declared unit, integration, e2e, perf, and type-check argv without a shell, reads the
+  canonical readings store, and records all-skipped cells N/A by declaration.
+- Retain immutable `@aarusso-nyx/devai@1.5.4` as the trusted local-RC verifier provider; the
+  verifier payload is unchanged.
+
 ## 1.6.0 — 2026-09-26
 
 - ADR-CHK-0002: declare toolchain identity in one manifest that workflows and preflight probes
