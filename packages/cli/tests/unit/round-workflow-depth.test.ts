@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path';
 import type { CAC } from 'cac';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EXIT_PRECONDITION, EXIT_USAGE } from '@devai-nyx/utils';
-import { TaskServiceError } from '#runtime-core';
+import { TaskServiceError } from '../../src/runtime-core.js';
 
 const runtime = vi.hoisted(() => ({
   closeGovernedRound: vi.fn(),
