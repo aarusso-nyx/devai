@@ -43,6 +43,7 @@ interface OwnerEffect {
   id: string;
   required_before: string;
   performed_at?: string | null;
+  outcome?: string;
 }
 interface Plan {
   status: string;
@@ -315,6 +316,79 @@ describe('campaign plan contract', () => {
     ).not.toEqual([]);
   });
 
+  // ADR-CHK-0003 with the outcome property: performed_at closes the round with either outcome.
+  it.each([
+    ['fallback', 'fallback'],
+    ['performed', 'performed'],
+    ['no outcome', undefined],
+  ])('accepts a closed round whose required Owner effect is performed_at with %s', (_, outcome) => {
+    const dir = copyCampaign();
+    mutatePlan(dir, (plan) => {
+      const round = plan.rounds.find((candidate) => candidate.id === 'R-0103');
+      const effect = plan.owner_effects.find((candidate) => candidate.id === 'OE-01');
+      if (round === undefined || effect === undefined) throw new Error('fixture effect missing');
+      expect(round.status).toBe('closed');
+      expect(round.owner_effects_required).toContain('OE-01');
+      effect.performed_at = '2026-01-01T00:00:00Z';
+      if (outcome === undefined) delete effect.outcome;
+      else effect.outcome = outcome;
+    });
+    const result = checkCampaign(root, dir);
+    expect(result.problems).toEqual([]);
+    expect(result.ok).toBe(true);
+  });
+
+  it('refuses a closed round whose required Owner effect has outcome fallback but no performed_at', () => {
+    const dir = copyCampaign();
+    mutatePlan(dir, (plan) => {
+      const effect = plan.owner_effects.find((candidate) => candidate.id === 'OE-01');
+      if (effect === undefined) throw new Error('fixture effect missing');
+      effect.performed_at = null;
+      effect.outcome = 'fallback';
+    });
+    const result = checkCampaign(root, dir);
+    expect(result.ok).toBe(false);
+    expect(
+      result.problems.filter((problem) => problem.includes('OE-01') && problem.includes('R-0103')),
+      `a problem names OE-01 and R-0103: ${JSON.stringify(result.problems)}`,
+    ).not.toEqual([]);
+  });
+
+  it('rejects an Owner effect outcome outside the enum by the campaign schema', () => {
+    const ajv = new Ajv2020({ strict: false, allErrors: true });
+    addFormats(ajv);
+    const validate = ajv.compile(
+      JSON.parse(readFileSync(join(root, 'law/schemas/campaign.schema.json'), 'utf8')) as object,
+    );
+    const valid = (outcome: string | undefined): boolean => {
+      const dir = copyCampaign();
+      let plan: unknown;
+      mutatePlan(dir, (candidate) => {
+        const effect = candidate.owner_effects.find((item) => item.id === 'OE-01');
+        if (effect === undefined) throw new Error('fixture effect missing');
+        effect.performed_at = '2026-01-01T00:00:00Z';
+        if (outcome === undefined) delete effect.outcome;
+        else effect.outcome = outcome;
+        plan = candidate;
+      });
+      return validate(plan) === true;
+    };
+    expect(valid(undefined), 'no outcome validates').toBe(true);
+    expect(valid('performed'), 'performed validates').toBe(true);
+    expect(valid('fallback'), 'fallback validates').toBe(true);
+    expect(valid('waived'), 'an outcome outside the enum is rejected').toBe(false);
+    expect(valid(''), 'an empty outcome is rejected').toBe(false);
+    const dir = copyCampaign();
+    mutatePlan(dir, (plan) => {
+      const effect = plan.owner_effects.find((item) => item.id === 'OE-01');
+      if (effect === undefined) throw new Error('fixture effect missing');
+      effect.performed_at = '2026-01-01T00:00:00Z';
+      effect.outcome = 'waived';
+    });
+    const result = checkCampaign(root, dir);
+    expect(result.ok, 'the campaign check reports the schema violation').toBe(false);
+  });
+
   it('refuses a ledger whose acceptance commands drift from the prompt', () => {
     const dir = copyConvergence();
     mutatePlan(dir, (plan) => {
@@ -442,18 +516,33 @@ describe('campaign plan contract', () => {
 
 // ADR-CHK-0004, Inspector Adversarial Acceptance IA-005 (serialized fallback):
 // while isolation.serialized_admission of law/policy/campaign-execution.json is
-// in force (the merge queue Owner effect OE-01 of CMP-0003 is unperformed), at
+// in force (the merge queue Owner effect OE-01 of CMP-0003 has no performed_at,
+// or carries performed_at with outcome fallback), at
 // most one pull request targeting the integration branch is in pre_merge, and
 // the campaign check refuses a second (fail_closed
 // concurrent-pre-merge-under-serialized-admission). A coupled wave shipped as
 // one pull request is one pull request, however many of its tasks are in
 // pre_merge.
 describe('serialized admission (ADR-CHK-0004 IA-005)', () => {
+  /**
+   * OE-01 is set explicitly in the fixture copy, so a case never reads the momentary
+   * state of the live ledger: performed_at null (no queue), performed_at with outcome
+   * fallback (the fallback was recorded), or performed_at with outcome performed or none.
+   */
+  type QueueState = 'unperformed' | 'fallback' | 'performed' | 'no-outcome';
+  function setQueue(plan: Plan, state: QueueState): void {
+    const effect = plan.owner_effects.find((candidate) => candidate.id === 'OE-01');
+    if (effect === undefined) throw new Error('fixture effect OE-01 missing');
+    delete effect.outcome;
+    effect.performed_at = state === 'unperformed' ? null : '2026-01-01T00:00:00Z';
+    if (state === 'fallback') effect.outcome = 'fallback';
+    if (state === 'performed') effect.outcome = 'performed';
+  }
+
   /** Every task of the plan in pre_merge moves back to in_progress, then the named ones enter pre_merge. */
-  function preMerge(dir: string, ids: readonly string[]): void {
+  function preMerge(dir: string, ids: readonly string[], state: QueueState = 'fallback'): void {
     mutatePlan(dir, (plan) => {
-      const effect = plan.owner_effects.find((candidate) => candidate.id === 'OE-01');
-      expect(effect?.performed_at ?? null, 'the merge queue is not enabled').toBeNull();
+      setQueue(plan, state);
       const tasks = plan.rounds.flatMap((round) => round.waves.flatMap((wave) => wave.tasks));
       for (const task of tasks) {
         if (task.status === 'pre_merge') task.status = 'in_progress';
@@ -475,32 +564,12 @@ describe('serialized admission (ADR-CHK-0004 IA-005)', () => {
       fail_closed?: readonly string[];
     };
     expect(typeof policy.isolation?.serialized_admission).toBe('string');
+    expect(policy.isolation?.serialized_admission).toMatch(/outcome fallback/u);
+    expect(typeof policy.isolation?.queue_prerequisite).toBe('string');
     expect(policy.fail_closed).toContain('concurrent-pre-merge-under-serialized-admission');
     expect(
       (policy.gates?.task_pre_merge ?? []).some((member) => /serialized admission/u.test(member)),
     ).toBe(true);
-  });
-
-  it('refuses two task pull requests in pre_merge, naming both tasks', () => {
-    const dir = copyConvergence();
-    // Two tasks of different waves open two pull requests against main.
-    preMerge(dir, ['TASK-0321', 'TASK-0331']);
-    const result = checkCampaign(root, dir);
-    expect(result.ok).toBe(false);
-    expect(
-      result.problems.filter(
-        (problem) => problem.includes('TASK-0321') && problem.includes('TASK-0331'),
-      ),
-      `a problem names TASK-0321 and TASK-0331: ${JSON.stringify(result.problems)}`,
-    ).not.toEqual([]);
-  });
-
-  it('accepts one task pull request in pre_merge', () => {
-    const dir = copyConvergence();
-    preMerge(dir, ['TASK-0331']);
-    const result = checkCampaign(root, dir);
-    expect(result.problems).toEqual([]);
-    expect(result.ok).toBe(true);
   });
 
   it('accepts one coupled wave in pre_merge as one pull request', () => {
@@ -510,4 +579,50 @@ describe('serialized admission (ADR-CHK-0004 IA-005)', () => {
     expect(result.problems).toEqual([]);
     expect(result.ok).toBe(true);
   });
+
+  const CONCURRENT = /concurrent-pre-merge-under-serialized-admission/u;
+
+  it.each<QueueState>(['unperformed', 'fallback'])(
+    'refuses two task pull requests in pre_merge with the merge queue %s',
+    (state) => {
+      const dir = copyConvergence();
+      preMerge(dir, ['TASK-0321', 'TASK-0331'], state);
+      const result = checkCampaign(root, dir);
+      expect(result.ok).toBe(false);
+      expect(
+        result.problems.filter(
+          (problem) =>
+            CONCURRENT.test(problem) &&
+            problem.includes('TASK-0321') &&
+            problem.includes('TASK-0331'),
+        ),
+        `a concurrent-pre-merge problem names both tasks: ${JSON.stringify(result.problems)}`,
+      ).not.toEqual([]);
+    },
+  );
+
+  it.each<QueueState>(['unperformed', 'fallback'])(
+    'accepts one task pull request in pre_merge with the merge queue %s',
+    (state) => {
+      const dir = copyConvergence();
+      preMerge(dir, ['TASK-0331'], state);
+      const result = checkCampaign(root, dir);
+      expect(result.problems).toEqual([]);
+      expect(result.ok).toBe(true);
+    },
+  );
+
+  it.each<QueueState>(['performed', 'no-outcome'])(
+    'does not enforce serialized admission once the merge queue is performed (%s)',
+    (state) => {
+      const dir = copyConvergence();
+      preMerge(dir, ['TASK-0321', 'TASK-0331'], state);
+      const result = checkCampaign(root, dir);
+      expect(
+        result.problems.filter((problem) => CONCURRENT.test(problem)),
+        `no concurrent-pre-merge problem: ${JSON.stringify(result.problems)}`,
+      ).toEqual([]);
+      expect(result.ok).toBe(true);
+    },
+  );
 });
