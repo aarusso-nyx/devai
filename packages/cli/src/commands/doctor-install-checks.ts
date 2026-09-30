@@ -166,6 +166,119 @@ export function checkDevaiVersionMatch(repoRoot: string): CheckResult {
   };
 }
 
+const CORE_EXTENSION_ID = 'devai-adopter-authority';
+
+type ExtensionEntry = {
+  readonly extension_id: string;
+  readonly extension_version: string;
+  readonly digest_sha256: string;
+};
+
+function extensionEntries(value: unknown): ExtensionEntry[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(
+    (entry): entry is ExtensionEntry =>
+      entry !== null &&
+      typeof entry === 'object' &&
+      typeof (entry as Record<string, unknown>)['extension_id'] === 'string',
+  );
+}
+
+/** The receipt's bound source and adopter extension, read leniently for reporting only. */
+function boundAdopterReceipt(repoRoot: string): {
+  readonly source_path?: string;
+  readonly authority_extension?: ExtensionEntry;
+} {
+  try {
+    const receipt = JSON.parse(
+      readFileSync(join(repoRoot, '.devai/config/adopter-policy-binding.json'), 'utf8'),
+    ) as Record<string, unknown>;
+    const extension = extensionEntries([receipt['authority_extension']])[0];
+    return {
+      ...(typeof receipt['source_path'] === 'string' && { source_path: receipt['source_path'] }),
+      ...(extension !== undefined && {
+        authority_extension: {
+          extension_id: extension.extension_id,
+          extension_version: extension.extension_version,
+          digest_sha256: extension.digest_sha256,
+        },
+      }),
+    };
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * ADR-AUT-0003: name the adopter extension the materialized policy and the receipt carry, and,
+ * on a mismatch, the extension entries that differ between the policy and the rebuilt sources
+ * together with the refusal the rebuilt sources give for the bound source.
+ */
+function adopterExtensionReport(
+  repoRoot: string,
+  policy: Record<string, unknown>,
+  expected: ReturnType<typeof buildTrustedAuthoritySources>,
+  bindingMatches: boolean,
+): { readonly info: Record<string, unknown>; readonly errors: string[] } {
+  const materialized = extensionEntries(policy['additive_extensions']);
+  const rebuilt = extensionEntries(expected.provenance.additive_extensions);
+  const receipt = boundAdopterReceipt(repoRoot);
+  const adopter =
+    materialized.find((entry) => entry.extension_id !== CORE_EXTENSION_ID) ??
+    receipt.authority_extension;
+  const info: Record<string, unknown> = {
+    ...(adopter !== undefined && {
+      adopter_extension: {
+        extension_id: adopter.extension_id,
+        extension_version: adopter.extension_version,
+        digest_sha256: adopter.digest_sha256,
+      },
+    }),
+  };
+  if (bindingMatches) return { info, errors: [] };
+  const key = (entry: ExtensionEntry) => canonicalSha256(entry);
+  const differing = [
+    ...materialized.filter((entry) => !rebuilt.some((other) => key(other) === key(entry))),
+    ...rebuilt.filter((entry) => !materialized.some((other) => key(other) === key(entry))),
+  ];
+  const named = [
+    ...new Set(
+      [
+        ...differing.map((entry) => entry.extension_id),
+        ...(receipt.authority_extension === undefined
+          ? []
+          : [receipt.authority_extension.extension_id]),
+      ].filter((id) => id !== CORE_EXTENSION_ID),
+    ),
+  ];
+  let refusal: string | undefined;
+  try {
+    void expected.additiveExtensions;
+  } catch (error) {
+    refusal = error instanceof Error ? error.message : String(error);
+  }
+  if (named.length === 0 && refusal === undefined) return { info, errors: [] };
+  const rebind =
+    receipt.source_path === undefined
+      ? 'devai init bind --target . --as-role architect --write'
+      : `devai init bind --target . --adopter-policy ${receipt.source_path} --as-role architect --write`;
+  return {
+    info: {
+      ...info,
+      extension_mismatch: {
+        extension_ids: named,
+        materialized: differing.filter((entry) => materialized.includes(entry)),
+        rebuilt: differing.filter((entry) => rebuilt.includes(entry)),
+        ...(refusal !== undefined && { refusal }),
+        remediation_command: rebind,
+      },
+    },
+    errors: [
+      `adopter extension ${named.join(', ') || 'binding'} differs from the sources rebuilt from the binding receipt; rebind with \`${rebind}\``,
+    ],
+  };
+}
+
 export function checkAuthorityEnforcement(repoRoot: string): CheckResult {
   const projectPath = join(repoRoot, '.devai/config/project.json');
   const policyPath = join(repoRoot, '.devai/config/authority-policy.json');
@@ -181,11 +294,12 @@ export function checkAuthorityEnforcement(repoRoot: string): CheckResult {
         errors: ['authority-policy.json does not validate against authority-policy.schema.json'],
       };
     }
-    const expected = buildTrustedAuthoritySources(
+    const sources = buildTrustedAuthoritySources(
       canonicalRegistry(),
       repoRoot,
       resolveCliVersion(),
-    ).provenance;
+    );
+    const expected = sources.provenance;
     const bindingMatches =
       policy['repository_id'] === expected.repository_id &&
       canonicalSha256(policy['framework_package']) ===
@@ -215,6 +329,7 @@ export function checkAuthorityEnforcement(repoRoot: string): CheckResult {
       declaredMode !== 'host-integrated' ||
       (adapterConfig === '.devai/config/post-merge-host-adapter.json' && localPostMerge.ok) ||
       (adapterConfig === '.devai/config/github-actions-host-adapter.json' && githubActions.ok);
+    const adopter = adopterExtensionReport(repoRoot, policy, sources, bindingMatches);
     const ok =
       bindingMatches &&
       enforcement?.mode === 'binding' &&
@@ -230,6 +345,7 @@ export function checkAuthorityEnforcement(repoRoot: string): CheckResult {
         host_mode: host?.mode ?? 'unknown',
         declared_mode: declaredMode ?? 'unknown',
         policy_binding: bindingMatches ? 'current' : 'mismatch',
+        ...adopter.info,
         selected_adapter_policy_bound: selectedAdapterBound,
         cli_runtime_enforced: bindingMatches && enforcement?.mode === 'binding',
         local_post_merge_enforced: bindingMatches && localPostMerge.ok,
@@ -241,6 +357,7 @@ export function checkAuthorityEnforcement(repoRoot: string): CheckResult {
       ...(!ok && {
         errors: [
           'authority posture is missing, stale, non-binding, or inconsistent; re-materialize with `devai init bind --as-role architect --write`',
+          ...adopter.errors,
           ...localPostMerge.errors,
           ...(adapterConfig === '.devai/config/github-actions-host-adapter.json'
             ? githubActions.errors
