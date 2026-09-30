@@ -76,3 +76,90 @@ Pull-request verification requires the exact signed commit. After GitHub creates
 main verification may reuse that receipt only in explicit `exact-tree` mode and only when the
 merged tree is byte-identical. Release-tag verification uses the same exact-tree rule; any changed
 byte requires a new local RC receipt.
+
+## Packed-adopter rehearsal
+
+The adopter path-authority extension of
+[ADR-AUT-0003](../../../law/adr/ADR-AUT-0003-governed-adopter-path-authority.md) and
+[ADR-AUT-0004](../../../law/adr/ADR-AUT-0004-class-write-verbs-for-adopter-path-authority.md)
+is proved on the published package, never on workspace sources: the installed smoke
+(`pnpm --filter @aarusso-nyx/devai run pack:smoke`, which runs
+`packages/cli/scripts/installed-tarball-smoke.mjs`) and the adopter package contract test
+(`packages/cli/tests/unit/adopter-package-contract.test.ts`) both perform the rehearsal below in
+a disposable clone, and the release workflow runs the smoke against the exact tarball it
+publishes. A rehearsal that resolves the broker, a schema, a policy, or
+the default test selectors from the workspace proves nothing about the package and is a defect of
+the rehearsal.
+
+1. **Pack the tarball.** `pnpm run build`, then `pnpm pack` in `packages/cli`, or pass the exact
+   candidate with `--tarball <absolute-path> --sha256 <digest>`. The packed file list must carry
+   `law/policy/adopter-defaults/path-authority-classes.json` under `dist/`: the default test
+   selectors are a law source of the package, and an installed bin that cannot resolve them reads
+   `ADOPTER_AUTHORITY_DEFAULTS_UNAVAILABLE` at the bind.
+2. **Install it in a disposable clone.** A fresh git repository under a temporary root, with the
+   tarball added as its only `@aarusso-nyx/devai` dependency and the lockfile committed; every
+   later command runs the installed `bin.js` from that clone's `node_modules`, and
+   `devai --version` is checked against the packed version before anything else.
+3. **Bind the constitution at 1.0.2, then the package law.** In order:
+   `init bind --tier tier1 --constitution`, `init bind --operational-law`,
+   `init bind --subprocess-effects`, and the plain `init bind`, each `--as-role architect --write`.
+   The constitution gate is real: a source with the block bound before this step reads
+   `ADOPTER_AUTHORITY_CONSTITUTION_VERSION` and leaves no receipt.
+4. **Bind the reference source.** Write the reference block of
+   [Path authority for multi-stack roots](../../adopters/path-authority.md#the-block) into
+   `law/policy/adopter-policy.json` of the clone and run
+   `init bind --adopter-policy law/policy/adopter-policy.json --as-role architect --write`. Assert
+   the receipt's `authority_extension` (`detran.path-authority`, the source `policy_version`, a
+   digest, `rule_count` 48) and the second `additive_extensions` entry of
+   `.devai/config/authority-policy.json` with the same id, version, and digest. Bind twice and
+   assert both files byte-identical.
+5. **Run Doctor through the installed bin.** `doctor --repo-root <clone> --format json` must read
+   `policy-materialization-current` and `authority-enforcement` `ok` with
+   `policy_binding: current`. Then edit the block without rebinding, remove the block without
+   rebinding, and delete the source, and assert after each that Doctor reports the reason id and
+   the rebind command the [Doctor findings](../../adopters/path-authority.md#doctor-findings)
+   table names, as a `review` verdict and never as a pass or a transport failure; rebind between
+   probes so each starts from a current receipt.
+6. **Drive the matrix through the installed bin.** A probe loads the broker from the installed
+   package and requests each row of the
+   [decision matrix](../../adopters/path-authority.md#decision-matrix) under the registered
+   entries exactly as registered, never with a substituted subject: `check` declared by the
+   Inspector, `task start` declared by the Engineer, `round seal` declared by the Architect. At
+   least the Inspector allow and the Engineer deny on a test path and the Architect allow and the
+   Engineer deny on an architecture path are asserted by code and by matched rule id, and a deny
+   under a class verb names no rule of a lower precedence. The drift refusals are driven the same
+   way: a governed write after an edit reads `AUTHORITY_POLICY_DIGEST_MISMATCH`, and after the
+   source is deleted reads `ADOPTER_AUTHORITY_SOURCE_UNAVAILABLE`.
+
+The smoke asserts the packed file list, the receipt field, the second extension entry, one allow
+and one deny of the matrix, and the Doctor verdict, so `pack:smoke` fails when a published package
+cannot enforce the extension; the contract test carries the full matrix and the drift states.
+
+### What DETRAN repeats before claiming enforcement
+
+The rehearsal above proves the package with the reference source in a fixture. It proves nothing
+about a candidate repository, whose roots, selectors, and tree are its own. Before DETRAN, or any
+adopter, states that path authority is enforced on its candidate, it repeats the sequence there,
+with the pinned release and its own source, and keeps the results with the candidate:
+
+- Pin the released version the campaign names, rebind the constitution at 1.0.2, and run the
+  operational-law and subprocess-effects rebinds of an upgrade, as
+  [Upgrading DEVAI](../../adopters/install.md#upgrading-devai) states.
+- Declare its own `authority` block, with the roots its tree actually carries and the architecture
+  selectors it wants covered (DDL, blueprints, and any nested `docs` it wants Architect), bump
+  `policy_version`, and bind it with `--adopter-policy` through the installed bin; commit the
+  source, the receipt, and every materialized target together.
+- Read Doctor `ok` on both checks, then edit the source without rebinding and read the finding
+  and the rebind command, so the drift path is seen to fail closed on that repository and not only
+  in the fixture; rebind afterwards.
+- Drive its own matrix: one existing path per root remainder, per test selector, and per
+  architecture selector, plus one path outside every root and one nested `docs` path, under the
+  three registered verbs, and record each code and matched rule id beside the row it stands for.
+  A row that reads other than the page predicts is a finding to report, never a row to reword.
+- State the boundary with the claim: the runtime brokers governed writes through its own actions,
+  and no host-enforcement adapter is declared for editor or shell writes, so the claim is
+  enforcement of governed writes, not of every write to the tree.
+
+A candidate that cannot complete a step, for example a package whose tarball lacks the defaults
+source or a Doctor finding that no rebind clears, is blocked on that step and reports it against
+the package, not worked around with a hand edit under `.devai/config`.
