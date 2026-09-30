@@ -85,6 +85,7 @@ function classify(code, exits) {
     code === 'CHECK_RUNNER_DESCRIPTOR' ||
     code === 'CHECK_TASK_DESCRIPTOR_MISSING' ||
     code === 'CHECK_RC_DB_TESTS_REQUIRED' ||
+    code === 'TASK_ROUND_INACTIVE' ||
     code.includes('_PRECONDITION') ||
     code.endsWith('_UNAVAILABLE')
   )
