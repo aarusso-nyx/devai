@@ -420,7 +420,7 @@
       "id": "R-0502",
       "title": "Materialization and broker enforcement",
       "goal": "The package default test selectors are a law source; init bind --adopter-policy materializes the compiled block as the second additive extension of authority-policy.json with receipt provenance, byte-stable across reruns; the broker decides every row of the DETRAN acceptance matrix as real rules with the fixed ladder, refuses paths outside the roots and escapes before any rule, and denies equal-precedence extension ties as ambiguous.",
-      "status": "open",
+      "status": "closed",
       "records": ["ADR-AUT-0003"],
       "depends_on": ["R-0501"],
       "attestation_reissue": false,
@@ -451,7 +451,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "in_progress",
+              "status": "merged",
               "target_substrates": ["F1"],
               "boundary": {
                 "paths": [
@@ -500,7 +500,7 @@
                 "sha256": "46b150ff85053337601521736c832bda963038e1e3b0c1acd38d15289cec82a6"
               },
               "pull_request": null,
-              "merged_as": null,
+              "merged_as": "a22269caab3b89d55c4f80668950f2964722b81a",
               "execution": {
                 "tier": "architect",
                 "effort": "high",
@@ -552,7 +552,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0521",
-              "status": "in_progress",
+              "status": "merged",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -595,7 +595,7 @@
                 "sha256": "75cc26132fc4a55cfe1edbc1d2e3ab51cfb430886ef0542838dba21bfef5629a"
               },
               "pull_request": null,
-              "merged_as": null,
+              "merged_as": "a22269caab3b89d55c4f80668950f2964722b81a",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -647,7 +647,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0522",
-              "status": "in_progress",
+              "status": "merged",
               "target_substrates": ["F2", "F5"],
               "boundary": {
                 "paths": [
@@ -700,7 +700,7 @@
                 "sha256": "34092b8a3d8fe5d34e3e3d573bc03279d769452694b84a08ff90eb8ca2a67252"
               },
               "pull_request": null,
-              "merged_as": null,
+              "merged_as": "a22269caab3b89d55c4f80668950f2964722b81a",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -748,7 +748,13 @@
             }
           ]
         }
-      ]
+      ],
+      "closure": {
+        "merged_head": "a22269caab3b89d55c4f80668950f2964722b81a",
+        "closed_at": "2026-09-30T16:27:57Z",
+        "task_policy_digest": null,
+        "phase_closure": null
+      }
     },
     {
       "id": "R-0503",
