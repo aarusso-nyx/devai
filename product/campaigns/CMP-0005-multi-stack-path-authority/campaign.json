@@ -760,7 +760,7 @@
       "id": "R-0503",
       "title": "Doctor drift, migration, and adoption rehearsal",
       "goal": "Doctor names an adopter extension whose source drifted, vanished, or was never rebound and prints the rebind command; the migration for existing adopters is documented and rehearsed from the packed tarball in a disposable clone that reproduces the matrix through the installed bin; the release that carries the campaign is published and DETRAN is told the version.",
-      "status": "planned",
+      "status": "open",
       "records": ["ADR-AUT-0003", "ADR-AUT-0004"],
       "depends_on": ["R-0502"],
       "attestation_reissue": false,
@@ -789,7 +789,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F1"],
               "boundary": {
                 "paths": [
@@ -824,14 +824,53 @@
               "commit_types": ["docs(adopters)", "docs(operations)"],
               "prompt": {
                 "path": "prompts/TASK-0531.md",
-                "sha256": null
+                "sha256": "b8aa983bed94cb737ea49017deeefacebf3536d91069e7a7bcef93557613311e"
               },
               "pull_request": null,
               "merged_as": null,
               "execution": {
                 "tier": "architect",
                 "effort": "medium",
-                "time_budget_minutes": 60
+                "time_budget_minutes": 60,
+                "resolved": {
+                  "policy_version": "1.0.0",
+                  "pinned_at": "2026-09-30T16:45:44Z",
+                  "tiers": {
+                    "architect": {
+                      "rank": 1,
+                      "hosts": {
+                        "claude": "claude-cli:fable",
+                        "codex": "codex-cli:gpt-6-astra"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker-high": {
+                      "rank": 2,
+                      "hosts": {
+                        "claude": "claude-cli:opus",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker": {
+                      "rank": 3,
+                      "hosts": {
+                        "claude": "claude-cli:sonnet",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "medium"
+                    },
+                    "clerk": {
+                      "rank": 4,
+                      "hosts": {
+                        "claude": "claude-cli:haiku",
+                        "codex": "codex-cli:gpt-6-luna"
+                      },
+                      "default_effort": "low"
+                    }
+                  },
+                  "ceiling": "architect"
+                }
               }
             },
             {
