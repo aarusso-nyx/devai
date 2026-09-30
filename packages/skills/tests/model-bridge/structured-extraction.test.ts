@@ -345,18 +345,18 @@ describe('IA-005 neither consumer accepts the other document', () => {
   });
 });
 
-describe('OE-05 CMP-0002 rejected PASS reply fixture', () => {
+describe('OE-05 CMP-0003 rejected PASS reply fixture', () => {
   const fixture = fileURLToPath(
     new URL(
-      '../../../../tests/fixtures/review-replies/cmp-0002-rejected-pass.txt',
+      '../../../../tests/fixtures/review-replies/cmp-0003-rejected-pass.txt',
       import.meta.url,
     ),
   );
 
-  it('parses the maintainer-supplied CMP-0002 reply as pass (OE-05; skipped while the file is absent)', (context) => {
+  it('parses the Owner-rejected CMP-0003 PASS reply as pass (OE-05; skipped while the file is absent)', (context) => {
     if (!existsSync(fixture)) {
       context.skip(
-        'OE-05 not performed: tests/fixtures/review-replies/cmp-0002-rejected-pass.txt is absent; this is a diagnostic, not a pass',
+        'OE-05 not performed: tests/fixtures/review-replies/cmp-0003-rejected-pass.txt is absent; this is a diagnostic, not a pass',
       );
       return;
     }
