@@ -3150,7 +3150,10 @@
                 "paths": [
                   "packages/cli/src/commands/round/workflow.ts",
                   "packages/loop/src/round-lifecycle/index.ts",
-                  "packages/loop/src/loop/task-services.ts"
+                  "packages/loop/src/loop/task-services.ts",
+                  "scripts/generate-error-code-reference.mjs",
+                  "docs/reference/error-codes.md",
+                  "Orchestrator note (2026-09-30): the handler's TASK_ROUND_INACTIVE literal is now scanned by the error-code generator, and ADR-EVI-0003 narrows that code's description to dispatch; the generator's remediation table and the regenerated page are admitted, with commit types ci(scripts) and docs(reference) in addition to the declared ones."
                 ],
                 "forbidden": [
                   "law/",
@@ -3178,7 +3181,7 @@
               "commit_types": ["fix(round)", "fix(loop)"],
               "prompt": {
                 "path": "prompts/TASK-0386.md",
-                "sha256": "b0a0e8e2fe1cf27c7b015064c368d2eaae7637ec7488ffc95c6b7828275a2977"
+                "sha256": "836c41ffc2c26431d3623895ebd1af29dca10c4315a0b1ee6f09130422e2e827"
               },
               "pull_request": null,
               "merged_as": null,
