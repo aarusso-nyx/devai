@@ -789,7 +789,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "in_progress",
+              "status": "merged",
               "target_substrates": ["F1"],
               "boundary": {
                 "paths": [
@@ -827,7 +827,7 @@
                 "sha256": "b8aa983bed94cb737ea49017deeefacebf3536d91069e7a7bcef93557613311e"
               },
               "pull_request": null,
-              "merged_as": null,
+              "merged_as": "ef9d59a477cc613bb61155642df7f0edda966013",
               "execution": {
                 "tier": "architect",
                 "effort": "medium",
@@ -879,7 +879,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0531",
-              "status": "in_progress",
+              "status": "merged",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -917,7 +917,7 @@
                 "sha256": "98320712acd52d4917699844169be74267822c957693b45d61b6dcd4e0d5da3b"
               },
               "pull_request": null,
-              "merged_as": null,
+              "merged_as": "ef9d59a477cc613bb61155642df7f0edda966013",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -969,7 +969,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0532",
-              "status": "in_progress",
+              "status": "merged",
               "target_substrates": ["F2", "F5"],
               "boundary": {
                 "paths": [
@@ -1015,7 +1015,7 @@
                 "sha256": "ad1cdd9cfd0912f1733c8e2b0dcde2a98e6618b99ad2403b8d46de7b690626b8"
               },
               "pull_request": null,
-              "merged_as": null,
+              "merged_as": "ef9d59a477cc613bb61155642df7f0edda966013",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -1086,7 +1086,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F1"],
               "boundary": {
                 "paths": ["docs/adopters/path-authority.md", "docs/dev/operations/testing.md"],
@@ -1117,14 +1117,53 @@
               "commit_types": ["docs(adopters)", "docs(operations)"],
               "prompt": {
                 "path": "prompts/TASK-0534.md",
-                "sha256": null
+                "sha256": "05b7301d9ebadd4345c42f974a017a283632fa0caaa865ba7a11b90003ea3c08"
               },
               "pull_request": null,
               "merged_as": null,
               "execution": {
                 "tier": "architect",
                 "effort": "medium",
-                "time_budget_minutes": 60
+                "time_budget_minutes": 60,
+                "resolved": {
+                  "policy_version": "1.0.0",
+                  "pinned_at": "2026-09-30T17:16:51Z",
+                  "tiers": {
+                    "architect": {
+                      "rank": 1,
+                      "hosts": {
+                        "claude": "claude-cli:fable",
+                        "codex": "codex-cli:gpt-6-astra"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker-high": {
+                      "rank": 2,
+                      "hosts": {
+                        "claude": "claude-cli:opus",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker": {
+                      "rank": 3,
+                      "hosts": {
+                        "claude": "claude-cli:sonnet",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "medium"
+                    },
+                    "clerk": {
+                      "rank": 4,
+                      "hosts": {
+                        "claude": "claude-cli:haiku",
+                        "codex": "codex-cli:gpt-6-luna"
+                      },
+                      "default_effort": "low"
+                    }
+                  },
+                  "ceiling": "architect"
+                }
               }
             },
             {
