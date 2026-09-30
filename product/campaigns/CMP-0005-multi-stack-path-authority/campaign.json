@@ -23,7 +23,7 @@
       "id": "OE-01",
       "description": "Approve the exact amended Article 6 words of ADR-GOV-0024 so the Architect can set ADR-GOV-0024 and ADR-AUT-0003 to accepted before R-0501 opens. The decisions of the proposal were answered by the Owner on 2026-09-30 and bind every task: (a) amend Article 6 at version 1.0.2; (b) the authority block in the adopter policy; (c) the fixed class ladder; (d) adopter-declared roots; (e) existing adopters unchanged and the framework declares no roots; (f) one release, 1.8.0, after R-0503 (OE-02); (g) the CMP-0003 tier pattern; (h) a source edited after binding refuses every governed write until rebind; (i) a nested docs directory under a root is Engineer by remainder and an adopter may name **/docs/** in its architecture class; (j) the harness subject of a class rule is bound to the class role.",
       "required_before": "R-0501",
-      "performed_at": null
+      "performed_at": "2026-09-30T12:30:00Z"
     },
     {
       "id": "OE-02",
