@@ -262,9 +262,12 @@ describe('decision_citation_resolution on scoped identities (ADR-SCR-0006)', () 
 });
 
 describe('the governance ledger sensors on the repository (ADR-SCR-0006 IA-004)', () => {
+  // The scan reads the history of every record, so its duration grows with the
+  // catalogue (about 15 s for 96 records on a workstation); the default 15 s
+  // limit made it fail intermittently, including under RC coverage.
   it('decision_record_integrity reports zero findings over the real law/adr tree', () => {
     expect(decisionRecordIntegrity({ repoRoot: REPO_ROOT })).toEqual({ ok: true, findings: [] });
-  });
+  }, 120_000);
 
   it('decision_citation_resolution reports zero findings over the repository', () => {
     expect(decisionCitationResolution({ repoRoot: REPO_ROOT })).toEqual({ ok: true, findings: [] });
