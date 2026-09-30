@@ -91,6 +91,34 @@ commands exited zero on an untrusted runner. Declare what must never run remotel
 `ci_economy.attested_rc.local_only_nodes`; `check --only ci-economy` fails closed on any
 workflow that reaches a declared local-only node, directly or through an npm-script alias.
 
+### Check members in a downstream CI list
+
+A downstream CI list names the `devai check` members it requires. Every member declares
+where it applies ([ADR-CHK-0005](../../law/adr/ADR-CHK-0005-check-member-applicability.md);
+the declarations are on
+[Check suites](../reference/cli/check-suites.md#where-a-member-applies)), so list only members
+that execute in an adopter:
+
+- Adopter-applicable, safe to require as PASS: `action-coverage`, `adrs`, `blueprint`,
+  `change-taxonomy`, `ci-economy`, `dependencies`, `docs-governance`, `docs-links`,
+  `forbidden-actions`, `glob-guards`, `glossary`, `invariant-strategies`, `invariants`,
+  `journeys`, `mutation`, `overrides`, `pr-compliance`, `schema`, `schemas`, `sensor-integrity`,
+  `test-trace`, `trace`, `translation`, and the `ledger-local` and `ledger-rc` suite members.
+- Framework-only, never a required PASS in an adopter: `action-effects`, `cli-reference`, and
+  `prompt-overlays`. In your repository each returns `status: "na"` with
+  `CHECK_MEMBER_NOT_APPLICABLE`; run alone through `--only` the aggregate reads
+  `readiness_status: "na"`, `ok: false`, exit `0`. A CI step that requires `ok: true` from one
+  of them fails by construction, and a step that reads only the exit code mistakes
+  not-applicable for a pass. Read the member's `status` instead, or leave the member out.
+
+Not-applicable is not a way to skip a check. A required source that is missing, an explicit
+path that is invalid, or a broken policy stays a failure with its named code, and an adopter
+with no action in scope gets `review` with `CHECK_MEMBER_POPULATION_EMPTY` from
+`action-coverage`, not a pass. To test the classification before committing a CI list, run
+each required member through `--only` in a clean checkout, read `results[0].status` and
+`results[0].value.repository_kind`, and run it a second time: the two outputs are byte for byte
+identical and no file appears in `git status --porcelain`.
+
 The package-owned `devai-evidence-export` entry point first
 validates the clean local receipt and exact results from the protected signing environment, then
 signs the canonical receipt outside the candidate repository. CI checks that export with the
