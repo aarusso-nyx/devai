@@ -559,7 +559,9 @@
                   "packages/cli/tests/fixtures/adopter-path-authority/",
                   "packages/cli/tests/unit/authority-adopter-extension-decisions.test.ts",
                   "packages/cli/tests/unit/adopter-policy-authority-materialization.test.ts",
-                  "packages/authority/tests/unit/authority-policy-resolver-contracts.test.ts"
+                  "packages/authority/tests/unit/authority-policy-resolver-contracts.test.ts",
+                  "packages/cli/tests/unit/check-schemas-adopter-boundaries.test.ts",
+                  "Orchestrator note (2026-09-30): the new canonical schema raises the canonical total to 113 and the runtime roster to 96."
                 ],
                 "forbidden": [
                   "law/",
@@ -591,7 +593,7 @@
               "commit_types": ["test(cli)", "test(authority)"],
               "prompt": {
                 "path": "prompts/TASK-0522.md",
-                "sha256": "ede4895ffc05d74c0a425f0f47f7e2b012bab00a2d5c3ae4b1432577795c7530"
+                "sha256": "fb8650c377e6056d6120eca5c9dec6e4637b723a1c3b05d1da307f5e3a92e78a"
               },
               "pull_request": null,
               "merged_as": null,
