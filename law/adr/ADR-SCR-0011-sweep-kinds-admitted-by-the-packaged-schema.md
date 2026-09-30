@@ -2,7 +2,7 @@
 id: ADR-SCR-0011
 title: Every sweep read kind is admitted by the packaged SensorReading schema
 type: adr
-status: proposed
+status: accepted
 date: 2026-09-29
 authority: Architect
 supersedes: []
@@ -34,8 +34,8 @@ inspector_acceptance:
 
 ## Status
 
-Proposed on 2026-09-29 from DETRAN R-0020 CTG-0004 (#184). Binds nothing
-until the Architect sets it to accepted before round R-0308 opens. Extends
+Accepted on 2026-09-30 by the Architect before round R-0308 opened; proposed on
+2026-09-29 from DETRAN R-0020 CTG-0004 (#184). Extends
 the reading contract of ADR-SCR-0002 and ADR-SCR-0005 by one invariant; the
 recording order and supersession rules of ADR-SCR-0008 are unchanged.
 

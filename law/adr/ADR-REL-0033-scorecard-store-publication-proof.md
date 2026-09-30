@@ -2,7 +2,7 @@
 id: ADR-REL-0033
 title: A release that changes the readings store is proven from the packed artifact in a disposable adopter
 type: adr
-status: proposed
+status: accepted
 date: 2026-09-29
 authority: Architect
 supersedes: []
@@ -34,8 +34,8 @@ inspector_acceptance:
 
 ## Status
 
-Proposed on 2026-09-29 from DETRAN R-0020 CTG-0004 (#185). Binds nothing
-until the Architect sets it to accepted before round R-0308 opens. Adds a
+Accepted on 2026-09-30 by the Architect before round R-0308 opened; proposed on
+2026-09-29 from DETRAN R-0020 CTG-0004 (#185). Adds a
 publication proof beside the offline bundle checks of ADR-REL-0025 and
 ADR-REL-0026; the release ladder and channels are unchanged. The publication
 itself is Owner effect OE-07 of CMP-0003.
