@@ -1,7 +1,18 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { getValidator } from '@devai-nyx/schemas';
 import { canonicalJson } from '@devai-nyx/utils';
-import { resolveCanonicalPolicyContent, validateCanonicalPolicyContent } from '@devai-nyx/skills';
+import {
+  parseConstitutionVersion,
+  resolveCanonicalPolicyContent,
+  validateCanonicalPolicyContent,
+} from '@devai-nyx/skills';
 import { projectOwnedProjectConfig } from './adopter-policy-ownership.js';
+import {
+  type AdopterAuthorityBlock,
+  compileAdopterAuthorityExtension,
+  DEFAULT_ADOPTER_TEST_SELECTORS,
+} from '../authority/policy-adopter-extension.js';
 
 export {
   ADOPTER_POLICY_OWNERSHIP_MATRIX,
@@ -51,16 +62,60 @@ export function jsonBytes(value: unknown): string {
 
 export type AdopterPolicyTarget = (typeof ADOPTER_POLICY_TARGETS)[number];
 
+export interface AdopterPolicyProjectionInput {
+  readonly policy: unknown;
+  readonly currentProject: unknown;
+  readonly frameworkVersion: string;
+  /**
+   * The bound constitution version that gates an `authority` block (ADR-AUT-0003). When
+   * absent, it is read from `.devai/pin/constitution.md` under `targetRoot`.
+   */
+  readonly constitutionVersion?: string;
+  /** Repository root whose bound constitution pin gates an `authority` block. */
+  readonly targetRoot?: string;
+}
+
+const CONSTITUTION_PIN = '.devai/pin/constitution.md';
+
+function boundConstitutionVersion(targetRoot: string): string {
+  const pin = join(targetRoot, CONSTITUTION_PIN);
+  const version = existsSync(pin) ? parseConstitutionVersion(readFileSync(pin, 'utf8')) : null;
+  if (version === null) {
+    throw new Error(
+      `ADOPTER_AUTHORITY_CONSTITUTION_VERSION:no bound constitution version at ${pin}`,
+    );
+  }
+  return version;
+}
+
+/**
+ * Compiles the source's `authority` block, when declared, so a refused block raises its
+ * ADOPTER_AUTHORITY_* code before any target is staged. The compiled rules are not
+ * consumed here: the trusted authority sources compile them against the repository
+ * identity once they are wired (R-0502), so the selectors' repository id is irrelevant to
+ * this refusal pass and no identity lookup (which would spawn git) is made.
+ */
+function refuseMalformedAuthority(input: AdopterPolicyProjectionInput, document: JsonObject): void {
+  if (document['authority'] === undefined) return;
+  compileAdopterAuthorityExtension({
+    policyId: String(document['policy_id']),
+    policyVersion: String(document['policy_version']),
+    authority: document['authority'] as AdopterAuthorityBlock,
+    constitutionVersion:
+      input.constitutionVersion ?? boundConstitutionVersion(resolve(input.targetRoot ?? '.')),
+    // The defaults law source arrives in R-0502; ADR-AUT-0003 states these four.
+    defaultTestSelectors: DEFAULT_ADOPTER_TEST_SELECTORS,
+    repositoryId: 'adopter-repository',
+  });
+}
+
 /**
  * Deterministically resolves adopter policy into the five bound config files.
- * This function has no filesystem effects and is shared by init bind and Doctor.
+ * This function writes nothing and is shared by init bind and Doctor; it reads only the
+ * bound constitution pin, and only when an `authority` block omits the input version.
  */
 export function resolveAdopterPolicyMaterialization(
-  input: {
-    readonly policy: unknown;
-    readonly currentProject: unknown;
-    readonly frameworkVersion: string;
-  },
+  input: AdopterPolicyProjectionInput,
   sources?: AdopterPolicyMaterializationSources,
 ): ReadonlyMap<AdopterPolicyTarget, string> {
   return resolveAdopterPolicyProjection(input, sources).files;
@@ -71,11 +126,7 @@ export function resolveAdopterPolicyMaterialization(
  * retires (ADR-CFG-0002), reported as JSON pointers at the ownership-matrix rows.
  */
 export function resolveAdopterPolicyProjection(
-  input: {
-    readonly policy: unknown;
-    readonly currentProject: unknown;
-    readonly frameworkVersion: string;
-  },
+  input: AdopterPolicyProjectionInput,
   sources?: AdopterPolicyMaterializationSources,
 ): {
   readonly files: ReadonlyMap<AdopterPolicyTarget, string>;
@@ -88,6 +139,7 @@ export function resolveAdopterPolicyProjection(
     throw new Error(`ADOPTER_POLICY_INVALID:${JSON.stringify(validatePolicy.errors)}`);
   }
   const document = input.policy as JsonObject;
+  refuseMalformedAuthority(input, document);
   const defaults = (
     file: 'domains.json' | 'thresholds.json' | 'scorecard-na.json' | 'glob-guards.json',
   ) => JSON.parse(validateCanonicalPolicyContent(file, readPolicy(file), validator)) as JsonObject;
