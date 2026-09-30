@@ -39,6 +39,7 @@
           "minLength": 1
         },
         "kind": {
+          "description": "Closed set of admitted sensor kinds. Every kind a sense preset can select is admitted here (ADR-SCR-0011); a registry entry the schema intentionally does not admit is refused before the sensor runs and never emitted as a reading. Five values name no registry entry and are kept as legacy so recorded readings under them stay valid (ADR-SCR-0008): api_test, contract_validation, db_test, journey_test, mutation_test.",
           "enum": [
             "type_check",
             "lint",
@@ -97,6 +98,10 @@
             "harness_performance",
             "harness_robustness",
             "inventory_performance",
+            "decision_record_integrity",
+            "decision_citation_resolution",
+            "archive_immutability",
+            "round_record_integrity",
             "docs_drift",
             "site_drift",
             "action_effect_inference"
