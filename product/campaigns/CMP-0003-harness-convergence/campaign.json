@@ -26,7 +26,8 @@
     "ADR-SCR-0011",
     "ADR-REL-0033",
     "ADR-EVI-0003",
-    "ADR-CHK-0005"
+    "ADR-CHK-0005",
+    "ADR-CHK-0006"
   ],
   "constraints": {
     "self_dogfood": true,
@@ -3888,6 +3889,230 @@
                   },
                   "ceiling": "architect"
                 }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R-0311",
+      "title": "Descriptor selector kinds trail the trusted verifier",
+      "goal": "The committed task descriptor is accepted by the pinned trusted verifier's policy builder, so a release rehearsal reconstructs the task policy from it; class selectors are materialized as their binding expansion until a published verifier admits them, the planning lane keeps its class semantics, and the descriptor check refuses undeclared kinds before any rehearsal.",
+      "status": "planned",
+      "records": ["ADR-CHK-0006"],
+      "depends_on": ["R-0301"],
+      "attestation_reissue": true,
+      "owner_effects_required": [],
+      "close_checks": ["schemas", "test:cli", "test:root", "ci-economy"],
+      "closure": null,
+      "waves": [
+        {
+          "id": "CTG-03111",
+          "title": "Descriptor selector kinds trail the trusted verifier",
+          "type": "coupled-triplet",
+          "records": ["ADR-CHK-0006"],
+          "depends_on": [],
+          "lock_scopes": [
+            "test-tasks.json",
+            "packages/cli/src/services/check-runner/",
+            "scripts/check-test-task-workspace-selectors.mjs",
+            "law/policy/trusted-local-rc-verifier-package.json"
+          ],
+          "gates": ["schemas", "test:cli", "test:root", "ci-economy"],
+          "tasks": [
+            {
+              "id": "TASK-03111",
+              "title": "Bind the committed descriptor's selector kinds to the pinned trusted verifier",
+              "discipline": "architect",
+              "coupled_pipeline_position": "architect",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F1"],
+              "boundary": {
+                "paths": [
+                  "law/adr/ADR-CHK-0006-descriptor-selector-kinds-trail-the-trusted-verifier.md",
+                  "law/adr/README.md",
+                  "law/policy/adr-validation.json",
+                  "law/policy/trusted-local-rc-verifier-package.json",
+                  "law/schemas/trusted-local-rc-verifier-package.schema.json",
+                  "docs/dev/operations/release-discipline.md"
+                ],
+                "forbidden": [".github/workflows/", "packages/", "tests/", "scripts/", "product/"]
+              },
+              "deliverables": [
+                "ADR-CHK-0006, accepted with the Owner's prior authorization, decides that the committed test-tasks.json uses only the selector kinds the pinned trusted verifier's descriptor schema admits, that the trusted-verifier policy declares that admitted set, that a class selector is materialized into its change-taxonomy binding expansion until a published verifier admits the class kind, and that the planning lane keeps selecting by the commit-range classification (ADR-CHK-0003 narrowed in its descriptor clause only); the catalogue is regenerated and re-pinned.",
+                "law/policy/trusted-local-rc-verifier-package.json declares descriptor.selector_kinds equal to the kinds the 1.5.4 verifier schema admits (exact, prefix, glob) and its schema requires the field; the release runbook states the rule and the one-release lag."
+              ],
+              "acceptance_commands": [
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "adrs",
+                  "--format",
+                  "json"
+                ],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "schemas",
+                  "--format",
+                  "json"
+                ],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "docs-links",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": [
+                "law(adr)",
+                "law(schemas)",
+                "law(trusted-verifier)",
+                "docs(operations)"
+              ],
+              "prompt": {
+                "path": "prompts/TASK-03111.md",
+                "sha256": "d8e260e82e0775e64dc41959a771d06c7ed11b38f7c67f0fda599fbf21afa709"
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "architect",
+                "effort": "high",
+                "time_budget_minutes": 90
+              }
+            },
+            {
+              "id": "TASK-03112",
+              "title": "Prove the descriptor stays verifier-compatible and the planning lane keeps its class semantics",
+              "discipline": "inspector",
+              "coupled_pipeline_position": "inspector",
+              "upstream_task_id": "TASK-03111",
+              "status": "planned",
+              "target_substrates": ["F3"],
+              "boundary": {
+                "paths": [
+                  "packages/cli/tests/unit/check-runner-class-selector.test.ts",
+                  "packages/cli/tests/unit/ci-economy-class-lane.test.ts",
+                  "packages/cli/tests/unit/check-runner-planning-lane.test.ts",
+                  "tests/contract/task-descriptor-verifier-compat.contract.test.ts",
+                  "packages/schemas/tests/contract/governance-v15-adr.test.ts"
+                ],
+                "forbidden": [
+                  "law/",
+                  "product/",
+                  "scripts/",
+                  ".github/workflows/",
+                  "packages/cli/src/",
+                  "packages/schemas/src/"
+                ]
+              },
+              "deliverables": [
+                "A contract test proves that every selector kind in the committed test-tasks.json is in the trusted-verifier policy's declared set and that the seven former class nodes carry exactly the change-taxonomy binding expansion of their class (drift in either direction fails); the ADR freeze test lists ADR-CHK-0006 as an effective authority.",
+                "The class-selector, class-lane, and planning-lane tests prove that the planning lane is still selected from the commit-range classification with a descriptor that holds no class selector, that a class selector remains supported by the policy layer for a future descriptor, and that the descriptor check refuses a kind outside the declared set."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "--config",
+                  "tests/config/local.config.ts",
+                  "packages/cli/tests/unit/check-runner-class-selector.test.ts",
+                  "packages/cli/tests/unit/ci-economy-class-lane.test.ts",
+                  "packages/cli/tests/unit/check-runner-planning-lane.test.ts",
+                  "tests/contract/task-descriptor-verifier-compat.contract.test.ts",
+                  "packages/schemas/tests/contract/governance-v15-adr.test.ts"
+                ]
+              ],
+              "commit_types": ["test(cli)", "test(contract)", "test(schemas)"],
+              "prompt": {
+                "path": "prompts/TASK-03112.md",
+                "sha256": "8dd2005f728716547ae160f6120b1726cd7fc5665b394ec1a2198235c7e5bf61"
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 120
+              }
+            },
+            {
+              "id": "TASK-03113",
+              "title": "Materialize the class selectors and refuse undeclared selector kinds in the descriptor check",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": "TASK-03112",
+              "status": "planned",
+              "target_substrates": ["F2", "F5"],
+              "boundary": {
+                "paths": [
+                  "test-tasks.json",
+                  "packages/cli/src/services/check-runner/policy-descriptor.ts",
+                  "packages/cli/src/services/check-runner/policy.ts",
+                  "scripts/check-test-task-workspace-selectors.mjs"
+                ],
+                "forbidden": [
+                  "law/",
+                  "product/",
+                  "tests/",
+                  ".github/workflows/",
+                  "packages/cli/tests/",
+                  "packages/schemas/"
+                ]
+              },
+              "deliverables": [
+                "test-tasks.json carries, for the seven plan and docs nodes, the exact change-taxonomy binding expansion of their class in place of the class selector, so the pinned 1.5.4 verifier's policy builder accepts the descriptor; the planning lane is still selected from the commit-range classification and the taxonomy classifier loads whenever the lane needs it, not only when the descriptor holds a class selector.",
+                "scripts/check-test-task-workspace-selectors.mjs refuses any selector kind absent from descriptor.selector_kinds of law/policy/trusted-local-rc-verifier-package.json with a named code, so devai:prepare and the gate fail before a release rehearsal would."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "--config",
+                  "tests/config/local.config.ts",
+                  "packages/cli/tests/unit/check-runner-class-selector.test.ts",
+                  "packages/cli/tests/unit/ci-economy-class-lane.test.ts",
+                  "packages/cli/tests/unit/check-runner-planning-lane.test.ts",
+                  "tests/contract/task-descriptor-verifier-compat.contract.test.ts",
+                  "packages/schemas/tests/contract/governance-v15-adr.test.ts"
+                ],
+                ["node", "scripts/check-test-task-workspace-selectors.mjs"],
+                ["pnpm", "run", "test:cli"],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "ci-economy",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": ["ci(scripts)", "fix(check)"],
+              "prompt": {
+                "path": "prompts/TASK-03113.md",
+                "sha256": "eb8c9dbbd013de6f5f7efb68965486a67fe90175d534176bba5b1144d989b42a"
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 150
               }
             }
           ]
