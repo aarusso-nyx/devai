@@ -95,9 +95,10 @@ function runInstalledModuleCheck(name, source, cwd = projectRoot) {
 
 // ADR-AUT-0003: a disposable adopter binds the reference path-authority source through the
 // installed bin after the constitution rebind, and the installed release-host broker decides
-// under the extension it compiled. Only the root decisions that hold under the registered
-// verbs are driven here; the class-verb cells of ADR-AUT-0004 wait for the registry change
-// of its wave and are rehearsed by the packed adopter contract.
+// under the extension it compiled. ADR-AUT-0004 IA-006: every probe presents a registered
+// entry with its registered subject, so each class role reaches its class through its own
+// verb (`task start` for the Engineer root, `check` for the Inspector test class, `round
+// seal` for the Architect architecture class) and no probe substitutes a subject.
 const PATH_AUTHORITY_SOURCE = 'law/policy/devai-adoption.json';
 const PATH_AUTHORITY_EXTENSION = 'detran.path-authority';
 const PATH_AUTHORITY_REFERENCE = {
@@ -186,6 +187,7 @@ function rehearseAdopterPathAuthority(binary, installedPackage) {
   }
 
   mkdirSync(join(adopter, 'apps/dashboard/web/src'), { recursive: true });
+  mkdirSync(join(adopter, 'backend/ddl'), { recursive: true });
   const probeScript = join(smokeRoot, 'installed-path-authority-probe.mjs');
   writeFileSync(
     probeScript,
@@ -201,20 +203,26 @@ function rehearseAdopterPathAuthority(binary, installedPackage) {
       }
       const version = JSON.parse(readFileSync(join(installed, 'package.json'), 'utf8')).version;
       const entries = host.canonicalRegistry();
+      const argvOf = {
+        check: ['check', '--suite', 'quick'],
+        'task start': ['task', 'start', '--round', 'R-0007', '--task', 'TASK-7001'],
+        'round seal': ['round', 'seal'],
+      };
       const codeOf = (error) => {
         if (error !== null && typeof error === 'object' && typeof error.code === 'string' && error.code !== '') return error.code;
         const message = error instanceof Error ? error.message : String(error);
         return /[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+/u.exec(message)?.[0] ?? message;
       };
-      const decisions = JSON.parse(process.argv[2]).map(({ role, path }) => {
-        const entry = entries.find((candidate) => candidate.name === 'task start');
+      const decisions = JSON.parse(process.argv[2]).map(({ verb, role, path }) => {
+        const entry = entries.find((candidate) => candidate.name === verb);
+        if (entry === undefined || argvOf[verb] === undefined) return 'PROBE_ACTION_UNREGISTERED';
         let applied = false;
         let broker;
         try {
           broker = host.createAuthorityHostBroker({
             entry,
             entries,
-            argv: [process.execPath, 'devai', 'task', 'start', '--round', 'R-0007', '--task', 'TASK-7001', '--as-role', role, '--write'],
+            argv: [process.execPath, 'devai', ...argvOf[verb], '--as-role', role, '--write'],
             role,
             declaration: { as_role: role },
             repository_root: repository,
@@ -238,11 +246,24 @@ function rehearseAdopterPathAuthority(binary, installedPackage) {
   const probe = (requests) =>
     JSON.parse(run(process.execPath, [probeScript, JSON.stringify(requests)], adopter));
   const rootSource = 'apps/dashboard/web/src/example.ts';
-  const decisions = probe([
-    { role: 'engineer', path: rootSource },
-    { role: 'inspector', path: rootSource },
-  ]);
-  if (JSON.stringify(decisions) !== JSON.stringify(['allow', 'AUTHORITY_HUMAN_ROLE_DENIED'])) {
+  const testPath = 'apps/dashboard/web/src/example.spec.ts';
+  const ddlPath = 'backend/ddl/example.sql';
+  const matrix = [
+    // IA-003: the Engineer writes the root through task start; the Inspector cannot declare it.
+    [{ verb: 'task start', role: 'engineer', path: rootSource }, 'allow'],
+    [{ verb: 'task start', role: 'inspector', path: rootSource }, 'AUTHORITY_HUMAN_ROLE_DENIED'],
+    // IA-001: the Inspector writes a colocated spec through check; task start stops at 700.
+    [{ verb: 'check', role: 'inspector', path: testPath }, 'allow'],
+    [{ verb: 'task start', role: 'engineer', path: testPath }, 'AUTHORITY_ACTION_DENIED'],
+    // IA-005: check declared by the Engineer is refused at the declaration boundary.
+    [{ verb: 'check', role: 'engineer', path: testPath }, 'AUTHORITY_HUMAN_ROLE_DENIED'],
+    // IA-002: the Architect writes a DDL path through round seal; task start stops at 750.
+    [{ verb: 'round seal', role: 'architect', path: ddlPath }, 'allow'],
+    [{ verb: 'task start', role: 'engineer', path: ddlPath }, 'AUTHORITY_ACTION_DENIED'],
+  ];
+  const decisions = probe(matrix.map(([request]) => request));
+  const expected = matrix.map(([, outcome]) => outcome);
+  if (JSON.stringify(decisions) !== JSON.stringify(expected)) {
     throw new Error(`INSTALLED_PATH_AUTHORITY_DECISIONS_INVALID:${JSON.stringify(decisions)}`);
   }
 
@@ -265,7 +286,7 @@ function rehearseAdopterPathAuthority(binary, installedPackage) {
   ) {
     throw new Error('INSTALLED_PATH_AUTHORITY_DRIFT_INVALID');
   }
-  const refused = probe([{ role: 'engineer', path: rootSource }]);
+  const refused = probe([{ verb: 'task start', role: 'engineer', path: rootSource }]);
   if (JSON.stringify(refused) !== JSON.stringify(['AUTHORITY_POLICY_DIGEST_MISMATCH'])) {
     throw new Error(`INSTALLED_PATH_AUTHORITY_DRIFT_WRITE_INVALID:${JSON.stringify(refused)}`);
   }
