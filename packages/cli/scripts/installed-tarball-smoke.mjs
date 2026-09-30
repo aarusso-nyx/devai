@@ -47,6 +47,7 @@ const authorizationRoot = join(smokeRoot, 'authorization-project');
 let smokePassed = false;
 let largeSnapshotBytes = 0;
 let largeSnapshotTaskPolicyDigest = '';
+let pathAuthorityRules = 0;
 const secondaryBins = [
   'devai-evidence-policy',
   'devai-evidence-verify',
@@ -90,6 +91,189 @@ function runInstalledModuleCheck(name, source, cwd = projectRoot) {
   const path = join(projectRoot, `installed-host-${name}.mjs`);
   writeFileSync(path, `${source}\n`);
   return run(process.execPath, [path], cwd);
+}
+
+// ADR-AUT-0003: a disposable adopter binds the reference path-authority source through the
+// installed bin after the constitution rebind, and the installed release-host broker decides
+// under the extension it compiled. Only the root decisions that hold under the registered
+// verbs are driven here; the class-verb cells of ADR-AUT-0004 wait for the registry change
+// of its wave and are rehearsed by the packed adopter contract.
+const PATH_AUTHORITY_SOURCE = 'law/policy/devai-adoption.json';
+const PATH_AUTHORITY_EXTENSION = 'detran.path-authority';
+const PATH_AUTHORITY_REFERENCE = {
+  schemaVersion: '1.0.0',
+  policy_id: 'detran.devai-adoption',
+  policy_version: '1.1.0',
+  authority: {
+    extension_id: PATH_AUTHORITY_EXTENSION,
+    roots: ['apps', 'backend', 'frontend', 'mobile', 'portal', 'src'],
+    classes: {
+      test: { selectors: ['**/*.spec.*', '**/*.test.*', '**/test/**', '**/tests/**'] },
+      architecture: { selectors: ['**/ddl/**/*.sql', '**/blueprints/**'] },
+    },
+  },
+};
+
+function rehearseAdopterPathAuthority(binary, installedPackage) {
+  const adopter = join(smokeRoot, 'path-authority-project');
+  mkdirSync(join(adopter, 'law/policy'), { recursive: true });
+  run('git', ['init', '-q'], adopter);
+  run('git', ['config', 'user.name', 'DEVAI smoke'], adopter);
+  run('git', ['config', 'user.email', 'smoke@example.invalid'], adopter);
+  writeFileSync(join(adopter, '.gitignore'), 'node_modules/\n.devai/state/\n');
+  const bind = (selector) =>
+    run(
+      binary,
+      ['init', 'bind', ...selector, '--target', adopter, '--as-role', 'architect', '--write'],
+      adopter,
+    );
+  for (const selector of [
+    ['--constitution', '--tier', 'tier1'],
+    ['--operational-law'],
+    ['--subprocess-effects'],
+    [],
+  ]) {
+    bind([...selector, '--format', 'json']);
+  }
+  const sourcePath = join(adopter, PATH_AUTHORITY_SOURCE);
+  const referenceBytes = `${JSON.stringify(PATH_AUTHORITY_REFERENCE, null, 2)}\n`;
+  const bindReference = () => {
+    writeFileSync(sourcePath, referenceBytes);
+    bind(['--adopter-policy', PATH_AUTHORITY_SOURCE, '--format', 'json']);
+  };
+  bindReference();
+  const readConfig = (name) =>
+    JSON.parse(readFileSync(join(adopter, '.devai/config', name), 'utf8'));
+  const extension = readConfig('adopter-policy-binding.json').authority_extension;
+  const listed = readConfig('authority-policy.json').additive_extensions ?? [];
+  if (
+    extension?.extension_id !== PATH_AUTHORITY_EXTENSION ||
+    extension?.extension_version !== '1.1.0' ||
+    extension?.rule_count !== 48 ||
+    !/^[0-9a-f]{64}$/u.test(String(extension?.digest_sha256)) ||
+    listed.length !== 2 ||
+    listed[0]?.extension_id !== 'devai-adopter-authority' ||
+    Object.keys(listed[1] ?? {}).length !== 3 ||
+    listed[1]?.extension_id !== PATH_AUTHORITY_EXTENSION ||
+    listed[1]?.extension_version !== '1.1.0' ||
+    listed[1]?.digest_sha256 !== extension.digest_sha256
+  ) {
+    throw new Error('INSTALLED_PATH_AUTHORITY_BIND_INVALID');
+  }
+  const doctor = () => {
+    const result = runResult(
+      binary,
+      ['doctor', '--repo-root', adopter, '--skip', 'docs-governance', '--format', 'json'],
+      adopter,
+    );
+    const checks = JSON.parse(String(result.stdout))?.result?.value?.checks ?? [];
+    const check = (name) => checks.find((candidate) => candidate.name === name);
+    return {
+      status: result.status,
+      materialization: check('policy-materialization-current'),
+      enforcement: check('authority-enforcement'),
+    };
+  };
+  const current = doctor();
+  if (
+    ![0, 1].includes(current.status) ||
+    current.materialization?.ok !== true ||
+    current.enforcement?.ok !== true ||
+    current.enforcement?.info?.policy_binding !== 'current' ||
+    current.enforcement?.info?.adopter_extension?.digest_sha256 !== extension.digest_sha256
+  ) {
+    throw new Error('INSTALLED_PATH_AUTHORITY_DOCTOR_INVALID');
+  }
+
+  mkdirSync(join(adopter, 'apps/dashboard/web/src'), { recursive: true });
+  const probeScript = join(smokeRoot, 'installed-path-authority-probe.mjs');
+  writeFileSync(
+    probeScript,
+    `
+      import { readFileSync } from 'node:fs';
+      import { join } from 'node:path';
+      import { pathToFileURL } from 'node:url';
+      const installed = ${JSON.stringify(installedPackage)};
+      const repository = ${JSON.stringify(adopter)};
+      const host = await import(pathToFileURL(join(installed, 'dist/runtime/index/release-host.js')).href);
+      if (typeof host.createAuthorityHostBroker !== 'function' || typeof host.canonicalRegistry !== 'function') {
+        throw new Error('INSTALLED_AUTHORITY_BROKER_UNAVAILABLE');
+      }
+      const version = JSON.parse(readFileSync(join(installed, 'package.json'), 'utf8')).version;
+      const entries = host.canonicalRegistry();
+      const codeOf = (error) => {
+        if (error !== null && typeof error === 'object' && typeof error.code === 'string' && error.code !== '') return error.code;
+        const message = error instanceof Error ? error.message : String(error);
+        return /[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+/u.exec(message)?.[0] ?? message;
+      };
+      const decisions = JSON.parse(process.argv[2]).map(({ role, path }) => {
+        const entry = entries.find((candidate) => candidate.name === 'task start');
+        let applied = false;
+        let broker;
+        try {
+          broker = host.createAuthorityHostBroker({
+            entry,
+            entries,
+            argv: [process.execPath, 'devai', 'task', 'start', '--round', 'R-0007', '--task', 'TASK-7001', '--as-role', role, '--write'],
+            role,
+            declaration: { as_role: role },
+            repository_root: repository,
+            package_version: version,
+            bootstrap_policy: false,
+          });
+          broker.scope.apply_effect(
+            { kind: 'filesystem', symbol: 'writeFileSync', arguments: [join(repository, path), 'probe\\n'] },
+            () => { applied = true; return 'applied'; },
+          );
+          return applied ? 'allow' : 'PROBE_EFFECT_NOT_APPLIED';
+        } catch (error) {
+          return applied ? 'PROBE_REFUSED_AFTER_APPLY' : codeOf(error);
+        } finally {
+          broker?.dispose();
+        }
+      });
+      process.stdout.write(JSON.stringify(decisions));
+    `,
+  );
+  const probe = (requests) =>
+    JSON.parse(run(process.execPath, [probeScript, JSON.stringify(requests)], adopter));
+  const rootSource = 'apps/dashboard/web/src/example.ts';
+  const decisions = probe([
+    { role: 'engineer', path: rootSource },
+    { role: 'inspector', path: rootSource },
+  ]);
+  if (JSON.stringify(decisions) !== JSON.stringify(['allow', 'AUTHORITY_HUMAN_ROLE_DENIED'])) {
+    throw new Error(`INSTALLED_PATH_AUTHORITY_DECISIONS_INVALID:${JSON.stringify(decisions)}`);
+  }
+
+  // An edit without a rebind is a Doctor review naming the drift and the rebind command, and
+  // every governed write under the extension is refused until the rebind.
+  const edited = structuredClone(PATH_AUTHORITY_REFERENCE);
+  edited.authority.classes.architecture.selectors = ['**/ddl/**/*.sql'];
+  writeFileSync(sourcePath, `${JSON.stringify(edited, null, 2)}\n`);
+  const drifted = doctor();
+  const reasons = [...(drifted.materialization?.info?.reason_ids ?? [])].sort();
+  if (
+    drifted.status !== 1 ||
+    drifted.materialization?.ok !== false ||
+    reasons.join(',') !== 'AUTHORITY_EXTENSION_DRIFT,SOURCE_DIGEST_MISMATCH' ||
+    !(drifted.materialization?.info?.remediation_commands ?? []).includes(
+      `devai init bind --target . --adopter-policy ${PATH_AUTHORITY_SOURCE} --as-role architect --write`,
+    ) ||
+    drifted.enforcement?.info?.policy_binding !== 'mismatch' ||
+    !JSON.stringify(drifted.enforcement?.info ?? {}).includes(PATH_AUTHORITY_EXTENSION)
+  ) {
+    throw new Error('INSTALLED_PATH_AUTHORITY_DRIFT_INVALID');
+  }
+  const refused = probe([{ role: 'engineer', path: rootSource }]);
+  if (JSON.stringify(refused) !== JSON.stringify(['AUTHORITY_POLICY_DIGEST_MISMATCH'])) {
+    throw new Error(`INSTALLED_PATH_AUTHORITY_DRIFT_WRITE_INVALID:${JSON.stringify(refused)}`);
+  }
+  bindReference();
+  if (doctor().materialization?.ok !== true) {
+    throw new Error('INSTALLED_PATH_AUTHORITY_REBIND_INVALID');
+  }
+  return extension.rule_count;
 }
 
 try {
@@ -383,6 +567,7 @@ try {
   if (lstatSync(join(projectRoot, '.devai/constitution.md')).isSymbolicLink()) {
     throw new Error('INSTALLED_CONSTITUTION_POINTER_SYMLINK');
   }
+  pathAuthorityRules = rehearseAdopterPathAuthority(binary, installedPackage);
 
   const authorityPolicyPath = join(projectRoot, '.devai/config/authority-policy.json');
   const initialPolicyDigest = JSON.parse(
@@ -1636,6 +1821,7 @@ void adapters;
       secondary_bins: secondaryBins.length,
       large_snapshot_bytes: largeSnapshotBytes,
       large_snapshot_task_policy_digest: largeSnapshotTaskPolicyDigest,
+      adopter_path_authority_rules: pathAuthorityRules,
       runtime_dependencies: dependencyNames.sort(),
     }) + '\n',
   );
