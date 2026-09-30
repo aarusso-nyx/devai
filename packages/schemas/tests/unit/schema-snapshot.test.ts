@@ -161,17 +161,40 @@ describe('installed schema snapshot binding', () => {
   });
 
   it('uses exactly the bound sensor kinds instead of ambient policy', async () => {
+    // ADR-SCR-0011: the bound schema file's enum is the admitted set; the bound registry is
+    // still the roster the loader reads (a malformed bound roster is refused above even though
+    // the ambient law registry is valid), but it never rewrites the enum.
     const registry = await import('../../src/index.js');
+    const input = snapshot();
+    const schema = JSON.parse(
+      input.schemas.get('sensor-reading.schema.json')?.toString() ?? 'null',
+    ) as { properties: { sensor: { properties: { kind: { enum: string[] } } } } };
+    schema.properties.sensor.properties.kind.enum = ['bound-schema-kind'];
+    input.schemas.set('sensor-reading.schema.json', Buffer.from(JSON.stringify(schema)));
     registry.bindSchemaPackageSnapshot({
-      ...snapshot(),
+      ...input,
       sensor_registry: Buffer.from(
         JSON.stringify({ entries: [{ kind: 'bound-first' }, { kind: 'bound-second' }] }),
       ),
     });
     expect(registry.loadSchema('sensor-reading.schema.json')).toHaveProperty(
       'properties.sensor.properties.kind.enum',
-      ['bound-first', 'bound-second'],
+      ['bound-schema-kind'],
     );
+    const reading = (kind: string) => ({
+      schemaVersion: '1.0.0',
+      id: 'SR-0123456789abcdef',
+      sensor: { name: kind, kind },
+      timestamp: '2026-09-29T00:00:00.000Z',
+      status: 'pass',
+      deterministic: true,
+      command: 'devai sense run',
+      command_hash: 'a'.repeat(64),
+    });
+    const validate = registry.getValidator('sensor-reading.schema.json');
+    expect(validate(reading('bound-schema-kind'))).toBe(true);
+    expect(validate(reading('bound-first'))).toBe(false);
+    expect(validate(reading('type_check'))).toBe(false);
   });
 });
 
