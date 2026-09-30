@@ -100,8 +100,11 @@ domains, partially override thresholds, declare exact scorecard N/A cells and gl
 under a constitution bound at 1.0.2 or later, declare the optional `authority` block that
 extends Article 6 with adopter roots and path classes
 ([Path authority for multi-stack roots](path-authority.md)); it cannot replace core or framework
-domains. Binding records the source path and digest and updates the resolved configuration
-atomically:
+domains. An adopter adding the block for the first time follows the
+[migration sequence](path-authority.md#migration) of that page, constitution rebind first, and
+reads the two Doctor checks it names through its
+[Doctor findings](path-authority.md#doctor-findings) table. Binding records the source path and
+digest and updates the resolved configuration atomically:
 
 ```bash
 pnpm exec devai init bind \
@@ -183,8 +186,12 @@ block yields a receipt without the field. The field and the matrix it stands for
 projection from the source and the current `project.json` and compares every digest the receipt
 carries with the file on disk. A receipt whose digests no longer match, because the source moved,
 a target was edited, or a declaration was added to `project.json` by hand after the bind, is a
-failure until the next bind rematerializes it. The remedy is always a rebind, never an edit to
-`.devai/config`.
+failure until the next bind rematerializes it. When the source declares the `authority` block,
+the same check compares `authority_extension` with a fresh compilation of the block, and
+`authority-enforcement` compares the extension entry of `authority-policy.json` with the sources
+rebuilt from the receipt; each finding, its reason id, and its remediation command are listed in
+[Doctor findings](path-authority.md#doctor-findings). The remedy is always a rebind, never an
+edit to `.devai/config`.
 
 ### Upgrading DEVAI
 
