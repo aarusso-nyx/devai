@@ -63,7 +63,7 @@
       "id": "OE-05",
       "description": "Supply one rejected PASS review reply from an orchestrator session as the first fixture of ADR-MDL-0001.",
       "required_before": "R-0305",
-      "performed_at": null
+      "performed_at": "2026-09-30T01:14:30Z"
     },
     {
       "id": "OE-06",
@@ -1127,7 +1127,7 @@
       "id": "R-0305",
       "title": "Review boundaries and model contracts",
       "goal": "A campaign may delegate model evaluation of a pull request under a human-initiated session while ratification, merge, and dispatch stay human; a repository default tier map with pinned resolution replaces the per-campaign copies; every model reply is validated against a consumer-specific schema through one shared extractor.",
-      "status": "closing",
+      "status": "closed",
       "records": ["ADR-GOV-0023", "ADR-MDL-0002", "ADR-MDL-0001"],
       "depends_on": ["R-0301"],
       "attestation_reissue": false,
@@ -1759,7 +1759,12 @@
           ]
         }
       ],
-      "closure": null
+      "closure": {
+        "merged_head": "04b141fef447d84fae496391ec36133db4365447",
+        "closed_at": "2026-09-30T01:14:30Z",
+        "task_policy_digest": "4d284d804badf9b0971313a65af8539dc380160fc724555bac2ba1872d1cd5d1",
+        "phase_closure": null
+      }
     },
     {
       "id": "R-0306",
