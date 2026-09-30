@@ -3614,6 +3614,157 @@
         "task_policy_digest": null,
         "phase_closure": null
       }
+    },
+    {
+      "id": "R-0310",
+      "title": "Owner-effect outcome",
+      "goal": "An Owner effect resolved by its declared fallback can be recorded as performed with outcome fallback, so the round that requires it closes while the campaign checker keeps enforcing serialized admission; R-0304 closes on that record.",
+      "status": "planned",
+      "records": ["ADR-CHK-0003", "ADR-CHK-0004"],
+      "depends_on": ["R-0301"],
+      "attestation_reissue": false,
+      "owner_effects_required": [],
+      "close_checks": ["schemas", "test:root"],
+      "closure": null,
+      "waves": [
+        {
+          "id": "CTG-03101",
+          "title": "Owner-effect outcome and serialized admission under the fallback",
+          "type": "coupled-triplet",
+          "records": ["ADR-CHK-0003", "ADR-CHK-0004"],
+          "depends_on": [],
+          "lock_scopes": [
+            "law/schemas/campaign.schema.json",
+            "law/policy/campaign-execution.json",
+            "scripts/check-campaign.mjs",
+            "tests/contract/campaign-plan.contract.test.ts"
+          ],
+          "gates": ["schemas", "test:root"],
+          "tasks": [
+            {
+              "id": "TASK-03101",
+              "title": "Declare the Owner-effect outcome and state when serialized admission stays in force",
+              "discipline": "architect",
+              "coupled_pipeline_position": "architect",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F1"],
+              "boundary": {
+                "paths": ["law/schemas/campaign.schema.json", "law/policy/campaign-execution.json"],
+                "forbidden": [".github/workflows/", "packages/", "tests/", "scripts/", "product/"]
+              },
+              "deliverables": [
+                "The campaign schema admits an optional outcome on every Owner effect, a closed enum of performed and fallback; an effect whose outcome is fallback records in performed_at the time the fallback was recorded, and every other field is unchanged (ADR-CHK-0003 round close).",
+                "The campaign execution policy states that serialized admission is in force whenever the merge-queue Owner effect has no performed_at or its outcome is fallback, and that a round closes when each required effect carries performed_at with either outcome (ADR-CHK-0004 IA-005)."
+              ],
+              "acceptance_commands": [
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "schemas",
+                  "--format",
+                  "json"
+                ],
+                ["node", "scripts/check-campaign.mjs"]
+              ],
+              "commit_types": ["law(schemas)", "law(campaign-execution)"],
+              "prompt": {
+                "path": "prompts/TASK-03101.md",
+                "sha256": "6ed3649471d8f4ed64197532d0d68a8ebc730d12ad3572c20acc119747e5bd78"
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "architect",
+                "effort": "medium",
+                "time_budget_minutes": 60
+              }
+            },
+            {
+              "id": "TASK-03102",
+              "title": "Prove the fallback outcome keeps serialized admission and lets a round close",
+              "discipline": "inspector",
+              "coupled_pipeline_position": "inspector",
+              "upstream_task_id": "TASK-03101",
+              "status": "planned",
+              "target_substrates": ["F3"],
+              "boundary": {
+                "paths": ["tests/contract/campaign-plan.contract.test.ts"],
+                "forbidden": ["law/", "product/", "scripts/", ".github/workflows/", "packages/"]
+              },
+              "deliverables": [
+                "The contract test proves that with the merge-queue effect performed and outcome fallback the campaign check still refuses two task pull requests in pre_merge and accepts one; that with outcome performed (or no outcome) and performed_at set the check no longer enforces serialized admission; that a closed round whose required effect carries performed_at with outcome fallback is accepted; and that an outcome outside the enum is rejected by the schema.",
+                "The serialized-admission fixtures derive the in-force state from the live ledger's outcome rather than asserting that OE-01 is unperformed, so the test never depends on the momentary state of a moving ledger."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "--config",
+                  "tests/config/local.config.ts",
+                  "tests/contract/campaign-plan.contract.test.ts"
+                ]
+              ],
+              "commit_types": ["test(contract)"],
+              "prompt": {
+                "path": "prompts/TASK-03102.md",
+                "sha256": "1e95feeeb9ee91992f7645982ea94c744f1cab0aee68bc0c43ed4672467eca2e"
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker",
+                "effort": "medium",
+                "time_budget_minutes": 60
+              }
+            },
+            {
+              "id": "TASK-03103",
+              "title": "Enforce serialized admission from the Owner-effect outcome in the campaign checker",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": "TASK-03102",
+              "status": "planned",
+              "target_substrates": ["F5"],
+              "boundary": {
+                "paths": ["scripts/check-campaign.mjs"],
+                "forbidden": ["law/", "product/", "tests/", "packages/", ".github/workflows/"]
+              },
+              "deliverables": [
+                "scripts/check-campaign.mjs reads the merge-queue effect's outcome: serialized admission is enforced when performed_at is absent or outcome is fallback, and a closed round is accepted when each required effect carries performed_at with either outcome; the problem text names the outcome it read."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "--config",
+                  "tests/config/local.config.ts",
+                  "tests/contract/campaign-plan.contract.test.ts"
+                ],
+                ["node", "scripts/check-campaign.mjs"]
+              ],
+              "commit_types": ["ci(scripts)"],
+              "prompt": {
+                "path": "prompts/TASK-03103.md",
+                "sha256": "799bbeff3ee551a0d94a99b66a043f8b7e52621ba761a101643dd1130bbcac08"
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker",
+                "effort": "medium",
+                "time_budget_minutes": 60
+              }
+            }
+          ]
+        }
+      ]
     }
   ]
 }
