@@ -969,7 +969,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0532",
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F2", "F5"],
               "boundary": {
                 "paths": [
@@ -977,7 +977,8 @@
                   "packages/cli/src/commands/doctor-install-checks.ts",
                   "packages/cli/scripts/installed-tarball-smoke.mjs",
                   "packages/cli/scripts/assemble-package.mjs",
-                  "docs/reference/error-codes.md"
+                  "docs/reference/error-codes.md",
+                  "packages/cli/src/release-host.ts"
                 ],
                 "forbidden": [
                   "law/",
@@ -1011,14 +1012,53 @@
               "commit_types": ["feat(doctor)", "feat(cli)", "docs(reference)"],
               "prompt": {
                 "path": "prompts/TASK-0533.md",
-                "sha256": null
+                "sha256": "ad1cdd9cfd0912f1733c8e2b0dcde2a98e6618b99ad2403b8d46de7b690626b8"
               },
               "pull_request": null,
               "merged_as": null,
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
-                "time_budget_minutes": 150
+                "time_budget_minutes": 150,
+                "resolved": {
+                  "policy_version": "1.0.0",
+                  "pinned_at": "2026-09-30T17:02:57Z",
+                  "tiers": {
+                    "architect": {
+                      "rank": 1,
+                      "hosts": {
+                        "claude": "claude-cli:fable",
+                        "codex": "codex-cli:gpt-6-astra"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker-high": {
+                      "rank": 2,
+                      "hosts": {
+                        "claude": "claude-cli:opus",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker": {
+                      "rank": 3,
+                      "hosts": {
+                        "claude": "claude-cli:sonnet",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "medium"
+                    },
+                    "clerk": {
+                      "rank": 4,
+                      "hosts": {
+                        "claude": "claude-cli:haiku",
+                        "codex": "codex-cli:gpt-6-luna"
+                      },
+                      "default_effort": "low"
+                    }
+                  },
+                  "ceiling": "architect"
+                }
               }
             }
           ]
