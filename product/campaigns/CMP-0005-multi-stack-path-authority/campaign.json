@@ -1,0 +1,701 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "CMP-0005",
+  "title": "Multi-stack path authority",
+  "type": "campaign",
+  "status": "proposed",
+  "date": "2026-09-30",
+  "authority": "Architect",
+  "mandate": {
+    "kind": "maintainer-decision",
+    "ref": "docs/dev/operations/multi-stack-path-authority-proposal.md"
+  },
+  "goal": "Give adopter repositories a governed, versioned, digest-bound source of path authority for their own application roots: Article 6 is amended to admit client extensions by declared root and path class (ADR-GOV-0024), the adopter policy gains an authority block compiled into a second additive extension of the trusted authority sources with a fixed class ladder (architecture over test over root), init bind materializes it into authority-policy.json with receipt provenance, the broker decides the DETRAN acceptance matrix as real rules, Doctor and the runtime refuse drift, and a packed-adopter rehearsal proves the migration before a release carries it to DETRAN CTG-0005 (issue #186).",
+  "records": ["ADR-GOV-0024", "ADR-AUT-0003"],
+  "constraints": {
+    "self_dogfood": true,
+    "human_invoked_only": true,
+    "one_role_per_session": true,
+    "remote_effects": "forbidden"
+  },
+  "owner_effects": [
+    {
+      "id": "OE-01",
+      "description": "Approve the Article 6 amendment text and the constitution version of ADR-GOV-0024 (recommended 1.1.0), and answer the decisions (a) to (j) of the proposal's Decisions required section, either by taking the recommended options or by naming the alternatives, so the Architect can set ADR-GOV-0024 and ADR-AUT-0003 to accepted before R-0501 opens.",
+      "required_before": "R-0501",
+      "performed_at": null
+    },
+    {
+      "id": "OE-02",
+      "description": "Publish the immutable release that carries R-0501 to R-0503 (recommended 1.8.0, the feat bump floor since v1.7.0; 2.0.0 if the Owner treats the constitutional amendment as breaking), from the exact packed artifact the rehearsal verified, and tell DETRAN the version so CTG-0005 can pin it, rebind the constitution at 1.1.0, bind its authority source, and run Doctor and the acceptance matrix in a clone before claiming enforcement.",
+      "required_before": "R-0503",
+      "performed_at": null
+    }
+  ],
+  "prompts": {
+    "preamble": "prompts/preamble.md"
+  },
+  "models": {
+    "schemaVersion": "1.0.0",
+    "hosts": ["claude", "codex"],
+    "tiers": {
+      "architect": {
+        "rank": 1,
+        "claude": "fable",
+        "codex": "gpt-6-astra",
+        "default_effort": "high",
+        "use_for": "orchestration, contracts, schemas, policy, decision records"
+      },
+      "worker-high": {
+        "rank": 2,
+        "claude": "opus",
+        "codex": "gpt-6-sol",
+        "default_effort": "high",
+        "use_for": "implementation across several modules, broker, sensor, and evidence changes, tests of runtime semantics"
+      },
+      "worker": {
+        "rank": 3,
+        "claude": "sonnet",
+        "codex": "gpt-6-sol",
+        "default_effort": "medium",
+        "use_for": "bounded tests, documentation, single-module changes"
+      },
+      "clerk": {
+        "rank": 4,
+        "claude": "haiku",
+        "codex": "gpt-6-luna",
+        "default_effort": "low",
+        "use_for": "mechanical edits, regeneration, mirrors, formatting"
+      }
+    },
+    "escalation": {
+      "trigger": "one failed iteration, a blocked report, or a time budget exceeded without a pull request",
+      "step": "one-rank-up",
+      "ceiling": "architect",
+      "authority": "orchestrator"
+    }
+  },
+  "rounds": [
+    {
+      "id": "R-0501",
+      "title": "Amendment and adopter authority source contract",
+      "goal": "The constitution is 1.1.0 with the Article 6 extension model of ADR-GOV-0024 and the framework's own pin is rebound; the adopter policy schema admits the authority block of ADR-AUT-0003; a pure compiler turns a valid block into the fixed-ladder rule set deterministically and refuses every malformed source and every source bound under a constitution below 1.1.0 with a named code; the adopter page states the contract.",
+      "status": "planned",
+      "records": ["ADR-GOV-0024", "ADR-AUT-0003"],
+      "depends_on": [],
+      "attestation_reissue": false,
+      "owner_effects_required": ["OE-01"],
+      "close_checks": ["adrs", "schemas", "docs-links", "test:schemas", "test:cli"],
+      "waves": [
+        {
+          "id": "CTG-0511",
+          "title": "Amendment, source grammar, and compiler",
+          "type": "coupled-triplet",
+          "records": ["ADR-GOV-0024", "ADR-AUT-0003"],
+          "depends_on": [],
+          "lock_scopes": [
+            "law/constitution.md",
+            ".devai/pin/constitution.md",
+            ".devai/config/authority-policy.json",
+            "law/schemas/adopter-policy.schema.json",
+            "packages/cli/src/authority/policy-adopter-extension.ts",
+            "packages/cli/src/services/adopter-policy.ts",
+            "docs/adopters/path-authority.md"
+          ],
+          "gates": ["adrs", "schemas", "docs-links", "test:schemas", "test:cli"],
+          "tasks": [
+            {
+              "id": "TASK-0511",
+              "title": "Apply the approved Article 6 amendment and declare the adopter authority source contract",
+              "discipline": "architect",
+              "coupled_pipeline_position": "architect",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F1", "F5"],
+              "boundary": {
+                "paths": [
+                  "law/constitution.md",
+                  ".devai/pin/constitution.md",
+                  ".devai/config/project.json",
+                  ".devai/config/authority-policy.json",
+                  "law/adr/ADR-GOV-0024-article-6-client-extensions-by-root-and-class.md",
+                  "law/adr/ADR-AUT-0003-governed-adopter-path-authority.md",
+                  "law/adr/README.md",
+                  "law/policy/adr-validation.json",
+                  "law/schemas/adopter-policy.schema.json",
+                  "docs/adopters/path-authority.md",
+                  "docs/adopters/index.md",
+                  "docs/adopters/install.md"
+                ],
+                "forbidden": ["packages/", "tests/", "scripts/", "product/", ".github/workflows/"]
+              },
+              "deliverables": [
+                "law/constitution.md is 1.1.0 with exactly the two amended sentences and the extension paragraph ADR-GOV-0024 states, its three version markers and frontmatter date updated and every core row unchanged; ADR-GOV-0024 and ADR-AUT-0003 are set to accepted with the Owner's OE-01 answers recorded in their Status sections; the catalogue is regenerated and re-pinned; the framework's own pin and authority policy are rebound through init bind --constitution --write and then init bind --write so .devai/pin/constitution.md and the constitution binding of .devai/config/authority-policy.json carry the 1.1.0 digest (law with its generated copies).",
+                "law/schemas/adopter-policy.schema.json admits the optional closed authority block of ADR-AUT-0003 (extension_id, roots, classes.test, classes.architecture, each selector a string) with one valid example; docs/adopters/path-authority.md states the extension model in the words of the amended article, the block grammar, the fixed ladder, and the refusal codes, is linked from docs/adopters/index.md, and the --adopter-policy section of docs/adopters/install.md names the block."
+              ],
+              "acceptance_commands": [
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "adrs",
+                  "--format",
+                  "json"
+                ],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "schemas",
+                  "--format",
+                  "json"
+                ],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "docs-links",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": ["law(constitution)", "law(adr)", "law(schemas)", "docs(adopters)"],
+              "prompt": {
+                "path": "prompts/TASK-0511.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "architect",
+                "effort": "high",
+                "time_budget_minutes": 120
+              }
+            },
+            {
+              "id": "TASK-0512",
+              "title": "Prove the amendment, the source grammar, and the compile ladder",
+              "discipline": "inspector",
+              "coupled_pipeline_position": "inspector",
+              "upstream_task_id": "TASK-0511",
+              "status": "planned",
+              "target_substrates": ["F3"],
+              "boundary": {
+                "paths": [
+                  "packages/cli/tests/unit/constitution-article-6-amendment.test.ts",
+                  "packages/cli/tests/unit/adopter-authority-extension-compile.test.ts",
+                  "packages/cli/tests/unit/adopter-policy-authority-block.test.ts",
+                  "packages/schemas/tests/contract/governance-v15-adr.test.ts"
+                ],
+                "forbidden": [
+                  "law/",
+                  "product/",
+                  "scripts/",
+                  ".github/workflows/",
+                  "packages/cli/src/",
+                  "packages/schemas/src/",
+                  "packages/authority/src/"
+                ]
+              },
+              "deliverables": [
+                "constitution-article-6-amendment.test.ts proves the source and the pin parse as 1.1.0, are byte-identical, carry each Article 6 core row verbatim, and carry the amended sentences of ADR-GOV-0024; governance-v15-adr.test.ts lists ADR-GOV-0024 and ADR-AUT-0003 as effective authorities over their declared subjects with the record, file, and subject counts updated.",
+                "adopter-authority-extension-compile.test.ts proves the reference source (six roots, the four default test selectors, the two architecture selectors) compiles to the exact rule set of ADR-AUT-0003 in declared order with the ladder 500, 700, 750 and role-bound harness subjects, that compiling twice yields identical bytes, and that each malformed source of IA-003 and a constitution below 1.1.0 is refused with its named ADOPTER_AUTHORITY_* code; adopter-policy-authority-block.test.ts proves the schema admits the block and refuses an unknown key, and that resolveAdopterPolicyProjection refuses a malformed block before any target is staged and projects a block-free source byte-identically to today. Tests of the compiler may be red until TASK-0513 lands; tests of unchanged behaviour must be green."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "--config",
+                  "tests/config/local.config.ts",
+                  "packages/cli/tests/unit/constitution-article-6-amendment.test.ts",
+                  "packages/cli/tests/unit/adopter-authority-extension-compile.test.ts",
+                  "packages/cli/tests/unit/adopter-policy-authority-block.test.ts",
+                  "packages/schemas/tests/contract/governance-v15-adr.test.ts"
+                ]
+              ],
+              "commit_types": ["test(cli)", "test(schemas)"],
+              "prompt": {
+                "path": "prompts/TASK-0512.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 120
+              }
+            },
+            {
+              "id": "TASK-0513",
+              "title": "Compile the adopter authority block behind the constitution gate",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": "TASK-0512",
+              "status": "planned",
+              "target_substrates": ["F2"],
+              "boundary": {
+                "paths": [
+                  "packages/cli/src/authority/policy-adopter-extension.ts",
+                  "packages/cli/src/authority/index.ts",
+                  "packages/cli/src/services/adopter-policy.ts",
+                  "docs/reference/error-codes.md"
+                ],
+                "forbidden": [
+                  "law/",
+                  "product/",
+                  "tests/",
+                  "packages/cli/tests/",
+                  "packages/schemas/",
+                  "packages/authority/",
+                  ".github/workflows/",
+                  "packages/cli/src/authority/policy.ts"
+                ]
+              },
+              "deliverables": [
+                "packages/cli/src/authority/policy-adopter-extension.ts exports a pure compiler from a validated authority block, the bound constitution version, and the declared test-class selectors to the extension document of ADR-AUT-0003: per root the two root rules at 500, one test rule per selector at 700, one architecture rule per selector at 750, each with the fixed role and the harness subject bound to that role, in declared order, and it refuses with ADOPTER_AUTHORITY_CONSTITUTION_VERSION below 1.1.0 and with the named ADOPTER_AUTHORITY_* code for every malformed source without emitting a rule.",
+                "resolveAdopterPolicyProjection compiles the block when the source declares it, with the constitution version read from the pin, and raises the compiler's code before any target is staged, so a refused bind leaves the previous projection and receipt untouched; docs/reference/error-codes.md lists every new code. The trusted authority sources are not yet wired (R-0502)."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "--config",
+                  "tests/config/local.config.ts",
+                  "packages/cli/tests/unit/constitution-article-6-amendment.test.ts",
+                  "packages/cli/tests/unit/adopter-authority-extension-compile.test.ts",
+                  "packages/cli/tests/unit/adopter-policy-authority-block.test.ts",
+                  "packages/schemas/tests/contract/governance-v15-adr.test.ts"
+                ],
+                ["pnpm", "run", "test:cli"]
+              ],
+              "commit_types": ["feat(authority)", "feat(adopter-policy)", "docs(reference)"],
+              "prompt": {
+                "path": "prompts/TASK-0513.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 180
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R-0502",
+      "title": "Materialization and broker enforcement",
+      "goal": "The package default test selectors are a law source; init bind --adopter-policy materializes the compiled block as the second additive extension of authority-policy.json with receipt provenance, byte-stable across reruns; the broker decides every row of the DETRAN acceptance matrix as real rules with the fixed ladder, refuses paths outside the roots and escapes before any rule, and denies equal-precedence extension ties as ambiguous.",
+      "status": "planned",
+      "records": ["ADR-AUT-0003"],
+      "depends_on": ["R-0501"],
+      "attestation_reissue": false,
+      "owner_effects_required": [],
+      "close_checks": ["schemas", "docs-links", "test:authority", "test:cli"],
+      "waves": [
+        {
+          "id": "CTG-0521",
+          "title": "Trusted sources, receipt provenance, and broker decisions",
+          "type": "coupled-triplet",
+          "records": ["ADR-AUT-0003"],
+          "depends_on": [],
+          "lock_scopes": [
+            "law/policy/adopter-defaults/path-authority-classes.json",
+            "law/schemas/path-authority-classes.schema.json",
+            "packages/cli/src/authority/",
+            "packages/cli/src/services/adopter-policy-binding.ts",
+            "packages/cli/src/commands/init/bind-adapters.ts",
+            "packages/authority/src/runtime/policy-resolver.ts",
+            "packages/schemas/src/roster.ts",
+            "docs/adopters/path-authority.md"
+          ],
+          "gates": ["schemas", "docs-links", "test:authority", "test:cli"],
+          "tasks": [
+            {
+              "id": "TASK-0521",
+              "title": "Declare the default test class as law and the decision matrix as adopter contract",
+              "discipline": "architect",
+              "coupled_pipeline_position": "architect",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F1"],
+              "boundary": {
+                "paths": [
+                  "law/policy/adopter-defaults/path-authority-classes.json",
+                  "law/schemas/path-authority-classes.schema.json",
+                  "docs/adopters/path-authority.md",
+                  "docs/adopters/install.md"
+                ],
+                "forbidden": [
+                  "packages/",
+                  "tests/",
+                  "scripts/",
+                  "product/",
+                  ".github/workflows/",
+                  "law/constitution.md",
+                  "law/adr/"
+                ]
+              },
+              "deliverables": [
+                "law/policy/adopter-defaults/path-authority-classes.json declares the package default test-class selectors (**/*.spec.*, **/*.test.*, **/test/**, **/tests/**) and no architecture default, validated by the new closed law/schemas/path-authority-classes.schema.json under the selector grammar of ADR-AUT-0003.",
+                "docs/adopters/path-authority.md carries the decision matrix as a table: every row of IA-001, IA-009, and IA-002 of ADR-AUT-0003 with the path, the role, the expected outcome, and the expected code, plus the authority_extension receipt field and the additive_extensions entry an adopter should see after binding; the receipt section of docs/adopters/install.md names the field."
+              ],
+              "acceptance_commands": [
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "schemas",
+                  "--format",
+                  "json"
+                ],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "docs-links",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": ["law(adopter-defaults)", "law(schemas)", "docs(adopters)"],
+              "prompt": {
+                "path": "prompts/TASK-0521.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "architect",
+                "effort": "high",
+                "time_budget_minutes": 90
+              }
+            },
+            {
+              "id": "TASK-0522",
+              "title": "Prove the matrix as real broker decisions, byte-stable rebinding, and ambiguity denial",
+              "discipline": "inspector",
+              "coupled_pipeline_position": "inspector",
+              "upstream_task_id": "TASK-0521",
+              "status": "planned",
+              "target_substrates": ["F3"],
+              "boundary": {
+                "paths": [
+                  "packages/cli/tests/fixtures/adopter-path-authority/",
+                  "packages/cli/tests/unit/authority-adopter-extension-decisions.test.ts",
+                  "packages/cli/tests/unit/adopter-policy-authority-materialization.test.ts",
+                  "packages/authority/tests/unit/authority-policy-resolver-contracts.test.ts"
+                ],
+                "forbidden": [
+                  "law/",
+                  "product/",
+                  "scripts/",
+                  ".github/workflows/",
+                  "packages/cli/src/",
+                  "packages/authority/src/",
+                  "packages/schemas/src/"
+                ]
+              },
+              "deliverables": [
+                "packages/cli/tests/fixtures/adopter-path-authority/ holds the reference source of ADR-AUT-0003 and its malformed variants; authority-adopter-extension-decisions.test.ts binds the reference source in a fixture repository pinned at 1.1.0 and drives the broker for every row of IA-001, IA-009, and IA-002 as each human role and as the harness initiated by each role, asserting each allow and each deny by code, including UNCLASSIFIED_RESOURCE outside the roots, the escape refusals before any rule, a declared-but-absent root granting exactly what a present root grants, and docs/ staying Architect.",
+                "adopter-policy-authority-materialization.test.ts proves that binding twice yields byte-identical authority-policy.json and adopter-policy-binding.json with the authority_extension field, that one changed selector changes the extension digest, the resolved digest, and the receipt, that removing the block removes the extension entry and its rules, that a source edited after binding makes a governed write read AUTHORITY_POLICY_DIGEST_MISMATCH, and that a missing source reads ADOPTER_AUTHORITY_SOURCE_UNAVAILABLE; authority-policy-resolver-contracts.test.ts proves two additive-extension rules at one precedence with different human role sets read AMBIGUOUS_POLICY_MATCH while core unions are unchanged. Tests of the new behaviour may be red until TASK-0523 lands."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "--config",
+                  "tests/config/local.config.ts",
+                  "packages/cli/tests/unit/authority-adopter-extension-decisions.test.ts",
+                  "packages/cli/tests/unit/adopter-policy-authority-materialization.test.ts",
+                  "packages/authority/tests/unit/authority-policy-resolver-contracts.test.ts"
+                ]
+              ],
+              "commit_types": ["test(cli)", "test(authority)"],
+              "prompt": {
+                "path": "prompts/TASK-0522.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 150
+              }
+            },
+            {
+              "id": "TASK-0523",
+              "title": "Materialize the adopter extension into the trusted sources and enforce it in the broker",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": "TASK-0522",
+              "status": "planned",
+              "target_substrates": ["F2", "F5"],
+              "boundary": {
+                "paths": [
+                  "packages/cli/src/authority/policy.ts",
+                  "packages/cli/src/authority/policy-adopter-extension.ts",
+                  "packages/cli/src/authority/policy-support.ts",
+                  "packages/cli/src/services/adopter-policy.ts",
+                  "packages/cli/src/services/adopter-policy-binding.ts",
+                  "packages/cli/src/commands/init/bind-adapters.ts",
+                  "packages/authority/src/runtime/policy-resolver.ts",
+                  "packages/schemas/src/roster.ts",
+                  "docs/reference/error-codes.md"
+                ],
+                "forbidden": [
+                  "law/",
+                  "product/",
+                  "tests/",
+                  "packages/cli/tests/",
+                  "packages/authority/tests/",
+                  ".github/workflows/"
+                ]
+              },
+              "deliverables": [
+                "buildTrustedAuthoritySources reads the binding receipt, loads and validates the source it names, merges the default test selectors from the law source (registered in packages/schemas/src/roster.ts) when the block omits them, and appends the compiled document as the second additive extension after devai-adopter-authority, so init bind, the broker, the session, and Doctor all derive the same digests; a receipt whose source is missing or invalid raises ADOPTER_AUTHORITY_SOURCE_UNAVAILABLE and a source without the block yields exactly one extension, byte-identical to today.",
+                "init bind --adopter-policy writes the authority_extension provenance (extension_id, extension_version, digest_sha256, rule_count) into the receipt and parseAdopterPolicyBinding admits it as optional; the resolver denies AMBIGUOUS_POLICY_MATCH when the highest matched precedence holds additive-extension rules with different human role sets and leaves core unions unchanged; docs/reference/error-codes.md lists the new codes."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "--config",
+                  "tests/config/local.config.ts",
+                  "packages/cli/tests/unit/authority-adopter-extension-decisions.test.ts",
+                  "packages/cli/tests/unit/adopter-policy-authority-materialization.test.ts",
+                  "packages/authority/tests/unit/authority-policy-resolver-contracts.test.ts"
+                ],
+                ["pnpm", "run", "test:authority"],
+                ["pnpm", "run", "test:cli"]
+              ],
+              "commit_types": [
+                "feat(authority)",
+                "feat(adopter-policy)",
+                "feat(schemas)",
+                "docs(reference)"
+              ],
+              "prompt": {
+                "path": "prompts/TASK-0523.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 180
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R-0503",
+      "title": "Doctor drift, migration, and adoption rehearsal",
+      "goal": "Doctor names an adopter extension whose source drifted, vanished, or was never rebound and prints the rebind command; the migration for existing adopters is documented and rehearsed from the packed tarball in a disposable clone that reproduces the matrix through the installed bin; the release that carries the campaign is published and DETRAN is told the version.",
+      "status": "planned",
+      "records": ["ADR-AUT-0003"],
+      "depends_on": ["R-0502"],
+      "attestation_reissue": false,
+      "owner_effects_required": ["OE-02"],
+      "close_checks": ["schemas", "docs-links", "test:cli", "release:static-integrity"],
+      "waves": [
+        {
+          "id": "CTG-0531",
+          "title": "Drift detection and packed-adopter rehearsal",
+          "type": "coupled-triplet",
+          "records": ["ADR-AUT-0003"],
+          "depends_on": [],
+          "lock_scopes": [
+            "packages/cli/src/commands/doctor-policy-checks.ts",
+            "packages/cli/src/commands/doctor-install-checks.ts",
+            "packages/cli/scripts/installed-tarball-smoke.mjs",
+            "docs/adopters/path-authority.md",
+            "docs/dev/operations/testing.md"
+          ],
+          "gates": ["schemas", "docs-links", "test:cli"],
+          "tasks": [
+            {
+              "id": "TASK-0531",
+              "title": "Document drift findings, the migration, and the adoption rehearsal",
+              "discipline": "architect",
+              "coupled_pipeline_position": "architect",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F1"],
+              "boundary": {
+                "paths": [
+                  "docs/adopters/path-authority.md",
+                  "docs/adopters/install.md",
+                  "docs/dev/operations/testing.md"
+                ],
+                "forbidden": [
+                  "packages/",
+                  "tests/",
+                  "scripts/",
+                  "product/",
+                  "law/",
+                  ".github/workflows/"
+                ]
+              },
+              "deliverables": [
+                "docs/adopters/path-authority.md gains a Migration section (rebind the constitution at 1.1.0, add the block, bump policy_version, run init bind --adopter-policy, read Doctor) and a Doctor findings table naming each reason id of policy-materialization-current and authority-enforcement for the extension with its remediation command; docs/adopters/install.md points to it from the --adopter-policy section.",
+                "docs/dev/operations/testing.md describes the packed-adopter rehearsal: pack the tarball, install it in a disposable clone, bind the reference source, run Doctor and the matrix through the installed bin, and what DETRAN must repeat on its own candidate before claiming enforcement."
+              ],
+              "acceptance_commands": [
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "docs-links",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": ["docs(adopters)", "docs(operations)"],
+              "prompt": {
+                "path": "prompts/TASK-0531.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "architect",
+                "effort": "medium",
+                "time_budget_minutes": 60
+              }
+            },
+            {
+              "id": "TASK-0532",
+              "title": "Prove Doctor names extension drift and the packed adopter reproduces the matrix",
+              "discipline": "inspector",
+              "coupled_pipeline_position": "inspector",
+              "upstream_task_id": "TASK-0531",
+              "status": "planned",
+              "target_substrates": ["F3"],
+              "boundary": {
+                "paths": [
+                  "packages/cli/tests/unit/doctor-adopter-authority-drift.test.ts",
+                  "packages/cli/tests/unit/adopter-package-contract.test.ts"
+                ],
+                "forbidden": [
+                  "law/",
+                  "product/",
+                  "scripts/",
+                  ".github/workflows/",
+                  "packages/cli/src/",
+                  "packages/cli/scripts/"
+                ]
+              },
+              "deliverables": [
+                "doctor-adopter-authority-drift.test.ts proves Doctor reports policy-materialization-current and authority-enforcement current after a bind of the reference source, and after the source is edited, the block removed without rebinding, or the source deleted, reports each as a mismatch with the reason id and the rebind command the adopter page names, never as a pass and never as a transport failure.",
+                "adopter-package-contract.test.ts packs the tarball, installs it in a disposable adopter, rebinds the constitution at 1.1.0, binds the reference source, and reproduces the decisions and the drift refusals of ADR-AUT-0003 through the installed bin only, so the published package and not the workspace proves the contract. Tests of the new Doctor output may be red until TASK-0533 lands."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "--config",
+                  "tests/config/local.config.ts",
+                  "packages/cli/tests/unit/doctor-adopter-authority-drift.test.ts",
+                  "packages/cli/tests/unit/adopter-package-contract.test.ts"
+                ]
+              ],
+              "commit_types": ["test(cli)"],
+              "prompt": {
+                "path": "prompts/TASK-0532.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 120
+              }
+            },
+            {
+              "id": "TASK-0533",
+              "title": "Report extension drift in Doctor and rehearse the bind in the installed smoke",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": "TASK-0532",
+              "status": "planned",
+              "target_substrates": ["F2", "F5"],
+              "boundary": {
+                "paths": [
+                  "packages/cli/src/commands/doctor-policy-checks.ts",
+                  "packages/cli/src/commands/doctor-install-checks.ts",
+                  "packages/cli/scripts/installed-tarball-smoke.mjs",
+                  "docs/reference/error-codes.md"
+                ],
+                "forbidden": [
+                  "law/",
+                  "product/",
+                  "tests/",
+                  "packages/cli/tests/",
+                  "packages/cli/src/authority/",
+                  "packages/authority/",
+                  ".github/workflows/"
+                ]
+              },
+              "deliverables": [
+                "policy-materialization-current compares the receipt's authority_extension with a fresh compilation of the bound source and reports AUTHORITY_EXTENSION_DRIFT, AUTHORITY_EXTENSION_UNBOUND, or AUTHORITY_EXTENSION_SOURCE_MISSING with the rebind command; authority-enforcement reports the adopter extension's id, version, and digest and names the extension when the policy binding mismatches; the codes are listed in docs/reference/error-codes.md.",
+                "packages/cli/scripts/installed-tarball-smoke.mjs binds the reference source in its disposable adopter after the constitution rebind, asserts the authority_extension receipt field and the second additive_extensions entry, and drives one allow and one deny of the matrix through the installed bin, so pack:smoke fails when a published package cannot enforce the extension."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "--config",
+                  "tests/config/local.config.ts",
+                  "packages/cli/tests/unit/doctor-adopter-authority-drift.test.ts",
+                  "packages/cli/tests/unit/adopter-package-contract.test.ts"
+                ],
+                ["pnpm", "run", "test:cli"],
+                ["pnpm", "--filter", "@aarusso-nyx/devai", "run", "pack:smoke"]
+              ],
+              "commit_types": ["feat(doctor)", "feat(cli)", "docs(reference)"],
+              "prompt": {
+                "path": "prompts/TASK-0533.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 150
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
