@@ -2811,7 +2811,10 @@
                   "tests/integration/packed-adopter-scorecard.integration.test.ts",
                   "tests/fixtures/sensor-readings/",
                   "packages/cli/tests/unit/sense-run-schema-admission.test.ts",
-                  "Orchestrator note (2026-09-30): the refusal of an unsupported registry entry before any sensor starts (ADR-SCR-0011 IA-005) is only observable at the sense dispatch in the CLI package; one CLI unit test file is admitted for it."
+                  "Orchestrator note (2026-09-30): the refusal of an unsupported registry entry before any sensor starts (ADR-SCR-0011 IA-005) is only observable at the sense dispatch in the CLI package; one CLI unit test file is admitted for it.",
+                  "packages/schemas/tests/unit/schema-layout.test.ts",
+                  "packages/schemas/tests/unit/schema-snapshot.test.ts",
+                  "Orchestrator note (2026-09-30): the schema file enum is now the authority at load, so the layout and snapshot tests that expected a bound registry to define the kind enum are updated to the new contract."
                 ],
                 "forbidden": [
                   "law/",
@@ -2850,7 +2853,7 @@
               "commit_types": ["test(sensors)", "test(cli)", "test(integration)"],
               "prompt": {
                 "path": "prompts/TASK-0382.md",
-                "sha256": "7991ed86688ab84ad3344d9baae7f607b687230a3537a88ae14c465d6c9a9cc2"
+                "sha256": "a2ab73f8f5e3e4613f6a3c810053446a99056ea0c513ef6906eec11fffa5ae83"
               },
               "pull_request": null,
               "merged_as": null,
