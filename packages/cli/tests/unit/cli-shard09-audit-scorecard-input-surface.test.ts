@@ -242,3 +242,140 @@ describe('CLI shard 09 audit scorecard reads the one readings store (ADR-SCR-000
     expect(scorecard.cells.filter((c) => c.verdict !== 'N/A')).toHaveLength(43);
   });
 });
+
+const STORE = '.devai/state/sensor-readings';
+const OLDER_ID = 'SR-00000000000000a1';
+const NEWER_ID = 'SR-00000000000000b2';
+const DIAGNOSTIC_KINDS = [
+  'decision_record_integrity',
+  'decision_citation_resolution',
+  'archive_immutability',
+  'round_record_integrity',
+] as const;
+
+function stored(
+  kind: SensorReading['sensor']['kind'],
+  status: SensorReading['status'],
+  id: string,
+  timestamp: string,
+): SensorReading {
+  return { ...reading(kind, status, id), timestamp };
+}
+
+function putReading(root: string, value: SensorReading | Record<string, unknown>): void {
+  const kind = (value as SensorReading).sensor.kind;
+  const id = (value as SensorReading).id;
+  put(root, `${STORE}/${kind}/${id}.json`, `${JSON.stringify(value)}\n`);
+}
+
+function runRaw(root: string, at: string = AT): void {
+  answerGit();
+  process.exitCode = undefined;
+  stdout = '';
+  stderr = '';
+  captureRegistration().action({ repoRoot: root, at });
+}
+
+function emittedScorecard(): Scorecard | undefined {
+  return stdout === '' ? undefined : (JSON.parse(stdout) as Scorecard);
+}
+
+describe('CLI shard 09 audit scorecard resolver seam (ADR-REL-0033)', () => {
+  it('reads UNKNOWN for a cell whose readings store is empty', () => {
+    const root = makeRoot();
+    mkdirSync(join(root, STORE), { recursive: true });
+
+    const presence = cell(runScorecard(root), 'F4', 'T1');
+    expect(presence.verdict).toBe('UNKNOWN');
+    expect(presence.sensor_readings ?? []).toEqual([]);
+  });
+
+  it('refuses an --at that is a full SHA but not the exact HEAD', () => {
+    const root = makeRoot();
+    answerGit('b'.repeat(40));
+    captureRegistration().action({ repoRoot: root, at: AT });
+
+    expect(process.exitCode).not.toBe(EXIT_PASS);
+    expect(stdout).toBe('');
+    expect(stderr).toContain('AUDIT_SCORECARD_EXACT_HEAD_REQUIRED');
+  });
+
+  it('selects the later of two readings of one kind, identically on two runs', () => {
+    const root = makeRoot();
+    putReading(root, stored('inventory_api', 'pass', NEWER_ID, '2026-09-26T11:30:00.000Z'));
+    putReading(root, stored('inventory_api', 'fail', OLDER_ID, '2026-09-26T10:00:00.000Z'));
+
+    const first = runScorecard(root);
+    const firstBytes = stdout;
+    process.exitCode = undefined;
+    stdout = '';
+    const second = runScorecard(root);
+
+    expect(stdout).toBe(firstBytes);
+    for (const scorecard of [first, second]) {
+      const presence = cell(scorecard, 'F4', 'T1');
+      expect(presence.verdict).toBe('PASS');
+      expect(presence.sensor_readings).toEqual([NEWER_ID]);
+    }
+  });
+
+  it('reads a failure older than the stale window as stale and never PASS', () => {
+    const root = makeRoot();
+    put(
+      root,
+      '.devai/config/thresholds.json',
+      `${JSON.stringify({ freshness: { scorecard_failure_max_age_hours: 168 } })}\n`,
+    );
+    putReading(root, stored('inventory_api', 'fail', OLDER_ID, '2026-09-01T00:00:00.000Z'));
+
+    const presence = cell(runScorecard(root), 'F4', 'T1');
+    expect(presence.verdict).not.toBe('PASS');
+    expect(presence.verdict).toBe('REVIEW');
+    expect(presence.notes).toContain('REVIEW-stale');
+  });
+
+  it('moves no cell verdict when the four admitted diagnostic kinds are in the store', () => {
+    const root = makeRoot();
+    putReading(root, stored('inventory_api', 'pass', NEWER_ID, '2026-09-26T11:30:00.000Z'));
+    const baseline = runScorecard(root).cells.map((c) => [c.substrate, c.property, c.verdict]);
+
+    DIAGNOSTIC_KINDS.forEach((kind, index) => {
+      putReading(root, stored(kind, 'fail', `SR-${String(index).padStart(16, 'c')}`, TIMESTAMP));
+    });
+    process.exitCode = undefined;
+    stdout = '';
+    const withDiagnostics = runScorecard(root);
+
+    expect(withDiagnostics.cells.map((c) => [c.substrate, c.property, c.verdict])).toEqual(
+      baseline,
+    );
+  });
+
+  it('rejects a file of invalid JSON in the store with SCORECARD_READING_UNPARSEABLE', () => {
+    const root = makeRoot();
+    put(root, `${STORE}/inventory_api/${OLDER_ID}.json`, '{not json\n');
+
+    runRaw(root);
+
+    expect(`${stdout}${stderr}`).toMatch(/SCORECARD_READING_UNPARSEABLE:\S+/u);
+    expect(`${stdout}${stderr}`).toContain(`${OLDER_ID}.json`);
+    const scorecard = emittedScorecard();
+    if (scorecard !== undefined) expect(cell(scorecard, 'F4', 'T1').verdict).not.toBe('PASS');
+  });
+
+  it('rejects a schema-invalid SensorReading with SCORECARD_READING_INVALID and never counts it PASS', () => {
+    const root = makeRoot();
+    const invalid: Record<string, unknown> = {
+      ...stored('inventory_api', 'pass', NEWER_ID, '2026-09-26T11:30:00.000Z'),
+    };
+    delete invalid['command_hash'];
+    putReading(root, invalid);
+
+    runRaw(root);
+
+    expect(`${stdout}${stderr}`).toMatch(/SCORECARD_READING_INVALID:\S+/u);
+    expect(`${stdout}${stderr}`).toContain(`${NEWER_ID}.json`);
+    const scorecard = emittedScorecard();
+    if (scorecard !== undefined) expect(cell(scorecard, 'F4', 'T1').verdict).not.toBe('PASS');
+  });
+});
