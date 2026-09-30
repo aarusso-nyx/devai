@@ -68,6 +68,10 @@
       "binary-map-drift"
     ]
   },
+  "descriptor": {
+    "description": "The selector kinds the pinned verifier's task-descriptor schema admits; the committed test-tasks.json uses no other kind, and the descriptor check refuses one outside this set (ADR-CHK-0006).",
+    "selector_kinds": ["exact", "prefix", "glob"]
+  },
   "external_duplicate": {
     "name": "DEVAI_LEDGER_VERIFIER_PROVENANCE_SHA256",
     "required": true,
