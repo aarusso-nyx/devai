@@ -11,7 +11,11 @@
     "sweep_members": "sensor-registry.entries where effect equals read",
     "sweep_excluded": "sensor-registry.entries where effect does not equal read",
     "unknown_or_missing_effect": "block-preset-resolution",
-    "caller_selected_omission": "forbidden"
+    "caller_selected_omission": "forbidden",
+    "schema_admission": "every kind a preset can select is admitted by the sensor.kind enum of law/schemas/sensor-reading.schema.json (ADR-SCR-0011)",
+    "schema_admission_invariant": "sweep members minus sensor-reading.schema.json sensor.kind enum equals the empty set",
+    "schema_unsupported_marker": "sensor-registry entry declares schema_admission equals unsupported",
+    "schema_unsupported_entry": "refuse-before-run:SENSOR_KIND_SCHEMA_UNSUPPORTED"
   },
   "presets": [
     {
