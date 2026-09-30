@@ -353,6 +353,45 @@ pnpm exec devai audit observe --repo-root . --at <full-sha> --as-role auditor --
 pnpm exec devai triage classify --repo-root . --input <reading.json> --as-role inspector --write --format json
 ```
 
+### Which check members apply to an adopter
+
+Every `devai check` member declares where it applies
+([ADR-CHK-0005](../../law/adr/ADR-CHK-0005-check-member-applicability.md)); the
+declarations and the result contract are on
+[Check suites](../reference/cli/check-suites.md#where-a-member-applies). In an adopter:
+
+- `action-coverage` evaluates your repository: the actions your invariants claim through
+  `measurable_via` and the actions referenced in your tree. With no action in scope it reports
+  `review` with `CHECK_MEMBER_POPULATION_EMPTY`, never an empty pass.
+- `action-effects`, `cli-reference`, and `prompt-overlays` read only the framework's own policy
+  and catalogue. They return the structured not-applicable result, `status: "na"` with
+  `CHECK_MEMBER_NOT_APPLICABLE`, and are unmeasured in an adopter until a later record declares a
+  package-owned input mode. Do not copy `law/policy/subprocess-effects.json`,
+  `law/policy/documentation-information-architecture.json`, or `tests/config/tsconfig.effects.json`
+  into your repository to turn them green.
+- Every other selector, and the `ledger-local` and `ledger-rc` suite members, reads your
+  repository or your explicit inputs and executes. A source it needs that is missing, such as
+  `docs/` for `docs-links` or `test-tasks.json` for the ledger members, is that member's own
+  failure with its named code; it never becomes not-applicable.
+
+DEVAI identifies the repository kind from the bound configuration, not from the directories
+you have: your tree is an adopter unless `.devai/config/adopter-policy-binding.json` carries the
+framework's own `policy_id`, `devai.devai-adoption`. Keep your `policy_id` in your own namespace.
+
+Test the classification once after binding and again after each upgrade. Run each of the three
+members through `--only`, read `status`, `code`, and `value.repository_kind` from the result, run
+each command twice and compare the outputs byte for byte, and confirm with `git status --porcelain`
+that nothing was created beneath the root:
+
+```bash
+pnpm exec devai check --only action-effects --repo-root . --format json
+pnpm exec devai check --only cli-reference --repo-root . --format json
+pnpm exec devai check --only action-coverage --repo-root . --format json
+```
+
+The first two return `na` with `repository_kind: "adopter"` and `kind_evidence` naming the
+binding receipt; the third returns `pass`, `fail`, or the explicit empty-population `review`.
+
 ## 5. Declare the adopter test DAG
 
 DEVAI does not guess a project's build or test commands. Create and review the
