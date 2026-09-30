@@ -606,6 +606,7 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-AUT-0001',
       'ADR-AUT-0002',
       'ADR-AUT-0003',
+      'ADR-AUT-0004',
       'ADR-CFG-0001',
       'ADR-CFG-0002',
       'ADR-CHK-0001',
@@ -700,17 +701,18 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-SCR-0011',
       'ADR-SEC-0001',
     ]);
-    expect(records).toHaveLength(97);
+    expect(records).toHaveLength(98);
     expect(
       records.filter((record) => record.format === 'legacy-catalog').map((record) => record.adr_id),
     ).toEqual(['ADR-014', 'ADR-MUT-0005', 'ADR-REL-0017']);
     expect(records.filter((record) => record.adr_id === 'ADR-014')).toHaveLength(1);
-    expect(result.files_scanned).toBe(98);
-    expect(result.subject_authorities).toHaveLength(350);
+    expect(result.files_scanned).toBe(99);
+    expect(result.subject_authorities).toHaveLength(356);
     expect(result.effective_authorities).toEqual([
       'ADR-014',
       'ADR-AUT-0001',
       'ADR-AUT-0003',
+      'ADR-AUT-0004',
       'ADR-CFG-0001',
       'ADR-CFG-0002',
       'ADR-CHK-0001',
@@ -790,9 +792,10 @@ describe('ADR-v3 public result and semantic authority', () => {
         .map((authority) => authority.subject)
         .sort(),
     ).toEqual([...(descriptorKinds?.affected_rules ?? [])].sort());
-    // ADR-GOV-0024 and ADR-AUT-0003 (CMP-0005): each accepted record is effective and is the
-    // sole lineage head of every subject it declares, including the shared adopter schema.
-    for (const adrId of ['ADR-GOV-0024', 'ADR-AUT-0003']) {
+    // ADR-GOV-0024, ADR-AUT-0003, and ADR-AUT-0004 (CMP-0005): each accepted record is
+    // effective and is the sole lineage head of every subject it declares, including the
+    // adopter schema shared by the first two and the compiler shared by the last two.
+    for (const adrId of ['ADR-GOV-0024', 'ADR-AUT-0003', 'ADR-AUT-0004']) {
       const declared = records.find((record) => record.adr_id === adrId);
       expect(declared?.affected_rules.length, adrId).toBeGreaterThan(0);
       expect(result.adrs.find((row) => row.adr_id === adrId)).toMatchObject({
@@ -818,6 +821,16 @@ describe('ADR-v3 public result and semantic authority', () => {
         .filter((head) => head === 'ADR-GOV-0024' || head === 'ADR-AUT-0003')
         .sort(),
     ).toEqual(['ADR-AUT-0003', 'ADR-GOV-0024']);
+    expect(
+      result.subject_authorities
+        .filter(
+          (authority) =>
+            authority.subject === 'packages/cli/src/authority/policy-adopter-extension.ts',
+        )
+        .map((authority) => authority.effective_head)
+        .filter((head) => head === 'ADR-AUT-0003' || head === 'ADR-AUT-0004')
+        .sort(),
+    ).toEqual(['ADR-AUT-0003', 'ADR-AUT-0004']);
     expect(validateAdrResult(result), JSON.stringify(validateAdrResult.errors)).toBe(true);
     expect(matchesAdrSemantics(records, result, markdownFiles(adrRoot).length)).toBe(true);
   });
