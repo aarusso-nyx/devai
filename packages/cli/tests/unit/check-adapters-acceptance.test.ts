@@ -7,7 +7,12 @@ import { join, resolve } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import { withAuthorityHostTestScope } from '../../../skills/tests/unit/authority-host-test-scope.js';
 import { executeCheckMember } from '../../src/commands/check/adapters.js';
-import { resolveCheckPlan, type ResolvedCheckMember } from '../../src/commands/check/contracts.js';
+import {
+  knownCheckMembers,
+  resolveCheckPlan,
+  runCheckPlan,
+  type ResolvedCheckMember,
+} from '../../src/commands/check/contracts.js';
 
 const ROOT = resolve(import.meta.dirname, '../../../..');
 const FIXTURE_ROOT = mkdtempSync(join(tmpdir(), 'devai-r0007-check-acceptance-'));
@@ -71,6 +76,7 @@ describe('canonical check adapter acceptance', () => {
         effect: 'read',
         cost: 'low',
         output: 'action-envelope-plus-campaign-report',
+        applicability: 'self',
       },
       {
         id: 'scorecard-page',
@@ -81,8 +87,60 @@ describe('canonical check adapter acceptance', () => {
         effect: 'read',
         cost: 'low',
         output: 'action-envelope-plus-scorecard-page-report',
+        applicability: 'self',
       },
     ]);
+  });
+
+  it('declares applicability for every member and every --only selector the CLI accepts', () => {
+    // ADR-CHK-0005: the policy declarations and the hardcoded selector set agree exactly.
+    const policy = JSON.parse(readFileSync(join(ROOT, 'law/policy/check-suites.json'), 'utf8')) as {
+      member_definitions: Array<{ id: string; applicability?: unknown }>;
+      selector_definitions: Array<{ id: string; applicability?: unknown }>;
+    };
+    const members = policy.member_definitions.map((entry) => entry.id);
+    const selectors = policy.selector_definitions.map((entry) => entry.id);
+    expect(policy.member_definitions.map((entry) => [entry.id, entry.applicability])).toEqual([
+      ['ledger-local', 'both'],
+      ['ledger-rc', 'both'],
+      ['campaign', 'self'],
+      ['scorecard-page', 'self'],
+    ]);
+    expect(selectors).toHaveLength(26);
+    expect(new Set(selectors).size).toBe(selectors.length);
+    expect(selectors.filter((id) => members.includes(id))).toEqual([]);
+    expect(knownCheckMembers(ROOT)).toEqual([...members, ...selectors].sort());
+    expect(
+      policy.selector_definitions
+        .filter((entry) => entry.applicability === 'self')
+        .map((entry) => entry.id),
+    ).toEqual(['action-effects', 'cli-reference', 'prompt-overlays']);
+    for (const entry of [...policy.member_definitions, ...policy.selector_definitions]) {
+      expect(['self', 'adopter', 'both']).toContain(entry.applicability);
+    }
+  });
+
+  it('carries not-applicable as its own result class in the aggregate report', async () => {
+    const plan = resolveCheckPlan(ROOT, { only: 'action-effects' });
+    const notApplicable = await runCheckPlan(plan, (entry) => ({
+      id: entry.id,
+      status: 'na',
+      effect: entry.effect,
+      binding: entry.binding,
+      duration_ms: 0,
+      code: 'CHECK_MEMBER_NOT_APPLICABLE',
+    }));
+    expect(notApplicable).toMatchObject({
+      ok: false,
+      execution_status: 'pass',
+      readiness_status: 'na',
+      exit_code: 0,
+      counts: { pass: 0, review: 0, fail: 0, unknown: 0, na: 1, error: 0 },
+    });
+    expect(notApplicable.results[0]).toMatchObject({
+      status: 'na',
+      code: 'CHECK_MEMBER_NOT_APPLICABLE',
+    });
   });
 
   it('executes every non-recursive read-safe check service as a total structured result', async () => {

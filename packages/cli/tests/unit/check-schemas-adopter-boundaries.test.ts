@@ -1,4 +1,4 @@
-import { ROSTER } from '@devai-nyx/schemas';
+import { ROSTER, getValidator } from '@devai-nyx/schemas';
 import { EXIT_FAIL, EXIT_PASS } from '@devai-nyx/utils';
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -322,5 +322,77 @@ describe('check schemas command boundary', () => {
       ].join('\n'),
     );
     expect(result.exitCode).toBe(EXIT_FAIL);
+  });
+});
+
+describe('check-suites schema applicability declarations (ADR-CHK-0005)', () => {
+  const source = resolve(import.meta.dirname, '../../../..');
+  type Entry = Record<string, unknown> & { readonly id: string };
+  type Policy = Record<string, unknown> & {
+    readonly member_definitions: readonly Entry[];
+    readonly selector_definitions: readonly Entry[];
+  };
+  const policy = (): Policy =>
+    JSON.parse(readFileSync(join(source, 'law/policy/check-suites.json'), 'utf8')) as Policy;
+  const validate = getValidator('check-suites.schema.json');
+  const without = (entry: Entry): Entry => {
+    const { applicability: _removed, ...rest } = entry;
+    return rest as Entry;
+  };
+
+  it('accepts the current policy with every member and selector declared', () => {
+    expect(validate(policy())).toBe(true);
+  });
+
+  it.each(policy().member_definitions.map((entry) => entry.id))(
+    'rejects the policy when member %s omits applicability',
+    (id) => {
+      const value = policy();
+      const broken = {
+        ...value,
+        member_definitions: value.member_definitions.map((entry) =>
+          entry.id === id ? without(entry) : entry,
+        ),
+      };
+      expect(validate(broken)).toBe(false);
+      expect(JSON.stringify(validate.errors)).toContain('applicability');
+    },
+  );
+
+  it.each(['action-coverage', 'action-effects', 'cli-reference'])(
+    'rejects the policy when selector %s omits applicability',
+    (id) => {
+      const value = policy();
+      const broken = {
+        ...value,
+        selector_definitions: value.selector_definitions.map((entry) =>
+          entry.id === id ? without(entry) : entry,
+        ),
+      };
+      expect(validate(broken)).toBe(false);
+      expect(JSON.stringify(validate.errors)).toContain('applicability');
+    },
+  );
+
+  it('rejects an applicability outside self, adopter, and both, and a missing selector list', () => {
+    const value = policy();
+    expect(
+      validate({
+        ...value,
+        selector_definitions: value.selector_definitions.map((entry) =>
+          entry.id === 'action-effects' ? { ...entry, applicability: 'package' } : entry,
+        ),
+      }),
+    ).toBe(false);
+    expect(
+      validate({
+        ...value,
+        member_definitions: value.member_definitions.map((entry) =>
+          entry.id === 'campaign' ? { ...entry, applicability: 'na' } : entry,
+        ),
+      }),
+    ).toBe(false);
+    const { selector_definitions: _selectors, ...withoutSelectors } = value;
+    expect(validate(withoutSelectors)).toBe(false);
   });
 });
