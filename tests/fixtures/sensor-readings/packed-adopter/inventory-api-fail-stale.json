@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "SR-00000000000000a1",
+  "sensor": { "name": "inventory:api", "kind": "inventory_api", "version": "1.0.0" },
+  "timestamp": "2020-01-01T00:00:00.000Z",
+  "status": "fail",
+  "deterministic": true,
+  "command": "devai sense run inventory_api",
+  "command_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "tier": "L0"
+}
