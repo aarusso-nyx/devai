@@ -585,8 +585,8 @@ describe('round status on a sealed round (ADR-EVI-0003)', () => {
     expect(result.exit).toBe(0);
     const body = JSON.parse(result.stdout) as { lifecycle: unknown; tasks?: unknown };
     expect(body.lifecycle).toEqual(closed);
-    // The summary is absent or marked inactive; it never lists tasks of a sealed round.
-    if (body.tasks !== undefined) expect(JSON.stringify(body.tasks)).toMatch(/inactive/iu);
+    // The task summary is absent on a sealed round, never a marker.
+    expect(body).not.toHaveProperty('tasks');
     expect(runtime.requireActiveTaskRound).not.toHaveBeenCalled();
   });
 
@@ -628,7 +628,7 @@ describe('round status on a sealed round (ADR-EVI-0003)', () => {
     });
   });
 
-  it('IA-004 fails an unknown round with its existing code and never reports closed', async () => {
+  it('IA-004 fails an unknown round with ROUND_RECORD_NOT_FOUND before any task-round check', async () => {
     runtime.governedRoundStatus.mockImplementation(() => {
       throw new Error('ROUND_RECORD_NOT_FOUND');
     });
@@ -636,13 +636,14 @@ describe('round status on a sealed round (ADR-EVI-0003)', () => {
       throw inactive();
     });
     const result = await invoke('status', { repoRoot: '/repo', round: 'R-0099' });
-    expect(result.exit).toBe(EXIT_PRECONDITION);
+    expect(result.exit).toBe(2);
     expect(JSON.parse(result.stderr)).toEqual({
-      code: 'TASK_ROUND_INACTIVE',
+      code: 'ROUND_RECORD_NOT_FOUND',
       operation: 'status',
-      exit: EXIT_PRECONDITION,
+      exit: 2,
     });
     expect(result.stdout).not.toMatch(/closed/u);
+    expect(runtime.roundTaskStatus).not.toHaveBeenCalled();
   });
 
   it('IA-003 keeps round run refusing a sealed round with TASK_ROUND_INACTIVE', async () => {
