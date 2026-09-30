@@ -1,5 +1,9 @@
 import { spawnSync } from '@devai-nyx/authority';
-import { resolveScorecardInputs } from '@devai-nyx/loop';
+import {
+  resolveScorecardInputs,
+  type SCORECARD_READING_INVALID,
+  type SCORECARD_READING_UNPARSEABLE,
+} from '@devai-nyx/loop';
 import { validators } from '@devai-nyx/schemas';
 import { EXIT_FAIL, EXIT_PASS, EXIT_USAGE } from '@devai-nyx/utils';
 import type { CAC } from 'cac';
@@ -13,6 +17,22 @@ interface AuditScorecardOptions {
 }
 
 const FULL_SHA = /^[0-9a-f]{40}$/u;
+
+/**
+ * Named rejections the loop resolver raises for a file in the readings store
+ * (ADR-REL-0033 IA-002). The command emits no scorecard for such a store, so a rejected
+ * reading is never counted, and the message keeps the code and the file path.
+ */
+const STORE_REJECTIONS: readonly (
+  typeof SCORECARD_READING_UNPARSEABLE | typeof SCORECARD_READING_INVALID
+)[] = ['SCORECARD_READING_UNPARSEABLE', 'SCORECARD_READING_INVALID'];
+
+function failureMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  return STORE_REJECTIONS.some((code) => message.startsWith(`${code}:`))
+    ? `${message} (remove the file or re-record the reading with devai sense record --write)`
+    : message;
+}
 
 function git(repoRoot: string, args: readonly string[], code: string): string {
   const result = spawnSync('git', [...args], { cwd: repoRoot, encoding: 'utf8' });
@@ -78,9 +98,7 @@ export const auditScorecard = defineCommand({
           );
           process.exitCode = EXIT_PASS;
         } catch (error) {
-          process.stderr.write(
-            `devai audit scorecard: ${error instanceof Error ? error.message : String(error)}\n`,
-          );
+          process.stderr.write(`devai audit scorecard: ${failureMessage(error)}\n`);
           process.exitCode = EXIT_FAIL;
         }
       });

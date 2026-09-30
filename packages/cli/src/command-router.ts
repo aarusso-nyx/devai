@@ -1,6 +1,12 @@
 import type { RegistryEntry } from './define-command.js';
 import { resolve } from 'node:path';
-import { isSensorKind } from '@devai-nyx/sensors/registry';
+import {
+  SENSOR_REGISTRY,
+  isSensorKind,
+  schemaUnsupportedKinds,
+  type SensorRegistry,
+} from '@devai-nyx/sensors/registry';
+import { sensePreset } from '@devai-nyx/sensors/presets';
 import { EXIT_USAGE } from '@devai-nyx/utils';
 import { cliError, renderCliError } from './cli-error.js';
 import { resolveInvocationEntry } from './authority/sense-selection.js';
@@ -91,10 +97,50 @@ export function invocationIsNonMutating(internalName: string, args: readonly str
   return internalName === 'init-bind' && !args.includes('--write');
 }
 
+/**
+ * ADR-SCR-0011: refuse `sense run` before any sensor starts when the selected kind, or any
+ * member of the selected preset, is declared `schema_admission: "unsupported"`.
+ */
+function schemaAdmissionRefusal(
+  args: readonly string[],
+  registry: Pick<SensorRegistry, 'entries'>,
+): RouteResult | undefined {
+  if (args[0] !== 'sense' || args[1] !== 'run') return undefined;
+  const positional = args[2] !== undefined && !args[2].startsWith('-') ? args[2] : undefined;
+  const presetName =
+    flagValue(args, '--preset') ??
+    args.find((arg) => arg.startsWith('--preset='))?.slice('--preset='.length);
+  const selected = [
+    ...(positional === undefined ? [] : [positional]),
+    ...(presetName === undefined ? [] : (sensePreset(presetName)?.members ?? [])),
+  ];
+  const unsupported = schemaUnsupportedKinds(selected, registry);
+  if (unsupported.length === 0) return undefined;
+  const error = cliError({
+    code: 'SENSOR_KIND_SCHEMA_UNSUPPORTED',
+    class: 'routing-authority',
+    exit: 2,
+    message: `Sensor kind '${unsupported.join("', '")}' is declared unsupported by the SensorReading schema and is refused before it runs.`,
+    remediation:
+      'Admit the kind in law/schemas/sensor-reading.schema.json and drop its schema_admission marker, or select other kinds.',
+    context: {
+      kinds: unsupported,
+      ...(presetName === undefined ? {} : { preset: presetName }),
+    },
+  });
+  return { kind: 'output', text: renderCliError(error, wantsJson(args)), exitCode: 2 };
+}
+
+/**
+ * Route the process argv. `sensorRegistry` defaults to the validated law registry; it is
+ * the ADR-SCR-0011 seam through which a caller supplies a registry-shaped fixture whose
+ * entries carry `schema_admission`, without editing law.
+ */
 export function routeArgv(
   argv: readonly string[],
   entries: readonly RegistryEntry[],
   version: string,
+  sensorRegistry: Pick<SensorRegistry, 'entries'> = SENSOR_REGISTRY,
 ): RouteResult {
   const args = argv.slice(2);
   if (
@@ -117,6 +163,8 @@ export function routeArgv(
     }
     // Canonical kinds remain positional values of the direct `sense run` facade.
   }
+  const admissionRefusal = schemaAdmissionRefusal(args, sensorRegistry);
+  if (admissionRefusal !== undefined) return admissionRefusal;
   const privateFlag = args.find((arg) => ['--execute', '--apply', '--human'].includes(arg));
   if (privateFlag !== undefined) {
     return {
