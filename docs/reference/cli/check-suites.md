@@ -327,9 +327,20 @@ pnpm exec devai check --only cli-reference --repo-root . --format json
 pnpm exec devai check --only action-coverage --repo-root . --format json
 ```
 
-To confirm the declarations themselves, run `check --only schemas` on the source
-repository, which validates `law/policy/check-suites.json` against its schema: removing
-`applicability` from any member or selector fails the check.
+To confirm the declarations themselves, validate the policy instance against its schema
+explicitly on the source repository; `check --only schemas` audits the canonical schema
+set and does not read policy instances:
+
+```sh
+node .devai/state/pr-bootstrap/cli/bin.js check --only schema \
+  --schema law/schemas/check-suites.schema.json \
+  --instance law/policy/check-suites.json --format json
+```
+
+Removing `applicability` from any member or selector fails that validation. The policy is
+also validated every time `check` loads it: a member or selector without a declaration is
+`CHECK_POLICY_MEMBER_INVALID` or `CHECK_POLICY_SELECTORS_INVALID`, and identity or
+behavior drift is `CHECK_POLICY_INVALID`, so no run proceeds on an undeclared member.
 
 ## Suites and gate nodes
 
