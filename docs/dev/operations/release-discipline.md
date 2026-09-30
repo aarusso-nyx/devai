@@ -73,6 +73,17 @@ closure, and creates a normalized public manifest with development workspace dep
 removed. Two clean packs must have identical bytes. The CycloneDX SBOM is generated from
 that normalized manifest and is rejected if a private `@devai-nyx/*` package appears.
 
+The same pinned verifier rebuilds the task policy from the candidate's `test-tasks.json` and
+byte-compares it with the ledger, so the committed descriptor uses only the selector kinds the
+pinned verifier's descriptor schema admits, declared as `descriptor.selector_kinds` in
+`law/policy/trusted-local-rc-verifier-package.json` (ADR-CHK-0006). A new selector kind trails
+the verifier by one release: the release that first ships a verifier admitting the kind is built
+from a descriptor that does not use it, and the descriptor may adopt the kind only after that
+release is pinned as the trusted verifier and the policy re-declares the set. The descriptor
+check run by `devai:prepare` refuses a kind outside the declared set with
+`TEST_TASK_SELECTOR_KIND_UNADMITTED`; a candidate that uses one cannot pass the exact-evidence
+binding step of a rehearsal.
+
 The protected Linux toolchain includes checksum-verified Python 3.13.5 and its explicitly
 pinned Debian snapshot dependencies. Repository evidence-transport and adopter-migration
 checks require Python; its executable identity and the complete image digest must be
