@@ -114,7 +114,11 @@ Recorded on 2026-09-29, after R-0301 reached `closing` and R-0302 opened:
    `law/policy/campaign-execution.json` (one pull request in `pre_merge` at a
    time, enforced by the campaign check since R-0304) is the recorded outcome;
    the `merge_group` trigger stays in the gate workflow for a future move to an
-   organization.
+   organization. The ledger keeps OE-01 unperformed: the campaign checker and
+   the serialized-admission contract test read `performed_at` on OE-01 as
+   "the queue is enabled" and stop enforcing one pull request in `pre_merge`,
+   which is the opposite of the fallback. R-0304 therefore stays `closing`
+   until the ledger can express an effect resolved by its fallback (backlog).
 6. **Extension for the adopter issues.** On 2026-09-29 the five DETRAN issues
    #184, #185, #175, #187, and #186 opened and matched no round of this
    campaign or of CMP-0004. The maintainer extended this campaign instead of
@@ -140,17 +144,17 @@ Close checks are the campaign's standing set (`adrs`, `schemas`, `docs-links`,
 detached worktree at the merged head after `pnpm run build` and
 `pnpm run release:bootstrap`.
 
-| Round  | Merged head | Pull requests    | State                                                                                                                                                                                                                |
-| ------ | ----------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| R-0301 | `e5cfdb77`  | #173, #176, #194 | `closed`: the check-suite declaration (decision 3) merged as #194 (`722cb5a6`) after the Owner accepted its broker widening; the single RC attestation ran on that head and its task-policy digest is in the closure |
-| R-0302 | `12d52fa5`  | #179, #181       | `closed`: close checks green on the merged head; `test-tasks.json` unchanged, so no attestation is owed                                                                                                              |
-| R-0303 | `0a66e13a`  | #183             | `closed`: close checks green on the merged head (990 skills tests, 3480 CLI tests); the eight-receipt acceptance was proven in the wave                                                                              |
-| R-0304 | `468de683`  | #188             | `closed`: OE-01 recorded through the serialized fallback (decision 5); the RC task-policy digest of the run on `722cb5a6` is in the closure                                                                          |
-| R-0305 | `04b141fe`  | #189, #190, #191 | `closed`: review mode, the versioned tier default, pinned resolution, the shared reply extractor; the attestation is covered by the run on `722cb5a6`; OE-05 performed with the fixture `cmp-0003-rejected-pass.txt` |
-| R-0306 | `5eda694f`  | #192, #193       | `closed`: OE-02, OE-03, and OE-04 performed on 2026-09-29 (control commit `722cb5a6`; the audit for tag v1.6.0 reissued against it)                                                                                  |
-| R-0307 | `90d5fc7d`  | #195             | `closed`: OE-06 performed (Claude Code 2.1.277); the three `FORBID-CI-WITHOUT-ADR` findings on its law commits carry Owner receipts in `law/policy/forbidden-action-authorizations.json`                             |
-| R-0308 |             | #197             | `planned`: waits for the Architect's acceptance of ADR-SCR-0011, ADR-REL-0033, and ADR-EVI-0003 (section 7)                                                                                                          |
-| R-0309 |             | #197             | `planned`: waits for the acceptance of ADR-CHK-0005 (section 7)                                                                                                                                                      |
+| Round  | Merged head | Pull requests    | State                                                                                                                                                                                                                                 |
+| ------ | ----------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| R-0301 | `e5cfdb77`  | #173, #176, #194 | `closed`: the check-suite declaration (decision 3) merged as #194 (`722cb5a6`) after the Owner accepted its broker widening; the single RC attestation ran on that head and its task-policy digest is in the closure                  |
+| R-0302 | `12d52fa5`  | #179, #181       | `closed`: close checks green on the merged head; `test-tasks.json` unchanged, so no attestation is owed                                                                                                                               |
+| R-0303 | `0a66e13a`  | #183             | `closed`: close checks green on the merged head (990 skills tests, 3480 CLI tests); the eight-receipt acceptance was proven in the wave                                                                                               |
+| R-0304 | `468de683`  | #188             | `closing`: OE-01 resolved by the serialized fallback (decision 5), which the ledger cannot yet record as performed without disabling the serialized-admission check; the RC task-policy digest of the run on `722cb5a6` is `4d284d80` |
+| R-0305 | `04b141fe`  | #189, #190, #191 | `closed`: review mode, the versioned tier default, pinned resolution, the shared reply extractor; the attestation is covered by the run on `722cb5a6`; OE-05 performed with the fixture `cmp-0003-rejected-pass.txt`                  |
+| R-0306 | `5eda694f`  | #192, #193       | `closed`: OE-02, OE-03, and OE-04 performed on 2026-09-29 (control commit `722cb5a6`; the audit for tag v1.6.0 reissued against it)                                                                                                   |
+| R-0307 | `90d5fc7d`  | #195             | `closed`: OE-06 performed (Claude Code 2.1.277); the three `FORBID-CI-WITHOUT-ADR` findings on its law commits carry Owner receipts in `law/policy/forbidden-action-authorizations.json`                                              |
+| R-0308 |             | #197             | `planned`: waits for the Architect's acceptance of ADR-SCR-0011, ADR-REL-0033, and ADR-EVI-0003 (section 7)                                                                                                                           |
+| R-0309 |             | #197             | `planned`: waits for the acceptance of ADR-CHK-0005 (section 7)                                                                                                                                                                       |
 
 Backlog observed while closing R-0302 and R-0303, outside every task boundary:
 
@@ -223,6 +227,15 @@ Backlog observed while performing the Owner effects and the OE-05 experiment
   remedy was to delete the cache entry and rerun. The fix is a `ci` task under
   ADR-CHK-0003: cache the workspace `dist` outputs with the runner, or make
   the runner self-contained.
+- An Owner effect has no outcome field. OE-01 was resolved by its fallback,
+  but `performed_at` is the only state the schema offers, and both the
+  campaign checker (`scripts/check-campaign.mjs`) and the contract test
+  `tests/contract/campaign-plan.contract.test.ts` read it as "the merge queue
+  is enabled" and stop enforcing serialized admission. The round-closure pull
+  request first recorded OE-01 as performed and failed that test in the gate
+  (`test:root`, three cases). The schema needs an `outcome` (`performed` or
+  `fallback`) so a required effect can close its round without widening what
+  the checker enforces; a `plan` and `law` task for a later round.
 - `attestation_reissue` is `true` only on R-0301 although decision 1 names
   R-0304 and R-0305 as descriptor-changing rounds; the closures of R-0301 and
   R-0304 carry the digest of the one run anyway. The campaign schema should
@@ -230,9 +243,10 @@ Backlog observed while performing the Owner effects and the OE-05 experiment
   round the attestation covers.
 
 State on 2026-09-30, after the round-closure commits were rebased onto the
-extension (`dd5c3a69`): every task of R-0301 to R-0307 is `merged` and the
-seven rounds are `closed`; R-0308 and R-0309 are `planned`. OE-01 to OE-06 are
-recorded as performed; OE-05 is the fixture
+extension (`dd5c3a69`): every task of R-0301 to R-0307 is `merged`; six rounds
+are `closed` and R-0304 is `closing` (decision 5); R-0308 and R-0309 are
+`planned`. OE-02 to OE-06 are recorded as performed and OE-01 stays
+unperformed by design; OE-05 is the fixture
 `tests/fixtures/review-replies/cmp-0003-rejected-pass.txt`, the `pass` reply
 (confidence 0.83) the `claude-cli:opus` evaluator returned for `90d5fc7d`
 through the bridge transport, which the Owner rejected on 2026-09-30; the
