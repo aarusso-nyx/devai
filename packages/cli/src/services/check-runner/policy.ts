@@ -27,6 +27,7 @@ import {
   isPreflightNode,
   withoutMutationTestTasks,
   descriptorClassifier,
+  taxonomyClassifier,
   taskDescriptorDigest,
   topologicalTasks,
 } from './policy-descriptor.js';
@@ -218,19 +219,27 @@ function baseCommitClassifier(repoRoot: string, base: string): PathClassifier {
  * declares the planning profile, the diff is not empty, every changed path is
  * an addition or modification, and every path classifies as plan under both
  * the candidate's and the base's taxonomy binding. A rename, a deletion, or
- * any path of another class falls back to the affected profile.
+ * any path of another class falls back to the affected profile. The candidate
+ * classifier is loaded only once the lane is otherwise eligible, whether or not
+ * the descriptor holds a class selector (ADR-CHK-0006); a taxonomy that cannot
+ * be loaded classifies nothing, so the affected profile is planned.
  */
 function selectsPlanningLane(
   descriptor: TaskDescriptor,
   entries: readonly ChangedEntry[],
-  candidateClassifier: PathClassifier | undefined,
+  loadCandidateClassifier: () => PathClassifier | undefined,
   baseClassifier: () => PathClassifier,
 ): boolean {
   const profile = descriptor.profiles.find((entry) => entry.profileId === PLANNING_LANE_PROFILE);
-  if (profile?.mode !== 'fixed' || entries.length === 0 || candidateClassifier === undefined) {
+  if (profile?.mode !== 'fixed' || entries.length === 0) return false;
+  if (entries.some((entry) => !PLANNING_LANE_STATUSES.has(entry.status))) return false;
+  let candidateClassifier: PathClassifier | undefined;
+  try {
+    candidateClassifier = loadCandidateClassifier();
+  } catch {
     return false;
   }
-  if (entries.some((entry) => !PLANNING_LANE_STATUSES.has(entry.status))) return false;
+  if (candidateClassifier === undefined) return false;
   if (entries.some((entry) => candidateClassifier(entry.path) !== PLANNING_LANE_CLASS)) {
     return false;
   }
@@ -409,8 +418,11 @@ export function buildTaskPlan(options: PolicyBuildOptions): TaskPlan {
   const planningLane =
     target === 'affected' &&
     baseCommit !== undefined &&
-    selectsPlanningLane(descriptor, entriesWithStatus, classifyPath, () =>
-      baseCommitClassifier(repoRoot, baseCommit),
+    selectsPlanningLane(
+      descriptor,
+      entriesWithStatus,
+      () => classifyPath ?? taxonomyClassifier(repoRoot),
+      () => baseCommitClassifier(repoRoot, baseCommit),
     );
   const selected = selectedNodeIds(
     descriptor,

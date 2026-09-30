@@ -4,6 +4,7 @@ import type { CAC } from 'cac';
 import { EXIT_FAIL, EXIT_PASS } from '@devai-nyx/utils';
 import { defineCommand } from '../../define-command.js';
 import { inspectRemoteLocalOnlyNodes } from './ci-local-only.js';
+import { PLANNING_LANE_PROFILE } from '../../services/check-runner/policy.js';
 
 /**
  * CI-economy check behind the canonical `check` facade.
@@ -231,10 +232,12 @@ export function pushNamesOnlyTags(text: string): boolean {
 
 /**
  * True when the repository's `test-tasks.json` is a readable descriptor whose
- * task input selectors include a `kind: class` selector: the pull-request lane
- * is then selected from the change taxonomy, and a workflow path filter would
- * duplicate that selection and let a candidate suppress checks by editing the
- * filter (ADR-CHK-0003). Missing or unreadable descriptors return false.
+ * task input selectors include a `kind: class` selector, or that declares the
+ * fixed planning profile the check runner plans from the commit-range
+ * classification: the pull-request lane is then selected from the change
+ * taxonomy, and a workflow path filter would duplicate that selection and let a
+ * candidate suppress checks by editing the filter (ADR-CHK-0003, ADR-CHK-0006).
+ * Missing or unreadable descriptors return false.
  */
 export function laneSelectedByClass(repoRoot: string): boolean {
   const descriptorPath = join(repoRoot, 'test-tasks.json');
@@ -246,6 +249,19 @@ export function laneSelectedByClass(repoRoot: string): boolean {
     return false;
   }
   if (typeof descriptor !== 'object' || descriptor === null) return false;
+  const profiles = (descriptor as { profiles?: unknown }).profiles;
+  if (
+    Array.isArray(profiles) &&
+    profiles.some(
+      (profile: unknown) =>
+        typeof profile === 'object' &&
+        profile !== null &&
+        (profile as { profileId?: unknown }).profileId === PLANNING_LANE_PROFILE &&
+        (profile as { mode?: unknown }).mode === 'fixed',
+    )
+  ) {
+    return true;
+  }
   const tasks = (descriptor as { tasks?: unknown }).tasks;
   if (!Array.isArray(tasks)) return false;
   return tasks.some((task: unknown) => {
