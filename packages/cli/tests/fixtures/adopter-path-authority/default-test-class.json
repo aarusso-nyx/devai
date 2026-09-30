@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "1.0.0",
+  "policy_id": "detran.devai-adoption",
+  "policy_version": "1.1.0",
+  "authority": {
+    "extension_id": "detran.path-authority",
+    "roots": ["apps", "backend", "frontend", "mobile", "portal", "src"],
+    "classes": {
+      "architecture": { "selectors": ["**/ddl/**/*.sql", "**/blueprints/**"] }
+    }
+  }
+}
