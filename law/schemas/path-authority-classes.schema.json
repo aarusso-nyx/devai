@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/path-authority-classes.schema.json",
+  "title": "Path authority class defaults",
+  "description": "The package default path-class selectors of ADR-AUT-0003, declared as a law source at law/policy/adopter-defaults/path-authority-classes.json. An adopter authority block that omits classes.test takes its Inspector test-class selectors from this file; the architecture class has no default and cannot be declared here, so an adopter that wants Architect classes under its roots names them in its own source. Every selector obeys the root-relative selector grammar of the record: a minimatch glob applied under every declared root, never absolute, never starting with a root segment, and free of dot segments, backslashes, doubled or trailing separators, braces, and extglobs. The bind compiles each selector under each declared root; nothing here names a root.",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "id", "authority", "classes"],
+  "$defs": {
+    "selector": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?![/!#])(?!.*//)(?!.*\\\\)(?!.*[{}])(?!.*[@!+*?]\\()(?!.*(?:^|/)\\.\\.?(?:/|$))(?!.*/$).+$",
+      "description": "One root-relative minimatch glob under the ADR-AUT-0003 grammar: no leading `/`, `!`, or `#`; no `.` or `..` segment; no backslash; no `//`; no trailing `/`; no brace; no extglob. The compiler additionally refuses a selector whose first segment equals a declared root (ADOPTER_AUTHORITY_SELECTOR_ROOTED), which no default can satisfy for every adopter and is therefore checked at bind."
+    },
+    "class": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["selectors"],
+      "description": "One path class: the selectors compiled under every declared root at the precedence and role the fixed ladder assigns to the class.",
+      "properties": {
+        "selectors": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/selector" },
+          "description": "Selectors in declaration order; the compiler numbers the rules it emits from this order."
+        }
+      }
+    }
+  },
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "id": {
+      "const": "path-authority-classes",
+      "description": "The identity of the defaults source."
+    },
+    "authority": {
+      "const": "Architect",
+      "description": "The role that owns the defaults; Article 6 places law/policy under the Architect."
+    },
+    "classes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["test"],
+      "description": "The classes that carry a package default. Only test is admitted: ADR-AUT-0003 gives the architecture class no default, so DDL coverage is explicit in each adopter's source and testable.",
+      "properties": {
+        "test": { "$ref": "#/$defs/class" }
+      }
+    }
+  },
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "id": "path-authority-classes",
+      "authority": "Architect",
+      "classes": {
+        "test": {
+          "selectors": ["**/*.spec.*", "**/*.test.*", "**/test/**", "**/tests/**"]
+        }
+      }
+    }
+  ]
+}
