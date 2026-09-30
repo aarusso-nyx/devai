@@ -100,7 +100,10 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Set up verifier runtime
-        uses: ./.github/actions/setup-node-toolchain
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          # Literal checked against .devai/config/toolchain.json runtimes.node (major) by scripts/check-workflows.mjs.
+          node-version: 24
       - name: Probe declared credential prerequisites
         shell: bash
         # Presence flags only (ADR-SEC-0001): each variable is true or false, never a value.
@@ -729,7 +732,10 @@ jobs:
           [[ "$CONTROL_COMMIT" =~ ^[a-f0-9]{40}$ ]]
           test "$(git -C release-control rev-parse HEAD)" = "$CONTROL_COMMIT"
       - name: Set up Node for Pages verification
-        uses: ./.github/actions/setup-node-toolchain
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          # Literal checked against .devai/config/toolchain.json runtimes.node (major) by scripts/check-workflows.mjs.
+          node-version: 24
       - name: Download canonical release assets
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
