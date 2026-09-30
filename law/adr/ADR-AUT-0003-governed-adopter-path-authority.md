@@ -61,15 +61,16 @@ immutable core of `policy-core-rules.ts`, the package extension
 `devai-adopter-authority`, and the exact-effect ledger of ADR-AUT-0001 are
 unchanged.
 
-Open questions, stated with options in the proposal's "Decisions required":
-the source (a block in the adopter policy, recommended, or a separate governed
-file); the precedence model (a fixed class ladder, recommended, or ordered
-rules with declared precedence); the root set (adopter-declared, recommended,
-or the fixed six); whether the framework declares roots of its own (no,
-recommended); nested `docs` directories under a root (Engineer by remainder,
-recommended); and the runtime effect of a source edited after binding (refuse
-every governed write, recommended). The drafts below take the recommended
-option in each case.
+Decided by the Owner on 2026-09-30, recorded in the proposal's "Decisions
+taken by the Owner" table: the source is a block in the adopter policy (b);
+the precedence model is the fixed class ladder (c); roots are
+adopter-declared (d); existing adopters are unchanged and the framework
+declares no roots (e); a source edited after binding refuses every governed
+write until rebind (h); a nested `docs` directory under a root is Engineer by
+remainder and an adopter may name `**/docs/**` in its architecture class (i);
+the harness subject of a class rule is bound to the class role (j). The
+constitution gate threshold is 1.0.2 (decision a). The text below states the
+decided design.
 
 ## Context
 
@@ -173,7 +174,7 @@ produce the same rules in the same order, and the extension digest is the
 SHA-256 of the canonical extension document.
 
 **Constitution gate.** The compiler refuses a block while the bound
-constitution version is below 1.1.0, with `ADOPTER_AUTHORITY_CONSTITUTION_VERSION`.
+constitution version is below 1.0.2, with `ADOPTER_AUTHORITY_CONSTITUTION_VERSION`.
 Every other refusal carries a named `ADOPTER_AUTHORITY_*` code
 (`ROOT_INVALID`, `ROOT_CORE_PREFIX`, `ROOT_DUPLICATE`, `ROOT_NESTED`,
 `SELECTOR_INVALID`, `SELECTOR_ROOTED`, `CLASS_UNKNOWN`,
@@ -211,7 +212,7 @@ core rules are unchanged.
 
 **Migration.** Adopters without the block change nothing and rebind only for
 the package version, as today. An adopter that wants roots rebinds the
-constitution at 1.1.0, adds the block, bumps `policy_version`, and runs
+constitution at 1.0.2, adds the block, bumps `policy_version`, and runs
 `init bind --adopter-policy`; the installed smoke and the adopter package
 contract test rehearse that sequence in a disposable clone with the reference
 source above. The framework declares no roots of its own in this record.
@@ -273,7 +274,7 @@ harness subject to the class role.
 
 ## Inspector Adversarial Acceptance
 
-Bind the reference source in a fixture repository pinned at 1.1.0 and drive
+Bind the reference source in a fixture repository pinned at 1.0.2 and drive
 the broker for every row of the matrix in IA-001 and IA-009 with each of the three roles
 as the human subject and as the harness initiator; confirm each allow and
 each deny by code. Request writes to `vendor/x.ts`, `apps/../law/x.md`, and a
