@@ -208,10 +208,12 @@ is still an adopter. The kind is one of two values:
   `law/policy/devai-adoption.json` declares for the DEVAI source repository;
 - `adopter` when the receipt exists and binds any other `policy_id`.
 
-A checkout with no binding receipt is not classified: every member that needs the kind,
-which is every member declared `self` or `adopter`, fails with
-`CHECK_REPOSITORY_KIND_INVALID`, and the kind never defaults to `adopter` and never
-yields not-applicable. A receipt that exists but cannot be parsed, or whose `policy_id`
+The receipt is written only by `init bind --adopter-policy <file>`; the constitution,
+operational-law, subprocess-effects, and authority-policy bind steps do not create it. A
+checkout with no binding receipt is not classified: every member that needs the kind,
+which is every member declared `self` or `adopter` and a `both` member that selects its
+scope by kind such as `action-coverage`, fails with `CHECK_REPOSITORY_KIND_INVALID`, and
+the kind never defaults to `adopter` and never yields not-applicable. A receipt that exists but cannot be parsed, or whose `policy_id`
 is not a string, is the same `CHECK_REPOSITORY_KIND_INVALID`: an execution error, never a
 default to either kind. The detection is reported as `kind_evidence`, an object with the
 repository-relative `source` consulted, the JSON `pointer` read, and the `value` found. A
