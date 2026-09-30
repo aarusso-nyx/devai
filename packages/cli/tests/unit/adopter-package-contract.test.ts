@@ -1355,6 +1355,24 @@ describe('packed adopter path authority', () => {
   const allow: Decision = { outcome: 'allow' };
   const deny = (code: string): Decision => ({ outcome: 'deny', code });
 
+  // ADR-AUT-0004 IA-004 and IA-006: the policy the installed bin bound carries on every class
+  // rule exactly the registered write verbs of its class role, so the probes below decide the
+  // packed extension under the verbs the installed registry admits.
+  it.each([
+    ['adopter-path-root-', ['task start']],
+    ['adopter-path-test-', ['check']],
+    [
+      'adopter-path-architecture-',
+      ['init apply architect', 'release export', 'round plan', 'round seal'],
+    ],
+  ] as const)('binds every %s rule through the installed bin under %j', (prefix, verbs) => {
+    const rules = (adopterJson(POLICY)['rules'] as JsonObject[]).filter((rule) =>
+      String(rule['rule_id']).startsWith(prefix),
+    );
+    expect(rules.length).toBeGreaterThan(0);
+    for (const rule of rules) expect(rule['action_ids'], String(rule['rule_id'])).toEqual(verbs);
+  });
+
   it.each([
     ['check', 'inspector', 'apps/dashboard/web/src/example.spec.ts', allow],
     [
@@ -1370,6 +1388,12 @@ describe('packed adopter path authority', () => {
       'task start',
       'inspector',
       'apps/dashboard/web/src/example.ts',
+      deny('AUTHORITY_HUMAN_ROLE_DENIED'),
+    ],
+    [
+      'check',
+      'engineer',
+      'apps/dashboard/web/src/example.spec.ts',
       deny('AUTHORITY_HUMAN_ROLE_DENIED'),
     ],
   ] as const)(
