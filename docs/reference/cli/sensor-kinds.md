@@ -1430,3 +1430,35 @@ sources or renderer, never the bytes between markers.
 - **Related workflow:** `sense`
 
 <!-- devai:generated-reference:end category="sensor-kinds" -->
+
+## Admitted kinds and schema-only legacy values
+
+Every kind the generated section lists is admitted by the `sensor.kind` enum of
+[`law/schemas/sensor-reading.schema.json`](../../../law/schemas/sensor-reading.schema.json),
+and every kind a preset can select must be
+([ADR-SCR-0011](../../../law/adr/ADR-SCR-0011-sweep-kinds-admitted-by-the-packaged-schema.md)).
+The invariant is stated on the preset contract
+([`law/policy/sense-presets.json`](../../../law/policy/sense-presets.json), `selection_effect_rule`):
+the `sweep` members minus the enum is the empty set, so a registry kind the packaged schema does
+not admit cannot be selected without the schema changing in the same release. A registry entry
+the schema intentionally does not admit says so on the entry (`schema_admission` equal to
+`unsupported`) and is refused before the sensor starts with `SENSOR_KIND_SCHEMA_UNSUPPORTED`; an
+invalid reading is never emitted. The four diagnostic kinds `decision_record_integrity`,
+`decision_citation_resolution`, `archive_immutability`, and `round_record_integrity` are admitted
+under this record; they map to no scorecard cell, so their admission moves no cell verdict.
+
+Five enum values name no registry entry and no emitter. They are **legacy**: readings recorded
+under them exist in adopter stores, and ADR-SCR-0008 forbids rewriting a recorded reading, so
+ADR-SCR-0011 keeps them and defers their retirement to a separate decision. They are not
+selectable, appear in no preset, and are not part of the generated catalog above.
+
+| Legacy value          | Standing                                                                    |
+| --------------------- | --------------------------------------------------------------------------- |
+| `api_test`            | Kept as legacy; schema-only, no registry entry, no emitter, not selectable. |
+| `contract_validation` | Kept as legacy; schema-only, no registry entry, no emitter, not selectable. |
+| `db_test`             | Kept as legacy; schema-only, no registry entry, no emitter, not selectable. |
+| `journey_test`        | Kept as legacy; schema-only, no registry entry, no emitter, not selectable. |
+| `mutation_test`       | Kept as legacy; schema-only, no registry entry, no emitter, not selectable. |
+
+Adopters declare sensor inputs on the [sensor inputs](../../adopters/sensor-inputs.md) page; the
+same invariant is stated there for adopters comparing package files.
