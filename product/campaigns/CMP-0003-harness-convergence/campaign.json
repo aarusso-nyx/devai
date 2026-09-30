@@ -2903,7 +2903,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0382",
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F2", "F4"],
               "boundary": {
                 "paths": [
@@ -2913,7 +2913,12 @@
                   "scripts/rehearse-packed-adopter.mjs",
                   "package.json",
                   "docs/reference/error-codes.md",
-                  "docs/reference/scripts.md"
+                  "docs/reference/scripts.md",
+                  "packages/sensors/src/sensor-registry.ts",
+                  "packages/cli/src/command-router.ts",
+                  "packages/loop/src/scorecard/inputs.ts",
+                  "packages/cli/src/commands/audit/scorecard.ts",
+                  "Orchestrator note (2026-09-30): widened after the Inspector's report. The store rejection codes of ADR-REL-0033 IA-002 (SCORECARD_READING_UNPARSEABLE, SCORECARD_READING_INVALID) live in the scorecard resolver and the audit command; the refusal of an intentionally unsupported registry entry (ADR-SCR-0011 IA-005, SENSOR_KIND_SCHEMA_UNSUPPORTED) lives in the registry loader and the sense dispatch. Commit types fix(loop) and fix(cli) are admitted for these paths."
                 ],
                 "forbidden": ["law/", "product/", ".github/workflows/", "tests/"]
               },
@@ -2936,14 +2941,53 @@
               "commit_types": ["fix(sensors)", "fix(schemas)", "ci(scripts)", "docs(reference)"],
               "prompt": {
                 "path": "prompts/TASK-0383.md",
-                "sha256": null
+                "sha256": "f2dc0f809344a722b1a02b7a58d7080c6fb5d637bf4d12636c6784d1e4acf582"
               },
               "pull_request": null,
               "merged_as": null,
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
-                "time_budget_minutes": 150
+                "time_budget_minutes": 150,
+                "resolved": {
+                  "policy_version": "1.0.0",
+                  "pinned_at": "2026-09-30T01:42:48Z",
+                  "tiers": {
+                    "architect": {
+                      "rank": 1,
+                      "hosts": {
+                        "claude": "claude-cli:fable",
+                        "codex": "codex-cli:gpt-6-astra"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker-high": {
+                      "rank": 2,
+                      "hosts": {
+                        "claude": "claude-cli:opus",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker": {
+                      "rank": 3,
+                      "hosts": {
+                        "claude": "claude-cli:sonnet",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "medium"
+                    },
+                    "clerk": {
+                      "rank": 4,
+                      "hosts": {
+                        "claude": "claude-cli:haiku",
+                        "codex": "codex-cli:gpt-6-luna"
+                      },
+                      "default_effort": "low"
+                    }
+                  },
+                  "ceiling": "architect"
+                }
               }
             }
           ]
