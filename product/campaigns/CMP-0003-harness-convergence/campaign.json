@@ -2809,7 +2809,9 @@
                   "packages/sensors/tests/unit/sensor-registry-runtime-boundaries.test.ts",
                   "packages/cli/tests/unit/cli-shard09-audit-scorecard-input-surface.test.ts",
                   "tests/integration/packed-adopter-scorecard.integration.test.ts",
-                  "tests/fixtures/sensor-readings/"
+                  "tests/fixtures/sensor-readings/",
+                  "packages/cli/tests/unit/sense-run-schema-admission.test.ts",
+                  "Orchestrator note (2026-09-30): the refusal of an unsupported registry entry before any sensor starts (ADR-SCR-0011 IA-005) is only observable at the sense dispatch in the CLI package; one CLI unit test file is admitted for it."
                 ],
                 "forbidden": [
                   "law/",
@@ -2848,7 +2850,7 @@
               "commit_types": ["test(sensors)", "test(cli)", "test(integration)"],
               "prompt": {
                 "path": "prompts/TASK-0382.md",
-                "sha256": "4c1859c4a91c435eda22d2500f16b1e9191902ef537a08a339c6561d99e91224"
+                "sha256": "7991ed86688ab84ad3344d9baae7f607b687230a3537a88ae14c465d6c9a9cc2"
               },
               "pull_request": null,
               "merged_as": null,
