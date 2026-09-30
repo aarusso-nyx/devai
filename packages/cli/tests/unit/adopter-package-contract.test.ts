@@ -510,7 +510,7 @@ describe('adopter-safe check and binding contracts', () => {
       mode: 'host-integrated',
       adapter: {
         adapter_id: 'github-actions-main-observation',
-        adapter_version: '1.6.0',
+        adapter_version: '1.7.0',
       },
     });
     execFileSync('git', ['add', '.'], { cwd: repo });
@@ -530,7 +530,7 @@ describe('adopter-safe check and binding contracts', () => {
       mode: 'host-integrated',
       adapter: {
         adapter_id: 'post-merge-host-adapter',
-        adapter_version: '1.6.0',
+        adapter_version: '1.7.0',
       },
     });
   }, 30_000);
