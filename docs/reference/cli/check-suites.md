@@ -206,13 +206,16 @@ is still an adopter. The kind is one of two values:
 - `self` when the adopter-policy binding receipt `.devai/config/adopter-policy-binding.json`
   exists and its `policy_id` is `devai.devai-adoption`, the identity that
   `law/policy/devai-adoption.json` declares for the DEVAI source repository;
-- `adopter` otherwise, including when no receipt is bound.
+- `adopter` when the receipt exists and binds any other `policy_id`.
 
-A receipt that exists but cannot be parsed, or whose `policy_id` is not a string, is
-`CHECK_REPOSITORY_KIND_INVALID`: an execution error, never a default to either kind. The
-detection is reported as `kind_evidence`, an object with the repository-relative `source`
-consulted, the JSON `pointer` read, and the `value` found (`null` when the receipt is
-absent). A member executes when its applicability equals the detected kind or is `both`.
+A checkout with no binding receipt is not classified: every member that needs the kind,
+which is every member declared `self` or `adopter`, fails with
+`CHECK_REPOSITORY_KIND_INVALID`, and the kind never defaults to `adopter` and never
+yields not-applicable. A receipt that exists but cannot be parsed, or whose `policy_id`
+is not a string, is the same `CHECK_REPOSITORY_KIND_INVALID`: an execution error, never a
+default to either kind. The detection is reported as `kind_evidence`, an object with the
+repository-relative `source` consulted, the JSON `pointer` read, and the `value` found. A
+member executes when its applicability equals the detected kind or is `both`.
 
 ### Input source
 
@@ -284,6 +287,9 @@ error with its named code, and none of them is ever reported as `na`:
   falls back to the defaults and never to not-applicable;
 - a policy error in `law/policy/check-suites.json`, which is the `CHECK_POLICY_*` code
   that names the broken section;
+- a checkout whose repository kind cannot be read, because the binding receipt is absent,
+  unparsable, or carries no string `policy_id`, which is `CHECK_REPOSITORY_KIND_INVALID`
+  for every member that needs the kind;
 - a genuine finding of a `self` member on the DEVAI source repository, which is that
   member's own `fail`.
 
