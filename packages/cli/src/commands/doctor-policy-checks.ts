@@ -6,11 +6,17 @@ import { MATERIALIZED_POLICY_FILES, resolveCanonicalPolicyContent } from '@devai
 import { resolveCliVersion } from '../version.js';
 import {
   ADOPTER_POLICY_TARGETS,
+  compileAdopterPolicyAuthority,
   isJsonObject,
   resolveAdopterPolicyMaterialization,
   type JsonObject,
 } from '../services/adopter-policy.js';
-import { parseAdopterPolicyBinding } from '../services/adopter-policy-binding.js';
+import {
+  parseAdopterPolicyBinding,
+  type AdopterAuthorityExtensionProvenance,
+} from '../services/adopter-policy-binding.js';
+import { repositoryIdFor } from '../authority/policy.js';
+import { adopterAuthorityExtensionDigest } from '../authority/policy-adopter-extension.js';
 import {
   type CheckResult,
   F1_PATHS,
@@ -94,6 +100,81 @@ function policyReasonId(words: string): string {
   return words.toUpperCase().replaceAll('-', '_');
 }
 
+// The extension finding ids of ADR-AUT-0003, quoted so the error-code reference lists them.
+const EXTENSION_REASONS = {
+  drift: 'AUTHORITY_EXTENSION_DRIFT',
+  unbound: 'AUTHORITY_EXTENSION_UNBOUND',
+  sourceMissing: 'AUTHORITY_EXTENSION_SOURCE_MISSING',
+} as const;
+
+type ExtensionComparison =
+  | { readonly reason?: undefined; readonly fresh?: AdopterAuthorityExtensionProvenance }
+  | {
+      readonly reason: string;
+      readonly message: string;
+      readonly fresh?: AdopterAuthorityExtensionProvenance;
+    };
+
+/**
+ * ADR-AUT-0003: compare the receipt's `authority_extension` with a fresh compilation of the
+ * bound source by the installed package. The comparison stands apart from the source digest,
+ * so a package that compiles an unchanged block differently reads as drift as well.
+ */
+function compareAuthorityExtension(
+  repoRoot: string,
+  policy: unknown,
+  bound: AdopterAuthorityExtensionProvenance | undefined,
+  sourceLexical: string,
+): ExtensionComparison {
+  const declares = isJsonObject(policy) && policy['authority'] !== undefined;
+  if (!declares) {
+    return bound === undefined
+      ? {}
+      : {
+          reason: EXTENSION_REASONS.unbound,
+          message: `the binding receipt carries adopter extension ${bound.extension_id} that ${sourceLexical} no longer declares`,
+        };
+  }
+  if (bound === undefined) {
+    return {
+      reason: EXTENSION_REASONS.unbound,
+      message: `${sourceLexical} declares an authority block the binding receipt does not carry`,
+    };
+  }
+  let fresh: AdopterAuthorityExtensionProvenance;
+  try {
+    const extension = compileAdopterPolicyAuthority(
+      { policy, currentProject: {}, frameworkVersion: resolveCliVersion(), targetRoot: repoRoot },
+      { repositoryId: repositoryIdFor(repoRoot) },
+    );
+    if (extension === undefined) throw new Error('authority block compiled to no extension');
+    fresh = {
+      extension_id: extension.extension_id,
+      extension_version: extension.extension_version,
+      digest_sha256: adopterAuthorityExtensionDigest(extension),
+      rule_count: extension.rules.length,
+    };
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    return {
+      reason: detail.startsWith('ADOPTER_AUTHORITY_DEFAULTS_UNAVAILABLE')
+        ? 'ADOPTER_AUTHORITY_DEFAULTS_UNAVAILABLE'
+        : 'SOURCE_POLICY_INVALID',
+      message: `the authority block of ${sourceLexical} does not compile: ${detail}`,
+    };
+  }
+  const drifted = (['extension_id', 'extension_version', 'digest_sha256', 'rule_count'] as const)
+    .filter((key) => fresh[key] !== bound[key])
+    .map((key) => `${key} ${String(bound[key])} -> ${String(fresh[key])}`);
+  return drifted.length === 0
+    ? { fresh }
+    : {
+        reason: EXTENSION_REASONS.drift,
+        message: `adopter extension ${bound.extension_id} compiled from ${sourceLexical} differs from the binding receipt: ${drifted.join(', ')}`,
+        fresh,
+      };
+}
+
 function checkAdopterPolicyMaterialization(repoRoot: string, bindingPath: string): CheckResult {
   const reasons: string[] = [];
   const errors: string[] = [];
@@ -102,6 +183,11 @@ function checkAdopterPolicyMaterialization(repoRoot: string, bindingPath: string
     if (!reasons.includes(reason)) reasons.push(reason);
     errors.push(message);
   };
+  // Filled once the receipt and the fresh compilation are read; empty on an early finding.
+  const extensionState: {
+    bound?: AdopterAuthorityExtensionProvenance;
+    fresh?: AdopterAuthorityExtensionProvenance;
+  } = {};
   const result = (source?: string): CheckResult => {
     const remediationCommands =
       source === undefined
@@ -114,6 +200,10 @@ function checkAdopterPolicyMaterialization(repoRoot: string, bindingPath: string
         binding: '.devai/config/adopter-policy-binding.json',
         reason_ids: reasons,
         mismatches,
+        ...(extensionState.bound !== undefined && { authority_extension: extensionState.bound }),
+        ...(extensionState.fresh !== undefined && {
+          compiled_authority_extension: extensionState.fresh,
+        }),
         remediation_commands: remediationCommands,
       },
       ...(errors.length > 0 && { errors }),
@@ -135,10 +225,22 @@ function checkAdopterPolicyMaterialization(repoRoot: string, bindingPath: string
     return result();
   }
   const binding = parsedBinding.binding;
+  const boundExtension = binding.authority_extension;
+  if (boundExtension !== undefined) extensionState.bound = boundExtension;
 
   const receiptTargets = Object.keys(binding.materialized).sort();
 
   const sourceLexical = binding.source_path;
+  const sourceAbsent = (message: string): CheckResult => {
+    addReason('SOURCE_MISSING', message);
+    if (boundExtension !== undefined) {
+      addReason(
+        EXTENSION_REASONS.sourceMissing,
+        `adopter extension ${boundExtension.extension_id} cannot be compared: its source ${sourceLexical} is absent; restore it, then rebind`,
+      );
+    }
+    return result(sourceLexical);
+  };
   const normalizedSource = sourceLexical.split('/').join(sep);
   const sourceCandidate = resolve(repoRoot, normalizedSource);
   const lawPolicyCandidate = resolve(repoRoot, 'law/policy');
@@ -159,8 +261,7 @@ function checkAdopterPolicyMaterialization(repoRoot: string, bindingPath: string
   }
 
   if (!existsSync(sourceCandidate)) {
-    addReason('SOURCE_MISSING', `adopter-policy source is missing: ${sourceLexical}`);
-    return result(sourceLexical);
+    return sourceAbsent(`adopter-policy source is missing: ${sourceLexical}`);
   }
   try {
     const lawPolicyRoot = realpathSync(lawPolicyCandidate);
@@ -178,8 +279,7 @@ function checkAdopterPolicyMaterialization(repoRoot: string, bindingPath: string
       return result();
     }
   } catch {
-    addReason('SOURCE_MISSING', `adopter-policy source cannot be resolved: ${sourceLexical}`);
-    return result(sourceLexical);
+    return sourceAbsent(`adopter-policy source cannot be resolved: ${sourceLexical}`);
   }
   let sourceBytes: string;
   try {
@@ -193,9 +293,9 @@ function checkAdopterPolicyMaterialization(repoRoot: string, bindingPath: string
     return result(sourceLexical);
   }
   const actualSourceDigest = createHash('sha256').update(sourceBytes).digest('hex');
-  if (actualSourceDigest !== binding.source_digest_sha256) {
+  const sourceDrifted = actualSourceDigest !== binding.source_digest_sha256;
+  if (sourceDrifted) {
     addReason('SOURCE_DIGEST_MISMATCH', `adopter-policy source digest differs: ${sourceLexical}`);
-    return result(sourceLexical);
   }
 
   let policy: unknown;
@@ -207,6 +307,15 @@ function checkAdopterPolicyMaterialization(repoRoot: string, bindingPath: string
     addReason('SOURCE_POLICY_INVALID', `adopter-policy source is invalid: ${sourceLexical}`);
     return result(sourceLexical);
   }
+
+  // Every finding is reported as a set: the extension comparison runs whether or not the
+  // source bytes still match the receipt.
+  const extension = compareAuthorityExtension(repoRoot, policy, boundExtension, sourceLexical);
+  if (extension.fresh !== undefined) extensionState.fresh = extension.fresh;
+  if (extension.reason !== undefined) addReason(extension.reason, extension.message);
+  // A source edited after the bind leaves every receipt digest stale by construction, so
+  // the projected targets are compared only against the source the receipt bound.
+  if (sourceDrifted) return result(sourceLexical);
   const policyDocument = policy as JsonObject;
   if (
     policyDocument['policy_id'] !== binding.policy_id ||
