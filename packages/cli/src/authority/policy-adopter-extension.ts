@@ -1,4 +1,15 @@
-import { defined, fsSelector, harnessSubject, rule } from './policy-support.js';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { getValidator } from '@devai-nyx/schemas';
+import {
+  canonicalBytes,
+  defined,
+  fsSelector,
+  harnessSubject,
+  rule,
+  sha256Bytes,
+} from './policy-support.js';
 
 /**
  * ADR-AUT-0003 compiler: turns a validated adopter `authority` block into one additive
@@ -27,9 +38,9 @@ export interface AdopterAuthorityExtension {
 }
 
 /**
- * The package default test selectors ADR-AUT-0003 states. Until the defaults law source
- * `law/policy/adopter-defaults/path-authority-classes.json` lands (R-0502), callers take
- * them from this constant.
+ * The package default test selectors ADR-AUT-0003 states. The bind and the trusted sources
+ * read them from the defaults law source through `loadAdopterAuthorityDefaultTestSelectors`;
+ * this constant mirrors that source for callers that compile without a package layout.
  */
 export const DEFAULT_ADOPTER_TEST_SELECTORS: readonly string[] = Object.freeze([
   '**/*.spec.*',
@@ -76,6 +87,8 @@ const CODES = {
   classUnknown: 'ADOPTER_AUTHORITY_CLASS_UNKNOWN',
   architectureSelectorsRequired: 'ADOPTER_AUTHORITY_ARCHITECTURE_SELECTORS_REQUIRED',
   extensionIdReserved: 'ADOPTER_AUTHORITY_EXTENSION_ID_RESERVED',
+  defaultsUnavailable: 'ADOPTER_AUTHORITY_DEFAULTS_UNAVAILABLE',
+  sourceUnavailable: 'ADOPTER_AUTHORITY_SOURCE_UNAVAILABLE',
 } as const;
 
 function refuse(code: (typeof CODES)[keyof typeof CODES], detail: string): never {
@@ -277,4 +290,161 @@ export function compileAdopterAuthorityExtension(input: {
     ]),
   );
   return { extension_id: extensionId, extension_version: input.policyVersion, rules };
+}
+
+/** SHA-256 of the canonical extension document, as the authority policy records it. */
+export function adopterAuthorityExtensionDigest(extension: AdopterAuthorityExtension): string {
+  return sha256Bytes(canonicalBytes(extension));
+}
+
+const DEFAULTS_RELATIVE = 'law/policy/adopter-defaults/path-authority-classes.json';
+
+/**
+ * Read the package default test selectors from the defaults law source, validated against
+ * `path-authority-classes.schema.json`. The source resolves from the assembled package
+ * (`dist/law/...`) or the source checkout only, never from the adopter repository.
+ */
+export function loadAdopterAuthorityDefaultTestSelectors(
+  validator: typeof getValidator = getValidator,
+): readonly string[] {
+  const moduleRoot = dirname(fileURLToPath(import.meta.url));
+  const candidates = [
+    resolve(moduleRoot, '../..', DEFAULTS_RELATIVE),
+    resolve(moduleRoot, '../../../..', DEFAULTS_RELATIVE),
+  ];
+  const path = candidates.find((candidate) => existsSync(candidate));
+  if (path === undefined) refuse(CODES.defaultsUnavailable, `${DEFAULTS_RELATIVE} is absent`);
+  let document: unknown;
+  try {
+    document = JSON.parse(readFileSync(path, 'utf8'));
+  } catch {
+    refuse(CODES.defaultsUnavailable, `${DEFAULTS_RELATIVE} is not JSON`);
+  }
+  const validate = validator('path-authority-classes.schema.json');
+  if (validate(document) !== true || !isRecord(document)) {
+    refuse(CODES.defaultsUnavailable, `${DEFAULTS_RELATIVE} failed schema validation`);
+  }
+  const classes = document['classes'] as { test: { selectors: string[] } };
+  return Object.freeze([...classes.test.selectors]);
+}
+
+const BINDING_RECEIPT = '.devai/config/adopter-policy-binding.json';
+
+function boundSourcePathValid(sourcePath: string): boolean {
+  return (
+    sourcePath.startsWith('law/policy/') &&
+    sourcePath.endsWith('.json') &&
+    !/[\\:*?]/u.test(sourcePath) &&
+    ![...sourcePath].some((character) => {
+      const code = character.charCodeAt(0);
+      return code < 32 || code === 127;
+    }) &&
+    !sourcePath.split('/').some((part) => part === '' || part === '.' || part === '..')
+  );
+}
+
+export type BoundAdopterAuthorityExtension =
+  | { readonly status: 'none' }
+  | { readonly status: 'compiled'; readonly extension: AdopterAuthorityExtension }
+  | { readonly status: 'refused'; readonly reason: string };
+
+/**
+ * Resolve the adopter extension a binding receipt names (ADR-AUT-0003).
+ *
+ * A receipt that records `authority_extension` binds that extension strictly: a missing,
+ * non-JSON, schema-invalid, or refused source reads `ADOPTER_AUTHORITY_SOURCE_UNAVAILABLE`,
+ * and a source whose bytes differ from the bound source digest, that no longer declares the
+ * block, or that compiles to other bytes than the receipt records drifted since the bind and
+ * reads `AUTHORITY_POLICY_DIGEST_MISMATCH`.
+ *
+ * A receipt without `authority_extension` is either a binding without the block or a bind
+ * in progress, which records the provenance only once the policy is materialized. Its source
+ * contributes the extension only when its bytes are exactly the ones the receipt bound and
+ * it declares the block; otherwise it binds none, so an adopter without the block is
+ * unchanged and a block added without rebinding grants nothing. The caller decides when a
+ * refusal applies.
+ */
+export function resolveBoundAdopterAuthorityExtension(input: {
+  readonly root: string;
+  readonly repositoryId: string;
+  readonly constitutionVersion: string;
+  readonly validator?: typeof getValidator;
+}): BoundAdopterAuthorityExtension {
+  const receiptPath = join(resolve(input.root), BINDING_RECEIPT);
+  if (!existsSync(receiptPath)) return { status: 'none' };
+  let receipt: unknown;
+  try {
+    receipt = JSON.parse(readFileSync(receiptPath, 'utf8'));
+  } catch {
+    // A malformed receipt binds no extension; Doctor reports the receipt separately, and a
+    // policy that still lists an adopter extension then fails its trusted-source checks.
+    return { status: 'none' };
+  }
+  if (!isRecord(receipt)) return { status: 'none' };
+  const bound = receipt['authority_extension'];
+  const strict = bound !== undefined;
+  const none: BoundAdopterAuthorityExtension = { status: 'none' };
+  const sourcePath = receipt['source_path'];
+  const rebind = `rerun devai init bind --adopter-policy ${String(sourcePath)} --write`;
+  const unavailable = (detail: string): BoundAdopterAuthorityExtension =>
+    strict
+      ? { status: 'refused', reason: `${CODES.sourceUnavailable}:${detail}; ${rebind}` }
+      : none;
+  const drifted = (detail: string): BoundAdopterAuthorityExtension =>
+    strict
+      ? { status: 'refused', reason: `AUTHORITY_POLICY_DIGEST_MISMATCH:${detail}; ${rebind}` }
+      : none;
+  if (typeof sourcePath !== 'string' || !boundSourcePathValid(sourcePath)) {
+    return unavailable('the binding receipt names no admissible source path');
+  }
+  if (strict && (!isRecord(bound) || typeof bound['digest_sha256'] !== 'string')) {
+    return unavailable('the binding receipt records no adopter extension digest');
+  }
+  const absolute = join(resolve(input.root), sourcePath);
+  if (!existsSync(absolute)) return unavailable(`${sourcePath} is absent`);
+  const text = readFileSync(absolute, 'utf8');
+  let document: unknown;
+  try {
+    document = JSON.parse(text);
+  } catch {
+    return unavailable(`${sourcePath} is not JSON`);
+  }
+  const validator = input.validator ?? getValidator;
+  const validate = validator('adopter-policy.schema.json');
+  if (validate(document) !== true || !isRecord(document)) {
+    return unavailable(`${sourcePath} does not validate against adopter-policy.schema.json`);
+  }
+  let extension: AdopterAuthorityExtension | undefined;
+  if (document['authority'] !== undefined) {
+    try {
+      extension = compileAdopterAuthorityExtension({
+        policyId: String(document['policy_id']),
+        policyVersion: String(document['policy_version']),
+        authority: document['authority'] as AdopterAuthorityBlock,
+        constitutionVersion: input.constitutionVersion,
+        defaultTestSelectors: loadAdopterAuthorityDefaultTestSelectors(validator),
+        repositoryId: input.repositoryId,
+      });
+    } catch (error) {
+      return unavailable(
+        `${sourcePath} does not compile: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+  if (sha256Bytes(new TextEncoder().encode(text)) !== receipt['source_digest_sha256']) {
+    return drifted(`${sourcePath} changed after it was bound`);
+  }
+  if (extension === undefined) {
+    return drifted(`${sourcePath} no longer declares the bound authority block`);
+  }
+  if (
+    strict &&
+    adopterAuthorityExtensionDigest(extension) !==
+      (bound as Record<string, unknown>)['digest_sha256']
+  ) {
+    return drifted(
+      `the adopter extension compiled from ${sourcePath} differs from the digest the binding receipt records`,
+    );
+  }
+  return { status: 'compiled', extension };
 }

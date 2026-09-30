@@ -219,6 +219,30 @@ function deny(
   return value;
 }
 
+/** The sorted human roles a rule's subjects name, as one comparable key. */
+function humanRoleSet(rule: AnyRecord): string | undefined {
+  const roles = new Set<string>();
+  for (const subject of Array.isArray(rule.subjects) ? rule.subjects : []) {
+    if (isRecord(subject) && subject.kind === 'human' && Array.isArray(subject.roles)) {
+      for (const role of subject.roles) roles.add(String(role));
+    }
+  }
+  return roles.size === 0 ? undefined : JSON.stringify([...roles].sort());
+}
+
+/**
+ * ADR-AUT-0003 IA-006: additive-extension rules of the highest matched precedence that
+ * carry different human role sets are ambiguous whatever the requesting subject, so the
+ * extension can never union a grant across class roles. Rules without a human subject and
+ * immutable-core rules are outside this check; core unions are unchanged.
+ */
+function extensionTie(rules: readonly AnyRecord[]): string[] {
+  const tied = rules.filter(
+    (rule) => rule.origin === 'additive-extension' && humanRoleSet(rule) !== undefined,
+  );
+  return new Set(tied.map(humanRoleSet)).size > 1 ? tied.map((rule) => String(rule.rule_id)) : [];
+}
+
 function classification(rules: AnyRecord[], resource: AnyRecord): AnyRecord[] {
   const sides =
     resource.kind === 'fs' && resource.operation === 'rename'
@@ -324,6 +348,8 @@ export function resolveAuthorityPolicy(policy: unknown, queryValue: unknown, dep
       'AUTHORITY_ACTION_DENIED',
       classified.map((rule) => rule.rule_id),
     );
+  const tie = extensionTie(actionRules);
+  if (tie.length > 0) return deny(state, policy, query, 'AMBIGUOUS_POLICY_MATCH', tie);
   const subjectRules = actionRules.filter(
     (rule) =>
       Array.isArray(rule.subjects) &&
