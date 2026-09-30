@@ -2,7 +2,7 @@
 id: ADR-CHK-0005
 title: Every check member declares where it applies and a framework-only member reports not-applicable in an adopter
 type: adr
-status: proposed
+status: accepted
 date: 2026-09-29
 authority: Architect
 supersedes: []
@@ -39,8 +39,8 @@ inspector_acceptance:
 
 ## Status
 
-Proposed on 2026-09-29 from DETRAN R-0020 CTG-0004 (#187). Binds nothing
-until the Architect sets it to accepted before round R-0309 opens. Extends
+Accepted on 2026-09-30 by the Architect before round R-0309 opened; proposed on
+2026-09-29 from DETRAN R-0020 CTG-0004 (#187). Extends
 the check contract of ADR-CHK-0003 with an applicability dimension; the
 planning lane, the class selectors, and the suites are unchanged. DETRAN's
 Owner has already accepted explicit not-applicable for the three members

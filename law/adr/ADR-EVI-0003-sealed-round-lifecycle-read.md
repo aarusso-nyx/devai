@@ -2,7 +2,7 @@
 id: ADR-EVI-0003
 title: round status reads the governed lifecycle without an active task round
 type: adr
-status: proposed
+status: accepted
 date: 2026-09-29
 authority: Architect
 supersedes: []
@@ -29,8 +29,8 @@ inspector_acceptance:
 
 ## Status
 
-Proposed on 2026-09-29 from DETRAN R-0003 and R-0017 (#175). Binds nothing
-until the Architect sets it to accepted before round R-0308 opens. The
+Accepted on 2026-09-30 by the Architect before round R-0308 opened; proposed on
+2026-09-29 from DETRAN R-0003 and R-0017 (#175). The
 reproduction on this repository is the first step of the round; if it does
 not reproduce on `main`, the task reports blocked and this record is
 revisited before any change lands. Seal evidence and its append-only rule
