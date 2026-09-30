@@ -3,7 +3,7 @@
   "id": "CMP-0005",
   "title": "Multi-stack path authority",
   "type": "campaign",
-  "status": "proposed",
+  "status": "active",
   "date": "2026-09-30",
   "authority": "Architect",
   "mandate": {
@@ -80,7 +80,7 @@
       "id": "R-0501",
       "title": "Amendment and adopter authority source contract",
       "goal": "The constitution is 1.0.2 with the Article 6 extension model of ADR-GOV-0024 and the framework's own pin is rebound; the adopter policy schema admits the authority block of ADR-AUT-0003; a pure compiler turns a valid block into the fixed-ladder rule set deterministically and refuses every malformed source and every source bound under a constitution below 1.0.2 with a named code; the adopter page states the contract.",
-      "status": "planned",
+      "status": "open",
       "records": ["ADR-GOV-0024", "ADR-AUT-0003"],
       "depends_on": [],
       "attestation_reissue": false,
@@ -110,7 +110,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -165,14 +165,53 @@
               "commit_types": ["law(constitution)", "law(adr)", "law(schemas)", "docs(adopters)"],
               "prompt": {
                 "path": "prompts/TASK-0511.md",
-                "sha256": null
+                "sha256": "66b3991418f5a1736e8d8257b36ae412134cc6d5496d90ddc8a7813b5dee814a"
               },
               "pull_request": null,
               "merged_as": null,
               "execution": {
                 "tier": "architect",
                 "effort": "high",
-                "time_budget_minutes": 120
+                "time_budget_minutes": 120,
+                "resolved": {
+                  "policy_version": "1.0.0",
+                  "pinned_at": "2026-09-30T14:42:36Z",
+                  "tiers": {
+                    "architect": {
+                      "rank": 1,
+                      "hosts": {
+                        "claude": "claude-cli:fable",
+                        "codex": "codex-cli:gpt-6-astra"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker-high": {
+                      "rank": 2,
+                      "hosts": {
+                        "claude": "claude-cli:opus",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker": {
+                      "rank": 3,
+                      "hosts": {
+                        "claude": "claude-cli:sonnet",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "medium"
+                    },
+                    "clerk": {
+                      "rank": 4,
+                      "hosts": {
+                        "claude": "claude-cli:haiku",
+                        "codex": "codex-cli:gpt-6-luna"
+                      },
+                      "default_effort": "low"
+                    }
+                  },
+                  "ceiling": "architect"
+                }
               }
             },
             {
