@@ -3,6 +3,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getValidator } from '@devai-nyx/schemas';
 import {
+  type ClassWriteVerbs,
   canonicalBytes,
   defined,
   fsSelector,
@@ -14,8 +15,10 @@ import {
 /**
  * ADR-AUT-0003 compiler: turns a validated adopter `authority` block into one additive
  * extension document with a fixed class ladder (root 500 Engineer, test 700 Inspector,
- * architecture 750 Architect) and a harness subject bound to each class role. The
- * function is pure: the same inputs yield the same rules in the same order.
+ * architecture 750 Architect) and a harness subject bound to each class role. Each class
+ * rule carries the registered write verbs of its class role (ADR-AUT-0004), given as an
+ * input by `classWriteVerbs` of the registry. The function is pure: the same inputs yield
+ * the same rules in the same order.
  */
 
 export interface AdopterAuthorityBlock {
@@ -69,9 +72,6 @@ const CORE_TABLE_SEGMENTS: ReadonlySet<string> = new Set([
   'AGENTS.md',
   'CLAUDE.md',
 ]);
-
-/** The Engineer write verbs the registry declares, as `adopter-engineer-packages` uses. */
-const ENGINEER_WRITE_VERBS: readonly string[] = ['round run', 'task finish', 'task start'];
 
 const CLASS_KEYS: ReadonlySet<string> = new Set(['test', 'architecture']);
 
@@ -175,6 +175,7 @@ function validSelectors(
 
 function classRule(
   repositoryId: string,
+  verbs: readonly string[],
   id: string,
   precedence: 500 | 700 | 750,
   glob: string,
@@ -185,7 +186,7 @@ function classRule(
     id,
     origin: 'additive-extension',
     precedence,
-    actionIds: ENGINEER_WRITE_VERBS,
+    actionIds: verbs,
     selector: fsSelector(repositoryId, glob),
     subjects: [{ kind: 'human', roles: [role] }, harnessSubject([role])],
     rationale,
@@ -203,6 +204,7 @@ export function compileAdopterAuthorityExtension(input: {
   readonly constitutionVersion: string;
   readonly defaultTestSelectors: readonly string[];
   readonly repositoryId: string;
+  readonly classWriteVerbs: ClassWriteVerbs;
 }): AdopterAuthorityExtension {
   if (!admitsAuthority(input.constitutionVersion)) {
     refuse(
@@ -253,6 +255,7 @@ export function compileAdopterAuthorityExtension(input: {
     defined([
       classRule(
         input.repositoryId,
+        input.classWriteVerbs.root,
         `adopter-path-root-${root}`,
         500,
         root,
@@ -261,6 +264,7 @@ export function compileAdopterAuthorityExtension(input: {
       ),
       classRule(
         input.repositoryId,
+        input.classWriteVerbs.root,
         `adopter-path-root-${root}-tree`,
         500,
         `${root}/**`,
@@ -270,6 +274,7 @@ export function compileAdopterAuthorityExtension(input: {
       ...testSelectors.map((selector, index) =>
         classRule(
           input.repositoryId,
+          input.classWriteVerbs.test,
           `adopter-path-test-${root}-${String(index + 1)}`,
           700,
           `${root}/${selector}`,
@@ -280,6 +285,7 @@ export function compileAdopterAuthorityExtension(input: {
       ...architectureSelectors.map((selector, index) =>
         classRule(
           input.repositoryId,
+          input.classWriteVerbs.architecture,
           `adopter-path-architecture-${root}-${String(index + 1)}`,
           750,
           `${root}/${selector}`,
@@ -368,6 +374,7 @@ export function resolveBoundAdopterAuthorityExtension(input: {
   readonly root: string;
   readonly repositoryId: string;
   readonly constitutionVersion: string;
+  readonly classWriteVerbs: ClassWriteVerbs;
   readonly validator?: typeof getValidator;
 }): BoundAdopterAuthorityExtension {
   const receiptPath = join(resolve(input.root), BINDING_RECEIPT);
@@ -424,6 +431,7 @@ export function resolveBoundAdopterAuthorityExtension(input: {
         constitutionVersion: input.constitutionVersion,
         defaultTestSelectors: loadAdopterAuthorityDefaultTestSelectors(validator),
         repositoryId: input.repositoryId,
+        classWriteVerbs: input.classWriteVerbs,
       });
     } catch (error) {
       return unavailable(

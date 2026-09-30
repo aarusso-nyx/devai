@@ -1,6 +1,7 @@
 import type { RegistryEntry } from '../define-command.js';
 import {
   authorityBindings,
+  classWriteVerbs,
   subjectGroups,
   POLICY_VERSION,
   canonicalBytes,
@@ -39,6 +40,7 @@ export function buildTrustedAuthoritySources(
     root,
     repositoryId,
     constitutionVersion: bindings.constitution_binding.version,
+    classWriteVerbs: classWriteVerbs(entries),
   });
   const adopterExtension = adopter.status === 'compiled' ? adopter.extension : undefined;
   const adopterRules = adopterExtension?.rules ?? [];
