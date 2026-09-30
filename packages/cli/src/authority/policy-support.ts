@@ -133,6 +133,48 @@ export function subjectGroups(entries: readonly RegistryEntry[]) {
   };
 }
 
+/** The registered write verbs of each adopter path class (ADR-AUT-0004). */
+export interface ClassWriteVerbs {
+  readonly root: readonly string[];
+  readonly test: readonly string[];
+  readonly architecture: readonly string[];
+}
+
+function classRoleWriteVerbs(entries: readonly RegistryEntry[], role: string): string[] {
+  return actionIds(entries, (entry) => {
+    const contract = entry.authority_contract;
+    if (!(contract.capabilities as readonly string[]).includes('fs:workspace')) return false;
+    const subject = contract.subject;
+    if (subject.kind === 'human')
+      return (subject.allowed_roles as readonly string[]).includes(role);
+    if (subject.kind === 'derived-machine' && subject.actor === 'harness') {
+      if (subject.initiator === 'none') return false;
+      const initiators: readonly string[] = subject.initiator.allowed_roles;
+      return initiators.length === 1 && initiators[0] === role;
+    }
+    return false;
+  });
+}
+
+/**
+ * ADR-AUT-0004: the write verbs each adopter path class carries, derived from the registry.
+ * A class role's set is every entry whose effect is not `read`, whose authority contract
+ * carries `fs:workspace`, and whose subject is the human subject admitting the role or the
+ * harness subject initiated by exactly that role. Root rules take the Engineer set, test
+ * rules the Inspector set, and architecture rules the Architect set; each set is sorted.
+ */
+export function classWriteVerbs(entries: readonly RegistryEntry[]): {
+  root: string[];
+  test: string[];
+  architecture: string[];
+} {
+  return {
+    root: classRoleWriteVerbs(entries, 'engineer'),
+    test: classRoleWriteVerbs(entries, 'inspector'),
+    architecture: classRoleWriteVerbs(entries, 'architect'),
+  };
+}
+
 export function machineSubject(actor: 'harness' | 'binding' | 'release') {
   return {
     kind: 'derived-machine',

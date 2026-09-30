@@ -46,6 +46,8 @@ import {
   type JsonObject,
 } from '../../services/adopter-policy.js';
 import { DEFAULT_REPO_ROOT, emit, type InitBindOptions } from './shared.js';
+import { classWriteVerbs } from '../../authority/policy-support.js';
+import { canonicalRegistry } from '../../define-command.js';
 
 function sha256Bytes(value: string | Buffer): string {
   return createHash('sha256').update(value).digest('hex');
@@ -196,6 +198,7 @@ function materializeAdopterPolicy(targetRoot: string, sourceArgument: string) {
   // from the authority policy once that is materialized (recordAuthorityExtension).
   const authorityExtension = compileAdopterPolicyAuthority(projectionInput, {
     repositoryId: 'adopter-repository',
+    classWriteVerbs: classWriteVerbs(canonicalRegistry()),
   });
   const receipt = {
     schemaVersion: '1.0.0',

@@ -14,6 +14,8 @@ import {
   compileAdopterAuthorityExtension,
   loadAdopterAuthorityDefaultTestSelectors,
 } from '../authority/policy-adopter-extension.js';
+import { type ClassWriteVerbs, classWriteVerbs } from '../authority/policy-support.js';
+import { canonicalRegistry } from '../define-command.js';
 
 export {
   ADOPTER_POLICY_OWNERSHIP_MATRIX,
@@ -91,7 +93,8 @@ function boundConstitutionVersion(targetRoot: string): string {
 
 /**
  * Compile the source's `authority` block, when declared, against the bound constitution of
- * `targetRoot` and the package default test selectors of the defaults law source. Returns
+ * `targetRoot`, the package default test selectors of the defaults law source, and the class
+ * write verbs the caller derives from its registry (ADR-AUT-0004). Returns
  * undefined for a source without the block; a refused block throws its ADOPTER_AUTHORITY_*
  * code. The rules carry the given repository id; their count, id, and version do not depend
  * on it, and the trusted authority sources compile the digest-bearing document themselves.
@@ -100,6 +103,7 @@ export function compileAdopterPolicyAuthority(
   input: AdopterPolicyProjectionInput,
   options: {
     readonly repositoryId: string;
+    readonly classWriteVerbs: ClassWriteVerbs;
     readonly validator?: typeof getValidator;
   },
 ): AdopterAuthorityExtension | undefined {
@@ -113,6 +117,7 @@ export function compileAdopterPolicyAuthority(
       input.constitutionVersion ?? boundConstitutionVersion(resolve(input.targetRoot ?? '.')),
     defaultTestSelectors: loadAdopterAuthorityDefaultTestSelectors(options.validator),
     repositoryId: options.repositoryId,
+    classWriteVerbs: options.classWriteVerbs,
   });
 }
 
@@ -149,7 +154,11 @@ export function resolveAdopterPolicyProjection(
   // A refused authority block raises its ADOPTER_AUTHORITY_* code before any target is
   // staged. The selectors' repository id is irrelevant to the refusal, so no identity
   // lookup (which may spawn git) is made here.
-  compileAdopterPolicyAuthority(input, { repositoryId: 'adopter-repository', validator });
+  compileAdopterPolicyAuthority(input, {
+    repositoryId: 'adopter-repository',
+    classWriteVerbs: classWriteVerbs(canonicalRegistry()),
+    validator,
+  });
   const defaults = (
     file: 'domains.json' | 'thresholds.json' | 'scorecard-na.json' | 'glob-guards.json',
   ) => JSON.parse(validateCanonicalPolicyContent(file, readPolicy(file), validator)) as JsonObject;

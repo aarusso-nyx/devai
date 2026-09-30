@@ -17,6 +17,8 @@ import {
 } from '../services/adopter-policy-binding.js';
 import { repositoryIdFor } from '../authority/policy.js';
 import { adopterAuthorityExtensionDigest } from '../authority/policy-adopter-extension.js';
+import { classWriteVerbs } from '../authority/policy-support.js';
+import { canonicalRegistry } from '../define-command.js';
 import {
   type CheckResult,
   F1_PATHS,
@@ -145,7 +147,10 @@ function compareAuthorityExtension(
   try {
     const extension = compileAdopterPolicyAuthority(
       { policy, currentProject: {}, frameworkVersion: resolveCliVersion(), targetRoot: repoRoot },
-      { repositoryId: repositoryIdFor(repoRoot) },
+      {
+        repositoryId: repositoryIdFor(repoRoot),
+        classWriteVerbs: classWriteVerbs(canonicalRegistry()),
+      },
     );
     if (extension === undefined) throw new Error('authority block compiled to no extension');
     fresh = {
