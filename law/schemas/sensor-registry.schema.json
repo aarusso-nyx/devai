@@ -124,6 +124,10 @@
         "diagnostic": {
           "const": true
         },
+        "schema_admission": {
+          "enum": ["admitted", "unsupported"],
+          "description": "Schema admission of this kind under ADR-SCR-0011. Absent or admitted: the kind must be in the sensor.kind enum of the packaged law/schemas/sensor-reading.schema.json, and every kind a preset can select is admitted. unsupported: the runner refuses the sensor before it starts with SENSOR_KIND_SCHEMA_UNSUPPORTED and never emits a reading for it."
+        },
         "tiers": {
           "type": "array",
           "minItems": 1,
