@@ -760,7 +760,7 @@
       "id": "R-0503",
       "title": "Doctor drift, migration, and adoption rehearsal",
       "goal": "Doctor names an adopter extension whose source drifted, vanished, or was never rebound and prints the rebind command; the migration for existing adopters is documented and rehearsed from the packed tarball in a disposable clone that reproduces the matrix through the installed bin; the release that carries the campaign is published and DETRAN is told the version.",
-      "status": "open",
+      "status": "closing",
       "records": ["ADR-AUT-0003", "ADR-AUT-0004"],
       "depends_on": ["R-0502"],
       "attestation_reissue": false,
@@ -1086,7 +1086,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "in_progress",
+              "status": "merged",
               "target_substrates": ["F1"],
               "boundary": {
                 "paths": ["docs/adopters/path-authority.md", "docs/dev/operations/testing.md"],
@@ -1120,7 +1120,7 @@
                 "sha256": "05b7301d9ebadd4345c42f974a017a283632fa0caaa865ba7a11b90003ea3c08"
               },
               "pull_request": null,
-              "merged_as": null,
+              "merged_as": "e5e54277839b83c4c09b7ca6c25a647b59187868",
               "execution": {
                 "tier": "architect",
                 "effort": "medium",
@@ -1172,7 +1172,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0534",
-              "status": "in_progress",
+              "status": "merged",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -1218,7 +1218,7 @@
                 "sha256": "72a38779c2a2b17a5e812ef43642d9550a43f70e2d4bd7ab31daad09a79715f8"
               },
               "pull_request": null,
-              "merged_as": null,
+              "merged_as": "e5e54277839b83c4c09b7ca6c25a647b59187868",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -1270,7 +1270,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0535",
-              "status": "in_progress",
+              "status": "merged",
               "target_substrates": ["F2", "F5"],
               "boundary": {
                 "paths": [
@@ -1323,7 +1323,7 @@
                 "sha256": "adc631bc2c65fa88a973c93b2bde895c6585732a65a39b96d83b023f0c08df20"
               },
               "pull_request": null,
-              "merged_as": null,
+              "merged_as": "e5e54277839b83c4c09b7ca6c25a647b59187868",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
