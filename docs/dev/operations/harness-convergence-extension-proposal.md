@@ -123,7 +123,7 @@ change that deserves its own review.
 - This is small enough to land as a fix under an existing record if the
   Architect prefers. It is listed here so it is not lost.
 
-### ADR-AUT-0003: governed path authority for adopter repositories (#186)
+### A future AUT-scope record: governed path authority for adopter repositories (#186)
 
 Deferred as a design task. What the record must decide, from the issue:
 
@@ -151,7 +151,7 @@ Deferred as a design task. What the record must decide, from the issue:
 | ------ | ------------------------------------------------ | ---------------------------------------- | ---------------- |
 | R-0308 | Adopter unblock: schema, release, seal status    | ADR-SCR-0011, ADR-REL-0033, ADR-EVI-0003 | #184, #185, #175 |
 | R-0309 | Check applicability                              | ADR-CHK-0005                             | #187             |
-| R-0310 | Governed path authority (or a separate campaign) | ADR-AUT-0003                             | #186             |
+| R-0310 | Governed path authority (or a separate campaign) | a future AUT record                      | #186             |
 
 Each round follows the existing three-task pattern: a documentation task, a
 proof task, and an implementation task. R-0308 splits into two waves, one for
