@@ -60,6 +60,7 @@ summarized in the proposals document's reconciliation section.
 | R-0307 | ADR-GOV-0021                             | One page per workflow under a completeness gate; generated ADR catalogue; stale statements corrected                                                                     |
 | R-0308 | ADR-SCR-0011, ADR-REL-0033, ADR-EVI-0003 | The sweep emits a schema-valid reading for every read kind; a packed candidate proves the scorecard route in a disposable adopter; `round status` reports a sealed round |
 | R-0309 | ADR-CHK-0005                             | Every check member declares where it applies; a framework-only member reports `not-applicable` in an adopter, never an empty PASS or an ENOENT                           |
+| R-0310 | ADR-CHK-0003, ADR-CHK-0004               | An Owner effect resolved by its fallback is recorded with `outcome: fallback`; the round that requires it closes while the checker keeps serialized admission in force   |
 
 ## 3. Owner effects
 
@@ -134,6 +135,12 @@ Recorded on 2026-09-29, after R-0301 reached `closing` and R-0302 opened:
    now and leaves option B to a later record. OE-05 is the PASS reply the
    evaluator returned for `90d5fc7d`, rejected by the Owner. #186 becomes a
    campaign of its own, proposed after R-0302, not a round of this one.
+8. **OE-07 executed and R-0310 authorized (2026-09-30).** The Owner authorized
+   the release that OE-07 names (rolled to 1.7.0, the bump floor since
+   `v1.6.0` being `minor`) and a plan-and-law round, R-0310, that gives every
+   Owner effect an `outcome` (`performed` or `fallback`) so the checker keeps
+   serialized admission in force under the fallback while the round that
+   requires the effect closes; OE-01 is recorded that way and R-0304 closed.
 
 ## 6. Round log
 
@@ -149,12 +156,13 @@ detached worktree at the merged head after `pnpm run build` and
 | R-0301 | `e5cfdb77`  | #173, #176, #194 | `closed`: the check-suite declaration (decision 3) merged as #194 (`722cb5a6`) after the Owner accepted its broker widening; the single RC attestation ran on that head and its task-policy digest is in the closure                                                                                                   |
 | R-0302 | `12d52fa5`  | #179, #181       | `closed`: close checks green on the merged head; `test-tasks.json` unchanged, so no attestation is owed                                                                                                                                                                                                                |
 | R-0303 | `0a66e13a`  | #183             | `closed`: close checks green on the merged head (990 skills tests, 3480 CLI tests); the eight-receipt acceptance was proven in the wave                                                                                                                                                                                |
-| R-0304 | `468de683`  | #188             | `closing`: OE-01 resolved by the serialized fallback (decision 5), which the ledger cannot yet record as performed without disabling the serialized-admission check; the RC task-policy digest of the run on `722cb5a6` is `4d284d80`                                                                                  |
+| R-0304 | `468de683`  | #188, #206       | `closed`: OE-01 recorded as `performed_at` with `outcome: fallback` once R-0310 landed (decision 8); the RC task-policy digest of the run on `722cb5a6` is in the closure                                                                                                                                              |
 | R-0305 | `04b141fe`  | #189, #190, #191 | `closed`: review mode, the versioned tier default, pinned resolution, the shared reply extractor; the attestation is covered by the run on `722cb5a6`; OE-05 performed with the fixture `cmp-0003-rejected-pass.txt`                                                                                                   |
 | R-0306 | `5eda694f`  | #192, #193       | `closed`: OE-02, OE-03, and OE-04 performed on 2026-09-29 (control commit `722cb5a6`; the audit for tag v1.6.0 reissued against it)                                                                                                                                                                                    |
 | R-0307 | `90d5fc7d`  | #195             | `closed`: OE-06 performed (Claude Code 2.1.277); the three `FORBID-CI-WITHOUT-ADR` findings on its law commits carry Owner receipts in `law/policy/forbidden-action-authorizations.json`                                                                                                                               |
 | R-0308 | `bda28a33`  | #199, #200, #201 | `closing`: the four adopter records accepted (#199); wave CTG-0382 (#175) merged as #200 and wave CTG-0381 (#184, #185) as #201; close checks green on the merged head (`schemas` pass, `test:sensors` 1124, `test:loop` 1052, `test:cli` 3510, `release:static-integrity` ok); waits for OE-07                        |
 | R-0309 | `1587a0a9`  | #202, #203       | `closed`: wave CTG-0391 (#187) merged as #203; every member declares applicability, a self member reports `not-applicable` in an adopter, the repository kind comes from the binding receipt and fails closed when unbound; close checks green on the merged head (`schemas` pass, `docs-links` pass, `test:cli` 3557) |
+| R-0310 | `b8c975f5`  | #206             | `closed`: wave CTG-03101 merged as #206 (schema `outcome`, policy 1.3.0, 28 contract cases, checker reads the outcome); close checks green on the merged head (`schemas` pass, `test:root` 946, campaign check ok)                                                                                                     |
 
 Backlog observed while closing R-0302 and R-0303, outside every task boundary:
 
@@ -227,7 +235,7 @@ Backlog observed while performing the Owner effects and the OE-05 experiment
   remedy was to delete the cache entry and rerun. The fix is a `ci` task under
   ADR-CHK-0003: cache the workspace `dist` outputs with the runner, or make
   the runner self-contained.
-- An Owner effect has no outcome field. OE-01 was resolved by its fallback,
+- Resolved by R-0310 (decision 8): an Owner effect had no outcome field. OE-01 was resolved by its fallback,
   but `performed_at` is the only state the schema offers, and both the
   campaign checker (`scripts/check-campaign.mjs`) and the contract test
   `tests/contract/campaign-plan.contract.test.ts` read it as "the merge queue
@@ -262,8 +270,9 @@ State on 2026-09-30, after the round-closure commits were rebased onto the
 extension (`dd5c3a69`): every task of R-0301 to R-0307 is `merged`; six rounds
 are `closed` and R-0304 is `closing` (decision 5); R-0308 and R-0309 are
 `planned`. OE-02 to OE-06 are recorded as performed and OE-01 stays
-unperformed by design; R-0309 closed on 2026-09-30 and R-0308 waits for
-OE-07; OE-05 is the fixture
+unperformed until R-0310 gave it `outcome: fallback`; R-0304, R-0309, and R-0310
+closed on 2026-09-30; R-0308 waits for OE-07, whose release 1.7.0 rolled over
+as #205 and entered rehearsal; OE-05 is the fixture
 `tests/fixtures/review-replies/cmp-0003-rejected-pass.txt`, the `pass` reply
 (confidence 0.83) the `claude-cli:opus` evaluator returned for `90d5fc7d`
 through the bridge transport, which the Owner rejected on 2026-09-30; the
