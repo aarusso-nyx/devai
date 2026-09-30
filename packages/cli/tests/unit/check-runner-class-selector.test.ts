@@ -3,8 +3,18 @@
 // assigns to that class; a path no binding covers still widens to the declared
 // fallback; and a plan-class-only change plans no node that executes package
 // code (vitest, coverage, or the build script).
-import { execFileSync } from 'node:child_process';
-import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+//
+// ADR-CHK-0006, Inspector Adversarial Acceptance IA-001 and IA-003: the class
+// kind stays supported by the policy layer under a fixture descriptor, never
+// the committed one, which may not use it while the pinned trusted verifier
+// does not admit it. selectorMatches resolves a class selector through the
+// classifier and refuses one without it; parseTaskDescriptor admits a class
+// selector naming a declared change class and refuses any other; and the
+// descriptor check refuses the same fixture under the pinned policy with
+// TEST_TASK_SELECTOR_KIND_UNADMITTED. That last case is red until TASK-03113
+// teaches scripts/check-test-task-workspace-selectors.mjs the declared set.
+import { execFileSync, spawnSync } from 'node:child_process';
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import {
@@ -13,7 +23,11 @@ import {
   type AuthorityHostEffectScope,
 } from '@devai-nyx/authority';
 import { afterEach, describe, expect, it } from 'vitest';
-import { buildTaskPlan } from '../../src/services/check-runner/policy.js';
+import {
+  buildTaskPlan,
+  parseTaskDescriptor,
+  selectorMatches,
+} from '../../src/services/check-runner/policy.js';
 import type { TaskDescriptor } from '../../src/services/check-runner/types.js';
 
 const REPOSITORY_ROOT = resolve(import.meta.dirname, '../../../..');
@@ -26,6 +40,8 @@ const PLAN_PATH = 'product/campaigns/CMP-9999-fixture/campaign.json';
 const CODE_PATH = 'packages/cli/src/services/fixture.ts';
 const UNBOUND_PATH = 'notes/unbound.txt';
 const CODE_RUNNERS = new Set(['vitest-v1', 'vitest-coverage-v1']);
+const VERIFIER_POLICY_PATH = 'law/policy/trusted-local-rc-verifier-package.json';
+const DESCRIPTOR_CHECK = join(REPOSITORY_ROOT, 'scripts/check-test-task-workspace-selectors.mjs');
 
 const roots: string[] = [];
 afterEach(() => roots.splice(0).forEach((root) => rmSync(root, { recursive: true, force: true })));
@@ -114,9 +130,9 @@ function node(
 
 // The class selector kind is declared in law/schemas/test-task-descriptor.schema.json
 // but not yet in the InputSelector type, so the fixture is built untyped and cast.
-function descriptorFixture(): TaskDescriptor {
+function rawDescriptorFixture() {
   const packages = [{ kind: 'prefix', pattern: 'packages/' }];
-  const descriptor = {
+  return {
     schemaVersion: '1.0.0',
     descriptorVersion: 'class-selector-fixture',
     repositoryId: 'fixture/repo',
@@ -150,7 +166,10 @@ function descriptorFixture(): TaskDescriptor {
       },
     ],
   };
-  return descriptor as unknown as TaskDescriptor;
+}
+
+function descriptorFixture(): TaskDescriptor {
+  return rawDescriptorFixture() as unknown as TaskDescriptor;
 }
 
 function plannedNodes(root: string, base: string): readonly string[] {
@@ -209,5 +228,63 @@ describe('check-runner class selector (ADR-GOV-0017)', () => {
       return CODE_RUNNERS.has(runner) || (runner === 'pnpm-script-v1' && nodeId === 'build');
     });
     expect(codeNodes).toEqual([]);
+  });
+});
+
+describe('class selector support in the policy layer (ADR-CHK-0006 IA-003)', () => {
+  const planSelector = { kind: 'class', pattern: 'plan' } as const;
+  const classify = (path: string) => (path.startsWith('product/') ? 'plan' : 'code');
+
+  it('matches a class selector through the classifier', () => {
+    expect(selectorMatches(planSelector, PLAN_PATH, classify)).toBe(true);
+    expect(selectorMatches(planSelector, CODE_PATH, classify)).toBe(false);
+  });
+
+  it('refuses a class selector evaluated without a classifier', () => {
+    expect(() => selectorMatches(planSelector, PLAN_PATH)).toThrow(
+      'CHECK_RUNNER_CLASS_SELECTOR_UNRESOLVED: plan',
+    );
+  });
+
+  it('admits a class selector naming a declared change class in a fixture descriptor', () => {
+    const parsed = parseTaskDescriptor(rawDescriptorFixture());
+    const planValidate = parsed.tasks.find((task) => task.nodeId === 'plan:validate');
+    expect(planValidate?.inputSelectors).toEqual([planSelector]);
+  });
+
+  it('refuses a class selector naming no declared change class', () => {
+    const raw = rawDescriptorFixture();
+    const tasks = raw.tasks.map((task) =>
+      task.nodeId === 'plan:validate'
+        ? { ...task, inputSelectors: [{ kind: 'class', pattern: 'not-a-class' }] }
+        : task,
+    );
+    expect(() => parseTaskDescriptor({ ...raw, tasks })).toThrow(
+      'CHECK_RUNNER_DESCRIPTOR: malformed task plan:validate',
+    );
+  });
+
+  it('is refused by the descriptor check while the pinned verifier does not admit it', () => {
+    const root = mkdtempSync(join(tmpdir(), 'devai-class-selector-check-'));
+    roots.push(root);
+    mkdirSync(join(root, 'packages'), { recursive: true });
+    put(root, 'package.json', '{"name":"fixture","private":true}\n');
+    mkdirSync(dirname(join(root, VERIFIER_POLICY_PATH)), { recursive: true });
+    copyFileSync(join(REPOSITORY_ROOT, VERIFIER_POLICY_PATH), join(root, VERIFIER_POLICY_PATH));
+    const bytes = `${JSON.stringify(rawDescriptorFixture(), null, 2)}\n`;
+    put(root, 'test-tasks.json', bytes);
+    const result = spawnSync(process.execPath, [DESCRIPTOR_CHECK, '--check'], {
+      cwd: root,
+      encoding: 'utf8',
+    });
+    const output = `${result.stdout}${result.stderr}`;
+    expect(result.status, output).not.toBe(0);
+    const line = output
+      .split('\n')
+      .find((entry) => entry.includes('TEST_TASK_SELECTOR_KIND_UNADMITTED'));
+    expect(line, output).toBeDefined();
+    expect(line).toContain('plan:validate');
+    expect(line).toContain('class');
+    expect(readFileSync(join(root, 'test-tasks.json'), 'utf8')).toBe(bytes);
   });
 });

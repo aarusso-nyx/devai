@@ -1,10 +1,14 @@
 // ADR-CHK-0003, Inspector Adversarial Acceptance IA-001, IA-002, and IA-005
-// (plan side): the check runner selects the planning lane from the change
-// taxonomy, never from a workflow path filter.
+// (plan side), and ADR-CHK-0006 IA-003: the check runner selects the planning
+// lane from the change taxonomy, never from a workflow path filter, and never
+// from a class selector in the descriptor.
 //
 // Each case builds a fixture repository that carries the framework's own
 // taxonomy files, commits a candidate diff, and plans the repository's real
-// test-tasks.json with the affected target through buildTaskPlan.
+// test-tasks.json with the affected target through buildTaskPlan. The planned
+// descriptor holds no class selector: any class selector the committed
+// descriptor still carries is replaced in place by its change-taxonomy binding
+// expansion, which is the committed shape ADR-CHK-0006 requires.
 //
 // - A diff whose paths all classify as plan (product/, record/, work/) plans
 //   exactly the planning lane: the preflight nodes, plan:validate with its
@@ -13,6 +17,11 @@
 // - A diff that also touches a path of another class, or that renames or
 //   deletes a plan-class path, plans the affected profile, whatever the
 //   candidate does to the workflow path filter or to the taxonomy binding.
+//
+// Red until TASK-03113: policy-descriptor.ts loads the taxonomy classifier only
+// when the descriptor holds a class selector, so a descriptor without one never
+// selects the planning lane (the three planning-lane cases), and the committed
+// plan:validate still selects by class.
 import { execFileSync } from 'node:child_process';
 import {
   copyFileSync,
@@ -52,13 +61,53 @@ const PACKAGE_SOURCE_PATH = 'packages/cli/src/services/fixture.ts';
 const EXCLUDED_NODES = ['generate', 'build'] as const;
 const PREFLIGHT_RUNNER = 'preflight-v1';
 
+type Selector = Readonly<{ kind: string; pattern: string }>;
+type Binding = Readonly<{ bindings: readonly Readonly<{ selector: Selector; class: string }>[] }>;
+
 const roots: string[] = [];
 afterEach(() => roots.splice(0).forEach((root) => rmSync(root, { recursive: true, force: true })));
 
+function readRepositoryJson<T>(path: string): T {
+  return JSON.parse(readFileSync(join(REPOSITORY_ROOT, path), 'utf8')) as T;
+}
+
+/** The binding entries of one class, as selectors, in the binding's order. */
+function classExpansion(changeClass: string): readonly Selector[] {
+  return readRepositoryJson<Binding>(BINDING_PATH)
+    .bindings.filter((entry) => entry.class === changeClass)
+    .map((entry) => ({ kind: entry.selector.kind, pattern: entry.selector.pattern }));
+}
+
+type RawDescriptor = Readonly<{
+  dynamicFallbackSelectors: readonly Selector[];
+  tasks: readonly Readonly<{ nodeId: string; inputSelectors: readonly Selector[] }>[];
+}>;
+
+function withoutClassSelectors(raw: RawDescriptor): RawDescriptor {
+  const expand = (selectors: readonly Selector[]): readonly Selector[] =>
+    selectors.flatMap((selector) =>
+      selector.kind === 'class' ? classExpansion(selector.pattern) : [selector],
+    );
+  return {
+    ...raw,
+    dynamicFallbackSelectors: expand(raw.dynamicFallbackSelectors),
+    tasks: raw.tasks.map((task) => ({ ...task, inputSelectors: expand(task.inputSelectors) })),
+  };
+}
+
+function classSelectorsOf(raw: RawDescriptor): readonly string[] {
+  return [...raw.dynamicFallbackSelectors, ...raw.tasks.flatMap((task) => task.inputSelectors)]
+    .filter((selector) => selector.kind === 'class')
+    .map((selector) => selector.pattern);
+}
+
+let plannedDescriptor: TaskDescriptor | undefined;
+/** The committed descriptor with no class selector (ADR-CHK-0006). */
 function descriptor(): TaskDescriptor {
-  return parseTaskDescriptor(
-    JSON.parse(readFileSync(join(REPOSITORY_ROOT, 'test-tasks.json'), 'utf8')) as unknown,
+  plannedDescriptor ??= parseTaskDescriptor(
+    withoutClassSelectors(readRepositoryJson<RawDescriptor>('test-tasks.json')),
   );
+  return plannedDescriptor;
 }
 
 let invocationOrdinal = 0;
@@ -230,11 +279,14 @@ function expectAffectedProfile(nodes: readonly string[], label: string): void {
 }
 
 describe('check-runner planning lane (ADR-CHK-0003)', () => {
-  it('binds plan:validate to the plan class with a class selector', () => {
-    expect(taskById('plan:validate').inputSelectors).toContainEqual({
-      kind: 'class',
-      pattern: 'plan',
-    });
+  it('plans a descriptor that holds no class selector (ADR-CHK-0006 IA-003)', () => {
+    expect(classSelectorsOf(descriptor() as unknown as RawDescriptor)).toEqual([]);
+  });
+
+  it('binds committed plan:validate to the plan expansion, not a class selector', () => {
+    const committed = readRepositoryJson<RawDescriptor>('test-tasks.json');
+    const planValidate = committed.tasks.find((task) => task.nodeId === 'plan:validate');
+    expect(planValidate?.inputSelectors).toEqual(classExpansion('plan'));
   });
 
   it('plans exactly the planning lane for a diff of one prompt and the ledger (IA-001)', () => {
