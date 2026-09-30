@@ -25,6 +25,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
+import { parse } from 'yaml';
 
 const ROOT = resolve(import.meta.dirname, '../..');
 interface WorkflowFinding {
@@ -57,6 +58,34 @@ const WORKFLOWS_USING_SHARED_SETUP = [
   'release.yml',
   'site-publish.yml',
 ] as const;
+// release.yml jobs that check the repository out under a path (candidate/ or
+// release-control/) rather than at the workspace root: a local action cannot
+// resolve there, so their Node setup is the inline pinned actions/setup-node
+// step, never the shared composite (release fix of pull request #208).
+const PATH_CHECKOUT_RELEASE_JOBS = ['verify-ledger', 'deploy-pages'] as const;
+// Root-checkout release.yml jobs that keep the shared composite.
+const ROOT_CHECKOUT_RELEASE_JOBS = ['build-release', 'finalize-release'] as const;
+const BUILD_RELEASE_SETUP_STEP = 'name: Set up pnpm and Node with GitHub Packages';
+
+type WorkflowStep = Readonly<{ uses?: unknown; with?: Readonly<Record<string, unknown>> }>;
+
+function releaseJobSteps(job: string): readonly WorkflowStep[] {
+  const workflow = parse(readFileSync(join(WORKFLOWS_DIR, 'release.yml'), 'utf8')) as {
+    jobs?: Record<string, { steps?: WorkflowStep[] }>;
+  };
+  const steps = workflow.jobs?.[job]?.steps;
+  expect(steps, `release.yml declares jobs.${job}.steps`).toBeDefined();
+  return steps ?? [];
+}
+
+/** The actions/setup-node pin the shared composite action carries. */
+function compositeSetupNodePin(): string {
+  const match = /uses: (actions\/setup-node@[0-9a-f]{40})/u.exec(
+    readFileSync(COMPOSITE_ACTION_FILE, 'utf8'),
+  );
+  expect(match, 'the composite action pins actions/setup-node').not.toBeNull();
+  return match?.[1] ?? '';
+}
 
 const roots: string[] = [];
 afterEach(() => roots.splice(0).forEach((root) => rmSync(root, { recursive: true, force: true })));
@@ -173,17 +202,91 @@ describe('composite action pins are validated the same way inline steps are', ()
     const path = join(root, '.github/workflows/release.yml');
     mutateFile(
       path,
-      'uses: ./.github/actions/setup-node-toolchain\n      - name: Probe declared credential prerequisites',
-      'uses: ./.github/actions/some-other-action\n      - name: Probe declared credential prerequisites',
+      `${BUILD_RELEASE_SETUP_STEP}\n        uses: ${SHARED_SETUP_ACTION}\n`,
+      `${BUILD_RELEASE_SETUP_STEP}\n        uses: ./.github/actions/some-other-action\n`,
     );
 
     const result = checkWorkflowTree(root);
 
     const named = result.findings.find(
-      (item) => item.file === 'release.yml' && item.code === 'CI_ACTION_REFERENCE_MUTABLE',
+      (item) =>
+        item.file === 'release.yml' &&
+        item.code === 'CI_ACTION_REFERENCE_MUTABLE' &&
+        item.detail.includes('build-release') &&
+        item.detail.includes('./.github/actions/some-other-action'),
     );
     expect(named, JSON.stringify(result.findings)).toBeDefined();
   });
+
+  it('still forbids a local action other than the shared composite in pull-request-checks.yml', () => {
+    const root = fixture();
+    const path = join(root, '.github/workflows/pull-request-checks.yml');
+    mutateFile(
+      path,
+      `uses: ${SHARED_SETUP_ACTION}\n`,
+      'uses: ./.github/actions/some-other-action\n',
+    );
+
+    const result = checkWorkflowTree(root);
+
+    const named = result.findings.find(
+      (item) =>
+        item.file === 'pull-request-checks.yml' &&
+        item.code === 'CI_CANDIDATE_LOCAL_VERIFIER_FORBIDDEN' &&
+        item.detail.includes('./.github/actions/some-other-action'),
+    );
+    expect(named, JSON.stringify(result.findings)).toBeDefined();
+  });
+
+  it('flags a divergent inline actions/setup-node pin in the verify-ledger job', () => {
+    const root = fixture();
+    const path = join(root, '.github/workflows/release.yml');
+    const pin = compositeSetupNodePin();
+    mutateFile(
+      path,
+      `name: Set up verifier runtime\n        uses: ${pin}\n`,
+      `name: Set up verifier runtime\n        uses: actions/setup-node@${'f'.repeat(40)}\n`,
+    );
+
+    const result = checkWorkflowTree(root);
+
+    const named = result.findings.find(
+      (item) =>
+        item.file === 'release.yml' &&
+        item.code === 'CI_ACTION_PIN_MISMATCH' &&
+        item.detail.includes('verify-ledger') &&
+        item.detail.includes('f'.repeat(40)),
+    );
+    expect(named, JSON.stringify(result.findings)).toBeDefined();
+  });
+});
+
+describe('release.yml sets Node up by checkout shape', () => {
+  it.each(PATH_CHECKOUT_RELEASE_JOBS)(
+    '%s, which checks out under a path, uses the inline pinned actions/setup-node step and no local action',
+    (job) => {
+      const steps = releaseJobSteps(job);
+      const uses = steps.map((step) => (typeof step.uses === 'string' ? step.uses : ''));
+      expect(
+        uses.filter((reference) => reference.startsWith('./')),
+        `${job} references no local action`,
+      ).toEqual([]);
+      const setup = steps.filter((step) => step.uses === compositeSetupNodePin());
+      expect(setup, `${job} carries one inline pinned actions/setup-node step`).toHaveLength(1);
+      expect(String(setup[0]?.with?.['node-version'])).toBe('24');
+    },
+  );
+
+  it.each(ROOT_CHECKOUT_RELEASE_JOBS)(
+    '%s, which checks out at the workspace root, delegates setup to the shared composite',
+    (job) => {
+      const uses = releaseJobSteps(job).map((step) => step.uses);
+      expect(uses).toContain(SHARED_SETUP_ACTION);
+      expect(
+        uses.filter((reference) => String(reference).startsWith('actions/setup-node@')),
+      ).toEqual([]);
+    },
+  );
 });
 
 describe('concurrency and permissions blocks are uniform across the four workflows', () => {
