@@ -3288,7 +3288,7 @@
       "id": "R-0309",
       "title": "Check member applicability in adopters",
       "goal": "Every check member declares where it applies; a framework-only member run in an adopter returns a structured not-applicable result that is distinct from PASS, REVIEW, and execution error and stable across reruns; missing required adopter inputs, malformed explicit inputs, and genuine self-check failures stay failures; no empty population reports ok.",
-      "status": "closing",
+      "status": "closed",
       "records": ["ADR-CHK-0005"],
       "depends_on": ["R-0301"],
       "attestation_reissue": false,
@@ -3608,7 +3608,12 @@
           ]
         }
       ],
-      "closure": null
+      "closure": {
+        "merged_head": "1587a0a99ab8ce0fd25a6a4cf062978384635319",
+        "closed_at": "2026-09-30T04:24:56Z",
+        "task_policy_digest": null,
+        "phase_closure": null
+      }
     }
   ]
 }
