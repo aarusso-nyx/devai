@@ -326,20 +326,30 @@ export const roundStatus = defineCommand({
       (options: RoundOptions) => {
         try {
           const round = requiredRound(options);
-          let lifecycle: unknown;
+          const repoRoot = root(options);
+          let lifecycle: { readonly location: string; readonly [key: string]: unknown };
           try {
-            lifecycle = governedRoundStatus({ repoRoot: root(options), round });
-          } catch {
-            lifecycle = {
-              id: requireActiveTaskRound({ repoRoot: root(options), round }),
-              location: 'active',
-            };
+            lifecycle = governedRoundStatus({ repoRoot, round });
+          } catch (error) {
+            // Named lifecycle failures (missing round, conflicting close state) surface as is.
+            if (error instanceof Error && /^ROUND_[A-Z0-9_]+$/u.test(error.message)) throw error;
+            lifecycle = { id: requireActiveTaskRound({ repoRoot, round }), location: 'active' };
           }
-          const tasks = roundTaskStatus({ repoRoot: root(options), round });
+          let tasks: ReturnType<typeof roundTaskStatus> | undefined;
+          try {
+            tasks = roundTaskStatus({ repoRoot, round });
+          } catch (error) {
+            // An inactive or sealed task round omits the summary; other failures surface.
+            if (!(error instanceof TaskServiceError) || error.code !== 'TASK_ROUND_INACTIVE') {
+              throw error;
+            }
+          }
           emit(
-            { lifecycle, tasks },
+            tasks === undefined ? { lifecycle } : { lifecycle, tasks },
             options.human === true,
-            `round status: ${tasks.round_id}; ${String(tasks.count)} task(s)`,
+            tasks === undefined
+              ? `round status: ${round}; ${lifecycle.location}`
+              : `round status: ${tasks.round_id}; ${String(tasks.count)} task(s)`,
           );
         } catch (error) {
           failure('status', error);
