@@ -39,7 +39,7 @@
       "id": "OE-01",
       "description": "Verify that the merge queue supports the rebase method with linear history and the required devai-release-gate check, then enable it on main; allow_update_branch is optional. If the queue is incompatible, record the serialized-admission fallback instead.",
       "required_before": "R-0304",
-      "performed_at": "2026-09-29T21:41:52Z"
+      "performed_at": null
     },
     {
       "id": "OE-02",
@@ -939,7 +939,7 @@
       "id": "R-0304",
       "title": "Serialized integration",
       "goal": "The pull-request gate runs under merge_group with the queue's base and head, admission and eviction are documented, and the merge queue or the serialized fallback is the mechanism that keeps pull requests from invalidating each other.",
-      "status": "closed",
+      "status": "closing",
       "records": ["ADR-CHK-0004"],
       "depends_on": ["R-0301"],
       "attestation_reissue": false,
@@ -1116,12 +1116,7 @@
           ]
         }
       ],
-      "closure": {
-        "merged_head": "468de683d953f9ccc416919775c68e6901a806e5",
-        "closed_at": "2026-09-29T22:00:59Z",
-        "task_policy_digest": "4d284d804badf9b0971313a65af8539dc380160fc724555bac2ba1872d1cd5d1",
-        "phase_closure": null
-      }
+      "closure": null
     },
     {
       "id": "R-0305",
