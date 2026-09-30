@@ -11,7 +11,7 @@
     "ref": "docs/dev/operations/multi-stack-path-authority-proposal.md"
   },
   "goal": "Give adopter repositories a governed, versioned, digest-bound source of path authority for their own application roots: Article 6 is amended to admit client extensions by declared root and path class (ADR-GOV-0024), the adopter policy gains an authority block compiled into a second additive extension of the trusted authority sources with a fixed class ladder (architecture over test over root), init bind materializes it into authority-policy.json with receipt provenance, the broker decides the DETRAN acceptance matrix as real rules, Doctor and the runtime refuse drift, and a packed-adopter rehearsal proves the migration before a release carries it to DETRAN CTG-0005 (issue #186).",
-  "records": ["ADR-GOV-0024", "ADR-AUT-0003"],
+  "records": ["ADR-GOV-0024", "ADR-AUT-0003", "ADR-AUT-0004"],
   "constraints": {
     "self_dogfood": true,
     "human_invoked_only": true,
@@ -761,7 +761,7 @@
       "title": "Doctor drift, migration, and adoption rehearsal",
       "goal": "Doctor names an adopter extension whose source drifted, vanished, or was never rebound and prints the rebind command; the migration for existing adopters is documented and rehearsed from the packed tarball in a disposable clone that reproduces the matrix through the installed bin; the release that carries the campaign is published and DETRAN is told the version.",
       "status": "planned",
-      "records": ["ADR-AUT-0003"],
+      "records": ["ADR-AUT-0003", "ADR-AUT-0004"],
       "depends_on": ["R-0502"],
       "attestation_reissue": false,
       "owner_effects_required": ["OE-02"],
@@ -777,6 +777,7 @@
             "packages/cli/src/commands/doctor-policy-checks.ts",
             "packages/cli/src/commands/doctor-install-checks.ts",
             "packages/cli/scripts/installed-tarball-smoke.mjs",
+            "packages/cli/scripts/assemble-package.mjs",
             "docs/adopters/path-authority.md",
             "docs/dev/operations/testing.md"
           ],
@@ -897,6 +898,7 @@
                   "packages/cli/src/commands/doctor-policy-checks.ts",
                   "packages/cli/src/commands/doctor-install-checks.ts",
                   "packages/cli/scripts/installed-tarball-smoke.mjs",
+                  "packages/cli/scripts/assemble-package.mjs",
                   "docs/reference/error-codes.md"
                 ],
                 "forbidden": [
@@ -911,7 +913,8 @@
               },
               "deliverables": [
                 "policy-materialization-current compares the receipt's authority_extension with a fresh compilation of the bound source and reports AUTHORITY_EXTENSION_DRIFT, AUTHORITY_EXTENSION_UNBOUND, or AUTHORITY_EXTENSION_SOURCE_MISSING with the rebind command; authority-enforcement reports the adopter extension's id, version, and digest and names the extension when the policy binding mismatches; the codes are listed in docs/reference/error-codes.md.",
-                "packages/cli/scripts/installed-tarball-smoke.mjs binds the reference source in its disposable adopter after the constitution rebind, asserts the authority_extension receipt field and the second additive_extensions entry, and drives one allow and one deny of the matrix through the installed bin, so pack:smoke fails when a published package cannot enforce the extension."
+                "packages/cli/scripts/installed-tarball-smoke.mjs binds the reference source in its disposable adopter after the constitution rebind, asserts the authority_extension receipt field and the second additive_extensions entry, and drives one allow and one deny of the matrix through the installed bin, so pack:smoke fails when a published package cannot enforce the extension.",
+                "packages/cli/scripts/assemble-package.mjs copies law/policy/adopter-defaults/path-authority-classes.json into dist/law/policy/adopter-defaults/ and lists it among the required assets, so the installed bin resolves the default test selectors instead of failing with ADOPTER_AUTHORITY_DEFAULTS_UNAVAILABLE, as the R-0502 Engineer found on the packed tarball."
               ],
               "acceptance_commands": [
                 [
@@ -930,6 +933,197 @@
               "commit_types": ["feat(doctor)", "feat(cli)", "docs(reference)"],
               "prompt": {
                 "path": "prompts/TASK-0533.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 150
+              }
+            }
+          ]
+        },
+        {
+          "id": "CTG-0532",
+          "title": "Class write verbs and the matrix under the registered entries",
+          "type": "coupled-triplet",
+          "records": ["ADR-AUT-0004"],
+          "depends_on": ["CTG-0531"],
+          "lock_scopes": [
+            "packages/cli/src/authority/",
+            "packages/cli/src/services/adopter-policy.ts",
+            "packages/cli/src/commands/init/bind-adapters.ts",
+            "packages/cli/src/commands/doctor-policy-checks.ts",
+            "packages/cli/scripts/installed-tarball-smoke.mjs",
+            "docs/adopters/path-authority.md",
+            "docs/dev/operations/testing.md"
+          ],
+          "gates": ["schemas", "docs-links", "test:authority", "test:cli"],
+          "tasks": [
+            {
+              "id": "TASK-0534",
+              "title": "Declare the verb per class and rewrite the decision matrix under the registered verbs",
+              "discipline": "architect",
+              "coupled_pipeline_position": "architect",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F1"],
+              "boundary": {
+                "paths": ["docs/adopters/path-authority.md", "docs/dev/operations/testing.md"],
+                "forbidden": [
+                  "packages/",
+                  "tests/",
+                  "scripts/",
+                  "product/",
+                  "law/",
+                  ".github/workflows/"
+                ]
+              },
+              "deliverables": [
+                "docs/adopters/path-authority.md replaces the verb clause of the decision matrix with the derivation and the three verb sets of ADR-AUT-0004 (task start on the root rules, check on the test rules, init apply architect, release export, round plan, and round seal on the architecture rules), names per matrix cell the verb the cell is decided under, rewrites every cross-class cell to AUTHORITY_ACTION_DENIED naming the class rule, states that a cross-role request under a class verb reads AUTHORITY_HUMAN_ROLE_DENIED at the declaration boundary, and adds to the Migration section that an extension bound before this record rebinds once.",
+                "docs/dev/operations/testing.md names the registered verbs the packed-adopter rehearsal drives (check declared by the Inspector, task start by the Engineer, round seal by the Architect) and states that no probe substitutes a subject on a registry entry."
+              ],
+              "acceptance_commands": [
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "docs-links",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": ["docs(adopters)", "docs(operations)"],
+              "prompt": {
+                "path": "prompts/TASK-0534.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "architect",
+                "effort": "medium",
+                "time_budget_minutes": 60
+              }
+            },
+            {
+              "id": "TASK-0535",
+              "title": "Prove the class verb sets and the matrix with the registered entries",
+              "discipline": "inspector",
+              "coupled_pipeline_position": "inspector",
+              "upstream_task_id": "TASK-0534",
+              "status": "planned",
+              "target_substrates": ["F3"],
+              "boundary": {
+                "paths": [
+                  "packages/cli/tests/unit/authority-class-write-verbs.test.ts",
+                  "packages/cli/tests/unit/adopter-authority-extension-compile.test.ts",
+                  "packages/cli/tests/unit/authority-adopter-extension-decisions.test.ts",
+                  "packages/cli/tests/unit/adopter-policy-authority-materialization.test.ts",
+                  "packages/cli/tests/unit/adopter-package-contract.test.ts"
+                ],
+                "forbidden": [
+                  "law/",
+                  "product/",
+                  "scripts/",
+                  ".github/workflows/",
+                  "packages/cli/src/",
+                  "packages/cli/scripts/",
+                  "packages/authority/src/",
+                  "packages/schemas/src/"
+                ]
+              },
+              "deliverables": [
+                "authority-class-write-verbs.test.ts computes the three class verb sets from the registered action registry by the derivation of ADR-AUT-0004 (effect not read, capability fs:workspace, human subject admitting the role or harness initiator exactly the role), freezes them at task start for the root rules, check for the test rules, and init apply architect, release export, round plan, and round seal for the architecture rules, and proves the action registry, its three generated views, the immutable core rules, and devai-adopter-authority are byte-identical to the R-0502 head (IA-004, IA-005); adopter-authority-extension-compile.test.ts asserts those sets per rule in place of the Engineer verbs and that round run and task finish appear on no rule.",
+                "authority-adopter-extension-decisions.test.ts drives every cell of IA-001, IA-002, and IA-003 with the registry entries exactly as registered (check declared by the Inspector, task start by the Engineer, round seal by the Architect), asserts each allow by matched rule id and each cross-class deny as AUTHORITY_ACTION_DENIED naming only the class precedence, asserts AUTHORITY_HUMAN_ROLE_DENIED for task start declared by the Inspector and check declared by the Engineer, and keeps the docs, unclassified, and escape rows; adopter-policy-authority-materialization.test.ts expects the new rule bytes, and adopter-package-contract.test.ts drives the four probes of IA-006 through the installed bin. Tests of the new verbs may be red until TASK-0536 lands."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "--config",
+                  "tests/config/local.config.ts",
+                  "packages/cli/tests/unit/authority-class-write-verbs.test.ts",
+                  "packages/cli/tests/unit/adopter-authority-extension-compile.test.ts",
+                  "packages/cli/tests/unit/authority-adopter-extension-decisions.test.ts",
+                  "packages/cli/tests/unit/adopter-policy-authority-materialization.test.ts",
+                  "packages/cli/tests/unit/adopter-package-contract.test.ts"
+                ]
+              ],
+              "commit_types": ["test(cli)"],
+              "prompt": {
+                "path": "prompts/TASK-0535.md",
+                "sha256": null
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 120
+              }
+            },
+            {
+              "id": "TASK-0536",
+              "title": "Compile the class verb sets from the registry and drive the smoke under the registered verbs",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": "TASK-0535",
+              "status": "planned",
+              "target_substrates": ["F2", "F5"],
+              "boundary": {
+                "paths": [
+                  "packages/cli/src/authority/policy-support.ts",
+                  "packages/cli/src/authority/policy-adopter-extension.ts",
+                  "packages/cli/src/authority/policy.ts",
+                  "packages/cli/src/services/adopter-policy.ts",
+                  "packages/cli/src/commands/init/bind-adapters.ts",
+                  "packages/cli/src/commands/doctor-policy-checks.ts",
+                  "packages/cli/scripts/installed-tarball-smoke.mjs"
+                ],
+                "forbidden": [
+                  "law/",
+                  "product/",
+                  "tests/",
+                  "packages/cli/tests/",
+                  "packages/authority/",
+                  "packages/schemas/",
+                  ".github/workflows/",
+                  "packages/cli/src/authority/policy-core-rules.ts",
+                  "packages/cli/src/authority/policy-additive-rules.ts",
+                  "packages/cli/src/generated/"
+                ]
+              },
+              "deliverables": [
+                "policy-support.ts exports one registry-derived function beside subjectGroups that yields the class verb sets of ADR-AUT-0004; compileAdopterAuthorityExtension in policy-adopter-extension.ts takes the sets as an input in place of its Engineer verb constant and stays pure, so the extension digest covers them; buildTrustedAuthoritySources in policy.ts, compileAdopterPolicyAuthority in adopter-policy.ts, and their callers in bind-adapters.ts and doctor-policy-checks.ts pass the registry entries they hold; the action registry, its generated views, the core rules, and devai-adopter-authority are untouched.",
+                "installed-tarball-smoke.mjs drives its matrix probes with the registered verbs through the installed bin (check declared by the Inspector allowed on a test path and task start declared by the Engineer refused there; round seal declared by the Architect allowed on a DDL path and task start declared by the Engineer refused there), so pack:smoke fails when a published package cannot admit a class role through its own verb."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "--config",
+                  "tests/config/local.config.ts",
+                  "packages/cli/tests/unit/authority-class-write-verbs.test.ts",
+                  "packages/cli/tests/unit/adopter-authority-extension-compile.test.ts",
+                  "packages/cli/tests/unit/authority-adopter-extension-decisions.test.ts",
+                  "packages/cli/tests/unit/adopter-policy-authority-materialization.test.ts",
+                  "packages/cli/tests/unit/adopter-package-contract.test.ts"
+                ],
+                ["pnpm", "run", "test:authority"],
+                ["pnpm", "run", "test:cli"],
+                ["pnpm", "--filter", "@aarusso-nyx/devai", "run", "pack:smoke"]
+              ],
+              "commit_types": ["feat(authority)", "feat(adopter-policy)", "feat(cli)"],
+              "prompt": {
+                "path": "prompts/TASK-0536.md",
                 "sha256": null
               },
               "pull_request": null,
