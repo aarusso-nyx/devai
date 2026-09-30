@@ -2,7 +2,7 @@
 id: ADR-GOV-0024
 title: Article 6 admits client path extensions by declared root and path class
 type: adr
-status: proposed
+status: accepted
 date: 2026-09-30
 authority: Architect
 supersedes: []
@@ -30,8 +30,10 @@ inspector_acceptance:
 
 ## Status
 
-Proposed on 2026-09-30 from the multi-stack path authority proposal for
-campaign CMP-0005. This record is a constitutional amendment under Article 9
+Accepted on 2026-09-30 by the Architect before round R-0501 opened, after
+the Owner approved the exact amended Article 6 words of ADR-GOV-0024 (OE-01
+of CMP-0005); proposed on 2026-09-30 from the multi-stack path authority
+proposal for campaign CMP-0005. This record is a constitutional amendment under Article 9
 and Article 40: it binds nothing until the Architect sets it `accepted`
 before round R-0501 opens, and the Architect task of R-0501 applies the
 amended text. Nothing here edits `law/constitution.md`; the amended text

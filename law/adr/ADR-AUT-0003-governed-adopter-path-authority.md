@@ -2,7 +2,7 @@
 id: ADR-AUT-0003
 title: Governed adopter path authority by declared roots and path classes
 type: adr
-status: proposed
+status: accepted
 date: 2026-09-30
 authority: Architect
 supersedes: []
@@ -52,8 +52,10 @@ inspector_acceptance:
 
 ## Status
 
-Proposed on 2026-09-30 from the multi-stack path authority proposal for
-campaign CMP-0005. Binds nothing until the Architect sets it `accepted`
+Accepted on 2026-09-30 by the Architect before round R-0501 opened, after
+the Owner approved the exact amended Article 6 words of ADR-GOV-0024 (OE-01
+of CMP-0005); proposed on 2026-09-30 from the multi-stack path authority
+proposal for campaign CMP-0005. Binds nothing until the Architect sets it `accepted`
 before round R-0501 opens, after the Owner approves ADR-GOV-0024. Extends the
 adopter policy source of ADR-CFG-0002 with one block and the trusted authority
 sources of the broker with one adopter-authored additive extension; the
