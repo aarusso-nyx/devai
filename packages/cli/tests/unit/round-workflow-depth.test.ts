@@ -3,7 +3,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import type { CAC } from 'cac';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { EXIT_USAGE } from '@devai-nyx/utils';
+import { EXIT_PRECONDITION, EXIT_USAGE } from '@devai-nyx/utils';
+import { TaskServiceError } from '#runtime-core';
 
 const runtime = vi.hoisted(() => ({
   closeGovernedRound: vi.fn(),
@@ -559,5 +560,100 @@ describe('round workflow command boundaries', () => {
       operation: 'status',
       exit: 2,
     });
+  });
+});
+
+describe('round status on a sealed round (ADR-EVI-0003)', () => {
+  const closed = {
+    ok: true,
+    id: 'R-0042',
+    location: 'closed',
+    path: 'work/rounds/R-0042/record.md',
+  };
+
+  function inactive(): Error {
+    return new TaskServiceError('TASK_ROUND_INACTIVE', EXIT_PRECONDITION);
+  }
+
+  it('IA-001 exits 0 with lifecycle closed although the task round is inactive', async () => {
+    runtime.governedRoundStatus.mockReturnValue(closed);
+    runtime.roundTaskStatus.mockImplementation(() => {
+      throw inactive();
+    });
+    const result = await invoke('status', { repoRoot: '/repo', round: 'R-0042' });
+    expect(result.stderr).toBe('');
+    expect(result.exit).toBe(0);
+    const body = JSON.parse(result.stdout) as { lifecycle: unknown; tasks?: unknown };
+    expect(body.lifecycle).toEqual(closed);
+    // The summary is absent or marked inactive; it never lists tasks of a sealed round.
+    if (body.tasks !== undefined) expect(JSON.stringify(body.tasks)).toMatch(/inactive/iu);
+    expect(runtime.requireActiveTaskRound).not.toHaveBeenCalled();
+  });
+
+  it('IA-001 renders the human line and stays read only on a sealed round', async () => {
+    runtime.governedRoundStatus.mockReturnValue(closed);
+    runtime.roundTaskStatus.mockImplementation(() => {
+      throw inactive();
+    });
+    const result = await invoke('status', { repoRoot: '/repo', round: 'R-0042', human: true });
+    expect(result.exit).toBe(0);
+    expect(result.stderr).toBe('');
+    expect(result.stdout).toMatch(/R-0042/u);
+    for (const write of [
+      runtime.closeGovernedRound,
+      runtime.declareGovernedRound,
+      runtime.scaffoldGovernedRound,
+      runtime.trackGovernanceEvent,
+      runtime.runRoundTasks,
+    ]) {
+      expect(write).not.toHaveBeenCalled();
+    }
+    expect(seams.recordRoundCloseTracking).not.toHaveBeenCalled();
+  });
+
+  it('IA-002 keeps the task summary on an active round', async () => {
+    runtime.governedRoundStatus.mockReturnValue({ ...closed, location: 'active' });
+    const result = await invoke('status', { repoRoot: '/repo', round: 'R-0042' });
+    expect(result).toMatchObject({ exit: 0, stderr: '' });
+    expect(JSON.parse(result.stdout)).toEqual({
+      lifecycle: { ...closed, location: 'active' },
+      tasks: {
+        round_id: 'R-0042',
+        count: 2,
+        tasks: [
+          { id: 'T-1', status: 'done' },
+          { id: 'T-2', status: 'ready' },
+        ],
+      },
+    });
+  });
+
+  it('IA-004 fails an unknown round with its existing code and never reports closed', async () => {
+    runtime.governedRoundStatus.mockImplementation(() => {
+      throw new Error('ROUND_RECORD_NOT_FOUND');
+    });
+    runtime.requireActiveTaskRound.mockImplementation(() => {
+      throw inactive();
+    });
+    const result = await invoke('status', { repoRoot: '/repo', round: 'R-0099' });
+    expect(result.exit).toBe(EXIT_PRECONDITION);
+    expect(JSON.parse(result.stderr)).toEqual({
+      code: 'TASK_ROUND_INACTIVE',
+      operation: 'status',
+      exit: EXIT_PRECONDITION,
+    });
+    expect(result.stdout).not.toMatch(/closed/u);
+  });
+
+  it('IA-003 keeps round run refusing a sealed round with TASK_ROUND_INACTIVE', async () => {
+    runtime.runRoundTasks.mockRejectedValue(inactive());
+    const result = await invoke('run', { repoRoot: '/repo', round: 'R-0042' });
+    expect(result.exit).toBe(EXIT_PRECONDITION);
+    expect(JSON.parse(result.stderr)).toEqual({
+      code: 'TASK_ROUND_INACTIVE',
+      operation: 'run',
+      exit: EXIT_PRECONDITION,
+    });
+    expect(runtime.governedRoundStatus).not.toHaveBeenCalled();
   });
 });
