@@ -4044,7 +4044,9 @@
                   "packages/cli/tests/unit/ci-economy-class-lane.test.ts",
                   "packages/cli/tests/unit/check-runner-planning-lane.test.ts",
                   "tests/contract/task-descriptor-verifier-compat.contract.test.ts",
-                  "packages/schemas/tests/contract/governance-v15-adr.test.ts"
+                  "packages/schemas/tests/contract/governance-v15-adr.test.ts",
+                  "tests/contract/workflow-shape.contract.test.ts",
+                  "Orchestrator note (2026-09-30): the workflow-shape contract test pins the shared composite action inside verify-ledger, which the release fix of pull request #208 replaced by the pinned inline setup step because that job checks out under a path; the test is realigned to the two shapes."
                 ],
                 "forbidden": [
                   "law/",
@@ -4077,7 +4079,7 @@
               "commit_types": ["test(cli)", "test(contract)", "test(schemas)"],
               "prompt": {
                 "path": "prompts/TASK-03112.md",
-                "sha256": "8dd2005f728716547ae160f6120b1726cd7fc5665b394ec1a2198235c7e5bf61"
+                "sha256": "98dc467d34635bed3a3d5c5f72545bc6cd7ed38b14af8b8436baf51a31fded92"
               },
               "pull_request": null,
               "merged_as": null,
