@@ -6,14 +6,14 @@
   },
   "profile": "tier3",
   "constitution": {
-    "version": "1.0.1",
-    "sha256": "ff8c4f099a284b1b42f980742b20c849379ba4e3f357905f36a87648ae3fdeae"
+    "version": "1.0.2",
+    "sha256": "d7f8791f1d00a7247bced66bdcdf8b1af431bb57e49d03b6ddd7024cb52f957d"
   },
+  "devai_version": "1.7.0",
   "repo": {
     "kind": "library"
   },
   "docs": {
     "builder": "docusaurus"
-  },
-  "devai_version": "1.6.0"
+  }
 }
