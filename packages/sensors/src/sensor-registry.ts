@@ -36,6 +36,12 @@ export interface SensorRegistryEntry {
   readonly effect_basis?: SensorEffectBasis;
   readonly cells?: readonly SensorCell[];
   readonly diagnostic?: true;
+  /**
+   * ADR-SCR-0011: absent or `admitted` means the kind is in the packaged SensorReading
+   * kind enum; `unsupported` means the runner refuses the sensor before it starts with
+   * `SENSOR_KIND_SCHEMA_UNSUPPORTED` and never emits a reading for it.
+   */
+  readonly schema_admission?: 'admitted' | 'unsupported';
   readonly tiers: readonly SensorRegistryTier[];
   readonly design_note: SensorDesignNote;
 }
@@ -136,6 +142,36 @@ const liveKindSet = new Set<SensorKind>(SENSOR_READING_KINDS);
 
 export function isSensorKind(value: unknown): value is SensorKind {
   return typeof value === 'string' && liveKindSet.has(value);
+}
+
+/** Refusal code of a registry entry declared `schema_admission: "unsupported"` (ADR-SCR-0011). */
+export const SENSOR_KIND_SCHEMA_UNSUPPORTED = 'SENSOR_KIND_SCHEMA_UNSUPPORTED';
+
+/**
+ * The kinds among `kinds` whose registry entry declares `schema_admission: "unsupported"`,
+ * in input order. The registry defaults to the validated law artifact; a caller may pass
+ * another registry-shaped value (for example a test fixture) without touching law.
+ */
+export function schemaUnsupportedKinds(
+  kinds: readonly string[],
+  registry: Pick<SensorRegistry, 'entries'> = SENSOR_REGISTRY,
+): string[] {
+  const unsupported = new Set(
+    registry.entries
+      .filter((entry) => entry.schema_admission === 'unsupported')
+      .map((entry) => entry.kind),
+  );
+  return kinds.filter((kind) => unsupported.has(kind));
+}
+
+/** Throw `SENSOR_KIND_SCHEMA_UNSUPPORTED:<kind>` when the kind is declared unsupported. */
+export function assertSensorKindSchemaAdmitted(
+  kind: string,
+  registry: Pick<SensorRegistry, 'entries'> = SENSOR_REGISTRY,
+): void {
+  if (schemaUnsupportedKinds([kind], registry).length > 0) {
+    throw new Error(`${SENSOR_KIND_SCHEMA_UNSUPPORTED}:${kind}`);
+  }
 }
 
 export const SENSOR_ENTRIES_BY_KIND: Readonly<Record<SensorKind, SensorRegistryEntry>> =
