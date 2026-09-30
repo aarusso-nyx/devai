@@ -21,13 +21,13 @@
   "owner_effects": [
     {
       "id": "OE-01",
-      "description": "Approve the Article 6 amendment text and the constitution version of ADR-GOV-0024 (recommended 1.1.0), and answer the decisions (a) to (j) of the proposal's Decisions required section, either by taking the recommended options or by naming the alternatives, so the Architect can set ADR-GOV-0024 and ADR-AUT-0003 to accepted before R-0501 opens.",
+      "description": "Approve the exact amended Article 6 words of ADR-GOV-0024 so the Architect can set ADR-GOV-0024 and ADR-AUT-0003 to accepted before R-0501 opens. The decisions of the proposal were answered by the Owner on 2026-09-30 and bind every task: (a) amend Article 6 at version 1.0.2; (b) the authority block in the adopter policy; (c) the fixed class ladder; (d) adopter-declared roots; (e) existing adopters unchanged and the framework declares no roots; (f) one release, 1.8.0, after R-0503 (OE-02); (g) the CMP-0003 tier pattern; (h) a source edited after binding refuses every governed write until rebind; (i) a nested docs directory under a root is Engineer by remainder and an adopter may name **/docs/** in its architecture class; (j) the harness subject of a class rule is bound to the class role.",
       "required_before": "R-0501",
       "performed_at": null
     },
     {
       "id": "OE-02",
-      "description": "Publish the immutable release that carries R-0501 to R-0503 (recommended 1.8.0, the feat bump floor since v1.7.0; 2.0.0 if the Owner treats the constitutional amendment as breaking), from the exact packed artifact the rehearsal verified, and tell DETRAN the version so CTG-0005 can pin it, rebind the constitution at 1.1.0, bind its authority source, and run Doctor and the acceptance matrix in a clone before claiming enforcement.",
+      "description": "Publish the immutable release that carries R-0501 to R-0503 (1.8.0, decided by the Owner on 2026-09-30 as the feat bump floor since v1.7.0), from the exact packed artifact the rehearsal verified, and tell DETRAN the version so CTG-0005 can pin it, rebind the constitution at 1.0.2, bind its authority source, and run Doctor and the acceptance matrix in a clone before claiming enforcement.",
       "required_before": "R-0503",
       "performed_at": null
     }
@@ -79,7 +79,7 @@
     {
       "id": "R-0501",
       "title": "Amendment and adopter authority source contract",
-      "goal": "The constitution is 1.1.0 with the Article 6 extension model of ADR-GOV-0024 and the framework's own pin is rebound; the adopter policy schema admits the authority block of ADR-AUT-0003; a pure compiler turns a valid block into the fixed-ladder rule set deterministically and refuses every malformed source and every source bound under a constitution below 1.1.0 with a named code; the adopter page states the contract.",
+      "goal": "The constitution is 1.0.2 with the Article 6 extension model of ADR-GOV-0024 and the framework's own pin is rebound; the adopter policy schema admits the authority block of ADR-AUT-0003; a pure compiler turns a valid block into the fixed-ladder rule set deterministically and refuses every malformed source and every source bound under a constitution below 1.0.2 with a named code; the adopter page states the contract.",
       "status": "planned",
       "records": ["ADR-GOV-0024", "ADR-AUT-0003"],
       "depends_on": [],
@@ -130,7 +130,7 @@
                 "forbidden": ["packages/", "tests/", "scripts/", "product/", ".github/workflows/"]
               },
               "deliverables": [
-                "law/constitution.md is 1.1.0 with exactly the two amended sentences and the extension paragraph ADR-GOV-0024 states, its three version markers and frontmatter date updated and every core row unchanged; ADR-GOV-0024 and ADR-AUT-0003 are set to accepted with the Owner's OE-01 answers recorded in their Status sections; the catalogue is regenerated and re-pinned; the framework's own pin and authority policy are rebound through init bind --constitution --write and then init bind --write so .devai/pin/constitution.md and the constitution binding of .devai/config/authority-policy.json carry the 1.1.0 digest (law with its generated copies).",
+                "law/constitution.md is 1.0.2 with exactly the two amended sentences and the extension paragraph ADR-GOV-0024 states, its three version markers and frontmatter date updated and every core row unchanged; ADR-GOV-0024 and ADR-AUT-0003 are set to accepted with the Owner's OE-01 answers recorded in their Status sections; the catalogue is regenerated and re-pinned; the framework's own pin and authority policy are rebound through init bind --constitution --write and then init bind --write so .devai/pin/constitution.md and the constitution binding of .devai/config/authority-policy.json carry the 1.0.2 digest (law with its generated copies).",
                 "law/schemas/adopter-policy.schema.json admits the optional closed authority block of ADR-AUT-0003 (extension_id, roots, classes.test, classes.architecture, each selector a string) with one valid example; docs/adopters/path-authority.md states the extension model in the words of the amended article, the block grammar, the fixed ladder, and the refusal codes, is linked from docs/adopters/index.md, and the --adopter-policy section of docs/adopters/install.md names the block."
               ],
               "acceptance_commands": [
@@ -201,8 +201,8 @@
                 ]
               },
               "deliverables": [
-                "constitution-article-6-amendment.test.ts proves the source and the pin parse as 1.1.0, are byte-identical, carry each Article 6 core row verbatim, and carry the amended sentences of ADR-GOV-0024; governance-v15-adr.test.ts lists ADR-GOV-0024 and ADR-AUT-0003 as effective authorities over their declared subjects with the record, file, and subject counts updated.",
-                "adopter-authority-extension-compile.test.ts proves the reference source (six roots, the four default test selectors, the two architecture selectors) compiles to the exact rule set of ADR-AUT-0003 in declared order with the ladder 500, 700, 750 and role-bound harness subjects, that compiling twice yields identical bytes, and that each malformed source of IA-003 and a constitution below 1.1.0 is refused with its named ADOPTER_AUTHORITY_* code; adopter-policy-authority-block.test.ts proves the schema admits the block and refuses an unknown key, and that resolveAdopterPolicyProjection refuses a malformed block before any target is staged and projects a block-free source byte-identically to today. Tests of the compiler may be red until TASK-0513 lands; tests of unchanged behaviour must be green."
+                "constitution-article-6-amendment.test.ts proves the source and the pin parse as 1.0.2, are byte-identical, carry each Article 6 core row verbatim, and carry the amended sentences of ADR-GOV-0024; governance-v15-adr.test.ts lists ADR-GOV-0024 and ADR-AUT-0003 as effective authorities over their declared subjects with the record, file, and subject counts updated.",
+                "adopter-authority-extension-compile.test.ts proves the reference source (six roots, the four default test selectors, the two architecture selectors) compiles to the exact rule set of ADR-AUT-0003 in declared order with the ladder 500, 700, 750 and role-bound harness subjects, that compiling twice yields identical bytes, and that each malformed source of IA-003 and a constitution below 1.0.2 is refused with its named ADOPTER_AUTHORITY_* code; adopter-policy-authority-block.test.ts proves the schema admits the block and refuses an unknown key, and that resolveAdopterPolicyProjection refuses a malformed block before any target is staged and projects a block-free source byte-identically to today. Tests of the compiler may be red until TASK-0513 lands; tests of unchanged behaviour must be green."
               ],
               "acceptance_commands": [
                 [
@@ -258,7 +258,7 @@
                 ]
               },
               "deliverables": [
-                "packages/cli/src/authority/policy-adopter-extension.ts exports a pure compiler from a validated authority block, the bound constitution version, and the declared test-class selectors to the extension document of ADR-AUT-0003: per root the two root rules at 500, one test rule per selector at 700, one architecture rule per selector at 750, each with the fixed role and the harness subject bound to that role, in declared order, and it refuses with ADOPTER_AUTHORITY_CONSTITUTION_VERSION below 1.1.0 and with the named ADOPTER_AUTHORITY_* code for every malformed source without emitting a rule.",
+                "packages/cli/src/authority/policy-adopter-extension.ts exports a pure compiler from a validated authority block, the bound constitution version, and the declared test-class selectors to the extension document of ADR-AUT-0003: per root the two root rules at 500, one test rule per selector at 700, one architecture rule per selector at 750, each with the fixed role and the harness subject bound to that role, in declared order, and it refuses with ADOPTER_AUTHORITY_CONSTITUTION_VERSION below 1.0.2 and with the named ADOPTER_AUTHORITY_* code for every malformed source without emitting a rule.",
                 "resolveAdopterPolicyProjection compiles the block when the source declares it, with the constitution version read from the pin, and raises the compiler's code before any target is staged, so a refused bind leaves the previous projection and receipt untouched; docs/reference/error-codes.md lists every new code. The trusted authority sources are not yet wired (R-0502)."
               ],
               "acceptance_commands": [
@@ -410,7 +410,7 @@
                 ]
               },
               "deliverables": [
-                "packages/cli/tests/fixtures/adopter-path-authority/ holds the reference source of ADR-AUT-0003 and its malformed variants; authority-adopter-extension-decisions.test.ts binds the reference source in a fixture repository pinned at 1.1.0 and drives the broker for every row of IA-001, IA-009, and IA-002 as each human role and as the harness initiated by each role, asserting each allow and each deny by code, including UNCLASSIFIED_RESOURCE outside the roots, the escape refusals before any rule, a declared-but-absent root granting exactly what a present root grants, and docs/ staying Architect.",
+                "packages/cli/tests/fixtures/adopter-path-authority/ holds the reference source of ADR-AUT-0003 and its malformed variants; authority-adopter-extension-decisions.test.ts binds the reference source in a fixture repository pinned at 1.0.2 and drives the broker for every row of IA-001, IA-009, and IA-002 as each human role and as the harness initiated by each role, asserting each allow and each deny by code, including UNCLASSIFIED_RESOURCE outside the roots, the escape refusals before any rule, a declared-but-absent root granting exactly what a present root grants, and docs/ staying Architect.",
                 "adopter-policy-authority-materialization.test.ts proves that binding twice yields byte-identical authority-policy.json and adopter-policy-binding.json with the authority_extension field, that one changed selector changes the extension digest, the resolved digest, and the receipt, that removing the block removes the extension entry and its rules, that a source edited after binding makes a governed write read AUTHORITY_POLICY_DIGEST_MISMATCH, and that a missing source reads ADOPTER_AUTHORITY_SOURCE_UNAVAILABLE; authority-policy-resolver-contracts.test.ts proves two additive-extension rules at one precedence with different human role sets read AMBIGUOUS_POLICY_MATCH while core unions are unchanged. Tests of the new behaviour may be red until TASK-0523 lands."
               ],
               "acceptance_commands": [
@@ -559,7 +559,7 @@
                 ]
               },
               "deliverables": [
-                "docs/adopters/path-authority.md gains a Migration section (rebind the constitution at 1.1.0, add the block, bump policy_version, run init bind --adopter-policy, read Doctor) and a Doctor findings table naming each reason id of policy-materialization-current and authority-enforcement for the extension with its remediation command; docs/adopters/install.md points to it from the --adopter-policy section.",
+                "docs/adopters/path-authority.md gains a Migration section (rebind the constitution at 1.0.2, add the block, bump policy_version, run init bind --adopter-policy, read Doctor) and a Doctor findings table naming each reason id of policy-materialization-current and authority-enforcement for the extension with its remediation command; docs/adopters/install.md points to it from the --adopter-policy section.",
                 "docs/dev/operations/testing.md describes the packed-adopter rehearsal: pack the tarball, install it in a disposable clone, bind the reference source, run Doctor and the matrix through the installed bin, and what DETRAN must repeat on its own candidate before claiming enforcement."
               ],
               "acceptance_commands": [
@@ -610,7 +610,7 @@
               },
               "deliverables": [
                 "doctor-adopter-authority-drift.test.ts proves Doctor reports policy-materialization-current and authority-enforcement current after a bind of the reference source, and after the source is edited, the block removed without rebinding, or the source deleted, reports each as a mismatch with the reason id and the rebind command the adopter page names, never as a pass and never as a transport failure.",
-                "adopter-package-contract.test.ts packs the tarball, installs it in a disposable adopter, rebinds the constitution at 1.1.0, binds the reference source, and reproduces the decisions and the drift refusals of ADR-AUT-0003 through the installed bin only, so the published package and not the workspace proves the contract. Tests of the new Doctor output may be red until TASK-0533 lands."
+                "adopter-package-contract.test.ts packs the tarball, installs it in a disposable adopter, rebinds the constitution at 1.0.2, binds the reference source, and reproduces the decisions and the drift refusals of ADR-AUT-0003 through the installed bin only, so the published package and not the workspace proves the contract. Tests of the new Doctor output may be red until TASK-0533 lands."
               ],
               "acceptance_commands": [
                 [
