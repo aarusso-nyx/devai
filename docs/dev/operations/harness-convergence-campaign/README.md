@@ -212,6 +212,17 @@ Backlog observed while performing the Owner effects and the OE-05 experiment
   `JSON.stringify(structured_output)`; the bridge prefers the structured
   output when present, so the reply digest a task records depends on that
   choice. The fixture format of ADR-MDL-0001 must say which bytes it stores.
+- The gate's bootstrap cache is unsafe on a hit. `bootstrap-check-runner.mjs`
+  links the runner's `node_modules` to `packages/cli/node_modules`, so the
+  cached `.devai/state/pr-bootstrap` holds the compiled runner and symlinks
+  only; on a cache hit the workflow runs `pnpm install` and never builds the
+  workspace packages, and the runner fails at import with
+  `@devai-nyx/sensors/dist` missing. A hit needs a green run of the same pull
+  request followed by a push that changes no key input, which first happened
+  on #198 (run 36654220587, 2026-09-30); every earlier restore was a miss. The
+  remedy was to delete the cache entry and rerun. The fix is a `ci` task under
+  ADR-CHK-0003: cache the workspace `dist` outputs with the runner, or make
+  the runner self-contained.
 - `attestation_reissue` is `true` only on R-0301 although decision 1 names
   R-0304 and R-0305 as descriptor-changing rounds; the closures of R-0301 and
   R-0304 carry the digest of the one run anyway. The campaign schema should
