@@ -147,6 +147,19 @@ describe('runtime sensor registry binds immutable views to approved law bytes', 
     );
     expect(markdown.endsWith('\n')).toBe(true);
   });
+  it('admits every live registry kind in the packaged sensor-reading schema file (ADR-SCR-0011)', () => {
+    const schema = JSON.parse(
+      readFileSync(
+        fileURLToPath(
+          new URL('../../../../law/schemas/sensor-reading.schema.json', import.meta.url),
+        ),
+        'utf8',
+      ),
+    ) as { properties: { sensor: { properties: { kind: { enum: string[] } } } } };
+    const admitted = new Set(schema.properties.sensor.properties.kind.enum);
+    expect(SENSOR_READING_KINDS.filter((kind) => !admitted.has(kind))).toEqual([]);
+    expect(sensorTierKinds('SWEEP').filter((kind) => !admitted.has(kind))).toEqual([]);
+  });
   it('does not certify development source registry bytes as an assembled code-bound package', () => {
     expect(() => assertBundledSensorRegistry(readFileSync(resolve(policyPath)))).toThrow(
       'rpl-package-identity-mismatch',
