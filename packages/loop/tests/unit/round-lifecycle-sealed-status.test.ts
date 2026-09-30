@@ -262,7 +262,7 @@ describe('sealed round lifecycle read (ADR-EVI-0003)', () => {
     });
   });
 
-  it('IA-004 never reports closed from a status read over a malformed close state', async () => {
+  it('IA-004 fails a status read over a malformed close state with ROUND_CLOSE_STATE_CONFLICT', async () => {
     const repo = repository();
     await withAuthorityHostTestScope(() => {
       declared(repo);
@@ -277,7 +277,7 @@ describe('sealed round lifecycle read (ADR-EVI-0003)', () => {
         code = (error as { code?: string; message?: string }).code ?? (error as Error).message;
       }
       expect(reported).not.toBe('closed');
-      expect(code).toMatch(/^ROUND_/u);
+      expect(code).toBe('ROUND_CLOSE_STATE_CONFLICT');
       expect(digest(repo, CLOSE_STATE)).toBe(truncated);
     });
   });
