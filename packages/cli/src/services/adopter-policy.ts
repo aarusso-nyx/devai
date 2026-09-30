@@ -10,8 +10,9 @@ import {
 import { projectOwnedProjectConfig } from './adopter-policy-ownership.js';
 import {
   type AdopterAuthorityBlock,
+  type AdopterAuthorityExtension,
   compileAdopterAuthorityExtension,
-  DEFAULT_ADOPTER_TEST_SELECTORS,
+  loadAdopterAuthorityDefaultTestSelectors,
 } from '../authority/policy-adopter-extension.js';
 
 export {
@@ -89,23 +90,29 @@ function boundConstitutionVersion(targetRoot: string): string {
 }
 
 /**
- * Compiles the source's `authority` block, when declared, so a refused block raises its
- * ADOPTER_AUTHORITY_* code before any target is staged. The compiled rules are not
- * consumed here: the trusted authority sources compile them against the repository
- * identity once they are wired (R-0502), so the selectors' repository id is irrelevant to
- * this refusal pass and no identity lookup (which would spawn git) is made.
+ * Compile the source's `authority` block, when declared, against the bound constitution of
+ * `targetRoot` and the package default test selectors of the defaults law source. Returns
+ * undefined for a source without the block; a refused block throws its ADOPTER_AUTHORITY_*
+ * code. The rules carry the given repository id; their count, id, and version do not depend
+ * on it, and the trusted authority sources compile the digest-bearing document themselves.
  */
-function refuseMalformedAuthority(input: AdopterPolicyProjectionInput, document: JsonObject): void {
-  if (document['authority'] === undefined) return;
-  compileAdopterAuthorityExtension({
+export function compileAdopterPolicyAuthority(
+  input: AdopterPolicyProjectionInput,
+  options: {
+    readonly repositoryId: string;
+    readonly validator?: typeof getValidator;
+  },
+): AdopterAuthorityExtension | undefined {
+  if (!isJsonObject(input.policy) || input.policy['authority'] === undefined) return undefined;
+  const document = input.policy;
+  return compileAdopterAuthorityExtension({
     policyId: String(document['policy_id']),
     policyVersion: String(document['policy_version']),
     authority: document['authority'] as AdopterAuthorityBlock,
     constitutionVersion:
       input.constitutionVersion ?? boundConstitutionVersion(resolve(input.targetRoot ?? '.')),
-    // The defaults law source arrives in R-0502; ADR-AUT-0003 states these four.
-    defaultTestSelectors: DEFAULT_ADOPTER_TEST_SELECTORS,
-    repositoryId: 'adopter-repository',
+    defaultTestSelectors: loadAdopterAuthorityDefaultTestSelectors(options.validator),
+    repositoryId: options.repositoryId,
   });
 }
 
@@ -139,7 +146,10 @@ export function resolveAdopterPolicyProjection(
     throw new Error(`ADOPTER_POLICY_INVALID:${JSON.stringify(validatePolicy.errors)}`);
   }
   const document = input.policy as JsonObject;
-  refuseMalformedAuthority(input, document);
+  // A refused authority block raises its ADOPTER_AUTHORITY_* code before any target is
+  // staged. The selectors' repository id is irrelevant to the refusal, so no identity
+  // lookup (which may spawn git) is made here.
+  compileAdopterPolicyAuthority(input, { repositoryId: 'adopter-repository', validator });
   const defaults = (
     file: 'domains.json' | 'thresholds.json' | 'scorecard-na.json' | 'glob-guards.json',
   ) => JSON.parse(validateCanonicalPolicyContent(file, readPolicy(file), validator)) as JsonObject;
