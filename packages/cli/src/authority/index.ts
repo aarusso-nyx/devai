@@ -55,6 +55,12 @@ export { declaredInvocationAuthority, declaredInvocationRole } from './invocatio
 export { createAuthorityCliHarness, stripAuthorityArgv } from './authority-harness.js';
 export { authorityDecisionRecordable } from './authority-session.js';
 export {
+  compileAdopterAuthorityExtension,
+  DEFAULT_ADOPTER_TEST_SELECTORS,
+  type AdopterAuthorityBlock,
+  type AdopterAuthorityExtension,
+} from './policy-adopter-extension.js';
+export {
   buildAuthorityActionRegistry,
   validateLiveAuthorityActionRegistry,
   actionId,
