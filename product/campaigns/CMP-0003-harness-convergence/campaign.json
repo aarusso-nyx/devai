@@ -3625,13 +3625,18 @@
       "id": "R-0310",
       "title": "Owner-effect outcome",
       "goal": "An Owner effect resolved by its declared fallback can be recorded as performed with outcome fallback, so the round that requires it closes while the campaign checker keeps enforcing serialized admission; R-0304 closes on that record.",
-      "status": "closing",
+      "status": "closed",
       "records": ["ADR-CHK-0003", "ADR-CHK-0004"],
       "depends_on": ["R-0301"],
       "attestation_reissue": false,
       "owner_effects_required": [],
       "close_checks": ["schemas", "test:root"],
-      "closure": null,
+      "closure": {
+        "merged_head": "b8c975f5506cd1aad8c7bb667100aae1126f4c7f",
+        "closed_at": "2026-09-30T05:22:04Z",
+        "task_policy_digest": null,
+        "phase_closure": null
+      },
       "waves": [
         {
           "id": "CTG-03101",
