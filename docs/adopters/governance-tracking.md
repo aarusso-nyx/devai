@@ -244,3 +244,90 @@ changes the item, its status, or any readiness verdict.
 Round close always records and seals its final tracking event and never waits for GitHub. Any
 remaining outbox is projected later, from sealed evidence, by a manual `sync` or by the
 trusted-`main` workflow.
+
+## Post-seal checkpoint
+
+`round seal --write` closes a governed round by appending one line to
+`work/rounds/<id>/close-state.jsonl`. A closure checklist commonly ends with a **post-seal
+checkpoint**: after the seal, `round status --format json` exits `0` and reports
+`lifecycle.location: closed`. That checkpoint is the contract stated under
+[`round status`](../reference/cli.md#round-status) in the CLI reference and fixed by
+[ADR-EVI-0003](../../law/adr/ADR-EVI-0003-sealed-round-lifecycle-read.md). The seal itself, its
+append-only evidence, and the closure index are unchanged by that contract.
+
+### Reproduction of #175
+
+Recorded on 2026-09-29 against the 1.6.0 source at commit `83d7e152`, whose round handler,
+lifecycle read, and dispatch precondition are byte-identical to `main` at `dd5c3a69`, with the
+check runner built by `pnpm run build` and `pnpm run release:bootstrap`. #175 reports the same
+control flow in the published 1.5.6 and 1.6.0 bundles. The fixture is a scratch governed
+repository, never a directory inside this repository.
+
+1. Bind the scratch repository as a governed repository with the four `init bind` steps that
+   the `AUTHORITY_POLICY_MISSING` remediation lists, all `--as-role architect --write`:
+   `--tier tier1 --constitution`, `--operational-law`, `--subprocess-effects`, and the final
+   plain bind that creates `.devai/config/authority-policy.json`.
+2. Provide the seal preconditions: decision stubs `law/adr/D-1.md` and `law/adr/D-2.md`, a
+   schema-valid `record/proofs/compliance/closures/PC-0001.json` whose `round_id`,
+   `declaring_decision`, `closing_decision`, `merged_as`, and passing `gates` match the round
+   record, and a `record/derived/indexes/rounds.md` ledger that names `PC-0001`.
+3. Scaffold and declare the round, then activate it:
+
+   ```bash
+   devai round plan --round R-0003 --repo-root . --scaffold --as-role architect --write --format json
+   devai round plan --round R-0003 --repo-root . --declare record-R-0003.json --as-role architect --write --format json
+   ```
+
+   `record-R-0003.json` carries `status: closed`, `declared_by: D-1`, `closed_by: D-2`,
+   `phase_closure: PC-0001`, and the same `merged_as` as the closure. A
+   `work/rounds/R-0003/AUTHORIZATION.md` with `status: active` and `GRANTED` makes the task
+   round active.
+
+4. Read the status before the seal. It exits `0` with `lifecycle.location: closed` (the record
+   is declared closed) and `tasks.count: 0`:
+
+   ```bash
+   devai round status --round R-0003 --repo-root . --format json
+   ```
+
+5. Seal the round. It exits `0` and reports `close_state: work/rounds/R-0003/close-state.jsonl`,
+   whose single line is `{"schemaVersion":"1.0.0","round_id":"R-0003","status":"closed",...}`:
+
+   ```bash
+   devai round seal --round R-0003 --repo-root . --as-role architect --write --format json
+   ```
+
+6. Read the status after the seal. Observed:
+
+   ```bash
+   devai round status --round R-0003 --repo-root . --format json
+   ```
+
+   ```json
+   {
+     "schemaVersion": "1.0.0",
+     "action_id": "round status",
+     "ok": false,
+     "error": {
+       "schemaVersion": "1.0.0",
+       "code": "ACTION_PRECONDITION_UNSATISFIED",
+       "class": "precondition",
+       "exit": 5,
+       "message": "The action precondition was not satisfied.",
+       "remediation": "Satisfy the reported precondition, then retry.",
+       "context": { "payload": { "code": "TASK_ROUND_INACTIVE", "operation": "status", "exit": 5 } }
+     }
+   }
+   ```
+
+   The process exit code is `5`. The SHA-256 of `close-state.jsonl` is identical before and
+   after the read, so the refusal comes from the read path alone: the handler reads the
+   lifecycle (`closed`) and then unconditionally requires an active task round, which the
+   existing `close-state.jsonl` makes false.
+
+The checkpoint therefore cannot be satisfied on this source, although the seal succeeded and its
+evidence is valid. ADR-EVI-0003 narrows the active-task precondition to dispatch so that the
+command, not a local workaround, satisfies the checkpoint; `round run` and task dispatch keep
+refusing a sealed round with `TASK_ROUND_INACTIVE`. Do not edit or re-append seal evidence to
+work around the refusal: `close-state.jsonl` is append-only, and a second, different line is
+`ROUND_CLOSE_STATE_CONFLICT`.
