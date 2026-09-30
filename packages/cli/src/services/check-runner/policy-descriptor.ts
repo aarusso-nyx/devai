@@ -75,7 +75,17 @@ function descriptorSelectors(descriptor: TaskDescriptor): readonly PolicyInputSe
   ];
 }
 
-/** Load the change-taxonomy classifier only when the descriptor selects by class. */
+/** The change-taxonomy classifier of the repository at repoRoot. */
+export function taxonomyClassifier(repoRoot: string): PathClassifier {
+  const taxonomy = loadChangeTaxonomy(repoRoot);
+  return (path) => taxonomy.classify(path);
+}
+
+/**
+ * The classifier that evaluates the descriptor's own selectors: loaded only
+ * when the descriptor selects by class. Lane selection does not depend on it;
+ * it loads the taxonomy itself when it needs one (ADR-CHK-0006).
+ */
 export function descriptorClassifier(
   repoRoot: string,
   descriptor: TaskDescriptor,
@@ -83,8 +93,7 @@ export function descriptorClassifier(
   if (!descriptorSelectors(descriptor).some((selector) => selector.kind === 'class')) {
     return undefined;
   }
-  const taxonomy = loadChangeTaxonomy(repoRoot);
-  return (path) => taxonomy.classify(path);
+  return taxonomyClassifier(repoRoot);
 }
 
 function validSelector(value: unknown): boolean {
