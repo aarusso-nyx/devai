@@ -34,6 +34,7 @@
     "scorecard-page:check": "node scripts/generate-scorecard-page.mjs --check",
     "release:closure": "node scripts/check-publishable-closure.mjs",
     "release:static-integrity": "node scripts/check-release-static-integrity.mjs",
+    "release:packed-adopter": "node scripts/rehearse-packed-adopter.mjs",
     "release:pr-gate": "node scripts/run-pr-release-gate.mjs",
     "format:check": "node scripts/check-formatting.mjs",
     "format:check:all": "node scripts/check-formatting.mjs --all-tracked",
