@@ -251,9 +251,14 @@ export const checkCmd = defineCommand({
           const report = await runCheckPlan(plan, (member) =>
             executeCheckMember(member, executionOptions),
           );
+          // --only prints the member's own value only when it executed and passed or
+          // failed; every other class (na, review, unknown, error) or a value-less result
+          // prints the full report, so results[0].status and code stay visible (ADR-CHK-0005).
+          const onlyResult = report.selection.kind === 'only' ? report.results[0] : undefined;
           const machineResult =
-            report.selection.kind === 'only' && report.results[0]?.value !== undefined
-              ? report.results[0].value
+            onlyResult?.value !== undefined &&
+            (onlyResult.status === 'pass' || onlyResult.status === 'fail')
+              ? onlyResult.value
               : report;
           process.stdout.write(
             options.human === true ? renderHuman(report) : `${JSON.stringify(machineResult)}\n`,
