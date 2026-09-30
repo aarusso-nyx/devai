@@ -80,7 +80,7 @@
       "id": "R-0501",
       "title": "Amendment and adopter authority source contract",
       "goal": "The constitution is 1.0.2 with the Article 6 extension model of ADR-GOV-0024 and the framework's own pin is rebound; the adopter policy schema admits the authority block of ADR-AUT-0003; a pure compiler turns a valid block into the fixed-ladder rule set deterministically and refuses every malformed source and every source bound under a constitution below 1.0.2 with a named code; the adopter page states the contract.",
-      "status": "open",
+      "status": "closed",
       "records": ["ADR-GOV-0024", "ADR-AUT-0003"],
       "depends_on": [],
       "attestation_reissue": false,
@@ -110,7 +110,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "in_progress",
+              "status": "merged",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -168,7 +168,7 @@
                 "sha256": "66b3991418f5a1736e8d8257b36ae412134cc6d5496d90ddc8a7813b5dee814a"
               },
               "pull_request": null,
-              "merged_as": null,
+              "merged_as": "009e7fd071b6f9edac127517fdb75b6c3c2fe749",
               "execution": {
                 "tier": "architect",
                 "effort": "high",
@@ -220,7 +220,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0511",
-              "status": "in_progress",
+              "status": "merged",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -263,7 +263,7 @@
                 "sha256": "25086cf8be29922dcd3e4c294ae18307d9a1a39ba4ae7e8318faee4613940d43"
               },
               "pull_request": null,
-              "merged_as": null,
+              "merged_as": "009e7fd071b6f9edac127517fdb75b6c3c2fe749",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -315,7 +315,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0512",
-              "status": "in_progress",
+              "status": "merged",
               "target_substrates": ["F2"],
               "boundary": {
                 "paths": [
@@ -360,7 +360,7 @@
                 "sha256": "15ea2381733c74b590c330f4bf0f4a4e034cc936808026c6a67f92f42c2dd42d"
               },
               "pull_request": null,
-              "merged_as": null,
+              "merged_as": "009e7fd071b6f9edac127517fdb75b6c3c2fe749",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -408,13 +408,19 @@
             }
           ]
         }
-      ]
+      ],
+      "closure": {
+        "merged_head": "009e7fd071b6f9edac127517fdb75b6c3c2fe749",
+        "closed_at": "2026-09-30T15:29:11Z",
+        "task_policy_digest": null,
+        "phase_closure": null
+      }
     },
     {
       "id": "R-0502",
       "title": "Materialization and broker enforcement",
       "goal": "The package default test selectors are a law source; init bind --adopter-policy materializes the compiled block as the second additive extension of authority-policy.json with receipt provenance, byte-stable across reruns; the broker decides every row of the DETRAN acceptance matrix as real rules with the fixed ladder, refuses paths outside the roots and escapes before any rule, and denies equal-precedence extension ties as ambiguous.",
-      "status": "planned",
+      "status": "open",
       "records": ["ADR-AUT-0003"],
       "depends_on": ["R-0501"],
       "attestation_reissue": false,
@@ -445,7 +451,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F1"],
               "boundary": {
                 "paths": [
@@ -491,14 +497,53 @@
               "commit_types": ["law(adopter-defaults)", "law(schemas)", "docs(adopters)"],
               "prompt": {
                 "path": "prompts/TASK-0521.md",
-                "sha256": null
+                "sha256": "46b150ff85053337601521736c832bda963038e1e3b0c1acd38d15289cec82a6"
               },
               "pull_request": null,
               "merged_as": null,
               "execution": {
                 "tier": "architect",
                 "effort": "high",
-                "time_budget_minutes": 90
+                "time_budget_minutes": 90,
+                "resolved": {
+                  "policy_version": "1.0.0",
+                  "pinned_at": "2026-09-30T15:29:12Z",
+                  "tiers": {
+                    "architect": {
+                      "rank": 1,
+                      "hosts": {
+                        "claude": "claude-cli:fable",
+                        "codex": "codex-cli:gpt-6-astra"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker-high": {
+                      "rank": 2,
+                      "hosts": {
+                        "claude": "claude-cli:opus",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker": {
+                      "rank": 3,
+                      "hosts": {
+                        "claude": "claude-cli:sonnet",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "medium"
+                    },
+                    "clerk": {
+                      "rank": 4,
+                      "hosts": {
+                        "claude": "claude-cli:haiku",
+                        "codex": "codex-cli:gpt-6-luna"
+                      },
+                      "default_effort": "low"
+                    }
+                  },
+                  "ceiling": "architect"
+                }
               }
             },
             {
