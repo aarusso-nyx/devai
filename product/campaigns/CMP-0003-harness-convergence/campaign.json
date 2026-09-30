@@ -39,7 +39,8 @@
       "id": "OE-01",
       "description": "Verify that the merge queue supports the rebase method with linear history and the required devai-release-gate check, then enable it on main; allow_update_branch is optional. If the queue is incompatible, record the serialized-admission fallback instead.",
       "required_before": "R-0304",
-      "performed_at": null
+      "performed_at": "2026-09-29T21:41:52Z",
+      "outcome": "fallback"
     },
     {
       "id": "OE-02",
@@ -939,7 +940,7 @@
       "id": "R-0304",
       "title": "Serialized integration",
       "goal": "The pull-request gate runs under merge_group with the queue's base and head, admission and eviction are documented, and the merge queue or the serialized fallback is the mechanism that keeps pull requests from invalidating each other.",
-      "status": "closing",
+      "status": "closed",
       "records": ["ADR-CHK-0004"],
       "depends_on": ["R-0301"],
       "attestation_reissue": false,
@@ -1116,7 +1117,12 @@
           ]
         }
       ],
-      "closure": null
+      "closure": {
+        "merged_head": "468de683d953f9ccc416919775c68e6901a806e5",
+        "closed_at": "2026-09-30T06:40:00Z",
+        "task_policy_digest": "4d284d804badf9b0971313a65af8539dc380160fc724555bac2ba1872d1cd5d1",
+        "phase_closure": null
+      }
     },
     {
       "id": "R-0305",
@@ -3647,7 +3653,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "in_progress",
+              "status": "pre_merge",
               "target_substrates": ["F1"],
               "boundary": {
                 "paths": ["law/schemas/campaign.schema.json", "law/policy/campaign-execution.json"],
@@ -3727,7 +3733,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-03101",
-              "status": "in_progress",
+              "status": "pre_merge",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": ["tests/contract/campaign-plan.contract.test.ts"],
@@ -3806,7 +3812,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-03102",
-              "status": "in_progress",
+              "status": "pre_merge",
               "target_substrates": ["F5"],
               "boundary": {
                 "paths": ["scripts/check-campaign.mjs"],
