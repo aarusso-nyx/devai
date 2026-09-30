@@ -49,26 +49,29 @@ summarized in the proposals document's reconciliation section.
 
 ## 2. Rounds and the outcome each must move
 
-| Round  | Records                                  | Outcome                                                                                                                                  |
-| ------ | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| R-0301 | ADR-CHK-0003                             | A ledger-only pull request executes the planning lane with the bootstrap restored from cache and the campaign check run; policy accepted |
-| R-0302 | ADR-CFG-0002, ADR-GOV-0020               | Retired blocks leave the projection; `CLAUDE.md` is the import; guidance survives `--force`; recipe front matter converged               |
-| R-0303 | ADR-GOV-0022                             | Recording eight receipts in one commit yields zero findings; deleting one yields one                                                     |
-| R-0304 | ADR-CHK-0004                             | Two green pull requests from one base merge through the queue without a manual rebase (or the recorded serialized fallback)              |
-| R-0305 | ADR-GOV-0023, ADR-MDL-0002, ADR-MDL-0001 | `review.mode` exists; the default tier map resolves and pins; prose around a valid verdict parses, an invalid one errors with a digest   |
-| R-0306 | ADR-REL-0030, ADR-REL-0032               | Two stops on rehearsal, two on publication; a site-only re-run resumes its submitted record                                              |
-| R-0307 | ADR-GOV-0021                             | One page per workflow under a completeness gate; generated ADR catalogue; stale statements corrected                                     |
+| Round  | Records                                  | Outcome                                                                                                                                                                  |
+| ------ | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| R-0301 | ADR-CHK-0003                             | A ledger-only pull request executes the planning lane with the bootstrap restored from cache and the campaign check run; policy accepted                                 |
+| R-0302 | ADR-CFG-0002, ADR-GOV-0020               | Retired blocks leave the projection; `CLAUDE.md` is the import; guidance survives `--force`; recipe front matter converged                                               |
+| R-0303 | ADR-GOV-0022                             | Recording eight receipts in one commit yields zero findings; deleting one yields one                                                                                     |
+| R-0304 | ADR-CHK-0004                             | Two green pull requests from one base merge through the queue without a manual rebase (or the recorded serialized fallback)                                              |
+| R-0305 | ADR-GOV-0023, ADR-MDL-0002, ADR-MDL-0001 | `review.mode` exists; the default tier map resolves and pins; prose around a valid verdict parses, an invalid one errors with a digest                                   |
+| R-0306 | ADR-REL-0030, ADR-REL-0032               | Two stops on rehearsal, two on publication; a site-only re-run resumes its submitted record                                                                              |
+| R-0307 | ADR-GOV-0021                             | One page per workflow under a completeness gate; generated ADR catalogue; stale statements corrected                                                                     |
+| R-0308 | ADR-SCR-0011, ADR-REL-0033, ADR-EVI-0003 | The sweep emits a schema-valid reading for every read kind; a packed candidate proves the scorecard route in a disposable adopter; `round status` reports a sealed round |
+| R-0309 | ADR-CHK-0005                             | Every check member declares where it applies; a framework-only member reports `not-applicable` in an adopter, never an empty PASS or an ENOENT                           |
 
 ## 3. Owner effects
 
-| Effect | Before | What                                                                                                                         |
-| ------ | ------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| OE-01  | R-0304 | Verify the merge queue supports rebase, linear history, and the required check; enable it, or record the serialized fallback |
-| OE-02  | R-0306 | Reconfigure the environments to one reviewer stop each on the three release environments and none on `github-pages`          |
-| OE-03  | R-0306 | Repoint `DEVAI_PROCESS_CONTROL_COMMIT` to an explicit reviewed SHA before the next rehearsal, and again after R-0306         |
-| OE-04  | R-0306 | Reissue the Pages migration audit for the next tag                                                                           |
-| OE-05  | R-0305 | Supply one rejected PASS review reply as the first fixture of ADR-MDL-0001                                                   |
-| OE-06  | R-0307 | Raise every maintainer host to a Claude Code release that reads `AGENTS.md` natively                                         |
+| Effect | Before | What                                                                                                                                                                                              |
+| ------ | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| OE-01  | R-0304 | Verify the merge queue supports rebase, linear history, and the required check; enable it, or record the serialized fallback                                                                      |
+| OE-02  | R-0306 | Reconfigure the environments to one reviewer stop each on the three release environments and none on `github-pages`                                                                               |
+| OE-03  | R-0306 | Repoint `DEVAI_PROCESS_CONTROL_COMMIT` to an explicit reviewed SHA before the next rehearsal, and again after R-0306                                                                              |
+| OE-04  | R-0306 | Reissue the Pages migration audit for the next tag                                                                                                                                                |
+| OE-05  | R-0305 | Supply one rejected PASS review reply as the first fixture of ADR-MDL-0001                                                                                                                        |
+| OE-06  | R-0307 | Raise every maintainer host to a Claude Code release that reads `AGENTS.md` natively                                                                                                              |
+| OE-07  | R-0308 | Publish the immutable release that carries the ADR-SCR-0011 schema admission and the scorecard store resolver, from the exact packed artifact the rehearsal verified, and tell DETRAN the version |
 
 ## 4. Running the campaign
 
@@ -112,6 +115,14 @@ Recorded on 2026-09-29, after R-0301 reached `closing` and R-0302 opened:
    time, enforced by the campaign check since R-0304) is the recorded outcome;
    the `merge_group` trigger stays in the gate workflow for a future move to an
    organization.
+6. **Extension for the adopter issues.** On 2026-09-29 the five DETRAN issues
+   #184, #185, #175, #187, and #186 opened and matched no round of this
+   campaign or of CMP-0004. The maintainer extended this campaign instead of
+   opening a new one (pull request #197, merged as `dd5c3a69`): rounds R-0308
+   and R-0309, four proposed records, and owner effect OE-07; #186 is
+   deferred (section 7). OE-07 narrows decision 4: one immutable version is
+   published after R-0308 because #185 needs a published package; no other
+   tag or publication belongs to this campaign.
 
 ## 6. Round log
 
@@ -122,15 +133,17 @@ Close checks are the campaign's standing set (`adrs`, `schemas`, `docs-links`,
 detached worktree at the merged head after `pnpm run build` and
 `pnpm run release:bootstrap`.
 
-| Round  | Merged head | Pull requests    | State                                                                                                                                                                        |
-| ------ | ----------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| R-0301 | `e5cfdb77`  | #173, #176       | `closing`: waits for the single RC attestation (decision 1); the check-suite declaration (decision 3) is pull request #194, held for the Owner's yes on its broker admission |
-| R-0302 | `12d52fa5`  | #179, #181       | `closed`: close checks green on the merged head; `test-tasks.json` unchanged, so no attestation is owed                                                                      |
-| R-0303 | `0a66e13a`  | #183             | `closed`: close checks green on the merged head (990 skills tests, 3480 CLI tests); the eight-receipt acceptance was proven in the wave                                      |
-| R-0304 | `468de683`  | #188             | `closing`: implementation in `main`; waits for the single RC attestation and for OE-01 (queue enabled or the serialized fallback recorded)                                   |
-| R-0305 | `04b141fe`  | #189, #190, #191 | `closing`: review mode, the versioned tier default, pinned resolution, the shared reply extractor; waits for the attestation and OE-05                                       |
-| R-0306 | `5eda694f`  | #192, #193       | `closing`: merged gated release jobs, control commit before the first stop, Pages resume-on-rerun; waits for OE-02, OE-03, OE-04                                             |
-| R-0307 | `90d5fc7d`  | #195             | `closing`: workflow reference pages, the IA completeness gate, the generated decision catalogue; waits for OE-06                                                             |
+| Round  | Merged head | Pull requests    | State                                                                                                                                                                                                                |
+| ------ | ----------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| R-0301 | `e5cfdb77`  | #173, #176, #194 | `closed`: the check-suite declaration (decision 3) merged as #194 (`722cb5a6`) after the Owner accepted its broker widening; the single RC attestation ran on that head and its task-policy digest is in the closure |
+| R-0302 | `12d52fa5`  | #179, #181       | `closed`: close checks green on the merged head; `test-tasks.json` unchanged, so no attestation is owed                                                                                                              |
+| R-0303 | `0a66e13a`  | #183             | `closed`: close checks green on the merged head (990 skills tests, 3480 CLI tests); the eight-receipt acceptance was proven in the wave                                                                              |
+| R-0304 | `468de683`  | #188             | `closed`: OE-01 recorded through the serialized fallback (decision 5); the RC task-policy digest of the run on `722cb5a6` is in the closure                                                                          |
+| R-0305 | `04b141fe`  | #189, #190, #191 | `closing`: review mode, the versioned tier default, pinned resolution, the shared reply extractor; the attestation is covered by the run on `722cb5a6`; waits for OE-05                                              |
+| R-0306 | `5eda694f`  | #192, #193       | `closed`: OE-02, OE-03, and OE-04 performed on 2026-09-29 (control commit `722cb5a6`; the audit for tag v1.6.0 reissued against it)                                                                                  |
+| R-0307 | `90d5fc7d`  | #195             | `closed`: OE-06 performed (Claude Code 2.1.277); the three `FORBID-CI-WITHOUT-ADR` findings on its law commits carry Owner receipts in `law/policy/forbidden-action-authorizations.json`                             |
+| R-0308 |             | #197             | `planned`: waits for the Architect's acceptance of ADR-SCR-0011, ADR-REL-0033, and ADR-EVI-0003 (section 7)                                                                                                          |
+| R-0309 |             | #197             | `planned`: waits for the acceptance of ADR-CHK-0005 (section 7)                                                                                                                                                      |
 
 Backlog observed while closing R-0302 and R-0303, outside every task boundary:
 
@@ -173,15 +186,91 @@ Backlog observed while running R-0305, outside every task boundary:
   their fixtures from a normalized copy. A contract test never depends on the
   momentary state of a moving ledger.
 
-Close state on 2026-09-29, after wave CTG-0371 merged as `90d5fc7d`: every
-task of the seven rounds is `merged`; R-0302 and R-0303 are `closed`; the
-other five rounds are `closing` and cannot reach `closed` until the Owner
-performs the effects the ledger names (OE-01 to OE-06), re-issues the single
-RC attestation for the merged head, and records receipts for the
-forbidden-actions findings the scanner reports at that head. On `90d5fc7d`
-the scanner reports three, all `FORBID-CI-WITHOUT-ADR` on the three R-0307
-law commits that cite `.github/workflows/` paths inside the information
-architecture policy and schema without touching a workflow file; the earlier
-Engineer-identity ledger findings have left the scan window. The close checks
-of this campaign ran on `90d5fc7d` in a detached worktree; their result is
-recorded in the closing pull request.
+Backlog observed while performing the Owner effects and the OE-05 experiment
+(a live run of the review evaluator through the bridge transport on
+2026-09-29, Claude Code 2.1.277), outside every task boundary:
+
+- A `claude -p --json-schema` reply ends with `stop_reason: "tool_use"` and
+  `terminal_reason: "completed"` while `structured_output` is present; the
+  bridge's finish mapping (`is_error`, `max_tokens`, `tool_use`) would turn
+  that envelope into `reply_provider_error`. The mapping must read a completed
+  terminal reason with a structured output as `stop` before any campaign runs
+  under `review.mode: model-advisory`; this also settles the R-0305 backlog
+  item on unverified envelope fields.
+- `--tools ''` does not disable the user's MCP servers: the evaluator used a
+  code-index server over fourteen turns while reviewing. The bridge needs an
+  explicit way to run the review without any MCP server, verified against the
+  CLI reference, so that a review reads only the prompt it was given.
+- The envelope's `result` string is not byte-identical to
+  `JSON.stringify(structured_output)`; the bridge prefers the structured
+  output when present, so the reply digest a task records depends on that
+  choice. The fixture format of ADR-MDL-0001 must say which bytes it stores.
+- `attestation_reissue` is `true` only on R-0301 although decision 1 names
+  R-0304 and R-0305 as descriptor-changing rounds; the closures of R-0301 and
+  R-0304 carry the digest of the one run anyway. The campaign schema should
+  say whether the flag marks the round that owes the attestation or every
+  round the attestation covers.
+
+State on 2026-09-30, after the round-closure commits were rebased onto the
+extension (`dd5c3a69`): every task of R-0301 to R-0307 is `merged`; R-0301,
+R-0302, R-0303, R-0304, R-0306, and R-0307 are `closed`; R-0305 is `closing`
+and waits only for OE-05; R-0308 and R-0309 are `planned`. OE-01 to OE-04 and
+OE-06 are recorded as performed. The single RC attestation of decision 1 ran
+on `722cb5a6`, the merged head after #194, with the database-gated profile
+(733 files, 11303 tests); its task-policy digest `4d284d80` is in the closures
+of R-0301 and R-0304, and signing and export of the receipt stay the Owner's
+step outside the repository. On `90d5fc7d` the scanner reported three
+`FORBID-CI-WITHOUT-ADR` findings on the three R-0307 law commits that cite
+`.github/workflows/` paths inside the information architecture policy and
+schema without touching a workflow file; the Owner's receipts for them are
+recorded and the scanner now reports zero findings with three applied. The
+close checks ran on `90d5fc7d` in a detached worktree; their result is
+recorded in the round-closure pull request.
+
+## 7. Extension: R-0308 and R-0309
+
+The extension proposal
+(`docs/dev/operations/harness-convergence-extension-proposal.md`) checked the
+five adopter issues against the checkout and placed them; decision 6 adopted
+it. Both rounds depend on R-0301, which is closed.
+
+| Round  | Waves                                  | Records                                  | Closes after                                                                                                 |
+| ------ | -------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| R-0308 | CTG-0381 (#184, #185), CTG-0382 (#175) | ADR-SCR-0011, ADR-REL-0033, ADR-EVI-0003 | `schemas`, `test:sensors`, `test:loop`, `test:cli`, `release:static-integrity` on the merged head, and OE-07 |
+| R-0309 | CTG-0391 (#187)                        | ADR-CHK-0005                             | `schemas`, `test:cli`, `docs-links` on the merged head                                                       |
+
+Each wave is a coupled triplet (architect, inspector, engineer) with prompts
+TASK-0381 to TASK-0386 and TASK-0391 to TASK-0393, run per section 4. CTG-0382
+does not depend on CTG-0381. TASK-0384 reproduces #175 on a sealed fixture
+round before it documents anything; if the refusal does not reproduce on
+`main`, the task reports blocked and ADR-EVI-0003 is revisited.
+
+The four records are `proposed` and bind nothing until the Architect sets
+them `accepted` before R-0308 opens. Two decisions are open inside them:
+
+1. **ADR-SCR-0011, the five schema-only legacy kind values.** The draft keeps
+   them and lists them as legacy on the sensor-kinds reference, because
+   readings recorded under them exist in adopter stores and ADR-SCR-0008
+   forbids rewriting a recorded reading; retiring them would be a separate
+   record.
+2. **ADR-CHK-0005, option A or option B for `action-effects` and
+   `cli-reference` in adopters.** The draft takes option A (a structured
+   `not-applicable`), because DETRAN's Owner accepted explicit N/A and option
+   B (a package-owned input mode) needs a decision on which package files are
+   inputs; B stays open as a later record.
+
+Acceptance changes the authority graph: the freeze test
+`packages/schemas/tests/contract/governance-v15-adr.test.ts` lists the four
+as effective authorities with their subject authorities, and the catalogue
+`law/adr/README.md` is regenerated and re-pinned in
+`law/policy/adr-validation.json`.
+
+#186 (governed multi-stack path authority) is deferred. Article 6 decides
+authority by a fixed path prefix of at most two segments and forbids a
+wildcard rule with a default remainder; the class precedence the issue needs
+(colocated `*.spec.*` files under `apps/**` to Inspector, DDL to Architect,
+over an Engineer grant on the root) cannot be expressed in that table, and
+Article 9 makes a change to Articles 6 to 10 a constitutional amendment with
+a new version. The orchestrator's recommendation is a campaign of its own,
+proposed after ADR-CFG-0002 (R-0302) on which its materialization depends,
+starting from the sketch in the extension proposal; the maintainer decides.
