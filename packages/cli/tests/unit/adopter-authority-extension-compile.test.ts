@@ -1,16 +1,31 @@
 import { describe, expect, it } from 'vitest';
+import * as policySupport from '../../src/authority/policy-support.js';
 import { canonicalSha256 } from '../../src/authority/policy-support.js';
 import { compileAdopterAuthorityExtension } from '../../src/authority/policy-adopter-extension.js';
+import { canonicalRegistry, type RegistryEntry } from '../../src/define-command.js';
 
 // ADR-AUT-0003 Compilation, Constitution gate, and IA-003/IA-004/IA-006: a pure compiler
 // turns a validated authority block into one additive extension document with a fixed
 // ladder (root 500, test 700, architecture 750), a fixed role per class, and a harness
 // subject bound to that role; every malformed source is refused by a named code.
+// ADR-AUT-0004 IA-004: each class rule carries exactly the registered write verbs of its class
+// role, which the compiler takes as an input derived from the registry; `round run` and
+// `task finish` appear on no rule.
 const REPOSITORY_ID = 'detran';
 const DEFAULT_TEST_SELECTORS = ['**/*.spec.*', '**/*.test.*', '**/test/**', '**/tests/**'];
 const ROOTS = ['apps', 'backend', 'frontend', 'mobile', 'portal', 'src'];
 const ARCHITECTURE_SELECTORS = ['**/ddl/**/*.sql', '**/blueprints/**'];
-const ENGINEER_WRITE_VERBS = ['round run', 'task finish', 'task start'];
+
+type ClassName = 'root' | 'test' | 'architecture';
+type ClassVerbs = Record<ClassName, readonly string[]>;
+
+/** The class verb sets ADR-AUT-0004 IA-004 freezes for the registered action registry. */
+const CLASS_WRITE_VERBS: ClassVerbs = {
+  root: ['task start'],
+  test: ['check'],
+  architecture: ['init apply architect', 'release export', 'round plan', 'round seal'],
+};
+const REMOVED_VERBS = ['round run', 'task finish'];
 
 const REFERENCE_AUTHORITY = {
   extension_id: 'detran.path-authority',
@@ -25,24 +40,37 @@ type Role = 'engineer' | 'inspector' | 'architect';
 
 function compile(
   authority: unknown,
-  overrides: { constitutionVersion?: string; defaultTestSelectors?: readonly string[] } = {},
+  overrides: {
+    constitutionVersion?: string;
+    defaultTestSelectors?: readonly string[];
+    classWriteVerbs?: ClassVerbs;
+  } = {},
 ) {
-  return compileAdopterAuthorityExtension({
+  // The class verb sets are an input of the pure compiler (ADR-AUT-0004 Derivation).
+  const input = {
     policyId: 'detran.devai-adoption',
     policyVersion: '1.1.0',
     authority: authority as Parameters<typeof compileAdopterAuthorityExtension>[0]['authority'],
     constitutionVersion: overrides.constitutionVersion ?? '1.0.2',
     defaultTestSelectors: overrides.defaultTestSelectors ?? DEFAULT_TEST_SELECTORS,
     repositoryId: REPOSITORY_ID,
-  });
+    classWriteVerbs: overrides.classWriteVerbs ?? CLASS_WRITE_VERBS,
+  };
+  return compileAdopterAuthorityExtension(input);
 }
+
+const CLASS_OF: Readonly<Record<Role, ClassName>> = {
+  engineer: 'root',
+  inspector: 'test',
+  architect: 'architecture',
+};
 
 function expectedRule(id: string, precedence: 500 | 700 | 750, glob: string, role: Role) {
   return {
     rule_id: id,
     origin: 'additive-extension',
     precedence,
-    action_ids: ENGINEER_WRITE_VERBS,
+    action_ids: CLASS_WRITE_VERBS[CLASS_OF[role]],
     selector: {
       kind: 'fs',
       repository_id: REPOSITORY_ID,
@@ -97,7 +125,7 @@ function refusal(code: string): RegExp {
 }
 
 describe('adopter authority extension compiler: reference source', () => {
-  it('compiles the reference source to the exact rule set of ADR-AUT-0003 in declared order', () => {
+  it('compiles the reference source to the exact rule set of ADR-AUT-0003 and ADR-AUT-0004 in declared order', () => {
     const extension = compile(REFERENCE_AUTHORITY);
     expect(extension.extension_id).toBe('detran.path-authority');
     expect(extension.extension_version).toBe('1.1.0');
@@ -127,6 +155,64 @@ describe('adopter authority extension compiler: reference source', () => {
       Object.fromEntries([...roleAt].map(([precedence, roles]) => [precedence, [...roles]])),
     ).toEqual({ 500: ['engineer'], 700: ['inspector'], 750: ['architect'] });
     expect(new Set(rules.map((rule) => rule.rule_id)).size).toBe(rules.length);
+  });
+
+  it.each([
+    ['adopter-path-root-', 500, CLASS_WRITE_VERBS.root],
+    ['adopter-path-test-', 700, CLASS_WRITE_VERBS.test],
+    ['adopter-path-architecture-', 750, CLASS_WRITE_VERBS.architecture],
+  ] as const)(
+    'carries on every %s rule at %i exactly the class verbs %j (IA-004)',
+    (prefix, precedence, verbs) => {
+      const rules = compile(REFERENCE_AUTHORITY).rules.filter((rule) =>
+        rule.rule_id.startsWith(prefix),
+      );
+      expect(rules.length).toBeGreaterThan(0);
+      for (const rule of rules) {
+        expect(rule.precedence, rule.rule_id).toBe(precedence);
+        expect(rule.action_ids, rule.rule_id).toEqual(verbs);
+      }
+    },
+  );
+
+  it('names round run and task finish on no rule (IA-004)', () => {
+    const { rules } = compile(REFERENCE_AUTHORITY);
+    const named = rules.filter((rule) =>
+      rule.action_ids.some((actionId) => REMOVED_VERBS.includes(actionId)),
+    );
+    expect(named.map((rule) => rule.rule_id)).toEqual([]);
+  });
+
+  it('compiles the sets the registry-derived package function yields to the frozen verbs', () => {
+    const derive = (policySupport as Record<string, unknown>)['classWriteVerbs'];
+    expect(typeof derive, 'policy-support.ts must export classWriteVerbs(entries)').toBe(
+      'function',
+    );
+    const derived = (derive as (entries: readonly RegistryEntry[]) => ClassVerbs)(
+      canonicalRegistry(),
+    );
+    expect(derived).toEqual(CLASS_WRITE_VERBS);
+    expect(compile(REFERENCE_AUTHORITY, { classWriteVerbs: derived })).toEqual(
+      compile(REFERENCE_AUTHORITY),
+    );
+  });
+
+  it('takes the class verb sets as an input, so a changed set changes the rules and the digest', () => {
+    const widened: ClassVerbs = {
+      ...CLASS_WRITE_VERBS,
+      test: ['check', 'synthetic inspector write'],
+    };
+    const reference = compile(REFERENCE_AUTHORITY);
+    const changed = compile(REFERENCE_AUTHORITY, { classWriteVerbs: widened });
+    for (const rule of changed.rules) {
+      const verbs = rule.rule_id.startsWith('adopter-path-test-')
+        ? widened.test
+        : rule.rule_id.startsWith('adopter-path-architecture-')
+          ? widened.architecture
+          : widened.root;
+      expect(rule.action_ids, rule.rule_id).toEqual(verbs);
+    }
+    expect(canonicalSha256(changed)).not.toBe(canonicalSha256(reference));
   });
 
   it('yields identical bytes and digest when compiled twice', () => {

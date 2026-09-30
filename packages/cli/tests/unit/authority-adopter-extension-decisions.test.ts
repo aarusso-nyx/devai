@@ -1,10 +1,13 @@
 // Invariants: INV-DEVAI-001, INV-DEVAI-015, INV-DEVAI-017
-// Inspector acceptance for ADR-AUT-0003 IA-001, IA-009, and IA-002: the reference source is
-// bound through `init bind --adopter-policy` in a fixture repository pinned at constitution
-// 1.0.2, and every cell of the decision matrix is a real broker decision over the
-// materialized authority policy (bootstrap_policy false), requested by each role as the
-// human subject and as the harness subject that role initiates. No decision is computed by
-// re-implementing the ladder: the broker loads the bound policy and resolves the write.
+// Inspector acceptance for ADR-AUT-0004 IA-001, IA-002, IA-003, and the declaration half of
+// IA-005 (over ADR-AUT-0003 IA-001, IA-009, and IA-002): the reference source is bound through
+// `init bind --adopter-policy` in a fixture repository pinned at constitution 1.0.2, and every
+// cell of the decision matrix is a real broker decision over the materialized authority policy
+// (bootstrap_policy false), requested with the registry entry exactly as registered: `check`
+// declared by the Inspector, `task start` declared by the Engineer, and `round seal` declared
+// by the Architect. No subject is substituted and no decision is computed by re-implementing
+// the ladder: the broker loads the bound policy and resolves the write, and the resolution it
+// reached is read back unchanged to name the matched rules.
 import { execFileSync } from 'node:child_process';
 import {
   existsSync,
@@ -24,22 +27,68 @@ import { createAuthorityHostBroker } from '../../src/authority/broker.js';
 import { canonicalRegistry, type RegistryEntry } from '../../src/define-command.js';
 import { resolveCliVersion } from '../../src/version.js';
 
+type Resolution = { readonly outcome: string; readonly code: string; readonly matched: string[] };
+
+// A passthrough over the policy resolver: it returns the resolver's own result unchanged and
+// records it, so a cell names the rules the broker matched without recomputing them.
+const resolutions = vi.hoisted(() => [] as Resolution[]);
+
+vi.mock('@devai-nyx/authority', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  const resolve = actual['resolveAuthorityPolicy'] as (...args: unknown[]) => unknown;
+  return {
+    ...actual,
+    resolveAuthorityPolicy: (...args: unknown[]) => {
+      const result = resolve(...args) as {
+        outcome?: unknown;
+        code?: unknown;
+        matched_rule_ids?: unknown;
+      };
+      resolutions.push({
+        outcome: String(result.outcome),
+        code: String(result.code),
+        matched: Array.isArray(result.matched_rule_ids)
+          ? result.matched_rule_ids.map((id) => String(id))
+          : [],
+      });
+      return result;
+    },
+  };
+});
+
 const FIXTURES = resolve(import.meta.dirname, '../fixtures/adopter-path-authority');
 const SOURCE = 'law/policy/devai-adoption.json';
 const POLICY = '.devai/config/authority-policy.json';
 
 type Role = 'engineer' | 'inspector' | 'architect';
-type SubjectKind = 'human' | 'harness';
-type Verb = 'engineer' | 'architect';
+type Verb = 'task start' | 'check' | 'round seal';
 type Decision = { readonly outcome: 'allow' } | { readonly outcome: 'deny'; readonly code: string };
+type Outcome = { readonly decision: Decision; readonly matched: string[] | undefined };
 
-const ROLES: readonly Role[] = ['engineer', 'inspector', 'architect'];
-const SUBJECTS: readonly SubjectKind[] = ['human', 'harness'];
+/** The class role and the registered verb it declares (ADR-AUT-0004 Verbs by class). */
+const ROLE_VERBS: ReadonlyArray<readonly [Role, Verb]> = [
+  ['engineer', 'task start'],
+  ['inspector', 'check'],
+  ['architect', 'round seal'],
+];
+const VERBS: readonly Verb[] = ROLE_VERBS.map(([, verb]) => verb);
+
+const ARGV: Readonly<Record<Verb, readonly string[]>> = {
+  'task start': ['task', 'start', '--round', 'R-0007', '--task', 'TASK-7001'],
+  check: ['check', '--suite', 'quick'],
+  'round seal': ['round', 'seal'],
+};
+
+const CLASS_VERBS = {
+  root: ['task start'],
+  test: ['check'],
+  architecture: ['init apply architect', 'release export', 'round plan', 'round seal'],
+} as const;
 
 const ALLOW: Decision = { outcome: 'allow' };
 const deny = (code: string): Decision => ({ outcome: 'deny', code });
-const SUBJECT_DENIED = deny('AUTHORITY_SUBJECT_DENIED');
 const ACTION_DENIED = deny('AUTHORITY_ACTION_DENIED');
+const HUMAN_ROLE_DENIED = deny('AUTHORITY_HUMAN_ROLE_DENIED');
 const UNCLASSIFIED = deny('UNCLASSIFIED_RESOURCE');
 const ESCAPE = deny('AUTHORITY_FS_SYMLINK_ESCAPE');
 const TARGET_INVALID = deny('AUTHORITY_FS_TARGET_INVALID');
@@ -92,38 +141,18 @@ function put(path: string, content: string): void {
   writeFileSync(absolute, content);
 }
 
-/** The registry entry of the verb, with its subject replaced by the requested kind and role. */
-function entryFor(verb: Verb, subject: SubjectKind, role: Role): RegistryEntry {
-  const name = verb === 'engineer' ? 'task start' : 'round plan';
-  const base = entries.find((candidate) => candidate.name === name);
-  if (base === undefined) throw new Error(`missing action ${name}`);
-  return {
-    ...base,
-    authority_contract: {
-      ...base.authority_contract,
-      subject:
-        subject === 'human'
-          ? { kind: 'human', allowed_roles: [role] }
-          : {
-              kind: 'derived-machine',
-              actor: 'harness',
-              transition: 'harness-write',
-              initiator: { allowed_roles: [role], preserve_in_context: true },
-            },
-    },
-  } as RegistryEntry;
+/** The registry entry of the verb exactly as registered; its subject is never replaced. */
+function registered(verb: Verb): RegistryEntry {
+  const entry = entries.find((candidate) => candidate.name === verb);
+  if (entry === undefined) throw new Error(`missing action ${verb}`);
+  return entry;
 }
 
-function brokerFor(verb: Verb, subject: SubjectKind, role: Role) {
-  const entry = entryFor(verb, subject, role);
-  const argv =
-    verb === 'engineer'
-      ? ['task', 'start', '--round', 'R-0007', '--task', 'TASK-7001']
-      : ['round', 'plan', '--documents', 'cli'];
+function brokerFor(verb: Verb, role: Role) {
   return createAuthorityHostBroker({
-    entry,
+    entry: registered(verb),
     entries,
-    argv: [process.execPath, 'devai', ...argv, '--as-role', role, '--write'],
+    argv: [process.execPath, 'devai', ...ARGV[verb], '--as-role', role, '--write'],
     role,
     declaration: { as_role: role },
     repository_root: repo,
@@ -141,11 +170,18 @@ function codeOf(error: unknown): string {
   return /[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+/u.exec(message)?.[0] ?? message;
 }
 
-/** One governed write through the broker; the host effect never reaches the disk. */
-function decide(verb: Verb, subject: SubjectKind, role: Role, target: unknown): Decision {
-  const host = brokerFor(verb, subject, role);
+/**
+ * One governed write through the broker; the host effect never reaches the disk. `matched`
+ * is the rule ids of the resolution the broker reached, or undefined when the request was
+ * refused before any rule was consulted.
+ */
+function decideWith(verb: Verb, role: Role, target: unknown): Outcome {
+  resolutions.length = 0;
   let applied = false;
+  let decision: Decision;
+  let host: ReturnType<typeof brokerFor> | undefined;
   try {
+    host = brokerFor(verb, role);
     const result = host.scope.apply_effect(
       { kind: 'filesystem', symbol: 'writeFileSync', arguments: [target, 'fixture\n'] },
       () => {
@@ -155,13 +191,23 @@ function decide(verb: Verb, subject: SubjectKind, role: Role, target: unknown): 
     );
     expect(result).toBe('applied');
     expect(applied).toBe(true);
-    return ALLOW;
+    decision = ALLOW;
   } catch (error) {
     expect(applied, `a refused write must not apply: ${String(target)}`).toBe(false);
-    return deny(codeOf(error));
+    decision = deny(codeOf(error));
   } finally {
-    host.dispose();
+    host?.dispose();
   }
+  const reached = resolutions.at(-1);
+  if (reached !== undefined) {
+    expect(reached.outcome, `${verb} ${role} ${String(target)}`).toBe(decision.outcome);
+    if (decision.outcome === 'deny') expect(reached.code).toBe(decision.code);
+  }
+  return { decision, matched: reached === undefined ? undefined : [...reached.matched].sort() };
+}
+
+function decide(verb: Verb, role: Role, target: unknown): Decision {
+  return decideWith(verb, role, target).decision;
 }
 
 const at = (path: string): string => `${repo}/${path}`;
@@ -220,7 +266,7 @@ afterAll(() => {
   }
 });
 
-describe('ADR-AUT-0003 fixture binding', () => {
+describe('ADR-AUT-0003 fixture binding under the ADR-AUT-0004 class verbs', () => {
   it('pins constitution 1.0.2 and binds the reference source', () => {
     expect(
       parseConstitutionVersion(readFileSync(join(repo, '.devai/pin/constitution.md'), 'utf8')),
@@ -234,23 +280,35 @@ describe('ADR-AUT-0003 fixture binding', () => {
   // The "decided by" column of the matrix names these rules; they are read from the
   // materialized policy, never recomputed here.
   it.each([
-    ['adopter-path-root-apps-tree', 500, 'apps/**', 'engineer'],
-    ['adopter-path-root-backend-tree', 500, 'backend/**', 'engineer'],
-    ['adopter-path-root-portal-tree', 500, 'portal/**', 'engineer'],
-    ['adopter-path-test-apps-1', 700, 'apps/**/*.spec.*', 'inspector'],
-    ['adopter-path-test-backend-2', 700, 'backend/**/*.test.*', 'inspector'],
-    ['adopter-path-test-backend-4', 700, 'backend/**/tests/**', 'inspector'],
-    ['adopter-path-architecture-backend-1', 750, 'backend/**/ddl/**/*.sql', 'architect'],
-    ['adopter-path-architecture-backend-2', 750, 'backend/**/blueprints/**', 'architect'],
+    ['adopter-path-root-apps-tree', 500, 'apps/**', 'engineer', CLASS_VERBS.root],
+    ['adopter-path-root-backend-tree', 500, 'backend/**', 'engineer', CLASS_VERBS.root],
+    ['adopter-path-root-portal-tree', 500, 'portal/**', 'engineer', CLASS_VERBS.root],
+    ['adopter-path-test-apps-1', 700, 'apps/**/*.spec.*', 'inspector', CLASS_VERBS.test],
+    ['adopter-path-test-backend-2', 700, 'backend/**/*.test.*', 'inspector', CLASS_VERBS.test],
+    ['adopter-path-test-backend-4', 700, 'backend/**/tests/**', 'inspector', CLASS_VERBS.test],
+    [
+      'adopter-path-architecture-backend-1',
+      750,
+      'backend/**/ddl/**/*.sql',
+      'architect',
+      CLASS_VERBS.architecture,
+    ],
+    [
+      'adopter-path-architecture-backend-2',
+      750,
+      'backend/**/blueprints/**',
+      'architect',
+      CLASS_VERBS.architecture,
+    ],
   ] as const)(
-    'materializes %s at %i over %s for the %s role only',
-    (ruleId, precedence, glob, role) => {
+    'materializes %s at %i over %s for the %s role only, under its class verbs',
+    (ruleId, precedence, glob, role, verbs) => {
       const rule = policyRules().find((candidate) => candidate['rule_id'] === ruleId);
       expect(rule, ruleId).toMatchObject({
         origin: 'additive-extension',
         precedence,
         effect: 'allow',
-        action_ids: ['round run', 'task finish', 'task start'],
+        action_ids: [...verbs],
         selector: { kind: 'fs', canonical_relative_path_glob: glob },
         subjects: [
           { kind: 'human', roles: [role] },
@@ -265,61 +323,154 @@ describe('ADR-AUT-0003 fixture binding', () => {
   );
 });
 
-// Each row: path, then the decision for Engineer, Inspector, and Architect under the
-// Engineer write verb (`task start`), identical for the human subject and the harness.
-const MATRIX: ReadonlyArray<readonly [string, string, Decision, Decision, Decision]> = [
-  ['IA-001', 'apps/dashboard/web/src/example.ts', ALLOW, SUBJECT_DENIED, SUBJECT_DENIED],
-  ['IA-001', 'backend/domains/ops/src/example.ts', ALLOW, SUBJECT_DENIED, SUBJECT_DENIED],
-  ['IA-001', 'apps/dashboard/web/README.md', ALLOW, SUBJECT_DENIED, SUBJECT_DENIED],
-  ['IA-001', 'backend/domains/ops/README.md', ALLOW, SUBJECT_DENIED, SUBJECT_DENIED],
-  ['IA-009', 'apps/dashboard/web/src/example.spec.ts', SUBJECT_DENIED, ALLOW, SUBJECT_DENIED],
-  ['IA-009', 'backend/domains/ops/tests/example.test.ts', SUBJECT_DENIED, ALLOW, SUBJECT_DENIED],
-  ['IA-009', 'backend/ddl/example.sql', SUBJECT_DENIED, SUBJECT_DENIED, ALLOW],
-  ['IA-009', 'backend/blueprints/ops.md', SUBJECT_DENIED, SUBJECT_DENIED, ALLOW],
-  ['IA-002', 'vendor/x.ts', UNCLASSIFIED, UNCLASSIFIED, UNCLASSIFIED],
-  ['IA-002', 'portal/src/example.ts', ALLOW, SUBJECT_DENIED, SUBJECT_DENIED],
+/** The precedence of each materialized rule, read from the bound policy. */
+function precedenceOf(ruleId: string): unknown {
+  return policyRules().find((rule) => rule['rule_id'] === ruleId)?.['precedence'];
+}
+
+// Each row: record, path, the decision for the Engineer under `task start`, the Inspector under
+// `check`, and the Architect under `round seal`, then the rules that decide every cell and
+// their precedence. An allow names them as matched; a deny names them as the classified rules
+// that carry no requested verb, and never a rule of a lower precedence.
+const MATRIX: ReadonlyArray<
+  readonly [string, string, Decision, Decision, Decision, readonly string[], number]
+> = [
+  [
+    'IA-003',
+    'apps/dashboard/web/src/example.ts',
+    ALLOW,
+    ACTION_DENIED,
+    ACTION_DENIED,
+    ['adopter-path-root-apps-tree'],
+    500,
+  ],
+  [
+    'IA-003',
+    'backend/domains/ops/src/example.ts',
+    ALLOW,
+    ACTION_DENIED,
+    ACTION_DENIED,
+    ['adopter-path-root-backend-tree'],
+    500,
+  ],
+  [
+    'IA-003',
+    'apps/dashboard/web/README.md',
+    ALLOW,
+    ACTION_DENIED,
+    ACTION_DENIED,
+    ['adopter-path-root-apps-tree'],
+    500,
+  ],
+  [
+    'IA-003',
+    'backend/domains/ops/README.md',
+    ALLOW,
+    ACTION_DENIED,
+    ACTION_DENIED,
+    ['adopter-path-root-backend-tree'],
+    500,
+  ],
+  [
+    'IA-001',
+    'apps/dashboard/web/src/example.spec.ts',
+    ACTION_DENIED,
+    ALLOW,
+    ACTION_DENIED,
+    ['adopter-path-test-apps-1'],
+    700,
+  ],
+  [
+    'IA-001',
+    'backend/domains/ops/tests/example.test.ts',
+    ACTION_DENIED,
+    ALLOW,
+    ACTION_DENIED,
+    ['adopter-path-test-backend-2', 'adopter-path-test-backend-4'],
+    700,
+  ],
+  [
+    'IA-002',
+    'backend/ddl/example.sql',
+    ACTION_DENIED,
+    ACTION_DENIED,
+    ALLOW,
+    ['adopter-path-architecture-backend-1'],
+    750,
+  ],
+  [
+    'IA-002',
+    'backend/blueprints/ops.md',
+    ACTION_DENIED,
+    ACTION_DENIED,
+    ALLOW,
+    ['adopter-path-architecture-backend-2'],
+    750,
+  ],
+  [
+    'IA-003',
+    'portal/src/example.ts',
+    ALLOW,
+    ACTION_DENIED,
+    ACTION_DENIED,
+    ['adopter-path-root-portal-tree'],
+    500,
+  ],
 ];
 
-const CASES = MATRIX.flatMap(([record, path, ...decisions]) =>
-  ROLES.flatMap((role, index) =>
-    SUBJECTS.map((subject) => [record, path, role, subject, decisions[index] as Decision] as const),
-  ),
-);
+const CASES = MATRIX.flatMap(([record, path, ...rest]) => {
+  const decisions = rest.slice(0, 3) as Decision[];
+  const [ruleIds, precedence] = rest.slice(3) as [readonly string[], number];
+  return ROLE_VERBS.map(
+    ([role, verb], index) =>
+      [record, path, verb, role, decisions[index] as Decision, ruleIds, precedence] as const,
+  );
+});
 
-describe('IA-001, IA-009, IA-002: the matrix under the Engineer write verb', () => {
-  it.each(CASES)('%s %s as %s (%s subject)', (_record, path, role, subject, expected) => {
-    expect(decide('engineer', subject, role, at(path))).toEqual(expected);
+describe('IA-001, IA-002, IA-003: the matrix under the registered verbs', () => {
+  it.each(CASES)(
+    '%s %s under %s declared by the %s',
+    (_record, path, verb, role, expected, ruleIds, precedence) => {
+      const { decision, matched } = decideWith(verb, role, at(path));
+      expect(decision).toEqual(expected);
+      expect(matched, 'the decision names exactly the rules of the class precedence').toEqual(
+        [...ruleIds].sort(),
+      );
+      for (const ruleId of matched ?? []) expect(precedenceOf(ruleId), ruleId).toBe(precedence);
+    },
+  );
+});
+
+// IA-005: the registry subjects and the class verbs name the same role, so a cross-role
+// request under a class verb is refused at the declaration boundary before any rule.
+describe('IA-005: a cross-role declaration is refused before any rule', () => {
+  it.each([
+    ['task start', 'inspector', 'apps/dashboard/web/src/example.ts'],
+    ['task start', 'inspector', 'apps/dashboard/web/src/example.spec.ts'],
+    ['check', 'engineer', 'apps/dashboard/web/src/example.spec.ts'],
+    ['check', 'engineer', 'apps/dashboard/web/src/example.ts'],
+    ['round seal', 'engineer', 'backend/ddl/example.sql'],
+    ['round seal', 'inspector', 'backend/ddl/example.sql'],
+  ] as const)('%s declared by the %s on %s', (verb, role, path) => {
+    expect(decideWith(verb, role, at(path))).toEqual({
+      decision: HUMAN_ROLE_DENIED,
+      matched: undefined,
+    });
   });
 });
 
-describe('IA-009: docs/ stays Architect under the core row', () => {
+describe('IA-003: docs/ stays Architect under the core row', () => {
   // The core docs rows admit only the human Architect verbs; the extension never names docs.
-  it.each(ROLES.flatMap((role) => SUBJECTS.map((subject) => [role, subject] as const)))(
-    'docs/index.md under the Engineer verb as %s (%s subject) reads AUTHORITY_ACTION_DENIED',
-    (role, subject) => {
-      expect(decide('engineer', subject, role, at('docs/index.md'))).toEqual(ACTION_DENIED);
-    },
-  );
-
   it.each([
-    ['architect', ALLOW],
-    ['engineer', SUBJECT_DENIED],
-    ['inspector', SUBJECT_DENIED],
-  ] as const)(
-    'docs/index.md under the Architect verb as the human %s reads %j',
-    (role, expected) => {
-      expect(decide('architect', 'human', role, at('docs/index.md'))).toEqual(expected);
-    },
-  );
-
-  // The matrix doc says the harness reads the same outcome as the human role; the core
-  // docs rows bind only the human Architect, so an Architect-initiated harness is refused.
-  it.each(ROLES)(
-    'docs/index.md under the Architect verb as the harness initiated by %s reads AUTHORITY_SUBJECT_DENIED',
-    (role) => {
-      expect(decide('architect', 'harness', role, at('docs/index.md'))).toEqual(SUBJECT_DENIED);
-    },
-  );
+    ['task start', 'engineer', ACTION_DENIED],
+    ['check', 'inspector', ACTION_DENIED],
+    ['round seal', 'architect', ALLOW],
+  ] as const)('docs/index.md under %s declared by the %s reads %j', (verb, role, expected) => {
+    const { decision, matched } = decideWith(verb, role, at('docs/index.md'));
+    expect(decision).toEqual(expected);
+    expect(matched?.every((ruleId) => !ruleId.startsWith('adopter-path-'))).toBe(true);
+    expect(matched).toContain('core-architect-docs');
+  });
 
   it('an extension rule never names or shadows docs/', () => {
     const extensionGlobs = policyRules()
@@ -334,7 +485,17 @@ describe('IA-009: docs/ stays Architect under the core row', () => {
   });
 });
 
-describe('IA-002: escapes are refused by canonicalization before any rule', () => {
+describe('IA-003: an undeclared directory present in the tree grants nothing', () => {
+  it.each(ROLE_VERBS)('vendor/x.ts declared by the %s under %s', (role, verb) => {
+    expect(existsSync(join(repo, 'vendor'))).toBe(true);
+    expect(decideWith(verb, role, at('vendor/x.ts'))).toEqual({
+      decision: UNCLASSIFIED,
+      matched: [],
+    });
+  });
+});
+
+describe('IA-003: escapes are refused by canonicalization before any rule', () => {
   const escapes = [
     ['a .. target that leaves the repository', () => at('apps/../../outside.md'), ESCAPE],
     ['a symlink under apps/ that resolves outside', () => at('apps/escape/x.ts'), ESCAPE],
@@ -344,45 +505,37 @@ describe('IA-002: escapes are refused by canonicalization before any rule', () =
 
   it.each(
     escapes.flatMap(([label, target, expected]) =>
-      ROLES.flatMap((role) =>
-        SUBJECTS.map((subject) => [label, role, subject, target, expected] as const),
-      ),
+      ROLE_VERBS.map(([role, verb]) => [label, verb, role, target, expected] as const),
     ),
-  )('%s as %s (%s subject)', (_label, role, subject, target, expected) => {
-    expect(decide('engineer', subject, role, target())).toEqual(expected);
+  )('%s under %s declared by the %s', (_label, verb, role, target, expected) => {
+    expect(decideWith(verb, role, target())).toEqual({ decision: expected, matched: undefined });
   });
 
   it('a .. target that stays inside canonicalizes to the core law/ row, never the apps root', () => {
-    for (const role of ROLES) {
-      for (const verb of ['engineer', 'architect'] as const) {
-        const direct = decide(verb, 'human', role, at('law/x.md'));
-        expect(decide(verb, 'human', role, at('apps/../law/x.md')), `${verb} ${role}`).toEqual(
-          direct,
-        );
-      }
+    for (const [role, verb] of ROLE_VERBS) {
+      const direct = decideWith(verb, role, at('law/x.md'));
+      const dotted = decideWith(verb, role, at('apps/../law/x.md'));
+      expect(dotted, `${verb} ${role}`).toEqual(direct);
+      expect(dotted.matched?.some((ruleId) => ruleId.startsWith('adopter-path-'))).not.toBe(true);
     }
-    expect(decide('architect', 'human', 'architect', at('apps/../law/x.md'))).toEqual(ALLOW);
-    expect(decide('engineer', 'human', 'engineer', at('apps/../law/x.md'))).toEqual(ACTION_DENIED);
+    expect(decide('round seal', 'architect', at('apps/../law/x.md'))).toEqual(ALLOW);
+    expect(decide('task start', 'engineer', at('apps/../law/x.md'))).toEqual(ACTION_DENIED);
   });
 });
 
-describe('IA-002: a declared but absent root grants exactly what a present root grants', () => {
-  it.each(ROLES.flatMap((role) => SUBJECTS.map((subject) => [role, subject] as const)))(
-    'portal/ reads as apps/ for %s (%s subject)',
-    (role, subject) => {
-      for (const path of ['src/example.ts', 'src/example.spec.ts', 'README.md']) {
-        expect(decide('engineer', subject, role, at(`portal/${path}`)), path).toEqual(
-          decide('engineer', subject, role, at(`apps/${path}`)),
-        );
-      }
-      expect(existsSync(join(repo, 'portal'))).toBe(false);
-    },
-  );
+describe('IA-003: a declared but absent root grants exactly what a present root grants', () => {
+  it.each(ROLE_VERBS)('portal/ reads as apps/ for the %s under %s', (role, verb) => {
+    for (const path of ['src/example.ts', 'src/example.spec.ts', 'README.md']) {
+      expect(decide(verb, role, at(`portal/${path}`)), path).toEqual(
+        decide(verb, role, at(`apps/${path}`)),
+      );
+    }
+    expect(existsSync(join(repo, 'portal'))).toBe(false);
+  });
 
-  it('an undeclared directory present in the tree grants nothing', () => {
-    expect(existsSync(join(repo, 'vendor'))).toBe(true);
-    for (const role of ROLES) {
-      expect(decide('engineer', 'harness', role, at('vendor/x.ts'))).toEqual(UNCLASSIFIED);
+  it('every registered verb is driven exactly as registered', () => {
+    for (const verb of VERBS) {
+      expect(registered(verb)).toBe(entries.find((entry) => entry.name === verb));
     }
   });
 });

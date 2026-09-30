@@ -4,7 +4,9 @@
 // into authority-policy.json and names it in the binding receipt, byte-stably; a changed,
 // removed, edited, or missing source moves or refuses exactly as the record states. Every
 // bind goes through the CLI and every governed write through the broker over the bound
-// policy (bootstrap_policy false).
+// policy (bootstrap_policy false). ADR-AUT-0004 IA-004 and IA-005: the materialized class
+// rules carry exactly the registered write verbs of their class role, and the immutable core
+// rules and devai-adopter-authority materialize unchanged beside them.
 import { execFileSync } from 'node:child_process';
 import {
   mkdirSync,
@@ -33,6 +35,13 @@ const EXTENSION = 'detran.path-authority';
 const SHA256 = /^[0-9a-f]{64}$/u;
 // Six roots, each with two root rules, four test rules, and two architecture rules.
 const REFERENCE_RULE_COUNT = 48;
+
+/** The class verb sets ADR-AUT-0004 IA-004 freezes for the registered action registry. */
+const CLASS_WRITE_VERBS = {
+  root: ['task start'],
+  test: ['check'],
+  architecture: ['init apply architect', 'release export', 'round plan', 'round seal'],
+} as const;
 
 const entries: readonly RegistryEntry[] = canonicalRegistry();
 const roots: string[] = [];
@@ -309,6 +318,119 @@ describe('IA-004: binding is byte-stable and names the extension it materialized
     for (const key of ['additive_extensions', 'rules', 'resolved_digest_sha256'] as const) {
       expect(policy[key], key).toEqual(core[key]);
     }
+  });
+});
+
+describe('ADR-AUT-0004 IA-004: the materialized class rules carry the registered class verbs', () => {
+  function expectedRule(
+    repositoryId: string,
+    id: string,
+    precedence: 500 | 700 | 750,
+    glob: string,
+    role: 'engineer' | 'inspector' | 'architect',
+    verbs: readonly string[],
+  ) {
+    return {
+      rule_id: id,
+      origin: 'additive-extension',
+      precedence,
+      action_ids: [...verbs],
+      selector: {
+        kind: 'fs',
+        repository_id: repositoryId,
+        canonical_relative_path_glob: glob,
+        operations: ['create', 'update', 'delete', 'rename'],
+      },
+      effect: 'allow',
+      subjects: [
+        { kind: 'human', roles: [role] },
+        {
+          kind: 'derived-machine',
+          actor: 'harness',
+          transition: 'harness-write',
+          initiator: { allowed_roles: [role], preserve_in_context: true },
+        },
+      ],
+      required_consent: { write: true, allow_publish: false, experimental: false },
+      constitutional_anchors: [6, 7, 8, 9, 10],
+      rationale: expect.any(String) as unknown,
+    };
+  }
+
+  it('binding the reference source materializes the new rule bytes in declared order', async () => {
+    const repo = await boundRepository();
+    await expectBound(repo, fixture('reference.json'));
+    const reference = JSON.parse(fixture('reference.json')) as {
+      authority: {
+        roots: string[];
+        classes: { test: { selectors: string[] }; architecture: { selectors: string[] } };
+      };
+    };
+    const rules = (json(repo, POLICY)['rules'] as JsonObject[]).filter((rule) =>
+      String(rule['rule_id']).startsWith('adopter-path-'),
+    );
+    const repositoryId = String((rules[0]?.['selector'] as JsonObject)['repository_id']);
+    const { roots, classes } = reference.authority;
+    const expected = roots.flatMap((root) => [
+      expectedRule(
+        repositoryId,
+        `adopter-path-root-${root}`,
+        500,
+        root,
+        'engineer',
+        CLASS_WRITE_VERBS.root,
+      ),
+      expectedRule(
+        repositoryId,
+        `adopter-path-root-${root}-tree`,
+        500,
+        `${root}/**`,
+        'engineer',
+        CLASS_WRITE_VERBS.root,
+      ),
+      ...classes.test.selectors.map((selector, index) =>
+        expectedRule(
+          repositoryId,
+          `adopter-path-test-${root}-${String(index + 1)}`,
+          700,
+          `${root}/${selector}`,
+          'inspector',
+          CLASS_WRITE_VERBS.test,
+        ),
+      ),
+      ...classes.architecture.selectors.map((selector, index) =>
+        expectedRule(
+          repositoryId,
+          `adopter-path-architecture-${root}-${String(index + 1)}`,
+          750,
+          `${root}/${selector}`,
+          'architect',
+          CLASS_WRITE_VERBS.architecture,
+        ),
+      ),
+    ]);
+    expect(rules).toHaveLength(REFERENCE_RULE_COUNT);
+    expect(rules).toEqual(expected);
+    expect(
+      rules.filter((rule) =>
+        (rule['action_ids'] as string[]).some((id) => id === 'round run' || id === 'task finish'),
+      ),
+    ).toEqual([]);
+  });
+
+  it('the core rules and devai-adopter-authority materialize unchanged beside the extension', async () => {
+    const repo = await boundRepository();
+    const core = json(repo, POLICY);
+    const nonAdopter = (policy: JsonObject) =>
+      (policy['rules'] as JsonObject[]).filter(
+        (rule) => !String(rule['rule_id']).startsWith('adopter-path-'),
+      );
+    await expectBound(repo, fixture('reference.json'));
+    const bound = json(repo, POLICY);
+    expect(nonAdopter(bound)).toEqual(nonAdopter(core));
+    expect((bound['additive_extensions'] as JsonObject[])[0]).toEqual(
+      (core['additive_extensions'] as JsonObject[])[0],
+    );
   });
 });
 
