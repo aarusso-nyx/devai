@@ -67,6 +67,14 @@ starts with a root segment, and is applied under every declared root. The block 
 the source's `policy_version` like every other block: to add, change, or remove it, edit the
 source, bump `policy_version`, and rebind.
 
+The test defaults are a law source, not a constant of the package:
+[`law/policy/adopter-defaults/path-authority-classes.json`](../../law/policy/adopter-defaults/path-authority-classes.json),
+validated by
+[`law/schemas/path-authority-classes.schema.json`](../../law/schemas/path-authority-classes.schema.json)
+under the same selector grammar. The schema admits the test class only, so no architecture
+default can be declared there, and its selectors are compiled under every root an adopter
+declares exactly as an explicit `classes.test` would be.
+
 ## The fixed ladder
 
 The bind compiles the block into one additive extension whose rules sit on a ladder fixed by
@@ -86,16 +94,87 @@ produce two rules of equal precedence with different roles; the resolver still d
 different human role sets. A path outside every declared root reads `UNCLASSIFIED_RESOURCE`, and
 a root declared but absent from the tree grants exactly what a present root grants.
 
+## Decision matrix
+
+The rows below are the inspector acceptance of ADR-AUT-0003 (IA-001, IA-009, and IA-002) under
+the reference block above: the roots `apps`, `backend`, `frontend`, `mobile`, `portal`, and `src`,
+the default test class, and the architecture selectors `**/ddl/**/*.sql` and `**/blueprints/**`.
+Each cell is a real broker decision under the bound policy, never documentation alone. The role
+columns name the human subject; the harness subject initiated by the same role reads the same
+outcome, because every class rule binds its harness subject to the class role. An allow reads
+`POLICY_ALLOW` and names the matched rule ids. Every extension rule carries the Engineer write
+verbs (`round run`, `task start`, `task finish`) whatever its class role, so a role mismatch under
+an extension rule always reads `AUTHORITY_SUBJECT_DENIED`. The core `docs/` rows admit Architect
+verbs only, so a write there by another role reads `AUTHORITY_ACTION_DENIED` under an Engineer
+verb and `AUTHORITY_SUBJECT_DENIED` under an Architect verb.
+
+| Record | Path                                                                                                                          | Engineer                              | Inspector                             | Architect                             | Decided by                                                                               |
+| ------ | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- | ------------------------------------- | ------------------------------------- | ---------------------------------------------------------------------------------------- |
+| IA-001 | `apps/dashboard/web/src/example.ts`                                                                                           | allow `POLICY_ALLOW`                  | deny `AUTHORITY_SUBJECT_DENIED`       | deny `AUTHORITY_SUBJECT_DENIED`       | `adopter-path-root-apps-tree` (500)                                                      |
+| IA-001 | `backend/domains/ops/src/example.ts`                                                                                          | allow `POLICY_ALLOW`                  | deny `AUTHORITY_SUBJECT_DENIED`       | deny `AUTHORITY_SUBJECT_DENIED`       | `adopter-path-root-backend-tree` (500)                                                   |
+| IA-001 | `apps/dashboard/web/README.md`                                                                                                | allow `POLICY_ALLOW`                  | deny `AUTHORITY_SUBJECT_DENIED`       | deny `AUTHORITY_SUBJECT_DENIED`       | `adopter-path-root-apps-tree` (500): local documentation is remainder                    |
+| IA-001 | `backend/domains/ops/README.md`                                                                                               | allow `POLICY_ALLOW`                  | deny `AUTHORITY_SUBJECT_DENIED`       | deny `AUTHORITY_SUBJECT_DENIED`       | `adopter-path-root-backend-tree` (500): local documentation is remainder                 |
+| IA-009 | `apps/dashboard/web/src/example.spec.ts`                                                                                      | deny `AUTHORITY_SUBJECT_DENIED`       | allow `POLICY_ALLOW`                  | deny `AUTHORITY_SUBJECT_DENIED`       | `adopter-path-test-apps-1` (700) over the root grant                                     |
+| IA-009 | `backend/domains/ops/tests/example.test.ts`                                                                                   | deny `AUTHORITY_SUBJECT_DENIED`       | allow `POLICY_ALLOW`                  | deny `AUTHORITY_SUBJECT_DENIED`       | `adopter-path-test-backend-2` and `adopter-path-test-backend-4` (700), one role, unioned |
+| IA-009 | `backend/ddl/example.sql`                                                                                                     | deny `AUTHORITY_SUBJECT_DENIED`       | deny `AUTHORITY_SUBJECT_DENIED`       | allow `POLICY_ALLOW`                  | `adopter-path-architecture-backend-1` (750) over the root grant                          |
+| IA-009 | `backend/blueprints/ops.md`                                                                                                   | deny `AUTHORITY_SUBJECT_DENIED`       | deny `AUTHORITY_SUBJECT_DENIED`       | allow `POLICY_ALLOW`                  | `adopter-path-architecture-backend-2` (750) over the root grant                          |
+| IA-009 | `docs/index.md`                                                                                                               | deny `AUTHORITY_ACTION_DENIED`        | deny `AUTHORITY_ACTION_DENIED`        | allow `POLICY_ALLOW`                  | `core-architect-docs` (650): the core row, which the extension never names               |
+| IA-002 | `vendor/x.ts`, outside every declared root                                                                                    | deny `UNCLASSIFIED_RESOURCE`          | deny `UNCLASSIFIED_RESOURCE`          | deny `UNCLASSIFIED_RESOURCE`          | no rule matches; nothing is inferred from the directory                                  |
+| IA-002 | a target that resolves outside the repository through `..` (for example `apps/../../x.md`) or through a symlink under `apps/` | refused `AUTHORITY_FS_SYMLINK_ESCAPE` | refused `AUTHORITY_FS_SYMLINK_ESCAPE` | refused `AUTHORITY_FS_SYMLINK_ESCAPE` | the path canonicalization, before any rule is consulted                                  |
+| IA-002 | a target that is empty or is not a path                                                                                       | refused `AUTHORITY_FS_TARGET_INVALID` | refused `AUTHORITY_FS_TARGET_INVALID` | refused `AUTHORITY_FS_TARGET_INVALID` | the path canonicalization, before any rule is consulted                                  |
+| IA-002 | `portal/src/example.ts`, with `portal` declared but absent from the tree                                                      | allow `POLICY_ALLOW`                  | deny `AUTHORITY_SUBJECT_DENIED`       | deny `AUTHORITY_SUBJECT_DENIED`       | `adopter-path-root-portal-tree` (500): exactly what a present root grants                |
+
+The `docs/index.md` denials read `AUTHORITY_SUBJECT_DENIED` instead when the request carries an
+Architect verb. A `..` target that stays inside the repository, for example `apps/../law/x.md`,
+canonicalizes to `law/x.md` and is decided by the core `law/` row, never by the `apps` root.
+
 ## Binding and drift
 
 Rebind the constitution at 1.0.2 first (`init bind --constitution --write`, the Article 40
 discipline), then add the block, bump `policy_version`, and run
-`init bind --adopter-policy <file> --as-role architect --write`. The receipt
-`.devai/config/adopter-policy-binding.json` gains an `authority_extension` object
-(`extension_id`, `extension_version`, `digest_sha256`, `rule_count`), and
-`.devai/config/authority-policy.json` lists the extension in `additive_extensions` with the same
-digest. Binding the same source twice is byte-stable; removing the block removes the extension
-and every rule it compiled.
+`init bind --adopter-policy <file> --as-role architect --write`. Binding the same source twice is
+byte-stable; removing the block removes the extension and every rule it compiled.
+
+The receipt `.devai/config/adopter-policy-binding.json` gains an `authority_extension` object
+naming the compiled extension: its id, its version (the source `policy_version`), the SHA-256 of
+the canonical extension document, and the number of rules it compiled. For the reference block,
+six roots, four test selectors, and two architecture selectors compile to forty-eight rules:
+
+```json
+{
+  "authority_extension": {
+    "extension_id": "detran.path-authority",
+    "extension_version": "1.1.0",
+    "digest_sha256": "<sha-256 of the canonical extension document>",
+    "rule_count": 48
+  }
+}
+```
+
+`.devai/config/authority-policy.json` lists the same extension in `additive_extensions`, after
+the package extension `devai-adopter-authority` and with the same digest, and its
+`resolved_digest_sha256` covers the compiled rules. After binding, an adopter sees two entries:
+
+```json
+{
+  "additive_extensions": [
+    {
+      "extension_id": "devai-adopter-authority",
+      "extension_version": "1.0.0",
+      "digest_sha256": "<digest of the package extension>"
+    },
+    {
+      "extension_id": "detran.path-authority",
+      "extension_version": "1.1.0",
+      "digest_sha256": "<the digest the receipt names>"
+    }
+  ]
+}
+```
+
+The receipt and the policy therefore name the same bytes. A source without the block yields a
+receipt without `authority_extension` and a policy with exactly one entry, byte-identical to a
+bind before ADR-AUT-0003.
 
 The broker, the session, and `doctor` rebuild the expected sources on every use. A source edited
 after binding refuses every governed write with `AUTHORITY_POLICY_DIGEST_MISMATCH` until the bind

@@ -172,6 +172,13 @@ A bind is idempotent. Against an unchanged source and an unchanged `project.json
 byte to any target and records an empty `retired_keys`, so a second bind is observable only
 through its unchanged receipt.
 
+When the source declares the `authority` block, the receipt also carries `authority_extension`:
+the `extension_id`, `extension_version`, `digest_sha256`, and `rule_count` of the additive
+extension the bind compiled from that block, the same id and digest that
+`.devai/config/authority-policy.json` lists under `additive_extensions`. A source without the
+block yields a receipt without the field. The field and the matrix it stands for are described in
+[Path authority for multi-stack roots](path-authority.md).
+
 `doctor` keeps the receipt honest through `policy-materialization-current`: it recomputes the
 projection from the source and the current `project.json` and compares every digest the receipt
 carries with the file on disk. A receipt whose digests no longer match, because the source moved,
