@@ -799,8 +799,16 @@
       "runner": "node-builtin-v1",
       "inputSelectors": [
         {
-          "kind": "class",
-          "pattern": "plan"
+          "kind": "prefix",
+          "pattern": "product/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "record/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "work/"
         },
         {
           "kind": "exact",
@@ -826,8 +834,16 @@
       "runner": "node-builtin-v1",
       "inputSelectors": [
         {
-          "kind": "class",
-          "pattern": "plan"
+          "kind": "prefix",
+          "pattern": "product/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "record/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "work/"
         },
         {
           "kind": "exact",
@@ -861,8 +877,16 @@
       "runner": "node-builtin-v1",
       "inputSelectors": [
         {
-          "kind": "class",
-          "pattern": "plan"
+          "kind": "prefix",
+          "pattern": "product/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "record/"
+        },
+        {
+          "kind": "prefix",
+          "pattern": "work/"
         }
       ],
       "toolchainKeys": ["node"],
@@ -931,8 +955,36 @@
       "runner": "node-builtin-v1",
       "inputSelectors": [
         {
-          "kind": "class",
-          "pattern": "docs"
+          "kind": "prefix",
+          "pattern": "docs/"
+        },
+        {
+          "kind": "exact",
+          "pattern": "README.md"
+        },
+        {
+          "kind": "exact",
+          "pattern": "CLAUDE.md"
+        },
+        {
+          "kind": "exact",
+          "pattern": "AGENTS.md"
+        },
+        {
+          "kind": "exact",
+          "pattern": "CHANGELOG.md"
+        },
+        {
+          "kind": "exact",
+          "pattern": "LICENSE"
+        },
+        {
+          "kind": "exact",
+          "pattern": "NOTICE"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scratch/README.md"
         }
       ],
       "toolchainKeys": ["node"],
@@ -958,8 +1010,36 @@
       "runner": "node-builtin-v1",
       "inputSelectors": [
         {
-          "kind": "class",
-          "pattern": "docs"
+          "kind": "prefix",
+          "pattern": "docs/"
+        },
+        {
+          "kind": "exact",
+          "pattern": "README.md"
+        },
+        {
+          "kind": "exact",
+          "pattern": "CLAUDE.md"
+        },
+        {
+          "kind": "exact",
+          "pattern": "AGENTS.md"
+        },
+        {
+          "kind": "exact",
+          "pattern": "CHANGELOG.md"
+        },
+        {
+          "kind": "exact",
+          "pattern": "LICENSE"
+        },
+        {
+          "kind": "exact",
+          "pattern": "NOTICE"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scratch/README.md"
         },
         {
           "kind": "exact",
@@ -989,8 +1069,36 @@
       "runner": "node-builtin-v1",
       "inputSelectors": [
         {
-          "kind": "class",
-          "pattern": "docs"
+          "kind": "prefix",
+          "pattern": "docs/"
+        },
+        {
+          "kind": "exact",
+          "pattern": "README.md"
+        },
+        {
+          "kind": "exact",
+          "pattern": "CLAUDE.md"
+        },
+        {
+          "kind": "exact",
+          "pattern": "AGENTS.md"
+        },
+        {
+          "kind": "exact",
+          "pattern": "CHANGELOG.md"
+        },
+        {
+          "kind": "exact",
+          "pattern": "LICENSE"
+        },
+        {
+          "kind": "exact",
+          "pattern": "NOTICE"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scratch/README.md"
         }
       ],
       "toolchainKeys": ["node"],
@@ -1016,8 +1124,36 @@
       "runner": "node-builtin-v1",
       "inputSelectors": [
         {
-          "kind": "class",
-          "pattern": "docs"
+          "kind": "prefix",
+          "pattern": "docs/"
+        },
+        {
+          "kind": "exact",
+          "pattern": "README.md"
+        },
+        {
+          "kind": "exact",
+          "pattern": "CLAUDE.md"
+        },
+        {
+          "kind": "exact",
+          "pattern": "AGENTS.md"
+        },
+        {
+          "kind": "exact",
+          "pattern": "CHANGELOG.md"
+        },
+        {
+          "kind": "exact",
+          "pattern": "LICENSE"
+        },
+        {
+          "kind": "exact",
+          "pattern": "NOTICE"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scratch/README.md"
         }
       ],
       "toolchainKeys": ["node"],

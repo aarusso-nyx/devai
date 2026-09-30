@@ -18,6 +18,52 @@ const packages = new Map(
   }),
 );
 const tasks = new Map(descriptor.tasks.map((task) => [task.nodeId, task]));
+
+// ADR-CHK-0006: the committed descriptor uses only the selector kinds the
+// pinned trusted verifier admits, declared in its package policy. An
+// unadmitted kind is refused before any rewrite, in both modes.
+const VERIFIER_POLICY_PATH = 'law/policy/trusted-local-rc-verifier-package.json';
+function admittedSelectorKinds() {
+  let policy;
+  try {
+    policy = JSON.parse(readFileSync(join(root, VERIFIER_POLICY_PATH), 'utf8'));
+  } catch (error) {
+    process.stderr.write(
+      `TEST_TASK_SELECTOR_KINDS_UNDECLARED: ${VERIFIER_POLICY_PATH} is unreadable (${error instanceof Error ? error.message : String(error)})\n`,
+    );
+    process.exit(1);
+  }
+  const kinds = policy?.descriptor?.selector_kinds;
+  if (
+    !Array.isArray(kinds) ||
+    kinds.length === 0 ||
+    kinds.some((kind) => typeof kind !== 'string')
+  ) {
+    process.stderr.write(
+      `TEST_TASK_SELECTOR_KINDS_UNDECLARED: ${VERIFIER_POLICY_PATH} declares no descriptor.selector_kinds\n`,
+    );
+    process.exit(1);
+  }
+  return new Set(kinds);
+}
+const admittedKinds = admittedSelectorKinds();
+const unadmitted = [
+  ...(descriptor.dynamicFallbackSelectors ?? []).map((selector) => [
+    '<dynamicFallbackSelectors>',
+    selector,
+  ]),
+  ...descriptor.tasks.flatMap((task) =>
+    (task.inputSelectors ?? []).map((selector) => [task.nodeId, selector]),
+  ),
+].filter(([, selector]) => !admittedKinds.has(selector?.kind));
+if (unadmitted.length > 0) {
+  for (const [nodeId, selector] of unadmitted) {
+    process.stderr.write(
+      `TEST_TASK_SELECTOR_KIND_UNADMITTED: ${nodeId} uses selector kind ${String(selector?.kind)} (${String(selector?.pattern)}), outside descriptor.selector_kinds [${[...admittedKinds].join(', ')}] of ${VERIFIER_POLICY_PATH}\n`,
+    );
+  }
+  process.exit(1);
+}
 const findings = [];
 let changed = false;
 
