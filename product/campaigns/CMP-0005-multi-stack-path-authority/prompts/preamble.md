@@ -9,7 +9,7 @@ Read first: `AGENTS.md`, `law/constitution.md` Articles 4 to 10, 18, 23 to 28, 3
 and 40, the decision records named in the task (ADR-GOV-0024 and ADR-AUT-0003),
 `law/policy/campaign-execution.json`, `law/policy/self-dogfood.json`, the proposal
 `docs/dev/operations/multi-stack-path-authority-proposal.md` (its "Decisions
-required" section and the Owner's answers recorded under OE-01 bind every task),
+taken by the Owner" table, mirrored in OE-01 of the ledger, binds every task),
 and the task entry in
 `product/campaigns/CMP-0005-multi-stack-path-authority/campaign.json`.
 
