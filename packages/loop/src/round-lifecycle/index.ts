@@ -198,13 +198,19 @@ export function governedRoundStatus(options: {
   const parsed = parseGovernanceRecord(path);
   if (!validators.recordMeta(parsed.frontmatter)) fail('ROUND_RECORD_SCHEMA_INVALID');
   if (parsed.frontmatter['id'] !== id) fail('ROUND_RECORD_ID_MISMATCH');
-  const location = parsed.frontmatter['status'] === 'closed' ? 'closed' : 'active';
+  const record = parsed.frontmatter as JsonRecord;
+  const closeStatePath = join(local, 'close-state.jsonl');
+  const sealed = existsSync(closeStatePath);
+  if (sealed && readFileSync(closeStatePath, 'utf8') !== closeStateLine(record)) {
+    fail('ROUND_CLOSE_STATE_CONFLICT');
+  }
+  const location = sealed || record['status'] === 'closed' ? 'closed' : 'active';
   return {
     ok: true,
     id,
     location,
     path: relative(repoRoot, path),
-    record: parsed.frontmatter as JsonRecord,
+    record,
   };
 }
 
@@ -280,8 +286,7 @@ function assertClosePreconditions(repoRoot: string, id: string, source: string):
   return record;
 }
 
-export function appendCloseState(source: string, record: JsonRecord): string {
-  const path = join(source, 'close-state.jsonl');
+function closeStateLine(record: JsonRecord): string {
   const state = {
     schemaVersion: '1.0.0',
     round_id: record['id'],
@@ -290,7 +295,12 @@ export function appendCloseState(source: string, record: JsonRecord): string {
     phase_closure: record['phase_closure'],
     merged_as: record['merged_as'],
   };
-  const line = `${JSON.stringify(state)}\n`;
+  return `${JSON.stringify(state)}\n`;
+}
+
+export function appendCloseState(source: string, record: JsonRecord): string {
+  const path = join(source, 'close-state.jsonl');
+  const line = closeStateLine(record);
   if (existsSync(path)) {
     if (readFileSync(path, 'utf8') === line) return path;
     fail('ROUND_CLOSE_STATE_CONFLICT');
