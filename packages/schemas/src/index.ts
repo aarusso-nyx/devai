@@ -122,9 +122,10 @@ function schemaDocument(name: SchemaName): Record<string, unknown> {
           : packageSnapshot.sensorRegistry
         ).toString('utf8'),
       ) as {
-        entries?: ReadonlyArray<{ kind?: unknown }>;
+        entries?: ReadonlyArray<{ kind?: unknown; schema_admission?: unknown }>;
       };
-      const kinds = (registry.entries ?? []).map((entry) => entry.kind);
+      const entries = registry.entries ?? [];
+      const kinds = entries.map((entry) => entry.kind);
       if (
         kinds.length === 0 ||
         kinds.some((kind) => typeof kind !== 'string' || kind.length === 0) ||
@@ -132,13 +133,25 @@ function schemaDocument(name: SchemaName): Record<string, unknown> {
       ) {
         throw new Error('sensor registry has no unique live kind roster');
       }
+      // ADR-SCR-0011: the schema file enum is the admitted kind set, so the loader never
+      // narrows or widens it. It fails closed when a registry kind that is not declared
+      // `schema_admission: "unsupported"` is missing from the file enum.
       const sensor = (s['properties'] as Record<string, unknown>)['sensor'] as Record<
         string,
         unknown
       >;
       const sensorProperties = sensor['properties'] as Record<string, unknown>;
       const kindContract = sensorProperties['kind'] as Record<string, unknown>;
-      kindContract['enum'] = kinds;
+      const admitted = new Set(
+        Array.isArray(kindContract['enum']) ? (kindContract['enum'] as unknown[]) : [],
+      );
+      const unadmitted = entries
+        .filter((entry) => entry.schema_admission !== 'unsupported')
+        .map((entry) => entry.kind as string)
+        .filter((kind) => !admitted.has(kind));
+      if (unadmitted.length > 0) {
+        throw new Error(`SENSOR_KIND_NOT_IN_SCHEMA:${unadmitted.join(',')}`);
+      }
     }
     rawCache.set(name, s);
   }
