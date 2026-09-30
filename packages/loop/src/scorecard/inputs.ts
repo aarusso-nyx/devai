@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { validators } from '@devai-nyx/schemas';
 import type { SensorReading } from '@devai-nyx/sensors';
 import { computeScorecard, type Scorecard } from '../loop/scorecard.js';
 import {
@@ -94,7 +95,7 @@ export function resolveScorecardInputs(opts: ScorecardInputs): ResolvedScorecard
   // (3) Disk fallback.
   const readingsDir =
     (inputs['readings_dir'] as string | undefined) ?? join(opts.repoRoot, SENSOR_READINGS_DIR);
-  const readings = loadReadingsFromDir(readingsDir);
+  const readings = loadReadingsFromDir(readingsDir, { rejectInvalid: true });
   const scorecard = computeScorecard({
     timestamp: opts.timestamp,
     integrationHead,
@@ -105,27 +106,61 @@ export function resolveScorecardInputs(opts: ScorecardInputs): ResolvedScorecard
   return { scorecard, readings, source: readings.length > 0 ? 'disk' : 'empty' };
 }
 
+/** A file in the readings store that is not valid JSON (ADR-REL-0033 IA-002). */
+export const SCORECARD_READING_UNPARSEABLE = 'SCORECARD_READING_UNPARSEABLE';
+/** A file in the readings store holding a value that is not a valid SensorReading. */
+export const SCORECARD_READING_INVALID = 'SCORECARD_READING_INVALID';
+
+/** Options of the readings-directory walker. */
+export interface LoadReadingsOptions {
+  /**
+   * Reject instead of skipping: a file of invalid JSON throws
+   * `SCORECARD_READING_UNPARSEABLE:<path>` and a value that is not a valid SensorReading
+   * under the packaged schema throws `SCORECARD_READING_INVALID:<path>`. The scorecard
+   * resolver always sets it (ADR-REL-0033 IA-002).
+   */
+  readonly rejectInvalid?: boolean;
+}
+
+/**
+ * Parse one store file. Under `rejectInvalid` every SensorReading it holds is validated
+ * against the packaged schema and a rejected file fails the whole resolution with a named
+ * code and its path, so an unreadable or invalid reading is never counted, least of all as
+ * PASS; otherwise an unparseable file is skipped.
+ */
+function readStoreFile(path: string, rejectInvalid: boolean): SensorReading[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(path, 'utf8')) as unknown;
+  } catch {
+    if (rejectInvalid) throw new Error(`${SCORECARD_READING_UNPARSEABLE}:${path}`);
+    return [];
+  }
+  const values = Array.isArray(parsed) ? (parsed as unknown[]) : [parsed];
+  if (rejectInvalid && values.some((value) => !validators.sensorReading(value))) {
+    throw new Error(`${SCORECARD_READING_INVALID}:${path}`);
+  }
+  return values as SensorReading[];
+}
+
 /**
  * Walk `<dir>` for `*.json` and one level into `<dir>/<kind>/*.json`.
  * The loader always selects the current standing for each sensor kind;
- * disk evidence remains intact.
+ * disk evidence remains intact. Without `rejectInvalid` an unparseable file
+ * is skipped; with it the walk fails closed with a named code (see
+ * `LoadReadingsOptions`).
  */
-export function loadReadingsFromDir(dir: string): SensorReading[] {
+export function loadReadingsFromDir(
+  dir: string,
+  options: LoadReadingsOptions = {},
+): SensorReading[] {
+  const rejectInvalid = options.rejectInvalid === true;
   const out: SensorReading[] = [];
   if (!existsSync(dir)) return out;
   for (const entry of readdirSync(dir).sort()) {
     const full = join(dir, entry);
     if (entry.endsWith('.json')) {
-      try {
-        const parsed = JSON.parse(readFileSync(full, 'utf8')) as unknown;
-        if (Array.isArray(parsed)) {
-          for (const r of parsed) out.push(r as SensorReading);
-        } else {
-          out.push(parsed as SensorReading);
-        }
-      } catch {
-        // skip unparseable
-      }
+      out.push(...readStoreFile(full, rejectInvalid));
       continue;
     }
     let isDir = false;
@@ -137,16 +172,7 @@ export function loadReadingsFromDir(dir: string): SensorReading[] {
     if (!isDir) continue;
     for (const childName of readdirSync(full).sort()) {
       if (!childName.endsWith('.json')) continue;
-      try {
-        const parsed = JSON.parse(readFileSync(join(full, childName), 'utf8')) as unknown;
-        if (Array.isArray(parsed)) {
-          for (const r of parsed) out.push(r as SensorReading);
-        } else {
-          out.push(parsed as SensorReading);
-        }
-      } catch {
-        // skip unparseable
-      }
+      out.push(...readStoreFile(join(full, childName), rejectInvalid));
     }
   }
   return filterLatestPerKind(out);
