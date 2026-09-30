@@ -379,7 +379,12 @@ jobs:
           set -euo pipefail
           pnpm run build
           pnpm run format:check
-          pnpm run lint
+          # The JSON report is one line of several hundred kilobytes that the run
+          # log drops, so a failure is summarized as file, line, rule, and message.
+          if ! pnpm run lint > "$RUNNER_TEMP/eslint-report.json" 2> "$RUNNER_TEMP/eslint-stderr.txt"; then
+            node -e 'const fs=require("fs");const raw=fs.readFileSync(process.argv[1],"utf8");let report;try{report=JSON.parse(raw.slice(raw.indexOf("[")))}catch{console.log("lint produced no JSON report; first bytes:");console.log(raw.slice(0,2000));console.log(fs.readFileSync(process.argv[2],"utf8").slice(-4000));process.exit(0)}for(const file of report)for(const m of file.messages)console.log(`${file.filePath}:${m.line}:${m.column} ${m.severity===2?"error":"warning"} ${m.ruleId??""} ${m.message}`);' "$RUNNER_TEMP/eslint-report.json" "$RUNNER_TEMP/eslint-stderr.txt"
+            exit 1
+          fi
           pnpm run typecheck
           pnpm run release:static-integrity
           pnpm run release:closure
