@@ -2705,7 +2705,9 @@
                   "law/policy/sense-presets.json",
                   "docs/reference/cli/sensor-kinds.md",
                   "docs/adopters/pack-resolution.md",
-                  "docs/adopters/sensor-inputs.md"
+                  "docs/adopters/sensor-inputs.md",
+                  "law/schemas/sensor-registry.schema.json",
+                  "Orchestrator note (2026-09-30): the registry schema closes its entries, so the intentionally-unsupported marker of ADR-SCR-0011 needs one optional property admitted there; widened after the Architect stopped at the boundary."
                 ],
                 "forbidden": [".github/workflows/", "packages/", "tests/", "scripts/"]
               },
@@ -2743,7 +2745,7 @@
               ],
               "prompt": {
                 "path": "prompts/TASK-0381.md",
-                "sha256": "df3270c58e36771cada0ffe298ddc15c7f7b101a6b4b66281e1f0e055ab55bfc"
+                "sha256": "121ff6219d1758ba8f848fe3241c7e2533053e1ad907682d2b658332b622b8c2"
               },
               "pull_request": null,
               "merged_as": null,
