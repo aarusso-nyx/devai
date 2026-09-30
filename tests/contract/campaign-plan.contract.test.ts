@@ -92,6 +92,8 @@ function resetTask(task: Plan['rounds'][number]['waves'][number]['tasks'][number
 function copyConvergence(): string {
   const dir = copyCampaign(join(root, 'product/campaigns/CMP-0003-harness-convergence'));
   mutatePlan(dir, (plan) => {
+    // CMP-0003 closed on 2026-09-30; the copy stands in for an active ledger.
+    (plan as unknown as { status: string }).status = 'active';
     (plan as unknown as { review: unknown }).review = { mode: 'human' };
     for (const task of plan.rounds.flatMap((round) => round.waves.flatMap((wave) => wave.tasks))) {
       if (task.status === 'merged') continue;

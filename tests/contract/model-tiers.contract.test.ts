@@ -58,6 +58,9 @@ function fixture(
   cpSync(ACTIVE, dir, { recursive: true });
   const path = join(dir, 'campaign.json');
   const plan = readJson(path);
+  // CMP-0003 closed on 2026-09-30; its copy stands in for an active ledger, which
+  // the checker validates (closed ledgers are exempt), so the copy is reactivated.
+  (plan as { status?: string }).status = 'active';
   normalize(plan);
   for (const task of tasksOf(plan)) {
     if (task.status !== 'planned' && task.execution.resolved === undefined) {
