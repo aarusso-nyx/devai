@@ -1,9 +1,19 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { basename, dirname, join, resolve } from 'node:path';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { parseConstitutionVersion } from '@devai-nyx/skills';
 import { canonicalSha256 } from '@devai-nyx/utils';
 import { withAuthorityHostTestScope } from '../../../skills/tests/unit/authority-host-test-scope.js';
 import { buildBootstrapPlan, executeBootstrapPlan } from '../../../skills/src/bootstrap/index.js';
@@ -983,6 +993,409 @@ describe('targeted dependency security floor', () => {
     for (const name of Object.keys(stryker)) {
       expect(manifest.devDependencies?.[name]).toBeUndefined();
       expect(manifest.dependencies?.[name]).toBeUndefined();
+    }
+  });
+});
+
+// ADR-AUT-0003 IA-008 and ADR-AUT-0004 IA-006: the packed tarball, installed in a disposable
+// adopter, binds the reference source and reproduces the decisions and the drift refusals through
+// the installed package only. One pack and one install serve every case below; every bind and
+// Doctor run executes the installed bin, and every decision loads the broker and the registry from
+// the installed package, never from workspace sources.
+describe('packed adopter path authority', () => {
+  const FIXTURES = resolve(import.meta.dirname, '../fixtures/adopter-path-authority');
+  const SOURCE = 'law/policy/devai-adoption.json';
+  const BINDING = '.devai/config/adopter-policy-binding.json';
+  const POLICY = '.devai/config/authority-policy.json';
+  const DEFAULTS = 'law/policy/adopter-defaults/path-authority-classes.json';
+  const EXTENSION_ID = 'detran.path-authority';
+  const REBIND = `devai init bind --target . --adopter-policy ${SOURCE} --as-role architect --write`;
+  const PROBE_EXPORTS = ['createAuthorityHostBroker', 'canonicalRegistry'] as const;
+
+  type JsonObject = Record<string, unknown>;
+  type Check = { name: string; ok: boolean; info?: JsonObject; errors?: string[] };
+  type Decision =
+    { readonly outcome: 'allow' } | { readonly outcome: 'deny'; readonly code: string };
+  type ProbeRequest = { readonly verb: string; readonly role: string; readonly path: string };
+  type ProbeResult = { readonly unavailable?: string[]; readonly decisions?: Decision[] };
+
+  let workspace = '';
+  let adopter = '';
+  let installed = '';
+  let packedFiles: string[] = [];
+  let probeScript = '';
+
+  const fixtureSource = (name: string): string => readFileSync(join(FIXTURES, name), 'utf8');
+
+  function installedBin(args: readonly string[]) {
+    const result = spawnSync(
+      process.execPath,
+      [join(installed, 'dist/runtime/index/bin.js'), ...args, '--format', 'json'],
+      { cwd: adopter, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } },
+    );
+    return { status: result.status, stdout: result.stdout, stderr: result.stderr };
+  }
+
+  function installedBinPass(args: readonly string[]) {
+    const result = installedBin(args);
+    expect(result.status, `${args.join(' ')}\n${result.stderr}`).toBe(0);
+    return result;
+  }
+
+  function putSource(content: string): void {
+    mkdirSync(join(adopter, 'law/policy'), { recursive: true });
+    writeFileSync(join(adopter, SOURCE), content);
+  }
+
+  function bindSource(content: string) {
+    putSource(content);
+    return installedBin([
+      'init',
+      'bind',
+      '--target',
+      '.',
+      '--adopter-policy',
+      SOURCE,
+      '--as-role',
+      'architect',
+      '--write',
+    ]);
+  }
+
+  function bindReference(): void {
+    const result = bindSource(fixtureSource('reference.json'));
+    expect(result.status, result.stderr).toBe(0);
+  }
+
+  function adopterJson(path: string): JsonObject {
+    return JSON.parse(readFileSync(join(adopter, path), 'utf8')) as JsonObject;
+  }
+
+  function installedDoctor() {
+    const result = installedBin(['doctor', '--repo-root', '.']);
+    let envelope: JsonObject;
+    try {
+      envelope = JSON.parse(result.stdout) as JsonObject;
+    } catch {
+      throw new Error(
+        `installed doctor wrote no envelope (exit ${String(result.status)})\n${result.stderr}`,
+      );
+    }
+    const checks =
+      (envelope['result'] as { value?: { checks?: Check[] } } | undefined)?.value?.checks ?? [];
+    const check = (name: string): Check => {
+      const found = checks.find((candidate) => candidate.name === name);
+      expect(found, `installed doctor must report ${name}`).toBeDefined();
+      return found as Check;
+    };
+    return { status: result.status, envelope, check };
+  }
+
+  /** Real broker decisions from the installed package, each under a registered entry as is. */
+  function probe(requests: readonly ProbeRequest[]): Decision[] {
+    const result = spawnSync(process.execPath, [probeScript, JSON.stringify(requests)], {
+      cwd: adopter,
+      encoding: 'utf8',
+      env: { ...process.env, NO_COLOR: '1' },
+    });
+    expect(result.status, result.stderr).toBe(0);
+    const parsed = JSON.parse(result.stdout) as ProbeResult;
+    expect(
+      parsed.unavailable ?? [],
+      'INSTALLED_AUTHORITY_BROKER_UNAVAILABLE: the installed package must expose the broker',
+    ).toEqual([]);
+    return parsed.decisions ?? [];
+  }
+
+  beforeAll(() => {
+    workspace = realpathSync(mkdtempSync(join(tmpdir(), 'devai-packed-path-authority-')));
+    const packDestination = join(workspace, 'pack');
+    adopter = join(workspace, 'adopter');
+    installed = join(adopter, 'node_modules/@aarusso-nyx/devai');
+    for (const directory of [packDestination, installed]) mkdirSync(directory, { recursive: true });
+    const cliPackage = resolve(ROOT, 'packages/cli');
+    expect(existsSync(join(cliPackage, 'dist/runtime/index/bin.js')), 'run pnpm run build').toBe(
+      true,
+    );
+    const packed = JSON.parse(
+      execFileSync(
+        'npm',
+        ['pack', '--json', '--ignore-scripts', '--pack-destination', packDestination],
+        { cwd: cliPackage, encoding: 'utf8' },
+      ),
+    ) as unknown;
+    const entry = (Array.isArray(packed) ? packed[0] : Object.values(packed as object)[0]) as {
+      filename: string;
+      files: Array<{ path: string }>;
+    };
+    packedFiles = entry.files.map((file) => file.path);
+    const tarball = join(packDestination, basename(entry.filename));
+    execFileSync('tar', ['-xzf', tarball, '-C', installed, '--strip-components', '1']);
+
+    const git = (args: readonly string[]) => execFileSync('git', [...args], { cwd: adopter });
+    git(['init', '-q']);
+    git(['config', 'user.name', 'DEVAI packed adopter']);
+    git(['config', 'user.email', 'packed-adopter@example.invalid']);
+    writeFileSync(
+      join(adopter, 'package.json'),
+      `${JSON.stringify(
+        {
+          name: 'packed-path-authority-adopter',
+          private: true,
+          dependencies: { '@aarusso-nyx/devai': `file:${tarball}` },
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    writeFileSync(join(adopter, '.gitignore'), 'node_modules/\n.devai/state/\n');
+    for (const selector of [
+      ['--constitution', '--tier', 'tier1'],
+      ['--operational-law'],
+      ['--subprocess-effects'],
+      [],
+    ]) {
+      installedBinPass([
+        'init',
+        'bind',
+        ...selector,
+        '--target',
+        '.',
+        '--as-role',
+        'architect',
+        '--write',
+      ]);
+    }
+    bindReference();
+    for (const path of ['apps/dashboard/web/src/.keep', 'backend/ddl/.keep']) {
+      mkdirSync(dirname(join(adopter, path)), { recursive: true });
+      writeFileSync(join(adopter, path), '');
+    }
+
+    probeScript = join(workspace, 'installed-authority-probe.mjs');
+    writeFileSync(
+      probeScript,
+      `
+        import { readFileSync } from 'node:fs';
+        import { join } from 'node:path';
+        import { pathToFileURL } from 'node:url';
+        const installed = ${JSON.stringify(installed)};
+        const repository = ${JSON.stringify(adopter)};
+        const host = await import(pathToFileURL(join(installed, 'dist/runtime/index/release-host.js')).href);
+        const unavailable = ${JSON.stringify(PROBE_EXPORTS)}.filter((name) => typeof host[name] !== 'function');
+        if (unavailable.length > 0) {
+          process.stdout.write(JSON.stringify({ unavailable }));
+          process.exit(0);
+        }
+        const version = JSON.parse(readFileSync(join(installed, 'package.json'), 'utf8')).version;
+        const entries = host.canonicalRegistry();
+        const argvOf = {
+          check: ['check', '--suite', 'quick'],
+          'task start': ['task', 'start', '--round', 'R-0007', '--task', 'TASK-7001'],
+          'round seal': ['round', 'seal'],
+        };
+        const codeOf = (error) => {
+          if (error !== null && typeof error === 'object' && typeof error.code === 'string' && error.code !== '') return error.code;
+          const message = error instanceof Error ? error.message : String(error);
+          return /[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+/u.exec(message)?.[0] ?? message;
+        };
+        const decisions = JSON.parse(process.argv[2]).map(({ verb, role, path }) => {
+          const entry = entries.find((candidate) => candidate.name === verb);
+          if (entry === undefined) return { outcome: 'deny', code: 'PROBE_ACTION_UNREGISTERED' };
+          let applied = false;
+          let broker;
+          try {
+            broker = host.createAuthorityHostBroker({
+              entry,
+              entries,
+              argv: [process.execPath, 'devai', ...argvOf[verb], '--as-role', role, '--write'],
+              role,
+              declaration: { as_role: role },
+              repository_root: repository,
+              package_version: version,
+              bootstrap_policy: false,
+            });
+            broker.scope.apply_effect(
+              { kind: 'filesystem', symbol: 'writeFileSync', arguments: [join(repository, path), 'probe\\n'] },
+              () => { applied = true; return 'applied'; },
+            );
+            return applied ? { outcome: 'allow' } : { outcome: 'deny', code: 'PROBE_EFFECT_NOT_APPLIED' };
+          } catch (error) {
+            if (applied) return { outcome: 'deny', code: 'PROBE_REFUSED_AFTER_APPLY' };
+            return { outcome: 'deny', code: codeOf(error) };
+          } finally {
+            broker?.dispose();
+          }
+        });
+        process.stdout.write(JSON.stringify({ decisions }));
+      `,
+    );
+  }, 300_000);
+
+  afterAll(() => {
+    if (workspace !== '') rmSync(workspace, { recursive: true, force: true });
+  });
+
+  it('packs the adopter defaults law source byte-identical under dist/law', () => {
+    expect(packedFiles).toContain(`dist/${DEFAULTS}`);
+    expect(readFileSync(join(installed, 'dist', DEFAULTS))).toEqual(
+      readFileSync(join(ROOT, DEFAULTS)),
+    );
+  });
+
+  it('runs the installed bin at the packed version with the constitution pinned at 1.0.2', () => {
+    const version = installedBin(['--version']);
+    const packedVersion = (
+      JSON.parse(readFileSync(join(installed, 'package.json'), 'utf8')) as { version: string }
+    ).version;
+    expect(version.stdout.trim().startsWith(`devai/${packedVersion} `)).toBe(true);
+    expect(
+      parseConstitutionVersion(readFileSync(join(adopter, '.devai/pin/constitution.md'), 'utf8')),
+    ).toBe('1.0.2');
+  });
+
+  it('binds the reference source with the receipt field and the second extension entry', () => {
+    const extension = adopterJson(BINDING)['authority_extension'] as JsonObject | undefined;
+    expect(extension).toMatchObject({
+      extension_id: EXTENSION_ID,
+      extension_version: '1.1.0',
+      rule_count: 48,
+    });
+    expect(String(extension?.['digest_sha256'])).toMatch(/^[0-9a-f]{64}$/u);
+    const entries = adopterJson(POLICY)['additive_extensions'] as JsonObject[];
+    expect(entries.map((entry) => entry['extension_id'])).toEqual([
+      'devai-adopter-authority',
+      EXTENSION_ID,
+    ]);
+    expect(entries[1]).toEqual({
+      extension_id: EXTENSION_ID,
+      extension_version: '1.1.0',
+      digest_sha256: extension?.['digest_sha256'],
+    });
+    const before = [BINDING, POLICY].map((path) => readFileSync(join(adopter, path)));
+    bindReference();
+    expect([BINDING, POLICY].map((path) => readFileSync(join(adopter, path)))).toEqual(before);
+  });
+
+  it('resolves the package default test selectors when the block omits them', () => {
+    try {
+      const result = bindSource(fixtureSource('default-test-class.json'));
+      expect(`${result.stdout}${result.stderr}`).not.toContain(
+        'ADOPTER_AUTHORITY_DEFAULTS_UNAVAILABLE',
+      );
+      expect(result.status, result.stderr).toBe(0);
+      expect(adopterJson(BINDING)['authority_extension']).toMatchObject({
+        extension_id: EXTENSION_ID,
+        rule_count: 48,
+      });
+    } finally {
+      bindReference();
+    }
+  });
+
+  it('reads Doctor current on both extension checks through the installed bin', () => {
+    const doctorRun = installedDoctor();
+    expect([0, 1]).toContain(doctorRun.status);
+    const materialization = doctorRun.check('policy-materialization-current');
+    expect(materialization.ok, JSON.stringify(materialization)).toBe(true);
+    const enforcement = doctorRun.check('authority-enforcement');
+    expect(enforcement.ok, JSON.stringify(enforcement)).toBe(true);
+    expect(enforcement.info?.['policy_binding']).toBe('current');
+  });
+
+  const editedReference = (): string => {
+    const edited = JSON.parse(fixtureSource('reference.json')) as {
+      authority: { classes: { architecture: { selectors: string[] } } };
+    };
+    edited.authority.classes.architecture.selectors = ['**/ddl/**/*.sql'];
+    return `${JSON.stringify(edited, null, 2)}\n`;
+  };
+
+  it.each([
+    [
+      'an edited block',
+      () => putSource(editedReference()),
+      ['SOURCE_DIGEST_MISMATCH', 'AUTHORITY_EXTENSION_DRIFT'],
+    ],
+    [
+      'a removed block',
+      () => putSource(fixtureSource('without-authority.json')),
+      ['SOURCE_DIGEST_MISMATCH', 'AUTHORITY_EXTENSION_UNBOUND'],
+    ],
+    [
+      'a deleted source',
+      () => unlinkSync(join(adopter, SOURCE)),
+      ['SOURCE_MISSING', 'AUTHORITY_EXTENSION_SOURCE_MISSING'],
+    ],
+  ] as const)(
+    'reports %s without a rebind as a review naming its reason ids and the rebind command',
+    (_state, drift, expectedIds) => {
+      try {
+        drift();
+        const doctorRun = installedDoctor();
+        expect(doctorRun.status, 'a drift is a review, never a pass or a transport failure').toBe(
+          1,
+        );
+        const materialization = doctorRun.check('policy-materialization-current');
+        expect(materialization.ok).toBe(false);
+        expect(materialization.info?.['remediation_commands']).toContain(REBIND);
+        const enforcement = doctorRun.check('authority-enforcement');
+        expect(enforcement.ok).toBe(false);
+        expect(enforcement.info?.['policy_binding']).toBe('mismatch');
+        expect.soft(JSON.stringify(enforcement.info)).toContain(EXTENSION_ID);
+        expect(new Set(materialization.info?.['reason_ids'] as string[])).toEqual(
+          new Set(expectedIds),
+        );
+      } finally {
+        bindReference();
+      }
+    },
+  );
+
+  const allow: Decision = { outcome: 'allow' };
+  const deny = (code: string): Decision => ({ outcome: 'deny', code });
+
+  it.each([
+    ['check', 'inspector', 'apps/dashboard/web/src/example.spec.ts', allow],
+    [
+      'task start',
+      'engineer',
+      'apps/dashboard/web/src/example.spec.ts',
+      deny('AUTHORITY_ACTION_DENIED'),
+    ],
+    ['round seal', 'architect', 'backend/ddl/example.sql', allow],
+    ['task start', 'engineer', 'backend/ddl/example.sql', deny('AUTHORITY_ACTION_DENIED')],
+    ['task start', 'engineer', 'apps/dashboard/web/src/example.ts', allow],
+    [
+      'task start',
+      'inspector',
+      'apps/dashboard/web/src/example.ts',
+      deny('AUTHORITY_HUMAN_ROLE_DENIED'),
+    ],
+  ] as const)(
+    'decides %s declared by the %s on %s through the installed broker',
+    (verb, role, path, expected) => {
+      expect(probe([{ verb, role, path }])).toEqual([expected]);
+    },
+  );
+
+  it.each([
+    ['an edited source', 'AUTHORITY_POLICY_DIGEST_MISMATCH', () => putSource(editedReference())],
+    [
+      'a deleted source',
+      'ADOPTER_AUTHORITY_SOURCE_UNAVAILABLE',
+      () => unlinkSync(join(adopter, SOURCE)),
+    ],
+  ] as const)('refuses a governed write after %s with %s', (_state, code, drift) => {
+    try {
+      drift();
+      expect(
+        probe([
+          { verb: 'task start', role: 'engineer', path: 'apps/dashboard/web/src/example.ts' },
+        ]),
+      ).toEqual([deny(code)]);
+    } finally {
+      bindReference();
     }
   });
 });
