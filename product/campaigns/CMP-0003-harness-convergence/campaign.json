@@ -3899,7 +3899,7 @@
       "id": "R-0311",
       "title": "Descriptor selector kinds trail the trusted verifier",
       "goal": "The committed task descriptor is accepted by the pinned trusted verifier's policy builder, so a release rehearsal reconstructs the task policy from it; class selectors are materialized as their binding expansion until a published verifier admits them, the planning lane keeps its class semantics, and the descriptor check refuses undeclared kinds before any rehearsal.",
-      "status": "open",
+      "status": "closing",
       "records": ["ADR-CHK-0006"],
       "depends_on": ["R-0301"],
       "attestation_reissue": true,
@@ -3927,7 +3927,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F1"],
               "boundary": {
                 "paths": [
@@ -3983,8 +3983,8 @@
                 "path": "prompts/TASK-03111.md",
                 "sha256": "d8e260e82e0775e64dc41959a771d06c7ed11b38f7c67f0fda599fbf21afa709"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/209",
+              "merged_as": "ff5190f84436879f0a9b8a98b4927e1544183643",
               "execution": {
                 "tier": "architect",
                 "effort": "high",
@@ -4036,7 +4036,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-03111",
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -4081,8 +4081,8 @@
                 "path": "prompts/TASK-03112.md",
                 "sha256": "98dc467d34635bed3a3d5c5f72545bc6cd7ed38b14af8b8436baf51a31fded92"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/209",
+              "merged_as": "ff5190f84436879f0a9b8a98b4927e1544183643",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -4134,7 +4134,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-03112",
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F2", "F5"],
               "boundary": {
                 "paths": [
@@ -4189,8 +4189,8 @@
                 "path": "prompts/TASK-03113.md",
                 "sha256": "3036bc0e570f02892f356ab0613babf6a61b3466df168eaac27c176169f79416"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/209",
+              "merged_as": "ff5190f84436879f0a9b8a98b4927e1544183643",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
