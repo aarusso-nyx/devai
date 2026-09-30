@@ -1,9 +1,10 @@
 # Multi-stack path authority proposal
 
-Status: proposed. Drafted 2026-09-30 for Owner and Architect review. Nothing
-here binds until ADR-GOV-0024 and ADR-AUT-0003 are accepted and campaign
-CMP-0005 is accepted; no constitution text, policy, or materialized file has
-been edited. It answers issue #186 (support governed multi-stack path
+Status: proposed. Drafted 2026-09-30 for Owner and Architect review; the
+Owner answered its decisions the same day (section "Decisions taken by the
+Owner"). Nothing here binds until ADR-GOV-0024 and ADR-AUT-0003 are accepted
+and campaign CMP-0005 is accepted; no constitution text, policy, or
+materialized file has been edited. It answers issue #186 (support governed multi-stack path
 authority for adopter repositories), deferred by decision 7 of the
 [harness convergence campaign](harness-convergence-campaign/README.md) and
 sketched in the
@@ -102,7 +103,7 @@ false`; its properties are `project`, `ci_economy`, `release_verification`,
 
 1. **Where the norm lives.** (A1) Amend Article 6: keep the core table
    immutable and admit client extensions by declared root and path class
-   with a fixed ladder; constitution 1.1.0. (A2) Stay inside the current
+   with a fixed ladder; a new constitution version. (A2) Stay inside the current
    grammar with an extension table of fixed prefixes: cannot separate
    `example.ts` from `example.spec.ts`, so tests and DDL go to Engineer with
    the root; fails requirements 2 and 3. (A3) Read the existing extension
@@ -142,9 +143,10 @@ false`; its properties are `project`, `ci_economy`, `release_verification`,
    class role (`harnessSubject(['inspector'])` and so on) or an Inspector
    harness write to source is admitted; the matrix requires it denied.
 
-## Recommended design
+## Decided design
 
-A1 + B1 + C1 + D1 + E2 + F1, drafted in
+A1 (at version 1.0.2) + B1 + C1 + D1 + E2 + F1, recommended by this
+proposal and taken by the Owner on 2026-09-30, drafted in
 [ADR-GOV-0024](../../../law/adr/ADR-GOV-0024-article-6-client-extensions-by-root-and-class.md)
 (the amendment, with the exact amended text and the version bump) and
 [ADR-AUT-0003](../../../law/adr/ADR-AUT-0003-governed-adopter-path-authority.md)
@@ -156,7 +158,7 @@ at 500 for Engineer, one rule per test selector at 700 for Inspector, and one
 rule per architecture selector at 750 for Architect, each binding the human
 role and the harness subject initiated by that role; the default test
 selectors are a law source under `law/policy/adopter-defaults/`; the compiler
-refuses a source bound under a constitution below 1.1.0 and every malformed
+refuses a source bound under a constitution below 1.0.2 and every malformed
 source with a named code; `buildTrustedAuthoritySources` appends the compiled
 document as the second additive extension, so the existing digests, the
 non-additive check, the loader's refusal of stale bytes, and Doctor's
@@ -168,7 +170,7 @@ canonical `docs/` stays core.
 
 | Round  | Title                                           | Records                    | Outcome                                                                                                                                                                |
 | ------ | ----------------------------------------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| R-0501 | Amendment and adopter authority source contract | ADR-GOV-0024, ADR-AUT-0003 | Constitution 1.1.0 applied and the framework pin rebound; schema block; pure compiler with the ladder and every refusal code; adopter page                             |
+| R-0501 | Amendment and adopter authority source contract | ADR-GOV-0024, ADR-AUT-0003 | Constitution 1.0.2 applied and the framework pin rebound; schema block; pure compiler with the ladder and every refusal code; adopter page                             |
 | R-0502 | Materialization and broker enforcement          | ADR-AUT-0003               | Default test class as law; second additive extension with receipt provenance, byte-stable; the matrix as real broker decisions; extension ties denied                  |
 | R-0503 | Doctor drift, migration, and adoption rehearsal | ADR-AUT-0003               | Doctor names drifted, unbound, or missing sources with the rebind command; migration documented; packed-adopter rehearsal through the installed bin; release published |
 
@@ -178,8 +180,9 @@ prompts TASK-0511 to TASK-0533 under
 
 ## Sequencing
 
-- OE-01 (approve the amendment and answer the decisions) precedes R-0501;
-  the Architect then accepts both records and TASK-0511 applies the text.
+- OE-01 (approve the exact amended words of ADR-GOV-0024; the decisions are
+  already answered) precedes R-0501; the Architect then accepts both records
+  and TASK-0511 applies the text.
 - R-0502 depends on R-0501: the compiler exists before it is wired into the
   trusted sources, so the R-0501 engineer task never touches
   `policy.ts` and the broker.
@@ -192,10 +195,11 @@ prompts TASK-0511 to TASK-0533 under
 
 ## Separate Owner effects
 
-- OE-01: approve the amended Article 6 text and the constitution version, and
-  answer the decisions below.
+- OE-01: approve the exact amended Article 6 words of ADR-GOV-0024. The
+  decisions below were answered on 2026-09-30; the words themselves are the
+  Owner's constitutional act and are approved at round open.
 - OE-02: publish the release that carries the campaign and tell DETRAN the
-  version; DETRAN then pins it, rebinds the constitution at 1.1.0, binds its
+  version; DETRAN then pins it, rebinds the constitution at 1.0.2, binds its
   source, and runs Doctor and the matrix in a clone before claiming
   enforcement (CTG-0005). The clone rehearsal on DETRAN's candidate is
   DETRAN's, not this campaign's.
@@ -212,59 +216,27 @@ prompts TASK-0511 to TASK-0533 under
 - The wording of DETRAN's own `authority` block: the reference source in
   ADR-AUT-0003 is a fixture, not DETRAN's policy.
 
-## Decisions required
+## Decisions taken by the Owner (2026-09-30)
 
-Each item names the question, the options with consequences, the
-recommendation the drafts take, and what changes if the Owner chooses
-otherwise. The ledger records the answers under OE-01.
+The Owner answered every decision of the draft on 2026-09-30. The answers are
+recorded here, in the Status sections of both records, and in OE-01 of the
+ledger; they bind every task of CMP-0005. Where the answer differs from the
+draft's recommendation, the affected artifacts were changed as noted.
 
-- **(a) Amend Article 6, and to which version.** A1 amends (recommended,
-  1.1.0); A2 cannot meet requirements 2 and 3; A3 has no amendment but
-  contradicts Article 9. Under A2 or A3: ADR-GOV-0024 is rejected, TASK-0511
-  loses `law/constitution.md`, the pin, and the authority policy from its
-  boundary, the constitution gate leaves ADR-AUT-0003 and TASK-0513, and the
-  amendment test leaves TASK-0512. Version 1.0.2 instead of 1.1.0 changes
-  only the markers in ADR-GOV-0024, the gate threshold, and TASK-0511.
-- **(b) The source.** B1, a block in the adopter policy (recommended); B2, a
-  separate file and flag. Under B2: the schema block moves to a new
-  `law/schemas/authority-extension.schema.json`, `init bind` gains
-  `--authority-extension`, a second receipt is written, and TASK-0511,
-  TASK-0513, TASK-0523, TASK-0533, and the adopter page change accordingly.
-- **(c) Precedence.** C1, a fixed class ladder (recommended); C2, declared
-  precedence per rule. Under C2: the block gains a `precedence` per selector,
-  the compiler gains a pairwise witness check, TASK-0512 and TASK-0522 gain
-  overlap fixtures, and the resolver tie denial of TASK-0523 becomes the
-  only guarantee.
-- **(d) Roots.** D1, adopter-declared (recommended); D2, the fixed six.
-  Under D2: `roots` becomes a closed enum in the schema (TASK-0511) and the
-  root grammar tests of TASK-0512 shrink to the enum.
-- **(e) Migration and dogfood.** E2, the framework declares no roots
-  (recommended); E1, the framework declares `packages`. Under E1: TASK-0533
-  (or a fourth single-role task in R-0503) adds the block to
-  `law/policy/devai-adoption.json`, bumps its `policy_version`, and rebinds
-  (`law` with its generated copies), and the freeze of the framework's own
-  policy in the smoke changes.
-- **(f) Release.** F1, one release after R-0503 at 1.8.0 (recommended); F2,
-  2.0.0; F3, none. Under F2 only OE-02's text changes; under F3 OE-02 is
-  removed, R-0503 loses `owner_effects_required`, and DETRAN adoption waits.
-- **(g) Tiers and budgets.** The CMP-0003 pattern is kept: architect tasks at
-  tier `architect` (high, 60 to 120 minutes; TASK-0531 is medium),
-  inspector and engineer tasks at `worker-high` (high, 120 to 180 minutes).
-  No deviation is proposed; an Owner who wants `worker` for TASK-0531 or
-  TASK-0532 changes only the ledger and the two prompts.
-- **(h) Runtime effect of a source edited after binding.** Refuse every
-  governed write until rebind (recommended; it is what the loader does today
-  for any digest mismatch and Doctor names the command); or keep the last
-  bound extension and refuse only the paths it governs, which would need a
-  partial policy the loader has no notion of. Under the alternative,
-  TASK-0523 and TASK-0522 change and ADR-AUT-0003 is revised before
-  acceptance.
-- **(i) Nested `docs` directories under a root.** Engineer by remainder,
-  with an adopter free to name `**/docs/**` in its architecture class
-  (recommended); or a package default architecture selector `**/docs/**`.
-  Under the alternative, `path-authority-classes.json` gains an architecture
-  default (TASK-0521) and the matrix gains a row (TASK-0522).
-- **(j) The harness subject of class rules.** Bound to the class role
-  (recommended, required by the matrix); or any initiator as the package
-  `packages/**` rule does, which would admit an Inspector harness write to
-  source. No draft takes the alternative.
+| Decision | Question                                      | Answer                                                                                                   | Artifacts                                                                                                             |
+| -------- | --------------------------------------------- | -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| (a)      | Amend Article 6, and the constitution version | Amend (A1); version **1.0.2**, a patch, not the 1.1.0 the draft recommended                              | ADR-GOV-0024 markers, the ADR-AUT-0003 gate threshold, TASK-0511 to TASK-0513, TASK-0522, TASK-0531, TASK-0532, guide |
+| (b)      | Source of the extension                       | B1, the `authority` block in the adopter policy                                                          | As drafted                                                                                                            |
+| (c)      | Precedence model                              | C1, the fixed class ladder (architecture 750, test 700, root 500) with resolver denial of extension ties | As drafted                                                                                                            |
+| (d)      | Root set                                      | D1, adopter-declared single segments under the closed grammar                                            | As drafted                                                                                                            |
+| (e)      | Migration and framework dogfood               | E2, existing adopters unchanged; the framework declares no roots                                         | As drafted                                                                                                            |
+| (f)      | Release                                       | F1, one release, 1.8.0, after R-0503 (OE-02)                                                             | OE-02 names 1.8.0 as decided                                                                                          |
+| (g)      | Tiers, efforts, budgets                       | The CMP-0003 pattern                                                                                     | As drafted                                                                                                            |
+| (h)      | Source edited after binding                   | Refuse every governed write until rebind                                                                 | As drafted                                                                                                            |
+| (i)      | Nested `docs` directories under a root        | Engineer by remainder; an adopter may name `**/docs/**` in its architecture class                        | As drafted                                                                                                            |
+| (j)      | Harness subject of class rules                | Bound to the class role                                                                                  | As drafted                                                                                                            |
+
+What remains for the Owner is OE-01 itself: approval of the exact amended
+words of ADR-GOV-0024, after which the Architect accepts both records and
+R-0501 opens. The rejected alternatives and their consequences are kept in
+the "Design options" section for the record.
