@@ -1,4 +1,6 @@
 import { assertCliInvocationIdle } from './cli-runtime.js';
+import { createAuthorityHostBroker as createCliAuthorityHostBroker } from './authority/broker.js';
+import { canonicalRegistry as cliCanonicalRegistry } from './define-command.js';
 import {
   installReleaseLifecycleCommandAdapters as installAdapters,
   type ReleaseLifecycleCommandAdapters,
@@ -165,3 +167,63 @@ export type {
   ProtectedMutationPackageObservation,
   ProtectedMutationPackageObserver,
 } from './services/release-mutation-observation.js';
+
+/**
+ * One registered action as the installed authority broker reads it. The entry is passed
+ * back to `createAuthorityHostBroker` exactly as `canonicalRegistry` returned it; its
+ * remaining fields are the registry contract and are opaque to a host.
+ */
+export interface AuthorityHostRegistryEntry {
+  readonly name: string;
+  readonly [field: string]: unknown;
+}
+
+/** The request under which the installed broker decides one governed invocation. */
+export interface AuthorityHostBrokerInput {
+  readonly entry: AuthorityHostRegistryEntry;
+  readonly entries: readonly AuthorityHostRegistryEntry[];
+  readonly argv: readonly string[];
+  readonly role: 'owner' | 'architect' | 'inspector' | 'engineer' | 'auditor';
+  readonly declaration: Readonly<
+    | { as_role: 'owner' | 'architect' | 'inspector' | 'engineer' | 'auditor' }
+    | { authority_session: string }
+  >;
+  readonly repository_root: string;
+  readonly package_version: string;
+  readonly bootstrap_policy: boolean;
+}
+
+/** One host effect the broker authorizes before `apply` runs, or refuses with a code. */
+export interface AuthorityHostEffect {
+  readonly kind: string;
+  readonly symbol: string;
+  readonly arguments: readonly unknown[];
+}
+
+/** The installed authority broker a host drives: one effect scope, disposed once. */
+export interface AuthorityHostBroker {
+  readonly scope: {
+    readonly action_id: string;
+    readonly apply_effect: (request: AuthorityHostEffect, apply: () => unknown) => unknown;
+  };
+  readonly dispose: () => void;
+}
+
+/**
+ * The canonical action registry of the installed package (ADR-AUT-0003), so a host that
+ * rehearses adopter path authority on the packed tarball decides under registered entries.
+ */
+export function canonicalRegistry(): readonly AuthorityHostRegistryEntry[] {
+  return cliCanonicalRegistry() as unknown as readonly AuthorityHostRegistryEntry[];
+}
+
+/**
+ * The authority broker of the installed package: the same broker the CLI builds for one
+ * governed invocation, bound to the repository's materialized authority policy and its
+ * adopter extension. It decides; it grants nothing the policy does not.
+ */
+export function createAuthorityHostBroker(input: AuthorityHostBrokerInput): AuthorityHostBroker {
+  return createCliAuthorityHostBroker(
+    input as unknown as Parameters<typeof createCliAuthorityHostBroker>[0],
+  ) as unknown as AuthorityHostBroker;
+}
