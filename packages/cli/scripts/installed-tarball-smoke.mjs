@@ -668,8 +668,12 @@ try {
         ],
       },
       project: {
+        // project.docs is an owned block (ADR-CFG-0002): the bind replaces it
+        // from this source, so the output directory the assertion expects is
+        // declared here rather than carried from the seeded project.json.
         docs: {
           builder: 'docusaurus',
+          output_dir: 'site/build',
           publish_target: 'gh-pages',
           gh_pages_branch: 'gh-pages',
         },
