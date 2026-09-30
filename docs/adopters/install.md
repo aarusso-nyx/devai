@@ -96,9 +96,12 @@ pnpm exec devai init bind --target . --as-role architect --write
 ```
 
 An adopter may own one validated policy source under `law/policy`. The source can add client
-domains, partially override thresholds, and declare exact scorecard N/A cells and glob guards;
-it cannot replace core or framework domains. Binding records the source path and digest and
-updates the resolved configuration atomically:
+domains, partially override thresholds, declare exact scorecard N/A cells and glob guards, and,
+under a constitution bound at 1.0.2 or later, declare the optional `authority` block that
+extends Article 6 with adopter roots and path classes
+([Path authority for multi-stack roots](path-authority.md)); it cannot replace core or framework
+domains. Binding records the source path and digest and updates the resolved configuration
+atomically:
 
 ```bash
 pnpm exec devai init bind \
