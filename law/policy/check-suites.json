@@ -42,7 +42,8 @@
       },
       "effect": "local-write",
       "cost": "medium",
-      "output": "action-envelope-plus-local-task-ledger-report"
+      "output": "action-envelope-plus-local-task-ledger-report",
+      "applicability": "both"
     },
     {
       "id": "ledger-rc",
@@ -52,7 +53,8 @@
       },
       "effect": "local-write",
       "cost": "high",
-      "output": "action-envelope-plus-rc-task-ledger-report"
+      "output": "action-envelope-plus-rc-task-ledger-report",
+      "applicability": "both"
     },
     {
       "id": "campaign",
@@ -62,7 +64,8 @@
       },
       "effect": "read",
       "cost": "low",
-      "output": "action-envelope-plus-campaign-report"
+      "output": "action-envelope-plus-campaign-report",
+      "applicability": "self"
     },
     {
       "id": "scorecard-page",
@@ -72,7 +75,36 @@
       },
       "effect": "read",
       "cost": "low",
-      "output": "action-envelope-plus-scorecard-page-report"
+      "output": "action-envelope-plus-scorecard-page-report",
+      "applicability": "self"
     }
+  ],
+  "selector_definitions": [
+    { "id": "action-coverage", "applicability": "both" },
+    { "id": "action-effects", "applicability": "self" },
+    { "id": "adrs", "applicability": "both" },
+    { "id": "blueprint", "applicability": "both" },
+    { "id": "change-taxonomy", "applicability": "both" },
+    { "id": "ci-economy", "applicability": "both" },
+    { "id": "cli-reference", "applicability": "self" },
+    { "id": "dependencies", "applicability": "both" },
+    { "id": "docs-governance", "applicability": "both" },
+    { "id": "docs-links", "applicability": "both" },
+    { "id": "forbidden-actions", "applicability": "both" },
+    { "id": "glob-guards", "applicability": "both" },
+    { "id": "glossary", "applicability": "both" },
+    { "id": "invariant-strategies", "applicability": "both" },
+    { "id": "invariants", "applicability": "both" },
+    { "id": "journeys", "applicability": "both" },
+    { "id": "mutation", "applicability": "both" },
+    { "id": "overrides", "applicability": "both" },
+    { "id": "pr-compliance", "applicability": "both" },
+    { "id": "prompt-overlays", "applicability": "self" },
+    { "id": "schema", "applicability": "both" },
+    { "id": "schemas", "applicability": "both" },
+    { "id": "sensor-integrity", "applicability": "both" },
+    { "id": "test-trace", "applicability": "both" },
+    { "id": "trace", "applicability": "both" },
+    { "id": "translation", "applicability": "both" }
   ]
 }

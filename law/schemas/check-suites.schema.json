@@ -16,7 +16,8 @@
     "unknown_behavior",
     "prerequisites",
     "suites",
-    "member_definitions"
+    "member_definitions",
+    "selector_definitions"
   ],
   "properties": {
     "$schema": {
@@ -76,12 +77,38 @@
       "items": {
         "$ref": "#/$defs/member"
       }
+    },
+    "selector_definitions": {
+      "description": "Applicability declarations for the `check --only` selectors that are dispatched by the CLI without a suite member definition (ADR-CHK-0005). Every selector the CLI accepts declares exactly one entry; a selector without a declaration is not dispatchable.",
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/selector"
+      }
     }
   },
   "$defs": {
     "token": {
       "type": "string",
       "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "applicability": {
+      "description": "Where the member applies (ADR-CHK-0005): `self` reads only the DEVAI source repository's own law, policy, scripts, or catalogue and reports not-applicable in an adopter; `adopter` reads only an adopter repository; `both` reads the checked repository whichever kind it is.",
+      "enum": ["self", "adopter", "both"]
+    },
+    "selector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "applicability"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/token"
+        },
+        "applicability": {
+          "$ref": "#/$defs/applicability"
+        }
+      }
     },
     "suite": {
       "type": "object",
@@ -179,7 +206,7 @@
     "member": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "binding", "effect", "cost", "output"],
+      "required": ["id", "binding", "effect", "cost", "output", "applicability"],
       "properties": {
         "id": {
           "$ref": "#/$defs/token"
@@ -227,6 +254,9 @@
         },
         "output": {
           "$ref": "#/$defs/token"
+        },
+        "applicability": {
+          "$ref": "#/$defs/applicability"
         }
       }
     }
