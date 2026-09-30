@@ -20,10 +20,10 @@ affected_rules:
   - law/schemas/adopter-policy.schema.json
   - docs/adopters/path-authority.md
 inspector_acceptance:
-  - IA-001 -- The amended constitution carries version 1.1.0 in its frontmatter title, its heading, and its Status block, and the text of every Article 6 core row is byte-identical to 1.0.1; a diff of Article 6 shows only the two amended sentences and the extension paragraph.
-  - IA-002 -- A bound adopter policy that declares an authority block is refused by init bind, by Doctor, and by the runtime while the pinned constitution is 1.0.1 or lower, with the named code ADOPTER_AUTHORITY_CONSTITUTION_VERSION, and is admitted once the pin is 1.1.0.
+  - IA-001 -- The amended constitution carries version 1.0.2 in its frontmatter title, its heading, and its Status block, and the text of every Article 6 core row is byte-identical to 1.0.1; a diff of Article 6 shows only the two amended sentences and the extension paragraph.
+  - IA-002 -- A bound adopter policy that declares an authority block is refused by init bind, by Doctor, and by the runtime while the pinned constitution is 1.0.1 or lower, with the named code ADOPTER_AUTHORITY_CONSTITUTION_VERSION, and is admitted once the pin is 1.0.2.
   - IA-003 -- No extension can alter, narrow, or shadow a core row; an extension root equal to a core-table prefix (law, product, docs, record, tests, packages, scratch, work, .devai) is refused at compile time, and an extension rule with a core selector at a precedence at or above the core rule is refused by the materializer with AUTHORITY_POLICY_EXTENSION_NON_ADDITIVE.
-  - IA-004 -- The framework's own pinned copy under .devai/pin/constitution.md equals law/constitution.md at 1.1.0 after the rebind, and the authority policy's constitution binding carries the 1.1.0 digest; Doctor reports the binding current.
+  - IA-004 -- The framework's own pinned copy under .devai/pin/constitution.md equals law/constitution.md at 1.0.2 after the rebind, and the authority policy's constitution binding carries the 1.0.2 digest; Doctor reports the binding current.
 ---
 
 # Article 6 admits client path extensions by declared root and path class
@@ -32,19 +32,16 @@ inspector_acceptance:
 
 Proposed on 2026-09-30 from the multi-stack path authority proposal for
 campaign CMP-0005. This record is a constitutional amendment under Article 9
-and Article 40: it binds nothing until the Owner approves the amended text and
-the version bump (Owner effect OE-01 of CMP-0005) and the Architect sets it
-`accepted` before round R-0501 opens. Nothing here edits
-`law/constitution.md`; the amended text lives in the Decision section so the
-Owner decides on exact words, and the Architect task of R-0501 applies them.
+and Article 40: it binds nothing until the Architect sets it `accepted`
+before round R-0501 opens, and the Architect task of R-0501 applies the
+amended text. Nothing here edits `law/constitution.md`; the amended text
+lives in the Decision section.
 
-Open questions for the Owner, stated in the proposal's "Decisions required":
-
-- Amend Article 6 (this record) or meet #186 additively inside the current
-  fixed-prefix grammar, which cannot express class precedence under a root
-  grant (decision a).
-- The new constitution version: 1.1.0 (recommended, the grammar of extensions
-  widens) or 1.0.2.
+Decided by the Owner on 2026-09-30, recorded in the proposal's "Decisions
+taken by the Owner" table: Article 6 is amended (option A1, decision a), and
+the new constitution version is 1.0.2, a patch, rather than the 1.1.0 the
+draft recommended. The exact amended words below remain for the Owner's
+approval under OE-01 of CMP-0005 before the Architect accepts the record.
 
 ## Context
 
@@ -79,7 +76,7 @@ the mechanism can enforce and keeps the core table immutable.
 
 ## Decision
 
-The constitution advances from 1.0.1 to 1.1.0. The version appears in the
+The constitution advances from 1.0.1 to 1.0.2. The version appears in the
 frontmatter `title`, the H1 heading, and the Status block; the frontmatter
 `date` becomes the amendment date. Every core row of Article 6 is unchanged
 byte for byte. Two sentences of Article 6 are amended and the extension
@@ -125,7 +122,7 @@ No other article changes. Article 40 continues to require an explicit
 `devai init bind --constitution --write`; the framework rebinds its own pin in
 the round that applies the amendment, and adopters rebind before they declare
 an extension. The runtime refuses an extension while the bound constitution is
-below 1.1.0 with the named code `ADOPTER_AUTHORITY_CONSTITUTION_VERSION`, so
+below 1.0.2 with the named code `ADOPTER_AUTHORITY_CONSTITUTION_VERSION`, so
 the mechanism cannot outrun the norm.
 
 ## Consequences
@@ -157,9 +154,9 @@ Article 40 binds a constitution version explicitly.
 
 ## Affected Rules
 
-- `law/constitution.md`: version 1.1.0; the two amended sentences and the
+- `law/constitution.md`: version 1.0.2; the two amended sentences and the
   extension paragraph of Article 6 as stated above.
-- `.devai/pin/constitution.md`: the framework's own pin, rebound to 1.1.0 in
+- `.devai/pin/constitution.md`: the framework's own pin, rebound to 1.0.2 in
   R-0501 through `init bind --constitution --write`.
 - `law/schemas/adopter-policy.schema.json`: the `authority` block the
   amendment admits (ADR-AUT-0003 declares its grammar).
@@ -168,15 +165,15 @@ Article 40 binds a constitution version explicitly.
 
 ## Inspector Adversarial Acceptance
 
-Diff `law/constitution.md` between 1.0.1 and 1.1.0 and confirm that only the
+Diff `law/constitution.md` between 1.0.1 and 1.0.2 and confirm that only the
 two sentences and the extension paragraph of Article 6, the three version
 markers, and the frontmatter date differ. Pin a fixture repository at 1.0.1,
 bind an adopter policy with an `authority` block, and confirm `init bind`
 refuses with `ADOPTER_AUTHORITY_CONSTITUTION_VERSION`; rebind the constitution
-at 1.1.0 and confirm the same bind is admitted. Declare `law`, `docs`,
+at 1.0.2 and confirm the same bind is admitted. Declare `law`, `docs`,
 `packages`, and `.devai` as extension roots and confirm each is refused before
 any rule is compiled. Construct an extension rule whose selector equals a core
 selector at precedence 750 and confirm the materializer refuses it with
 `AUTHORITY_POLICY_EXTENSION_NON_ADDITIVE`. Run Doctor on the framework after
 the rebind and confirm `constitution-binding` and `authority-enforcement`
-report current with the 1.1.0 digest.
+report current with the 1.0.2 digest.
