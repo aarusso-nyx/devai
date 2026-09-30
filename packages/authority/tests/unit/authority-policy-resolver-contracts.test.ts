@@ -28,13 +28,20 @@ type AnyRecord = Record<string, unknown>;
 const disposers: (() => void)[] = [];
 afterEach(() => disposers.splice(0).forEach((dispose) => dispose()));
 
-async function session(rules: readonly unknown[] = [engineerRule]) {
+async function session(
+  rules: readonly unknown[] = [engineerRule],
+  coreRules?: readonly unknown[],
+  role: 'engineer' | 'inspector' = 'engineer',
+) {
   const api = await runtimeApi();
   const issuer = createIssuer(api);
   disposers.push(() => {
     issuer.dispose();
   });
-  const plant = makePolicyPlant({ additiveRules: rules });
+  const plant = makePolicyPlant({
+    additiveRules: rules,
+    ...(coreRules === undefined ? {} : { rules: coreRules }),
+  });
   const policy = expectSuccess<{ provenance: unknown }>(
     api.loadAuthorityPolicy({ document: plant.document }, plant.deps),
   );
@@ -44,10 +51,15 @@ async function session(rules: readonly unknown[] = [engineerRule]) {
         action_id: 'test mutate',
         invocation_id: 'invocation-1',
         dry_run: false,
-        declaration: { as_role: 'engineer' },
+        declaration: { as_role: role },
         consent: CONSENT,
       },
-      declarationDependencies(issuer, actionDocument(), undefined, policy.provenance),
+      declarationDependencies(
+        issuer,
+        actionDocument('local-write', { kind: 'human', allowed_roles: ['engineer', 'inspector'] }),
+        undefined,
+        policy.provenance,
+      ),
     ),
   );
   const query: AnyRecord = {
@@ -351,4 +363,102 @@ describe('rule matching contracts', () => {
       resource_target_id: secondFsTarget.id,
     });
   });
+});
+
+// ADR-AUT-0003 IA-006: two additive-extension rules that match one path at the highest
+// matched precedence with different human role sets are ambiguous at the resolver, whatever
+// the requesting role; rules of the immutable core keep unioning their subjects.
+describe('additive-extension tie contracts', () => {
+  const specTarget = {
+    kind: 'fs',
+    id: 'fs:apps/web/src/example.spec.ts',
+    repository_id: fsTarget.repository_id,
+    canonical_relative_path: 'apps/web/src/example.spec.ts',
+    operation: 'update',
+  } as const;
+
+  function fsRule(
+    ruleId: string,
+    origin: 'additive-extension' | 'immutable-core',
+    precedence: number,
+    glob: string,
+    roles: readonly string[],
+  ) {
+    return {
+      ...engineerRule,
+      rule_id: ruleId,
+      origin,
+      precedence,
+      selector: { ...engineerRule.selector, canonical_relative_path_glob: glob },
+      subjects: [{ kind: 'human', roles: [...roles] }],
+    };
+  }
+
+  const engineerTree = fsRule('ext-apps-tree', 'additive-extension', 700, 'apps/**', ['engineer']);
+  const inspectorSpecs = fsRule('ext-apps-spec', 'additive-extension', 700, 'apps/**/*.spec.*', [
+    'inspector',
+  ]);
+
+  it.each(['engineer', 'inspector'] as const)(
+    'denies AMBIGUOUS_POLICY_MATCH to %s when two extension rules at 700 grant different roles',
+    async (role) => {
+      const s = await session([engineerTree, inspectorSpecs], undefined, role);
+      const decision = s.resolve({ ...s.query, resource: specTarget });
+      expect(decision).toMatchObject({ outcome: 'deny', code: 'AMBIGUOUS_POLICY_MATCH' });
+      expect(decision['matched_rule_ids']).toEqual(
+        expect.arrayContaining([engineerTree.rule_id, inspectorSpecs.rule_id]),
+      );
+    },
+  );
+
+  it('allows when two extension rules at one precedence grant the same role set', async () => {
+    const engineerSpecs = { ...inspectorSpecs, subjects: [{ kind: 'human', roles: ['engineer'] }] };
+    const s = await session([engineerTree, engineerSpecs]);
+    const decision = s.resolve({ ...s.query, resource: specTarget });
+    expect(decision).toMatchObject({ outcome: 'allow', code: 'POLICY_ALLOW' });
+    expect(decision['matched_rule_ids']).toEqual(
+      [engineerTree.rule_id, engineerSpecs.rule_id].sort(),
+    );
+  });
+
+  it('decides by the higher precedence when extension rules with different roles differ in precedence', async () => {
+    const s = await session(
+      [engineerTree, { ...inspectorSpecs, precedence: 750 }],
+      undefined,
+      'inspector',
+    );
+    expect(s.resolve({ ...s.query, resource: specTarget })).toMatchObject({
+      outcome: 'allow',
+      matched_rule_ids: [inspectorSpecs.rule_id],
+    });
+  });
+
+  it('is not ambiguous when only one of the differing extension rules matches the path', async () => {
+    const s = await session([engineerTree, inspectorSpecs]);
+    const source = {
+      ...specTarget,
+      id: 'fs:apps/web/src/example.ts',
+      canonical_relative_path: 'apps/web/src/example.ts',
+    };
+    expect(s.resolve({ ...s.query, resource: source })).toMatchObject({
+      outcome: 'allow',
+      matched_rule_ids: [engineerTree.rule_id],
+    });
+  });
+
+  it.each(['engineer', 'inspector'] as const)(
+    'keeps unioning immutable-core rules at one precedence with different roles for %s',
+    async (role) => {
+      const coreTree = fsRule('core-apps-tree', 'immutable-core', 700, 'apps/**', ['engineer']);
+      const coreSpecs = fsRule('core-apps-spec', 'immutable-core', 700, 'apps/**/*.spec.*', [
+        'inspector',
+      ]);
+      const s = await session([engineerRule], [coreTree, coreSpecs], role);
+      expect(s.resolve({ ...s.query, resource: specTarget })).toMatchObject({
+        outcome: 'allow',
+        code: 'POLICY_ALLOW',
+        matched_rule_ids: [role === 'engineer' ? coreTree.rule_id : coreSpecs.rule_id],
+      });
+    },
+  );
 });
