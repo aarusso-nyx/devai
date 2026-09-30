@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "1.0.0",
+  "refusals": {
+    "root-separator.json": "ADOPTER_POLICY_INVALID",
+    "root-dot-segment.json": "ADOPTER_POLICY_INVALID",
+    "root-core-table.json": "ADOPTER_AUTHORITY_ROOT_CORE_PREFIX",
+    "root-duplicate.json": "ADOPTER_POLICY_INVALID",
+    "root-nested.json": "ADOPTER_AUTHORITY_ROOT_NESTED",
+    "selector-absolute.json": "ADOPTER_AUTHORITY_SELECTOR_INVALID",
+    "selector-parent-segment.json": "ADOPTER_AUTHORITY_SELECTOR_INVALID",
+    "selector-backslash.json": "ADOPTER_AUTHORITY_SELECTOR_INVALID",
+    "selector-brace.json": "ADOPTER_AUTHORITY_SELECTOR_INVALID",
+    "selector-extglob.json": "ADOPTER_AUTHORITY_SELECTOR_INVALID",
+    "selector-rooted.json": "ADOPTER_AUTHORITY_SELECTOR_ROOTED",
+    "class-unknown.json": "ADOPTER_POLICY_INVALID",
+    "architecture-selectors-missing.json": "ADOPTER_POLICY_INVALID",
+    "architecture-selectors-empty.json": "ADOPTER_AUTHORITY_ARCHITECTURE_SELECTORS_REQUIRED",
+    "extension-id-reserved.json": "ADOPTER_AUTHORITY_EXTENSION_ID_RESERVED"
+  }
+}
