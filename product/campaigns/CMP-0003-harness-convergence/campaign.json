@@ -3619,7 +3619,7 @@
       "id": "R-0310",
       "title": "Owner-effect outcome",
       "goal": "An Owner effect resolved by its declared fallback can be recorded as performed with outcome fallback, so the round that requires it closes while the campaign checker keeps enforcing serialized admission; R-0304 closes on that record.",
-      "status": "planned",
+      "status": "open",
       "records": ["ADR-CHK-0003", "ADR-CHK-0004"],
       "depends_on": ["R-0301"],
       "attestation_reissue": false,
@@ -3647,7 +3647,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F1"],
               "boundary": {
                 "paths": ["law/schemas/campaign.schema.json", "law/policy/campaign-execution.json"],
@@ -3679,7 +3679,46 @@
               "execution": {
                 "tier": "architect",
                 "effort": "medium",
-                "time_budget_minutes": 60
+                "time_budget_minutes": 60,
+                "resolved": {
+                  "policy_version": "1.0.0",
+                  "pinned_at": "2026-09-30T04:36:44Z",
+                  "tiers": {
+                    "architect": {
+                      "rank": 1,
+                      "hosts": {
+                        "claude": "claude-cli:fable",
+                        "codex": "codex-cli:gpt-6-astra"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker-high": {
+                      "rank": 2,
+                      "hosts": {
+                        "claude": "claude-cli:opus",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker": {
+                      "rank": 3,
+                      "hosts": {
+                        "claude": "claude-cli:sonnet",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "medium"
+                    },
+                    "clerk": {
+                      "rank": 4,
+                      "hosts": {
+                        "claude": "claude-cli:haiku",
+                        "codex": "codex-cli:gpt-6-luna"
+                      },
+                      "default_effort": "low"
+                    }
+                  },
+                  "ceiling": "architect"
+                }
               }
             },
             {
