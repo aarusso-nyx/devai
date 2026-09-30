@@ -552,7 +552,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0521",
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -591,14 +591,53 @@
               "commit_types": ["test(cli)", "test(authority)"],
               "prompt": {
                 "path": "prompts/TASK-0522.md",
-                "sha256": null
+                "sha256": "ede4895ffc05d74c0a425f0f47f7e2b012bab00a2d5c3ae4b1432577795c7530"
               },
               "pull_request": null,
               "merged_as": null,
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
-                "time_budget_minutes": 150
+                "time_budget_minutes": 150,
+                "resolved": {
+                  "policy_version": "1.0.0",
+                  "pinned_at": "2026-09-30T15:39:09Z",
+                  "tiers": {
+                    "architect": {
+                      "rank": 1,
+                      "hosts": {
+                        "claude": "claude-cli:fable",
+                        "codex": "codex-cli:gpt-6-astra"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker-high": {
+                      "rank": 2,
+                      "hosts": {
+                        "claude": "claude-cli:opus",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker": {
+                      "rank": 3,
+                      "hosts": {
+                        "claude": "claude-cli:sonnet",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "medium"
+                    },
+                    "clerk": {
+                      "rank": 4,
+                      "hosts": {
+                        "claude": "claude-cli:haiku",
+                        "codex": "codex-cli:gpt-6-luna"
+                      },
+                      "default_effort": "low"
+                    }
+                  },
+                  "ceiling": "architect"
+                }
               }
             },
             {
@@ -619,7 +658,8 @@
                   "packages/cli/src/commands/init/bind-adapters.ts",
                   "packages/authority/src/runtime/policy-resolver.ts",
                   "packages/schemas/src/roster.ts",
-                  "docs/reference/error-codes.md"
+                  "docs/reference/error-codes.md",
+                  "Orchestrator note (2026-09-30): the defaults source of TASK-0521 is loaded at runtime through the schema validator, so path-authority-classes.schema.json is registered in the schemas roster; commit type fix(schemas) is admitted for it."
                 ],
                 "forbidden": [
                   "law/",
@@ -657,7 +697,7 @@
               ],
               "prompt": {
                 "path": "prompts/TASK-0523.md",
-                "sha256": null
+                "sha256": "66ecd394fd9c5a0e363d2c718008e3cfa54ff1aab089954a70e3c4f4acee8f50"
               },
               "pull_request": null,
               "merged_as": null,
