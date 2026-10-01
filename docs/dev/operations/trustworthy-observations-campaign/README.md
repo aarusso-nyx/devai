@@ -148,3 +148,70 @@ closing rounds. Three rules are specific to this campaign:
 | R-0401 | `259197ac`  | #218, #219, #220, #221 | `closed` on 2026-10-01: wave CTG-0411 (ADR-AUT-0002, #155, #162) merged as #220 and wave CTG-0412 (ADR-SCR-0007, #156, #161) as #221; the #155 cause was the corepack `pnpm.js` shim missing the broker's basename match; `sense run build` and `sense run e2e_test` read PASS; close checks green on the merged head (`law:validate` runs as `check --only adrs`, as in CMP-0002); the database-gated RC closure passed on `259197ac` with task-policy digest `a33e4782`, recorded in the closure, and signing and export of its receipt stay the Owner's step |
 | R-0402 | `24d869a2`  | #222, #224             | `closed` on 2026-10-01: wave CTG-0421 (ADR-SCR-0008, #157 to #160) merged as #224; readings carry `supersedes`, `sense record` appends a digest-bearing chain entry and repairs a missing one, the sweep runs in two passes, the backlog has a schema and the post-merge hook reads the bound checkout store; the record pairs F4:T4 and F4:T9 with the sensors the other way round from the sensor registry, and the registry governs; close checks green on the merged head; no attestation re-issue                                                          |
 | R-0403 | —           | —                      | `open` on 2026-10-01 alongside R-0402 (it depends only on R-0401); TASK-0431 and TASK-0437 in progress                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+
+## 7. Second scorecard
+
+The second self-scorecard `SC-20261001T194346-001` observes main at
+`c06810699ee53f931d4426ef103ace922f829ab9` (`c0681069`, the merged head after
+CTG-0441). It was taken on a fresh worktree with a clean tree, after
+`pnpm install`, `pnpm run build`, `release:bootstrap`, and
+`tsc -b packages/cli/tsconfig.typecheck.json`. The inspector followed the
+ordered protocol of ADR-SCR-0008 and recorded every reading with
+`sense record`:
+
+1. The R-0404 `sweep` first pass (47 readings).
+2. The write-effect readings the first scorecard carried, one kind at a time:
+   `build`, `unit_test`, `integration_test`, `e2e_test`,
+   `test_coverage_depth`, and `inventory_regeneration`.
+3. The second pass (`harness_invariant_alignment`, `inventory_performance`).
+4. `audit observe` at the head.
+
+`migration_check` was not run. It needs a database, which OE-02 declines, so
+F2:T4 reads UNKNOWN in both scorecards.
+
+The harness sensors read the declared population of ADR-SCR-0010: 186 runs of
+`pull-request-checks.yml` on `pull_request` in 30 days. That is above every
+declared minimum, so no harness cell reads UNKNOWN for its sample. The
+scorecard, assessment, and backlog are copied byte-exact beside the first
+under `record/proofs/compliance/scorecards/`.
+
+| Scorecard                | Head       | PASS | REVIEW | FAIL | UNKNOWN | N/A |
+| ------------------------ | ---------- | ---- | ------ | ---- | ------- | --- |
+| `SC-20260927T205906-001` | `86d8ccea` | 31   | 5      | 3    | 3       | 3   |
+| `SC-20261001T194346-001` | `c0681069` | 35   | 4      | 1    | 2       | 3   |
+
+Cells whose verdict changed:
+
+| Cell  | Old → new      | Cause                                                                                                                                                                  |
+| ----- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| F5:T7 | FAIL → PASS    | ADR-SCR-0010 (#154): `harness_performance` samples the pull request gate population instead of branch `main`                                                           |
+| F5:T8 | REVIEW → PASS  | ADR-SCR-0010 (#154): `harness_robustness` samples the same declared population                                                                                         |
+| F5:T9 | FAIL → REVIEW  | ADR-SCR-0010 (#154): `harness_green_main` reads 159 of 186 runs green (85.5%), between the review threshold 80% and the pass threshold 95%                             |
+| F4:T7 | REVIEW → PASS  | ADR-SCR-0008 (#158): `inventory_performance` runs in the second pass after the inventory readings are recorded; overall p95 986 ms against 2000 ms                     |
+| F3:T1 | FAIL → PASS    | ADR-SCR-0007 (#156): `e2e_test` selects `tests/e2e` through `rc.e2e.config.ts`; `unit_test`, `integration_test`, and `e2e_test` all read PASS                          |
+| F3:T2 | REVIEW → PASS  | ADR-SCR-0007 (#161): coverage measures the local population without a database; 91.66% of lines against the pass threshold 80%                                         |
+| F2:T9 | UNKNOWN → PASS | ADR-AUT-0002 (#155): the broker admits `sense run build`, which reads PASS                                                                                             |
+| F2:T6 | PASS → FAIL    | No CMP-0004 record: `pnpm audit` reports 8 high-severity advisories against the review threshold 5. Worse                                                              |
+| F5:T3 | PASS → REVIEW  | No CMP-0004 record: `harness_coherence` finds `.github/workflows/site-publish.yml` (changed by `ea66b63d`) without a concurrency group that cancels in progress. Worse |
+
+Two cells got worse, F2:T6 and F5:T3, and no CMP-0004 record caused either.
+
+The F3:T2 reading needs a caveat. In the first pass, `test_coverage_depth`
+read FAIL (`COVERAGE_PRODUCER_FAILED`, the local coverage producer exited 1).
+The standalone run that followed it read PASS at the same head. Under
+ADR-SCR-0008 the later instance governs the cell. The reading did not keep
+enough output to name the cause of the first-pass exit, so the cell may be
+order-sensitive or flaky.
+
+Cells still not PASS:
+
+| Cell                | Verdict | Measured reason                                                                                                                       |
+| ------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| F2:T6               | FAIL    | 8 high-severity advisories exceed the review threshold 5                                                                              |
+| F5:T3               | REVIEW  | `HARNESS_COHERENCE_CONCURRENCY_POLICY` on `site-publish.yml`                                                                          |
+| F5:T4               | REVIEW  | `HARNESS_INVARIANT_ALIGNMENT_UNMEASURED_IN_CI`: INV-DEVAI-002 and INV-HARNESS-006 have no fail-closed CI step with candidate evidence |
+| F5:T9               | REVIEW  | 85.5% green over 186 runs, below 95%; the base branch filter is reported unverified                                                   |
+| F4:T9               | REVIEW  | `INVENTORY_REGENERATION_NO_KINDS_TOUCHED`: no inventory bodies were found to rebuild                                                  |
+| F2:T4               | UNKNOWN | `migration_check` needs a database (OE-02); not run, as in the first scorecard                                                        |
+| F4:T4               | UNKNOWN | `INVENTORY_ADHERENCE_INPUT_MISSING`: `.devai/state/inventory/inventory.json` is absent                                                |
+| F1:T1, F4:T5, F4:T6 | N/A     | Unchanged declarations; F4:T6 cites the `rbac` surface declared absent                                                                |
