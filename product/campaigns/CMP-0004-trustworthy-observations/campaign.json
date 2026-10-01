@@ -1113,7 +1113,9 @@
                 "paths": [
                   "docs/reference/cli/evidence-render.md",
                   "docs/theory/framework/loop.md",
-                  "record/derived/indexes/README.md"
+                  "record/derived/indexes/README.md",
+                  "docs/reference/cli/index.md",
+                  "law/policy/documentation-information-architecture.json"
                 ],
                 "forbidden": [".github/workflows/", "packages/", "tests/"]
               },
@@ -1134,7 +1136,7 @@
               "commit_types": ["docs(reference)", "docs(theory)", "plan(record)"],
               "prompt": {
                 "path": "prompts/TASK-0431.md",
-                "sha256": "be0bc0b08ed1e4c017fb0c87f38c86664afcdb58a14b2b0ddac47a4dcd30fcb6"
+                "sha256": "38d1fe966eac3bec056664be8761816156c5a3cee7840c813599325c35ce8fc7"
               },
               "pull_request": null,
               "merged_as": null,
