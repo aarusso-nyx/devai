@@ -46,6 +46,7 @@ import {
   senseTypeCheck,
   measureTestCoverageDepth,
   SENSOR_READING_KINDS,
+  type HarnessRobustnessOptions,
   type SensorKind,
 } from '@devai-nyx/sensors';
 import {
@@ -59,6 +60,7 @@ import {
 
 import { rebuildSensorReadings } from './readings-rebuild.js';
 import {
+  type SenseAdapterRequest,
   type SenseSensorAdapter,
   optional,
   stringArrayInput,
@@ -74,6 +76,50 @@ import {
   actionEffectInference,
 } from './adapter-readers.js';
 export type { SenseAdapterRequest, SenseSensorAdapter } from './adapter-readers.js';
+
+/**
+ * The declared CI population of a harness sensor (ADR-SCR-0010), forwarded from
+ * .devai/config/sensor-inputs.json. The schema requires workflow, event, and minimumSample;
+ * a run without them is refused here as a missing input, never defaulted.
+ */
+function harnessPopulationInput(
+  request: SenseAdapterRequest,
+): Omit<HarnessRobustnessOptions, 'thresholds'> {
+  const attemptsInput = stringInput(request, 'attempts');
+  if (attemptsInput !== undefined && attemptsInput !== 'last' && attemptsInput !== 'all') {
+    throw new Error('SENSE_INPUT_INVALID:attempts');
+  }
+  const attempts: 'last' | 'all' | undefined = attemptsInput;
+  const includeCancelled = request.inputs?.['includeCancelled'];
+  if (includeCancelled !== undefined && typeof includeCancelled !== 'boolean') {
+    throw new Error('SENSE_INPUT_INVALID:includeCancelled');
+  }
+  const minimumSample = integerInput(request, 'minimumSample');
+  if (minimumSample === undefined) throw new Error('SENSE_INPUT_REQUIRED:minimumSample');
+  const excluded = request.inputs?.['excludedJobs'];
+  if (excluded !== undefined && !Array.isArray(excluded)) {
+    throw new Error('SENSE_INPUT_INVALID:excludedJobs');
+  }
+  const excludedJobs = ((excluded ?? []) as unknown[]).map((pair) => {
+    const record = pair as Record<string, unknown> | null;
+    if (typeof record?.['workflow'] !== 'string' || typeof record['job'] !== 'string') {
+      throw new Error('SENSE_INPUT_INVALID:excludedJobs');
+    }
+    return { workflow: record['workflow'], job: record['job'] };
+  });
+  return {
+    repoRoot: request.repoRoot,
+    workflow: stringInput(request, 'workflow', { required: true }) as string,
+    event: stringInput(request, 'event', { required: true }) as string,
+    minimumSample,
+    excludedJobs,
+    ...optional('headBranch', stringInput(request, 'headBranch')),
+    ...optional('baseBranch', stringInput(request, 'baseBranch')),
+    ...optional('attempts', attempts),
+    ...optional('includeCancelled', includeCancelled),
+    ...optional('lookbackDays', integerInput(request, 'lookbackDays')),
+  };
+}
 
 const ADAPTERS: Readonly<Record<SensorKind, SenseSensorAdapter>> = Object.freeze({
   type_check: (request) =>
@@ -233,7 +279,11 @@ const ADAPTERS: Readonly<Record<SensorKind, SenseSensorAdapter>> = Object.freeze
   inventory_adherence: inventoryAdherence,
   inventory_determinism: inventoryDeterminism,
   harness_security: (request) => senseHarnessSecurity({ repoRoot: request.repoRoot }).reading,
-  harness_green_main: (request) => senseHarnessGreenMain({ repoRoot: request.repoRoot }),
+  harness_green_main: (request) =>
+    senseHarnessGreenMain({
+      ...harnessPopulationInput(request),
+      ...optional('since', stringInput(request, 'since')),
+    }),
   spec_alignment: (request) => senseSpecAlignment({ repoRoot: request.repoRoot }),
   spec_security_coverage: (request) => senseSpecSecurityCoverage({ repoRoot: request.repoRoot }),
   spec_performance_targets: (request) =>
@@ -279,8 +329,8 @@ const ADAPTERS: Readonly<Record<SensorKind, SenseSensorAdapter>> = Object.freeze
         integerInput(request, 'minWorkflowsForReusableCheck'),
       ),
     }),
-  harness_performance: (request) => senseHarnessPerformance({ repoRoot: request.repoRoot }),
-  harness_robustness: (request) => senseHarnessRobustness({ repoRoot: request.repoRoot }),
+  harness_performance: (request) => senseHarnessPerformance(harnessPopulationInput(request)),
+  harness_robustness: (request) => senseHarnessRobustness(harnessPopulationInput(request)),
   inventory_performance: (request) =>
     senseInventoryPerformance({
       repoRoot: request.repoRoot,

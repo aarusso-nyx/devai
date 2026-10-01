@@ -4,24 +4,24 @@ import {
   type SensorReading,
   type SensorStatus,
 } from './sensor-reading.js';
-import { invokeGhJson } from './harness/gh-api.js';
+import {
+  insufficientSampleFinding,
+  samplePopulation,
+  type HarnessPopulationOptions,
+} from './harness/gh-api.js';
 
 /**
  * F5 harness performance sensor (28.G; F5×T7). Per design note at
  * docs/theory/architecture/sensors/harness_performance.md.
  */
 
-export interface HarnessPerformanceOptions {
-  readonly repoRoot: string;
-  readonly branch?: string;
-  readonly limit?: number;
+export interface HarnessPerformanceOptions extends HarnessPopulationOptions {
   readonly thresholds?: {
     readonly passMedianMs: number;
     readonly passP95Ms: number;
     readonly reviewMedianMs: number;
     readonly reviewP95Ms: number;
   };
-  readonly now?: string;
 }
 
 const DEFAULT_THRESHOLDS = {
@@ -31,12 +31,6 @@ const DEFAULT_THRESHOLDS = {
   reviewP95Ms: 3_600_000,
 } as const;
 
-interface GhRun {
-  readonly conclusion?: string;
-  readonly createdAt?: string;
-  readonly updatedAt?: string;
-}
-
 function percentile(sorted: readonly number[], p: number): number {
   if (sorted.length === 0) return 0;
   const rank = Math.max(1, Math.ceil(p * sorted.length));
@@ -44,69 +38,65 @@ function percentile(sorted: readonly number[], p: number): number {
 }
 
 export function senseHarnessPerformance(opts: HarnessPerformanceOptions): SensorReading {
-  const branch = opts.branch ?? 'main';
-  const limit = opts.limit ?? 50;
   const thresholds = opts.thresholds ?? DEFAULT_THRESHOLDS;
+  const common = {
+    sensorName: 'harness-performance',
+    sensorKind: 'harness_performance',
+    deterministic: false,
+    tier: 'L2',
+    ...(opts.now !== undefined && { timestamp: opts.now }),
+  } as const;
 
-  const args = [
-    'run',
-    'list',
-    '--branch',
-    branch,
-    '--json',
-    'conclusion,createdAt,updatedAt',
-    '--limit',
-    String(limit),
-  ];
-  const result = invokeGhJson<GhRun[]>({ cwd: opts.repoRoot, args });
-  if (!result.ok) {
+  const sample = samplePopulation(opts);
+  if (!sample.ok) {
     return buildSensorReading({
-      sensorName: 'harness-performance',
-      sensorKind: 'harness_performance',
-      command: ['gh', ...args],
+      ...common,
+      command: ['gh', ...sample.args],
       status: 'unknown',
-      deterministic: false,
-      tier: 'L2',
-      ...(opts.now !== undefined && { timestamp: opts.now }),
       findings: [
         {
           severity: 'info',
           code: 'HARNESS_PERFORMANCE_GH_UNAVAILABLE',
-          message: `Skipped: ${result.reason}`,
+          message: `Skipped: ${sample.reason}`,
         },
       ],
       metrics: { run_count: 0 },
     });
   }
+  const command = ['gh', ...sample.args];
 
   const durations: number[] = [];
-  let total = 0;
-  for (const run of result.data) {
-    total += 1;
+  for (const run of sample.runs) {
     if (run.conclusion !== 'success') continue;
     if (run.createdAt === undefined || run.updatedAt === undefined) continue;
     const start = Date.parse(run.createdAt);
     const end = Date.parse(run.updatedAt);
     if (Number.isFinite(start) && Number.isFinite(end) && end >= start) durations.push(end - start);
   }
+  const total = sample.runs.length;
 
-  if (durations.length === 0) {
+  // The minimum counts the successful runs whose durations are measured.
+  if (durations.length < sample.minimum) {
     return buildSensorReading({
-      sensorName: 'harness-performance',
-      sensorKind: 'harness_performance',
-      command: ['gh', ...args],
-      status: total === 0 ? 'unknown' : 'review',
-      deterministic: false,
-      tier: 'L2',
-      ...(opts.now !== undefined && { timestamp: opts.now }),
+      ...common,
+      command,
+      status: 'unknown',
       findings: [
-        {
-          severity: 'warning',
-          code: 'HARNESS_PERFORMANCE_NO_SUCCESS_RUNS',
-          message: `No successful runs found on branch ${branch} (last ${String(total)} entries).`,
-        },
+        insufficientSampleFinding(
+          'HARNESS_PERFORMANCE_INSUFFICIENT_SAMPLE',
+          durations.length,
+          sample.minimum,
+          sample.describe,
+          'successful run(s)',
+        ),
+        sample.unverifiedFinding,
       ],
-      metrics: { run_count: total, success_count: 0 },
+      metrics: {
+        run_count: total,
+        success_count: durations.length,
+        sample_size: durations.length,
+        ...sample.metrics,
+      },
     });
   }
 
@@ -133,23 +123,22 @@ export function senseHarnessPerformance(opts: HarnessPerformanceOptions): Sensor
       message: `median ${String(Math.round(median / 1000))}s, p95 ${String(Math.round(p95 / 1000))}s — above review thresholds.`,
     });
   }
+  findings.push(sample.unverifiedFinding);
 
   return buildSensorReading({
-    sensorName: 'harness-performance',
-    sensorKind: 'harness_performance',
-    command: ['gh', ...args],
+    ...common,
+    command,
     status,
-    deterministic: false,
-    tier: 'L2',
-    ...(opts.now !== undefined && { timestamp: opts.now }),
     findings,
     metrics: {
       run_count: total,
       success_count: durations.length,
+      sample_size: durations.length,
       median_ms: median,
       p95_ms: p95,
       pass_median_ms: thresholds.passMedianMs,
       pass_p95_ms: thresholds.passP95Ms,
+      ...sample.metrics,
     },
   });
 }
