@@ -40,42 +40,27 @@ interface ChainArtifactView {
   readonly sha256?: unknown;
 }
 
-/** The SHA-256 every chain entry naming `path` declares for it. */
-function chainedDigests(repoRoot: string, path: string): string[] {
+/** The SHA-256 the latest chain entry naming `path` declares for it, if any. */
+function chainedDigest(repoRoot: string, path: string): string | undefined {
   const chainPath = join(repoRoot, SENSE_RECORD_CHAIN_PATH);
-  if (!existsSync(chainPath)) return [];
+  if (!existsSync(chainPath)) return undefined;
   const chain = loadChain(chainPath);
-  const digests: string[] = [];
+  let digest: string | undefined;
   for (const entry of chain.records) {
     if (entry.action !== SENSE_RECORD_CHAIN_ACTION) continue;
     for (const artifact of (entry.artifacts ?? []) as readonly ChainArtifactView[]) {
-      if (artifact.path === path) digests.push(String(artifact.sha256));
+      if (artifact.path === path) digest = String(artifact.sha256);
     }
   }
-  return digests;
+  return digest;
 }
 
-/**
- * The second write of a recording: one `sense.readings.record` entry naming the
- * reading id, kind, and the SHA-256 of the recorded file bytes, bound to HEAD.
- * An existing entry is never rewritten; one whose digest disagrees with the
- * file is a finding (`SENSE_RECORD_CHAIN_DIGEST_MISMATCH`), never a repair.
- * Returns whether an entry was appended.
- */
-function ensureChainEntry(
+function appendChainEntry(
   repoRoot: string,
   reading: SensorReading,
   path: string,
-  bytes: Buffer,
-): boolean {
-  const sha256 = createHash('sha256').update(bytes).digest('hex');
-  const declared = chainedDigests(repoRoot, path);
-  if (declared.length > 0) {
-    if (declared.some((digest) => digest !== sha256)) {
-      throw new Error(`SENSE_RECORD_CHAIN_DIGEST_MISMATCH:${reading.id}`);
-    }
-    return false;
-  }
+  sha256: string,
+): void {
   const appended = appendVerbEvidence({
     repoRoot,
     chainPath: SENSE_RECORD_CHAIN_PATH,
@@ -87,7 +72,31 @@ function ensureChainEntry(
   if (!appended.ok) {
     throw new Error(`SENSE_RECORD_CHAIN_APPEND_FAILED:${reading.id}:${appended.error ?? ''}`);
   }
-  return true;
+}
+
+function digestOf(bytes: Buffer): string {
+  return createHash('sha256').update(bytes).digest('hex');
+}
+
+/**
+ * The second write of a re-record: an already recorded file whose chain entry was
+ * lost gains one `sense.readings.record` entry. An existing entry is never
+ * rewritten; one whose digest disagrees with the file is a finding
+ * (`SENSE_RECORD_CHAIN_DIGEST_MISMATCH`), never a repair.
+ */
+function repairChainEntry(
+  repoRoot: string,
+  reading: SensorReading,
+  path: string,
+  bytes: Buffer,
+): void {
+  const sha256 = digestOf(bytes);
+  const declared = chainedDigest(repoRoot, path);
+  if (declared === undefined) {
+    appendChainEntry(repoRoot, reading, path, sha256);
+    return;
+  }
+  if (declared !== sha256) throw new Error(`SENSE_RECORD_CHAIN_DIGEST_MISMATCH:${reading.id}`);
 }
 
 /**
@@ -126,12 +135,13 @@ export function recordSensorReading(repoRoot: string, inputPath: string): Record
     if (JSON.stringify(existing) !== JSON.stringify(reading)) {
       throw new Error(`SENSE_RECORD_ID_CONFLICT:${reading.id}`);
     }
-    ensureChainEntry(repoRoot, reading, relativePath, bytes);
+    repairChainEntry(repoRoot, reading, relativePath, bytes);
     return Object.freeze({ path: target, action: 'already-recorded', reading });
   }
   mkdirSync(directory, { recursive: true });
   writeFileSync(target, canonical, { flag: 'wx' });
-  ensureChainEntry(repoRoot, reading, relativePath, Buffer.from(canonical, 'utf8'));
+  // A newly created file always gains its own entry naming exactly these bytes.
+  appendChainEntry(repoRoot, reading, relativePath, digestOf(Buffer.from(canonical, 'utf8')));
   return Object.freeze({ path: target, action: 'created', reading });
 }
 
