@@ -10,7 +10,6 @@ vi.mock('@devai-nyx/authority', async (importOriginal) => ({
   spawnSync: mocks.spawnSync,
 }));
 
-import { HARNESS_RUN_FIELDS } from '../../src/harness/gh-api.js';
 import { senseHarnessRobustness } from '../../src/harness-robustness.js';
 
 const NOW = '2026-09-08T12:00:00.000Z';
