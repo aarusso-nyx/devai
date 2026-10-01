@@ -59,6 +59,7 @@
     "test:utils": "vitest run --config tests/config/local.config.ts packages/utils/tests",
     "test:root": "vitest run --config tests/config/local.config.ts tests/contract tests/integration",
     "test:perf": "vitest run --config tests/config/rc.performance.config.ts tests/regression",
+    "test:coverage:local": "vitest run --config tests/config/local.coverage.config.ts",
     "test:coverage:rc": "vitest run --config tests/config/rc.coverage.config.ts",
     "test:db:rc": "vitest run --config tests/config/rc.db.config.ts",
     "test:e2e:rc": "vitest run --config tests/config/rc.e2e.config.ts",
