@@ -11,12 +11,16 @@
 //     'main', attempts 'last', includeCancelled false, lookbackDays 30, excludedJobs [].
 //   - The gh call is `gh run list --workflow <file> --event <event> [--branch <ref>]
 //     --json <fields> --limit <n> [--created >=<date>]`, with no --branch for headBranch '*'.
-//   - gh run list rows are filtered again by the sensor, so a row outside the population is
-//     never counted even when gh returns it. A row carries databaseId, attempt, conclusion,
-//     createdAt, updatedAt, event, headBranch, baseBranch, workflowFile, and jobs (the job
-//     keys the run executed). The sensor asks for those fields in --json.
-//   - A run is left out by identity when its workflowFile and one of its jobs match an
-//     excludedJobs pair; a duration or conclusion never leaves a run out.
+//     The --json fields are only real gh run list fields (attempt, conclusion, createdAt,
+//     updatedAt, event, headBranch, databaseId, ...); never a base branch, a workflow path,
+//     or jobs, which gh run list does not return.
+//   - Server-side filters: workflow, event, and a literal head branch. The sensor re-checks
+//     `event` and a literal `headBranch` on the returned rows. Row filters: attempts (via
+//     attempt and databaseId), cancelled (via conclusion), lookback (via createdAt).
+//   - Base branch and a same-workflow excludedJobs pair cannot be verified from gh run list
+//     rows: the sensor never filters on them. It reports them as unverified (below) and still
+//     gives the measured verdict. A pair whose workflow differs from the sampled workflow is
+//     satisfied by construction (--workflow never returns those runs) and is not unverified.
 //   - attempts 'last' keeps, per databaseId, the row with the highest attempt; 'all' keeps
 //     every row.
 //   - Below minimumSample the reading is status unknown and the finding message names the
@@ -25,6 +29,12 @@
 //     population_head_branch, population_base_branch, population_attempts,
 //     population_include_cancelled, population_lookback_days. The population metrics are
 //     present at and above the minimum too.
+//   - Unverified filters: metric population_base_branch_verified is false (boolean);
+//     population_excluded_jobs_unverified is the number of excludedJobs pairs naming the
+//     sampled workflow (0 when none); population_unverified is a comma-joined string naming
+//     the unverified filters, "baseBranch" and/or "excludedJobs" ('' when none). A finding
+//     whose message contains the word unverified and each name is present on every reading
+//     that has any, including the measured verdicts and the UNKNOWN reading.
 //   - For harness_performance the minimum counts successful runs.
 // spawnSync is mocked: no real gh ever runs.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -53,12 +63,11 @@ interface Row {
   readonly updatedAt: string;
   readonly event: string;
   readonly headBranch: string;
-  readonly baseBranch: string;
-  readonly workflowFile: string;
-  readonly jobs: readonly string[];
 }
 
 let nextId = 1;
+/** Test-side only: the workflow file each fixture run belongs to; never part of a gh row. */
+const workflowOf = new Map<number, string>();
 
 function daysAgo(days: number): string {
   return new Date(Date.parse(NOW) - days * DAY).toISOString();
@@ -66,11 +75,20 @@ function daysAgo(days: number): string {
 
 /** One in-population run: the gate on a pull request into main, created `ageDays` ago. */
 function row(
-  overrides: Partial<Row> & { readonly durationMs?: number; readonly ageDays?: number } = {},
+  overrides: Partial<Row> & {
+    readonly durationMs?: number;
+    readonly ageDays?: number;
+    readonly workflow?: string;
+  } = {},
 ): Row {
-  const { durationMs = 5 * MIN, ageDays = 2, ...rest } = overrides;
+  const {
+    durationMs = 5 * MIN,
+    ageDays = 2,
+    workflow = 'pull-request-checks.yml',
+    ...rest
+  } = overrides;
   const created = daysAgo(ageDays);
-  return {
+  const built: Row = {
     databaseId: nextId++,
     attempt: 1,
     conclusion: 'success',
@@ -78,11 +96,10 @@ function row(
     updatedAt: new Date(Date.parse(created) + durationMs).toISOString(),
     event: 'pull_request',
     headBranch: 'feature/x',
-    baseBranch: 'main',
-    workflowFile: 'pull-request-checks.yml',
-    jobs: ['gate'],
     ...rest,
   };
+  workflowOf.set(built.databaseId, workflow);
+  return built;
 }
 
 function rows(count: number, overrides: Parameters<typeof row>[0] = {}): Row[] {
@@ -94,10 +111,33 @@ function mix(ok: number, bad: number, overrides: Parameters<typeof row>[0] = {})
   return [...rows(ok, overrides), ...rows(bad, { ...overrides, conclusion: 'failure' })];
 }
 
+function ghReply(data: readonly Row[]) {
+  return { status: 0, signal: null, stdout: JSON.stringify(data), stderr: '', error: undefined };
+}
+
+/** A gh that honours the server-side filters --workflow, --event, and --branch. */
 function stubGh(data: readonly Row[]): void {
+  mocks.spawnSync.mockImplementation((command: string, args: readonly string[]) => {
+    if (command !== 'gh') throw new Error(`unexpected spawnSync call: ${command}`);
+    const workflow = valueAfter(args, '--workflow');
+    const event = valueAfter(args, '--event');
+    const branch = valueAfter(args, '--branch');
+    return ghReply(
+      data.filter(
+        (r) =>
+          (workflow === undefined || workflowOf.get(r.databaseId) === workflow) &&
+          (event === undefined || r.event === event) &&
+          (branch === undefined || r.headBranch === branch),
+      ),
+    );
+  });
+}
+
+/** A gh that ignores every filter and returns all rows, so the sensor's own re-checks show. */
+function stubGhRaw(data: readonly Row[]): void {
   mocks.spawnSync.mockImplementation((command: string) => {
     if (command !== 'gh') throw new Error(`unexpected spawnSync call: ${command}`);
-    return { status: 0, signal: null, stdout: JSON.stringify(data), stderr: '', error: undefined };
+    return ghReply(data);
   });
 }
 
@@ -111,6 +151,25 @@ function valueAfter(argv: readonly string[], flag: string): string | undefined {
   const at = argv.indexOf(flag);
   return at < 0 ? undefined : argv[at + 1];
 }
+
+const REAL_GH_FIELDS = [
+  'attempt',
+  'conclusion',
+  'createdAt',
+  'databaseId',
+  'displayTitle',
+  'event',
+  'headBranch',
+  'headSha',
+  'name',
+  'number',
+  'startedAt',
+  'status',
+  'updatedAt',
+  'url',
+  'workflowDatabaseId',
+  'workflowName',
+];
 
 const RELEASE_EXCLUSIONS = [
   { workflow: 'release.yml', job: 'verify-ledger' },
@@ -148,24 +207,24 @@ const SENSORS: readonly (readonly [string, Sense, number])[] = [
   ['harness_robustness', robustness, 20],
 ];
 
-/** Runs that sit outside the population on exactly one axis each; none may be counted. */
+/** Runs outside the population on one axis each; gh filters or the sensor drops them. */
 function outsiders(): Row[] {
   return [
-    row({ workflowFile: 'ci.yml', conclusion: 'failure' }),
+    row({ workflow: 'ci.yml', conclusion: 'failure' }),
     row({ event: 'push', conclusion: 'failure' }),
     row({ event: 'merge_group', conclusion: 'failure' }),
-    row({ baseBranch: 'release/1.x', conclusion: 'failure' }),
     row({ conclusion: 'cancelled' }),
     row({ ageDays: 45, conclusion: 'failure' }),
     row({ ageDays: 31, conclusion: 'failure' }),
-    row({ workflowFile: 'release.yml', jobs: ['build-release'], durationMs: 3 * DAY }),
-    row({ workflowFile: 'release.yml', jobs: ['verify-ledger'], conclusion: 'failure' }),
+    row({ workflow: 'release.yml', durationMs: 3 * DAY }),
+    row({ workflow: 'release.yml', conclusion: 'failure' }),
   ];
 }
 
 beforeEach(() => {
   mocks.spawnSync.mockReset();
   nextId = 1;
+  workflowOf.clear();
 });
 
 afterEach(() => {
@@ -271,6 +330,87 @@ describe.each(SENSORS)('%s sampling (IA-001)', (kind, sense, minimum) => {
     expect(reading.metrics?.['sample_size']).toBe(minimum - 1);
   });
 
+  it('re-checks the event on the returned rows even when gh returns another event', () => {
+    stubGhRaw([...rows(minimum - 1), ...rows(5, { event: 'push' })]);
+    const reading = sense(population(minimum));
+    expect(reading.status).toBe('unknown');
+    expect(reading.metrics?.['sample_size']).toBe(minimum - 1);
+  });
+
+  it('re-checks a literal head branch on the returned rows', () => {
+    stubGhRaw([
+      ...rows(minimum - 1, { event: 'push', headBranch: 'main' }),
+      ...rows(5, { event: 'push', headBranch: 'feature/y' }),
+    ]);
+    const reading = sense(population(minimum, { event: 'push', headBranch: 'main' }));
+    expect(reading.status).toBe('unknown');
+    expect(reading.metrics?.['sample_size']).toBe(minimum - 1);
+  });
+
+  it('requests only real gh run list fields in --json', () => {
+    stubGh(rows(minimum));
+    sense(population(minimum));
+    const fields = (valueAfter(ghArgv(), '--json') ?? '').split(',');
+    expect(fields.length).toBeGreaterThan(0);
+    for (const field of fields) expect(REAL_GH_FIELDS).toContain(field);
+  });
+
+  it('does not filter on the base branch: a declared base branch changes no count', () => {
+    stubGh(rows(minimum));
+    const a = sense(population(minimum, { baseBranch: 'main' }));
+    mocks.spawnSync.mockReset();
+    stubGh(rows(minimum));
+    const b = sense(population(minimum, { baseBranch: 'release/1.x' }));
+    expect(b.metrics?.['sample_size']).toBe(a.metrics?.['sample_size']);
+    expect(b.status).toBe(a.status);
+    expect(b.metrics?.['population_base_branch']).toBe('release/1.x');
+  });
+
+  it('reports the base branch as unverified in metrics and finding, with a measured verdict', () => {
+    stubGh(rows(minimum));
+    const reading = sense(population(minimum));
+    expect(reading.status).not.toBe('unknown');
+    expect(reading.metrics?.['population_base_branch_verified']).toBe(false);
+    expect(reading.metrics?.['population_unverified']).toBe('baseBranch');
+    expect(reading.metrics?.['population_excluded_jobs_unverified']).toBe(0);
+    const message = (reading.findings ?? []).map((f) => f.message).join('\n');
+    expect(message).toContain('unverified');
+    expect(message).toContain('baseBranch');
+    expect(message).not.toContain('excludedJobs');
+  });
+
+  it('reports a same-workflow excluded pair as unverified without filtering any run', () => {
+    stubGh(rows(minimum));
+    const reading = sense(
+      population(minimum, {
+        excludedJobs: [...RELEASE_EXCLUSIONS, { workflow: 'pull-request-checks.yml', job: 'gate' }],
+      }),
+    );
+    expect(reading.status).not.toBe('unknown');
+    expect(reading.metrics?.['sample_size']).toBe(minimum);
+    expect(reading.metrics?.['population_excluded_jobs_unverified']).toBe(1);
+    expect(reading.metrics?.['population_unverified']).toBe('baseBranch,excludedJobs');
+    const message = (reading.findings ?? []).map((f) => f.message).join('\n');
+    expect(message).toContain('unverified');
+    expect(message).toContain('excludedJobs');
+  });
+
+  it('reports the unverified filters on the UNKNOWN reading too', () => {
+    stubGh(rows(1));
+    const reading = sense(population(minimum));
+    expect(reading.status).toBe('unknown');
+    expect(reading.metrics?.['population_unverified']).toBe('baseBranch');
+    const message = (reading.findings ?? []).map((f) => f.message).join('\n');
+    expect(message).toContain('unverified');
+  });
+
+  it('reports no unverified job pair for the DEVAI declaration, only the base branch', () => {
+    stubGh(rows(minimum));
+    const reading = sense(population(minimum));
+    expect(reading.metrics?.['population_excluded_jobs_unverified']).toBe(0);
+    expect(reading.metrics?.['population_unverified']).toBe('baseBranch');
+  });
+
   it('keeps every head branch when the declared head branch is *', () => {
     stubGh([...rows(10, { headBranch: 'a' }), ...rows(minimum - 10, { headBranch: 'b/c' })]);
     const reading = sense(population(minimum));
@@ -293,7 +433,7 @@ describe.each(SENSORS)('%s sampling (IA-001)', (kind, sense, minimum) => {
 describe('population filtering', () => {
   // Measured through harness_green_main: an in-population success rate of 100% with a
   // block of failing outsiders; any outsider that leaks in drops the rate and the status.
-  it('leaves out runs of another workflow, event, base branch, lookback, and cancelled runs', () => {
+  it('leaves out runs of another workflow, event, lookback, and cancelled runs', () => {
     stubGh([...rows(20), ...outsiders()]);
     const reading = senseHarnessGreenMain(population(20));
     expect(reading.status).toBe('pass');
@@ -361,19 +501,13 @@ describe('population filtering', () => {
     expect(reading.status).toBe('fail');
   });
 
-  it('leaves out an excluded workflow-and-job pair by identity, never a slow run of the sampled workflow', () => {
-    stubGh([
-      ...rows(10),
-      row({
-        workflowFile: 'release.yml',
-        jobs: ['verify-ledger', 'deploy-pages'],
-        durationMs: 4 * DAY,
-      }),
-    ]);
+  it('never counts a release.yml run: a cross-workflow excluded pair is satisfied by construction', () => {
+    stubGh([...rows(10), row({ workflow: 'release.yml', durationMs: 4 * DAY })]);
     const reading = senseHarnessPerformance(population(10));
     expect(reading.status).toBe('pass');
     expect(reading.metrics?.['sample_size']).toBe(10);
     expect(reading.metrics?.['p95_ms']).toBe(5 * MIN);
+    expect(valueAfter(ghArgv(), '--workflow')).toBe('pull-request-checks.yml');
   });
 
   it('keeps a long run of the sampled workflow in the sample, where it can drive FAIL', () => {
@@ -381,19 +515,6 @@ describe('population filtering', () => {
     const reading = senseHarnessPerformance(population(10));
     expect(reading.status).toBe('fail');
     expect(reading.metrics?.['sample_size']).toBe(10);
-  });
-
-  it('does not exclude a run whose job is not on the excluded list', () => {
-    stubGh([
-      ...rows(9),
-      row({ workflowFile: 'release.yml', jobs: ['control-commit-summary'], event: 'pull_request' }),
-    ]);
-    // The workflow is outside the population anyway, so it is not counted either way.
-    const reading = senseHarnessPerformance(
-      population(10, { workflow: 'release.yml', excludedJobs: [] }),
-    );
-    expect(reading.metrics?.['sample_size']).toBe(1);
-    expect(reading.status).toBe('unknown');
   });
 });
 
