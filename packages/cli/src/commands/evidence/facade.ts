@@ -5,8 +5,11 @@ import { spawnSync, writeGovernanceProjectionSync } from '@devai-nyx/authority';
 import {
   LocalEvidenceError,
   appendProofEpochErrata,
+  closureIndexRows,
   loadChain,
   normalizeActorList,
+  readClosures,
+  renderClosureIndex,
   verifyChain,
   verifyLocalEvidence,
   verifyProofEpoch,
@@ -24,7 +27,9 @@ import { toArray, usage, message, jsonRecord } from './facade-shared.js';
 export { evidenceCollect, evidenceRecord } from './facade-collect-record.js';
 
 const DEFAULT_CHAIN_PATH = 'record/proofs/chain.json';
-const RENDER_KINDS = new Set(['decisions', 'rounds', 'test-matrix']);
+const RENDER_KINDS = new Set(['decisions', 'rounds', 'round-narratives', 'test-matrix']);
+/** The committed rounds index that `--kind rounds --check` compares with (ADR-EVI-0001). */
+const ROUNDS_INDEX_PATH = 'record/derived/indexes/rounds.md';
 
 interface RedactOptions {
   readonly round?: string;
@@ -120,7 +125,13 @@ interface RenderOptions {
   readonly includeThresholds?: boolean;
   readonly thresholdsPath?: string;
   readonly strict?: boolean;
+  readonly check?: boolean;
   readonly human?: boolean;
+}
+
+/** The canonical rounds index rendered from the phase closures, rejecting an inconsistent set. */
+function renderRoundsIndex(repoRoot: string): string {
+  return renderClosureIndex(closureIndexRows(readClosures(repoRoot)));
 }
 
 function explicitWrite(): boolean {
@@ -134,7 +145,7 @@ export const evidenceRender = defineCommand({
   register(cli: CAC): void {
     cli
       .command('evidence-render', 'Render one canonical evidence view')
-      .option('--kind <kind>', 'decisions | rounds | test-matrix (required)')
+      .option('--kind <kind>', 'decisions | rounds | round-narratives | test-matrix (required)')
       .option('--repo-root <path>', 'Repository root (default: cwd)')
       .option('--out <path>', 'Write the rendered view to this path')
       .option('--in <path>', 'Test-result input directory')
@@ -146,10 +157,22 @@ export const evidenceRender = defineCommand({
       .option('--include-thresholds', 'Include test thresholds')
       .option('--thresholds-path <path>', 'Threshold configuration path')
       .option('--strict', 'Fail on test-matrix readiness violations')
+      .option('--check', 'Compare the rendered rounds index with the committed file; write nothing')
       .option('--human', 'Human-readable write receipt')
       .action(async (options: RenderOptions) => {
         if (options.kind === undefined || !RENDER_KINDS.has(options.kind)) {
-          usage('evidence render', '--kind must be decisions, rounds, or test-matrix');
+          usage(
+            'evidence render',
+            '--kind must be decisions, rounds, round-narratives, or test-matrix',
+          );
+          return;
+        }
+        if (options.check === true && options.kind !== 'rounds') {
+          usage('evidence render', '--check applies only to --kind rounds');
+          return;
+        }
+        if (options.check === true && options.out !== undefined) {
+          usage('evidence render', '--check is incompatible with --out');
           return;
         }
         if (options.out !== undefined && !explicitWrite()) {
@@ -195,10 +218,38 @@ export const evidenceRender = defineCommand({
             return;
           }
 
+          if (options.check === true) {
+            const rendered = renderRoundsIndex(repoRoot);
+            const committedPath = resolve(repoRoot, ROUNDS_INDEX_PATH);
+            if (!existsSync(committedPath)) {
+              process.stderr.write(
+                `devai evidence render: ${ROUNDS_INDEX_PATH} is missing; regenerate it with --kind rounds --out ${ROUNDS_INDEX_PATH} --write\n`,
+              );
+              process.exitCode = EXIT_FAIL;
+              return;
+            }
+            if (readFileSync(committedPath, 'utf8') !== rendered) {
+              process.stderr.write(
+                `devai evidence render: ${ROUNDS_INDEX_PATH} differs from the phase closures; regenerate it with --kind rounds --out ${ROUNDS_INDEX_PATH} --write\n`,
+              );
+              process.exitCode = EXIT_FAIL;
+              return;
+            }
+            process.stdout.write(
+              options.human === true
+                ? `evidence render: ${ROUNDS_INDEX_PATH} matches the phase closures\n`
+                : `${JSON.stringify({ kind: 'rounds', check: 'fresh', path: ROUNDS_INDEX_PATH })}\n`,
+            );
+            process.exitCode = EXIT_PASS;
+            return;
+          }
+
           const body =
             options.kind === 'decisions'
               ? renderDecisionRecords({ repoRoot })
-              : renderRoundRecords({ repoRoot });
+              : options.kind === 'rounds'
+                ? renderRoundsIndex(repoRoot)
+                : renderRoundRecords({ repoRoot });
           if (options.out === undefined) {
             process.stdout.write(body.endsWith('\n') ? body : `${body}\n`);
           } else {

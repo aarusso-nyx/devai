@@ -328,3 +328,126 @@ export function computeLedger(records: readonly PhaseClosureRecord[]): ClosureLe
     rounds,
   };
 }
+
+/** One row of the canonical rounds index (ADR-EVI-0001; docs/reference/cli/evidence-render.md). */
+export interface ClosureIndexRow {
+  readonly closure: string;
+  readonly round: string;
+  readonly supersedes: string | null;
+  readonly merged_as: string;
+  readonly terminal: boolean;
+}
+
+function closureFile(id: string): string {
+  return `${id}.json`;
+}
+
+function byId(left: { readonly id: string }, right: { readonly id: string }): number {
+  return left.id < right.id ? -1 : left.id > right.id ? 1 : 0;
+}
+
+/**
+ * The rounds-index rows of a closure set: rounds ascending by plain string order of the round
+ * id, each round following its supersession chain from the first closure to the terminal one.
+ * The order is a function of the records alone. Throws an Error naming the offending
+ * `PC-NNNN.json` on a duplicate id, a `supersedes` link to an absent closure or to a closure of
+ * another round, a fork (two closures superseding one), a supersession cycle, or more than one
+ * terminal closure for a round. A closure without `merged_as` renders the placeholder `-`.
+ */
+export function closureIndexRows(
+  records: readonly PhaseClosureRecord[],
+): readonly ClosureIndexRow[] {
+  const sorted = [...records].sort(byId);
+  const byClosure = new Map<string, PhaseClosureRecord>();
+  for (const record of sorted) {
+    if (byClosure.has(record.id)) {
+      throw new Error(`phase closure ${closureFile(record.id)} repeats closure id ${record.id}`);
+    }
+    byClosure.set(record.id, record);
+  }
+  const successor = new Map<string, PhaseClosureRecord>();
+  for (const record of sorted) {
+    const target = record.supersedes;
+    if (target === undefined) continue;
+    const superseded = byClosure.get(target);
+    if (superseded === undefined) {
+      throw new Error(
+        `phase closure ${closureFile(record.id)} supersedes ${target}, which is not a closure in the directory`,
+      );
+    }
+    if (superseded.round_id !== record.round_id) {
+      throw new Error(
+        `phase closure ${closureFile(record.id)} of round ${record.round_id} supersedes ${target} of round ${superseded.round_id}`,
+      );
+    }
+    if (target === record.id) {
+      throw new Error(`phase closure ${closureFile(record.id)} supersedes itself`);
+    }
+    const earlier = successor.get(target);
+    if (earlier !== undefined) {
+      throw new Error(
+        `phase closure ${closureFile(record.id)} and ${closureFile(earlier.id)} both supersede ${target}, leaving round ${record.round_id} with two terminal closures`,
+      );
+    }
+    successor.set(target, record);
+  }
+
+  const rounds = new Map<string, PhaseClosureRecord[]>();
+  for (const record of sorted) {
+    const members = rounds.get(record.round_id) ?? [];
+    members.push(record);
+    rounds.set(record.round_id, members);
+  }
+  const rows: ClosureIndexRow[] = [];
+  for (const round of [...rounds.keys()].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))) {
+    const members = rounds.get(round) ?? [];
+    const chains: PhaseClosureRecord[][] = [];
+    const visited = new Set<string>();
+    for (const first of members.filter((record) => record.supersedes === undefined)) {
+      const chain: PhaseClosureRecord[] = [];
+      for (let next: PhaseClosureRecord | undefined = first; next !== undefined;) {
+        chain.push(next);
+        visited.add(next.id);
+        next = successor.get(next.id);
+      }
+      chains.push(chain);
+    }
+    const cyclic = members.find((record) => !visited.has(record.id));
+    if (cyclic !== undefined) {
+      throw new Error(
+        `phase closure ${closureFile(cyclic.id)} is in a supersession cycle of round ${round} that never reaches a terminal closure`,
+      );
+    }
+    if (chains.length > 1) {
+      const terminals = chains.map((chain) => closureFile(chain[chain.length - 1]?.id ?? '?'));
+      throw new Error(`round ${round} has more than one terminal closure: ${terminals.join(', ')}`);
+    }
+    for (const chain of chains) {
+      chain.forEach((record, position) => {
+        rows.push({
+          closure: record.id,
+          round,
+          supersedes: record.supersedes ?? null,
+          merged_as: record.merged_as ?? '-',
+          terminal: position === chain.length - 1,
+        });
+      });
+    }
+  }
+  return rows;
+}
+
+/** The canonical bytes of `record/derived/indexes/rounds.md` for the given rows. */
+export function renderClosureIndex(rows: readonly ClosureIndexRow[]): string {
+  const lines = [
+    '# Rounds index',
+    '',
+    '| closure | round | supersedes | merged_as | terminal |',
+    '| --- | --- | --- | --- | --- |',
+    ...rows.map(
+      (row) =>
+        `| ${row.closure} | ${row.round} | ${row.supersedes ?? '-'} | ${row.merged_as} | ${row.terminal ? 'yes' : 'no'} |`,
+    ),
+  ];
+  return `${lines.join('\n')}\n`;
+}
