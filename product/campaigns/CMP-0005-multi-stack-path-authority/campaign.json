@@ -3,7 +3,7 @@
   "id": "CMP-0005",
   "title": "Multi-stack path authority",
   "type": "campaign",
-  "status": "active",
+  "status": "closed",
   "date": "2026-09-30",
   "authority": "Architect",
   "mandate": {
@@ -29,7 +29,7 @@
       "id": "OE-02",
       "description": "Publish the immutable release that carries R-0501 to R-0503 (1.8.0, decided by the Owner on 2026-09-30 as the feat bump floor since v1.7.0), from the exact packed artifact the rehearsal verified, and tell DETRAN the version so CTG-0005 can pin it, rebind the constitution at 1.0.2, bind its authority source, and run Doctor and the acceptance matrix in a clone before claiming enforcement.",
       "required_before": "R-0503",
-      "performed_at": null
+      "performed_at": "2026-10-01T02:04:43Z"
     }
   ],
   "prompts": {
@@ -760,7 +760,7 @@
       "id": "R-0503",
       "title": "Doctor drift, migration, and adoption rehearsal",
       "goal": "Doctor names an adopter extension whose source drifted, vanished, or was never rebound and prints the rebind command; the migration for existing adopters is documented and rehearsed from the packed tarball in a disposable clone that reproduces the matrix through the installed bin; the release that carries the campaign is published and DETRAN is told the version.",
-      "status": "closing",
+      "status": "closed",
       "records": ["ADR-AUT-0003", "ADR-AUT-0004"],
       "depends_on": ["R-0502"],
       "attestation_reissue": false,
@@ -1371,7 +1371,13 @@
             }
           ]
         }
-      ]
+      ],
+      "closure": {
+        "merged_head": "c7fb44cddf6295ba6221bcc40dfcaaa9da23594a",
+        "closed_at": "2026-10-01T02:05:15Z",
+        "task_policy_digest": "4a38295aa6a2962d55bc383e79fcebec2a99971f9460200c6ec33a062bf5b820",
+        "phase_closure": null
+      }
     }
   ]
 }
