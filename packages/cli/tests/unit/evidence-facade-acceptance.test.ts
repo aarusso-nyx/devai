@@ -1011,7 +1011,9 @@ describe('evidence render and verify acceptance', () => {
         ])
       ).exit,
     ).toBe(2);
-    const verified = await invoke(evidenceVerify, [
+    // ADR-EVI-0002: without a baseline and without --write the chain verification refuses with
+    // PROOF_ANCHOR_BASELINE_MISSING, names --write, and writes nothing.
+    const chainArgv = [
       'evidence-verify',
       '--scope',
       'chain',
@@ -1019,9 +1021,20 @@ describe('evidence render and verify acceptance', () => {
       '--repo-root',
       repo,
       '--human',
-    ]);
+    ] as const;
+    const chainBytes = readFileSync(chain, 'utf8');
+    const refused = await invoke(evidenceVerify, chainArgv);
+    expect(refused.exit).toBe(2);
+    expect(refused.stderr).toContain('PROOF_ANCHOR_BASELINE_MISSING');
+    expect(refused.stderr).toContain('--write');
+    expect(refused.stdout).not.toContain('evidence chain: valid');
+    expect(existsSync(join(repo, 'record/proofs/anchor-baseline.json'))).toBe(false);
+    expect(readdirSync(join(repo, 'record/proofs'))).toEqual(['chain.json']);
+    expect(readFileSync(chain, 'utf8')).toBe(chainBytes);
+    const verified = await invoke(evidenceVerify, chainArgv, { writeConsent: true });
     expect(verified).toMatchObject({ exit: 0, stderr: '' });
-    expect(verified.stdout).toContain('evidence chain: valid; head');
+    expect(existsSync(join(repo, 'record/proofs/anchor-baseline.json'))).toBe(true);
+    expect(verified.stdout).toMatch(/^evidence chain: valid; .*; head [0-9a-f]*\n$/u);
     writeFileSync(chain, '{"head":"tampered","records":[]}\n');
     const tampered = await invoke(evidenceVerify, [
       'evidence-verify',
