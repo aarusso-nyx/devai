@@ -4,7 +4,7 @@
   "id": "self-dogfood",
   "status": "active",
   "authority": "Architect",
-  "policy_version": "1.1.0",
+  "policy_version": "1.2.0",
   "scope": {
     "subject": "devai-source-repository",
     "governs_human_maintainers": false,
@@ -70,7 +70,8 @@
     {
       "check_id": "sense record",
       "effect": "harness-write",
-      "initiator_roles": ["inspector"]
+      "initiator_roles": ["inspector"],
+      "harness_write_paths": [".devai/state/sensor-readings", "record/proofs/chain.json"]
     },
     {
       "check_id": "sense run",

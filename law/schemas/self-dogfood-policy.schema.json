@@ -261,8 +261,12 @@
             },
             "initiator_roles": {
               "const": ["inspector"]
+            },
+            "harness_write_paths": {
+              "const": [".devai/state/sensor-readings", "record/proofs/chain.json"]
             }
-          }
+          },
+          "required": ["harness_write_paths"]
         },
         {
           "$ref": "#/$defs/permitted_check",
@@ -519,6 +523,16 @@
           "items": {
             "$ref": "#/$defs/role"
           }
+        },
+        "harness_write_paths": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^(\\.devai/state|record/proofs)(/[A-Za-z0-9._-]+)*$"
+          },
+          "description": "The repository paths a harness-write check is declared to write, relative to the repository root. ADR-SCR-0008 requires sense record to declare the chain path beside the readings directory, so its two ordered writes (the reading file, then the sense.readings.record chain entry) are both declared harness-writes."
         }
       },
       "allOf": [
@@ -639,7 +653,7 @@
       "id": "self-dogfood",
       "status": "active",
       "authority": "Architect",
-      "policy_version": "1.1.0",
+      "policy_version": "1.2.0",
       "scope": {
         "subject": "devai-source-repository",
         "governs_human_maintainers": false,
@@ -705,7 +719,8 @@
         {
           "check_id": "sense record",
           "effect": "harness-write",
-          "initiator_roles": ["inspector"]
+          "initiator_roles": ["inspector"],
+          "harness_write_paths": [".devai/state/sensor-readings", "record/proofs/chain.json"]
         },
         {
           "check_id": "sense run",
