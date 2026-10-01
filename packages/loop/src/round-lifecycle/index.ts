@@ -231,6 +231,22 @@ function decisionExists(repoRoot: string, decision: string): boolean {
   return new RegExp(`^###\\s+${decision}\\b`, 'mu').test(readFileSync(register, 'utf8'));
 }
 
+/**
+ * Exact membership in the rounds index (ADR-EVI-0001; docs/reference/cli/evidence-render.md):
+ * some five-cell row `| closure | round | supersedes | merged_as | terminal |` has the closure
+ * cell equal to `closureId`, the round cell equal to `roundId`, and the terminal cell `yes`.
+ * A mention inside a longer cell, in prose, or on a superseded row does not count.
+ */
+function hasTerminalIndexRow(index: string, closureId: string, roundId: string): boolean {
+  return index.split('\n').some((line) => {
+    if (!line.startsWith('| ') || !line.endsWith(' |')) return false;
+    const cells = line.slice(2, -2).split(' | ');
+    return (
+      cells.length === 5 && cells[0] === closureId && cells[1] === roundId && cells[4] === 'yes'
+    );
+  });
+}
+
 function assertClosePreconditions(repoRoot: string, id: string, source: string): JsonRecord {
   const recordPath = join(source, 'record.md');
   if (!existsSync(recordPath)) fail('ROUND_ARCHIVE_RECORD_MISSING');
@@ -261,7 +277,10 @@ function assertClosePreconditions(repoRoot: string, id: string, source: string):
     fail('ROUND_ARCHIVE_PHASE_CLOSURE_MISMATCH');
   }
   const phaseLedger = join(repoRoot, 'record/derived/indexes/rounds.md');
-  if (!existsSync(phaseLedger) || !readFileSync(phaseLedger, 'utf8').includes(closureId)) {
+  if (
+    !existsSync(phaseLedger) ||
+    !hasTerminalIndexRow(readFileSync(phaseLedger, 'utf8'), closureId, id)
+  ) {
     fail('ROUND_ARCHIVE_PHASE_LEDGER_MISSING');
   }
   const closureGates = closure['gates'] as JsonRecord;
