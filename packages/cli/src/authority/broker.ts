@@ -294,18 +294,42 @@ const GH_RUN_LIST_CREATED =
   /^>=[0-9]{4}-[0-9]{2}-[0-9]{2}(?:T[0-9:.]+(?:Z|[+-][0-9]{2}:?[0-9]{2})?)?$/u;
 
 /**
+ * The Pages publication journal the site_drift sensor reads (ADR-AUT-0002): the journal
+ * repository packages/sensors/src/site-drift.ts declares, and the two exact GET endpoints
+ * templates gh-api-pages-deployments and gh-api-pages-deployment-statuses describe. The
+ * endpoint and query are fixed strings; only the decimal deployment id varies.
+ */
+const GH_API_PAGES_JOURNAL_REPOSITORY = 'aarusso-nyx/devai';
+const GH_API_PAGES_DEPLOYMENTS = `/repos/${GH_API_PAGES_JOURNAL_REPOSITORY}/deployments?environment=devai-pages-publication&per_page=100`;
+const GH_API_PAGES_DEPLOYMENT_STATUSES =
+  /^\/repos\/aarusso-nyx\/devai\/deployments\/[1-9][0-9]{0,15}\/statuses\?per_page=100$/u;
+
+/**
+ * `gh api <endpoint>` with exactly one endpoint argument and no option, so the method is
+ * the implicit GET and no field, input, pagination, header, or host can be supplied.
+ */
+function pagesJournalGhApi(argv: readonly string[]): boolean {
+  if (argv.length !== 2 || argv[0] !== 'api') return false;
+  const endpoint = argv[1] ?? '';
+  return endpoint === GH_API_PAGES_DEPLOYMENTS || GH_API_PAGES_DEPLOYMENT_STATUSES.test(endpoint);
+}
+
+/**
  * The declared read-only GitHub CLI shapes (ADR-SCR-0005 IA-004): `gh auth` (usage),
  * `gh auth status`, and the exact argv the harness sensors emit:
  * `gh run list --branch <ref> --json <fields> --limit <n> [--created >=<date>]`.
  * Declared by templates gh-auth-status, gh-run-list, and gh-run-list-created in
- * law/policy/subprocess-effects.json. Those templates are descriptive for the
- * effect-inference sensor and are not loaded here, so this matcher mirrors them;
- * it is not gated by parent action, so `sense run` and `check` both admit it.
+ * law/policy/subprocess-effects.json, plus the two Pages journal GET shapes of
+ * templates gh-api-pages-deployments and gh-api-pages-deployment-statuses
+ * (ADR-AUT-0002). Those templates are descriptive for the effect-inference sensor and
+ * are not loaded here, so this literal is the executable policy and mirrors them; it
+ * is not gated by parent action, so `sense run` and `check` both admit it.
  * Every other gh argv is refused.
  */
 function readOnlyGhProcess(args: readonly unknown[]): boolean {
   if (args.some((argument) => typeof argument !== 'string')) return false;
   const argv = args as readonly string[];
+  if (pagesJournalGhApi(argv)) return true;
   if (argv[0] === 'auth' && (argv.length === 1 || (argv.length === 2 && argv[1] === 'status'))) {
     return true;
   }
@@ -333,6 +357,22 @@ function governedTestPath(value: unknown): boolean {
     segments[0] === 'tests' &&
     segments.length > 1 &&
     segments.every((segment) => segment.length > 0 && segment !== '..' && segment !== '.')
+  );
+}
+
+/**
+ * The pnpm executable as the build sensor resolves it: a path whose basename is `pnpm`, or
+ * the corepack shim `<prefix>/corepack/dist/pnpm.js` that a corepack-managed `pnpm` on PATH
+ * resolves to (#155). The shim is pnpm itself, so admitting it widens no argv; the argv is
+ * still matched exactly by the caller.
+ */
+function pnpmExecutable(executable: string): boolean {
+  if (basename(executable) === 'pnpm') return true;
+  const dist = dirname(executable);
+  return (
+    basename(executable) === 'pnpm.js' &&
+    basename(dist) === 'dist' &&
+    basename(dirname(dist)) === 'corepack'
   );
 }
 
@@ -380,11 +420,12 @@ function readOnlyProcess(
   }
   if (
     parentAction === 'sense run' &&
-    basename(executable) === 'pnpm' &&
+    pnpmExecutable(executable) &&
     args.length === 2 &&
     args[0] === '-r' &&
     args[1] === 'build'
   ) {
+    // Mirrors template pnpm-recursive-build (ADR-AUT-0002): exactly `pnpm -r build`.
     return true;
   }
   if (parentAction === 'sense run' && basename(executable) === 'pnpm') {
