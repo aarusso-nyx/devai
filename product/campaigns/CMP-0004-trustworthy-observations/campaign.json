@@ -1071,7 +1071,7 @@
       "id": "R-0403",
       "title": "Evidence closure, proof anchoring, and intent export",
       "goal": "The rounds index is rendered from phase closures and sealed by exact membership; chain verification cross-checks every proof line with bounded historical declarations; the exporter reconstructs the expected task policy from a pinned release intent.",
-      "status": "open",
+      "status": "closed",
       "records": ["ADR-EVI-0001", "ADR-EVI-0002", "ADR-REL-0031"],
       "depends_on": ["R-0401"],
       "attestation_reissue": false,
@@ -1107,7 +1107,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -1138,8 +1138,8 @@
                 "path": "prompts/TASK-0431.md",
                 "sha256": "38d1fe966eac3bec056664be8761816156c5a3cee7840c813599325c35ce8fc7"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/226",
+              "merged_as": "dfe6a7d52ff3369d0b705ca09f8660f4b9716232",
               "execution": {
                 "tier": "architect",
                 "effort": "high",
@@ -1191,7 +1191,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0431",
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -1235,8 +1235,8 @@
                 "path": "prompts/TASK-0432.md",
                 "sha256": "884b246517aec35e4609eaa74d5ae1a70457ba195f43102c9083fe13e5e361e1"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/226",
+              "merged_as": "dfe6a7d52ff3369d0b705ca09f8660f4b9716232",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -1288,7 +1288,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0432",
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F2", "F3"],
               "boundary": {
                 "paths": [
@@ -1323,8 +1323,8 @@
                 "path": "prompts/TASK-0433.md",
                 "sha256": "9282809ff9a82ed5890ac3de8bb2bf568a7c11270557b74215650a088459df27"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/226",
+              "merged_as": "dfe6a7d52ff3369d0b705ca09f8660f4b9716232",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -1393,7 +1393,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -1443,8 +1443,8 @@
                 "path": "prompts/TASK-0434.md",
                 "sha256": "029627af07b1f7d833ca336bd601755b8c649739dfb25ac41fa4e0ac2952295b"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/228",
+              "merged_as": "839075e765e3913ca5839b9628ae92e5c3b65af0",
               "execution": {
                 "tier": "architect",
                 "effort": "high",
@@ -1496,7 +1496,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0434",
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -1536,8 +1536,8 @@
                 "path": "prompts/TASK-0435.md",
                 "sha256": "2271cf10e6366545ff18c77ad7132ac15282d4fc5f869351cccc9703a35a8063"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/228",
+              "merged_as": "839075e765e3913ca5839b9628ae92e5c3b65af0",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -1589,7 +1589,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0435",
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F2", "F3"],
               "boundary": {
                 "paths": [
@@ -1628,8 +1628,8 @@
                 "path": "prompts/TASK-0436.md",
                 "sha256": "7240923070a84a1bf1b5c36cb6d4e273df85161378fd71f8cdd2d17a0599b544"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/228",
+              "merged_as": "839075e765e3913ca5839b9628ae92e5c3b65af0",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -1696,7 +1696,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -1738,8 +1738,8 @@
                 "path": "prompts/TASK-0437.md",
                 "sha256": "6ac3299a0ff51f409d4e32e75c1bf2ebca4c5b965f31a0513cdfa73dc4b9f12f"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/227",
+              "merged_as": "ce768667899cfcf2df2af6f8c6b183fcbe9b8c53",
               "execution": {
                 "tier": "architect",
                 "effort": "high",
@@ -1791,7 +1791,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0437",
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -1834,8 +1834,8 @@
                 "path": "prompts/TASK-0438.md",
                 "sha256": "f96751891b0793d9287b47e561f6e72c083263c0c8ac338c32d5870721e9464a"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/227",
+              "merged_as": "ce768667899cfcf2df2af6f8c6b183fcbe9b8c53",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -1887,7 +1887,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0438",
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F2", "F3"],
               "boundary": {
                 "paths": [
@@ -1924,8 +1924,8 @@
                 "path": "prompts/TASK-0439.md",
                 "sha256": "58cb0280a7c0db408a216d448d691223dd7a83a3dd2edbe0e4c569e045cf7ac6"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/227",
+              "merged_as": "ce768667899cfcf2df2af6f8c6b183fcbe9b8c53",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -1974,7 +1974,12 @@
           ]
         }
       ],
-      "closure": null
+      "closure": {
+        "merged_head": "839075e765e3913ca5839b9628ae92e5c3b65af0",
+        "closed_at": "2026-10-01T18:40:11Z",
+        "task_policy_digest": null,
+        "phase_closure": null
+      }
     },
     {
       "id": "R-0404",
