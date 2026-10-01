@@ -305,7 +305,7 @@
       "argv_shape": ["vitest", "run", "--config", "<governed-config>", "<test-path>"],
       "capabilities": ["proc:pnpm-read"],
       "effect": "read",
-      "reason": "Test sensors run vitest under a governed configuration (ADR-SCR-0005); under sense run the broker admits exactly this shape without a host adapter: <governed-config> is one of tests/config/local.config.ts, tests/config/rc.performance.config.ts, or the suite configurations the test sensor emits (tests/config/t1.unit.config.ts, t3.integration.config.ts, t4.regression.config.ts, t5.e2e.config.ts), and the optional <test-path> is one repository-relative path under tests/ without an empty, '.', or '..' segment (the perf_test declaration passes tests/regression). A bare package script such as pnpm test:perf or pnpm run test:perf is refused.",
+      "reason": "Test sensors run vitest under a governed configuration (ADR-SCR-0005); under sense run the broker admits exactly this shape without a host adapter: <governed-config> is one of tests/config/local.config.ts, tests/config/rc.performance.config.ts, tests/config/rc.e2e.config.ts (the governed e2e configuration the e2e_test declaration names, ADR-SCR-0007), tests/config/local.coverage.config.ts (the database-free coverage producer test_coverage_depth runs for the local population, ADR-SCR-0007), or the suite configurations the test sensor emits (tests/config/t1.unit.config.ts, t3.integration.config.ts, t4.regression.config.ts, t5.e2e.config.ts), and the optional <test-path> is one repository-relative path under tests/ without an empty, '.', or '..' segment (the perf_test declaration passes tests/regression). A bare package script such as pnpm test:perf or pnpm run test:perf is refused.",
       "owner": "architect"
     },
     {
