@@ -1502,7 +1502,10 @@
                 "paths": [
                   "packages/evidence/tests/proof-line-anchoring.test.ts",
                   "packages/cli/tests/unit/evidence-verify-anchors.test.ts",
-                  "tests/fixtures/proof-baseline/README.md"
+                  "tests/fixtures/proof-baseline/README.md",
+                  "packages/schemas/tests/contract/schema-roster.test.ts",
+                  "packages/cli/tests/unit/check-schemas-adopter-boundaries.test.ts",
+                  "packages/cli/tests/unit/evidence-facade-acceptance.test.ts"
                 ],
                 "forbidden": [
                   "law/",
@@ -1531,7 +1534,7 @@
               "commit_types": ["test(evidence)", "test(cli)", "test(fixtures)"],
               "prompt": {
                 "path": "prompts/TASK-0435.md",
-                "sha256": "ef66c58ad679af95ac934f3b09614ecb668e1ae6c7f2afa377d748e7eb9ebc01"
+                "sha256": "2271cf10e6366545ff18c77ad7132ac15282d4fc5f869351cccc9703a35a8063"
               },
               "pull_request": null,
               "merged_as": null,
@@ -1600,7 +1603,8 @@
                   "packages/evidence/src/evidence/proof-epoch.ts",
                   "record/proofs/anchor-baseline.json",
                   "packages/cli/src/authority/index.ts",
-                  "packages/cli/src/commands/evidence/facade-verify.ts"
+                  "packages/cli/src/commands/evidence/facade-verify.ts",
+                  "packages/cli/src/commands/check/schemas.ts"
                 ],
                 "forbidden": ["law/", "product/", ".github/workflows/"]
               },
@@ -1622,7 +1626,7 @@
               "commit_types": ["feat(evidence)", "refactor(schemas)", "docs(reference)"],
               "prompt": {
                 "path": "prompts/TASK-0436.md",
-                "sha256": "2c2dd4457dfa8aa339dd90936f9a2dd1859fab040e1f1cc155a9fd59bbe511e4"
+                "sha256": "7240923070a84a1bf1b5c36cb6d4e273df85161378fd71f8cdd2d17a0599b544"
               },
               "pull_request": null,
               "merged_as": null,
