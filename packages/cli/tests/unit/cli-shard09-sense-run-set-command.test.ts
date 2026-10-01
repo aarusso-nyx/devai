@@ -128,6 +128,10 @@ describe('CLI shard 09 sense run set command', () => {
       ['--round <id>', 'Round id required by the sweep preset'],
       ['--repo-root <path>', 'Repository root (default: .)'],
       ['--input <json>', 'Sensor-specific inputs as a JSON object'],
+      [
+        '--pass <pass>',
+        'Sweep pass: first (default, omits the store readers) | second (the declared store readers)',
+      ],
       ['--dry-run', 'Resolve and display the exact population without executing it'],
       ['--human', 'Human-readable summary'],
     ]);

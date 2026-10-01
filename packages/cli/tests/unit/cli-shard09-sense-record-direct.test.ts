@@ -1,4 +1,5 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { validators } from '@devai-nyx/schemas';
@@ -119,9 +120,44 @@ describe('sense record direct contract', () => {
 
     expect(result).toEqual({ path: target, action: 'created', reading });
     expect(Object.isFrozen(result)).toBe(true);
-    expect(authorityCalls.mkdir).toEqual([[directory, { recursive: true }]]);
-    expect(authorityCalls.write).toEqual([[target, canonical, { flag: 'wx' }]]);
+    // ADR-SCR-0008: the reading file is the first write and is written exactly once
+    // with exclusive creation; the second write is one appended chain entry.
+    const proofs = join(root, 'record/proofs');
+    const chainPath = join(proofs, 'chain.json');
+    expect(authorityCalls.mkdir).toEqual([
+      [directory, { recursive: true }],
+      [proofs, { recursive: true }],
+    ]);
+    expect(authorityCalls.write[0]).toEqual([target, canonical, { flag: 'wx' }]);
+    expect(authorityCalls.write.filter(([path]) => path === target)).toHaveLength(1);
+    const chainWrites = authorityCalls.write.slice(1);
+    expect(chainWrites).toHaveLength(2);
+    for (const [path, , options] of chainWrites) {
+      expect(path.startsWith(`${chainPath}.tmp.`)).toBe(true);
+      expect(options).toEqual({ flag: 'wx' });
+    }
+    expect(chainWrites[0]?.[1]).toBe(`${JSON.stringify({ head: null, records: [] }, null, 2)}\n`);
     expect(readFileSync(target, 'utf8')).toBe(canonical);
+
+    const chain = JSON.parse(readFileSync(chainPath, 'utf8')) as {
+      readonly records: readonly {
+        readonly action: string;
+        readonly status: string;
+        readonly artifacts: readonly { readonly path: string; readonly sha256: string }[];
+      }[];
+    };
+    expect(chainWrites[1]?.[1]).toBe(readFileSync(chainPath, 'utf8'));
+    expect(chain.records).toHaveLength(1);
+    expect(chain.records[0]).toMatchObject({
+      action: 'sense.readings.record',
+      status: 'completed',
+    });
+    expect(chain.records[0]?.artifacts).toContainEqual(
+      expect.objectContaining({
+        path: '.devai/state/sensor-readings/inventory_api/SR-0123456789abcdef.json',
+        sha256: createHash('sha256').update(canonical).digest('hex'),
+      }),
+    );
   });
 
   it('distinguishes identical invalid and conflicting existing records', async () => {
