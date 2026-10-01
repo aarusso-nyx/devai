@@ -52,6 +52,9 @@ const SOURCE_ONLY_SCHEMAS = [
   'inv-override.schema.json',
   'preflight-probe.schema.json',
   'prompt-composition.schema.json',
+  // ADR-EVI-0002: catalogued here until TASK-0436 moves them into the runtime roster.
+  'proof-anchor-baseline.schema.json',
+  'proof-orphan-declaration.schema.json',
   'stack-adapter.schema.json',
   'targets.schema.json',
   'task-freshness.schema.json',
