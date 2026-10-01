@@ -82,7 +82,7 @@ export type { SenseAdapterRequest, SenseSensorAdapter } from './adapter-readers.
  * .devai/config/sensor-inputs.json. The schema requires workflow, event, and minimumSample;
  * a run without them is refused here as a missing input, never defaulted.
  */
-function harnessPopulationInput(
+export function harnessPopulationInput(
   request: SenseAdapterRequest,
 ): Omit<HarnessRobustnessOptions, 'thresholds'> {
   const attemptsInput = stringInput(request, 'attempts');
