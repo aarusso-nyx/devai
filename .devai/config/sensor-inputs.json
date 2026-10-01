@@ -71,6 +71,54 @@
     },
     "plant_depth": {
       "excludeGlobs": ["packages/cli/src/generated/**"]
+    },
+    "harness_green_main": {
+      "workflow": "pull-request-checks.yml",
+      "event": "pull_request",
+      "headBranch": "*",
+      "baseBranch": "main",
+      "attempts": "last",
+      "includeCancelled": false,
+      "lookbackDays": 30,
+      "minimumSample": 20,
+      "excludedJobs": [
+        { "workflow": "release.yml", "job": "verify-ledger" },
+        { "workflow": "release.yml", "job": "build-release" },
+        { "workflow": "release.yml", "job": "finalize-release" },
+        { "workflow": "release.yml", "job": "deploy-pages" }
+      ]
+    },
+    "harness_performance": {
+      "workflow": "pull-request-checks.yml",
+      "event": "pull_request",
+      "headBranch": "*",
+      "baseBranch": "main",
+      "attempts": "last",
+      "includeCancelled": false,
+      "lookbackDays": 30,
+      "minimumSample": 10,
+      "excludedJobs": [
+        { "workflow": "release.yml", "job": "verify-ledger" },
+        { "workflow": "release.yml", "job": "build-release" },
+        { "workflow": "release.yml", "job": "finalize-release" },
+        { "workflow": "release.yml", "job": "deploy-pages" }
+      ]
+    },
+    "harness_robustness": {
+      "workflow": "pull-request-checks.yml",
+      "event": "pull_request",
+      "headBranch": "*",
+      "baseBranch": "main",
+      "attempts": "last",
+      "includeCancelled": false,
+      "lookbackDays": 30,
+      "minimumSample": 20,
+      "excludedJobs": [
+        { "workflow": "release.yml", "job": "verify-ledger" },
+        { "workflow": "release.yml", "job": "build-release" },
+        { "workflow": "release.yml", "job": "finalize-release" },
+        { "workflow": "release.yml", "job": "deploy-pages" }
+      ]
     }
   },
   "surfaces": {
