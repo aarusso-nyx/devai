@@ -49,6 +49,7 @@ export const ROSTER = [
   'mutation-report-set-v2.schema.json',
   'mutation-intent.schema.json',
   'mutation-scenario.schema.json',
+  'observation-backlog.schema.json',
   'path-authority-classes.schema.json',
   'phase-closure.schema.json',
   'proof-epoch.schema.json',
