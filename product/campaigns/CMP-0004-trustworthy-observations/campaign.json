@@ -531,7 +531,8 @@
                   "tests/contract/sensor-inputs.contract.test.ts",
                   "packages/sensors/tests/e2e-and-coverage-outcomes.test.ts",
                   "packages/cli/tests/unit/check-test-task-workspace-selectors.test.ts",
-                  "tests/config/rc.e2e.config.ts"
+                  "tests/config/rc.e2e.config.ts",
+                  "packages/cli/tests/unit/doctor-check-result-identities.test.ts"
                 ],
                 "forbidden": [
                   "law/",
@@ -561,7 +562,7 @@
               "commit_types": ["test(config)", "test(sensors)", "test(cli)"],
               "prompt": {
                 "path": "prompts/TASK-0415.md",
-                "sha256": "c1071e13b4c8556c184e867bf32e96f01a9ce674d55d73218949e3d97bf79a1b"
+                "sha256": "bb4b290cabda346f89e7ed5fc92c861e056c2e479c16b52b76f90ad0e2588e06"
               },
               "pull_request": null,
               "merged_as": null,
@@ -625,7 +626,8 @@
                   "test-tasks.json",
                   "scripts/check-test-task-workspace-selectors.mjs",
                   "packages/sensors/src/test-coverage-depth.ts",
-                  "packages/sensors/src/test.ts"
+                  "packages/sensors/src/test.ts",
+                  "packages/cli/src/commands/sense/adapters.ts"
                 ],
                 "forbidden": ["law/", "product/", ".github/workflows/"]
               },
@@ -648,7 +650,7 @@
               "commit_types": ["feat(authority)", "build(scripts)", "fix(sensors)"],
               "prompt": {
                 "path": "prompts/TASK-0416.md",
-                "sha256": null
+                "sha256": "f08735e3ab8afed1bd18bdde01e51f359223a9264f410b1dc8c2f44f2c3642af"
               },
               "pull_request": null,
               "merged_as": null,
