@@ -863,7 +863,12 @@
                   "packages/skills/tests/unit/post-merge-auditor-store-resolution.test.ts",
                   "packages/cli/tests/unit/check-schemas-adopter-boundaries.test.ts",
                   "packages/schemas/tests/contract/schema-roster.test.ts",
-                  "packages/cli/tests/unit/self-dogfood-policy.test.ts"
+                  "packages/cli/tests/unit/self-dogfood-policy.test.ts",
+                  "packages/cli/tests/unit/cli-shard09-sense-record-direct.test.ts",
+                  "packages/cli/tests/unit/cli-shard09-sense-run-set-command.test.ts",
+                  "packages/skills/tests/unit/post-merge-boundaries.test.ts",
+                  "packages/skills/tests/unit/post-merge-observation-boundaries.test.ts",
+                  "tests/integration/packed-adopter-scorecard.integration.test.ts"
                 ],
                 "forbidden": [
                   "law/",
@@ -895,7 +900,7 @@
               "commit_types": ["test(cli)", "test(sensors)", "test(skills)"],
               "prompt": {
                 "path": "prompts/TASK-0422.md",
-                "sha256": "4d7f602b2c04201cbeb969c3d6d42ac59ef7982dfab4a739576d917260c7b2d0"
+                "sha256": "f57a7617931605d05e4ca5a5efa652ad56a1843892e8dfc97d6ef8a2b90e06c5"
               },
               "pull_request": null,
               "merged_as": null,
@@ -969,7 +974,9 @@
                   "packages/skills/src/operations/backlog.ts",
                   "packages/sensors/src/inventory-performance.ts",
                   "packages/cli/src/commands/sense/readings-rebuild.ts",
-                  "packages/cli/src/services/self-dogfood.ts"
+                  "packages/cli/src/services/self-dogfood.ts",
+                  "packages/cli/src/commands/check/schemas.ts",
+                  "packages/cli/src/commands/sense/adapter-readers.ts"
                 ],
                 "forbidden": ["law/", "product/", ".github/workflows/"]
               },
@@ -1001,7 +1008,7 @@
               ],
               "prompt": {
                 "path": "prompts/TASK-0423.md",
-                "sha256": "7109a7d97415c448a4d557e64ac937773eaf20c28d015b96af111c6ca2caaab8"
+                "sha256": "44e1622c1a97c2c5332d9ddd13e9976f664d75c1f9ebaafc39c9cdf3e073305f"
               },
               "pull_request": null,
               "merged_as": null,
