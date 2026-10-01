@@ -5,7 +5,7 @@
 // The DETRAN fixture under tests/fixtures/proof-baseline/detran-r0020 is byte-exact and is only
 // ever copied into a temporary directory before a run that writes.
 import { createHash } from 'node:crypto';
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -97,6 +97,8 @@ interface AnchoringExports {
     readonly repoRoot: string;
     readonly chainPath?: string;
     readonly now?: Date;
+    /** `--write` consent: only with it may the baseline be created or appended to. */
+    readonly write?: boolean;
   }) => ProofAnchorVerification;
   readonly resolveProofAnchor: (
     repoRoot: string,
@@ -113,7 +115,12 @@ function anchoring<K extends keyof AnchoringExports>(name: K): AnchoringExports[
   return exported as AnchoringExports[K];
 }
 
+/** A verification with write consent, so the baseline is written or appended. */
 const verify = (repoRoot: string, now: Date): ProofAnchorVerification =>
+  anchoring('verifyProofAnchors')({ repoRoot, now, write: true });
+
+/** A read-only verification: it never creates or changes the baseline. */
+const verifyReadOnly = (repoRoot: string, now: Date): ProofAnchorVerification =>
   anchoring('verifyProofAnchors')({ repoRoot, now });
 
 interface ProofAnchorInput {
@@ -441,6 +448,39 @@ describe('the DETRAN baseline fixture (OE-01)', () => {
   });
 });
 
+describe('the baseline write is gated by write consent', () => {
+  it('fails PROOF_ANCHOR_BASELINE_MISSING and writes nothing without a baseline and without write', () => {
+    const root = detranCopy();
+    const result = verifyReadOnly(root, T0);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((error) => error.includes('PROOF_ANCHOR_BASELINE_MISSING'))).toBe(
+      true,
+    );
+    expect(result.errors.some((error) => error.includes('--write'))).toBe(true);
+    expect(existsSync(join(root, BASELINE))).toBe(false);
+    const explicit = anchoring('verifyProofAnchors')({ repoRoot: root, now: T0, write: false });
+    expect(explicit.valid).toBe(false);
+    expect(explicit.errors.some((error) => error.includes('PROOF_ANCHOR_BASELINE_MISSING'))).toBe(
+      true,
+    );
+    expect(existsSync(join(root, BASELINE))).toBe(false);
+  });
+
+  it('reads a written baseline without write and never appends to it', () => {
+    const root = tempRoot();
+    anchorWithDigest(root, 'generic', 'R-0001', appendGeneric(root, 'R-0001', 'one'));
+    expect(verify(root, T0).valid).toBe(true);
+    const written = readFileSync(join(root, BASELINE), 'utf8');
+    expect(verifyReadOnly(root, T1).valid).toBe(true);
+    anchorWithDigest(root, 'generic', 'R-0001', appendGeneric(root, 'R-0001', 'two'));
+    const read = verifyReadOnly(root, T2);
+    expect(read.errors.some((error) => error.includes('PROOF_ANCHOR_BASELINE_MISSING'))).toBe(
+      false,
+    );
+    expect(readFileSync(join(root, BASELINE), 'utf8')).toBe(written);
+  });
+});
+
 describe('IA-001 the historical declaration over the DETRAN baseline', () => {
   it('fails before the declaration listing every one of the 52 orphans and writes the baseline', () => {
     const root = detranCopy();
@@ -694,6 +734,19 @@ describe('IA-003 declarations that are rejected leave their orphans reported', (
     anchorWithDigest(root, 'generic', 'R-0021', appendGeneric(root, 'R-0021', 'anchored'));
     const lateRef = ref(epochPath('generic', 'R-0021'), late);
     expect(labelled(verify(root, T1), 'orphan')).toContain(lateRef);
+    // The cutoff rule: entries observed at the first verification carry the cutoff and are
+    // eligible; the late line was observed after it.
+    const entries = readBaseline(root).entries;
+    const lateEntry = entries.find(
+      (entry) => entry.path === epochPath('generic', 'R-0021') && entry.sequence === late,
+    );
+    expect(lateEntry?.observed_at).toBe(T1.toISOString());
+    expect(readBaseline(root).cutoff).toBe(T0.toISOString());
+    expect(
+      entries
+        .filter((entry) => !entry.path.endsWith('/R-0021.jsonl'))
+        .every((entry) => entry.observed_at === T0.toISOString()),
+    ).toBe(true);
     const orphans = [
       ...contractOrphans(),
       {
