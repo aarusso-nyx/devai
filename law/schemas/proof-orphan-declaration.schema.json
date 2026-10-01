@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://devai.nyxk.com.br/schemas/proof-orphan-declaration.schema.json",
   "title": "Proof orphan declaration",
-  "description": "The payload of a historical declaration proof line of kind `historical-gap` under ADR-EVI-0002. The line is appended through `evidence record`, is itself directly anchored in the chain with a digest, names each orphaned proof line by canonical path, sequence, and line digest, carries the Architect's authorization as the declaring decision, and applies only to lines whose baseline entry predates the cutoff. A declaration never restores provenance: the lines it names read as `historical gap acknowledged` in the verification result.",
+  "description": "The payload of a historical declaration proof line of kind `historical-gap` under ADR-EVI-0002. The line is appended through `evidence record`, is itself directly anchored in the chain with a digest, names each orphaned proof line by canonical path, sequence, and line digest, carries the Architect's authorization as the declaring decision, and applies only to lines whose baseline entry was observed at the first verification, at the cutoff; a line observed after the cutoff is rejected as POST_CUTOFF. A declaration never restores provenance: the lines it names read as `historical gap acknowledged` in the verification result.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "declaration", "record", "authorization", "cutoff", "orphans"],
@@ -40,7 +40,7 @@
     "cutoff": {
       "type": "string",
       "format": "date-time",
-      "description": "The cutoff of `record/proofs/anchor-baseline.json`, repeated so the declaration states which first verification it is bound to. Every named orphan must have a baseline entry observed before it."
+      "description": "The cutoff of `record/proofs/anchor-baseline.json`, repeated so the declaration states which first verification it is bound to. Every named orphan must have a baseline entry observed at it, never after it."
     },
     "cause": {
       "type": "string",

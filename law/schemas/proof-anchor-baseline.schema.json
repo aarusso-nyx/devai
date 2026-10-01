@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://devai.nyxk.com.br/schemas/proof-anchor-baseline.schema.json",
   "title": "Proof anchor baseline",
-  "description": "The append-only baseline that the first `evidence verify --scope chain` under ADR-EVI-0002 writes to `record/proofs/anchor-baseline.json`: one entry per physical proof line under `record/proofs/work`, with its canonical path, its one-based sequence inside that file, the SHA-256 of the line bytes, and the anchor status observed. The `cutoff` is the timestamp of that first verification; a historical declaration may name only lines whose entry predates it. A later verification may append entries for lines that were not yet present and may never change or remove an entry.",
+  "description": "The append-only baseline that the first `evidence verify --scope chain` under ADR-EVI-0002 writes to `record/proofs/anchor-baseline.json`: one entry per physical proof line under `record/proofs/work`, with its canonical path, its one-based sequence inside that file, the SHA-256 of the line bytes, and the anchor status observed. The `cutoff` is the timestamp of that first verification; a historical declaration may name only lines whose entry was observed at the first verification, so an entry observed after the cutoff is never eligible. A later verification may append entries for lines that were not yet present and may never change or remove an entry.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "record", "cutoff", "entries"],
@@ -47,7 +47,7 @@
           "observed_at": {
             "type": "string",
             "format": "date-time",
-            "description": "Timestamp of the verification that appended this entry. Entries written at the first verification carry the cutoff."
+            "description": "Timestamp of the verification that appended this entry. Entries written at the first verification carry the cutoff and are eligible for a historical declaration; an entry observed after the cutoff is not."
           }
         }
       }

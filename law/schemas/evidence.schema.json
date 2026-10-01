@@ -204,6 +204,21 @@
       "pattern": "^(GENESIS|[a-f0-9]{64})$",
       "description": "Readable predecessor alias: GENESIS for sequence one, otherwise the prior manifest hash."
     },
+    "proof_path": {
+      "type": "string",
+      "pattern": "^record/proofs/work/[a-z0-9][a-z0-9_-]*/R-[0-9]{4}\\.jsonl$",
+      "description": "ADR-EVI-0002 anchor: the canonical repository-relative path of the proof epoch file that holds the anchored line (forward slashes, no dot segment). Optional so that historical entries, which carry the anchor only in notes, stay valid."
+    },
+    "proof_sequence": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "ADR-EVI-0002 anchor: the one-based position of the anchored line within its proof epoch file."
+    },
+    "proof_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "ADR-EVI-0002 anchor: the SHA-256 of the anchored line bytes, exclusive of the terminating newline."
+    },
     "manifest_hash": {
       "type": "string",
       "pattern": "^[a-f0-9]{64}$",
