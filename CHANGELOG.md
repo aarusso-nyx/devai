@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.8.0 — 2026-09-30
+
+- ADR-GOV-0024: constitution 1.0.2 amends Article 6 so an adopter repository may declare client
+  extensions by root and path class; the core path rows are unchanged and the framework declares
+  no roots (#186).
+- ADR-AUT-0003: an optional closed `authority` block in the adopter policy names the roots, the
+  test selectors (package defaults `**/*.spec.*`, `**/*.test.*`, `**/test/**`, `**/tests/**`), and
+  the architecture selectors; `init bind` compiles it on the fixed ladder root 500 (Engineer),
+  test 700 (Inspector), architecture 750 (Architect) into a second additive extension, records it
+  as `authority_extension` in the binding receipt, refuses a malformed block with named
+  `ADOPTER_AUTHORITY_*` codes before any target is staged, refuses every governed write until
+  rebind when the source drifts, and refuses an extension tie as `AMBIGUOUS_POLICY_MATCH` (#186).
+- ADR-AUT-0004: each class carries the registered write verbs derived from the action registry
+  (root `task start`; test `check`; architecture `init apply architect`, `release export`,
+  `round plan`, `round seal`); the action registry is unchanged (#186).
+- Doctor reports adopter extension drift as a set of reason ids (`AUTHORITY_EXTENSION_DRIFT`,
+  `AUTHORITY_EXTENSION_UNBOUND`, `AUTHORITY_EXTENSION_SOURCE_MISSING`) with the rebind command; the
+  installed package ships the adopter defaults and the authority broker, and the installed smoke
+  proves the class-verb matrix from the tarball.
+- Retain immutable `@aarusso-nyx/devai@1.5.4` as the trusted local-RC verifier provider; the
+  verifier payload is unchanged.
+
 ## 1.7.0 — 2026-09-30
 
 - ADR-SCR-0011: admit every sweep read kind in the packaged `SensorReading` schema
