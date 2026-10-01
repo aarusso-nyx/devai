@@ -73,11 +73,74 @@ not hold.
 | `unit_test`, `integration_test`, `e2e_test`                                                            | `argv`                         | `pnpm vitest run --config tests/config/t1.unit.config.ts` (unit), `t3.integration.config.ts` (integration), `t5.e2e.config.ts` (e2e) | The suite command the sensor executes for its suite, executable first, never joined through a shell, graded by exit code and the vitest summary line. A repository whose suites do not live in those configurations declares its own; with nothing declared the hardcoded configuration is the fallback. Under `sense run` the authority broker admits only the governed vitest shape `law/policy/subprocess-effects.json` declares.                                         |
 | `perf_test`                                                                                            | `argv`                         | none                                                                                                                                 | The performance suite command the sensor executes for F2:T7, executable first, never joined through a shell, graded by exit code and duration and by a JSON metrics line when it prints one. When declared it takes precedence over `scriptName`. Under `sense run` the authority broker admits only the command shapes `law/policy/subprocess-effects.json` declares, such as `pnpm vitest run --config <governed-config> [<test-path>]`; a bare package script is refused. |
 | `perf_test`                                                                                            | `scriptName`                   | `test:perf`                                                                                                                          | Legacy: the root package script the sensor runs as `pnpm <scriptName>` when no `argv` is declared. A missing script reads as unmeasurable.                                                                                                                                                                                                                                                                                                                                   |
+| `build`                                                                                                | `argv`                         | the `build` node of `test-tasks.json`, else the root package `build` script                                                          | The build command the sensor executes for F2:T9, executable first, never joined through a shell, graded by exit code. Admitted only when `test-tasks.json` has no `build` node; see [Build command precedence](#build-command-precedence). Under `sense run` the authority broker admits only the build shape `law/policy/subprocess-effects.json` declares (`pnpm -r build`); a declared argv outside it is refused before a process starts.                                |
+| `build`                                                                                                | `cwd`                          | the repository root                                                                                                                  | The repository-relative directory the build command runs from, under the same path grammar as the other inputs.                                                                                                                                                                                                                                                                                                                                                              |
 | `harness_idiomaticity`                                                                                 | `minWorkflowsForReusableCheck` | `1` (always graded)                                                                                                                  | The workflow count at or above which the harness idiomaticity sensor grades the reusable-workflow signal for F5:T5. Below the declared threshold the signal is dropped from both the score and its denominator, not counted as missing, so a repository whose CI is too small to benefit from factoring out a reusable workflow is not graded against a shape it has not grown into.                                                                                         |
 | `plant_depth`                                                                                          | `excludeGlobs`                 | none (every `packages/*/src` file)                                                                                                   | Repository-relative file globs left out of the plant whose file sizes F2:T2 grades; `*` matches within one path segment and a `**` segment matches any number of segments. Declare a glob only for files that are derived rather than authored, such as a view generated from a law policy (an F4 artifact); the pass and review thresholds stay the same.                                                                                                                   |
 
 A kind that appears under `inputs` must declare at least one key. Kinds not listed above take
 no declared input, and naming one is refused as an undeclared key.
+
+## Build command precedence
+
+The `build` sensor is a write: the compiler materializes its outputs under the package
+directories, so the sensor runs with `--write`, stays out of the `sweep` preset, and records
+its reading as a harness-write. Its command comes from two sources in a fixed order
+([ADR-AUT-0002](../../law/adr/ADR-AUT-0002-sensing-process-admission.md); the template
+`pnpm-recursive-build` in
+[`law/policy/subprocess-effects.json`](../../law/policy/subprocess-effects.json) declares the
+order as `argv_precedence`):
+
+1. The `build` node of `test-tasks.json`. When the descriptor carries that node, its `argv`
+   and `cwd` are the command, and no declaration replaces them.
+2. The `build` entry of `.devai/config/sensor-inputs.json`, admitted only when the descriptor
+   has no `build` node. This is the adopter case without a descriptor.
+
+Declaring a `build` argv beside a descriptor `build` node that names a different argv is a
+declaration defect, not a preference: the declared-inputs contract test fails naming both
+argv, and at run time the sensor reads `error` with `BUILD_ARGV_CONFLICT`. With neither source
+the sensor falls back to the root package `build` script through the lockfile's package
+manager, and with no script it reads `skipped` with `BUILD_NOT_DECLARED`. Whichever source
+supplies the argv, the broker admits only the declared shape, `pnpm -r build`, under
+`sense run`; a selected argv outside it is refused before any process starts and the sensor
+reports the refusal rather than a reading. A failing build reads FAIL with its exit code and
+stays visible on the scorecard.
+
+```json
+{
+  "schemaVersion": "1.0.0",
+  "inputs": {
+    "build": { "argv": ["pnpm", "-r", "build"], "cwd": "." }
+  }
+}
+```
+
+## GitHub CLI shapes the broker admits
+
+Harness sensors reach GitHub only through the GitHub CLI shapes
+[`law/policy/subprocess-effects.json`](../../law/policy/subprocess-effects.json) declares and
+the authority broker admits without a host adapter. Beyond `gh auth`, `gh auth status`, and
+the `gh run list` shapes of `harness_green_main`, the `site_drift` sensor reads the Pages
+publication journal through two exact read-only `gh api` GET shapes
+([ADR-AUT-0002](../../law/adr/ADR-AUT-0002-sensing-process-admission.md)):
+
+| Template                           | Argv                                                                                        | Reads                                                                                                     |
+| ---------------------------------- | ------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `gh-api-pages-deployments`         | `gh api /repos/<owner>/<repo>/deployments?environment=devai-pages-publication&per_page=100` | The Pages publication deployments the journal records.                                                    |
+| `gh-api-pages-deployment-statuses` | `gh api /repos/<owner>/<repo>/deployments/<id>/statuses?per_page=100`                       | The statuses of one deployment: the publication intent and its verification. `<id>` is a decimal integer. |
+
+In both, `<owner>/<repo>` is the journal repository the sensor declares, the endpoint and
+query are fixed strings, the method is the implicit GET, and every option is refused,
+including `--method`, `-X`, `-f`, `-F`, `--field`, `--raw-field`, `--input`, `--paginate`,
+and `--hostname`. An argv that names another repository, a non-integer deployment id, or a
+third endpoint is refused although the method is GET, and `site_drift` reports the refused argv
+verbatim. With the shapes admitted the sensor reads PASS when the local `gh-pages` tip matches
+the last verified identity, REVIEW with `journal-not-verified` or `journal-no-matching-intent`
+when the journal holds no usable record, and FAIL when the tip differs; it reads
+`SITE_DRIFT_PROVENANCE_ADAPTER_REQUIRED` only for an argv the broker actually refuses. The
+broker's literal list is the executable policy and the templates describe it; every future
+read-only `gh` shape follows the same path of broker literal, mirrored template, and mirror
+test.
 
 ## Surfaces
 
@@ -150,7 +213,10 @@ for `type_check`,
 `e2e_test`,
 `pnpm vitest run --config tests/config/rc.performance.config.ts tests/regression` (the
 performance configuration over the regression suite) as `perf_test`'s `argv`, `5` for `harness_idiomaticity`'s `minWorkflowsForReusableCheck`,
-and `packages/cli/src/generated/**` for `plant_depth`'s `excludeGlobs`.
+and `packages/cli/src/generated/**` for `plant_depth`'s `excludeGlobs`. It declares no
+`build` input: DEVAI's `test-tasks.json` carries a `build` node (`pnpm -r build` from the
+repository root), and under the [precedence above](#build-command-precedence) that node is the
+build sensor's command and a declaration beside it is not admitted.
 DEVAI's CI is four single-purpose workflows (`pull-request-checks`, `release`,
 `site-publish`, `devai-ledger-verify`), three of which share their setup steps through a
 composite action, and none of them has a job the others would reuse; factoring one of the
