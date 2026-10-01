@@ -12,14 +12,20 @@ chain are unchanged by that record.
 `record/proofs/` is machine-written (Constitution Article 6). No role edits a proof line, a chain
 entry, or the baseline by hand, and the README beside those files is not where their shape is
 described; this page is. The verifier refuses to run on a working tree that has modified an old
-line or an old chain entry.
+line or an old chain entry (`PROOF_HISTORY_MODIFIED`).
 
 Usage:
 
 ```bash
-devai evidence verify --scope chain --repo-root . --format json               # verify; the first run writes the baseline
-devai evidence verify --scope chain --show-head --repo-root . --format json   # also print the chain head
+devai evidence verify --scope chain --repo-root .                  # verify; a JSON receipt on stdout
+devai evidence verify --scope chain --repo-root . --human          # the same, human-readable
+devai evidence verify --scope chain --show-head --repo-root .      # also print the chain head
+devai evidence verify --scope chain --repo-root . --write          # first run only: also write the baseline
 ```
+
+`evidence verify` is a read by default (Owner decision of 2026-10-01). It prints a JSON receipt
+on stdout unless `--human` is given. The one write it can perform is the first baseline write,
+and that needs `--write`: see [The baseline](#the-baseline).
 
 ## What an anchor is
 
@@ -86,7 +92,7 @@ verification under ADR-EVI-0002 writes to `record/proofs/anchor-baseline.json`, 
 | Field                     | Value                                                                                          |
 | ------------------------- | ---------------------------------------------------------------------------------------------- |
 | `record`                  | `ADR-EVI-0002`.                                                                                |
-| `cutoff`                  | The timestamp of the first verification. Fixed at the first write and never changed.           |
+| `cutoff`                  | The timestamp of the first verification, the one that wrote the baseline. Never changed.       |
 | `entries[].path`          | The canonical path of the line's file.                                                         |
 | `entries[].sequence`      | The line's position inside that file.                                                          |
 | `entries[].sha256`        | The line digest.                                                                               |
@@ -96,8 +102,28 @@ verification under ADR-EVI-0002 writes to `record/proofs/anchor-baseline.json`, 
 The baseline is append-only. A later verification may append entries for lines that were not
 yet present, and may never change or remove an entry. One changed byte in the baseline file
 makes the verification fail naming the entry (IA-002). The baseline is a committed file under
-`record/proofs`: the first verification on a checkout creates it, and the commit that carries
-it is a machine write, not a hand edit.
+`record/proofs`; the commit that carries it is a machine write, not a hand edit.
+
+### Writing the baseline
+
+Writing the baseline is the one write `evidence verify` performs, and it is gated by write
+consent (Owner decision of 2026-10-01):
+
+- Without a baseline and without `--write`, the verification fails with a named failure code
+  whose message names `--write`; nothing is written, and the chain is not reported as valid.
+- With `--write`, the first verification writes `record/proofs/anchor-baseline.json` with every
+  line observed, `cutoff` equal to that verification's timestamp, and each entry's `observed_at`
+  equal to the cutoff. Later verifications run as reads against the committed file.
+- `--write` on a later run appends only entries for lines not yet present; it never rewrites one.
+
+### The cutoff rule
+
+The cutoff separates eligible lines from later ones:
+
+- An entry observed at the first verification (`observed_at` equal to `cutoff`) is eligible for
+  a historical declaration.
+- An entry observed after the cutoff was recorded under ADR-EVI-0002 and is never eligible; a
+  declaration that names it is rejected as `POST_CUTOFF`, and the line stays an orphan.
 
 ## The historical declaration
 
@@ -116,30 +142,35 @@ A historical declaration is a proof line of kind `historical-gap`, appended thro
   (`authorization.role` is `Architect`; `authorization.decision` names the record or contract
   in which the Architect authorized it); only the Architect authorizes a historical orphan
   declaration (maintainer decision 10);
-- it repeats the baseline `cutoff`, and applies only to lines whose baseline entry predates
-  that cutoff: only lines recorded before the first verification under ADR-EVI-0002 are
-  eligible.
+- it repeats the baseline `cutoff`, and applies only to lines whose baseline entry was observed
+  at the first verification: only lines recorded before the first verification under
+  ADR-EVI-0002 are eligible, and a line observed after the cutoff is `POST_CUTOFF`.
 
 A declaration acknowledges a gap; it never restores provenance. The lines it names read as
 `historical gap acknowledged` in the verification result and stay listed under that label.
 
 A declaration is rejected, and the orphans it names remain failures, when it (IA-003):
 
-| Condition                                                        | Outcome                                         |
-| ---------------------------------------------------------------- | ----------------------------------------------- |
-| names a line whose baseline entry is at or after the cutoff      | rejected; the line stays an orphan              |
-| lacks the Architect authorization                                | rejected; every named line stays an orphan      |
-| omits the line digest of a named orphan                          | rejected; every named line stays an orphan      |
-| is not itself anchored with a digest                             | rejected; every named line stays an orphan      |
-| names a line whose current bytes differ from the declared digest | the line fails verification naming the mismatch |
+| Condition                                                        | Outcome                                             |
+| ---------------------------------------------------------------- | --------------------------------------------------- |
+| names a line whose baseline entry was observed after the cutoff  | rejected as `POST_CUTOFF`; the line stays an orphan |
+| lacks the Architect authorization                                | rejected; every named line stays an orphan          |
+| omits the line digest of a named orphan                          | rejected; every named line stays an orphan          |
+| is not itself anchored with a digest                             | rejected; every named line stays an orphan          |
+| names a line whose current bytes differ from the declared digest | the line fails verification naming the mismatch     |
+
+The verifier also refuses to run at all, before any declaration is read, when the working tree
+has changed an old proof line or an old chain entry: `PROOF_HISTORY_MODIFIED`. Nothing is
+written, the baseline is left untouched, and the remedy is to restore the committed bytes, never
+to re-anchor or re-declare the changed line.
 
 ## Crash recovery: `UNANCHORED_NEWEST_LINE`
 
 `evidence record` writes in two steps: the proof line, then the chain entry. When the newest
 line of an epoch has no anchor and no declaration, the verifier reports it as
-`UNANCHORED_NEWEST_LINE` with the remediation of appending its chain entry through
-`evidence record`, which computes the digest from the existing bytes and writes nothing else
-(IA-004). Only the newest line of an epoch qualifies: an older unanchored line is a historical
+`UNANCHORED_NEWEST_LINE` with the remediation of appending the missing chain entry through
+`evidence record`, which computes the digest from the existing line bytes, appends that one
+chain entry, and writes nothing else; the proof line itself is not rewritten (IA-004). Only the newest line of an epoch qualifies: an older unanchored line is a historical
 gap when a declaration covers it and a failure otherwise.
 
 ## The verification result
@@ -154,6 +185,8 @@ own defects (IA-002), and adds the line-level cross-check:
 | `historical gap acknowledged` | A line named by an accepted historical declaration; listed, never counted as restored.       |
 | `UNANCHORED_NEWEST_LINE`      | The newest line of an epoch with no anchor; a failure with the remediation above.            |
 | unresolved anchor             | An anchor that resolves to no line, to more than one line, or to a line with another digest. |
+| `POST_CUTOFF`                 | A declaration rejection: it named a line observed after the baseline cutoff.                 |
+| `PROOF_HISTORY_MODIFIED`      | A refusal to verify: an old proof line or chain entry changed in the working tree.           |
 
 A failing cross-check is a measured outcome: no threshold or reading makes an orphan pass, and
 an acknowledged gap is reported on every verification, not only the first.
