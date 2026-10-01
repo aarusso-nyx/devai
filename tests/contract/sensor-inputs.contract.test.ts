@@ -461,7 +461,11 @@ describe('sensor inputs schema', () => {
 
 // ADR-SCR-0010 IA-004: a harness population names its workflow, event, and minimum sample, and
 // names only an event the workflow carries under its on: block and only jobs it defines.
-const POPULATION_KINDS = ['harness_green_main', 'harness_performance', 'harness_robustness'] as const;
+const POPULATION_KINDS = [
+  'harness_green_main',
+  'harness_performance',
+  'harness_robustness',
+] as const;
 const WORKFLOWS_DIR = resolve(ROOT, '.github/workflows');
 
 const EXCLUDED_RELEASE_JOBS = [
@@ -532,7 +536,10 @@ function workflowShape(file: string): WorkflowShape | undefined {
 }
 
 /** The declared-inputs contract: defects of one harness population against the workflow files. */
-function harnessPopulationDefects(kind: string, input: Readonly<Record<string, unknown>>): string[] {
+function harnessPopulationDefects(
+  kind: string,
+  input: Readonly<Record<string, unknown>>,
+): string[] {
   const defects: string[] = [];
   for (const key of ['workflow', 'event', 'minimumSample'] as const) {
     if (input[key] === undefined) defects.push(`${kind}: ${key} is required`);
@@ -616,7 +623,10 @@ describe('harness population declaration (ADR-SCR-0010)', () => {
       }),
     ).toEqual(['harness_performance: release.yml defines no job no-such-job']);
     expect(
-      harnessPopulationDefects('harness_robustness', { ...devaiPopulation(20), workflow: 'absent.yml' }),
+      harnessPopulationDefects('harness_robustness', {
+        ...devaiPopulation(20),
+        workflow: 'absent.yml',
+      }),
     ).toEqual(['harness_robustness: workflow absent.yml does not exist']);
   });
 
