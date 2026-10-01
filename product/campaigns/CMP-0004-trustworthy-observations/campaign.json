@@ -1198,7 +1198,12 @@
                   "packages/cli/tests/unit/evidence-render-rounds.test.ts",
                   "packages/loop/tests/round-lifecycle-seal-membership.test.ts",
                   "packages/evidence/tests/closure-index.test.ts",
-                  "tests/fixtures/closures/README.md"
+                  "tests/fixtures/closures/README.md",
+                  "packages/loop/tests/unit/round-identity-boundaries.test.ts",
+                  "packages/loop/tests/unit/round-lifecycle-sealed-status.test.ts",
+                  "packages/loop/tests/unit/round-lifecycle-cases.ts",
+                  "packages/cli/tests/unit/evidence-facade-acceptance.test.ts",
+                  "packages/cli/tests/unit/round-tracking-closure-depth.test.ts"
                 ],
                 "forbidden": [
                   "law/",
@@ -1228,7 +1233,7 @@
               "commit_types": ["test(cli)", "test(loop)", "test(evidence)", "test(fixtures)"],
               "prompt": {
                 "path": "prompts/TASK-0432.md",
-                "sha256": "d4b0536af42cdebfb58298e661999b22893b4b9361c734bed07f5d194dd63e04"
+                "sha256": "884b246517aec35e4609eaa74d5ae1a70457ba195f43102c9083fe13e5e361e1"
               },
               "pull_request": null,
               "merged_as": null,
