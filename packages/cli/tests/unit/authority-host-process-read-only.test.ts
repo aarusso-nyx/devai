@@ -26,6 +26,23 @@ const { resolveCliVersion } = await import('../../src/version.js');
 const { senseHarnessGreenMain, senseHarnessPerformance, senseHarnessRobustness } =
   await import('@devai-nyx/sensors');
 
+/** DEVAI's declared population (.devai/config/sensor-inputs.json), ADR-SCR-0010. */
+const DEVAI_POPULATION = {
+  workflow: 'pull-request-checks.yml',
+  event: 'pull_request',
+  headBranch: '*',
+  baseBranch: 'main',
+  attempts: 'last',
+  includeCancelled: false,
+  lookbackDays: 30,
+  excludedJobs: [
+    { workflow: 'release.yml', job: 'verify-ledger' },
+    { workflow: 'release.yml', job: 'build-release' },
+    { workflow: 'release.yml', job: 'finalize-release' },
+    { workflow: 'release.yml', job: 'deploy-pages' },
+  ],
+} as const;
+
 const ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 const entries = canonicalRegistry();
 function action(name: string) {
@@ -70,49 +87,64 @@ afterEach(() => {
   spawned.length = 0;
 });
 
+/** The admitted gh run list shape: workflow and event, then json and limit (ADR-SCR-0010). */
+const BASE = ['run', 'list', '--workflow', 'pull-request-checks.yml', '--event', 'pull_request'];
+const TAIL = ['--json', 'conclusion', '--limit', '50'];
+
 describe('gh run list is a declared read-only host process (ADR-SCR-0005 IA-004)', () => {
   it.each([
-    ['harness_green_main', () => senseHarnessGreenMain({ repoRoot: ROOT })],
     [
       'harness_green_main',
-      () => senseHarnessGreenMain({ repoRoot: ROOT, since: '2026-09-01', limit: 20 }),
+      () => senseHarnessGreenMain({ repoRoot: ROOT, ...DEVAI_POPULATION, minimumSample: 20 }),
     ],
-    ['harness_performance', () => senseHarnessPerformance({ repoRoot: ROOT })],
-    ['harness_robustness', () => senseHarnessRobustness({ repoRoot: ROOT })],
+    [
+      'harness_green_main',
+      () =>
+        senseHarnessGreenMain({
+          repoRoot: ROOT,
+          ...DEVAI_POPULATION,
+          minimumSample: 20,
+          headBranch: 'release/v1.2',
+          since: '2026-09-01',
+          limit: 20,
+        }),
+    ],
+    [
+      'harness_performance',
+      () => senseHarnessPerformance({ repoRoot: ROOT, ...DEVAI_POPULATION, minimumSample: 10 }),
+    ],
+    [
+      'harness_robustness',
+      () => senseHarnessRobustness({ repoRoot: ROOT, ...DEVAI_POPULATION, minimumSample: 20 }),
+    ],
   ] as const)('admits the argv %s actually emits', (kind, sense) => {
     sense();
     expect(spawned).toHaveLength(1);
     const [call] = spawned;
     expect(call?.executable).toBe('gh');
     expect(call?.args.slice(0, 2)).toEqual(['run', 'list']);
+    expect(call?.args).toContain('--workflow');
+    expect(call?.args).toContain('--event');
     expect(invoke(kind, call?.executable, call?.args)()).toBe('allowed');
   });
 
   it.each([
+    ['harness_green_main', [...BASE, ...TAIL]],
+    ['harness_green_main', [...BASE, '--branch', 'release/v1.2', ...TAIL]],
+    ['harness_green_main', [...BASE, ...TAIL, '--created', '>=2026-09-01T00:00:00Z']],
     [
       'harness_green_main',
-      ['run', 'list', '--branch', 'main', '--json', 'conclusion,createdAt', '--limit', '50'],
-    ],
-    [
-      'harness_green_main',
-      [
-        'run',
-        'list',
-        '--branch',
-        'release/v1.2',
-        '--json',
-        'conclusion,createdAt',
-        '--limit',
-        '50',
-        '--created',
-        '>=2026-09-01T00:00:00Z',
-      ],
+      [...BASE, '--branch', 'release/v1.2', ...TAIL, '--created', '>=2026-09-01'],
     ],
     [
       'harness_performance',
       [
         'run',
         'list',
+        '--workflow',
+        'ci.yml',
+        '--event',
+        'push',
         '--branch',
         'main',
         '--json',
@@ -121,10 +153,7 @@ describe('gh run list is a declared read-only host process (ADR-SCR-0005 IA-004)
         '50',
       ],
     ],
-    [
-      'harness_robustness',
-      ['run', 'list', '--branch', 'main', '--json', 'conclusion,attempt', '--limit', '100'],
-    ],
+    ['harness_robustness', [...BASE, '--json', 'conclusion,attempt', '--limit', '100']],
     ['runtime_probe_auth', ['auth', 'status']],
     ['runtime_probe_api', ['--version']],
   ] as const)('admits %s: gh %j', (kind, args) => {
@@ -164,44 +193,38 @@ describe('gh run list is a declared read-only host process (ADR-SCR-0005 IA-004)
     ['pr', 'list'],
     ['run', 'list'],
     // gh run list outside the declared shape.
-    ['run', 'list', '--branch', 'main', '--json', 'conclusion', '--limit', '50', '--jq', '.'],
-    ['run', 'list', '--branch', 'main', '--json', 'conclusion', '--limit', '50', '--web', 'x'],
-    ['run', 'list', '--repo', 'o/r', '--json', 'conclusion', '--limit', '50', '--x', 'y'],
-    ['run', 'list', '--json', 'conclusion', '--branch', 'main', '--limit', '50'],
-    ['run', 'list', '--branch', '--web', '--json', 'conclusion', '--limit', '50'],
-    ['run', 'list', '--branch', '../main', '--json', 'conclusion', '--limit', '50'],
-    ['run', 'list', '--branch', 'main', '--json', 'a;b', '--limit', '50'],
-    ['run', 'list', '--branch', 'main', '--json', '', '--limit', '50'],
-    ['run', 'list', '--branch', 'main', '--json', 'conclusion', '--limit', '0'],
-    ['run', 'list', '--branch', 'main', '--json', 'conclusion', '--limit', '-1'],
-    ['run', 'list', '--branch', 'main', '--json', 'conclusion', '--limit', '99999'],
-    ['run', 'list', '--branch', 'main', '--json', 'conclusion', '--limit', '50', '--created'],
-    [
-      'run',
-      'list',
-      '--branch',
-      'main',
-      '--json',
-      'conclusion',
-      '--limit',
-      '50',
-      '--created',
-      '<=2026-09-01',
-    ],
-    [
-      'run',
-      'list',
-      '--branch',
-      'main',
-      '--json',
-      'conclusion',
-      '--limit',
-      '50',
-      '--status',
-      'failure',
-    ],
-    ['run', 'list', '--branch', 'main', '--json', 'conclusion', '--limit', 50],
-    ['-R', 'owner/repo', 'run', 'list', '--branch', 'main', '--json', 'c', '--limit', '5'],
+    [...BASE, ...TAIL, '--jq', '.'],
+    [...BASE, ...TAIL, '--web', 'x'],
+    ['run', 'list', '--repo', 'o/r', ...TAIL, '--x', 'y'],
+    // The old shape without --workflow and --event is no longer admitted.
+    ['run', 'list', '--branch', 'main', ...TAIL],
+    // A second --branch, or --branch out of order.
+    [...BASE, '--branch', 'main', '--branch', 'dev', ...TAIL],
+    [...BASE, ...TAIL.slice(0, 2), '--branch', 'main', ...TAIL.slice(2)],
+    // Options out of order.
+    ['run', 'list', '--event', 'pull_request', '--workflow', 'pull-request-checks.yml', ...TAIL],
+    ['run', 'list', ...TAIL, '--workflow', 'pull-request-checks.yml', '--event', 'pull_request'],
+    ['run', 'list', '--workflow', 'pull-request-checks.yml', ...TAIL, '--event', 'pull_request'],
+    // A bad event or workflow file.
+    ['run', 'list', '--workflow', 'pull-request-checks.yml', '--event', 'issues', ...TAIL],
+    ['run', 'list', '--workflow', 'pull-request-checks.yml', '--event', '--web', ...TAIL],
+    ['run', 'list', '--workflow', '../ci.yml', '--event', 'pull_request', ...TAIL],
+    ['run', 'list', '--workflow', '.github/ci.yml', '--event', 'pull_request', ...TAIL],
+    ['run', 'list', '--workflow', 'ci.txt', '--event', 'pull_request', ...TAIL],
+    ['run', 'list', '--workflow', '--web', '--event', 'pull_request', ...TAIL],
+    // A bad branch, fields, limit, or created filter.
+    [...BASE, '--branch', '--web', ...TAIL],
+    [...BASE, '--branch', '../main', ...TAIL],
+    [...BASE, '--json', 'a;b', '--limit', '50'],
+    [...BASE, '--json', '', '--limit', '50'],
+    [...BASE, '--json', 'conclusion', '--limit', '0'],
+    [...BASE, '--json', 'conclusion', '--limit', '-1'],
+    [...BASE, '--json', 'conclusion', '--limit', '99999'],
+    [...BASE, ...TAIL, '--created'],
+    [...BASE, ...TAIL, '--created', '<=2026-09-01'],
+    [...BASE, ...TAIL, '--status', 'failure'],
+    [...BASE, '--json', 'conclusion', '--limit', 50],
+    ['-R', 'owner/repo', ...BASE, '--json', 'c', '--limit', '5'],
   ];
 
   // `gh pr list` resolves to a governed process target and is refused for consent
@@ -214,9 +237,9 @@ describe('gh run list is a declared read-only host process (ADR-SCR-0005 IA-004)
   );
 
   it.each([
-    ['/tmp/gh', ['run', 'list', '--branch', 'main', '--json', 'conclusion', '--limit', '50']],
+    ['/tmp/gh', [...BASE, ...TAIL]],
     ['./gh', ['auth', 'status']],
-    ['gh', 'run list --branch main --json conclusion --limit 50'],
+    ['gh', `${BASE.join(' ')} ${TAIL.join(' ')}`],
   ] as const)('refuses a non-exact gh executable or argv: %s %j', (executable, args) => {
     expect(invoke('harness_green_main', executable, args)).toThrow(
       'AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED',
@@ -224,7 +247,7 @@ describe('gh run list is a declared read-only host process (ADR-SCR-0005 IA-004)
   });
 
   it('admits the harness_performance argv under check, where it also runs', () => {
-    senseHarnessPerformance({ repoRoot: ROOT });
+    senseHarnessPerformance({ repoRoot: ROOT, ...DEVAI_POPULATION, minimumSample: 10 });
     const [call] = spawned;
     expect(invoke('harness_performance', call?.executable, call?.args, 'check')()).toBe('allowed');
     expect(invoke('harness_performance', 'gh', ['run', 'cancel', '1'], 'check')).toThrow(
@@ -234,6 +257,8 @@ describe('gh run list is a declared read-only host process (ADR-SCR-0005 IA-004)
 
   it('admits exactly the argv shapes the subprocess-effects templates declare', () => {
     const samples: Readonly<Record<string, string>> = {
+      '<file>': 'pull-request-checks.yml',
+      '<event>': 'pull_request',
       '<ref>': 'main',
       '<fields>': 'conclusion,createdAt',
       '<n>': '50',
@@ -247,11 +272,19 @@ describe('gh run list is a declared read-only host process (ADR-SCR-0005 IA-004)
         templates: { template_id: string; executable: string; argv_shape: string[] }[];
       };
       const declared = registry.templates.filter((template) =>
-        ['gh-auth-status', 'gh-run-list', 'gh-run-list-created'].includes(template.template_id),
+        [
+          'gh-auth-status',
+          'gh-run-list',
+          'gh-run-list-created',
+          'gh-run-list-branch',
+          'gh-run-list-branch-created',
+        ].includes(template.template_id),
       );
       expect(declared.map((template) => template.template_id).sort()).toEqual([
         'gh-auth-status',
         'gh-run-list',
+        'gh-run-list-branch',
+        'gh-run-list-branch-created',
         'gh-run-list-created',
       ]);
       for (const template of declared) {

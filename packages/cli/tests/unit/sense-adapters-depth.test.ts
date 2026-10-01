@@ -202,6 +202,28 @@ describe('sense adapter deterministic boundaries', () => {
   });
 
   it('delegates the complete simple read-sensor surface with exact repository inputs', async () => {
+    // ADR-SCR-0010: the CI harness adapters receive DEVAI's declared population.
+    const devaiPopulation = (minimumSample: number) => ({
+      workflow: 'pull-request-checks.yml',
+      event: 'pull_request',
+      headBranch: '*',
+      baseBranch: 'main',
+      attempts: 'last' as const,
+      includeCancelled: false,
+      lookbackDays: 30,
+      minimumSample,
+      excludedJobs: [
+        { workflow: 'release.yml', job: 'verify-ledger' },
+        { workflow: 'release.yml', job: 'build-release' },
+        { workflow: 'release.yml', job: 'finalize-release' },
+        { workflow: 'release.yml', job: 'deploy-pages' },
+      ],
+    });
+    const declaredInputs: Readonly<Record<string, ReturnType<typeof devaiPopulation>>> = {
+      harness_green_main: devaiPopulation(20),
+      harness_performance: devaiPopulation(10),
+      harness_robustness: devaiPopulation(20),
+    };
     const cases = [
       ['lint', 'senseLint', { cwd: '/repo' }, false],
       ['build', 'senseBuild', { cwd: '/repo' }, false],
@@ -241,7 +263,12 @@ describe('sense adapter deterministic boundaries', () => {
       ['plant_coverage', 'sensePlantCoverage', { repoRoot: '/repo' }, false],
       ['test_invariant_alignment', 'senseTestInvariantAlignment', { repoRoot: '/repo' }, false],
       ['harness_security', 'senseHarnessSecurity', { repoRoot: '/repo' }, true],
-      ['harness_green_main', 'senseHarnessGreenMain', { repoRoot: '/repo' }, false],
+      [
+        'harness_green_main',
+        'senseHarnessGreenMain',
+        { repoRoot: '/repo', ...devaiPopulation(20) },
+        false,
+      ],
       ['spec_alignment', 'senseSpecAlignment', { repoRoot: '/repo' }, false],
       ['spec_security_coverage', 'senseSpecSecurityCoverage', { repoRoot: '/repo' }, false],
       ['spec_performance_targets', 'senseSpecPerformanceTargets', { repoRoot: '/repo' }, false],
@@ -263,8 +290,18 @@ describe('sense adapter deterministic boundaries', () => {
         false,
       ],
       ['harness_idiomaticity', 'senseHarnessIdiomaticity', { repoRoot: '/repo' }, false],
-      ['harness_performance', 'senseHarnessPerformance', { repoRoot: '/repo' }, false],
-      ['harness_robustness', 'senseHarnessRobustness', { repoRoot: '/repo' }, false],
+      [
+        'harness_performance',
+        'senseHarnessPerformance',
+        { repoRoot: '/repo', ...devaiPopulation(10) },
+        false,
+      ],
+      [
+        'harness_robustness',
+        'senseHarnessRobustness',
+        { repoRoot: '/repo', ...devaiPopulation(20) },
+        false,
+      ],
       ['inventory_performance', 'senseInventoryPerformance', { repoRoot: '/repo' }, false],
       ['docs_drift', 'senseDocsDrift', { repoRoot: '/repo' }, false],
       ['site_drift', 'senseSiteDrift', { repoRoot: '/repo' }, false],
@@ -273,7 +310,11 @@ describe('sense adapter deterministic boundaries', () => {
     for (const [kind, delegateName, expectedInput, returnsReading] of cases) {
       const delegate = simpleSensors[delegateName];
       if (delegate === undefined) throw new Error(`missing test delegate: ${delegateName}`);
-      const result = await sensorAdapter(kind)({ repoRoot: '/repo' });
+      const inputs = declaredInputs[kind];
+      const result = await sensorAdapter(kind)({
+        repoRoot: '/repo',
+        ...(inputs !== undefined && { inputs }),
+      });
       expect(delegate).toHaveBeenCalledWith(expectedInput);
       expect(result).toEqual(
         returnsReading
