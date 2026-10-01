@@ -427,8 +427,7 @@ export function senseSiteDrift(opts: SiteDriftOptions): SensorReading {
 
   if (tipSource !== undefined) {
     // ADR-AUT-0002 IA-004: a well-formed tip is compared with the last verified identity
-    // the journal records; a tip that differs from it reads FAIL. When the journal yields
-    // no verified identity the tip's own provenance stands, as before the journal read.
+    // the journal records; a tip that differs from it reads FAIL.
     const journal = readJournalProvenance(opts.repoRoot);
     if (journal.ok && journal.commit !== tipSource) {
       return buildSensorReading({
@@ -456,6 +455,15 @@ export function senseSiteDrift(opts: SiteDriftOptions): SensorReading {
           journal_intent_id: journal.intentId,
           published_source: journal.commit,
         },
+      });
+    }
+    // A well-formed tip is not provenance on its own: when the journal holds no verified
+    // record for the declared repository the reading is REVIEW with the journal reason
+    // (Owner ruling of 2026-10-01 on ADR-AUT-0002 IA-004).
+    if (!journal.ok && JOURNAL_REVIEW_REASONS.has(journal.reason)) {
+      return journalReviewReading(journal, {
+        published_tip: publishedTip.stdout,
+        published_tip_source: tipSource,
       });
     }
     publishedSource = tipSource;
