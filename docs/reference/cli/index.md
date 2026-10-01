@@ -194,7 +194,10 @@ other. Preview or inspect whenever the leaf offers `--dry-run`, plan output, sta
   [round execution outputs](../../../law/policy/round-execution.json); evidence supports `round`
   and `release` but does not authorize either. The `rounds` kind of `evidence render`, the
   derived rounds index it writes, and the exact-membership rule `round seal` applies to that index
-  are specified in [`evidence render` and the rounds index](./evidence-render.md).
+  are specified in [`evidence render` and the rounds index](./evidence-render.md). The
+  proof-line cross-check of `evidence verify --scope chain`, the anchor baseline, and the
+  historical declaration are specified in
+  [`evidence verify` and proof-line anchoring](./evidence-verify.md).
 
 ### `release` — Release control
 
@@ -324,6 +327,7 @@ authorized.
 - Operate governed work with [rounds, tasks, and executors](./round-task-executors.md).
 - Close and seal rounds against the rendered index in
   [`evidence render` and the rounds index](./evidence-render.md).
+- Account for every proof line with [`evidence verify` and proof-line anchoring](./evidence-verify.md).
 - Check role and mutation boundaries in [authority and effects](./authority-effects.md).
   Canonical routing: [action registry](../../../law/policy/action-registry.json),
   [documentation information architecture](../../../law/policy/documentation-information-architecture.json).
