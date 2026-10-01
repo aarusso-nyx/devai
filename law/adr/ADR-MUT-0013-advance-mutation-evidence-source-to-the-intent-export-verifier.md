@@ -2,7 +2,7 @@
 id: ADR-MUT-0013
 title: Advance the mutation-evidence approved source to the intent-export verifier
 type: adr
-status: proposed
+status: accepted
 date: 2026-10-01
 authority: Architect
 supersedes: []
@@ -24,9 +24,9 @@ inspector_acceptance:
 
 ## Status
 
-Proposed forward provenance pin. It binds nothing until the Owner accepts it;
-the policy and schema constants are repinned only after that acceptance. It
-advances only the exact canonical verifier identity used by the active
+Accepted on 2026-10-01 by the Architect after the Owner accepted it as drafted;
+round R-0403 of CMP-0004 repins the policy and schema constants under it.
+Proposed the same day as a forward provenance pin. It advances only the exact canonical verifier identity used by the active
 mutation-evidence v2 contract; it does not change the mutation protocol, the
 release action set, the evidence meaning, the signer, or any external effect.
 
@@ -65,14 +65,12 @@ population stays 26 files and the source-only upstream test population stays
 the same nine named files; the native suite grew by seventeen cases, and the
 policy pins the file names, not the case count.
 
-At the time of this proposal commit `8b215d70` is pushed on the canonical
-repository branch `claude/rel-0031-intent-export` and is not yet contained in
-canonical `main`. ADR-MUT-0007 cited the merged pull requests that produced
-its source and ADR-MUT-0010 stated that canonical `main` contained its commit;
-neither states a rule that the pinned commit must be on `main`, but both
-precedents pinned a merged commit. Whether acceptance waits for the merge is
-an open item for the Owner; this record does not claim a merge that has not
-happened.
+Canonical `main` contains commit `8b215d70`: the Owner chose to merge the
+canonical source before accepting this record, and devai-verifier pull request
+12 merged it as merge commit `097ef4a658c0478f79d5b21da28a22aea64b7ec3`, whose
+parents are the previous pin `8174749e` and `8b215d70`. The pinned commit,
+tree, and vendored bytes are those of `8b215d70` itself, as with the merged
+sources ADR-MUT-0007 and ADR-MUT-0010 pinned.
 
 ## Decision
 
