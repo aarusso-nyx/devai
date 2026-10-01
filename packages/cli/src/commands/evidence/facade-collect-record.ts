@@ -11,6 +11,7 @@ import {
   validateActionsEvidenceShadowTuple,
   type ActionsEvidenceShadowDecision,
 } from '#runtime-core';
+import { validators } from '@devai-nyx/schemas';
 import { EXIT_FAIL, EXIT_PASS } from '@devai-nyx/utils';
 import { defineCommand } from '../../define-command.js';
 import { coverageAggregate } from '../coverage/aggregate.js';
@@ -21,7 +22,34 @@ import { invokeCommandService, type DirectCommandResult } from './direct-command
 import { type JsonRecord, toArray, usage, message, parseJson } from './facade-shared.js';
 
 const TUPLE_FILES = ['manifest.json', 'full-result.json', 'decision.json'] as const;
-const RECORD_KINDS = new Set(['generic', 'coverage', 'test', 'mutation', 'rtd']);
+const RECORD_KINDS = new Set(['generic', 'historical-gap', 'coverage', 'test', 'mutation', 'rtd']);
+const validateHistoricalGap = validators.proofOrphanDeclaration;
+
+/**
+ * ADR-EVI-0002: the second step of the two-step writer. The chain entry anchors the proof line by
+ * the digest of its bytes on disk (`proof_path`, `proof_sequence`, `proof_sha256`) and keeps the
+ * historical `notes` form for readers.
+ */
+function anchorProofLine(
+  repoRoot: string,
+  action: string,
+  status: 'completed' | 'failed',
+  roundId: string,
+  kind: string,
+  sequence: number,
+): ReturnType<typeof appendVerbEvidence> {
+  const chain = appendVerbEvidence({
+    repoRoot,
+    action,
+    status,
+    notes: [`round_id=${roundId}`, `proof_sequence=${String(sequence)}`],
+    proofAnchor: { path: `record/proofs/work/${kind}/${roundId}.jsonl`, sequence },
+  });
+  if (!chain.ok) {
+    throw new Error(`EVIDENCE_CHAIN_APPEND_FAILED:${chain.error ?? 'unknown error'}`);
+  }
+  return chain;
+}
 const TEST_TIERS = new Set([
   'unit',
   'api',
@@ -102,7 +130,15 @@ function collectActions(options: CollectOptions, repoRoot: string): JsonRecord {
     kind: 'actions',
     payload: { source: 'actions', observation, artifacts },
   });
-  return { source: 'actions', observation, artifacts, proof };
+  const chain = anchorProofLine(
+    repoRoot,
+    'evidence.collect.actions',
+    'completed',
+    options.round,
+    'actions',
+    proof.sequence,
+  );
+  return { source: 'actions', observation, artifacts, proof, chain };
 }
 
 function collectLocal(options: CollectOptions, repoRoot: string): JsonRecord {
@@ -205,7 +241,9 @@ function genericPayload(options: RecordOptions, repoRoot: string): JsonRecord {
   if (options.input !== undefined) {
     return parseJson(readFileSync(resolve(repoRoot, options.input), 'utf8'), '--input');
   }
-  throw new Error('--payload <json> or --input <path> is required for --kind generic');
+  throw new Error(
+    `--payload <json> or --input <path> is required for --kind ${options.kind ?? 'generic'}`,
+  );
 }
 
 async function recordService(
@@ -284,11 +322,14 @@ export const evidenceRecord = defineCommand({
   register(cli: CAC): void {
     cli
       .command('evidence-record', 'Record one governed evidence kind')
-      .option('--kind <kind>', 'generic | coverage | test | mutation | rtd (required)')
+      .option(
+        '--kind <kind>',
+        'generic | historical-gap | coverage | test | mutation | rtd (required)',
+      )
       .option('--round <round-id>', 'Owning round for the append-only proof epoch (required)')
       .option('--repo-root <path>', 'Repository root (default: cwd)')
-      .option('--payload <json>', 'Generic evidence JSON object')
-      .option('--input <path>', 'Generic evidence JSON file')
+      .option('--payload <json>', 'Generic or historical-gap evidence JSON object')
+      .option('--input <path>', 'Generic or historical-gap evidence JSON file')
       .option('--in <path>', 'Coverage input directory')
       .option('--out <path>', 'Coverage, test, or mutation output path')
       .option('--output <path>', 'Additional RTD manifest output path')
@@ -310,7 +351,10 @@ export const evidenceRecord = defineCommand({
       .option('--human', 'Human-readable summary')
       .action(async (options: RecordOptions) => {
         if (options.kind === undefined || !RECORD_KINDS.has(options.kind)) {
-          usage('evidence record', '--kind must be generic, coverage, test, mutation, or rtd');
+          usage(
+            'evidence record',
+            '--kind must be generic, historical-gap, coverage, test, mutation, or rtd',
+          );
           return;
         }
         if (options.kind === 'mutation') {
@@ -325,27 +369,32 @@ export const evidenceRecord = defineCommand({
         }
         const repoRoot = resolve(options.repoRoot ?? process.cwd());
         try {
-          if (options.kind === 'generic') {
+          if (options.kind === 'generic' || options.kind === 'historical-gap') {
+            const kind = options.kind;
             const payload = genericPayload(options, repoRoot);
+            if (kind === 'historical-gap' && !validateHistoricalGap(payload)) {
+              throw new Error(
+                `historical-gap payload does not validate against proof-orphan-declaration.schema.json: ${JSON.stringify(validateHistoricalGap.errors)}`,
+              );
+            }
             const proof = appendProofEpochRecord({
               repoRoot,
               roundId: options.round,
-              kind: 'generic',
+              kind,
               payload,
             });
-            const chain = appendVerbEvidence({
+            const chain = anchorProofLine(
               repoRoot,
-              action: 'evidence.record.generic',
-              status: 'completed',
-              notes: [`round_id=${options.round}`, `proof_sequence=${String(proof.sequence)}`],
-            });
-            if (!chain.ok) {
-              throw new Error(`EVIDENCE_CHAIN_APPEND_FAILED:${chain.error ?? 'unknown error'}`);
-            }
+              `evidence.record.${kind}`,
+              'completed',
+              options.round,
+              kind,
+              proof.sequence,
+            );
             process.stdout.write(
               options.human === true
-                ? `evidence record: generic sequence ${String(proof.sequence)}\n`
-                : `${JSON.stringify({ kind: 'generic', round_id: options.round, result: payload, proof, chain })}\n`,
+                ? `evidence record: ${kind} sequence ${String(proof.sequence)}\n`
+                : `${JSON.stringify({ kind, round_id: options.round, result: payload, proof, chain })}\n`,
             );
             process.exitCode = EXIT_PASS;
             return;
@@ -363,7 +412,16 @@ export const evidenceRecord = defineCommand({
               ...(service.stderr.trim().length > 0 && { service_error: service.stderr.trim() }),
             },
           });
-          if (service.exitCode !== 0 || service.stderr.length > 0) {
+          const failed = service.exitCode !== 0 || service.stderr.length > 0;
+          const chain = anchorProofLine(
+            repoRoot,
+            `evidence.record.${options.kind}`,
+            failed ? 'failed' : 'completed',
+            options.round,
+            options.kind,
+            proof.sequence,
+          );
+          if (failed) {
             process.stderr.write(
               `devai evidence record: ${options.kind} exited ${String(service.exitCode)}; governed proof sequence ${String(proof.sequence)}${service.stderr.trim().length > 0 ? `: ${service.stderr.trim()}` : ''}\n`,
             );
@@ -373,7 +431,7 @@ export const evidenceRecord = defineCommand({
           process.stdout.write(
             options.human === true
               ? `evidence record: ${options.kind} sequence ${String(proof.sequence)}\n`
-              : `${JSON.stringify({ kind: options.kind, round_id: options.round, result, proof })}\n`,
+              : `${JSON.stringify({ kind: options.kind, round_id: options.round, result, proof, chain })}\n`,
           );
           process.exitCode = EXIT_PASS;
         } catch (error) {

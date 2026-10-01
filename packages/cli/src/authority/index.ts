@@ -1,5 +1,11 @@
-import { resolve } from 'node:path';
-import { runWithAuthorityHostEffects, type AuthorityHostEffectScope } from '@devai-nyx/authority';
+import { dirname, join, resolve } from 'node:path';
+import {
+  existsSync,
+  lstatSync,
+  realpathSync,
+  runWithAuthorityHostEffects,
+  type AuthorityHostEffectScope,
+} from '@devai-nyx/authority';
 import type { Command } from 'cac';
 import {
   createPostMergeHostScope,
@@ -86,7 +92,70 @@ let pendingHostDryRun = false;
 let pendingSessionOperation: (() => unknown) | undefined;
 let pendingPolicyMaterialization: (() => unknown) | undefined;
 let pendingExactCommit: (() => void) | undefined;
+let pendingProofBaselineGate = false;
 let invocationDisposalFailed = false;
+
+/** ADR-EVI-0002: the one path the gated `evidence verify --scope chain --write` may write. */
+const PROOF_ANCHOR_BASELINE_PATH = 'record/proofs/anchor-baseline.json';
+
+/**
+ * Owner decision of 2026-10-01: `evidence verify` stays `read`, and its one conditional write,
+ * the anchor baseline, is authorized only by `--write` consent at invocation, following the
+ * `docs decisions render --out` precedent below.
+ */
+function proofAnchorBaselineWrite(entry: RegistryEntry, argv: readonly string[]): boolean {
+  return (
+    entry.name === 'evidence verify' &&
+    flagValue(argv, '--scope') === 'chain' &&
+    argv.includes('--write')
+  );
+}
+
+/**
+ * Derives, from the ordinary read scope, a scope that admits exactly the baseline file (and the
+ * creation of its `record/proofs` directory) and nothing broader. Every other filesystem effect is
+ * refused as a read-action mutation; process effects keep the read broker's admission.
+ */
+function admitProofAnchorBaselineWrite(
+  scope: AuthorityHostEffectScope,
+  root: string,
+): AuthorityHostEffectScope {
+  const baseline = resolve(root, PROOF_ANCHOR_BASELINE_PATH);
+  const directory = dirname(baseline);
+  const physicalDirectory = (): boolean =>
+    existsSync(root) &&
+    (!existsSync(directory) ||
+      realpathSync(directory) === join(realpathSync(root), 'record/proofs'));
+  return Object.freeze({
+    ...scope,
+    effect: 'harness-write' as const,
+    apply_effect: (
+      request: Parameters<AuthorityHostEffectScope['apply_effect']>[0],
+      apply: () => unknown,
+    ) => {
+      if (request.kind !== 'filesystem') return scope.apply_effect(request, apply);
+      const target = request.arguments[0];
+      if (
+        request.symbol === 'writeFileSync' &&
+        typeof target === 'string' &&
+        resolve(target) === baseline &&
+        physicalDirectory() &&
+        (!existsSync(baseline) || lstatSync(baseline).isFile())
+      ) {
+        return apply();
+      }
+      if (
+        request.symbol === 'mkdirSync' &&
+        typeof target === 'string' &&
+        resolve(target) === directory &&
+        !existsSync(directory)
+      ) {
+        return apply();
+      }
+      throw new Error('AUTHORITY_READ_ACTION_MUTATION_FORBIDDEN');
+    },
+  });
+}
 
 function guardedInvocationDisposal(dispose: () => void): () => void {
   return () => {
@@ -109,6 +178,7 @@ export function disposeCliInvocationAuthority(): void {
   pendingSessionOperation = undefined;
   pendingPolicyMaterialization = undefined;
   pendingExactCommit = undefined;
+  pendingProofBaselineGate = false;
   clearResolvedInvocationAuthority();
   dispose?.();
   if (invocationDisposalFailed) throw new Error('AUTHORITY_INVOCATION_DISPOSAL_FAILED');
@@ -194,17 +264,25 @@ export function attachAuthorityCommandBoundaries(
       const sessionOperation = pendingSessionOperation;
       const policyMaterialization = pendingPolicyMaterialization;
       const exactCommit = pendingExactCommit;
+      const proofBaselineGate = pendingProofBaselineGate;
       pendingHostScope = undefined;
       pendingHostDispose = undefined;
       pendingHostDryRun = false;
       pendingSessionOperation = undefined;
       pendingPolicyMaterialization = undefined;
       pendingExactCommit = undefined;
+      pendingProofBaselineGate = false;
+      const expectedEffect = proofBaselineGate
+        ? 'harness-write'
+        : dryRun
+          ? 'read'
+          : invocationEntry.effects;
       if (
         !scope ||
         !dispose ||
         scope.action_id !== entry.name ||
-        scope.effect !== (dryRun ? 'read' : invocationEntry.effects)
+        scope.effect !== expectedEffect ||
+        (proofBaselineGate && !proofAnchorBaselineWrite(invocationEntry, process.argv))
       ) {
         dispose?.();
         throw new Error('AUTHORITY_FINAL_BOUNDARY_REQUIRED');
@@ -388,6 +466,29 @@ export function authorizeCliArgv(
       // check above and still installs the ordinary read scope so the command
       // wrapper cannot execute outside the final boundary.
       stageHostScope(entry, entries, argv, 'owner', { as_role: 'owner' });
+    } catch (error) {
+      const code = authorityErrorCode(error);
+      if (code === undefined) throw error;
+      return renderAuthorityResult(taggedAuthorityFailure('refused', code, entry, argv), format);
+    }
+    return undefined;
+  }
+  if (proofAnchorBaselineWrite(entry, argv)) {
+    // The registry remains read. `--write` is the consent for the one baseline write; every other
+    // declaration a read action refuses is still refused.
+    const refusal = readDeclarationRefusal(
+      argv.filter((value) => value !== '--write'),
+      entry,
+      asRole,
+      sessionId,
+      format,
+    );
+    if (refusal !== undefined) return refusal;
+    try {
+      stageHostScope(entry, entries, argv, 'owner', { as_role: 'owner' });
+      if (pendingHostScope === undefined) throw new Error('AUTHORITY_FINAL_BOUNDARY_REQUIRED');
+      pendingHostScope = admitProofAnchorBaselineWrite(pendingHostScope, targetRoot(entry, argv));
+      pendingProofBaselineGate = true;
     } catch (error) {
       const code = authorityErrorCode(error);
       if (code === undefined) throw error;

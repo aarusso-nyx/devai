@@ -10,8 +10,8 @@ import {
   normalizeActorList,
   readClosures,
   renderClosureIndex,
-  verifyChain,
   verifyLocalEvidence,
+  verifyProofAnchors,
   verifyProofEpoch,
   type VerifyContext,
   type VerifyMode,
@@ -357,26 +357,41 @@ export const evidenceVerify = defineCommand({
         try {
           if (options.scope === 'chain') {
             const chainPath = resolve(repoRoot, options.chain ?? DEFAULT_CHAIN_PATH);
-            const verification = verifyChain(chainPath);
-            const result = {
-              scope: 'chain',
-              valid: verification.valid,
-              errors: verification.errors,
-              ...(options.showHead === true && { head: loadChain(chainPath).head }),
-            };
-            if (verification.valid) {
-              process.stdout.write(
-                options.human === true
-                  ? `evidence chain: valid${options.showHead === true ? `; head ${String(result.head ?? '')}` : ''}\n`
-                  : `${JSON.stringify(result)}\n`,
-              );
-              process.exitCode = EXIT_PASS;
-            } else {
+            // ADR-EVI-0002: the line-level cross-check. The baseline is written only with the
+            // --write consent the authority layer admits for this one path; the action stays read.
+            const verification = verifyProofAnchors({
+              repoRoot,
+              chainPath,
+              write: explicitWrite(),
+            });
+            if (!verification.valid) {
               process.stderr.write(
                 `devai evidence verify: invalid chain: ${verification.errors.join('; ')}\n`,
               );
               process.exitCode = EXIT_FAIL;
+              return;
             }
+            const head = options.showHead === true ? loadChain(chainPath).head : undefined;
+            const count = (label: string): number =>
+              verification.lines.filter((line) => line.label === label).length;
+            const result = {
+              scope: 'chain',
+              valid: true,
+              errors: verification.errors,
+              chain: verification.chain,
+              baseline: verification.baseline,
+              lines: verification.lines,
+              anchors: verification.anchors,
+              declarations: verification.declarations,
+              ...(options.showHead === true && { head }),
+            };
+            const acknowledged = count('historical gap acknowledged');
+            process.stdout.write(
+              options.human === true
+                ? `evidence chain: valid; ${String(count('anchored'))} proof lines anchored${acknowledged > 0 ? `; ${String(acknowledged)} historical gap acknowledged` : ''}${options.showHead === true ? `; head ${String(head ?? '')}` : ''}\n`
+                : `${JSON.stringify(result)}\n`,
+            );
+            process.exitCode = EXIT_PASS;
             return;
           }
 

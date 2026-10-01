@@ -9,6 +9,14 @@ import {
 import { dirname } from 'node:path';
 import { validators } from '@devai-nyx/schemas';
 
+// ADR-EVI-0002: the line-level cross-check lives beside the chain checks it extends.
+export {
+  verifyProofAnchors,
+  type ProofAnchorVerification,
+  type ProofAnchorVerificationInputs,
+} from './anchors.js';
+export { proofLineDigest, resolveProofAnchor, type ProofAnchorResolution } from './proof-epoch.js';
+
 const validateEvidence = validators.evidence;
 
 export interface EvidenceContext {
@@ -53,6 +61,12 @@ export interface EvidenceRecord {
   sequence?: number;
   /** Human-readable predecessor alias: GENESIS or the prior manifest hash. */
   previous_hash?: string;
+  /** ADR-EVI-0002 anchor: the canonical path of the proof epoch file holding the line. */
+  proof_path?: string;
+  /** ADR-EVI-0002 anchor: the one-based position of the line within that file. */
+  proof_sequence?: number;
+  /** ADR-EVI-0002 anchor: the SHA-256 of the line bytes, exclusive of the newline. */
+  proof_sha256?: string;
 }
 
 export interface DraftEvidence {
@@ -66,6 +80,9 @@ export interface DraftEvidence {
   readonly artifacts?: readonly EvidenceArtifact[];
   readonly findings_summary?: FindingsSummary;
   readonly notes?: readonly string[];
+  readonly proof_path?: string;
+  readonly proof_sequence?: number;
+  readonly proof_sha256?: string;
 }
 
 export interface EvidenceChain {
@@ -186,6 +203,9 @@ export function appendRecord(chainPath: string, draft: DraftEvidence): EvidenceR
     artifacts,
     ...(draft.findings_summary !== undefined && { findings_summary: draft.findings_summary }),
     ...(draft.notes !== undefined && { notes: [...draft.notes] }),
+    ...(draft.proof_path !== undefined && { proof_path: draft.proof_path }),
+    ...(draft.proof_sequence !== undefined && { proof_sequence: draft.proof_sequence }),
+    ...(draft.proof_sha256 !== undefined && { proof_sha256: draft.proof_sha256 }),
     previous_run_hash,
     manifest_hash,
     sequence: chain.records.length + 1,
