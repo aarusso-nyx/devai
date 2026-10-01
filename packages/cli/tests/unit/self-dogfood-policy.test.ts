@@ -37,6 +37,12 @@ const ROLES: readonly SelfDogfoodRole[] = [
 const NON_INSPECTORS = ROLES.filter((role) => role !== 'inspector');
 const HARNESS_WRITE_ACTIONS = ['sense record', 'audit observe'] as const;
 const ATTRIBUTED = { declaring_role: 'inspector', human_invocation: 'maintainer:R-0206' } as const;
+// ADR-SCR-0008: the sense record row declares the chain path beside the readings directory.
+const SENSE_RECORD_WRITE_PATHS = ['.devai/state/sensor-readings', 'record/proofs/chain.json'];
+
+function declaredWritePaths(checkId: string) {
+  return checkId === 'sense record' ? { harness_write_paths: SENSE_RECORD_WRITE_PATHS } : {};
+}
 
 let policy: Policy;
 
@@ -64,6 +70,7 @@ function admitted(role: SelfDogfoodRole, checkId: string, effect: string) {
     check_id: checkId,
     role,
     effect,
+    ...declaredWritePaths(checkId),
     produces_readiness_claim: false,
     grants_publication_authority: false,
   };
@@ -109,6 +116,7 @@ describe('ADR-SCR-0001 self-dogfood admission of the sensing actions', () => {
         check_id: actionId,
         effect: 'harness-write',
         initiator_roles: ['inspector'],
+        ...declaredWritePaths(actionId),
       });
       for (const role of NON_INSPECTORS) {
         const row = policy.role_effect_matrix.find((entry) => entry.role === role);
