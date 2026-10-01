@@ -184,6 +184,9 @@ export async function runPostMergeAuditor(
           previousMergeSha,
           previousDigest,
           opts.injectFailure === true,
+          mergeSha,
+          // ADR-SCR-0008: readings resolve from the bound checkout's store.
+          repoRoot,
         );
         commitAuditBundle(worktreeRoot, stateRoot, mergeSha);
         previousMergeSha = mergeSha;
