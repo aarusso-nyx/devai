@@ -189,14 +189,14 @@ export function measureTestCoverageDepth(opts: MeasureTestCoverageDepthOptions):
       result = runCommand(LOCAL_COVERAGE_PRODUCER_ARGV, { cwd: opts.repoRoot });
     } catch (error) {
       // The host refused to start the producer (an authority scope that does not admit
-      // it). The producer is part of this sensor's command, so the refusal is a FAIL
-      // naming it, never an `error` reading for a missing prerequisite.
+      // it). A refusal measures nothing about the code, so the reading is an `unknown`
+      // diagnostic naming the refusal, never a verdict and never an `error` reading.
       const reason = error instanceof Error ? error.message : String(error);
       return reading(
-        'fail',
+        'unknown',
         [
           {
-            severity: 'error',
+            severity: 'warning',
             code: 'COVERAGE_PRODUCER_REFUSED',
             message: `The ${population} coverage producer \`${LOCAL_COVERAGE_PRODUCER_ARGV.join(' ')}\` was not started: ${reason}`,
           },
