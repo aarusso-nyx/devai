@@ -46,13 +46,12 @@ ADR-REL-0031).
 
 ## 2. Rounds and the outcome each must move
 
-| Round  | Records                    | Outcome                                                                                                                               |
-| ------ | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| R-0401 | ADR-AUT-0002, ADR-SCR-0007 | `sense run build` and `sense run site_drift` produce readings; e2e and coverage report measured outcomes, including FAIL              |
-| R-0402 | ADR-SCR-0008               | Ordered protocol on a fresh worktree yields substrate-reflecting readings for F4:T7 and F5:T4; the committed backlog validates        |
-| R-0403 | `839075e7`                 | #223, #226, #227, #228                                                                                                                | `closed` on 2026-10-01: CTG-0431 (ADR-EVI-0001, #169) as #226, CTG-0433 (ADR-REL-0031, #69, with ADR-MUT-0013) as #227, CTG-0432 (ADR-EVI-0002, #168) as #228; the DETRAN closures seal R-0017 through PC-0018 and the DETRAN proof baseline fails with its 52 orphans until an Architect declaration acknowledges them; close checks green on the merged head; no attestation re-issue |
-| R-0404 | —                          | —                                                                                                                                     | `open` on 2026-10-01 with TASK-0441 and TASK-0442 in progress                                                                                                                                                                                                                                                                                                                           |
-| R-0404 | ADR-SCR-0010               | Harness sensors declare their population and read UNKNOWN below the minimum sample; the second scorecard is recorded beside the first |
+| Round  | Records                                  | Outcome                                                                                                                               |
+| ------ | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| R-0401 | ADR-AUT-0002, ADR-SCR-0007               | `sense run build` and `sense run site_drift` produce readings; e2e and coverage report measured outcomes, including FAIL              |
+| R-0402 | ADR-SCR-0008                             | Ordered protocol on a fresh worktree yields substrate-reflecting readings for F4:T7 and F5:T4; the committed backlog validates        |
+| R-0403 | ADR-EVI-0001, ADR-EVI-0002, ADR-REL-0031 | Superseding closures render and seal; the DETRAN baseline fails before its declaration and passes after; intent receipts export       |
+| R-0404 | ADR-SCR-0010                             | Harness sensors declare their population and read UNKNOWN below the minimum sample; the second scorecard is recorded beside the first |
 
 ## 3. Owner effects
 
@@ -143,11 +142,12 @@ closing rounds. Three rules are specific to this campaign:
 
 ## 6. Round log
 
-| Round  | Merged head | Pull requests          | State                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| ------ | ----------- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| R-0401 | `259197ac`  | #218, #219, #220, #221 | `closed` on 2026-10-01: wave CTG-0411 (ADR-AUT-0002, #155, #162) merged as #220 and wave CTG-0412 (ADR-SCR-0007, #156, #161) as #221; the #155 cause was the corepack `pnpm.js` shim missing the broker's basename match; `sense run build` and `sense run e2e_test` read PASS; close checks green on the merged head (`law:validate` runs as `check --only adrs`, as in CMP-0002); the database-gated RC closure passed on `259197ac` with task-policy digest `a33e4782`, recorded in the closure, and signing and export of its receipt stay the Owner's step |
-| R-0402 | `24d869a2`  | #222, #224             | `closed` on 2026-10-01: wave CTG-0421 (ADR-SCR-0008, #157 to #160) merged as #224; readings carry `supersedes`, `sense record` appends a digest-bearing chain entry and repairs a missing one, the sweep runs in two passes, the backlog has a schema and the post-merge hook reads the bound checkout store; the record pairs F4:T4 and F4:T9 with the sensors the other way round from the sensor registry, and the registry governs; close checks green on the merged head; no attestation re-issue                                                          |
-| R-0403 | —           | —                      | `open` on 2026-10-01 alongside R-0402 (it depends only on R-0401); TASK-0431 and TASK-0437 in progress                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Round  | Merged head | Pull requests                | State                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ------ | ----------- | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| R-0401 | `259197ac`  | #218, #219, #220, #221       | `closed` on 2026-10-01: wave CTG-0411 (ADR-AUT-0002, #155, #162) merged as #220 and wave CTG-0412 (ADR-SCR-0007, #156, #161) as #221; the #155 cause was the corepack `pnpm.js` shim missing the broker's basename match; `sense run build` and `sense run e2e_test` read PASS; close checks green on the merged head (`law:validate` runs as `check --only adrs`, as in CMP-0002); the database-gated RC closure passed on `259197ac` with task-policy digest `a33e4782`, recorded in the closure, and signing and export of its receipt stay the Owner's step |
+| R-0402 | `24d869a2`  | #222, #224                   | `closed` on 2026-10-01: wave CTG-0421 (ADR-SCR-0008, #157 to #160) merged as #224; readings carry `supersedes`, `sense record` appends a digest-bearing chain entry and repairs a missing one, the sweep runs in two passes, the backlog has a schema and the post-merge hook reads the bound checkout store; the record pairs F4:T4 and F4:T9 with the sensors the other way round from the sensor registry, and the registry governs; close checks green on the merged head; no attestation re-issue                                                          |
+| R-0403 | `839075e7`  | #223, #226, #227, #228, #229 | `closed` on 2026-10-01: CTG-0431 (ADR-EVI-0001, #169) as #226, CTG-0433 (ADR-REL-0031, #69, with ADR-MUT-0013) as #227, CTG-0432 (ADR-EVI-0002, #168) as #228; the DETRAN closures seal R-0017 through PC-0018 and the DETRAN proof baseline fails with its 52 orphans until an Architect declaration acknowledges them; close checks green on the merged head; no attestation re-issue                                                                                                                                                                         |
+| R-0404 | `c0326aa9`  | #229, #230, #231             | `closed` on 2026-10-01: CTG-0441 (ADR-SCR-0010, #154) as #230, the harness sensors sample the declared gate population and read UNKNOWN below the minimum; CTG-0442 recorded SC-20261001T194346-001 at `c0681069` as #231 (PASS 35, REVIEW 4, FAIL 1, UNKNOWN 2, N/A 3, beside 31, 5, 3, 3, 3); close checks green on the merged head; no attestation re-issue                                                                                                                                                                                                  |
 
 ## 7. Second scorecard
 
@@ -215,3 +215,22 @@ Cells still not PASS:
 | F2:T4               | UNKNOWN | `migration_check` needs a database (OE-02); not run, as in the first scorecard                                                        |
 | F4:T4               | UNKNOWN | `INVENTORY_ADHERENCE_INPUT_MISSING`: `.devai/state/inventory/inventory.json` is absent                                                |
 | F1:T1, F4:T5, F4:T6 | N/A     | Unchanged declarations; F4:T6 cites the `rbac` surface declared absent                                                                |
+
+## 8. Campaign close
+
+CMP-0004 closed on 2026-10-01 at `c0326aa9`, with all four rounds closed and
+both owner effects performed. Follow-ups outside the campaign:
+
+- F2:T6 fails on eight high-severity dependency advisories, and F5:T3 reads
+  REVIEW because `site-publish.yml` has no cancelling concurrency group; no
+  CMP-0004 record caused either.
+- The local coverage producer exited non-zero once inside the sweep
+  (`release-lifecycle-execution.test.ts`) and passed standalone; the cause is
+  open.
+- `ROUND_PHASE_CLOSURE_UNRESOLVED` still matches the closure id as a substring
+  of the rounds index; `evidence record` has no flag for the
+  `UNANCHORED_NEWEST_LINE` recovery the library supports.
+- After the next release, the trusted local-RC verifier is repinned (step 4 of
+  the repin order), and the Owner signs and exports the R-0401 RC receipt
+  before any release plan uses that head. DETRAN adopts the canonical rounds
+  index.
