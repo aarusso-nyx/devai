@@ -93,8 +93,9 @@ A rendered excerpt from the DETRAN closures fixture
 | PC-0001 | R-0003 | - | cf8f475eaf1951fa2ebb3c42d24f725c6581ea0e | yes |
 | PC-0002 | R-0004 | - | a7e5e93398dee6d3dd6a979d04dc5bd9e3b9d913 | yes |
 ...
-| PC-0011 | R-0007 | - | b662f8af90fdd9d27be08ae49feec70ccd13aded | yes |
-| PC-0005 | R-0008 | - | 3f8a817f4e716749420f716a9e5a83cc6b956d8e | yes |
+| PC-0008 | R-0010 | - | 1c24657b784c519cd243a7e6925a33b460c760de | yes |
+...
+| PC-0007 | R-0014 | - | 48d103fc36fa3b15a32e5dd5da11b6d729b3c596 | yes |
 ...
 | PC-0017 | R-0017 | - | d5afcf9211373238d6eb7b8ad09188a342101a39 | no |
 | PC-0018 | R-0017 | PC-0017 | d5afcf9211373238d6eb7b8ad09188a342101a39 | yes |
@@ -115,7 +116,7 @@ it:
    one: the row with no `supersedes` first, then the closure that names it, and so on until the
    row marked `terminal: yes`.
 
-So in the excerpt above `R-0007` (`PC-0011`) precedes `R-0008` (`PC-0005`) although its closure
+So in the excerpt above `R-0010` (`PC-0008`) precedes `R-0014` (`PC-0007`) although its closure
 id is larger, and `PC-0017` precedes the `PC-0018` that supersedes it.
 
 ## Rejections
