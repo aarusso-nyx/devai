@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/observation-backlog.schema.json",
+  "title": "Observation Backlog",
+  "description": "The backlog.json that audit observe writes into a post-merge observation bundle (ADR-SCR-0008, Article 33): the observed merge sha, the timestamp, one observation per scorecard cell with its verdict and the ids of the readings it was composed from, and the deltas against the previous bundle. The object is closed at every level, so an unknown top-level key fails; an observation without its cell fails; and a delta names a cell by the same coordinate grammar as the N/A ledger. A delta that names a cell absent from the current observations is rejected by the validating suite, which cross-checks the two arrays, because the cross-reference is outside what JSON Schema expresses.",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "merge_sha",
+    "previous_merge_sha",
+    "generated_at",
+    "observations",
+    "deltas"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "merge_sha": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$",
+      "description": "The integration commit the observation measured."
+    },
+    "previous_merge_sha": {
+      "type": ["string", "null"],
+      "pattern": "^[a-f0-9]{40}$",
+      "description": "The integration commit of the previous completed bundle the deltas are computed against, or null for the first bundle."
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "The observation timestamp shared by the bundle's artifacts."
+    },
+    "observations": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 45,
+      "uniqueItems": true,
+      "description": "One observation per scorecard cell, in scorecard cell order. A cell is never omitted: a ledger or declaration N/A is an observation with verdict N/A.",
+      "items": {
+        "$ref": "#/$defs/observation"
+      }
+    },
+    "deltas": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["additions", "completions"],
+      "description": "The backlog movement since the previous bundle. An addition is a cell that now reads FAIL or REVIEW and did not before; a completion is a cell that read FAIL or REVIEW before and no longer does. Both arrays are empty for a first bundle.",
+      "properties": {
+        "additions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/delta"
+          }
+        },
+        "completions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/delta"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "cell": {
+      "type": "string",
+      "pattern": "^F[1-5]:T[1-9]$",
+      "description": "Cell coordinate in Fx:Ty form, the grammar law/policy/scorecard-na.json uses."
+    },
+    "verdict": {
+      "enum": ["PASS", "REVIEW", "FAIL", "N/A", "UNKNOWN"],
+      "description": "The cell verdict as scorecard.schema.json records it."
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cell", "verdict", "reading_ids"],
+      "properties": {
+        "cell": {
+          "$ref": "#/$defs/cell"
+        },
+        "verdict": {
+          "$ref": "#/$defs/verdict"
+        },
+        "reading_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "description": "The ids of the readings the cell verdict was composed from, as the scorecard cell lists them in sensor_readings; empty for a ledger N/A, which takes no reading.",
+          "items": {
+            "type": "string",
+            "pattern": "^SR-[a-f0-9]{16}$"
+          }
+        }
+      }
+    },
+    "delta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cell", "verdict"],
+      "properties": {
+        "cell": {
+          "$ref": "#/$defs/cell"
+        },
+        "verdict": {
+          "$ref": "#/$defs/verdict",
+          "description": "For an addition, the cell's current verdict; for a completion, the verdict the previous bundle recorded."
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "merge_sha": "86d8cceab1d0c2a4ea3891e151d23150ac22dab1",
+      "previous_merge_sha": null,
+      "generated_at": "2026-09-27T20:59:06.000Z",
+      "observations": [
+        {
+          "cell": "F1:T1",
+          "verdict": "N/A",
+          "reading_ids": []
+        },
+        {
+          "cell": "F3:T1",
+          "verdict": "FAIL",
+          "reading_ids": ["SR-89f7974460e256a3"]
+        }
+      ],
+      "deltas": {
+        "additions": [],
+        "completions": []
+      }
+    }
+  ]
+}
