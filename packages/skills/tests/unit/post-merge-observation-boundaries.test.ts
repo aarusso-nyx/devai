@@ -604,33 +604,64 @@ describe('post-merge audit publication', () => {
 });
 
 describe('post-merge backlog deltas', () => {
-  it('ignores entries of a stored predecessor backlog that are not items', async () => {
+  it('ignores a stored predecessor backlog whose observations are not cell observations', async () => {
+    // ADR-SCR-0008: the hook scores the bound checkout's store as it stands when it
+    // fires, so each round is observed by its own hook invocation.
     const fx = fixture({
-      merges: 2,
-      readings: [
-        [reading('type_check', 'fail'), reading('lint', 'fail')],
-        [reading('type_check', 'pass'), reading('lint', 'fail'), reading('security_scan', 'fail')],
-      ],
+      merges: 1,
+      readings: [[reading('type_check', 'fail'), reading('lint', 'fail')]],
     });
     await runAuditor(fx);
-    const [firstSha, secondSha] = fx.merges as readonly [string, string];
+    const firstSha = fx.mergeSha;
 
-    const stored = readJsonBundle(fx, 'backlog', firstSha);
-    const current = stored['current'] as { readonly items: readonly JsonRecord[] };
-    expect(current.items.map((item) => item['id'])).toEqual(['BL-F2-T5', 'BL-F2-T8']);
-    forgeArtifact(fx, firstSha, 'backlog', {
-      ...stored,
-      current: { ...current, items: [...current.items, 'BL-F2-T8'] },
+    git(fx.root, ['checkout', '-qb', 'feature-2']);
+    put(fx.root, 'feature-2.txt', 'feature 2\n');
+    writeReadingsRound(fx.root, [
+      reading('type_check', 'pass'),
+      reading('lint', 'fail'),
+      reading('security_scan', 'fail'),
+    ]);
+    git(fx.root, ['add', '-A', '--', 'feature-2.txt', READINGS_STORE]);
+    git(fx.root, ['commit', '-qm', 'feature 2']);
+    git(fx.root, ['checkout', '-q', 'main']);
+    git(fx.root, ['merge', '--no-ff', 'feature-2', '-qm', 'merge 2']);
+    const secondSha = git(fx.root, ['rev-parse', 'HEAD']);
+    const { signature_hmac_sha256: _signature, ...receipt } = JSON.parse(
+      readFileSync(fx.receiptPath, 'utf8'),
+    ) as JsonRecord;
+    writeFileSync(
+      fx.receiptPath,
+      `${JSON.stringify(signed({ ...receipt, merge_sha: secondSha, nonce: 'c'.repeat(32) }, fx.key))}\n`,
+    );
+    const next: HostFixture = { ...fx, mergeSha: secondSha, merges: [firstSha, secondSha] };
+    expect(await runAuditor(next)).toMatchObject({ status: 'completed', processed: [secondSha] });
+    const deltasOf = () =>
+      readJsonBundle(next, 'backlog', secondSha)['deltas'] as Record<
+        'additions' | 'completions',
+        readonly JsonRecord[]
+      >;
+
+    // Against a well-formed predecessor the round opens F2×T6 and closes F2×T8.
+    expect(deltasOf()).toEqual({
+      additions: [{ cell: 'F2:T6', verdict: 'FAIL' }],
+      completions: [{ cell: 'F2:T8', verdict: 'FAIL' }],
     });
-    git(fx.root, ['update-ref', '-d', auditRef(fx, secondSha)]);
 
-    expect(await runAuditor(fx)).toMatchObject({ status: 'completed', processed: [secondSha] });
-    const deltas = readJsonBundle(fx, 'backlog', secondSha)['deltas'] as Record<
-      'additions' | 'completions',
-      readonly JsonRecord[]
-    >;
-    expect(deltas.completions.map((item) => item['id'])).toEqual(['BL-F2-T8']);
-    expect(deltas.additions.map((item) => item['id'])).toEqual(['BL-F2-T6']);
+    // A predecessor carrying an entry that is not a cell observation is not a
+    // baseline: the recomputed round neither crashes nor derives deltas from it.
+    const stored = readJsonBundle(next, 'backlog', firstSha);
+    const observations = stored['observations'] as readonly JsonRecord[];
+    expect(
+      observations.filter((entry) => entry['verdict'] === 'FAIL').map((entry) => entry['cell']),
+    ).toEqual(['F2:T5', 'F2:T8']);
+    forgeArtifact(next, firstSha, 'backlog', {
+      ...stored,
+      observations: [...observations, 'F2:T8'],
+    });
+    git(fx.root, ['update-ref', '-d', auditRef(next, secondSha)]);
+
+    expect(await runAuditor(next)).toMatchObject({ status: 'completed', processed: [secondSha] });
+    expect(deltasOf()).toEqual({ additions: [], completions: [] });
   });
 });
 
