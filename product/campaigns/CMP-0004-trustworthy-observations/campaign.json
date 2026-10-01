@@ -225,7 +225,8 @@
                   "packages/sensors/tests/build-invocation.test.ts",
                   "packages/sensors/tests/site-drift-provenance.test.ts",
                   "tests/contract/sensor-inputs.contract.test.ts",
-                  "packages/sensors/tests/site-drift.test.ts"
+                  "packages/sensors/tests/site-drift.test.ts",
+                  "packages/cli/tests/unit/doctor-check-result-identities.test.ts"
                 ],
                 "forbidden": [
                   "law/",
@@ -255,7 +256,7 @@
               "commit_types": ["test(cli)", "test(sensors)"],
               "prompt": {
                 "path": "prompts/TASK-0412.md",
-                "sha256": "b28f2d9399fba77a87daf83106ee36f9332826da76cb9af68692907acad24c42"
+                "sha256": "f26d0787f255171b39c389a16a10eadf2e9f5fea519c32304b5bbfabf67b5144"
               },
               "pull_request": null,
               "merged_as": null,
