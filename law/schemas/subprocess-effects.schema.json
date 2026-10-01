@@ -116,6 +116,39 @@
             "enum": ["read", "harness-write", "local-write", "remote-write"],
             "description": "Derived public consent summary retained for a mechanical capabilities-to-effect consistency check."
           },
+          "argv_precedence": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "description": "Ordered sources of the concrete argv a sensor executes under this template, highest precedence first (ADR-AUT-0002). A template without this field takes its argv from its emitter alone. The field declares which source wins; it never widens the shape the broker admits, which stays argv_shape.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["source", "path", "rule"],
+              "properties": {
+                "source": {
+                  "enum": ["test-task-descriptor", "sensor-inputs-declaration"],
+                  "description": "The kind of source: the repository test task descriptor or the adopter sensor inputs declaration."
+                },
+                "path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "^(?!\\.\\.(?:/|$))(?!.*/\\.\\.(?:/|$))[A-Za-z0-9_.@-][A-Za-z0-9_.@/-]*$",
+                  "description": "Repository-relative path of the source file."
+                },
+                "rule": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "When this source supplies the argv and what disqualifies it."
+                }
+              }
+            }
+          },
+          "conflict_code": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]*$",
+            "description": "Finding code the sensor reads as error when two argv_precedence sources disagree; present only with argv_precedence."
+          },
           "reason": {
             "type": "string",
             "minLength": 1
