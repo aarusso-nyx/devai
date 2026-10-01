@@ -28,6 +28,16 @@ import { withAuthorityHostTestScope } from '../../../skills/tests/unit/authority
 // still gates the read on an active task round.
 
 const ROUND = 'R-0005';
+
+/** The canonical rounds index (ADR-EVI-0001) holding the fixture closure as the terminal row of its round. */
+const ROUNDS_INDEX = [
+  '# Rounds index',
+  '',
+  '| closure | round | supersedes | merged_as | terminal |',
+  '| --- | --- | --- | --- | --- |',
+  `| PC-0001 | ${ROUND} | - | ${'b'.repeat(40)} | yes |`,
+  '',
+].join('\n');
 const roots: string[] = [];
 
 afterEach(() => {
@@ -106,7 +116,7 @@ function declared(repo: string): void {
     merged_as: 'b'.repeat(40),
     release_disposition: 'none-needed',
   });
-  write(repo, 'record/derived/indexes/rounds.md', 'PC-0001\n');
+  write(repo, 'record/derived/indexes/rounds.md', ROUNDS_INDEX);
   write(repo, `work/rounds/${ROUND}/AUTHORIZATION.md`, 'status: active\nGRANTED\n');
 }
 

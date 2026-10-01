@@ -12,6 +12,16 @@ import {
   scaffoldGovernedRound,
 } from '../../src/round-lifecycle/index.js';
 
+/** The canonical rounds index (ADR-EVI-0001) holding the fixture closure as the terminal row of its round. */
+const ROUNDS_INDEX = [
+  '# Rounds index',
+  '',
+  '| closure | round | supersedes | merged_as | terminal |',
+  '| --- | --- | --- | --- | --- |',
+  `| PC-0001 | R-0005 | - | ${'b'.repeat(40)} | yes |`,
+  '',
+].join('\n');
+
 const roots: string[] = [];
 afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
@@ -84,7 +94,7 @@ function fixture() {
     'law/register/DECISIONS.md',
     '### DII-1 — Declare fixture\n\n### DII-2 — Close fixture\n',
   );
-  write(root, 'record/derived/indexes/rounds.md', 'PC-0001\n');
+  write(root, 'record/derived/indexes/rounds.md', ROUNDS_INDEX);
   return root;
 }
 
