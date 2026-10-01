@@ -976,7 +976,7 @@
       "id": "R-0403",
       "title": "Evidence closure, proof anchoring, and intent export",
       "goal": "The rounds index is rendered from phase closures and sealed by exact membership; chain verification cross-checks every proof line with bounded historical declarations; the exporter reconstructs the expected task policy from a pinned release intent.",
-      "status": "planned",
+      "status": "open",
       "records": ["ADR-EVI-0001", "ADR-EVI-0002", "ADR-REL-0031"],
       "depends_on": ["R-0401"],
       "attestation_reissue": false,
@@ -1012,7 +1012,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -1039,14 +1039,53 @@
               "commit_types": ["docs(reference)", "docs(theory)", "plan(record)"],
               "prompt": {
                 "path": "prompts/TASK-0431.md",
-                "sha256": null
+                "sha256": "1910727a24f312f44d2420d7f5dec98e2bd34c4b002e6b400aba058eba9afd6f"
               },
               "pull_request": null,
               "merged_as": null,
               "execution": {
                 "tier": "architect",
                 "effort": "high",
-                "time_budget_minutes": 60
+                "time_budget_minutes": 60,
+                "resolved": {
+                  "policy_version": "1.0.0",
+                  "pinned_at": "2026-10-01T06:29:19Z",
+                  "tiers": {
+                    "architect": {
+                      "rank": 1,
+                      "hosts": {
+                        "claude": "claude-cli:fable",
+                        "codex": "codex-cli:gpt-6-astra"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker-high": {
+                      "rank": 2,
+                      "hosts": {
+                        "claude": "claude-cli:opus",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker": {
+                      "rank": 3,
+                      "hosts": {
+                        "claude": "claude-cli:sonnet",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "medium"
+                    },
+                    "clerk": {
+                      "rank": 4,
+                      "hosts": {
+                        "claude": "claude-cli:haiku",
+                        "codex": "codex-cli:gpt-6-luna"
+                      },
+                      "default_effort": "low"
+                    }
+                  },
+                  "ceiling": "architect"
+                }
               }
             },
             {
@@ -1349,7 +1388,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -1384,14 +1423,53 @@
               "commit_types": ["docs(operations)", "law(release)"],
               "prompt": {
                 "path": "prompts/TASK-0437.md",
-                "sha256": null
+                "sha256": "82676ca1717986ed1b674d79f5bf65129efa17c0f0835f3dae1495efd9511f20"
               },
               "pull_request": null,
               "merged_as": null,
               "execution": {
                 "tier": "architect",
                 "effort": "high",
-                "time_budget_minutes": 60
+                "time_budget_minutes": 60,
+                "resolved": {
+                  "policy_version": "1.0.0",
+                  "pinned_at": "2026-10-01T06:29:20Z",
+                  "tiers": {
+                    "architect": {
+                      "rank": 1,
+                      "hosts": {
+                        "claude": "claude-cli:fable",
+                        "codex": "codex-cli:gpt-6-astra"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker-high": {
+                      "rank": 2,
+                      "hosts": {
+                        "claude": "claude-cli:opus",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker": {
+                      "rank": 3,
+                      "hosts": {
+                        "claude": "claude-cli:sonnet",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "medium"
+                    },
+                    "clerk": {
+                      "rank": 4,
+                      "hosts": {
+                        "claude": "claude-cli:haiku",
+                        "codex": "codex-cli:gpt-6-luna"
+                      },
+                      "default_effort": "low"
+                    }
+                  },
+                  "ceiling": "architect"
+                }
               }
             },
             {
