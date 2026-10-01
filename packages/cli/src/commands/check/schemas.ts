@@ -50,6 +50,8 @@ const SOURCE_ONLY_SCHEMAS = [
   'data-handling.schema.json',
   'documentation-information-architecture.schema.json',
   'inv-override.schema.json',
+  // ADR-SCR-0008: catalogued here until TASK-0423 moves it into the runtime roster.
+  'observation-backlog.schema.json',
   'preflight-probe.schema.json',
   'prompt-composition.schema.json',
   'stack-adapter.schema.json',
