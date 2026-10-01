@@ -185,23 +185,19 @@ describe('senseSiteDrift journal-based provenance (ADR-SCR-0005 IA-005)', () => 
     expect(reading.metrics).toEqual({ repository_head: head, published_tip: tip });
   });
 
-  it('falls back to the malformed-tip finding when the journal has no matching intent', () => {
-    const head = commit('base');
-    const tip = publishTip('not a provenance message');
+  it('reads REVIEW journal-not-verified beside a malformed tip when the journal is empty (ADR-AUT-0002 IA-004)', () => {
+    commit('base');
+    publishTip('not a provenance message');
 
     const reading = withScope(() => senseSiteDrift({ repoRoot: root, now: NOW }), {
       gh: { [DEPLOYMENTS_PATH]: { status: 0, stdout: '[]' } },
     });
 
-    expect(reading.status).toBe('unknown');
-    expect(reading.findings).toEqual([
-      {
-        severity: 'warning',
-        code: 'SITE_DRIFT_PROVENANCE_MALFORMED',
-        message: 'The gh-pages tip message must be exactly "docs: publish from <40-hex-sha>".',
-      },
-    ]);
-    expect(reading.metrics).toEqual({ repository_head: head, published_tip: tip });
+    expect(reading.status).toBe('review');
+    expect(JSON.stringify(reading.findings)).toContain('journal-not-verified');
+    expect(JSON.stringify(reading.findings)).not.toContain(
+      'SITE_DRIFT_PROVENANCE_ADAPTER_REQUIRED',
+    );
   });
 
   it('falls back to the unavailable finding when the gh CLI call itself fails', () => {
@@ -223,7 +219,7 @@ describe('senseSiteDrift journal-based provenance (ADR-SCR-0005 IA-005)', () => 
     expect(reading.metrics).toEqual({ repository_head: head });
   });
 
-  it('treats a submitted-but-unverified intent as absent provenance', () => {
+  it('reads REVIEW journal-not-verified for a submitted-but-unverified intent (ADR-AUT-0002 IA-004)', () => {
     const head = commit('base');
 
     const reading = withScope(() => senseSiteDrift({ repoRoot: root, now: NOW }), {
@@ -233,9 +229,11 @@ describe('senseSiteDrift journal-based provenance (ADR-SCR-0005 IA-005)', () => 
       },
     });
 
-    expect(reading.status).toBe('unknown');
-    expect(reading.findings?.[0]?.code).toBe('SITE_DRIFT_PROVENANCE_UNAVAILABLE');
-    expect(reading.metrics).toEqual({ repository_head: head });
+    expect(reading.status).toBe('review');
+    expect(JSON.stringify(reading.findings)).toContain('journal-not-verified');
+    expect(JSON.stringify(reading.findings)).not.toContain(
+      'SITE_DRIFT_PROVENANCE_ADAPTER_REQUIRED',
+    );
   });
 
   it('rejects a journal record whose payload commit does not match the deployment sha', () => {
