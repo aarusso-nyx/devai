@@ -4,8 +4,10 @@ Sensor inputs are adopter declarations. Each sensor carries a default for a conv
 service layout; a repository with another layout declares where its inputs live once, in
 `.devai/config/sensor-inputs.json`, under `law/schemas/sensor-inputs.schema.json`. The file is
 materialized by `init bind` from the adopter default under
-`law/policy/adopter-defaults/sensor-inputs.json`, which declares no input, so every adopter
-starts on the sensor defaults and declares only what differs (ADR-SCR-0005). The same file
+`law/policy/adopter-defaults/sensor-inputs.json`, which declares only the
+[CI population](#the-harness-sensor-population) of the three harness sensors, so every adopter
+starts on the sensor defaults and declares only what differs (ADR-SCR-0005,
+[ADR-SCR-0010](../../law/adr/ADR-SCR-0010-ci-sampling-contract.md)). The same file
 declares which plant [surfaces](#surfaces) the repository has (ADR-SCR-0003).
 
 A declaration changes what a sensor reads, never what it concludes. Thresholds, verdict rules,
@@ -79,9 +81,61 @@ not hold.
 | `build`                                                                                                | `cwd`                          | the repository root                                                                                                                  | The repository-relative directory the build command runs from, under the same path grammar as the other inputs.                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `harness_idiomaticity`                                                                                 | `minWorkflowsForReusableCheck` | `1` (always graded)                                                                                                                  | The workflow count at or above which the harness idiomaticity sensor grades the reusable-workflow signal for F5:T5. Below the declared threshold the signal is dropped from both the score and its denominator, not counted as missing, so a repository whose CI is too small to benefit from factoring out a reusable workflow is not graded against a shape it has not grown into.                                                                                                                                                                                                |
 | `plant_depth`                                                                                          | `excludeGlobs`                 | none (every `packages/*/src` file)                                                                                                   | Repository-relative file globs left out of the plant whose file sizes F2:T2 grades; `*` matches within one path segment and a `**` segment matches any number of segments. Declare a glob only for files that are derived rather than authored, such as a view generated from a law policy (an F4 artifact); the pass and review thresholds stay the same.                                                                                                                                                                                                                          |
+| `harness_green_main`, `harness_performance`, `harness_robustness`                                      | `workflow`                     | none (required)                                                                                                                      | The workflow file under `.github/workflows` whose runs the sensor samples for F5:T9, F5:T7, or F5:T8, passed to `gh run list` as `--workflow <file>`. See [The harness sensor population](#the-harness-sensor-population).                                                                                                                                                                                                                                                                                                                                                          |
+| `harness_green_main`, `harness_performance`, `harness_robustness`                                      | `event`                        | none (required)                                                                                                                      | The event whose runs are sampled, one of `push`, `pull_request`, `merge_group`, `workflow_dispatch`, or `schedule`, passed as `--event <event>`. The workflow must carry the event under its `on:` block; the declared-inputs contract test rejects one that does not.                                                                                                                                                                                                                                                                                                              |
+| `harness_green_main`, `harness_performance`, `harness_robustness`                                      | `headBranch`                   | `*` (any head branch)                                                                                                                | A literal branch reference, passed as the single `--branch <ref>` option, or `*` to keep every head branch and pass no `--branch` option. A gate that runs on pull requests declares `*`, since a pull request's head branch is never the base branch.                                                                                                                                                                                                                                                                                                                              |
+| `harness_green_main`, `harness_performance`, `harness_robustness`                                      | `baseBranch`                   | `main`                                                                                                                               | The branch the sampled runs target, applied by the sensor after the `gh run list` call.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `harness_green_main`, `harness_performance`, `harness_robustness`                                      | `attempts`                     | `last`                                                                                                                               | Whether only the last attempt of each run counts (`last`, so a rerun replaces the attempt it retried) or every attempt counts (`all`).                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `harness_green_main`, `harness_performance`, `harness_robustness`                                      | `includeCancelled`             | `false`                                                                                                                              | Whether cancelled runs count. `false` leaves them out of the sample and the denominator; `true` counts a cancelled run as one that did not succeed.                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `harness_green_main`, `harness_performance`, `harness_robustness`                                      | `lookbackDays`                 | `30`                                                                                                                                 | How many days back a run may have been created and still be sampled. The `since` input of `harness_green_main` is kept and applied after this filter.                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `harness_green_main`, `harness_performance`, `harness_robustness`                                      | `minimumSample`                | none (required)                                                                                                                      | How many runs the population must hold before the sensor states a verdict: sampled runs for `harness_green_main` and `harness_robustness`, successful runs for `harness_performance`. Below it the reading is `UNKNOWN` with `sample_size` and `minimum_sample` in the finding, never FAIL and never PASS; at or above it the verdict is the measured one under the unchanged thresholds.                                                                                                                                                                                           |
+| `harness_green_main`, `harness_performance`, `harness_robustness`                                      | `excludedJobs`                 | none                                                                                                                                 | Workflow-and-job pairs (`{ "workflow", "job" }`, the job key under `jobs:`) left out of the sample by identity, never by duration: jobs that wait on a protected environment, whose wall-clock time would otherwise enter the performance median. A slow run of the sampled workflow stays in and can drive FAIL.                                                                                                                                                                                                                                                                   |
 
 A kind that appears under `inputs` must declare at least one key. Kinds not listed above take
 no declared input, and naming one is refused as an undeclared key.
+
+## The harness sensor population
+
+`harness_green_main`, `harness_performance`, and `harness_robustness` read GitHub Actions run
+history through `gh run list`, and a sample is only as meaningful as the population it was
+drawn from. Before [ADR-SCR-0010](../../law/adr/ADR-SCR-0010-ci-sampling-contract.md) the
+three sensors sampled the last runs on head branch `main`; a gate that runs on pull requests
+has a head branch that is never `main`, so the sample did not contain the workflow it meant to
+measure (#154). Each sensor therefore declares its population: `workflow` and `event` are
+required and name the runs; `headBranch`, `baseBranch`, `attempts`, `includeCancelled`, and
+`lookbackDays` narrow them; `minimumSample` is required and says how many runs make a verdict;
+`excludedJobs` leaves out workflow-and-job pairs by identity. The declaration is part of the
+reading's `metrics`, so a scorecard reader sees what was sampled. Below the minimum each sensor
+reads `UNKNOWN` with the sample size, the minimum, and the population in the finding, never
+FAIL and never PASS; at or above it the verdict is the measured one, including FAIL when the
+gate is red or slow. No threshold changes.
+
+The declaration drives the argv: a literal `headBranch` is passed as the single `--branch`
+option and `*` passes none, so the broker admits four exact `gh run list` shapes
+(`gh-run-list`, `gh-run-list-created`, `gh-run-list-branch`, `gh-run-list-branch-created` in
+[`law/policy/subprocess-effects.json`](../../law/policy/subprocess-effects.json)), each with
+`--workflow <file>` and `--event <event>` under the grammar the schema fixes; a value outside
+it, a second `--branch`, or any other option is refused before a process starts.
+
+The adopter default declares a conventional gate, `ci.yml` on `pull_request` against `main`,
+any head branch, last attempt only, cancelled runs excluded, thirty days, twenty runs for
+`harness_green_main` and `harness_robustness` and ten successful runs for
+`harness_performance`, and no excluded job. An adopter whose gate runs on pushes to `main`
+declares `push` with `headBranch` `main` and loses nothing:
+
+```json
+{
+  "schemaVersion": "1.0.0",
+  "inputs": {
+    "harness_green_main": {
+      "workflow": "ci.yml",
+      "event": "push",
+      "headBranch": "main",
+      "minimumSample": 20
+    }
+  }
+}
+```
 
 ## The coverage population
 
@@ -157,7 +211,9 @@ stays visible on the scorecard.
 Harness sensors reach GitHub only through the GitHub CLI shapes
 [`law/policy/subprocess-effects.json`](../../law/policy/subprocess-effects.json) declares and
 the authority broker admits without a host adapter. Beyond `gh auth`, `gh auth status`, and
-the `gh run list` shapes of `harness_green_main`, the `site_drift` sensor reads the Pages
+the four `gh run list` shapes of the [harness sensor population](#the-harness-sensor-population)
+(`gh run list --workflow <file> --event <event> [--branch <ref>] --json <fields> --limit <n>
+[--created >=<date>]`, one template per combination of the optional pairs), the `site_drift` sensor reads the Pages
 publication journal through two exact read-only `gh api` GET shapes
 ([ADR-AUT-0002](../../law/adr/ADR-AUT-0002-sensing-process-admission.md)):
 
@@ -209,12 +265,26 @@ sensor that found it. Declare a surface absent because the repository has none o
 move a cell.
 
 The adopter default declares the conventional service shape, `http`, `database`, and `rbac`
-present and `actions` absent:
+present and `actions` absent, beside the harness population above (shown here for one of the
+three kinds; `harness_performance` and `harness_robustness` repeat it with their own
+`minimumSample`):
 
 ```json
 {
   "schemaVersion": "1.0.0",
-  "inputs": {},
+  "inputs": {
+    "harness_green_main": {
+      "workflow": "ci.yml",
+      "event": "pull_request",
+      "headBranch": "*",
+      "baseBranch": "main",
+      "attempts": "last",
+      "includeCancelled": false,
+      "lookbackDays": 30,
+      "minimumSample": 20,
+      "excludedJobs": []
+    }
+  },
   "surfaces": { "http": true, "database": true, "rbac": true, "actions": false }
 }
 ```
@@ -255,7 +325,13 @@ out the inventory smoke file; `LOCAL_INCLUDE` selects nothing under `tests/e2e`,
 earlier declaration over `local.config.ts` measured an empty population),
 `pnpm vitest run --config tests/config/rc.performance.config.ts tests/regression` (the
 performance configuration over the regression suite) as `perf_test`'s `argv`, `5` for `harness_idiomaticity`'s `minWorkflowsForReusableCheck`,
-and `packages/cli/src/generated/**` for `plant_depth`'s `excludeGlobs`. It declares no
+`packages/cli/src/generated/**` for `plant_depth`'s `excludeGlobs`, and for the three harness
+sensors the population of the gate: `pull-request-checks.yml` on `pull_request`, any head
+branch (`*`), base `main`, last attempt only, cancelled runs excluded, thirty days, a minimum
+of twenty runs for `harness_green_main` and `harness_robustness` and ten successful runs for
+`harness_performance`, and the four environment-gated jobs of `release.yml` (`verify-ledger`,
+`build-release`, `finalize-release`, `deploy-pages`) excluded by identity, so a release
+rehearsal's approval waits never enter the performance median. It declares no
 `build` input: DEVAI's `test-tasks.json` carries a `build` node (`pnpm -r build` from the
 repository root), and under the [precedence above](#build-command-precedence) that node is the
 build sensor's command and a declaration beside it is not admitted.
