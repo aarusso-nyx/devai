@@ -12,15 +12,15 @@ import { verifyPreparedBundle } from '../../vendor/evidence-verification/src/pub
 const VERIFIER_ROOT = resolve(import.meta.dirname, '../../vendor/evidence-verification');
 const VERIFIER_TEST_ROOT = join(VERIFIER_ROOT, 'test');
 const EXPECTED_PROVENANCE = {
-  sourceCommit: '8174749ebcfabab246031281a036032f636b8a39',
-  manifestDigest: '1035c8aad52f4b2beb6a6f010106a4d1866c92dadf3fbae1c6e36e1a4d2ceddf',
-  filePopulationDigest: '670be4bbdc7cd2fae146019566f1ab341fea1f87ece90d9bd1b6b24e6bea0224',
+  sourceCommit: '8b215d706a828af7361f9c6799b9cb0a30c9d00b',
+  manifestDigest: '302161f378e54d0a2b14b743a68577f4bfc43a147a1f17568941e08e14e767a0',
+  filePopulationDigest: 'bc12045a9d6fb74298e665350c18c1a080b99f76fcfe8d4c972bf090e2ee8729',
   runtimeFileCount: 26,
 } as const;
 const UPSTREAM_TEST_DIGESTS = new Map([
   ['artifact-safety.test.js', 'fd69eb952a381d6e18fcc9de581505ddff7d9f82f9d86c5a8a5e0d9fbaad9a09'],
   ['detached-trust.test.js', '0233d302a5f796c539bf300a88325569e3c6a3638e906cb00dca67e061c8b4ba'],
-  ['export.test.js', '1e9519152f254a35e24387398ce1eadf0714233e508d7d4d45d3503c18f3fd95'],
+  ['export.test.js', '82ef4d8233521c66fcff1c40917dc13891d65d8ec432a79a4dc5ca0c86464803'],
   [
     'mutation-v21-contract.test.js',
     '20569712e944c8b5366b3b52d279addde8862292d1ae9ee8f2875af3e2cdc3a1',
@@ -30,7 +30,7 @@ const UPSTREAM_TEST_DIGESTS = new Map([
     '9496d28bfffa1731fc4fc92a02255b64e13174d3cba999e6e5e47c7a95078065',
   ],
   ['mutation.test.js', '9a5815d17a17f7e606aaca0f088b23d7bb900e5b171d875cf9903670142dd661'],
-  ['policy-builder.test.js', '950dddd8cc2e06da2eea75be124a3ced431617e3838a32b312205a9bc823485a'],
+  ['policy-builder.test.js', '81698c39bfc7a272e9c8f13d98e78e0f84c8dfd7c3c28162cc9c2f948ae498c3'],
   ['publish.test.js', '74a4472721b84efef62ea3ce5e28eca6f5d706323bb4d488c42d96ade6cdf70c'],
   ['verifier.test.js', '0bffed225e86fdf59900b8c86eafa685af06b2fd17ceff56eac2133792613ed1'],
 ]);
@@ -66,7 +66,7 @@ describe('package-owned evidence verifier native suite', () => {
     }
   });
 
-  it('executes all 131 vendored node:test cases against the packaged implementation', () => {
+  it('executes all 148 vendored node:test cases against the packaged implementation', () => {
     const files = readdirSync(VERIFIER_TEST_ROOT)
       .filter((name) => name.endsWith('.test.js'))
       .sort()
@@ -82,8 +82,8 @@ describe('package-owned evidence verifier native suite', () => {
     expect(result.error, output).toBeUndefined();
     expect(result.status, output).toBe(0);
     expect(result.signal, output).toBeNull();
-    expect(output).toMatch(/# tests 131(?:\r?\n|$)/u);
-    expect(output).toMatch(/# pass 131(?:\r?\n|$)/u);
+    expect(output).toMatch(/# tests 148(?:\r?\n|$)/u);
+    expect(output).toMatch(/# pass 148(?:\r?\n|$)/u);
     expect(output).toMatch(/# fail 0(?:\r?\n|$)/u);
   }, 130_000);
 
