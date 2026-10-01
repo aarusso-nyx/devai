@@ -1,0 +1,104 @@
+{
+  "round_id": "R-0013",
+  "title": "WP-T4, WP-T5 and WP-T6 TEAT frontends: governed contracts and provisioning, Android/mobile and web UI/workflow homologation, with productive operation deferred",
+  "declaring_decision": "D-1",
+  "closing_decision": "D-2",
+  "batches": [
+    {
+      "id": "CTG-0001",
+      "roles": [
+        "Architect"
+      ],
+      "commit": "2c82b2698d153005aaf0ea5d4d49667411ed7ace",
+      "headline": "Reconciled TEAT corpus and source contracts, integrated in PR #70."
+    },
+    {
+      "id": "CTG-0002",
+      "roles": [
+        "Architect",
+        "Inspector",
+        "Engineer"
+      ],
+      "commit": "3da2b61ee8e418e634a7364417175a1e86a8c9e0",
+      "headline": "Frontend parity contracts and governed preflight, integrated in PR #73."
+    },
+    {
+      "id": "CTG-0003",
+      "roles": [
+        "Architect",
+        "Inspector",
+        "Engineer",
+        "Auditor"
+      ],
+      "commit": "b892045749085effb6bcfbe8be0c17fe0a0c3a39",
+      "headline": "Offline operational provisioning and authoritative backend boundaries, integrated in PR #82."
+    },
+    {
+      "id": "CTG-0004a-0004b-0005",
+      "roles": [
+        "Owner",
+        "Architect",
+        "Inspector",
+        "Engineer",
+        "Auditor"
+      ],
+      "commit": "646c6c2897f1dff275ebe513dfa15f62d5a2befb",
+      "headline": "ADR-0033 mobile/web UI and workflow homologation, six AIT REDs resolved, full manifest and synthetic workflow proofs, production negatives, documentation and issues #108–#112; integrated in PR #113."
+    }
+  ],
+  "gates": {
+    "delivery-review": {
+      "status": "pass",
+      "detail": "Independent Owner-authorized same-family Codex reviewer PASS on exact Git tree bba592ecf0750f4da0525c990668dc16b5cb0d18; no blockers. Earlier group reviews and corrective cycles remain in the round records."
+    },
+    "github-ci": {
+      "status": "pass",
+      "detail": "PR #113 seven checks passed on the integrated candidate: backend-kernel, foundation, boat-documents-real, evidence-gate, senatran-mock, senatran-mock-tests and verified-local-rc. Earlier PRs #70, #73 and #82 were merged under their gates."
+    },
+    "pnpm-check": {
+      "status": "pass",
+      "detail": "Full local pnpm check exited 0 on the reviewed candidate, including formatting, orchestration, knowledge base, blueprints, contracts, generated consistency, typechecks, lint, frontend tests and builds."
+    },
+    "app-suite": {
+      "status": "pass",
+      "detail": "Mobile 1157/1157 and web 594/594; independent focused DOM/a11y review mobile 32/32 and web 29/29, including six former AIT REDs, 576 indexed transitions and 197 denied conditionals."
+    },
+    "evidence-chain": {
+      "status": "pass",
+      "detail": "DEVAI generic evidence through sequence 15, chain valid; audit observation EV-33ead2fd8120f724 records exact PR #113 merge 646c6c2897f1dff275ebe513dfa15f62d5a2befb."
+    }
+  },
+  "validation_criteria": [
+    {
+      "criterion": "The six AIT REDs are resolved through explicit homologation-only positive paths while productive missing-authority negatives remain fail-closed.",
+      "verdict": "pass",
+      "evidence": "PR #113; ADR-0033; mobile suite 1157/1157; independent review PASS on exact tree."
+    },
+    {
+      "criterion": "Mobile and web homologation demonstrate the governed routes, guards, forms, AIT, sync, roles, synthetic events, error states and accessibility without real IdP, official AIT, network side effects or field rights.",
+      "verdict": "pass",
+      "evidence": "PR #113; mobile 1157/1157, web 594/594; reviewer mobile 32/32 and web 29/29; full pnpm check and CI green."
+    },
+    {
+      "criterion": "The Owner-approved equipment decision does not imply homologation of the productive app or field operation; productive E2 trust, validator, lifecycle, device integration and release are separately tracked.",
+      "verdict": "pass",
+      "evidence": "ADR-0033; build pack and round plan; open GitHub issues #108–#112."
+    },
+    {
+      "criterion": "All delivered commits are PR-integrated, the final merge is audited by exact SHA, and the DEVAI evidence chain verifies.",
+      "verdict": "pass",
+      "evidence": "PRs #70, #73, #82 and #113; merge 646c6c2897f1dff275ebe513dfa15f62d5a2befb; EV-33ead2fd8120f724; evidence verify head 510f34f0c5961e30b2d4c0a5402fcab76b9baea1c628dd1ee2f9b3d01571009d."
+    }
+  ],
+  "closed_at": "2026-09-24T02:15:23Z",
+  "merged_as": "646c6c2897f1dff275ebe513dfa15f62d5a2befb",
+  "release_disposition": "none-needed",
+  "source_repo_deleted": false,
+  "evidence": {
+    "proof_epoch": "R-0013",
+    "terminal_sha256": "510f34f0c5961e30b2d4c0a5402fcab76b9baea1c628dd1ee2f9b3d01571009d"
+  },
+  "notes": "D-1 is the Owner-authorized R-0013 orchestration. D-2 closes only the delivered UI/workflow homologation scope under the Owner decision of 2026-09-23, not productive TEAT mobile/field operation. The Gertec GMS820 equipment approval remains unconditional, but productive app integration needs a separate round (R-0017 is only a candidate ID). Production issues #108–#112 stay open. No package release or deployment is authorized or implied.",
+  "schemaVersion": "1.0.0",
+  "id": "PC-0013"
+}

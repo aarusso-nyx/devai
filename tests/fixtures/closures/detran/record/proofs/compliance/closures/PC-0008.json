@@ -1,0 +1,85 @@
+{
+  "round_id": "R-0010",
+  "title": "WP-B0…WP-B3 of the BOAT build pack: policy and EST crash model, handwritten commands and offline synchronization, provisional RENAEST mapping and monthly tenant-scoped transmission job, consumer-owned projections, command contracts, and the Owner-approved Default D1 preliminary PDF/A-2b report",
+  "declaring_decision": "D-1",
+  "closing_decision": "D-2",
+  "batches": [
+    {
+      "id": "CTG-0001",
+      "roles": [
+        "Owner",
+        "Architect",
+        "Inspector",
+        "Engineer"
+      ],
+      "commit": "289916b39c37f4f1e3b93c1038e388248071c9f4",
+      "headline": "Delivered WP-B0/WP-B1: reconciled est:* policy, UC-BOAT-013, BP-EST-CRASH-001, DDL 19/70, generated EST crash package, fixtures, lifecycle vocabulary, purpose-audited victim reads, RLS and validation (PR #55)."
+    },
+    {
+      "id": "CTG-0002",
+      "roles": [
+        "Owner",
+        "Architect",
+        "Inspector",
+        "Engineer"
+      ],
+      "commit": "8f02e914bfdf4f5bd669506465265b35837106f4",
+      "headline": "Delivered WP-B2/WP-B3: handwritten crash commands and sync applier, provisional RENAEST mapping and mock integration, three consumer-owned projections, tenant-scoped monthly job, command contracts and clients, and the Default D1 preliminary PDF/A-2b report with STYNX storage/signature substrate and real veraPDF validation (PR #71)."
+    }
+  ],
+  "gates": {
+    "delivery-review": {
+      "status": "pass",
+      "detail": "CTG-0001 reached PASS on restricted cycle 4. CTG-0002 document completion reached PASS on restricted cycle 3 after the Owner authorized remediation of six high and one low findings and temporarily authorized a Codex GPT-5.6 Sol reviewer while Claude was unavailable."
+    },
+    "github-ci": {
+      "status": "pass",
+      "detail": "PR #55 run 35150065364 passed all five required jobs. PR #71 run 35526082301 passed backend-kernel, boat-documents-real, evidence-gate, foundation, senatran-mock and senatran-mock-tests."
+    },
+    "repository-check": {
+      "status": "pass",
+      "detail": "The post-R-0013 integrated candidate passed pnpm install --frozen-lockfile and pnpm check, including format, generated blueprint/contract/parameter consistency, type integrity, RLS, lifecycle, SENATRAN boundaries, Portal 1314 pass plus 14 todo, and builds."
+    },
+    "backend-and-database": {
+      "status": "pass",
+      "detail": "Shared 404/404, app unit 120/120, EST unit 1/1, full PostGIS apply, seed twice, app integration 19/19, app E2E 382 pass plus 2 pre-existing todo, remaining E2E packages green, and RAIT destructive upgrade rehearsal 18/18."
+    },
+    "documents-real": {
+      "status": "pass",
+      "detail": "The isolated real tier passed 2/2 with Python 3.13.7, WeasyPrint 70.0 installed from a complete hashed lock, and the immutable veraPDF image. Production facade, SQL repository, STYNX storage, restart persistence and full validation evidence were exercised."
+    }
+  },
+  "source_repo_deleted": false,
+  "validation_criteria": [
+    {
+      "criterion": "WP-B0/WP-B1 establish the BOAT policy, product duty surface, canonical EST crash aggregate, generated contracts, DDL, RLS, fixtures and purpose-audited sensitive-health reads.",
+      "verdict": "pass",
+      "evidence": "PR #55; evidence-CTG-0001.json; delivery-review-CTG-0001-cycle-4 PASS; CI run 35150065364; audit observation of merge 4f034553 recorded in the chain."
+    },
+    {
+      "criterion": "WP-B2/WP-B3 provide tested commands, offline sync, provisional RENAEST integration, consumer-owned projections, tenant-scoped monthly scheduling, SSE and synchronized command contracts without claiming real RENAEST homologation.",
+      "verdict": "pass",
+      "evidence": "PR #71; evidence-CTG-0002.json; contracts and reports TASK-0005…TASK-0022; CI run 35526082301; audit observation EV-76217ff26560e410 at 1c24657b784c519cd243a7e6925a33b460c760de."
+    },
+    {
+      "criterion": "Default D1 satisfies C-2-13 with a preliminary PDF/A-2b report through the production composition, while official BAT authority and normative national fields remain source_pending.",
+      "verdict": "pass",
+      "evidence": "Owner decisions recorded in AUTHORIZATION.md and plan.md; CTG-0002-documents contract; real document tier 2/2; delivery-review-CTG-0002-documents-cycle-3 PASS."
+    },
+    {
+      "criterion": "Every integrated candidate passes protected CI and evidence-chain verification, and the final implementation merge is observed at its exact SHA.",
+      "verdict": "pass",
+      "evidence": "PR #55 and #71 green; generic evidence records for both CTGs; EV-76217ff26560e410 at exact merge SHA 1c24657b784c519cd243a7e6925a33b460c760de."
+    }
+  ],
+  "closed_at": "2026-09-20T17:58:17.883Z",
+  "merged_as": "1c24657b784c519cd243a7e6925a33b460c760de",
+  "release_disposition": "none-needed",
+  "evidence": {
+    "proof_epoch": "R-0010",
+    "terminal_sha256": "09daaf1afa3428335db2abbea6a457d11ea3dc06ce7868035de327ee3ef09172"
+  },
+  "notes": "D-1 binds the Owner-authorized R-0010 maestro execution for BOAT WP-B0…WP-B3. D-2 records the Architect closing judgment after both coupled groups reached delivery PASS, protected CI was green, and exact-SHA audit observation completed. Projection option 1, the monthly job boundaries, and Default D1 were Owner-approved. Official BAT status, its normative fields and production RENAEST homologation remain source_pending under DT-061/OD-B08; the preliminary report makes no official BAT claim.",
+  "schemaVersion": "1.0.0",
+  "id": "PC-0008"
+}

@@ -1,0 +1,78 @@
+{
+  "round_id": "R-0006",
+  "title": "WP-A remainder of the RAIT build pack: infraction aggregate, notification, deadline engine, RAIT model deltas, organisation, collection, integration and documents facade",
+  "declaring_decision": "D-1",
+  "closing_decision": "D-2",
+  "batches": [
+    {
+      "id": "CTG-0001",
+      "roles": [
+        "Architect",
+        "Inspector",
+        "Engineer"
+      ],
+      "commit": "1fefb32f2ca4cadaca8c6d3ff9885885b5eb245c",
+      "headline": "Delivered BP-INF-INFRACTION-001, BP-INF-NOTIFICATION-001, @detran/inf-deadlines with event port and T-DIL extension, transition guards, event schemas, fixtures and tests; seed and CI fixture wiring (PR #39)."
+    },
+    {
+      "id": "CTG-0002",
+      "roles": [
+        "Architect",
+        "Inspector",
+        "Engineer"
+      ],
+      "commit": "515a5e3da63e040ae9287719d9a735213a31e249",
+      "headline": "Delivered the RAIT blueprint deltas v1.1.0, BP-INF-RAIT-ORG-001, BP-INF-COLLECTION-001, BP-INF-RAIT-INTEGRATION-001, documents facade types, mock bank port, fixtures, database contract tests, policy negatives and documentation (PR #43)."
+    }
+  ],
+  "gates": {
+    "cross-family-delivery-review": {
+      "status": "pass",
+      "detail": "CTG-0001: cycle 4 PASS (GPT-5.6 Terra). CTG-0002: cycle 5 PASS (cycles 1–2 FAIL, 3–4 REVIEW corrected under M17/OD-309)."
+    },
+    "github-ci": {
+      "status": "pass",
+      "detail": "PR #39 all five jobs green; PR #43: run for 3f55589 all five jobs green."
+    },
+    "repository-check": {
+      "status": "pass",
+      "detail": "pnpm check green on both merged trees (format, kb, blueprints, contracts, parameters, typecheck, ui, decorators, rls-ddl 178, role-catalog, lifecycle-vocabulary 15/12/18, senatran boundary/contracts, pec parity/superset)."
+    },
+    "backend-tests": {
+      "status": "pass",
+      "detail": "backend:test:ci green with role_app_backend; 23 deadline cases, 88 infraction unit, 114 RAIT integration, 73 shared, e2e 12/12."
+    },
+    "database": {
+      "status": "pass",
+      "detail": "apply.sh --full + seed.sh idempotent (seeds 00…60, 87 parameters, 178 tenant tables, rls-smoke 125 tables)."
+    }
+  },
+  "source_repo_deleted": false,
+  "validation_criteria": [
+    {
+      "criterion": "WP-A remainder implemented per ADR-0016/0017/0018/0020/0021 without routes, jobs or projections (deferred to R-0007/WP-P).",
+      "verdict": "pass",
+      "evidence": "plan.md decisions M1–M17; contracts CTG-0001, CTG-0002-deltas, CTG-0002-modules; delivery reviews."
+    },
+    {
+      "criterion": "Every merged commit passes the required checks and fixtures load in CI.",
+      "verdict": "pass",
+      "evidence": "PR #39 and PR #43 CI; backend-kernel now runs seed.sh; audit observations EV-3aa0c1d48633ef57 (515a5e3) and EV-9f3aa9a41093dbea (9292e4f)."
+    },
+    {
+      "criterion": "No Owner decision reopened; steering §H premises carried; new gaps recorded as OD proposals.",
+      "verdict": "pass",
+      "evidence": "plan.md §Bloqueios; contracts §9/§g/§e.3; M14/M15 Owner decisions recorded."
+    }
+  ],
+  "closed_at": "2026-09-15T04:00:48.660Z",
+  "merged_as": "515a5e3da63e040ae9287719d9a735213a31e249",
+  "release_disposition": "none-needed",
+  "evidence": {
+    "proof_epoch": "R-0006",
+    "terminal_sha256": "bb7d69ae86b2667c257733a0743a708a40742b6115d2e117fa4745d270698f00"
+  },
+  "notes": "D-1 binds the Owner-authorized execution of the R-0006 maestro prompt (WP-A remainder). D-2 records the Architect closing judgment after GPT-5.6 Terra delivery PASS on both groups, green CI on PR #39 and PR #43, exact-SHA Auditor observations EV-3aa0c1d48633ef57 at 515a5e3da63e040ae9287719d9a735213a31e249 (delivery merge) and EV-9f3aa9a41093dbea at 9292e4fdee2153ce87e8aff0a5635c4df7c18370 (integration of main after R-0005 closed as PC-0003), and no release-bearing package publication.",
+  "schemaVersion": "1.0.0",
+  "id": "PC-0004"
+}

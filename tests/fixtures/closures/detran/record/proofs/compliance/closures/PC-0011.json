@@ -1,0 +1,108 @@
+{
+  "round_id": "R-0007",
+  "title": "WP-B + WP-C do RAIT: prioridade legal e relógio, upgrade transacional, casos, filas e sessões, comandos de infração, organização, cobrança, integrações, SSE, contratos de comando e clientes tipados",
+  "declaring_decision": "D-1",
+  "closing_decision": "D-2",
+  "batches": [
+    {
+      "id": "CTG-0001",
+      "roles": [
+        "Architect",
+        "Inspector",
+        "Engineer"
+      ],
+      "commit": "a8d60d88a096383c9946e0dd1274409917d89508",
+      "headline": "Entregou a base de caso, fila e sessão RAIT, prioridade legal configurável e comprovada no protocolo, seis providers de Clock, imutabilidade de id/protocolled_at e upgrade PostgreSQL atômico e verificável (PR #69)."
+    },
+    {
+      "id": "CTG-0002",
+      "roles": [
+        "Architect",
+        "Inspector",
+        "Engineer"
+      ],
+      "commit": "a8d60d88a096383c9946e0dd1274409917d89508",
+      "headline": "Entregou os 20 comandos de worklist/session, política e matriz de autorização, assinatura da ata de distribuição por presidente e relatores, fronteira de confiança documental, blueprints e composição E2E (PR #69)."
+    },
+    {
+      "id": "CTG-0003",
+      "roles": [
+        "Architect",
+        "Inspector",
+        "Engineer"
+      ],
+      "commit": "c061f8854eeff1d8f51a0f25cfd657c1dcb4b6a7",
+      "headline": "Entregou contratos, sensores e runtime dos comandos de infração, motor de prazos com Clock injetável, política, outbox e wiring oficial por blueprint (PR #94)."
+    },
+    {
+      "id": "CTG-0004",
+      "roles": [
+        "Architect",
+        "Inspector",
+        "Engineer"
+      ],
+      "commit": "c061f8854eeff1d8f51a0f25cfd657c1dcb4b6a7",
+      "headline": "Entregou organização, cobrança, integrações e SSE do RAIT, sete contratos OpenAPI de comandos, verificador canônico, clientes tipados e documentação reconciliada (PR #94)."
+    }
+  ],
+  "gates": {
+    "review-governance": {
+      "status": "pass",
+      "detail": "CTG-0001 e CTG-0002 obtiveram revisão independente final PASS. Para CTG-0003/CTG-0004, o Owner dispensou expressamente uma nova repetição e aceitou o resultado existente como PASS; este fechamento registra a exceção, sem alegar uma revisão independente adicional."
+    },
+    "github-ci": {
+      "status": "pass",
+      "detail": "PR #69 e PR #94 foram mescladas. No merge final b662f8af, o run 35755550929 concluiu success: evidence-gate, senatran-mock, senatran-mock-tests, boat-documents-real, backend-kernel, foundation e verified-local-rc verdes. O workflow standalone 35755551238 falhou como esperado por ausência de tag exact-tree no merge; o fallback remoto autoritativo executou o backend-kernel e publicou verified-local-rc=success."
+    },
+    "repository-and-contracts": {
+      "status": "pass",
+      "detail": "O candidato final passou pnpm check, blueprints/contracts checks, verificadores de parâmetros, RLS, papéis e vocabulário; o inventário canônico contém 256 operações e os derivados foram reproduzíveis."
+    },
+    "database-and-backend": {
+      "status": "pass",
+      "detail": "O banco descartável autorizado detran_r7_ctg1_a2 provou fresh e upgrade, idempotência, rollback por fase, concorrência, preservação de legado e imutabilidade. O sensor final de upgrade passou 21/21 duas vezes localmente e o backend-kernel remoto passou no merge final."
+    },
+    "evidence-chain": {
+      "status": "pass",
+      "detail": "Evidência generic de R-0007 preservada até a sequência 42; o merge final b662f8af foi observado como EV-e0e0f616a7db4cca e a cadeia foi verificada antes do fechamento."
+    }
+  },
+  "validation_criteria": [
+    {
+      "criterion": "CTG-0001 fecha a qualificação e ordenação legal: idade calculada no ato de qualificação a partir da data de nascimento, PCD comprovada no protocolo pelo rait-secretary, default sem prioridade, PCD=80 configurável e revisão futura por portaria sem requalificação silenciosa do protocolo histórico.",
+      "verdict": "pass",
+      "evidence": "PR #69; TASK-0020…TASK-0043; C4-OD V3; matriz de autorização nominal; upgrade dirigido 18/18 e entrega final TASK-0022."
+    },
+    {
+      "criterion": "CTG-0002 fecha os 20 comandos de fila e sessão, a autorização fail-closed, a ata de distribuição vinculada a snapshot/hash/documento e os signatários decididos pelo Owner (presidente e relatores dos itens).",
+      "verdict": "pass",
+      "evidence": "PR #69; TASK-0005…TASK-0008 e TASK-0044…TASK-0082; parecer final CTG-0002 PASS; backend:test:ci e app E2E verdes no candidato integrado."
+    },
+    {
+      "criterion": "CTG-0003 fecha contratos, testes e implementação dos comandos de infração e prazos, com seis providers de Clock, transações, eventos/outbox, política e wiring oficial gerado.",
+      "verdict": "pass",
+      "evidence": "PR #94; TASK-0009…TASK-0012; relatórios individuais PASS; contratos, typecheck, geração e banco descartável verdes."
+    },
+    {
+      "criterion": "CTG-0004 fecha organização, cobrança, integrações e SSE, sete contratos de comando, clientes tipados e documentação; nenhuma rota de comando do inventário fica sem contrato.",
+      "verdict": "pass",
+      "evidence": "PR #94; TASK-0013…TASK-0018; inventário 256 operações; gates de comandos, OpenAPI, clientes, módulos focados e documentação verdes."
+    },
+    {
+      "criterion": "O candidato mesclado final passa os checks exigidos e possui observação de Auditor no SHA exato; históricos de tentativas, waivers e achados não são reescritos.",
+      "verdict": "pass",
+      "evidence": "PR #94 merge b662f8af; GitHub Actions 35755550929 success; verified-local-rc success por fallback remoto; EV-e0e0f616a7db4cca; registros históricos preservados."
+    }
+  ],
+  "closed_at": "2026-09-22T17:19:14.000Z",
+  "merged_as": "b662f8af90fdd9d27be08ae49feec70ccd13aded",
+  "release_disposition": "none-needed",
+  "source_repo_deleted": false,
+  "evidence": {
+    "proof_epoch": "R-0007",
+    "terminal_sha256": "598035879d1ab977b864a7c1e9df4820a903d024897f70913e56abae9c33f6a1"
+  },
+  "notes": "D-1 consolida a autorização do Owner para executar R-0007 e suas decisões registradas ao longo da campanha. D-2 registra o juízo de fechamento após as quatro CTGs concluídas, PRs #69 e #94 mescladas, observação pós-merge e CI final verde. O waiver do Owner para não repetir a revisão de CTG-0003/CTG-0004 é parte explícita da trilha, não uma revisão independente fictícia. O ledger de orçamento contém estimativas, não telemetria exata: 9.537.000 tokens de entrada e 1.331.000 de saída estavam estimados até a janela 23; o trabalho posterior ficou sem medição confiável. Nenhuma publicação de pacote ou release é necessária.",
+  "schemaVersion": "1.0.0",
+  "id": "PC-0011"
+}

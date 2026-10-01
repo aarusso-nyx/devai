@@ -1,0 +1,80 @@
+{
+  "round_id": "R-0004",
+  "title": "WP-A shared parameter store and canonical catalogue",
+  "declaring_decision": "D-1",
+  "closing_decision": "D-2",
+  "batches": [
+    {
+      "id": "CTG-0001",
+      "roles": [
+        "Owner",
+        "Architect",
+        "Inspector",
+        "Engineer"
+      ],
+      "commit": "a7e5e93398dee6d3dd6a979d04dc5bd9e3b9d913",
+      "headline": "Delivered ops.parameter, its blueprint and DDL, the command contract, tenant-aware service, policy, wiring, and behavioral coverage."
+    },
+    {
+      "id": "CTG-0002",
+      "roles": [
+        "Owner",
+        "Architect",
+        "Inspector",
+        "Engineer"
+      ],
+      "commit": "a7e5e93398dee6d3dd6a979d04dc5bd9e3b9d913",
+      "headline": "Delivered the fail-closed catalogue parser and verifier, deterministic seed and typed artifacts, and application feature-flag defaults."
+    }
+  ],
+  "gates": {
+    "cross-family-delivery-review": {
+      "status": "pass",
+      "detail": "Claude Fable 5.1: CTG-0001 cycle 3 and CTG-0002 cycle 2 passed with no findings."
+    },
+    "github-ci": {
+      "status": "pass",
+      "detail": "PR #37 run 34892284732: evidence-gate, senatran-mock, senatran-mock-tests, backend-kernel, and foundation passed."
+    },
+    "parameter-catalogue": {
+      "status": "pass",
+      "detail": "87 entries, 18 flags, zero errors; parser/generator suite passed 17 tests."
+    },
+    "backend-tests": {
+      "status": "pass",
+      "detail": "Unit, integration, and E2E tiers passed locally against detran_r4_param_store and in GitHub CI."
+    },
+    "repository-check": {
+      "status": "pass",
+      "detail": "Format, type integrity, build, contracts, generated consistency, documentation, DEVAI doctor, RLS, boundaries, and whitespace passed."
+    }
+  },
+  "source_repo_deleted": false,
+  "validation_criteria": [
+    {
+      "criterion": "The shared parameter store implements ADR-0021 and UC-RAIT-043 without absorbing the deferred editor or normative compatibility view.",
+      "verdict": "pass",
+      "evidence": "PR #37; CTG-0001 and CTG-0002 delivery reviews; R-0004 evidence sequences 1 and 2."
+    },
+    {
+      "criterion": "The exact integrated commit passes all required repository checks.",
+      "verdict": "pass",
+      "evidence": "GitHub Actions run 34892284732 and audit observation EV-d69f475e1ba8d2c9 at a7e5e93398dee6d3dd6a979d04dc5bd9e3b9d913."
+    },
+    {
+      "criterion": "Every catalogue output and prompt composition affected by the final amendments has a deterministic, synchronized identity.",
+      "verdict": "pass",
+      "evidence": "preflight-final-delivery.md, verify:parameter-catalogue, parameters:test, contracts:check, and prompt/task symmetry validation."
+    }
+  ],
+  "closed_at": "2026-09-14T20:31:54Z",
+  "merged_as": "a7e5e93398dee6d3dd6a979d04dc5bd9e3b9d913",
+  "release_disposition": "none-needed",
+  "evidence": {
+    "proof_epoch": "R-0004",
+    "terminal_sha256": "526e1bf195fa60423efe1bfdf2f176d4749758f4ffe9d1bde0136bda7d02303c"
+  },
+  "notes": "D-1 binds the Owner-authorized ADR-0021 parameter-store implementation. D-2 records the Architect closing judgment after Fable delivery PASS, green CI, exact-SHA Auditor observation, and no release-bearing package publication.",
+  "schemaVersion": "1.0.0",
+  "id": "PC-0002"
+}

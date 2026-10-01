@@ -1,0 +1,81 @@
+{
+  "round_id": "R-0011",
+  "title": "WP-D1…WP-D3 of the DASHBOARD build pack: BP-DASH-MONITOR-001 own state, vocabulary and projections with the verify:domain-boundaries gate (CTG-0001); alert cycle, duties, freshness, dashboard-owned clock, export with cell suppression, reports, audit trail, open data, SSE, command contracts, event schemas, feed proposals and documentation (CTG-0002)",
+  "declaring_decision": "D-1",
+  "closing_decision": "D-2",
+  "batches": [
+    {
+      "id": "CTG-0001",
+      "roles": [
+        "Owner",
+        "Architect",
+        "Inspector",
+        "Engineer"
+      ],
+      "commit": "e0763c6c72ba618f7ae598591c2c678d19dc0edf",
+      "headline": "Delivered WP-D1: BP-DASH-MONITOR-001 1.0.0 (20 entities, no routes), DDL 19-dashboard-lifecycle-vocabulary.sql (10 refs, 14 timers owner=dashboard), @detran/dashboard-monitor with 8 projectors declaring consumedEvents, catalogue seed (42 indicators P3, 15 duties) and state fixtures, generalized verify:domain-boundaries gate wired into pnpm check, DASHBOARD block in check-lifecycle-vocabulary, parameters verifier recognising consumedEvents, portal projections declaring consumedEvents (PR #83)."
+    },
+    {
+      "id": "CTG-0002",
+      "roles": [
+        "Owner",
+        "Architect",
+        "Inspector",
+        "Engineer"
+      ],
+      "commit": "3bb94351a456f26c30aaa574998103cdd27e262c",
+      "headline": "Delivered WP-D2/WP-D3 via M7/A3 (Owner amendment 2): blueprint 1.1.0 (Timer, AccessLog, 7 handwritten controllers), escalation_chain_ref, dashboard-owned clock/sweeper, alert cycle with 13 guarded transitions, duties, freshness, layer gate (N3 never, X-Purpose, access_log), export with primary/secondary suppression and watermark, reports/catalogue/panels, audit trail/comparisons/transparency/kpis, datasets/open-data, SSE /v1/dashboard/stream, commands contract (43 ops) and 6 event schemas, 4 feed proposals, check-commands gate extended (203 ops), and documentation of WP-D1…D3 with OD-D14…D80 (PR #87)."
+    }
+  ],
+  "gates": {
+    "delivery-review": {
+      "status": "pass",
+      "detail": "CTG-0001: cycle 1 REVIEW (2 high + 1 low on the domain-boundaries gate: cross-domain writes by projections, stale debt, OD-D16 notice) → Inspector tests + Engineer fix → cycle 2 PASS. CTG-0002: cycle 1 REVIEW (1 high: role declaration in the TASK-0006 report) → cycle 2 restricted PASS including the merge of origin/main (C-5-16 = 203). Reviewer codex gpt-5.6-terra via tools/orchestra/bridge.sh; 10 prompt-review cycles (PASS at 2, 4, 6, 8, 10)."
+    },
+    "github-ci": {
+      "status": "pass",
+      "detail": "PR #83 (after the closed DDL inventory 60 → 62) and PR #87 (after the cycle suite created its own second tenant) passed backend-kernel, foundation, evidence-gate, senatran-mock, senatran-mock-tests, boat-documents-real and verified-local-rc."
+    },
+    "repository-check": {
+      "status": "pass",
+      "detail": "pnpm check green on both integrated candidates: format, kb, blueprints, contracts (203 operations, 63 clients), parameters (90 entries), typecheck, decorators (1009 handlers), RLS (257 tenant tables), lifecycle vocabulary (INF/EST/DASHBOARD), senatran boundaries, pec parity, domain boundaries (1608 files, known debt OD-D15 printed, app/src skipped OD-D16), portal-web and rait-web builds."
+    },
+    "backend-and-database": {
+      "status": "pass",
+      "detail": "@detran/dashboard-monitor unit 231/231 and integration 430/430 (twice consecutively on detran_r11); app e2e dashboard-* 1275 passed | 1 todo (OD-D58) twice, policy matrix 32 keys × 36 canonical roles presence and absence, SQL capture proving no write outside dashboard.*/integration.outbox besides platform idempotency/rate-limit/audit; policy-routes 5/5; apply.sh incremental + seed.sh twice (35 dashboard.* tables); contracts:test 58/58; parameters:test 43/43."
+    }
+  },
+  "source_repo_deleted": false,
+  "validation_criteria": [
+    {
+      "criterion": "WP-D1 establishes the DASHBOARD own state, closed vocabularies (WF-DASH-001/002/003), projections idempotent on event.id and versioned (ADR-0020), the 42-indicator catalogue born P3 (RN-DASH-142) and the verify:domain-boundaries gate in pnpm check without silent exception lists.",
+      "verdict": "pass",
+      "evidence": "PR #83; evidence-CTG-0001.json (generic sequence 1); delivery-review-CTG-0001-2 PASS; CI run of PR #83; audit observation EV-569032faa59d0063 at e0763c6c."
+    },
+    {
+      "criterion": "WP-D2 implements the alert cycle, duties, freshness, export regime (RN-DASH-172 five rules, RN-DASH-161 suppression), layers and purpose (RN-DASH-170/171) and SSE with Inspectors' tests written before the Engineers' code (C-0002-01…100), without widening policy.ts and without editing @detran/inf-deadlines (via M7/A3, Owner amendment 2).",
+      "verdict": "pass",
+      "evidence": "PR #87; contracts/CTG-0002.md; reports TASK-0004/0005/0012/0013/0014; evidence-CTG-0002.json (generic sequence 2); delivery-review-CTG-0002-2 PASS; CI run of PR #87."
+    },
+    {
+      "criterion": "WP-D3 publishes the command contract, one schema per published event, the four feed proposals as source_pending, and extends the contracts gate bidirectionally to dashboard/* and the DASH. catalogue.",
+      "verdict": "pass",
+      "evidence": "BP-DASH-MONITOR-001.commands.openapi.json (43 operations); docs/framework/schemas/events/dashboard.*.schema.json; dashboard-feeds/*.md; tools/contracts check-commands.dashboard.test.mjs; commands contracts: OK (203 operations)."
+    },
+    {
+      "criterion": "Every integrated candidate passes protected CI and evidence-chain verification, and each merge is observed at its exact SHA; the family change (Sol → Fable) and the round lessons are recorded in waves.md, the method §10 and the backlog.",
+      "verdict": "pass",
+      "evidence": "PRs #83 and #87 green; EV-569032faa59d0063 at e0763c6c and EV-8784e0fb48845699 at 3bb94351; chain head 465f59b031288520e23f246267f35c9db3ba49b3da48a8475afc4839e1744e0a; waves.md and orchestra/README.md §10 updated by TASK-0007."
+    }
+  ],
+  "closed_at": "2026-09-22T07:39:32.488Z",
+  "merged_as": "3bb94351a456f26c30aaa574998103cdd27e262c",
+  "release_disposition": "none-needed",
+  "evidence": {
+    "proof_epoch": "R-0011",
+    "terminal_sha256": "465f59b031288520e23f246267f35c9db3ba49b3da48a8475afc4839e1744e0a"
+  },
+  "notes": "D-1 binds the Owner-authorized R-0011 maestro execution (Fable 5.1 family, Claude Code with Opus 5; reviewer codex gpt-5.6-terra) for DASHBOARD WP-D1…WP-D3, with amendment 1 (proceed to completion) and amendment 2 (open CTG-0002 via M7/A3 without waiting for R-0007 CTG-0003). D-2 records the Architect closing judgment after both coupled groups reached delivery PASS, protected CI was green and exact-SHA audit observation completed. Deferred, all registered as OD-D14…D80 in the build pack and the backlog: integration with the deadline engine owner='dashboard' (OD-D28) and the real producer of rait.clock.flag-changed (OD-D17, R-0007 CTG-0003 — block A 2/11 connected until then); escalation chains of PEC/TEAT/BOAT/PORTAL/adapter (OD-D29); the global-admin shortcut question (OD-D76, Owner); known debt ops/field → inf.normative_mobile_package (OD-D15) and backend/app/src outside the gate (OD-D16).",
+  "schemaVersion": "1.0.0",
+  "id": "PC-0009"
+}

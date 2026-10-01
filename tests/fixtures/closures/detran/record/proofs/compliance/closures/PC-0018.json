@@ -1,0 +1,140 @@
+{
+  "schemaVersion": "1.0.0",
+  "round_id": "R-0017",
+  "title": "C-0002 action 4: versioned local DETRAN stack, isolated fixtures, four-app smoke, runbook and optional manual CI job",
+  "declaring_decision": "D-1",
+  "closing_decision": "D-2",
+  "batches": [
+    {
+      "id": "CTG-0001",
+      "roles": [
+        "Architect",
+        "Inspector",
+        "Engineer"
+      ],
+      "commit": "b1268a35c7758e9d017cf297039ba4cdbf95ba27",
+      "headline": "Verbatim stack adoption and characterization, then isolated DB, pinned PostGIS, inspectable config and bounded health (PR #133)."
+    },
+    {
+      "id": "CTG-0002",
+      "roles": [
+        "Architect",
+        "Inspector",
+        "Engineer"
+      ],
+      "commit": "f1dde3bc9029f52532865bafe14cda3cf770656b",
+      "headline": "Fresh-local-stack seed, six-route SEFAZ mock, fail-closed CH adapters, local-only Portal complaint and four-app smoke (PR #143)."
+    },
+    {
+      "id": "CTG-0003",
+      "roles": [
+        "Architect",
+        "Engineer"
+      ],
+      "commit": "d5afcf9211373238d6eb7b8ad09188a342101a39",
+      "headline": "Runbook, disposable env example, workflow_dispatch-only CI smoke and R-0017 record transcription (PR #144)."
+    }
+  ],
+  "gates": {
+    "cross-family-delivery-review": {
+      "status": "pass",
+      "detail": "CTG-0001 and CTG-0002 final PASS; CTG-0003 REVIEW then PASS on cycle 2 with no findings."
+    },
+    "evidence-gate": {
+      "status": "pass",
+      "detail": "Required check green on PR #144; generic evidence sequences through 6 anchored, chain valid."
+    },
+    "foundation": {
+      "status": "pass",
+      "detail": "Required check green on PR #144 (27m26s)."
+    },
+    "senatran-mock": {
+      "status": "pass",
+      "detail": "Required check green on PR #144."
+    },
+    "senatran-mock-tests": {
+      "status": "pass",
+      "detail": "Required check green on PR #144."
+    },
+    "verified-local-rc": {
+      "status": "pass",
+      "detail": "Required exact-candidate check green on PR #144; local legacy-upgrade RC 21/21 on CTG-0002."
+    },
+    "pnpm-check": {
+      "status": "pass",
+      "detail": "Full local pnpm check exit 0 for CTG-0003; pnpm docs:check, verify:state-index and format:check exit 0."
+    },
+    "checkpoint-b": {
+      "status": "pass",
+      "detail": "Clean-worktree db-reset/start/health/smoke/stop exit 0; smoke 42/42 and stopped-backend negative exit 1."
+    },
+    "evidence-chain": {
+      "status": "pass",
+      "detail": "DEVAI 1.5.6 verify valid after exact-SHA audit observe d5afcf9211373238d6eb7b8ad09188a342101a39 (EV-5a597c2297292a98); head 25f94219921c2f37f927aa55c2aa98d97e96502d753be669134e6245c1b429d1."
+    }
+  },
+  "source_repo_deleted": false,
+  "validation_criteria": [
+    {
+      "criterion": "Meta 1: adopt the pre-existing stack script, proxy and nine package scripts verbatim, then characterize current behavior offline before revisions",
+      "verdict": "pass",
+      "evidence": "CTG-0001 adoption checkpoint (a), sha256 comparison and offline characterization; PR #133."
+    },
+    {
+      "criterion": "Meta 2: own disposable database and authorization, pinned PostGIS digest, bounded SENATRAN health, fixed ports including inactive PEC slot, JSON config, health checks and canonical local roles",
+      "verdict": "pass",
+      "evidence": "CTG-0001 contract/tests/implementation; PR #133; pnpm test:stack and CI green."
+    },
+    {
+      "criterion": "Meta 3: add isolated fresh-local-stack fixtures while preserving fresh and legacy-upgrade profiles and excluding PEC fixtures",
+      "verdict": "pass",
+      "evidence": "CTG-0002 SQL and scratch 3/3; legacy baseline 20 cases plus upgrade 21/21; PR #143."
+    },
+    {
+      "criterion": "Meta 4: six-route deterministic local SEFAZ mock, CH PAdES/biometric/council explicitly off and fail-closed, no real external integration",
+      "verdict": "pass",
+      "evidence": "OD-R17-001/002; adapter parity and live smoke CH 503s; PR #143."
+    },
+    {
+      "criterion": "Meta 5: integrated four-app proxy smoke with backend/seed/RLS, health, JSON report and nonzero exit on failure",
+      "verdict": "pass",
+      "evidence": "Checkpoint (b) 42/42, stopped-backend negative exit 1; Portal local-only fixture OD-R17-004; PR #143."
+    },
+    {
+      "criterion": "Meta 6: Portuguese local-stack runbook and disposable .env.example without real credentials or published-site link",
+      "verdict": "pass",
+      "evidence": "TASK-0008, docs:check exit 0, PR #144."
+    },
+    {
+      "criterion": "Meta 7: optional stack-smoke CI job only on workflow_dispatch, outside five required main checks",
+      "verdict": "pass",
+      "evidence": "OD-R17-003; TASK-0009; stack-smoke skipped on PR #144 as designed; five required checks green."
+    },
+    {
+      "criterion": "C-01-07 historical SEFAZ pending and PAdES/biometric/council proposed_off states",
+      "verdict": "n/a",
+      "evidence": "A4 superseded these literals after Owner OD-R17-001/002; delivered SEFAZ mock and three explicit off states instead. Na observação corretiva, n/a por substituição autorizada pelo Owner nas adendas A4–A6; o FAIL histórico permanece em PC-0017 e não é promovido a PASS."
+    },
+    {
+      "criterion": "C-01-11 historical exclusion of SEFAZ from health probing",
+      "verdict": "n/a",
+      "evidence": "A4 superseded exclusion; active mock is covered by start/stop/status/health and bounded wait. Na observação corretiva, n/a por substituição autorizada pelo Owner nas adendas A4–A6; o FAIL histórico permanece em PC-0017 e não é promovido a PASS."
+    },
+    {
+      "criterion": "C-01-07 historical config.seed.profile=fresh literal",
+      "verdict": "n/a",
+      "evidence": "A5 superseded literal with fresh-local-stack after isolated profile proof; fresh and legacy-upgrade remain unchanged. Na observação corretiva, n/a por substituição autorizada pelo Owner nas adendas A4–A6; o FAIL histórico permanece em PC-0017 e não é promovido a PASS."
+    },
+    {
+      "criterion": "C-02-05 historical attribution of a Portal complaint to 70-fixtures-portal.sql",
+      "verdict": "n/a",
+      "evidence": "A6 and OD-R17-004 superseded this incorrect source; deterministic complaint exists only in detran_local_stack via the smoke fixture. Na observação corretiva, n/a por substituição autorizada pelo Owner nas adendas A4–A6; o FAIL histórico permanece em PC-0017 e não é promovido a PASS."
+    }
+  ],
+  "merged_as": "d5afcf9211373238d6eb7b8ad09188a342101a39",
+  "release_disposition": "none-needed",
+  "notes": "Correção append-only autorizada pelo Owner em work/rounds/R-0017/SEAL-AUTHORIZATION.md. Supersede PC-0017 apenas para a observação de selo: os quatro critérios substituídos por A4–A6 são n/a no contrato efetivo e permanecem FAIL no recibo original. Três CTGs, cinco checks obrigatórios e reviewer PASS mantidos. Nenhum critério histórico foi promovido a PASS. O sello é registrado separadamente pelo DEVAI round seal.",
+  "supersedes": "PC-0017",
+  "id": "PC-0018",
+  "closed_at": "2026-09-28T00:57:18.023Z"
+}

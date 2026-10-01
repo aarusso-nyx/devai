@@ -1,0 +1,84 @@
+{
+  "round_id": "R-0015",
+  "title": "WP-B4 and WP-B5 BOAT frontends: 17 governed screen sheets, pt-BR catalogue and navigation transitions; @detran/boat-mobile field library integrated into TEAT mobile and five sinistros pages integrated into TEAT web",
+  "declaring_decision": "D-1",
+  "closing_decision": "D-2",
+  "batches": [
+    {
+      "id": "CTG-0001",
+      "roles": [
+        "Architect",
+        "Inspector",
+        "Engineer"
+      ],
+      "commit": "6c76971d2425d62bcee1cc50c34c2caf5e0a0da7",
+      "headline": "17 IU-BOAT-S/W sheets, 114-key pt-BR seed with source-pending markers, fail-closed boat.* i18n allowlist, and 149 canonical plus two additive S-12 transitions; integrated by PR #107 as 1dc8b630."
+    },
+    {
+      "id": "CTG-0002",
+      "roles": [
+        "Architect",
+        "Inspector",
+        "Engineer",
+        "Auditor"
+      ],
+      "commit": "80d4ac1c03386539058718b142206372352edca8",
+      "headline": "@detran/boat-mobile with twelve accessible pages, schemas and native ports; twelve TEAT mobile boundaries and five TEAT web sinistros pages with role matrices, real DOM/axe and zero-HTTP proofs; integrated by PR #116 as 50626da5."
+    }
+  ],
+  "gates": {
+    "cross-family-delivery-review": {
+      "status": "pass",
+      "detail": "CTG-0001 REVIEW to restricted PASS; CTG-0002 FAIL with sixteen findings, corrected by the owning Architect, Inspector and Engineers, then restricted PASS with no findings. Reviewer Claude Opus through the governed bridge."
+    },
+    "github-ci": {
+      "status": "pass",
+      "detail": "PR #107 and PR #116 integrated only after all seven required checks passed. Final PR #116 candidate 80d4ac1c: evidence-gate, boat-documents-real, senatran-mock, senatran-mock-tests, foundation, backend-kernel and verified-local-rc green."
+    },
+    "pnpm-check": {
+      "status": "pass",
+      "detail": "Full repository gate exited 0 locally; clean-checkout CI exposed and closed evidence formatting and BOAT-before-host typecheck ordering defects."
+    },
+    "app-suites": {
+      "status": "pass",
+      "detail": "BOAT 15/15; focused TEAT mobile 190/190; TEAT web 611/611, including real schema gates, all-nine-role matrices, executable native-port doubles, mounted DOM, orientation, axe and zero HTTP."
+    },
+    "evidence-chain": {
+      "status": "pass",
+      "detail": "Generic sequences 1 and 2 valid; exact merge observations EV-c0590734c54263e9 for CTG-0001 and EV-3f6a7b6febe2d92a for CTG-0002."
+    }
+  },
+  "validation_criteria": [
+    {
+      "criterion": "WP-B4 publishes all 17 governed BOAT screen sheets, its pt-BR catalogue and the canonical plus additive S-12 navigation contract without inventing source-pending text.",
+      "verdict": "pass",
+      "evidence": "PR #107; delivery-review CTG-0001 PASS; 773 KB artifacts and valid parameter catalogue."
+    },
+    {
+      "criterion": "WP-B5 delivers @detran/boat-mobile and integrates the twelve mobile boundaries and five web pages into the existing TEAT hosts with fail-closed roles and gates.",
+      "verdict": "pass",
+      "evidence": "PR #116; BOAT 15/15, TEAT mobile 190/190 and TEAT web 611/611; delivery-review CTG-0002 PASS."
+    },
+    {
+      "criterion": "Accessibility, persona and zero-network invariants are proved on mounted runtime surfaces, including the Owner-authorized residual homologation spec.",
+      "verdict": "pass",
+      "evidence": "TASK-0008 iteration 4; prompt-review-8 PASS; app.homologation.spec.ts and app.runtime-foundations.spec.ts included only under Emendas 2 and 3."
+    },
+    {
+      "criterion": "Unknown source authority remains explicit and productive field integrations are not implied by the frontend delivery.",
+      "verdict": "pass",
+      "evidence": "OD-R15-003 through OD-R15-006 remain recorded; hardware real, release, deployment and real RENAEST/SNE/gov.br homologation remain outside the round."
+    }
+  ],
+  "closed_at": "2026-09-24T13:58:27Z",
+  "merged_as": "50626da5967c703a035aff6ce469a3e59511648c",
+  "release_disposition": "none-needed",
+  "source_repo_deleted": false,
+  "evidence": {
+    "proof_epoch": "R-0015",
+    "terminal_sha256": "035497d588522bf40b3b89fd1326eca342854c23d66f48eb894a740d3951d59a"
+  },
+  "notes": "D-1 is the Owner authorization opening R-0015 with maestro GPT-5.6 Sol, workers Terra/Luna and Claude Opus as opposite-family reviewer, including the 2026-09-21 Fable to Sol switch. D-2 closes the two integrated CTGs after review, local gates, GitHub CI and exact-SHA audit observations. Emendas 2 and 3 authorized only the Inspector residual boundaries and their third and fourth restricted prompt reviews. No package publication, deployment, productive field operation, hardware integration or external-system homologation is authorized or implied.",
+  "schemaVersion": "1.0.0",
+  "id": "PC-0014"
+}

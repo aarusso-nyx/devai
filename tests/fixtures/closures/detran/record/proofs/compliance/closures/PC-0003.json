@@ -1,0 +1,99 @@
+{
+  "round_id": "R-0005",
+  "title": "WP-T1 TEAT ops-agency, generated ops modules, inf model deltas, fixtures and documentation",
+  "declaring_decision": "D-1",
+  "closing_decision": "D-2",
+  "batches": [
+    {
+      "id": "CTG-0001",
+      "roles": [
+        "Owner",
+        "Architect",
+        "Inspector",
+        "Engineer"
+      ],
+      "commit": "1c662f08ab3a7a61db754700dbe45fd91680de25",
+      "headline": "Delivered ops/agency plus the four generated ops domains, synchronized DDL and OpenAPI artifacts, handwritten controller preservation, RLS coverage, and application wiring."
+    },
+    {
+      "id": "CTG-0002",
+      "roles": [
+        "Owner",
+        "Architect",
+        "Inspector",
+        "Engineer"
+      ],
+      "commit": "bb4797ab38cc4cf47d500e29b203925b29861057",
+      "headline": "Delivered the four INF blueprint deltas, canonical lifecycle vocabulary and transitions, timers, regenerated packages, tests, and the OD-T13 fail-closed boundary."
+    },
+    {
+      "id": "CTG-0003",
+      "roles": [
+        "Owner",
+        "Inspector",
+        "Engineer"
+      ],
+      "commit": "30118fa749801d43e7b0b3238ed19b241c8b9114",
+      "headline": "Delivered deterministic and idempotent WP-T1 fixtures for AIT states, reservations, normative publication, devices, evidence, and legal event ordering."
+    },
+    {
+      "id": "TASK-0009",
+      "roles": [
+        "Owner",
+        "Architect"
+      ],
+      "commit": "f432a0cd1ef3bc1005da24208b9e3fb58ac098d6",
+      "headline": "Transcribed only verified WP-T1 delivery facts into the build pack, blueprint and ops documentation, route contract, decision closure plan, and backlog."
+    }
+  ],
+  "gates": {
+    "cross-family-delivery-review": {
+      "status": "pass",
+      "detail": "Opus 5: final CTG-0001, CTG-0002, CTG-0003, and TASK-0009 reviews passed with zero high findings; remaining lows were explicitly routed to R-0008/WP-T2 or orchestra hardening."
+    },
+    "github-ci": {
+      "status": "pass",
+      "detail": "PR #40 run 34904483773, PR #41 run 34922071820, PR #42 run 34923196682, and PR #44 run 34928749360 each passed evidence-gate, senatran-mock, senatran-mock-tests, backend-kernel, and foundation."
+    },
+    "backend-and-database": {
+      "status": "pass",
+      "detail": "Generated contracts, canonical AIT lifecycle, database apply and idempotent seed, tenant RLS smoke, unit, integration, E2E, and backend:test:ci passed without weakened assertions."
+    },
+    "documentation": {
+      "status": "pass",
+      "detail": "TASK-0009 final review passed; format, KB validation at 521 artifacts and 446 canonical tokens, and publish validation at 201 files passed."
+    },
+    "repository-check": {
+      "status": "pass",
+      "detail": "The exact PR #44 candidate passed pnpm check after frozen workspace installation, and the integrated merge was observed by EV-9dee77a57754060b."
+    }
+  },
+  "source_repo_deleted": false,
+  "validation_criteria": [
+    {
+      "criterion": "WP-T1 provides the minimum ops/agency model, generated ops domains, approved INF deltas, canonical lifecycle behavior, fixtures, and synchronized documentation without absorbing WP-T2 or provisioning scope.",
+      "verdict": "pass",
+      "evidence": "PRs #40, #41, #42, and #44; final Opus 5 delivery reviews; R-0005 evidence sequences and worker reports."
+    },
+    {
+      "criterion": "Every integrated candidate passes the required repository and protected CI checks.",
+      "verdict": "pass",
+      "evidence": "GitHub Actions runs 34904483773, 34922071820, 34923196682, and 34928749360; audit observation EV-9dee77a57754060b at f432a0cd1ef3bc1005da24208b9e3fb58ac098d6."
+    },
+    {
+      "criterion": "The generated blueprints, DDL, contracts, lifecycle vocabulary, fixtures, and documentation preserve deterministic identities and explicit deferred boundaries.",
+      "verdict": "pass",
+      "evidence": "blueprints:check, contracts:check, verify:rls-ddl, verify:lifecycle-vocabulary, idempotent seed, backend:test:ci, pnpm check, and TASK-0009 documentation gates."
+    }
+  ],
+  "closed_at": "2026-09-15T04:42:32.000Z",
+  "merged_as": "f432a0cd1ef3bc1005da24208b9e3fb58ac098d6",
+  "release_disposition": "none-needed",
+  "evidence": {
+    "proof_epoch": "R-0005",
+    "terminal_sha256": "19ff2e0b751db00e3aadd21be284685b5aab6314aa20398c7f2744d8db6c533b"
+  },
+  "notes": "D-1 binds the Owner-authorized WP-T1 scope and its explicit deferrals. D-2 records the Architect closing judgment after final Opus 5 PASS verdicts, green CI on every integrated group, exact-SHA Auditor observation, and no release-bearing package publication.",
+  "schemaVersion": "1.0.0",
+  "id": "PC-0003"
+}

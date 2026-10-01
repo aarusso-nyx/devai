@@ -1,0 +1,172 @@
+{
+  "schemaVersion": "1.0.0",
+  "round_id": "R-0021",
+  "title": "C-0002 action 7a: STYNX 1.4.0 pin, pre/post characterization and upstream requirements; migrations transferred under Owner A1",
+  "declaring_decision": "D-1",
+  "closing_decision": "D-2",
+  "batches": [
+    {
+      "id": "CTG-0001",
+      "roles": [
+        "Owner",
+        "Architect",
+        "Inspector",
+        "Auditor"
+      ],
+      "commit": "3d96eeb8650446ae47519b2fe2c989a9028ba07d",
+      "headline": "Inventory, upstream requirements and 1.3.1 characterization; PR #149 merged with required checks green and exact-SHA audit observation."
+    },
+    {
+      "id": "CTG-0002",
+      "roles": [
+        "Architect",
+        "Inspector",
+        "Engineer",
+        "Auditor"
+      ],
+      "commit": "69642874c1ccd4cf4d1c6f0ec431ecd9fb848a05",
+      "headline": "STYNX 1.4.0 source pin, verifier and unchanged post-pin characterization; PR #151 merged with required checks green and exact-SHA audit observation."
+    },
+    {
+      "id": "CTG-0007",
+      "roles": [
+        "Architect",
+        "Engineer",
+        "Auditor"
+      ],
+      "commit": "1576708f8378817d5e3338953015f5acdb704e1e",
+      "headline": "ADR, orchestra history, backlog and round index transcription, close preflight, worker erratum and Opus 5.5 PASS; PR #153 merged with required checks green."
+    }
+  ],
+  "gates": {
+    "pnpm-check": {
+      "status": "pass",
+      "detail": "Exit 0 for all active CTGs; final CTG-0007 log and SHA-256 in reports/CTG-0007-gates.md."
+    },
+    "backend-test-ci": {
+      "status": "pass",
+      "detail": "Exit 0 on R21 exclusive PostGIS and mock SENATRAN; final app e2e 37 files/1,681 pass plus three prior TODO, upgrade 21/21."
+    },
+    "final-build-and-rls": {
+      "status": "pass",
+      "detail": "pnpm build and backend:rls-smoke exit 0; RLS covers 140 inf/ch tables and ops tenant isolation."
+    },
+    "delivery-review": {
+      "status": "pass",
+      "detail": "Opus 5.5 PASS for CTG-0001 cycle 2, CTG-0002 cycle 4 and CTG-0007 cycles 2 and 3; prompt-review cycle 3 PASS."
+    },
+    "required-pr-ci": {
+      "status": "pass",
+      "detail": "PR #149, #151 and #153 merged only after all required GitHub checks passed on their exact heads."
+    },
+    "evidence-chain": {
+      "status": "pass",
+      "detail": "DEVAI generic records and Auditor observations on exact merge SHAs; latest observation EV-15963d738bf70dfe for PR #153, verified chain head ec36cf1bf45f951d6db2d4e9849cc3c2a5be56705040f208a0598ea4d882db77."
+    },
+    "isolated-stack-smoke": {
+      "status": "pass",
+      "detail": "Exact CTG-0002 product candidate 2bc62e7a passed 42/42 in Docker-in-Docker. Remote manual workflows failed on candidate and 1.3.1 main and are tracked separately; no remote PASS claimed."
+    },
+    "token-budget-window1": {
+      "status": "fail",
+      "detail": "Observed Codex and Claude input excluding cache reads totaled 3,391,468 tokens in window 1, above the authorized 2,250,000 input-token limit. The earlier estimated-unique ledger underrepresented runtime usage; these metrics are distinct but do not establish compliance. Owner A2 expressly authorized round close with this gate kept FAIL, without a retrospective limit increase."
+    }
+  },
+  "source_repo_deleted": false,
+  "validation_criteria": [
+    {
+      "criterion": "A1 active scope: inventory, requirements and 1.3.1 characterization",
+      "verdict": "pass",
+      "evidence": "CTG-0001 PR #149; seven characterization specs; 76 upstream requirements in 18 issues plus STYNX tracker #289."
+    },
+    {
+      "criterion": "A1 active scope: STYNX 1.4.0 pin and dynamic verifier",
+      "verdict": "pass",
+      "evidence": "CTG-0002 PR #151; 59 source manifests, 158 declarations, 48 generated and 11 manual; eight verifier negatives RED before CLI then 8/8 GREEN unchanged."
+    },
+    {
+      "criterion": "A1 active scope: post-pin characterization without product migration",
+      "verdict": "pass",
+      "evidence": "Seven pre-pin characterization specs remained green after 1.4.0 pin; backend e2e and upgrade green; no transferred module implemented."
+    },
+    {
+      "criterion": "A1 active scope: documentary transcription and handoff",
+      "verdict": "pass",
+      "evidence": "CTG-0007 PR #153; ADR-0015, waves, backlog and round index; Opus 5.5 cycles 2 and 3 PASS; Owner A1 retained."
+    },
+    {
+      "criterion": "Original goal 2: signature and document provider migration",
+      "verdict": "fail",
+      "evidence": "Owner A1 / OD-R21-01 transfers all signature migration to R-0022 pending compatible upstream support; original adapter removal and STYNX module wiring not delivered."
+    },
+    {
+      "criterion": "Original goal 3: dispatch and event-log outbox migration including RENACH",
+      "verdict": "fail",
+      "evidence": "Owner A1 / OD-R21-02 transfers all outbox migration, including RENACH, to R-0022; no outbox DDL or STYNX wiring delivered."
+    },
+    {
+      "criterion": "Original goal 4: offline-sync store and service migration",
+      "verdict": "fail",
+      "evidence": "Owner A1 transfers migration to R-0022 pending protocol-compatible upstream support; characterization only was delivered."
+    },
+    {
+      "criterion": "Original goal 5: notifications module adoption",
+      "verdict": "fail",
+      "evidence": "Owner A1 / OD-R21-03 defers adoption until the OD-P40 producer exists; no notifications module or DDL delivered."
+    },
+    {
+      "criterion": "Original goal 6: remove or justify unused STYNX dependencies",
+      "verdict": "fail",
+      "evidence": "Inventoried for R-0022 under Owner A1; no dependency was removed or justified as final disposition in this round."
+    },
+    {
+      "criterion": "Original goal 7: keep STYNX jobs adoption outside this round",
+      "verdict": "pass",
+      "evidence": "No jobs module adoption; UPS-JOB requirements remain upstream/R-0024 as planned."
+    },
+    {
+      "criterion": "Original goal 8: characterize behavior before migration",
+      "verdict": "pass",
+      "evidence": "Seven characterization specs green on 1.3.1 and again on 1.4.0; no transferred migration attempted."
+    },
+    {
+      "criterion": "Original goal 9: full division ADR and migration ADR amendments",
+      "verdict": "fail",
+      "evidence": "Owner A1 narrows R-0021 to ADR-0015 pin transcription; original signature/outbox/offline migration documentation transfers with implementation to R-0022."
+    },
+    {
+      "criterion": "Original signature/import/adapters-removed acceptance commands",
+      "verdict": "fail",
+      "evidence": "No STYNX signature module was mounted; adapter-removal and import assertions stay unmet under OD-R21-01."
+    },
+    {
+      "criterion": "Original outbox DDL/RLS and RENACH SQL-removal acceptance commands",
+      "verdict": "fail",
+      "evidence": "No outbox migration or DDL; existing RLS checks pass for the unchanged schema but do not satisfy the transferred outbox criterion."
+    },
+    {
+      "criterion": "Original offline-sync STYNX delegation acceptance commands",
+      "verdict": "fail",
+      "evidence": "HTTP and integration characterization pass, but the STYNX store/service migration was not performed under Owner A1."
+    },
+    {
+      "criterion": "token-budget-window1 control and accounting",
+      "verdict": "fail",
+      "evidence": "W1 observed no-cache-read input: Codex 2,817,534 plus Claude 573,934 = 3,391,468 versus limit 2,250,000. The runtime measure and estimated unique input differ; the control failure remains FAIL. Owner A2 authorized formal close with this FAIL but did not waive the overrun or increase the past limit."
+    },
+    {
+      "criterion": "Original DEVAI close + seal anchor acceptance",
+      "verdict": "fail",
+      "evidence": "Owner A1 approved round close without seal for the transferred migration criteria. DEVAI 1.5.6 round seal rejects failed criteria (ROUND_ARCHIVE_VALIDATION_NOT_GREEN); no record.md or close-state.jsonl was created. The original close-plus-seal acceptance therefore remains unmet."
+    }
+  ],
+  "merged_as": "1576708f8378817d5e3338953015f5acdb704e1e",
+  "release_disposition": "none-needed",
+  "notes": "D-1 is Owner A1 in AUTHORIZATION.md and plan.md. D-2 is the effective Architect close judgment after three active CTGs, exact PR CI, independent reviews and DEVAI proofs, bound to Owner A2 in AUTHORIZATION.md. The historical migration criteria remain fail; Owner A1 authorized close without seal for the transferred historical migration criteria; the additional window-1 budget failure is covered only by the subsequent narrow Owner A2 authorization to emit this close with the FAIL preserved. No retrospective waiver or limit increase is inferred. DEVAI 1.5.6 rejects sealing with failed validation criteria, so no record.md or close-state.jsonl is fabricated. Remote manual stack smoke exited 1 on both candidate and 1.3.1 baseline; isolated exact product smoke passed 42/42 and sensor triage is in the R-0022 backlog. The runtime task queue was never materialized because TASK_ROUND_INACTIVE held before AUTHORIZATION markers were added; prepared work/rounds task JSONs are historical checkpoints, not retroactive DEVAI execution transitions. STYNX tracker #289 holds the published upstream requirements.",
+  "evidence": {
+    "proof_epoch": "R-0021",
+    "terminal_sha256": "ec36cf1bf45f951d6db2d4e9849cc3c2a5be56705040f208a0598ea4d882db77"
+  },
+  "id": "PC-0019",
+  "closed_at": "2026-09-28T14:18:18.702Z"
+}
