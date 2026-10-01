@@ -7,11 +7,33 @@
 //
 // Interface assumptions: none beyond the committed files. The registry is read from
 // law/policy/sensor-registry.json, the Architect source the runtime registry is
-// generated from.
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
-import { resolve } from 'node:path';
+// generated from. ADR-SCR-0007 adds the governed e2e argv, the local coverage population and
+// exclusions, the LOCAL_INCLUDE population contract, and the local coverage producer, whose
+// exports tests/config/local.coverage.config.ts defines.
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, matchesGlob, resolve } from 'node:path';
 import Ajv2020 from 'ajv/dist/2020.js';
 import { describe, expect, it } from 'vitest';
+import { LOCAL_INCLUDE, RC_ONLY } from '../config/local.config.js';
+import localCoverageConfig, {
+  LOCAL_COVERAGE_EXCLUSIONS,
+  LOCAL_COVERAGE_POPULATION,
+  LOCAL_COVERAGE_REPORT,
+  LOCAL_COVERAGE_SIDECAR,
+  PopulationSidecarReporter,
+  localCoverageSidecar,
+  measuredFileCount,
+} from '../config/local.coverage.config.js';
+import rcE2eConfig from '../config/rc.e2e.config.js';
 
 const ROOT = resolve(import.meta.dirname, '../..');
 const SCHEMA_PATH = resolve(ROOT, 'law/schemas/sensor-inputs.schema.json');
@@ -127,7 +149,6 @@ describe('DEVAI sensor inputs declaration', () => {
   it.each([
     ['unit_test', 'tests/contract'],
     ['integration_test', 'tests/integration'],
-    ['e2e_test', 'tests/e2e'],
   ])('declares the %s suite argv in the governed vitest shape over %s', (kind, dir) => {
     const argv = declaration.inputs[kind]?.['argv'] as string[];
     expect(argv).toEqual([
@@ -140,6 +161,173 @@ describe('DEVAI sensor inputs declaration', () => {
     ]);
     expect(existsSync(resolve(ROOT, argv[4] as string))).toBe(true);
     expect(statSync(resolve(ROOT, dir)).isDirectory()).toBe(true);
+  });
+
+  // ADR-SCR-0007: the e2e argv names the governed e2e configuration and appends no test
+  // path; the configuration's own include selects the population.
+  it('declares the e2e_test argv as the governed rc.e2e configuration with no test path', () => {
+    const argv = declaration.inputs['e2e_test']?.['argv'] as string[];
+    expect(argv).toEqual(['pnpm', 'vitest', 'run', '--config', 'tests/config/rc.e2e.config.ts']);
+    expect(existsSync(resolve(ROOT, argv[4] as string))).toBe(true);
+    expect(rcE2eConfig.test?.include).toEqual(['tests/e2e/**/*.test.ts']);
+    expect(rcE2eConfig.test?.exclude).toContain('tests/e2e/inventory-sensors.smoke.test.ts');
+  });
+
+  // ADR-SCR-0007: the coverage input names the local report, its population, and the
+  // RC-only suites the local producer leaves out, one by one.
+  it('declares the local coverage population and its exclusions', () => {
+    expect(declaration.inputs['test_coverage_depth']).toEqual({
+      coveragePath: 'scratch/coverage/local/coverage-final.json',
+      population: 'local',
+      exclusions: [
+        'packages/authority/tests/unit/authority-resource-boundaries.red.test.ts',
+        'packages/skills/tests/recipes/adapters.test.ts',
+        'tests/integration/authority-effect-postgres.db.test.ts',
+        'tests/integration/runtime-probe-data.integration.test.ts',
+      ],
+    });
+    const input = declaration.inputs['test_coverage_depth'] ?? {};
+    expect(input['exclusions']).toEqual([...RC_ONLY]);
+    expect(input['exclusions']).toEqual([...LOCAL_COVERAGE_EXCLUSIONS]);
+    expect(input['population']).toBe(LOCAL_COVERAGE_POPULATION);
+    expect(input['coveragePath']).toBe(LOCAL_COVERAGE_REPORT);
+    for (const excluded of input['exclusions'] as string[]) {
+      expect(existsSync(resolve(ROOT, excluded)), `${excluded} does not exist`).toBe(true);
+    }
+  });
+});
+
+// ADR-SCR-0007 IA-005: LOCAL_INCLUDE is the population of pnpm test, test:local-full, and the
+// local coverage producer. It selects nothing under tests/e2e or tests/regression; a change
+// that adds either fails this contract.
+const OUT_OF_POPULATION = [
+  'tests/e2e/usage-exit-codes.e2e.test.ts',
+  'tests/e2e/nested/fixture.test.ts',
+  'tests/regression/evidence-chain-100-event.regression.test.ts',
+  'tests/regression/nested/fixture.test.ts',
+] as const;
+
+function populationDefects(include: readonly string[]): readonly string[] {
+  return OUT_OF_POPULATION.flatMap((file) =>
+    include
+      .filter((glob) => matchesGlob(file, glob))
+      .map((glob) => `${glob} selects ${file}, outside the local population`),
+  );
+}
+
+describe('local test population (ADR-SCR-0007 IA-005)', () => {
+  it('selects nothing under tests/e2e or tests/regression', () => {
+    expect(populationDefects(LOCAL_INCLUDE)).toEqual([]);
+  });
+
+  it('still selects the declared local suites', () => {
+    for (const file of [
+      'packages/cli/tests/unit/fixture.test.ts',
+      'packages/sensors/tests/fixture.spec.ts',
+      'tests/contract/fixture.test.ts',
+      'tests/integration/fixture.test.ts',
+    ]) {
+      expect(
+        LOCAL_INCLUDE.some((glob) => matchesGlob(file, glob)),
+        file,
+      ).toBe(true);
+    }
+  });
+
+  it.each([['tests/e2e/**/*.test.ts'], ['tests/regression/**/*.test.ts'], ['tests/**/*.test.ts']])(
+    'fails the population contract when LOCAL_INCLUDE gains %s',
+    (glob) => {
+      const defects = populationDefects([...LOCAL_INCLUDE, glob]);
+      expect(defects.length).toBeGreaterThan(0);
+      expect(defects.every((defect) => defect.startsWith(glob))).toBe(true);
+    },
+  );
+});
+
+// ADR-SCR-0007: tests/config/local.coverage.config.ts is the database-free producer of the
+// declared report. It runs LOCAL_INCLUDE, excludes exactly the declared exclusions, writes
+// the JSON report into the declared directory, enforces no threshold, and never reads
+// DEVAI_DB_TESTS. Its population.json sidecar names the population, the include globs, the
+// excluded suites, and the count of files measured.
+describe('local coverage producer configuration (ADR-SCR-0007)', () => {
+  const COVERAGE_CONFIG_PATH = resolve(ROOT, 'tests/config/local.coverage.config.ts');
+  const test = localCoverageConfig.test ?? {};
+  const coverage = (test.coverage ?? {}) as Readonly<Record<string, unknown>>;
+  const input = declaration.inputs['test_coverage_depth'] ?? {};
+
+  it('runs LOCAL_INCLUDE and excludes exactly the declared exclusions', () => {
+    expect(test.include).toEqual([...LOCAL_INCLUDE]);
+    const exclude = (test.exclude ?? []).filter(
+      (glob) => glob !== '**/node_modules/**' && glob !== '**/dist/**',
+    );
+    expect(exclude).toEqual(input['exclusions']);
+    expect(test.passWithNoTests).toBe(false);
+  });
+
+  it('writes the JSON report into the directory of the declared coveragePath', () => {
+    expect(coverage['enabled']).toBe(true);
+    expect(coverage['provider']).toBe('v8');
+    expect(coverage['reporter']).toContain('json');
+    expect(`${String(coverage['reportsDirectory'])}/coverage-final.json`).toBe(
+      input['coveragePath'],
+    );
+    expect(coverage['thresholds']).toBeUndefined();
+  });
+
+  it('has no DEVAI_DB_TESTS gate and selects nothing under tests/e2e or tests/regression', () => {
+    const source = readFileSync(COVERAGE_CONFIG_PATH, 'utf8');
+    expect(source).not.toMatch(/process\.env/u);
+    expect(populationDefects(test.include ?? [])).toEqual([]);
+  });
+
+  it('writes the population sidecar beside the report after a passing run', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'devai-local-coverage-sidecar-'));
+    try {
+      const sidecarPath = join(directory, 'local', 'population.json');
+      const reporter = new PopulationSidecarReporter(sidecarPath);
+      reporter.onInit();
+      reporter.onCoverage({ files: () => ['a.ts', 'b.ts', 'c.ts'] });
+      reporter.onTestRunEnd([{}, {}] as never, [], 'passed');
+      const written = readFileSync(sidecarPath, 'utf8');
+      expect(JSON.parse(written)).toEqual({
+        schemaVersion: '1.0.0',
+        population: 'local',
+        include: [...LOCAL_INCLUDE],
+        exclusions: input['exclusions'],
+        filesMeasured: 3,
+        testFiles: 2,
+      });
+      expect(written).toBe(
+        `${JSON.stringify(localCoverageSidecar({ filesMeasured: 3, testFiles: 2 }), null, 2)}\n`,
+      );
+      expect(LOCAL_COVERAGE_SIDECAR).toBe(
+        `${dirname(input['coveragePath'] as string)}/population.json`,
+      );
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('removes a stale sidecar and writes none after a failed run', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'devai-local-coverage-sidecar-'));
+    try {
+      const sidecarPath = join(directory, 'population.json');
+      writeFileSync(sidecarPath, '{"population":"rc"}\n', 'utf8');
+      const reporter = new PopulationSidecarReporter(sidecarPath);
+      reporter.onInit();
+      expect(existsSync(sidecarPath)).toBe(false);
+      reporter.onCoverage({ 'a.ts': {} });
+      reporter.onTestRunEnd([], [], 'failed');
+      expect(existsSync(sidecarPath)).toBe(false);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('counts the per-file entries of a coverage map or a plain report', () => {
+    expect(measuredFileCount({ files: () => ['a.ts', 'b.ts'] })).toBe(2);
+    expect(measuredFileCount({ 'a.ts': {}, 'b.ts': {}, 'c.ts': {} })).toBe(3);
+    expect(measuredFileCount(null)).toBe(0);
   });
 });
 
