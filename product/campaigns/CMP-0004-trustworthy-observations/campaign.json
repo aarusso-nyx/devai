@@ -1985,7 +1985,7 @@
       "id": "R-0404",
       "title": "CI sampling contract and the second scorecard",
       "goal": "The harness sensors declare their population and read UNKNOWN below the minimum sample; a second scorecard is recorded beside the first once the sample matures and the delta is noted.",
-      "status": "planned",
+      "status": "open",
       "records": ["ADR-SCR-0010"],
       "depends_on": ["R-0402", "R-0403"],
       "attestation_reissue": false,
@@ -2015,7 +2015,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -2058,14 +2058,53 @@
               "commit_types": ["law(sensors)", "docs(adopters)"],
               "prompt": {
                 "path": "prompts/TASK-0441.md",
-                "sha256": null
+                "sha256": "17da05f9f6a1255a035d7ad4a655c014c616476c3357d94756003b760075d5e9"
               },
               "pull_request": null,
               "merged_as": null,
               "execution": {
                 "tier": "architect",
                 "effort": "high",
-                "time_budget_minutes": 60
+                "time_budget_minutes": 60,
+                "resolved": {
+                  "policy_version": "1.0.0",
+                  "pinned_at": "2026-10-01T18:40:23Z",
+                  "tiers": {
+                    "architect": {
+                      "rank": 1,
+                      "hosts": {
+                        "claude": "claude-cli:fable",
+                        "codex": "codex-cli:gpt-6-astra"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker-high": {
+                      "rank": 2,
+                      "hosts": {
+                        "claude": "claude-cli:opus",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker": {
+                      "rank": 3,
+                      "hosts": {
+                        "claude": "claude-cli:sonnet",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "medium"
+                    },
+                    "clerk": {
+                      "rank": 4,
+                      "hosts": {
+                        "claude": "claude-cli:haiku",
+                        "codex": "codex-cli:gpt-6-luna"
+                      },
+                      "default_effort": "low"
+                    }
+                  },
+                  "ceiling": "architect"
+                }
               }
             },
             {
@@ -2074,7 +2113,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0441",
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -2108,14 +2147,53 @@
               "commit_types": ["test(sensors)"],
               "prompt": {
                 "path": "prompts/TASK-0442.md",
-                "sha256": null
+                "sha256": "d0403705d33418dc3e776be9c241ec14f2b5234665d9d5580be4d9afb88c5a95"
               },
               "pull_request": null,
               "merged_as": null,
               "execution": {
                 "tier": "worker",
                 "effort": "high",
-                "time_budget_minutes": 90
+                "time_budget_minutes": 90,
+                "resolved": {
+                  "policy_version": "1.0.0",
+                  "pinned_at": "2026-10-01T18:40:24Z",
+                  "tiers": {
+                    "architect": {
+                      "rank": 1,
+                      "hosts": {
+                        "claude": "claude-cli:fable",
+                        "codex": "codex-cli:gpt-6-astra"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker-high": {
+                      "rank": 2,
+                      "hosts": {
+                        "claude": "claude-cli:opus",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker": {
+                      "rank": 3,
+                      "hosts": {
+                        "claude": "claude-cli:sonnet",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "medium"
+                    },
+                    "clerk": {
+                      "rank": 4,
+                      "hosts": {
+                        "claude": "claude-cli:haiku",
+                        "codex": "codex-cli:gpt-6-luna"
+                      },
+                      "default_effort": "low"
+                    }
+                  },
+                  "ceiling": "architect"
+                }
               }
             },
             {
@@ -2154,7 +2232,7 @@
               "commit_types": ["feat(sensors)"],
               "prompt": {
                 "path": "prompts/TASK-0443.md",
-                "sha256": null
+                "sha256": "863592ddc57e97bdcfdfb8cf2dc3e79a4898cfa40f8acd0b49358cb20473fe8d"
               },
               "pull_request": null,
               "merged_as": null,
