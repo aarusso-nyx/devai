@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "1.0.0",
+  "policy_id": "fixture.release",
+  "policy_version": "1.0.0",
+  "release_unit": "fixture/repository",
+  "version_source": "package.json",
+  "default_support": "current",
+  "capability_tasks": {
+    "formatting-hygiene": ["prepare"],
+    "lint": ["prepare"],
+    "type-integrity": ["prepare"],
+    "schema-consistency": ["prepare"],
+    "secret-scan": ["prepare"],
+    "path-portability": ["prepare"],
+    "package-integrity": ["prepare"],
+    "exact-candidate": ["prepare"],
+    "affected-checks": ["unit"],
+    "dependent-checks": ["unit"],
+    "build-integrity": ["unit"]
+  },
+  "risk_capabilities": {},
+  "mutation_roster": []
+}
