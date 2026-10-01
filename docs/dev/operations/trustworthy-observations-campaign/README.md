@@ -46,12 +46,13 @@ ADR-REL-0031).
 
 ## 2. Rounds and the outcome each must move
 
-| Round  | Records                                  | Outcome                                                                                                                               |
-| ------ | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| R-0401 | ADR-AUT-0002, ADR-SCR-0007               | `sense run build` and `sense run site_drift` produce readings; e2e and coverage report measured outcomes, including FAIL              |
-| R-0402 | ADR-SCR-0008                             | Ordered protocol on a fresh worktree yields substrate-reflecting readings for F4:T7 and F5:T4; the committed backlog validates        |
-| R-0403 | ADR-EVI-0001, ADR-EVI-0002, ADR-REL-0031 | Superseding closures render and seal; the DETRAN baseline fails before its declaration and passes after; intent receipts export       |
-| R-0404 | ADR-SCR-0010                             | Harness sensors declare their population and read UNKNOWN below the minimum sample; the second scorecard is recorded beside the first |
+| Round  | Records                    | Outcome                                                                                                                               |
+| ------ | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| R-0401 | ADR-AUT-0002, ADR-SCR-0007 | `sense run build` and `sense run site_drift` produce readings; e2e and coverage report measured outcomes, including FAIL              |
+| R-0402 | ADR-SCR-0008               | Ordered protocol on a fresh worktree yields substrate-reflecting readings for F4:T7 and F5:T4; the committed backlog validates        |
+| R-0403 | `839075e7`                 | #223, #226, #227, #228                                                                                                                | `closed` on 2026-10-01: CTG-0431 (ADR-EVI-0001, #169) as #226, CTG-0433 (ADR-REL-0031, #69, with ADR-MUT-0013) as #227, CTG-0432 (ADR-EVI-0002, #168) as #228; the DETRAN closures seal R-0017 through PC-0018 and the DETRAN proof baseline fails with its 52 orphans until an Architect declaration acknowledges them; close checks green on the merged head; no attestation re-issue |
+| R-0404 | —                          | —                                                                                                                                     | `open` on 2026-10-01 with TASK-0441 and TASK-0442 in progress                                                                                                                                                                                                                                                                                                                           |
+| R-0404 | ADR-SCR-0010               | Harness sensors declare their population and read UNKNOWN below the minimum sample; the second scorecard is recorded beside the first |
 
 ## 3. Owner effects
 
@@ -114,6 +115,31 @@ closing rounds. Three rules are specific to this campaign:
    rendering. `record/derived/indexes/README.md` is not written by hand
    (Constitution Article 6); the derived index is described on the
    `evidence render` reference page only. An amending record may restate IA-005.
+
+7. **ADR-REL-0031 lands in the canonical verifier first (2026-10-01).** The
+   Owner chose to change the canonical source `devai-nyx/devai-verifier`,
+   merged as its pull request 12 (merge `097ef4a6`), and to re-vendor exactly
+   commit `8b215d70`. Only the in-repository restatements of the vendored copy
+   moved; the trusted-verifier pins move after the next release (step 4 of the
+   repin order). A profile id containing a separator or a dot is
+   `PROFILE_ID_INVALID`, decided by grammar alone.
+8. **ADR-MUT-0013 (2026-10-01).** The re-vendor changed the manifest
+   `mutation-evidence-v2` pins, so a new record advanced its approved source to
+   `8b215d70`; the Owner accepted it as drafted and the policy and schema
+   constants were repinned in the same wave, so no merged head carried a
+   mutation refusal.
+9. **The anchor baseline write (2026-10-01).** `evidence verify` stays `read`
+   in the action registry. Without a baseline and without `--write` it fails
+   `PROOF_ANCHOR_BASELINE_MISSING`; with `--write` the authority layer admits
+   exactly `record/proofs/anchor-baseline.json`, as it gates
+   `docs decisions render --out`. `record/proofs/README.md` is not edited by
+   hand (Constitution Article 6).
+10. **ADR-SCR-0010 fields (2026-10-01).** `gh run list` returns no base branch,
+    workflow path, or jobs, and the record admits no other shape. Workflow,
+    event, and head branch filter server side; attempts, cancelled runs, and the
+    lookback filter on the rows; a job pair naming another workflow is excluded
+    by construction; the base branch and a same-workflow job pair are reported
+    unverified in the reading.
 
 ## 6. Round log
 
