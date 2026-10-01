@@ -287,6 +287,8 @@ function policyFor(input: BrokerInput, now: string) {
   return { policy: expectSuccess(loaded), sources };
 }
 
+const GH_RUN_LIST_WORKFLOW = /^[A-Za-z0-9_.-]+\.ya?ml$/u;
+const GH_RUN_LIST_EVENT = /^(?:push|pull_request|merge_group|workflow_dispatch|schedule)$/u;
 const GH_RUN_LIST_BRANCH = /^(?!-)(?!.*\.\.)[A-Za-z0-9._/-]{1,255}$/u;
 const GH_RUN_LIST_JSON_FIELDS = /^[A-Za-z]+(?:,[A-Za-z]+){0,15}$/u;
 const GH_RUN_LIST_LIMIT = /^[1-9][0-9]{0,3}$/u;
@@ -315,15 +317,17 @@ function pagesJournalGhApi(argv: readonly string[]): boolean {
 }
 
 /**
- * The declared read-only GitHub CLI shapes (ADR-SCR-0005 IA-004): `gh auth` (usage),
- * `gh auth status`, and the exact argv the harness sensors emit:
- * `gh run list --branch <ref> --json <fields> --limit <n> [--created >=<date>]`.
- * Declared by templates gh-auth-status, gh-run-list, and gh-run-list-created in
+ * The declared read-only GitHub CLI shapes (ADR-SCR-0005 IA-004, ADR-SCR-0010): `gh auth`
+ * (usage), `gh auth status`, and the argv the harness sensors emit:
+ * `gh run list --workflow <file> --event <event> [--branch <ref>] --json <fields>
+ * --limit <n> [--created >=<date>]`. Declared by templates gh-auth-status, gh-run-list,
+ * gh-run-list-created, gh-run-list-branch, and gh-run-list-branch-created in
  * law/policy/subprocess-effects.json, plus the two Pages journal GET shapes of
  * templates gh-api-pages-deployments and gh-api-pages-deployment-statuses
  * (ADR-AUT-0002). Those templates are descriptive for the effect-inference sensor and
  * are not loaded here, so this literal is the executable policy and mirrors them; it
- * is not gated by parent action, so `sense run` and `check` both admit it.
+ * is not gated by parent action, so `sense run` and `check` both admit it. Each option
+ * appears once and in the stated order.
  * Every other gh argv is refused.
  */
 function readOnlyGhProcess(args: readonly unknown[]): boolean {
@@ -333,19 +337,27 @@ function readOnlyGhProcess(args: readonly unknown[]): boolean {
   if (argv[0] === 'auth' && (argv.length === 1 || (argv.length === 2 && argv[1] === 'status'))) {
     return true;
   }
-  if (argv.length !== 8 && argv.length !== 10) return false;
-  const [run, list, branchFlag, branch, jsonFlag, fields, limitFlag, limit, createdFlag, created] =
-    argv;
+  return runListGhProcess(argv);
+}
+
+function runListGhProcess(argv: readonly string[]): boolean {
+  if (argv.length < 10 || argv.length > 14) return false;
+  if (argv[0] !== 'run' || argv[1] !== 'list') return false;
+  if (argv[2] !== '--workflow' || !GH_RUN_LIST_WORKFLOW.test(argv[3] ?? '')) return false;
+  if (argv[4] !== '--event' || !GH_RUN_LIST_EVENT.test(argv[5] ?? '')) return false;
+  let at = 6;
+  if (argv[at] === '--branch') {
+    if (!GH_RUN_LIST_BRANCH.test(argv[at + 1] ?? '')) return false;
+    at += 2;
+  }
+  if (argv[at] !== '--json' || !GH_RUN_LIST_JSON_FIELDS.test(argv[at + 1] ?? '')) return false;
+  if (argv[at + 2] !== '--limit' || !GH_RUN_LIST_LIMIT.test(argv[at + 3] ?? '')) return false;
+  at += 4;
+  if (at === argv.length) return true;
   return (
-    run === 'run' &&
-    list === 'list' &&
-    branchFlag === '--branch' &&
-    GH_RUN_LIST_BRANCH.test(branch ?? '') &&
-    jsonFlag === '--json' &&
-    GH_RUN_LIST_JSON_FIELDS.test(fields ?? '') &&
-    limitFlag === '--limit' &&
-    GH_RUN_LIST_LIMIT.test(limit ?? '') &&
-    (argv.length === 8 || (createdFlag === '--created' && GH_RUN_LIST_CREATED.test(created ?? '')))
+    argv.length === at + 2 &&
+    argv[at] === '--created' &&
+    GH_RUN_LIST_CREATED.test(argv[at + 1] ?? '')
   );
 }
 

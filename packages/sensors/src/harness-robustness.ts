@@ -4,87 +4,73 @@ import {
   type SensorReading,
   type SensorStatus,
 } from './sensor-reading.js';
-import { invokeGhJson } from './harness/gh-api.js';
+import {
+  insufficientSampleFinding,
+  samplePopulation,
+  type HarnessPopulationOptions,
+} from './harness/gh-api.js';
 
 /**
  * F5 harness robustness sensor (28.H; F5×T8). Per design note at
  * docs/theory/architecture/sensors/harness_robustness.md.
  */
 
-export interface HarnessRobustnessOptions {
-  readonly repoRoot: string;
-  readonly branch?: string;
-  readonly limit?: number;
+export interface HarnessRobustnessOptions extends HarnessPopulationOptions {
   readonly thresholds?: { readonly pass: number; readonly review: number };
-  readonly now?: string;
 }
 
 const DEFAULT_THRESHOLDS = { pass: 5, review: 15 } as const;
 
-interface GhRun {
-  readonly conclusion?: string;
-  readonly attempt?: number;
-}
-
 export function senseHarnessRobustness(opts: HarnessRobustnessOptions): SensorReading {
-  const branch = opts.branch ?? 'main';
-  const limit = opts.limit ?? 100;
   const thresholds = opts.thresholds ?? DEFAULT_THRESHOLDS;
+  const common = {
+    sensorName: 'harness-robustness',
+    sensorKind: 'harness_robustness',
+    deterministic: false,
+    tier: 'L2',
+    ...(opts.now !== undefined && { timestamp: opts.now }),
+  } as const;
 
-  const args = [
-    'run',
-    'list',
-    '--branch',
-    branch,
-    '--json',
-    'conclusion,attempt',
-    '--limit',
-    String(limit),
-  ];
-  const result = invokeGhJson<GhRun[]>({ cwd: opts.repoRoot, args });
-  if (!result.ok) {
+  const sample = samplePopulation(opts);
+  if (!sample.ok) {
     return buildSensorReading({
-      sensorName: 'harness-robustness',
-      sensorKind: 'harness_robustness',
-      command: ['gh', ...args],
+      ...common,
+      command: ['gh', ...sample.args],
       status: 'unknown',
-      deterministic: false,
-      tier: 'L2',
-      ...(opts.now !== undefined && { timestamp: opts.now }),
       findings: [
         {
           severity: 'info',
           code: 'HARNESS_ROBUSTNESS_GH_UNAVAILABLE',
-          message: `Skipped: ${result.reason}`,
+          message: `Skipped: ${sample.reason}`,
         },
       ],
       metrics: { run_count: 0 },
     });
   }
+  const command = ['gh', ...sample.args];
 
-  const total = result.data.length;
-  if (total === 0) {
+  const total = sample.runs.length;
+  if (total < sample.minimum) {
     return buildSensorReading({
-      sensorName: 'harness-robustness',
-      sensorKind: 'harness_robustness',
-      command: ['gh', ...args],
-      status: 'review',
-      deterministic: false,
-      tier: 'L2',
-      ...(opts.now !== undefined && { timestamp: opts.now }),
+      ...common,
+      command,
+      status: 'unknown',
       findings: [
-        {
-          severity: 'warning',
-          code: 'HARNESS_ROBUSTNESS_NO_RUNS',
-          message: `No CI runs found on branch ${branch}.`,
-        },
+        insufficientSampleFinding(
+          'HARNESS_ROBUSTNESS_INSUFFICIENT_SAMPLE',
+          total,
+          sample.minimum,
+          sample.describe,
+          'run(s)',
+        ),
+        sample.unverifiedFinding,
       ],
-      metrics: { run_count: 0, flaky_runs: 0, flakiness_pct: 0 },
+      metrics: { run_count: total, sample_size: total, ...sample.metrics },
     });
   }
 
   let flaky = 0;
-  for (const run of result.data) {
+  for (const run of sample.runs) {
     if (run.conclusion === 'success' && typeof run.attempt === 'number' && run.attempt > 1)
       flaky += 1;
   }
@@ -109,15 +95,12 @@ export function senseHarnessRobustness(opts: HarnessRobustnessOptions): SensorRe
       message: `Flakiness rate ${pct.toFixed(1)}% (above review ${String(thresholds.review)}%).`,
     });
   }
+  findings.push(sample.unverifiedFinding);
 
   return buildSensorReading({
-    sensorName: 'harness-robustness',
-    sensorKind: 'harness_robustness',
-    command: ['gh', ...args],
+    ...common,
+    command,
     status,
-    deterministic: false,
-    tier: 'L2',
-    ...(opts.now !== undefined && { timestamp: opts.now }),
     findings,
     metrics: {
       run_count: total,
@@ -125,6 +108,8 @@ export function senseHarnessRobustness(opts: HarnessRobustnessOptions): SensorRe
       flakiness_pct: Number(pct.toFixed(2)),
       threshold_pass: thresholds.pass,
       threshold_review: thresholds.review,
+      sample_size: total,
+      ...sample.metrics,
     },
   });
 }
