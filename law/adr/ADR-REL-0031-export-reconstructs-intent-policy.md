@@ -2,7 +2,7 @@
 id: ADR-REL-0031
 title: The evidence exporter reconstructs the expected task policy from the pinned release intent
 type: adr
-status: proposed
+status: accepted
 date: 2026-09-28
 authority: Architect
 supersedes: []
@@ -31,9 +31,10 @@ inspector_acceptance:
 
 ## Status
 
-Proposed on 2026-09-28 from the harness convergence brainstorm and its
-independent review. Binds nothing until the Architect sets it to accepted
-before the round that implements it opens. Adds a release-intent path to the
+Accepted on 2026-10-01 by the Architect as drafted, after the Owner
+accepted it on 2026-10-01; round R-0403 of CMP-0004 implements it. Proposed on
+2026-09-28 from the harness convergence brainstorm and its independent
+review. Adds a release-intent path to the
 vendored evidence exporter beside the unchanged profile path and re-vendors
 the verifier with a new provenance.
 

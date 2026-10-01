@@ -2,7 +2,7 @@
 id: ADR-EVI-0002
 title: Chain verification cross-checks every proof line and historical gaps are declared, never restored
 type: adr
-status: proposed
+status: accepted
 date: 2026-09-28
 authority: Architect
 supersedes: []
@@ -33,9 +33,10 @@ inspector_acceptance:
 
 ## Status
 
-Proposed on 2026-09-28 from the harness convergence brainstorm and its
-independent review. Binds nothing until the Architect sets it to accepted
-before the round that implements it opens. Extends `evidence verify --scope
+Accepted on 2026-10-01 by the Architect as drafted, after the Owner
+accepted it on 2026-10-01; round R-0403 of CMP-0004 implements it. Proposed on
+2026-09-28 from the harness convergence brainstorm and its independent
+review. Extends `evidence verify --scope
 chain` with a line-level cross-check and a governed historical declaration;
 the manifest hashing, link, and head rules of the chain are unchanged.
 

@@ -2,7 +2,7 @@
 id: ADR-SCR-0007
 title: The governed e2e configuration and a database-free coverage producer with a declared denominator
 type: adr
-status: proposed
+status: accepted
 date: 2026-09-28
 authority: Architect
 supersedes: []
@@ -37,9 +37,10 @@ inspector_acceptance:
 
 ## Status
 
-Proposed on 2026-09-28 from the harness convergence brainstorm and its
-independent review. Binds nothing until the Architect sets it to accepted
-before the round that implements it opens. Changes the declared e2e and
+Accepted on 2026-10-01 by the Architect as drafted, after the Owner
+accepted it on 2026-09-30; round R-0401 of CMP-0004 implements it. Proposed on
+2026-09-28 from the harness convergence brainstorm and its independent
+review. Changes the declared e2e and
 coverage inputs of ADR-SCR-0005 and adds one governed configuration; the RC
 coverage lane and its database gate are unchanged.
 

@@ -2,7 +2,7 @@
 id: ADR-SCR-0008
 title: Immutable readings, supersession by instance, recording order, and cell applicability
 type: adr
-status: proposed
+status: accepted
 date: 2026-09-28
 authority: Architect
 supersedes: []
@@ -42,9 +42,10 @@ inspector_acceptance:
 
 ## Status
 
-Proposed on 2026-09-28 from the harness convergence brainstorm and its
-independent review. Binds nothing until the Architect sets it to accepted
-before the round that implements it opens. Extends the one-store rule of
+Accepted on 2026-10-01 by the Architect as drafted, after the Owner
+accepted it on 2026-10-01; round R-0402 of CMP-0004 implements it. Proposed on
+2026-09-28 from the harness convergence brainstorm and its independent
+review. Extends the one-store rule of
 ADR-SCR-0002 with reading identity, recording order, a backlog schema, and per-cell applicability.
 
 ## Context
