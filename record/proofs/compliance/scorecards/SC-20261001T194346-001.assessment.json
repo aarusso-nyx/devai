@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "AS-20261001T194346-001",
+  "generated_at": "2026-10-01T16:43:46-03:00",
+  "scorecard_id": "SC-20261001T194346-001",
+  "previous_assessment_id": null,
+  "narrative": "Overall: RED. 35/45 cells passing. 1 cell(s) failing. 4 cell(s) in review. 2 cell(s) unknown (sensor coverage gap). Per-cell signals:\n  - F2×T6 FAIL: security_scan → SECURITY_SCAN_HIGH_OVER_THRESHOLD: 8 high-severity vulnerabilities exceed REVIEW threshold 5.\n  - F4×T4 UNKNOWN (SR exists but classifier returned UNKNOWN; check rule for kind=inventory_adherence)\n  - F4×T9 REVIEW: INVENTORY_REGENERATION_NO_KINDS_TOUCHED\n  - F5×T3 REVIEW: HARNESS_COHERENCE_CONCURRENCY_POLICY\n  - F5×T4 REVIEW: HARNESS_INVARIANT_ALIGNMENT_UNMEASURED_IN_CI\n  - F5×T9 REVIEW: HARNESS_GREEN_MAIN_PARTIAL, HARNESS_POPULATION_UNVERIFIED",
+  "deltas": [],
+  "backlog_actions": {
+    "additions": [],
+    "completions": [],
+    "deprioritizations": []
+  },
+  "recommended_priorities": []
+}
