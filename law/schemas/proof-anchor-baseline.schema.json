@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/proof-anchor-baseline.schema.json",
+  "title": "Proof anchor baseline",
+  "description": "The append-only baseline that the first `evidence verify --scope chain` under ADR-EVI-0002 writes to `record/proofs/anchor-baseline.json`: one entry per physical proof line under `record/proofs/work`, with its canonical path, its one-based sequence inside that file, the SHA-256 of the line bytes, and the anchor status observed. The `cutoff` is the timestamp of that first verification; a historical declaration may name only lines whose entry predates it. A later verification may append entries for lines that were not yet present and may never change or remove an entry.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "record", "cutoff", "entries"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": "1.0.0" },
+    "record": {
+      "const": "ADR-EVI-0002",
+      "description": "The decision record under which the baseline was first written."
+    },
+    "cutoff": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of the first verification under ADR-EVI-0002. Fixed at the first write and never changed."
+    },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sequence", "sha256", "anchor_status", "observed_at"],
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^record/proofs/work/[a-z0-9][a-z0-9_-]*/R-[0-9]{4}\\.jsonl$",
+            "description": "Canonical repository-relative path of the proof epoch file: forward slashes, no dot segment, no leading slash."
+          },
+          "sequence": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "One-based position of the line within its file. The sequence namespace is the file; it never crosses files."
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "SHA-256 of the line bytes between the previous newline and the next newline, exclusive of the newline."
+          },
+          "anchor_status": {
+            "enum": ["anchored", "orphaned"],
+            "description": "Whether a chain entry anchored the line when the entry was observed."
+          },
+          "observed_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp of the verification that appended this entry. Entries written at the first verification carry the cutoff."
+          }
+        }
+      }
+    }
+  },
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "record": "ADR-EVI-0002",
+      "cutoff": "2026-10-02T00:00:00.000Z",
+      "entries": [
+        {
+          "path": "record/proofs/work/generic/R-0001.jsonl",
+          "sequence": 1,
+          "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "anchor_status": "anchored",
+          "observed_at": "2026-10-02T00:00:00.000Z"
+        },
+        {
+          "path": "record/proofs/work/generic/R-0002.jsonl",
+          "sequence": 3,
+          "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "anchor_status": "orphaned",
+          "observed_at": "2026-10-02T00:00:00.000Z"
+        }
+      ]
+    }
+  ]
+}

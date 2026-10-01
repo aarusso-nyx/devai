@@ -242,6 +242,32 @@
       ]
     },
     {
+      "page_id": "evidence-verify",
+      "planned_path": "docs/reference/cli/evidence-verify.md",
+      "title": "evidence verify and proof-line anchoring",
+      "purpose": "Specify the proof-line cross-check of evidence verify --scope chain: the canonical path, sequence namespace, newline handling and byte hashing of an anchor, the structured proof_path, proof_sequence and proof_sha256 fields of new anchors, the append-only baseline record/proofs/anchor-baseline.json, the historical-gap declaration proof and its rejections, the UNANCHORED_NEWEST_LINE crash-recovery rule, and the historical gap acknowledged label.",
+      "content_mode": "narrative",
+      "mutable_population_mode": "none",
+      "category_ids": [],
+      "source_refs": [
+        {
+          "path": "law/adr/ADR-EVI-0002-proof-line-anchoring.md",
+          "pointer": "#",
+          "projection": "decision, anchoring rules, baseline, declaration, and crash-recovery rule as accepted on 2026-10-01 with maintainer decision 10"
+        },
+        {
+          "path": "law/schemas/proof-anchor-baseline.schema.json",
+          "pointer": "#",
+          "projection": "baseline fields record, cutoff, and the path, sequence, sha256, anchor_status, and observed_at of each entry"
+        },
+        {
+          "path": "law/schemas/proof-orphan-declaration.schema.json",
+          "pointer": "#",
+          "projection": "declaration payload fields declaration, record, authorization, cutoff, and the path, sequence, and sha256 of each orphan"
+        }
+      ]
+    },
+    {
       "page_id": "workflows",
       "planned_path": "docs/dev/operations/workflows/README.md",
       "title": "Workflows",
