@@ -1,0 +1,113 @@
+{
+  "round_id": "R-0008",
+  "title": "WP-T2 + WP-T3 of the TEAT build pack: handwritten command surfaces for AIT, bootstrap/shift/handoff, numbering and offline sync, evidence custody, external snapshots, normative package, administrative measures, alcohol, speed, SSE stream and integrations; policy⇔routes matrix; command contracts, gate, typed clients and schemas",
+  "declaring_decision": "D-1",
+  "closing_decision": "D-2",
+  "batches": [
+    {
+      "id": "CTG-0001",
+      "roles": [
+        "Architect",
+        "Inspector",
+        "Engineer"
+      ],
+      "commit": "397cb033ce2da549e2922d307c28b6b81e5d5070",
+      "headline": "Delivered DetranError and the shared events/outbox port, If-Match on AIT, the AIT lifecycle commands (vehicles, people, science, finalize, print-events, transmission, protocol, concurrency review, corrections, accept/reject/archive) and the cancel-request flow with decision_body claim; policy §4; tests (PR #47)."
+    },
+    {
+      "id": "CTG-0002",
+      "roles": [
+        "Architect",
+        "Inspector",
+        "Engineer"
+      ],
+      "commit": "ade61acfbdc4dc5c1d6931e9b508428650da231f",
+      "headline": "Delivered mobile bootstrap, shift open/close, session handoff, numbering reservations (reserve/cancel/block/close/reconcile/consumption), the sync-batch protocol with receipts, queue items, conflicts and entity appliers, and field-operations commands; policy §5–§6; seed 26; tests (PR #48)."
+    },
+    {
+      "id": "CTG-0003",
+      "roles": [
+        "Architect",
+        "Inspector",
+        "Engineer"
+      ],
+      "commit": "f04fd680354b50b5db49cb16becd30cba809dc15",
+      "headline": "Delivered evidence custody and bodycam access requests, external snapshots via the SENATRAN adapter ports, the normative mobile package lifecycle with signed content, handwritten-first controller registration in the generator; policy §7; seed 27; tests (PR #49)."
+    },
+    {
+      "id": "CTG-0004",
+      "roles": [
+        "Architect",
+        "Inspector",
+        "Engineer"
+      ],
+      "commit": "69f2cda74d2e999d8e6b37ca0d2fb401c41be7e7",
+      "headline": "Delivered administrative measures, alcohol procedures and speed measurements as handwritten commands with status history and outbox events, the SSE stream over the outbox with injectable poller, the integrations projection, policy §8 and the policy⇔routes matrix; seed 28; blueprints 1.2.0; tests (PR #50)."
+    },
+    {
+      "id": "CTG-0005",
+      "roles": [
+        "Architect",
+        "Inspector",
+        "Engineer"
+      ],
+      "commit": "3f8a817f4e716749420f716a9e5a83cc6b956d8e",
+      "headline": "Delivered nine handwritten command contracts (92 operations), the check-commands gate in contracts:check, typed clients generated into @detran/api-clients, sync-batch/normative-package/bootstrap schemas and 16 event schemas, node:test suites, and the WP-T2/WP-T3 documentation transcription (PR #51)."
+    }
+  ],
+  "gates": {
+    "cross-family-delivery-review": {
+      "status": "pass",
+      "detail": "CTG-0001 cycle 3 PASS; CTG-0002 cycle 4 PASS; CTG-0003 cycle 3 PASS; CTG-0004 cycle 3 PASS (cycles 1–2 FAIL corrected under §16); CTG-0005 cycle 3 PASS (cycles 1–2 REVIEW corrected under §9.14–§9.19) (GPT-5.6 Terra)."
+    },
+    "github-ci": {
+      "status": "pass",
+      "detail": "PR #47, #48, #49, #50 and #51 all five jobs green (backend-kernel, evidence-gate, foundation, senatran-mock, senatran-mock-tests)."
+    },
+    "repository-check": {
+      "status": "pass",
+      "detail": "pnpm check green on every merged tree (format, orchestra-bridge, kb, blueprints, contracts incl. check-commands and clients --check, parameters, contracts:test, typecheck, ui, decorators 863, rls-ddl, role-catalog, lifecycle-vocabulary, senatran boundary/contracts, pec parity/superset)."
+    },
+    "backend-tests": {
+      "status": "pass",
+      "detail": "backend:test:ci green with role_app_backend after apply.sh --full + seed.sh: CTG-0004 tree 51 vitest runs / 1541 tests; CTG-0005 tree 51 vitest runs / 1561 tests plus unit rerun 34 runs / 1278 tests on the final tree."
+    },
+    "database": {
+      "status": "pass",
+      "detail": "apply.sh --full + seed.sh idempotent on detran_r8 (seeds 00…60 plus 26–28 TEAT fixtures); all e2e suites run against the reseeded database."
+    }
+  },
+  "source_repo_deleted": false,
+  "validation_criteria": [
+    {
+      "criterion": "WP-T2 implemented: every command of teat-route-contract.md §4–§7 mounted as a handwritten controller with DetranError, If-Match/ETag, Idempotency-Key, status history and outbox events in one transaction; policy keys ⇔ routes proven in both directions.",
+      "verdict": "pass",
+      "evidence": "plan.md M1–M18; contracts CTG-0001…CTG-0004 with maestro adendas; policy-routes.e2e.spec.ts; delivery reviews."
+    },
+    {
+      "criterion": "WP-T3 implemented: nine *.commands.openapi.json covering the 92 mounted operations, check-commands gate and clients --check in contracts:check, @detran/api-clients generated and committed, payload and event schemas, documentation transcribed (build pack, route contract §9, schemas README, fixtures, OD-T13…OD-T73).",
+      "verdict": "pass",
+      "evidence": "contracts/CTG-0005.md §1–§9; reports TASK-0010/0012/0013/0011; pnpm contracts:check and contracts:test."
+    },
+    {
+      "criterion": "Every merged commit passes the required checks; fixtures load in CI; audit observations recorded at the exact merge SHAs.",
+      "verdict": "pass",
+      "evidence": "EV-5a4d81502cca07c6 (397cb03), EV-09de2ec425fa6a4a (ade61ac), EV-7015a54fd4ea3537 (f04fd68), EV-6cb2ac671c8c61ca (69f2cda), EV-6bf500197fd3900b (3f8a817f4e716749420f716a9e5a83cc6b956d8e)."
+    },
+    {
+      "criterion": "No Owner decision reopened; divergences between contracts and code recorded as OD proposals (OD-T13…OD-T73) instead of silent changes; the budget overrun and the continuation after a FAIL verdict recorded in plan.md.",
+      "verdict": "pass",
+      "evidence": "plan.md §Bloqueios and §Retomada; open-decisions-rait.md §F; budget.json."
+    }
+  ],
+  "closed_at": "2026-09-16T12:10:58.882038Z",
+  "merged_as": "3f8a817f4e716749420f716a9e5a83cc6b956d8e",
+  "release_disposition": "none-needed",
+  "evidence": {
+    "proof_epoch": "R-0008",
+    "terminal_sha256": "edf94592af5ea6b3bb128e1cd54ed892322a605f3dee3ee7d81913bb6567d9c4"
+  },
+  "notes": "D-1 binds the Owner-authorized execution of the R-0008 maestro prompt (WP-T2 + WP-T3 of the TEAT build pack) until complete finalization and merge. D-2 records the Architect closing judgment after GPT-5.6 Terra delivery PASS on all five coupled groups, green CI on PR #47–#51, exact-SHA Auditor observations at every merge, and no release-bearing package publication (@detran/api-clients is a workspace-only types package).",
+  "schemaVersion": "1.0.0",
+  "id": "PC-0005"
+}

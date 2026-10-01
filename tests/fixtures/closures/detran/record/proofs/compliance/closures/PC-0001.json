@@ -1,0 +1,73 @@
+{
+  "round_id": "R-0003",
+  "title": "WP-D0 dashboard roles, policy matrix, and access layers",
+  "declaring_decision": "D-1",
+  "closing_decision": "D-2",
+  "batches": [
+    {
+      "id": "CTG-0001",
+      "roles": [
+        "Owner",
+        "Architect",
+        "Inspector",
+        "Engineer"
+      ],
+      "commit": "cf8f475eaf1951fa2ebb3c42d24f725c6581ea0e",
+      "headline": "Delivered the two DASHBOARD roles, dashboard policy matrix, N0-N3 access helpers, catalog DDL, tests, and governed documentation."
+    }
+  ],
+  "gates": {
+    "cross-family-delivery-review": {
+      "status": "pass",
+      "detail": "GPT-5.6 Terra cycle 2 PASS with no findings."
+    },
+    "github-ci": {
+      "status": "pass",
+      "detail": "PR #32 run 34806752089: all five jobs passed."
+    },
+    "shared-tests": {
+      "status": "pass",
+      "detail": "38 tests passed."
+    },
+    "role-catalog": {
+      "status": "pass",
+      "detail": "36 roles, including 10 RAIT and 2 DASHBOARD roles."
+    },
+    "rls-ddl": {
+      "status": "pass",
+      "detail": "134 tenant tables verified; fresh DDL application produced 36 catalog rows."
+    },
+    "repository-check": {
+      "status": "pass",
+      "detail": "Format, type integrity, generated consistency, documentation, DEVAI doctor, and whitespace checks passed locally and in CI."
+    }
+  },
+  "source_repo_deleted": false,
+  "validation_criteria": [
+    {
+      "criterion": "WP-D0 roles and policy are implemented without absorbing WP-D1 or WP-T2.",
+      "verdict": "pass",
+      "evidence": "PR #32; CTG-0001; delivery review cycle 2 PASS."
+    },
+    {
+      "criterion": "The exact integrated commit passes the repository's required checks.",
+      "verdict": "pass",
+      "evidence": "GitHub Actions run 34806752089 and audit observation EV-c02e644fc87284b3 at cf8f475eaf1951fa2ebb3c42d24f725c6581ea0e."
+    },
+    {
+      "criterion": "OD-D01 is implemented while Auditor and DPO remain read-only and integration-operator does not gain dashboard alert access.",
+      "verdict": "pass",
+      "evidence": "Contract CTG-0001, policy tests, and reference-gap corrections recorded in the round plan."
+    }
+  ],
+  "closed_at": "2026-09-14T04:50:05.824Z",
+  "merged_as": "cf8f475eaf1951fa2ebb3c42d24f725c6581ea0e",
+  "release_disposition": "none-needed",
+  "evidence": {
+    "proof_epoch": "R-0003",
+    "terminal_sha256": "d572245820f95ea605ec50fe34641ecf3f694ed64ab18c95d72a1dfae085795f"
+  },
+  "notes": "D-1 binds the Owner-approved OD-D01 declaration in steering H.38. D-2 records the Architect closing judgment after reviewer PASS, green CI, exact-SHA merge observation, and no release-bearing package change.",
+  "schemaVersion": "1.0.0",
+  "id": "PC-0001"
+}

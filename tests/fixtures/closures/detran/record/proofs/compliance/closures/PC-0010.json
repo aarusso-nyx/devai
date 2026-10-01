@@ -1,0 +1,129 @@
+{
+  "round_id": "R-0012",
+  "title": "WP-D, WP-E e WP-F do pacote de construção do RAIT: 63 fichas de tela por rota (IU-RAIT-002…064), o app apps/rait/web sobre @detran/ui e STYNX 1.3.1 (74 rotas do manifesto com guardas por papel, shell, SSE com fallback por polling, error boundary único, 8 clientes gerados e 11 facades, 26 componentes de domínio, 50 páginas L1/L2 com matriz de autorização ação × papel, catálogo i18n de 890 chaves) e os 16 formulários com gates de transição e as duas regras ESLint locais; documentação de fechamento",
+  "declaring_decision": "D-1",
+  "closing_decision": "D-2",
+  "batches": [
+    {
+      "id": "CTG-0001",
+      "roles": [
+        "Architect"
+      ],
+      "commit": "442357b34f88b5c858933ef6be13d7d7f673397d",
+      "headline": "63 fichas IU-RAIT-002…064, uma por rota com página de rait-web-frontend.md §4, com acesso por papel, comandos com pré/pós-estado, LGPD, atalhos e chaves i18n; baseline do KB 675 → 738 (PR #79)."
+    },
+    {
+      "id": "CTG-0002a",
+      "roles": [
+        "Architect",
+        "Inspector",
+        "Engineer"
+      ],
+      "commit": "4d472d75d1109c09327e79e474da01b25260996d",
+      "headline": "Núcleo de apps/rait/web: manifesto de 74 rotas, árvore lazy com placeholders, guardas (papéis = união das claims cognito:groups e roles), session facade, shell, atalhos, SSE com backoff e polling, error boundary único (131 códigos), catálogo i18n e 14 namespaces rait.* na allowlist (PR #81)."
+    },
+    {
+      "id": "CTG-0002b-1",
+      "roles": [
+        "Architect",
+        "Inspector",
+        "Engineer"
+      ],
+      "commit": "3280f5f82229d2d9e04c3e1c67c54fd03a29a843",
+      "headline": "Camada de dados (modelos-alias dos contratos gerados, list-query sem reordenação, ETag, RaitClock, 8 clientes com 98 GET e 64 comandos todo M8, 11 facades com invalidação SSE) e os 26 componentes de domínio com matriz de permissão por papel (PR #85)."
+    },
+    {
+      "id": "CTG-0002b-2",
+      "roles": [
+        "Architect",
+        "Inspector",
+        "Engineer"
+      ],
+      "commit": "ba5676be70e2617e02568c87235af3082cf4ea10",
+      "headline": "50 páginas (43 L2 + layout do caso + 6 L1) ligadas às rotas por módulo, listas sincronizadas com a URL, atalhos, confirmações com o efeito jurídico das fichas (45 chaves confirm.*), matriz ação × 13 papéis e 3688 testes (PR #90)."
+    },
+    {
+      "id": "CTG-0002c",
+      "roles": [
+        "Architect",
+        "Inspector",
+        "Engineer"
+      ],
+      "commit": "4b0fcc1c4bfb867093cdd008f5c1949913910a3f",
+      "headline": "16 schemas zod com gate de transição no cabeçalho, 152 chaves rait.forms.*, regras ESLint rait/no-client-deadline-math e rait/no-static-token-i18n-key ligadas ao app, 325 testes de autorização por gate; 4434 testes verdes; documentação de fechamento (PR #92)."
+    }
+  ],
+  "gates": {
+    "cross-family-delivery-review": {
+      "status": "pass",
+      "detail": "CTG-0001 REVIEW→PASS; CTG-0002a REVIEW→PASS; CTG-0002b-1 REVIEW→PASS; CTG-0002b-2 REVIEW→REVIEW→PASS (B4); CTG-0002c PASS no primeiro ciclo — todos por codex gpt-5.6-terra pela ponte. Prompt-reviews 1…18 chegaram a PASS (ciclos de estrutura registrados em plan.md B1–B3)."
+    },
+    "github-ci": {
+      "status": "pass",
+      "detail": "PRs #79, #81, #85, #90 e #92 com os sete jobs verdes (backend-kernel exigiu rerun em #85 e #90 por falha intermitente de rait-priority-upgrade.integration.spec.ts, teste de R-0007 não tocado por esta frente e verde em main)."
+    },
+    "pnpm-check": {
+      "status": "pass",
+      "detail": "EXIT 0 em cada grupo acoplado sobre a árvore final, inclusive após cada integração de main (R-0011, R-0013, R-0016, DEVAI 1.5.4/1.5.5/1.5.6)."
+    },
+    "app-suite": {
+      "status": "pass",
+      "detail": "pnpm --filter @detran/rait-web typecheck|lint|test|build verdes; Tests 4434 passed | 139 todo (4573) — os todo são métodos de comando aguardando R-0007 CTG-0004 (M8), todos com OD citada; build sem warnings; lint com as duas regras locais ligadas."
+    },
+    "knowledge-base": {
+      "status": "pass",
+      "detail": "node tools/docs/kb/check.mjs OK (756 artifacts, 446 canonical tokens; baseline 675 → 738 com as 63 fichas); pnpm docs:kb:publish-check OK."
+    },
+    "parameter-catalogue": {
+      "status": "pass",
+      "detail": "pnpm verify:parameter-catalogue OK (90 entries, 18 flags, 57 i18n namespaces, 0 errors) com os 14 namespaces rait.* acrescentados; pnpm parameters:test 41/41 (caso negativo de colisão rait.timer mantido)."
+    },
+    "evidence-chain": {
+      "status": "pass",
+      "detail": "devai evidence record generic sequences 1…5 e verify --scope chain válido a cada gravação; observações do Auditor nos SHAs exatos de cada merge."
+    }
+  },
+  "validation_criteria": [
+    {
+      "criterion": "WP-D entregue: uma ficha de tela por rota com página da §4 (63), com objetivo, papel, resolver, layout, componentes compartilhados, ações e comandos com pré/pós-estado, estados com códigos do catálogo de erros, atalhos, LGPD por papel e critérios ligados aos AC-RAIT-*; status draft até a revisão do Owner.",
+      "verdict": "pass",
+      "evidence": "PR #79 (08fb84e8); docs:kb:check OK 738 artefatos; delivery-review-CTG-0001-2 PASS; evidência generic seq. 1."
+    },
+    {
+      "criterion": "WP-F entregue: apps/rait/web sobre @detran/ui e STYNX 1.3.1 com a árvore exata da §4 (74 entradas do manifesto, títulos, guardas por papel), core (shell, SSE, atalhos, error boundary), data/ (clientes gerados e facades), shared/ (26 componentes da §5.2), 50 páginas nos níveis fixados e i18n pt-BR; módulos sem backend renderizam \"indisponível nesta versão\" sem mock silencioso (§11).",
+      "verdict": "pass",
+      "evidence": "PRs #81 (026c9fc0), #85 (72c15ae9), #90 (4abe570a); contratos CTG-0002a/b; delivery-review-CTG-0002a, -0002b-1-2, -0002b-2-3 PASS; evidência generic seq. 2, 3, 4."
+    },
+    {
+      "criterion": "WP-E entregue: 16 schemas de formulário com campo, tipo, obrigatoriedade condicional, máscara, validação de forma e código de erro de negócio esperado, mais o gate de transição no cabeçalho e no consolidado rait-web-forms.md; nenhum prazo legal calculado no cliente, provado por regra ESLint local.",
+      "verdict": "pass",
+      "evidence": "PR #92; contrato CTG-0002c (100 critérios); 663 testes de formulários e 44 de RuleTester; delivery-review-CTG-0002c PASS; evidência generic seq. 5."
+    },
+    {
+      "criterion": "Matriz de autorização exaustiva: toda ação com permissão testa presença para cada papel canônico concedido em RAIT_COMMAND_RULES e ausência para cada papel omitido (455 testes nas páginas e componentes, 325 nos gates); nenhum grant por analogia.",
+      "verdict": "pass",
+      "evidence": "adendas A11/A15; specs app.guards-matrix.*, features/**/*.page.spec.ts, forms/gates-matrix.spec.ts; delivery-review CTG-0002b-1 ciclo 2 e CTG-0002b-2 ciclo 3 PASS."
+    },
+    {
+      "criterion": "Nenhum valor inventado: endpoints de comando ausentes ficam todo citando R-0007 CTG-0004 (M8), tipos só dos contratos gerados, textos e rótulos sem fonte registrados como OD; as 54 questões OD-R12-001…054 estão transcritas em open-decisions-rait.md §G com premissa, decisor e fonte, nenhuma fechada.",
+      "verdict": "pass",
+      "evidence": "open-decisions-rait.md §G; contratos §9/§12; reports/TASK-*.md; nenhum DTO à mão (contracts:clients inalterado)."
+    },
+    {
+      "criterion": "Todo commit mesclado passou nos checks exigidos; observações de auditoria gravadas nos SHAs exatos de cada merge; desvios registrados (B1 terceiro ciclo de prompt-review; B2 FAIL por estrutura de fronteira; B3 edição não aplicada entre ciclos; B4 terceiro ciclo de delivery-review; B5 despacho com PR verde ainda não mesclado) e adendas A1…A16 no plano.",
+      "verdict": "pass",
+      "evidence": "EV-b4d8707038beb8a2 (08fb84e8), EV-67165ae15201f198 (026c9fc0), EV-a04b28c82c5b9527 (72c15ae9), EV-1cbd064c9bf1fabc (4abe570a), EV-e92d3c90ddfcec77 (828331d4); plan.md §Bloqueios, §Triagem, §Adendas; AUTHORIZATION.md emenda 1."
+    }
+  ],
+  "closed_at": "2026-09-22T14:30:00.000Z",
+  "merged_as": "828331d49ef5fb5d6ec368aba8c3f2360863e610",
+  "release_disposition": "none-needed",
+  "source_repo_deleted": false,
+  "evidence": {
+    "proof_epoch": "R-0012",
+    "terminal_sha256": "4fd46d0736b56a097c9e1257a8c1ea8b27b9b5fd3890f18bf2f83ac5c546b23d"
+  },
+  "notes": "D-1 vincula a execução autorizada pelo Owner do prompt do maestro de R-0012 (WP-D, WP-E e WP-F do pacote de construção do RAIT; abertura em worktree sobre origin/main com o plano do PR #78; lock packages/ui tomado antes de R-0013 CTG-0004) até o fechamento completo, com a emenda 1 (prosseguir até a completa finalização, 2026-09-21). D-2 registra o juízo de fechamento após delivery-review de outra família PASS em todos os cinco grupos acoplados (codex gpt-5.6-terra), CI verde nos PRs #79, #81, #85, #90 e #92, observações do Auditor nos SHAs exatos, comandos do console deixados como todo até R-0007 CTG-0004 e nenhuma publicação de pacote com release. Consumo estimado da rodada: ≈5,5 M tokens únicos de entrada e ≈1,6 M de saída (brutos dos workers ≈12 M), em execução contínua.",
+  "schemaVersion": "1.0.0",
+  "id": "PC-0010"
+}

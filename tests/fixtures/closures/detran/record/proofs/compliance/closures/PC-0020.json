@@ -1,0 +1,145 @@
+{
+  "round_id": "R-0018",
+  "title": "C-0002 action 3: ADR numbering policy and renumbering (ADR-0035…0038), ADR and state indexes with the verify:state-index gate, state documents and model ladder (Sol 6 / Opus 5.5), versioned worker reports, and 52 new plus 12 refreshed READMEs",
+  "declaring_decision": "D-1",
+  "closing_decision": "D-2",
+  "batches": [
+    {
+      "id": "CTG-0001",
+      "roles": [
+        "Architect",
+        "Inspector",
+        "Engineer",
+        "Auditor"
+      ],
+      "commit": "7d6bd665f539ff1b15f91853edfa3813d9741e95",
+      "headline": "ADR-0035 policy, renumbering 0006-ops→0036, 0024-rait→0037, 0028-prov→0038 with redirect stubs and aliases, coherent ADR and rounds indexes, verify:state-index/test:state-index/adr:renumber; integrated by PR #128 as 289a072f."
+    },
+    {
+      "id": "CTG-0002",
+      "roles": [
+        "Architect",
+        "Engineer",
+        "Auditor"
+      ],
+      "commit": "7ef96d42681395222a84fd377bd197067e9748bd",
+      "headline": "Build packs, waves, start, BUILD-PLAN and model-ladder reconciled with closures; .gitignore/.prettierignore for worker reports; CLAUDE/AGENTS patches proposed (OD-R18-003); integrated by PR #129 as 681e8d65."
+    },
+    {
+      "id": "CTG-0003",
+      "roles": [
+        "Architect",
+        "Auditor"
+      ],
+      "commit": "f996290c214d55e2b8059df9cf1407c60d220841",
+      "headline": "52 new module/package/domain READMEs from closed sources and 12 refreshed READMEs; closing lines phase 1 and OD-R18-005; integrated by PR #130 as 4bd1d553."
+    }
+  ],
+  "gates": {
+    "cross-family-delivery-review": {
+      "status": "pass",
+      "detail": "Reviewer codex gpt-6-sol via tools/orchestra/bridge.sh. CTG-0001 REVIEW→REVIEW→PASS (cycle 3 after escalation Sonnet 5→Opus 5.5, AUTHORIZATION Emenda 2); CTG-0002 FAIL→PASS (Art. 7 heading; TASK-0005 boundary violation T8 redone in isolation); CTG-0003 REVIEW→PASS. Prompt reviews: 10 (3 FAIL/REVIEW cycles corrected)."
+    },
+    "github-ci": {
+      "status": "pass",
+      "detail": "PR #128, #129 and #130 merged only after all seven checks passed (evidence-gate, foundation, senatran-mock, senatran-mock-tests, verified-local-rc, backend-kernel, boat-documents-real); the five required by main protection included."
+    },
+    "pnpm-check": {
+      "status": "pass",
+      "detail": "Exit 0 locally on each CTG tree, including verify:state-index OK: 39 ADRs, 3 redirecionamentos, 33 rodadas, 14 closures and test:state-index 98/98."
+    },
+    "docs": {
+      "status": "pass",
+      "detail": "pnpm docs:check, docs:kb:check and docs:kb:publish-check OK."
+    },
+    "evidence-chain": {
+      "status": "pass",
+      "detail": "Generic sequences 1-3 anchored in record/proofs/chain.json; exact merge observations EV-5b4f8f7a4c723afa (289a072f), EV-86defc6a6ac2a44f (681e8d65), EV-be847ccb8991ac31 (4bd1d553)."
+    }
+  },
+  "source_repo_deleted": false,
+  "validation_criteria": [
+    {
+      "criterion": "pnpm format:check, docs:kb:check and docs:kb:publish-check → OK",
+      "verdict": "pass",
+      "evidence": "pnpm check exit 0 on 4bd1d553 tree"
+    },
+    {
+      "criterion": "pnpm docs:check → OK (renumbered ADRs and redirects resolve)",
+      "verdict": "pass",
+      "evidence": "Docusaurus build without broken links (CTG-0001/0002/0003)"
+    },
+    {
+      "criterion": "pnpm check → green; pnpm devai:doctor → all ✓",
+      "verdict": "pass",
+      "evidence": "pnpm check exit 0; devai doctor ok:true (tier3)"
+    },
+    {
+      "criterion": "pnpm test:state-index → all TASK-0002 cases green",
+      "verdict": "pass",
+      "evidence": "98/98"
+    },
+    {
+      "criterion": "pnpm verify:state-index → OK on integrated main and fails (exit ≠ 0) on the negative fixtures",
+      "verdict": "pass",
+      "evidence": "OK: 39 ADRs, 3 redirecionamentos, 33 rodadas, 14 closures; negative fixtures C-01-01…C-01-36"
+    },
+    {
+      "criterion": "pnpm adr:renumber (dry-run) after --write → no pending change",
+      "verdict": "pass",
+      "evidence": "0 pending, 9 review (review lines resolved by alias)"
+    },
+    {
+      "criterion": "duplicated ADR numbers only where the pair is a redirect (checked by the gate)",
+      "verdict": "pass",
+      "evidence": "0006, 0024, 0028 each with one redirect stub"
+    },
+    {
+      "criterion": "git grep '1\\.4\\.5' in work/rounds/README.md, docs/start/index.md, BUILD-PLAN.md → empty",
+      "verdict": "pass"
+    },
+    {
+      "criterion": "git grep 'R-0031' work/rounds/README.md → one line; 'C-0002' present",
+      "verdict": "pass"
+    },
+    {
+      "criterion": "git grep 'Sol 6\\|Opus 5.5' model-ladder.md → present",
+      "verdict": "pass"
+    },
+    {
+      "criterion": "git check-ignore -v work/rounds/R-0018/reports/TASK-0001.md → not ignored",
+      "verdict": "pass",
+      "evidence": "Literally met (exit 1), but only because the file is tracked; the evidentiary proof is git check-ignore --no-index (C-02-20: exit 1)"
+    },
+    {
+      "criterion": "git check-ignore -v dist → ignored",
+      "verdict": "n/a",
+      "evidence": "Critério literal não cumprido (exit 1), preservado como fail em PC-0015. Substituído somente nesta observação corretiva por autorização Owner em work/rounds/R-0020/AUTHORIZATION-CTG3-2026-09-28.md; prova efetiva C-02-21 consta em item próprio."
+    },
+    {
+      "criterion": "git grep 'placeholder\\|Built in Phase 3' in apps/teat/{web,mobile}/README.md → empty",
+      "verdict": "pass"
+    },
+    {
+      "criterion": "grep -c 'intentionally empty' law/adr/README.md → 0",
+      "verdict": "pass"
+    },
+    {
+      "criterion": "CLAUDE.md / AGENTS.md changed only by Owner-accepted patch (OD-R18-003)",
+      "verdict": "n/a",
+      "evidence": "OD-R18-003 pending; patches in work/rounds/R-0018/proposals/, files untouched"
+    },
+    {
+      "criterion": "C-02-21: git check-ignore --no-index dist/x → ignored (exit 0)",
+      "verdict": "pass",
+      "evidence": "Medição no candidato integrado após PR #155 em 2026-09-28: git check-ignore --no-index dist/x saiu 0 e imprimiu dist/x; git check-ignore --no-index -v dist/x saiu 0 e apontou .gitignore:3:dist/. Fonte histórica: work/rounds/R-0018/contracts/CTG-0002.md §5.3 e reports/TASK-0007.md."
+    }
+  ],
+  "closed_at": "2026-09-28T16:08:27.874Z",
+  "merged_as": "4bd1d553478e1eb831353d30dd6769183c2b3990",
+  "release_disposition": "none-needed",
+  "notes": "D-1: Owner authorization opening R-0018 (AUTHORIZATION.md, 2026-09-26; maestro Opus 5.5, workers Opus 5.5/Sonnet 5, reviewer Sol 6); Emenda 1 (prompt-review cycle 2) and Emenda 2 (run to completion, escalation, budget threshold not stopping the round). D-2: closing after three integrated CTGs, cross-family review, local gates, GitHub CI and exact-SHA observations. Deviations recorded in plan.md: T8 boundary violation by TASK-0005 attempt 1 (redone in isolation) and window budget exceeded under Emenda 2. Owner decisions still pending: OD-R18-001, 002, 003, 004, 005. round seal (2026-09-27): refused with ROUND_ARCHIVE_RECORD_MISSING; not bypassed — the seal of R-0018 is deferred to R-0020, which seals R-0003…R-0019 (C-0002 §4; plan.md §Bloqueios B2). Emitted closure: PC-0015. Correção append-only específica de selo autorizada pelo Owner em work/rounds/R-0020/AUTHORIZATION-CTG3-2026-09-28.md (proposta SHA-256 0aec312aa98b8d3d1b9effbca770192752a6c238046a49d412dcb86748d20ef1). PC-0015 e seu fail literal permanecem imutáveis. Nesta observação corretiva, o literal é n/a por substituição autorizada, e C-02-21 é pass por medição atual. Nenhum fail histórico é promovido a pass.",
+  "supersedes": "PC-0015",
+  "schemaVersion": "1.0.0",
+  "id": "PC-0020"
+}

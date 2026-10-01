@@ -1,0 +1,88 @@
+{
+  "round_id": "R-0009",
+  "title": "WP-P0…WP-P3 of the Portal build pack: gov.br federation via Cognito (ADR-0024), portal data model (five BP-PORTAL blueprints, DDL 61–65 + handwritten 19/14/11, canonical fixtures), citizen identity guard and act-level matrix as data, citizen routes /v1/portal/* (identity, requests with immediate protocol and delegation port, inbox/SNE, ombudsman, projections, cached national reads, SSE), PORTAL_RULES policy, command contracts and typed clients",
+  "declaring_decision": "D-1",
+  "closing_decision": "D-2",
+  "batches": [
+    {
+      "id": "CTG-0001",
+      "roles": [
+        "Architect",
+        "Inspector",
+        "Engineer"
+      ],
+      "commit": "1175f4f33015e6c0f389bb3e2ada2ef1ae5304c8",
+      "headline": "Delivered ADR-0024, contract CTG-0001 (52 criteria), five BP-PORTAL blueprints with operations: [] and generated packages/DDL 61–65, handwritten DDL 19 (platform, RLS-exempt by design), 14 (portal timers) and 11 (portal schema triggers), seed 70, @detran/portal-identity (PortalCitizenGuard fail-closed, PortalIdentityService with assertActLevel/assertEntitled, GET me/brand/services), Host tenant resolution, AppModule wiring, RLS allowlist; tests unit/integration/e2e (PR #54)."
+    },
+    {
+      "id": "CTG-0002",
+      "roles": [
+        "Architect",
+        "Inspector",
+        "Engineer"
+      ],
+      "commit": "0940a201547ac92ac50d4d4a500544ceda1af559",
+      "headline": "Delivered contract CTG-0002 (43 routes, 84 criteria) and M24 wiring, PORTAL_RULES (29 keys; portal:appeal:* removed), identity routes §3, request lifecycle §5 with immediate protocol, delegation port (UnavailableDelegationTarget until R-0007) and idempotency 409, inbox with SNE acknowledgement evidence and NOTIFICACAO_CIENCIA, SNE enrolment, ombudsman manifestations/evaluations with T-OUV-* from DDL 14, five projections with replay, cached national reads through the senatran-adapter ports, GET /v1/portal/stream, five command contracts (47 operations) with typed clients, request-draft schema, documentation transcription and OD-P14…P46 (PR #56)."
+    }
+  ],
+  "gates": {
+    "cross-family-delivery-review": {
+      "status": "pass",
+      "detail": "CTG-0001 cycle 2 PASS (cycle 1 REVIEW: two spec findings); CTG-0002 cycle 1 PASS with one low note fixed, cycle 2 restricted PASS (docs + fix) (GPT-5.6 Terra). Prompt-review PASS on cycle 3 (cycles 1–2 FAIL: write-boundary structure → M24, TASK-0009 as Architect-transcription; consistency)."
+    },
+    "github-ci": {
+      "status": "pass",
+      "detail": "PR #54 and PR #56 all five jobs green (backend-kernel, evidence-gate, foundation, senatran-mock, senatran-mock-tests)."
+    },
+    "repository-check": {
+      "status": "pass",
+      "detail": "pnpm check green on both merged trees (format, orchestra-bridge, kb 522/446, blueprints, contracts incl. check-commands 139 ops and clients 58, parameters, contracts:test 35, typecheck, ui, decorators 960, rls-ddl 207 + 2 exempt by design, role-catalog, lifecycle-vocabulary 28 timers, senatran boundary/contracts, pec parity/superset)."
+    },
+    "backend-tests": {
+      "status": "pass",
+      "detail": "backend:test:ci green with role_app_backend after apply.sh --full + seed.sh on detran_r9 (unit/integration/e2e of every package; app e2e 142 passed | 2 todo citing R-0007); backend:rls-smoke green."
+    },
+    "database": {
+      "status": "pass",
+      "detail": "apply.sh --full + seed.sh idempotent on detran_r9 (seeds 00…71, portal fixtures 70/71 proven twice); local e2e provisions the local tenant's portal parameters by copying the canonical rows."
+    }
+  },
+  "source_repo_deleted": false,
+  "validation_criteria": [
+    {
+      "criterion": "WP-P0 implemented: gov.br federation decision (ADR-0024) with levels as signed claim (prata/ouro = avancada per H.50, risk recorded), CPF as business subject, simulated IdP in local/test profiles, fail-closed guard PORTAL.ASSURANCE_NOT_VERIFIED proven by e2e.",
+      "verdict": "pass",
+      "evidence": "ADR-0024; contracts/CTG-0001.md §2–§4, §11; backend/app/tests/e2e/portal-identity.e2e.spec.ts (14/14); delivery-review-CTG-0001-2 PASS."
+    },
+    {
+      "criterion": "WP-P1 implemented: BP-PORTAL-{IDENTITY,REQUESTS,INBOX,CITIZEN-SERVICE,PROJECTIONS}-001 with the request machine of WF-PORTAL-001 fixed in code (13 states, OD-P13 closed), manifestation machine of WF-PORTAL-004, act→level matrix as data, portal/complaints preserved (M2), timers owner='portal', fixtures per level/state/catalogue 9/2/4, blueprints:check and verify:rls-ddl green with the two by-design exemptions.",
+      "verdict": "pass",
+      "evidence": "plan.md M1–M24 + A1–A3; DDL 61–65, 19, 14, 11; seed 70/71; portal-seed/portal-rls integration specs; evidence generic seq. 1."
+    },
+    {
+      "criterion": "WP-P2 implemented: every route of portal-route-contract.md §3–§9 mounted as a hand-written controller (entitlement 404, act level 403, idempotency 409 with different body, immediate protocol before content validation, SERVICE_UNAVAILABLE with reason for delegations pending R-0007, projections rebuilt by replay, SSE stream); PORTAL_RULES ⇔ routes proven in both directions with exhaustive negatives.",
+      "verdict": "pass",
+      "evidence": "contracts/CTG-0002.md §2–§13; policy.spec.ts portal:* block; policy-routes.e2e.spec.ts; portal-requests/portal-routes/portal-stream e2e; delivery-review-CTG-0002 PASS; evidence generic seq. 2."
+    },
+    {
+      "criterion": "WP-P3 implemented: five BP-PORTAL-*.commands.openapi.json (47 operations) verified by check-commands.mjs against the mounted controllers and portal-error-catalog.md, typed clients in @detran/api-clients, portal-request-draft.schema.json per serviceKey; documentation transcribed (build pack §1–§4, ADR-0019 status, closure plan, backlog).",
+      "verdict": "pass",
+      "evidence": "pnpm contracts:check (139 operations, 58 clients); reports TASK-0009/0010; delivery-review-CTG-0002-2 PASS."
+    },
+    {
+      "criterion": "Every merged commit passes the required checks; audit observations recorded at the exact merge SHAs; no Owner decision reopened; divergences recorded as adendas A1–A7 and OD-P14…P46; the budget overrun, the continuation after FAIL prompt-review verdicts and the two cross-lock fixes (ops/parameter Date defect, parameter usage scan exclusion) recorded in plan.md.",
+      "verdict": "pass",
+      "evidence": "EV-999a0329d451aa89 (1175f4f); EV-badb08481ac9c850 (0940a201547ac92ac50d4d4a500544ceda1af559); plan.md §Bloqueios, §Triagem, §Decisões; budget.json."
+    }
+  ],
+  "closed_at": "2026-09-17T02:41:22.485704Z",
+  "merged_as": "0940a201547ac92ac50d4d4a500544ceda1af559",
+  "release_disposition": "none-needed",
+  "evidence": {
+    "proof_epoch": "R-0009",
+    "terminal_sha256": "e5242136c787ab18e2772be538a3c3a2e91a4b9ccad6bfc69be00a97cf135aac"
+  },
+  "notes": "D-1 binds the Owner-authorized execution of the R-0009 maestro prompt (WP-P0…WP-P3 of the Portal build pack) until complete closure and merge (AUTHORIZATION.md, lifting the earlier suspension). D-2 records the Architect closing judgment after GPT-5.6 Terra delivery PASS on both coupled groups, green CI on PR #54 and #56, exact-SHA Auditor observations at every merge, delegations to RAIT/infraction/payment left as SERVICE_UNAVAILABLE until R-0007 per the prompt §0, and no release-bearing package publication.",
+  "schemaVersion": "1.0.0",
+  "id": "PC-0006"
+}

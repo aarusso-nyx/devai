@@ -1,0 +1,107 @@
+{
+  "round_id": "R-0016",
+  "title": "WP-D4 e WP-D5 do pacote de construção do DASHBOARD: 18 fichas de tela do console (IU-DASH-D-01…D-18) com os seis estados obrigatórios e os textos fixos, a semente i18n dashboard.pt-BR.json (307 chaves em 16 namespaces, 42 nomes de indicador) com a allowlist dashboard.* do catálogo de parâmetros, e o console apps/dashboard/web (@detran/dashboard-web) em nível L0 — 22 rotas do manifesto com guardas por política e camada, shell por camadas, frescor, SSE com fallback, error boundary único, 17 componentes compartilhados, 18 páginas, 9 formulários com gates e 2042 testes; documentação de fechamento",
+  "declaring_decision": "D-1",
+  "closing_decision": "D-2",
+  "batches": [
+    {
+      "id": "CTG-0001",
+      "roles": [
+        "Architect"
+      ],
+      "commit": "0a2befb7b905be4127f1f4ab98d0d6c53511600a",
+      "headline": "18 fichas IU-DASH-D-01…D-18, uma por rota de dashboard-frontends.md §4, com camada de acesso, chave de política, comandos do contrato de rotas, os seis estados obrigatórios e os textos fixos do WP-D4; semente i18n com 307 chaves e as 16 linhas dashboard.* da allowlist; baseline do KB 738 → 756 (PR #80, merge 6a50f026)."
+    },
+    {
+      "id": "CTG-0002",
+      "roles": [
+        "Architect",
+        "Inspector",
+        "Engineer"
+      ],
+      "commit": "42b4e6acee06dafdaf6a2f3ead7c3b4fd9f4465b",
+      "headline": "apps/dashboard/web em nível L0: manifesto de 22 rotas, árvore lazy sob /monitoramento com authGuard → permissionGuard → layerGuard, session facade com a semântica de wildcard de policy.ts, core/layer-table.ts transcrito até OD-D16-006, shell com menu por camada, FreshnessStore e interceptor, SSE com Last-Event-ID e polling de 30 s, ErrorBoundary único, 17 componentes de shared/, 18 páginas, 9 schemas com gates e 2042 testes do Inspector (PR #103)."
+    },
+    {
+      "id": "CTG-0003",
+      "roles": [
+        "Architect"
+      ],
+      "commit": "32c025a3d547c6d658531124fa1a1edf2ae73d9c",
+      "headline": "Documentação de fechamento: build pack §WP-D4/§WP-D5 executados com os gates que existem e §5 inconsistências 3 e 4 corrigidas; dashboard-frontends.md §7 (ao menos uma evidência em D-09, OD-D16-011), §9 e §10; backlog com 19 entradas OD-D16 e a frente L0 → L2; waves.md com a troca Sol → Fable e a linha da rodada; orchestra/README.md §9 e as lições em §10 (PR #103)."
+    }
+  ],
+  "gates": {
+    "cross-family-delivery-review": {
+      "status": "pass",
+      "detail": "CTG-0001 FAIL→PASS (4 achados: evidência de prove × UC-DASH-003, agency-admin em incident:read, matriz por comando, contagem de chaves); CTG-0002 FAIL→PASS (fronteira do maestro em src/app/**, C-02-83 × agregador, pnpm check após o merge de main); CTG-0003 REVIEW→REVIEW→PASS (célula de R-0011 desatualizada, supressão de P-09 afirmada além do provado). Prompt-reviews 1…8: quatro ciclos 1 com FAIL/REVIEW de estrutura, todos PASS no ciclo restrito. Todos por codex gpt-5.6-terra pela ponte."
+    },
+    "github-ci": {
+      "status": "pass",
+      "detail": "PR #80 verde após rerun de backend-kernel (flake de rait-priority-upgrade.integration.spec.ts, teste de R-0007 verde em main). PR #103: sete checks verdes no commit 43694534 (foundation 23m16s, backend-kernel 26m9s) após duas correções — .gitignore 'reports/' que mantinha features/reports fora de todo commit e a formatação que o mesmo padrão escondia do Prettier; execução sobre a documentação disparada por workflow_dispatch (o gatilho de pull_request não registrou execução para aquele SHA) — sete verdes; após integrar o PR #104 por merge, o gatilho voltou a funcionar e o commit de merge 32c025a3 fechou com os sete checks verdes (foundation 35m12s, backend-kernel 27m2s). Merge do PR #103 em 973e78c3."
+    },
+    "pnpm-check": {
+      "status": "pass",
+      "detail": "EXIT 0 na linha de base (4cd43fa5) e no HEAD após integrar origin/main (114 commits, incluindo R-0011 e R-0012): portal 1314, dashboard 2042, rait 4434 na mesma execução."
+    },
+    "app-suite": {
+      "status": "pass",
+      "detail": "pnpm --filter @detran/dashboard-web typecheck|lint|test|build verdes; Tests 2042 passed (2042); tsc -p tsconfig.app.json e -p tsconfig.spec.json com 0 erros; build dentro dos orçamentos de angular.json."
+    },
+    "knowledge-base": {
+      "status": "pass",
+      "detail": "node tools/docs/kb/check.mjs OK (756 artifacts, 446 canonical tokens; baseline 738 → 756 com as 18 fichas); pnpm docs:kb:publish-check OK (201 files)."
+    },
+    "parameter-catalogue": {
+      "status": "pass",
+      "detail": "pnpm verify:parameter-catalogue OK (90 entries, 18 flags, 57 i18n namespaces, 0 errors) com os 16 namespaces dashboard.* acrescentados e pnpm parameters:generate aplicado pelo maestro."
+    },
+    "evidence-chain": {
+      "status": "pass",
+      "detail": "devai evidence record generic sequences 1, 2 e 3 e verify --scope chain válido a cada gravação; audit observe EV-ded786c48daa2c5f no SHA exato do merge do CTG-0001 (6a50f026) e EV-7b245d9fa41ab30a no do CTG-0002/0003 (973e78c3)."
+    }
+  },
+  "validation_criteria": [
+    {
+      "criterion": "WP-D4 (fichas) entregue: uma ficha por tela do console (18), com identidade, acesso por camada N0/N1/N2 e chave de política, entrada, dados, os seis estados obrigatórios (vazio, carregando, erro, indisponível, desatualizado, bloqueado por decisão), comandos limitados ao contrato de rotas, LGPD, acessibilidade, testes, componentes e chaves i18n; textos fixos do WP-D4 nas telas que os exigem; D-08 e D-14 nomeiam os dois conjuntos de deveres.",
+      "verdict": "pass",
+      "evidence": "PR #80 (merge 6a50f026); docs:kb:check OK 756 artefatos; delivery-review-CTG-0001-2 PASS; evidência generic seq. 1."
+    },
+    {
+      "criterion": "WP-D4 (i18n) entregue: semente docs/framework/arch/i18n/dashboard.pt-BR.json plana e ordenada, com os 42 nomes de indicador transcritos de [APP-DASHBOARD] §Catálogo, estados dos três workflows, códigos DASH.* e os títulos das 18 telas, em 16 namespaces declarados na allowlist §Namespaces i18n do catálogo de parâmetros (OD-P46); nenhuma chave fora dos namespaces.",
+      "verdict": "pass",
+      "evidence": "PR #80; verify:parameter-catalogue OK; 307 chaves (312 do contrato menos as 5 severity.shape.* que aguardam OD-D16-009, adenda A4); i18n do app idêntica byte a byte à semente."
+    },
+    {
+      "criterion": "WP-D5 (console) entregue em nível L0: bootstrap por provideDetranAuthenticatedApp, guardas authGuard → permissionGuard(policy) → layerGuard(access) em todas as rotas com política, N3 sempre negado, freshnessInterceptor, SSE com fallback de polling, 18 telas com os seis estados, componentes §5 com escala única, célula suprimida visível e severidade nunca só por cor, scripts build|test|lint|typecheck ligados a pnpm check e README por blocos A–D e camadas.",
+      "verdict": "pass",
+      "evidence": "PR #103; 2042 testes (matriz 20 rotas × 36 papéis, matriz por comando 16 × 36, 18/18 ficha ↔ rota ↔ i18n, axe por estado); delivery-review-CTG-0002-2 PASS; evidência generic seq. 2."
+    },
+    {
+      "criterion": "Matriz de autorização exaustiva: cada rota e cada comando testam presença para os papéis literais de DASHBOARD_RULES (mais o passe global de GLOBAL_ADMIN_ROLES) e ausência para todos os demais códigos canônicos de DETRAN_ROLES; nenhum grant por analogia; divergências entre a especificação e policy.ts resolvidas a favor de policy.ts e registradas como OD.",
+      "verdict": "pass",
+      "evidence": "adendas A1 e A7; fixtures src/testing/{route-manifest,command-matrix,roles,layer-table}.fixture.ts por transcrição independente; specs app.guards-matrix.*.spec.ts e app.command-matrix.spec.ts; OD-D16-003/004/005."
+    },
+    {
+      "criterion": "Nenhum valor inventado: rótulo, papel, limiar ou chave sem fonte vira OD; as questões OD-D16-001…019 estão registradas em backlog.md com premissa, dono e fonte, nenhuma fechada; as OD-D16-020…026 (infraestrutura de teste) foram resolvidas dentro da rodada.",
+      "verdict": "pass",
+      "evidence": "contracts/CTG-0001.md §5 e CTG-0002.md §14.1; backlog.md (19 entradas DASHBOARD OD-D16-*); delivery-review-CTG-0003-3 PASS."
+    },
+    {
+      "criterion": "O que não foi entregue está declarado: as 18 telas ficam em nível L0 (renderizam 'indisponível nesta versão') porque o backend de R-0011 mesclou durante o CTG-0002; a subida a L2 — facades e clientes gerados de BP-DASH-MONITOR-001, dados reais e o teste ponta a ponta de supressão secundária — está registrada como frente seguinte, não como dívida oculta.",
+      "verdict": "pass",
+      "evidence": "adenda A5; contracts/CTG-0002.md §Decisões 6; backlog.md (entrada de frente L0 → L2); dashboard-build-pack.md §WP-D5 e §1."
+    }
+  ],
+  "closed_at": "2026-09-22T00:00:00.000Z",
+  "merged_as": "973e78c3cf0902479754e311412fea1082a5c9d0",
+  "release_disposition": "none-needed",
+  "source_repo_deleted": false,
+  "evidence": {
+    "proof_epoch": "R-0016",
+    "terminal_sha256": "8261f367467b9118bc4a5f6f6dca64b4514688bd8cac068aaa59a455f5a9bd08"
+  },
+  "notes": "D-1 vincula a execução autorizada pelo Owner do prompt do maestro de R-0016 (WP-D4 e WP-D5 do pacote de construção do DASHBOARD; troca de família Sol → Fable decidida em 2026-09-21; abertura em worktree sobre origin/main 08fb84e8 com plano e prompt regenerados) até o fechamento completo, com a Emenda 1 (\"prosseguir até a completa finalização\", 2026-09-21) e a instrução do Owner de 2026-09-22 para prosseguir até fechar a rodada. Os merges da rodada são 6a50f026eca2e72dac0b1d901e08964a49ab481e (PR #80, CTG-0001) e 973e78c3cf0902479754e311412fea1082a5c9d0 (PR #103, CTG-0002 + CTG-0003); `merged_as` carrega o segundo, que é o HEAD integrado. D-2 registra o juízo de fechamento após delivery-review de outra família PASS nos três grupos acoplados (codex gpt-5.6-terra), CI verde nos PRs #80 e #103, observações do Auditor nos SHAs exatos dos dois merges (EV-ded786c48daa2c5f em 6a50f026 e EV-7b245d9fa41ab30a em 973e78c3) e nenhuma publicação de pacote com release. A rodada fecha com o console em nível L0 — as 18 telas renderizam \"indisponível nesta versão\" porque R-0011 (dashboard-backend) mesclou durante o CTG-0002 —; a subida a L2 (facades e clientes gerados de BP-DASH-MONITOR-001, dados reais e o teste ponta a ponta de supressão secundária) está registrada como frente seguinte em backlog.md, não como dívida oculta. Quatro defeitos próprios do maestro foram registrados e corrigidos: escrita dentro da fronteira dos workers (A9, reversão e redespacho aos donos), o padrão .gitignore reports/ que manteve o módulo features/reports fora de todo commit e invisível ao Prettier, a colisão de sensores de scaffold entre apps (A11) e a redação que afirmava supressão ativa em P-09. Consumo estimado da rodada em budget.json: ≈1,49 M tokens únicos de entrada e ≈0,41 M de saída (brutos dos workers ≈4,4 M), em janelas contínuas sob as duas instruções do Owner.",
+  "schemaVersion": "1.0.0",
+  "id": "PC-0012"
+}

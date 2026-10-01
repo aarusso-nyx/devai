@@ -1,0 +1,131 @@
+{
+  "round_id": "R-0014",
+  "title": "WP-P4…WP-P6 of the Portal build pack: 27 screen sheets and the i18n catalogue with the namespace allowlist (OD-P46 closed), the first frontend app apps/portal/web (Angular 22 / @detran/ui, 38 routes, guards, forms and gates, encrypted offline documents, SSE and push, 27 real screens, axe by state on every route), and the WP-P6 integration: 11 citizen journeys e2e on the API against the in-process SENATRAN mock, CNH-e/vehicle/clearance normalisation, SNE enrollment through SnePort, push idempotency, payload lint, CI backend-kernel with the mock; closure documentation",
+  "declaring_decision": "D-1",
+  "closing_decision": "D-2",
+  "batches": [
+    {
+      "id": "CTG-0001",
+      "roles": [
+        "Architect",
+        "Inspector",
+        "Engineer"
+      ],
+      "commit": "1396f1a6d7cedf2afe5b0f90b9ef1be164c86015",
+      "headline": "Delivered OD-P46 (i18n namespace allowlist in parameter-catalogue.md read by tools/parameters/verify.mjs), the app scaffold apps/portal/web (package scripts, vitest + Angular JIT transform, eslint flat, pnpm check extension, @detran/ui exports), route manifest (38 routes), guards, shell, ErrorBoundary, OfflineDocumentStore and PortalClient reads with tests (PR #60)."
+    },
+    {
+      "id": "CTG-0002",
+      "roles": [
+        "Architect",
+        "Inspector",
+        "Engineer"
+      ],
+      "commit": "2888c9b08dc67a65c3fe102ad5713e04585fc5ec",
+      "headline": "Delivered the 27 screen sheets IU-PORTAL-T01…T27, the i18n catalogue portal.pt-BR.json (14 allowlisted namespaces) and the screen ↔ sheet ↔ route ↔ i18n tests (PR #61)."
+    },
+    {
+      "id": "CTG-0003a",
+      "roles": [
+        "Architect",
+        "Inspector",
+        "Engineer"
+      ],
+      "commit": "ddca5272c491cbde41798a2066514d27e473bcd8",
+      "headline": "Delivered pair 1 of the functional app: shared components §5.2, 14 schemas + FormGate (M12), PortalClient commands with If-Match and deterministic Idempotency-Key (M17), OfflineDocumentStore AES-GCM (M14), ErrorBoundary catalogue mapping, form state guards; axe by state on all 11 shared components (PR #62)."
+    },
+    {
+      "id": "CTG-0003b",
+      "roles": [
+        "Architect",
+        "Inspector",
+        "Engineer"
+      ],
+      "commit": "d2412558a05c8ef75935eafaea13ad535d58c7a5",
+      "headline": "Delivered pair 2 (appeal trail): 7 PortalClient reads, five facades, PaymentComparison (80·60·40, H.53), ProcessTimeline, 13 real screens T-01…T-08/T-10/T-11/T-13/T-14/T-23; suite 972 passed | 7 todo (PR #63)."
+    },
+    {
+      "id": "CTG-0003c",
+      "roles": [
+        "Architect",
+        "Inspector",
+        "Engineer"
+      ],
+      "commit": "4c3be45395bafed288186fff7c65e0748f62fe99",
+      "headline": "Delivered pair 3 (greenfield + PWA, closes WP-P5): 23 PortalClient reads/commands, RealtimeService (SSE + polling), PushService, InicioFacade + eight facades, functionalRouteFor, seven shared components, 22 real screens; errors/offline classified only by ErrorBoundary (A12); suite 118 files / 1314 passed | 14 todo; axe on all 38 routes (PR #64)."
+    },
+    {
+      "id": "CTG-0004",
+      "roles": [
+        "Architect",
+        "Inspector",
+        "Engineer"
+      ],
+      "commit": "11d939f66b413948f6369bb65dabd9b6813302d2",
+      "headline": "Delivered WP-P6 under Codex execution (Owner Amendment 2): contract CTG-0004 (74 criteria), 11 citizen journeys e2e on the API with the in-process SENATRAN mock (M18), CNH-e/vehicle/clearance normalisation (OD-P35/P36/P91 closed; vehicleId = UUIDv5 of the chassis), SNE enrollment through a mandatory SnePort (adapter → db → outbox), push-subscriptions on the M9 idempotency pattern, payload lint against internal vocabulary, CI backend-kernel with the mock before backend:test:e2e; app e2e 240 passed | 2 todo (PR #65)."
+    },
+    {
+      "id": "CTG-0005",
+      "roles": [
+        "Architect"
+      ],
+      "commit": "48d103fc36fa3b15a32e5dd5da11b6d729b3c596",
+      "headline": "Closure documentation: build pack WP-P4…P6 executed and OD-P47…P108 transcribed (64 rows), portal-frontends §9/§10, parameter catalogue OD-P66 (proposta) with regenerated artefacts, orchestra method §4.17/§4.18/§10 (R-0014 history incl. Codex execution), engineer-frontend app pattern (R-0012 copies), backlog, screen sheets T10…T18, CTG-0003c A12(j) (PR #66)."
+    }
+  ],
+  "gates": {
+    "cross-family-delivery-review": {
+      "status": "pass",
+      "detail": "CTG-0001 REVIEW→PASS, CTG-0002 PASS, CTG-0003a REVIEW→PASS (Codex Terra); CTG-0003b REVIEW×3→PASS and CTG-0003c REVIEW→PASS through the claude bridge with Opus 5 (Owner Amendment 1 while Codex was capped, plan B2); CTG-0004 FAIL→FAIL(contested, A24)→PASS and CTG-0005 REVIEW→REVIEW→PASS by Codex Terra (Amendment 2, B3). Prompt-reviews 1…12 all reached PASS (structural FAIL/REVIEW cycles recorded in plan.md B0)."
+    },
+    "github-ci": {
+      "status": "pass",
+      "detail": "PRs #60…#66 all five jobs green (backend-kernel — from #65 with the in-repo SENATRAN mock before backend:test:e2e —, evidence-gate, foundation, senatran-mock, senatran-mock-tests)."
+    },
+    "repository-check": {
+      "status": "pass",
+      "detail": "pnpm check green on every merged tree (format, orchestra-bridge incl. worker.test, kb 549/446, blueprints, contracts, parameters, typecheck, ui, @detran/portal-web typecheck|lint|test|build — 118 files / 1314 passed | 14 todo, bundle 542 kB < 600 kB —, decorators 960, rls-ddl, role-catalog, lifecycle-vocabulary, senatran boundary/contracts 2288 files, pec parity/superset, verify:parameter-catalogue 89 entries / 14 namespaces)."
+    },
+    "backend-tests": {
+      "status": "pass",
+      "detail": "backend:test:ci green on detran_r14 (apply.sh --full + seed.sh) with the senatran-mock on :3001: app e2e 17 files, 240 passed | 2 todo, incl. portal-journeys (52), portal-national-mock (16), portal-national-unavailable (2), portal-payload-lint (30); portal-inbox unit 13/13 with the mandatory SnePort stub."
+    },
+    "accessibility": {
+      "status": "pass",
+      "detail": "axe-core (serious/critical = 0) by state on every page and shared component and on all 38 manifest routes in TestBed (M3; Lighthouse CI replaced — plan B1, build pack §2)."
+    }
+  },
+  "source_repo_deleted": false,
+  "validation_criteria": [
+    {
+      "criterion": "WP-P4 implemented: 27 screen sheets IU-PORTAL-T01…T27 and the single i18n catalogue with namespaces allowlisted in parameter-catalogue.md (OD-P46 closed in this round by Owner instruction), STYNX {x} placeholders, screen ↔ sheet ↔ route ↔ i18n tests; sheets corrected at closure (T10…T18).",
+      "verdict": "pass",
+      "evidence": "plan.md M10, A5, A7(c); PRs #60/#61/#66; verify:parameter-catalogue OK; delivery-review-CTG-0002 PASS."
+    },
+    {
+      "criterion": "WP-P5 implemented: apps/portal/web as the first app fixing the scaffold pattern (Owner instruction; engineer-frontend.md), 38 routes with guards (M8), 27 real screens over @detran/ui, forms with FormGate (M12), encrypted offline CNH-e/CRLV-e (M14), SSE + polling and push (M14), delegations pending R-0007 shown as unavailable and never simulated (M15), deterministic Idempotency-Key (M17), errors/offline classified only by ErrorBoundary (A12); axe by state everywhere.",
+      "verdict": "pass",
+      "evidence": "contracts/CTG-0003a/b/c.md; PRs #62/#63/#64; suite 118 files / 1314 passed | 14 todo; delivery-review-CTG-0003a-2, -0003b-4, -0003c-2 PASS; evidence generic seq. 3, 4, 5."
+    },
+    {
+      "criterion": "WP-P6 implemented: 11 citizen journeys proven end-to-end on the API against the in-process SENATRAN mock (M18) with the stops fixed by decision (M15, OD-P15/P17/P19) as negatives; CNH-e/vehicles/clearance normalised from CdtPort (OD-P35/P36/P91 closed), SNE enrollment through SnePort before persistence and outbox (mock; real homologation OD-P16), push subscription idempotent (M9), payload lint (no internal token in any /v1/portal/* response or SSE data), CI backend-kernel with the mock.",
+      "verdict": "pass",
+      "evidence": "contracts/CTG-0004.md (74 criteria); PR #65; backend:test:ci green; delivery-review-CTG-0004-3 PASS; evidence generic seq. 6."
+    },
+    {
+      "criterion": "Every merged commit passes the required checks; audit observations recorded at the exact merge SHAs; no Owner decision reopened (A24: wire enum of effectsAck per route contract §5.1 prevails; OD-P61 records the divergence); deviations recorded: B0 structural prompt-review cycles, B1 Lighthouse→axe, B2 same-family reviewer (Amendment 1), B3 Codex workers/reviewer (Amendment 2) with tools/orchestra/worker.sh; adendas A1…A25 and OD-P47…P108 transcribed to the build pack; budget window overruns recorded in budget.json.",
+      "verdict": "pass",
+      "evidence": "EV-1ccc334f256359b6 (1396f1a), EV-976c235d27abf061 (2888c9b), EV-87c4bc8c41a7ee99 (ddca527), EV-03c67d03ad731326 (d2412558), EV-e8514b9464f0b049 (4c3be453), EV-631e1db24c09716e (11d939f6), EV-5b7c9c092cf57216 (48d103fc); plan.md §Bloqueios, §Adendas; AUTHORIZATION.md amendments 1–2; budget.json."
+    }
+  ],
+  "closed_at": "2026-09-19T19:45:00.000Z",
+  "merged_as": "48d103fc36fa3b15a32e5dd5da11b6d729b3c596",
+  "release_disposition": "none-needed",
+  "evidence": {
+    "proof_epoch": "R-0014",
+    "terminal_sha256": "453c9e53e7359ea5c1f01f8d2f534d7dc77bd0047bf71193e908aabfd11fe99f"
+  },
+  "notes": "D-1 binds the Owner-authorized execution of the R-0014 maestro prompt (WP-P4…WP-P6 of the Portal build pack; apps/portal/web as the first app fixing the scaffold pattern; OD-P46 resolved here) until complete closure and merge (AUTHORIZATION.md with amendments 1 and 2). D-2 records the closing judgment after cross-family delivery PASS on every coupled group (Codex Terra; Claude/Opus under Amendment 1 for CTG-0003b/c), green CI on PRs #60…#66, exact-SHA Auditor observations at every merge, delegations left as SERVICE_UNAVAILABLE until R-0007, gov.br/SNE/privacy/junta médica/VAPID left source_pending (OD-P15/P16/P17/P19/P88), and no release-bearing package publication. Estimated round consumption: ≈ 8 M unique input tokens (Claude, four windows) plus ≈ 2.1 M uncached Codex input tokens (B3).",
+  "schemaVersion": "1.0.0",
+  "id": "PC-0007"
+}
