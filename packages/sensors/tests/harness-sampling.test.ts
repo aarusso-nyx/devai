@@ -621,10 +621,10 @@ describe('harness_robustness verdict and last-attempt sampling', () => {
     stubGh([
       row({ databaseId: id, attempt: 1, conclusion: 'failure' }),
       row({ databaseId: id, attempt: 2, conclusion: 'success' }),
-      ...rows(19),
+      ...rows(20),
     ]);
     const reading = senseHarnessRobustness(population(20));
-    expect(reading.metrics?.['sample_size']).toBe(20);
+    expect(reading.metrics?.['sample_size']).toBe(21);
     expect(reading.metrics?.['flaky_runs']).toBe(1);
     expect(reading.status).toBe('pass');
   });

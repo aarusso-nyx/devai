@@ -17,6 +17,14 @@ import { senseHarnessPerformance } from '../../src/harness-performance.js';
 const NOW = '2026-09-08T12:00:00.000Z';
 const roots: string[] = [];
 
+/** ADR-SCR-0010: the declared population, and a run row that belongs to it. */
+const POPULATION = {
+  workflow: 'pull-request-checks.yml',
+  event: 'pull_request',
+  minimumSample: 1,
+} as const;
+const GATE_RUN = { event: 'pull_request', headBranch: 'feature/x' } as const;
+
 beforeEach(() => {
   mocks.spawnSync.mockReset();
 });
@@ -116,10 +124,11 @@ describe('round24 D3 — the since window compares ISO strings lexicographically
   it('excludes a run created before an offset-bearing since instant', () => {
     // 2026-09-01T18:00:00-06:00 is 2026-09-02T00:00:00Z, one hour AFTER the run.
     stubCommands({
-      gh: ghJson([{ conclusion: 'success', createdAt: '2026-09-01T23:00:00Z' }]),
+      gh: ghJson([{ ...GATE_RUN, conclusion: 'success', createdAt: '2026-09-01T23:00:00Z' }]),
     });
 
     const reading = senseHarnessGreenMain({
+      ...POPULATION,
       repoRoot: '/repo',
       since: '2026-09-01T18:00:00-06:00',
       now: NOW,
@@ -129,6 +138,7 @@ describe('round24 D3 — the since window compares ISO strings lexicographically
     // retained and the sensor reports a one-run sample instead of an empty one.
     expect((reading.findings ?? []).map((finding) => finding.code)).toEqual([
       'HARNESS_GREEN_MAIN_NO_RUNS',
+      'HARNESS_POPULATION_UNVERIFIED',
     ]);
   });
 });
@@ -136,14 +146,15 @@ describe('round24 D3 — the since window compares ISO strings lexicographically
 it('includes equal ISO instants and excludes earlier or invalid run timestamps', () => {
   stubCommands({
     gh: ghJson([
-      { conclusion: 'success', createdAt: '2026-09-02T00:00:00Z' },
-      { conclusion: 'success', createdAt: '2026-09-02T03:00:00+03:00' },
-      { conclusion: 'failure', createdAt: '2026-09-01T23:59:59Z' },
-      { conclusion: 'failure', createdAt: 'invalid' },
-      { conclusion: 'failure' },
+      { ...GATE_RUN, conclusion: 'success', createdAt: '2026-09-02T00:00:00Z' },
+      { ...GATE_RUN, conclusion: 'success', createdAt: '2026-09-02T03:00:00+03:00' },
+      { ...GATE_RUN, conclusion: 'failure', createdAt: '2026-09-01T23:59:59Z' },
+      { ...GATE_RUN, conclusion: 'failure', createdAt: 'invalid' },
+      { ...GATE_RUN, conclusion: 'failure' },
     ]),
   });
   const reading = senseHarnessGreenMain({
+    ...POPULATION,
     repoRoot: '/repo',
     since: '2026-09-01T18:00:00-06:00',
     minSampleSize: 2,

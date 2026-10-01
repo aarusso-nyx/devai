@@ -811,15 +811,17 @@ jobs:
     }
     expect(readings.some((reading) => reading.status === 'fail')).toBe(true);
     expect(readings.some((reading) => reading.status === 'review')).toBe(true);
-    expect(() => senseHarnessGreenMain({ repoRoot: root, now: NOW })).toThrow(
-      'AUTHORITY_FINAL_BOUNDARY_REQUIRED',
-    );
-    expect(() => senseHarnessPerformance({ repoRoot: root, now: NOW })).toThrow(
-      'AUTHORITY_FINAL_BOUNDARY_REQUIRED',
-    );
-    expect(() => senseHarnessRobustness({ repoRoot: root, now: NOW })).toThrow(
-      'AUTHORITY_FINAL_BOUNDARY_REQUIRED',
-    );
+    // ADR-SCR-0010: with no declared population the CI harness sensors read UNKNOWN and say why.
+    for (const sensed of [
+      senseHarnessGreenMain({ repoRoot: root, now: NOW }),
+      senseHarnessPerformance({ repoRoot: root, now: NOW }),
+      senseHarnessRobustness({ repoRoot: root, now: NOW }),
+    ]) {
+      expect(sensed.status).toBe('unknown');
+      expect((sensed.findings ?? []).map((f) => f.message).join('\n')).toContain(
+        'harness-population-undeclared',
+      );
+    }
   });
 
   it('handles absent substrate across every static quality family', () => {

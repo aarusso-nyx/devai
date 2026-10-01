@@ -2,38 +2,53 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { GhResult } from '../../src/harness/gh-api.js';
 
-interface GhRun {
-  readonly conclusion?: string;
-  readonly attempt?: number;
-}
+const mocks = vi.hoisted(() => ({ spawnSync: vi.fn() }));
 
-const ghState = vi.hoisted(() => ({
-  result: { ok: false, reason: 'gh-cli-unavailable' } as GhResult<GhRun[]>,
+vi.mock('@devai-nyx/authority', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@devai-nyx/authority')>()),
+  spawnSync: mocks.spawnSync,
 }));
 
-vi.mock('../../src/harness/gh-api.js', () => ({
-  invokeGhJson: () => ghState.result,
-}));
-
+import { HARNESS_RUN_FIELDS } from '../../src/harness/gh-api.js';
 import { senseHarnessRobustness } from '../../src/harness-robustness.js';
 
 const NOW = '2026-09-08T12:00:00.000Z';
 let root: string;
 
+function population(extra: Record<string, unknown> = {}) {
+  return {
+    repoRoot: root,
+    now: NOW,
+    workflow: 'pull-request-checks.yml',
+    event: 'pull_request',
+    minimumSample: 1,
+    ...extra,
+  };
+}
+
+function reply(value: { status: number; stdout?: string; stderr?: string }): void {
+  mocks.spawnSync.mockReturnValue({
+    signal: null,
+    stdout: '',
+    stderr: '',
+    error: undefined,
+    ...value,
+  });
+}
+
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), 'devai-harness-robustness-unavailable-'));
-  ghState.result = { ok: false, reason: 'gh-cli-unavailable' };
+  mocks.spawnSync.mockReset();
 });
 
 afterEach(() => rmSync(root, { recursive: true, force: true }));
 
 describe('harness robustness unavailable and empty populations', () => {
   it('reports GitHub CLI failure as an explicit unknown observation', () => {
-    ghState.result = { ok: false, reason: 'gh-cli-error: permission denied' };
+    reply({ status: 1, stderr: 'permission denied' });
 
-    const reading = senseHarnessRobustness({ repoRoot: root, now: NOW });
+    const reading = senseHarnessRobustness(population());
 
     expect(reading).toMatchObject({
       status: 'unknown',
@@ -41,43 +56,59 @@ describe('harness robustness unavailable and empty populations', () => {
       tier: 'L2',
       timestamp: NOW,
       sensor: { name: 'harness-robustness', kind: 'harness_robustness' },
-      command: 'gh run list --branch main --json conclusion,attempt --limit 100',
       findings: [
         {
           severity: 'info',
           code: 'HARNESS_ROBUSTNESS_GH_UNAVAILABLE',
-          message: 'Skipped: gh-cli-error: permission denied',
+          message: 'Skipped: gh-cli-nonzero-exit: permission denied',
         },
       ],
       metrics: { run_count: 0 },
     });
+    expect(reading.command).toContain('gh run list --workflow pull-request-checks.yml');
   });
 
-  it('reports an empty successful run population as review with zero flakiness', () => {
-    ghState.result = { ok: true, data: [] };
+  it('reports an undeclared population as unknown with the reason, never an invented default', () => {
+    const reading = senseHarnessRobustness({ repoRoot: root, now: NOW });
 
-    const reading = senseHarnessRobustness({
-      repoRoot: root,
-      branch: 'release',
-      limit: 25,
-      now: NOW,
+    expect(reading.status).toBe('unknown');
+    expect(reading.findings?.[0]).toMatchObject({
+      code: 'HARNESS_ROBUSTNESS_GH_UNAVAILABLE',
     });
+    expect(reading.findings?.[0]?.message).toContain('harness-population-undeclared');
+    expect(mocks.spawnSync).not.toHaveBeenCalled();
+  });
+
+  it('reports an empty successful run population as unknown with the sample size', () => {
+    reply({ status: 0, stdout: '[]' });
+
+    const reading = senseHarnessRobustness(
+      population({ headBranch: 'release', event: 'push', minimumSample: 3, limit: 25 }),
+    );
 
     expect(reading).toMatchObject({
-      status: 'review',
+      status: 'unknown',
       deterministic: false,
       tier: 'L2',
       timestamp: NOW,
       sensor: { name: 'harness-robustness', kind: 'harness_robustness' },
-      command: 'gh run list --branch release --json conclusion,attempt --limit 25',
       findings: [
         {
-          severity: 'warning',
-          code: 'HARNESS_ROBUSTNESS_NO_RUNS',
-          message: 'No CI runs found on branch release.',
+          severity: 'info',
+          code: 'HARNESS_ROBUSTNESS_INSUFFICIENT_SAMPLE',
         },
+        { code: 'HARNESS_POPULATION_UNVERIFIED' },
       ],
-      metrics: { run_count: 0, flaky_runs: 0, flakiness_pct: 0 },
+      metrics: {
+        run_count: 0,
+        sample_size: 0,
+        minimum_sample: 3,
+        population_head_branch: 'release',
+        population_event: 'push',
+      },
     });
+    expect(reading.command).toContain('--branch release');
+    expect(reading.command).toContain('--limit 25');
+    expect(reading.findings?.[0]?.message).toContain('head branch release');
   });
 });

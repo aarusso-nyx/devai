@@ -131,23 +131,44 @@ function argvOf(callIndex: number): readonly string[] {
   return mocks.spawnSync.mock.calls[callIndex]?.[1] as readonly string[];
 }
 
+/** ADR-SCR-0010: the declared population the CI sensors sample, and its description. */
+const POPULATION = {
+  workflow: 'pull-request-checks.yml',
+  event: 'pull_request',
+  minimumSample: 1,
+} as const;
+const DESCRIBE = 'workflow pull-request-checks.yml, event pull_request, head branch *';
+const FIELDS = 'attempt,conclusion,createdAt,databaseId,event,headBranch,updatedAt';
+const IN_LOOKBACK = '2026-09-05T00:00:00Z';
+let nextRunId = 1;
+
+/** One run row of the population, with only real `gh run list` fields. */
+function ghRun(fields: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    databaseId: nextRunId++,
+    attempt: 1,
+    event: 'pull_request',
+    headBranch: 'feature/x',
+    createdAt: IN_LOOKBACK,
+    updatedAt: IN_LOOKBACK,
+    ...fields,
+  };
+}
+
 describe('harness green-main sensor', () => {
-  interface GhRunFixture {
-    conclusion?: string;
-    createdAt?: string;
+  function runs(count: number, successes: number, createdAt?: string): Record<string, unknown>[] {
+    return Array.from({ length: count }, (_, i) =>
+      ghRun({
+        conclusion: i < successes ? 'success' : 'failure',
+        ...(createdAt !== undefined && { createdAt }),
+      }),
+    );
   }
 
-  function runs(count: number, successes: number, createdAt?: string): GhRunFixture[] {
-    return Array.from({ length: count }, (_, i) => ({
-      conclusion: i < successes ? 'success' : 'failure',
-      ...(createdAt !== undefined && { createdAt }),
-    }));
-  }
-
-  it('emits unknown with the default argv when the gh binary is missing', () => {
+  it('emits unknown with the declared argv when the gh binary is missing', () => {
     stubCommands({ gh: enoent() });
 
-    const reading = senseHarnessGreenMain({ repoRoot: '/repo', now: NOW });
+    const reading = senseHarnessGreenMain({ ...POPULATION, repoRoot: '/repo', now: NOW });
 
     expect(reading).toMatchObject({
       sensor: { name: 'harness-green-main', kind: 'harness_green_main' },
@@ -155,7 +176,7 @@ describe('harness green-main sensor', () => {
       deterministic: false,
       tier: 'L2',
       timestamp: NOW,
-      command: 'gh run list --branch main --json conclusion,createdAt --limit 50',
+      command: `gh run list --workflow pull-request-checks.yml --event pull_request --json ${FIELDS} --limit 300 --created >=2026-08-09`,
       findings: [
         {
           severity: 'info',
@@ -167,9 +188,32 @@ describe('harness green-main sensor', () => {
     });
     expect(mocks.spawnSync).toHaveBeenCalledWith(
       'gh',
-      ['run', 'list', '--branch', 'main', '--json', 'conclusion,createdAt', '--limit', '50'],
+      [
+        'run',
+        'list',
+        '--workflow',
+        'pull-request-checks.yml',
+        '--event',
+        'pull_request',
+        '--json',
+        FIELDS,
+        '--limit',
+        '300',
+        '--created',
+        '>=2026-08-09',
+      ],
       expect.objectContaining({ cwd: '/repo', encoding: 'utf8', timeout: 30_000 }),
     );
+  });
+
+  it('reads unknown with the reason, and never calls gh, when no population is declared', () => {
+    const reading = senseHarnessGreenMain({ repoRoot: '/repo', now: NOW });
+
+    expect(reading.status).toBe('unknown');
+    expect(message(reading, 'HARNESS_GREEN_MAIN_GH_UNAVAILABLE')).toContain(
+      'harness-population-undeclared',
+    );
+    expect(mocks.spawnSync).not.toHaveBeenCalled();
   });
 
   it('separates a generic spawn failure from a missing binary', () => {
@@ -180,7 +224,7 @@ describe('harness green-main sensor', () => {
       }),
     });
 
-    const reading = senseHarnessGreenMain({ repoRoot: '/repo', now: NOW });
+    const reading = senseHarnessGreenMain({ ...POPULATION, repoRoot: '/repo', now: NOW });
 
     expect(reading.status).toBe('unknown');
     expect(message(reading, 'HARNESS_GREEN_MAIN_GH_UNAVAILABLE')).toBe(
@@ -188,14 +232,14 @@ describe('harness green-main sensor', () => {
     );
   });
 
-  it('truncates non-zero-exit stderr to 256 characters verbatim', () => {
+  it('truncates non-zero-exit stderr to 256 characters, then trims it', () => {
     stubCommands({ gh: spawnResult({ status: 1, stderr: `  ${'x'.repeat(300)}` }) });
 
-    const reading = senseHarnessGreenMain({ repoRoot: '/repo', now: NOW });
+    const reading = senseHarnessGreenMain({ ...POPULATION, repoRoot: '/repo', now: NOW });
 
-    // Not trimmed: the leading spaces are part of the 256-character window.
+    // The shared gh wrapper keeps a 256-character window, then trims the two leading spaces.
     expect(message(reading, 'HARNESS_GREEN_MAIN_GH_UNAVAILABLE')).toBe(
-      `Skipped: gh-cli-nonzero-exit:   ${'x'.repeat(254)}`,
+      `Skipped: gh-cli-nonzero-exit: ${'x'.repeat(254)}`,
     );
   });
 
@@ -204,7 +248,7 @@ describe('harness green-main sensor', () => {
 
     expect(
       message(
-        senseHarnessGreenMain({ repoRoot: '/repo', now: NOW }),
+        senseHarnessGreenMain({ ...POPULATION, repoRoot: '/repo', now: NOW }),
         'HARNESS_GREEN_MAIN_GH_UNAVAILABLE',
       ),
     ).toBe('Skipped: gh-cli-nonzero-exit: ');
@@ -213,7 +257,7 @@ describe('harness green-main sensor', () => {
   it('emits unknown when stdout is not JSON', () => {
     stubCommands({ gh: spawnResult({ stdout: '{not json' }) });
 
-    const reading = senseHarnessGreenMain({ repoRoot: '/repo', now: NOW });
+    const reading = senseHarnessGreenMain({ ...POPULATION, repoRoot: '/repo', now: NOW });
 
     expect(reading.status).toBe('unknown');
     expect(message(reading, 'HARNESS_GREEN_MAIN_GH_UNAVAILABLE')).toMatch(
@@ -221,33 +265,34 @@ describe('harness green-main sensor', () => {
     );
   });
 
-  it('reviews an empty run list and reports the unfiltered window in the message', () => {
+  it('reads unknown, not review, for an empty run list, naming the population', () => {
     stubCommands({ gh: ghJson([]) });
 
     const reading = senseHarnessGreenMain({
+      ...POPULATION,
       repoRoot: '/repo',
-      branch: 'release',
+      headBranch: 'release',
       limit: 7,
       now: NOW,
     });
 
-    expect(reading).toMatchObject({
-      status: 'review',
-      findings: [
-        {
-          severity: 'warning',
-          code: 'HARNESS_GREEN_MAIN_NO_RUNS',
-          message: 'No CI runs found for branch release in the last 7 entries.',
-        },
-      ],
-    });
-    expect(reading.metrics).toEqual({ run_count: 0, success_pct: 0 });
+    expect(reading.status).toBe('unknown');
+    expect(codes(reading)).toEqual([
+      'HARNESS_GREEN_MAIN_INSUFFICIENT_SAMPLE',
+      'HARNESS_POPULATION_UNVERIFIED',
+    ]);
+    expect(message(reading, 'HARNESS_GREEN_MAIN_INSUFFICIENT_SAMPLE')).toBe(
+      'Sample size 0 run(s) is below the minimum sample 1 for workflow pull-request-checks.yml, event pull_request, head branch release. Verdict suppressed.',
+    );
+    expect(argvOf(0)).toEqual(expect.arrayContaining(['--branch', 'release', '--limit', '7']));
+    expect(reading.metrics).toMatchObject({ run_count: 0, sample_size: 0, minimum_sample: 1 });
   });
 
   it('reviews an empty post-since window and flags that the filter ran', () => {
-    stubCommands({ gh: ghJson(runs(3, 3, '2026-08-01T00:00:00Z')) });
+    stubCommands({ gh: ghJson(runs(3, 3, '2026-08-20T00:00:00Z')) });
 
     const reading = senseHarnessGreenMain({
+      ...POPULATION,
       repoRoot: '/repo',
       since: '2026-09-01T00:00:00Z',
       now: NOW,
@@ -255,55 +300,60 @@ describe('harness green-main sensor', () => {
 
     expect(reading.status).toBe('review');
     expect(message(reading, 'HARNESS_GREEN_MAIN_NO_RUNS')).toBe(
-      'No CI runs found for branch main since 2026-09-01T00:00:00Z (within the last 50 entries).',
+      `No CI runs of the population since 2026-09-01T00:00:00Z (${DESCRIBE}).`,
     );
-    expect(reading.metrics).toEqual({ run_count: 0, success_pct: 0, since_filter_applied: 1 });
+    expect(reading.metrics).toMatchObject({
+      run_count: 0,
+      success_pct: 0,
+      since_filter_applied: 1,
+    });
   });
 
-  it('passes at exactly the 95% pass threshold with no findings', () => {
+  it('passes at exactly the 95% pass threshold with only the unverified finding', () => {
     stubCommands({ gh: ghJson(runs(20, 19)) });
 
-    const reading = senseHarnessGreenMain({ repoRoot: '/repo', now: NOW });
+    const reading = senseHarnessGreenMain({ ...POPULATION, repoRoot: '/repo', now: NOW });
 
     expect(reading.status).toBe('pass');
-    expect(reading.findings).toEqual([]);
-    expect(reading.metrics).toEqual({
+    expect(codes(reading)).toEqual(['HARNESS_POPULATION_UNVERIFIED']);
+    expect(reading.metrics).toMatchObject({
       run_count: 20,
       success_count: 19,
       success_pct: 95,
       threshold_pass: 95,
       threshold_review: 80,
+      sample_size: 20,
     });
   });
 
   it('reviews at exactly the 80% review threshold', () => {
     stubCommands({ gh: ghJson(runs(20, 16)) });
 
-    const reading = senseHarnessGreenMain({ repoRoot: '/repo', now: NOW });
+    const reading = senseHarnessGreenMain({ ...POPULATION, repoRoot: '/repo', now: NOW });
 
     expect(reading.status).toBe('review');
     expect(reading.findings?.[0]?.severity).toBe('warning');
     expect(message(reading, 'HARNESS_GREEN_MAIN_PARTIAL')).toBe(
-      'Main branch success rate 80.0% (over last 20 runs) is below pass threshold 95%.',
+      `Success rate 80.0% (over 20 runs, ${DESCRIBE}) is below pass threshold 95%.`,
     );
   });
 
   it('fails below the review threshold with an error finding', () => {
     stubCommands({ gh: ghJson(runs(20, 15)) });
 
-    const reading = senseHarnessGreenMain({ repoRoot: '/repo', now: NOW });
+    const reading = senseHarnessGreenMain({ ...POPULATION, repoRoot: '/repo', now: NOW });
 
     expect(reading.status).toBe('fail');
     expect(reading.findings?.[0]?.severity).toBe('error');
     expect(message(reading, 'HARNESS_GREEN_MAIN_BELOW_THRESHOLD')).toBe(
-      'Main branch success rate 75.0% (over last 20 runs) is below review threshold 80%.',
+      `Success rate 75.0% (over 20 runs, ${DESCRIBE}) is below review threshold 80%.`,
     );
   });
 
   it('rounds success_pct to two decimals and the message to one', () => {
     stubCommands({ gh: ghJson(runs(3, 2)) });
 
-    const reading = senseHarnessGreenMain({ repoRoot: '/repo', now: NOW });
+    const reading = senseHarnessGreenMain({ ...POPULATION, repoRoot: '/repo', now: NOW });
 
     expect(reading.metrics?.success_pct).toBe(66.67);
     expect(message(reading, 'HARNESS_GREEN_MAIN_BELOW_THRESHOLD')).toContain('66.7%');
@@ -312,17 +362,18 @@ describe('harness green-main sensor', () => {
   it('counts only runs whose conclusion is exactly success', () => {
     stubCommands({
       gh: ghJson([
-        { conclusion: 'success' },
-        { conclusion: 'SUCCESS' },
-        { conclusion: 'failure' },
-        { conclusion: 'cancelled' },
-        {},
+        ghRun({ conclusion: 'success' }),
+        ghRun({ conclusion: 'SUCCESS' }),
+        ghRun({ conclusion: 'failure' }),
+        ghRun({ conclusion: 'cancelled' }),
+        ghRun(),
       ]),
     });
 
-    const reading = senseHarnessGreenMain({ repoRoot: '/repo', now: NOW });
+    // The cancelled run is outside the population (includeCancelled is false), not a failure.
+    const reading = senseHarnessGreenMain({ ...POPULATION, repoRoot: '/repo', now: NOW });
 
-    expect(reading.metrics).toMatchObject({ run_count: 5, success_count: 1, success_pct: 20 });
+    expect(reading.metrics).toMatchObject({ run_count: 4, success_count: 1, success_pct: 25 });
     expect(reading.status).toBe('fail');
   });
 
@@ -330,6 +381,7 @@ describe('harness green-main sensor', () => {
     stubCommands({ gh: ghJson(runs(20, 15)) });
 
     const reading = senseHarnessGreenMain({
+      ...POPULATION,
       repoRoot: '/repo',
       thresholds: { pass: 75, review: 50 },
       now: NOW,
@@ -339,39 +391,43 @@ describe('harness green-main sensor', () => {
     expect(reading.metrics).toMatchObject({ threshold_pass: 75, threshold_review: 50 });
   });
 
-  it('passes --created server-side and still filters createdAt client-side', () => {
+  it('passes the lookback server-side and applies since client-side after the population', () => {
     stubCommands({
       gh: ghJson([
-        { conclusion: 'success', createdAt: '2026-09-05T00:00:00Z' },
-        { conclusion: 'success', createdAt: '2026-09-01T00:00:00Z' },
-        { conclusion: 'failure', createdAt: '2026-08-31T23:59:59Z' },
-        { conclusion: 'success' },
-        { conclusion: 'success', createdAt: '2026-09-06T00:00:00Z' },
-        { conclusion: 'failure', createdAt: '2026-09-07T00:00:00Z' },
+        ghRun({ conclusion: 'success', createdAt: '2026-09-05T00:00:00Z' }),
+        ghRun({ conclusion: 'success', createdAt: '2026-09-01T00:00:00Z' }),
+        ghRun({ conclusion: 'failure', createdAt: '2026-08-31T23:59:59Z' }),
+        ghRun({ conclusion: 'success', createdAt: undefined }),
+        ghRun({ conclusion: 'success', createdAt: '2026-09-06T00:00:00Z' }),
+        ghRun({ conclusion: 'failure', createdAt: '2026-09-07T00:00:00Z' }),
       ]),
     });
 
     const reading = senseHarnessGreenMain({
+      ...POPULATION,
       repoRoot: '/repo',
       since: '2026-09-01T00:00:00Z',
       minSampleSize: 2,
       now: NOW,
     });
 
+    // since is never forwarded to gh: the population lookback is the only --created.
     expect(argvOf(0)).toEqual([
       'run',
       'list',
-      '--branch',
-      'main',
+      '--workflow',
+      'pull-request-checks.yml',
+      '--event',
+      'pull_request',
       '--json',
-      'conclusion,createdAt',
+      FIELDS,
       '--limit',
-      '50',
+      '300',
       '--created',
-      '>=2026-09-01T00:00:00Z',
+      '>=2026-08-09',
     ]);
-    // The undated run and the pre-window run are both dropped.
-    expect(reading.metrics).toEqual({
+    // The undated run is outside the population; the pre-since run is in it but not in the window.
+    expect(reading.metrics).toMatchObject({
       run_count: 4,
       success_count: 3,
       success_pct: 75,
@@ -379,6 +435,7 @@ describe('harness green-main sensor', () => {
       threshold_review: 80,
       since_filter_applied: 1,
       min_sample_size: 2,
+      sample_size: 5,
     });
     expect(reading.status).toBe('fail');
   });
@@ -387,6 +444,7 @@ describe('harness green-main sensor', () => {
     stubCommands({ gh: ghJson(runs(4, 4, '2026-09-02T00:00:00Z')) });
 
     const reading = senseHarnessGreenMain({
+      ...POPULATION,
       repoRoot: '/repo',
       since: '2026-09-01T00:00:00Z',
       now: NOW,
@@ -396,7 +454,7 @@ describe('harness green-main sensor', () => {
     expect(message(reading, 'HARNESS_GREEN_MAIN_INSUFFICIENT_SAMPLE_POST_FILTER')).toBe(
       'Only 4 run(s) since 2026-09-01T00:00:00Z; below min_sample_size 5. Verdict suppressed.',
     );
-    expect(reading.metrics).toEqual({
+    expect(reading.metrics).toMatchObject({
       run_count: 4,
       success_pct: 0,
       min_sample_size: 5,
@@ -408,6 +466,7 @@ describe('harness green-main sensor', () => {
     stubCommands({ gh: ghJson(runs(5, 5, '2026-09-02T00:00:00Z')) });
 
     const reading = senseHarnessGreenMain({
+      ...POPULATION,
       repoRoot: '/repo',
       since: '2026-09-01T00:00:00Z',
       now: NOW,
@@ -421,6 +480,7 @@ describe('harness green-main sensor', () => {
     stubCommands({ gh: ghJson(runs(6, 6, '2026-09-02T00:00:00Z')) });
 
     const reading = senseHarnessGreenMain({
+      ...POPULATION,
       repoRoot: '/repo',
       since: '2026-09-01T00:00:00Z',
       minSampleSize: 7,
@@ -428,14 +488,17 @@ describe('harness green-main sensor', () => {
     });
 
     expect(reading.status).toBe('unknown');
-    expect(codes(reading)).toEqual(['HARNESS_GREEN_MAIN_INSUFFICIENT_SAMPLE_POST_FILTER']);
+    expect(codes(reading)).toEqual([
+      'HARNESS_GREEN_MAIN_INSUFFICIENT_SAMPLE_POST_FILTER',
+      'HARNESS_POPULATION_UNVERIFIED',
+    ]);
     expect(reading.metrics).toMatchObject({ min_sample_size: 7 });
   });
 
-  it('never applies the sample guard without a since window', () => {
+  it('never applies the post-since sample guard without a since window', () => {
     stubCommands({ gh: ghJson(runs(1, 1)) });
 
-    const reading = senseHarnessGreenMain({ repoRoot: '/repo', now: NOW });
+    const reading = senseHarnessGreenMain({ ...POPULATION, repoRoot: '/repo', now: NOW });
 
     expect(reading.status).toBe('pass');
     expect(reading.metrics).not.toHaveProperty('min_sample_size');
@@ -443,9 +506,11 @@ describe('harness green-main sensor', () => {
   });
 
   it('stamps the current time when no timestamp is supplied', () => {
-    stubCommands({ gh: ghJson(runs(1, 1)) });
+    stubCommands({
+      gh: ghJson([ghRun({ conclusion: 'success', createdAt: new Date().toISOString() })]),
+    });
 
-    const reading = senseHarnessGreenMain({ repoRoot: '/repo' });
+    const reading = senseHarnessGreenMain({ ...POPULATION, repoRoot: '/repo' });
 
     expect(Number.isFinite(Date.parse(reading.timestamp))).toBe(true);
   });
@@ -743,17 +808,21 @@ describe('harness performance sensor', () => {
 
   function successRun(durationMs: number, startIso = START) {
     const start = Date.parse(startIso);
-    return {
+    return ghRun({
       conclusion: 'success',
       createdAt: new Date(start).toISOString(),
       updatedAt: new Date(start + durationMs).toISOString(),
-    };
+    });
   }
 
-  it('emits unknown with the default argv when the gh binary is missing', () => {
+  function sense(extra: Record<string, unknown> = {}): SensorReading {
+    return senseHarnessPerformance({ ...POPULATION, repoRoot: '/repo', now: NOW, ...extra });
+  }
+
+  it('emits unknown with the declared argv when the gh binary is missing', () => {
     stubCommands({ gh: enoent() });
 
-    const reading = senseHarnessPerformance({ repoRoot: '/repo', now: NOW });
+    const reading = sense();
 
     expect(reading).toMatchObject({
       sensor: { name: 'harness-performance', kind: 'harness_performance' },
@@ -761,7 +830,7 @@ describe('harness performance sensor', () => {
       deterministic: false,
       tier: 'L2',
       timestamp: NOW,
-      command: 'gh run list --branch main --json conclusion,createdAt,updatedAt --limit 50',
+      command: `gh run list --workflow pull-request-checks.yml --event pull_request --json ${FIELDS} --limit 300 --created >=2026-08-09`,
       findings: [
         {
           severity: 'info',
@@ -774,21 +843,33 @@ describe('harness performance sensor', () => {
     expect(argvOf(0)).toEqual([
       'run',
       'list',
-      '--branch',
-      'main',
+      '--workflow',
+      'pull-request-checks.yml',
+      '--event',
+      'pull_request',
       '--json',
-      'conclusion,createdAt,updatedAt',
+      FIELDS,
       '--limit',
-      '50',
+      '300',
+      '--created',
+      '>=2026-08-09',
     ]);
+  });
+
+  it('reads unknown with the reason, and never calls gh, when no population is declared', () => {
+    const reading = senseHarnessPerformance({ repoRoot: '/repo', now: NOW });
+
+    expect(reading.status).toBe('unknown');
+    expect(message(reading, 'HARNESS_PERFORMANCE_GH_UNAVAILABLE')).toContain(
+      'harness-population-undeclared',
+    );
+    expect(mocks.spawnSync).not.toHaveBeenCalled();
   });
 
   it('trims the stderr excerpt on a non-zero exit', () => {
     stubCommands({ gh: spawnResult({ status: 1, stderr: '  gh: auth required \n' }) });
 
-    const reading = senseHarnessPerformance({ repoRoot: '/repo', now: NOW });
-
-    expect(message(reading, 'HARNESS_PERFORMANCE_GH_UNAVAILABLE')).toBe(
+    expect(message(sense(), 'HARNESS_PERFORMANCE_GH_UNAVAILABLE')).toBe(
       'Skipped: gh-cli-nonzero-exit: gh: auth required',
     );
   });
@@ -796,7 +877,7 @@ describe('harness performance sensor', () => {
   it('emits unknown when stdout is not JSON', () => {
     stubCommands({ gh: spawnResult({ stdout: 'not json' }) });
 
-    const reading = senseHarnessPerformance({ repoRoot: '/repo', now: NOW });
+    const reading = sense();
 
     expect(reading.status).toBe('unknown');
     expect(message(reading, 'HARNESS_PERFORMANCE_GH_UNAVAILABLE')).toMatch(
@@ -804,61 +885,61 @@ describe('harness performance sensor', () => {
     );
   });
 
-  it('reports an absent measurement for an empty run list', () => {
+  it('reports an absent measurement for an empty run list as an insufficient sample', () => {
     stubCommands({ gh: ghJson([]) });
 
-    const reading = senseHarnessPerformance({ repoRoot: '/repo', now: NOW });
+    const reading = sense();
 
     expect(reading.status).toBe('unknown');
-    expect(message(reading, 'HARNESS_PERFORMANCE_NO_SUCCESS_RUNS')).toBe(
-      'No successful runs found on branch main (last 0 entries).',
+    expect(message(reading, 'HARNESS_PERFORMANCE_INSUFFICIENT_SAMPLE')).toBe(
+      `Sample size 0 successful run(s) is below the minimum sample 1 for ${DESCRIBE}. Verdict suppressed.`,
     );
-    expect(reading.metrics).toEqual({ run_count: 0, success_count: 0 });
+    expect(reading.metrics).toMatchObject({ run_count: 0, success_count: 0, sample_size: 0 });
   });
 
-  it('reviews when every run failed but still counts them', () => {
+  it('reads unknown when every run failed, but still counts them', () => {
     stubCommands({
       gh: ghJson([
-        { conclusion: 'failure', createdAt: START, updatedAt: START },
-        { conclusion: 'cancelled', createdAt: START, updatedAt: START },
-        { createdAt: START, updatedAt: START },
+        ghRun({ conclusion: 'failure', createdAt: START, updatedAt: START }),
+        ghRun({ conclusion: 'cancelled', createdAt: START, updatedAt: START }),
+        ghRun({ createdAt: START, updatedAt: START }),
       ]),
     });
 
-    const reading = senseHarnessPerformance({ repoRoot: '/repo', branch: 'dev', now: NOW });
+    const reading = sense();
 
-    expect(reading.status).toBe('review');
-    expect(message(reading, 'HARNESS_PERFORMANCE_NO_SUCCESS_RUNS')).toBe(
-      'No successful runs found on branch dev (last 3 entries).',
-    );
-    expect(reading.metrics).toEqual({ run_count: 3, success_count: 0 });
+    // The cancelled run is outside the population; the minimum counts successful runs only.
+    expect(reading.status).toBe('unknown');
+    expect(message(reading, 'HARNESS_PERFORMANCE_INSUFFICIENT_SAMPLE')).toContain(DESCRIBE);
+    expect(reading.metrics).toMatchObject({ run_count: 2, success_count: 0, sample_size: 0 });
   });
 
   it('drops successful runs with missing, unparsable or reversed timestamps', () => {
     stubCommands({
       gh: ghJson([
-        { conclusion: 'success', updatedAt: START },
-        { conclusion: 'success', createdAt: START },
-        { conclusion: 'success', createdAt: 'not-a-date', updatedAt: START },
-        { conclusion: 'success', createdAt: START, updatedAt: 'not-a-date' },
-        {
+        ghRun({ conclusion: 'success', createdAt: undefined, updatedAt: START }),
+        ghRun({ conclusion: 'success', createdAt: START, updatedAt: undefined }),
+        ghRun({ conclusion: 'success', createdAt: 'not-a-date', updatedAt: START }),
+        ghRun({ conclusion: 'success', createdAt: START, updatedAt: 'not-a-date' }),
+        ghRun({
           conclusion: 'success',
           createdAt: '2026-09-01T00:10:00.000Z',
           updatedAt: '2026-09-01T00:00:00.000Z',
-        },
+        }),
       ]),
     });
 
-    const reading = senseHarnessPerformance({ repoRoot: '/repo', now: NOW });
+    const reading = sense();
 
-    expect(reading.status).toBe('review');
-    expect(reading.metrics).toEqual({ run_count: 5, success_count: 0 });
+    // Runs with no or unparsable createdAt are outside the population; the rest have no duration.
+    expect(reading.status).toBe('unknown');
+    expect(reading.metrics).toMatchObject({ run_count: 3, success_count: 0, sample_size: 0 });
   });
 
   it('keeps a zero-length successful run', () => {
     stubCommands({ gh: ghJson([successRun(0)]) });
 
-    const reading = senseHarnessPerformance({ repoRoot: '/repo', now: NOW });
+    const reading = sense();
 
     expect(reading.status).toBe('pass');
     expect(reading.metrics).toMatchObject({
@@ -874,19 +955,20 @@ describe('harness performance sensor', () => {
       gh: ghJson([
         successRun(400_000),
         successRun(100_000),
-        { conclusion: 'failure', createdAt: START, updatedAt: START },
+        ghRun({ conclusion: 'failure', createdAt: START, updatedAt: START }),
         successRun(300_000),
         successRun(200_000),
       ]),
     });
 
-    const reading = senseHarnessPerformance({ repoRoot: '/repo', now: NOW });
+    const reading = sense();
 
     expect(reading.status).toBe('pass');
-    expect(reading.findings).toEqual([]);
-    expect(reading.metrics).toEqual({
+    expect(codes(reading)).toEqual(['HARNESS_POPULATION_UNVERIFIED']);
+    expect(reading.metrics).toMatchObject({
       run_count: 5,
       success_count: 4,
+      sample_size: 4,
       median_ms: 200_000,
       p95_ms: 400_000,
       pass_median_ms: 600_000,
@@ -897,7 +979,7 @@ describe('harness performance sensor', () => {
   it('does not pass when the median sits exactly on the pass bound', () => {
     stubCommands({ gh: ghJson([successRun(600_000)]) });
 
-    const reading = senseHarnessPerformance({ repoRoot: '/repo', now: NOW });
+    const reading = sense();
 
     expect(reading.status).toBe('review');
     expect(message(reading, 'HARNESS_PERFORMANCE_SLOW')).toBe(
@@ -910,7 +992,7 @@ describe('harness performance sensor', () => {
       gh: ghJson([successRun(1_000), successRun(1_000), successRun(1_000), successRun(1_800_000)]),
     });
 
-    const reading = senseHarnessPerformance({ repoRoot: '/repo', now: NOW });
+    const reading = sense();
 
     expect(reading.status).toBe('review');
     expect(reading.metrics).toMatchObject({ median_ms: 1_000, p95_ms: 1_800_000 });
@@ -919,7 +1001,7 @@ describe('harness performance sensor', () => {
   it('fails when the median sits exactly on the review bound', () => {
     stubCommands({ gh: ghJson([successRun(1_200_000)]) });
 
-    const reading = senseHarnessPerformance({ repoRoot: '/repo', now: NOW });
+    const reading = sense();
 
     expect(reading.status).toBe('fail');
     expect(reading.findings?.[0]?.severity).toBe('error');
@@ -933,7 +1015,7 @@ describe('harness performance sensor', () => {
       gh: ghJson([successRun(1_000), successRun(1_000), successRun(1_000), successRun(3_600_000)]),
     });
 
-    const reading = senseHarnessPerformance({ repoRoot: '/repo', now: NOW });
+    const reading = sense();
 
     expect(reading.status).toBe('fail');
     expect(message(reading, 'HARNESS_PERFORMANCE_TOO_SLOW')).toBe(
@@ -944,17 +1026,16 @@ describe('harness performance sensor', () => {
   it('rounds the reported seconds to the nearest second', () => {
     stubCommands({ gh: ghJson([successRun(600_500)]) });
 
-    expect(
-      message(senseHarnessPerformance({ repoRoot: '/repo', now: NOW }), 'HARNESS_PERFORMANCE_SLOW'),
-    ).toBe('median 601s, p95 601s — above pass thresholds.');
+    expect(message(sense(), 'HARNESS_PERFORMANCE_SLOW')).toBe(
+      'median 601s, p95 601s — above pass thresholds.',
+    );
   });
 
-  it('honours custom branch, limit and thresholds', () => {
-    stubCommands({ gh: ghJson([successRun(700_000)]) });
+  it('honours a custom head branch, limit and thresholds', () => {
+    stubCommands({ gh: ghJson([{ ...successRun(700_000), headBranch: 'release' }]) });
 
-    const reading = senseHarnessPerformance({
-      repoRoot: '/repo',
-      branch: 'release',
+    const reading = sense({
+      headBranch: 'release',
       limit: 5,
       thresholds: {
         passMedianMs: 800_000,
@@ -962,27 +1043,35 @@ describe('harness performance sensor', () => {
         reviewMedianMs: 1_000_000,
         reviewP95Ms: 1_100_000,
       },
-      now: NOW,
     });
 
     expect(argvOf(0)).toEqual([
       'run',
       'list',
+      '--workflow',
+      'pull-request-checks.yml',
+      '--event',
+      'pull_request',
       '--branch',
       'release',
       '--json',
-      'conclusion,createdAt,updatedAt',
+      FIELDS,
       '--limit',
       '5',
+      '--created',
+      '>=2026-08-09',
     ]);
     expect(reading.status).toBe('pass');
     expect(reading.metrics).toMatchObject({ pass_median_ms: 800_000, pass_p95_ms: 900_000 });
   });
 
   it('stamps the current time when no timestamp is supplied', () => {
-    stubCommands({ gh: ghJson([successRun(1_000)]) });
+    const created = new Date().toISOString();
+    stubCommands({
+      gh: ghJson([ghRun({ conclusion: 'success', createdAt: created, updatedAt: created })]),
+    });
 
-    const reading = senseHarnessPerformance({ repoRoot: '/repo' });
+    const reading = senseHarnessPerformance({ ...POPULATION, repoRoot: '/repo' });
 
     expect(Number.isFinite(Date.parse(reading.timestamp))).toBe(true);
   });
