@@ -1134,7 +1134,7 @@
               "commit_types": ["docs(reference)", "docs(theory)", "plan(record)"],
               "prompt": {
                 "path": "prompts/TASK-0431.md",
-                "sha256": "1910727a24f312f44d2420d7f5dec98e2bd34c4b002e6b400aba058eba9afd6f"
+                "sha256": "be0bc0b08ed1e4c017fb0c87f38c86664afcdb58a14b2b0ddac47a4dcd30fcb6"
               },
               "pull_request": null,
               "merged_as": null,
