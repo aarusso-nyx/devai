@@ -95,8 +95,30 @@ When a task escalates to human after iteration-cap exhaustion:
 
 Human resolution paths: adopt the escalated branch in a human-owned worktree (not counted against the worktree cap); edit the specification to make the task feasible and re-queue; or cancel. Escalated branches are preserved indefinitely; pruning is a manual human-invoked operation.
 
+## Round closure and the rounds index
+
+A round leaves the loop through a phase closure and a seal, not through a narrative. Closing a
+phase appends one immutable `PC-NNNN` closure under `record/proofs/compliance/closures`; a
+correction appends another closure that names the first in `supersedes`, so the last closure of a
+round is the terminal one and the earlier ones stay visible as superseded. The rounds index at
+`record/derived/indexes/rounds.md` is rendered from those closures by
+`evidence render --kind rounds`, one row per closure in round order, and `round seal` accepts a
+round only when the index holds the exact terminal row for it: the closure id as a whole cell,
+marked terminal, in that round. A substring, a prose mention, or a superseded row does not seal
+(ADR-EVI-0001, #169).
+
+Two consequences follow for the loop. The index is derived state: nobody types a closure id into
+it, and a closure added without regenerating the index is a stale derived file that the
+round-close checks reject until the renderer runs again. And the seal reads the committed index,
+not the closure directory, so the evidence a reviewer reads and the evidence the seal checks are
+the same bytes. The row shape, order, rejections, and `--check` mode are specified on the
+[`evidence render` reference](../../reference/cli/evidence-render.md); the narrative
+concatenation of round records that `--kind rounds` used to produce remains available as
+`--kind round-narratives`.
+
 ## See also
 
 - [Constitution Part V — Articles 15-23](../../reference/law.md) — the loop's binding text.
+- [`evidence render` and the rounds index](../../reference/cli/evidence-render.md) — closure rows, order, and the exact-membership seal.
 - [Scorecard](./scorecard.md) — gates + thresholds + tie-breaker ladder.
 - [Concurrency](./concurrency.md) — coupled triplets, locks, checkpoints.
