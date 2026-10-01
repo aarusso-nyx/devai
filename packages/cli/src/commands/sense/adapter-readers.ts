@@ -171,7 +171,12 @@ export async function inventoryAdherence(request: SenseAdapterRequest): Promise<
   const trace = JSON.parse(readFileSync(tracePath, 'utf8')) as Parameters<
     typeof computeReverseAdherence
   >[0]['trace'];
-  return senseInventoryAdherence({ report: computeReverseAdherence({ inventory, trace }) });
+  const surfaces = surfacesInput(request);
+  // ADR-SCR-0008: skipped only when every plant surface is declared absent.
+  return senseInventoryAdherence({
+    report: computeReverseAdherence({ inventory, trace }),
+    ...(surfaces === undefined ? {} : { surfaces }),
+  });
 }
 
 export async function inventoryDeterminism(request: SenseAdapterRequest): Promise<SensorReading> {
