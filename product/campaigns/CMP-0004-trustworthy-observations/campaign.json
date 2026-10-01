@@ -713,7 +713,7 @@
       "id": "R-0402",
       "title": "Immutable readings and recording order",
       "goal": "Recorded readings are immutable instances linked by supersession, the sweep stays read-only with an ordered second pass, sense record appends the chain entry the alignment sensor counts, the observation backlog validates, the hook reads the bound store, and the two inventory cells are decided per cell.",
-      "status": "planned",
+      "status": "open",
       "records": ["ADR-SCR-0008"],
       "depends_on": ["R-0401"],
       "attestation_reissue": false,
@@ -743,7 +743,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -796,14 +796,53 @@
               ],
               "prompt": {
                 "path": "prompts/TASK-0421.md",
-                "sha256": null
+                "sha256": "d7cae4a2c8a0338f559741dd48670efa52dd7884ed5d34b15593da53b777d001"
               },
               "pull_request": null,
               "merged_as": null,
               "execution": {
                 "tier": "architect",
                 "effort": "high",
-                "time_budget_minutes": 120
+                "time_budget_minutes": 120,
+                "resolved": {
+                  "policy_version": "1.0.0",
+                  "pinned_at": "2026-10-01T05:18:05Z",
+                  "tiers": {
+                    "architect": {
+                      "rank": 1,
+                      "hosts": {
+                        "claude": "claude-cli:fable",
+                        "codex": "codex-cli:gpt-6-astra"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker-high": {
+                      "rank": 2,
+                      "hosts": {
+                        "claude": "claude-cli:opus",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker": {
+                      "rank": 3,
+                      "hosts": {
+                        "claude": "claude-cli:sonnet",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "medium"
+                    },
+                    "clerk": {
+                      "rank": 4,
+                      "hosts": {
+                        "claude": "claude-cli:haiku",
+                        "codex": "codex-cli:gpt-6-luna"
+                      },
+                      "default_effort": "low"
+                    }
+                  },
+                  "ceiling": "architect"
+                }
               }
             },
             {
