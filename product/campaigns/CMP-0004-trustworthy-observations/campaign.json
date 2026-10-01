@@ -2118,7 +2118,17 @@
               "boundary": {
                 "paths": [
                   "packages/sensors/tests/harness-sampling.test.ts",
-                  "tests/contract/sensor-inputs.contract.test.ts"
+                  "tests/contract/sensor-inputs.contract.test.ts",
+                  "packages/cli/tests/unit/authority-host-process-read-only.test.ts",
+                  "packages/cli/tests/unit/sense-adapters-depth.test.ts",
+                  "packages/cli/tests/unit/doctor-check-result-identities.test.ts",
+                  "packages/cli/tests/unit/evidence-export-intent-receipt.test.ts",
+                  "packages/sensors/tests/unit/harness-quality-runtime-coverage.test.ts",
+                  "packages/sensors/tests/unit/harness-quality-defect-regressions.test.ts",
+                  "packages/sensors/tests/unit/harness-robustness-run-population.test.ts",
+                  "packages/sensors/tests/unit/harness-robustness-unavailable-population.test.ts",
+                  "packages/sensors/tests/unit/sensor-reading.test.ts",
+                  "packages/sensors/tests/unit/inventory-sensor-cases.ts"
                 ],
                 "forbidden": [
                   "law/",
@@ -2147,7 +2157,7 @@
               "commit_types": ["test(sensors)"],
               "prompt": {
                 "path": "prompts/TASK-0442.md",
-                "sha256": "d0403705d33418dc3e776be9c241ec14f2b5234665d9d5580be4d9afb88c5a95"
+                "sha256": "420d3dbe84c24be5b8285ec0ce224efae370078bc206abaad2ccd0202c55b443"
               },
               "pull_request": null,
               "merged_as": null,
@@ -2211,7 +2221,8 @@
                   "packages/sensors/src/harness-robustness.ts",
                   "packages/sensors/src/harness/gh-api.ts",
                   "packages/cli/src/commands/sense/adapters.ts",
-                  "packages/cli/src/authority/broker.ts"
+                  "packages/cli/src/authority/broker.ts",
+                  "packages/cli/src/commands/check/adapters-reports.ts"
                 ],
                 "forbidden": ["law/", "product/", ".github/workflows/"]
               },
@@ -2232,7 +2243,7 @@
               "commit_types": ["feat(sensors)"],
               "prompt": {
                 "path": "prompts/TASK-0443.md",
-                "sha256": "863592ddc57e97bdcfdfb8cf2dc3e79a4898cfa40f8acd0b49358cb20473fe8d"
+                "sha256": "6c5d364fd896fb83ead48016711950d72a2c7629b577c5e05ce44934e3ce9cf2"
               },
               "pull_request": null,
               "merged_as": null,
