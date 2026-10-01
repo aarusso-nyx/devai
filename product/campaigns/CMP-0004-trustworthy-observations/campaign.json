@@ -1405,7 +1405,8 @@
                   "docs/reference/cli/index.md",
                   "law/policy/documentation-information-architecture.json",
                   "law/schemas/evidence.schema.json",
-                  "law/policy/action-registry.json"
+                  "law/policy/action-registry.json",
+                  "docs/reference/cli/authority-effects.md"
                 ],
                 "forbidden": [".github/workflows/", "packages/", "tests/"]
               },
@@ -1440,7 +1441,7 @@
               ],
               "prompt": {
                 "path": "prompts/TASK-0434.md",
-                "sha256": "8bdb89ebbd3f18de93f19da2caef457eefd787900e37c6ff24a784f83016c029"
+                "sha256": "029627af07b1f7d833ca336bd601755b8c649739dfb25ac41fa4e0ac2952295b"
               },
               "pull_request": null,
               "merged_as": null,
@@ -1530,7 +1531,7 @@
               "commit_types": ["test(evidence)", "test(cli)", "test(fixtures)"],
               "prompt": {
                 "path": "prompts/TASK-0435.md",
-                "sha256": "fbccb7118ce0125858c5a573a3a624c39120b2b5eb394ef7a1466d38cf78a77a"
+                "sha256": "ef66c58ad679af95ac934f3b09614ecb668e1ae6c7f2afa377d748e7eb9ebc01"
               },
               "pull_request": null,
               "merged_as": null,
@@ -1597,7 +1598,9 @@
                   "packages/schemas/src/roster.ts",
                   "docs/reference/error-codes.md",
                   "packages/evidence/src/evidence/proof-epoch.ts",
-                  "record/proofs/anchor-baseline.json"
+                  "record/proofs/anchor-baseline.json",
+                  "packages/cli/src/authority/index.ts",
+                  "packages/cli/src/commands/evidence/facade-verify.ts"
                 ],
                 "forbidden": ["law/", "product/", ".github/workflows/"]
               },
@@ -1619,7 +1622,7 @@
               "commit_types": ["feat(evidence)", "refactor(schemas)", "docs(reference)"],
               "prompt": {
                 "path": "prompts/TASK-0436.md",
-                "sha256": null
+                "sha256": "2c2dd4457dfa8aa339dd90936f9a2dd1859fab040e1f1cc155a9fd59bbe511e4"
               },
               "pull_request": null,
               "merged_as": null,
