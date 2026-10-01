@@ -72,6 +72,37 @@
     "description": "The selector kinds the pinned verifier's task-descriptor schema admits; the committed test-tasks.json uses no other kind, and the descriptor check refuses one outside this set (ADR-CHK-0006).",
     "selector_kinds": ["exact", "prefix", "glob"]
   },
+  "repin": {
+    "description": "How this pin moves (ADR-REL-0031, ADR-CHK-0006). The verifier this policy trusts is the one inside the published release that package.release_source names; a verifier change lands first in the canonical source, is then vendored into the in-repository copy with a rewritten provenance manifest, ships in a release verified by the still-pinned verifier, and only then is pinned here. The pin trails the vendored copy by one published release.",
+    "rule": "trusted-verifier-trails-vendored-copy-by-one-published-release",
+    "vendored_copy": {
+      "root": "packages/cli/vendor/evidence-verification",
+      "provenance_manifest": "packages/cli/vendor/evidence-verification/provenance.json",
+      "made_only_from": "canonical-source-commit",
+      "hand_edit": false
+    },
+    "order": [
+      "canonical-verifier-source-change-with-tests",
+      "vendored-copy-rewritten-with-new-provenance-and-in-repository-restatements",
+      "release-published-under-current-pin",
+      "law-repin-from-published-release"
+    ],
+    "moves_together": [
+      "package.version",
+      "package.tarball",
+      "package.shasum_sha1",
+      "package.integrity_sri",
+      "package.release_source.commit",
+      "package.release_source.tree",
+      "verifier.source_commit",
+      "verifier.provenance_sha256",
+      "verifier.payload_file_count",
+      "descriptor.selector_kinds"
+    ],
+    "verifier_values_read_from": "the published release's vendored provenance.json at package.release_source.commit",
+    "partial_repin": false,
+    "owner_effect": "re-declare the repository variable named by external_duplicate.name to the new verifier.provenance_sha256, recorded separately"
+  },
   "external_duplicate": {
     "name": "DEVAI_LEDGER_VERIFIER_PROVENANCE_SHA256",
     "required": true,
