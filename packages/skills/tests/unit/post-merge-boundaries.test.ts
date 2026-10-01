@@ -427,35 +427,57 @@ describe('post-merge completed round identity', () => {
   }, 60_000);
 
   it('carries the previous merge and its backlog forward into the round deltas', async () => {
-    const fx = fixture(2, [
-      [reading('type_check', 'fail'), reading('lint', 'fail')],
-      [reading('type_check', 'pass'), reading('lint', 'fail'), reading('security_scan', 'fail')],
-    ]);
+    // ADR-SCR-0008: the hook scores the bound checkout's store as it stands when the
+    // hook fires, so each round is observed by its own hook invocation.
+    const fx = fixture(1, [[reading('type_check', 'fail'), reading('lint', 'fail')]]);
     await runAuditor(fx);
-    const [firstSha, secondSha] = fx.merges as readonly [string, string];
+    const firstSha = fx.mergeSha;
+
+    git(fx.root, ['checkout', '-qb', 'feature-2']);
+    put(fx.root, 'feature-2.txt', 'feature 2\n');
+    writeReadingsRound(fx.root, [
+      reading('type_check', 'pass'),
+      reading('lint', 'fail'),
+      reading('security_scan', 'fail'),
+    ]);
+    git(fx.root, ['add', '-A', '--', 'feature-2.txt', READINGS_STORE]);
+    git(fx.root, ['commit', '-qm', 'feature 2']);
+    git(fx.root, ['checkout', '-q', 'main']);
+    git(fx.root, ['merge', '--no-ff', 'feature-2', '-qm', 'merge 2']);
+    const secondSha = git(fx.root, ['rev-parse', 'HEAD']);
+    const { signature_hmac_sha256: _signature, ...receipt } = fx.receipt;
+    writeFileSync(
+      fx.receiptPath,
+      `${JSON.stringify(signed({ ...receipt, merge_sha: secondSha, nonce: 'b'.repeat(32) }, fx.key))}\n`,
+    );
+    const next: HostFixture = { ...fx, mergeSha: secondSha, merges: [firstSha, secondSha] };
+    expect(await runAuditor(next)).toMatchObject({ status: 'completed', processed: [secondSha] });
+
     const first = JSON.parse(readBundle(fx, 'backlog', firstSha)) as Record<string, unknown>;
     const second = JSON.parse(readBundle(fx, 'backlog', secondSha)) as Record<string, unknown>;
-    const ids = (value: Record<string, unknown>, key: 'additions' | 'completions') =>
-      ((value['deltas'] as Record<string, readonly Record<string, unknown>[]>)[key] ?? []).map(
-        (item) => item['id'],
-      );
-    const currentIds = (value: Record<string, unknown>) =>
-      (value['current'] as { readonly items: readonly Record<string, unknown>[] }).items.map(
-        (item) => item['id'],
-      );
+    // ADR-SCR-0008: the backlog carries one observation per cell and the deltas name
+    // cells with the verdict that moved them.
+    const deltas = (value: Record<string, unknown>, key: 'additions' | 'completions') =>
+      (value['deltas'] as Record<string, readonly Record<string, unknown>[]>)[key] ?? [];
+    const openCells = (value: Record<string, unknown>) =>
+      (value['observations'] as readonly Record<string, unknown>[])
+        .filter(
+          (observation) => observation['verdict'] === 'FAIL' || observation['verdict'] === 'REVIEW',
+        )
+        .map((observation) => observation['cell']);
 
-    // The first round has no predecessor, so every open item is an addition.
-    expect(currentIds(first)).toEqual(['BL-F2-T5', 'BL-F2-T8']);
+    // The first round has no predecessor, so its deltas are empty.
+    expect(openCells(first)).toEqual(['F2:T5', 'F2:T8']);
     expect(first['previous_merge_sha']).toBeNull();
-    expect(ids(first, 'additions')).toEqual(['BL-F2-T5', 'BL-F2-T8']);
-    expect(ids(first, 'completions')).toEqual([]);
+    expect(deltas(first, 'additions')).toEqual([]);
+    expect(deltas(first, 'completions')).toEqual([]);
 
     // The second round retains F2×T5, opens F2×T6, and closes F2×T8.
-    expect(currentIds(second)).toEqual(['BL-F2-T5', 'BL-F2-T6']);
+    expect(openCells(second)).toEqual(['F2:T5', 'F2:T6']);
     expect(second['previous_merge_sha']).toBe(firstSha);
     expect(second['merge_sha']).toBe(secondSha);
-    expect(ids(second, 'additions')).toEqual(['BL-F2-T6']);
-    expect(ids(second, 'completions')).toEqual(['BL-F2-T8']);
+    expect(deltas(second, 'additions')).toEqual([{ cell: 'F2:T6', verdict: 'FAIL' }]);
+    expect(deltas(second, 'completions')).toEqual([{ cell: 'F2:T8', verdict: 'FAIL' }]);
     expect(second['schemaVersion']).toBe('1.0.0');
   }, 60_000);
 });
