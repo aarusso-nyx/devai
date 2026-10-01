@@ -88,7 +88,7 @@
       "id": "R-0401",
       "title": "Sensing process admission and measurable test cells",
       "goal": "The build and site_drift sensors produce readings under exact broker admission; e2e runs the governed RC e2e configuration and coverage is measured on a declared database-free population; F2:T4, F2:T9, F3:T1, and F3:T2 carry measured verdicts.",
-      "status": "open",
+      "status": "closed",
       "records": ["ADR-AUT-0002", "ADR-SCR-0007"],
       "depends_on": [],
       "attestation_reissue": true,
@@ -702,7 +702,12 @@
           ]
         }
       ],
-      "closure": null
+      "closure": {
+        "merged_head": "259197ac0c809f360884fc14da1d87ac92f3f0e2",
+        "closed_at": "2026-10-01T05:17:44Z",
+        "task_policy_digest": "a33e478245b2e05adbc0f768a2544c77c699a9edd68443d0528a8719013685ed",
+        "phase_closure": null
+      }
     },
     {
       "id": "R-0402",
