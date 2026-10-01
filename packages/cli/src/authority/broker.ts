@@ -349,6 +349,18 @@ function readOnlyGhProcess(args: readonly unknown[]): boolean {
   );
 }
 
+/** The executable and argv of a refused process request, as strings, for the refusal context. */
+function refusedProcessContext(request: AuthorityHostEffectRequest): {
+  readonly executable: string;
+  readonly argv: readonly string[];
+} {
+  const args = request.arguments[1];
+  return {
+    executable: String(request.arguments[0]),
+    argv: Array.isArray(args) ? args.map((argument: unknown) => String(argument)) : [],
+  };
+}
+
 /** One repository-relative path under tests/: no option, no absolute path, no parent segment. */
 function governedTestPath(value: unknown): boolean {
   if (typeof value !== 'string' || isAbsolute(value)) return false;
@@ -433,6 +445,8 @@ function readOnlyProcess(
     // A literal list: never read from disk, never a bare package script.
     const governedConfigs = [
       'tests/config/local.config.ts',
+      'tests/config/local.coverage.config.ts',
+      'tests/config/rc.e2e.config.ts',
       'tests/config/rc.performance.config.ts',
       'tests/config/t1.unit.config.ts',
       'tests/config/t3.integration.config.ts',
@@ -1069,8 +1083,15 @@ export function createAuthorityHostBroker(input: BrokerInput): {
     if (request.kind === 'process') {
       if (readOnlyProcess(request, input.entry.name, input.entry.authority_contract.capabilities))
         return apply();
-      if (input.entry.effects === 'read')
-        throw new Error('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
+      if (input.entry.effects === 'read') {
+        // Name the refused argv so the reader sees which command was not admitted
+        // (ADR-SCR-0007 IA-002); the argv is the caller's own declared command.
+        const error = new Error('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED') as Error & {
+          context?: object;
+        };
+        error.context = refusedProcessContext(request);
+        throw error;
+      }
       const target = processTarget(
         request,
         input.entry.name,
@@ -1086,7 +1107,7 @@ export function createAuthorityHostBroker(input: BrokerInput): {
         const error = new Error('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED') as Error & {
           context?: object;
         };
-        if (context !== undefined) error.context = context;
+        error.context = context ?? refusedProcessContext(request);
         throw error;
       }
       if (actionPlanner.kind === 'exact-plan') {
