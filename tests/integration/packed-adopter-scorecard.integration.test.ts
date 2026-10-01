@@ -2,6 +2,7 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import {
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -409,6 +410,22 @@ describe('ADR-REL-0033: the scorecard route from the packed artifact', () => {
 
   it('leaves no copy or symlink under the legacy readings store', () => {
     expect(existsSync(join(fixture, LEGACY_STORE))).toBe(false);
-    expect(readdirSync(fixture).includes('record')).toBe(false);
+    // ADR-SCR-0008: sense record appends its chain entry to record/proofs/chain.json,
+    // which is the only path it may create under record/.
+    const created: string[] = [];
+    const walk = (relative: string): void => {
+      const stat = lstatSync(join(fixture, relative));
+      if (stat.isDirectory()) {
+        for (const entry of readdirSync(join(fixture, relative)).sort()) {
+          walk(`${relative}/${entry}`);
+        }
+        return;
+      }
+      created.push(
+        `${relative}:${stat.isSymbolicLink() ? 'symlink' : stat.isFile() ? 'file' : 'other'}`,
+      );
+    };
+    if (existsSync(join(fixture, 'record'))) walk('record');
+    expect(created).toEqual(['record/proofs/chain.json:file']);
   });
 });
