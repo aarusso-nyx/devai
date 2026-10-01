@@ -180,8 +180,10 @@ function invokeCommand(options: CommandOptions): {
 describe('complete schema canon filesystem checks', () => {
   it('counts the model-tiers schema in the runtime roster once TASK-0353 moves it', () => {
     const report = checkSchemaCanon(canonFixture());
-    expect(ROSTER).toHaveLength(96);
-    expect(report).toMatchObject({ ok: true, canonical_total: 113, findings: [] });
+    // ADR-SCR-0008 adds observation-backlog.schema.json to the canon and TASK-0423
+    // moves it from the source-only catalogue into the runtime roster.
+    expect(ROSTER).toHaveLength(97);
+    expect(report).toMatchObject({ ok: true, canonical_total: 114, findings: [] });
   });
   it.each(['missing-source-only', 'missing-runtime', 'unexpected'] as const)(
     'reports %s source inventory changes without throwing',
@@ -200,7 +202,7 @@ describe('complete schema canon filesystem checks', () => {
         );
       const report = checkSchemaCanon(root);
       expect(report.ok).toBe(false);
-      expect(report.canonical_total).toBe(kind === 'unexpected' ? 114 : 112);
+      expect(report.canonical_total).toBe(kind === 'unexpected' ? 115 : 113);
       expect(report.findings).toContainEqual({
         rule: 'recursive-closed-complete-objects',
         path: 'law/schemas',
@@ -288,7 +290,7 @@ describe('check schemas command boundary', () => {
     const result = invokeCommand({ repoRoot: canonFixture() });
     expect(JSON.parse(result.stdout)).toEqual({
       ok: true,
-      canonical_total: 113,
+      canonical_total: 114,
       rules: [
         'recursive-closed-complete-objects',
         'predicate-fragments-valid',
@@ -304,7 +306,7 @@ describe('check schemas command boundary', () => {
 
   it('renders the exact passing human summary', () => {
     const result = invokeCommand({ repoRoot: canonFixture(), human: true });
-    expect(result.stdout).toBe('policy check schemas: OK (113 canonical schemas, 0 findings)\n');
+    expect(result.stdout).toBe('policy check schemas: OK (114 canonical schemas, 0 findings)\n');
     expect(result.exitCode).toBe(EXIT_PASS);
   });
 
@@ -316,7 +318,7 @@ describe('check schemas command boundary', () => {
     const result = invokeCommand({ repoRoot: root, human: true });
     expect(result.stdout).toBe(
       [
-        'policy check schemas: FAIL (113 canonical schemas, 1 findings)',
+        'policy check schemas: FAIL (114 canonical schemas, 1 findings)',
         `  [dereferenced-publish-byte-identity] ${missing}: Bundled publish bytes differ from canonical law bytes.`,
         '',
       ].join('\n'),
