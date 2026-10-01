@@ -14,9 +14,8 @@ R-0305. This page is the human guide: it records the diagnosis the campaign
 starts from and the outcome each round must move.
 
 The seven records are ADR-AUT-0002, ADR-SCR-0007, ADR-SCR-0008, ADR-EVI-0001,
-ADR-EVI-0002, ADR-REL-0031, and ADR-SCR-0010 under `law/adr/`, all proposed at
-the time of writing. The Architect sets each round's records to accepted
-before that round opens.
+ADR-EVI-0002, ADR-REL-0031, and ADR-SCR-0010 under `law/adr/`. All seven were
+accepted as drafted on 2026-10-01 after the Owner's decisions in section 5.
 
 ## 1. Diagnosis (measured on 2026-09-28, main at `6add3383`)
 
@@ -74,3 +73,22 @@ closing rounds. Three rules are specific to this campaign:
   reports.
 - R-0404's second scorecard waits for the declared minimum sample on `main`;
   implementation closure of the other rounds does not wait for it.
+
+## 5. Owner decisions
+
+1. **Records accepted as drafted.** The Owner accepted ADR-AUT-0002 and
+   ADR-SCR-0007 on 2026-09-30, and ADR-SCR-0008, ADR-EVI-0001, ADR-EVI-0002,
+   ADR-REL-0031, and ADR-SCR-0010 on 2026-10-01, each without change. The
+   Architect set all seven to accepted before R-0401 opened.
+2. **Broker admission approved.** On 2026-09-30 the Owner explicitly approved
+   every broker and subprocess admission the seven records declare: the two
+   `gh api` Pages GET shapes and the build precedence of ADR-AUT-0002, the two
+   governed vitest configurations of ADR-SCR-0007, and the declared shapes of
+   the later rounds. A widening that no record declares still stops the task.
+3. **OE-01 source.** The Owner authorized reading the DETRAN repository with
+   `gh` to assemble the OE-01 fixtures: the phase closures and the rendered
+   rounds index for ADR-EVI-0001, and the proof lines, the chain, and the
+   R-0020 contract with the line digests for ADR-EVI-0002. Fixture bytes are
+   copied unchanged; a credential or absolute host path in them stops the
+   copy and returns to the Owner, because removing it would change the line
+   digests the verification checks.
