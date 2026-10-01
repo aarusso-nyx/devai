@@ -237,6 +237,8 @@ export const SURFACE_BOUND_SENSOR_KINDS: ReadonlySet<string> = new Set([
   'inventory_coverage',
   'plant_coverage',
   'inventory_performance',
+  // ADR-SCR-0008: inventory_adherence is N/A only when every surface is declared absent.
+  'inventory_adherence',
 ]);
 
 interface SensorInputsSchema {
