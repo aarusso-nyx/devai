@@ -6,12 +6,13 @@ import { getValidator, ROSTER } from '../../src/index.js';
 const ROOT = resolve(import.meta.dirname, '../../../..');
 
 // ADR-MDL-0002: model-tiers.schema.json moves from the check command's source-only
-// catalogue into the runtime roster (TASK-0353). The count is the 92 schemas that
-// preceded it plus that one. EXPECTED-RED until TASK-0353.
+// catalogue into the runtime roster (TASK-0353). ADR-AUT-0003 adds
+// path-authority-classes.schema.json (TASK-0523), so the count is 96.
 describe('schema roster', () => {
-  it('holds the previous roster plus model-tiers', () => {
-    expect(ROSTER).toHaveLength(95);
+  it('holds the previous roster plus model-tiers and path-authority-classes', () => {
+    expect(ROSTER).toHaveLength(96);
     expect(ROSTER).toContain('model-tiers.schema.json');
+    expect(ROSTER).toContain('path-authority-classes.schema.json');
   });
 
   it('has no duplicate names and a law source file for every entry', () => {
