@@ -713,7 +713,7 @@
       "id": "R-0402",
       "title": "Immutable readings and recording order",
       "goal": "Recorded readings are immutable instances linked by supersession, the sweep stays read-only with an ordered second pass, sense record appends the chain entry the alignment sensor counts, the observation backlog validates, the hook reads the bound store, and the two inventory cells are decided per cell.",
-      "status": "open",
+      "status": "closed",
       "records": ["ADR-SCR-0008"],
       "depends_on": ["R-0401"],
       "attestation_reissue": false,
@@ -743,7 +743,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -799,8 +799,8 @@
                 "path": "prompts/TASK-0421.md",
                 "sha256": "4b5523680bdb6d4ba01feb6568e2f19bc51da998f839bb54ba3476cf48a8473a"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/224",
+              "merged_as": "24d869a2bebf776060cc989fe8954cfaa30c3bee",
               "execution": {
                 "tier": "architect",
                 "effort": "high",
@@ -852,7 +852,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0421",
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -902,8 +902,8 @@
                 "path": "prompts/TASK-0422.md",
                 "sha256": "f57a7617931605d05e4ca5a5efa652ad56a1843892e8dfc97d6ef8a2b90e06c5"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/224",
+              "merged_as": "24d869a2bebf776060cc989fe8954cfaa30c3bee",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -955,7 +955,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0422",
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F2", "F3"],
               "boundary": {
                 "paths": [
@@ -1010,8 +1010,8 @@
                 "path": "prompts/TASK-0423.md",
                 "sha256": "44e1622c1a97c2c5332d9ddd13e9976f664d75c1f9ebaafc39c9cdf3e073305f"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/224",
+              "merged_as": "24d869a2bebf776060cc989fe8954cfaa30c3bee",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -1060,7 +1060,12 @@
           ]
         }
       ],
-      "closure": null
+      "closure": {
+        "merged_head": "24d869a2bebf776060cc989fe8954cfaa30c3bee",
+        "closed_at": "2026-10-01T15:41:57Z",
+        "task_policy_digest": null,
+        "phase_closure": null
+      }
     },
     {
       "id": "R-0403",
