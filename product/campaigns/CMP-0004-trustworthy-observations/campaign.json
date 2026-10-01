@@ -2015,7 +2015,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -2060,8 +2060,8 @@
                 "path": "prompts/TASK-0441.md",
                 "sha256": "17da05f9f6a1255a035d7ad4a655c014c616476c3357d94756003b760075d5e9"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/230",
+              "merged_as": "c06810699ee53f931d4426ef103ace922f829ab9",
               "execution": {
                 "tier": "architect",
                 "effort": "high",
@@ -2113,7 +2113,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0441",
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -2159,8 +2159,8 @@
                 "path": "prompts/TASK-0442.md",
                 "sha256": "420d3dbe84c24be5b8285ec0ce224efae370078bc206abaad2ccd0202c55b443"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/230",
+              "merged_as": "c06810699ee53f931d4426ef103ace922f829ab9",
               "execution": {
                 "tier": "worker",
                 "effort": "high",
@@ -2212,7 +2212,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0442",
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F2", "F3"],
               "boundary": {
                 "paths": [
@@ -2245,8 +2245,8 @@
                 "path": "prompts/TASK-0443.md",
                 "sha256": "6c5d364fd896fb83ead48016711950d72a2c7629b577c5e05ce44934e3ce9cf2"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/230",
+              "merged_as": "c06810699ee53f931d4426ef103ace922f829ab9",
               "execution": {
                 "tier": "worker",
                 "effort": "high",
@@ -2313,7 +2313,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "pre_merge",
               "target_substrates": ["F4", "F5"],
               "boundary": {
                 "paths": [
@@ -2353,14 +2353,53 @@
               "commit_types": ["plan(scorecard)", "docs(dev)"],
               "prompt": {
                 "path": "prompts/TASK-0444.md",
-                "sha256": null
+                "sha256": "baf4269276b8363bfe4aed227801578a6bd90d6fe53036a657e5fd8d43e63ffb"
               },
               "pull_request": null,
               "merged_as": null,
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
-                "time_budget_minutes": 120
+                "time_budget_minutes": 120,
+                "resolved": {
+                  "policy_version": "1.0.0",
+                  "pinned_at": "2026-10-01T20:40:18Z",
+                  "tiers": {
+                    "architect": {
+                      "rank": 1,
+                      "hosts": {
+                        "claude": "claude-cli:fable",
+                        "codex": "codex-cli:gpt-6-astra"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker-high": {
+                      "rank": 2,
+                      "hosts": {
+                        "claude": "claude-cli:opus",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker": {
+                      "rank": 3,
+                      "hosts": {
+                        "claude": "claude-cli:sonnet",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "medium"
+                    },
+                    "clerk": {
+                      "rank": 4,
+                      "hosts": {
+                        "claude": "claude-cli:haiku",
+                        "codex": "codex-cli:gpt-6-luna"
+                      },
+                      "default_effort": "low"
+                    }
+                  },
+                  "ceiling": "architect"
+                }
               }
             }
           ]
