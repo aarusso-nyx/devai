@@ -1,6 +1,40 @@
 {
   "schemaVersion": "1.0.0",
-  "inputs": {},
+  "inputs": {
+    "harness_green_main": {
+      "workflow": "ci.yml",
+      "event": "pull_request",
+      "headBranch": "*",
+      "baseBranch": "main",
+      "attempts": "last",
+      "includeCancelled": false,
+      "lookbackDays": 30,
+      "minimumSample": 20,
+      "excludedJobs": []
+    },
+    "harness_performance": {
+      "workflow": "ci.yml",
+      "event": "pull_request",
+      "headBranch": "*",
+      "baseBranch": "main",
+      "attempts": "last",
+      "includeCancelled": false,
+      "lookbackDays": 30,
+      "minimumSample": 10,
+      "excludedJobs": []
+    },
+    "harness_robustness": {
+      "workflow": "ci.yml",
+      "event": "pull_request",
+      "headBranch": "*",
+      "baseBranch": "main",
+      "attempts": "last",
+      "includeCancelled": false,
+      "lookbackDays": 30,
+      "minimumSample": 20,
+      "excludedJobs": []
+    }
+  },
   "surfaces": {
     "http": true,
     "database": true,
