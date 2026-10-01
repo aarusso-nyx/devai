@@ -3,7 +3,7 @@
   "id": "CMP-0004",
   "title": "Trustworthy observations",
   "type": "campaign",
-  "status": "active",
+  "status": "closed",
   "date": "2026-09-28",
   "authority": "Architect",
   "mandate": {
@@ -1985,7 +1985,7 @@
       "id": "R-0404",
       "title": "CI sampling contract and the second scorecard",
       "goal": "The harness sensors declare their population and read UNKNOWN below the minimum sample; a second scorecard is recorded beside the first once the sample matures and the delta is noted.",
-      "status": "open",
+      "status": "closed",
       "records": ["ADR-SCR-0010"],
       "depends_on": ["R-0402", "R-0403"],
       "attestation_reissue": false,
@@ -2313,7 +2313,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": null,
-              "status": "pre_merge",
+              "status": "merged",
               "target_substrates": ["F4", "F5"],
               "boundary": {
                 "paths": [
@@ -2355,8 +2355,8 @@
                 "path": "prompts/TASK-0444.md",
                 "sha256": "baf4269276b8363bfe4aed227801578a6bd90d6fe53036a657e5fd8d43e63ffb"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/231",
+              "merged_as": "c0326aa9cc986d0b4e4350ac14be02a3cf71b7ec",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -2405,7 +2405,12 @@
           ]
         }
       ],
-      "closure": null
+      "closure": {
+        "merged_head": "c0326aa9cc986d0b4e4350ac14be02a3cf71b7ec",
+        "closed_at": "2026-10-01T20:59:30Z",
+        "task_policy_digest": null,
+        "phase_closure": null
+      }
     }
   ]
 }
