@@ -29,6 +29,11 @@
       "pattern": "^SR-[a-f0-9]{16}$",
       "description": "Machine-only content-derived ID."
     },
+    "supersedes": {
+      "type": "string",
+      "pattern": "^SR-[a-f0-9]{16}$",
+      "description": "The id of the earlier recorded instance of the same kind for the same candidate that this reading replaces (ADR-SCR-0008). A recorded reading is immutable, so a later reading is a new instance that names the earlier one here; the scorecard selects the latest instance by following these links, never by file time. A reading with no earlier instance omits the field."
+    },
     "sensor": {
       "type": "object",
       "additionalProperties": false,

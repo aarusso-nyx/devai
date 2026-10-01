@@ -15,7 +15,11 @@
     "schema_admission": "every kind a preset can select is admitted by the sensor.kind enum of law/schemas/sensor-reading.schema.json (ADR-SCR-0011)",
     "schema_admission_invariant": "sweep members minus sensor-reading.schema.json sensor.kind enum equals the empty set",
     "schema_unsupported_marker": "sensor-registry entry declares schema_admission equals unsupported",
-    "schema_unsupported_entry": "refuse-before-run:SENSOR_KIND_SCHEMA_UNSUPPORTED"
+    "schema_unsupported_entry": "refuse-before-run:SENSOR_KIND_SCHEMA_UNSUPPORTED",
+    "sweep_second_pass": "harness_invariant_alignment,inventory_performance",
+    "sweep_second_pass_rule": "the sweep members that read .devai/state/sensor-readings, comma-separated in execution order; each is a sweep member with effect read, is omitted from the first pass, and runs after the first pass is recorded (ADR-SCR-0008)",
+    "sweep_second_pass_invariant": "sweep_second_pass minus sweep members equals the empty set, and every sweep_second_pass kind has effect read",
+    "sweep_recording_protocol": "first pass, record, second pass, record: recording is the inspector's harness-write step through sense record; the preset never records and the sweep stays read-only for every role (ADR-SCR-0008)"
   },
   "presets": [
     {
