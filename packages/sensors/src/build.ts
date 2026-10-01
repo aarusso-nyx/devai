@@ -4,7 +4,16 @@ import { runCommand } from './run-command.js';
 import { buildSensorReading, type SensorReading, type SensorStatus } from './sensor-reading.js';
 
 export interface BuildOptions {
+  /** The repository root. */
   readonly cwd: string;
+  /**
+   * The declared build argv from `.devai/config/sensor-inputs.json`. It is the command only
+   * when `test-tasks.json` has no build node; a different argv beside that node reads
+   * `error` with `BUILD_ARGV_CONFLICT` (ADR-AUT-0002).
+   */
+  readonly argv?: readonly string[];
+  /** The declared repository-relative working directory for `argv`; the root when omitted. */
+  readonly buildCwd?: string;
   readonly timeoutMs?: number;
 }
 
@@ -42,7 +51,7 @@ function resolveExecutable(repoRoot: string, executable: string): string | undef
   return undefined;
 }
 
-function declaredBuildCommand(repoRoot: string): BuildCommand | undefined {
+function descriptorBuildCommand(repoRoot: string): BuildCommand | undefined {
   const descriptorPath = join(repoRoot, 'test-tasks.json');
   if (!existsSync(descriptorPath)) return undefined;
   try {
@@ -79,6 +88,32 @@ function declaredBuildCommand(repoRoot: string): BuildCommand | undefined {
   }
 }
 
+function declaredInputCommand(
+  repoRoot: string,
+  argv: readonly string[],
+  buildCwd: string | undefined,
+): BuildCommand | undefined {
+  const cwd = resolve(repoRoot, buildCwd ?? '.');
+  if (!existsSync(cwd)) return undefined;
+  const canonicalCwd = realpathSync(cwd);
+  return within(repoRoot, canonicalCwd) ? { argv, cwd: canonicalCwd } : undefined;
+}
+
+function sameArgv(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((argument, index) => argument === right[index]);
+}
+
+function errorReading(code: string, message: string): SensorReading {
+  return buildSensorReading({
+    sensorName: 'build',
+    sensorKind: 'build',
+    command: ['<build-declaration-error>'],
+    status: 'error',
+    deterministic: true,
+    findings: [{ severity: 'error', code, message }],
+  });
+}
+
 function packageBuildCommand(repoRoot: string): BuildCommand | undefined {
   const packagePath = join(repoRoot, 'package.json');
   if (!existsSync(packagePath)) return undefined;
@@ -102,7 +137,31 @@ function packageBuildCommand(repoRoot: string): BuildCommand | undefined {
 
 export function senseBuild(opts: BuildOptions): SensorReading {
   const repoRoot = realpathSync(resolve(opts.cwd));
-  const selected = declaredBuildCommand(repoRoot) ?? packageBuildCommand(repoRoot);
+  const descriptor = descriptorBuildCommand(repoRoot);
+  if (
+    descriptor !== undefined &&
+    opts.argv !== undefined &&
+    !sameArgv(descriptor.argv, opts.argv)
+  ) {
+    return errorReading(
+      'BUILD_ARGV_CONFLICT',
+      `The declared build argv "${opts.argv.join(' ')}" differs from the test-tasks.json build ` +
+        `node argv "${descriptor.argv.join(' ')}"; the descriptor node is the build command, ` +
+        'so the declaration in .devai/config/sensor-inputs.json must be removed or match it.',
+    );
+  }
+  let declared: BuildCommand | undefined;
+  if (descriptor === undefined && opts.argv !== undefined) {
+    declared = declaredInputCommand(repoRoot, opts.argv, opts.buildCwd);
+    if (declared === undefined) {
+      return errorReading(
+        'BUILD_CWD_INVALID',
+        `The declared build cwd "${opts.buildCwd ?? '.'}" does not name an existing directory ` +
+          'inside the repository root.',
+      );
+    }
+  }
+  const selected = descriptor ?? declared ?? packageBuildCommand(repoRoot);
   if (selected === undefined) {
     return buildSensorReading({
       sensorName: 'build',

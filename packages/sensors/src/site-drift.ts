@@ -37,13 +37,11 @@ const DEFAULT_ROOT_INPUTS = [
 const PACKAGE_TAG = /^(?:@[^@/]+\/[^@]+@|v?)\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/;
 const PUBLICATION_MESSAGE = /^docs: publish from ([0-9a-f]{40})$/;
 
-// ADR-SCR-0005 IA-005: when the local gh-pages ref carries no verifiable
-// `docs: publish from <sha>` provenance (the Pages deployment API path never
-// writes one), read the provenance the publication path already journals
-// through the GitHub deployments API for environment
-// devai-pages-publication, instead of inventing a commit message. This is a
-// read-only `gh api` call; the authority broker admits it only once
-// TASK-0224 declares the argv shape below.
+// ADR-SCR-0005 IA-005 and ADR-AUT-0002: read the provenance the publication path
+// journals through the GitHub deployments API for environment
+// devai-pages-publication, instead of inventing a commit message. The two
+// read-only `gh api` GET argv below are the exact shapes the authority broker
+// admits (templates gh-api-pages-deployments and gh-api-pages-deployment-statuses).
 const JOURNAL_REPOSITORY = 'aarusso-nyx/devai';
 const JOURNAL_ENVIRONMENT = 'devai-pages-publication';
 const JOURNAL_TASK = 'devai:pages-publication';
@@ -87,6 +85,12 @@ type ProvenanceResult =
     };
 type ProvenanceFailure = Extract<ProvenanceResult, { readonly ok: false }>;
 
+/** Journal outcomes that are a reading (REVIEW), not a missing prerequisite. */
+const JOURNAL_REVIEW_REASONS: ReadonlySet<string> = new Set([
+  'journal-not-verified',
+  'journal-no-matching-intent',
+]);
+
 /**
  * Reads the published-source commit the Pages publication path already
  * journals through GitHub deployment metadata (see
@@ -113,7 +117,27 @@ function readJournalProvenance(repoRoot: string): ProvenanceResult {
     };
   }
 
-  const candidates = deployments
+  // An empty journal holds no verified deployment at all.
+  if (deployments.length === 0)
+    return { ok: false, adapterRequired: false, argv: listArgv, reason: 'journal-not-verified' };
+  const intents = deployments.filter(
+    (deployment) =>
+      deployment.environment === JOURNAL_ENVIRONMENT &&
+      deployment.task === JOURNAL_TASK &&
+      deployment.payload?.kind === 'devai-pages-publication-intent' &&
+      deployment.payload.identity?.repository === JOURNAL_REPOSITORY,
+  );
+  if (intents.length === 0)
+    return {
+      ok: false,
+      adapterRequired: false,
+      argv: listArgv,
+      reason: 'journal-no-matching-intent',
+    };
+
+  // An intent for the declared repository whose record is malformed (for example a payload
+  // commit that differs from the deployment sha) is a provenance defect, not an absent intent.
+  const candidates = intents
     .filter(
       (
         deployment,
@@ -124,12 +148,8 @@ function readJournalProvenance(repoRoot: string): ProvenanceResult {
         };
       } =>
         typeof deployment.id === 'number' &&
-        deployment.environment === JOURNAL_ENVIRONMENT &&
-        deployment.task === JOURNAL_TASK &&
-        deployment.payload?.kind === 'devai-pages-publication-intent' &&
-        deployment.payload.schemaVersion === '1.0.0' &&
-        deployment.payload.identity?.repository === JOURNAL_REPOSITORY &&
-        typeof deployment.payload.identity.commit === 'string' &&
+        deployment.payload?.schemaVersion === '1.0.0' &&
+        typeof deployment.payload.identity?.commit === 'string' &&
         /^[0-9a-f]{40}$/.test(deployment.payload.identity.commit) &&
         deployment.payload.identity.commit === deployment.sha &&
         typeof deployment.payload.identity.tag === 'string',
@@ -141,7 +161,7 @@ function readJournalProvenance(repoRoot: string): ProvenanceResult {
       ok: false,
       adapterRequired: false,
       argv: listArgv,
-      reason: 'journal-no-matching-intent',
+      reason: 'journal-intent-invalid',
     };
 
   const statusesArgv = ['api', journalStatusesPath(latest.id)];
@@ -256,7 +276,9 @@ function releaseTagsAfter(
   publishedSource: string,
   head: string,
 ): readonly string[] {
-  const tags = git(repoRoot, ['tag', '--list']);
+  // `rev-parse --symbolic --tags` lists the tag names through a git verb the authority
+  // broker admits as a read; `git tag --list` is not an admitted read shape.
+  const tags = git(repoRoot, ['rev-parse', '--symbolic', '--tags']);
   if (!tags.ok || tags.stdout.length === 0) return [];
   return tags.stdout
     .split('\n')
@@ -365,10 +387,86 @@ export function senseSiteDrift(opts: SiteDriftOptions): SensorReading {
     );
   }
 
+  function journalReviewReading(
+    provenance: ProvenanceFailure,
+    extraMetrics: Readonly<Record<string, string>>,
+  ): SensorReading {
+    const notVerified = provenance.reason === 'journal-not-verified';
+    return buildSensorReading({
+      sensorName: 'site-drift',
+      sensorKind: 'site_drift',
+      command: ['devai', 'sense', 'site', 'drift'],
+      status: 'review',
+      deterministic: true,
+      tier: 'L0',
+      ...(opts.now !== undefined && { timestamp: opts.now }),
+      findings: [
+        {
+          severity: 'warning',
+          code: notVerified ? 'SITE_DRIFT_JOURNAL_NOT_VERIFIED' : 'SITE_DRIFT_JOURNAL_NO_INTENT',
+          message: notVerified
+            ? 'The Pages publication journal holds no verified deployment for environment ' +
+              `devai-pages-publication (journal-not-verified), read through "gh ${provenance.argv.join(' ')}".`
+            : 'The Pages publication journal holds no publication intent for the declared ' +
+              `repository ${JOURNAL_REPOSITORY} (journal-no-matching-intent), read through ` +
+              `"gh ${provenance.argv.join(' ')}".`,
+        },
+      ],
+      metrics: { repository_head: head.stdout, ...extraMetrics },
+    });
+  }
+
   let publishedSource: string;
   let provenanceMetrics: Readonly<Record<string, string>>;
 
-  if (!publishedTip.ok) {
+  const tipMessage = publishedTip.ok
+    ? git(opts.repoRoot, ['show', '-s', '--format=%B', publishedTip.stdout])
+    : undefined;
+  const tipMatch = tipMessage?.ok === true ? PUBLICATION_MESSAGE.exec(tipMessage.stdout) : null;
+  const tipSource = tipMatch?.[1];
+
+  if (tipSource !== undefined) {
+    // ADR-AUT-0002 IA-004: a well-formed tip is compared with the last verified identity
+    // the journal records; a tip that differs from it reads FAIL. When the journal yields
+    // no verified identity the tip's own provenance stands, as before the journal read.
+    const journal = readJournalProvenance(opts.repoRoot);
+    if (journal.ok && journal.commit !== tipSource) {
+      return buildSensorReading({
+        sensorName: 'site-drift',
+        sensorKind: 'site_drift',
+        command: ['devai', 'sense', 'site', 'drift'],
+        status: 'fail',
+        deterministic: true,
+        tier: 'L0',
+        ...(opts.now !== undefined && { timestamp: opts.now }),
+        findings: [
+          {
+            severity: 'error',
+            code: 'SITE_DRIFT_TIP_NOT_VERIFIED',
+            message:
+              `The local gh-pages tip publishes ${tipSource}, but the last verified ` +
+              `publication identity in the journal is ${journal.commit} (intent ${journal.intentId}).`,
+          },
+        ],
+        metrics: {
+          repository_head: head.stdout,
+          published_tip: publishedTip.stdout,
+          published_tip_source: tipSource,
+          published_source_provenance: 'journal',
+          journal_intent_id: journal.intentId,
+          published_source: journal.commit,
+        },
+      });
+    }
+    publishedSource = tipSource;
+    provenanceMetrics = {
+      published_tip: publishedTip.stdout,
+      ...(journal.ok && { journal_intent_id: journal.intentId }),
+    };
+  } else {
+    const tipMetrics: Readonly<Record<string, string>> = publishedTip.ok
+      ? { published_tip: publishedTip.stdout }
+      : {};
     const journal = readJournalProvenance(opts.repoRoot);
     if (journal.ok) {
       publishedSource = journal.commit;
@@ -377,39 +475,23 @@ export function senseSiteDrift(opts: SiteDriftOptions): SensorReading {
         journal_intent_id: journal.intentId,
       };
     } else if (journal.adapterRequired) {
-      return adapterRequiredReading(journal, {});
-    } else {
+      return adapterRequiredReading(journal, tipMetrics);
+    } else if (JOURNAL_REVIEW_REASONS.has(journal.reason)) {
+      return journalReviewReading(journal, tipMetrics);
+    } else if (!publishedTip.ok) {
       return unknownReading(
         opts,
         'SITE_DRIFT_PROVENANCE_UNAVAILABLE',
         'Local refs/remotes/origin/gh-pages is unavailable; fetch or live verification is required.',
         { repository_head: head.stdout },
       );
-    }
-  } else {
-    const message = git(opts.repoRoot, ['show', '-s', '--format=%B', publishedTip.stdout]);
-    const matched = message.ok ? PUBLICATION_MESSAGE.exec(message.stdout) : null;
-    if (matched !== null) {
-      publishedSource = matched[1] ?? '';
-      provenanceMetrics = { published_tip: publishedTip.stdout };
     } else {
-      const journal = readJournalProvenance(opts.repoRoot);
-      if (journal.ok) {
-        publishedSource = journal.commit;
-        provenanceMetrics = {
-          published_source_provenance: 'journal',
-          journal_intent_id: journal.intentId,
-        };
-      } else if (journal.adapterRequired) {
-        return adapterRequiredReading(journal, { published_tip: publishedTip.stdout });
-      } else {
-        return unknownReading(
-          opts,
-          'SITE_DRIFT_PROVENANCE_MALFORMED',
-          'The gh-pages tip message must be exactly "docs: publish from <40-hex-sha>".',
-          { repository_head: head.stdout, published_tip: publishedTip.stdout },
-        );
-      }
+      return unknownReading(
+        opts,
+        'SITE_DRIFT_PROVENANCE_MALFORMED',
+        'The gh-pages tip message must be exactly "docs: publish from <40-hex-sha>".',
+        { repository_head: head.stdout, published_tip: publishedTip.stdout },
+      );
     }
   }
 

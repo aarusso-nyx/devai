@@ -81,7 +81,14 @@ const ADAPTERS: Readonly<Record<SensorKind, SenseSensorAdapter>> = Object.freeze
       ...optional('argv', stringArrayInput(request, 'argv')),
     }).aggregate,
   lint: (request) => senseLint({ cwd: request.repoRoot }),
-  build: (request) => senseBuild({ cwd: request.repoRoot }),
+  // ADR-AUT-0002: the declared build argv and cwd; build.ts applies the descriptor-first
+  // precedence and reads BUILD_ARGV_CONFLICT for a declaration that differs from it.
+  build: (request) =>
+    senseBuild({
+      cwd: request.repoRoot,
+      ...optional('argv', stringArrayInput(request, 'argv')),
+      ...optional('buildCwd', stringInput(request, 'cwd')),
+    }),
   unit_test: (request) =>
     senseTest({
       cwd: request.repoRoot,
