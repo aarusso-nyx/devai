@@ -257,6 +257,16 @@ describe.sequential('round tracking status and closure seam', () => {
 });
 
 const SEALED_ROUND = 'R-0005';
+
+/** The canonical rounds index (ADR-EVI-0001) holding the fixture closure as the terminal row of its round. */
+const ROUNDS_INDEX = [
+  '# Rounds index',
+  '',
+  '| closure | round | supersedes | merged_as | terminal |',
+  '| --- | --- | --- | --- | --- |',
+  `| PC-0001 | ${SEALED_ROUND} | - | ${'b'.repeat(40)} | yes |`,
+  '',
+].join('\n');
 const CLOSE_STATE = `work/rounds/${SEALED_ROUND}/close-state.jsonl`;
 
 function sealedRoundRecord(): Record<string, unknown> {
@@ -315,7 +325,7 @@ function declareSealable(root: string): void {
     merged_as: 'b'.repeat(40),
     release_disposition: 'none-needed',
   });
-  putText(root, 'record/derived/indexes/rounds.md', 'PC-0001\n');
+  putText(root, 'record/derived/indexes/rounds.md', ROUNDS_INDEX);
   putText(root, `work/rounds/${SEALED_ROUND}/AUTHORIZATION.md`, 'status: active\nGRANTED\n');
 }
 
