@@ -335,6 +335,143 @@ Until OE-02 is performed the live environments still stop as the before matrix s
 The after matrix is the specification the workflows and the workflow checker are built
 to, not a claim about the live repository.
 
+## Export a release-intent certify receipt
+
+[ADR-REL-0031](../../../law/adr/ADR-REL-0031-export-reconstructs-intent-policy.md) gives
+`devai-evidence-export` a second reconstruction path beside the unchanged profile path.
+Today the exporter derives the expected task policy only through `buildExpectedTaskPolicy`
+with a descriptor profile id, so the certify receipt of a release-intent run cannot be
+exported: that run selects its nodes by capability from the intent and the release
+verification profile, builds the release form of the task policy (schema `1.2.0` with an
+`inputProjection`), and still writes a candidate receipt whose `profile` field is the
+literal `rc`. Rebuilding under descriptor profile `rc` yields a different digest, or
+`PROFILE_UNKNOWN` when the descriptor declares no such profile, and the only workaround was a
+second `--rc` execution that reproduced the closure under a profile (#69). This section is
+the specification the inspector tests and the engineer's verifier change are built to.
+
+### The two paths
+
+A receipt is exported through exactly one of two paths, selected by the arguments the
+caller supplies. `--profile <id>` selects the profile path, which keeps its current
+behavior byte-for-byte: the id is resolved against the committed descriptor and the
+expected policy is built as today, so no existing export changes its result. The intent
+set, `--release-intent <path>`, `--release-profile <path>`, `--release-stage certify`, and
+`--preflight-receipt <path>`, selects the intent path. Supplying `--profile` together with
+any member of the intent set, or an incomplete intent set, is `USAGE`, before any input is
+read. Both paths keep every existing trust-boundary check: the candidate repository must
+be clean at the exact `--commit` and `--tree`, every external input must lie outside the
+candidate, and the private key is read only for a signing export.
+
+### What the intent path reconstructs
+
+The intent path never reads the task set the receipt claims. It reconstructs the expected
+release task policy from eight pinned inputs and compares the receipt to the reconstruction.
+The release preflight receipt of the same run is the pin carrier: certification already
+requires it, it is validated against `release-preflight-receipt.schema.json`, and it binds
+`releaseIntentDigest`, `releaseProfileDigest`, `toolchainDigest`, `base`, and `repository`.
+
+| Pin         | Source the exporter reads                                                         | Bound to                                                                                                                            |
+| ----------- | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| intent      | `--release-intent`, validated against `release-intent.schema.json`                | SHA-256 of its canonical JSON equals the preflight receipt's `releaseIntentDigest`                                                  |
+| policy      | `--release-profile`, validated against `release-verification-profile.schema.json` | SHA-256 of its canonical JSON equals the preflight receipt's `releaseProfileDigest`; `release_unit` equals the intent's             |
+| descriptor  | `test-tasks.json` read from the candidate commit's tree, never the working tree   | its digest enters every task key, as on the profile path                                                                            |
+| toolchain   | `--toolchain`, a string map outside the candidate                                 | its digest equals the preflight receipt's `toolchainDigest`; every key a selected task names must be present                        |
+| environment | `--environment`, an allowlisted map outside the candidate                         | every key a selected task allowlists must be present and, under policy `1.1.0` or later, be a SHA-256 identity or `null`            |
+| base        | `--base` and `intent.base`                                                        | the same commit, resolving exactly to `intent.base.tree`, an ancestor of the candidate, and equal to the preflight receipt's `base` |
+| candidate   | `--commit`, `--tree`, and `intent.candidate`                                      | the same commit and tree, equal to the preflight receipt's `repository`, with the repository id of the descriptor                   |
+| stage       | `--release-stage`                                                                 | `certify`; the policy is reconstructed for the certify stage and the preflight reconstruction is used only to name a stage mismatch |
+
+From those pins the exporter recomputes what the release run computed, in this order:
+the release verification decision from the intent and the policy (version transition,
+support, change kind, channel, risks, owner escalations, mutation requirement); the task
+roots from `capability_tasks` for every capability the decision selects; the mutation
+roster selection from `mutation_roster`, the intent's `changed_packages`, `changed_paths`,
+and `risks`; the affected-selection closure over the base-to-candidate change set when
+the decision includes `affected-checks`; the dependency closure of the selected roots in
+descriptor order; each task key from the descriptor digest, the task's argv, cwd, runner,
+selected toolchain, selected environment, resolved output contract, and the content
+digests of its selected inputs at the candidate tree; and the `inputProjection` digest over
+the candidate snapshot. The result is the release task policy, schema `1.2.0`, and its
+digest. A decision whose verdict is not `ready` is refused before any reconstruction,
+because the run could not have produced a receipt from it.
+
+The reconstruction is complete when it holds every field the run's own policy holds, so
+the certify receipt's `taskPolicyDigest` must equal the reconstructed digest exactly and
+the receipt's `tasks` must name exactly the reconstructed required nodes, each with its
+reconstructed task key. Equality of digests is the proof; the exporter never patches a
+reconstruction toward the receipt. A certify receipt exported this way needs no second
+`--rc` execution: the signed portable closure is built from the run that produced it.
+
+### The rejection set
+
+Rejection is exact and coded. Every refusal is emitted as the exporter's existing
+`{ ok: false, code, message }` line on stderr with a non-zero exit, and no bundle, staging
+directory, or output directory is created on refusal. The codes below are new to the
+verifier; the existing codes keep their meaning.
+
+| Code                           | Refused when                                                                                                                                                                     | Record item |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| `INTENT_DIGEST_MISMATCH`       | the canonical digest of the supplied intent differs from the preflight receipt's `releaseIntentDigest`, so one altered intent field after the run is refused rather than trusted | IA-002      |
+| `INTENT_STAGE_MISMATCH`        | `--release-stage` is not `certify`, the receipt is a preflight receipt rather than a candidate receipt, or the receipt's policy digest equals the preflight-stage reconstruction | IA-003      |
+| `INTENT_POLICY_STALE`          | the canonical digest of the supplied release profile differs from the preflight receipt's `releaseProfileDigest`, or its `release_unit` differs from the intent's                | IA-003      |
+| `INTENT_BASE_MISMATCH`         | `--base`, `intent.base`, and the preflight receipt's `base` are not one commit and tree, the base tree does not resolve, or the base is not an ancestor of the candidate         | IA-004      |
+| `INTENT_CANDIDATE_MISMATCH`    | `--commit`, `--tree`, `intent.candidate`, and the preflight receipt's `repository` are not one commit and tree, or the repository id differs from the descriptor's               | IA-004      |
+| `INTENT_POPULATION_INCOMPLETE` | the receipt's `tasks` are not exactly the reconstructed required nodes: a strict subset, a superset, or a node whose task key differs from its reconstruction                    | IA-004      |
+| `INTENT_DECISION_BLOCKED`      | the release verification decision reconstructed from the intent and the policy is not `ready`; the message carries the decision's blocking reasons                               | IA-002      |
+| `PROFILE_ID_INVALID`           | the `--profile` value is not a well-formed profile id because it contains a path separator or names a readable file; it is raised before the descriptor is consulted             | IA-005      |
+
+`PROFILE_UNKNOWN` is reserved for a well-formed id that the committed descriptor does not
+declare, so a usage error is never reported as a policy error (IA-005). `POLICY_DIGEST_MISMATCH`
+keeps its meaning on both paths: a receipt whose digest equals neither stage reconstruction
+is refused with it, and a receipt built against a stale policy that still passes the pin
+checks above is caught here. Every rejection is reproducible by a fixture that alters one
+input of a passing export, and the fixtures live in the vendored test directory beside the
+source they exercise.
+
+### The verifier-source boundary and the order of a repin
+
+The vendored verifier under `packages/cli/vendor/evidence-verification` is a copy of the
+canonical `devai-verifier` source at the commit `provenance.json` names as `sourceCommit`,
+and that manifest records the SHA-256 of every vendored file. The trusted local-RC verifier
+that the protected ledger and release lanes run is a different, older thing: the verifier
+inside the published release `law/policy/trusted-local-rc-verifier-package.json` pins by
+package identity, materialized from that release's `release_source.commit`. A change to the
+exporter therefore moves through four ordered steps, and no step is skipped or reordered:
+
+1. The change lands in the canonical verifier source with its tests, and that source commit
+   is the only thing the vendored copy may be made from. The vendored copy is never edited
+   by hand; a differing byte is a provenance violation that `release:closure` and the
+   installed-tarball smoke report as `PUBLISHABLE_VERIFIER_DIGEST_INVALID` or a population
+   fault, not a change to be accepted.
+2. The copy is re-vendored: `schemas`, `src`, and `test` are copied byte-for-byte from the
+   source commit, `provenance.json` is rewritten with the new `sourceCommit` and the SHA-256
+   of every vendored file, and every in-repository restatement of the vendored copy's
+   source commit and payload count moves in the same change (the publishable-closure check,
+   the package assembly and tarball smoke scripts, the pull-request preflight lane, which
+   materializes the in-repository copy, and the unit and contract tests that pin it). The
+   doctor's vendored-copy check observes the result as a new pin, not as drift, because the
+   manifest and the bytes move together.
+3. The release that first ships the re-vendored verifier is rehearsed and published under
+   the still-pinned trusted verifier. The law policy does not change in that release: its
+   protected ledger is verified by the older verifier, whose `verify.js` path ADR-REL-0031
+   does not touch, so the RC closure of that release is still verifiable.
+4. Only after that release is published does a `law(release)` change repin
+   `law/policy/trusted-local-rc-verifier-package.json` to it, under the policy's own `repin`
+   rule: the `package` identity (version, tarball, SHA-1, SRI, release-source commit and
+   tree), the `verifier` identity (`source_commit`, `provenance_sha256`, `payload_file_count`
+   read from the published release's `provenance.json`), and `descriptor.selector_kinds`
+   re-declared from the pinned schema (ADR-CHK-0006) move together in one commit, never one
+   field at a time. The same change moves the restatements that the ledger and release lanes
+   carry, through the ci-scaffold generator and the workflow checker, and the Owner
+   re-declares the repository variable the policy names as `external_duplicate` to the new
+   provenance digest as a separate recorded effect. Until step 4, the trusted verifier is
+   the previous release's, which is the one-release lag ADR-CHK-0006 already imposes on
+   descriptor selector kinds.
+
+The export path is usable locally and in the preflight lane from step 2, because both run
+the in-repository copy. It becomes part of the protected release verification only at
+step 4.
+
 ## Publish the documentation site without a release
 
 A change that touches only the documentation site, with no semantic or product
