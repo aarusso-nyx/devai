@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/proof-orphan-declaration.schema.json",
+  "title": "Proof orphan declaration",
+  "description": "The payload of a historical declaration proof line of kind `historical-gap` under ADR-EVI-0002. The line is appended through `evidence record`, is itself directly anchored in the chain with a digest, names each orphaned proof line by canonical path, sequence, and line digest, carries the Architect's authorization as the declaring decision, and applies only to lines whose baseline entry predates the cutoff. A declaration never restores provenance: the lines it names read as `historical gap acknowledged` in the verification result.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "declaration", "record", "authorization", "cutoff", "orphans"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": "1.0.0" },
+    "declaration": {
+      "const": "historical-gap",
+      "description": "Equal to the kind of the proof line that carries this payload."
+    },
+    "record": {
+      "const": "ADR-EVI-0002",
+      "description": "The decision record that governs historical declarations."
+    },
+    "authorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "decision", "authorized_at"],
+      "properties": {
+        "role": {
+          "const": "Architect",
+          "description": "Only the Architect authorizes a historical orphan declaration (maintainer decision 10)."
+        },
+        "decision": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The declaring decision: the identifier of the record or contract in which the Architect authorized this declaration."
+        },
+        "authorized_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "cutoff": {
+      "type": "string",
+      "format": "date-time",
+      "description": "The cutoff of `record/proofs/anchor-baseline.json`, repeated so the declaration states which first verification it is bound to. Every named orphan must have a baseline entry observed before it."
+    },
+    "cause": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Optional documented cause of the gap. Absence imputes no origin."
+    },
+    "orphans": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sequence", "sha256"],
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^record/proofs/work/[a-z0-9][a-z0-9_-]*/R-[0-9]{4}\\.jsonl$",
+            "description": "Canonical repository-relative path of the proof epoch file: forward slashes, no dot segment, no leading slash."
+          },
+          "sequence": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "One-based position of the line within its file."
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "SHA-256 of the line bytes, exclusive of the terminating newline. Not the line's internal `line_hash`."
+          }
+        }
+      }
+    }
+  },
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "declaration": "historical-gap",
+      "record": "ADR-EVI-0002",
+      "authorization": {
+        "role": "Architect",
+        "decision": "ADR-EVI-0002",
+        "authorized_at": "2026-10-02T00:00:00.000Z"
+      },
+      "cutoff": "2026-10-02T00:00:00.000Z",
+      "cause": "source_pending",
+      "orphans": [
+        {
+          "path": "record/proofs/work/generic/R-0002.jsonl",
+          "sequence": 3,
+          "sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+        }
+      ]
+    }
+  ]
+}
