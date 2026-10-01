@@ -1670,7 +1670,13 @@
                   "packages/cli/tests/unit/evidence-export-intent-receipt.test.ts",
                   "tests/fixtures/export-intent/README.md",
                   "packages/cli/vendor/evidence-verification/test/policy-builder.test.js",
-                  "packages/cli/vendor/evidence-verification/test/export.test.js"
+                  "packages/cli/vendor/evidence-verification/test/export.test.js",
+                  "packages/cli/tests/contract/package-owned-verifier-native.test.ts",
+                  "packages/cli/tests/unit/version.test.ts",
+                  "packages/cli/tests/unit/live-ledger-workflow.test.ts",
+                  "packages/cli/tests/unit/mutation-evidence-v21.test.ts",
+                  "packages/schemas/tests/contract/governance-v15-mutation.test.ts",
+                  "packages/schemas/tests/contract/governance-v15-adr.test.ts"
                 ],
                 "forbidden": [
                   "law/",
@@ -1698,7 +1704,7 @@
               "commit_types": ["test(cli)", "test(fixtures)"],
               "prompt": {
                 "path": "prompts/TASK-0438.md",
-                "sha256": "2d29f3533deb2f3b65fff5b186921d24459a76d55a80fbddea5523d336fffc80"
+                "sha256": "f96751891b0793d9287b47e561f6e72c083263c0c8ac338c32d5870721e9464a"
               },
               "pull_request": null,
               "merged_as": null,
