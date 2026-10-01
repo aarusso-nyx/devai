@@ -90,7 +90,7 @@ for (const [name, path] of Object.entries(SECONDARY_BINS)) {
 const verifierRoot = join(ROOT, 'packages/cli/dist/runtime/evidence-verification');
 const verifierProvenance = json('packages/cli/dist/runtime/evidence-verification/provenance.json');
 if (
-  verifierProvenance.sourceCommit !== 'fe30293db41b7fbaf7752c39d9170dbfc5012b6c' ||
+  verifierProvenance.sourceCommit !== '8b215d706a828af7361f9c6799b9cb0a30c9d00b' ||
   !Array.isArray(verifierProvenance.files) ||
   verifierProvenance.files.length !== 26
 ) {
