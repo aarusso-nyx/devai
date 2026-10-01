@@ -32,10 +32,21 @@
     {
       "template_id": "gh-run-list",
       "executable": "gh",
-      "argv_shape": ["run", "list", "--branch", "<ref>", "--json", "<fields>", "--limit", "<n>"],
+      "argv_shape": [
+        "run",
+        "list",
+        "--workflow",
+        "<file>",
+        "--event",
+        "<event>",
+        "--json",
+        "<fields>",
+        "--limit",
+        "<n>"
+      ],
       "capabilities": ["proc:gh-read"],
       "effect": "read",
-      "reason": "Harness sensors read GitHub Actions run history (ADR-SCR-0005 IA-004); the broker admits exactly this shape without a host adapter under sense run and check: <ref> is letters, digits, dot, underscore, slash, or hyphen without a leading hyphen or '..'; <fields> is one to sixteen comma-separated alphabetic names; <n> is 1 to 9999; gh-run-list-created adds the --created filter. Every other gh argv except auth, auth status, --version, and --help is refused.",
+      "reason": "Harness sensors read the GitHub Actions run history of the population their declaration in .devai/config/sensor-inputs.json names (ADR-SCR-0005 IA-004, ADR-SCR-0010); the broker admits exactly this shape without a host adapter under sense run and check: <file> is one workflow file name of letters, digits, dot, underscore, or hyphen ending in .yml or .yaml, without a directory; <event> is one of push, pull_request, merge_group, workflow_dispatch, or schedule, nothing else; <fields> is one to sixteen comma-separated alphabetic names; <n> is 1 to 9999. This shape carries no --branch option and is emitted when the declared headBranch is * (any head branch); gh-run-list-branch adds the single --branch <ref> option for a literal head branch, and the -created variants add the --created filter. Each option appears once and in this order; a second --branch, a value outside its grammar, and every other gh argv except auth, auth status, --version, and --help are refused.",
       "owner": "architect"
     },
     {
@@ -44,6 +55,54 @@
       "argv_shape": [
         "run",
         "list",
+        "--workflow",
+        "<file>",
+        "--event",
+        "<event>",
+        "--json",
+        "<fields>",
+        "--limit",
+        "<n>",
+        "--created",
+        ">=<date>"
+      ],
+      "capabilities": ["proc:gh-read"],
+      "effect": "read",
+      "reason": "The harness_green_main sensor narrows gh-run-list by creation date (ADR-SCR-0005 IA-004, ADR-SCR-0010); the broker admits exactly this shape without a host adapter under sense run and check, with the gh-run-list value grammar and <date> an ISO date or datetime after the literal >= prefix.",
+      "owner": "architect"
+    },
+    {
+      "template_id": "gh-run-list-branch",
+      "executable": "gh",
+      "argv_shape": [
+        "run",
+        "list",
+        "--workflow",
+        "<file>",
+        "--event",
+        "<event>",
+        "--branch",
+        "<ref>",
+        "--json",
+        "<fields>",
+        "--limit",
+        "<n>"
+      ],
+      "capabilities": ["proc:gh-read"],
+      "effect": "read",
+      "reason": "Harness sensors whose declared headBranch is a literal branch reference pass it as the single --branch <ref> option (ADR-SCR-0005 IA-004, ADR-SCR-0010); the broker admits exactly this shape without a host adapter under sense run and check, with the gh-run-list value grammar and <ref> letters, digits, dot, underscore, slash, or hyphen without a leading hyphen or '..'. A second --branch is refused.",
+      "owner": "architect"
+    },
+    {
+      "template_id": "gh-run-list-branch-created",
+      "executable": "gh",
+      "argv_shape": [
+        "run",
+        "list",
+        "--workflow",
+        "<file>",
+        "--event",
+        "<event>",
         "--branch",
         "<ref>",
         "--json",
@@ -55,7 +114,7 @@
       ],
       "capabilities": ["proc:gh-read"],
       "effect": "read",
-      "reason": "The harness_green_main sensor narrows gh-run-list by creation date (ADR-SCR-0005 IA-004); the broker admits exactly this shape without a host adapter under sense run and check, with gh-run-list value constraints and <date> an ISO date or datetime after the literal >= prefix.",
+      "reason": "The harness_green_main sensor with a literal head branch narrows gh-run-list-branch by creation date (ADR-SCR-0005 IA-004, ADR-SCR-0010); the broker admits exactly this shape without a host adapter under sense run and check, with the gh-run-list-branch value grammar and <date> an ISO date or datetime after the literal >= prefix.",
       "owner": "architect"
     },
     {
