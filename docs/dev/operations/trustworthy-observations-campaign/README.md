@@ -104,6 +104,17 @@ closing rounds. Three rules are specific to this campaign:
    verified record, or no intent for the declared repository, `site_drift`
    reads REVIEW with that journal reason. The ruling landed with wave CTG-0411.
 
+6. **ADR-EVI-0001 index shape (2026-10-01).** The record's Decision fixes the
+   row (closure id, round, supersedes, `merged_as`, terminal) and the order
+   (rounds by id, then supersession order); IA-005 asks for byte identity with
+   DETRAN's own generator output, which is in Portuguese, has no terminal
+   column, and is ordered by closure id. Both cannot hold. The Owner ruled that
+   the Decision governs and IA-005 is met by the same rows and by sealing every
+   round DETRAN sealed (R-0017 through PC-0018); DETRAN adopts the canonical
+   rendering. `record/derived/indexes/README.md` is not written by hand
+   (Constitution Article 6); the derived index is described on the
+   `evidence render` reference page only. An amending record may restate IA-005.
+
 ## 6. Round log
 
 | Round  | Merged head | Pull requests          | State                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
