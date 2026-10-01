@@ -945,7 +945,22 @@ describe('evidence render and verify acceptance', () => {
       '--repo-root',
       repo,
     ]);
-    expect(rounds.stdout).toBe('# Governed Rounds\n');
+    // ADR-EVI-0001: `rounds` is the canonical index rendered from phase closures; with no
+    // closures it is the heading, the column header, and the separator.
+    expect(rounds).toMatchObject({
+      exit: 0,
+      stdout:
+        '# Rounds index\n\n| closure | round | supersedes | merged_as | terminal |\n| --- | --- | --- | --- | --- |\n',
+      stderr: '',
+    });
+    const narratives = await invoke(evidenceRender, [
+      'evidence-render',
+      '--kind',
+      'round-narratives',
+      '--repo-root',
+      repo,
+    ]);
+    expect(narratives).toMatchObject({ exit: 0, stdout: '# Governed Rounds\n', stderr: '' });
     const written = await invoke(
       evidenceRender,
       [
