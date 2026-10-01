@@ -13,6 +13,16 @@ import {
 } from '../../src/round-lifecycle/index.js';
 import { withAuthorityHostTestScope } from '../../../skills/tests/unit/authority-host-test-scope.js';
 
+/** The canonical rounds index (ADR-EVI-0001) holding the fixture closure as the terminal row of its round. */
+const ROUNDS_INDEX = [
+  '# Rounds index',
+  '',
+  '| closure | round | supersedes | merged_as | terminal |',
+  '| --- | --- | --- | --- | --- |',
+  `| PC-0001 | R-0005 | - | ${'b'.repeat(40)} | yes |`,
+  '',
+].join('\n');
+
 const roots: string[] = [];
 
 afterEach(() => {
@@ -185,7 +195,7 @@ describe('round lifecycle filesystem behavior', () => {
         merged_as: 'b'.repeat(40),
         release_disposition: 'none-needed',
       });
-      write(repo, 'record/derived/indexes/rounds.md', 'PC-0001\n');
+      write(repo, 'record/derived/indexes/rounds.md', ROUNDS_INDEX);
 
       expect(closeGovernedRound({ repoRoot: repo, round: 5 })).toMatchObject({
         ok: true,
