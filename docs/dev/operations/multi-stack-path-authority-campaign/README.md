@@ -100,3 +100,17 @@ ADR-GOV-0024, which is the constitutional act the effect names.
   CTG-0532 was added to R-0503 after CTG-0531. The R-0502 Engineer found the
   packed tarball lacks the adopter defaults law source; TASK-0533 now carries
   the assembly fix.
+- 2026-09-30: CTG-0531 and CTG-0532 integrated on the campaign branch and
+  R-0503 moved to closing with every close check green except the known
+  load-sensitive `cli-shard09-verify-translation-c-overlay-boundaries` file,
+  which passes 14/14 alone.
+- 2026-10-01: the campaign branch was rebase-merged to main as PR 216 together
+  with the 1.8.0 roll. The gate caught the schema roster test still pinned at
+  95 entries; the Inspector counted `path-authority-classes` (96). The ledger
+  now names the rebased commits on main. The RC attestation was issued on
+  `c7fb44cd` (task-policy digest `4a38295a`), its evidence published as an
+  immutable bundle, and the rehearsal (run 36803426599) and publication (run 36803940735) passed on the first attempt. `v1.8.0` is a stable release
+  (`latest`) signed with the release tag key; OE-02 is performed, R-0503 is
+  closed, and the campaign is closed. DETRAN still has to be told the version
+  so CTG-0005 can pin it, rebind the constitution at 1.0.2, bind its authority
+  source, and rehearse before claiming enforcement.
