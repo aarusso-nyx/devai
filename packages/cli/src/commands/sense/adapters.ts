@@ -44,6 +44,7 @@ import {
   senseTestWeakening,
   senseTraceResolve,
   senseTypeCheck,
+  measureTestCoverageDepth,
   SENSOR_READING_KINDS,
   type SensorKind,
 } from '@devai-nyx/sensors';
@@ -200,6 +201,17 @@ const ADAPTERS: Readonly<Record<SensorKind, SenseSensorAdapter>> = Object.freeze
       ...optional('surfaces', surfacesInput(request)),
     }),
   test_coverage_depth: (request) => {
+    // ADR-SCR-0007: a declared population routes to the producer-running measurement,
+    // which reads the population sidecar and states the population in its reading.
+    const population = stringInput(request, 'population');
+    if (population !== undefined) {
+      return measureTestCoverageDepth({
+        repoRoot: request.repoRoot,
+        coveragePath: stringInput(request, 'coveragePath', { required: true }) ?? '',
+        population,
+        exclusions: stringArrayInput(request, 'exclusions') ?? [],
+      });
+    }
     const coveragePath = absolute(
       request.repoRoot,
       stringInput(request, 'coveragePath') ?? 'coverage/coverage-final.json',
