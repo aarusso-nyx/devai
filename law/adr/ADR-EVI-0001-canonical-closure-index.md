@@ -2,7 +2,7 @@
 id: ADR-EVI-0001
 title: The rounds index is rendered from phase closures and the seal checks exact membership
 type: adr
-status: proposed
+status: accepted
 date: 2026-09-28
 authority: Architect
 supersedes: []
@@ -31,9 +31,10 @@ inspector_acceptance:
 
 ## Status
 
-Proposed on 2026-09-28 from the harness convergence brainstorm and its
-independent review. Binds nothing until the Architect sets it to accepted
-before the round that implements it opens. Changes the `rounds` kind of
+Accepted on 2026-10-01 by the Architect as drafted, after the Owner
+accepted it on 2026-10-01; round R-0403 of CMP-0004 implements it. Proposed on
+2026-09-28 from the harness convergence brainstorm and its independent
+review. Changes the `rounds` kind of
 `evidence render` and the ledger check of `round seal`; the phase closure
 schema and `closePhase` are unchanged.
 

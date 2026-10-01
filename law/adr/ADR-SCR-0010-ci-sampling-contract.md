@@ -2,7 +2,7 @@
 id: ADR-SCR-0010
 title: The harness sensors declare their CI sample and read UNKNOWN below the minimum
 type: adr
-status: proposed
+status: accepted
 date: 2026-09-28
 authority: Architect
 supersedes: []
@@ -37,9 +37,10 @@ inspector_acceptance:
 
 ## Status
 
-Proposed on 2026-09-28 from the harness convergence brainstorm and its
-independent review. Binds nothing until the Architect sets it to accepted
-before the round that implements it opens. Extends the read-only `gh run
+Accepted on 2026-10-01 by the Architect as drafted, after the Owner
+accepted it on 2026-10-01; round R-0404 of CMP-0004 implements it. Proposed on
+2026-09-28 from the harness convergence brainstorm and its independent
+review. Extends the read-only `gh run
 list` admission of ADR-SCR-0005 with a declared population and changes the
 below-minimum verdict of the three harness sensors; no threshold changes.
 

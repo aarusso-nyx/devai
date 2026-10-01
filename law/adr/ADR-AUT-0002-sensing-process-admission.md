@@ -2,7 +2,7 @@
 id: ADR-AUT-0002
 title: Exact admission of the build sensor process and the Pages journal reads
 type: adr
-status: proposed
+status: accepted
 date: 2026-09-28
 authority: Architect
 supersedes: []
@@ -36,9 +36,10 @@ inspector_acceptance:
 
 ## Status
 
-Proposed on 2026-09-28 from the harness convergence brainstorm and its
-independent review. Binds nothing until the Architect sets it to accepted
-before the round that implements it opens. Extends the read-only host process
+Accepted on 2026-10-01 by the Architect as drafted, after the Owner
+accepted it on 2026-09-30; round R-0401 of CMP-0004 implements it. Proposed on
+2026-09-28 from the harness convergence brainstorm and its independent
+review. Extends the read-only host process
 admission of ADR-SCR-0005 with a write process and two `gh api` GET shapes;
 ADR-AUT-0001 and its exact-effect ledger are unchanged.
 
