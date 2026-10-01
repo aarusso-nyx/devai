@@ -1,5 +1,11 @@
 import { createHash } from 'node:crypto';
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from '@devai-nyx/authority';
+import {
+  appendFileSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+} from '@devai-nyx/authority';
 import { validators } from '@devai-nyx/schemas';
 import { dirname, join } from 'node:path';
 
@@ -236,5 +242,87 @@ export function verifyProofEpoch(inputs: {
     recordCount,
     lines,
     errors,
+  };
+}
+
+/* ADR-EVI-0002: the canonical path, the sequence namespace, the newline rule, and the line digest. */
+
+/** `record/proofs/work/<kind>/<round_id>.jsonl`: forward slashes, no dot segment, no leading slash. */
+export const CANONICAL_PROOF_PATH =
+  /^record\/proofs\/work\/[a-z0-9][a-z0-9_-]*\/R-[0-9]{4}\.jsonl$/u;
+
+/** The canonical repository-relative path of one proof epoch file. */
+export function canonicalProofPath(kind: string, roundId: string): string {
+  return `record/proofs/work/${kind}/${roundId}.jsonl`;
+}
+
+/** The SHA-256 of the line bytes, exclusive of the terminating newline; never the `line_hash`. */
+export function proofLineDigest(line: Uint8Array | string): string {
+  return createHash('sha256')
+    .update(typeof line === 'string' ? Buffer.from(line, 'utf8') : line)
+    .digest('hex');
+}
+
+export type ProofEpochBytes =
+  | { readonly ok: true; readonly lines: readonly Buffer[] }
+  | { readonly ok: false; readonly reason: 'TRUNCATED' };
+
+/**
+ * Splits one epoch file into its physical lines: the bytes between the previous newline (or the
+ * start of the file) and the next newline, exclusive of the newline. A non-empty file whose last
+ * byte is not a newline is truncated, and none of its lines resolve.
+ */
+export function splitProofEpochBytes(bytes: Uint8Array): ProofEpochBytes {
+  if (bytes.length === 0) return { ok: true, lines: [] };
+  if (bytes[bytes.length - 1] !== 0x0a) return { ok: false, reason: 'TRUNCATED' };
+  const buffer = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.length);
+  const lines: Buffer[] = [];
+  let start = 0;
+  for (let index = 0; index < buffer.length; index += 1) {
+    if (buffer[index] === 0x0a) {
+      lines.push(buffer.subarray(start, index));
+      start = index + 1;
+    }
+  }
+  return { ok: true, lines };
+}
+
+export type ProofAnchorResolution =
+  | {
+      readonly resolved: true;
+      readonly path: string;
+      readonly sequence: number;
+      readonly sha256: string;
+    }
+  | { readonly resolved: false; readonly reason: string };
+
+/**
+ * Resolves one anchor to exactly one physical line. A non-canonical path, a sequence outside the
+ * one-based namespace of its file, a missing file, and a truncated file resolve to no line; the
+ * path is never normalized into a match.
+ */
+export function resolveProofAnchor(
+  repoRoot: string,
+  anchor: { readonly path: string; readonly sequence: number },
+): ProofAnchorResolution {
+  if (typeof anchor.path !== 'string' || !CANONICAL_PROOF_PATH.test(anchor.path)) {
+    return { resolved: false, reason: 'NON_CANONICAL_PATH' };
+  }
+  if (!Number.isSafeInteger(anchor.sequence) || anchor.sequence < 1) {
+    return { resolved: false, reason: 'INVALID_SEQUENCE' };
+  }
+  const absolute = join(repoRoot, anchor.path);
+  if (!existsSync(absolute) || !lstatSync(absolute).isFile()) {
+    return { resolved: false, reason: 'NO_FILE' };
+  }
+  const epoch = splitProofEpochBytes(readFileSync(absolute));
+  if (!epoch.ok) return { resolved: false, reason: epoch.reason };
+  const line = epoch.lines[anchor.sequence - 1];
+  if (line === undefined) return { resolved: false, reason: 'NO_LINE' };
+  return {
+    resolved: true,
+    path: anchor.path,
+    sequence: anchor.sequence,
+    sha256: proofLineDigest(line),
   };
 }
