@@ -1,4 +1,9 @@
 import {
+  applySurfaceDeclaration,
+  type DeclaredSurfaces,
+  type PlantSurface,
+} from './declared-surfaces.js';
+import {
   buildSensorReading,
   type SensorFinding,
   type SensorReading,
@@ -36,11 +41,29 @@ export interface InventoryAdherenceOptions {
   /** Max orphan count tolerated as REVIEW. Default 50. */
   readonly maxOrphans?: number;
   readonly now?: string;
+  /**
+   * Declared plant surfaces (ADR-SCR-0003, ADR-SCR-0008). Omitted: every surface is
+   * presumed present. The reading is `skipped` only when every surface the sensor
+   * measures is declared absent.
+   */
+  readonly surfaces?: DeclaredSurfaces;
 }
+
+/** Bound to every plant surface: adherence is measured unless all are declared absent. */
+const BOUND_SURFACES: readonly PlantSurface[] = ['http', 'database', 'rbac', 'actions'];
 
 const DEFAULT_MAX_ORPHANS = 50;
 
 export function senseInventoryAdherence(opts: InventoryAdherenceOptions): SensorReading {
+  return applySurfaceDeclaration(
+    measureInventoryAdherence(opts),
+    opts.surfaces,
+    BOUND_SURFACES,
+    [],
+  );
+}
+
+function measureInventoryAdherence(opts: InventoryAdherenceOptions): SensorReading {
   const maxOrphans = opts.maxOrphans ?? DEFAULT_MAX_ORPHANS;
   const { counts } = opts.report;
   let status: SensorStatus;
