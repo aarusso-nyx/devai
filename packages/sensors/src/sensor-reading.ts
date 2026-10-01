@@ -56,6 +56,12 @@ export interface SensorReadingInput {
    * (`sense-test-weakening` is the canonical case) opt in.
    */
   readonly forceUniqueId?: boolean;
+  /**
+   * ADR-SCR-0008: the id of the earlier recorded instance of the same kind for
+   * the same candidate that this reading replaces. It is part of the id hash, so
+   * a later instance is a new file and never rewrites the earlier one.
+   */
+  readonly supersedes?: string;
 }
 
 export interface SensorIdentity {
@@ -68,6 +74,8 @@ export interface SensorReading {
   schemaVersion: '1.0.0';
   lifecycle?: 'supported' | 'experimental';
   id: string;
+  /** ADR-SCR-0008: the earlier instance this reading replaces. */
+  supersedes?: string;
   sensor: SensorIdentity;
   timestamp: string;
   status: SensorStatus;
@@ -105,6 +113,9 @@ export function buildSensorReading(input: SensorReadingInput): SensorReading {
     // Phase 30.D (W-2): opt-in timestamp inclusion for sensors
     // that need every-run evidence.
     input.forceUniqueId === true ? timestamp : '',
+    // ADR-SCR-0008: an instance that supersedes another is a distinct instance.
+    // Appended only when present so every existing id stays unchanged.
+    ...(input.supersedes === undefined ? [] : [`supersedes:${input.supersedes}`]),
   ]);
   const id = `SR-${createHash('sha256').update(canonicalForId).digest('hex').slice(0, 16)}`;
 
@@ -115,6 +126,7 @@ export function buildSensorReading(input: SensorReadingInput): SensorReading {
     schemaVersion: '1.0.0',
     ...(input.lifecycle !== undefined && { lifecycle: input.lifecycle }),
     id,
+    ...(input.supersedes !== undefined && { supersedes: input.supersedes }),
     sensor,
     timestamp,
     status: input.status,

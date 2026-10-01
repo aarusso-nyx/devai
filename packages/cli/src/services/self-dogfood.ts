@@ -48,6 +48,11 @@ export type SelfDogfoodDecision =
       readonly check_id: string;
       readonly role: SelfDogfoodRole;
       readonly effect: Exclude<SelfDogfoodEffect, 'remote-write'>;
+      /**
+       * The repository paths the admitted harness-write check is declared to write
+       * (ADR-SCR-0008), present when the roster row declares them.
+       */
+      readonly harness_write_paths?: readonly string[];
       readonly produces_readiness_claim: false;
       readonly grants_publication_authority: false;
     }
@@ -59,6 +64,7 @@ interface SelfDogfoodPolicy {
     readonly check_id: string;
     readonly effect: Exclude<SelfDogfoodEffect, 'remote-write'>;
     readonly initiator_roles: readonly SelfDogfoodRole[];
+    readonly harness_write_paths?: readonly string[];
   }[];
   readonly role_effect_matrix: readonly {
     readonly role: SelfDogfoodRole;
@@ -163,6 +169,9 @@ export function authorizeSelfDogfoodCheck(
     check_id: request.check_id,
     role: request.role as SelfDogfoodRole,
     effect: effect as Exclude<SelfDogfoodEffect, 'remote-write'>,
+    ...(check?.harness_write_paths === undefined
+      ? {}
+      : { harness_write_paths: [...check.harness_write_paths] }),
     produces_readiness_claim: false,
     grants_publication_authority: false,
   };

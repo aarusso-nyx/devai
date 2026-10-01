@@ -1,4 +1,6 @@
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
+import { appendVerbEvidence, loadChain } from '#runtime-core';
 import { mkdirSync, writeFileSync } from '@devai-nyx/authority';
 import { join, resolve } from 'node:path';
 import type { CAC } from 'cac';
@@ -27,6 +29,73 @@ export interface RecordedSensorReading {
   readonly reading: SensorReading;
 }
 
+/** The chain `sense record` appends its second write to (ADR-SCR-0008). */
+export const SENSE_RECORD_CHAIN_PATH = 'record/proofs/chain.json';
+/** The chain action naming one recorded reading file and its digest. */
+export const SENSE_RECORD_CHAIN_ACTION = 'sense.readings.record';
+const SENSOR_READINGS_STORE = '.devai/state/sensor-readings';
+
+interface ChainArtifactView {
+  readonly path?: unknown;
+  readonly sha256?: unknown;
+}
+
+/** The SHA-256 every chain entry naming `path` declares for it. */
+function chainedDigests(repoRoot: string, path: string): string[] {
+  const chainPath = join(repoRoot, SENSE_RECORD_CHAIN_PATH);
+  if (!existsSync(chainPath)) return [];
+  const chain = loadChain(chainPath);
+  const digests: string[] = [];
+  for (const entry of chain.records) {
+    if (entry.action !== SENSE_RECORD_CHAIN_ACTION) continue;
+    for (const artifact of (entry.artifacts ?? []) as readonly ChainArtifactView[]) {
+      if (artifact.path === path) digests.push(String(artifact.sha256));
+    }
+  }
+  return digests;
+}
+
+/**
+ * The second write of a recording: one `sense.readings.record` entry naming the
+ * reading id, kind, and the SHA-256 of the recorded file bytes, bound to HEAD.
+ * An existing entry is never rewritten; one whose digest disagrees with the
+ * file is a finding (`SENSE_RECORD_CHAIN_DIGEST_MISMATCH`), never a repair.
+ * Returns whether an entry was appended.
+ */
+function ensureChainEntry(
+  repoRoot: string,
+  reading: SensorReading,
+  path: string,
+  bytes: Buffer,
+): boolean {
+  const sha256 = createHash('sha256').update(bytes).digest('hex');
+  const declared = chainedDigests(repoRoot, path);
+  if (declared.length > 0) {
+    if (declared.some((digest) => digest !== sha256)) {
+      throw new Error(`SENSE_RECORD_CHAIN_DIGEST_MISMATCH:${reading.id}`);
+    }
+    return false;
+  }
+  const appended = appendVerbEvidence({
+    repoRoot,
+    chainPath: SENSE_RECORD_CHAIN_PATH,
+    action: SENSE_RECORD_CHAIN_ACTION,
+    status: 'completed',
+    artifacts: [{ path, sha256, kind: 'sensor-reading' }],
+    notes: [`sensor-reading id: ${reading.id}; kind: ${reading.sensor.kind}; sha256: ${sha256}`],
+  });
+  if (!appended.ok) {
+    throw new Error(`SENSE_RECORD_CHAIN_APPEND_FAILED:${reading.id}:${appended.error ?? ''}`);
+  }
+  return true;
+}
+
+/**
+ * Record one reading as an immutable instance (ADR-SCR-0008). Two ordered writes:
+ * the reading file under `.devai/state/sensor-readings/<kind>/<id>.json` with `wx`,
+ * then one digest-bearing chain entry. A re-record of the same body appends the
+ * missing entry when the second write was lost and rewrites nothing.
+ */
 export function recordSensorReading(repoRoot: string, inputPath: string): RecordedSensorReading {
   const source = resolve(repoRoot, inputPath);
   const parsed: unknown = JSON.parse(readFileSync(source, 'utf8'));
@@ -43,22 +112,26 @@ export function recordSensorReading(repoRoot: string, inputPath: string): Record
     throw new Error(`SENSE_RECORD_ID_INVALID:${reading.id}`);
   }
   const canonical = `${JSON.stringify(reading, null, 2)}\n`;
-  const directory = join(repoRoot, '.devai/state/sensor-readings', reading.sensor.kind);
+  const relativePath = `${SENSOR_READINGS_STORE}/${reading.sensor.kind}/${reading.id}.json`;
+  const directory = join(repoRoot, SENSOR_READINGS_STORE, reading.sensor.kind);
   const target = join(directory, `${reading.id}.json`);
   if (existsSync(target)) {
+    const bytes = readFileSync(target);
     let existing: unknown;
     try {
-      existing = JSON.parse(readFileSync(target, 'utf8')) as unknown;
+      existing = JSON.parse(bytes.toString('utf8')) as unknown;
     } catch (error) {
       throw new Error(`SENSE_RECORD_EXISTING_INVALID:${target}`, { cause: error });
     }
     if (JSON.stringify(existing) !== JSON.stringify(reading)) {
       throw new Error(`SENSE_RECORD_ID_CONFLICT:${reading.id}`);
     }
+    ensureChainEntry(repoRoot, reading, relativePath, bytes);
     return Object.freeze({ path: target, action: 'already-recorded', reading });
   }
   mkdirSync(directory, { recursive: true });
   writeFileSync(target, canonical, { flag: 'wx' });
+  ensureChainEntry(repoRoot, reading, relativePath, Buffer.from(canonical, 'utf8'));
   return Object.freeze({ path: target, action: 'created', reading });
 }
 
