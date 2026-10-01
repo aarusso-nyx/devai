@@ -52,9 +52,9 @@ so the admission is enforced, and it performs no write.
   `journal-no-matching-intent` when no deployment carries the publication intent for the
   declared repository.
 - FAIL when the tip differs from the verified identity, including a local tip ahead of it.
-- When the journal yields no verified identity and the local `gh-pages` tip carries a
-  well-formed publication message, the tip's own provenance stands, as it did before
-  ADR-AUT-0002; the record does not decide that combination.
+- A well-formed `gh-pages` tip is not provenance on its own: when the journal holds no
+  verified record, or no intent for the declared repository, the reading is REVIEW with
+  that journal reason whatever the tip says (Owner ruling of 2026-10-01).
 - Tags are listed through the admitted read `git rev-parse --symbolic --tags`, so the
   journal read adds no git shape to the broker.
 - `SITE_DRIFT_PROVENANCE_ADAPTER_REQUIRED` only for an argv the broker actually refuses, which
