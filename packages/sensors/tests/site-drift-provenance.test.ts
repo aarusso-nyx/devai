@@ -309,6 +309,40 @@ describe('site_drift journal readings (ADR-AUT-0002 IA-004)', () => {
     expect(findingsText(reading)).toContain('journal-no-matching-intent');
   });
 
+  it('reads REVIEW journal-not-verified beside a well-formed gh-pages tip when the journal is empty', () => {
+    const head = commit('base');
+    publishTip(`docs: publish from ${head}`);
+
+    const { reading } = run({ deployments: [] });
+
+    expect(reading.status).toBe('review');
+    expect(findingsText(reading)).toContain('journal-not-verified');
+    expect(reading.metrics).toMatchObject({ published_tip_source: head });
+  });
+
+  it('reads REVIEW journal-not-verified beside a well-formed gh-pages tip when the intent is only submitted', () => {
+    const head = commit('base');
+    publishTip(`docs: publish from ${head}`);
+
+    const { reading } = run({
+      deployments: [deployment(9, head)],
+      statuses: { 9: [status(2, 'in_progress', 'devai-pages:submitted:pages-1')] },
+    });
+
+    expect(reading.status).toBe('review');
+    expect(findingsText(reading)).toContain('journal-not-verified');
+  });
+
+  it('reads REVIEW journal-no-matching-intent beside a well-formed gh-pages tip', () => {
+    const head = commit('base');
+    publishTip(`docs: publish from ${head}`);
+
+    const { reading } = run({ deployments: [deployment(9, head, 'aarusso-nyx/detran')] });
+
+    expect(reading.status).toBe('review');
+    expect(findingsText(reading)).toContain('journal-no-matching-intent');
+  });
+
   it('reads PASS when the verified identity is HEAD and no gh-pages ref exists', () => {
     const head = commit('base');
 
