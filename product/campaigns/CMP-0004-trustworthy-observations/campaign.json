@@ -223,7 +223,9 @@
                 "paths": [
                   "packages/cli/tests/unit/authority-broker-sensing-shapes.test.ts",
                   "packages/sensors/tests/build-invocation.test.ts",
-                  "packages/sensors/tests/site-drift-provenance.test.ts"
+                  "packages/sensors/tests/site-drift-provenance.test.ts",
+                  "tests/contract/sensor-inputs.contract.test.ts",
+                  "packages/sensors/tests/site-drift.test.ts"
                 ],
                 "forbidden": [
                   "law/",
@@ -253,7 +255,7 @@
               "commit_types": ["test(cli)", "test(sensors)"],
               "prompt": {
                 "path": "prompts/TASK-0412.md",
-                "sha256": "10c4cfbf13080ec080e72d76b3db4ca84b2d8c2c3da7efeb9bc90eec00a86b45"
+                "sha256": "b28f2d9399fba77a87daf83106ee36f9332826da76cb9af68692907acad24c42"
               },
               "pull_request": null,
               "merged_as": null,
