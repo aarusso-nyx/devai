@@ -109,6 +109,55 @@ The first scorecard recorded this way is rendered on the
 [SC-20260927T205906-001](../../../record/proofs/compliance/scorecards/SC-20260927T205906-001.json),
 observed on DEVAI's own main branch in round R-0206.
 
+### Reading instances and the recording order
+
+A recorded reading is immutable (ADR-SCR-0008). Its id stays content-derived and the file under
+`.devai/state/sensor-readings/<kind>/<id>.json` is never rewritten: a same-id different-body write
+is refused with `SENSE_RECORD_ID_CONFLICT`, and a same-id same-body write is `already-recorded`. A
+later reading of the same kind for the same candidate is a new instance that names the earlier id
+in its optional `supersedes` field, and the loop resolver selects the latest instance per kind and
+candidate by following those links, never by file time. The store is therefore an append-only
+history per kind and candidate, and the scorecard reads the newest instance without a rebuild.
+
+A recording is two ordered writes. `sense record` writes the reading file first, then appends one
+`sense.readings.record` entry to `record/proofs/chain.json` naming the reading id, its kind, and the
+SHA-256 of the file bytes. A missing entry is repaired by re-running `sense record` on the same
+file, which appends and edits nothing; a digest mismatch is a finding, not a repair. The
+`harness_invariant_alignment` sensor accepts a store reading when the reading carries its candidate
+binding or its chain entry carries the candidate head, and ignores a reading with neither.
+
+The sweep stays read-only. Two of its members measure the store itself, so on a fresh worktree they
+would read an empty store if they ran beside the sensors whose readings they measure. The `sweep`
+preset therefore declares an ordered second pass in `selection_effect_rule.sweep_second_pass` of
+`law/policy/sense-presets.json`, today `harness_invariant_alignment` and `inventory_performance`,
+and the recording protocol is first pass, record, second pass, record. Recording is the inspector's
+harness-write step; the preset never records. F4:T7 and F5:T4 then read PASS or FAIL from the
+substrate, and never REVIEW for the absence of their own inputs.
+
+### Per-cell applicability of F4:T4 and F4:T9
+
+Applicability is decided per cell from the subject the cell measures, never as a blanket N/A for a
+sensor family. The ledger carries no entry for either cell:
+
+| Cell  | Substrate × property   | Sensor bound to it       | Decision                                                                                                                                                              |
+| ----- | ---------------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| F4:T4 | Inventory × Alignment  | `inventory_adherence`    | Measured. N/A only when every surface the sensor measures is declared absent in `sensor-inputs.json`; the framework declares `actions` present.                       |
+| F4:T9 | Inventory × Discipline | `inventory_regeneration` | Measured. The regenerated `inventory_dep_graph` and `inventory_coverage` kinds are present on the framework, and a ledger N/A while their readings exist is rejected. |
+
+Each cell reads a measured verdict or a ledger-anchored N/A with its reason, never an unexplained
+blank. The ledger count above is unchanged: DEVAI's ledger still lists F1:T1 and F4:T5 only.
+
+### The observation backlog
+
+The backlog the Auditor compiles after a merge (Article 33) has a contract:
+`law/schemas/observation-backlog.schema.json` describes the `backlog.json` that `audit observe`
+writes into the observation bundle, with the observed merge sha, the timestamp, one observation per
+scorecard cell carrying its verdict and reading ids, and the deltas against the previous bundle.
+The object is closed, so an unknown top-level key or an observation without its cell fails, and the
+validating suite rejects a delta that names a cell absent from the current observations. The
+post-merge hook resolves readings from the bound checkout's `.devai/state/sensor-readings`, never
+from the detached worktree root.
+
 ## Hard gate (Article 17)
 
 The hard gate is the deterministic component of error _Error(0)_. It comprises:
