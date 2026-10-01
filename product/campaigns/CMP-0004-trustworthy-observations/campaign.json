@@ -1403,7 +1403,9 @@
                   "docs/reference/cli/evidence-verify.md",
                   "law/schemas/proof-anchor-baseline.schema.json",
                   "docs/reference/cli/index.md",
-                  "law/policy/documentation-information-architecture.json"
+                  "law/policy/documentation-information-architecture.json",
+                  "law/schemas/evidence.schema.json",
+                  "law/policy/action-registry.json"
                 ],
                 "forbidden": [".github/workflows/", "packages/", "tests/"]
               },
@@ -1438,7 +1440,7 @@
               ],
               "prompt": {
                 "path": "prompts/TASK-0434.md",
-                "sha256": "b9a6a8e695ad00d7297fbfb9143577789e5fd894194b7b8617d49e94c9f77a37"
+                "sha256": "8bdb89ebbd3f18de93f19da2caef457eefd787900e37c6ff24a784f83016c029"
               },
               "pull_request": null,
               "merged_as": null,
