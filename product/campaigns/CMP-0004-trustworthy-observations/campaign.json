@@ -759,7 +759,8 @@
                   "law/policy/sensor-notes/harness_invariant_alignment.md",
                   "packages/cli/src/commands/check/schemas.ts",
                   "docs/theory/framework/scorecard.md",
-                  "law/schemas/sensor-reading.schema.json"
+                  "law/schemas/sensor-reading.schema.json",
+                  "law/schemas/self-dogfood-policy.schema.json"
                 ],
                 "forbidden": [".github/workflows/", "packages/", "tests/"]
               },
@@ -796,7 +797,7 @@
               ],
               "prompt": {
                 "path": "prompts/TASK-0421.md",
-                "sha256": "d7cae4a2c8a0338f559741dd48670efa52dd7884ed5d34b15593da53b777d001"
+                "sha256": "4b5523680bdb6d4ba01feb6568e2f19bc51da998f839bb54ba3476cf48a8473a"
               },
               "pull_request": null,
               "merged_as": null,
