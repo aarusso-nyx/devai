@@ -92,3 +92,10 @@ closing rounds. Three rules are specific to this campaign:
    copied unchanged; a credential or absolute host path in them stops the
    copy and returns to the Owner, because removing it would change the line
    digests the verification checks.
+4. **OE-01 performed with one waiver (2026-10-01).** The fixtures are under
+   `tests/fixtures/closures/detran/` and `tests/fixtures/proof-baseline/detran-r0020/`,
+   each with a `PROVENANCE.md` naming the DETRAN commit and the digest of every
+   file. The copied baseline reproduces 119 lines, 67 anchored and 52 orphaned.
+   The DETRAN chain records carry absolute host paths in `context.repo_root`,
+   which feed their manifest hashes; the Owner waived the host-path clause for
+   that file so the fixture stays DETRAN's real chain. No credential was found.
