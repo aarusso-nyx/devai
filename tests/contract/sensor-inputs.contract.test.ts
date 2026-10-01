@@ -143,6 +143,76 @@ describe('DEVAI sensor inputs declaration', () => {
   });
 });
 
+// ADR-AUT-0002 IA-005 and template pnpm-recursive-build (argv_precedence, conflict_code):
+// a test-tasks.json build node is the build sensor's command, and a build declaration whose
+// argv differs from that node is a declaration defect this contract rejects naming both argv.
+const DESCRIPTOR_PATH = resolve(ROOT, 'test-tasks.json');
+
+function descriptorBuildArgv(descriptor: unknown): readonly string[] | undefined {
+  const tasks = (descriptor as { readonly tasks?: readonly Record<string, unknown>[] }).tasks;
+  const node = tasks?.find((task) => task['nodeId'] === 'build');
+  return Array.isArray(node?.['argv']) ? (node['argv'] as readonly string[]) : undefined;
+}
+
+function buildDeclarationDefect(descriptor: unknown, candidate: Declaration): string | undefined {
+  const declared = candidate.inputs['build']?.['argv'];
+  const node = descriptorBuildArgv(descriptor);
+  if (!Array.isArray(declared) || node === undefined) return undefined;
+  if (JSON.stringify(declared) === JSON.stringify(node)) return undefined;
+  return (
+    `BUILD_ARGV_CONFLICT: test-tasks.json build node argv ${JSON.stringify(node)} differs ` +
+    `from the declared build argv ${JSON.stringify(declared)}`
+  );
+}
+
+describe('build declaration precedence (ADR-AUT-0002 IA-005)', () => {
+  const descriptor = readJson<unknown>(DESCRIPTOR_PATH);
+
+  it('pins the descriptor build node and DEVAI declaring no build input', () => {
+    expect(descriptorBuildArgv(descriptor)).toEqual(['pnpm', '-r', 'build']);
+    expect(declaration.inputs['build']).toBeUndefined();
+  });
+
+  it('finds no build declaration defect in the committed declaration', () => {
+    const defect = buildDeclarationDefect(descriptor, declaration);
+    expect(defect, defect).toBeUndefined();
+  });
+
+  it('accepts a schema-valid build input beside a node with the same argv', () => {
+    const same: Declaration = {
+      schemaVersion: '1.0.0',
+      inputs: { build: { argv: ['pnpm', '-r', 'build'] } },
+    };
+    expect(valid(same)).toBe(true);
+    expect(buildDeclarationDefect(descriptor, same)).toBeUndefined();
+  });
+
+  it.each([
+    ['another script', ['pnpm', '-r', 'compile']],
+    ['an extra argument', ['pnpm', '-r', 'build', '--filter', 'cli']],
+    ['another executable', ['npm', 'run', 'build']],
+  ] as const)('rejects a schema-valid build input with %s, naming both argv', (_label, argv) => {
+    const conflicting: Declaration = {
+      schemaVersion: '1.0.0',
+      inputs: { build: { argv: [...argv] } },
+    };
+    expect(valid(conflicting)).toBe(true);
+    const defect = buildDeclarationDefect(descriptor, conflicting);
+    expect(defect).toContain('BUILD_ARGV_CONFLICT');
+    expect(defect).toContain(JSON.stringify(['pnpm', '-r', 'build']));
+    expect(defect).toContain(JSON.stringify(argv));
+  });
+
+  it('admits a build input when the descriptor has no build node', () => {
+    const adopter: Declaration = {
+      schemaVersion: '1.0.0',
+      inputs: { build: { argv: ['pnpm', '-r', 'compile'], cwd: 'app' } },
+    };
+    expect(valid(adopter)).toBe(true);
+    expect(buildDeclarationDefect({ tasks: [] }, adopter)).toBeUndefined();
+  });
+});
+
 describe('sensor inputs schema', () => {
   it('keys only registered sensor kinds', () => {
     for (const kind of Object.keys(schema.properties.inputs.properties)) {
