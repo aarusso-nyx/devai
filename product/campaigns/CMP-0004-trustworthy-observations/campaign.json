@@ -31,7 +31,7 @@
       "id": "OE-01",
       "description": "Supply the DETRAN closures and the proof-line baseline (119 lines, 67 anchored, 52 orphaned) as fixtures for ADR-EVI-0001 and ADR-EVI-0002, sanitized of any credential or absolute host path.",
       "required_before": "R-0403",
-      "performed_at": null
+      "performed_at": "2026-10-01T02:34:58Z"
     },
     {
       "id": "OE-02",
