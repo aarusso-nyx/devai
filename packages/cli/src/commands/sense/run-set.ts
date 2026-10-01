@@ -8,6 +8,7 @@ import {
   resolveSelfDogfoodDeclaration,
   selfDogfoodRefusal,
 } from '../../services/self-dogfood.js';
+import { SENSE_PRESET_POLICY } from '@devai-nyx/sensors';
 import { sensorAdapter } from './adapters.js';
 import {
   resolveSenseSelection,
@@ -50,6 +51,7 @@ interface SenseRunOptions {
   readonly input?: string;
   readonly dryRun?: boolean;
   readonly human?: boolean;
+  readonly pass?: string;
 }
 
 const STRUCTURED_STATUSES = new Set([
@@ -271,6 +273,100 @@ export async function executeResolvedSenseSelection(
   return Object.freeze(results);
 }
 
+/** One ordered pass of a resolved selection (ADR-SCR-0008). */
+export type ResolvedSensePass = ResolvedSenseSelection & { readonly pass: 'first' | 'second' };
+
+const PASS_EFFECT_RANK: Readonly<Record<string, number>> = Object.freeze({
+  read: 0,
+  'harness-write': 1,
+  'local-write': 2,
+  'remote-write': 3,
+});
+
+/**
+ * The ordered second pass of the sweep, as `law/policy/sense-presets.json` declares it
+ * in `selection_effect_rule.sweep_second_pass`: the members that read the readings
+ * store, comma-separated in execution order.
+ */
+export function sweepSecondPass(): readonly string[] {
+  const rule = (
+    SENSE_PRESET_POLICY as unknown as {
+      readonly selection_effect_rule?: Readonly<Record<string, unknown>>;
+    }
+  ).selection_effect_rule;
+  const declared = rule?.['sweep_second_pass'];
+  if (typeof declared !== 'string') return [];
+  return declared
+    .split(',')
+    .map((kind) => kind.trim())
+    .filter((kind) => kind.length > 0);
+}
+
+function passOf(
+  resolved: ResolvedSenseSelection,
+  pass: 'first' | 'second',
+  kinds: readonly string[],
+): ResolvedSensePass {
+  const members = kinds.flatMap((kind) => {
+    const member = resolved.members.find((candidate) => candidate.kind === kind);
+    return member === undefined ? [] : [member];
+  });
+  const executed = members
+    .map((member) => member.kind)
+    .filter((kind) => resolved.executed.includes(kind));
+  const aggregate = members.reduce<ResolvedSenseSelection['aggregate_effect']>(
+    (current, member) =>
+      (PASS_EFFECT_RANK[member.effect] ?? 0) > (PASS_EFFECT_RANK[current] ?? 0)
+        ? member.effect
+        : current,
+    'read',
+  );
+  return Object.freeze({
+    ...resolved,
+    pass,
+    members,
+    executed,
+    aggregate_effect: aggregate,
+  });
+}
+
+/**
+ * Split a resolved selection into its two ordered passes (ADR-SCR-0008). For the
+ * sweep the first pass omits the declared store readers and the second pass runs
+ * them in their declared order after the first pass is recorded; the preset never
+ * records. Any other selection is a single first pass with an empty second pass.
+ * Selection and exclusions are unchanged in both passes.
+ */
+export function resolveSensePasses(resolved: ResolvedSenseSelection): {
+  readonly first: ResolvedSensePass;
+  readonly second: ResolvedSensePass;
+} {
+  const isSweep = resolved.selection.type === 'preset' && resolved.selection.value === 'sweep';
+  const memberKinds = resolved.members.map((member) => member.kind);
+  const secondKinds = isSweep ? sweepSecondPass().filter((kind) => memberKinds.includes(kind)) : [];
+  const firstKinds = memberKinds.filter((kind) => !secondKinds.includes(kind));
+  return {
+    first: passOf(resolved, 'first', firstKinds),
+    second: passOf(resolved, 'second', secondKinds),
+  };
+}
+
+function selectedPass(
+  resolved: ResolvedSenseSelection,
+  pass: string | undefined,
+): ResolvedSenseSelection | ResolvedSensePass {
+  if (pass !== undefined && pass !== 'first' && pass !== 'second') {
+    throw new Error(`SENSE_PASS_UNKNOWN:${pass}`);
+  }
+  const isSweep = resolved.selection.type === 'preset' && resolved.selection.value === 'sweep';
+  if (!isSweep) {
+    if (pass === 'second') throw new Error(`SENSE_PASS_SWEEP_ONLY:${resolved.selection.value}`);
+    return resolved;
+  }
+  const passes = resolveSensePasses(resolved);
+  return pass === 'second' ? passes.second : passes.first;
+}
+
 function selectionFor(kind: string | undefined, preset: string | undefined): SenseSelection {
   if (kind !== undefined && preset === undefined) return { kind };
   if (kind === undefined && preset !== undefined) return { preset };
@@ -292,14 +388,22 @@ export const senseRunSetCmd = defineCommand({
       .option('--round <id>', 'Round id required by the sweep preset')
       .option('--repo-root <path>', 'Repository root (default: .)')
       .option('--input <json>', 'Sensor-specific inputs as a JSON object')
+      .option(
+        '--pass <pass>',
+        'Sweep pass: first (default, omits the store readers) | second (the declared store readers)',
+      )
       .option('--dry-run', 'Resolve and display the exact population without executing it')
       .option('--human', 'Human-readable summary')
       .action(async (kind: string | undefined, options: SenseRunOptions) => {
         try {
           // Resolution is intentionally complete before any adapter can execute.
-          const resolved = resolveSenseSelection(selectionFor(kind, options.preset), {
-            ...(options.round === undefined ? {} : { roundId: options.round }),
-          });
+          // ADR-SCR-0008: the sweep runs in two ordered passes; the first is the default.
+          const resolved = selectedPass(
+            resolveSenseSelection(selectionFor(kind, options.preset), {
+              ...(options.round === undefined ? {} : { roundId: options.round }),
+            }),
+            options.pass,
+          );
           const repoRoot = options.repoRoot ?? '.';
           const explicit = parseInputs(options.input);
           const memberInputs = resolveMemberInputs(resolved, {

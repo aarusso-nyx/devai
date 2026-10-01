@@ -60,6 +60,36 @@ export interface ResolvedScorecardInputs {
 
 const DEFAULT_INTEGRATION_HEAD = '0'.repeat(39) + 'f';
 
+/** A ledger N/A entry for a cell whose subject has readings (ADR-SCR-0008 IA-006). */
+export const SCORECARD_NA_MEASURED_CELL = 'SCORECARD_NA_MEASURED_CELL';
+
+/**
+ * Cells whose subject is measured whenever readings of these kinds exist:
+ * `inventory_regeneration` (F4:T9) regenerates the `inventory_dep_graph` and
+ * `inventory_coverage` kinds, so a ledger N/A for F4:T9 beside them is rejected.
+ */
+const MEASURED_CELL_KINDS: Readonly<Record<string, readonly string[]>> = Object.freeze({
+  'F4:T9': Object.freeze(['inventory_dep_graph', 'inventory_coverage']),
+});
+
+/**
+ * Reject a ledger N/A for a cell whose subject has readings in the store: a cell
+ * reads a measured verdict or a ledger-anchored N/A, never an N/A over evidence.
+ */
+export function assertNaCellsUnmeasured(
+  naCells: ReadonlySet<string>,
+  readings: readonly SensorReading[],
+): void {
+  const kinds = new Set(readings.map((reading) => reading.sensor.kind as string));
+  for (const [cell, measuredBy] of Object.entries(MEASURED_CELL_KINDS)) {
+    if (!naCells.has(cell)) continue;
+    const present = measuredBy.filter((kind) => kinds.has(kind));
+    if (present.length > 0) {
+      throw new Error(`${SCORECARD_NA_MEASURED_CELL}:${cell}:${present.join(',')}`);
+    }
+  }
+}
+
 /** Project the repository N/A ledger into the classifier's `naCells` option. */
 export function resolveScorecardNaCells(repoRoot: string): ReadonlySet<string> {
   return scorecardNaCellSet(loadScorecardNaConfig(resolveScorecardNaPath(repoRoot)));
@@ -82,11 +112,13 @@ export function resolveScorecardInputs(opts: ScorecardInputs): ResolvedScorecard
   const suppliedReadings = inputs['readings'] as readonly SensorReading[] | undefined;
   if (suppliedReadings !== undefined && suppliedReadings.length > 0) {
     const preReadings = filterLatestPerKind(suppliedReadings);
+    const naCells = resolveScorecardNaCells(opts.repoRoot);
+    assertNaCellsUnmeasured(naCells, preReadings);
     const scorecard = computeScorecard({
       timestamp: opts.timestamp,
       integrationHead,
       readings: preReadings,
-      naCells: resolveScorecardNaCells(opts.repoRoot),
+      naCells,
       staleFailAfterMs: loadScorecardFailureMaxAgeMs(opts.repoRoot),
     });
     return { scorecard, readings: preReadings, source: 'inputs' };
@@ -96,11 +128,13 @@ export function resolveScorecardInputs(opts: ScorecardInputs): ResolvedScorecard
   const readingsDir =
     (inputs['readings_dir'] as string | undefined) ?? join(opts.repoRoot, SENSOR_READINGS_DIR);
   const readings = loadReadingsFromDir(readingsDir, { rejectInvalid: true });
+  const naCells = resolveScorecardNaCells(opts.repoRoot);
+  assertNaCellsUnmeasured(naCells, readings);
   const scorecard = computeScorecard({
     timestamp: opts.timestamp,
     integrationHead,
     readings,
-    naCells: resolveScorecardNaCells(opts.repoRoot),
+    naCells,
     staleFailAfterMs: loadScorecardFailureMaxAgeMs(opts.repoRoot),
   });
   return { scorecard, readings, source: readings.length > 0 ? 'disk' : 'empty' };
