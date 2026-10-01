@@ -22,6 +22,7 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, join, matchesGlob, resolve } from 'node:path';
 import Ajv2020 from 'ajv/dist/2020.js';
+import { parse as parseYaml } from 'yaml';
 import { describe, expect, it } from 'vitest';
 import { LOCAL_INCLUDE, RC_ONLY } from '../config/local.config.js';
 import localCoverageConfig, {
@@ -410,7 +411,7 @@ describe('sensor inputs schema', () => {
 
   it('accepts the empty adopter default and its own examples', () => {
     expect(valid(readJson(ADOPTER_DEFAULT_PATH))).toBe(true);
-    expect(readJson<Declaration>(ADOPTER_DEFAULT_PATH).inputs).toEqual({});
+    expect(readJson<Declaration>(ADOPTER_DEFAULT_PATH).inputs).toEqual(ADOPTER_HARNESS_POPULATIONS);
     for (const example of schema.examples ?? []) expect(valid(example)).toBe(true);
   });
 
@@ -456,4 +457,226 @@ describe('sensor inputs schema', () => {
       expect(valid(instance)).toBe(false);
     });
   }
+});
+
+// ADR-SCR-0010 IA-004: a harness population names its workflow, event, and minimum sample, and
+// names only an event the workflow carries under its on: block and only jobs it defines.
+const POPULATION_KINDS = ['harness_green_main', 'harness_performance', 'harness_robustness'] as const;
+const WORKFLOWS_DIR = resolve(ROOT, '.github/workflows');
+
+const EXCLUDED_RELEASE_JOBS = [
+  { workflow: 'release.yml', job: 'verify-ledger' },
+  { workflow: 'release.yml', job: 'build-release' },
+  { workflow: 'release.yml', job: 'finalize-release' },
+  { workflow: 'release.yml', job: 'deploy-pages' },
+];
+
+function devaiPopulation(minimumSample: number): Record<string, unknown> {
+  return {
+    workflow: 'pull-request-checks.yml',
+    event: 'pull_request',
+    headBranch: '*',
+    baseBranch: 'main',
+    attempts: 'last',
+    includeCancelled: false,
+    lookbackDays: 30,
+    minimumSample,
+    excludedJobs: EXCLUDED_RELEASE_JOBS,
+  };
+}
+
+const DEVAI_HARNESS_POPULATIONS = {
+  harness_green_main: devaiPopulation(20),
+  harness_performance: devaiPopulation(10),
+  harness_robustness: devaiPopulation(20),
+};
+
+function adopterPopulation(minimumSample: number): Record<string, unknown> {
+  return {
+    workflow: 'ci.yml',
+    event: 'pull_request',
+    headBranch: '*',
+    baseBranch: 'main',
+    attempts: 'last',
+    includeCancelled: false,
+    lookbackDays: 30,
+    minimumSample,
+    excludedJobs: [],
+  };
+}
+
+const ADOPTER_HARNESS_POPULATIONS = {
+  harness_green_main: adopterPopulation(20),
+  harness_performance: adopterPopulation(10),
+  harness_robustness: adopterPopulation(20),
+};
+
+interface WorkflowShape {
+  readonly events: readonly string[];
+  readonly jobs: readonly string[];
+}
+
+function workflowShape(file: string): WorkflowShape | undefined {
+  const path = join(WORKFLOWS_DIR, file);
+  if (!existsSync(path)) return undefined;
+  const doc = parseYaml(readFileSync(path, 'utf8')) as {
+    readonly on?: unknown;
+    readonly jobs?: Readonly<Record<string, unknown>>;
+  };
+  const on = doc.on;
+  let events: string[] = [];
+  if (typeof on === 'string') events = [on];
+  else if (Array.isArray(on)) events = on.map(String);
+  else if (on !== null && typeof on === 'object') events = Object.keys(on);
+  return { events, jobs: Object.keys(doc.jobs ?? {}) };
+}
+
+/** The declared-inputs contract: defects of one harness population against the workflow files. */
+function harnessPopulationDefects(kind: string, input: Readonly<Record<string, unknown>>): string[] {
+  const defects: string[] = [];
+  for (const key of ['workflow', 'event', 'minimumSample'] as const) {
+    if (input[key] === undefined) defects.push(`${kind}: ${key} is required`);
+  }
+  const workflow = input['workflow'];
+  if (typeof workflow !== 'string') return defects;
+  const shape = workflowShape(workflow);
+  if (shape === undefined) return [...defects, `${kind}: workflow ${workflow} does not exist`];
+  const event = input['event'];
+  if (typeof event === 'string' && !shape.events.includes(event)) {
+    defects.push(`${kind}: ${workflow} does not carry the ${event} event`);
+  }
+  const excluded = (input['excludedJobs'] ?? []) as readonly { workflow: string; job: string }[];
+  for (const pair of excluded) {
+    const owner = workflowShape(pair.workflow);
+    if (owner === undefined || !owner.jobs.includes(pair.job)) {
+      defects.push(`${kind}: ${pair.workflow} defines no job ${pair.job}`);
+    }
+  }
+  return defects;
+}
+
+describe('harness population declaration (ADR-SCR-0010)', () => {
+  it('declares DEVAI gate population for the three harness sensors', () => {
+    for (const kind of POPULATION_KINDS) {
+      expect(declaration.inputs[kind]).toEqual(DEVAI_HARNESS_POPULATIONS[kind]);
+    }
+  });
+
+  it('declares a minimum sample of twenty, ten successful runs, and twenty', () => {
+    expect(declaration.inputs['harness_green_main']?.['minimumSample']).toBe(20);
+    expect(declaration.inputs['harness_performance']?.['minimumSample']).toBe(10);
+    expect(declaration.inputs['harness_robustness']?.['minimumSample']).toBe(20);
+  });
+
+  it('declares a population that is the pull request gate, never main pushes', () => {
+    for (const kind of POPULATION_KINDS) {
+      const input = declaration.inputs[kind] ?? {};
+      expect(input['workflow']).toBe('pull-request-checks.yml');
+      expect(input['event']).toBe('pull_request');
+      expect(input['headBranch']).toBe('*');
+      expect(input['includeCancelled']).toBe(false);
+    }
+  });
+
+  it('declares only an event its workflow carries and only jobs the workflows define', () => {
+    for (const kind of POPULATION_KINDS) {
+      expect(harnessPopulationDefects(kind, declaration.inputs[kind] ?? {})).toEqual([]);
+    }
+  });
+
+  it('leaves the environment-gated release jobs out of every population by identity', () => {
+    for (const kind of POPULATION_KINDS) {
+      expect(declaration.inputs[kind]?.['excludedJobs']).toEqual(EXCLUDED_RELEASE_JOBS);
+    }
+  });
+
+  it('declares the adopter default gate population for the three harness sensors', () => {
+    const adopter = readJson<Declaration>(ADOPTER_DEFAULT_PATH);
+    expect(valid(adopter)).toBe(true);
+    for (const kind of POPULATION_KINDS) {
+      expect(adopter.inputs[kind]).toEqual(ADOPTER_HARNESS_POPULATIONS[kind]);
+    }
+  });
+
+  it('flags an event the workflow does not carry', () => {
+    const defects = harnessPopulationDefects('harness_green_main', {
+      ...devaiPopulation(20),
+      event: 'schedule',
+    });
+    expect(defects).toEqual([
+      'harness_green_main: pull-request-checks.yml does not carry the schedule event',
+    ]);
+  });
+
+  it('flags an excluded job the workflow does not define and a missing workflow file', () => {
+    expect(
+      harnessPopulationDefects('harness_performance', {
+        ...devaiPopulation(10),
+        excludedJobs: [{ workflow: 'release.yml', job: 'no-such-job' }],
+      }),
+    ).toEqual(['harness_performance: release.yml defines no job no-such-job']);
+    expect(
+      harnessPopulationDefects('harness_robustness', { ...devaiPopulation(20), workflow: 'absent.yml' }),
+    ).toEqual(['harness_robustness: workflow absent.yml does not exist']);
+  });
+
+  for (const key of ['workflow', 'event', 'minimumSample'] as const) {
+    for (const kind of POPULATION_KINDS) {
+      it(`rejects a ${kind} declaration that omits ${key}, in the schema and the contract`, () => {
+        const { [key]: _omitted, ...rest } = devaiPopulation(20);
+        void _omitted;
+        expect(valid({ schemaVersion: '1.0.0', inputs: { [kind]: rest } })).toBe(false);
+        expect(harnessPopulationDefects(kind, rest)).toContain(`${kind}: ${key} is required`);
+      });
+    }
+  }
+
+  const populationRefused: readonly (readonly [string, Record<string, unknown>])[] = [
+    ['an event outside the closed set', { ...devaiPopulation(20), event: 'issues' }],
+    ['a workflow with a directory', { ...devaiPopulation(20), workflow: '.github/ci.yml' }],
+    ['a workflow that is not a yml file', { ...devaiPopulation(20), workflow: 'ci.txt' }],
+    ['a zero minimum sample', { ...devaiPopulation(20), minimumSample: 0 }],
+    ['a lookback of zero days', { ...devaiPopulation(20), lookbackDays: 0 }],
+    ['a lookback beyond a year', { ...devaiPopulation(20), lookbackDays: 366 }],
+    ['attempts other than last or all', { ...devaiPopulation(20), attempts: 'first' }],
+    ['a head branch with a parent segment', { ...devaiPopulation(20), headBranch: 'a/../b' }],
+    ['a head branch with a leading hyphen', { ...devaiPopulation(20), headBranch: '-x' }],
+    ['a base branch of *', { ...devaiPopulation(20), baseBranch: '*' }],
+    ['an undeclared population key', { ...devaiPopulation(20), branch: 'main' }],
+    [
+      'an excluded job with no job key',
+      { ...devaiPopulation(20), excludedJobs: [{ workflow: 'release.yml' }] },
+    ],
+    [
+      'a duplicate excluded pair',
+      {
+        ...devaiPopulation(20),
+        excludedJobs: [
+          { workflow: 'release.yml', job: 'build-release' },
+          { workflow: 'release.yml', job: 'build-release' },
+        ],
+      },
+    ],
+  ];
+
+  for (const [label, population] of populationRefused) {
+    it(`refuses ${label}`, () => {
+      expect(valid({ schemaVersion: '1.0.0', inputs: { harness_green_main: population } })).toBe(
+        false,
+      );
+    });
+  }
+
+  it('accepts the minimal population of workflow, event, and minimum sample', () => {
+    for (const kind of POPULATION_KINDS) {
+      expect(
+        valid({
+          schemaVersion: '1.0.0',
+          inputs: {
+            [kind]: { workflow: 'ci.yml', event: 'push', minimumSample: 5 },
+          },
+        }),
+      ).toBe(true);
+    }
+  });
 });
