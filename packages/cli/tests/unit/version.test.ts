@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -10,6 +11,30 @@ const ROOT = resolve(import.meta.dirname, '../../../..');
 const CANDIDATE_RELEASE_VERSION = '1.8.0';
 const PUBLISHED_RELEASE_VERSION = '1.5.4';
 const TRUSTED_VERIFIER_PACKAGE_VERSION = '1.5.4';
+const VENDORED_PROVENANCE = 'packages/cli/vendor/evidence-verification/provenance.json';
+// The verifier inside the published 1.5.4 package that the law policy trusts (step 4 pin).
+const TRUSTED_VERIFIER = {
+  sourceCommit: '8174749ebcfabab246031281a036032f636b8a39',
+  provenanceSha256: '1035c8aad52f4b2beb6a6f010106a4d1866c92dadf3fbae1c6e36e1a4d2ceddf',
+} as const;
+// The in-repository vendored copy, re-vendored at step 2 for ADR-REL-0031.
+const VENDORED_VERIFIER = {
+  sourceCommit: '8b215d706a828af7361f9c6799b9cb0a30c9d00b',
+  provenanceSha256: '302161f378e54d0a2b14b743a68577f4bfc43a147a1f17568941e08e14e767a0',
+  payloadFileCount: 26,
+} as const;
+
+function sha256(bytes: Buffer): string {
+  return createHash('sha256').update(bytes).digest('hex');
+}
+
+function gitBytes(args: readonly string[]): Buffer {
+  return execFileSync('git', ['-C', ROOT, ...args], { maxBuffer: 16 * 1024 * 1024 });
+}
+
+function git(args: readonly string[]): string {
+  return gitBytes(args).toString('utf8').trim();
+}
 
 describe('resolveCliVersion', () => {
   it('returns a semver-shaped string', () => {
@@ -100,44 +125,89 @@ describe('resolveCliVersion', () => {
     ).toContain(`@aarusso-nyx/devai@${TRUSTED_VERIFIER_PACKAGE_VERSION}`);
   });
 
-  it('binds the candidate verifier bytes to the exact trusted 1.5.4 provider policy', () => {
+  it('binds the trusted verifier pin to the published 1.5.4 package, not to the vendored copy', () => {
     const policy = JSON.parse(
       readFileSync(join(ROOT, 'law/policy/trusted-local-rc-verifier-package.json'), 'utf8'),
     ) as {
       package: {
         version: string;
-        release_source: { commit: string; tree: string };
+        release_source: { repository: string; commit: string; tree: string };
       };
       verifier: {
         provenance_sha256: string;
         source_commit: string;
         payload_file_count: number;
       };
+      repin: { rule: string; order: string[] };
     };
+    expect(policy.package.version).toBe(TRUSTED_VERIFIER_PACKAGE_VERSION);
     expect(policy.package.release_source).toEqual({
       repository: 'aarusso-nyx/devai',
       commit: '8b600ed16ebd101ff88ecfaac9cc04abcf0ce174',
       tree: 'd2f60e0602ffc849e9b5b1b52ca54731eca7c8b1',
     });
-    const provenanceBytes = readFileSync(
-      join(ROOT, 'packages/cli/vendor/evidence-verification/provenance.json'),
-    );
-    const provenance = JSON.parse(provenanceBytes.toString('utf8')) as {
-      schemaVersion: string;
+    // The trusted identity is read from the published release's own vendored provenance,
+    // at the release-source commit the policy pins, never from the working tree.
+    const releaseCommit = policy.package.release_source.commit;
+    expect(git(['rev-parse', `${releaseCommit}^{tree}`])).toBe(policy.package.release_source.tree);
+    const trustedBytes = gitBytes(['show', `${releaseCommit}:${VENDORED_PROVENANCE}`]);
+    const trusted = JSON.parse(trustedBytes.toString('utf8')) as {
       sourceCommit: string;
       files: unknown[];
     };
-    const candidateProvenanceSha256 = createHash('sha256').update(provenanceBytes).digest('hex');
-    expect(candidateProvenanceSha256).toBe(
-      '1035c8aad52f4b2beb6a6f010106a4d1866c92dadf3fbae1c6e36e1a4d2ceddf',
-    );
+    expect(sha256(trustedBytes)).toBe(TRUSTED_VERIFIER.provenanceSha256);
+    expect(trusted.sourceCommit).toBe(TRUSTED_VERIFIER.sourceCommit);
+    expect(policy.verifier.provenance_sha256).toBe(sha256(trustedBytes));
+    expect(policy.verifier.source_commit).toBe(trusted.sourceCommit);
+    expect(policy.verifier.payload_file_count).toBe(trusted.files.length);
+  });
+
+  it('binds the vendored verifier copy to its own provenance manifest', () => {
+    const root = join(ROOT, 'packages/cli/vendor/evidence-verification');
+    const provenanceBytes = readFileSync(join(ROOT, VENDORED_PROVENANCE));
+    const provenance = JSON.parse(provenanceBytes.toString('utf8')) as {
+      schemaVersion: string;
+      sourceCommit: string;
+      files: Array<{ path: string; sha256: string }>;
+    };
     expect(provenance).toMatchObject({
       schemaVersion: '1.0.0',
-      sourceCommit: '8174749ebcfabab246031281a036032f636b8a39',
+      sourceCommit: VENDORED_VERIFIER.sourceCommit,
     });
-    expect(provenance.files).toHaveLength(policy.verifier.payload_file_count);
-    expect(candidateProvenanceSha256).toBe(policy.verifier.provenance_sha256);
-    expect(provenance.sourceCommit).toBe(policy.verifier.source_commit);
+    expect(sha256(provenanceBytes)).toBe(VENDORED_VERIFIER.provenanceSha256);
+    expect(provenance.files).toHaveLength(VENDORED_VERIFIER.payloadFileCount);
+    for (const entry of provenance.files) {
+      expect(sha256(readFileSync(join(root, entry.path))), entry.path).toBe(entry.sha256);
+    }
+  });
+
+  it('keeps the trusted pin one published release behind the vendored copy until the repin', () => {
+    // Repin order (ADR-REL-0031, release-discipline.md): the vendored copy is rewritten at
+    // step 2, a release ships it under the still-pinned verifier at step 3, and only a
+    // law(release) change at step 4 moves the trusted pin. Between steps 2 and 4 the two
+    // identities differ by design; step 4 restates TRUSTED_VERIFIER here.
+    const policy = JSON.parse(
+      readFileSync(join(ROOT, 'law/policy/trusted-local-rc-verifier-package.json'), 'utf8'),
+    ) as {
+      verifier: { provenance_sha256: string; source_commit: string };
+      repin: { rule: string; order: string[]; partial_repin: boolean };
+    };
+    expect(policy.repin.rule).toBe(
+      'trusted-verifier-trails-vendored-copy-by-one-published-release',
+    );
+    expect(policy.repin.order).toEqual([
+      'canonical-verifier-source-change-with-tests',
+      'vendored-copy-rewritten-with-new-provenance-and-in-repository-restatements',
+      'release-published-under-current-pin',
+      'law-repin-from-published-release',
+    ]);
+    expect(policy.repin.partial_repin).toBe(false);
+    expect(policy.verifier.provenance_sha256).toBe(TRUSTED_VERIFIER.provenanceSha256);
+    expect(policy.verifier.source_commit).toBe(TRUSTED_VERIFIER.sourceCommit);
+    const vendoredBytes = readFileSync(join(ROOT, VENDORED_PROVENANCE));
+    expect(sha256(vendoredBytes)).toBe(VENDORED_VERIFIER.provenanceSha256);
+    expect(VENDORED_VERIFIER.provenanceSha256).not.toBe(TRUSTED_VERIFIER.provenanceSha256);
+    expect(VENDORED_VERIFIER.sourceCommit).not.toBe(TRUSTED_VERIFIER.sourceCommit);
   });
 });
 

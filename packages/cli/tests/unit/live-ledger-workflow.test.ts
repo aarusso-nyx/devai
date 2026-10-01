@@ -162,19 +162,31 @@ function executablePackageMaterializationFixture(
   mkdirSync(mockBin, { recursive: true });
   // Repack the exact policy-selected verifier payload for mocked registry I/O.
   // The generated workflow independently binds the real registry tarball to
-  // the same release commit/tree, SHA-1, SRI, and provenance digest.
+  // the same release commit/tree, SHA-1, SRI, and provenance digest. The payload
+  // is the published package's verifier, read at the pinned release-source
+  // commit: the in-repository vendored copy runs one published release ahead of
+  // the trusted pin between repin steps 2 and 4 (ADR-REL-0031), so it is never
+  // the trusted payload.
   const publishedArchive = join(root, 'published-verifier.tar');
+  expect(
+    execFileSync(
+      'git',
+      ['-C', ROOT, 'rev-parse', `${VERIFIER_POLICY.package.release_source.commit}^{tree}`],
+      { encoding: 'utf8' },
+    ).trim(),
+  ).toBe(VERIFIER_POLICY.package.release_source.tree);
   execFileSync(
-    'tar',
+    'git',
     [
-      '-cf',
-      publishedArchive,
-      '--format=ustar',
       '-C',
       ROOT,
+      'archive',
+      '--format=tar',
+      `--output=${publishedArchive}`,
+      VERIFIER_POLICY.package.release_source.commit,
       'packages/cli/vendor/evidence-verification',
     ],
-    { cwd: root, env: { ...process.env, COPYFILE_DISABLE: '1' } },
+    { cwd: root },
   );
   execFileSync(
     'tar',
