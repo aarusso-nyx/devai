@@ -168,7 +168,7 @@
                 "sha256": "66b3991418f5a1736e8d8257b36ae412134cc6d5496d90ddc8a7813b5dee814a"
               },
               "pull_request": null,
-              "merged_as": "009e7fd071b6f9edac127517fdb75b6c3c2fe749",
+              "merged_as": "6f042f89a25e6695fe829b4aa37b696a29976b12",
               "execution": {
                 "tier": "architect",
                 "effort": "high",
@@ -263,7 +263,7 @@
                 "sha256": "25086cf8be29922dcd3e4c294ae18307d9a1a39ba4ae7e8318faee4613940d43"
               },
               "pull_request": null,
-              "merged_as": "009e7fd071b6f9edac127517fdb75b6c3c2fe749",
+              "merged_as": "6f042f89a25e6695fe829b4aa37b696a29976b12",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -360,7 +360,7 @@
                 "sha256": "15ea2381733c74b590c330f4bf0f4a4e034cc936808026c6a67f92f42c2dd42d"
               },
               "pull_request": null,
-              "merged_as": "009e7fd071b6f9edac127517fdb75b6c3c2fe749",
+              "merged_as": "6f042f89a25e6695fe829b4aa37b696a29976b12",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -410,7 +410,7 @@
         }
       ],
       "closure": {
-        "merged_head": "009e7fd071b6f9edac127517fdb75b6c3c2fe749",
+        "merged_head": "6f042f89a25e6695fe829b4aa37b696a29976b12",
         "closed_at": "2026-09-30T15:29:11Z",
         "task_policy_digest": null,
         "phase_closure": null
@@ -500,7 +500,7 @@
                 "sha256": "46b150ff85053337601521736c832bda963038e1e3b0c1acd38d15289cec82a6"
               },
               "pull_request": null,
-              "merged_as": "a22269caab3b89d55c4f80668950f2964722b81a",
+              "merged_as": "db218ee3502190f19e352f485483c5925331c39f",
               "execution": {
                 "tier": "architect",
                 "effort": "high",
@@ -595,7 +595,7 @@
                 "sha256": "75cc26132fc4a55cfe1edbc1d2e3ab51cfb430886ef0542838dba21bfef5629a"
               },
               "pull_request": null,
-              "merged_as": "a22269caab3b89d55c4f80668950f2964722b81a",
+              "merged_as": "db218ee3502190f19e352f485483c5925331c39f",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -700,7 +700,7 @@
                 "sha256": "34092b8a3d8fe5d34e3e3d573bc03279d769452694b84a08ff90eb8ca2a67252"
               },
               "pull_request": null,
-              "merged_as": "a22269caab3b89d55c4f80668950f2964722b81a",
+              "merged_as": "db218ee3502190f19e352f485483c5925331c39f",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -750,7 +750,7 @@
         }
       ],
       "closure": {
-        "merged_head": "a22269caab3b89d55c4f80668950f2964722b81a",
+        "merged_head": "db218ee3502190f19e352f485483c5925331c39f",
         "closed_at": "2026-09-30T16:27:57Z",
         "task_policy_digest": null,
         "phase_closure": null
@@ -827,7 +827,7 @@
                 "sha256": "b8aa983bed94cb737ea49017deeefacebf3536d91069e7a7bcef93557613311e"
               },
               "pull_request": null,
-              "merged_as": "ef9d59a477cc613bb61155642df7f0edda966013",
+              "merged_as": "b3e755cb0a4f77e8c4a0cce2c12ae445e159039d",
               "execution": {
                 "tier": "architect",
                 "effort": "medium",
@@ -917,7 +917,7 @@
                 "sha256": "98320712acd52d4917699844169be74267822c957693b45d61b6dcd4e0d5da3b"
               },
               "pull_request": null,
-              "merged_as": "ef9d59a477cc613bb61155642df7f0edda966013",
+              "merged_as": "b3e755cb0a4f77e8c4a0cce2c12ae445e159039d",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -1015,7 +1015,7 @@
                 "sha256": "ad1cdd9cfd0912f1733c8e2b0dcde2a98e6618b99ad2403b8d46de7b690626b8"
               },
               "pull_request": null,
-              "merged_as": "ef9d59a477cc613bb61155642df7f0edda966013",
+              "merged_as": "b3e755cb0a4f77e8c4a0cce2c12ae445e159039d",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -1120,7 +1120,7 @@
                 "sha256": "05b7301d9ebadd4345c42f974a017a283632fa0caaa865ba7a11b90003ea3c08"
               },
               "pull_request": null,
-              "merged_as": "e5e54277839b83c4c09b7ca6c25a647b59187868",
+              "merged_as": "b16b2124f78c3f859da7ad0f4c2f346d24eb34d6",
               "execution": {
                 "tier": "architect",
                 "effort": "medium",
@@ -1218,7 +1218,7 @@
                 "sha256": "72a38779c2a2b17a5e812ef43642d9550a43f70e2d4bd7ab31daad09a79715f8"
               },
               "pull_request": null,
-              "merged_as": "e5e54277839b83c4c09b7ca6c25a647b59187868",
+              "merged_as": "b16b2124f78c3f859da7ad0f4c2f346d24eb34d6",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -1323,7 +1323,7 @@
                 "sha256": "adc631bc2c65fa88a973c93b2bde895c6585732a65a39b96d83b023f0c08df20"
               },
               "pull_request": null,
-              "merged_as": "e5e54277839b83c4c09b7ca6c25a647b59187868",
+              "merged_as": "b16b2124f78c3f859da7ad0f4c2f346d24eb34d6",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
