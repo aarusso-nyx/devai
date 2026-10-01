@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://devai.nyxk.com.br/schemas/sensor-inputs.schema.json",
   "title": "Sensor inputs declaration",
-  "description": "One adopter-owned declaration of the inputs its sensors read and the plant surfaces it has, materialized at .devai/config/sensor-inputs.json from the law default under law/policy/adopter-defaults/sensor-inputs.json (ADR-SCR-0005, ADR-SCR-0003). Every entry under inputs is keyed by a registered sensor kind from law/policy/sensor-registry.json and carries only the inputs that kind reads: test roots, the decision record directory, the invariants directory, the coverage report path, the effects tsconfig path, the type check argv, the unit, integration, and end-to-end suite argv, the performance suite argv or legacy script name, the build argv and optional working directory, the reusable-workflow threshold, and the plant depth exclusion globs. A kind that declares nothing keeps the sensor's own default; the build input is admitted only when test-tasks.json has no build node, and a build declaration whose argv differs from that node reads error with BUILD_ARGV_CONFLICT (ADR-AUT-0002); sense run refuses a key this schema does not list, a kind the registry does not hold, and a path that leaves the repository root, and merges an explicit --input for the same key over the declaration for one run only. The surfaces object names which of the four plant surfaces the repository has (http, database, rbac, actions), each true or false; a sensor bound only to surfaces declared absent emits a skipped reading carrying the declaration as its reason, the scorecard composer records a cell whose readings are all skipped as N/A with that reason, and a sensor that finds a surface declared absent reports review. Declaring an input never changes a threshold or a verdict rule.",
+  "description": "One adopter-owned declaration of the inputs its sensors read and the plant surfaces it has, materialized at .devai/config/sensor-inputs.json from the law default under law/policy/adopter-defaults/sensor-inputs.json (ADR-SCR-0005, ADR-SCR-0003). Every entry under inputs is keyed by a registered sensor kind from law/policy/sensor-registry.json and carries only the inputs that kind reads: test roots, the decision record directory, the invariants directory, the coverage report path with its measured population and exclusion list (ADR-SCR-0007), the effects tsconfig path, the type check argv, the unit, integration, and end-to-end suite argv, the performance suite argv or legacy script name, the build argv and optional working directory, the reusable-workflow threshold, and the plant depth exclusion globs. A kind that declares nothing keeps the sensor's own default; the build input is admitted only when test-tasks.json has no build node, and a build declaration whose argv differs from that node reads error with BUILD_ARGV_CONFLICT (ADR-AUT-0002); sense run refuses a key this schema does not list, a kind the registry does not hold, and a path that leaves the repository root, and merges an explicit --input for the same key over the declaration for one run only. The surfaces object names which of the four plant surfaces the repository has (http, database, rbac, actions), each true or false; a sensor bound only to surfaces declared absent emits a skipped reading carrying the declaration as its reason, the scorecard composer records a cell whose readings are all skipped as N/A with that reason, and a sensor that finds a surface declared absent reports review. Declaring an input never changes a threshold or a verdict rule.",
   "schema_version": "1.0.0",
   "type": "object",
   "additionalProperties": false,
@@ -79,7 +79,20 @@
       "properties": {
         "coveragePath": {
           "$ref": "#/$defs/repository_path",
-          "description": "Istanbul per-file coverage report (coverage-final.json shape) the sensor normalizes, instead of the sensor default of coverage/coverage-final.json."
+          "description": "Istanbul per-file coverage report (coverage-final.json shape) the sensor normalizes, instead of the sensor default of coverage/coverage-final.json. When the report is absent the sensor runs the declared producer for the population and reads the report it writes; a producer that exits non-zero reads FAIL with its exit code, and a report still missing after a zero exit reads FAIL with COVERAGE_REPORT_MISSING (ADR-SCR-0007)."
+        },
+        "population": {
+          "type": "string",
+          "enum": ["local", "rc"],
+          "description": "Name of the test population the report measures (ADR-SCR-0007): local is the LOCAL_INCLUDE population produced by tests/config/local.coverage.config.ts without a database; rc is the full population the RC coverage gate produces behind DEVAI_DB_TESTS. The producer writes a population.json sidecar beside the report naming its population, include globs, excluded suites, and measured file count; the sensor refuses a report whose sidecar names another population, so a stale report of one population is never read as the measurement of another, and every reading states the population it measured in metrics and in its finding text."
+        },
+        "exclusions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/repository_path"
+          },
+          "description": "Repository-relative test files the declared population leaves out, named one by one (ADR-SCR-0007): for the local population, the RC-only and database-bound suites that tests/config/local.config.ts lists as RC_ONLY. The sensor refuses a report whose sidecar lists a different exclusion set with the mismatch named. Declaring an exclusion changes the denominator the reading states, never a threshold."
         }
       }
     },
@@ -112,7 +125,7 @@
       "properties": {
         "argv": {
           "$ref": "#/$defs/argv",
-          "description": "Test suite command the sensor executes, without a shell, and grades by exit code and the vitest summary line, instead of the sensor default of pnpm vitest run --config tests/config/t1.unit.config.ts, t3.integration.config.ts, or t5.e2e.config.ts for the unit, integration, or end-to-end suite."
+          "description": "Test suite command the sensor executes, without a shell, and grades by exit code and the vitest summary line, instead of the sensor default of pnpm vitest run --config tests/config/t1.unit.config.ts, t3.integration.config.ts, or t5.e2e.config.ts for the unit, integration, or end-to-end suite. Under sense run the broker admits only the governed shape of template pnpm-vitest-run-governed-config in law/policy/subprocess-effects.json; the framework's e2e_test declares tests/config/rc.e2e.config.ts, whose own include selects tests/e2e, with no test path appended (ADR-SCR-0007)."
         }
       }
     },
@@ -284,13 +297,18 @@
           "adrDir": "law/adr"
         },
         "test_coverage_depth": {
-          "coveragePath": "scratch/coverage/rc/coverage-final.json"
+          "coveragePath": "scratch/coverage/local/coverage-final.json",
+          "population": "local",
+          "exclusions": ["tests/integration/authority-effect-postgres.db.test.ts"]
         },
         "action_effect_inference": {
           "tsconfigPath": "tests/config/tsconfig.effects.json"
         },
         "type_check": {
           "argv": ["pnpm", "run", "typecheck"]
+        },
+        "e2e_test": {
+          "argv": ["pnpm", "vitest", "run", "--config", "tests/config/rc.e2e.config.ts"]
         },
         "perf_test": {
           "argv": [
