@@ -6,9 +6,17 @@
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  cpSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join, relative, resolve } from 'node:path';
 import type { CAC } from '../../node_modules/cac/dist/index.d.ts';
 import { afterEach, describe, expect, it } from 'vitest';
 import { loadChain, saveChain } from '../../../evidence/src/evidence/chain.js';
@@ -110,25 +118,46 @@ async function captureInvocation(run: () => Promise<void>): Promise<InvocationRe
   }
 }
 
-async function invoke(definition: Definition, argv: readonly string[]): Promise<InvocationResult> {
+/**
+ * Runs one facade. `--write` consent is appended after parsing, as the command router does: it
+ * strips `--write` before the command parses and the facade reads it from `process.argv`.
+ */
+async function invoke(
+  definition: Definition,
+  argv: readonly string[],
+  options: { readonly writeConsent?: boolean } = {},
+): Promise<InvocationResult> {
   const cli = cac('devai-evidence-verify-anchors');
   definition.register(cli);
   return captureInvocation(async () => {
     process.argv = ['node', 'devai', ...argv];
     cli.parse(process.argv, { run: false });
+    if (options.writeConsent === true) process.argv.push('--write');
     await withAuthorityHostTestScope(() => cli.runMatchedCommand());
   });
 }
 
+const VERIFY_CHAIN = ['evidence-verify', '--scope', 'chain', '--repo-root'] as const;
+
+/** A read-only verification: it never writes the baseline. */
 function verifyChain(repo: string, ...extra: string[]): Promise<InvocationResult> {
-  return invoke(evidenceVerify, [
-    'evidence-verify',
-    '--scope',
-    'chain',
-    '--repo-root',
-    repo,
-    ...extra,
-  ]);
+  return invoke(evidenceVerify, [...VERIFY_CHAIN, repo, ...extra]);
+}
+
+/** A verification with `--write` consent: the first one writes the baseline, later ones append. */
+function verifyChainWriting(repo: string, ...extra: string[]): Promise<InvocationResult> {
+  return invoke(evidenceVerify, [...VERIFY_CHAIN, repo, ...extra], { writeConsent: true });
+}
+
+/** Every file under the repository with its bytes, to prove that a run wrote nothing. */
+function snapshot(repo: string): Record<string, string> {
+  const files: Record<string, string> = {};
+  for (const entry of readdirSync(repo, { recursive: true, withFileTypes: true })) {
+    if (!entry.isFile()) continue;
+    const path = join(entry.parentPath, entry.name);
+    files[relative(repo, path)] = readFileSync(path).toString('base64');
+  }
+  return files;
 }
 
 function record(
@@ -211,8 +240,21 @@ describe('IA-001 evidence verify --scope chain over the DETRAN baseline', () => 
     const orphans = contractOrphans();
     expect(orphans).toHaveLength(52);
 
-    const before = await verifyChain(repo);
+    // Without a baseline and without --write: PROOF_ANCHOR_BASELINE_MISSING, and nothing written.
+    const untouched = snapshot(repo);
+    const missing = await verifyChain(repo);
+    expect(missing.exit).toBe(2);
+    expect(missing.stderr).toContain('PROOF_ANCHOR_BASELINE_MISSING');
+    expect(missing.stderr).toContain('--write');
+    expect(missing.stdout).not.toMatch(/"valid":\s*true/u);
+    expect(missing.stdout).not.toContain('evidence chain: valid');
+    expect(existsSync(join(repo, BASELINE))).toBe(false);
+    expect(snapshot(repo)).toEqual(untouched);
+
+    // With --write consent: the baseline is written and the 52 orphans fail the verification.
+    const before = await verifyChainWriting(repo);
     expect(before.exit).toBe(2);
+    expect(before.stderr).not.toContain('PROOF_ANCHOR_BASELINE_MISSING');
     for (const orphan of orphans) {
       expect(names(before.stderr, ref(orphan.path, orphan.sequence))).toBe(true);
     }
@@ -250,7 +292,7 @@ describe('IA-001 evidence verify --scope chain over the DETRAN baseline', () => 
       proof_sha256: lineDigest(repo, declarationPath, 1),
     });
 
-    const after = await verifyChain(repo);
+    const after = await verifyChainWriting(repo);
     expect(after, after.stderr).toMatchObject({ exit: 0, stderr: '' });
     const result = receipt(after);
     expect(result).toMatchObject({ scope: 'chain', valid: true, errors: [] });
@@ -263,9 +305,12 @@ describe('IA-001 evidence verify --scope chain over the DETRAN baseline', () => 
     expect(result.lines.filter((line) => line.label === 'anchored')).toHaveLength(68);
     expect(result.declarations).toEqual([expect.objectContaining({ status: 'accepted' })]);
 
+    // Later verifications are reads against the baseline and keep reporting the gap.
+    const settled = snapshot(repo);
     const human = await verifyChain(repo, '--human');
     expect(human).toMatchObject({ exit: 0, stderr: '' });
     expect(human.stdout).toContain(ACKNOWLEDGED);
+    expect(snapshot(repo)).toEqual(settled);
   });
 });
 
@@ -278,7 +323,7 @@ describe('IA-002 the cryptographic chain checks are unchanged', () => {
     if (victim === undefined) throw new Error('fixture chain is shorter than 50 records');
     victim.previous_run_hash = '0'.repeat(64);
     await withAuthorityHostTestScope(() => saveChain(chainPath, chain));
-    const result = await verifyChain(repo);
+    const result = await verifyChainWriting(repo);
     expect(result.exit).toBe(2);
     expect(result.stderr).toContain('previous_run_hash mismatch');
   });
@@ -298,11 +343,32 @@ describe('new anchors recorded through evidence record', () => {
       [path, 1, lineDigest(repo, path, 1)],
       [path, 2, lineDigest(repo, path, 2)],
     ]);
-    const first = await verifyChain(repo);
+    const first = await verifyChainWriting(repo);
     expect(first, first.stderr).toMatchObject({ exit: 0, stderr: '' });
     expect(receipt(first)).toMatchObject({ scope: 'chain', valid: true, errors: [] });
     expect(existsSync(join(repo, BASELINE))).toBe(true);
+    const written = snapshot(repo);
     expect(await verifyChain(repo)).toMatchObject({ exit: 0, stderr: '' });
+    expect(snapshot(repo)).toEqual(written);
+  });
+});
+
+describe('the gated baseline write', () => {
+  it('fails PROOF_ANCHOR_BASELINE_MISSING without --write even for a fully anchored chain', async () => {
+    const repo = tempRoot();
+    expect(await record(repo, 'generic', 'R-0001', { note: 'one' })).toMatchObject({ exit: 0 });
+    const before = snapshot(repo);
+    for (const extra of [[], ['--human'], ['--show-head']]) {
+      const result = await verifyChain(repo, ...extra);
+      expect(result.exit).toBe(2);
+      expect(result.stderr).toContain('PROOF_ANCHOR_BASELINE_MISSING');
+      expect(result.stderr).toContain('--write');
+      expect(result.stdout).not.toContain('evidence chain: valid');
+      expect(result.stdout).not.toMatch(/"valid":\s*true/u);
+    }
+    expect(snapshot(repo)).toEqual(before);
+    expect(await verifyChainWriting(repo)).toMatchObject({ exit: 0, stderr: '' });
+    expect(existsSync(join(repo, BASELINE))).toBe(true);
   });
 });
 
@@ -319,7 +385,7 @@ describe('IA-004 crash recovery through the public verifier', () => {
         payload: { note: 'two' },
       }),
     );
-    const result = await verifyChain(repo);
+    const result = await verifyChainWriting(repo);
     expect(result.exit).toBe(2);
     expect(result.stderr).toContain('UNANCHORED_NEWEST_LINE');
     expect(names(result.stderr, ref(epochPath('generic', 'R-0004'), 2))).toBe(true);
@@ -334,7 +400,7 @@ describe('the verifier refuses a working tree that modified recorded history', (
     for (const note of ['one', 'two']) {
       expect(await record(repo, 'generic', 'R-0001', { note })).toMatchObject({ exit: 0 });
     }
-    expect(await verifyChain(repo)).toMatchObject({ exit: 0 });
+    expect(await verifyChainWriting(repo)).toMatchObject({ exit: 0 });
     git(repo, ['add', 'record']);
     git(repo, ['commit', '-qm', 'recorded history']);
     return repo;
@@ -344,11 +410,12 @@ describe('the verifier refuses a working tree that modified recorded history', (
     const repo = await committedRepository();
     const path = join(repo, epochPath('generic', 'R-0001'));
     writeFileSync(path, readFileSync(path, 'utf8').replace('"one"', '"uno"'));
-    const baseline = readFileSync(join(repo, BASELINE), 'utf8');
-    const result = await verifyChain(repo);
+    const before = snapshot(repo);
+    // Even with --write consent, a refused verification writes nothing.
+    const result = await verifyChainWriting(repo);
     expect(result.exit).toBe(2);
     expect(result.stderr).toContain('PROOF_HISTORY_MODIFIED');
-    expect(readFileSync(join(repo, BASELINE), 'utf8')).toBe(baseline);
+    expect(snapshot(repo)).toEqual(before);
   });
 
   it('refuses when an old chain entry changed outside its manifest hash', async () => {
@@ -367,7 +434,7 @@ describe('the verifier refuses a working tree that modified recorded history', (
   it('does not refuse an append through evidence record', async () => {
     const repo = await committedRepository();
     expect(await record(repo, 'generic', 'R-0001', { note: 'three' })).toMatchObject({ exit: 0 });
-    const result = await verifyChain(repo);
+    const result = await verifyChainWriting(repo);
     expect(result.stderr).not.toContain('PROOF_HISTORY_MODIFIED');
     expect(result).toMatchObject({ exit: 0, stderr: '' });
   });
