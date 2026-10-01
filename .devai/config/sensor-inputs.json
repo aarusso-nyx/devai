@@ -18,7 +18,14 @@
       "invariantsDir": "law/invariants"
     },
     "test_coverage_depth": {
-      "coveragePath": "scratch/coverage/rc/coverage-final.json"
+      "coveragePath": "scratch/coverage/local/coverage-final.json",
+      "population": "local",
+      "exclusions": [
+        "packages/authority/tests/unit/authority-resource-boundaries.red.test.ts",
+        "packages/skills/tests/recipes/adapters.test.ts",
+        "tests/integration/authority-effect-postgres.db.test.ts",
+        "tests/integration/runtime-probe-data.integration.test.ts"
+      ]
     },
     "action_effect_inference": {
       "tsconfigPath": "tests/config/tsconfig.effects.json"
@@ -47,7 +54,7 @@
       ]
     },
     "e2e_test": {
-      "argv": ["pnpm", "vitest", "run", "--config", "tests/config/local.config.ts", "tests/e2e"]
+      "argv": ["pnpm", "vitest", "run", "--config", "tests/config/rc.e2e.config.ts"]
     },
     "perf_test": {
       "argv": [
