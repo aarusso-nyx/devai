@@ -221,6 +221,27 @@
       ]
     },
     {
+      "page_id": "evidence-render",
+      "planned_path": "docs/reference/cli/evidence-render.md",
+      "title": "evidence render and the rounds index",
+      "purpose": "Specify the rounds kind of evidence render: the closure-row shape, the deterministic order, the rejection rules, the --check mode, the round-narratives kind, the derived-index freshness consequence, and the exact-membership rule round seal applies to record/derived/indexes/rounds.md.",
+      "content_mode": "narrative",
+      "mutable_population_mode": "none",
+      "category_ids": [],
+      "source_refs": [
+        {
+          "path": "law/adr/ADR-EVI-0001-canonical-closure-index.md",
+          "pointer": "#",
+          "projection": "decision, rejections, --check, and exact-membership seal rule as the Owner ruling of 2026-10-01 fixes them"
+        },
+        {
+          "path": "law/schemas/phase-closure.schema.json",
+          "pointer": "#",
+          "projection": "closure fields id, round_id, supersedes, and merged_as that each index row carries"
+        }
+      ]
+    },
+    {
       "page_id": "workflows",
       "planned_path": "docs/dev/operations/workflows/README.md",
       "title": "Workflows",
