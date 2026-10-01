@@ -852,7 +852,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0421",
-              "status": "planned",
+              "status": "in_progress",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -860,7 +860,10 @@
                   "packages/cli/tests/unit/sense-run-set-two-pass.test.ts",
                   "packages/sensors/tests/harness-invariant-alignment-store.test.ts",
                   "packages/skills/tests/unit/observation-backlog-schema.test.ts",
-                  "packages/skills/tests/unit/post-merge-auditor-store-resolution.test.ts"
+                  "packages/skills/tests/unit/post-merge-auditor-store-resolution.test.ts",
+                  "packages/cli/tests/unit/check-schemas-adopter-boundaries.test.ts",
+                  "packages/schemas/tests/contract/schema-roster.test.ts",
+                  "packages/cli/tests/unit/self-dogfood-policy.test.ts"
                 ],
                 "forbidden": [
                   "law/",
@@ -892,14 +895,53 @@
               "commit_types": ["test(cli)", "test(sensors)", "test(skills)"],
               "prompt": {
                 "path": "prompts/TASK-0422.md",
-                "sha256": null
+                "sha256": "4d7f602b2c04201cbeb969c3d6d42ac59ef7982dfab4a739576d917260c7b2d0"
               },
               "pull_request": null,
               "merged_as": null,
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
-                "time_budget_minutes": 120
+                "time_budget_minutes": 120,
+                "resolved": {
+                  "policy_version": "1.0.0",
+                  "pinned_at": "2026-10-01T05:41:57Z",
+                  "tiers": {
+                    "architect": {
+                      "rank": 1,
+                      "hosts": {
+                        "claude": "claude-cli:fable",
+                        "codex": "codex-cli:gpt-6-astra"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker-high": {
+                      "rank": 2,
+                      "hosts": {
+                        "claude": "claude-cli:opus",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "high"
+                    },
+                    "worker": {
+                      "rank": 3,
+                      "hosts": {
+                        "claude": "claude-cli:sonnet",
+                        "codex": "codex-cli:gpt-6-sol"
+                      },
+                      "default_effort": "medium"
+                    },
+                    "clerk": {
+                      "rank": 4,
+                      "hosts": {
+                        "claude": "claude-cli:haiku",
+                        "codex": "codex-cli:gpt-6-luna"
+                      },
+                      "default_effort": "low"
+                    }
+                  },
+                  "ceiling": "architect"
+                }
               }
             },
             {
@@ -926,7 +968,8 @@
                   "packages/loop/src/scorecard/inputs.ts",
                   "packages/skills/src/operations/backlog.ts",
                   "packages/sensors/src/inventory-performance.ts",
-                  "packages/cli/src/commands/sense/readings-rebuild.ts"
+                  "packages/cli/src/commands/sense/readings-rebuild.ts",
+                  "packages/cli/src/services/self-dogfood.ts"
                 ],
                 "forbidden": ["law/", "product/", ".github/workflows/"]
               },
@@ -958,7 +1001,7 @@
               ],
               "prompt": {
                 "path": "prompts/TASK-0423.md",
-                "sha256": null
+                "sha256": "7109a7d97415c448a4d557e64ac937773eaf20c28d015b96af111c6ca2caaab8"
               },
               "pull_request": null,
               "merged_as": null,
