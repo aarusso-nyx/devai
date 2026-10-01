@@ -340,8 +340,12 @@ Read without a role declaration or consent:
 
 ```sh
 devai release status --repo-root . --format json
-devai evidence verify --scope chain --show-head --repo-root . --format json
+devai evidence verify --scope chain --show-head --repo-root .
 ```
+
+`evidence verify` stays a read; adding `--write` authorizes only its one governed write, the
+first anchor-baseline write described in
+[`evidence verify` and proof-line anchoring](./evidence-verify.md#the-baseline).
 
 Inspect a local-write leaf without dispatching it:
 

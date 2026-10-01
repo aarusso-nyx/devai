@@ -23,9 +23,12 @@ devai evidence verify --scope chain --show-head --repo-root .      # also print 
 devai evidence verify --scope chain --repo-root . --write          # first run only: also write the baseline
 ```
 
-`evidence verify` is a read by default (Owner decision of 2026-10-01). It prints a JSON receipt
-on stdout unless `--human` is given. The one write it can perform is the first baseline write,
-and that needs `--write`: see [The baseline](#the-baseline).
+`evidence verify` is a read by default (Owner decision of 2026-10-01), and it stays `read` in the
+[action registry](../../../law/policy/action-registry.json). It prints a JSON receipt on stdout
+unless `--human` is given. The one write it can perform is the first baseline write, and that is
+authorized only by `--write` consent at invocation, gated in the authority layer the same way
+`docs decisions render --out` is, not by a write effect on the action: see
+[The baseline](#the-baseline).
 
 ## What an anchor is
 
@@ -107,10 +110,13 @@ makes the verification fail naming the entry (IA-002). The baseline is a committ
 ### Writing the baseline
 
 Writing the baseline is the one write `evidence verify` performs, and it is gated by write
-consent (Owner decision of 2026-10-01):
+consent (Owner decision of 2026-10-01). The action stays `read` in the registry; the write is
+authorized only by `--write` at invocation, following the `docs decisions render --out`
+precedent:
 
-- Without a baseline and without `--write`, the verification fails with a named failure code
-  whose message names `--write`; nothing is written, and the chain is not reported as valid.
+- Without a baseline and without `--write`, the verification fails with
+  `PROOF_ANCHOR_BASELINE_MISSING`; its message names `--write`, nothing is written, and the
+  chain is not reported as valid.
 - With `--write`, the first verification writes `record/proofs/anchor-baseline.json` with every
   line observed, `cutoff` equal to that verification's timestamp, and each entry's `observed_at`
   equal to the cutoff. Later verifications run as reads against the committed file.
