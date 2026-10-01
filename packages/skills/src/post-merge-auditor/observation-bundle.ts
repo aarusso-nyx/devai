@@ -3,8 +3,12 @@ import { join, relative, sep } from 'node:path';
 import { validators } from '@devai-nyx/schemas';
 import { mkdirSync, renameSync, writeFileSync } from '@devai-nyx/authority';
 import { regenerateInventory } from '@devai-nyx/loop';
-import { assessScorecard, resolveScorecardInputs } from '@devai-nyx/loop';
-import { compileBacklogObservation as compileBacklog } from '../operations/backlog.js';
+import { assessScorecard, resolveScorecardInputs, SENSOR_READINGS_DIR } from '@devai-nyx/loop';
+import {
+  compileObservationBacklog,
+  validateObservationBacklog,
+  type ObservationBacklogObservation,
+} from '../operations/backlog.js';
 import { canonicalSha256, git, gitText, isRecord, sha256, type JsonRecord } from './support.js';
 
 function observationErrorCode(error: unknown): string {
@@ -109,23 +113,21 @@ export function archiveIncompleteObservation(stateRoot: string, mergeSha: string
   renameSync(bundleRoot, archived);
 }
 
-async function compileBacklogObservation(
-  _worktreeRoot: string,
-  scorecard: unknown,
-  _timestamp: string,
-): Promise<JsonRecord> {
-  return compileBacklog(scorecard);
-}
-
-function backlogDelta(current: JsonRecord, previous: JsonRecord | null): JsonRecord {
-  const items = Array.isArray(current['items']) ? current['items'].filter(isRecord) : [];
-  const priorItems = Array.isArray(previous?.['items']) ? previous.items.filter(isRecord) : [];
-  const currentIds = new Set(items.map((item) => String(item['id'])));
-  const priorIds = new Set(priorItems.map((item) => String(item['id'])));
-  return {
-    additions: items.filter((item) => !priorIds.has(String(item['id']))),
-    completions: priorItems.filter((item) => !currentIds.has(String(item['id']))),
-  };
+/**
+ * The observations of the previous bundle's backlog.json, or null when there is no
+ * previous bundle or it predates the observation backlog contract.
+ */
+function previousObservations(
+  stateRoot: string,
+  previousMergeSha: string | null,
+): readonly ObservationBacklogObservation[] | null {
+  if (previousMergeSha === null) return null;
+  const previousPath = join(stateRoot, previousMergeSha, 'backlog.json');
+  if (!existsSync(previousPath)) return null;
+  const parsed: unknown = JSON.parse(readFileSync(previousPath, 'utf8'));
+  return validateObservationBacklog(parsed).ok
+    ? (parsed as { readonly observations: readonly ObservationBacklogObservation[] }).observations
+    : null;
 }
 
 export async function writeBundle(
@@ -137,6 +139,7 @@ export async function writeBundle(
   previousDigest: string | null,
   injectFailure: boolean,
   bundleKey = mergeSha,
+  storeRoot = worktreeRoot,
 ): Promise<string> {
   const bundleRoot = join(stateRoot, bundleKey);
   mkdirSync(bundleRoot, { recursive: true });
@@ -149,29 +152,23 @@ export async function writeBundle(
     });
     // ADR-SCR-0002: one readings store. The observation reads the same
     // readings and N/A ledger as `audit scorecard` through the loop resolver.
+    // ADR-SCR-0008: the store is ignored by git, so the readings resolve from the
+    // bound checkout's store, never from the detached observation worktree.
     const { scorecard, readings } = resolveScorecardInputs({
       repoRoot: worktreeRoot,
-      inputs: undefined,
+      inputs: { readings_dir: join(storeRoot, SENSOR_READINGS_DIR) },
       timestamp,
       integrationHead: mergeSha,
     });
     const assessment = assessScorecard(scorecard, timestamp, 1, readings);
-    const backlogCurrent = await compileBacklogObservation(worktreeRoot, scorecard, timestamp);
-    let previousBacklog: JsonRecord | null = null;
-    if (previousMergeSha !== null) {
-      const previousPath = join(stateRoot, previousMergeSha, 'backlog.json');
-      if (existsSync(previousPath)) {
-        const parsed: unknown = JSON.parse(readFileSync(previousPath, 'utf8'));
-        if (isRecord(parsed) && isRecord(parsed['current'])) previousBacklog = parsed.current;
-      }
-    }
-    const backlog = {
-      schemaVersion: '1.0.0',
-      merge_sha: mergeSha,
-      previous_merge_sha: previousMergeSha,
-      current: backlogCurrent,
-      deltas: backlogDelta(backlogCurrent, previousBacklog),
-    };
+    const backlog = compileObservationBacklog({
+      scorecard,
+      mergeSha,
+      previousMergeSha,
+      generatedAt: timestamp,
+      previous: previousObservations(stateRoot, previousMergeSha),
+    });
+    if (!validateObservationBacklog(backlog).ok) throw new Error('POST_MERGE_BACKLOG_INVALID');
     if (!validators.inventory(inventory)) throw new Error('POST_MERGE_INVENTORY_INVALID');
     if (!validators.scorecard(scorecard)) throw new Error('POST_MERGE_SCORECARD_INVALID');
     if (!validators.assessment(assessment)) throw new Error('POST_MERGE_ASSESSMENT_INVALID');
