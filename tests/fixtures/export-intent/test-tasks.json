@@ -1,0 +1,55 @@
+{
+  "schemaVersion": "1.0.0",
+  "descriptorVersion": "export-intent-fixture-1",
+  "repositoryId": "fixture/repository",
+  "fallbackNodeId": null,
+  "dynamicFallbackSelectors": [],
+  "tasks": [
+    {
+      "nodeId": "prepare",
+      "dependencies": [],
+      "argv": ["node", "-e", "require('node:fs').writeFileSync('../export-ran-a-task', 'prepare')"],
+      "cwd": ".",
+      "runner": "node-test-v1",
+      "inputSelectors": [
+        { "kind": "exact", "pattern": "package.json" },
+        { "kind": "exact", "pattern": "test-tasks.json" }
+      ],
+      "toolchainKeys": ["node"],
+      "allowlistedEnv": [],
+      "outputContract": { "kind": "node-test", "requiredResult": "pass" }
+    },
+    {
+      "nodeId": "unit",
+      "dependencies": ["prepare"],
+      "argv": ["node", "-e", "require('node:fs').writeFileSync('../export-ran-a-task', 'unit')"],
+      "cwd": ".",
+      "runner": "node-test-v1",
+      "inputSelectors": [{ "kind": "prefix", "pattern": "src/" }],
+      "toolchainKeys": ["node"],
+      "allowlistedEnv": [],
+      "outputContract": { "kind": "node-test", "requiredResult": "pass" }
+    },
+    {
+      "nodeId": "docs",
+      "dependencies": [],
+      "argv": ["node", "-e", "require('node:fs').writeFileSync('../export-ran-a-task', 'docs')"],
+      "cwd": ".",
+      "runner": "node-test-v1",
+      "inputSelectors": [{ "kind": "prefix", "pattern": "docs/" }],
+      "toolchainKeys": ["node"],
+      "allowlistedEnv": [],
+      "outputContract": { "kind": "node-test", "requiredResult": "pass" }
+    }
+  ],
+  "profiles": [
+    {
+      "profileId": "affected",
+      "mode": "affected",
+      "requiredNodes": ["prepare"],
+      "eligibleNodes": ["prepare", "unit", "docs"]
+    },
+    { "profileId": "rc", "mode": "fixed", "requiredNodes": ["prepare", "unit"] },
+    { "profileId": "preflight-floor", "mode": "fixed", "requiredNodes": ["prepare"] }
+  ]
+}
