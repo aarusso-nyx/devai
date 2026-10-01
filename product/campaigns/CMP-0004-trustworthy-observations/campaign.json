@@ -1573,7 +1573,12 @@
               "boundary": {
                 "paths": [
                   "docs/dev/operations/release-discipline.md",
-                  "law/policy/trusted-local-rc-verifier-package.json"
+                  "law/policy/trusted-local-rc-verifier-package.json",
+                  "law/adr/ADR-MUT-0013-advance-mutation-evidence-source-to-the-intent-export-verifier.md",
+                  "law/adr/README.md",
+                  "law/policy/adr-validation.json",
+                  "law/policy/mutation-evidence-v2.json",
+                  "law/schemas/mutation-evidence-policy-v2.schema.json"
                 ],
                 "forbidden": [".github/workflows/", "packages/", "tests/"]
               },
@@ -1603,7 +1608,7 @@
               "commit_types": ["docs(operations)", "law(release)"],
               "prompt": {
                 "path": "prompts/TASK-0437.md",
-                "sha256": "82676ca1717986ed1b674d79f5bf65129efa17c0f0835f3dae1495efd9511f20"
+                "sha256": "6ac3299a0ff51f409d4e32e75c1bf2ebca4c5b965f31a0513cdfa73dc4b9f12f"
               },
               "pull_request": null,
               "merged_as": null,
