@@ -59,6 +59,27 @@
       "owner": "architect"
     },
     {
+      "template_id": "gh-api-pages-deployments",
+      "executable": "gh",
+      "argv_shape": [
+        "api",
+        "/repos/<owner>/<repo>/deployments?environment=devai-pages-publication&per_page=100"
+      ],
+      "capabilities": ["proc:gh-read"],
+      "effect": "read",
+      "reason": "The site_drift sensor lists the Pages publication deployments that scripts/process/github-pages-journal.mjs records through the GitHub deployments API (ADR-AUT-0002); the broker admits exactly this shape without a host adapter: <owner>/<repo> is the journal repository the sensor declares, the endpoint and query are the fixed strings written here, the method is the implicit GET, and every option is refused, including --method, -X, -f, -F, --field, --raw-field, --input, --paginate, and --hostname. A gh api argv whose repository differs from the declared journal repository, or whose endpoint is neither this shape nor gh-api-pages-deployment-statuses, is refused although the method is GET.",
+      "owner": "architect"
+    },
+    {
+      "template_id": "gh-api-pages-deployment-statuses",
+      "executable": "gh",
+      "argv_shape": ["api", "/repos/<owner>/<repo>/deployments/<id>/statuses?per_page=100"],
+      "capabilities": ["proc:gh-read"],
+      "effect": "read",
+      "reason": "The site_drift sensor lists the statuses of one Pages publication deployment, the journal's intent and verification record (ADR-AUT-0002); the broker admits exactly this shape without a host adapter: <owner>/<repo> is the journal repository the sensor declares, <id> is a decimal integer deployment id taken from gh-api-pages-deployments, the endpoint and query are the fixed strings written here, the method is the implicit GET, and every option is refused, including --method, -X, -f, -F, --field, --raw-field, --input, --paginate, and --hostname. A non-integer <id> is refused.",
+      "owner": "architect"
+    },
+    {
       "template_id": "git-dynamic-read",
       "executable": "git",
       "argv_shape": ["<dynamic-argv>"],
@@ -255,6 +276,28 @@
       "effect": "read",
       "reason": "Dependency policy requests the read-only audit report.",
       "owner": "architect"
+    },
+    {
+      "template_id": "pnpm-recursive-build",
+      "executable": "pnpm",
+      "argv_shape": ["-r", "build"],
+      "capabilities": ["proc:pnpm-build", "fs:workspace"],
+      "effect": "local-write",
+      "reason": "The build sensor compiles the workspace (ADR-AUT-0002); the compiler writes under the package directories, so the process is a write and never read-only, and recording its reading is an inspector harness-write under the self-dogfood matrix. Under sense run the broker admits exactly this shape without a host adapter. The sensor takes its argv and cwd from the sources argv_precedence lists in that order: a test-tasks.json build node wins, and a build entry in .devai/config/sensor-inputs.json is admitted only when the descriptor has no build node; a declaration whose argv differs from the descriptor node is a declaration defect that the declared-inputs contract test rejects naming both argv and that the sensor reads as error with conflict_code. A declared argv outside this shape is refused before a process starts.",
+      "owner": "architect",
+      "argv_precedence": [
+        {
+          "source": "test-task-descriptor",
+          "path": "test-tasks.json",
+          "rule": "The argv and cwd of the node whose nodeId is build; when the node exists it is the build sensor's command and no declaration may replace it."
+        },
+        {
+          "source": "sensor-inputs-declaration",
+          "path": ".devai/config/sensor-inputs.json",
+          "rule": "The build input's argv and optional cwd; admitted only when test-tasks.json has no build node, which is the adopter case without a descriptor."
+        }
+      ],
+      "conflict_code": "BUILD_ARGV_CONFLICT"
     },
     {
       "template_id": "pnpm-vitest-run-governed-config",
