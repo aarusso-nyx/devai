@@ -21,6 +21,8 @@ import {
   verifyChain,
 } from '#runtime-core';
 import { validators } from '@devai-nyx/schemas';
+import { harnessPopulationInput } from '../sense/adapters.js';
+import { resolveDeclaredSensorInputs } from '../sense/shared.js';
 import {
   senseHarnessPerformance,
   senseHarnessSecurity,
@@ -342,6 +344,23 @@ export function mutationDeprecationReport(): RawExecution {
   };
 }
 
+/**
+ * The harness_performance population exactly as `sense run` resolves it from
+ * .devai/config/sensor-inputs.json (ADR-SCR-0010). A repository that declares none gets
+ * `{ repoRoot }`, which the sensor reads as UNKNOWN (harness-population-undeclared).
+ */
+function declaredHarnessPopulation(repoRoot: string) {
+  const inputs = resolveDeclaredSensorInputs({ repoRoot, sensorKind: 'harness_performance' });
+  if (
+    inputs['workflow'] === undefined &&
+    inputs['event'] === undefined &&
+    inputs['minimumSample'] === undefined
+  ) {
+    return { repoRoot };
+  }
+  return harnessPopulationInput({ repoRoot, inputs });
+}
+
 export function securityPerformanceReport(repoRoot: string): RawExecution {
   const readings: readonly SensorReading[] = [
     senseSecurityScan({ repoRoot }),
@@ -350,7 +369,7 @@ export function securityPerformanceReport(repoRoot: string): RawExecution {
     senseTestSecurityCoverage({ repoRoot }),
     senseTestPerformanceCoverage({ repoRoot }),
     senseInventoryPerformance({ repoRoot }),
-    senseHarnessPerformance({ repoRoot }),
+    senseHarnessPerformance(declaredHarnessPopulation(repoRoot)),
     senseHarnessSecurity({ repoRoot }).reading,
   ];
   const statuses = readings.map((reading) => reading.status);
