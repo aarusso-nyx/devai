@@ -1,6 +1,45 @@
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve, sep } from 'node:path';
 import { parse as parseYaml } from 'yaml';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { parseWorkflow } from '../../src/harness/workflow-parser.js';
+
+// Complete supplied-checkout fixtures; scripts below are parsed, never executed.
+const candidateRoots: string[] = [];
+afterEach(() => {
+  for (const root of candidateRoots.splice(0)) rmSync(root, { recursive: true, force: true });
+});
+function candidateRoot(): string {
+  const root = mkdtempSync(join(tmpdir(), 'devai-parser-candidate-'));
+  candidateRoots.push(root);
+  return root;
+}
+function candidateWrite(root: string, path: string, source: string): void {
+  const target = resolve(root, path);
+  if (!target.startsWith(root + sep)) throw new Error('outside candidate fixture');
+  mkdirSync(dirname(target), { recursive: true });
+  writeFileSync(target, source);
+}
+function candidateWorkflow(command: string): string {
+  return `permissions:\n  contents: read\njobs:\n  inspect:\n    concurrency:\n      group: inspect-${'${{ github.ref }}'}\n      cancel-in-progress: true\n    steps:\n      - run: ${JSON.stringify(command)}\n`;
+}
+function candidateEffect(root: string, source: string): string | undefined {
+  return parseWorkflow(join(root, '.github/workflows/arbitrary.yml'), source, root).jobs[0]?.effect;
+}
+function completeCandidate(root: string): void {
+  candidateWrite(root, 'scripts/process/publish-site.mjs', "import './leaf.mjs';\n");
+  candidateWrite(
+    root,
+    'scripts/process/leaf.mjs',
+    "export const description = 'contained read-only fixture';\n",
+  );
+  candidateWrite(
+    root,
+    '.github/actions/local/action.yml',
+    'name: local\nruns:\n  using: composite\n  steps:\n    - shell: bash\n      run: node scripts/process/publish-site.mjs\n',
+  );
+}
 
 function parse(line: string) {
   return parseWorkflow(
@@ -402,8 +441,10 @@ describe('folded scalar line boundaries', () => {
 // ADR-REL-0034 requires per-job custody/effects with no filename privilege.
 describe('job-scoped effect declarations', () => {
   it('retains independent locks, needs, permissions, environment and run scripts per arbitrary named job', () => {
+    const root = candidateRoot();
+    completeCandidate(root);
     const ast = parseWorkflow(
-      '/repo/.github/workflows/arbitrary.yml',
+      join(root, '.github/workflows/arbitrary.yml'),
       `permissions:
   contents: read
 jobs:
@@ -429,7 +470,7 @@ jobs:
     steps:
       - run: node scripts/process/publish-site.mjs
 `,
-      '/repo',
+      root,
     );
     expect(ast.jobs).toEqual([
       expect.objectContaining({
@@ -453,5 +494,112 @@ jobs:
       }),
     ]);
     expect(ast.hasConcurrencyBlock).toBe(false);
+  });
+});
+
+describe('supplied candidate source provenance (offline analysis)', () => {
+  const direct = candidateWorkflow('node scripts/process/publish-site.mjs');
+  it.each([
+    'missing-direct',
+    'missing-import',
+    'unreadable-direct',
+    'import-cycle',
+    'import-escape',
+    'symlink-escape',
+    'dynamic-import',
+  ])('refuses %s after a complete direct/import positive', (fault) => {
+    const root = candidateRoot();
+    completeCandidate(root);
+    expect(candidateEffect(root, direct)).toBe('read-only');
+    if (fault === 'missing-direct') rmSync(join(root, 'scripts/process/publish-site.mjs'));
+    if (fault === 'missing-import') rmSync(join(root, 'scripts/process/leaf.mjs'));
+    if (fault === 'unreadable-direct') {
+      rmSync(join(root, 'scripts/process/publish-site.mjs'));
+      mkdirSync(join(root, 'scripts/process/publish-site.mjs'));
+    }
+    if (fault === 'import-cycle')
+      candidateWrite(root, 'scripts/process/leaf.mjs', "import './publish-site.mjs';\n");
+    if (fault === 'import-escape')
+      candidateWrite(root, 'scripts/process/leaf.mjs', "import '../../../outside.mjs';\n");
+    if (fault === 'symlink-escape') {
+      const outside = candidateRoot();
+      candidateWrite(outside, 'leaf.mjs', 'export const value = 1;\n');
+      rmSync(join(root, 'scripts/process/leaf.mjs'));
+      symlinkSync(join(outside, 'leaf.mjs'), join(root, 'scripts/process/leaf.mjs'));
+    }
+    if (fault === 'dynamic-import')
+      candidateWrite(
+        root,
+        'scripts/process/leaf.mjs',
+        'await import(process.env.SELECTED_MODULE);\n',
+      );
+    // The sole changed source edge is unresolved; no analyzer checkout may fill it.
+    expect(candidateEffect(root, direct)).toBe('unknown');
+  });
+  it('uses supplied same-path bytes and refuses absent explicit candidate identity', () => {
+    const root = candidateRoot();
+    completeCandidate(root);
+    expect(candidateEffect(root, direct)).toBe('read-only');
+    candidateWrite(
+      root,
+      'scripts/process/leaf.mjs',
+      'fetch("https://example.invalid", {method:"POST"});\n',
+    );
+    expect(candidateEffect(root, direct)).toBe('publication');
+    const other = candidateRoot();
+    completeCandidate(other);
+    expect(candidateEffect(other, direct)).toBe('read-only');
+    expect(
+      parseWorkflow(join(root, '.github/workflows/arbitrary.yml'), direct, '').jobs[0]?.effect,
+    ).toBe('unknown');
+  });
+  it.each([
+    'node -e \'fetch("https://example.invalid", {method:"POST"})\'',
+    'node --eval \'fetch("https://example.invalid")\'',
+    "python -c 'import urllib.request'",
+    "sh -c 'unknown-operation'",
+    'unregistered-tool --write',
+  ])('refuses unbound executable form %s', (command) => {
+    const root = candidateRoot();
+    completeCandidate(root);
+    expect(candidateEffect(root, direct)).toBe('read-only');
+    expect(candidateEffect(root, candidateWorkflow(command))).toBe('unknown');
+  });
+  it('follows concrete local-composite scripts/imports before classifying locks', () => {
+    const root = candidateRoot();
+    completeCandidate(root);
+    const composite = direct.replace(
+      'run: "node scripts/process/publish-site.mjs"',
+      'uses: ./.github/actions/local',
+    );
+    expect(candidateEffect(root, composite)).toBe('read-only');
+    candidateWrite(
+      root,
+      'scripts/process/leaf.mjs',
+      'fetch("https://example.invalid", {method:"POST"});\n',
+    );
+    expect(candidateEffect(root, composite)).toBe('publication');
+    rmSync(join(root, 'scripts/process/leaf.mjs'));
+    expect(candidateEffect(root, composite)).toBe('unknown');
+  });
+  it('follows contained nested local actions and refuses a local action cycle', () => {
+    const root = candidateRoot();
+    completeCandidate(root);
+    candidateWrite(
+      root,
+      '.github/actions/outer/action.yml',
+      'name: outer\nruns:\n  using: composite\n  steps:\n    - uses: ./.github/actions/local\n',
+    );
+    const nested = direct.replace(
+      'run: "node scripts/process/publish-site.mjs"',
+      'uses: ./.github/actions/outer',
+    );
+    expect(candidateEffect(root, nested)).toBe('read-only');
+    candidateWrite(
+      root,
+      '.github/actions/local/action.yml',
+      'name: local\nruns:\n  using: composite\n  steps:\n    - uses: ./.github/actions/outer\n',
+    );
+    expect(candidateEffect(root, nested)).toBe('unknown');
   });
 });

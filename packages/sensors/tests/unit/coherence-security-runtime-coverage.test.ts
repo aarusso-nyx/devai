@@ -339,7 +339,11 @@ describe('senseHarnessCoherence', () => {
     expect(strict.metrics?.incoherence_score).toBe(4);
     expect(strict.metrics?.max_review_incoherence).toBe(3);
 
-    const lenient = senseHarnessCoherence({ repoRoot: root, maxReviewIncoherence: 4, now: NOW });
+    const lenient = senseHarnessCoherence({
+      repoRoot: root,
+      maxReviewIncoherence: 4,
+      now: NOW,
+    });
     expect(lenient.status).toBe('review');
     expect(lenient.metrics?.max_review_incoherence).toBe(4);
 
@@ -352,7 +356,11 @@ describe('senseHarnessCoherence', () => {
     write(root, '.github/workflows/ci.yml', workflow({ concurrency: null }));
     write(root, 'ci/flows/ci.yml', workflow());
 
-    const reading = senseHarnessCoherence({ repoRoot: root, workflowDir: 'ci/flows', now: NOW });
+    const reading = senseHarnessCoherence({
+      repoRoot: root,
+      workflowDir: 'ci/flows',
+      now: NOW,
+    });
 
     expect(reading.status).toBe('pass');
     expect(reading.metrics?.workflow_count).toBe(1);
@@ -596,7 +604,11 @@ describe('senseHarnessSecurity', () => {
     write(root, 'ci/flows/ci.yml', workflow({ permissions: null }));
     const absolute = write(outside, 'flows/ci.yml', workflow());
 
-    const relative = senseHarnessSecurity({ repoRoot: root, workflowDir: 'ci/flows', now: NOW });
+    const relative = senseHarnessSecurity({
+      repoRoot: root,
+      workflowDir: 'ci/flows',
+      now: NOW,
+    });
     expect(relative.reading.status).toBe('review');
     expect(relative.perFile.map((f) => f.file)).toEqual(['ci/flows/ci.yml']);
 
@@ -797,7 +809,11 @@ describe('sensePlantCoherence', () => {
     write(root, 'alpha/src/one-file.ts', 'export const a = 1;\n');
     write(root, 'lib/two-file.ts', 'export const b = 2;\n');
 
-    const leading = sensePlantCoherence({ repoRoot: root, sourceGlobs: ['*/src/**'], now: NOW });
+    const leading = sensePlantCoherence({
+      repoRoot: root,
+      sourceGlobs: ['*/src/**'],
+      now: NOW,
+    });
     expect(leading.status).toBe('pass');
     expect(leading.metrics?.dirs_scanned).toBe(1);
 
@@ -892,6 +908,8 @@ describe('generic publication effect concurrency (offline)', () => {
 `;
   it('accepts an arbitrary filename when every effectful job has the noncancelling shared lock', () => {
     const root = fixtureRoot('job-effects');
+    write(root, 'scripts/process/publish-site.mjs', "import './leaf.mjs';\n");
+    write(root, 'scripts/process/leaf.mjs', "export const value = 'contained offline source';\n");
     write(root, '.github/workflows/not-site.yml', writer);
     expect(senseHarnessCoherence({ repoRoot: root, now: NOW }).metrics).toMatchObject({
       concurrency_semantic_issues: 0,
@@ -901,6 +919,8 @@ describe('generic publication effect concurrency (offline)', () => {
     'refuses %s independently of the workflow filename',
     (fault) => {
       const root = fixtureRoot('job-effects');
+      write(root, 'scripts/process/publish-site.mjs', "import './leaf.mjs';\n");
+      write(root, 'scripts/process/leaf.mjs', "export const value = 'contained offline source';\n");
       let source = writer;
       if (fault === 'cancelled-lock')
         source = source.replace('cancel-in-progress: false', 'cancel-in-progress: true');
@@ -926,6 +946,8 @@ describe('generic publication effect concurrency (offline)', () => {
   );
   it('resolves publication effects reached through a local reusable workflow', () => {
     const root = fixtureRoot('job-effects');
+    write(root, 'scripts/process/publish-site.mjs', "import './leaf.mjs';\n");
+    write(root, 'scripts/process/leaf.mjs', "export const value = 'contained offline source';\n");
     write(
       root,
       '.github/workflows/caller.yml',
@@ -939,5 +961,73 @@ describe('generic publication effect concurrency (offline)', () => {
     expect(
       senseHarnessCoherence({ repoRoot: root, now: NOW }).metrics?.concurrency_semantic_issues,
     ).toBeGreaterThan(0);
+  });
+});
+
+describe('causal candidate effect concurrency regressions (offline)', () => {
+  function complete(root: string): string {
+    write(root, 'scripts/process/publish-site.mjs', "import './leaf.mjs';\n");
+    write(root, 'scripts/process/leaf.mjs', "export const value = 'contained read-only source';\n");
+    write(
+      root,
+      '.github/actions/local/action.yml',
+      'name: local\nruns:\n  using: composite\n  steps:\n    - shell: bash\n      run: node scripts/process/publish-site.mjs\n',
+    );
+    return `permissions:\n  contents: read\njobs:\n  inspect:\n    concurrency:\n      group: inspect-${'${{ github.ref }}'}\n      cancel-in-progress: true\n    steps:\n      - run: node scripts/process/publish-site.mjs\n`;
+  }
+  function observe(root: string, source: string) {
+    write(root, '.github/workflows/neutral.yml', source);
+    return senseHarnessCoherence({ repoRoot: root, now: NOW });
+  }
+  it.each([
+    'missing-direct',
+    'missing-import',
+    'inline-executable',
+    'composite-effect',
+    'composite-missing-import',
+    'source-substitution',
+    'import-cycle',
+    'import-escape',
+  ])('refuses %s causally after the same complete candidate passes', (fault) => {
+    const root = fixtureRoot('candidate-concurrency');
+    let source = complete(root);
+    if (fault.startsWith('composite-'))
+      source = source.replace(
+        'run: node scripts/process/publish-site.mjs',
+        'uses: ./.github/actions/local',
+      );
+    const control = observe(root, source);
+    expect(control.status).toBe('pass');
+    expect(control.metrics?.concurrency_semantic_issues).toBe(0);
+    expect(codes(control)).toEqual([]);
+    if (fault === 'missing-direct') rmSync(join(root, 'scripts/process/publish-site.mjs'));
+    if (fault === 'missing-import' || fault === 'composite-missing-import')
+      rmSync(join(root, 'scripts/process/leaf.mjs'));
+    if (fault === 'inline-executable')
+      source = source.replace(
+        'node scripts/process/publish-site.mjs',
+        'node -e \'fetch("https://example.invalid",{method:"POST"})\'',
+      );
+    if (fault === 'composite-effect' || fault === 'source-substitution')
+      write(
+        root,
+        'scripts/process/leaf.mjs',
+        'fetch("https://example.invalid",{method:"POST"});\n',
+      );
+    if (fault === 'import-cycle')
+      write(root, 'scripts/process/leaf.mjs', "import './publish-site.mjs';\n");
+    if (fault === 'import-escape')
+      write(root, 'scripts/process/leaf.mjs', "import '../../../outside.mjs';\n");
+    const rejected = observe(root, source);
+    expect(rejected.status).toBe('review');
+    expect(rejected.metrics?.concurrency_semantic_issues).toBe(1);
+    expect(codes(rejected)).toEqual(['HARNESS_COHERENCE_CONCURRENCY_POLICY']);
+    // A complete effectful candidate becomes acceptable only with the required publication lock.
+    if (fault === 'composite-effect' || fault === 'source-substitution') {
+      const locked = source
+        .replace('inspect-${{ github.ref }}', 'devai-pages-publication')
+        .replace('cancel-in-progress: true', 'cancel-in-progress: false');
+      expect(observe(root, locked).metrics?.concurrency_semantic_issues).toBe(0);
+    }
   });
 });
