@@ -46,6 +46,34 @@ actual host capacity; the current child-agent interface advertises four slots
 including its coordinator, so it cannot dispatch a fifth agent merely because
 the plan permits five. This amendment expires with CMP-0006.
 
+## Early architecture preparation
+
+On 2026-10-02 the Owner instructed (`CMP0006-OD-EARLY-ARCH-20261002`):
+
+```text
+Ok, start 603 and 605 architecture tasks
+```
+
+Central may grant preparation-only permits for TASK-0631 in CTG-0631 and
+TASK-0651 in CTG-0651 from its exact accepted source checkpoint and ratified
+R-0601 entry. These are the only exceptions to waiting for round-wide source
+predecessors before Architect preparation. Each worker may author only its
+existing Architect-owned law/docs paths in an isolated worktree, with the entire
+first-wave lock population acquired and fresh prefix-overlap checks. Count both
+rounds toward the later-phase four-round ceiling; initial rounds retain three
+inclusive slots and later rounds five, bounded by actual host capacity.
+
+Retain every round/wave/task dependency edge. This exception grants no Inspector
+or Engineer dispatch, later-wave work, generator/runtime effect or final gate
+waiver. Preserve known schema/catalogue and other failures. A reviewed design may
+be recorded only as a provisional preparation checkpoint until its original
+predecessors complete and the design is refreshed, independently reviewed and
+validated against their exact composed candidate before downstream handoff.
+Release a frozen reviewed preparation lease when idle; reacquire complete locks
+before any refresh. Central alone integrates contributions and grants subsequent
+permits. The exception expires at that qualified downstream handoff or campaign
+closure/abandonment, and does not apply to any other task.
+
 ## Standing authority and acceptance
 
 Routine scope proposals, prompt/boundary amendments within the campaign, coherent
