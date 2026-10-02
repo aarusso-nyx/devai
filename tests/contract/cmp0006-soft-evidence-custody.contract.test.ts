@@ -933,6 +933,7 @@ describe('raw threshold custody regressions (offline component)', () => {
           text: reply,
           finish_reason: 'stop',
           usage: { input_tokens: 1, output_tokens: 1, cost_usd: 0 },
+          latency_ms: 1,
           host_observation: host,
         }),
       },
