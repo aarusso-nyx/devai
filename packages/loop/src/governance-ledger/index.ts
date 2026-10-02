@@ -15,6 +15,7 @@ import { archiveImmutability } from './archive.js';
 import {
   DEFAULT_RECORDS_DIR,
   DEFAULT_ROUNDS_DIR,
+  hasTerminalClosureIndexRow,
   markdownFiles,
   renderDecisionIndex,
   renderDecisionRecords,
@@ -432,12 +433,13 @@ export function roundRecordIntegrity(options: {
       });
     }
     if (record.frontmatter['status'] === 'closed') {
-      const phaseClosure = String(record.frontmatter['phase_closure'] ?? '');
+      const citation = record.frontmatter['phase_closure'];
+      const phaseClosure = typeof citation === 'string' ? citation : '';
       const phaseLedgerPath = join(options.repoRoot, 'record/derived/indexes/rounds.md');
       if (
         phaseClosure.length === 0 ||
         !existsSync(phaseLedgerPath) ||
-        !readFileSync(phaseLedgerPath, 'utf8').includes(phaseClosure)
+        !hasTerminalClosureIndexRow(readFileSync(phaseLedgerPath, 'utf8'), phaseClosure, name)
       ) {
         findings.push({
           code: 'ROUND_PHASE_CLOSURE_UNRESOLVED',
