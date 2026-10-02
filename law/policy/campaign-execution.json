@@ -4,7 +4,7 @@
   "id": "campaign-execution",
   "status": "accepted",
   "authority": "Architect",
-  "policy_version": "1.4.1",
+  "policy_version": "1.4.2",
   "plan_schema": "law/schemas/campaign.schema.json",
   "containment": {
     "levels": ["campaign", "round", "wave", "task"],
@@ -283,14 +283,31 @@
             "R-0608",
             "R-0609"
           ],
-          "max_active_rounds": 3,
-          "max_active_agents_per_round": 3,
+          "max_active_rounds": 4,
+          "max_active_agents_per_round": 5,
           "agent_count": "inclusive of Architect coordinator, task workers, reviewers and nested agents; slots are not multiplicative",
           "initial_active_rounds": ["R-0602", "R-0604", "R-0606"],
           "queued_rounds": ["R-0603", "R-0605", "R-0607", "R-0608", "R-0609"],
           "dispatch": "central campaign coordinator alone grants round permit after predecessor and capacity verification; queued chats acknowledge then stay idle without source writes or workers",
           "coordination": "Owner explicitly authorizes messages among central campaign chat and its eight round chats; no unsolicited third-party messaging",
-          "handoff": "exact immutable source checkpoint, complete wave locks, no shared mutable worktree; parent-child pipeline order retained"
+          "handoff": "exact immutable source checkpoint, complete wave locks, no shared mutable worktree; parent-child pipeline order retained",
+          "concurrency_amendment": {
+            "decision": "CMP0006-OD-CONCURRENCY-20261002",
+            "reference": "docs/dev/operations/open-issue-closure-campaign/execution-discipline.md",
+            "task_limit_meaning": "maximum concurrent task/agent slots; inclusive coordinator, workers, reviewers and nested agents, not total planned task count",
+            "initial_phase": {
+              "rounds": ["R-0602", "R-0604", "R-0606"],
+              "max_active_rounds": 3,
+              "max_active_agents_per_round": 3
+            },
+            "later_phase": {
+              "rounds": ["R-0603", "R-0605", "R-0607", "R-0608", "R-0609"],
+              "max_active_rounds": 4,
+              "max_active_agents_per_round": 5
+            },
+            "transition": "central enters the later phase when the first eligible later round receives a permit; remaining initial rounds may overlap and retain their three-agent limit; all active rounds count toward four; preserve original dependencies; not formal runtime round closure",
+            "effective_capacity": "minimum of applicable Owner ceiling, actual host capacity, ready dependency checkpoints and disjoint complete wave locks; do not manufacture concurrency"
+          }
         },
         "checkpoint_acceptance": {
           "routine": "coordinator verifies exact HEAD/tree/base/diff/prompt, path authority, declared evidence and distinct review then records accepted-under-standing-Owner-mandate",
