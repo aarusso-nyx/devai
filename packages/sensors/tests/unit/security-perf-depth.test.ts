@@ -1,4 +1,4 @@
-// Invariants: INV-DEVAI-001, INV-DEVAI-012, INV-DEVAI-017
+// Invariants: INV-DEVAI-001, INV-DEVAI-012, INV-DEVAI-017; CMP-0006 TASK-0622 / issue #233
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -52,11 +52,23 @@ describe('security scan depth', () => {
   it('grades clean, review, high-fail, and critical metadata summaries', () => {
     for (const [vulnerabilities, status, code] of [
       [{ critical: 0, high: 0, moderate: 1, low: 2, info: 3 }, 'pass', undefined],
-      [{ critical: 0, high: 1 }, 'review', 'SECURITY_SCAN_HIGH_PRESENT'],
-      [{ critical: 0, high: 6 }, 'fail', 'SECURITY_SCAN_HIGH_OVER_THRESHOLD'],
-      [{ critical: 1, high: 0 }, 'fail', 'SECURITY_SCAN_CRITICAL_VULN'],
+      [
+        { critical: 0, high: 1, moderate: 0, low: 0, info: 0 },
+        'review',
+        'SECURITY_SCAN_HIGH_PRESENT',
+      ],
+      [
+        { critical: 0, high: 6, moderate: 0, low: 0, info: 0 },
+        'fail',
+        'SECURITY_SCAN_HIGH_OVER_THRESHOLD',
+      ],
+      [
+        { critical: 1, high: 0, moderate: 0, low: 0, info: 0 },
+        'fail',
+        'SECURITY_SCAN_CRITICAL_VULN',
+      ],
     ] as const) {
-      mocks.spawnSync.mockReturnValueOnce(audit({ metadata: { vulnerabilities } }));
+      mocks.spawnSync.mockReturnValueOnce(audit({ metadata: { vulnerabilities } }, 1));
       const reading = senseSecurityScan({ repoRoot: root, now });
       expect(reading.status).toBe(status);
       expect(reading.findings?.[0]?.code).toBe(code);
@@ -65,21 +77,55 @@ describe('security scan depth', () => {
 
   it('uses npm-shape advisories and the configured alternate tool', () => {
     mocks.spawnSync.mockReturnValueOnce(
-      audit({
-        vulnerabilities: {
-          a: { severity: 'critical' },
-          b: { severity: 'high' },
-          c: { severity: 'moderate' },
-          d: { severity: 'low' },
-          e: { severity: 'info' },
-          ignored: null,
-          unknown: { severity: 'other' },
+      audit(
+        {
+          vulnerabilities: {
+            a: { severity: 'critical' },
+            b: { severity: 'high' },
+            c: { severity: 'moderate' },
+            d: { severity: 'low' },
+            e: { severity: 'info' },
+          },
         },
-      }),
+        1,
+      ),
     );
     const reading = senseSecurityScan({ repoRoot: root, preferredTool: 'npm', now });
     expect(reading).toMatchObject({ status: 'fail', metrics: { total_vulnerabilities: 5 } });
     expect(mocks.spawnSync).toHaveBeenCalledWith('npm', ['audit', '--json'], expect.any(Object));
+
+    for (const invalidMembers of [
+      { ignored: null },
+      { unknown: { severity: 'other' } },
+      { ignored: null, unknown: { severity: 'other' } },
+    ]) {
+      mocks.spawnSync
+        .mockReturnValueOnce(
+          audit(
+            {
+              vulnerabilities: {
+                a: { severity: 'critical' },
+                b: { severity: 'high' },
+                c: { severity: 'moderate' },
+                d: { severity: 'low' },
+                e: { severity: 'info' },
+                ...invalidMembers,
+              },
+            },
+            1,
+          ),
+        )
+        .mockReturnValueOnce({
+          status: null,
+          signal: null,
+          stdout: '',
+          stderr: '',
+          error: Object.assign(new Error('pnpm absent'), { code: 'ENOENT' }),
+        });
+      const rejected = senseSecurityScan({ repoRoot: root, preferredTool: 'npm', now });
+      expect(rejected.status).toBe('unknown');
+      expect(rejected.findings?.length).toBeGreaterThan(0);
+    }
   });
 
   it('falls back after missing, empty, invalid, and generic tool failures', () => {
@@ -95,9 +141,11 @@ describe('security scan depth', () => {
       { status: 0, signal: null, stdout: '{', stderr: '', error: undefined },
       { status: null, signal: null, stdout: '', stderr: '', error: new Error('boom') },
     ]) {
-      mocks.spawnSync
-        .mockReturnValueOnce(first)
-        .mockReturnValueOnce(audit({ metadata: { vulnerabilities: {} } }));
+      mocks.spawnSync.mockReturnValueOnce(first).mockReturnValueOnce(
+        audit({
+          metadata: { vulnerabilities: { critical: 0, high: 0, moderate: 0, low: 0, info: 0 } },
+        }),
+      );
       expect(senseSecurityScan({ repoRoot: root, now }).status).toBe('pass');
     }
     expect(mocks.spawnSync).toHaveBeenCalledTimes(8);
