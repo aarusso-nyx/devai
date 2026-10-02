@@ -119,6 +119,22 @@ exclusive. Choose a preset when its complete declared population matches the obs
 you need. Choose `sense run <kind>` when you need one registered observation. A preset
 name never grants authority and never changes a member's intrinsic effect.
 
+Use the separated form `--preset <name>`, such as `--preset baseline`.
+The inline form `--preset=<name>` is unsupported, including names of valid presets.
+The [Owner decision for #252](https://github.com/aarusso-nyx/devai/issues/252#issuecomment-5940972742)
+requires selection and schema admission to refuse it consistently before dispatch.
+The CMP-0006 design proposes the existing public `SENSE_SELECTION_INVALID` code,
+usage exit `2`, and remediation to use the separated form. Implementation alignment
+and its acceptance evidence are pending; see the
+[provisional refusal contract](../../dev/operations/open-issue-closure-campaign/sense-refusal-contract.md).
+
+An inline token must not resolve a preset, run a sensor, or become a read-only
+fallback because another selection or consent flag is present. A valid separated
+selection still resolves its exact population and effects; a kind or member marked
+`schema_admission: unsupported` still refuses before execution with
+`SENSOR_KIND_SCHEMA_UNSUPPORTED` under
+[ADR-SCR-0011](../../../law/adr/ADR-SCR-0011-sweep-kinds-admitted-by-the-packaged-schema.md).
+
 Inspect the resolved population without dispatching any sensor by using `--dry-run`:
 
 ```sh
