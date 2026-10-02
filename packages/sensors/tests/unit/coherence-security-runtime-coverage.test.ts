@@ -47,6 +47,30 @@ function write(root: string, rel: string, contents: string): string {
   return path;
 }
 
+/** Complete candidate source for the ordinary observation command used below. */
+function coherenceRoot(): string {
+  const root = fixtureRoot('harness-coherence');
+  write(
+    root,
+    'package.json',
+    JSON.stringify({ private: true, scripts: { test: 'node scripts/read-only.cjs' } }),
+  );
+  write(
+    root,
+    'scripts/read-only.cjs',
+    [
+      "const { readFileSync } = require('node:fs');",
+      "const { resolve } = require('node:path');",
+      "const assert = require('node:assert/strict');",
+      "const manifest = JSON.parse(readFileSync(resolve(__dirname, '../package.json'), 'utf8'));",
+      'assert.equal(manifest.private, true);',
+      "assert.equal(manifest.scripts.test, 'node scripts/read-only.cjs');",
+      '',
+    ].join('\n'),
+  );
+  return root;
+}
+
 function findings(reading: SensorReading): SensorFinding[] {
   return reading.findings ?? [];
 }
@@ -86,7 +110,7 @@ function workflow(spec: WorkflowSpec = {}): string {
 
 describe('senseHarnessCoherence', () => {
   it('reports the no-workflow reading when the workflow directory is absent', () => {
-    const root = fixtureRoot('harness-coherence');
+    const root = coherenceRoot();
 
     const reading = senseHarnessCoherence({ repoRoot: root, now: NOW });
 
@@ -107,7 +131,7 @@ describe('senseHarnessCoherence', () => {
   });
 
   it('passes a single coherent workflow and reports the full metric set', () => {
-    const root = fixtureRoot('harness-coherence');
+    const root = coherenceRoot();
     write(root, '.github/workflows/ci.yml', workflow());
 
     const reading = senseHarnessCoherence({ repoRoot: root, now: NOW });
@@ -126,7 +150,7 @@ describe('senseHarnessCoherence', () => {
   });
 
   it('accepts cancel-in-progress: false only where the workflow serializes', () => {
-    const root = fixtureRoot('harness-coherence');
+    const root = coherenceRoot();
     // A release path serializes; a plain observation path supersedes.
     write(root, '.github/workflows/release.yml', workflow({ concurrency: SERIALIZED.join('\n') }));
     write(root, '.github/workflows/ci.yml', workflow());
@@ -140,7 +164,7 @@ describe('senseHarnessCoherence', () => {
   });
 
   it('flags a release workflow that cancels in-progress runs', () => {
-    const root = fixtureRoot('harness-coherence');
+    const root = coherenceRoot();
     write(root, '.github/workflows/release.yml', workflow());
 
     const reading = senseHarnessCoherence({ repoRoot: root, now: NOW });
@@ -159,7 +183,7 @@ describe('senseHarnessCoherence', () => {
   });
 
   it('treats a top-level schedule trigger as serializing', () => {
-    const root = fixtureRoot('harness-coherence');
+    const root = coherenceRoot();
     write(
       root,
       '.github/workflows/nightly.yml',
@@ -176,7 +200,7 @@ describe('senseHarnessCoherence', () => {
   });
 
   it('does not treat a deeply indented schedule input as serializing', () => {
-    const root = fixtureRoot('harness-coherence');
+    const root = coherenceRoot();
     write(
       root,
       '.github/workflows/dispatch.yml',
@@ -199,7 +223,7 @@ describe('senseHarnessCoherence', () => {
   });
 
   it('reports action-version drift once per action and ignores local and unpinned-ref uses', () => {
-    const root = fixtureRoot('harness-coherence');
+    const root = coherenceRoot();
     write(
       root,
       '.github/workflows/a-ci.yml',
@@ -219,7 +243,7 @@ describe('senseHarnessCoherence', () => {
     write(
       root,
       '.github/actions/setup/action.yml',
-      'name: setup\nruns:\n  using: composite\n  steps:\n    - run: pnpm install\n',
+      'name: setup\nruns:\n  using: composite\n  steps:\n    - run: pnpm test\n',
     );
 
     const reading = senseHarnessCoherence({ repoRoot: root, now: NOW });
@@ -238,7 +262,7 @@ describe('senseHarnessCoherence', () => {
   });
 
   it('reports mixed permissions discipline and counts it once', () => {
-    const root = fixtureRoot('harness-coherence');
+    const root = coherenceRoot();
     write(root, '.github/workflows/a-ci.yml', workflow());
     write(root, '.github/workflows/b-ci.yml', workflow({ permissions: null }));
 
@@ -257,7 +281,7 @@ describe('senseHarnessCoherence', () => {
   });
 
   it('reports mixed concurrency as info and the missing block as a policy warning', () => {
-    const root = fixtureRoot('harness-coherence');
+    const root = coherenceRoot();
     write(root, '.github/workflows/a-ci.yml', workflow());
     write(root, '.github/workflows/b-ci.yml', workflow({ concurrency: null }));
 
@@ -289,7 +313,7 @@ describe('senseHarnessCoherence', () => {
   });
 
   it('rejects a concurrency block with no group and one with no cancel-in-progress', () => {
-    const root = fixtureRoot('harness-coherence');
+    const root = coherenceRoot();
     write(
       root,
       '.github/workflows/a-ci.yml',
@@ -317,7 +341,7 @@ describe('senseHarnessCoherence', () => {
   });
 
   it('rejects an inline concurrency scalar that carries no group or cancel semantics', () => {
-    const root = fixtureRoot('harness-coherence');
+    const root = coherenceRoot();
     write(root, '.github/workflows/ci.yml', workflow({ concurrency: 'concurrency: ci-inline' }));
 
     const reading = senseHarnessCoherence({ repoRoot: root, now: NOW });
@@ -329,7 +353,7 @@ describe('senseHarnessCoherence', () => {
   });
 
   it('fails past the review budget and honours an explicit maxReviewIncoherence', () => {
-    const root = fixtureRoot('harness-coherence');
+    const root = coherenceRoot();
     for (const name of ['a', 'b', 'c', 'd']) {
       write(root, `.github/workflows/${name}-ci.yml`, workflow({ concurrency: null }));
     }
@@ -352,7 +376,7 @@ describe('senseHarnessCoherence', () => {
   });
 
   it('reads workflows from an explicit workflowDir', () => {
-    const root = fixtureRoot('harness-coherence');
+    const root = coherenceRoot();
     write(root, '.github/workflows/ci.yml', workflow({ concurrency: null }));
     write(root, 'ci/flows/ci.yml', workflow());
 
@@ -367,7 +391,7 @@ describe('senseHarnessCoherence', () => {
   });
 
   it('stamps its own timestamp when none is supplied', () => {
-    const root = fixtureRoot('harness-coherence');
+    const root = coherenceRoot();
     write(root, '.github/workflows/ci.yml', workflow());
 
     const reading = senseHarnessCoherence({ repoRoot: root });
