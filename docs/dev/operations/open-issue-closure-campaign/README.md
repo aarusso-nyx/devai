@@ -71,8 +71,7 @@ CTG-0624 supplies the bounded enforcement/generation support. See the
 and [decision register](decision-register.md). The two-PR discipline is accepted: cumulative remediation first, then the
 post-publication verifier repin. Main ancestry and release order remain intact.
 
-Current scope is 9 rounds, 20 CTGs and 46 tasks; CTG-0624 adds three tasks to the
-original 19-CTG/43-task draft. Current source checkpoints are recorded in checkpoint-register.md; no formal closure is inferred.
+Current scope is 9 rounds, 22 CTGs and 50 tasks; CTG-0624 added three integration tasks; CTG-0625/CTG-0626 add four distinct trace repair/adoption tasks to the original 19-CTG/43-task draft. Current source checkpoints are recorded in checkpoint-register.md; no formal closure is inferred.
 
 Final revalidation observes #253 already closed not_planned by aarusso-nyx at 2026-10-01T21:27:31Z, event 32290441966. Preserve that externally performed disposition; no duplicate issue-state effect is required. The original scope is 22 issues, and 21 remain open. All five later Owner comments, including the now-closed issue, are retained in the complete comment refresh.
 

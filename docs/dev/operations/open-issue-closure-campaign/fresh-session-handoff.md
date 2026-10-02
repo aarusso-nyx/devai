@@ -1,7 +1,7 @@
 # CMP-0006 current execution handoff
 
 Updated for the 2026-10-02 [Owner execution decision](execution-discipline.md).
-Role: Architect central coordinator. Campaign scope: 9 rounds, 20 CTGs, 46 tasks.
+Role: Architect central coordinator. Campaign scope: 9 rounds, 22 CTGs, 50 tasks.
 The standing mandate authorizes uninterrupted routine work and necessary campaign
 effects; expiry is campaign closure or abandonment. Genuine unresolved decisions
 are reported while independent work continues.
