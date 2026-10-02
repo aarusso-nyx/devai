@@ -872,3 +872,72 @@ describe('sensePlantCoherence', () => {
     expect(Number.isNaN(Date.parse(reading.timestamp))).toBe(false);
   });
 });
+
+// Trace annotation deferred to Architect TASK-06216: no exact canonical concurrency invariant.
+// ADR-REL-0034 derives effects from arbitrary jobs and recursively reachable local calls.
+describe('generic publication effect concurrency (offline)', () => {
+  const writer = `jobs:
+  arbitrary:
+    permissions:
+      contents: read
+      pages: write
+      deployments: write
+      id-token: write
+    environment: github-pages
+    concurrency:
+      group: devai-pages-publication
+      cancel-in-progress: false
+    steps:
+      - run: node scripts/process/publish-site.mjs
+`;
+  it('accepts an arbitrary filename when every effectful job has the noncancelling shared lock', () => {
+    const root = fixtureRoot('job-effects');
+    write(root, '.github/workflows/not-site.yml', writer);
+    expect(senseHarnessCoherence({ repoRoot: root, now: NOW }).metrics).toMatchObject({
+      concurrency_semantic_issues: 0,
+    });
+  });
+  it.each(['cancelled-lock', 'case-alias', 'missing-lock', 'unknown-call'])(
+    'refuses %s independently of the workflow filename',
+    (fault) => {
+      const root = fixtureRoot('job-effects');
+      let source = writer;
+      if (fault === 'cancelled-lock')
+        source = source.replace('cancel-in-progress: false', 'cancel-in-progress: true');
+      if (fault === 'case-alias')
+        source = source
+          .replace('group: devai-pages-publication', 'group: DEVAI-PAGES-PUBLICATION')
+          .replace('cancel-in-progress: false', 'cancel-in-progress: true');
+      if (fault === 'missing-lock')
+        source = source.replace(
+          '    concurrency:\n      group: devai-pages-publication\n      cancel-in-progress: false\n',
+          '',
+        );
+      if (fault === 'unknown-call')
+        source = source.replace(
+          'node scripts/process/publish-site.mjs',
+          'node scripts/process/unknown-write.mjs',
+        );
+      write(root, '.github/workflows/not-site.yml', source);
+      expect(
+        senseHarnessCoherence({ repoRoot: root, now: NOW }).metrics?.concurrency_semantic_issues,
+      ).toBeGreaterThan(0);
+    },
+  );
+  it('resolves publication effects reached through a local reusable workflow', () => {
+    const root = fixtureRoot('job-effects');
+    write(
+      root,
+      '.github/workflows/caller.yml',
+      `jobs:\n  looks_read_only:\n    uses: ./.github/workflows/callee.yml\n`,
+    );
+    write(
+      root,
+      '.github/workflows/callee.yml',
+      writer.replace('cancel-in-progress: false', 'cancel-in-progress: true'),
+    );
+    expect(
+      senseHarnessCoherence({ repoRoot: root, now: NOW }).metrics?.concurrency_semantic_issues,
+    ).toBeGreaterThan(0);
+  });
+});

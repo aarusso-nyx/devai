@@ -397,3 +397,61 @@ describe('folded scalar line boundaries', () => {
     expect(ast.runScripts).toEqual([reference.jobs.check.steps[0]?.run]);
   });
 });
+
+// Trace annotation deferred to Architect TASK-06216: no exact canonical concurrency invariant.
+// ADR-REL-0034 requires per-job custody/effects with no filename privilege.
+describe('job-scoped effect declarations', () => {
+  it('retains independent locks, needs, permissions, environment and run scripts per arbitrary named job', () => {
+    const ast = parseWorkflow(
+      '/repo/.github/workflows/arbitrary.yml',
+      `permissions:
+  contents: read
+jobs:
+  observe:
+    concurrency:
+      group: prepare-${'${{ github.ref }}'}
+      cancel-in-progress: true
+    permissions:
+      contents: read
+    steps:
+      - run: pnpm docs:build
+  actuate:
+    needs: observe
+    permissions:
+      contents: read
+      pages: write
+      deployments: write
+      id-token: write
+    environment: github-pages
+    concurrency:
+      group: devai-pages-publication
+      cancel-in-progress: false
+    steps:
+      - run: node scripts/process/publish-site.mjs
+`,
+      '/repo',
+    );
+    expect(ast.jobs).toEqual([
+      expect.objectContaining({
+        name: 'observe',
+        permissions: { contents: 'read' },
+        concurrency: { group: 'prepare-${{ github.ref }}', cancelInProgress: true },
+        runScripts: ['pnpm docs:build'],
+      }),
+      expect.objectContaining({
+        name: 'actuate',
+        needs: ['observe'],
+        permissions: {
+          contents: 'read',
+          pages: 'write',
+          deployments: 'write',
+          'id-token': 'write',
+        },
+        environment: 'github-pages',
+        concurrency: { group: 'devai-pages-publication', cancelInProgress: false },
+        runScripts: ['node scripts/process/publish-site.mjs'],
+      }),
+    ]);
+    expect(ast.hasConcurrencyBlock).toBe(false);
+  });
+});
