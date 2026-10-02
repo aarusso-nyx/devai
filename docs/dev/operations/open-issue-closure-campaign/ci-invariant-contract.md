@@ -12,8 +12,10 @@ TASK-0624, Architect design proposal for issues #234 and #235. Entry source is
 180a122787193f9bdfce9b7f4cd5600e85ae7854. R-0602 depends only on the
 human-ratified R-0601 source checkpoint; CTG-0622 has no wave predecessor.
 The separate CTG-0621 Inspector red tests remain byte-exact. This document is
-source design for human review, not an accepted amendment, runtime proof,
-implementation result, merge admission or publication authorization.
+the original design checkpoint, accepted under the standing Owner mandate with
+its unresolved obligations preserved. The dated amendment below is a separate
+source proposal; neither checkpoint establishes runtime proof, merge admission
+or performed publication.
 
 ## Trace resolution producer
 
@@ -233,3 +235,91 @@ installed in this checkout; Git reports 2.54.0 rather than the manifest's
 2.47.3. These executor/toolchain discrepancies remain explicit before any
 conforming checkpoint ratification. No policy or campaign record is amended
 to conceal them.
+
+## R-0602 staged Pages amendment — 2026-10-02
+
+This scoped source amendment reopens TASK-0624 under
+CMP0006-OD-EXEC-20261002. It preserves the archived original design, failures and
+checkpoint receipts. It selects option 1 above for separate role implementation
+and counterexamples; the existing publication setting stays false until those
+counterexamples and the exact implementation pass. It does not select a
+cross-dispatch reconciliation protocol.
+
+Keep the existing manual `workflow_dispatch` trigger without inputs and exact
+`main` guard. Replace the single-job topology only as one complete change:
+
+- `prepare-site` checks out and binds the dispatched SHA/tree, runs the existing
+  documentation security/type/build/local-byte checks once, and uploads the exact
+  Pages artifact. Its explicit permission set is `contents: read`; it has no
+  protected environment, publication permission, journal invocation or provider
+  invocation. Its distinct ref-scoped preparation concurrency group has
+  `cancel-in-progress: true`.
+- `publish-site` requires successful `prepare-site`, checks out the same SHA,
+  consumes its immutable artifact ID and source/run/population digests, and
+  verifies custody before creating any intent. It retains the existing protected
+  environment and scoped job permissions. Its job-level concurrency group is
+  exactly `devai-pages-publication`, with `cancel-in-progress: false`, shared
+  with release publication. It never rebuilds documentation.
+
+Remove workflow-level concurrency only together with complete job-level
+concurrency enforcement. A workflow-level superseding lock could interrupt the
+publisher and is forbidden. Preparation and publication groups must differ,
+including case-insensitive comparison. A failed, skipped or cancelled preparation
+cannot enter publication, even through `always()` or permissive conditions.
+GitHub may replace a pending publisher; that job has created no intent. The
+contract guarantees that superseding preparation cannot cancel publication; it
+does not guarantee publication of every dispatch or immunity to manual
+cancellation, timeout or runner loss.
+
+Preparation uploads the Pages archive, preserving the current upload action and
+its exclusion rules. Publication obtains that same-run artifact by exact numeric
+ID, never by name, latest selection or another workflow. A bounded artifact
+validation helper verifies the repository/run/SHA/tree, completed preparation,
+artifact/archive digest and canonical member population before extracting to a
+new contained directory or invoking the journal. Validate all archive members
+before writing any member: reject traversal, absolute paths, links, duplicate
+members, unsupported member types, excessive member count/size and incomplete
+archives. A contained site-member check after unsafe extraction is insufficient.
+The public population digest is SHA-256 of UTF-8
+`JSON.stringify(siteMembers(directory))`, matching the current publisher.
+`siteMembers` excludes only the existing empty `.nojekyll` sentinel and refuses
+other dot members; do not silently change that behavior. Keep `index.html` and
+full live-byte verification.
+
+Rerunning only the publisher consumes the retained successful preparation
+artifact/output identities. Rerunning all jobs can yield another artifact ID,
+but cannot claim that replacement was deployed. A known submitted journal
+record retains and observes its original Pages and artifact IDs. Identical
+public population bytes may be checked against that original identity; different
+population bytes are a different identity and fail the unresolved-predecessor
+guard. An unknown intent still refuses resume even when live bytes match.
+Retain cross-run refusal, verified release baseline, release attempt semantics,
+read-after-write durability, original records and verified no-op behavior.
+
+The coherence sensor must evaluate effective concurrency per job and actual
+effect surfaces: write permissions, environments, deploy operations and resolved
+local/reusable calls. Ordinary preparation supersedes; effect-bearing publication
+serializes. Unresolved effect surfaces keep a finding. No site filename exception,
+N/A declaration or blanket sensor exemption is permitted. Reject parent
+cancellation that can interrupt a serialized child and missing/malformed or
+conflicting job locks. Existing release/schedule safety requirements remain.
+
+The exact scope proposal includes an ADR amending ADR-REL-0030's single-job and
+build-location clauses, the credential/job matrix and workflow documentation,
+workflow checker, generic coherence/parser, artifact validation helper and
+Inspector custody/concurrency counterexamples. Central alone synchronizes the
+campaign, prompts and manifest. Acquire every amended wave path and serialize
+cross-round overlaps before those writes; this document does not confer paths
+on downstream workers.
+
+Inspector counterexamples must prove preparation cancellation before and after
+upload has no journal effect; later preparation cannot cancel an existing
+publisher/release writer; preparation failure cannot deploy; wrong/missing/
+expired/ambiguous artifact and changed source/member bytes fail before intent;
+unsafe archive extraction performs no write; incorrect locks/permissions/hidden
+effects are rejected; and every existing journal interruption/resume test retains
+its expectation. Fixtures establish deterministic rejection and source structure,
+not performed Pages publication or operational independent soft evaluation.
+
+The soft-rubric amendment and the 1651 retained test-trace diagnostics remain
+separate substantive obligations. The Pages selection does not resolve either.
