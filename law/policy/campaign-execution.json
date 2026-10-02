@@ -4,7 +4,7 @@
   "id": "campaign-execution",
   "status": "accepted",
   "authority": "Architect",
-  "policy_version": "1.4.0",
+  "policy_version": "1.4.1",
   "plan_schema": "law/schemas/campaign.schema.json",
   "containment": {
     "levels": ["campaign", "round", "wave", "task"],
@@ -249,21 +249,58 @@
           "R-0607-preparation-artifacts"
         ],
         "repin_scope": ["R-0608", "R-0609-bounded-accounting-artifacts"],
-        "source_dependency_rule": "exact-human-ratified-candidate-checkpoints-permit-downstream-source-work-before-remediation-merge; no-merged_as-or-round-closure-or-runtime-authority-is-inferred",
+        "source_dependency_rule": "exact-source-checkpoints-accepted-under-specific-human-ratification-or-standing-Owner-mandate-permit-downstream-source-work; no-merged_as-or-round-closure-or-runtime-authority-is-inferred",
         "checkpoint_kinds": {
           "architect": "accepted-design-on-exact-head",
           "inspector": "established-counterexamples-on-exact-head; declared-red-implementation-case-is-not-a-passing-gate",
           "engineer": "implementation-and-all-declared-acceptance-pass-on-exact-head"
         },
-        "role_rule": "separate-role-declared-sessions-and-isolated-worktrees; each author touches only declared paths; human integrates reviewed single-family role-attributed commits",
+        "role_rule": "separate-role-declared-sessions-and-isolated-worktrees; declared-path-authorship; central-integrator-preserves-reviewed-single-family-role-attributed-commits-under-standing-Owner-authority",
         "admission_rule": "all-final-task-acceptance-and-mandatory-floor-on-exact-cumulative-candidate; shared-identical-PR-reference-counts-once; refuse-any-undeclared-third-source-PR",
-        "merge_rule": "human-ratified-rebase-integration-only; actual-mapped-commits-and-merged-head-recorded-after-observation; no-squash-or-intermediate-task-merge",
+        "merge_rule": "Owner-authorized-rebase-integration-only-after-final-candidate-gates; record-concrete-single-use-effect-authority-and-observed-mapped-commits-and-merged-head; no-squash-or-intermediate-task-merge",
         "publication_rule": "remediation-PR-must-merge-before-shipping-from-main-under-old-trusted-pin; repin-PR-requires-immutable-published-artifact; preserve-all-release-authority-and-exact-effect-gates",
         "bookkeeping_rule": "source checkpoints and draft accounting are not runtime records; post-merge final effects/observations close rounds only when universal and issue-specific gates hold; no third implementation PR inferred",
         "expiry": "CMP-0006 closed or abandoned; no override for other source campaigns or adopters",
-        "precedence": "this explicit human-driven source procedure replaces intermediate merged/closed prerequisites only for reviewed source contribution sequencing; default runtime state transitions, actual close gates and external effects remain unchanged",
+        "precedence": "explicit-human-directed-source-development-procedure-and-standing-Owner-mandate-supersede-routine-source-dispatch/commit/checkpoint-permission-pauses-only-for-CMP-0006; product-runtime-transitions-and-actual-close/effect-evidence-remain-unchanged",
         "source_lock_rule": "acquire the complete declared wave lock set before writing; release at a frozen reviewed checkpoint and exact handoff; serialize every overlapping scope; a previously completed unmerged contribution is read-only unless reopened and re-reviewed",
-        "post_merge_phase_rule": "R-0608 source work requires actual R-0607 closure and immutable publication; R-0609 candidate accounting may be prepared from the reviewed R-0608 checkpoint but final observations/closure wait for actual R-0608 integration, closure and effects"
+        "post_merge_phase_rule": "R-0608 source work requires actual R-0607 closure and immutable publication; R-0609 candidate accounting may be prepared from the reviewed R-0608 checkpoint but final observations/closure wait for actual R-0608 integration, closure and effects",
+        "standing_owner_authority": {
+          "decision": "CMP0006-OD-EXEC-20261002",
+          "reference": "docs/dev/operations/open-issue-closure-campaign/execution-discipline.md",
+          "scope": "routine proposals, exact scoped plan amendments, role-bounded implementation and tests, local commits, source checkpoint acceptance, coordination, integration and necessary declared campaign completion effects",
+          "acceptance": "automatic after exact-candidate evidence and distinct qualified review; acceptance is exercised under standing human mandate, never represented as a new human review",
+          "exceptions": "substantive unresolved product/risk decisions, unavailable credentials/protected approvals, failed technical gates and externally required independent confirmations remain explicit",
+          "expiry": "CMP-0006 closed or abandoned; never another campaign or adopter"
+        },
+        "execution_discipline": {
+          "round_sessions": [
+            "R-0602",
+            "R-0603",
+            "R-0604",
+            "R-0605",
+            "R-0606",
+            "R-0607",
+            "R-0608",
+            "R-0609"
+          ],
+          "max_active_rounds": 3,
+          "max_active_agents_per_round": 3,
+          "agent_count": "inclusive of Architect coordinator, task workers, reviewers and nested agents; slots are not multiplicative",
+          "initial_active_rounds": ["R-0602", "R-0604", "R-0606"],
+          "queued_rounds": ["R-0603", "R-0605", "R-0607", "R-0608", "R-0609"],
+          "dispatch": "central campaign coordinator alone grants round permit after predecessor and capacity verification; queued chats acknowledge then stay idle without source writes or workers",
+          "coordination": "Owner explicitly authorizes messages among central campaign chat and its eight round chats; no unsolicited third-party messaging",
+          "handoff": "exact immutable source checkpoint, complete wave locks, no shared mutable worktree; parent-child pipeline order retained"
+        },
+        "checkpoint_acceptance": {
+          "routine": "coordinator verifies exact HEAD/tree/base/diff/prompt, path authority, declared evidence and distinct review then records accepted-under-standing-Owner-mandate",
+          "inspector_red": "retained reproducible counterexamples may permit only the declared Engineer handoff; never a passing final gate",
+          "failed_or_unknown": "retain and resolve; no auto-PASS, invented human actor, hidden failure or synthesized observation",
+          "historical": "original receipts, prompts, model maps and digests remain immutable; new plan hashes apply only to newly initiated/reopened work"
+        },
+        "integration_responsibility": "central campaign coordinator alone updates cumulative integration candidate and campaign-wide planning/manifest files; round coordinators own local contributions and request scoped amendments; serialized PR-A then PR-B discipline retained",
+        "effect_execution": "standing Owner mandate authorizes necessary declared CMP-0006 effects; bind concrete candidate/version/run/environment/inputs and single-use record before execution; mark performed_at only after observed completion; protected service approval and custody cannot be forged",
+        "external_host_authoring": "configured desktop host defaults are approved for external CMP-0006 source authoring only; record actual model/effort separately from immutable declared tier maps; do not claim runtime/live evaluator conformity; product model registry and historical pins unchanged"
       }
     }
   },
