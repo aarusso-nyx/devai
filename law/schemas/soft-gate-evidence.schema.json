@@ -1,0 +1,314 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/soft-gate-evidence.schema.json",
+  "title": "Authenticated soft gate payload manifest",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "canonicalization",
+    "signature_domain",
+    "repository",
+    "candidate",
+    "producer_control",
+    "working_agent",
+    "evaluator",
+    "created_at",
+    "invocation_id",
+    "bound_inputs",
+    "reply_sha256",
+    "host_envelope_sha256",
+    "score_projection_sha256",
+    "payload_roles",
+    "members"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "canonicalization": {
+      "const": "DEVAI-CANONICAL-JSON-V1"
+    },
+    "signature_domain": {
+      "const": "DEVAI-SOFT-GATE-EVIDENCE-V1"
+    },
+    "repository": {
+      "const": "aarusso-nyx/devai"
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commit", "tree", "base_commit"],
+      "properties": {
+        "commit": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "tree": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "base_commit": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        }
+      }
+    },
+    "producer_control": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commit", "tree", "executable_sha256"],
+      "properties": {
+        "commit": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "tree": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "executable_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "working_agent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["agent_id", "session_id", "process_instance_id", "host", "model"],
+      "properties": {
+        "agent_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "session_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "process_instance_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "host": {
+          "enum": ["claude", "codex"]
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "evaluator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["agent_id", "session_id", "process_instance_id", "host", "model"],
+      "properties": {
+        "agent_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "session_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "process_instance_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "host": {
+          "enum": ["claude", "codex"]
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "invocation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "bound_inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_population_sha256",
+        "lockfile_population_sha256",
+        "toolchain_sha256",
+        "task_roster_sha256",
+        "context_sha256",
+        "rubric_sha256",
+        "thresholds_sha256",
+        "configuration_sha256",
+        "inventory_sha256",
+        "host_help_sha256"
+      ],
+      "properties": {
+        "source_population_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "lockfile_population_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "toolchain_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "task_roster_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "context_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "rubric_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "thresholds_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "configuration_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "inventory_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "host_help_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "reply_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "host_envelope_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "score_projection_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "payload_roles": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "score_reply",
+        "host_envelope",
+        "configuration_observation",
+        "inventory_observation",
+        "host_help_observation",
+        "context_inventory",
+        "effective_rubric",
+        "effective_thresholds",
+        "control_observation",
+        "invocation_envelope"
+      ],
+      "properties": {
+        "score_reply": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)(?!.*\\\\)(?!.*[\\u0000-\\u001f])[^/]+(?:/[^/]+)*$"
+        },
+        "host_envelope": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)(?!.*\\\\)(?!.*[\\u0000-\\u001f])[^/]+(?:/[^/]+)*$"
+        },
+        "configuration_observation": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)(?!.*\\\\)(?!.*[\\u0000-\\u001f])[^/]+(?:/[^/]+)*$"
+        },
+        "inventory_observation": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)(?!.*\\\\)(?!.*[\\u0000-\\u001f])[^/]+(?:/[^/]+)*$"
+        },
+        "host_help_observation": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)(?!.*\\\\)(?!.*[\\u0000-\\u001f])[^/]+(?:/[^/]+)*$"
+        },
+        "context_inventory": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)(?!.*\\\\)(?!.*[\\u0000-\\u001f])[^/]+(?:/[^/]+)*$"
+        },
+        "effective_rubric": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)(?!.*\\\\)(?!.*[\\u0000-\\u001f])[^/]+(?:/[^/]+)*$"
+        },
+        "effective_thresholds": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)(?!.*\\\\)(?!.*[\\u0000-\\u001f])[^/]+(?:/[^/]+)*$"
+        },
+        "control_observation": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)(?!.*\\\\)(?!.*[\\u0000-\\u001f])[^/]+(?:/[^/]+)*$"
+        },
+        "invocation_envelope": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)(?!.*\\\\)(?!.*[\\u0000-\\u001f])[^/]+(?:/[^/]+)*$"
+        }
+      }
+    },
+    "members": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "byte_length", "sha256"],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)(?!.*\\\\)(?!.*[\\u0000-\\u001f])[^/]+(?:/[^/]+)*$"
+          },
+          "byte_length": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 16777216
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      }
+    }
+  },
+  "description": "Unsigned canonical manifest: lists payload only, excluding manifest.json/signature.ed25519 and excluding its own digest/evidence-commit identity. Members must be unique NFC contained sorted paths with total bytes <=32MiB; roles each resolve to exactly one listed member. Complete host envelope and exact selected reply bytes are distinct; selected reply digest is over unchanged adapter bytes, score projection digest is separately canonicalized. No completed/isolated/verified declaration establishes observation. External trust binds computed manifest digest and immutable evidence commit after signing."
+}

@@ -20,5 +20,20 @@
   "freshness": {
     "default_max_age_hours": 168,
     "scorecard_failure_max_age_hours": 168
+  },
+  "soft_gate": {
+    "scale_min": 0,
+    "scale_max": 4,
+    "minimum_scores": {
+      "spec_coherence": 3,
+      "plant_idiomaticity": 3,
+      "test_depth": 3,
+      "traceability_quality": 3
+    },
+    "aggregation": "all-dimensions",
+    "max_age_hours": 24,
+    "future_tolerance_seconds": 0,
+    "require_independent_evaluator": true,
+    "require_completed_no_tool_mcp": true
   }
 }

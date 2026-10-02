@@ -166,3 +166,29 @@ a canonical verdict with a complete no-tool/no-MCP transcript for each declared
 host separately. The campaign review mode remains human under ADR-GOV-0023:
 model evaluation never ratifies a gate, dispatches a task, merges or authorizes
 an external effect. Neither this note nor offline acceptance grants that use.
+
+## Separate scored soft gate (ADR-MDL-0004)
+
+The optional explicit scored consumer mode uses `soft-gate-score.schema.json`, never a
+widened generic review-verdict or triage schema. All existing identity, standing, tier,
+command/emitter and completion/extraction/projection/isolation rules remain. Every
+Article18 dimension is integer0..4 with structured source citations, and each must
+reach3 independently against the exact effective rubric/threshold/source context. PASS additionally requires verdict=pass and complete valid observations; review/fail blocks despite high scores, while unknown or invalid evidence is an evidence error.
+Missing observations yield error; zero requires a demonstrated contradiction. A generic
+verdict, confidence, average or mutation score cannot replace dimension evidence.
+
+The trusted custodian explicitly invokes the registered scored mode through the
+reviewed integrated bridge in a fresh supported native process, with the exact bounded
+invocation envelope and actual effective empty tool/MCP/config/context controls. Retain
+complete bounded host envelope and unchanged selected reply bytes with separate digests
+from canonical score projection. Unsupported/unknown/inherited controls, real tool/MCP
+events, absent positive completion, ambiguity, refusal/error/truncation or lost bytes
+refuse. Scored replies cannot substitute for generic review or triage, and no transport
+projection or normalization silently fills required scored fields or changes legacy
+canonical schemas. No provider is invoked automatically in CI.
+
+Independent actual observations, externally selected immutable candidate/control/input
+identity and Ed25519 custody together support admission. A signature/self-declared
+verified/completed/isolated field alone cannot establish execution or independence.
+Exact external trust selection, freshness and all candidate/base/context/citation/
+member identities are reverified on the same actual immutable bytes before consumption.
