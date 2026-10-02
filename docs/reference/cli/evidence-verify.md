@@ -2,8 +2,10 @@
 
 `devai evidence verify --scope chain` checks `record/proofs/chain.json`: the sequence, the
 previous-hash links, each record's manifest hash, and the head. Under
-[ADR-EVI-0002](../../../law/adr/ADR-EVI-0002-proof-line-anchoring.md) it also cross-checks the
-chain against every physical proof line under `record/proofs/work`, in both directions. This
+[ADR-EVI-0002](../../../law/adr/ADR-EVI-0002-proof-line-anchoring.md), with the accepted
+[ADR-EVI-0005 recovery amendment](../../../law/adr/ADR-EVI-0005-newest-line-recovery-cli.md),
+it also cross-checks the chain against every physical proof line under `record/proofs/work`,
+in both directions. This
 page is the reference for that cross-check: the anchoring rules, the append-only baseline the
 first verification writes, the governed historical declaration, the crash-recovery rule, and
 the labels the verification result carries. The manifest hashing, link, and head rules of the
@@ -134,9 +136,11 @@ The cutoff separates eligible lines from later ones:
 ## The historical declaration
 
 Every physical line under `record/proofs/work` must have exactly one direct anchor or one
-governed historical declaration. A line with neither is an orphan and fails verification. The
-only remedy for an orphan is a declaration; an orphan is never re-anchored by a synthetic chain
-entry, and an old entry is never edited to add a digest.
+governed historical declaration. A line with neither is an orphan and fails verification.
+An older orphan can be acknowledged only by an eligible governed historical declaration;
+it is never re-anchored by a synthetic chain entry, and an old entry is never edited to add
+a digest. Without an eligible declaration it remains a failure. The bounded newest-line
+crash recovery below is separate from historical-gap acknowledgement.
 
 A historical declaration is a proof line of kind `historical-gap`, appended through
 `evidence record --kind historical-gap`, whose payload validates against
@@ -178,6 +182,40 @@ line of an epoch has no anchor and no declaration, the verifier reports it as
 `evidence record`, which computes the digest from the existing line bytes, appends that one
 chain entry, and writes nothing else; the proof line itself is not rewritten (IA-004). Only the newest line of an epoch qualifies: an older unanchored line is a historical
 gap when a declaration covers it and a failure otherwise.
+
+### Accepted recovery options (proposed)
+
+[ADR-EVI-0005](../../../law/adr/ADR-EVI-0005-newest-line-recovery-cli.md) accepts the
+following options on the existing `evidence record` action. They are proposed until the
+implementation lands: current CLI help does not expose them. Check the installed
+`devai evidence record --help` before attempting recovery; the accepted command does not
+create a new action or admit another initiating role.
+
+For an epoch whose newest physical line is sequence `1`, the accepted spelling is:
+
+```bash
+devai evidence record --recover-newest-line \
+  --proof-path record/proofs/work/generic/R-0007.jsonl --proof-sequence 1 \
+  --repo-root . --as-role inspector --write
+```
+
+`--proof-path` names the canonical repository-relative epoch path; `--proof-sequence` is a
+positive integer in that file's one-based namespace and must identify its newest physical
+line. Recovery resolves the existing line and its round from immutable bytes, computes the
+SHA-256 of those bytes without their newline, and rechecks the line immediately before
+appending its missing chain entry through `appendVerbEvidence` with `proofAnchor`.
+
+Only that chain entry may be appended. The physical JSONL, baseline, earlier chain entries,
+and every historical proof byte remain identical. An exact already-anchored line returns
+a non-duplicating outcome, so retrying never creates another anchor. A successful recovery
+is followed by `devai evidence verify --scope chain --repo-root .`; its real result still
+includes any unrelated defects or historical gaps.
+
+An older line, changed digest, symlink, path escape, non-newline tail, ambiguous anchor, or
+missing `--write` consent is refused before mutation. Recovery does not rewrite a proof,
+repair the baseline, declare a historical gap, or manufacture historical provenance.
+The registered initiating Inspector and authority check on the exact chain append remain
+required; consent alone grants no additional role or write scope.
 
 ## The verification result
 
