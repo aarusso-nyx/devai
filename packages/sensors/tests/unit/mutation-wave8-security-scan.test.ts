@@ -1,3 +1,4 @@
+// Invariants: INV-DEVAI-012; CMP-0006 TASK-0622 / issue #233.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({ spawnSync: vi.fn() }));
@@ -20,8 +21,8 @@ type SpawnResult = {
   readonly error?: NodeJS.ErrnoException;
 };
 
-function okJson(value: unknown): SpawnResult {
-  return { status: 0, signal: null, stdout: JSON.stringify(value), stderr: '' };
+function okJson(value: unknown, status = 0): SpawnResult {
+  return { status, signal: null, stdout: JSON.stringify(value), stderr: '' };
 }
 
 function spawnError(code: 'EACCES' | 'ENOENT', message: string): SpawnResult {
@@ -55,7 +56,9 @@ describe('security scan mutation boundaries', () => {
     process.env.DEVAI_SENSOR_ENV_MARKER = 'present';
     try {
       keyedSpawn({
-        pnpm: okJson({ metadata: { vulnerabilities: {} } }),
+        pnpm: okJson({
+          metadata: { vulnerabilities: { critical: 0, high: 0, moderate: 0, low: 0, info: 0 } },
+        }),
       });
 
       const reading = senseSecurityScan({ repoRoot: root, preferredTool: 'pnpm', now });
@@ -101,9 +104,12 @@ describe('security scan mutation boundaries', () => {
 
   it('preserves every numeric severity count from pnpm metadata', () => {
     keyedSpawn({
-      pnpm: okJson({
-        metadata: { vulnerabilities: { critical: 0, high: 0, moderate: 2, low: 3, info: 4 } },
-      }),
+      pnpm: okJson(
+        {
+          metadata: { vulnerabilities: { critical: 0, high: 0, moderate: 2, low: 3, info: 4 } },
+        },
+        1,
+      ),
     });
 
     const reading = senseSecurityScan({ repoRoot: root, now });
@@ -120,7 +126,9 @@ describe('security scan mutation boundaries', () => {
   it('selects the alternate fallback and counts npm v2 info advisories', () => {
     keyedSpawn({
       npm: spawnError('EACCES', 'permission denied'),
-      pnpm: okJson({ metadata: { vulnerabilities: {} } }),
+      pnpm: okJson({
+        metadata: { vulnerabilities: { critical: 0, high: 0, moderate: 0, low: 0, info: 0 } },
+      }),
     });
     const npmPreferred = senseSecurityScan({ repoRoot: root, preferredTool: 'npm', now });
     expect(calls()).toEqual(['npm', 'pnpm']);
@@ -129,7 +137,7 @@ describe('security scan mutation boundaries', () => {
 
     keyedSpawn({
       pnpm: spawnError('EACCES', 'permission denied'),
-      npm: okJson({ vulnerabilities: { pkg: { severity: 'info' } } }),
+      npm: okJson({ vulnerabilities: { pkg: { severity: 'info' } } }, 1),
     });
     const pnpmPreferred = senseSecurityScan({ repoRoot: root, preferredTool: 'pnpm', now });
     expect(calls()).toEqual(['pnpm', 'npm']);
@@ -141,7 +149,10 @@ describe('security scan mutation boundaries', () => {
 
   it('keeps the review threshold strict at equality', () => {
     keyedSpawn({
-      pnpm: okJson({ metadata: { vulnerabilities: { critical: 0, high: 5 } } }),
+      pnpm: okJson(
+        { metadata: { vulnerabilities: { critical: 0, high: 5, moderate: 0, low: 0, info: 0 } } },
+        1,
+      ),
     });
 
     const reading = senseSecurityScan({
