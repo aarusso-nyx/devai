@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { describe, expect, it } from 'vitest';
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 import { getValidator, validators } from '@devai-nyx/schemas';
 import { buildSensorReading } from '@devai-nyx/sensors';
 import {
@@ -21,6 +21,74 @@ import {
  *     SHA-256 of the full reply and only a bounded excerpt of it;
  *   - the breaker request names the consumer schema (`response_schema`).
  */
+
+// Activated before any bridge/SDK import and retained through suite teardown.
+// This is native denial, independent of vi mocks and per-test restoration.
+const offlineGuard = await vi.hoisted(async () => {
+  const http = (await import('node:http')).default;
+  const https = (await import('node:https')).default;
+  const net = (await import('node:net')).default;
+  const tls = (await import('node:tls')).default;
+  const childProcess = (await import('node:child_process')).default;
+  const { syncBuiltinESMExports } = await import('node:module');
+  const attempts: string[] = [];
+  const retained: { object: object; key: string; descriptor: PropertyDescriptor | undefined }[] =
+    [];
+  const deny = (surface: string): never => {
+    attempts.push(surface);
+    throw new Error(`OFFLINE_TEST_EFFECT_FORBIDDEN:${surface}`);
+  };
+  const block = (object: object, key: string, surface: string) => {
+    retained.push({ object, key, descriptor: Object.getOwnPropertyDescriptor(object, key) });
+    Object.defineProperty(object, key, {
+      configurable: true,
+      writable: true,
+      value: () => deny(surface),
+    });
+  };
+  block(globalThis, 'fetch', 'fetch');
+  for (const [object, name] of [
+    [http, 'http'],
+    [https, 'https'],
+  ] as const) {
+    block(object, 'request', `${name}.request`);
+    block(object, 'get', `${name}.get`);
+  }
+  block(net.Socket.prototype, 'connect', 'socket.connect');
+  block(tls, 'connect', 'tls.connect');
+  for (const key of [
+    'spawn',
+    'spawnSync',
+    'exec',
+    'execSync',
+    'execFile',
+    'execFileSync',
+    'fork',
+  ]) {
+    block(childProcess, key, `child_process.${key}`);
+  }
+  block(childProcess.ChildProcess.prototype, 'spawn', 'ChildProcess.spawn');
+  syncBuiltinESMExports();
+  return {
+    attempts,
+    restore() {
+      for (const { object, key, descriptor } of retained.reverse()) {
+        if (descriptor === undefined) Reflect.deleteProperty(object, key);
+        else Object.defineProperty(object, key, descriptor);
+      }
+      syncBuiltinESMExports();
+    },
+  };
+});
+
+afterEach(() => {
+  // Surface names only: never print SDK headers, credentials or request bodies.
+  expect(offlineGuard.attempts).toEqual([]);
+});
+afterAll(() => {
+  offlineGuard.restore();
+  expect(offlineGuard.attempts).toEqual([]);
+});
 
 const TIMESTAMP = '2026-09-29T00:00:00.000Z';
 const SCHEMA = 'triage-breaker.schema.json';

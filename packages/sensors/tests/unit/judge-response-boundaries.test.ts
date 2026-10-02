@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { describe, expect, it } from 'vitest';
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 import { senseJudge, type JudgeLlmClient } from '../../src/judge.js';
 
 /**
@@ -11,6 +11,74 @@ import { senseJudge, type JudgeLlmClient } from '../../src/judge.js';
  * SHA-256 of the full reply text (`metrics.reply_sha256`). `unknown` is only the
  * model's explicit uncertainty, never a parse fallback.
  */
+
+// Activated before any bridge/SDK import and retained through suite teardown.
+// This is native denial, independent of vi mocks and per-test restoration.
+const offlineGuard = await vi.hoisted(async () => {
+  const http = (await import('node:http')).default;
+  const https = (await import('node:https')).default;
+  const net = (await import('node:net')).default;
+  const tls = (await import('node:tls')).default;
+  const childProcess = (await import('node:child_process')).default;
+  const { syncBuiltinESMExports } = await import('node:module');
+  const attempts: string[] = [];
+  const retained: { object: object; key: string; descriptor: PropertyDescriptor | undefined }[] =
+    [];
+  const deny = (surface: string): never => {
+    attempts.push(surface);
+    throw new Error(`OFFLINE_TEST_EFFECT_FORBIDDEN:${surface}`);
+  };
+  const block = (object: object, key: string, surface: string) => {
+    retained.push({ object, key, descriptor: Object.getOwnPropertyDescriptor(object, key) });
+    Object.defineProperty(object, key, {
+      configurable: true,
+      writable: true,
+      value: () => deny(surface),
+    });
+  };
+  block(globalThis, 'fetch', 'fetch');
+  for (const [object, name] of [
+    [http, 'http'],
+    [https, 'https'],
+  ] as const) {
+    block(object, 'request', `${name}.request`);
+    block(object, 'get', `${name}.get`);
+  }
+  block(net.Socket.prototype, 'connect', 'socket.connect');
+  block(tls, 'connect', 'tls.connect');
+  for (const key of [
+    'spawn',
+    'spawnSync',
+    'exec',
+    'execSync',
+    'execFile',
+    'execFileSync',
+    'fork',
+  ]) {
+    block(childProcess, key, `child_process.${key}`);
+  }
+  block(childProcess.ChildProcess.prototype, 'spawn', 'ChildProcess.spawn');
+  syncBuiltinESMExports();
+  return {
+    attempts,
+    restore() {
+      for (const { object, key, descriptor } of retained.reverse()) {
+        if (descriptor === undefined) Reflect.deleteProperty(object, key);
+        else Object.defineProperty(object, key, descriptor);
+      }
+      syncBuiltinESMExports();
+    },
+  };
+});
+
+afterEach(() => {
+  // Surface names only: never print SDK headers, credentials or request bodies.
+  expect(offlineGuard.attempts).toEqual([]);
+});
+afterAll(() => {
+  offlineGuard.restore();
+  expect(offlineGuard.attempts).toEqual([]);
+});
 
 type FinishReason = 'stop' | 'length' | 'tool_use' | 'error';
 
@@ -59,16 +127,25 @@ const PASS = {
   findings: [],
 };
 
+const FINDINGS = {
+  verdict: 'fail',
+  confidence: 0.7,
+  rationale: 'two defects',
+  findings: [
+    { severity: 'critical', code: 'VALID', message: 'kept' },
+    { severity: 'warning', code: 'SECOND', message: 'also kept' },
+  ],
+};
+
 function sha256(text: string): string {
   return createHash('sha256').update(text, 'utf8').digest('hex');
 }
 
-async function expectErrorReading(response: {
-  text: string;
-  json?: unknown;
-  finish_reason?: FinishReason;
-}): Promise<void> {
-  const reading = await senseJudge(baseOptions, client(response));
+async function expectErrorReading(
+  response: { text: string; json?: unknown; finish_reason?: FinishReason },
+  evidencePath?: string,
+): Promise<Awaited<ReturnType<typeof senseJudge>>> {
+  const reading = await senseJudge({ ...baseOptions, evidencePath }, client(response));
   expect(reading).toMatchObject({
     status: 'error',
     deterministic: false,
@@ -90,6 +167,8 @@ async function expectErrorReading(response: {
   expect(typeof excerpt).toBe('string');
   expect(String(excerpt).length).toBeLessThanOrEqual(EXCERPT_CEILING);
   expect(reading.status).not.toBe('unknown');
+  if (evidencePath !== undefined) expect(reading.evidence_path).toBe(evidencePath);
+  return reading;
 }
 
 describe('judge response boundaries', () => {
@@ -103,8 +182,11 @@ describe('judge response boundaries', () => {
     });
   });
 
-  it('prefers a valid object response over invalid text and records provider identity', async () => {
-    const reading = await senseJudge(baseOptions, client({ text: '{not-json', json: PASS }));
+  it('accepts matching selected text and structured output and records provider identity', async () => {
+    const reading = await senseJudge(
+      baseOptions,
+      client({ text: JSON.stringify(PASS), json: PASS }),
+    );
 
     expect(reading).toMatchObject({
       status: 'pass',
@@ -124,6 +206,26 @@ describe('judge response boundaries', () => {
       },
       findings: [{ severity: 'info', code: 'rationale', message: 'structured result' }],
     });
+  });
+
+  it('refuses valid structured output paired with invalid selected text and hashes that text', async () => {
+    const text = '{not-json';
+    expect(sha256(text)).toBe('f1dec6e9ee608550bd1c39ff2b90134059bac5d02e4e78f6410aed2fbd870bd0');
+    await expectErrorReading({ text, json: PASS });
+  });
+
+  it('refuses findings paired with empty selected text and preserves its digest and evidence path', async () => {
+    const text = '';
+    expect(sha256(text)).toBe('e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855');
+    const reading = await expectErrorReading(
+      { text, json: FINDINGS },
+      'record/proofs/judge/coherence.json',
+    );
+    expect(reading.findings).toHaveLength(1);
+    const findings = reading.findings;
+    if (findings === undefined) throw new Error('Expected the refusal finding');
+    expect(findings.map((finding) => finding.code)).not.toContain('VALID');
+    expect(findings.map((finding) => finding.code)).not.toContain('SECOND');
   });
 
   it('yields the verdict from prose around one unfenced document (IA-001)', async () => {
@@ -166,16 +268,8 @@ describe('judge response boundaries', () => {
     const reading = await senseJudge(
       { ...baseOptions, evidencePath: 'record/proofs/judge/coherence.json' },
       client({
-        text: '',
-        json: {
-          verdict: 'fail',
-          confidence: 0.7,
-          rationale: 'two defects',
-          findings: [
-            { severity: 'critical', code: 'VALID', message: 'kept' },
-            { severity: 'warning', code: 'SECOND', message: 'also kept' },
-          ],
-        },
+        text: JSON.stringify(FINDINGS),
+        json: FINDINGS,
       }),
     );
     expect(reading).toMatchObject({
