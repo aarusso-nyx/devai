@@ -27,6 +27,7 @@ descriptor closure remain release gates.
 
 ## Runbooks
 
+- [CMP-0006 open-issue closure campaign](operations/open-issue-closure-campaign/README.md)
 - [Testing](operations/testing.md)
 - [Worktrees](operations/worktree-runbook.md)
 - [Database isolation](operations/db-isolation.md)
