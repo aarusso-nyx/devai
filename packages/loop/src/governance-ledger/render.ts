@@ -5,6 +5,111 @@ import { parseGovernanceRecord } from './records.js';
 export const DEFAULT_RECORDS_DIR = 'law/adr';
 export const DEFAULT_ROUNDS_DIR = 'work/rounds';
 
+interface ClosureIndexRow {
+  readonly closure: string;
+  readonly round: string;
+  readonly supersedes: string | null;
+  readonly merged_as: string;
+  readonly terminal: boolean;
+}
+
+type ClosureIndexParseResult =
+  { readonly ok: true; readonly rows: readonly ClosureIndexRow[] } | { readonly ok: false };
+
+const CLOSURE_ID = /^PC-[0-9]{4}$/u;
+const CLOSURE_INDEX_HEADER = '| closure | round | supersedes | merged_as | terminal |';
+const CLOSURE_INDEX_SEPARATOR = '| --- | --- | --- | --- | --- |';
+
+/** Parse the canonical five-cell format without repairing malformed data lines. */
+export function parseClosureIndexRows(index: string): ClosureIndexParseResult {
+  const rows: ClosureIndexRow[] = [];
+  for (const line of index.split('\n')) {
+    if (line === CLOSURE_INDEX_HEADER || line === CLOSURE_INDEX_SEPARATOR) continue;
+    // Recognize broken table rows too, so prose cannot hide malformed membership data.
+    if (!/^\s*\|/u.test(line) && !/^\s*PC-[^|]*\|/u.test(line)) continue;
+    if (!line.startsWith('| ') || !line.endsWith(' |')) return { ok: false };
+    const cells = line.slice(2, -2).split(' | ');
+    if (cells.length !== 5) return { ok: false };
+    const [closure, round, supersedes, mergedAs, terminal] = cells;
+    if (
+      closure === undefined ||
+      !CLOSURE_ID.test(closure) ||
+      round === undefined ||
+      round.length === 0 ||
+      round !== round.trim() ||
+      /[|\r\n]/u.test(round) ||
+      supersedes === undefined ||
+      (supersedes !== '-' && !CLOSURE_ID.test(supersedes)) ||
+      mergedAs === undefined ||
+      (mergedAs !== '-' && !/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u.test(mergedAs)) ||
+      (terminal !== 'yes' && terminal !== 'no')
+    ) {
+      return { ok: false };
+    }
+    rows.push(
+      Object.freeze({
+        closure,
+        round,
+        supersedes: supersedes === '-' ? null : supersedes,
+        merged_as: mergedAs,
+        terminal: terminal === 'yes',
+      }),
+    );
+  }
+  return { ok: true, rows: Object.freeze(rows) };
+}
+
+/** Exact terminal membership requires one coherent supersession chain in every round. */
+export function hasTerminalClosureIndexRow(
+  index: string,
+  closureId: string,
+  roundId: string,
+): boolean {
+  if (!CLOSURE_ID.test(closureId) || roundId.length === 0) return false;
+  const parsed = parseClosureIndexRows(index);
+  if (!parsed.ok || parsed.rows.length === 0) return false;
+  const byId = new Map<string, ClosureIndexRow>();
+  const byRound = new Map<string, ClosureIndexRow[]>();
+  for (const row of parsed.rows) {
+    if (byId.has(row.closure)) return false;
+    byId.set(row.closure, row);
+    const roundRows = byRound.get(row.round) ?? [];
+    roundRows.push(row);
+    byRound.set(row.round, roundRows);
+  }
+  const successors = new Map<string, string>();
+  for (const row of parsed.rows) {
+    if (row.supersedes === null) continue;
+    const predecessor = byId.get(row.supersedes);
+    if (
+      predecessor === undefined ||
+      predecessor.round !== row.round ||
+      predecessor.closure === row.closure ||
+      successors.has(predecessor.closure)
+    ) {
+      return false;
+    }
+    successors.set(predecessor.closure, row.closure);
+  }
+  for (const roundRows of byRound.values()) {
+    const roots = roundRows.filter((row) => row.supersedes === null);
+    if (roots.length !== 1) return false;
+    for (const row of roundRows) {
+      if (row.terminal !== !successors.has(row.closure)) return false;
+    }
+    const visited = new Set<string>();
+    let current = roots[0]?.closure;
+    while (current !== undefined) {
+      if (visited.has(current)) return false;
+      visited.add(current);
+      current = successors.get(current);
+    }
+    if (visited.size !== roundRows.length) return false;
+  }
+  const target = byId.get(closureId);
+  return target !== undefined && target.round === roundId && target.terminal;
+}
+
 export function markdownFiles(dir: string): readonly string[] {
   if (!existsSync(dir)) return [];
   return readdirSync(dir)
