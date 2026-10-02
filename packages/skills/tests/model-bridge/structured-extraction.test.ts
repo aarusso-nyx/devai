@@ -243,11 +243,14 @@ describe('IA-001 prose around exactly one valid document yields the document', (
 });
 
 describe('the provider json field is validated too', () => {
-  it('takes a valid json field over a prose text body', () => {
-    expectOk(
-      extract({ text: 'Structured output returned.', json: PASS, finish_reason: 'stop' }),
-      PASS,
-    );
+  it('accepts a structured object matching the selected text', () => {
+    expectOk(extract({ text: PASS_TEXT, json: PASS, finish_reason: 'stop' }), PASS);
+  });
+
+  it('refuses a valid object paired with prose-only selected text and hashes that text', () => {
+    const text = 'Structured output returned.';
+    expect(sha256(text)).toBe('92b29b433aca9a7e94e16de5540f6a569ce8e1e38999ed09e738e04b027da9f8');
+    expectError(extract({ text, json: PASS, finish_reason: 'stop' }), text, 'reply_invalid');
   });
 
   it('refuses an invalid json field and never falls back to a valid text body', () => {
