@@ -195,7 +195,7 @@ For an epoch whose newest physical line is sequence `1`, the accepted spelling i
 
 ```bash
 devai evidence record --recover-newest-line \
-  --proof-path record/proofs/work/generic/R-0007.jsonl --proof-sequence 1 \
+  --proof-path record/proofs/work/generic/R-9999.jsonl --proof-sequence 1 \
   --repo-root . --as-role inspector --write
 ```
 

@@ -164,7 +164,7 @@ unchanged. Successful sealing preserves its existing authorized lifecycle writes
 ## Inspector acceptance matrix
 
 Use minimal real canonical rows in the two owned test files. `C` denotes queried
-`PC-0007`, `R` denotes `R-0007`; valid merged cells may use the existing SHA
+`PC-0007`, `R` denotes `R-9999`; valid merged cells may use the existing SHA
 fixture or `-` where historical rendering is the subject. First supply valid
 proof/record/decision prerequisites when reaching the sealing ledger check.
 
