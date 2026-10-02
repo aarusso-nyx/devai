@@ -4,7 +4,7 @@
   "id": "campaign-execution",
   "status": "accepted",
   "authority": "Architect",
-  "policy_version": "1.3.0",
+  "policy_version": "1.4.0",
   "plan_schema": "law/schemas/campaign.schema.json",
   "containment": {
     "levels": ["campaign", "round", "wave", "task"],
@@ -230,7 +230,42 @@
     "integration_boundaries": "two: the local preflight against a named fetched base is the ready-for-a-pull-request condition, repeated by the pull_request run of the gate on the head; integration validation runs against the queue candidate under merge_group, measured against the queue base, and that run is the one binding for the integration branch",
     "queue_admission": "a pull request enters the merge queue when its own required gate is green on its head; the queue rebases the entry onto the current tip of the integration branch and re-runs the gate on the rebased candidate with the queue base as its base; an entry whose gate fails is evicted with its diagnostic, its task returns from pre_merge to in_progress, and no entry behind it is cancelled; a red head is never admitted and a stale candidate is never retried",
     "queue_prerequisite": "the merge queue merges with the rebase method together with linear history and the single required check; enabling it is an Owner effect on the repository settings, verified and performed before the round that delivers the merge_group lane closes; when the prerequisite fails, the Owner records the serialized-admission fallback on that effect with outcome fallback and performed_at set to the time of the recording, which lets the round close without enabling the queue; allow_update_branch is a convenience, not a prerequisite",
-    "serialized_admission": "in force whenever the merge queue is not enabled on the integration branch: that is, whenever the merge-queue Owner effect has no performed_at, or carries performed_at with outcome fallback because the prerequisite failed and the fallback was recorded in its place; only performed_at with outcome performed, or with no outcome, lifts it; while in force, at most one pull request targeting the integration branch is in pre_merge at a time; a second task does not enter pre_merge until that pull request is merged or returned to in_progress, and once it merges the next task rebases onto the new tip and re-runs the local preflight before opening its pull request"
+    "serialized_admission": "in force whenever the merge queue is not enabled on the integration branch: that is, whenever the merge-queue Owner effect has no performed_at, or carries performed_at with outcome fallback because the prerequisite failed and the fallback was recorded in its place; only performed_at with outcome performed, or with no outcome, lifts it; while in force, at most one pull request targeting the integration branch is in pre_merge at a time; a second task does not enter pre_merge until that pull request is merged or returned to in_progress, and once it merges the next task rebases onto the new tip and re-runs the local preflight before opening its pull request",
+    "source_campaign_overrides": {
+      "CMP-0006": {
+        "repository": "aarusso-nyx/devai",
+        "source_development_only": true,
+        "materialized_runtime_override": false,
+        "mandate": "docs/dev/operations/open-issue-closure-campaign/mandate.md",
+        "procedure": "docs/dev/operations/open-issue-closure-campaign/integration-contract.md",
+        "pull_request_cardinality": "one-cumulative-remediation-pr-plus-one-post-publication-repin-pr",
+        "remediation_scope": [
+          "R-0601",
+          "R-0602",
+          "R-0603",
+          "R-0604",
+          "R-0605",
+          "R-0606",
+          "R-0607-preparation-artifacts"
+        ],
+        "repin_scope": ["R-0608", "R-0609-bounded-accounting-artifacts"],
+        "source_dependency_rule": "exact-human-ratified-candidate-checkpoints-permit-downstream-source-work-before-remediation-merge; no-merged_as-or-round-closure-or-runtime-authority-is-inferred",
+        "checkpoint_kinds": {
+          "architect": "accepted-design-on-exact-head",
+          "inspector": "established-counterexamples-on-exact-head; declared-red-implementation-case-is-not-a-passing-gate",
+          "engineer": "implementation-and-all-declared-acceptance-pass-on-exact-head"
+        },
+        "role_rule": "separate-role-declared-sessions-and-isolated-worktrees; each author touches only declared paths; human integrates reviewed single-family role-attributed commits",
+        "admission_rule": "all-final-task-acceptance-and-mandatory-floor-on-exact-cumulative-candidate; shared-identical-PR-reference-counts-once; refuse-any-undeclared-third-source-PR",
+        "merge_rule": "human-ratified-rebase-integration-only; actual-mapped-commits-and-merged-head-recorded-after-observation; no-squash-or-intermediate-task-merge",
+        "publication_rule": "remediation-PR-must-merge-before-shipping-from-main-under-old-trusted-pin; repin-PR-requires-immutable-published-artifact; preserve-all-release-authority-and-exact-effect-gates",
+        "bookkeeping_rule": "source checkpoints and draft accounting are not runtime records; post-merge final effects/observations close rounds only when universal and issue-specific gates hold; no third implementation PR inferred",
+        "expiry": "CMP-0006 closed or abandoned; no override for other source campaigns or adopters",
+        "precedence": "this explicit human-driven source procedure replaces intermediate merged/closed prerequisites only for reviewed source contribution sequencing; default runtime state transitions, actual close gates and external effects remain unchanged",
+        "source_lock_rule": "acquire the complete declared wave lock set before writing; release at a frozen reviewed checkpoint and exact handoff; serialize every overlapping scope; a previously completed unmerged contribution is read-only unless reopened and re-reviewed",
+        "post_merge_phase_rule": "R-0608 source work requires actual R-0607 closure and immutable publication; R-0609 candidate accounting may be prepared from the reviewed R-0608 checkpoint but final observations/closure wait for actual R-0608 integration, closure and effects"
+      }
+    }
   },
   "prompts": {
     "composition": ["preamble", "task"],
