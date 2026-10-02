@@ -45,8 +45,7 @@ The final Owner instruction is: “Go with One cumulative remediation PR, plus o
 contract is accepted; earlier one-PR deliberation is superseded. The scoped
 source procedure is explicit in campaign-execution.json 1.4.0.
 
-Current planned scope: 9 rounds, 20 CTGs, 46 tasks. The previous scope was 9,
-19 and 43; only CTG-0624 (TASK-06210, TASK-06211, TASK-06212) was added.
+Current planned scope: 9 rounds, 22 CTGs, 50 tasks. The initial 9-round/19-CTG/43-task scope gained CTG-0624 integration support and now CTG-0625 trace repair plus CTG-0626 Architect inventory adoption (TASK-06213–TASK-06216); original issue population and receipts are preserved.
 This preparation grants local artifact updates and records the explicit contract
 acceptances. Worker execution, commits, source publication, PR creation/merge,
 issue effects, signing/export, release/Pages/settings and notifications still
