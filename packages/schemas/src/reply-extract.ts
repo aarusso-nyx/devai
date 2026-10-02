@@ -1,4 +1,4 @@
-// ADR-MDL-0001: the one shared extractor for model-evaluated replies.
+// ADR-MDL-0003: the one shared extractor for model-evaluated replies.
 //
 // It validates a provider `json` field when one is present, and otherwise accepts
 // exactly one unambiguous candidate document in the reply text, fenced or not. It
@@ -10,7 +10,8 @@
 import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import type { ErrorObject } from 'ajv';
-import { getValidator } from './index.js';
+import Ajv2020 from 'ajv/dist/2020.js';
+import { getValidator, loadSchema } from './index.js';
 
 /** The consumer-specific reply contracts the extractor reads against. */
 export type ReplySchemaName = 'review-verdict.schema.json' | 'triage-breaker.schema.json';
@@ -22,6 +23,12 @@ export interface StructuredReply {
   readonly text: string;
   readonly json?: unknown;
   readonly finish_reason?: ReplyFinishReason;
+  /** Exact strict request identity; raw replies validate before optional-null removal. */
+  readonly projection?: {
+    readonly version: 'strict-reply-v1';
+    readonly schema: ReplySchemaName;
+    readonly schema_sha256: string;
+  };
 }
 
 export type ReplyErrorCode =
@@ -164,38 +171,32 @@ export function extractStructuredReply(
       error: { code, message, excerpt: excerptOf(source, focus), reply_sha256 },
     }) as const;
 
-  const finish = reply.finish_reason ?? 'stop';
+  const finish = reply.finish_reason;
   if (finish === 'length') {
     return fail('reply_truncated', 'the provider stopped the reply at its output limit');
   }
   if (finish !== 'stop') {
     return fail(
       'reply_provider_error',
-      `the provider finished the reply with ${finish}, not a completed turn`,
+      `the provider has no affirmative completed turn (${String(finish)})`,
     );
   }
 
   const validate = getValidator(schema);
-  if (reply.json !== undefined && reply.json !== null) {
-    if (validate(reply.json)) {
-      return { ok: true, document: reply.json as Record<string, unknown> };
-    }
-    let source: string;
-    try {
-      source = JSON.stringify(reply.json) ?? String(reply.json);
-    } catch {
-      source = String(reply.json);
-    }
+  const supplied = reply.json !== undefined && reply.json !== null;
+  // An invalid provider object never falls back to apparently valid text.
+  if (supplied && reply.projection === undefined && !validate(reply.json)) {
     return fail(
       'reply_invalid',
       `the provider json document fails ${schema}: ${describeErrors(validate.errors)}`,
-      source,
     );
   }
-
   const found = candidates(text);
   if (found.length === 0) {
-    return fail('reply_no_document', 'the reply holds no JSON document');
+    return fail(
+      supplied ? 'reply_invalid' : 'reply_no_document',
+      'the selected reply holds no JSON document',
+    );
   }
   const parsed = found.filter((candidate) => candidate.parses);
   const distinct: Candidate[] = [];
@@ -220,7 +221,51 @@ export function extractStructuredReply(
       first?.raw,
     );
   }
-  if (!validate(only.parsed)) {
+  if (supplied && !isDeepStrictEqual(reply.json, only.parsed)) {
+    return fail(
+      'reply_invalid',
+      'the provider json document disagrees with the selected reply text',
+    );
+  }
+  let document = only.parsed;
+  if (reply.projection !== undefined) {
+    const projection = reply.projection;
+    if (projection === null || typeof projection !== 'object' || Array.isArray(projection)) {
+      return fail('reply_invalid', 'the strict reply projection must be an exact identity object');
+    }
+    const expected = strictReplySchema(schema);
+    const digest = createHash('sha256').update(JSON.stringify(expected), 'utf8').digest('hex');
+    if (
+      projection.version !== 'strict-reply-v1' ||
+      projection.schema !== schema ||
+      projection.schema_sha256 !== digest ||
+      Object.keys(projection).sort().join(',') !== 'schema,schema_sha256,version'
+    ) {
+      return fail(
+        'reply_invalid',
+        'the strict reply projection identity does not match the consumer schema',
+      );
+    }
+    const projected = new Ajv2020({ strict: false, allErrors: true }).compile(expected);
+    if (!projected(document)) {
+      return fail(
+        'reply_invalid',
+        `the raw reply fails its strict projection: ${describeErrors(projected.errors)}`,
+      );
+    }
+    document = structuredClone(document) as Record<string, unknown>;
+    if (schema === 'review-verdict.schema.json') {
+      const review = document as Record<string, unknown>;
+      if (review['findings'] === null) delete review['findings'];
+      else if (Array.isArray(review['findings'])) {
+        for (const finding of review['findings'] as Record<string, unknown>[]) {
+          if (finding['file'] === null) delete finding['file'];
+          if (finding['line'] === null) delete finding['line'];
+        }
+      }
+    }
+  }
+  if (!validate(document)) {
     return fail(
       'reply_invalid',
       `the reply document fails ${schema}: ${describeErrors(validate.errors)}`,
@@ -228,5 +273,49 @@ export function extractStructuredReply(
       only.raw,
     );
   }
-  return { ok: true, document: only.parsed as Record<string, unknown> };
+  return { ok: true, document: document as Record<string, unknown> };
+}
+
+/** Reconstruct the declared strict request from the immutable consumer contract. */
+function strictReplySchema(name: ReplySchemaName): Record<string, unknown> {
+  const visit = (value: unknown, path: string): unknown => {
+    if (Array.isArray(value))
+      return value.map((member, index) => visit(member, `${path}/${index}`));
+    if (value === null || typeof value !== 'object') return value;
+    const node = value as Record<string, unknown>;
+    const out = Object.fromEntries(
+      Object.entries(node)
+        .filter(
+          ([key]) => !['$schema', '$id', 'schema_version', 'examples', 'default'].includes(key),
+        )
+        .map(([key, member]) => [key, visit(member, `${path}/${key}`)]),
+    );
+    if (node['type'] === 'object') {
+      if (
+        node['additionalProperties'] !== false ||
+        !node['properties'] ||
+        !Array.isArray(node['required'])
+      ) {
+        throw new Error('MODEL_BRIDGE_SCHEMA_UNSUPPORTED');
+      }
+      const properties = out['properties'] as Record<string, unknown>;
+      for (const key of Object.keys(properties)) {
+        if ((node['required'] as string[]).includes(key)) continue;
+        const position = `${path}/properties/${key}`;
+        if (
+          name !== 'review-verdict.schema.json' ||
+          ![
+            '/properties/findings',
+            '/$defs/finding/properties/file',
+            '/$defs/finding/properties/line',
+          ].includes(position)
+        )
+          throw new Error('MODEL_BRIDGE_SCHEMA_UNSUPPORTED');
+        properties[key] = { anyOf: [properties[key], { type: 'null' }] };
+      }
+      out['required'] = Object.keys(properties);
+    }
+    return out;
+  };
+  return visit(loadSchema(name), '') as Record<string, unknown>;
 }
