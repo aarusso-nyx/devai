@@ -365,8 +365,14 @@ export const evidenceVerify = defineCommand({
               write: explicitWrite(),
             });
             if (!verification.valid) {
+              const recovery = verification.lines
+                .filter((line) => line.label === 'UNANCHORED_NEWEST_LINE')
+                .map(
+                  (line) =>
+                    `evidence record --recover-newest-line --proof-path ${line.path} --proof-sequence ${String(line.sequence)} --repo-root <root> --as-role inspector --write`,
+                );
               process.stderr.write(
-                `devai evidence verify: invalid chain: ${verification.errors.join('; ')}\n`,
+                `devai evidence verify: invalid chain: ${verification.errors.join('; ')}${recovery.length > 0 ? `; newest-line recovery: ${recovery.join('; ')}` : ''}\n`,
               );
               process.exitCode = EXIT_FAIL;
               return;
