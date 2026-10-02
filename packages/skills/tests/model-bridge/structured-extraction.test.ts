@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ROSTER, getValidator } from '@devai-nyx/schemas';
 
 /**
@@ -26,6 +26,74 @@ import { ROSTER, getValidator } from '@devai-nyx/schemas';
  * call option `response_schema` naming the consumer's schema.
  */
 
+// Activated before any bridge/SDK import and retained through suite teardown.
+// This is native denial, independent of vi mocks and per-test restoration.
+const offlineGuard = await vi.hoisted(async () => {
+  const http = (await import('node:http')).default;
+  const https = (await import('node:https')).default;
+  const net = (await import('node:net')).default;
+  const tls = (await import('node:tls')).default;
+  const childProcess = (await import('node:child_process')).default;
+  const { syncBuiltinESMExports } = await import('node:module');
+  const attempts: string[] = [];
+  const retained: { object: object; key: string; descriptor: PropertyDescriptor | undefined }[] =
+    [];
+  const deny = (surface: string): never => {
+    attempts.push(surface);
+    throw new Error(`OFFLINE_TEST_EFFECT_FORBIDDEN:${surface}`);
+  };
+  const block = (object: object, key: string, surface: string) => {
+    retained.push({ object, key, descriptor: Object.getOwnPropertyDescriptor(object, key) });
+    Object.defineProperty(object, key, {
+      configurable: true,
+      writable: true,
+      value: () => deny(surface),
+    });
+  };
+  block(globalThis, 'fetch', 'fetch');
+  for (const [object, name] of [
+    [http, 'http'],
+    [https, 'https'],
+  ] as const) {
+    block(object, 'request', `${name}.request`);
+    block(object, 'get', `${name}.get`);
+  }
+  block(net.Socket.prototype, 'connect', 'socket.connect');
+  block(tls, 'connect', 'tls.connect');
+  for (const key of [
+    'spawn',
+    'spawnSync',
+    'exec',
+    'execSync',
+    'execFile',
+    'execFileSync',
+    'fork',
+  ]) {
+    block(childProcess, key, `child_process.${key}`);
+  }
+  block(childProcess.ChildProcess.prototype, 'spawn', 'ChildProcess.spawn');
+  syncBuiltinESMExports();
+  return {
+    attempts,
+    restore() {
+      for (const { object, key, descriptor } of retained.reverse()) {
+        if (descriptor === undefined) Reflect.deleteProperty(object, key);
+        else Object.defineProperty(object, key, descriptor);
+      }
+      syncBuiltinESMExports();
+    },
+  };
+});
+
+afterEach(() => {
+  // Surface names only: never print SDK headers, credentials or request bodies.
+  expect(offlineGuard.attempts).toEqual([]);
+});
+afterAll(() => {
+  offlineGuard.restore();
+  expect(offlineGuard.attempts).toEqual([]);
+});
+
 const { spawnSyncMock } = vi.hoisted(() => ({ spawnSyncMock: vi.fn() }));
 vi.mock('@devai-nyx/authority', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -36,12 +104,12 @@ const { anthropicCreate, openaiCreate } = vi.hoisted(() => ({
   anthropicCreate: vi.fn(),
   openaiCreate: vi.fn(),
 }));
-vi.mock('@anthropic-ai/sdk', () => ({
+vi.mock('../../node_modules/@anthropic-ai/sdk/index.mjs', () => ({
   default: class {
     messages = { create: anthropicCreate };
   },
 }));
-vi.mock('openai', () => ({
+vi.mock('../../node_modules/openai/index.mjs', () => ({
   default: class {
     chat = { completions: { create: openaiCreate } };
   },
@@ -543,5 +611,111 @@ describe('bridge transports (IA-004, IA-006)', () => {
       'reference_gap',
       'inconclusive',
     ]);
+  });
+});
+
+describe('CMP-0006 exact selected reply and completion counterexamples', () => {
+  it('refuses missing positive finish evidence instead of defaulting to stop', () => {
+    expectError(extract({ text: PASS_TEXT }), PASS_TEXT, 'reply_provider_error');
+  });
+
+  it('refuses a provider json document contradicting the selected text document', () => {
+    const other = { ...PASS, verdict: 'fail' };
+    expectError(
+      extract({ text: JSON.stringify(other), json: PASS, finish_reason: 'stop' }),
+      JSON.stringify(other),
+      'reply_invalid',
+    );
+  });
+
+  it('caps redacted diagnostics at the contract bound of 1024 characters', () => {
+    const text = `${'diagnostic '.repeat(300)}{"verdict":"maybe"}`;
+    const result = extract({ text, finish_reason: 'stop' });
+    expectError(result, text, 'reply_invalid');
+    if (!result.ok) expect(result.error.excerpt.length).toBeLessThanOrEqual(1024);
+  });
+});
+
+// The Claude host formatter exception never applies to API tool-use content.
+describe('CMP-0006 API completion evidence (mocked clients only)', () => {
+  const originalAnthropic = process.env.ANTHROPIC_API_KEY;
+  const originalOpenai = process.env.OPENAI_API_KEY;
+  beforeEach(() => {
+    spawnSyncMock.mockReset();
+    anthropicCreate.mockReset();
+    openaiCreate.mockReset();
+    process.env.ANTHROPIC_API_KEY = 'synthetic-offline-key';
+    process.env.OPENAI_API_KEY = 'synthetic-offline-key';
+  });
+  afterEach(() => {
+    if (originalAnthropic === undefined) delete process.env.ANTHROPIC_API_KEY;
+    else process.env.ANTHROPIC_API_KEY = originalAnthropic;
+    if (originalOpenai === undefined) delete process.env.OPENAI_API_KEY;
+    else process.env.OPENAI_API_KEY = originalOpenai;
+  });
+
+  it.each([
+    ['missing completion', undefined, []],
+    ['API tool stop', 'tool_use', []],
+    [
+      'tool content hidden behind end_turn',
+      'end_turn',
+      [{ type: 'tool_use', id: 'tool', name: 'Bash', input: { command: 'true' } }],
+    ],
+    [
+      'MCP content hidden behind end_turn',
+      'end_turn',
+      [{ type: 'tool_use', id: 'mcp', name: 'mcp__inherited__read', input: {} }],
+    ],
+    ['truncation', 'max_tokens', []],
+    ['refusal', 'refusal', []],
+  ])('refuses Claude API %s', async (_name, stop_reason, extra) => {
+    anthropicCreate.mockResolvedValue({
+      content: [{ type: 'text', text: PASS_TEXT }, ...extra],
+      usage: { input_tokens: 1, output_tokens: 1 },
+      stop_reason,
+    });
+    const response = await createModelBridge({ provider: 'claude', model: 'offline' }).complete(
+      { system: 'rubric', user: 'evidence' },
+      {},
+      { response_schema: REVIEW },
+    );
+    expect(anthropicCreate).toHaveBeenCalledTimes(1);
+    expect(openaiCreate).not.toHaveBeenCalled();
+    expect(spawnSyncMock).not.toHaveBeenCalled();
+    expect(extract(response).ok).toBe(false);
+  });
+
+  it.each([
+    ['missing completion', undefined, {}],
+    ['tool finish', 'tool_calls', {}],
+    [
+      'tool calls hidden behind stop',
+      'stop',
+      {
+        tool_calls: [{ id: 'tool', type: 'function', function: { name: 'read', arguments: '{}' } }],
+      },
+    ],
+    [
+      'legacy function call hidden behind stop',
+      'stop',
+      { function_call: { name: 'read', arguments: '{}' } },
+    ],
+    ['refusal hidden behind stop', 'stop', { refusal: 'Refused.' }],
+    ['truncation', 'length', {}],
+  ])('refuses OpenAI API %s', async (_name, finish_reason, extra) => {
+    openaiCreate.mockResolvedValue({
+      choices: [{ message: { content: PASS_TEXT, ...extra }, finish_reason }],
+      usage: { prompt_tokens: 1, completion_tokens: 1 },
+    });
+    const response = await createModelBridge({ provider: 'codex', model: 'offline' }).complete(
+      { system: 'rubric', user: 'evidence' },
+      {},
+      { response_schema: REVIEW },
+    );
+    expect(openaiCreate).toHaveBeenCalledTimes(1);
+    expect(anthropicCreate).not.toHaveBeenCalled();
+    expect(spawnSyncMock).not.toHaveBeenCalled();
+    expect(extract(response).ok).toBe(false);
   });
 });

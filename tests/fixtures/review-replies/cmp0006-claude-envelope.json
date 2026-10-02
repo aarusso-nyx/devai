@@ -1,0 +1,19 @@
+{
+  "type": "result",
+  "subtype": "success",
+  "is_error": false,
+  "stop_reason": "tool_use",
+  "terminal_reason": "completed",
+  "result": "The structured output is authoritative; this result string is deliberately different.",
+  "structured_output": {
+    "verdict": "pass",
+    "confidence": 0.91,
+    "rationale": "Synthetic offline completion; no live review is claimed.",
+    "findings": []
+  },
+  "usage": {
+    "input_tokens": 2,
+    "output_tokens": 3
+  },
+  "total_cost_usd": 0
+}

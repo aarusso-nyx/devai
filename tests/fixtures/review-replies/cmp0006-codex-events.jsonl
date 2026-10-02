@@ -1,0 +1,4 @@
+{"type":"thread.started","thread_id":"synthetic-offline-thread"}
+{"type":"turn.started"}
+{"type":"item.completed","item":{"id":"synthetic-final","type":"agent_message","text":"\t{\"verdict\":\"pass\",\"confidence\":0.91,\"rationale\":\"Synthetic offline completed Codex turn.\",\"findings\":null}\n"}}
+{"type":"turn.completed","usage":{"input_tokens":2,"cached_input_tokens":1,"output_tokens":3}}

@@ -1,0 +1,1 @@
+{"verdict":"pass","confidence":0.91,"rationale":"Synthetic offline completion; no live review is claimed.","findings":[]}

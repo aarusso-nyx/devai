@@ -1,0 +1,1 @@
+	{"verdict":"pass","confidence":0.91,"rationale":"Synthetic offline completed Codex turn.","findings":null}
