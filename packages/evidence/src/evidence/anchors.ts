@@ -92,6 +92,8 @@ export interface ProofAnchorVerificationInputs {
   readonly now?: Date;
   /** `--write` consent: only with it may the baseline be created or appended to. */
   readonly write?: boolean;
+  /** Read-only recovery inspection retains absence failures while checking every present claim. */
+  readonly inspectRecovery?: boolean;
 }
 
 interface BaselineEntry {
@@ -395,7 +397,27 @@ export function verifyProofAnchors(inputs: ProofAnchorVerificationInputs): Proof
   const chainPath = resolve(root, inputs.chainPath ?? DEFAULT_CHAIN_PATH);
   const observedAt = (inputs.now ?? new Date()).toISOString();
   const write = inputs.write === true;
-  const chain = verifyChain(chainPath);
+  const inspectRecovery = inputs.inspectRecovery === true;
+  if (inspectRecovery && write) {
+    throw new Error('PROOF_ANCHOR_UNRESOLVED: recovery inspection is read-only');
+  }
+  let chainMissing = false;
+  if (inspectRecovery) {
+    try {
+      lstatSync(chainPath);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      chainMissing = true;
+    }
+  }
+  const chain: VerifyResult = chainMissing
+    ? {
+        valid: false,
+        errors: [
+          `PROOF_ANCHOR_UNRESOLVED ${relative(root, chainPath).split(sep).join('/')}: no evidence chain is recorded for read-only recovery inspection`,
+        ],
+      }
+    : verifyChain(chainPath);
   const errors: string[] = [...chain.errors];
   const refused = (baseline: ProofAnchorBaselineSummary | null): ProofAnchorVerification => ({
     valid: false,
@@ -410,7 +432,7 @@ export function verifyProofAnchors(inputs: ProofAnchorVerificationInputs): Proof
   const history = proofHistoryModifications(root, chainPath);
   if (history.length > 0) {
     errors.push(...history);
-    return refused(null);
+    if (!inspectRecovery) return refused(null);
   }
 
   const loaded = readBaseline(root, errors);
@@ -419,7 +441,7 @@ export function verifyProofAnchors(inputs: ProofAnchorVerificationInputs): Proof
     errors.push(
       `PROOF_ANCHOR_BASELINE_MISSING ${PROOF_ANCHOR_BASELINE_PATH}: no anchor baseline is recorded; rerun evidence verify --scope chain with --write to record the first baseline`,
     );
-    return refused(null);
+    if (!inspectRecovery) return refused(null);
   }
   const cutoff = loaded?.cutoff ?? observedAt;
   const baselineEntries = new Map<string, BaselineEntry>(
@@ -444,7 +466,8 @@ export function verifyProofAnchors(inputs: ProofAnchorVerificationInputs): Proof
   const anchors: ProofAnchorFinding[] = [];
   const anchored = new Map<string, string>();
   const digestAnchored = new Set<string>();
-  loadChain(chainPath).records.forEach((record, index) => {
+  const records = chainMissing ? [] : loadChain(chainPath).records;
+  records.forEach((record, index) => {
     const claim = anchorClaim(record);
     if (claim === undefined) return;
     const recordId = typeof record.id === 'string' ? record.id : `#${String(index + 1)}`;
@@ -494,6 +517,15 @@ export function verifyProofAnchors(inputs: ProofAnchorVerificationInputs): Proof
     const key = ref(line.path, line.sequence);
     const expected =
       claim.form === 'structured' ? (claim.digest as string) : baselineEntries.get(key)?.sha256;
+    if (inspectRecovery && expected === undefined) {
+      unresolved(
+        'MALFORMED_ANCHOR',
+        line.path,
+        line.sequence,
+        'a notes-only anchor requires an establishing baseline digest for recovery inspection',
+      );
+      return;
+    }
     if (expected !== undefined && expected !== line.sha256) {
       unresolved(
         'DIGEST_MISMATCH',
@@ -661,7 +693,10 @@ export function verifyProofAnchors(inputs: ProofAnchorVerificationInputs): Proof
   return {
     valid: errors.length === 0,
     chain,
-    baseline: { path: PROOF_ANCHOR_BASELINE_PATH, cutoff, created: write && created, appended },
+    baseline:
+      inspectRecovery && loaded === null
+        ? null
+        : { path: PROOF_ANCHOR_BASELINE_PATH, cutoff, created: write && created, appended },
     lines: findings,
     anchors,
     declarations,

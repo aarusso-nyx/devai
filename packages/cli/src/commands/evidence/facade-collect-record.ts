@@ -207,6 +207,9 @@ export const evidenceCollect = defineCommand({
 });
 
 interface RecordOptions {
+  readonly recoverNewestLine?: boolean;
+  readonly proofPath?: string;
+  readonly proofSequence?: string | number;
   readonly kind?: string;
   readonly round?: string;
   readonly repoRoot?: string;
@@ -324,9 +327,21 @@ export const evidenceRecord = defineCommand({
       .command('evidence-record', 'Record one governed evidence kind')
       .option(
         '--kind <kind>',
-        'generic | historical-gap | coverage | test | mutation | rtd (required)',
+        'generic | historical-gap | coverage | test | mutation | rtd (new records only)',
       )
-      .option('--round <round-id>', 'Owning round for the append-only proof epoch (required)')
+      .option(
+        '--recover-newest-line',
+        'Append only the missing anchor of an immutable newest proof line',
+      )
+      .option(
+        '--proof-path <canonical-path>',
+        'Existing canonical proof epoch path (recovery only)',
+      )
+      .option(
+        '--proof-sequence <positive-integer>',
+        'Newest physical line position (recovery only)',
+      )
+      .option('--round <round-id>', 'Owning round for a new append-only proof record')
       .option('--repo-root <path>', 'Repository root (default: cwd)')
       .option('--payload <json>', 'Generic or historical-gap evidence JSON object')
       .option('--input <path>', 'Generic or historical-gap evidence JSON file')
@@ -350,6 +365,70 @@ export const evidenceRecord = defineCommand({
       .option('--no-git', 'Use the RTD zero integration-head sentinel')
       .option('--human', 'Human-readable summary')
       .action(async (options: RecordOptions) => {
+        if (options.recoverNewestLine === true) {
+          const sequence = Number(options.proofSequence);
+          if (
+            options.proofPath === undefined ||
+            !/^[1-9][0-9]*$/u.test(String(options.proofSequence)) ||
+            !Number.isSafeInteger(sequence)
+          ) {
+            usage(
+              'evidence record',
+              '--proof-path and a positive integer --proof-sequence are required for recovery',
+            );
+            return;
+          }
+          // Recovery never executes a recording service or accepts a replacement payload.
+          const conflicting = Object.entries(options).filter(
+            ([key, value]) =>
+              ![
+                'recoverNewestLine',
+                'proofPath',
+                'proofSequence',
+                'repoRoot',
+                'human',
+                'asRole',
+                'write',
+                '--',
+              ].includes(key) && !(key === 'git' && value === true),
+          );
+          if (conflicting.length > 0) {
+            usage(
+              'evidence record',
+              `recovery does not accept recording options: ${conflicting.map(([key]) => key).join(', ')}`,
+            );
+            return;
+          }
+          const kind = options.proofPath.split('/')[3] ?? '';
+          const chain = appendVerbEvidence({
+            repoRoot: resolve(options.repoRoot ?? process.cwd()),
+            action: `evidence.record.${kind}`,
+            status: 'completed',
+            proofAnchor: { path: options.proofPath, sequence },
+            recoverNewestLine: true,
+          });
+          if (!chain.ok) {
+            process.stderr.write(
+              `devai evidence record: ${chain.error ?? 'evidence chain append failed'}\n`,
+            );
+            process.exitCode = EXIT_FAIL;
+            return;
+          }
+          process.stdout.write(
+            options.human === true
+              ? `evidence record: ${chain.alreadyAnchored === true ? 'already anchored' : 'recovered newest line'} ${options.proofPath}:${String(sequence)}\n`
+              : `${JSON.stringify({ recovery: true, proof_path: options.proofPath, proof_sequence: sequence, chain })}\n`,
+          );
+          process.exitCode = EXIT_PASS;
+          return;
+        }
+        if (options.proofPath !== undefined || options.proofSequence !== undefined) {
+          usage(
+            'evidence record',
+            '--proof-path and --proof-sequence require --recover-newest-line',
+          );
+          return;
+        }
         if (options.kind === undefined || !RECORD_KINDS.has(options.kind)) {
           usage(
             'evidence record',
