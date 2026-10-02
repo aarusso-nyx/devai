@@ -38,7 +38,7 @@ function record(status = 'closed', phase = 'PC-0007') {
 }
 function close() {
   write(rel + '/record.md', record());
-  write('record/derived/indexes/rounds.md', 'PC-0007\n');
+  write('record/derived/indexes/rounds.md', '| PC-0007 | R-0007 | - | - | yes |\n');
   commit('close round');
 }
 beforeEach(() => {
@@ -95,6 +95,32 @@ describe('closed round archive history', () => {
       ],
     });
   });
+  it('retains archive mutation and restoration findings when closure membership also fails', () => {
+    close();
+    const original = readFileSync(join(root, rel, 'record.md'), 'utf8');
+    write(rel + '/record.md', original + '\nLate edit\n');
+    commit('change closed record');
+    write(rel + '/record.md', original);
+    commit('restore closed record');
+    write('record/derived/indexes/rounds.md', '# PC-0007 only in prose\n');
+    const before = readFileSync(join(root, rel, 'record.md'));
+    expect(roundRecordIntegrity({ repoRoot: root })).toEqual({
+      ok: false,
+      findings: [
+        {
+          code: 'ROUND_PHASE_CLOSURE_UNRESOLVED',
+          message: 'R-0007 cites missing phase closure PC-0007.',
+          path: rel + '/record.md',
+        },
+        {
+          code: 'ROUND_ARCHIVE_MUTATED',
+          message: 'R-0007 changed after its first closed commit.',
+          path: rel,
+        },
+      ],
+    });
+    expect(readFileSync(join(root, rel, 'record.md'))).toEqual(before);
+  });
   it('does not attribute an unrelated later commit to the sealed round', () => {
     close();
     write('unrelated.md', 'other work\n');
@@ -102,9 +128,19 @@ describe('closed round archive history', () => {
     expect(roundRecordIntegrity({ repoRoot: root })).toEqual({ ok: true, findings: [] });
   });
   it.each([
-    { label: 'empty', phase: '', ledger: 'PC-0007\n', message: '(none)' },
+    {
+      label: 'empty',
+      phase: '',
+      ledger: '| PC-0007 | R-0007 | - | - | yes |\n',
+      message: '(none)',
+    },
     { label: 'absent ledger', phase: 'PC-0007', ledger: null, message: 'PC-0007' },
-    { label: 'different closure', phase: 'PC-0007', ledger: 'PC-0008\n', message: 'PC-0007' },
+    {
+      label: 'different closure',
+      phase: 'PC-0007',
+      ledger: '| PC-0008 | R-0007 | - | - | yes |\n',
+      message: 'PC-0007',
+    },
   ])('reports $label closure evidence separately', ({ phase, ledger, message }) => {
     write(rel + '/record.md', record('closed', phase));
     if (ledger !== null) write('record/derived/indexes/rounds.md', ledger);
@@ -135,7 +171,7 @@ describe('closed round archive history', () => {
   });
   it('reports unavailable verification when a closed record has not entered Git history', () => {
     write(rel + '/record.md', record());
-    write('record/derived/indexes/rounds.md', 'PC-0007\n');
+    write('record/derived/indexes/rounds.md', '| PC-0007 | R-0007 | - | - | yes |\n');
     expect(roundRecordIntegrity({ repoRoot: root })).toEqual({
       ok: false,
       findings: [
