@@ -855,6 +855,65 @@ describe('IA-003 declarations that are rejected leave their orphans reported', (
 });
 
 describe('IA-004 crash recovery between the proof line and the chain entry', () => {
+  // ADR-EVI-0005 IA-006: the existing typed append primitive is the CLI recovery seam.
+  it('anchors physical UTF-8 bytes without rewriting the observed baseline or previous records', () => {
+    const root = tempRoot();
+    const path = epochPath('generic', 'R-0004');
+    anchorWithDigest(root, 'generic', 'R-0004', appendGeneric(root, 'R-0004', 'history'));
+    expect(verify(root, T0).valid).toBe(true);
+    const previous = loadChain(join(root, CHAIN));
+    // Exclude the mutable head and the array delimiter; retain physical old-entry bytes.
+    const oldRecordBytes = /"records": \[([\s\S]*)\n {2}\]/u.exec(
+      readFileSync(join(root, CHAIN), 'utf8'),
+    )?.[1];
+    if (oldRecordBytes === undefined || oldRecordBytes.trim().length === 0) {
+      throw new Error('fixture has no stored chain record population');
+    }
+    const crashed = appendGeneric(root, 'R-0004', 'newest ç');
+    // JSON whitespace is part of the physical digest, even though it changes no parsed field.
+    const bytes = readFileSync(join(root, path), 'utf8');
+    const newline = bytes.indexOf('\n');
+    const newest = bytes.slice(newline + 1).replaceAll(':', ': ');
+    writeFileSync(join(root, path), bytes.slice(0, newline + 1) + newest);
+    expect(verify(root, T1).valid).toBe(false);
+    const epochBytes = readFileSync(join(root, path));
+    const baselineBytes = readFileSync(join(root, BASELINE));
+    anchorWithDigest(root, 'generic', 'R-0004', crashed);
+    const recovered = loadChain(join(root, CHAIN));
+    expect(recovered.records).toHaveLength(previous.records.length + 1);
+    expect(recovered.records.slice(0, -1)).toEqual(previous.records);
+    const recoveredRecordBytes = /"records": \[([\s\S]*)\n {2}\]/u.exec(
+      readFileSync(join(root, CHAIN), 'utf8'),
+    )?.[1];
+    expect(recoveredRecordBytes?.startsWith(oldRecordBytes)).toBe(true);
+    expect(recovered.records.at(-1)).toMatchObject({
+      proof_path: path,
+      proof_sequence: crashed,
+      proof_sha256: sha256(newest.slice(0, -1)),
+    });
+    expect(readFileSync(join(root, path))).toEqual(epochBytes);
+    expect(readFileSync(join(root, BASELINE))).toEqual(baselineBytes);
+    expect(verifyReadOnly(root, T2).valid).toBe(true);
+    expect(readFileSync(join(root, BASELINE))).toEqual(baselineBytes);
+  });
+
+  it('does not initialize a chain or change crash residue when its anchor cannot resolve', () => {
+    const root = tempRoot();
+    const path = epochPath('generic', 'R-0004');
+    appendGeneric(root, 'R-0004', 'only durable first write');
+    const bytes = readFileSync(join(root, path));
+    const result = verbModule.appendVerbEvidence({
+      repoRoot: root,
+      action: 'evidence.record.generic',
+      status: 'completed',
+      proofAnchor: { path, sequence: 2 },
+    });
+    expect(result.ok).toBe(false);
+    expect(existsSync(join(root, CHAIN))).toBe(false);
+    expect(existsSync(join(root, BASELINE))).toBe(false);
+    expect(readFileSync(join(root, path))).toEqual(bytes);
+  });
+
   it('reports UNANCHORED_NEWEST_LINE with the remediation, then recovers by appending its entry', () => {
     const root = tempRoot();
     const path = epochPath('generic', 'R-0004');
