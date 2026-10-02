@@ -37,78 +37,147 @@ interface AdvisorySummary {
   readonly info: number;
 }
 
-function runAudit(
-  tool: 'pnpm' | 'npm',
-  cwd: string,
-): { ok: true; data: unknown; tool: 'pnpm' | 'npm' } | { ok: false; reason: string } {
+const SEVERITIES = ['critical', 'high', 'moderate', 'low', 'info'] as const;
+type AuditTool = 'pnpm' | 'npm';
+type AuditResult =
+  | { ok: true; summary: AdvisorySummary; tool: AuditTool; exitCode: number }
+  | { ok: false; reason: string; detail?: string };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isSeverity(value: unknown): value is (typeof SEVERITIES)[number] {
+  return SEVERITIES.some((severity) => severity === value);
+}
+
+function total(summary: AdvisorySummary): number {
+  return SEVERITIES.reduce((sum, severity) => sum + summary[severity], 0);
+}
+
+/** Validate evidence before grading; absence is never a zero population. */
+function summarise(audit: unknown): AdvisorySummary {
+  if (!isRecord(audit) || Object.hasOwn(audit, 'error')) {
+    throw new Error('audit is not a completed report');
+  }
+  const counts = { critical: 0, high: 0, moderate: 0, low: 0, info: 0 };
+  const metadata = audit['metadata'];
+  const reported = isRecord(metadata) ? metadata['vulnerabilities'] : undefined;
+  let summary: AdvisorySummary | undefined;
+  if (isRecord(reported)) {
+    for (const severity of SEVERITIES) {
+      const count = reported[severity];
+      if (typeof count !== 'number' || !Number.isSafeInteger(count) || count < 0) {
+        throw new Error(`invalid or missing ${severity} count`);
+      }
+      counts[severity] = count;
+    }
+    if (!Number.isSafeInteger(total(counts))) throw new Error('invalid total count');
+    if (Object.hasOwn(reported, 'total') && reported['total'] !== total(counts)) {
+      throw new Error('inconsistent total count');
+    }
+    summary = counts;
+  } else if (Array.isArray(reported)) {
+    throw new Error('severity summary must be an object');
+  }
+
+  // npm audit v2 uses a package-keyed map. Validate every member even when
+  // metadata exists, so malformed or contradictory evidence cannot be hidden.
+  if (Object.hasOwn(audit, 'vulnerabilities')) {
+    const vulnerabilities = audit['vulnerabilities'];
+    if (!isRecord(vulnerabilities)) throw new Error('invalid npm vulnerability map');
+    const npmCounts = { critical: 0, high: 0, moderate: 0, low: 0, info: 0 };
+    for (const member of Object.values(vulnerabilities)) {
+      if (!isRecord(member) || !isSeverity(member['severity'])) {
+        throw new Error('invalid npm vulnerability member');
+      }
+      npmCounts[member['severity']] += 1;
+    }
+    const metadataSummary = summary;
+    if (
+      metadataSummary !== undefined &&
+      SEVERITIES.some((s) => metadataSummary[s] !== npmCounts[s])
+    ) {
+      throw new Error('metadata and npm population disagree');
+    }
+    summary = npmCounts;
+  }
+  if (summary === undefined) throw new Error('missing complete audit population');
+
+  // pnpm metadata counts findings, which can exceed the number of advisory
+  // entries. Every declared advisory must still be represented in the summary.
+  if (Object.hasOwn(audit, 'advisories')) {
+    const advisories = audit['advisories'];
+    if (!isRecord(advisories)) throw new Error('invalid pnpm advisory map');
+    const minimum = { critical: 0, high: 0, moderate: 0, low: 0, info: 0 };
+    for (const member of Object.values(advisories)) {
+      if (!isRecord(member) || !isSeverity(member['severity'])) {
+        throw new Error('invalid pnpm advisory member');
+      }
+      minimum[member['severity']] += 1;
+    }
+    if (SEVERITIES.some((s) => summary[s] < minimum[s])) {
+      throw new Error('metadata omits declared pnpm advisories');
+    }
+  }
+  return summary;
+}
+
+function runAudit(tool: AuditTool, cwd: string): AuditResult {
   const args = ['audit', '--json'];
-  const r = spawnSync(tool, args, {
-    cwd,
-    encoding: 'utf8',
-    env: { ...process.env },
-    timeout: 60_000,
-  });
-  if (r.error !== undefined) {
-    const err = r.error as NodeJS.ErrnoException;
-    if (err.code === 'ENOENT') return { ok: false, reason: `${tool}-not-on-path` };
-    return { ok: false, reason: `${tool}-error: ${err.message}` };
-  }
-  // pnpm + npm audit exit with code 1 if vulnerabilities are found,
-  // but the JSON is still emitted on stdout. Don't reject non-zero.
-  const stdout = r.stdout ?? '';
-  if (stdout.trim().length === 0) {
-    return { ok: false, reason: `${tool}-empty-output` };
-  }
   try {
-    return { ok: true, data: JSON.parse(stdout), tool };
+    const r = spawnSync(tool, args, {
+      cwd,
+      encoding: 'utf8',
+      env: { ...process.env },
+      timeout: 60_000,
+    });
+    if (r.error !== undefined) {
+      const err = r.error as NodeJS.ErrnoException;
+      return {
+        ok: false,
+        reason: err.code === 'ENOENT' ? `${tool}-not-on-path` : `${tool}-error: ${err.message}`,
+        detail: err.message,
+      };
+    }
+    if (r.signal !== null && r.signal !== undefined) {
+      return { ok: false, reason: `${tool}-signal: ${r.signal}` };
+    }
+    if (r.status !== 0 && r.status !== 1) {
+      return { ok: false, reason: `${tool}-incomplete-exit: ${String(r.status)}` };
+    }
+    const stdout = r.stdout ?? '';
+    if (stdout.trim().length === 0) return { ok: false, reason: `${tool}-empty-output` };
+    let audit: unknown;
+    try {
+      audit = JSON.parse(stdout) as unknown;
+    } catch (e) {
+      return {
+        ok: false,
+        reason: `${tool}-parse-error: ${e instanceof Error ? e.message : String(e)}`,
+      };
+    }
+    const summary = summarise(audit);
+    // A completed default audit exits 1 for findings and 0 for a clean report.
+    // Other exits, or a contradictory status, are failures to observe.
+    if ((r.status === 1) !== total(summary) > 0) {
+      return { ok: false, reason: `${tool}-incoherent-exit: ${String(r.status)}` };
+    }
+    return { ok: true, summary, tool, exitCode: r.status };
   } catch (e) {
     return {
       ok: false,
-      reason: `${tool}-parse-error: ${e instanceof Error ? e.message : String(e)}`,
+      reason: `${tool}-invalid-evidence: ${e instanceof Error ? e.message : String(e)}`,
     };
   }
 }
 
-/**
- * Both pnpm and npm emit JSON with a top-level structure that
- * carries vulnerability counts. Schemas differ slightly across
- * tool + version; we look for common fields and degrade gracefully.
- */
-function summarise(audit: unknown): AdvisorySummary {
-  const blank: AdvisorySummary = { critical: 0, high: 0, moderate: 0, low: 0, info: 0 };
-  if (audit === null || typeof audit !== 'object') return blank;
-  const root = audit as Record<string, unknown>;
-  // pnpm audit JSON shape: { advisories: {<id>: { severity }}, metadata: { vulnerabilities: {...} } }
-  const metadata = root['metadata'];
-  if (metadata !== null && typeof metadata === 'object') {
-    const v = (metadata as Record<string, unknown>)['vulnerabilities'];
-    if (v !== null && typeof v === 'object') {
-      const r = v as Record<string, unknown>;
-      return {
-        critical: typeof r['critical'] === 'number' ? (r['critical'] as number) : 0,
-        high: typeof r['high'] === 'number' ? (r['high'] as number) : 0,
-        moderate: typeof r['moderate'] === 'number' ? (r['moderate'] as number) : 0,
-        low: typeof r['low'] === 'number' ? (r['low'] as number) : 0,
-        info: typeof r['info'] === 'number' ? (r['info'] as number) : 0,
-      };
-    }
-  }
-  // npm-audit v2 fallback: { vulnerabilities: {<name>: { severity }} }
-  const vulns = root['vulnerabilities'];
-  if (vulns !== null && typeof vulns === 'object') {
-    const counts = { ...blank };
-    for (const v of Object.values(vulns as Record<string, unknown>)) {
-      if (v === null || typeof v !== 'object') continue;
-      const sev = (v as Record<string, unknown>)['severity'];
-      if (sev === 'critical') counts.critical += 1;
-      else if (sev === 'high') counts.high += 1;
-      else if (sev === 'moderate') counts.moderate += 1;
-      else if (sev === 'low') counts.low += 1;
-      else if (sev === 'info') counts.info += 1;
-    }
-    return counts;
-  }
-  return blank;
+function failedAuditFinding(result: Extract<AuditResult, { ok: false }>): SensorFinding {
+  return {
+    severity: 'info',
+    code: 'SECURITY_SCAN_PREFERRED_AUDIT_FAILED',
+    message: `${result.reason}${result.detail === undefined ? '' : `: ${result.detail}`}`,
+  };
 }
 
 export function senseSecurityScan(opts: SecurityScanOptions): SensorReading {
@@ -116,15 +185,10 @@ export function senseSecurityScan(opts: SecurityScanOptions): SensorReading {
   const preferred = opts.preferredTool ?? 'pnpm';
   const fallback = preferred === 'pnpm' ? 'npm' : 'pnpm';
 
-  let result = runAudit(preferred, opts.repoRoot);
-  let usedTool: 'pnpm' | 'npm' | null = null;
-  if (result.ok) usedTool = result.tool;
-  if (!result.ok) {
-    result = runAudit(fallback, opts.repoRoot);
-    if (result.ok) usedTool = result.tool;
-  }
+  const preferredResult = runAudit(preferred, opts.repoRoot);
+  const result = preferredResult.ok ? preferredResult : runAudit(fallback, opts.repoRoot);
 
-  if (!result.ok || usedTool === null) {
+  if (!result.ok) {
     return buildSensorReading({
       sensorName: 'security-scan',
       sensorKind: 'security_scan',
@@ -137,14 +201,16 @@ export function senseSecurityScan(opts: SecurityScanOptions): SensorReading {
         {
           severity: 'info',
           code: 'SECURITY_SCAN_NO_AUDIT_TOOL',
-          message: `Neither pnpm nor npm available: ${(result as { reason?: string }).reason ?? 'unknown'}`,
+          message: `Neither pnpm nor npm available: ${result.reason}`,
         },
+        ...(!preferredResult.ok ? [failedAuditFinding(preferredResult)] : []),
       ],
       metrics: { tools_tried: 2 },
     });
   }
 
-  const summary = summarise(result.data);
+  const usedTool = result.tool;
+  const summary = result.summary;
   const totalVulns =
     summary.critical + summary.high + summary.moderate + summary.low + summary.info;
   let status: SensorStatus;
@@ -174,10 +240,13 @@ export function senseSecurityScan(opts: SecurityScanOptions): SensorReading {
     status = 'pass';
   }
 
+  if (!preferredResult.ok) findings.push(failedAuditFinding(preferredResult));
+
   return buildSensorReading({
     sensorName: 'security-scan',
     sensorKind: 'security_scan',
     command: [usedTool, 'audit', '--json'],
+    exit_code: result.exitCode,
     status,
     deterministic: false,
     tier: 'L0',
