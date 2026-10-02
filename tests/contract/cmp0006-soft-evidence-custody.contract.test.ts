@@ -15,8 +15,11 @@ const offlineGuard = await vi.hoisted(async () => {
   const childProcess = (await import('node:child_process')).default;
   const { syncBuiltinESMExports } = await import('node:module');
   const attempts: string[] = [];
-  const retained: { object: object; key: string; descriptor: PropertyDescriptor | undefined }[] =
-    [];
+  const retained: {
+    object: object;
+    key: string;
+    descriptor: PropertyDescriptor | undefined;
+  }[] = [];
   const deny = (surface: string): never => {
     attempts.push(surface);
     throw new Error(`OFFLINE_TEST_EFFECT_FORBIDDEN:${surface}`);
@@ -94,7 +97,11 @@ const roles = [
 function fixture() {
   const keys = generateKeyPairSync('ed25519');
   const publicKey = keys.publicKey.export({ type: 'spki', format: 'der' });
-  const candidate = { commit: 'a'.repeat(40), tree: 'b'.repeat(40), base_commit: 'c'.repeat(40) };
+  const candidate = {
+    commit: 'a'.repeat(40),
+    tree: 'b'.repeat(40),
+    base_commit: 'c'.repeat(40),
+  };
   const producer_control = {
     commit: 'd'.repeat(40),
     tree: 'e'.repeat(40),
@@ -243,7 +250,7 @@ function fixture() {
     input.signature = sign(null, Buffer.concat([Buffer.from(DOMAIN), bytes]), keys.privateKey);
   };
   seal();
-  return { input, manifest, trust, seal, sealRaw };
+  return { input, manifest, trust, seal, sealRaw, keys };
 }
 async function verifier() {
   return (await import(
@@ -255,6 +262,8 @@ async function verifier() {
     evaluateCiInvariantGate: (input: unknown) => {
       status: string;
     };
+    consumeVerifiedSoftGatePayload: (input: unknown) => { status: string };
+    verifySoftGateHostObservation: (input: unknown) => { status: string };
   };
 }
 describe('canonical signature and exact payload custody component (offline)', () => {
@@ -621,7 +630,10 @@ function transport(fault = '') {
         { headers: { 'content-type': 'application/json' } },
       );
     if (fault === 'redirect')
-      return new Response(null, { status: 302, headers: { location: 'https://evil.invalid/' } });
+      return new Response(null, {
+        status: 302,
+        headers: { location: 'https://evil.invalid/' },
+      });
     if (fault === 'rate-limit') return new Response('{}', { status: 429 });
     if (fault === 'oversize-metadata') return new Response('x'.repeat(2 * 1024 * 1024 + 1));
     const key = String(url).split('/git/')[1];
@@ -745,3 +757,245 @@ function required<T>(value: T | undefined): T {
   if (value === undefined) throw new Error('OFFLINE_FIXTURE_REQUIRED_VALUE_MISSING');
   return value;
 }
+
+// Exact threshold byte custody is independent of comparator/schema validity.
+// All host bytes below are declared offline component fixtures under native effect denial.
+function rawThresholdFixture() {
+  const f = fixture();
+  const role = required(f.manifest.payload_roles.effective_thresholds);
+  const value = JSON.parse(required(f.input.members.get(role)).toString('utf8'));
+  const bytes = Buffer.from(JSON.stringify(value, null, 2) + '\n');
+  const bind = (next: Buffer) => {
+    f.input.members.set(role, next);
+    f.manifest.members = [...f.input.members]
+      .map(([path, raw]) => ({ path, byte_length: raw.length, sha256: hash(raw) }))
+      .sort((a, b) => (a.path < b.path ? -1 : 1));
+    f.manifest.bound_inputs.thresholds_sha256 = hash(next);
+    f.input.expected.boundInputs.thresholds_sha256 = hash(next);
+    f.seal();
+  };
+  bind(bytes);
+  return { f, role, value, bytes, bind };
+}
+function offlineProducerHost(f: ReturnType<typeof fixture>) {
+  const executableBytes = Buffer.from('offline immutable executable fixture; never executed');
+  const helpBytes = Buffer.from(
+    'Usage: codex exec [OPTIONS]\n--json --ephemeral --sandbox --config\n',
+  );
+  const configuration = {
+    tools: [],
+    mcp_servers: [],
+    hooks: [],
+    plugins: [],
+    agents: [],
+    inheritedConversation: false,
+    precedence: [{ source: 'isolated-settings', sha256: hash(Buffer.from('{}')) }],
+  };
+  const configurationBytes = Buffer.from(JSON.stringify(configuration));
+  const argv = [
+    'exec',
+    '--json',
+    '--ephemeral',
+    '--sandbox',
+    'read-only',
+    '--config',
+    'mcp_servers={}',
+    '--config',
+    'tools={}',
+  ];
+  const reply = required(f.input.members.get('score_reply.json'));
+  const events = [
+    { type: 'thread.started', tools: [], mcp_servers: [] },
+    {
+      type: 'item.completed',
+      item: { id: 'final', type: 'agent_message', text: reply.toString('utf8') },
+    },
+    { type: 'turn.completed', usage: { input_tokens: 1, output_tokens: 1 } },
+  ];
+  return {
+    workingAgent: f.manifest.working_agent,
+    evaluator: f.manifest.evaluator,
+    executable: { path: '/offline/codex', bytes: executableBytes },
+    version: { status: 0, stdout: Buffer.from('codex offline-fixture-version\n') },
+    hostHelp: { status: 0, stdout: helpBytes },
+    configuration,
+    configurationBytes,
+    selectedControls: {
+      executablePath: '/offline/codex',
+      executableSha256: hash(executableBytes),
+      version: 'codex offline-fixture-version',
+      hostHelpSha256: hash(helpBytes),
+      configurationSha256: hash(configurationBytes),
+      argvSha256: hash(Buffer.from(JSON.stringify(argv))),
+    },
+    invocation: {
+      process_instance_id: f.manifest.evaluator.process_instance_id,
+      argv,
+      status: 0,
+      stdout: Buffer.from(events.map((e) => JSON.stringify(e)).join('\n')),
+      stderr: Buffer.alloc(0),
+    },
+  };
+}
+describe('raw threshold custody regressions (offline component)', () => {
+  it.each(['format-only', 'key-order', 'canonical-projection'])(
+    'refuses %s substitution after authentic raw control and opaque consumption pass',
+    async (fault) => {
+      const { f, role, value, bytes } = rawThresholdFixture();
+      const module = await verifier();
+      const verified = module.verifySoftGatePayload(f.input);
+      expect(verified.status).toBe('pass');
+      const consume = () =>
+        module.consumeVerifiedSoftGatePayload({
+          verifiedPayload: verified,
+          trustBytes: f.input.trustBytes,
+          members: f.input.members,
+          expected: f.input.expected,
+          now: f.input.now,
+        });
+      expect(consume().status).toBe('pass');
+      const next =
+        fault === 'format-only'
+          ? Buffer.from(JSON.stringify(value) + '\n')
+          : fault === 'key-order'
+            ? Buffer.from(
+                JSON.stringify(Object.fromEntries(Object.entries(value).reverse()), null, 2) + '\n',
+              )
+            : canonical(value);
+      expect(JSON.parse(next.toString('utf8'))).toEqual(value);
+      expect(hash(next)).not.toBe(hash(bytes));
+      f.input.members.set(role, next);
+      expect(consume()).toMatchObject({
+        status: 'error',
+        findings: [{ code: 'CI_GATE_PAYLOAD_CUSTODY_CHANGED' }],
+      });
+      // Authentically re-sign every changed member while retaining the independently selected raw digest.
+      f.manifest.members = [...f.input.members]
+        .map(([path, raw]) => ({ path, byte_length: raw.length, sha256: hash(raw) }))
+        .sort((a, b) => (a.path < b.path ? -1 : 1));
+      f.manifest.bound_inputs.thresholds_sha256 = hash(next);
+      f.seal();
+      expect(module.verifySoftGatePayload(f.input)).toMatchObject({
+        status: 'error',
+        findings: [{ code: 'CI_GATE_PAYLOAD_INVALID' }],
+      });
+    },
+  );
+  it('retains observed raw threshold bytes in the actual producer member and rejects parsed/projection substitution', async () => {
+    const { f, role, value, bytes } = rawThresholdFixture();
+    const gate = await verifier();
+    const host = offlineProducerHost(f);
+    expect(gate.verifySoftGateHostObservation(host).status).toBe('pass');
+    const rubric = JSON.parse(
+      required(f.input.members.get('effective_rubric.json')).toString('utf8'),
+    );
+    const boundInputs = { ...f.input.expected.boundInputs };
+    boundInputs.source_population_sha256 = hash(
+      canonical(
+        [...f.input.sourceFiles].map(([path, raw]) => ({
+          path,
+          byte_length: raw.length,
+          sha256: hash(raw),
+        })),
+      ),
+    );
+    boundInputs.configuration_sha256 = hash(host.configurationBytes);
+    boundInputs.inventory_sha256 = hash(
+      canonical({ tools: [], mcp_servers: [], hooks: [], plugins: [], agents: [] }),
+    );
+    boundInputs.host_help_sha256 = hash(host.hostHelp.stdout);
+    boundInputs.context_sha256 = hash(
+      canonical({ inheritedConversation: false, messages: [], agents: [] }),
+    );
+    const expected = {
+      ...f.input.expected,
+      producerControl: {
+        ...f.input.expected.producerControl,
+        executable_sha256: host.selectedControls.executableSha256,
+      },
+      boundInputs,
+    };
+    const reply = required(f.input.members.get('score_reply.json')).toString('utf8');
+    const args = {
+      envelope: {
+        operation: 'scored-llm-judge',
+        invocation_id: 'offline-invocation',
+        candidate: expected.candidate,
+        timeout_ms: 10000,
+        max_output_bytes: 1024 * 1024,
+        max_cost_usd: 0,
+        no_tools: true,
+        no_mcp: true,
+      },
+      client: {
+        family: 'codex-cli',
+        complete: async () => ({
+          text: reply,
+          finish_reason: 'stop',
+          usage: { input_tokens: 1, output_tokens: 1, cost_usd: 0 },
+          host_observation: host,
+        }),
+      },
+      observeHost: async (raw: unknown) => {
+        expect(raw).toBe(host);
+        return host;
+      },
+      signManifest: async (message: Uint8Array) =>
+        sign(null, Buffer.from(message), f.keys.privateKey),
+      expected,
+      rubric,
+      thresholds: value,
+      thresholdBytes: bytes,
+      sourceFiles: f.input.sourceFiles,
+      retainedInputs: new Map(),
+      createdAt: f.manifest.created_at,
+      invocationId: 'offline-invocation',
+    };
+    const { produceCiInvariantEvidence } = await import(
+      new URL('../../scripts/process/produce-ci-invariant-evidence.mjs', import.meta.url).href
+    );
+    // First establish the actual producer seam using independently selected compact raw bytes.
+    const compactBytes = canonical(value);
+    const compactExpected = {
+      ...expected,
+      boundInputs: { ...boundInputs, thresholds_sha256: hash(compactBytes) },
+    };
+    const compactControl = await produceCiInvariantEvidence({
+      ...args,
+      thresholdBytes: compactBytes,
+      expected: compactExpected,
+    });
+    expect(compactControl.reading.status).toBe('pass');
+    expect(compactControl.members.get(role)).toEqual(compactBytes);
+    const produced = await produceCiInvariantEvidence(args);
+    expect(produced.reading.status).toBe('pass');
+    expect(produced.members.get(role)).toEqual(bytes);
+    const manifest = JSON.parse(Buffer.from(produced.manifestBytes).toString('utf8'));
+    expect(manifest.bound_inputs.thresholds_sha256).toBe(hash(bytes));
+    expect(manifest.bound_inputs.thresholds_sha256).not.toBe(hash(canonical(value)));
+    f.trust.producer_control = { ...expected.producerControl };
+    f.trust.payload_sha256 = hash(produced.manifestBytes);
+    const payloadInput = { ...f.input, ...produced, expected, trustBytes: canonical(f.trust) };
+    const verified = gate.verifySoftGatePayload(payloadInput);
+    expect(verified.status).toBe('pass');
+    expect(
+      gate.consumeVerifiedSoftGatePayload({
+        verifiedPayload: verified,
+        trustBytes: payloadInput.trustBytes,
+        members: produced.members,
+        expected,
+        now: payloadInput.now,
+      }).status,
+    ).toBe('pass');
+    // The valid raw control must succeed first; only then change the raw observation/parsed agreement.
+    await expect(
+      produceCiInvariantEvidence({ ...args, thresholdBytes: canonical(value) }),
+    ).rejects.toThrow('CI_EVIDENCE_PRODUCER_REFUSED');
+    await expect(
+      produceCiInvariantEvidence({ ...args, thresholdBytes: undefined }),
+    ).rejects.toThrow('CI_EVIDENCE_PRODUCER_REFUSED');
+    await expect(
+      produceCiInvariantEvidence({ ...args, thresholdBytes: Buffer.from('{}') }),
+    ).rejects.toThrow('CI_EVIDENCE_PRODUCER_REFUSED');
+  });
+});

@@ -160,6 +160,12 @@ describe('job lock and parent cancellation mutations', () => {
 `;
   it('accepts complete safe per-job coverage without a workflow-level lock', () => {
     const root = fixtureRoot();
+    write(root, 'scripts/process/publish-site.mjs', "import './leaf.mjs';\n");
+    write(
+      root,
+      'scripts/process/leaf.mjs',
+      'fetch("https://example.invalid", { method: "POST" });\n',
+    );
     write(root, '.github/workflows/renamed.yml', jobs);
     expect(senseHarnessCoherence({ repoRoot: root, now: NOW }).metrics).toMatchObject({
       concurrency_semantic_issues: 0,
@@ -170,6 +176,12 @@ describe('job lock and parent cancellation mutations', () => {
     'concurrency:\n  group: DEVAI-PAGES-PUBLICATION\n  cancel-in-progress: true\n',
   ])('refuses a cancelling parent that can interrupt publication: %s', (parent) => {
     const root = fixtureRoot();
+    write(root, 'scripts/process/publish-site.mjs', "import './leaf.mjs';\n");
+    write(
+      root,
+      'scripts/process/leaf.mjs',
+      'fetch("https://example.invalid", { method: "POST" });\n',
+    );
     write(root, '.github/workflows/renamed.yml', parent + jobs);
     expect(
       senseHarnessCoherence({ repoRoot: root, now: NOW }).metrics?.concurrency_semantic_issues,
