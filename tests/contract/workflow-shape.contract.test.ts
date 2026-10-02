@@ -297,13 +297,79 @@ describe('concurrency and permissions blocks are uniform across the four workflo
     }
   });
 
-  it('declares a top-level concurrency block with a group and an explicit cancel-in-progress in every workflow', () => {
+  it('declares a concurrency block at its accepted level with a group and an explicit cancel-in-progress in every workflow', () => {
     for (const file of REQUIRED_WORKFLOWS) {
       const source = readFileSync(join(WORKFLOWS_DIR, file), 'utf8');
-      expect(source, `${file} must declare top-level concurrency`).toMatch(/^concurrency:/mu);
+      // ADR-REL-0034 relocates site locks; exact job/group/cancellation semantics are
+      // asserted in site-publication-workflow.contract.test.ts:106-122.
+      expect(source, `${file} must declare concurrency at its accepted level`).toMatch(
+        file === 'site-publish.yml' ? /^ {4}concurrency:/mu : /^concurrency:/mu,
+      );
       expect(source, `${file} concurrency must declare cancel-in-progress`).toMatch(
         /cancel-in-progress:\s*(true|false)/u,
       );
+      if (file === 'site-publish.yml') {
+        const workflow = parse(source) as {
+          on?: Record<string, unknown>;
+          permissions?: Record<string, string>;
+          concurrency?: unknown;
+          jobs?: Record<
+            string,
+            {
+              if?: string;
+              needs?: unknown;
+              permissions?: Record<string, string>;
+              environment?: unknown;
+              concurrency?: { group: string; 'cancel-in-progress': boolean };
+              steps?: { uses?: string; run?: string; with?: Record<string, unknown> }[];
+            }
+          >;
+        };
+        const prepare = workflow.jobs?.['prepare-site'];
+        const publish = workflow.jobs?.['publish-site'];
+        const mainDispatch =
+          "${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}";
+        expect(Object.keys(workflow.jobs ?? {})).toEqual(['prepare-site', 'publish-site']);
+        expect(workflow.concurrency).toBeUndefined();
+        expect(Object.keys(workflow.on ?? {})).toEqual(['workflow_dispatch']);
+        expect(workflow.on?.workflow_dispatch).toEqual({});
+        expect(workflow.permissions).toEqual({ contents: 'read' });
+        expect(prepare?.if).toBe(mainDispatch);
+        expect(publish?.if).toBe(mainDispatch);
+        expect(prepare?.needs).toBeUndefined();
+        expect(publish?.needs).toBe('prepare-site');
+        expect(prepare?.permissions).toEqual({ contents: 'read' });
+        expect(prepare?.environment).toBeUndefined();
+        expect(publish?.permissions).toEqual({
+          contents: 'read',
+          pages: 'write',
+          deployments: 'write',
+          'id-token': 'write',
+        });
+        expect(publish?.environment).toEqual({
+          name: 'github-pages',
+          url: '${{ steps.deployment.outputs.page_url }}',
+        });
+        expect(prepare?.concurrency?.['cancel-in-progress']).toBe(true);
+        expect(prepare?.concurrency?.group).toContain('github.ref');
+        expect(publish?.concurrency).toEqual({
+          group: 'devai-pages-publication',
+          'cancel-in-progress': false,
+        });
+        expect(prepare?.concurrency?.group.toLowerCase()).not.toBe(
+          publish?.concurrency?.group.toLowerCase(),
+        );
+        const checkout = prepare?.steps?.find((step) => step.uses?.startsWith('actions/checkout@'));
+        expect(checkout?.with?.ref).toBe('${{ github.sha }}');
+        expect(checkout?.with?.['persist-credentials']).toBe(false);
+        const publication = (publish?.steps ?? []).map((step) => step.run ?? '').join('\n');
+        expect(publication).toContain('verify-site-preparation-artifact');
+        expect(publication).not.toMatch(/pnpm(?:[^\n]*)(?:build|install)|docs:(?:build|install)/u);
+        expect(source).not.toMatch(/latest.*artifact|artifact.*latest|listArtifactsForRepo/u);
+        expect(source).not.toMatch(/secrets\./);
+        expect(source).not.toMatch(/vars\./);
+        expect(source.match(/github\.token/g)).toHaveLength(1);
+      }
     }
   });
 
