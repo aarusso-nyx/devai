@@ -28,10 +28,14 @@ Draft readiness: reviewable with complete issue coverage and executable offline 
 
 ## Resource and review discipline
 
-Eight Architect round chats cover R-0602–R-0609 under the Devai project. At most
-three rounds execute concurrently, with at most three active agents per round
-including the coordinator, reviewers and nested workers. Initial active rounds
-are R-0602, R-0604 and R-0606. Remaining chats register and become idle until the
+Eight Architect round chats cover R-0602–R-0609 under the Devai project. Initial
+R-0602, R-0604 and R-0606 retain ceilings of three rounds and three concurrent
+task/agent slots per round. When the first eligible later round receives a
+permit, allow four active rounds in total and five concurrent task/agent slots
+per later round, including coordinators, reviewers and nested workers. Remaining
+initial rounds retain three slots and count toward the global four-round ceiling.
+Actual host capacity, dependencies and locks may permit fewer. See the
+[phase-specific execution discipline](execution-discipline.md). Remaining chats register and become idle until the
 central coordinator grants a permit with an exact candidate. Original dependencies
 and complete wave locks determine the next eligible round; the priority queue is
 R-0603, R-0605, R-0607, R-0608, R-0609.
