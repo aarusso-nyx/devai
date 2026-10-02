@@ -5,8 +5,10 @@
 reference for the `rounds` kind, which renders the canonical rounds index at
 `record/derived/indexes/rounds.md`, and for the exact-membership rule that `round seal` applies
 against that index. The governing record is
-[ADR-EVI-0001](../../../law/adr/ADR-EVI-0001-canonical-closure-index.md); the Owner ruling of
-2026-10-01 (CMP-0004 guide, decision 6) fixes the row shape and order below.
+[ADR-EVI-0001](../../../law/adr/ADR-EVI-0001-canonical-closure-index.md), as amended by
+[ADR-EVI-0004](../../../law/adr/ADR-EVI-0004-canonical-closure-acceptance-amendment.md);
+the Owner ruling of 2026-10-01 (CMP-0004 guide, decision 6) fixes the row shape and order
+below.
 
 The index is a derived file under `record/derived/`. Constitution Article 6 reserves that tree for
 the regeneration subsystem: no role writes it by hand, and this page, not a README beside the
@@ -178,6 +180,14 @@ Each of the following therefore fails with `ROUND_ARCHIVE_PHASE_LEDGER_MISSING` 
 - the id is the `closure` cell of a row that is `terminal: no` (a superseded closure);
 - the id is the terminal row of a different round.
 
+The seal and closed-round integrity use the same exact-row predicate. Every row must have
+canonical five-cell syntax, unique closure identities and a coherent same-round supersession
+chain with terminal flags that agree with its links. A malformed row, duplicate, cycle,
+disconnected chain or contradictory terminal flag invalidates membership even beside a
+plausible target row. Integrity retains `ROUND_PHASE_CLOSURE_UNRESOLVED`; sealing retains
+`ROUND_ARCHIVE_PHASE_LEDGER_MISSING` and its independent proof, decision, gate and artifact
+preconditions.
+
 The seal reads the committed index, not the closure directory, so the seal agrees with what a
 reviewer reads. A stale index fails the seal until it is regenerated.
 
@@ -191,6 +201,15 @@ column. By the Owner ruling of 2026-10-01 the canonical rendering above governs;
 ADR-EVI-0001 is met when the DETRAN fixture yields the same rows (closure, round, supersedes,
 `merged_as`) and seals every round the adopter sealed, not by byte identity with the adopter's
 file. An adopter regenerates its index once with the command above and commits the result.
+
+## Proof recovery and derived indexes
+
+The accepted [newest-line recovery contract](./evidence-verify.md#accepted-recovery-options-proposed)
+adds proposed options to `evidence record`, not to `evidence render`. Its only permitted
+repair is appending one missing chain anchor for the newest physical proof line. It does
+not regenerate or hand-edit `rounds.md`, change closure rows, rewrite historical proofs,
+or replace a historical-gap declaration. Derived index changes still require the registered
+renderer and the exact closure-membership and supersession checks above.
 
 ## See also
 
