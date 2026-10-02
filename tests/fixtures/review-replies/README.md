@@ -1,9 +1,9 @@
 # Review reply fixtures
 
-Replies from review evaluators that the shared extractor of ADR-MDL-0001 must read
-exactly as they were returned. Each fixture holds the full reply text, bytes
-unchanged, so its SHA-256 is the digest a task's `review.reply_sha256` carries and
-the excerpt an `error` outcome keeps can be checked against it.
+Fixtures retain declared reply bytes and host transcripts for shared-extractor
+acceptance. The historical captured reply below is unchanged. CMP-0006 adds
+explicitly synthetic offline fixtures; none is a live provider transcript or
+proof of provider/schema acceptance or effective host isolation.
 
 | Fixture                      | Origin                                                                                                                                                                                                 | Expected outcome through the shared extractor                                             |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
@@ -25,3 +25,75 @@ Adding a fixture:
   values, paths outside the repository) before committing, and say so in this table.
 - Name the file `<campaign>-<what>.txt` and add one row here with its origin and the
   outcome the extractor must produce.
+
+## CMP-0006 synthetic transport fixtures
+
+These fixtures exercise ADR-MDL-0003 and the TASK-0661 completion/byte contract.
+The two host files and two reply files have separate identities below. SHA-256
+covers each stored UTF-8 file exactly, including actual host whitespace, JSONL
+separators and final newlines. Each reply file is recomputed independently from
+its host file in the operation tests and is hashed before optional-null
+normalization. No normalized verdict digest replaces a reply digest.
+
+- Claude: a successful terminal result carries the structured formatter
+  `tool_use` marker and `terminal_reason: completed`. `result` deliberately differs
+  from the selected `structured_output`; the reply is its exact JavaScript
+  `JSON.stringify` serialization with no newline. The completed synthetic stream
+  tests add an empty inventory and text event before this terminal.
+- Codex: one final agent message precedes `turn.completed`. Its selected reply
+  retains leading/trailing whitespace; JSONL framing belongs only to the host
+  file. Its strict projected `findings: null` normalizes to an absent canonical
+  property. The stored reply keeps that null exactly.
+
+No credentials, original live responses or unredacted originals were used.
+The provenance identifies generated synthetic bytes, not a digest of a captured
+or sanitized live original. Negative transcripts are constructed in the tests
+from these fixtures; their failures and tooling/inventory evidence are retained.
+The failure excerpt is diagnostic only, capped at 1024 characters, and the full
+selected reply is hashed before redaction. These offline tests require explicit
+SDK mocks and fetch/http/https/socket/tls guards; mocked success grants no live
+provider call or readiness claim. Codex live isolation remains separately gated
+on supported verified empty inventories; no tool-disable flag is invented here.
+
+<!-- cmp0006-provenance:start -->
+
+```json
+[
+  {
+    "origin": "synthetic-offline",
+    "sanitization": "none; generated from non-sensitive synthetic values; no captured original exists",
+    "host": {
+      "file": "cmp0006-claude-envelope.json",
+      "encoding": "UTF-8",
+      "bytes": 492,
+      "sha256": "2c6408cb45b64c83e52c454097337cac87eb50d28d6bf5911b48003505867fba"
+    },
+    "reply": {
+      "file": "cmp0006-claude-reply.txt",
+      "encoding": "UTF-8",
+      "transformation": "UTF-8 JSON.stringify(structured_output); no appended newline; before normalization",
+      "bytes": 121,
+      "sha256": "c434de2d250850fd45f51c825c8e66fabb103eb524379f93c04c00c160dfe226"
+    }
+  },
+  {
+    "origin": "synthetic-offline",
+    "sanitization": "none; generated from non-sensitive synthetic values; no captured original exists",
+    "host": {
+      "file": "cmp0006-codex-events.jsonl",
+      "encoding": "UTF-8",
+      "bytes": 397,
+      "sha256": "22481883b8c983114456a15f446738be5b8908b06eb255ef84afe09d8f9f82a1"
+    },
+    "reply": {
+      "file": "cmp0006-codex-reply.txt",
+      "encoding": "UTF-8",
+      "transformation": "UTF-8 unique final agent_message.text; no trimming or added newline; before normalization",
+      "bytes": 108,
+      "sha256": "bdfd2da04ad8a8e9c987095f668c92f95f5b307eb47cafe74c9aac306ea30c83"
+    }
+  }
+]
+```
+
+<!-- cmp0006-provenance:end -->
