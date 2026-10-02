@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "invariants": [
     {
       "id": "INV-AUTH-001",
@@ -445,6 +445,20 @@
         {
           "suite": "unit",
           "path": "packages/loop/tests/unit/scorecard-aggregation-boundaries.test.ts"
+        },
+        {
+          "suite": "contract",
+          "path": "tests/contract/cmp0006-soft-gate.contract.test.ts",
+          "assertions": [
+            "PASS requires verdict pass, all independent Article18 dimension floors and complete valid externally observed candidate evidence; contradictory high-score verdicts block."
+          ]
+        },
+        {
+          "suite": "contract",
+          "path": "tests/contract/cmp0006-soft-evidence-custody.contract.test.ts",
+          "assertions": [
+            "Missing, stale, substituted or self-selected trust/evidence and non-independent or incomplete host observations refuse before actual candidate admission."
+          ]
         }
       ],
       "docs": [
@@ -457,7 +471,11 @@
         "packages/loop/src/loop/scorecard.ts",
         ".github/workflows/pull-request-checks.yml",
         "scripts/check-workflows.mjs",
-        "packages/sensors/src/harness-invariant-alignment-workflow.ts"
+        "packages/sensors/src/harness-invariant-alignment-workflow.ts",
+        "packages/sensors/src/ci-invariant-gate.ts",
+        "packages/skills/src/model-bridge/soft-gate-observation.ts",
+        "scripts/process/fetch-ci-invariant-evidence.mjs",
+        "scripts/process/check-ci-invariant-gate.mjs"
       ]
     },
     {

@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/thresholds.schema.json",
+  "title": "Hard and scored soft gate thresholds",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "coverage",
+    "mutation",
+    "lint",
+    "typecheck",
+    "freshness",
+    "soft_gate"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lines", "branches", "functions", "statements"],
+      "properties": {
+        "lines": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "branches": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "functions": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "statements": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        }
+      }
+    },
+    "mutation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["score_min", "survived_max"],
+      "properties": {
+        "score_min": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "survived_max": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      }
+    },
+    "lint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_errors", "max_warnings"],
+      "properties": {
+        "max_errors": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "max_warnings": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      }
+    },
+    "typecheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_errors"],
+      "properties": {
+        "max_errors": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      }
+    },
+    "freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["default_max_age_hours", "scorecard_failure_max_age_hours"],
+      "properties": {
+        "default_max_age_hours": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "scorecard_failure_max_age_hours": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "soft_gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scale_min",
+        "scale_max",
+        "minimum_scores",
+        "aggregation",
+        "max_age_hours",
+        "future_tolerance_seconds",
+        "require_independent_evaluator",
+        "require_completed_no_tool_mcp"
+      ],
+      "properties": {
+        "scale_min": {
+          "const": 0
+        },
+        "scale_max": {
+          "const": 4
+        },
+        "minimum_scores": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "spec_coherence",
+            "plant_idiomaticity",
+            "test_depth",
+            "traceability_quality"
+          ],
+          "properties": {
+            "spec_coherence": {
+              "const": 3
+            },
+            "plant_idiomaticity": {
+              "const": 3
+            },
+            "test_depth": {
+              "const": 3
+            },
+            "traceability_quality": {
+              "const": 3
+            }
+          }
+        },
+        "aggregation": {
+          "const": "all-dimensions"
+        },
+        "max_age_hours": {
+          "const": 24
+        },
+        "future_tolerance_seconds": {
+          "const": 0
+        },
+        "require_independent_evaluator": {
+          "const": true
+        },
+        "require_completed_no_tool_mcp": {
+          "const": true
+        }
+      }
+    }
+  }
+}
