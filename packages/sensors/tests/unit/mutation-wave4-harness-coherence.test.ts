@@ -131,3 +131,48 @@ jobs:
     expect(reading.status).toBe('pass');
   });
 });
+
+// Trace annotation deferred to Architect TASK-06216: no exact canonical concurrency invariant.
+// ADR-REL-0034: parent cancellation cannot safely cover a publication child.
+describe('job lock and parent cancellation mutations', () => {
+  const jobs = `jobs:
+  prepare:
+    permissions:
+      contents: read
+    concurrency:
+      group: prepare-${'${{ github.ref }}'}
+      cancel-in-progress: true
+    steps:
+      - run: echo offline-preparation
+  publish:
+    needs: prepare
+    permissions:
+      contents: read
+      pages: write
+      deployments: write
+      id-token: write
+    environment: github-pages
+    concurrency:
+      group: devai-pages-publication
+      cancel-in-progress: false
+    steps:
+      - run: node scripts/process/publish-site.mjs
+`;
+  it('accepts complete safe per-job coverage without a workflow-level lock', () => {
+    const root = fixtureRoot();
+    write(root, '.github/workflows/renamed.yml', jobs);
+    expect(senseHarnessCoherence({ repoRoot: root, now: NOW }).metrics).toMatchObject({
+      concurrency_semantic_issues: 0,
+    });
+  });
+  it.each([
+    'concurrency:\n  group: parent-${{ github.ref }}\n  cancel-in-progress: true\n',
+    'concurrency:\n  group: DEVAI-PAGES-PUBLICATION\n  cancel-in-progress: true\n',
+  ])('refuses a cancelling parent that can interrupt publication: %s', (parent) => {
+    const root = fixtureRoot();
+    write(root, '.github/workflows/renamed.yml', parent + jobs);
+    expect(
+      senseHarnessCoherence({ repoRoot: root, now: NOW }).metrics?.concurrency_semantic_issues,
+    ).toBeGreaterThan(0);
+  });
+});

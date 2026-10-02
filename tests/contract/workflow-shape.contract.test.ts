@@ -328,3 +328,38 @@ describe('dependency caching is present in the shared setup', () => {
     expect(release).toMatch(/setup-pnpm:\s*'true'[\s\S]*?cache:\s*pnpm/u);
   });
 });
+
+// Invariants: INV-CORE-003, INV-HARNESS-006
+// ADR-MDL-0004: named provider-free scored gate joins, rather than skips, the floor.
+describe('provider-free scored gate source integration', () => {
+  it('retains every mandatory hard stage and consumes selected soft evidence', () => {
+    const source = readFileSync(join(WORKFLOWS_DIR, 'pull-request-checks.yml'), 'utf8');
+    expect(source).toContain('release:bootstrap');
+    expect(source).toContain('check-ci-invariant-gate');
+    expect(source).toContain('fetch-ci-invariant-evidence');
+    expect(source).not.toMatch(
+      /produce-ci-invariant-evidence|claude(?:\s|$)|codex exec|OPENAI_API_KEY|ANTHROPIC_API_KEY/u,
+    );
+    const parsed = parse(source) as {
+      jobs: Record<
+        string,
+        {
+          steps?: {
+            id?: string;
+            run?: string;
+            'continue-on-error'?: unknown;
+            env?: Record<string, string>;
+          }[];
+        }
+      >;
+    };
+    const steps = parsed.jobs.preflight?.steps ?? [];
+    const soft = steps.filter((step) => step.id === 'soft-gate');
+    expect(soft).toHaveLength(1);
+    expect(soft[0]?.['continue-on-error']).not.toBe(true);
+    expect(soft[0]?.env).toEqual({
+      DEVAI_SOFT_GATE_TRUST_JSON: '${{ vars.DEVAI_SOFT_GATE_TRUST_JSON }}',
+    });
+    expect(source.match(/vars\.DEVAI_SOFT_GATE_TRUST_JSON/gu)).toHaveLength(1);
+  });
+});

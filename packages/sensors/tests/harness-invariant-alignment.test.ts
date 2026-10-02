@@ -74,3 +74,61 @@ describe('harness_invariant_alignment and the bootstrapped pull-request runner',
     expect(sense().status).not.toBe('pass');
   });
 });
+
+// Invariants: INV-CORE-003, INV-HARNESS-006
+// ADR-MDL-0004: textual invocation and untrusted evidence cannot admit a gate.
+describe('candidate gate alignment does not infer an observed verdict', () => {
+  it.each(['review', 'fail', 'unknown', 'error'])(
+    'rejects %s hard evidence despite a real registered launcher',
+    (status) => {
+      workflow(`${BOOTSTRAP} ${ACTION}`);
+      evidence(`${BOOTSTRAP} ${ACTION}`);
+      writeFileSync(
+        join(root, 'evidence/result.json'),
+        JSON.stringify({
+          command: `${BOOTSTRAP} ${ACTION}`,
+          status,
+          lifecycle: 'supported',
+          candidate_sha: CANDIDATE,
+          completed_at: '2026-09-27T11:00:00.000Z',
+        }),
+      );
+      expect(sense().status).not.toBe('pass');
+    },
+  );
+  it('refuses a convenient pass for a moved candidate', () => {
+    workflow(`${BOOTSTRAP} ${ACTION}`);
+    writeFileSync(
+      join(root, 'evidence/result.json'),
+      JSON.stringify({
+        command: `${BOOTSTRAP} ${ACTION}`,
+        status: 'pass',
+        lifecycle: 'supported',
+        candidate_sha: '3'.repeat(40),
+        completed_at: '2026-09-27T11:00:00.000Z',
+      }),
+    );
+    expect(sense().status).not.toBe('pass');
+  });
+  it('refuses declaration-only soft evidence at the named producer invocation', () => {
+    const command = 'node scripts/process/check-ci-invariant-gate.mjs';
+    writeFileSync(
+      join(root, 'law/invariants/INV-TEST-001.json'),
+      JSON.stringify({ id: 'INV-TEST-001', severity: 'gate', measurable_via: ['audit scorecard'] }),
+    );
+    workflow(command);
+    writeFileSync(
+      join(root, 'evidence/result.json'),
+      JSON.stringify({
+        command,
+        status: 'pass',
+        lifecycle: 'supported',
+        candidate_sha: CANDIDATE,
+        completed_at: '2026-09-27T11:00:00.000Z',
+        verified: true,
+        isolated: true,
+      }),
+    );
+    expect(sense().status).not.toBe('pass');
+  });
+});

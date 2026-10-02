@@ -115,3 +115,46 @@ describe('wave3 composite cache propagation', () => {
     }
   });
 });
+
+// Trace annotation deferred to Architect TASK-06216: no exact canonical job parser invariant.
+// ADR-REL-0034: indentation and quoted group scalars do not merge sibling effects.
+describe('job metadata scalar and sibling boundaries', () => {
+  it('keeps quoted hash in group and does not inherit a sibling environment or write permission', () => {
+    const ast = parseWorkflow(
+      file,
+      `jobs:
+  writer:
+    environment:
+      name: github-pages
+    permissions:
+      pages: write
+    concurrency:
+      group: 'pages #shared' # outside comment
+      cancel-in-progress: false
+    steps:
+      - run: echo writer
+  reader:
+    permissions:
+      contents: read
+    concurrency:
+      group: 'prepare-${'${{ github.ref }}'}'
+      cancel-in-progress: true
+    steps:
+      - run: echo reader
+`,
+      '/repo',
+    );
+    expect(ast.jobs[0]).toMatchObject({
+      name: 'writer',
+      environment: 'github-pages',
+      permissions: { pages: 'write' },
+      concurrency: { group: 'pages #shared', cancelInProgress: false },
+    });
+    expect(ast.jobs[1]).toMatchObject({
+      name: 'reader',
+      permissions: { contents: 'read' },
+      concurrency: { group: 'prepare-${{ github.ref }}', cancelInProgress: true },
+    });
+    expect(ast.jobs[1]).not.toHaveProperty('environment');
+  });
+});

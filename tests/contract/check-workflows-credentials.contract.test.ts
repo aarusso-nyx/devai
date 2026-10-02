@@ -159,3 +159,54 @@ it('names jobs.publish-site when the site publication token consumer is removed 
   );
   expect(named, JSON.stringify(result.findings)).toBeDefined();
 });
+
+// Invariants: INV-SEC-001, INV-HARNESS-006
+// ADR-MDL-0004 exact one-step public metadata exception; all other reads refuse.
+it('accepts the one declared soft-gate public trust env read', () => {
+  const root = fixture();
+  const file = 'pull-request-checks.yml';
+  const source = readWorkflow(root, file);
+  expect(source).toContain('id: soft-gate');
+  expect(source).toContain('DEVAI_SOFT_GATE_TRUST_JSON: ${{ vars.DEVAI_SOFT_GATE_TRUST_JSON }}');
+  expect(checkWorkflowTree(root).ok).toBe(true);
+});
+it.each([
+  '${{ secrets.DEVAI_SOFT_GATE_TRUST_JSON }}',
+  '${{ vars.OTHER_PUBLIC_VALUE }}',
+  '${{ vars }}',
+  "${{ vars['DEVAI_SOFT_GATE_TRUST_JSON'] }}",
+])('refuses unapproved trust expression %s', (expression) => {
+  const root = fixture();
+  const file = 'pull-request-checks.yml';
+  const source = readWorkflow(root, file);
+  const anchor = '${{ vars.DEVAI_SOFT_GATE_TRUST_JSON }}';
+  expect(source).toContain(anchor);
+  writeWorkflow(root, file, source.replace(anchor, expression));
+  const result = checkWorkflowTree(root);
+  expect(result.ok).toBe(false);
+  expect(
+    result.findings.some(
+      (item) => item.file === file && /trust|vars|secret|credential/iu.test(item.detail),
+    ),
+  ).toBe(true);
+});
+it('refuses duplicated and relocated public trust reads', () => {
+  for (const line of [
+    '          EXTRA: ${{ vars.DEVAI_SOFT_GATE_TRUST_JSON }}',
+    '      - run: echo "${{ vars.DEVAI_SOFT_GATE_TRUST_JSON }}"',
+  ]) {
+    const root = fixture();
+    const file = 'pull-request-checks.yml';
+    const source = readWorkflow(root, file);
+    const anchor = '          DEVAI_SOFT_GATE_TRUST_JSON: ${{ vars.DEVAI_SOFT_GATE_TRUST_JSON }}';
+    expect(source).toContain(anchor);
+    writeWorkflow(root, file, source.replace(anchor, `${anchor}\n${line}`));
+    const result = checkWorkflowTree(root);
+    expect(result.ok).toBe(false);
+    expect(
+      result.findings.some(
+        (item) => item.file === file && /trust|vars|credential/iu.test(item.detail),
+      ),
+    ).toBe(true);
+  }
+});
