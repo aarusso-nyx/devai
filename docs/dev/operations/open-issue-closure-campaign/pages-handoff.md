@@ -1,9 +1,16 @@
 # Pages handoff template — not authorization
 
+Current execution authority is the [standing Owner decision](execution-discipline.md).
+It supersedes earlier preparation-only and repeated routine authorization text;
+exact evidence, role boundaries, substantive unresolved contracts and actual
+performance gates remain. Historical observations and approvals below are
+preserved; they do not describe a new human review of later candidates.
+
 Choose the exact current control commit and site source commit/tree only after
 CTG-0622 cancellation/reconciliation evidence is accepted. Record audit schema,
 workflow/control identities and audit JSON/digest identities without secret values.
-OE-07 separately authorizes protected audit-variable updates and exact deployment.
+OE-07 uses the standing mandate for protected audit-variable updates and exact
+deployment; concrete exact effect records, approvals and readbacks remain required.
 
 Discover existing journal state before dispatch. The drafting probe of gh-pages
 returned 404 and an old site workflow run was green; neither proves the current

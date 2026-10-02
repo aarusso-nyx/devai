@@ -1,5 +1,11 @@
 # CTG-0622 CI invariant evidence and Pages cancellation contract
 
+Current execution authority is the [standing Owner decision](execution-discipline.md).
+It supersedes earlier preparation-only and repeated routine authorization text;
+exact evidence, role boundaries, substantive unresolved contracts and actual
+performance gates remain. Historical observations and approvals below are
+preserved; they do not describe a new human review of later candidates.
+
 TASK-0624, Architect design proposal for issues #234 and #235. Entry source is
 970514e90ebbdb0d2f6d7de6722619585715c973, tree
 98fc52ce988c3ce679276e9ed3e13d0d26bf93fb, with base

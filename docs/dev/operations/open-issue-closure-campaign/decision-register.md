@@ -1,5 +1,11 @@
 # Decision register
 
+Current authority: the [Owner execution decision](execution-discipline.md)
+supersedes preparation-only limits and repeated routine approvals. It authorizes
+necessary campaign effects and designated chat coordination; exact effect
+records, technical prerequisites and independently observed results still apply.
+The historical decisions below remain accepted scope evidence.
+
 Five Owner comments posted after the initial snapshot settle the following choices. They are scope/contract evidence, not new execution or publication authority.
 
 | Issue | Owner decision                                                                                                                                                                                                                                       | Exact evidence                                                                                                      | Plan consequence                                                      |
@@ -60,4 +66,22 @@ Current planned scope: 9 rounds, 20 CTGs, 46 tasks. The previous scope was 9,
 This preparation grants local artifact updates and records the explicit contract
 acceptances. Worker execution, commits, source publication, PR creation/merge,
 issue effects, signing/export, release/Pages/settings and notifications still
-require the applicable exact authority. All rounds/tasks remain planned.
+require the applicable exact authority. Current source checkpoint state is in checkpoint-register.md; no actual round closure is inferred.
+
+## Execution amendment and substantive proposals
+
+Routine scope amendments, commits and checkpoints now proceed after distinct
+review under the standing mandate. TASK-0611/0621/0622/0623/0641/0661 are ratified;
+TASK-0624 is committed pending acceptance after central review under that mandate.
+Only the central coordinator grants/releases round permits and integrates PR
+branches; eight round chats follow the original dependency queue and the limits
+of three active rounds and three inclusive active agents per round.
+
+TASK-0624 acceptance does not settle its Pages cancellation/reconciliation or
+soft rubric/threshold/producer/consumer scope gaps. The R-0602 Architect may
+prepare concrete technical amendments under delegated authority and distinct
+review. Keep cancellation disabled until safety is proved, preserve existing
+trace failures, and escalate any genuine unresolved new behavior/risk choice.
+Live isolation, exact release intent/receipt binding, protected availability and
+independent DETRAN confirmation remain substantive preconditions; an authority
+record never supplies their missing evidence.

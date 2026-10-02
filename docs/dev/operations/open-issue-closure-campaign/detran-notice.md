@@ -1,6 +1,14 @@
 # Prepared DETRAN notice — unsent
 
-The Owner must explicitly authorize the destination and send this message.
+Current execution authority is the [standing Owner decision](execution-discipline.md).
+It supersedes earlier preparation-only and repeated routine authorization text;
+exact evidence, role boundaries, substantive unresolved contracts and actual
+performance gates remain. Historical observations and approvals below are
+preserved; they do not describe a new human review of later candidates.
+
+The standing mandate authorizes the prepared DETRAN notice. Bind its exact
+destination, message and immutable evidence in a single-use effect record before
+sending; independent DETRAN confirmation remains required.
 Fill exact immutable version/source/package identities and verified evidence links
 after OE-06. Existing 1.8.0 delivers CMP-0005 path authority; the next selected
 shipping artifact delivers the later CMP-0004/0006 closure and evidence fixes.

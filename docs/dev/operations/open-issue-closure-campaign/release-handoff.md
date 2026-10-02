@@ -1,5 +1,11 @@
 # Release handoff template — not authorization
 
+Current execution authority is the [standing Owner decision](execution-discipline.md).
+It supersedes earlier preparation-only and repeated routine authorization text;
+exact evidence, role boundaries, substantive unresolved contracts and actual
+performance gates remain. Historical observations and approvals below are
+preserved; they do not describe a new human review of later candidates.
+
 Prepare the handoff from exact remediation checkpoints and include it in PR-A.
 Complete actual release evidence only after PR-A merges and the implementation
 round close gates hold. PR-B repins only after immutable publication.
@@ -17,7 +23,8 @@ round close gates hold. PR-B repins only after immutable publication.
 - Proposed release version derived from actual changes; no fixed next version.
 - Exact signed tag and candidate, immutable pack/SRI/artifact identities, trusted
   verifier pin, exact-tag rehearsal run and every required job including Linux
-  adoption, followed by separately authorized publish consent and environments.
+  adoption, followed by recorded standing publish consent, publish:true and required
+  protected environment approvals.
 - Owner effects consumed, run IDs, final registry/Release identities, tag/source/
   tree rechecks. A skip is not PASS; package availability is not adopter proof.
 

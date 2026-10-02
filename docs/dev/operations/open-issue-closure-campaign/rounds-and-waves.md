@@ -1,6 +1,12 @@
 # CMP-0006 rounds and waves
 
-Accepted plan: 9 rounds, 20 CTGs, 46 tasks. All remain planned. PR-A collects the 44 remediation/preparation task contributions in R-0601–R-0607; PR-B contains TASK-0681 and bounded TASK-0691 accounting after immutable publication. Role boundaries, attributed single-family commits and human review remain.
+Current execution authority is the [standing Owner decision](execution-discipline.md).
+It supersedes earlier preparation-only and repeated routine authorization text;
+exact evidence, role boundaries, substantive unresolved contracts and actual
+performance gates remain. Historical observations and approvals below are
+preserved; they do not describe a new human review of later candidates.
+
+Accepted plan: 9 rounds, 20 CTGs, 46 tasks. Current source checkpoints are in checkpoint-register.md; no formal round closure is inferred. PR-A collects the 44 remediation/preparation task contributions in R-0601–R-0607; PR-B contains TASK-0681 and bounded TASK-0691 accounting after immutable publication. Role boundaries, attributed single-family commits and human review remain.
 
 Source sequencing uses the exact reviewed checkpoints in integration-contract.md under the CMP-0006 source-only policy override. Runtime round/task records retain their normal lifecycle. A checkpoint never means merged or closed. After each observed PR merge, perform actual close gates; effects keep R-0607/R-0608/R-0609 open until verified.
 

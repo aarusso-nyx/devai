@@ -1,5 +1,13 @@
 # TASK-0611 Architect checkpoint proposal
 
+Current execution authority is the [standing Owner decision](execution-discipline.md).
+It supersedes earlier preparation-only and repeated routine authorization text;
+exact evidence, role boundaries, substantive unresolved contracts and actual
+performance gates remain. The task-entry narrative below is historical checkpoint evidence. Its old
+permission stops are superseded; inspections, contracts, failures, actual models
+and original approvals remain preserved. It does not describe a fresh human
+review of later candidates.
+
 Local preparation and declared task checks are complete. Human review, commit
 permission and checkpoint ratification are pending. This is an uncommitted
 source proposal; it does not establish a reviewed commit, merged head, runtime

@@ -1,5 +1,11 @@
 # Atomic verifier repin manifest template — unperformed
 
+Current execution authority is the [standing Owner decision](execution-discipline.md).
+It supersedes earlier preparation-only and repeated routine authorization text;
+exact evidence, role boundaries, substantive unresolved contracts and actual
+performance gates remain. Historical observations and approvals below are
+preserved; they do not describe a new human review of later candidates.
+
 Precondition: immutable OE-06 shipping release and all exact artifact identities.
 Record package name/version/registry/tarball, SHA-1, SRI, release_source commit/tree,
 published provenance digest/source_commit/payload_file_count, and selector kinds

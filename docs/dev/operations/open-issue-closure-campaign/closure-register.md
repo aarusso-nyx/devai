@@ -1,5 +1,11 @@
 # Issue closure register — unperformed
 
+Current execution authority is the [standing Owner decision](execution-discipline.md).
+It supersedes earlier preparation-only and repeated routine authorization text;
+exact evidence, role boundaries, substantive unresolved contracts and actual
+performance gates remain. Historical observations and approvals below are
+preserved; they do not describe a new human review of later candidates.
+
 No issue is closed by this draft. Fill this register only from observed results;
 never pre-populate merged commits, PASS, signed evidence, deployment or consent.
 

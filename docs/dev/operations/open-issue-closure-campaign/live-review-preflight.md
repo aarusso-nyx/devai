@@ -1,5 +1,13 @@
 # Live review preflight — offline TASK-0661 checkpoint
 
+Current execution authority is the [standing Owner decision](execution-discipline.md).
+It supersedes earlier preparation-only and repeated routine authorization text;
+exact evidence, role boundaries, substantive unresolved contracts and actual
+performance gates remain. The task-entry narrative below is historical checkpoint evidence. Its old
+permission stops are superseded; inspections, contracts, failures, actual models
+and original approvals remain preserved. It does not describe a fresh human
+review of later candidates.
+
 This is the Architect's offline contract and installed-host inspection for
 CTG-0661 under [ADR-MDL-0003](../../../../law/adr/ADR-MDL-0003-live-review-envelope-contract.md)
 and [ADR-GOV-0023](../../../../law/adr/ADR-GOV-0023-review-boundaries.md).
