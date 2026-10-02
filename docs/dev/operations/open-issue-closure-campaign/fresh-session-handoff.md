@@ -37,9 +37,12 @@ issues and complete paginated comments against original scope and prior receipts
 
 Keep eight Architect round chats R-0602–R-0609 under the Devai project. Only the
 central coordinator grants/releases round slots and integrates PR branches.
-Initial permitted rounds are R-0602, R-0604 and R-0606. At most three rounds and
-three agents per round execute, including coordinator, reviewers and all nested
-workers. Queued chats acknowledge and become idle until a central start message
+Initial permitted rounds R-0602, R-0604 and R-0606 retain three-round and
+three-agent ceilings. When the first eligible later round receives a permit,
+allow four active rounds in total and five concurrent task/agent slots per later
+round, counting coordinators, reviewers and nested workers. Remaining initial
+rounds retain three slots and count toward four. Apply actual host
+capacity and the [phase transition](execution-discipline.md) before dispatch. Queued chats acknowledge and become idle until a central start message
 supplies their permit and exact candidate. Next dependency queue is R-0603,
 R-0605, R-0607, R-0608, R-0609. Count existing workers or keep them idle.
 

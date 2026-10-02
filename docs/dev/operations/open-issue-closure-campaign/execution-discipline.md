@@ -22,6 +22,30 @@ You are AUTHORIZED to accept, perform, execute whatever you need to reach this c
 Update plans to fit such decisions
 ```
 
+## Later-round concurrency amendment
+
+The Owner additionally instructed on 2026-10-02
+(`CMP0006-OD-CONCURRENCY-20261002`):
+
+```text
+change settings to allow up to 4 rounds at same time, with at most 5 tasks each round for next rounds after 602/604/606
+```
+
+R-0602, R-0604 and R-0606 retain their initial ceilings: three simultaneous
+rounds and three concurrent task/agent slots per round. When the first eligible
+later round receives its permit, the global ceiling becomes four active rounds,
+counting any remaining initial rounds. R-0603, R-0605, R-0607, R-0608 and R-0609
+use five concurrent task/agent slots per round; initial rounds retain three. Count coordinators,
+workers, reviewers and nested agents together; five is a concurrency ceiling,
+not a limit on the total planned tasks. An optional clarification of the Owner's
+word “tasks” is pending; this stated interpretation applies unless corrected.
+Central records the phase transition; original dependency edges remain unchanged
+and a source-phase completion is not a formal runtime round closure. Dependencies and complete wave locks still determine
+which work can run. Effective capacity is the minimum of these ceilings and
+actual host capacity; the current child-agent interface advertises four slots
+including its coordinator, so it cannot dispatch a fifth agent merely because
+the plan permits five. This amendment expires with CMP-0006.
+
 ## Standing authority and acceptance
 
 Routine scope proposals, prompt/boundary amendments within the campaign, coherent
@@ -53,9 +77,10 @@ proofs. Default runtime and adopter lifecycle contracts remain unchanged.
 
 Create eight Architect coordinator chats under the Devai project, one each for
 R-0602 through R-0609. The central campaign chat alone grants and releases round
-slots and integrates cumulative PR branches. At most three rounds execute at
-once; at most three agents execute within each active round, counting its
-coordinator, role workers, reviewers and all nested agents. Existing task chats
+slots and integrates cumulative PR branches. The initial phase permits three
+rounds and three agents per round; the later phase permits four rounds and five
+concurrent task/agent slots per round, as defined above. Count coordinators, role
+workers, reviewers and all nested agents together. Existing task chats
 must be idle or counted. Creating a queued chat grants no execution slot.
 Queued chats register, acknowledge their assignment and become idle; they perform
 no dependent source work, tests or worker dispatch until the central coordinator
@@ -82,7 +107,7 @@ paths. Coordinators never implement code or tests under their Architect role.
 Acquire the entire declared wave lock set before writing; overlapping prefixes
 serialize. Release locks only at a frozen reviewed checkpoint and exact handoff.
 Reopen and review a completed contribution explicitly before modifying it.
-A three-agent ceiling does not bypass predecessor checkpoints. Useful concurrent
+The phase-specific agent ceiling does not bypass predecessor checkpoints. Useful concurrent
 work is a coordinator, a ready role worker and a distinct reviewer with disjoint
 write authority. Reviewers do not share the working agent's conversation when
 performing a soft-gate evaluation.
