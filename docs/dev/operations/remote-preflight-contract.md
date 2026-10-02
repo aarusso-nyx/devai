@@ -136,7 +136,11 @@ triggers, jobs, environments, credentials, effects, and recovery paths.
 | `release.yml`             | Tag validation, candidate rehearsal, authorized artifact promotion        |
 | `site-publish.yml`        | Owner-dispatched documentation site publication from main                 |
 
-The PR lane has `contents: read`, no environment, secrets or protected variables,
+The PR lane has `contents: read`, no environment, secrets or protected variables.
+Its only additional variable is independently controlled public
+`vars.DEVAI_SOFT_GATE_TRUST_JSON`, read once in the declared provider-free `soft-gate`
+step env under ADR-MDL-0004; every other vars/secret/whole-context/bracket/duplicate/
+relocated read remains refused. It uses
 pinned actions, exact candidate checkout without persisted credentials, Linux runners
 and a bounded timeout. It never uploads evidence or executes the local-only RC closure.
 Verifier materialization validates bytes; it never invokes signing or receipt verification.
@@ -172,3 +176,21 @@ satisfies the up-to-date requirement by construction for every entry it merges.
 
 The generic adopter contract remains controlled by its constitution and materialized
 policy. No own-repository exception weakens adopter roles, gates or trust anchors.
+
+## Independent scored admission
+
+The signed payload and external tuple must bind the exact event candidate/tree/base,
+reviewed immutable producer control and all source/lock/toolchain/roster/context/rubric/
+threshold/configuration/inventory/help/reply/envelope identities. Every Article18 dimension
+is an integer0..4 and must reach3 independently, with verdict=pass and complete valid observations for PASS. Verdict review/fail blocks admission even with high scores; unknown or invalid evidence is an evidence error. Source citations resolve actual frozen
+bytes/lines/anchors. Missing observation is error; confidence and averages never substitute.
+
+The complete bounded native stream proves positive completion, effective empty tool/MCP
+controls and no inherited configuration/context, with distinct externally established
+working/evaluator/custodian identities. Signature alone or a self-declaration is not proof.
+Fetch is provider-free, fixed to public `aarusso-nyx/devai` commit/tree/blob endpoints, with
+no redirects, token/secret fallback, git pack/history checkout, signing or automatic retry.
+Hard candidate checks, signature/canonical/member/input/host verification and freshness
+remain fail-closed. Exact selected evidence and public trust effects are separately
+recorded and observed under standing Owner authority before admission; missing technical
+custody/isolation/availability remains a gate, not an inferred successful outcome.

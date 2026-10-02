@@ -47,9 +47,9 @@ declares no override.
 
 ## Secrets and variables each job reads
 
-| Job         | Secrets | Variables | Token                                                 |
-| ----------- | ------- | --------- | ----------------------------------------------------- |
-| `preflight` | none    | none      | the job-scoped `GITHUB_TOKEN` is not read by any step |
+| Job         | Secrets | Variables                                                            | Token                                                 |
+| ----------- | ------- | -------------------------------------------------------------------- | ----------------------------------------------------- |
+| `preflight` | none    | `DEVAI_SOFT_GATE_TRUST_JSON`, only the declared `soft-gate` env seam | the job-scoped `GITHUB_TOKEN` is not read by any step |
 
 The checkout uses `persist-credentials: false`, so no credential survives the checkout
 step.
@@ -80,6 +80,15 @@ step.
    `pnpm run release:pr-gate -- "$DEVAI_PREFLIGHT_BASE"` (commit-range hygiene, the bump
    floor, and the release profile preflight for a version-changing pull request), then
    `check --affected --run --base "$DEVAI_PREFLIGHT_BASE" --as-role inspector --write`.
+
+7. **Authenticated independent soft gate** (`id: soft-gate`): fetch and consume the
+   exact externally selected signed payload using only
+   `${{ vars.DEVAI_SOFT_GATE_TRUST_JSON }}` in that step env. Bounded fixed public
+   GitHub commit/tree/blob reads use no token, secret or credential fallback. The typed
+   gate rechecks actual hard outputs, exact current candidate/tree/base/control/inputs,
+   four dimension thresholds, resolved source citations and actual completed independent
+   no-tool/MCP observations. Missing/stale/changed/unsupported/invalid evidence fails.
+   CI never calls a provider, signs, publishes evidence, changes trust or creates a proof.
 
 Each step fails the job on its own; the runner report is the lane's verdict and the
 task DAG marks the dependents of a `BLOCKED` probe blocked-environment (ADR-CHK-0001).
@@ -122,3 +131,15 @@ task DAG marks the dependents of a `BLOCKED` probe blocked-environment (ADR-CHK-
 - Not reusable as-is: the verifier-package materialization in step 5 checks DEVAI's own
   vendored verifier; an adopter has no such vendor tree and runs `check --preflight`
   against its own `test-tasks.json`.
+
+## Public trust input boundary
+
+The sole additional variable read is the exact public trust expression above, once at
+the declared provider-free step. All secrets, other vars, whole contexts, bracket reads,
+duplicate or relocated reads and unknown fields remain refused. The independently
+controlled tuple binds immutable evidence commit/payload digest, Ed25519 SPKI/key identity,
+reviewed producer control and exact working/evaluator/candidate/base identities. It is
+not candidate-authored law or a fixture. Fetch/signature/member/host observation checks
+and gate consumption preserve the same frozen verified bytes privately or fully reverify
+them; a serialized `verified:true` field conveys no authority. PR-head and merge-group
+evidence are distinct; movement requires new separately bounded evaluation/selection.
