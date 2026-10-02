@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "invariants": [
     {
       "id": "INV-AUTH-001",
@@ -251,7 +251,11 @@
       "tests": [
         {
           "suite": "contract",
-          "path": "tests/contract/invariant-resolution.contract.test.ts"
+          "path": "tests/contract/invariant-resolution.contract.test.ts",
+          "assertions": [
+            "Every readiness-bearing invariant resolves to an existing executable test; the readiness population is non-empty.",
+            "Every trace invariant id exists and every declared test path resolves; script/config attestations do not replace executable readiness tests."
+          ]
         },
         {
           "suite": "unit",
@@ -261,6 +265,18 @@
           "suite": "unit",
           "path": "packages/sensors/tests/unit/trace-resolve.test.ts"
         }
+      ],
+      "docs": [
+        {
+          "doc": "docs/dev/operations/open-issue-closure-campaign/ci-invariant-contract.md",
+          "anchor": "trace-resolution-producer"
+        }
+      ],
+      "code_areas": [
+        "packages/sensors/src/trace-resolve.ts",
+        "packages/spec/src/spec/test-trace-validator.ts",
+        ".github/workflows/pull-request-checks.yml",
+        "packages/sensors/src/harness-invariant-alignment-workflow.ts"
       ]
     },
     {
@@ -417,7 +433,10 @@
       "tests": [
         {
           "suite": "unit",
-          "path": "packages/loop/tests/scorecard.test.ts"
+          "path": "packages/loop/tests/scorecard.test.ts",
+          "assertions": [
+            "Compose measured scorecard verdicts conservatively; a composed scorecard alone does not prove soft thresholds or evaluator independence."
+          ]
         },
         {
           "suite": "unit",
@@ -427,6 +446,18 @@
           "suite": "unit",
           "path": "packages/loop/tests/unit/scorecard-aggregation-boundaries.test.ts"
         }
+      ],
+      "docs": [
+        {
+          "doc": "docs/dev/operations/open-issue-closure-campaign/ci-invariant-contract.md",
+          "anchor": "hard-and-soft-gate-producers"
+        }
+      ],
+      "code_areas": [
+        "packages/loop/src/loop/scorecard.ts",
+        ".github/workflows/pull-request-checks.yml",
+        "scripts/check-workflows.mjs",
+        "packages/sensors/src/harness-invariant-alignment-workflow.ts"
       ]
     },
     {
