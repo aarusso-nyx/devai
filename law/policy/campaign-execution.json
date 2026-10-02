@@ -288,7 +288,7 @@
           "agent_count": "inclusive of Architect coordinator, task workers, reviewers and nested agents; slots are not multiplicative",
           "initial_active_rounds": ["R-0602", "R-0604", "R-0606"],
           "queued_rounds": ["R-0603", "R-0605", "R-0607", "R-0608", "R-0609"],
-          "dispatch": "central campaign coordinator alone grants round permit after predecessor and capacity verification; queued chats acknowledge then stay idle without source writes or workers",
+          "dispatch": "central campaign coordinator alone grants round permit after predecessor and capacity verification; queued chats acknowledge then stay idle without source writes or workers; CMP0006-OD-EARLY-ARCH-20261002 additionally permits only TASK-0631 and TASK-0651 Architect preparation from the exact accepted central checkpoint before round-wide predecessor completion, after capacity and complete-wave lock verification; all original dependency edges remain for downstream tasks, final acceptance and later waves; refresh and independently review designs against completed predecessors before downstream handoff; no runtime effects or final gate waiver",
           "coordination": "Owner explicitly authorizes messages among central campaign chat and its eight round chats; no unsolicited third-party messaging",
           "handoff": "exact immutable source checkpoint, complete wave locks, no shared mutable worktree; parent-child pipeline order retained",
           "concurrency_amendment": {
