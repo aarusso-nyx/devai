@@ -5,6 +5,7 @@ import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import {
   cpSync,
+  existsSync,
   lstatSync,
   mkdirSync,
   mkdtempSync,
@@ -20,13 +21,20 @@ import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { withAuthorityHostTestScope } from '../../../authority/tests/unit/authority-host-test-scope.js';
-import { appendRecord, loadChain } from '../../../evidence/src/evidence/chain.js';
+import {
+  appendRecord,
+  loadChain,
+  resolveProofAnchor,
+  saveChain,
+  verifyChain,
+} from '../../../evidence/src/evidence/chain.js';
 import { appendProofEpochRecord } from '../../../evidence/src/evidence/proof-epoch.js';
 import { appendVerbEvidence } from '../../../evidence/src/evidence/verb-evidence.js';
 
 const ROOT = resolve(import.meta.dirname, '../../../..');
 const BIN = join(ROOT, '.devai/state/pr-bootstrap/cli/bin.js');
 const CHAIN = 'record/proofs/chain.json';
+const BASELINE = 'record/proofs/anchor-baseline.json';
 const PATH = 'record/proofs/work/generic/R-0007.jsonl';
 const roots: string[] = [];
 
@@ -376,6 +384,95 @@ describe('ADR-EVI-0005 public newest-line recovery', () => {
       'changed newest ç',
     );
     writeFileSync(join(root, PATH), bytes);
+    expectRefused(root, () => recover(root));
+  });
+
+  // ADR-EVI-0005 IA-002/IA-007: absence of a baseline cannot hide defective older anchors.
+  it.each(['digest mismatch', 'duplicate population'] as const)(
+    'refuses an older anchor %s with no baseline even when the cryptographic chain is valid',
+    async (defect) => {
+      const { root } = await crashFixture();
+      rmSync(join(root, BASELINE));
+      const chain = loadChain(join(root, CHAIN));
+      const [first, second] = chain.records;
+      if (first === undefined || second === undefined) throw new Error('missing older anchors');
+      const physical = resolveProofAnchor(root, { path: PATH, sequence: 1 });
+      expect(physical.resolved).toBe(true);
+      if (!physical.resolved) throw new Error('older physical line does not resolve');
+      expect(first.proof_sha256).toBe(physical.sha256);
+      if (defect === 'digest mismatch') {
+        first.proof_sha256 = '0'.repeat(64);
+        expect(first.proof_sha256).not.toBe(physical.sha256);
+      } else {
+        second.proof_path = PATH;
+        second.proof_sequence = 1;
+        second.proof_sha256 = physical.sha256;
+        expect(
+          chain.records.filter(
+            (record) => record.proof_path === PATH && record.proof_sequence === 1,
+          ),
+        ).toHaveLength(2);
+      }
+      // Structured anchor fields are outside the manifest hash; the observed defect must not
+      // collapse into a generic broken cryptographic chain fixture.
+      await withAuthorityHostTestScope(() => saveChain(join(root, CHAIN), chain));
+      expect(verifyChain(join(root, CHAIN))).toMatchObject({ valid: true, errors: [] });
+      expect(
+        chain.records.filter((record) => record.proof_path === PATH && record.proof_sequence === 3),
+      ).toEqual([]);
+      expect(existsSync(join(root, BASELINE))).toBe(false);
+      expectRefused(root, () => recover(root));
+    },
+  );
+
+  it('refuses changed committed older proof bytes when both the chain and baseline are absent', async () => {
+    const { root, bytes } = await crashFixture();
+    rmSync(join(root, CHAIN));
+    rmSync(join(root, BASELINE));
+    const git = (args: readonly string[]): string => {
+      const result = spawnSync('git', [...args], {
+        cwd: root,
+        env: {
+          ...process.env,
+          GIT_CONFIG_NOSYSTEM: '1',
+          GIT_CONFIG_GLOBAL: '/dev/null',
+          GIT_CONFIG_SYSTEM: '/dev/null',
+          GIT_TERMINAL_PROMPT: '0',
+        },
+        encoding: 'utf8',
+        timeout: 30_000,
+        maxBuffer: 1024 * 1024,
+      });
+      if (result.error !== undefined) throw result.error;
+      expect(result.signal, result.stderr).toBeNull();
+      expect(result.status, result.stderr).toBe(0);
+      return result.stdout;
+    };
+    // This is a disposable fixture commit, never a commit in the author worktree.
+    git(['init', '--quiet', '--template=', '--initial-branch=fixture']);
+    git(['add', '--', PATH]);
+    git([
+      '-c',
+      'user.name=Inspector recovery fixture',
+      '-c',
+      'user.email=fixture@example.invalid',
+      '-c',
+      'commit.gpgSign=false',
+      'commit',
+      '--quiet',
+      '-m',
+      'test(fixtures): preserve proof history',
+    ]);
+    expect(git(['show', `HEAD:${PATH}`])).toBe(bytes.toString('utf8'));
+    const newest = newestBytes(root);
+    // Leading JSON whitespace preserves parsed content and every internal line hash, while
+    // changing the committed physical bytes of line 1. The newest crash residue stays exact.
+    writeFileSync(join(root, PATH), Buffer.concat([Buffer.from(' '), bytes]));
+    expect(newestBytes(root)).toEqual(newest);
+    expect(git(['diff', '--name-only', 'HEAD', '--', PATH])).toBe(`${PATH}\n`);
+    expect(existsSync(join(root, CHAIN))).toBe(false);
+    expect(existsSync(join(root, BASELINE))).toBe(false);
+    // snapshot includes Git/config metadata as well as proofs and checks absent-file population.
     expectRefused(root, () => recover(root));
   });
 
