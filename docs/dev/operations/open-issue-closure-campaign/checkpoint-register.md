@@ -6,15 +6,15 @@ evidence without repeated human ratification requests. Preserve the original
 human-ratified checkpoint receipts and actual authors/reviewers; record new
 acceptance as execution under standing Owner authority, not fresh human review.
 
-| Task      | Source checkpoint status at discipline amendment                                                                                             |
-| --------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| TASK-0611 | Ratified campaign entry and accepted contracts                                                                                               |
-| TASK-0621 | Ratified dependency remediation design                                                                                                       |
-| TASK-0622 | Ratified Inspector counterexamples; declared RED retained                                                                                    |
-| TASK-0623 | Ratified dependency implementation; focused checks and audit passed on its exact candidate                                                   |
-| TASK-0624 | Committed design; pending acceptance under the new standing mandate after central distinct review; substantive Pages/soft-gate gaps retained |
-| TASK-0641 | Ratified exact closure-membership design                                                                                                     |
-| TASK-0661 | Ratified offline review-transport design; live isolation/verification remains separate                                                       |
+| Task      | Source checkpoint status at discipline amendment                                                      |
+| --------- | ----------------------------------------------------------------------------------------------------- |
+| TASK-0611 | Ratified campaign entry and accepted contracts                                                        |
+| TASK-0621 | Ratified dependency remediation design                                                                |
+| TASK-0622 | Ratified Inspector counterexamples; declared RED retained                                             |
+| TASK-0623 | Ratified dependency implementation; focused checks and audit passed on its exact candidate            |
+| TASK-0624 | Accepted under standing Owner mandate after central review; substantive Pages/soft-gate gaps retained |
+| TASK-0641 | Ratified exact closure-membership design                                                              |
+| TASK-0661 | Ratified offline review-transport design; live isolation/verification remains separate                |
 
 Completed contributions are integrated locally on the central planning branch.
 No main merge, formal round closure or publication is claimed. The archived
