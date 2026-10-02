@@ -233,12 +233,13 @@ declares an environment.
 | `build-release`                     | rehearsal                              | `verify-ledger`                     | `devai-rc-release`          | none                                                                              | `DEVAI_PROCESS_CONTROL_COMMIT`                                                                           | `contents: read`                                                          | rehearsal 2 of 2                     |
 | `finalize-release`                  | publication                            | `verify-ledger`                     | `devai-rc-publication`      | `GITHUB_TOKEN` (`secrets.GITHUB_TOKEN`)                                           | `DEVAI_PROCESS_CONTROL_COMMIT`                                                                           | `contents: write`, `packages: write`                                      | publication 2 of 2                   |
 | `deploy-pages`                      | publication with `publish_pages: true` | `finalize-release`, `verify-ledger` | `github-pages`, no reviewer | `GITHUB_TOKEN` (`github.token`)                                                   | `DEVAI_PROCESS_CONTROL_COMMIT`, `DEVAI_PAGES_MIGRATION_AUDIT_JSON`, `DEVAI_PAGES_MIGRATION_AUDIT_SHA256` | `contents: read`, `pages: write`, `deployments: write`, `id-token: write` | none                                 |
-| `publish-site` (`site-publish.yml`) | Owner dispatch from `main`             | none                                | `github-pages`, no reviewer | `GITHUB_TOKEN` (`github.token`)                                                   | none                                                                                                     | `contents: read`, `pages: write`, `deployments: write`, `id-token: write` | none                                 |
+| `prepare-site` (`site-publish.yml`) | Owner dispatch from `main`             | none                                | none                        | none (normal read-only checkout token)                                            | none                                                                                                     | `contents: read`                                                          | none                                 |
+| `publish-site` (`site-publish.yml`) | Owner dispatch from `main`             | `prepare-site`                      | `github-pages`, no reviewer | `GITHUB_TOKEN` (`github.token`)                                                   | none                                                                                                     | `contents: read`, `pages: write`, `deployments: write`, `id-token: write` | none                                 |
 
 The job set of `release.yml` is exactly `build-release`, `control-commit-summary`,
 `deploy-pages`, `finalize-release`, and `verify-ledger`; `promote-assets`,
 `rehearsal-summary`, and `verify-linux-adopter` no longer exist as jobs. The job set of
-`site-publish.yml` is exactly `publish-site`. Job by job:
+`site-publish.yml` is exactly `prepare-site` then `publish-site` under ADR-REL-0034. Job by job:
 
 - `control-commit-summary` declares no `environment` and no `if`, has
   `permissions: contents: read`, and references no secret. Its only checkout is a
@@ -294,11 +295,13 @@ The job set of `release.yml` is exactly `build-release`, `control-commit-summary
   permissions, its `github.token` and audit-variable reads, and its steps; `needs` becomes
   `finalize-release` then `verify-ledger`, and `Download canonical release assets` reads
   `artifact-ids: ${{ needs.verify-ledger.outputs.release_asset_id }}`.
-- `publish-site` is unchanged in every pin: the `workflow_dispatch` trigger without
-  inputs, `permissions: contents: read` at the workflow level, the
-  `devai-pages-publication` concurrency group, the single job, the `main` guard, the
-  `github-pages` environment name and URL, the build sequence, and the publication
-  steps. The only change is outside the file: the environment carries no reviewer.
+- ADR-REL-0034 moves the existing checkout/build/security/type/local-byte/upload
+  sequence to read-only `prepare-site`, with no environment and only `contents: read`.
+  Its ref-scoped job lock may supersede preparation. `publish-site` requires success,
+  checks the same source/run/artifact/population, validates the complete bounded archive
+  before extraction, never rebuilds, and keeps the original `github-pages` environment,
+  permissions and journal operation under the noncancellable shared publication job lock.
+  The manual main/no-input guard and actual configured environment protection remain.
 
 Unchanged across the restructure: the `v*` tag push trigger; the `workflow_dispatch`
 inputs `release_tag`, `publish`, `publish_pages`, `candidate_commit`, `rehearsal_run_id`,
@@ -486,11 +489,12 @@ clauses that stay in force are these:
   `workflow_dispatch` from `main`, has no inputs, and reads no repository secret or
   variable; its only credential is the job-scoped `GITHUB_TOKEN`, declared as a
   consumer in `law/policy/credential-requirements.json`.
-- Its single `publish-site` job checks out the dispatched commit without persisted
-  credentials, binds the source ref, commit, and tree, builds the site from `docs/site`
-  with its own lockfile (`npm --prefix docs/site ci`), runs the site `security:check`
-  and `typecheck`, runs `build`, verifies the local bytes, and uploads the exact Pages
-  artifact.
+- ADR-REL-0034 places exact checkout/ref/commit/tree binding, the existing
+  `docs/site` lockfile/security/type/build/local-byte checks and exact Pages upload in
+  read-only `prepare-site`. `publish-site` requires its success and immutable same-run
+  artifact ID, validates complete archive custody before extraction and publication, and
+  never rebuilds. Preparation supersedes only its own ref-scoped job; the publisher
+  retains the noncancellable shared journal lock and all existing scoped permissions.
 - Deployment goes through `scripts/process/publish-site.mjs`, which records a
   site-only identity in the single-writer Pages journal of
   `scripts/process/github-pages-journal.mjs` and shares the `devai-pages-publication`
@@ -786,3 +790,22 @@ an existing different record. Neither observing nor storing a report grants
 execution custody, a reuse origin, or candidate readiness. Restarted execution
 must independently establish those proofs; the installed driver still declares
 its own results as executed and does not replay these checkpoints.
+
+## Independent candidate soft-gate evidence
+
+ADR-MDL-0004 adds the separate fully required four-dimension scored reply and external
+trust/evidence selection. PASS requires verdict=pass, complete valid observations and every integer0..4 dimension independently reaching3 with
+structured resolved source citations. Missing observations are errors, and generic
+review/triage schemas and original hard thresholds remain unchanged. Review/fail blocks despite high scores, while unknown or invalid evidence is an evidence error. The producer runs
+once under its exact Owner-initiated invocation envelope from a separately reviewed
+immutable control checkpoint, retains actual completed no-tool/MCP/config/inventory
+observations and signs only through independent custody. Signature alone is insufficient.
+
+The PR lane reads only `vars.DEVAI_SOFT_GATE_TRUST_JSON` at the declared provider-free
+`soft-gate` env seam, using fixed public GitHub commit/tree/blob reads without a token or
+secret fallback. It admits only selected immutable externally authenticated candidate/
+base/control/input/reply/host identities with <=24h freshness and no future times. A new
+PR or merge-group candidate requires new separately invoked evaluation and external
+selection; CI never initiates a provider, changes trust or fabricates evidence. Exact
+evidence-ref/trust effects may precede PR admission from a reviewed control checkpoint,
+with single-use effect records and observed receipts, preserving the two-PR discipline.

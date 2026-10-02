@@ -323,3 +323,54 @@ not performed Pages publication or operational independent soft evaluation.
 
 The soft-rubric amendment and the 1651 retained test-trace diagnostics remain
 separate substantive obligations. The Pages selection does not resolve either.
+
+## Independently selected scored evidence
+
+ADR-MDL-0004 defines the separate fully required scored mode. PASS requires
+`verdict=pass`, all four integer0..4 dimensions independently at or above3,
+resolved structured source citations and complete valid observed evidence. Review/fail
+blocks despite high scores; unknown or invalid evidence is an evidence error. Legacy
+generic review/triage schemas and the original hard thresholds remain unchanged.
+
+The trusted custodian invokes a distinct eligible evaluator under one exact bounded
+Owner-initiated envelope from a separately reviewed immutable producer control
+checkpoint. Retain actual completed host output, effective empty tools/MCP and
+configuration/inventory observations, unchanged adapter-selected reply bytes and
+separate canonical score projection. A signature, declared isolation or worker fixture
+cannot establish execution or independence. Missing supported controls or protected
+custody remain actual admission failures.
+
+Canonical byte equality applies only to the unsigned manifest, external trust tuple
+and canonical score projection. Preserve and hash exact adapter reply bytes; unchanged
+ADR-MDL-0003 extraction admits its inherited structured/fenced/prefaced reply forms.
+Domain-separated Ed25519 signatures authenticate the exact manifest payload roster,
+excluding manifest/signature metadata and circular commit/self digests. Independent
+external trust pins immutable evidence commit, computed manifest digest, public key
+and exact candidate/base/control/agent identities. No private key enters candidate
+source, job configuration or selected public trust.
+
+The PR lane reads the sole additional public
+`${{ vars.DEVAI_SOFT_GATE_TRUST_JSON }}` once in the declared provider-free `soft-gate`
+step env. Bounded fixed public GitHub commit/tree/blob requests introduce no token,
+secret, redirects, packs/history checkout or fallback. Schema/canonical/signature/
+member/input/host/citation/freshness checks consume the same verified immutable bytes
+through a private typed result or fully reverify before consumption; serialized
+`verified:true` has no authority. CI never initiates a provider, signs, publishes
+evidence or changes trust. Missing or changed evidence blocks candidate admission.
+
+PR-head and merge-group candidates are distinct. Candidate/base/input movement
+requires new separately bounded evaluation and independent selection. Central owns
+exact evidence-ref and public-trust effects, with single-use reviewed effect records
+and observed receipts; source contracts do not report those effects as performed.
+
+ADR-REL-0034 limits cancellation to read-only preparation and preserves the complete
+publication environment/permission/journal contract. Exact same-run artifact/source/
+population custody and complete bounded archive validation precede extraction; typed
+deterministic validation lives in `packages/sensors/src/ci-invariant-gate.ts`, with
+I/O wrappers only in the declared process scripts. Interruption cannot establish new
+verification; independently persisted verified journal evidence remains valid.
+
+Focused source validators and offline counterexamples establish only their declared
+source behavior. Final cumulative admission still requires the actual real trace
+and test-trace gates after TASK-06216 and actual independently observed scored
+evidence for the exact admitted candidate. No synthetic/partial gate is readiness.

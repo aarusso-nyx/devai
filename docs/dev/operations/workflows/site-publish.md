@@ -1,11 +1,11 @@
 # site-publish.yml
 
-The site-only Pages publication lane (ADR-REL-0029, approval clause superseded by
-ADR-REL-0030). It publishes the documentation site from a `main` commit without a
-version, a tag, or a rehearsal, through the same single-writer Pages journal the release
-path uses. The clauses that bind it are on
-[release discipline](../release-discipline.md#publish-the-documentation-site-without-a-release);
-this page describes the file as it stands.
+The site-only Pages publication lane retains ADR-REL-0029 and the approval topology
+of ADR-REL-0030. ADR-REL-0034 changes only build placement and job concurrency:
+read-only preparation may be superseded; publication remains serialized through
+the original single-writer journal. This page declares the selected target contract;
+implementation must pair the workflow and its checked documentation before final
+admission. It reports no dispatched publication or environment change.
 
 <!-- devai:workflow-metadata -->
 
@@ -14,110 +14,116 @@ workflow: .github/workflows/site-publish.yml
 triggers:
   - workflow_dispatch
 jobs:
+  - prepare-site
   - publish-site
 ```
 
 ## Triggers and path scope
 
-| Event               | Inputs | Guard                                                                            |
-| ------------------- | ------ | -------------------------------------------------------------------------------- |
-| `workflow_dispatch` | none   | the job runs only when `github.ref` is `refs/heads/main`; any other ref skips it |
+| Event               | Inputs | Guard                                                                   |
+| ------------------- | ------ | ----------------------------------------------------------------------- |
+| `workflow_dispatch` | none   | exact `refs/heads/main` guard; no feature branch may prepare or publish |
 
-There is no path filter and no other trigger. The Owner dispatches with
-`gh workflow run site-publish.yml --ref main`. The concurrency group is
-`devai-pages-publication` with `cancel-in-progress: false`, shared with `deploy-pages`
-of `release.yml`, so a site-only publication and a release deployment never interleave.
+There is no path filter or other trigger. The Owner dispatches
+`gh workflow run site-publish.yml --ref main`. Preparation has a distinct exact
+ref-scoped job concurrency group with `cancel-in-progress: true`. Publication has
+job group `devai-pages-publication`, `cancel-in-progress: false`, shared with
+`deploy-pages` of `release.yml`. Groups must differ case-insensitively. There is no
+parent cancellation that can interrupt a publisher. Pending publisher replacement
+is possible before an intent exists; every queued dispatch is not guaranteed to deploy.
 
 ## Jobs and their order
 
-One job, `publish-site` ("Publish the documentation site from main"), on
-`ubuntu-latest` with a 20 minute timeout.
+`prepare-site` precedes `publish-site` on `ubuntu-latest`, each bounded by the existing
+20 minute timeout. Publication requires successful preparation and the exact same
+dispatched commit/tree/run/artifact/population identities; failure, skip or cancellation
+cannot enter publication through an `always()` or permissive condition.
 
 ## Environments and who stops there
 
-| Job            | Environment                                                     | Stop                                                                                                                                                                                      |
-| -------------- | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `publish-site` | `github-pages`, `url: ${{ steps.deployment.outputs.page_url }}` | none by design: the environment keeps its deployment branch policy and carries no reviewer (ADR-REL-0030). Until Owner effect OE-02 removes the live reviewer, the run still waits there. |
+| Job            | Environment                                                     | Stop                                                                                  |
+| -------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `prepare-site` | none                                                            | none                                                                                  |
+| `publish-site` | `github-pages`, `url: ${{ steps.deployment.outputs.page_url }}` | none by design under ADR-REL-0030; actual configured protection remains authoritative |
 
-The workflow-level `permissions` block is `contents: read`; the job overrides it with
-`contents: read`, `pages: write`, `deployments: write`, `id-token: write`.
+The workflow permission is `contents: read`. Preparation explicitly uses only that
+read permission and no protected environment. Publication retains `contents: read`,
+`pages: write`, `deployments: write`, `id-token: write`; no permission is widened.
 
 ## Secrets and variables each job reads
 
-| Job            | Secrets                        | Variables | Permissions                                                               |
-| -------------- | ------------------------------ | --------- | ------------------------------------------------------------------------- |
-| `publish-site` | `github.token` (as `GH_TOKEN`) | none      | `contents: read`, `pages: write`, `deployments: write`, `id-token: write` |
+| Job            | Secrets                                            | Variables | Permissions                                                               |
+| -------------- | -------------------------------------------------- | --------- | ------------------------------------------------------------------------- |
+| `prepare-site` | none; normal checkout uses its read-only job token | none      | `contents: read`                                                          |
+| `publish-site` | `github.token` (as `GH_TOKEN`)                     | none      | `contents: read`, `pages: write`, `deployments: write`, `id-token: write` |
 
-The job reads no repository secret or variable; `GITHUB_TOKEN` is declared as its
-consumer in `law/policy/credential-requirements.json`. The checkout uses
-`persist-credentials: false`. Scripts run from the dispatched `main` commit, not from
-`DEVAI_PROCESS_CONTROL_COMMIT`, which is acceptable because this lane can publish only
-documentation bytes.
+Neither job reads a repository secret or variable. The exact consumers are declared
+in `law/policy/credential-requirements.json`. Every checkout uses
+`persist-credentials: false`. The scripts remain bound to the dispatched main commit;
+this path publishes documentation bytes only.
 
 ## What each job runs
 
-`publish-site` runs these steps in order:
+`prepare-site` runs:
 
-1. **Check out the dispatched main commit**: `actions/checkout` at `github.sha`.
-2. **Set up Node**: the composite action with its defaults (no pnpm, no cache).
-3. **Bind source identity** (`id: source`): asserts `GITHUB_REF` is `refs/heads/main`
-   and `HEAD` is `GITHUB_SHA`; outputs the tree sha.
-4. **Build and verify the documentation site**: `npm --prefix docs/site ci`,
-   `security:check`, `typecheck`, `build`, then
-   `scripts/process/verify-pages-bytes.mjs local docs/site/build`.
-5. **Upload exact Pages artifact** (`id: pages-artifact`): `actions/upload-pages-artifact`
-   from `docs/site/build` as `github-pages-<attempt>`, retained 30 days.
-6. **Reconcile and deploy exact Pages artifact** (`id: deployment`):
-   `scripts/process/publish-site.mjs docs/site/build site-publication-record` with
-   `GH_TOKEN`, `PAGES_ARTIFACT_ID`, and `SOURCE_TREE`. The script builds a site-only
-   identity (repository, `mode: site-only`, the package version as tag, commit, tree,
-   the site member digest, the run and attempt, and the commit as control commit),
-   reads the journal, and creates the intent, submits the deployment, observes it, and
-   verifies the live bytes, in that order.
-7. **Retain site publication identifiers**: uploads `site-publication-record/*` as
-   `devai-site-publication-<attempt>` for 30 days, `if: always()`, warning when empty.
-8. **Verify live documentation**: polls `index.html` on the live site up to twelve
-   times until its digest equals the built file, then
-   `verify-pages-bytes.mjs live docs/site/build`.
+1. Check out the exact dispatched main SHA without persisted credentials.
+2. Set up Node through the existing composite action.
+3. Bind exact ref/commit/tree/run identities.
+4. Run `npm --prefix docs/site ci`, `security:check`, `typecheck`, `build`, and
+   `scripts/process/verify-pages-bytes.mjs local docs/site/build` once.
+5. Compute the existing population SHA-256 over UTF-8
+   `JSON.stringify(siteMembers(directory))` over members only, with the existing
+   empty `.nojekyll` exclusion. Emit and bind exact source/tree/run identities
+   separately; do not incorporate them into `siteSha256`.
+6. Upload the current Pages archive using the pinned upload action; emit immutable
+   numeric artifact ID and source/population outputs. No journal/provider is invoked.
+
+`publish-site` runs:
+
+1. Check out the same dispatched SHA and verify successful preparation identities.
+2. Obtain only that run's exact immutable artifact ID; reject name/latest/cross-run lookup.
+3. Run `scripts/process/verify-site-preparation-artifact.mjs` to validate every bounded
+   archive entry before extracting any byte. Refuse unsafe/absolute/traversing/duplicate/
+   link/special/unknown members or excessive/incomplete archives. Only approved ordinary
+   directories/files and explicitly recognized metadata are admitted. Verify the exact
+   site member population after safe extraction; empty `.nojekyll` is excluded as in the
+   current publisher, and every other dot member refuses.
+4. Invoke the existing `scripts/process/publish-site.mjs` with exact `GH_TOKEN`,
+   `PAGES_ARTIFACT_ID`, `SOURCE_TREE` and validated site directory. It never rebuilds.
+   Its site-only identity is repository/mode/tag/commit/tree/siteSha256/sourceRun/
+   controlCommit. The current attempt is observation metadata, not a new identity field.
+5. Retain original intent/submitted/verified identifiers for 30 days and verify full
+   live bytes using the original publisher operation. Unknown intents and missing
+   verified release baseline or unresolved other-mode publications still refuse.
 
 ## Direct effects
 
-- One GitHub Pages deployment of the built site.
-- One GitHub Deployment record (task `devai:pages-publication`, environment
-  `devai-pages-publication`) with a `submitted` and then a `verified` status; this is the
-  journal entry other publications read.
-- The retained artifacts `github-pages-<attempt>` and `devai-site-publication-<attempt>`.
+Preparation creates only its exact run's build artifact and metadata. Publication
+creates the existing GitHub Pages deployment and GitHub Deployment journal record,
+retains its original identifiers and verifies actual live bytes. It never publishes a
+package, release or tag, or repoints a protected process-control commit.
 
 ## Side effects
 
-- Reads the complete deployment journal and the live site before writing anything.
-- Never publishes a package, a Release, or a tag; never touches `release.yml`
-  artifacts; never repoints `DEVAI_PROCESS_CONTROL_COMMIT`.
+The complete publication journal and live bytes are read before an intent is created.
+Preparation cancellation has no journal effect. Generic harness coherence checks
+actual job effects, permissions, environments and resolved local/reusable calls;
+unknown effects or lock aliases remain findings, with no filename/N/A exception.
 
 ## Recovery paths
 
-- **`SITE_BASELINE_MISSING`**: the journal holds no verified release-mode deployment.
-  The first publication of any site is a release; run a publication with
-  `publish_pages: true` through `release.yml` first.
-- **`OTHER_PUBLICATION_UNRESOLVED`**: a deployment with a different identity is still
-  `submitted` (a release deploy or an earlier site dispatch that did not finish).
-  Resolve that publication first by re-running its own workflow with its own inputs;
-  the re-run observes the exact Pages deployment and closes the record when the live
-  bytes match. A site-only re-run cannot close a release record and a release re-run
-  cannot close a site-only one, because the identity differs.
-- **This publication left `submitted`** (the job failed after step 6 created the Pages
-  deployment): re-dispatch from the same `main` commit. The identity is rebuilt from the
-  same commit and tree, the script finds the single matching record, observes the
-  deployment, and verifies the live bytes without a second deploy when they already
-  match. A different `main` commit is a different identity and is blocked until the
-  earlier one is resolved.
-- **`DEPLOYMENT_UNRESOLVED`**: the Pages deployment did not succeed. Check the Pages
-  deployments API for its state; when it is terminal and failed, the record stays
-  `submitted` until an operator with the deployment-write permission resolves it in
-  the same journal, after which a fresh dispatch creates a new intent. Report it; the
-  script never overwrites a record.
-- **Live verification failed after a successful deploy**: re-dispatch; the deploy is a
-  no-op on matching bytes and only the verification runs again.
+- Missing verified release-mode baseline still requires the original release path first.
+- A known submitted publication in this run resumes only its original Pages and
+  artifact IDs. A publisher-only retry consumes retained preparation outputs. If all
+  jobs rerun, a fresh artifact ID does not establish that its replacement was deployed;
+  identical site population may verify the original identity, changed population refuses.
+- Unknown intent refuses even if current live bytes match. A different run/commit or
+  unresolved other-mode predecessor cannot be reconciled by this dispatch. Retain the
+  original workflow/input identity and complete journal evidence for its resolution.
+- Failed deployment, manual cancellation, timeout or runner loss cannot establish
+  new verification; independently persisted verified evidence from before interruption
+  remains valid. No fabricated verified record is created. The original durable-intent/read-after-write and journal
+  refusals remain; no new cross-dispatch reconciliation protocol is introduced.
 
 ## Steps an adopter may reuse
 
