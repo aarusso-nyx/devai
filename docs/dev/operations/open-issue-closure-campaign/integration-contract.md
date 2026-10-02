@@ -5,7 +5,10 @@ arrangements. After reviewing PR counts and the publication-order conflict, the
 final instruction was: “Go with One cumulative remediation PR, plus one
 post-release repin PR”. This replaces the earlier strict one-PR proposal.
 The choice is effective for CMP-0006 source development and expires at campaign
-closure or abandonment. It grants no publication or merge effect by itself.
+closure or abandonment. The later [execution discipline](execution-discipline.md)
+authorizes routine acceptance after distinct review and all necessary campaign
+effects; concrete exact records and technical gates remain required. Earlier
+human-per-candidate permission language below is superseded by that mandate.
 
 ## Two delivery PRs
 
@@ -13,8 +16,8 @@ PR-A is the cumulative remediation PR: the planning/authority bundle, R-0601
 through R-0606 source outcomes, and the R-0607 release/Pages preparation artifacts.
 It contains 44 planned task contributions. Architect, Inspector and Engineer
 sessions remain separate, with exact owned paths, isolated worktrees and
-single-family attributed commits. A human integrates reviewed task commits into
-one campaign branch. No task or CTG opens a separate PR. The final human review
+single-family attributed commits. Only the central coordinator integrates reviewed task commits into
+one campaign branch under standing Owner authority. No task or CTG opens a separate PR. Distinct final review
 and admission cover the combined candidate, including all generated outputs.
 
 PR-B is the post-release verifier repin PR: TASK-0681 plus only the bounded
@@ -23,15 +26,16 @@ based on fetched main after PR-A is observed merged and OE-06 has produced an
 immutable shipping artifact. It does not change a generator, dependency, public
 API or unrelated implementation. Supporting repin manifest/DETRAN notice/accounting
 prose commits remain separate from the atomic policy/workflow commit.
-No third implementation PR is planned. A newly discovered source repair stops
-for a bounded amended plan; it is not hidden in the repin PR.
+No third implementation PR is planned. A newly discovered source repair requires
+a bounded independently reviewed amendment under standing authority; it is not hidden in the repin PR.
 
 ## Source dependencies and evidence
 
-The scoped source-only exception in campaign-execution.json 1.4.0 applies only to
+The scoped source-only exception in campaign-execution.json applies only to
 aarusso-nyx/devai CMP-0006. It preserves the default lifecycle for every other
 campaign and for materialized adopter/runtime records. Source dependency edges
-are satisfied by human-ratified checkpoints, not intermediate main merges.
+are satisfied by exact reviewed checkpoints accepted under standing Owner
+authority, not intermediate main merges.
 
 Each checkpoint identifies role/task/wave/round, exact commit/tree/base, owned
 diff, prompt SHA-256, resolved tier, commands/results and reviewer/handoff.
@@ -49,8 +53,9 @@ All final task acceptance commands, wave gates and the unconditional floor must
 pass on the cumulative candidate before its PR is admitted. CTG-0624 implements
 checker accounting for the shared exact PR identity; it counts that PR once and
 rejects undeclared/different identities within the phase. Default serialized
-one-PR-at-a-time admission remains in force. Human ratification, PR creation,
-source publication and merge are still separate exact effects.
+one-PR-at-a-time admission remains in force. Routine source acceptance proceeds after distinct review under standing Owner
+authority. PR creation, source publication and merge remain distinct exact effects,
+with concrete single-use records before execution and observed receipts after it.
 
 A checkpoint never sets merged_as or closes a round. After each actual merge,
 map the observed task commits to its PR and merged head, then perform real close
@@ -91,17 +96,19 @@ authored and the ledger template never overwrites release.yml.
 ## Publication sequence
 
 1. Complete reviewed source checkpoints and generated outputs; admit and merge PR-A
-   only with exact external authorization and passing final candidate checks.
+   with exact effect records under standing Owner authority and passing final candidate checks.
 2. Close the implementation rounds on observed integration evidence. Select the
-   exact main candidate/version, resolve the receipt and run separately authorized
+   exact main candidate/version, resolve the receipt and run bounded authorized
    RC/export/exact-tag rehearsal/publication under the existing trusted verifier.
 3. Only after immutable OE-06 publication, derive package/source/provenance/count/
    selector identities from that artifact; prepare PR-B with the atomic repin.
 4. After authorized PR-B integration, perform OE-08 variable readback and OE-09
    DETRAN notification/independent clone confirmation. Execute final OE-10 Inspector
-   observations, then separately authorized OE-11 issue closure and backlog refresh.
+   observations, then evidenced OE-11 issue closure and backlog refresh under standing authority.
 
 The release workflow main ancestry requirement (.github/workflows/release.yml:245)
 and release-discipline step 4 (docs/dev/operations/release-discipline.md:458-473)
 remain intact. No live provider, release, Pages, variable, notification or issue
-state effect was authorized by choosing PR cardinality.
+state effect was authorized by choosing PR cardinality alone. The later standing
+Owner execution mandate supplies authority for necessary campaign effects;
+immutable evidence and technical gates still determine when they can execute.

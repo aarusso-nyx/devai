@@ -1,5 +1,13 @@
 # TASK-0641 exact terminal closure membership contract
 
+Current execution authority is the [standing Owner decision](execution-discipline.md).
+It supersedes earlier preparation-only and repeated routine authorization text;
+exact evidence, role boundaries, substantive unresolved contracts and actual
+performance gates remain. The task-entry narrative below is historical checkpoint evidence. Its old
+permission stops are superseded; inspections, contracts, failures, actual models
+and original approvals remain preserved. It does not describe a fresh human
+review of later candidates.
+
 Role: Architect. Campaign CMP-0006, round R-0604, wave CTG-0641.
 This document defines the TASK-0642 Inspector and TASK-0643 Engineer reference.
 It is a proposed source checkpoint for human review, not implementation, a

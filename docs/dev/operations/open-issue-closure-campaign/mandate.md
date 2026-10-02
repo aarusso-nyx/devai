@@ -1,4 +1,11 @@
-# CMP-0006 draft mandate
+# CMP-0006 mandate
+
+The current [Owner execution decision](execution-discipline.md) supersedes the
+preparation-only limits below. It authorizes uninterrupted source work, routine
+acceptance after distinct review, eight round chats and necessary campaign
+effects with exact records and technical gates. Scope expires at CMP-0006 closure
+or abandonment. Earlier decisions below remain historical scope evidence; their
+preparation-only authority language no longer limits the current mandate.
 
 The Owner requested: “Write a CMP-0006 campaign with all artifacts required to
 handle and close all OPEN Github issues.” The later steering asks to check
@@ -8,7 +15,7 @@ This authorizes preparation of this local campaign and its proposed decision
 records, coverage, prompts, handoffs and checklists. It grants no implementation,
 worker dispatch, commit, PR, merge, issue-state change, message, signing/export,
 tag, package/release publication, protected-variable change or deployment.
-The initial mandate was preparation only; the later exact decisions below supersede its proposed-record state. Every round/task stays planned.
+The initial mandate was preparation only; the later exact decisions below supersede its proposed-record state. This was the preparation snapshot; current checkpoint state is in checkpoint-register.md.
 
 Repository: aarusso-nyx/devai. Primary checkout:
 /Volumes/Thiamat II/stech/devai (main 5461ba55d8fba23d8e0a310480eb62d1e3c6c52c,
@@ -43,4 +50,4 @@ Current planned scope: 9 rounds, 20 CTGs, 46 tasks. The previous scope was 9,
 This preparation grants local artifact updates and records the explicit contract
 acceptances. Worker execution, commits, source publication, PR creation/merge,
 issue effects, signing/export, release/Pages/settings and notifications still
-require the applicable exact authority. All rounds/tasks remain planned.
+require the applicable exact authority. Current source execution follows execution-discipline.md; actual round closure still requires observed integration and effects.
