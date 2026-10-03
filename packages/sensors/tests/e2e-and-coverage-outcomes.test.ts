@@ -288,6 +288,32 @@ describe('test_coverage_depth runs the local producer and reads the measured rat
     expect(reading.metrics?.['population']).toBe('local');
   });
 
+  it('marks the producer and never starts a nested producer from inside one (#242)', () => {
+    const root = fixtureRoot();
+    runCommandMock.mockImplementation((_argv, options) => {
+      writeProduced(options?.cwd ?? root, 9, 10);
+      return ran(' Test Files  1 passed (1)\n', 0);
+    });
+    measure(declared(root));
+    expect(runCommandMock.mock.calls[0]?.[1]?.env).toEqual({
+      DEVAI_COVERAGE_PRODUCER_ACTIVE: '1',
+    });
+
+    runCommandMock.mockReset();
+    const nested = fixtureRoot();
+    const previous = process.env['DEVAI_COVERAGE_PRODUCER_ACTIVE'];
+    process.env['DEVAI_COVERAGE_PRODUCER_ACTIVE'] = '1';
+    try {
+      const reading = measure(declared(nested));
+      expect(runCommandMock).not.toHaveBeenCalled();
+      expect(reading.status).toBe('unknown');
+      expect(reading.findings?.[0]?.code).toBe('COVERAGE_PRODUCER_RECURSION');
+    } finally {
+      if (previous === undefined) delete process.env['DEVAI_COVERAGE_PRODUCER_ACTIVE'];
+      else process.env['DEVAI_COVERAGE_PRODUCER_ACTIVE'] = previous;
+    }
+  });
+
   it('reads a present report without running the producer and states the population', () => {
     const root = fixtureRoot();
     writeProduced(root, 6, 10);
