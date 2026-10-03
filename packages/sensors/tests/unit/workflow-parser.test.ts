@@ -25,14 +25,6 @@ function candidateWrite(root: string, path: string, source: string): void {
 function candidateWorkflow(command: string): string {
   return `permissions:\n  contents: read\njobs:\n  inspect:\n    concurrency:\n      group: inspect-${'${{ github.ref }}'}\n      cancel-in-progress: true\n    steps:\n      - run: ${JSON.stringify(command)}\n`;
 }
-// The write-capable twin of a (possibly derived) candidateWorkflow fixture: byte-identical
-// except its single workflow-level grant reads `contents: write`, which no read-only
-// capability bound can admit (CMP0006-OD-COHERENCE-20261003).
-function writeCapableCandidate(workflow: string): string {
-  const grant = 'permissions:\n  contents: read\n';
-  if (workflow.split(grant).length !== 2) throw new Error('not a single read-only candidate');
-  return workflow.replace(grant, 'permissions:\n  contents: write\n');
-}
 function candidateEffect(root: string, source: string): string | undefined {
   return parseWorkflow(join(root, '.github/workflows/arbitrary.yml'), source, root).jobs[0]?.effect;
 }
@@ -1117,10 +1109,7 @@ describe('contained builtin capability effects (offline source analysis)', () =>
         // candidate source identity stay bound to the complete accepted control.
         candidateWrite(root, topology === 'transitive' ? leaf : entry, fault.source);
         expect(candidateEffect(root, workflow)).toBe(fault.expected);
-        const refused = observe(
-          root,
-          fault.expected === 'unknown' ? writeCapableCandidate(workflow) : workflow,
-        );
+        const refused = observe(root, workflow);
         expect(refused.status).toBe('review');
         expect(refused.metrics?.concurrency_semantic_issues).toBe(1);
         expect(refused.findings ?? []).toEqual([
@@ -1135,10 +1124,7 @@ describe('contained builtin capability effects (offline source analysis)', () =>
           .replace('inspect-${{ github.ref }}', 'devai-pages-publication')
           .replace('cancel-in-progress: true', 'cancel-in-progress: false');
         expect(candidateEffect(root, serialized)).toBe(fault.expected);
-        const locked = observe(
-          root,
-          fault.expected === 'unknown' ? writeCapableCandidate(serialized) : serialized,
-        );
+        const locked = observe(root, serialized);
         expect(locked.status).toBe(fault.expected === 'publication' ? 'pass' : 'review');
         expect(locked.metrics?.concurrency_semantic_issues).toBe(
           fault.expected === 'publication' ? 0 : 1,
@@ -1149,27 +1135,6 @@ describe('contained builtin capability effects (offline source analysis)', () =>
       },
     );
   }
-  it('admits the read-only twin of an unknown source effect under its cancellable lock', () => {
-    const root = candidateRoot();
-    const fault = variants.find((variant) => variant.name === 'child-process-property');
-    if (fault === undefined) throw new Error('missing child-process-property variant');
-    candidateWrite(root, 'fixtures/control.txt', 'contained observation\n');
-    candidateWrite(root, 'scripts/observe.cjs', fault.source);
-    const workflow = candidateWorkflow('node scripts/observe.cjs');
-    expect(candidateEffect(root, workflow)).toBe('unknown');
-    const admitted = observe(root, workflow);
-    expect(admitted.status).toBe('pass');
-    expect(admitted.metrics?.unproved_effect_admitted).toBe(1);
-    expect(admitted.metrics?.concurrency_semantic_issues).toBe(0);
-    expect(admitted.findings ?? []).toEqual([
-      {
-        severity: 'info',
-        code: 'HARNESS_COHERENCE_UNPROVED_EFFECT_ADMITTED',
-        message:
-          '.github/workflows/arbitrary.yml#inspect: unknown effect admitted as read-only-capability-bound',
-      },
-    ]);
-  });
   it.each([
     'inline-assignment',
     'inline-export',
@@ -1237,7 +1202,7 @@ describe('contained builtin capability effects (offline source analysis)', () =>
           action + '      env:\n        NODE_OPTIONS: --require=./scripts/writer.cjs\n',
         );
       expect(candidateEffect(root, loader)).toBe('unknown');
-      const refused = observe(root, writeCapableCandidate(loader));
+      const refused = observe(root, loader);
       expect(refused.status).toBe('review');
       expect(refused.metrics?.concurrency_semantic_issues).toBe(1);
       expect(refused.findings ?? []).toEqual([
@@ -1252,38 +1217,12 @@ describe('contained builtin capability effects (offline source analysis)', () =>
         .replace('inspect-${{ github.ref }}', 'devai-pages-publication')
         .replace('cancel-in-progress: true', 'cancel-in-progress: false');
       expect(candidateEffect(root, serialized)).toBe('unknown');
-      const locked = observe(root, writeCapableCandidate(serialized));
+      const locked = observe(root, serialized);
       expect(locked.status).toBe('review');
       expect(locked.metrics?.concurrency_semantic_issues).toBe(1);
       expect(locked.findings ?? []).toEqual(refused.findings);
     },
   );
-  it('admits the read-only twin of an executable-affecting inline assignment', () => {
-    const root = candidateRoot();
-    candidateWrite(root, 'fixtures/control.txt', 'contained observation\n');
-    candidateWrite(root, 'scripts/observe.cjs', readOnlyCjs);
-    candidateWrite(
-      root,
-      'scripts/writer.cjs',
-      "const cp = require('node:child_process');\ncp.execFileSync('git', ['push', 'origin', 'HEAD']);\n",
-    );
-    const loader = candidateWorkflow(
-      'NODE_OPTIONS=--require=./scripts/writer.cjs node scripts/observe.cjs',
-    );
-    expect(candidateEffect(root, loader)).toBe('unknown');
-    const admitted = observe(root, loader);
-    expect(admitted.status).toBe('pass');
-    expect(admitted.metrics?.unproved_effect_admitted).toBe(1);
-    expect(admitted.metrics?.concurrency_semantic_issues).toBe(0);
-    expect(admitted.findings ?? []).toEqual([
-      {
-        severity: 'info',
-        code: 'HARNESS_COHERENCE_UNPROVED_EFFECT_ADMITTED',
-        message:
-          '.github/workflows/arbitrary.yml#inspect: unknown effect admitted as read-only-capability-bound',
-      },
-    ]);
-  });
   it.each([
     'node-redirection',
     'echo-redirection',
@@ -1388,7 +1327,7 @@ describe('contained builtin capability effects (offline source analysis)', () =>
         '      - run: "node scripts/observe.cjs"\n        working-directory: nested\n',
       );
     expect(candidateEffect(root, changed)).toBe('unknown');
-    const refused = observe(root, writeCapableCandidate(changed));
+    const refused = observe(root, changed);
     expect(refused.status).toBe('review');
     expect(refused.metrics?.concurrency_semantic_issues).toBe(1);
     expect(refused.findings ?? []).toEqual([
@@ -1403,30 +1342,10 @@ describe('contained builtin capability effects (offline source analysis)', () =>
       .replace('inspect-${{ github.ref }}', 'devai-pages-publication')
       .replace('cancel-in-progress: true', 'cancel-in-progress: false');
     expect(candidateEffect(root, serialized)).toBe('unknown');
-    const locked = observe(root, writeCapableCandidate(serialized));
+    const locked = observe(root, serialized);
     expect(locked.status).toBe('review');
     expect(locked.metrics?.concurrency_semantic_issues).toBe(1);
     expect(locked.findings ?? []).toEqual(refused.findings);
-  });
-
-  it('admits the read-only twin of an unproved node redirection', () => {
-    const root = candidateRoot();
-    candidateWrite(root, 'fixtures/control.txt', 'contained observation\n');
-    candidateWrite(root, 'scripts/observe.cjs', readOnlyCjs);
-    const changed = candidateWorkflow('node scripts/observe.cjs > observed.txt');
-    expect(candidateEffect(root, changed)).toBe('unknown');
-    const admitted = observe(root, changed);
-    expect(admitted.status).toBe('pass');
-    expect(admitted.metrics?.unproved_effect_admitted).toBe(1);
-    expect(admitted.metrics?.concurrency_semantic_issues).toBe(0);
-    expect(admitted.findings ?? []).toEqual([
-      {
-        severity: 'info',
-        code: 'HARNESS_COHERENCE_UNPROVED_EFFECT_ADMITTED',
-        message:
-          '.github/workflows/arbitrary.yml#inspect: unknown effect admitted as read-only-capability-bound',
-      },
-    ]);
   });
 
   it('refuses a candidate package-bin node shadow after its complete npm control passes', () => {
@@ -1453,7 +1372,7 @@ describe('contained builtin capability effects (offline source analysis)', () =>
     );
     chmodSync(join(root, 'node_modules/.bin/node'), 0o755);
     expect(candidateEffect(root, observation)).toBe('unknown');
-    const refused = observe(root, writeCapableCandidate(observation));
+    const refused = observe(root, observation);
     expect(refused.status).toBe('review');
     expect(refused.metrics?.concurrency_semantic_issues).toBe(1);
     expect(refused.findings ?? []).toEqual([
@@ -1468,41 +1387,10 @@ describe('contained builtin capability effects (offline source analysis)', () =>
       .replace('inspect-${{ github.ref }}', 'devai-pages-publication')
       .replace('cancel-in-progress: true', 'cancel-in-progress: false');
     expect(candidateEffect(root, serialized)).toBe('unknown');
-    const locked = observe(root, writeCapableCandidate(serialized));
+    const locked = observe(root, serialized);
     expect(locked.status).toBe('review');
     expect(locked.metrics?.concurrency_semantic_issues).toBe(1);
     expect(locked.findings ?? []).toEqual(refused.findings);
-  });
-
-  it('admits the read-only twin of a candidate package-bin node shadow', () => {
-    const root = candidateRoot();
-    candidateWrite(root, 'fixtures/control.txt', 'contained observation\n');
-    candidateWrite(root, 'scripts/observe.cjs', readOnlyCjs);
-    candidateWrite(
-      root,
-      'package.json',
-      JSON.stringify({ private: true, scripts: { test: 'node scripts/observe.cjs' } }),
-    );
-    candidateWrite(
-      root,
-      'node_modules/.bin/node',
-      '#!/bin/sh\nprintf payload > selector-publication.txt\n',
-    );
-    chmodSync(join(root, 'node_modules/.bin/node'), 0o755);
-    const observation = candidateWorkflow('npm test');
-    expect(candidateEffect(root, observation)).toBe('unknown');
-    const admitted = observe(root, observation);
-    expect(admitted.status).toBe('pass');
-    expect(admitted.metrics?.unproved_effect_admitted).toBe(1);
-    expect(admitted.metrics?.concurrency_semantic_issues).toBe(0);
-    expect(admitted.findings ?? []).toEqual([
-      {
-        severity: 'info',
-        code: 'HARNESS_COHERENCE_UNPROVED_EFFECT_ADMITTED',
-        message:
-          '.github/workflows/arbitrary.yml#inspect: unknown effect admitted as read-only-capability-bound',
-      },
-    ]);
   });
 
   it.each([
@@ -1584,7 +1472,7 @@ describe('contained builtin capability effects (offline source analysis)', () =>
           observerAction.replace('run: node scripts/observe.cjs', '"run": node scripts/writer.cjs'),
         );
       expect(candidateEffect(root, changed)).toBe('unknown');
-      const refused = observe(root, writeCapableCandidate(changed));
+      const refused = observe(root, changed);
       expect(refused.status).toBe('review');
       expect(refused.metrics?.concurrency_semantic_issues).toBe(1);
       expect(refused.findings ?? []).toEqual([
@@ -1599,40 +1487,12 @@ describe('contained builtin capability effects (offline source analysis)', () =>
         .replace('inspect-${{ github.ref }}', 'devai-pages-publication')
         .replace('cancel-in-progress: true', 'cancel-in-progress: false');
       expect(candidateEffect(root, serialized)).toBe('unknown');
-      const locked = observe(root, writeCapableCandidate(serialized));
+      const locked = observe(root, serialized);
       expect(locked.status).toBe('review');
       expect(locked.metrics?.concurrency_semantic_issues).toBe(1);
       expect(locked.findings ?? []).toEqual(refused.findings);
     },
   );
-
-  it('admits the read-only twin of a concealed quoted run selector', () => {
-    const root = candidateRoot();
-    candidateWrite(root, 'fixtures/control.txt', 'contained observation\n');
-    candidateWrite(root, 'scripts/observe.cjs', readOnlyCjs);
-    candidateWrite(
-      root,
-      'scripts/writer.cjs',
-      "const cp = require('node:child_process');\ncp.execFileSync('git', ['push', 'origin', 'HEAD']);\n",
-    );
-    const changed = candidateWorkflow('node scripts/observe.cjs').replace(
-      '      - run: "node scripts/observe.cjs"\n',
-      '      - "run": node scripts/writer.cjs\n',
-    );
-    expect(candidateEffect(root, changed)).toBe('unknown');
-    const admitted = observe(root, changed);
-    expect(admitted.status).toBe('pass');
-    expect(admitted.metrics?.unproved_effect_admitted).toBe(1);
-    expect(admitted.metrics?.concurrency_semantic_issues).toBe(0);
-    expect(admitted.findings ?? []).toEqual([
-      {
-        severity: 'info',
-        code: 'HARNESS_COHERENCE_UNPROVED_EFFECT_ADMITTED',
-        message:
-          '.github/workflows/arbitrary.yml#inspect: unknown effect admitted as read-only-capability-bound',
-      },
-    ]);
-  });
 
   it('keeps an actual node action unknown when description text impersonates composite metadata', () => {
     const root = candidateRoot();
