@@ -10,12 +10,13 @@
  * absence (missing directory, wrong extension, unparseable block) rather than
  * by changing file modes.
  */
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve, sep } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { senseHarnessCoherence } from '../../src/harness-coherence.js';
+import { jobEffectFacts } from '../../src/harness/workflow-parser.js';
 import { senseHarnessSecurity } from '../../src/harness-security.js';
 import { sensePlantCoherence } from '../../src/plant-coherence.js';
 import type { SensorFinding, SensorReading } from '../../src/sensor-reading.js';
@@ -988,6 +989,47 @@ describe('generic publication effect concurrency (offline)', () => {
   });
 });
 
+const ADMITTED_CODE = 'HARNESS_COHERENCE_UNPROVED_EFFECT_ADMITTED';
+type AdmissionGround = 'serialized-publisher' | 'read-only-capability-bound';
+function admittedFinding(file: string, job: string, ground: AdmissionGround): SensorFinding {
+  return {
+    severity: 'info',
+    code: ADMITTED_CODE,
+    message: `.github/workflows/${file}#${job}: unknown effect admitted as ${ground}`,
+  };
+}
+/** The single unknown-effect job is admitted, reported by name and ground, and counted. */
+function expectAdmitted(
+  reading: SensorReading,
+  file: string,
+  job: string,
+  ground: AdmissionGround,
+): void {
+  expect(reading.status).toBe('pass');
+  expect(findings(reading)).toEqual([admittedFinding(file, job, ground)]);
+  expect(reading.metrics?.concurrency_semantic_issues).toBe(0);
+  expect(reading.metrics?.incoherence_score).toBe(0);
+  expect(reading.metrics?.unproved_effect_admitted).toBe(1);
+}
+// Unknown effects whose job keeps the declared contents: read bound (no secret, environment,
+// credential input, deploy action or unresolved call) are admitted by the amendment.
+const BOUND_ADMITTED_FAULTS = new Set([
+  'missing-direct',
+  'missing-import',
+  'inline-executable',
+  'composite-missing-import',
+  'import-cycle',
+  'import-escape',
+]);
+const BOUND_ADMITTED_INPUTS = new Set<string>([
+  'checkout github-server-url',
+  'checkout ssh-strict false',
+  'setup-node mirror',
+  'cache restore over scripts',
+  'input-free artifact download',
+  'undeclared input on a branch ref',
+]);
+
 describe('causal candidate effect concurrency regressions (offline)', () => {
   function complete(root: string): string {
     write(root, 'scripts/process/publish-site.mjs', "import './leaf.mjs';\n");
@@ -1043,9 +1085,14 @@ describe('causal candidate effect concurrency regressions (offline)', () => {
     if (fault === 'import-escape')
       write(root, 'scripts/process/leaf.mjs', "import '../../../outside.mjs';\n");
     const rejected = observe(root, source);
-    expect(rejected.status).toBe('review');
-    expect(rejected.metrics?.concurrency_semantic_issues).toBe(1);
-    expect(codes(rejected)).toEqual(['HARNESS_COHERENCE_CONCURRENCY_POLICY']);
+    // CMP0006-OD-COHERENCE-20261003: the unproved job holds a declared read-only bound.
+    if (BOUND_ADMITTED_FAULTS.has(fault))
+      expectAdmitted(rejected, 'neutral.yml', 'inspect', 'read-only-capability-bound');
+    else {
+      expect(rejected.status).toBe('review');
+      expect(rejected.metrics?.concurrency_semantic_issues).toBe(1);
+      expect(codes(rejected)).toEqual(['HARNESS_COHERENCE_CONCURRENCY_POLICY']);
+    }
     // A complete effectful candidate becomes acceptable only with the required publication lock.
     if (fault === 'composite-effect' || fault === 'source-substitution') {
       const locked = source
@@ -1098,9 +1145,14 @@ describe('causal candidate effect concurrency regressions (offline)', () => {
       const step = [`      - uses: ${use}`];
       if (inputs.length) step.push('        with:', ...inputs.map((input) => `          ${input}`));
       const rejected = observe(root, before(step.join('\n')));
-      expect(rejected.status).toBe('review');
-      expect(rejected.metrics?.concurrency_semantic_issues).toBe(1);
-      expect(codes(rejected)).toEqual(['HARNESS_COHERENCE_CONCURRENCY_POLICY']);
+      // CMP0006-OD-COHERENCE-20261003: a non-credential selector leaves the read-only bound intact.
+      if (BOUND_ADMITTED_INPUTS.has(_n))
+        expectAdmitted(rejected, 'neutral.yml', 'inspect', 'read-only-capability-bound');
+      else {
+        expect(rejected.status).toBe('review');
+        expect(rejected.metrics?.concurrency_semantic_issues).toBe(1);
+        expect(codes(rejected)).toEqual(['HARNESS_COHERENCE_CONCURRENCY_POLICY']);
+      }
     },
   );
   it.each([
@@ -1124,9 +1176,249 @@ describe('causal candidate effect concurrency regressions (offline)', () => {
       expect(control.metrics?.concurrency_semantic_issues).toBe(0);
       expect(codes(control)).toEqual([]);
       const rejected = observe(root, `${caller}    ${forwarded}\n`);
-      expect(rejected.status).toBe('review');
-      expect(rejected.metrics?.concurrency_semantic_issues).toBe(1);
-      expect(codes(rejected)).toEqual(['HARNESS_COHERENCE_CONCURRENCY_POLICY']);
+      // CMP0006-OD-COHERENCE-20261003: forwarded data to a resolved bounded callee is admitted;
+      // forwarded secrets are a credential flow beyond the ambient token and stay refused.
+      if (_name === 'with inputs')
+        expectAdmitted(rejected, 'neutral.yml', 'call', 'read-only-capability-bound');
+      else {
+        expect(rejected.status).toBe('review');
+        expect(rejected.metrics?.concurrency_semantic_issues).toBe(1);
+        expect(codes(rejected)).toEqual(['HARNESS_COHERENCE_CONCURRENCY_POLICY']);
+      }
     },
   );
+});
+
+// Trace annotation deferred to Architect TASK-06216: no exact canonical concurrency invariant.
+// ADR-REL-0034 Amendment 2026-10-03 (CMP0006-OD-COHERENCE-20261003), ground 2: a cancellable
+// unknown-effect job is admitted only under an explicit read-only capability bound.
+describe('read-only capability bound admission of unknown effects (offline)', () => {
+  const BOUND_POLICY: SensorFinding = {
+    severity: 'warning',
+    code: 'HARNESS_COHERENCE_CONCURRENCY_POLICY',
+    message:
+      '.github/workflows/bounded.yml must declare a non-empty concurrency group with cancel-in-progress: true (superseding).',
+  };
+  const BOUNDED = [
+    'name: bounded',
+    'on:',
+    '  push:',
+    '    branches: [main]',
+    'permissions:',
+    '  contents: read',
+    'jobs:',
+    '  inspect:',
+    '    runs-on: ubuntu-latest',
+    '    concurrency:',
+    `      group: inspect-${'${{ github.ref }}'}`,
+    '      cancel-in-progress: true',
+    '    steps:',
+    `      - uses: actions/checkout@${SHA}`,
+    '        with:',
+    '          persist-credentials: false',
+    '      - run: node scripts/unproved.mjs',
+    '',
+  ].join('\n');
+  const WORKFLOW_READ = 'permissions:\n  contents: read\n';
+  const JOB_HEAD = '  inspect:\n    runs-on: ubuntu-latest\n';
+  const RUN = '      - run: node scripts/unproved.mjs\n';
+  const CHECKOUT_WITH = `      - uses: actions/checkout@${SHA}\n        with:\n`;
+  function boundRoot(): string {
+    const root = fixtureRoot('bound-admission');
+    // Child-process execution has no read-only proof: the parser keeps this job unknown.
+    write(
+      root,
+      'scripts/unproved.mjs',
+      "import { spawnSync } from 'node:child_process';\nspawnSync('make', ['all']);\n",
+    );
+    return root;
+  }
+  function sense(root: string, source: string, job = 'inspect'): SensorReading {
+    const file = write(root, '.github/workflows/bounded.yml', source);
+    // Parser classification is unchanged by the amendment: the job stays unknown.
+    expect(jobEffectFacts(readFileSync(file, 'utf8'), root, job).effect).toBe('unknown');
+    return senseHarnessCoherence({ repoRoot: root, now: NOW });
+  }
+  function replaced(source: string, from: string, to: string): string {
+    expect(source.split(from)).toHaveLength(2);
+    return source.replace(from, to);
+  }
+  function expectRefused(reading: SensorReading): void {
+    expect(reading.status).toBe('review');
+    expect(findings(reading)).toEqual([BOUND_POLICY]);
+    expect(reading.metrics?.concurrency_semantic_issues).toBe(1);
+    expect(reading.metrics?.unproved_effect_admitted).toBe(undefined);
+  }
+
+  it('admits and reports a cancellable unknown job under workflow contents: read', () => {
+    const reading = sense(boundRoot(), BOUNDED);
+    expectAdmitted(reading, 'bounded.yml', 'inspect', 'read-only-capability-bound');
+    expect(reading.metrics).toEqual({
+      workflow_count: 1,
+      action_version_drift_count: 0,
+      permissions_mixed: 0,
+      concurrency_mixed: 0,
+      concurrency_semantic_issues: 0,
+      incoherence_score: 0,
+      max_review_incoherence: 3,
+      unproved_effect_admitted: 1,
+    });
+  });
+
+  // Each admitted variant keeps every bound clause; persist-credentials: true persists only the
+  // read-scoped ambient token, which is not a write credential (spec reading recorded in evidence).
+  it.each([
+    ['workflow read-all', (s: string) => replaced(s, WORKFLOW_READ, 'permissions: read-all\n')],
+    [
+      'read and none scopes',
+      (s: string) => replaced(s, WORKFLOW_READ, `${WORKFLOW_READ}  actions: none\n`),
+    ],
+    [
+      'job-level contents: read without workflow permissions',
+      (s: string) =>
+        replaced(
+          replaced(s, WORKFLOW_READ, ''),
+          JOB_HEAD,
+          `${JOB_HEAD}    permissions:\n      contents: read\n`,
+        ),
+    ],
+    [
+      'job-level contents: read overriding workflow write-all',
+      (s: string) =>
+        replaced(
+          replaced(s, WORKFLOW_READ, 'permissions: write-all\n'),
+          JOB_HEAD,
+          `${JOB_HEAD}    permissions:\n      contents: read\n`,
+        ),
+    ],
+    [
+      'ambient token references only',
+      (s: string) =>
+        replaced(
+          replaced(s, CHECKOUT_WITH, `${CHECKOUT_WITH}          token: ${'${{ github.token }}'}\n`),
+          RUN,
+          `${RUN}        env:\n          GH_TOKEN: ${'${{ secrets.GITHUB_TOKEN }}'}\n`,
+        ),
+    ],
+    [
+      'persisted read-scoped ambient credential',
+      (s: string) => replaced(s, 'persist-credentials: false', 'persist-credentials: true'),
+    ],
+    [
+      'run-scoped artifact upload and cache save',
+      (s: string) =>
+        `${s}      - uses: actions/upload-artifact@${SHA}\n        with:\n          name: report\n          path: out\n      - uses: actions/cache@${SHA}\n        with:\n          path: .cache\n          key: bounded\n`,
+    ],
+    [
+      'workflow-level superseding lock',
+      (s: string) =>
+        replaced(
+          replaced(
+            s,
+            `    concurrency:\n      group: inspect-${'${{ github.ref }}'}\n      cancel-in-progress: true\n`,
+            '',
+          ),
+          'jobs:\n',
+          `concurrency:\n  group: bounded-${'${{ github.ref }}'}\n  cancel-in-progress: true\njobs:\n`,
+        ),
+    ],
+  ] as const)('admits and reports the bound with %s', (_name, mutate) => {
+    const root = boundRoot();
+    expectAdmitted(sense(root, BOUNDED), 'bounded.yml', 'inspect', 'read-only-capability-bound');
+    expectAdmitted(
+      sense(root, mutate(BOUNDED)),
+      'bounded.yml',
+      'inspect',
+      'read-only-capability-bound',
+    );
+  });
+
+  it.each([
+    ['omitted permissions', (s: string) => replaced(s, WORKFLOW_READ, '')],
+    [
+      'contents: write',
+      (s: string) => replaced(s, WORKFLOW_READ, 'permissions:\n  contents: write\n'),
+    ],
+    ['write-all', (s: string) => replaced(s, WORKFLOW_READ, 'permissions: write-all\n')],
+    [
+      'id-token: write beside contents: read',
+      (s: string) => replaced(s, WORKFLOW_READ, `${WORKFLOW_READ}  id-token: write\n`),
+    ],
+    [
+      'job-level contents: write overriding workflow read',
+      (s: string) => replaced(s, JOB_HEAD, `${JOB_HEAD}    permissions:\n      contents: write\n`),
+    ],
+    ['an environment', (s: string) => replaced(s, JOB_HEAD, `${JOB_HEAD}    environment: ci\n`)],
+    [
+      'a secret in step env',
+      (s: string) =>
+        replaced(s, RUN, `${RUN}        env:\n          TOKEN: ${'${{ secrets.DEPLOY_TOKEN }}'}\n`),
+    ],
+    [
+      'a secret in a run script',
+      (s: string) =>
+        replaced(
+          s,
+          RUN,
+          `      - run: node scripts/unproved.mjs "${'${{ secrets.DEPLOY_TOKEN }}'}"\n`,
+        ),
+    ],
+    [
+      'a secret-backed checkout token',
+      (s: string) =>
+        replaced(s, CHECKOUT_WITH, `${CHECKOUT_WITH}          token: ${'${{ secrets.PAT }}'}\n`),
+    ],
+    [
+      'a non-ambient credential input',
+      (s: string) =>
+        replaced(s, CHECKOUT_WITH, `${CHECKOUT_WITH}          token: ${'${{ vars.BOT_TOKEN }}'}\n`),
+    ],
+    ['a deploy-pages step', (s: string) => `${s}      - uses: actions/deploy-pages@${SHA}\n`],
+    [
+      'a release action step',
+      (s: string) => `${s}      - uses: softprops/action-gh-release@${SHA}\n`,
+    ],
+    [
+      'an unresolved local composite',
+      (s: string) => `${s}      - uses: ./.github/actions/absent\n`,
+    ],
+    [
+      'a local composite that violates the bound',
+      (s: string) => `${s}      - uses: ./.github/actions/leaky\n`,
+    ],
+  ] as const)('refuses the bound with %s after the bounded control is admitted', (_n, mutate) => {
+    const root = boundRoot();
+    write(
+      root,
+      '.github/actions/leaky/action.yml',
+      `name: leaky\nruns:\n  using: composite\n  steps:\n    - shell: bash\n      run: node scripts/unproved.mjs "${'${{ secrets.DEPLOY_TOKEN }}'}"\n`,
+    );
+    expectAdmitted(sense(root, BOUNDED), 'bounded.yml', 'inspect', 'read-only-capability-bound');
+    expectRefused(sense(root, mutate(BOUNDED)));
+  });
+
+  it('refuses an unresolved local reusable call after the bounded control is admitted', () => {
+    const root = boundRoot();
+    expectAdmitted(sense(root, BOUNDED), 'bounded.yml', 'inspect', 'read-only-capability-bound');
+    const call = BOUNDED.slice(0, BOUNDED.indexOf(JOB_HEAD)).concat(
+      `  inspect:\n    concurrency:\n      group: inspect-${'${{ github.ref }}'}\n      cancel-in-progress: true\n    uses: ./.github/workflows/absent.yml\n`,
+    );
+    expectRefused(sense(root, call));
+  });
+
+  it('keeps the finding for a refused job beside an admitted job in the same workflow', () => {
+    const root = boundRoot();
+    expectAdmitted(sense(root, BOUNDED), 'bounded.yml', 'inspect', 'read-only-capability-bound');
+    const twoJobs = `${BOUNDED}  deploy:\n    runs-on: ubuntu-latest\n    environment: production\n    concurrency:\n      group: deploy-${'${{ github.ref }}'}\n      cancel-in-progress: true\n    steps:\n      - run: node scripts/unproved.mjs\n`;
+    const reading = sense(root, twoJobs, 'deploy');
+    expect(reading.status).toBe('review');
+    const byCode = (a: SensorFinding, b: SensorFinding) => a.code.localeCompare(b.code);
+    expect([...findings(reading)].sort(byCode)).toEqual(
+      [BOUND_POLICY, admittedFinding('bounded.yml', 'inspect', 'read-only-capability-bound')].sort(
+        byCode,
+      ),
+    );
+    expect(reading.metrics?.concurrency_semantic_issues).toBe(1);
+    expect(reading.metrics?.unproved_effect_admitted).toBe(1);
+  });
 });
