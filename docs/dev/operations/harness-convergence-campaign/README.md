@@ -191,10 +191,11 @@ Backlog observed while running R-0305, outside every task boundary:
 - A rejected tie-breaker reply escalates with confidence 0. No current page,
   policy or source states a substituted midpoint any longer (#251, closed in
   v1.9.0).
-- `docs/reference/error-codes.md` is generated from the CLI, authority and
-  utils sources only; the campaign checker's kebab-case codes and the loop's
-  `TASK_REGISTRY_IDENTITY_MISMATCH` have no home there until the generator's
-  scope widens.
+- `docs/reference/error-codes.md` is generated from every package source and
+  the vendored evidence verifier (#250, v1.9.0). Codes that only repository
+  scripts emit, such as the campaign checker's kebab-case codes and the packed
+  adopter rehearsal's `RELEASE_PACKED_ADOPTER_*`, stay out: the CLI never emits
+  them.
 - When the affected check fails in the gate, its JSON report is one long
   stdout line that the GitHub log does not show, so the failing node is only
   recoverable by a local reproduction (about ten minutes). The gate step
