@@ -47,12 +47,16 @@ jobs:
       # The bootstrap output is keyed by the digest of the TypeScript inputs it
       # compiles, so a candidate that changes no source restores the runner
       # instead of compiling it; a stale key only causes a recompile
-      # (ADR-CHK-0003).
+      # (ADR-CHK-0003). The runner resolves the workspace packages through
+      # node_modules links into packages/*/dist, so the cache carries those
+      # outputs with it; a hit without them fails with ERR_MODULE_NOT_FOUND (#247).
       - name: Restore the check runner bootstrap
         id: bootstrap-cache
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
-          path: .devai/state/pr-bootstrap
+          path: |
+            .devai/state/pr-bootstrap
+            packages/*/dist
           key: pr-bootstrap-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'tsconfig*.json', 'packages/*/tsconfig*.json', 'packages/*/src/**/*.ts', 'packages/*/package.json', 'scripts/process/bootstrap-check-runner.mjs') }}
 
       # Three steps, each failing the job on its own; the runner report replaces
