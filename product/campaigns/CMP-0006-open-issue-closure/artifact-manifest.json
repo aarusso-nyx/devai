@@ -1,0 +1,503 @@
+{
+  "purpose": "CMP0006-OD-EXEC-20261002 standing Owner execution discipline and cumulative source candidate integrity inventory; original task receipts remain immutable; not runtime closure evidence",
+  "base_commit": "180a122787193f9bdfce9b7f4cd5600e85ae7854",
+  "digest_algorithm": "sha256",
+  "files": [
+    {
+      "path": "docs/dev/index.md",
+      "sha256": "5c5b15752a85378c348eb418f6e5fcae71766b98b0edaa13dfebc122a12d9c00"
+    },
+    {
+      "path": "docs/dev/operations/open-issue-closure-campaign/README.md",
+      "sha256": "ecac9a02c672848ef4530adec34d2b95ded97ab3622776cc245ba195f2043fda"
+    },
+    {
+      "path": "docs/dev/operations/open-issue-closure-campaign/TASK-0611-checkpoint-proposal.md",
+      "sha256": "63b0b1fe72be023f8105c76cfa8fea9e5c350093823e2d450e826bdf3dd5c952"
+    },
+    {
+      "path": "docs/dev/operations/open-issue-closure-campaign/checkpoint-register.md",
+      "sha256": "2a67c2576756aa5c57c187e22cd68eeb273d8c07ad30c30da06e92168d7695e8"
+    },
+    {
+      "path": "docs/dev/operations/open-issue-closure-campaign/ci-invariant-contract.md",
+      "sha256": "6d125f3ac4a89f87223ccb70ca64507d01367ebf21a43acaf69e83d96e08fb1c"
+    },
+    {
+      "path": "docs/dev/operations/open-issue-closure-campaign/closure-membership.md",
+      "sha256": "a197653923cb1f01fb457383b772434bfa96305c156a1fa26e0faa39bd343433"
+    },
+    {
+      "path": "docs/dev/operations/open-issue-closure-campaign/closure-register.md",
+      "sha256": "19d614fff48409b5d5cdf5c18962809a9c88be5a3fe0b2a4bf2d97a672bcb861"
+    },
+    {
+      "path": "docs/dev/operations/open-issue-closure-campaign/decision-register.md",
+      "sha256": "f7cbe74002917a5bf0286df399f7bbcb5bc5dd5faf0a9daf8a821e64519a99c3"
+    },
+    {
+      "path": "docs/dev/operations/open-issue-closure-campaign/dependency-remediation.md",
+      "sha256": "2ebee25879b946c1b298e36d2628c8a0bd68d8e972bdd9763786b2f385bb06cc"
+    },
+    {
+      "path": "docs/dev/operations/open-issue-closure-campaign/detran-notice.md",
+      "sha256": "8e0da27f84a5dbb4af40a0cdad71f44ef0e978e253a5d71d69c2a657cf6b3fe2"
+    },
+    {
+      "path": "docs/dev/operations/open-issue-closure-campaign/execution-discipline.md",
+      "sha256": "968f6120baf1d2257926edab42968cceb68e5e5be8066f28ad85b175430c9e03"
+    },
+    {
+      "path": "docs/dev/operations/open-issue-closure-campaign/fresh-session-handoff.md",
+      "sha256": "06e916f5da31b211f4e114d790674c5216da570083f7879c209d1cd6e57d119a"
+    },
+    {
+      "path": "docs/dev/operations/open-issue-closure-campaign/integration-contract.md",
+      "sha256": "b4e45a4a371648cf9228f05dee5f2e97febc1b9b5faba348377ae79c46a3c2d7"
+    },
+    {
+      "path": "docs/dev/operations/open-issue-closure-campaign/inventory-production.md",
+      "sha256": "218104edc96d658bef7d4cb41a8805aafb1f0dee064e882d672bfffd56b5c140"
+    },
+    {
+      "path": "docs/dev/operations/open-issue-closure-campaign/live-review-preflight.md",
+      "sha256": "9ba93abe4ec8dbc315d53a5d18e3df46486c8db6ee1c8feba31798a5c554dea6"
+    },
+    {
+      "path": "docs/dev/operations/open-issue-closure-campaign/mandate.md",
+      "sha256": "478b473d018ffcbabba6d761573038fbdefaab21393efcc40e57727a4662f3c7"
+    },
+    {
+      "path": "docs/dev/operations/open-issue-closure-campaign/pages-handoff.md",
+      "sha256": "360b677a22dff3333650dc5e6dbafb03747215ab89bde5abe7f8f2604a517284"
+    },
+    {
+      "path": "docs/dev/operations/open-issue-closure-campaign/release-handoff.md",
+      "sha256": "04a6993c10aa1bf0093c9cc5572929a597787c7d07e2572906b425983cff8eae"
+    },
+    {
+      "path": "docs/dev/operations/open-issue-closure-campaign/repin-manifest.md",
+      "sha256": "2892b76c0fd7467802254171c540e3c44324594614a0618abd8af6136d4262e7"
+    },
+    {
+      "path": "docs/dev/operations/open-issue-closure-campaign/rounds-and-waves.md",
+      "sha256": "022c11c062a01bf34d43db9668e2a0b007f34582bc918de6eaacdee6cd4fded7"
+    },
+    {
+      "path": "docs/dev/operations/open-issue-closure-campaign/sense-refusal-contract.md",
+      "sha256": "e9ea8930100b25b45940130bf52b4024a67e4f9cbd1bed5b3885657fd200214f"
+    },
+    {
+      "path": "docs/dev/operations/open-issue-closure-campaign/source-map.md",
+      "sha256": "349714fdac0fad45530b4fe5e3a08203bb74429dab74111923300b9146898ac9"
+    },
+    {
+      "path": "docs/reference/cli/evidence-render.md",
+      "sha256": "55a5b98c60e994390c01df56108f145bea48d12c85f2a36e2a32d7e29855cbde"
+    },
+    {
+      "path": "docs/reference/cli/evidence-verify.md",
+      "sha256": "56e735c06f4454962350298e8c1284577e3fe14cb497255ab2118dd4aed9244d"
+    },
+    {
+      "path": "docs/reference/cli/sense-presets.md",
+      "sha256": "4d9a772d6cf399b274905d78185dab19e610298148ee77bd0b38bc1892b31d44"
+    },
+    {
+      "path": "law/adr/ADR-EVI-0004-canonical-closure-acceptance-amendment.md",
+      "sha256": "c886f0b2ca2a31961f592fc09044e12cc9a82894cf1cec28dbddb13c4cc5ecea"
+    },
+    {
+      "path": "law/adr/ADR-EVI-0005-newest-line-recovery-cli.md",
+      "sha256": "958cf1a4a2363298e8a810a9572cc1a1e515481b705c0e12fdbd917ce42b0583"
+    },
+    {
+      "path": "law/adr/ADR-MDL-0003-live-review-envelope-contract.md",
+      "sha256": "9b5769fd52a2b255f7b0885460a3f771d6ba737d3cc3a49f5052948a06e436d1"
+    },
+    {
+      "path": "law/adr/ADR-SCR-0012-inventory-cell-naming-amendment.md",
+      "sha256": "7c4bf5c6a0417e4d488e2aeaa9e2b20c7f9121931d9bf815c1fb77eb02fb28be"
+    },
+    {
+      "path": "law/adr/README.md",
+      "sha256": "e4d655f0323c3188d52238977ca0ba480f2087a34f800efc55410015971b918f"
+    },
+    {
+      "path": "law/policy/adr-validation.json",
+      "sha256": "32d527db2a1a23c0554cd438853f8f778d4fa0788a0b07bf2823fea81cf82f59"
+    },
+    {
+      "path": "law/policy/campaign-execution.json",
+      "sha256": "daed7dc00fe7c0c38fe8dc8df6b62247f57a0d25440aa493795e38b56f00c59d"
+    },
+    {
+      "path": "law/policy/model-runtime-registry.json",
+      "sha256": "5cee939472f8fef63347f149e6ebb4fb3f21d0d5abb250d449e123a5b31b060d"
+    },
+    {
+      "path": "law/policy/sensor-notes/inventory_adherence.md",
+      "sha256": "852a811b48ecb7eec1cd0b3779652f7e56d27d15f8ba7864a5d31851f4eaeb4f"
+    },
+    {
+      "path": "law/policy/sensor-notes/inventory_regeneration.md",
+      "sha256": "68e06b4f4181d0b84f0466e13f6dac223e29ad2db83776a1fe724930b9f4e2ca"
+    },
+    {
+      "path": "law/policy/sensor-notes/llm_judge.md",
+      "sha256": "37fe1717aaa3c69180c580fd4b87d682d0bd9849edd05a49a6c387b1f38e8fd9"
+    },
+    {
+      "path": "law/trace.json",
+      "sha256": "a1805ff614c37e57449959f27cb44917205a72e5a7a42ceef6914fbf3b5864e2"
+    },
+    {
+      "path": "package.json",
+      "sha256": "77c36a501047c95696150cc9c1a14e8b142a50b5e34ebc7348f7bb24a0d0f83d"
+    },
+    {
+      "path": "packages/cli/tests/unit/cmp0006-evidence-recovery.test.ts",
+      "sha256": "e5ee736011323a7361821b37cd7c045fd8d3787f4075aa2bae0298e742204683"
+    },
+    {
+      "path": "packages/evidence/src/evidence/anchors.ts",
+      "sha256": "b999fa0003219b6374e37613935818efd082b1c12a74289cea606b684662552f"
+    },
+    {
+      "path": "packages/evidence/tests/proof-line-anchoring.test.ts",
+      "sha256": "450448351bdfb4dd2380d344cebbce14b0cecda9fc5c89a5d3a1db137d574e77"
+    },
+    {
+      "path": "packages/loop/src/governance-ledger/index.ts",
+      "sha256": "043da202d9a809cdede4023d281c36fabd4755faf082aab0e122d14498cc499a"
+    },
+    {
+      "path": "packages/loop/src/governance-ledger/render.ts",
+      "sha256": "da2e33594887fc4e20599eeae02ab245162d703a99fd5d0aa3b5ae2ec89f0c7d"
+    },
+    {
+      "path": "packages/loop/src/round-lifecycle/index.ts",
+      "sha256": "317c20d0c88541d4945d57c248216c762a953ef101800595906648e0569720bb"
+    },
+    {
+      "path": "packages/loop/tests/triage-breaker-schema.test.ts",
+      "sha256": "c767dd322fd1838a0cc6c3ec5f6e7e28f25f7f50747663c312d53c43f4aeb6f8"
+    },
+    {
+      "path": "packages/loop/tests/unit/cmp0006-exact-closure-integrity.test.ts",
+      "sha256": "7edf80c89f28baa34ba20fe7829c5480a005a87615bcb08631870d306b620785"
+    },
+    {
+      "path": "packages/loop/tests/unit/round-archive-history-boundaries.test.ts",
+      "sha256": "76336be3e2195a33a6fff53b84bc34e78f0f7a5851655e99ee2b4bd125f11761"
+    },
+    {
+      "path": "packages/schemas/tests/unit/cmp0006-provider-review-projection.test.ts",
+      "sha256": "6355520006246f8331e705eed767f4a03fcc5ce2959f0eb79967397bff8d1cda"
+    },
+    {
+      "path": "packages/sensors/src/security-scan.ts",
+      "sha256": "5c8d60a1d6db248d335b91cf3c2dbb9ede436b7c10b15727605d798ddf37d374"
+    },
+    {
+      "path": "packages/sensors/tests/unit/cmp0006-dependency-advisories.test.ts",
+      "sha256": "83be8aee8f5d09a48b60078259b8a5483e0fc3b683a1add2934597558d696d2e"
+    },
+    {
+      "path": "packages/sensors/tests/unit/coherence-security-runtime-coverage.test.ts",
+      "sha256": "ca97c7fb2d68bca92c95e5f887a1a4eab99fa2b078f137f8930b42c01c17a71d"
+    },
+    {
+      "path": "packages/sensors/tests/unit/judge-response-boundaries.test.ts",
+      "sha256": "5bf6f302ec0eba15ae80165474b454ae7d30256690265951be1fae382d6e26bd"
+    },
+    {
+      "path": "packages/sensors/tests/unit/mutation-wave4-harness-coherence.test.ts",
+      "sha256": "723a3872079d66ed1de05c7bcd7b6b6aec69148f49a50889c76e7dbed3134ed6"
+    },
+    {
+      "path": "packages/sensors/tests/unit/mutation-wave8-security-scan.test.ts",
+      "sha256": "85b43040b1dd524b158b6071c038ac2513910d07257524fee281104ff2b83a03"
+    },
+    {
+      "path": "packages/sensors/tests/unit/security-perf-depth.test.ts",
+      "sha256": "627ce4a4d0cd2a73bf7719a6b6cce119363718b0a2f5b0e37aa15d22a2487eb5"
+    },
+    {
+      "path": "packages/sensors/tests/unit/security-scan-shape-boundaries.test.ts",
+      "sha256": "590ebda23ddb879e9d3cca04e86324df55d7bcf673a9b81d255ee4085c718a3c"
+    },
+    {
+      "path": "packages/sensors/tests/unit/workflow-parser.test.ts",
+      "sha256": "3d36013edb092ae405f583a52cada8c171fdf6cdb5133c4768c564d4ed2512fc"
+    },
+    {
+      "path": "packages/skills/tests/model-bridge/structured-extraction.test.ts",
+      "sha256": "a08ea874e89d24d08b1d043ca4c31d0b25b5264f4883c139d5525f235342e726"
+    },
+    {
+      "path": "packages/skills/tests/operations/model-bridge.test.ts",
+      "sha256": "ae23a64b25966e31fa23e479ad529a8c78f66fba7d9c060416fb676b8ba5939c"
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "sha256": "4d98f1dc53ca4b917669681f8f3982e496d4350f3772713d479a0eae268b7e35"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/campaign.json",
+      "sha256": "eaeceed31d551d7534e8c15d66a320b99c3c16a0a33bb059a7db9355ec238d9f"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/coverage.md",
+      "sha256": "bfed1018a0091f61209701b8f4fdcc586ae924e34f0934d845b2b2dc91663104"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/issue-snapshot.json",
+      "sha256": "24d6849c30ab5c7ed833f0a312342bfa890ec47849ef2afb248b0c5890a96c4a"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/linked-evidence.json",
+      "sha256": "05d82634afe66d169ba32f9bca917dabf6e1d089ea6c102c6e977a294ff8da99"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-0611.md",
+      "sha256": "4d59a15507c0b219cfba29b25d23a371c5416503e86650046016f3bdcde20507"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-0621.md",
+      "sha256": "f2012f34232471a5abd54ff7c0bdbb676feb7cefc96e6021ec50f04152848862"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-06210.md",
+      "sha256": "f282d85bdbd8ae71d8626a9fc76f175f845aeccbcf9e3d60aa658b773f18b5f0"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-06211.md",
+      "sha256": "c4e31c82e0b9592ff123004666add8b48b82f5361d3f455323c099900970f1cb"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-06212.md",
+      "sha256": "b85f79d01d0623581f9153d57a4c93fe33d5e3e62df7ba163a8b1b7f56f45ebb"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-06213.md",
+      "sha256": "c95de27e45942f0fbb257eb0ea4d09d7bb3046a75e106a24bc97c9b0ccb262f1"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-06214.md",
+      "sha256": "dc3930f876ea722740b174538fd897ce7ea65db926958f3b001539af10e253f2"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-06215.md",
+      "sha256": "24c564cbfa7a7105dd2f3b3b0f494757a68ef9a0918977e174b77302a09830bc"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-06216.md",
+      "sha256": "db470e7d11ebab8c7fa5e1004326d531e6ebb13c99df850dcd477ecc4e9044eb"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-0622.md",
+      "sha256": "91167e5a4254307a7624d27da4a152b5fd5dc7cb19413aa76a976ccb61a47710"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-0623.md",
+      "sha256": "5548adb8a79b1e250a934038ef43223b0834f722708777f4ed8c86f1298ffb55"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-0624.md",
+      "sha256": "96081e6aa6707ab269ba6bc06d1527c99af4a8cefd68d8f9df6a953d3ac1beb3"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-0625.md",
+      "sha256": "c7a1286cad5aac822a0e0cb6aaaa39c390977407bdb03ba0c55ac373505c0e51"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-0626.md",
+      "sha256": "cd06e0283690c409cf49919085a7e91771adf0899671af640e8df4b5cea2e94a"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-0627.md",
+      "sha256": "56eae573046b8c5424aaa1cd51a15e0c13dfc8089ac4dccc4912a869d3836b23"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-0628.md",
+      "sha256": "2d4ceb5c32618a019b575e9c9935bd4aeb44226f312bd2e522cf8098837ab2a8"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-0629.md",
+      "sha256": "583d92b01ffd00999bc54da7e5b3989192fb69c55917965f648e42dde9bbaccb"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-0631.md",
+      "sha256": "c016a200edc3f9bb86de5420db90c3b61cf44f5c21ec8adaab086c09591159b4"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-0632.md",
+      "sha256": "8600ab41a1fbab0756ef752efa4c572c095116e51294b753be50649b145eadff"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-0633.md",
+      "sha256": "6c1d7895b02dbff41e48377bb2f2f6111a0352d74db7af3418e1374aa2e6aa00"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-0634.md",
+      "sha256": "84ab62fb89368484d16478663ff1542b70df590515e6363b4115326b1e13fd5d"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-0635.md",
+      "sha256": "4240036884e917026c177e850eb0863fdcbbcce54695e6aa0d9303bd7868df2b"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-0636.md",
+      "sha256": "963bcf16f7675a42ffad3fa577c248542b5227484a7888dc1f335b82eb8a40e8"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-0637.md",
+      "sha256": "81cda7a0726e6b22952c6f1cd1605d5536f6188f5bdf7737c022dd740d35377b"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-0638.md",
+      "sha256": "81e3d76fb7132763b09bff8f622788d15efeb5323221733214abd29c110f7630"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-0639.md",
+      "sha256": "3552f04c82dca243ff0c15eade7b6c876a53fc608cb3c9f6f1771c0cfc0ec838"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-0641.md",
+      "sha256": "3536eaf395efec00ea245b1f4422814be48030f8b25c81302dfb8228554d157e"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-0642.md",
+      "sha256": "35a107d70093d8e71e8728bece1d9cd2d7e89f73fa9961eac4c8935cb93df0ae"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-0643.md",
+      "sha256": "ceeda7ae289d88dbc91588c4786b207f5526f62c11110719e05f9e4bf9c2db2e"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-0644.md",
+      "sha256": "c50a9e1e8809e7003c01521248e96249b42cf7044c684afaaac4cec06c62139b"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-0645.md",
+      "sha256": "123d739e40914bfdd9841d857964b80154076ac271fcfc5496d41dadbdb856a0"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-0646.md",
+      "sha256": "5e793966dba0df102e8ae33cff2933c90a6236fa7514f504f74b3f48942c7e07"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-0651.md",
+      "sha256": "1879260c8b10df72b6d512da5355c63be31fd6824d92440e54b73454bc53ba2a"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-06510.md",
+      "sha256": "238c152ebb8262013e85df65b88a8169cc5d5ae0fb00380a0c5fc5c1881ec783"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-06511.md",
+      "sha256": "64762ff23096a293e8bd8ff919296d0ac4d92bc39b793f712d239930fd9f52a6"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-0652.md",
+      "sha256": "a77c4e84b933e020a66f15909199720931cd1296ee70ee2c07f3599be2d21755"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-0653.md",
+      "sha256": "8f6aef626841d61aa5c056c514ccde75dda0c2bc73d4d43a2073621036c91f08"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-0654.md",
+      "sha256": "aa2bd1dbaf14a033a7fa732a89202d94bdaf723874e83dac2f329c85bb0312db"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-0655.md",
+      "sha256": "16b1a4d2c71c10546a5bfdc3c4bb544e9392c0db21532a9336ef883d50058535"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-0656.md",
+      "sha256": "f1b4e8653537a942ed8270a4bfefa67176d468cbe9e5c50ab3e2f8fd4b946c1f"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-0657.md",
+      "sha256": "0d2ca1af60fda2750bd0c8111beb0c1b08ed3c389f7ab90415c7db915bbe78ad"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-0658.md",
+      "sha256": "aad775c1dd04d1e46d1106790e2b421dfd9d5430499405aa5debe2e2e0039d3f"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-0659.md",
+      "sha256": "cf8766cb3cbd36ffe6e73797d7a440aace28c68cfc475b5bcf756c0b887eac16"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-0661.md",
+      "sha256": "8573eb4a1bf490795b3d2ed17691bf7ceae66ac4b3e79de5f8a95da2e51605c5"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-0662.md",
+      "sha256": "2247879a53383326337cd5f198edac63ffc82e03d294925e972f9fc98608feb6"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-0663.md",
+      "sha256": "b51cacb9e5fc664b59c376102a4a5b296bc62b8dacb82c30e69c27bab10a8d03"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-0671.md",
+      "sha256": "2ecb501f62b3c4dda5606c67e90bede67280238bf995449b0bbead058d2e080a"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-0672.md",
+      "sha256": "2c94ef57b5bbcf67d874f6e5d21367363395e9aca42c5c52bfeb74e7a166b3e7"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-0681.md",
+      "sha256": "d482dd601cf4dd310a451f0a5a28b15d4a2f9f8976b4da0857553aa3b6406771"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/TASK-0691.md",
+      "sha256": "950597f3123292567ea513d0c22ca3f78b02fa7ea3178706627cedfc4afb604b"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/prompts/preamble.md",
+      "sha256": "006e211dacd21261ddec63867081c84e562aa278a0452daa94af4b2d07af4758"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/revalidation.json",
+      "sha256": "9165602b9f28f454239a6ee0e95791bf654ddfc79f4355f37a88d9bbef57cfa7"
+    },
+    {
+      "path": "product/campaigns/CMP-0006-open-issue-closure/validation.md",
+      "sha256": "91bc59088c727e8b0b76f2eb90667ad344949ed1e6595be83d3c35ee9eb143d1"
+    },
+    {
+      "path": "tests/contract/cmp0006-soft-evidence-custody.contract.test.ts",
+      "sha256": "93b50428c31cc3cb93cb29ba011c916699da77906aedf4fea7a0d2bfd02b474a"
+    },
+    {
+      "path": "tests/contract/workflow-shape.contract.test.ts",
+      "sha256": "94ef367a20cca4eacaced8ee8f410b56a86f1e22311af6e92ae05a8917af5c03"
+    },
+    {
+      "path": "tests/fixtures/review-replies/README.md",
+      "sha256": "4569f118ddac1abd80bcd4df7f113b226b66fe544b4ed6c6593f4d8e4349cc29"
+    },
+    {
+      "path": "tests/fixtures/review-replies/cmp0006-claude-envelope.json",
+      "sha256": "2c6408cb45b64c83e52c454097337cac87eb50d28d6bf5911b48003505867fba"
+    },
+    {
+      "path": "tests/fixtures/review-replies/cmp0006-claude-reply.txt",
+      "sha256": "c434de2d250850fd45f51c825c8e66fabb103eb524379f93c04c00c160dfe226"
+    },
+    {
+      "path": "tests/fixtures/review-replies/cmp0006-codex-events.jsonl",
+      "sha256": "22481883b8c983114456a15f446738be5b8908b06eb255ef84afe09d8f9f82a1"
+    },
+    {
+      "path": "tests/fixtures/review-replies/cmp0006-codex-reply.txt",
+      "sha256": "bdfd2da04ad8a8e9c987095f668c92f95f5b307eb47cafe74c9aac306ea30c83"
+    }
+  ]
+}

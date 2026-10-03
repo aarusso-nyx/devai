@@ -1,0 +1,514 @@
+{
+  "checked_at_utc": "2026-10-01T21:51:32.280809Z",
+  "checked_at_local": "2026-10-01T18:51:32.700195-03:00",
+  "repository": "aarusso-nyx/devai",
+  "origin_main": "180a122787193f9bdfce9b7f4cd5600e85ae7854",
+  "expected_base": "180a122787193f9bdfce9b7f4cd5600e85ae7854",
+  "main_unchanged": true,
+  "pagination_complete": true,
+  "open_issue_count": 21,
+  "open_issue_numbers": [
+    233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251,
+    252, 254
+  ],
+  "scope_changes": [
+    {
+      "issue": 253,
+      "change": "no longer open",
+      "reconciliation": "Observed Owner not_planned closure of #253, event 32290441966; all original issue IDs remain covered."
+    }
+  ],
+  "issues": [
+    {
+      "id": 5669314108,
+      "number": 233,
+      "updated_at": "2026-10-01T21:27:28Z",
+      "body_sha256": "5dc05d05f82932bbfda8cdda141093ccb15147d281cf5a1eed319dedb9172b1d",
+      "state": "open",
+      "comments_count": 1
+    },
+    {
+      "id": 5669314357,
+      "number": 234,
+      "updated_at": "2026-10-01T21:18:23Z",
+      "body_sha256": "5f842cf5521635a471a9bf407304745b9ed3171803d56678ccfe1fafe0946f7a",
+      "state": "open",
+      "comments_count": 0
+    },
+    {
+      "id": 5669314654,
+      "number": 235,
+      "updated_at": "2026-10-01T21:18:25Z",
+      "body_sha256": "fc1eedd65d4c88a00794ad2f3d30b4d6b6aff6610b1fd96f528b00cdf9e02892",
+      "state": "open",
+      "comments_count": 0
+    },
+    {
+      "id": 5669314976,
+      "number": 236,
+      "updated_at": "2026-10-01T21:18:26Z",
+      "body_sha256": "050636417bf13e94839d9bcc4b17a08faf25bcda0db384c1d6111f0e49fd814e",
+      "state": "open",
+      "comments_count": 0
+    },
+    {
+      "id": 5669315260,
+      "number": 237,
+      "updated_at": "2026-10-01T21:27:26Z",
+      "body_sha256": "48db838ed4679e0b85b49415db084e86dd0489ca5dbaf3945e1d0ca39e1e8b07",
+      "state": "open",
+      "comments_count": 1
+    },
+    {
+      "id": 5669315538,
+      "number": 238,
+      "updated_at": "2026-10-01T21:18:29Z",
+      "body_sha256": "be1a56a5d1497b7da75776d6decde5811b98b5973713be0467e2511b603b5a4d",
+      "state": "open",
+      "comments_count": 0
+    },
+    {
+      "id": 5669316030,
+      "number": 239,
+      "updated_at": "2026-10-01T21:18:31Z",
+      "body_sha256": "43da0868b8d686755f4d47208e7a44bf6a8dda3e2eac8dc197871f9bdb83a292",
+      "state": "open",
+      "comments_count": 0
+    },
+    {
+      "id": 5669316447,
+      "number": 240,
+      "updated_at": "2026-10-01T21:27:29Z",
+      "body_sha256": "50b067cbf7f960003c4778e6aa802a678983f71765b8c29aaa15969d44711e05",
+      "state": "open",
+      "comments_count": 1
+    },
+    {
+      "id": 5669316969,
+      "number": 241,
+      "updated_at": "2026-10-01T21:18:34Z",
+      "body_sha256": "47239df5e546d96c215abb7276f7e7ec5da5fb9bdca6b0b202ca9078a95062dc",
+      "state": "open",
+      "comments_count": 0
+    },
+    {
+      "id": 5669317329,
+      "number": 242,
+      "updated_at": "2026-10-01T21:18:36Z",
+      "body_sha256": "34e5f3e63713d159fc3430cfe6f80e03ba961f82177d8bc18eae22a3fc687a42",
+      "state": "open",
+      "comments_count": 0
+    },
+    {
+      "id": 5669317618,
+      "number": 243,
+      "updated_at": "2026-10-01T21:18:38Z",
+      "body_sha256": "f367f40a68a3f8735746491d9e9a1e7d00c7f4326ee4c9e37246080d77d87142",
+      "state": "open",
+      "comments_count": 0
+    },
+    {
+      "id": 5669317956,
+      "number": 244,
+      "updated_at": "2026-10-01T21:18:40Z",
+      "body_sha256": "e3e13d4cab59ec268293511236a58d2c90af7bc4ba0eff656ace19462fee55c2",
+      "state": "open",
+      "comments_count": 0
+    },
+    {
+      "id": 5669318273,
+      "number": 245,
+      "updated_at": "2026-10-01T21:18:41Z",
+      "body_sha256": "a24632cd77043a76f9ae1133cec0663f8ba42d713afee88741f82ba8640dc579",
+      "state": "open",
+      "comments_count": 0
+    },
+    {
+      "id": 5669318580,
+      "number": 246,
+      "updated_at": "2026-10-01T21:18:43Z",
+      "body_sha256": "c1a41c12e010d84bb1daa53f0342ba68013a406158e72060beca0faac2a171ec",
+      "state": "open",
+      "comments_count": 0
+    },
+    {
+      "id": 5669318834,
+      "number": 247,
+      "updated_at": "2026-10-01T21:18:45Z",
+      "body_sha256": "6d0892576da74ca39e1aec5d21fd74eca5e54d3c9cccd7faa7983125eb86e7a3",
+      "state": "open",
+      "comments_count": 0
+    },
+    {
+      "id": 5669319124,
+      "number": 248,
+      "updated_at": "2026-10-01T21:18:46Z",
+      "body_sha256": "29051a41e99a1d76d07a630280d760cedd4a9fdbf8c9bb2633c086a53f31e3d3",
+      "state": "open",
+      "comments_count": 0
+    },
+    {
+      "id": 5669319403,
+      "number": 249,
+      "updated_at": "2026-10-01T21:18:47Z",
+      "body_sha256": "f4390cd5522fc5f6fa5bce0a394c1df7e6fd32f86b100289f58418edeb0e32e6",
+      "state": "open",
+      "comments_count": 0
+    },
+    {
+      "id": 5669319848,
+      "number": 250,
+      "updated_at": "2026-10-01T21:18:49Z",
+      "body_sha256": "f7aeae8cb70d66655b5bdd96cd7c3fe6f0365cd28d8d3507de05734eb79e4a68",
+      "state": "open",
+      "comments_count": 0
+    },
+    {
+      "id": 5669320191,
+      "number": 251,
+      "updated_at": "2026-10-01T21:18:51Z",
+      "body_sha256": "12f90b58ae5d07fcb57470d93d1aedfbfcfd6aa58e8f5eff3001a990b714354b",
+      "state": "open",
+      "comments_count": 0
+    },
+    {
+      "id": 5669320599,
+      "number": 252,
+      "updated_at": "2026-10-01T21:27:27Z",
+      "body_sha256": "846e54cf2569e2011c7695d8a7f820af9d13f2ae36a0d9492d89f43534221a1b",
+      "state": "open",
+      "comments_count": 1
+    },
+    {
+      "id": 5669321291,
+      "number": 254,
+      "updated_at": "2026-10-01T21:18:56Z",
+      "body_sha256": "3d683ac8e0998c7212c28d85d7192f1febc5fb9c97587da452bce6f986cb7b68",
+      "state": "open",
+      "comments_count": 0
+    }
+  ],
+  "complete_comments": [
+    {
+      "number": 233,
+      "pages": 1,
+      "comments": [
+        {
+          "id": 5940973056,
+          "node_id": "IC_kwDOT1g9Xs8AAAABYhwOAA",
+          "html_url": "https://github.com/aarusso-nyx/devai/issues/233#issuecomment-5940973056",
+          "created_at": "2026-10-01T21:27:28Z",
+          "updated_at": "2026-10-01T21:27:28Z",
+          "body": "**Owner decision (2026-10-01): fix and upgrade.** Every high-severity advisory is resolved by upgrading or replacing the affected dependency; no Owner waiver is granted for this issue.",
+          "author": "aarusso-nyx"
+        }
+      ]
+    },
+    {
+      "number": 234,
+      "pages": 1,
+      "comments": []
+    },
+    {
+      "number": 235,
+      "pages": 1,
+      "comments": []
+    },
+    {
+      "number": 236,
+      "pages": 1,
+      "comments": []
+    },
+    {
+      "number": 237,
+      "pages": 1,
+      "comments": [
+        {
+          "id": 5940972412,
+          "node_id": "IC_kwDOT1g9Xs8AAAABYhwLfA",
+          "html_url": "https://github.com/aarusso-nyx/devai/issues/237#issuecomment-5940972412",
+          "created_at": "2026-10-01T21:27:25Z",
+          "updated_at": "2026-10-01T21:27:25Z",
+          "body": "**Owner decision (2026-10-01): option (a).** DEVAI produces the inventory its own sensors expect, so F4:T4 and F4:T9 stay measured cells as ADR-SCR-0008 decides. No N/A declaration and no amending record for these cells.",
+          "author": "aarusso-nyx"
+        }
+      ]
+    },
+    {
+      "number": 238,
+      "pages": 1,
+      "comments": []
+    },
+    {
+      "number": 239,
+      "pages": 1,
+      "comments": []
+    },
+    {
+      "number": 240,
+      "pages": 1,
+      "comments": [
+        {
+          "id": 5940973522,
+          "node_id": "IC_kwDOT1g9Xs8AAAABYhwP0g",
+          "html_url": "https://github.com/aarusso-nyx/devai/issues/240#issuecomment-5940973522",
+          "created_at": "2026-10-01T21:27:29Z",
+          "updated_at": "2026-10-01T21:27:29Z",
+          "body": "**Owner decision (2026-10-01): confirmed.** The Architect writes the amending records (ADR-EVI-0001 IA-005 restated to the Owner's ruling; ADR-SCR-0008 sensor-to-cell pairing aligned with `law/policy/sensor-registry.json`) for Owner acceptance.",
+          "author": "aarusso-nyx"
+        }
+      ]
+    },
+    {
+      "number": 241,
+      "pages": 1,
+      "comments": []
+    },
+    {
+      "number": 242,
+      "pages": 1,
+      "comments": []
+    },
+    {
+      "number": 243,
+      "pages": 1,
+      "comments": []
+    },
+    {
+      "number": 244,
+      "pages": 1,
+      "comments": []
+    },
+    {
+      "number": 245,
+      "pages": 1,
+      "comments": []
+    },
+    {
+      "number": 246,
+      "pages": 1,
+      "comments": []
+    },
+    {
+      "number": 247,
+      "pages": 1,
+      "comments": []
+    },
+    {
+      "number": 248,
+      "pages": 1,
+      "comments": []
+    },
+    {
+      "number": 249,
+      "pages": 1,
+      "comments": []
+    },
+    {
+      "number": 250,
+      "pages": 1,
+      "comments": []
+    },
+    {
+      "number": 251,
+      "pages": 1,
+      "comments": []
+    },
+    {
+      "number": 252,
+      "pages": 1,
+      "comments": [
+        {
+          "id": 5940972742,
+          "node_id": "IC_kwDOT1g9Xs8AAAABYhwMxg",
+          "html_url": "https://github.com/aarusso-nyx/devai/issues/252#issuecomment-5940972742",
+          "created_at": "2026-10-01T21:27:27Z",
+          "updated_at": "2026-10-01T21:27:27Z",
+          "body": "**Owner decision (2026-10-01): refuse.** The inline `sense run --preset=<name>` form is not a supported selection. Selection and admission must refuse it consistently with one error code; `--preset <name>` remains the supported form.",
+          "author": "aarusso-nyx"
+        }
+      ]
+    },
+    {
+      "number": 253,
+      "pages": 1,
+      "comments": [
+        {
+          "id": 5940974066,
+          "node_id": "IC_kwDOT1g9Xs8AAAABYhwR8g",
+          "html_url": "https://github.com/aarusso-nyx/devai/issues/253#issuecomment-5940974066",
+          "created_at": "2026-10-01T21:27:31Z",
+          "updated_at": "2026-10-01T21:27:31Z",
+          "body": "**Owner decision (2026-10-01): not planned.** ADR-CHK-0005 option A (structured `not-applicable` for `action-effects` and `cli-reference` in adopters) stands; option B is not pursued.",
+          "author": "aarusso-nyx"
+        }
+      ]
+    },
+    {
+      "number": 254,
+      "pages": 1,
+      "comments": []
+    }
+  ],
+  "recent_comments_since_work_start": [
+    {
+      "number": 237,
+      "id": 5940972412,
+      "node_id": "IC_kwDOT1g9Xs8AAAABYhwLfA",
+      "html_url": "https://github.com/aarusso-nyx/devai/issues/237#issuecomment-5940972412",
+      "created_at": "2026-10-01T21:27:25Z",
+      "updated_at": "2026-10-01T21:27:25Z",
+      "body": "**Owner decision (2026-10-01): option (a).** DEVAI produces the inventory its own sensors expect, so F4:T4 and F4:T9 stay measured cells as ADR-SCR-0008 decides. No N/A declaration and no amending record for these cells.",
+      "author": "aarusso-nyx"
+    },
+    {
+      "number": 252,
+      "id": 5940972742,
+      "node_id": "IC_kwDOT1g9Xs8AAAABYhwMxg",
+      "html_url": "https://github.com/aarusso-nyx/devai/issues/252#issuecomment-5940972742",
+      "created_at": "2026-10-01T21:27:27Z",
+      "updated_at": "2026-10-01T21:27:27Z",
+      "body": "**Owner decision (2026-10-01): refuse.** The inline `sense run --preset=<name>` form is not a supported selection. Selection and admission must refuse it consistently with one error code; `--preset <name>` remains the supported form.",
+      "author": "aarusso-nyx"
+    },
+    {
+      "number": 233,
+      "id": 5940973056,
+      "node_id": "IC_kwDOT1g9Xs8AAAABYhwOAA",
+      "html_url": "https://github.com/aarusso-nyx/devai/issues/233#issuecomment-5940973056",
+      "created_at": "2026-10-01T21:27:28Z",
+      "updated_at": "2026-10-01T21:27:28Z",
+      "body": "**Owner decision (2026-10-01): fix and upgrade.** Every high-severity advisory is resolved by upgrading or replacing the affected dependency; no Owner waiver is granted for this issue.",
+      "author": "aarusso-nyx"
+    },
+    {
+      "number": 240,
+      "id": 5940973522,
+      "node_id": "IC_kwDOT1g9Xs8AAAABYhwP0g",
+      "html_url": "https://github.com/aarusso-nyx/devai/issues/240#issuecomment-5940973522",
+      "created_at": "2026-10-01T21:27:29Z",
+      "updated_at": "2026-10-01T21:27:29Z",
+      "body": "**Owner decision (2026-10-01): confirmed.** The Architect writes the amending records (ADR-EVI-0001 IA-005 restated to the Owner's ruling; ADR-SCR-0008 sensor-to-cell pairing aligned with `law/policy/sensor-registry.json`) for Owner acceptance.",
+      "author": "aarusso-nyx"
+    },
+    {
+      "number": 253,
+      "id": 5940974066,
+      "node_id": "IC_kwDOT1g9Xs8AAAABYhwR8g",
+      "html_url": "https://github.com/aarusso-nyx/devai/issues/253#issuecomment-5940974066",
+      "created_at": "2026-10-01T21:27:31Z",
+      "updated_at": "2026-10-01T21:27:31Z",
+      "body": "**Owner decision (2026-10-01): not planned.** ADR-CHK-0005 option A (structured `not-applicable` for `action-effects` and `cli-reference` in adopters) stands; option B is not pursued.",
+      "author": "aarusso-nyx"
+    }
+  ],
+  "new_or_edited_comments_not_in_initial_update": [],
+  "execution_requires_another_live_revalidation": true,
+  "reconciled_external_closures": [
+    {
+      "id": 5669320975,
+      "number": 253,
+      "html_url": "https://github.com/aarusso-nyx/devai/issues/253",
+      "state": "closed",
+      "state_reason": "not_planned",
+      "closed_at": "2026-10-01T21:27:31Z",
+      "updated_at": "2026-10-01T21:27:31Z",
+      "closed_by": "aarusso-nyx",
+      "events": [
+        {
+          "id": 32290441966,
+          "event": "closed",
+          "created_at": "2026-10-01T21:27:31Z",
+          "actor": "aarusso-nyx"
+        }
+      ],
+      "disposition": "Owner closed not_planned; preserve closure, no option B implementation, no duplicate close operation"
+    }
+  ],
+  "final_refresh_at_utc": "2026-10-01T21:57:21.464121Z",
+  "final_refresh_new_or_edited_comments": 0,
+  "final_refresh_scope_unchanged": true,
+  "final_refresh_main_unchanged": true,
+  "preparation_decision_refresh": {
+    "checked_at_utc": "2026-10-02T00:41:19.130724Z",
+    "checked_at_local": "2026-10-01T21:41:19.130724-03:00",
+    "pagination_complete": true,
+    "open_issue_numbers": [
+      233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251,
+      252, 254
+    ],
+    "open_issue_count": 21,
+    "main": "180a122787193f9bdfce9b7f4cd5600e85ae7854",
+    "main_unchanged": true,
+    "new_or_edited_recent_comments": [],
+    "complete_comment_scope": [
+      233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251,
+      252, 253, 254
+    ],
+    "complete_comment_refresh_at_utc": "2026-10-02T00:45:55.677464Z",
+    "complete_comment_refresh_at_local": "2026-10-01T21:45:55.677464-03:00",
+    "new_or_edited_complete_comments": [],
+    "issue_body_changes": []
+  },
+  "handoff_final_refresh": {
+    "checked_at_utc": "2026-10-02T00:51:33.155551Z",
+    "checked_at_local": "2026-10-01T21:51:33.155551-03:00",
+    "pagination_complete": true,
+    "open_issue_count": 21,
+    "open_issue_numbers": [
+      233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251,
+      252, 254
+    ],
+    "new_or_edited_recent_comments": [],
+    "issue_body_changes": [],
+    "scope_changed": false,
+    "main": "180a122787193f9bdfce9b7f4cd5600e85ae7854",
+    "main_unchanged": true
+  },
+  "task_0611_entry": {
+    "recorded_at_utc": "2026-10-02T01:30:23.629145+00:00",
+    "source_worktree": "/Volumes/Thiamat II/stech/devai-cmp-0006",
+    "task_worktree": "/Users/aarusso/.codex/worktrees/1f47/devai",
+    "task_branch": "codex/R-0601-TASK-0611-entry",
+    "head": "180a122787193f9bdfce9b7f4cd5600e85ae7854",
+    "baseline_tree": "90c7c4b5acbd9c9bc4acd9aea54a2eb0b0c60921",
+    "manifest_verified_files": 75,
+    "manifest_mismatches": [],
+    "original_scope_count": 22,
+    "open_issue_count": 21,
+    "open_issue_numbers": [
+      233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251,
+      252, 254
+    ],
+    "paginated_complete_comment_scope": [
+      233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251,
+      252, 253, 254
+    ],
+    "issue_identity_body_title_changes": [],
+    "comment_identity_author_body_time_changes": [],
+    "closure_253": {
+      "state": "closed",
+      "state_reason": "not_planned",
+      "closed_at": "2026-10-01T21:27:31Z",
+      "id": 5669320975
+    },
+    "fetched_main": "180a122787193f9bdfce9b7f4cd5600e85ae7854",
+    "fallback_observation": {
+      "merge_queue": null,
+      "active_branch_rules": [],
+      "required_check": "devai-release-gate",
+      "strict": true,
+      "required_linear_history": true,
+      "enforce_admins": true,
+      "open_prs_targeting_main": [],
+      "cmp_0003_owner_effect": {
+        "id": "OE-01",
+        "outcome": "fallback",
+        "performed_at": "2026-09-29T21:41:52Z"
+      },
+      "continued_admission": "at-most-one-pre-merge-pr"
+    },
+    "external_mutations": [],
+    "human_ratification": null
+  }
+}
