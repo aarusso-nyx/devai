@@ -230,6 +230,19 @@ export async function actionEffectInference(request: SenseAdapterRequest): Promi
     request.repoRoot,
     stringInput(request, 'subprocessRegistry') ?? 'law/policy/subprocess-effects.json',
   );
+  const tsconfigPath = absolute(
+    request.repoRoot,
+    stringInput(request, 'tsconfigPath') ?? 'tsconfig.effects.json',
+  );
+  // #254: an adopter without the effects policy or program reads UNKNOWN, never ENOENT.
+  const missing = [registryPath, tsconfigPath].find((path) => !existsSync(path));
+  if (missing !== undefined) {
+    return unknownReading(
+      'action_effect_inference',
+      'ACTION_EFFECT_INFERENCE_INPUT_MISSING',
+      `Required input is absent: ${missing}`,
+    );
+  }
   const subprocessRegistry = JSON.parse(readFileSync(registryPath, 'utf8')) as {
     readonly templates: readonly {
       readonly template_id: string;
@@ -241,10 +254,7 @@ export async function actionEffectInference(request: SenseAdapterRequest): Promi
     }[];
   };
   const result = await senseActionEffectInference({
-    tsconfigPath: absolute(
-      request.repoRoot,
-      stringInput(request, 'tsconfigPath') ?? 'tsconfig.effects.json',
-    ),
+    tsconfigPath,
     catalog: ACTION_EFFECT_CONTRACTS.map((entry) => entry.action_id),
     contracts: ACTION_EFFECT_CONTRACTS,
     subprocessRegistry,

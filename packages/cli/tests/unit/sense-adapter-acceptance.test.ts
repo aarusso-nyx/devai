@@ -93,6 +93,11 @@ describe('sense adapter acceptance', () => {
     expect(() =>
       sensorAdapter('migration_check')({ repoRoot: ROOT, inputs: { databaseUrl: 1 } }),
     ).toThrow('SENSE_INPUT_REQUIRED:databaseUrl');
-    await expect(sensorAdapter('action_effect_inference')({ repoRoot: ROOT })).rejects.toThrow();
+    await expect(
+      sensorAdapter('action_effect_inference')({
+        repoRoot: ROOT,
+        inputs: { subprocessRegistry: 'missing.json' },
+      }),
+    ).resolves.toMatchObject({ status: 'unknown' });
   });
 });
