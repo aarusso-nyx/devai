@@ -202,15 +202,7 @@ const PREFLIGHT_ALLOWED_SCRIPTS = [
 // The collapsed lane (ADR-CHK-0001): the step ids in order and the commands
 // each must carry.
 const PREFLIGHT_STEP_ID = 'preflight';
-const PREFLIGHT_LANE_STEP_IDS = ['install', PREFLIGHT_STEP_ID, 'affected', 'soft-gate'];
-// ADR-MDL-0004: the provider-free soft gate runs exactly these parsed command lines.
-const SOFT_GATE_RUN_LINES = [
-  'set -euo pipefail',
-  'node .devai/state/pr-bootstrap/cli/bin.js check --only trace --format json > "$RUNNER_TEMP/devai-trace.json"',
-  'node .devai/state/pr-bootstrap/cli/bin.js check --only test-trace --format json > "$RUNNER_TEMP/devai-test-trace.json"',
-  'node .devai/state/pr-bootstrap/cli/bin.js audit scorecard --repo-root . --at "$(git rev-parse HEAD)" --format json > "$RUNNER_TEMP/devai-scorecard.json"',
-  'node scripts/process/check-ci-invariant-gate.mjs --fetch-script scripts/process/fetch-ci-invariant-evidence.mjs --preflight "$RUNNER_TEMP/devai-preflight.json" --affected "$RUNNER_TEMP/devai-affected.json" --trace "$RUNNER_TEMP/devai-trace.json" --test-trace "$RUNNER_TEMP/devai-test-trace.json" --scorecard "$RUNNER_TEMP/devai-scorecard.json"',
-];
+const PREFLIGHT_LANE_STEP_IDS = ['install', PREFLIGHT_STEP_ID, 'affected'];
 // Per-event bindings (ADR-CHK-0004, remote-preflight-contract.md Queue
 // admission): the merge_group head and base under merge_group, the pull
 // request head and base otherwise; the job binds the base once and every base
@@ -561,8 +553,6 @@ export function credentialReferences(value) {
     names.add(match[1] ?? match[2]);
   }
   if (/\bgithub\s*\.\s*token\b/u.test(text)) names.add('GITHUB_TOKEN');
-  if (text.includes('vars.DEVAI_SOFT_GATE_TRUST_JSON')) names.add('DEVAI_SOFT_GATE_TRUST_JSON');
-
   return names;
 }
 
@@ -1016,44 +1006,16 @@ function checkPreflightWorkflow(file, workflow, source, findings, pins) {
     );
   }
 
-  // Exactly one independently controlled public metadata seam; all other protected reads refuse.
-  const softSteps =
-    object(workflow.jobs).preflight?.steps?.filter((step) => step.id === 'soft-gate') ?? [];
-  const trustExpression = '${{ vars.DEVAI_SOFT_GATE_TRUST_JSON }}';
-  const trustLine = `DEVAI_SOFT_GATE_TRUST_JSON: ${trustExpression}`;
-  const soft = object(softSteps[0]);
-  const validTrust =
-    softSteps.length === 1 &&
-    JSON.stringify(Object.keys(soft).sort()) ===
-      JSON.stringify(['env', 'id', 'name', 'run', 'shell']) &&
-    soft.shell === 'bash' &&
-    JSON.stringify(object(soft.env)) ===
-      JSON.stringify({ DEVAI_SOFT_GATE_TRUST_JSON: trustExpression }) &&
-    JSON.stringify(runLines(soft)) === JSON.stringify(SOFT_GATE_RUN_LINES);
-  // Raw-source scan: an implicit expression (e.g. `if: vars.X`) or bracket access is a read
-  // even outside `${{ }}`. Only the single exact trust env line is removed before scanning.
-  const trustLines = source.split('\n').filter((line) => line.trim() === trustLine);
-  const remainder = source
-    .split('\n')
-    .filter((line) => line.trim() !== trustLine)
-    .join('\n');
-  const protectedExpression = [...remainder.matchAll(/\$\{\{([\s\S]*?)\}\}/gu)].some((match) =>
+  // GitHub contexts also support bracket access and whole-context expressions.
+  // Dotted-name matching alone permits e.g. toJSON(secrets) to bypass this guard.
+  const protectedExpression = [...source.matchAll(/\$\{\{([\s\S]*?)\}\}/gu)].some((match) =>
     /\b(?:secrets|vars)\b/u.test(match[1] ?? ''),
   );
-  if (
-    !validTrust ||
-    trustLines.length !== 1 ||
-    source.split(trustExpression).length !== 2 ||
-    /\b(?:secrets|vars)\s*(?:\.|\[)/u.test(remainder) ||
-    protectedExpression
-  )
+  if (/\b(?:secrets|vars)\s*(?:\.|\[)/u.test(source) || protectedExpression) {
     findings.push(
-      finding(
-        'CI_PREFLIGHT_SECRET_ACCESS_FORBIDDEN',
-        file,
-        'only one exact soft-gate env vars.DEVAI_SOFT_GATE_TRUST_JSON public trust read is permitted; every secret/other vars read refuses',
-      ),
+      finding('CI_PREFLIGHT_SECRET_ACCESS_FORBIDDEN', file, 'preflight must reference no secret'),
     );
+  }
 
   const jobs = object(workflow.jobs);
   if (Object.keys(jobs).length === 0) {
@@ -1232,8 +1194,7 @@ function checkPreflightWorkflow(file, workflow, source, findings, pins) {
         PREFLIGHT_EVIDENCE_TOKENS.test(
           executed.replaceAll("'verifier-package'", "'package-check'"),
         ) &&
-        step.id !== PREFLIGHT_STEP_ID &&
-        step.id !== 'soft-gate'
+        step.id !== PREFLIGHT_STEP_ID
       ) {
         findings.push(
           finding(
