@@ -2,6 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://devai.nyxk.com.br/schemas/thresholds.schema.json",
   "title": "Hard and scored soft gate thresholds",
+  "description": "Hard and scored soft gate thresholds, held canonically in law/policy/thresholds.json and installed for adopters as .devai/config/thresholds.json. coverage, mutation, lint, typecheck and freshness are the original hard thresholds, which ADR-MDL-0004 leaves unchanged; coverage and mutation percentages are never soft thresholds and review confidence is never a rubric score. soft_gate pins the scored soft gate as constants so a candidate cannot lower them: an integer scale 0 to 4, a minimum of 3 for each of the four rubric dimensions compared independently under all-dimensions aggregation, evidence no older than 24 hours with zero future tolerance, an evaluator independent of the working agent, and an observed completed evaluation with no tools or MCP servers. The consumer binds the exact thresholds bytes it applied as thresholds_sha256 in soft-gate evidence; a changed digest or one dimension below its minimum blocks admission even when the verdict is pass.",
   "schema_version": "1.0.0",
   "type": "object",
   "additionalProperties": false,
@@ -167,5 +168,46 @@
         }
       }
     }
-  }
+  },
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "coverage": {
+        "lines": 70,
+        "branches": 60,
+        "functions": 70,
+        "statements": 70
+      },
+      "mutation": {
+        "score_min": 60,
+        "survived_max": 9007199254740991
+      },
+      "lint": {
+        "max_errors": 0,
+        "max_warnings": 0
+      },
+      "typecheck": {
+        "max_errors": 0
+      },
+      "freshness": {
+        "default_max_age_hours": 168,
+        "scorecard_failure_max_age_hours": 168
+      },
+      "soft_gate": {
+        "scale_min": 0,
+        "scale_max": 4,
+        "minimum_scores": {
+          "spec_coherence": 3,
+          "plant_idiomaticity": 3,
+          "test_depth": 3,
+          "traceability_quality": 3
+        },
+        "aggregation": "all-dimensions",
+        "max_age_hours": 24,
+        "future_tolerance_seconds": 0,
+        "require_independent_evaluator": true,
+        "require_completed_no_tool_mcp": true
+      }
+    }
+  ]
 }

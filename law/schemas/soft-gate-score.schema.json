@@ -162,5 +162,49 @@
       }
     }
   },
-  "description": "Separate fully required scored reply, not a widening of review-verdict. Each contained NFC source path and source-byte digest must resolve in the frozen context. Locations resolve to existing lines/anchors; line ranges must be increasing. PASS additionally requires verdict pass; review/fail block admission and unknown or invalid evidence is an evidence error even with four passing scores. Gate checks every dimension independently, actual host completion/isolation and all evidence bindings; confidence/rationale never substitute. Missing observations are an error, not score zero."
+  "description": "Separate fully required scored reply, not a widening of review-verdict. Each contained NFC source path and source-byte digest must resolve in the frozen context. Locations resolve to existing lines/anchors; line ranges must be increasing. PASS additionally requires verdict pass; review/fail block admission and unknown or invalid evidence is an evidence error even with four passing scores. Gate checks every dimension independently, actual host completion/isolation and all evidence bindings; confidence/rationale never substitute. Missing observations are an error, not score zero.",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "verdict": "pass",
+      "confidence": 0.82,
+      "rationale": "Every dimension criterion is observed and cited against the frozen candidate; no contradiction found.",
+      "scores": {
+        "spec_coherence": 3,
+        "plant_idiomaticity": 4,
+        "test_depth": 3,
+        "traceability_quality": 3
+      },
+      "citations": {
+        "spec_coherence": [
+          {
+            "path": "law/adr/ADR-MDL-0004-scored-soft-gate.md",
+            "location": "L41-L47",
+            "source_sha256": "0fc8146d0908e8a4f37e74d4ea3e2c2ed09c60daab71c9a6508848f71eae7d26"
+          }
+        ],
+        "plant_idiomaticity": [
+          {
+            "path": "packages/sensors/src/ci-invariant-gate.ts",
+            "location": "L110-L130",
+            "source_sha256": "c974e17b8e7321ce8c12983de3d0ed4a289821f579bbe0925b0181a4bc8e8d80"
+          }
+        ],
+        "test_depth": [
+          {
+            "path": "packages/schemas/tests/unit/soft-gate-schema.test.ts",
+            "location": "L42-L67",
+            "source_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+          }
+        ],
+        "traceability_quality": [
+          {
+            "path": "docs/dev/operations/open-issue-closure-campaign/ci-invariant-contract.md",
+            "location": "#threshold-binding",
+            "source_sha256": "cc8321d6375c494d043fdd0260f21bc0ec51dacc9f6abb7f909cdcd3041b78bf"
+          }
+        ]
+      }
+    }
+  ]
 }

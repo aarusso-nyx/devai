@@ -2,6 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://devai.nyxk.com.br/schemas/soft-gate-rubric.schema.json",
   "title": "Soft gate rubric",
+  "description": "The Architect-owned rubric the scored llm_judge mode of ADR-MDL-0004 gives the evaluator, separate from the generic review-verdict contract. It names the four soft dimensions spec_coherence, plant_idiomaticity, test_depth and traceability_quality, each with up to 32 deterministic criteria the evaluator must observe and cite, and fixes the meaning of every integer score level 0 to 4. Aggregation is all-dimensions: each dimension is compared independently with its minimum in thresholds.schema.json, and no average, confidence or mutation result substitutes for a low dimension. Level 0 means a demonstrated contradiction; a missing observation is an evidence error, never a zero. The canonical instance is law/policy/soft-gate-rubric.json, serialized under DEVAI-CANONICAL-JSON-V1, and soft-gate evidence binds its digest as rubric_sha256.",
   "schema_version": "1.0.0",
   "type": "object",
   "additionalProperties": false,
@@ -100,5 +101,43 @@
         }
       }
     }
-  }
+  },
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "id": "soft-gate-rubric",
+      "authority": "Architect",
+      "canonicalization": "DEVAI-CANONICAL-JSON-V1",
+      "aggregation": "all-dimensions",
+      "dimensions": {
+        "spec_coherence": [
+          "Resolve effective law and exact declared scope against the frozen candidate.",
+          "Show schema/contract/generated identities and refusal behavior remain coherent.",
+          "Cite concrete contradictions or their absence from checked artifacts."
+        ],
+        "plant_idiomaticity": [
+          "Use established typed operations and approved CLI/recipe boundaries.",
+          "Keep package ownership, effects, configuration and deterministic behavior idiomatic to this plant.",
+          "Cite the relevant existing seams and any divergence."
+        ],
+        "test_depth": [
+          "Check meaningful assertions and adversarial failures for the changed obligations.",
+          "Preserve existing cases/assertions and distinguish measured behavior from mocks or source-only evidence.",
+          "Cite behavior coverage, counterexamples and unresolved observation gaps."
+        ],
+        "traceability_quality": [
+          "Resolve actual source-comment invariant annotations to justified effective setpoints.",
+          "Verify discovered population, lifecycle and executable assertion count/digest bindings.",
+          "Cite precise authority, test and source identities; do not accept dummy IDs or broad semantic aliases."
+        ]
+      },
+      "score_levels": {
+        "0": "A demonstrated contradiction of a declared obligation.",
+        "1": "Multiple major criteria fail with concrete citations.",
+        "2": "A material criterion gap remains with concrete citations.",
+        "3": "Every dimension criterion is adequately observed and cited.",
+        "4": "Every criterion is adequately observed and independently corroborated through adversarial evidence."
+      }
+    }
+  ]
 }
