@@ -882,121 +882,136 @@ describe('raw threshold custody regressions (offline component)', () => {
     },
   );
   it('retains observed raw threshold bytes in the actual producer member and rejects parsed/projection substitution', async () => {
-    const { f, role, value, bytes } = rawThresholdFixture();
-    const gate = await verifier();
-    const host = offlineProducerHost(f);
-    expect(gate.verifySoftGateHostObservation(host).status).toBe('pass');
-    const rubric = JSON.parse(
-      required(f.input.members.get('effective_rubric.json')).toString('utf8'),
-    );
-    const boundInputs = { ...f.input.expected.boundInputs };
-    boundInputs.source_population_sha256 = hash(
-      canonical(
-        [...f.input.sourceFiles].map(([path, raw]) => ({
-          path,
-          byte_length: raw.length,
-          sha256: hash(raw),
-        })),
-      ),
-    );
-    boundInputs.configuration_sha256 = hash(host.configurationBytes);
-    boundInputs.inventory_sha256 = hash(
-      canonical({ tools: [], mcp_servers: [], hooks: [], plugins: [], agents: [] }),
-    );
-    boundInputs.host_help_sha256 = hash(host.hostHelp.stdout);
-    boundInputs.context_sha256 = hash(
-      canonical({ inheritedConversation: false, messages: [], agents: [] }),
-    );
-    const expected = {
-      ...f.input.expected,
-      producerControl: {
-        ...f.input.expected.producerControl,
-        executable_sha256: host.selectedControls.executableSha256,
-      },
-      boundInputs,
-    };
-    const reply = required(f.input.members.get('score_reply.json')).toString('utf8');
-    const args = {
-      envelope: {
-        operation: 'scored-llm-judge',
-        invocation_id: 'offline-invocation',
-        candidate: expected.candidate,
-        timeout_ms: 10000,
-        max_output_bytes: 1024 * 1024,
-        max_cost_usd: 0,
-        no_tools: true,
-        no_mcp: true,
-      },
-      client: {
-        family: 'codex-cli',
-        complete: async () => ({
-          text: reply,
-          finish_reason: 'stop',
-          usage: { input_tokens: 1, output_tokens: 1, cost_usd: 0 },
-          latency_ms: 1,
-          host_observation: host,
-        }),
-      },
-      observeHost: async (raw: unknown) => {
-        expect(raw).toBe(host);
-        return host;
-      },
-      signManifest: async (message: Uint8Array) =>
-        sign(null, Buffer.from(message), f.keys.privateKey),
-      expected,
-      rubric,
-      thresholds: value,
-      thresholdBytes: bytes,
-      sourceFiles: f.input.sourceFiles,
-      retainedInputs: new Map(),
-      createdAt: f.manifest.created_at,
-      invocationId: 'offline-invocation',
-    };
-    const { produceCiInvariantEvidence } = await import(
-      new URL('../../scripts/process/produce-ci-invariant-evidence.mjs', import.meta.url).href
-    );
-    // First establish the actual producer seam using independently selected compact raw bytes.
-    const compactBytes = canonical(value);
-    const compactExpected = {
-      ...expected,
-      boundInputs: { ...boundInputs, thresholds_sha256: hash(compactBytes) },
-    };
-    const compactControl = await produceCiInvariantEvidence({
-      ...args,
-      thresholdBytes: compactBytes,
-      expected: compactExpected,
-    });
-    expect(compactControl.reading.status).toBe('pass');
-    expect(compactControl.members.get(role)).toEqual(compactBytes);
-    const produced = await produceCiInvariantEvidence(args);
-    expect(produced.reading.status).toBe('pass');
-    expect(produced.members.get(role)).toEqual(bytes);
-    const manifest = JSON.parse(Buffer.from(produced.manifestBytes).toString('utf8'));
-    expect(manifest.bound_inputs.thresholds_sha256).toBe(hash(bytes));
-    expect(manifest.bound_inputs.thresholds_sha256).not.toBe(hash(canonical(value)));
-    f.trust.producer_control = { ...expected.producerControl };
-    f.trust.payload_sha256 = hash(produced.manifestBytes);
-    const payloadInput = { ...f.input, ...produced, expected, trustBytes: canonical(f.trust) };
-    const verified = gate.verifySoftGatePayload(payloadInput);
-    expect(verified.status).toBe('pass');
-    expect(
-      gate.consumeVerifiedSoftGatePayload({
-        verifiedPayload: verified,
-        trustBytes: payloadInput.trustBytes,
-        members: produced.members,
+    // The producer checks createdAt against the wall clock (24h window); pin only Date to the
+    // fixture's NOW so the case does not expire with real time. Timers stay real.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(NOW);
+    try {
+      const { f, role, value, bytes } = rawThresholdFixture();
+      const gate = await verifier();
+      const host = offlineProducerHost(f);
+      expect(gate.verifySoftGateHostObservation(host).status).toBe('pass');
+      const rubric = JSON.parse(
+        required(f.input.members.get('effective_rubric.json')).toString('utf8'),
+      );
+      const boundInputs = { ...f.input.expected.boundInputs };
+      boundInputs.source_population_sha256 = hash(
+        canonical(
+          [...f.input.sourceFiles].map(([path, raw]) => ({
+            path,
+            byte_length: raw.length,
+            sha256: hash(raw),
+          })),
+        ),
+      );
+      boundInputs.configuration_sha256 = hash(host.configurationBytes);
+      boundInputs.inventory_sha256 = hash(
+        canonical({ tools: [], mcp_servers: [], hooks: [], plugins: [], agents: [] }),
+      );
+      boundInputs.host_help_sha256 = hash(host.hostHelp.stdout);
+      boundInputs.context_sha256 = hash(
+        canonical({ inheritedConversation: false, messages: [], agents: [] }),
+      );
+      const expected = {
+        ...f.input.expected,
+        producerControl: {
+          ...f.input.expected.producerControl,
+          executable_sha256: host.selectedControls.executableSha256,
+        },
+        boundInputs,
+      };
+      const reply = required(f.input.members.get('score_reply.json')).toString('utf8');
+      const args = {
+        envelope: {
+          operation: 'scored-llm-judge',
+          invocation_id: 'offline-invocation',
+          candidate: expected.candidate,
+          timeout_ms: 10000,
+          max_output_bytes: 1024 * 1024,
+          max_cost_usd: 0,
+          no_tools: true,
+          no_mcp: true,
+        },
+        client: {
+          family: 'codex-cli',
+          complete: async () => ({
+            text: reply,
+            finish_reason: 'stop',
+            usage: { input_tokens: 1, output_tokens: 1, cost_usd: 0 },
+            latency_ms: 1,
+            host_observation: host,
+          }),
+        },
+        observeHost: async (raw: unknown) => {
+          expect(raw).toBe(host);
+          return host;
+        },
+        signManifest: async (message: Uint8Array) =>
+          sign(null, Buffer.from(message), f.keys.privateKey),
         expected,
-        now: payloadInput.now,
-      }).status,
-    ).toBe('pass');
-    // The valid raw control must succeed first; only then change the raw observation/parsed agreement.
-    await expect(
-      produceCiInvariantEvidence({ ...args, thresholdBytes: canonical(value) }),
-    ).rejects.toThrow('CI_EVIDENCE_PRODUCER_REFUSED');
-    await expect(
-      produceCiInvariantEvidence({ ...args, thresholdBytes: undefined }),
-    ).rejects.toThrow('CI_EVIDENCE_PRODUCER_REFUSED');
-    await expect(
-      produceCiInvariantEvidence({ ...args, thresholdBytes: Buffer.from('{}') }),
-    ).rejects.toThrow('CI_EVIDENCE_PRODUCER_REFUSED');
+        rubric,
+        thresholds: value,
+        thresholdBytes: bytes,
+        sourceFiles: f.input.sourceFiles,
+        retainedInputs: new Map(),
+        createdAt: f.manifest.created_at,
+        invocationId: 'offline-invocation',
+      };
+      const { produceCiInvariantEvidence } = await import(
+        new URL('../../scripts/process/produce-ci-invariant-evidence.mjs', import.meta.url).href
+      );
+      // First establish the actual producer seam using independently selected compact raw bytes.
+      const compactBytes = canonical(value);
+      const compactExpected = {
+        ...expected,
+        boundInputs: { ...boundInputs, thresholds_sha256: hash(compactBytes) },
+      };
+      const compactControl = await produceCiInvariantEvidence({
+        ...args,
+        thresholdBytes: compactBytes,
+        expected: compactExpected,
+      });
+      expect(compactControl.reading.status).toBe('pass');
+      expect(compactControl.members.get(role)).toEqual(compactBytes);
+      const produced = await produceCiInvariantEvidence(args);
+      expect(produced.reading.status).toBe('pass');
+      expect(produced.members.get(role)).toEqual(bytes);
+      const manifest = JSON.parse(Buffer.from(produced.manifestBytes).toString('utf8'));
+      expect(manifest.bound_inputs.thresholds_sha256).toBe(hash(bytes));
+      expect(manifest.bound_inputs.thresholds_sha256).not.toBe(hash(canonical(value)));
+      f.trust.producer_control = { ...expected.producerControl };
+      f.trust.payload_sha256 = hash(produced.manifestBytes);
+      const payloadInput = { ...f.input, ...produced, expected, trustBytes: canonical(f.trust) };
+      const verified = gate.verifySoftGatePayload(payloadInput);
+      expect(verified.status).toBe('pass');
+      expect(
+        gate.consumeVerifiedSoftGatePayload({
+          verifiedPayload: verified,
+          trustBytes: payloadInput.trustBytes,
+          members: produced.members,
+          expected,
+          now: payloadInput.now,
+        }).status,
+      ).toBe('pass');
+      // The valid raw control must succeed first; only then change the raw observation/parsed agreement.
+      await expect(
+        produceCiInvariantEvidence({ ...args, thresholdBytes: canonical(value) }),
+      ).rejects.toThrow('CI_EVIDENCE_PRODUCER_REFUSED');
+      await expect(
+        produceCiInvariantEvidence({ ...args, thresholdBytes: undefined }),
+      ).rejects.toThrow('CI_EVIDENCE_PRODUCER_REFUSED');
+      await expect(
+        produceCiInvariantEvidence({ ...args, thresholdBytes: Buffer.from('{}') }),
+      ).rejects.toThrow('CI_EVIDENCE_PRODUCER_REFUSED');
+      // The pinned clock keeps the freshness window effective at both edges.
+      await expect(
+        produceCiInvariantEvidence({ ...args, createdAt: '2026-10-01T09:59:59.999Z' }),
+      ).rejects.toThrow('CI_EVIDENCE_PRODUCER_REFUSED');
+      await expect(
+        produceCiInvariantEvidence({ ...args, createdAt: '2026-10-02T10:00:00.001Z' }),
+      ).rejects.toThrow('CI_EVIDENCE_PRODUCER_REFUSED');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
