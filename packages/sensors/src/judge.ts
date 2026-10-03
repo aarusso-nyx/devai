@@ -1,4 +1,4 @@
-import { extractStructuredReply } from '@devai-nyx/schemas';
+import { extractStructuredReply, getValidator } from '@devai-nyx/schemas';
 import {
   buildSensorReading,
   type FindingSeverity,
@@ -26,7 +26,7 @@ export interface JudgeLlmClient {
       readonly max_output_tokens?: number;
       readonly temperature?: number;
       readonly response_format_json?: boolean;
-      readonly response_schema?: 'review-verdict.schema.json';
+      readonly response_schema?: 'review-verdict.schema.json' | 'soft-gate-score.schema.json';
     },
   ): Promise<{
     readonly text: string;
@@ -44,6 +44,12 @@ export interface JudgeLlmClient {
 }
 
 export interface JudgeOptions {
+  /** Internal registered-emitter mode; no additional public CLI action or flag. */
+  readonly mode?: 'generic' | 'scored';
+  readonly scoredContext?: {
+    readonly thresholds: unknown;
+    readonly sourceFiles: Map<string, Uint8Array>;
+  };
   /** Aspect identifier, e.g. `coherence`, `idiomaticity`, `test_depth`. */
   readonly aspect: string;
   /** Rubric body. Required: tells the model what to evaluate against. */
@@ -88,6 +94,36 @@ export async function senseJudge(
   client: JudgeLlmClient,
 ): Promise<SensorReading> {
   const command = ['devai', 'sense', 'judge', opts.aspect];
+  let scoredRubric: unknown;
+  if (opts.mode === 'scored') {
+    try {
+      scoredRubric = JSON.parse(opts.rubric);
+    } catch {
+      scoredRubric = undefined;
+    }
+    if (
+      !getValidator('soft-gate-rubric.schema.json')(scoredRubric) ||
+      !getValidator('thresholds.schema.json')(opts.scoredContext?.thresholds) ||
+      !(opts.scoredContext?.sourceFiles instanceof Map)
+    ) {
+      return buildSensorReading({
+        sensorName: `judge.${opts.aspect}`,
+        sensorKind: 'llm_judge',
+        command,
+        status: 'error',
+        deterministic: false,
+        findings: [
+          {
+            severity: 'critical',
+            code: 'judge_invalid_scored_context',
+            message: 'Scored context must validate before invoking the evaluator.',
+          },
+        ],
+      });
+    }
+  }
+  const schema =
+    opts.mode === 'scored' ? 'soft-gate-score.schema.json' : 'review-verdict.schema.json';
   const system = [
     'You are a DEVAI soft-gate evaluator. Your job is to apply the rubric below to the evidence and emit a single JSON verdict.',
     '',
@@ -102,6 +138,11 @@ export async function senseJudge(
     '  "findings": [ { "severity": "info|warning|error|critical", "code": "...", "message": "..." } ]',
     '}',
     '',
+    ...(opts.mode === 'scored'
+      ? [
+          'Replace the generic format above with the fully required soft-gate-score.schema.json object: schemaVersion 1.0.0, verdict, confidence, rationale, scores and citations. Scores are independent integers 0..4 for spec_coherence, plant_idiomaticity, test_depth, traceability_quality. Cite each dimension using contained source path, existing line/anchor location and exact source_sha256. Missing observation is an error; score zero requires a cited demonstrated contradiction.',
+        ]
+      : []),
     'Return ONLY the JSON object. No markdown fences, no prose.',
   ].join('\n');
   const meta: Parameters<JudgeLlmClient['complete']>[1] = { caller: 'sense judge' };
@@ -113,12 +154,12 @@ export async function senseJudge(
   }
   const response = await client.complete({ system, user: opts.evidence }, meta, {
     temperature: 0.0,
-    response_schema: 'review-verdict.schema.json',
+    response_schema: schema,
   });
   // ADR-MDL-0001: one shared extractor, validated against review-verdict.schema.json.
   // A failure is an error reading with a bounded redacted excerpt and the reply digest;
   // `unknown` is only the model's explicit uncertainty, never a parse fallback.
-  const extracted = extractStructuredReply(response, 'review-verdict.schema.json');
+  const extracted = extractStructuredReply(response, schema);
   if (!extracted.ok) {
     return buildSensorReading({
       sensorName: `judge.${opts.aspect}`,
@@ -147,7 +188,18 @@ export async function senseJudge(
     });
   }
   const parsed = extracted.document as unknown as ReviewVerdict;
-  const verdict = parsed.verdict;
+  // The gate module keeps an optional top-level dependency load for bare site runners; it is
+  // loaded only on the scored path so generic judge consumers (and bundles) never await it.
+  const scored =
+    opts.mode === 'scored'
+      ? (await import('./ci-invariant-gate.js')).validateScoredSoftGate({
+          score: extracted.document,
+          thresholds: opts.scoredContext?.thresholds,
+          rubric: scoredRubric,
+          sourceFiles: opts.scoredContext?.sourceFiles,
+        })
+      : undefined;
+  const verdict = scored?.status ?? parsed.verdict;
   const findings: SensorFinding[] = [
     { severity: 'info', code: 'rationale', message: parsed.rationale },
     ...(parsed.findings ?? []).map((f) => ({
@@ -170,6 +222,15 @@ export async function senseJudge(
     metrics: {
       aspect_label: opts.aspect,
       confidence: parsed.confidence,
+      ...(opts.mode === 'scored'
+        ? {
+            reply_sha256: (await import('node:crypto'))
+              .createHash('sha256')
+              .update(response.text)
+              .digest('hex'),
+            score_projection: JSON.stringify(extracted.document),
+          }
+        : {}),
       input_tokens: response.usage.input_tokens,
       output_tokens: response.usage.output_tokens,
       cost_usd: response.usage.cost_usd,
