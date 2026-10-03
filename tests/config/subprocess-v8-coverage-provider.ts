@@ -126,9 +126,14 @@ export function mergeCanonicalHits(
 ): void {
   for (const filename of coverageMap.files()) {
     const current = coverageMap.fileCoverageFor(filename).toJSON() as FileCoverageData;
-    statementLocationHits(current, 'parent');
-    functionLocationHits(current, 'parent');
-    branchLocationHits(current, 'parent');
+    try {
+      statementLocationHits(current, 'parent');
+      functionLocationHits(current, 'parent');
+      branchLocationHits(current, 'parent');
+    } catch (error) {
+      // Name the source file: the location alone cannot be traced back after a full run.
+      throw new Error(`${(error as Error).message}: ${filename}`, { cause: error });
+    }
   }
 
   for (const filename of subprocessMap.files()) {
