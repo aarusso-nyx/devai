@@ -16,6 +16,11 @@
       "development": "./src/index.ts",
       "default": "./dist/index.js"
     },
+    "./ci-invariant-gate": {
+      "types": "./dist/ci-invariant-gate.d.ts",
+      "development": "./src/ci-invariant-gate.ts",
+      "default": "./dist/ci-invariant-gate.js"
+    },
     "./inventory-slices": {
       "types": "./dist/inventory-slices.d.ts",
       "development": "./src/inventory-slices.ts",
