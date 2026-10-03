@@ -78,6 +78,25 @@ interface ReviewVerdict {
 }
 
 /**
+ * The rationale and reported findings of a verdict. Kept synchronous and outside senseJudge:
+ * its conditional dynamic import gave this mapping two source-mapped branch entries under the
+ * merged RC coverage, which the exact-location merger rightly refuses.
+ */
+function verdictFindings(parsed: ReviewVerdict): SensorFinding[] {
+  const reported = parsed.findings === undefined ? [] : parsed.findings;
+  return [
+    { severity: 'info', code: 'rationale', message: parsed.rationale },
+    ...reported.map((f) => ({
+      severity: f.severity,
+      code: f.code,
+      message: f.message,
+      ...(f.file !== undefined && { file: f.file }),
+      ...(f.line !== undefined && { line: f.line }),
+    })),
+  ];
+}
+
+/**
  * Soft-gate LLM evaluator with an LLM-backed
  * implementation. The caller supplies an `LlmClient` instance (mock
  * in tests, Anthropic/Codex in production) and the rubric body; the
@@ -200,16 +219,7 @@ export async function senseJudge(
         })
       : undefined;
   const verdict = scored?.status ?? parsed.verdict;
-  const findings: SensorFinding[] = [
-    { severity: 'info', code: 'rationale', message: parsed.rationale },
-    ...(parsed.findings ?? []).map((f) => ({
-      severity: f.severity,
-      code: f.code,
-      message: f.message,
-      ...(f.file !== undefined && { file: f.file }),
-      ...(f.line !== undefined && { line: f.line }),
-    })),
-  ];
+  const findings = verdictFindings(parsed);
   return buildSensorReading({
     sensorName: `judge.${opts.aspect}`,
     sensorKind: 'llm_judge',
