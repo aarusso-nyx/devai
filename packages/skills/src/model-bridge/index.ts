@@ -29,6 +29,9 @@ export interface ModelBridgeOptions {
 
 /** Per-call request options. `response_schema` names the consumer's reply contract. */
 export interface ModelBridgeCallOptions {
+  /** Internal custodian bounds for this invocation. */
+  readonly timeout_ms?: number;
+  readonly max_output_bytes?: number;
   readonly max_output_tokens?: number;
   readonly temperature?: number;
   readonly response_format_json?: boolean;
@@ -102,6 +105,12 @@ function providerSchemaName(name: ReplySchemaName): string {
 }
 
 interface BridgeResponse extends StructuredReply {
+  readonly host_observation?: {
+    readonly argv: readonly string[];
+    readonly status: number;
+    readonly stdout: Uint8Array;
+    readonly stderr: Uint8Array;
+  };
   readonly text: string;
   readonly family: string;
   readonly model: string;
@@ -421,6 +430,9 @@ function cliResponse(
           '--ephemeral',
           '--sandbox',
           'read-only',
+          ...(call?.response_schema === 'soft-gate-score.schema.json'
+            ? ['--config', 'mcp_servers={}', '--config', 'tools={}']
+            : []),
           ...(schemaPath === undefined ? [] : ['--output-schema', schemaPath]),
           prompt,
         ];
@@ -428,8 +440,8 @@ function cliResponse(
   try {
     result = spawnSync(cli, argv, {
       encoding: 'utf8',
-      timeout: options.timeout_ms ?? 120_000,
-      maxBuffer: 32 * 1024 * 1024,
+      timeout: call?.timeout_ms ?? options.timeout_ms ?? 120_000,
+      maxBuffer: call?.max_output_bytes ?? 32 * 1024 * 1024,
     });
   } finally {
     if (schemaDir !== undefined) rmSync(schemaDir, { recursive: true, force: true });
@@ -440,6 +452,12 @@ function cliResponse(
     );
   }
   const stdout = String(result.stdout ?? '');
+  const hostObservation = {
+    argv: [...argv],
+    status: result.status ?? -1,
+    stdout: Buffer.from(stdout),
+    stderr: Buffer.from(String(result.stderr ?? '')),
+  };
   const events = hostEvents(stdout);
   const isolation = inventories(events);
   if (cli === 'claude') {
@@ -504,6 +522,7 @@ function cliResponse(
       },
       finish_reason: finish,
       latency_ms: Date.now() - started,
+      host_observation: hostObservation,
       ...(structured === undefined ? {} : { json: structured }),
       ...(isolation === undefined ? {} : { isolation }),
     };
@@ -609,6 +628,7 @@ function cliResponse(
     finish_reason:
       completed === 1 && finals.length === 1 && !failed && state.complete() ? 'stop' : 'error',
     latency_ms: Date.now() - started,
+    host_observation: hostObservation,
     ...(parsedJson(text, true) === undefined ? {} : { json: parsedJson(text, true) }),
     ...(projection === undefined ? {} : { projection }),
     ...(isolation === undefined ? {} : { isolation }),
@@ -625,6 +645,10 @@ export function createModelBridge(options: ModelBridgeOptions) {
       _meta: Readonly<Record<string, unknown>>,
       call?: ModelBridgeCallOptions,
     ): Promise<BridgeResponse> {
+      for (const bound of [call?.timeout_ms, call?.max_output_bytes]) {
+        if (bound !== undefined && (!Number.isSafeInteger(bound) || bound < 1))
+          throw new Error('MODEL_BRIDGE_INVOCATION_BOUND_INVALID');
+      }
       if (options.provider.endsWith('-cli'))
         return cliResponse(options, messages.system, messages.user, call);
       const started = Date.now();
@@ -652,7 +676,7 @@ export function createModelBridge(options: ModelBridgeOptions) {
               ? {}
               : { output_config: { format: { type: 'json_schema' as const, schema } } }),
           },
-          { timeout: options.timeout_ms ?? 120_000 },
+          { timeout: call?.timeout_ms ?? options.timeout_ms ?? 120_000 },
         );
         const text = response.content
           .map((part) => (part.type === 'text' ? part.text : ''))
@@ -700,7 +724,7 @@ export function createModelBridge(options: ModelBridgeOptions) {
               ? { response_format: { type: 'json_object' as const } }
               : {}),
         },
-        { timeout: options.timeout_ms ?? 120_000 },
+        { timeout: call?.timeout_ms ?? options.timeout_ms ?? 120_000 },
       );
       const text = response.choices[0]?.message.content ?? '';
       const projection = projectionIdentity(call?.response_schema, schema);

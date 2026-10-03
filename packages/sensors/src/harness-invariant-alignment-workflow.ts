@@ -48,7 +48,7 @@ function unquoteYamlScalar(value: string): string {
  * reader like workflow-parser.ts; adding a second YAML dependency just for
  * this sensor would be disproportionate.
  */
-function extractRunSteps(content: string): WorkflowRunStep[] {
+export function extractRunSteps(content: string): WorkflowRunStep[] {
   const lines = content.split('\n');
   const steps: WorkflowRunStep[] = [];
 

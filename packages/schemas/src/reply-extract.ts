@@ -14,7 +14,8 @@ import Ajv2020 from 'ajv/dist/2020.js';
 import { getValidator, loadSchema } from './index.js';
 
 /** The consumer-specific reply contracts the extractor reads against. */
-export type ReplySchemaName = 'review-verdict.schema.json' | 'triage-breaker.schema.json';
+export type ReplySchemaName =
+  'review-verdict.schema.json' | 'triage-breaker.schema.json' | 'soft-gate-score.schema.json';
 
 export type ReplyFinishReason = 'stop' | 'length' | 'tool_use' | 'error';
 

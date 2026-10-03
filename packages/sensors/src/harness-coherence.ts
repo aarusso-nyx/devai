@@ -5,7 +5,7 @@ import {
   type SensorReading,
   type SensorStatus,
 } from './sensor-reading.js';
-import { loadWorkflows } from './harness/workflow-parser.js';
+import { loadWorkflows, jobEffectFacts } from './harness/workflow-parser.js';
 
 /**
  * F5 harness coherence sensor (28.D; F5×T3). Per design note at
@@ -133,10 +133,49 @@ export function senseHarnessCoherence(opts: HarnessCoherenceOptions): SensorRead
   for (const workflow of workflows) {
     const declaration = concurrencyDeclaration(workflow.file);
     const serialize = requiresSerialization(workflow.relativeFile, workflow.file);
+    const jobs = workflow.jobs.map((job) => ({
+      ...job,
+      ...jobEffectFacts(readFileSync(workflow.file, 'utf8'), opts.repoRoot, job.name),
+    }));
+    const effectful = jobs.some((job) => job.effect !== 'read-only');
+    const jobLocks =
+      jobs.length > 0 &&
+      jobs.every((job) => {
+        const lock = job.concurrency;
+        if (job.effect === 'unknown' || !lock || !lock.group || lock.cancelInProgress === null)
+          return false;
+        if (job.effect === 'publication')
+          return (
+            lock.cancelInProgress === false &&
+            lock.group.toLowerCase() === 'devai-pages-publication'
+          );
+        return (
+          lock.cancelInProgress === !serialize && (serialize || lock.group.includes('github.ref'))
+        );
+      });
+    const aliases = jobs.some((a) =>
+      jobs.some(
+        (b) =>
+          a !== b &&
+          a.effect !== b.effect &&
+          a.concurrency?.group.toLowerCase() === b.concurrency?.group.toLowerCase(),
+      ),
+    );
+    const bypass = jobs.some(
+      (job) =>
+        job.effect === 'publication' &&
+        job.needs?.length &&
+        /\b(?:always|failure|cancelled)\s*\(/u.test(job.condition ?? ''),
+    );
     const valid =
-      declaration !== null &&
-      declaration.group.length > 0 &&
-      declaration.cancelInProgress === !serialize;
+      !aliases &&
+      !bypass &&
+      jobs.every((j) => j.effect !== 'unknown') &&
+      (declaration === null
+        ? jobLocks
+        : declaration.group.length > 0 &&
+          declaration.cancelInProgress === !(serialize || effectful) &&
+          (!effectful || declaration.cancelInProgress === false));
     if (valid) continue;
     concurrencySemanticIssues += 1;
     findings.push({
