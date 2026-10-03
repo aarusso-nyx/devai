@@ -556,9 +556,29 @@ describe('sense adapter deterministic boundaries', () => {
     }
   });
 
+  it('reads UNKNOWN for action-effect inference in a clean adopter (#254)', async () => {
+    const root = repository();
+    const clean = await sensorAdapter('action_effect_inference')({ repoRoot: root });
+    expect(clean).toMatchObject({
+      status: 'unknown',
+      findings: [
+        {
+          code: 'ACTION_EFFECT_INFERENCE_INPUT_MISSING',
+          message: expect.stringContaining(join(root, 'law/policy/subprocess-effects.json')),
+        },
+      ],
+    });
+    put(root, 'law/policy/subprocess-effects.json', { templates: [] });
+    const noProgram = await sensorAdapter('action_effect_inference')({ repoRoot: root });
+    expect(noProgram.findings?.[0]?.message).toContain(join(root, 'tsconfig.effects.json'));
+    expect(sensors.senseActionEffectInference).not.toHaveBeenCalled();
+  });
+
   it('loads action-effect and coverage inputs from exact resolved paths', async () => {
     const root = repository();
     put(root, 'policy/subprocess.json', { templates: [] });
+    put(root, 'tsconfig.x.json', {});
+    put(root, 'tsconfig.effects.json', {});
     const effectReading = { id: 'effect-reading' };
     sensors.senseActionEffectInference.mockResolvedValue({ reading: effectReading });
     expect(

@@ -8,6 +8,7 @@ authoritative for that invocation.
 
 | Code | Cause | Meaning | Remediation | Exit class |
 | --- | --- | --- | --- | --- |
+| `ACTION_EFFECT_INFERENCE_INPUT_MISSING` | action effect inference input missing | Stable diagnostic for action effect inference input missing. | Follow the structured envelope remediation and retry only after its condition is satisfied. | failure / 2 |
 | `ACTION_GATE_FAILED` | action gate failed | Stable diagnostic for action gate failed. | Follow the structured envelope remediation and retry only after its condition is satisfied. | failure / 2 |
 | `ACTION_INVOCATION_REFUSED` | action invocation refused | Stable diagnostic for action invocation refused. | Follow the structured envelope remediation and retry only after its condition is satisfied. | failure / 2 |
 | `ACTION_OUTPUT_CONTRACT_VIOLATION` | action output contract violation | Stable diagnostic for action output contract violation. | Follow the structured envelope remediation and retry only after its condition is satisfied. | failure / 2 |
