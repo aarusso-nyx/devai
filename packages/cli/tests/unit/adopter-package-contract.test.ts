@@ -968,6 +968,10 @@ describe('targeted dependency security floor', () => {
     expect(resolvedPackages).not.toMatch(/^ {2}fast-uri@3\.1\.[0-7]:/mu);
     expect(resolvedPackages).not.toMatch(/^ {2}brace-expansion@2\.1\.[0-6]:/mu);
     expect(resolvedPackages).not.toMatch(/^ {2}qs@6\.(?:[0-9]|1[0-5])\.\d+:/mu);
+    // #233: no patched braces or http-cache-semantics exists; neither may re-enter the tree.
+    expect(resolvedPackages).not.toMatch(/^ {2}braces@/mu);
+    expect(resolvedPackages).not.toMatch(/^ {2}http-cache-semantics@/mu);
+    expect(resolvedPackages).not.toMatch(/^ {2}libxmljs2@/mu);
     expect(resolvedPackages).toMatch(/^ {2}fast-uri@3\.1\.8:/mu);
     expect(resolvedPackages).toMatch(/^ {2}brace-expansion@1\.1\.21:/mu);
     expect(resolvedPackages).toMatch(/^ {2}brace-expansion@2\.1\.7:/mu);
