@@ -19,7 +19,12 @@ function client(capture: Capture): JudgeLlmClient {
       capture.options = { ...options };
       capture.system = messages.system;
       capture.user = messages.user;
-      const verdict = { verdict: 'pass', confidence: 0.9, rationale: 'fixture rationale', findings: [] };
+      const verdict = {
+        verdict: 'pass',
+        confidence: 0.9,
+        rationale: 'fixture rationale',
+        findings: [],
+      };
       return {
         text: JSON.stringify(verdict),
         json: verdict,

@@ -76,13 +76,13 @@ describe('every scored dimension is independently binding (offline)', () => {
     'resolves actual source locations rather than citation syntax alone: %s',
     (location) => {
       const value = input();
-      required(value.score.citations.spec_coherence[0]).location = location;
+      required(required(value.score.citations.spec_coherence)[0]).location = location;
       expect(validateScoredSoftGate(value).status).toBe('error');
     },
   );
   it('refuses source digest substitution and incomplete citation populations', () => {
     const value = input();
-    required(value.score.citations.test_depth[0]).source_sha256 = 'f'.repeat(64);
+    required(required(value.score.citations.test_depth)[0]).source_sha256 = 'f'.repeat(64);
     expect(validateScoredSoftGate(value).status).toBe('error');
     const absent = input();
     absent.score.citations.traceability_quality = [];

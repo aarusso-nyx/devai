@@ -2,7 +2,9 @@
 // ADR-REL-0034 IA-004/005: real journal reducer, offline approved-host controls.
 // These fixtures never authenticate a remote deployment or a live journal.
 import { describe, expect, it, vi } from 'vitest';
-const { publishPages } = await import('../../scripts/process/pages-publication.mjs');
+const { publishPages } = await import(
+  new URL('../../scripts/process/pages-publication.mjs', import.meta.url).href
+);
 const identity = () => ({
   repository: 'aarusso-nyx/devai',
   mode: 'site-only',
