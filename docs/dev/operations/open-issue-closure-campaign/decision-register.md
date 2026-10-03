@@ -84,3 +84,20 @@ trace failures, and escalate any genuine unresolved new behavior/risk choice.
 Live isolation, exact release intent/receipt binding, protected availability and
 independent DETRAN confirmation remain substantive preconditions; an authority
 record never supplies their missing evidence.
+
+## Owner reset and v1.9.0 descope (2026-10-03)
+
+The campaign stalled inside R-0602 for two days. The Owner handed it to a single
+coordinator, retired every per-task worktree and branch (archived under
+`refs/archive/2026-10-03/`), and ruled:
+
+- The remaining issues ship as plain fixes in one cumulative PR for v1.9.0, without
+  Architect/Inspector/Engineer triplets per issue.
+- The serialize-or-bound admission of unknown job effects (the INFO-013 route and its
+  ADR-REL-0034 amendment) is withdrawn; the coherence sensor keeps refusing unproved
+  effects. The positive-control twins are dropped with it.
+- The provider-free soft-gate step leaves the pull-request lane for v1.9.0; its scripts
+  stay for a later release, which must also settle the `DEVAI_SOFT_GATE_TRUST_JSON` variable.
+- Reply fixtures follow the strict ADR-MDL-0003 contract; a json body that disagrees with
+  the reply text is refused.
+- #237 (inventory) and the strict proof for #235 are deferred beyond v1.9.0.
