@@ -372,6 +372,9 @@ describe('serialized publisher admission of unknown effects (offline)', () => {
 // Real-repository pin: the literal amended rule over the repository's own workflows. The
 // environment- and secret-bearing unknown jobs of the release and ledger-verification workflows
 // satisfy neither ground, so those two workflows keep their finding (reported, not hidden).
+// Architect ruling F1(a) on the 2026-10-03 checkpoint review: ground 2 admits a bound job only
+// when its effective lock cancels it, so release.yml#control-commit-summary, bounded but held only
+// by release.yml's serialized (cancel-in-progress: false) workflow lock, is not admitted.
 describe('repository workflow coherence under the serialize-or-bound amendment', () => {
   it('admits exactly the bounded and serialized jobs and reports the remaining findings', () => {
     const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
@@ -381,7 +384,6 @@ describe('repository workflow coherence under the serialize-or-bound amendment',
       (reading.findings ?? []).filter((finding) => finding.code === code).sort(byMessage);
     expect(of(ADMITTED_CODE)).toEqual([
       admitted('pull-request-checks.yml', 'preflight', 'read-only-capability-bound'),
-      admitted('release.yml', 'control-commit-summary', 'read-only-capability-bound'),
       admitted('site-publish.yml', 'prepare-site', 'read-only-capability-bound'),
       admitted('site-publish.yml', 'publish-site', 'serialized-publisher'),
     ]);
@@ -406,7 +408,7 @@ describe('repository workflow coherence under the serialize-or-bound amendment',
         message: '3 workflows declare concurrency, 1 do not.',
       },
     ]);
-    expect(reading.findings).toHaveLength(7);
+    expect(reading.findings).toHaveLength(6);
     expect(reading.metrics).toEqual({
       workflow_count: 4,
       action_version_drift_count: 0,
@@ -415,7 +417,7 @@ describe('repository workflow coherence under the serialize-or-bound amendment',
       concurrency_semantic_issues: 2,
       incoherence_score: 2,
       max_review_incoherence: 3,
-      unproved_effect_admitted: 4,
+      unproved_effect_admitted: 3,
     });
     expect(reading.status).toBe('review');
   });

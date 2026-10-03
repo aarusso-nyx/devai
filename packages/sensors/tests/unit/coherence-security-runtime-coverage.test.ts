@@ -1421,4 +1421,98 @@ describe('read-only capability bound admission of unknown effects (offline)', ()
     expect(reading.metrics?.concurrency_semantic_issues).toBe(1);
     expect(reading.metrics?.unproved_effect_admitted).toBe(1);
   });
+
+  // Architect ruling F1(a)/F2 on the 2026-10-03 checkpoint review: ground 2 admits a bound job
+  // only when its effective lock cancels it (job- or workflow-level cancel-in-progress: true).
+  const JOB_LOCK = `    concurrency:\n      group: inspect-${'${{ github.ref }}'}\n      cancel-in-progress: true\n`;
+  it.each([
+    ['no concurrency at all', (s: string) => replaced(s, JOB_LOCK, '')],
+    [
+      'a workflow-level cancel-in-progress: false lock',
+      (s: string) =>
+        replaced(
+          replaced(s, JOB_LOCK, ''),
+          'jobs:\n',
+          `concurrency:\n  group: bounded-${'${{ github.ref }}'}\n  cancel-in-progress: false\njobs:\n`,
+        ),
+    ],
+    [
+      'a job-level cancel-in-progress: false lock',
+      (s: string) =>
+        replaced(
+          s,
+          JOB_LOCK,
+          JOB_LOCK.replace('cancel-in-progress: true', 'cancel-in-progress: false'),
+        ),
+    ],
+  ] as const)(
+    'refuses a bound job with %s after the cancellable control is admitted',
+    (_n, mutate) => {
+      const root = boundRoot();
+      expectAdmitted(sense(root, BOUNDED), 'bounded.yml', 'inspect', 'read-only-capability-bound');
+      expectRefused(sense(root, mutate(BOUNDED)));
+    },
+  );
+
+  // Architect ruling F3: a local reusable call that resolves is admitted only when the callee
+  // itself keeps the bound. The callee is an unknown-effect workflow of its own, so it is sensed
+  // (and admitted or refused) beside its caller.
+  function callee(extra: string): string {
+    return [
+      'name: callee',
+      'on:',
+      '  workflow_call: {}',
+      'permissions:',
+      '  contents: read',
+      'jobs:',
+      '  check:',
+      '    runs-on: ubuntu-latest',
+      `${extra}    concurrency:`,
+      `      group: check-${'${{ github.ref }}'}`,
+      '      cancel-in-progress: true',
+      '    steps:',
+      '      - run: node scripts/unproved.mjs',
+      '',
+    ].join('\n');
+  }
+  function calleePolicy(file: string): SensorFinding {
+    return { ...BOUND_POLICY, message: BOUND_POLICY.message.replace('bounded.yml', file) };
+  }
+  it.each([
+    ['an environment', '    environment: ci\n'],
+    ['job-level contents: write', '    permissions:\n      contents: write\n'],
+  ] as const)(
+    'refuses a resolved reusable call whose callee has %s after the bounded callee is admitted',
+    (_n, extra) => {
+      const root = boundRoot();
+      const call = BOUNDED.slice(0, BOUNDED.indexOf(JOB_HEAD)).concat(
+        `  inspect:\n${JOB_LOCK}    uses: ./.github/workflows/callee.yml\n`,
+      );
+      const byMessage = (a: SensorFinding, b: SensorFinding) => a.message.localeCompare(b.message);
+      const calleeFile = write(root, '.github/workflows/callee.yml', callee(''));
+      expect(jobEffectFacts(readFileSync(calleeFile, 'utf8'), root, 'check').effect).toBe(
+        'unknown',
+      );
+      const control = sense(root, call);
+      expect(control.status).toBe('pass');
+      expect([...findings(control)].sort(byMessage)).toEqual([
+        admittedFinding('bounded.yml', 'inspect', 'read-only-capability-bound'),
+        admittedFinding('callee.yml', 'check', 'read-only-capability-bound'),
+      ]);
+      expect(control.metrics?.concurrency_semantic_issues).toBe(0);
+      expect(control.metrics?.unproved_effect_admitted).toBe(2);
+      write(root, '.github/workflows/callee.yml', callee(extra));
+      expect(jobEffectFacts(readFileSync(calleeFile, 'utf8'), root, 'check').effect).toBe(
+        'unknown',
+      );
+      const rejected = sense(root, call);
+      expect(rejected.status).toBe('review');
+      expect([...findings(rejected)].sort(byMessage)).toEqual([
+        calleePolicy('bounded.yml'),
+        calleePolicy('callee.yml'),
+      ]);
+      expect(rejected.metrics?.concurrency_semantic_issues).toBe(2);
+      expect(rejected.metrics?.unproved_effect_admitted).toBe(undefined);
+    },
+  );
 });
