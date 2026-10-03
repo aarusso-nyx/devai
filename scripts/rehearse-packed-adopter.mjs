@@ -18,12 +18,13 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   renameSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Ajv2020 from 'ajv/dist/2020.js';
 import addFormats from 'ajv-formats';
@@ -33,6 +34,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const CLI_PACKAGE = join(ROOT, 'packages/cli');
 const STORE = '.devai/state/sensor-readings';
 const LEGACY_STORE = 'record/proofs/freshness/readings';
+const SENSE_RECORD_FILES = new Set(['record/proofs/chain.json']);
 const RECORDED_KIND = 'inventory_api';
 const CELL = { substrate: 'F4', property: 'T1' };
 const FOUR_KINDS = [
@@ -473,11 +475,25 @@ function checkLegacyStore() {
   } catch {
     // absent
   }
+  // ADR-SCR-0008: `sense record` appends its chain entry to record/proofs/chain.json, so that
+  // file is the only content record/ may hold; any other path is a legacy store artifact.
+  const unexpected = filesUnder(join(fixture, 'record'))
+    .map((path) => relative(fixture, path).split(sep).join('/'))
+    .filter((path) => !SENSE_RECORD_FILES.has(path));
   record(
     'store:legacy-absent',
     'RELEASE_PACKED_ADOPTER_LEGACY_STORE_PRESENT',
-    !present && !existsSync(join(fixture, 'record')),
+    !present && unexpected.length === 0,
+    unexpected.length === 0 ? undefined : unexpected.join(', '),
   );
+}
+
+function filesUnder(path) {
+  if (!existsSync(path)) return [];
+  return readdirSync(path, { withFileTypes: true }).flatMap((entry) => {
+    const child = join(path, entry.name);
+    return entry.isDirectory() ? filesUnder(child) : [child];
+  });
 }
 
 let exitCode = 0;
