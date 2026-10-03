@@ -400,7 +400,7 @@ describe('Doctor whole CheckResult identities', () => {
               {
                 "actual_sha256": "missing",
                 "file": "thresholds.json",
-                "installed_sha256": "108c575a9b1c83683e97862faefc0058c2c45696d36603a59b26e8e644d7c8d5",
+                "installed_sha256": "4662c41fbbce00db9e887be3f44f7f799e9bee587cb74dccb86e68eca3e4e9f4",
                 "target": "<repo>/.devai/config/thresholds.json",
               },
               {
@@ -927,7 +927,7 @@ describe('Doctor whole CheckResult identities', () => {
             "mismatches": [
               {
                 "actual_sha256": "unreadable",
-                "expected_sha256": "d150313685cf52102171e15927b00549d976879ccd6edada60c58e7753cb24f7",
+                "expected_sha256": "fbb25154918b5faffe9f57a24ad8ca4c3d95d2f62e507b4fffbfd21f9af12c55",
                 "file": ".devai/config/thresholds.json",
               },
             ],
