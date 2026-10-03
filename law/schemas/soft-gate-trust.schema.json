@@ -160,5 +160,45 @@
       "format": "date-time"
     }
   },
-  "description": "Independently controlled DEVAI_SOFT_GATE_TRUST_JSON snapshot, never accepted from candidate law/config/fixture. Round-trip canonical base64 DER SPKI must be an Ed25519 public key, key_id hashes decoded DER, signature exactly64raw bytes. Compare all candidate/control/agent/evaluator bindings and manifest identity; selected_at/created_at must not be future and expiration/freshness must hold. Custodian/evaluator independence is externally established, not a worker self-assertion. Preserve one frozen snapshot through opaque verified-byte consumption or fully reverify before use."
+  "description": "Independently controlled DEVAI_SOFT_GATE_TRUST_JSON snapshot, never accepted from candidate law/config/fixture. Round-trip canonical base64 DER SPKI must be an Ed25519 public key, key_id hashes decoded DER, signature exactly64raw bytes. Compare all candidate/control/agent/evaluator bindings and manifest identity; selected_at/created_at must not be future and expiration/freshness must hold. Custodian/evaluator independence is externally established, not a worker self-assertion. Preserve one frozen snapshot through opaque verified-byte consumption or fully reverify before use.",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "repository": "aarusso-nyx/devai",
+      "evidence_commit": "6693a11bb837d2a4afb324b0aecc72fb906edcc5",
+      "payload_sha256": "ca68880b85e92c75bc7b2270aee567bd5e47e607daeb17d96bf1505084dac0f5",
+      "candidate": {
+        "commit": "266ec841a313476ea6cf2d7e453e490ae0585e54",
+        "tree": "f9ca3359d542ad621650fd968193e97051f56afb",
+        "base_commit": "1405df66cbe219b0bf6355bc3d60361a8376b6b4"
+      },
+      "producer_control": {
+        "commit": "2aeede80be6f6dfc0aa4d1cbd6487e24e27a81be",
+        "tree": "510a60fe2e547b9e7dc3eb752ffda90ce84044f5",
+        "executable_sha256": "ed1b0205387c3895111f4f2dab40e302abd3d2fedea24b728ec306014a064186"
+      },
+      "working_agent": {
+        "agent_id": "engineer-ctg-0662",
+        "session_id": "session-worker-0001",
+        "process_instance_id": "proc-worker-4711",
+        "host": "claude",
+        "model": "claude-opus-5-5"
+      },
+      "custodian_id": "central-soft-gate-custodian",
+      "evaluator_identity": {
+        "agent_id": "soft-gate-evaluator",
+        "session_id": "session-eval-0002",
+        "process_instance_id": "proc-eval-4712",
+        "host": "codex",
+        "model": "gpt-5-codex"
+      },
+      "public_key_spki_der_base64": "MCowBQYDK2VwAyEA6D1pdKQsSxC40ks0Wk1ORiJKIRJ3RiWwq4w5uLUf+Pk=",
+      "key_id": "2726d4f7c5edcb4a8efed7dfa2abc37a637b6288d31fe31ee94af773ebe018f3",
+      "algorithm": "Ed25519",
+      "canonicalization": "DEVAI-CANONICAL-JSON-V1",
+      "signature_domain": "DEVAI-SOFT-GATE-EVIDENCE-V1",
+      "selected_at": "2026-10-02T14:20:00Z",
+      "expires_at": "2026-10-03T14:05:31Z"
+    }
+  ]
 }

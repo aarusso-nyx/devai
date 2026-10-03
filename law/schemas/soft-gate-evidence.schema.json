@@ -310,5 +310,118 @@
       }
     }
   },
-  "description": "Unsigned canonical manifest: lists payload only, excluding manifest.json/signature.ed25519 and excluding its own digest/evidence-commit identity. Members must be unique NFC contained sorted paths with total bytes <=32MiB; roles each resolve to exactly one listed member. Complete host envelope and exact selected reply bytes are distinct; selected reply digest is over unchanged adapter bytes, score projection digest is separately canonicalized. No completed/isolated/verified declaration establishes observation. External trust binds computed manifest digest and immutable evidence commit after signing."
+  "description": "Unsigned canonical manifest: lists payload only, excluding manifest.json/signature.ed25519 and excluding its own digest/evidence-commit identity. Members must be unique NFC contained sorted paths with total bytes <=32MiB; roles each resolve to exactly one listed member. Complete host envelope and exact selected reply bytes are distinct; selected reply digest is over unchanged adapter bytes, score projection digest is separately canonicalized. No completed/isolated/verified declaration establishes observation. External trust binds computed manifest digest and immutable evidence commit after signing.",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "canonicalization": "DEVAI-CANONICAL-JSON-V1",
+      "signature_domain": "DEVAI-SOFT-GATE-EVIDENCE-V1",
+      "repository": "aarusso-nyx/devai",
+      "candidate": {
+        "commit": "266ec841a313476ea6cf2d7e453e490ae0585e54",
+        "tree": "f9ca3359d542ad621650fd968193e97051f56afb",
+        "base_commit": "1405df66cbe219b0bf6355bc3d60361a8376b6b4"
+      },
+      "producer_control": {
+        "commit": "2aeede80be6f6dfc0aa4d1cbd6487e24e27a81be",
+        "tree": "510a60fe2e547b9e7dc3eb752ffda90ce84044f5",
+        "executable_sha256": "ed1b0205387c3895111f4f2dab40e302abd3d2fedea24b728ec306014a064186"
+      },
+      "working_agent": {
+        "agent_id": "engineer-ctg-0662",
+        "session_id": "session-worker-0001",
+        "process_instance_id": "proc-worker-4711",
+        "host": "claude",
+        "model": "claude-opus-5-5"
+      },
+      "evaluator": {
+        "agent_id": "soft-gate-evaluator",
+        "session_id": "session-eval-0002",
+        "process_instance_id": "proc-eval-4712",
+        "host": "codex",
+        "model": "gpt-5-codex"
+      },
+      "created_at": "2026-10-02T14:05:31Z",
+      "invocation_id": "oe-04-soft-gate-0001",
+      "bound_inputs": {
+        "source_population_sha256": "b0bdbabd3ae3645cec485c92a532099b71b810d8a4ef9dcf210cd244a70ce0be",
+        "lockfile_population_sha256": "c40750b5fc6e15bf4d0dcf68f9b7dc5982566edd20fe6fd3890f833cbd21620c",
+        "toolchain_sha256": "7a5b03472090ee1e916c2e542cdf0d7a5f815d1adc76b42f68f874334266308a",
+        "task_roster_sha256": "880c835d63f1a49b10ff2e2c792e5d384c5079e9931610102d739a53b3807863",
+        "context_sha256": "4169af1adafb0f00741cec4fd3eb348134276b597921607cebe55d4dc2fa4f9d",
+        "rubric_sha256": "e126072ac55777c1387075290bd5d2af6a67785217a2f4e57d87e0ad3026983d",
+        "thresholds_sha256": "72e96c20b7fa82a4a533bebe49e896e8fa276e1a9088cac82e17a51df953e121",
+        "configuration_sha256": "c1ade61bbfc126e289659ec692ce9c3c3768199dfd041e3d454c9566cd35e349",
+        "inventory_sha256": "5811a1b1f75677dbeb924664e6d49b03166cf222735df4136dee13f2a17702a2",
+        "host_help_sha256": "3fae37b455ae01139e87fbd6a1025d33c6f8d2ce52e9dc729a37515ef5ebefcd"
+      },
+      "reply_sha256": "5417651b7412bbdb37a221a61588c95f765881da5c6f7d62900ce93a6f788c79",
+      "host_envelope_sha256": "e9e7f1eb28f7484831249a3be65d55cb32a8b92d5686de8871f42fc5d112ffbb",
+      "score_projection_sha256": "92865cfdbd68fbf2dc884310feccab1fcc65745a69e7f7a2295d4076e1fa813d",
+      "payload_roles": {
+        "score_reply": "score-reply.json",
+        "host_envelope": "host-envelope.jsonl",
+        "configuration_observation": "observations/configuration.json",
+        "inventory_observation": "observations/inventory.json",
+        "host_help_observation": "observations/host-help.txt",
+        "context_inventory": "context/inventory.json",
+        "effective_rubric": "context/soft-gate-rubric.json",
+        "effective_thresholds": "context/thresholds.json",
+        "control_observation": "observations/control.json",
+        "invocation_envelope": "invocation-envelope.json"
+      },
+      "members": [
+        {
+          "path": "context/inventory.json",
+          "byte_length": 20480,
+          "sha256": "8e9ee28a0449d8ffcad13d64ca47fff9c80bafc647142789b17b7a53671c9787"
+        },
+        {
+          "path": "context/soft-gate-rubric.json",
+          "byte_length": 1693,
+          "sha256": "ecd13db9dcaa7dd160db306f548885ae6906aef6520e9a193bf7095917f6a35f"
+        },
+        {
+          "path": "context/thresholds.json",
+          "byte_length": 744,
+          "sha256": "e3554cdbdeeb41c6d6bc09b3d7e8b35f1e9e2fcae36f8b675e77f11c7a288067"
+        },
+        {
+          "path": "host-envelope.jsonl",
+          "byte_length": 48213,
+          "sha256": "e9e7f1eb28f7484831249a3be65d55cb32a8b92d5686de8871f42fc5d112ffbb"
+        },
+        {
+          "path": "invocation-envelope.json",
+          "byte_length": 2048,
+          "sha256": "54c83947b699cfb06e5845218e9bbae2f5faf52d5e3e44f0f4ec25566e75acc6"
+        },
+        {
+          "path": "observations/configuration.json",
+          "byte_length": 912,
+          "sha256": "e291407024b34fc68fe9b5002d5daf65745838967851556cebbca0ea49b88857"
+        },
+        {
+          "path": "observations/control.json",
+          "byte_length": 1310,
+          "sha256": "961cb25574d9df1626d2af0e2c18f5f0721d4ab749d1fb6d5196c0716b665104"
+        },
+        {
+          "path": "observations/host-help.txt",
+          "byte_length": 5120,
+          "sha256": "b61b8199365e1a48f867fbdf0be3b9c2be3dccd253f4a4b81ca372f73f928fa4"
+        },
+        {
+          "path": "observations/inventory.json",
+          "byte_length": 640,
+          "sha256": "adecaf9c9eb201dc394eada6173aee6733578e3e454c24ecf50ca94c5db61ce7"
+        },
+        {
+          "path": "score-reply.json",
+          "byte_length": 1874,
+          "sha256": "5417651b7412bbdb37a221a61588c95f765881da5c6f7d62900ce93a6f788c79"
+        }
+      ]
+    }
+  ]
 }
