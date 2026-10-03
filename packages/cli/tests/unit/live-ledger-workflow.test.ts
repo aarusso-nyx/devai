@@ -1030,8 +1030,8 @@ describe('remote preflight workflow', () => {
       name: 'remote execution of the attested RC closure',
       mutate: (source: string) =>
         source.replace(
-          'run: pnpm run release:pr-gate -- "$DEVAI_PREFLIGHT_BASE"',
-          'run: pnpm run test:coverage:rc',
+          '          pnpm run release:pr-gate -- "$DEVAI_PREFLIGHT_BASE"\n',
+          '          pnpm run test:coverage:rc\n',
         ),
       diagnostic: 'CI_PREFLIGHT_ATTESTED_CLOSURE_FORBIDDEN',
     },
