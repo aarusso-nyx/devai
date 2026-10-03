@@ -117,7 +117,8 @@ function recordingBreaker(reply: {
       });
       if (reply.reject !== undefined) return Promise.reject(reply.reject);
       return Promise.resolve({
-        text: reply.text ?? '',
+        // ADR-MDL-0003: a provider json body must agree with the selected reply text.
+        text: reply.text ?? (reply.json === undefined ? '' : JSON.stringify(reply.json)),
         family: reply.family ?? 'independent',
         model: reply.model ?? 'breaker-fixture',
         usage: { input_tokens: 12, output_tokens: 8, cost_usd: 0.0001 },
@@ -818,7 +819,7 @@ describe('Article-23 ladder response handling', () => {
     expectSchemaConformant(result);
   });
 
-  it('prefers the structured json body over a conflicting text body', async () => {
+  it('refuses a structured json body that disagrees with the text body (ADR-MDL-0003)', async () => {
     const { first, second } = disagreeingPair();
     const client = recordingBreaker({
       json: { classification: 'sensor_error', confidence: 0.99, rationale: 'adapter crashed' },
@@ -832,7 +833,8 @@ describe('Article-23 ladder response handling', () => {
       timestamp: TIMESTAMP,
     });
 
-    expect(result.classification).toBe('sensor_error');
+    expect(result.classification).toBe('inconclusive');
+    expect(result.recommended_route.action).toBe('escalate_to_human');
   });
 
   it('escalates when a json array carries no classification', async () => {

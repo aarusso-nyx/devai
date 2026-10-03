@@ -214,6 +214,8 @@ function client(response: Record<string, unknown>): JudgeLlmClient {
         usage: { input_tokens: 2, output_tokens: 3, cost_usd: 0.1 },
         finish_reason: 'stop',
         latency_ms: 4,
+        // ADR-MDL-0003: a provider json body must agree with the selected reply text.
+        ...('json' in response && !('text' in response) ? { text: JSON.stringify(response['json']) } : {}),
         ...response,
       }) as Awaited<ReturnType<JudgeLlmClient['complete']>>,
   };
