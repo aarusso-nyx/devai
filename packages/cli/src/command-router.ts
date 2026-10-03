@@ -99,17 +99,30 @@ export function invocationIsNonMutating(internalName: string, args: readonly str
 
 /**
  * ADR-SCR-0011: refuse `sense run` before any sensor starts when the selected kind, or any
- * member of the selected preset, is declared `schema_admission: "unsupported"`.
+ * member of the selected preset, is declared `schema_admission: "unsupported"`. An inline
+ * `--preset=` token is refused first as an invalid selection (#252).
  */
 function schemaAdmissionRefusal(
   args: readonly string[],
   registry: Pick<SensorRegistry, 'entries'>,
 ): RouteResult | undefined {
   if (args[0] !== 'sense' || args[1] !== 'run') return undefined;
+  // #252 (Owner decision 2026-10-01): the inline `--preset=<name>` form is unsupported. Any
+  // inline token invalidates the selection before schema membership is examined.
+  const inline = args.find((arg) => arg.startsWith('--preset='));
+  if (inline !== undefined && !args.includes('--help') && !args.includes('-h')) {
+    const error = cliError({
+      code: 'SENSE_SELECTION_INVALID',
+      class: 'routing-authority',
+      exit: 2,
+      message: `Sense selection is invalid: the inline ${inline} form is unsupported.`,
+      remediation: 'Select a preset with the separated form --preset <name>.',
+      context: { token: inline },
+    });
+    return { kind: 'output', text: renderCliError(error, wantsJson(args)), exitCode: 2 };
+  }
   const positional = args[2] !== undefined && !args[2].startsWith('-') ? args[2] : undefined;
-  const presetName =
-    flagValue(args, '--preset') ??
-    args.find((arg) => arg.startsWith('--preset='))?.slice('--preset='.length);
+  const presetName = flagValue(args, '--preset');
   const selected = [
     ...(positional === undefined ? [] : [positional]),
     ...(presetName === undefined ? [] : (sensePreset(presetName)?.members ?? [])),

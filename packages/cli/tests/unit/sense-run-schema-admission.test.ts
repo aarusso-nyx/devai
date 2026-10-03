@@ -81,20 +81,44 @@ describe('ADR-SCR-0011 IA-005: sense run refuses a schema-unsupported kind befor
     expect(readingsWritten(root)).toEqual([]);
   });
 
-  it.each([
-    [['--preset', 'sweep', '--round', 'R-0001']],
-    [['--preset=sweep', '--round', 'R-0001']],
-  ])('refuses the sweep preset %j that selects the marked kind', (selector) => {
-    const root = makeRoot();
-    const envelope = refusal(route([...selector, '--repo-root', root, '--format', 'json'], marked));
+  it.each([[['--preset', 'sweep', '--round', 'R-0001']]])(
+    'refuses the sweep preset %j that selects the marked kind',
+    (selector) => {
+      const root = makeRoot();
+      const envelope = refusal(
+        route([...selector, '--repo-root', root, '--format', 'json'], marked),
+      );
 
-    expect(envelope.code).toBe('SENSOR_KIND_SCHEMA_UNSUPPORTED');
-    expect(envelope.exit).toBe(2);
-    expect(envelope.context).toEqual({ kinds: ['inventory_api'], preset: 'sweep' });
-    expect(envelope).not.toHaveProperty('result');
-    expect(JSON.stringify(envelope)).not.toMatch(/SR-[a-f0-9]{16}/u);
-    expect(mocks.sensorAdapter).not.toHaveBeenCalled();
-    expect(readingsWritten(root)).toEqual([]);
+      expect(envelope.code).toBe('SENSOR_KIND_SCHEMA_UNSUPPORTED');
+      expect(envelope.exit).toBe(2);
+      expect(envelope.context).toEqual({ kinds: ['inventory_api'], preset: 'sweep' });
+      expect(envelope).not.toHaveProperty('result');
+      expect(JSON.stringify(envelope)).not.toMatch(/SR-[a-f0-9]{16}/u);
+      expect(mocks.sensorAdapter).not.toHaveBeenCalled();
+      expect(readingsWritten(root)).toEqual([]);
+    },
+  );
+
+  // #252: selection and admission agree; every inline token is one selection refusal.
+  it.each([
+    [['--preset=sweep', '--round', 'R-0001']],
+    [['--preset=unknown-name']],
+    [['--preset=']],
+    [['inventory_api', '--preset=sweep']],
+    [['--preset', 'sweep', '--preset=sweep', '--round', 'R-0001']],
+    [['--preset=sweep', '--dry-run']],
+  ])('refuses the inline preset token in %j as an invalid selection', (selector) => {
+    for (const registry of [marked, registryMarking(undefined)]) {
+      const root = makeRoot();
+      const envelope = refusal(
+        route([...selector, '--repo-root', root, '--format', 'json'], registry),
+      );
+      expect(envelope.code).toBe('SENSE_SELECTION_INVALID');
+      expect(envelope.exit).toBe(2);
+      expect(envelope).not.toHaveProperty('result');
+      expect(mocks.sensorAdapter).not.toHaveBeenCalled();
+      expect(readingsWritten(root)).toEqual([]);
+    }
   });
 
   it('does not refuse an admitted kind in the registry that marks another', () => {
