@@ -5,7 +5,7 @@ import {
   type SensorReading,
   type SensorStatus,
 } from './sensor-reading.js';
-import { loadWorkflows, jobEffectFacts } from './harness/workflow-parser.js';
+import { listWorkflowFiles, loadWorkflows, jobEffectFacts } from './harness/workflow-parser.js';
 
 /**
  * F5 harness coherence sensor (28.D; F5×T3). Per design note at
@@ -57,8 +57,19 @@ export function senseHarnessCoherence(opts: HarnessCoherenceOptions): SensorRead
   const maxReview = opts.maxReviewIncoherence ?? DEFAULT_MAX_REVIEW;
   const workflows = loadWorkflows(opts.repoRoot, opts.workflowDir);
   const findings: SensorFinding[] = [];
+  // Fail closed: a listed workflow the loader could not read is never silently dropped.
+  const loaded = new Set(workflows.map((workflow) => workflow.file));
+  const unreadable = listWorkflowFiles(opts.repoRoot, opts.workflowDir).filter(
+    (file) => !loaded.has(file),
+  );
+  for (const file of unreadable)
+    findings.push({
+      severity: 'error',
+      code: 'HARNESS_COHERENCE_WORKFLOW_UNREADABLE',
+      message: `${file} could not be read; its concurrency coherence is unproved.`,
+    });
 
-  if (workflows.length === 0) {
+  if (workflows.length === 0 && unreadable.length === 0) {
     return buildSensorReading({
       sensorName: 'harness-coherence',
       sensorKind: 'harness_coherence',
@@ -185,7 +196,7 @@ export function senseHarnessCoherence(opts: HarnessCoherenceOptions): SensorRead
     });
   }
 
-  const incoherence = driftCount + permissionsMixed + concurrencySemanticIssues;
+  const incoherence = driftCount + permissionsMixed + concurrencySemanticIssues + unreadable.length;
   let status: SensorStatus;
   if (incoherence === 0) status = 'pass';
   else if (incoherence <= maxReview) status = 'review';
@@ -202,6 +213,7 @@ export function senseHarnessCoherence(opts: HarnessCoherenceOptions): SensorRead
     findings,
     metrics: {
       workflow_count: workflows.length,
+      ...(unreadable.length === 0 ? {} : { unreadable_workflows: unreadable.length }),
       action_version_drift_count: driftCount,
       permissions_mixed: permissionsMixed,
       concurrency_mixed: concurrencyMixed,

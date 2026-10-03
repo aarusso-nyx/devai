@@ -141,21 +141,48 @@ function sameSourceIdentity(a: Stats, b: Stats): boolean {
     a.nlink === b.nlink
   );
 }
-/** Read from a validated descriptor; recheck containment/identity before exposing caller .file. */
+/** Ordinary I/O denial of an already bound, contained regular file: the entry is unreadable. */
+const UNREADABLE_CODES = new Set(['EACCES', 'EPERM', 'EIO']);
+class UnreadableSource extends Error {}
+function unreadable(error: unknown): boolean {
+  return UNREADABLE_CODES.has(String((error as NodeJS.ErrnoException | undefined)?.code ?? ''));
+}
+/**
+ * Read from a validated descriptor; recheck containment/identity before exposing caller .file.
+ * Escapes, aliases and identity changes refuse. An ordinary read denial of the bound regular
+ * file returns undefined (unreadable entry). The bytes are also read through the logical path
+ * exposed as .file, exactly as downstream consumers read them, and must equal the descriptor
+ * bytes; any divergence refuses.
+ */
 function readBoundSource(
   repoRoot: string,
   path: string,
   read: boolean,
-): { file: string; source: string } {
+): { file: string; source: string } | undefined {
   const binding = sourceBinding(repoRoot, path);
   if (!binding || !binding.stat.isFile() || binding.stat.nlink !== 1) return sourceBindingRefused();
   let fd: number | undefined;
   try {
-    fd = openSync(binding.actual, constants.O_RDONLY | constants.O_NOFOLLOW);
+    try {
+      fd = openSync(binding.actual, constants.O_RDONLY | constants.O_NOFOLLOW);
+    } catch (error) {
+      if (unreadable(error)) throw new UnreadableSource();
+      throw error;
+    }
     const opened = fstatSync(fd);
     if (!opened.isFile() || !sameSourceIdentity(binding.stat, opened))
       return sourceBindingRefused();
     const bytes = read ? readFileSync(fd) : Buffer.alloc(0);
+    if (read) {
+      let viaPath: Buffer;
+      try {
+        viaPath = readFileSync(binding.logical);
+      } catch (error) {
+        if (unreadable(error)) throw new UnreadableSource();
+        throw error;
+      }
+      if (!viaPath.equals(bytes)) return sourceBindingRefused();
+    }
     const source = bytes.toString('utf8');
     if (!Buffer.from(source, 'utf8').equals(bytes)) return sourceBindingRefused();
     const after = sourceBinding(repoRoot, path);
@@ -168,7 +195,8 @@ function readBoundSource(
     )
       return sourceBindingRefused();
     return { file: after.logical, source };
-  } catch {
+  } catch (error) {
+    if (error instanceof UnreadableSource) return undefined;
     return sourceBindingRefused();
   } finally {
     if (fd !== undefined) {
@@ -202,7 +230,8 @@ export function listWorkflowFiles(repoRoot: string, dir?: string): string[] {
     if (!selected) return sourceBindingRefused();
     // Suffix-bearing real directories are excluded structurally, never treated as source files.
     if (selected.stat.isDirectory()) continue;
-    files.push(readBoundSource(repoRoot, selected.logical, false).file);
+    // A bound but unreadable file is still a selected workflow entry; loading skips it.
+    files.push(readBoundSource(repoRoot, selected.logical, false)?.file ?? selected.logical);
   }
   const after = sourceBinding(repoRoot, binding.logical);
   if (!after || after.actual !== binding.actual || !sameSourceIdentity(binding.stat, after.stat))
@@ -274,9 +303,13 @@ function executionYaml(source: string): ExecutionYaml | undefined {
     if (/^ *\t/u.test(row)) throw new Error('unproved YAML indentation');
     return trimComment(row);
   };
+  // YAML permits whitespace between a mapping key and its ':' indicator (`run : x`); the key
+  // identity is unchanged, so it is read exactly as GitHub's parser reads it.
   const keyValue = (text: string): { key: string; value: string } => {
     const match =
-      /^(?:([A-Za-z0-9_.-]+)|'([A-Za-z0-9_.-]+)'|"([A-Za-z0-9_.-]+)"):(?:[ \t]+(.*)|$)/u.exec(text);
+      /^(?:([A-Za-z0-9_.-]+)|'([A-Za-z0-9_.-]+)'|"([A-Za-z0-9_.-]+)")[ \t]*:(?:[ \t]+(.*)|$)/u.exec(
+        text,
+      );
     if (!match) throw new Error('unproved YAML mapping');
     return { key: match[1] ?? match[2] ?? match[3] ?? '', value: match[4] ?? '' };
   };
@@ -308,7 +341,7 @@ function executionYaml(source: string): ExecutionYaml | undefined {
         const next = rowText().trim();
         if (
           !/^-(?:\s|$)/u.test(next) &&
-          !/^(?:[A-Za-z0-9_.-]+|'[A-Za-z0-9_.-]+'|"[A-Za-z0-9_.-]+"):/u.test(next)
+          !/^(?:[A-Za-z0-9_.-]+|'[A-Za-z0-9_.-]+'|"[A-Za-z0-9_.-]+")[ \t]*:/u.test(next)
         ) {
           const body: string[] = [];
           while (
@@ -364,14 +397,14 @@ function executionYaml(source: string): ExecutionYaml | undefined {
     const decoded = decodedValue(text, parent, displayIndent);
     return { ...decoded, line, ...(decoded.display === undefined ? { display: text } : {}) };
   }
-  function mapping(width: number, first?: string): ExecutionYaml {
+  function mapping(width: number, first?: string, firstDisplay = width - 2): ExecutionYaml {
     const entries = new Map<string, ExecutionYaml>();
     const append = (text: string, displayIndent = width) => {
       const pair = keyValue(text);
       if (entries.has(pair.key)) throw new Error('duplicate YAML key');
       entries.set(pair.key, value(pair.value, width, displayIndent));
     };
-    if (first !== undefined) append(first, width - 2);
+    if (first !== undefined) append(first, firstDisplay);
     while (true) {
       skip();
       if (cursor >= rows.length) break;
@@ -392,17 +425,20 @@ function executionYaml(source: string): ExecutionYaml | undefined {
       skip();
       if (cursor >= rows.length || indentOf(rowText()) < width) break;
       const row = rowText();
-      const item = /^-(?: (.*))?$/u.exec(row.slice(width));
+      // Any run of spaces may follow the '-' indicator; an inline mapping then starts at the
+      // first key column, so its sibling keys are scoped to that exact column.
+      const item = /^-(?:( +)(.*))?$/u.exec(row.slice(width));
       if (indentOf(row) !== width || !item) throw new Error('unproved YAML sequence');
       cursor++;
-      const text = item[1] ?? '';
+      const text = item[2] ?? '';
+      const column = width + 1 + (item[1]?.length ?? 1);
       if (!text) {
         skip();
         if (cursor >= rows.length || indentOf(rowText()) <= width)
           throw new Error('unbound YAML item');
         items.push(block(indentOf(rowText())));
-      } else if (/^(?:[A-Za-z0-9_.-]+|'[A-Za-z0-9_.-]+'|"[A-Za-z0-9_.-]+"):/u.test(text))
-        items.push(mapping(width + 2, text));
+      } else if (/^(?:[A-Za-z0-9_.-]+|'[A-Za-z0-9_.-]+'|"[A-Za-z0-9_.-]+")[ \t]*:/u.test(text))
+        items.push(mapping(column, text, width));
       else items.push(value(text, width));
     }
     return { kind: 'list', items };
@@ -607,8 +643,15 @@ export function parseWorkflow(file: string, content: string, repoRoot: string): 
       jobs.push({ name, stepCount: captureSteps(job?.get('steps')), matrixSizes });
     }
   }
-  // Never expose an admitting zero-job view for an empty, malformed or unproved inventory.
-  if (!inventoryKnown) jobs.push({ name: '<unresolved-workflow>', stepCount: 0, matrixSizes: [] });
+  // Never expose an admitting zero-job view for a malformed, unproved or declared-but-unproved
+  // inventory. A fully proved document that declares no jobs key at all has a known empty
+  // inventory (zero jobs), which callers report as such rather than as one unresolved job.
+  // A key that only case-folds to 'jobs' (e.g. 'Jobs') is not an absent inventory: GitHub
+  // rejects it, and its content stays unresolved rather than reading as zero jobs.
+  const provedWithoutJobs =
+    fields !== undefined && ![...fields.keys()].some((key) => key.toLowerCase() === 'jobs');
+  if (!inventoryKnown && !provedWithoutJobs)
+    jobs.push({ name: '<unresolved-workflow>', stepCount: 0, matrixSizes: [] });
   // Best-effort diagnostic metadata comes from actual runs.steps, never descriptive text.
   // Missing using identity cannot certify execution: actionEffect still requires composite.
   const runs = yamlMap(fields?.get('runs'));
@@ -688,7 +731,9 @@ function loadCompositeActionFlags(
   const alternate = primary ? undefined : sourceBinding(repoRoot, join(normalized, 'action.yaml'));
   const selected = primary ?? alternate;
   if (!selected) return null;
-  const { file: actionPath, source: content } = readBoundSource(repoRoot, selected.logical, true);
+  const bound = readBoundSource(repoRoot, selected.logical, true);
+  if (!bound) return null;
+  const { file: actionPath, source: content } = bound;
   const parsed = parseWorkflow(actionPath, content, repoRoot);
   return {
     hasCache: parsed.hasCache,
@@ -701,7 +746,9 @@ export function loadWorkflows(repoRoot: string, dir?: string): WorkflowAst[] {
   const files = listWorkflowFiles(repoRoot, dir);
   const out: WorkflowAst[] = [];
   for (const f of files) {
-    const { file, source: content } = readBoundSource(repoRoot, f, true);
+    const bound = readBoundSource(repoRoot, f, true);
+    if (!bound) continue; // Unreadable workflow entries are skipped, never fabricated.
+    const { file, source: content } = bound;
     const wf = parseWorkflow(file, content, repoRoot);
     if (wf.compositeActionUses.length === 0) {
       out.push(wf);
