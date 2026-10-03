@@ -324,6 +324,20 @@ describe('subprocess template mirror (ADR-AUT-0002 IA-006)', () => {
   });
 });
 
+describe('refused sense run process context (#241)', () => {
+  it('names the sensor and the sensor-inputs declaration', () => {
+    const { refusal } = decide('coverage', 'unlisted-tool', ['--flag']);
+    expect((refusal as Error).message).toBe('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
+    expect((refusal as Error & { context?: object }).context).toEqual({
+      executable: 'unlisted-tool',
+      argv: ['--flag'],
+      action: 'sense run',
+      sensor: 'coverage',
+      descriptor_path: '.devai/config/sensor-inputs.json',
+    });
+  });
+});
+
 describe('build shape under sense run (ADR-AUT-0002 IA-001)', () => {
   it.each([
     ['a bare pnpm', 'pnpm'],
