@@ -6,7 +6,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { deflateRawSync } from 'node:zlib';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-const { siteMembers } = await import('../../scripts/process/verify-pages-bytes.mjs');
+const { siteMembers } = await import(
+  new URL('../../scripts/process/verify-pages-bytes.mjs', import.meta.url).href
+);
 const hash = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
 const roots: string[] = [];
 afterEach(() => {

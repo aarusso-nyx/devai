@@ -244,7 +244,7 @@ function fixture() {
     );
   };
   const sealRaw = (bytes: Buffer) => {
-    input.manifestBytes = bytes;
+    input.manifestBytes = Buffer.from(bytes);
     trust.payload_sha256 = hash(bytes);
     input.trustBytes = canonical(trust);
     input.signature = sign(null, Buffer.concat([Buffer.from(DOMAIN), bytes]), keys.privateKey);
@@ -766,7 +766,7 @@ function rawThresholdFixture() {
   const value = JSON.parse(required(f.input.members.get(role)).toString('utf8'));
   const bytes = Buffer.from(JSON.stringify(value, null, 2) + '\n');
   const bind = (next: Buffer) => {
-    f.input.members.set(role, next);
+    f.input.members.set(role, Buffer.from(next));
     f.manifest.members = [...f.input.members]
       .map(([path, raw]) => ({ path, byte_length: raw.length, sha256: hash(raw) }))
       .sort((a, b) => (a.path < b.path ? -1 : 1));
