@@ -99,11 +99,13 @@
       "properties": {
         "default_max_age_hours": {
           "type": "number",
-          "exclusiveMinimum": 0
+          "minimum": 1,
+          "maximum": 8760
         },
         "scorecard_failure_max_age_hours": {
           "type": "number",
-          "exclusiveMinimum": 0
+          "minimum": 1,
+          "maximum": 8760
         }
       }
     },
