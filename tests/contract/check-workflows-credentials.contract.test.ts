@@ -210,3 +210,31 @@ it('refuses duplicated and relocated public trust reads', () => {
     ).toBe(true);
   }
 });
+// WHOLE19-REV-005: an implicit-expression `if:` reads a protected context without `${{ }}`.
+it.each([
+  "vars.DEVAI_SOFT_GATE_TRUST_JSON != ''",
+  "vars.OTHER_PUBLIC_VALUE == 'enabled'",
+  "secrets.DEVAI_EVIDENCE_READ_TOKEN != ''",
+  "contains(vars['OTHER_PUBLIC_VALUE'], 'enabled')",
+])('refuses a bare protected-context step condition if: %s on an action step', (condition) => {
+  const root = fixture();
+  const file = 'pull-request-checks.yml';
+  const source = readWorkflow(root, file);
+  expect(source).toContain('id: soft-gate');
+  expect(checkWorkflowTree(root).ok).toBe(true);
+  const anchor = '        id: bootstrap-cache\n        uses: actions/cache@';
+  expect(source).toContain(anchor);
+  writeWorkflow(
+    root,
+    file,
+    source.replace(anchor, anchor.replace('\n', `\n        if: ${condition}\n`)),
+  );
+  const result = checkWorkflowTree(root);
+  expect(result.ok).toBe(false);
+  expect(
+    result.findings.some(
+      (item) => item.file === file && /trust|vars|secret|credential/iu.test(item.detail),
+    ),
+    JSON.stringify(result.findings),
+  ).toBe(true);
+});
