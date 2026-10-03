@@ -1010,6 +1010,15 @@ describe('raw threshold custody regressions (offline component)', () => {
       await expect(
         produceCiInvariantEvidence({ ...args, createdAt: '2026-10-02T10:00:00.001Z' }),
       ).rejects.toThrow('CI_EVIDENCE_PRODUCER_REFUSED');
+      // Both window edges are inclusive (createdAt <= now, now - createdAt <= 24h): evidence created
+      // exactly at the pinned clock and exactly 24h before it is accepted.
+      for (const createdAt of [NOW, '2026-10-01T10:00:00.000Z']) {
+        const edge = await produceCiInvariantEvidence({ ...args, createdAt });
+        expect(edge.reading.status).toBe('pass');
+        expect(JSON.parse(Buffer.from(edge.manifestBytes).toString('utf8')).created_at).toBe(
+          createdAt,
+        );
+      }
     } finally {
       vi.useRealTimers();
     }
