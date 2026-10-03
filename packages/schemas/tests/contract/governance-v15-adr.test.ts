@@ -618,6 +618,8 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-EVI-0001',
       'ADR-EVI-0002',
       'ADR-EVI-0003',
+      'ADR-EVI-0004',
+      'ADR-EVI-0005',
       'ADR-GOV-0001',
       'ADR-GOV-0002',
       'ADR-GOV-0003',
@@ -644,6 +646,8 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-GOV-0024',
       'ADR-MDL-0001',
       'ADR-MDL-0002',
+      'ADR-MDL-0003',
+      'ADR-MDL-0004',
       'ADR-MUT-0001',
       'ADR-MUT-0002',
       'ADR-MUT-0003',
@@ -690,6 +694,7 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-REL-0031',
       'ADR-REL-0032',
       'ADR-REL-0033',
+      'ADR-REL-0034',
       'ADR-SCR-0001',
       'ADR-SCR-0002',
       'ADR-SCR-0003',
@@ -700,15 +705,16 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-SCR-0008',
       'ADR-SCR-0010',
       'ADR-SCR-0011',
+      'ADR-SCR-0012',
       'ADR-SEC-0001',
     ]);
-    expect(records).toHaveLength(99);
+    expect(records).toHaveLength(105);
     expect(
       records.filter((record) => record.format === 'legacy-catalog').map((record) => record.adr_id),
     ).toEqual(['ADR-014', 'ADR-MUT-0005', 'ADR-REL-0017']);
     expect(records.filter((record) => record.adr_id === 'ADR-014')).toHaveLength(1);
-    expect(result.files_scanned).toBe(100);
-    expect(result.subject_authorities).toHaveLength(422);
+    expect(result.files_scanned).toBe(106);
+    expect(result.subject_authorities).toHaveLength(441);
     expect(result.effective_authorities).toEqual([
       'ADR-014',
       'ADR-AUT-0001',
@@ -723,9 +729,9 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-CHK-0004',
       'ADR-CHK-0005',
       'ADR-CHK-0006',
-      'ADR-EVI-0001',
-      'ADR-EVI-0002',
       'ADR-EVI-0003',
+      'ADR-EVI-0004',
+      'ADR-EVI-0005',
       'ADR-GOV-0002',
       'ADR-GOV-0004',
       'ADR-GOV-0007',
@@ -742,8 +748,9 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-GOV-0022',
       'ADR-GOV-0023',
       'ADR-GOV-0024',
-      'ADR-MDL-0001',
       'ADR-MDL-0002',
+      'ADR-MDL-0003',
+      'ADR-MDL-0004',
       'ADR-MUT-0004',
       'ADR-MUT-0006',
       'ADR-MUT-0007',
@@ -780,6 +787,7 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-REL-0031',
       'ADR-REL-0032',
       'ADR-REL-0033',
+      'ADR-REL-0034',
       'ADR-SCR-0001',
       'ADR-SCR-0002',
       'ADR-SCR-0003',
@@ -787,9 +795,9 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-SCR-0005',
       'ADR-SCR-0006',
       'ADR-SCR-0007',
-      'ADR-SCR-0008',
       'ADR-SCR-0010',
       'ADR-SCR-0011',
+      'ADR-SCR-0012',
       'ADR-SEC-0001',
     ]);
     // ADR-CHK-0006 IA-005: the record is the effective head of every subject it declares.
