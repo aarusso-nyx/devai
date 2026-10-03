@@ -1,5 +1,34 @@
 # Changelog
 
+## 1.9.0 — 2026-10-03
+
+- Sense and audit (CMP-0004): every new reading file gets its own chain entry and the sweep runs
+  in two ordered passes; the auditor resolves readings from the bound checkout store; the harness
+  population is sampled through the admitted `gh run list` shapes; `test_coverage_depth` measures
+  the declared local population and reads a refused or nested producer as UNKNOWN
+  (`COVERAGE_PRODUCER_REFUSED`, `COVERAGE_PRODUCER_RECURSION`, #242); the Pages journal verdicts
+  and the build precedence are read by the drift sensor.
+- Evidence (ADR-EVI-0002, ADR-EVI-0005): every proof line is cross-checked against the chain with a
+  gated anchor baseline and Architect historical-gap declarations; the rounds index is rendered
+  from phase closures with `--check`; `evidence record` recovers an unanchored newest line after
+  validating prior anchors (#239).
+- Loop: round seal and closure resolve membership from exact terminal rows of the rounds index
+  (#238).
+- Review bridge (ADR-MDL-0003): structured replies need an affirmative completion, and a provider
+  json body must agree with the reply text.
+- CLI: `action_effect_inference` reads UNKNOWN with `ACTION_EFFECT_INFERENCE_INPUT_MISSING` in an
+  adopter without the effects policy (#254); a refused `sense run` process names the sensor and
+  `.devai/config/sensor-inputs.json` (#241); the inline `sense run --preset=<name>` form is refused
+  with `SENSE_SELECTION_INVALID` (#252).
+- Release: the evidence verifier is re-vendored from devai-verifier `8b215d70` with the
+  release-intent certify export (ADR-REL-0031); the trusted local-RC verifier stays
+  `@aarusso-nyx/devai@1.5.4` until this release is published and repinned (#243).
+- Pages publication is split into a cancellable read-only `prepare-site` job and a serialized
+  journal-bound `publish-site` job (ADR-REL-0034, #234).
+- The error-code reference covers every package source (#250); the thresholds schema bounds
+  freshness windows to 1–8760 hours; dependency audit is clean, with `lint-staged` 17 and no
+  `libxmljs2` (#233).
+
 ## 1.8.0 — 2026-09-30
 
 - ADR-GOV-0024: constitution 1.0.2 amends Article 6 so an adopter repository may declare client
