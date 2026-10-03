@@ -84,14 +84,3 @@ trace failures, and escalate any genuine unresolved new behavior/risk choice.
 Live isolation, exact release intent/receipt binding, protected availability and
 independent DETRAN confirmation remain substantive preconditions; an authority
 record never supplies their missing evidence.
-
-## Concurrency coherence for unproved job effects
-
-On 2026-10-03 the Owner approved CMP0006-OD-COHERENCE-20261003, verbatim:
-"Approve amending the CMP-0006 CI-invariant contract: for concurrency coherence,
-an UNKNOWN-effect job is admitted only (1) under the exact noncancellable shared
-publication lock with main/manual guard, or (2) when cancellable with a capability
-bound excluding all repository/deployment writes. Parser effect classification is
-unchanged; unproved effects remain reported." ADR-REL-0034 records the exact rule.
-It resolves the R-0602 finding that the real preflight and publish-site jobs stayed
-unknown under the strict effect proof; it grants no other exception.

@@ -299,13 +299,7 @@ read-after-write durability, original records and verified no-op behavior.
 The coherence sensor must evaluate effective concurrency per job and actual
 effect surfaces: write permissions, environments, deploy operations and resolved
 local/reusable calls. Ordinary preparation supersedes; effect-bearing publication
-serializes. Unresolved effect surfaces keep a finding, except that the
-serialize-or-bound amendment in ADR-REL-0034 (Owner decision
-CMP0006-OD-COHERENCE-20261003) admits an unknown-effect job that either holds the
-exact noncancellable shared publication lock under the main/manual guard or is
-cancellable with a declared read-only capability bound excluding all repository
-and deployment writes. Parser classification stays unknown and every admitted
-job is still reported. No site filename exception,
+serializes. Unresolved effect surfaces keep a finding. No site filename exception,
 N/A declaration or blanket sensor exemption is permitted. Reject parent
 cancellation that can interrupt a serialized child and missing/malformed or
 conflicting job locks. Existing release/schedule safety requirements remain.
