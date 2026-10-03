@@ -127,11 +127,14 @@ jobs:
           echo "version=1.5.1" >> "$GITHUB_OUTPUT"
           echo "provenance_sha256=$actual_provenance_sha256" >> "$GITHUB_OUTPUT"
           node .devai/state/pr-bootstrap/cli/bin.js init bind --target . --as-role architect --write --format json
-          node .devai/state/pr-bootstrap/cli/bin.js check --preflight --run --base "$DEVAI_PREFLIGHT_BASE" --as-role inspector --write --format json > "$RUNNER_TEMP/devai-preflight.json"
+          # The runner report (stdout) is retained for the soft gate; the check invocation itself
+          # stays exactly the local one (ADR-CHK-0001 IA-003 lane parity).
+          exec > "$RUNNER_TEMP/devai-preflight.json"
+          node .devai/state/pr-bootstrap/cli/bin.js check --preflight --run --base "$DEVAI_PREFLIGHT_BASE" --as-role inspector --write --format json
 
       - name: Affected checks and profile-selected candidate preflight
         id: affected
-        run: pnpm run release:pr-gate -- "$DEVAI_PREFLIGHT_BASE" && node .devai/state/pr-bootstrap/cli/bin.js check --affected --run --base "$DEVAI_PREFLIGHT_BASE" --as-role inspector --write --format json > "$RUNNER_TEMP/devai-affected.json"
+        run: pnpm run release:pr-gate -- "$DEVAI_PREFLIGHT_BASE" && exec > "$RUNNER_TEMP/devai-affected.json" && node .devai/state/pr-bootstrap/cli/bin.js check --affected --run --base "$DEVAI_PREFLIGHT_BASE" --as-role inspector --write --format json
 
       - name: Verify candidate invariant and trace evidence
         id: soft-gate
