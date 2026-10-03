@@ -1,9 +1,10 @@
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve, sep } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { afterEach, describe, expect, it } from 'vitest';
 import { parseWorkflow } from '../../src/harness/workflow-parser.js';
+import { senseHarnessCoherence } from '../../src/harness-coherence.js';
 
 // Complete supplied-checkout fixtures; scripts below are parsed, never executed.
 const candidateRoots: string[] = [];
@@ -601,5 +602,1033 @@ describe('supplied candidate source provenance (offline analysis)', () => {
       'name: local\nruns:\n  using: composite\n  steps:\n    - uses: ./.github/actions/outer\n',
     );
     expect(candidateEffect(root, nested)).toBe('unknown');
+  });
+});
+
+describe('contained builtin capability effects (offline source analysis)', () => {
+  const readOnlyCjs = [
+    "const { readFileSync } = require('node:fs');",
+    "const { join } = require('node:path');",
+    "const assert = require('node:assert/strict');",
+    "const observed = readFileSync(join(__dirname, '../fixtures/control.txt'), 'utf8');",
+    "assert.equal(observed, 'contained observation\\n');",
+    '',
+  ].join('\n');
+  const readOnlyMjs = [
+    "import { readFileSync } from 'node:fs';",
+    "import { join } from 'node:path';",
+    "import assert from 'node:assert/strict';",
+    "const observed = readFileSync(join('fixtures', 'control.txt'), 'utf8');",
+    "assert.equal(observed, 'contained observation\\n');",
+    '',
+  ].join('\n');
+  const variants = [
+    {
+      name: 'child-process-property',
+      extension: 'cjs',
+      source:
+        "const cp = require('node:child_process');\ncp.execFileSync('git', ['push', 'origin', 'HEAD']);\n",
+      expected: 'unknown',
+    },
+    {
+      name: 'child-process-destructured-alias-argv',
+      extension: 'cjs',
+      source:
+        "const { spawnSync: launch } = require('node:child_process');\nconst executable = 'git';\nconst argv = ['push', 'origin', 'HEAD'];\nlaunch(executable, argv);\n",
+      expected: 'unknown',
+    },
+    {
+      name: 'child-process-imported-alias-argv',
+      extension: 'mjs',
+      source:
+        "import { execFileSync as launch } from 'node:child_process';\nconst executable = 'git';\nconst argv = ['push', 'origin', 'HEAD'];\nlaunch(executable, argv);\n",
+      expected: 'unknown',
+    },
+    {
+      name: 'child-process-computed-operation',
+      extension: 'cjs',
+      source:
+        "const cp = require('node:child_process');\nconst operation = process.env.OPERATION;\ncp[operation](process.env.EXECUTABLE, JSON.parse(process.env.ARGV));\n",
+      expected: 'unknown',
+    },
+    {
+      name: 'fs-mutator-alias',
+      extension: 'cjs',
+      source:
+        "const { writeFileSync: mutate } = require('node:fs');\nconst target = process.env.DESTINATION;\nmutate(target, 'candidate mutation');\n",
+      expected: 'publication',
+    },
+    {
+      name: 'fs-imported-mutator',
+      extension: 'mjs',
+      source:
+        "import { appendFileSync as mutate } from 'node:fs';\nconst target = process.env.DESTINATION;\nmutate(target, 'candidate mutation');\n",
+      expected: 'publication',
+    },
+    {
+      name: 'fs-computed-mutator',
+      extension: 'cjs',
+      source:
+        "const filesystem = require('node:fs');\nconst operation = process.env.OPERATION;\nfilesystem[operation](process.env.DESTINATION, 'candidate mutation');\n",
+      expected: 'unknown',
+    },
+    {
+      name: 'network-request-alias',
+      extension: 'cjs',
+      source:
+        "const client = require('node:https');\nconst send = client.request;\nconst options = { hostname: 'example.invalid', method: 'POST' };\nsend(options);\n",
+      expected: 'unknown',
+    },
+    {
+      name: 'network-imported-request',
+      extension: 'mjs',
+      source:
+        "import { request as send } from 'node:http';\nconst options = { hostname: 'example.invalid', method: 'POST' };\nsend(options);\n",
+      expected: 'unknown',
+    },
+    {
+      name: 'vm-execution-alias',
+      extension: 'cjs',
+      source:
+        "const { runInNewContext: execute } = require('node:vm');\nconst program = process.env.PROGRAM;\nexecute(program);\n",
+      expected: 'unknown',
+    },
+    {
+      name: 'unresolved-require-alias',
+      extension: 'cjs',
+      source:
+        'const load = require;\nconst client = load(process.env.MODULE_NAME);\nclient[process.env.OPERATION](process.env.VALUE);\n',
+      expected: 'unknown',
+    },
+    {
+      name: 'unresolved-global-executor',
+      extension: 'cjs',
+      source: 'const execute = globalThis[process.env.EXECUTOR];\nexecute(process.env.COMMAND);\n',
+      expected: 'unknown',
+    },
+    {
+      name: 'unresolved-reflective-executor',
+      extension: 'cjs',
+      source:
+        'const execute = globalThis[process.env.EXECUTOR];\nReflect.apply(execute, null, [process.env.COMMAND]);\n',
+      expected: 'unknown',
+    },
+    {
+      name: 'fs-static-computed-alias',
+      extension: 'cjs',
+      source:
+        "const filesystem = require('node:fs');\nconst operation = 'writeFileSync';\nconst mutate = filesystem[operation];\nmutate(process.env.DESTINATION, 'candidate mutation');\n",
+      expected: 'publication',
+    },
+    {
+      name: 'aliased-Function-constructor',
+      extension: 'cjs',
+      source:
+        'const compile = Function;\nconst execute = new compile(process.env.PROGRAM);\nexecute();\n',
+      expected: 'unknown',
+    },
+    {
+      name: 'aliased-eval',
+      extension: 'cjs',
+      source: 'const execute = eval;\nexecute(process.env.PROGRAM);\n',
+      expected: 'unknown',
+    },
+    {
+      name: 'worker-thread-constructor',
+      extension: 'cjs',
+      source:
+        "const { Worker: Execute } = require('node:worker_threads');\nnew Execute(process.env.PROGRAM, { eval: true });\n",
+      expected: 'unknown',
+    },
+    {
+      name: 'module-createRequire-alias',
+      extension: 'cjs',
+      source:
+        "const { createRequire: loadFactory } = require('node:module');\nconst load = loadFactory(__filename);\nload(process.env.MODULE_NAME);\n",
+      expected: 'unknown',
+    },
+    {
+      name: 'process-getBuiltinModule',
+      extension: 'cjs',
+      source:
+        'const load = process.getBuiltinModule;\nconst client = load(process.env.MODULE_NAME);\nclient[process.env.OPERATION](process.env.VALUE);\n',
+      expected: 'unknown',
+    },
+    {
+      name: 'getter-executable-capability',
+      extension: 'cjs',
+      source:
+        'const object = { get operation() { return globalThis[process.env.EXECUTOR]; } };\nobject.operation(process.env.VALUE);\n',
+      expected: 'unknown',
+    },
+    {
+      name: 'proxy-executable-capability',
+      extension: 'cjs',
+      source:
+        'const object = new Proxy({}, { get() { return globalThis[process.env.EXECUTOR]; } });\nobject.operation(process.env.VALUE);\n',
+      expected: 'unknown',
+    },
+    {
+      name: 'fs-path-coercion-executable-hook',
+      extension: 'cjs',
+      source:
+        "const filesystem = require('node:fs');\nconst path = { toString() { const execute = globalThis[process.env.EXECUTOR]; execute(process.env.VALUE); return 'fixtures/control.txt'; } };\nfilesystem.readFileSync(path, 'utf8');\n",
+      expected: 'unknown',
+    },
+  ];
+  function observe(root: string, source: string) {
+    candidateWrite(root, '.github/workflows/arbitrary.yml', source);
+    return senseHarnessCoherence({ repoRoot: root, now: '2026-10-02T12:00:00.000Z' });
+  }
+  for (const topology of ['direct', 'transitive', 'composite'] as const) {
+    it.each(variants)(
+      `${topology} source refuses $name after the complete control passes`,
+      (fault) => {
+        const root = candidateRoot();
+        const entry = `scripts/observe.${fault.extension}`;
+        const leaf = `scripts/runner.${fault.extension}`;
+        const readOnly = fault.extension === 'cjs' ? readOnlyCjs : readOnlyMjs;
+        candidateWrite(root, 'fixtures/control.txt', 'contained observation\n');
+        candidateWrite(root, leaf, readOnly);
+        candidateWrite(
+          root,
+          entry,
+          topology === 'transitive'
+            ? fault.extension === 'cjs'
+              ? "require('./runner.cjs');\n"
+              : "import './runner.mjs';\n"
+            : readOnly,
+        );
+        candidateWrite(
+          root,
+          '.github/actions/builtin-control/action.yml',
+          `name: contained control\nruns:\n  using: composite\n  steps:\n    - shell: bash\n      run: node ${entry}\n`,
+        );
+        const command = `node ${entry}`;
+        const direct = candidateWorkflow(command);
+        const workflow =
+          topology === 'composite'
+            ? direct.replace(
+                `run: ${JSON.stringify(command)}`,
+                'uses: ./.github/actions/builtin-control',
+              )
+            : direct;
+        expect(candidateEffect(root, workflow)).toBe('read-only');
+        const control = observe(root, workflow);
+        expect(control.status).toBe('pass');
+        expect(control.metrics?.concurrency_semantic_issues).toBe(0);
+        expect(control.findings ?? []).toEqual([]);
+        // Only this reachable source member changes; root, command, data and
+        // candidate source identity stay bound to the complete accepted control.
+        candidateWrite(root, topology === 'transitive' ? leaf : entry, fault.source);
+        expect(candidateEffect(root, workflow)).toBe(fault.expected);
+        const refused = observe(root, workflow);
+        expect(refused.status).toBe('review');
+        expect(refused.metrics?.concurrency_semantic_issues).toBe(1);
+        expect(refused.findings ?? []).toEqual([
+          {
+            severity: 'warning',
+            code: 'HARNESS_COHERENCE_CONCURRENCY_POLICY',
+            message:
+              '.github/workflows/arbitrary.yml must declare a non-empty concurrency group with cancel-in-progress: true (superseding).',
+          },
+        ]);
+        const serialized = workflow
+          .replace('inspect-${{ github.ref }}', 'devai-pages-publication')
+          .replace('cancel-in-progress: true', 'cancel-in-progress: false');
+        expect(candidateEffect(root, serialized)).toBe(fault.expected);
+        const locked = observe(root, serialized);
+        expect(locked.status).toBe(fault.expected === 'publication' ? 'pass' : 'review');
+        expect(locked.metrics?.concurrency_semantic_issues).toBe(
+          fault.expected === 'publication' ? 0 : 1,
+        );
+        expect(locked.findings ?? []).toEqual(
+          fault.expected === 'publication' ? [] : refused.findings,
+        );
+      },
+    );
+  }
+  it.each([
+    'inline-assignment',
+    'inline-export',
+    'inline-path',
+    'workflow-env',
+    'job-env',
+    'step-env',
+    'composite-step-env',
+  ] as const)(
+    'refuses executable-affecting %s after the unchanged observation control passes',
+    (scope) => {
+      const root = candidateRoot();
+      candidateWrite(root, 'fixtures/control.txt', 'contained observation\n');
+      candidateWrite(root, 'scripts/observe.cjs', readOnlyCjs);
+      candidateWrite(
+        root,
+        'scripts/writer.cjs',
+        "const cp = require('node:child_process');\ncp.execFileSync('git', ['push', 'origin', 'HEAD']);\n",
+      );
+      const action =
+        'name: loader control\nruns:\n  using: composite\n  steps:\n    - shell: bash\n      run: node scripts/observe.cjs\n';
+      candidateWrite(root, '.github/actions/loader-control/action.yml', action);
+      const direct = candidateWorkflow('node scripts/observe.cjs');
+      const observation =
+        scope === 'composite-step-env'
+          ? direct.replace(
+              'run: "node scripts/observe.cjs"',
+              'uses: ./.github/actions/loader-control',
+            )
+          : direct;
+      expect(candidateEffect(root, observation)).toBe('read-only');
+      const control = observe(root, observation);
+      expect(control.status).toBe('pass');
+      expect(control.metrics?.concurrency_semantic_issues).toBe(0);
+      expect(control.findings ?? []).toEqual([]);
+      // The preload writer is already contained but unreachable in the control.
+      // Only one applicable environment/command input changes after it passes.
+      let loader = observation;
+      if (scope === 'inline-assignment')
+        loader = candidateWorkflow(
+          'NODE_OPTIONS=--require=./scripts/writer.cjs node scripts/observe.cjs',
+        );
+      if (scope === 'inline-export')
+        loader = candidateWorkflow(
+          'export NODE_OPTIONS=--require=./scripts/writer.cjs; node scripts/observe.cjs',
+        );
+      if (scope === 'inline-path')
+        loader = candidateWorkflow('PATH=./scripts node scripts/observe.cjs');
+      if (scope === 'workflow-env')
+        loader = 'env:\n  NODE_OPTIONS: --require=./scripts/writer.cjs\n' + observation;
+      if (scope === 'job-env')
+        loader = observation.replace(
+          '  inspect:\n',
+          '  inspect:\n    env:\n      NODE_OPTIONS: --require=./scripts/writer.cjs\n',
+        );
+      if (scope === 'step-env')
+        loader = observation.replace(
+          '      - run: "node scripts/observe.cjs"\n',
+          '      - run: "node scripts/observe.cjs"\n        env:\n          NODE_OPTIONS: --require=./scripts/writer.cjs\n',
+        );
+      if (scope === 'composite-step-env')
+        candidateWrite(
+          root,
+          '.github/actions/loader-control/action.yml',
+          action + '      env:\n        NODE_OPTIONS: --require=./scripts/writer.cjs\n',
+        );
+      expect(candidateEffect(root, loader)).toBe('unknown');
+      const refused = observe(root, loader);
+      expect(refused.status).toBe('review');
+      expect(refused.metrics?.concurrency_semantic_issues).toBe(1);
+      expect(refused.findings ?? []).toEqual([
+        {
+          severity: 'warning',
+          code: 'HARNESS_COHERENCE_CONCURRENCY_POLICY',
+          message:
+            '.github/workflows/arbitrary.yml must declare a non-empty concurrency group with cancel-in-progress: true (superseding).',
+        },
+      ]);
+      const serialized = loader
+        .replace('inspect-${{ github.ref }}', 'devai-pages-publication')
+        .replace('cancel-in-progress: true', 'cancel-in-progress: false');
+      expect(candidateEffect(root, serialized)).toBe('unknown');
+      const locked = observe(root, serialized);
+      expect(locked.status).toBe('review');
+      expect(locked.metrics?.concurrency_semantic_issues).toBe(1);
+      expect(locked.findings ?? []).toEqual(refused.findings);
+    },
+  );
+  it.each([
+    'node-redirection',
+    'echo-redirection',
+    'package-redirection',
+    'composite-redirection',
+    'package-pretest',
+    'package-posttest',
+    'package-script-shell',
+    'workflow-shell',
+    'job-shell',
+    'step-shell',
+    'composite-shell',
+    'step-working-directory',
+  ] as const)('refuses unproved %s after its complete source control passes', (fault) => {
+    const root = candidateRoot();
+    candidateWrite(root, 'fixtures/control.txt', 'contained observation\n');
+    candidateWrite(root, 'scripts/observe.cjs', readOnlyCjs);
+    const writer =
+      "const cp = require('node:child_process');\ncp.execFileSync('git', ['push', 'origin', 'HEAD']);\n";
+    candidateWrite(root, 'scripts/writer.cjs', writer);
+    candidateWrite(root, 'nested/scripts/observe.cjs', writer);
+    // This real executable fixture is dormant in every control and never run.
+    candidateWrite(root, 'scripts/executor.cjs', '#!/usr/bin/env node\n' + writer);
+    chmodSync(join(root, 'scripts/executor.cjs'), 0o755);
+    const packageControl = { private: true, scripts: { test: 'node scripts/observe.cjs' } };
+    candidateWrite(root, 'package.json', JSON.stringify(packageControl));
+    const action =
+      'name: shell control\nruns:\n  using: composite\n  steps:\n    - shell: bash\n      run: node scripts/observe.cjs\n';
+    candidateWrite(root, '.github/actions/shell-control/action.yml', action);
+    const direct = candidateWorkflow('node scripts/observe.cjs');
+    const observation = fault.startsWith('package-')
+      ? candidateWorkflow('npm test')
+      : fault.startsWith('composite-')
+        ? direct.replace('run: "node scripts/observe.cjs"', 'uses: ./.github/actions/shell-control')
+        : fault === 'echo-redirection'
+          ? candidateWorkflow('node scripts/observe.cjs; echo payload')
+          : direct;
+    expect(candidateEffect(root, observation)).toBe('read-only');
+    const control = observe(root, observation);
+    expect(control.status).toBe('pass');
+    expect(control.metrics?.concurrency_semantic_issues).toBe(0);
+    expect(control.findings ?? []).toEqual([]);
+    // Only one run, package/config, hook or effective-executor member changes.
+    let changed = observation;
+    if (fault === 'node-redirection')
+      changed = candidateWorkflow('node scripts/observe.cjs > observed.txt');
+    if (fault === 'echo-redirection')
+      changed = candidateWorkflow('node scripts/observe.cjs; echo payload > observed.txt');
+    if (fault === 'package-redirection')
+      candidateWrite(
+        root,
+        'package.json',
+        JSON.stringify({
+          ...packageControl,
+          scripts: { test: 'node scripts/observe.cjs > observed.txt' },
+        }),
+      );
+    if (fault === 'composite-redirection')
+      candidateWrite(
+        root,
+        '.github/actions/shell-control/action.yml',
+        action.replace(
+          'run: node scripts/observe.cjs',
+          'run: node scripts/observe.cjs > observed.txt',
+        ),
+      );
+    if (fault === 'package-pretest' || fault === 'package-posttest')
+      candidateWrite(
+        root,
+        'package.json',
+        JSON.stringify({
+          ...packageControl,
+          scripts: {
+            ...packageControl.scripts,
+            [fault === 'package-pretest' ? 'pretest' : 'posttest']: 'node scripts/writer.cjs',
+          },
+        }),
+      );
+    if (fault === 'package-script-shell')
+      candidateWrite(root, '.npmrc', 'script-shell=./scripts/executor.cjs\n');
+    if (fault === 'workflow-shell')
+      changed = 'defaults:\n  run:\n    shell: node scripts/writer.cjs {0}\n' + observation;
+    if (fault === 'job-shell')
+      changed = observation.replace(
+        '  inspect:\n',
+        '  inspect:\n    defaults:\n      run:\n        shell: node scripts/writer.cjs {0}\n',
+      );
+    if (fault === 'step-shell')
+      changed = observation.replace(
+        '      - run: "node scripts/observe.cjs"\n',
+        '      - run: "node scripts/observe.cjs"\n        shell: node scripts/writer.cjs {0}\n',
+      );
+    if (fault === 'composite-shell')
+      candidateWrite(
+        root,
+        '.github/actions/shell-control/action.yml',
+        action.replace('shell: bash', 'shell: node scripts/writer.cjs {0}'),
+      );
+    if (fault === 'step-working-directory')
+      changed = observation.replace(
+        '      - run: "node scripts/observe.cjs"\n',
+        '      - run: "node scripts/observe.cjs"\n        working-directory: nested\n',
+      );
+    expect(candidateEffect(root, changed)).toBe('unknown');
+    const refused = observe(root, changed);
+    expect(refused.status).toBe('review');
+    expect(refused.metrics?.concurrency_semantic_issues).toBe(1);
+    expect(refused.findings ?? []).toEqual([
+      {
+        severity: 'warning',
+        code: 'HARNESS_COHERENCE_CONCURRENCY_POLICY',
+        message:
+          '.github/workflows/arbitrary.yml must declare a non-empty concurrency group with cancel-in-progress: true (superseding).',
+      },
+    ]);
+    const serialized = changed
+      .replace('inspect-${{ github.ref }}', 'devai-pages-publication')
+      .replace('cancel-in-progress: true', 'cancel-in-progress: false');
+    expect(candidateEffect(root, serialized)).toBe('unknown');
+    const locked = observe(root, serialized);
+    expect(locked.status).toBe('review');
+    expect(locked.metrics?.concurrency_semantic_issues).toBe(1);
+    expect(locked.findings ?? []).toEqual(refused.findings);
+  });
+
+  it('refuses a candidate package-bin node shadow after its complete npm control passes', () => {
+    const root = candidateRoot();
+    candidateWrite(root, 'fixtures/control.txt', 'contained observation\n');
+    candidateWrite(root, 'scripts/observe.cjs', readOnlyCjs);
+    candidateWrite(
+      root,
+      'package.json',
+      JSON.stringify({ private: true, scripts: { test: 'node scripts/observe.cjs' } }),
+    );
+    const observation = candidateWorkflow('npm test');
+    expect(candidateEffect(root, observation)).toBe('read-only');
+    const control = observe(root, observation);
+    expect(control.status).toBe('pass');
+    expect(control.metrics?.concurrency_semantic_issues).toBe(0);
+    expect(control.findings ?? []).toEqual([]);
+    // Only this real contained package-bin executable is added after the control.
+    // Its valid source and mode are inspected, never invoked by this test.
+    candidateWrite(
+      root,
+      'node_modules/.bin/node',
+      '#!/bin/sh\nprintf payload > selector-publication.txt\n',
+    );
+    chmodSync(join(root, 'node_modules/.bin/node'), 0o755);
+    expect(candidateEffect(root, observation)).toBe('unknown');
+    const refused = observe(root, observation);
+    expect(refused.status).toBe('review');
+    expect(refused.metrics?.concurrency_semantic_issues).toBe(1);
+    expect(refused.findings ?? []).toEqual([
+      {
+        severity: 'warning',
+        code: 'HARNESS_COHERENCE_CONCURRENCY_POLICY',
+        message:
+          '.github/workflows/arbitrary.yml must declare a non-empty concurrency group with cancel-in-progress: true (superseding).',
+      },
+    ]);
+    const serialized = observation
+      .replace('inspect-${{ github.ref }}', 'devai-pages-publication')
+      .replace('cancel-in-progress: true', 'cancel-in-progress: false');
+    expect(candidateEffect(root, serialized)).toBe('unknown');
+    const locked = observe(root, serialized);
+    expect(locked.status).toBe('review');
+    expect(locked.metrics?.concurrency_semantic_issues).toBe(1);
+    expect(locked.findings ?? []).toEqual(refused.findings);
+  });
+
+  it.each([
+    'node-v8-coverage',
+    'node-compile-cache',
+    'step-leading-shell',
+    'step-leading-env',
+    'step-leading-cwd',
+    'quoted-run',
+    'quoted-uses',
+    'composite-quoted-run',
+  ] as const)(
+    'refuses concealed invocation selector %s after its complete control passes',
+    (fault) => {
+      const root = candidateRoot();
+      candidateWrite(root, 'fixtures/control.txt', 'contained observation\n');
+      candidateWrite(root, 'scripts/observe.cjs', readOnlyCjs);
+      candidateWrite(
+        root,
+        'scripts/writer.cjs',
+        "const cp = require('node:child_process');\ncp.execFileSync('git', ['push', 'origin', 'HEAD']);\n",
+      );
+      const observerAction =
+        'name: observation\nruns:\n  using: composite\n  steps:\n    - shell: bash\n      run: node scripts/observe.cjs\n';
+      const writerAction =
+        'name: writer\nruns:\n  using: composite\n  steps:\n    - shell: bash\n      run: node scripts/writer.cjs\n';
+      candidateWrite(root, '.github/actions/selector-observer/action.yml', observerAction);
+      candidateWrite(root, '.github/actions/selector-writer/action.yml', writerAction);
+      const direct = candidateWorkflow('node scripts/observe.cjs');
+      const observation =
+        fault === 'composite-quoted-run'
+          ? direct.replace(
+              'run: "node scripts/observe.cjs"',
+              'uses: ./.github/actions/selector-observer',
+            )
+          : direct;
+      expect(candidateEffect(root, observation)).toBe('read-only');
+      const control = observe(root, observation);
+      expect(control.status).toBe('pass');
+      expect(control.metrics?.concurrency_semantic_issues).toBe(0);
+      expect(control.findings ?? []).toEqual([]);
+      // One applicable env selector or serialized executable-bearing YAML form changes.
+      // All candidate script/action bodies are present before this accepted control.
+      let changed = observation;
+      if (fault === 'node-v8-coverage' || fault === 'node-compile-cache')
+        changed = observation.replace(
+          '      - run: "node scripts/observe.cjs"\n',
+          `      - run: "node scripts/observe.cjs"\n        env:\n          ${fault === 'node-v8-coverage' ? 'NODE_V8_COVERAGE' : 'NODE_COMPILE_CACHE'}: ./runtime-output\n`,
+        );
+      if (fault === 'step-leading-shell')
+        changed = observation.replace(
+          '      - run: "node scripts/observe.cjs"\n',
+          '      - shell: bash\n        run: node scripts/writer.cjs\n',
+        );
+      if (fault === 'step-leading-env')
+        changed = observation.replace(
+          '      - run: "node scripts/observe.cjs"\n',
+          '      - env:\n          OBSERVATION_ONLY: yes\n        run: node scripts/writer.cjs\n',
+        );
+      if (fault === 'step-leading-cwd')
+        changed = observation.replace(
+          '      - run: "node scripts/observe.cjs"\n',
+          '      - working-directory: .\n        run: node scripts/writer.cjs\n',
+        );
+      if (fault === 'quoted-run')
+        changed = observation.replace(
+          '      - run: "node scripts/observe.cjs"\n',
+          '      - "run": node scripts/writer.cjs\n',
+        );
+      if (fault === 'quoted-uses')
+        changed = observation.replace(
+          '      - run: "node scripts/observe.cjs"\n',
+          '      - "uses": ./.github/actions/selector-writer\n',
+        );
+      if (fault === 'composite-quoted-run')
+        candidateWrite(
+          root,
+          '.github/actions/selector-observer/action.yml',
+          observerAction.replace('run: node scripts/observe.cjs', '"run": node scripts/writer.cjs'),
+        );
+      expect(candidateEffect(root, changed)).toBe('unknown');
+      const refused = observe(root, changed);
+      expect(refused.status).toBe('review');
+      expect(refused.metrics?.concurrency_semantic_issues).toBe(1);
+      expect(refused.findings ?? []).toEqual([
+        {
+          severity: 'warning',
+          code: 'HARNESS_COHERENCE_CONCURRENCY_POLICY',
+          message:
+            '.github/workflows/arbitrary.yml must declare a non-empty concurrency group with cancel-in-progress: true (superseding).',
+        },
+      ]);
+      const serialized = changed
+        .replace('inspect-${{ github.ref }}', 'devai-pages-publication')
+        .replace('cancel-in-progress: true', 'cancel-in-progress: false');
+      expect(candidateEffect(root, serialized)).toBe('unknown');
+      const locked = observe(root, serialized);
+      expect(locked.status).toBe('review');
+      expect(locked.metrics?.concurrency_semantic_issues).toBe(1);
+      expect(locked.findings ?? []).toEqual(refused.findings);
+    },
+  );
+
+  it('keeps an actual node action unknown when description text impersonates composite metadata', () => {
+    const root = candidateRoot();
+    candidateWrite(root, 'fixtures/control.txt', 'contained observation\n');
+    candidateWrite(root, 'scripts/observe.cjs', readOnlyCjs);
+    candidateWrite(
+      root,
+      '.github/actions/selector-node/writer.cjs',
+      "const cp = require('node:child_process');\ncp.execFileSync('git', ['push', 'origin', 'HEAD']);\n",
+    );
+    const nodeAction = 'name: node writer\nruns:\n  using: node20\n  main: writer.cjs\n';
+    candidateWrite(root, '.github/actions/selector-node/action.yml', nodeAction);
+    const observation = candidateWorkflow('node scripts/observe.cjs');
+    expect(candidateEffect(root, observation)).toBe('read-only');
+    const control = observe(root, observation);
+    expect(control.status).toBe('pass');
+    expect(control.metrics?.concurrency_semantic_issues).toBe(0);
+    expect(control.findings ?? []).toEqual([]);
+    const actionWorkflow = observation.replace(
+      'run: "node scripts/observe.cjs"',
+      'uses: ./.github/actions/selector-node',
+    );
+    // The genuine unsafe action baseline is refused before any description changes.
+    expect(candidateEffect(root, actionWorkflow)).toBe('unknown');
+    const beforeDescription = observe(root, actionWorkflow);
+    expect(beforeDescription.status).toBe('review');
+    expect(beforeDescription.metrics?.concurrency_semantic_issues).toBe(1);
+    expect(beforeDescription.findings ?? []).toEqual([
+      {
+        severity: 'warning',
+        code: 'HARNESS_COHERENCE_CONCURRENCY_POLICY',
+        message:
+          '.github/workflows/arbitrary.yml must declare a non-empty concurrency group with cancel-in-progress: true (superseding).',
+      },
+    ]);
+    // Only descriptive scalar text changes; actual runs.using/main remain byte-exact.
+    candidateWrite(
+      root,
+      '.github/actions/selector-node/action.yml',
+      nodeAction.replace(
+        'name: node writer\n',
+        'name: node writer\ndescription: |\n  using: composite\n',
+      ),
+    );
+    expect(candidateEffect(root, actionWorkflow)).toBe('unknown');
+    const afterDescription = observe(root, actionWorkflow);
+    expect(afterDescription.status).toBe('review');
+    expect(afterDescription.metrics?.concurrency_semantic_issues).toBe(1);
+    expect(afterDescription.findings ?? []).toEqual(beforeDescription.findings);
+    const serialized = actionWorkflow
+      .replace('inspect-${{ github.ref }}', 'devai-pages-publication')
+      .replace('cancel-in-progress: true', 'cancel-in-progress: false');
+    expect(candidateEffect(root, serialized)).toBe('unknown');
+    const locked = observe(root, serialized);
+    expect(locked.status).toBe('review');
+    expect(locked.metrics?.concurrency_semantic_issues).toBe(1);
+    expect(locked.findings ?? []).toEqual(beforeDescription.findings);
+  });
+
+  it('keeps publication controls bound to the actual job when workflow name text impersonates them', () => {
+    const root = candidateRoot();
+    candidateWrite(root, 'fixtures/control.txt', 'contained observation\n');
+    candidateWrite(root, 'scripts/observe.cjs', readOnlyCjs);
+    candidateWrite(
+      root,
+      'scripts/actual-writer.cjs',
+      "const fs = require('node:fs');\nfs.writeFileSync('fixtures/published.txt', 'payload');\n",
+    );
+    const observation = candidateWorkflow('node scripts/observe.cjs');
+    expect(candidateEffect(root, observation)).toBe('read-only');
+    const control = observe(root, observation);
+    expect(control.status).toBe('pass');
+    expect(control.metrics?.concurrency_semantic_issues).toBe(0);
+    expect(control.findings ?? []).toEqual([]);
+    const writer = candidateWorkflow('node scripts/actual-writer.cjs').replace(
+      '    concurrency:\n      group: inspect-${{ github.ref }}\n      cancel-in-progress: true\n',
+      '',
+    );
+    const actual = parseWorkflow(
+      join(root, '.github/workflows/arbitrary.yml'),
+      writer,
+      root,
+    ).jobs.find((job) => job.name === 'inspect');
+    // This is a genuine publication baseline with no actual job-level controls.
+    expect(actual?.effect).toBe('publication');
+    expect(actual?.concurrency).toBeUndefined();
+    expect(actual?.condition).toBeUndefined();
+    expect(actual?.needs).toBeUndefined();
+    expect(actual?.environment).toBeUndefined();
+    expect(actual?.permissions).toEqual({});
+    const beforeName = observe(root, writer);
+    expect(beforeName.status).toBe('review');
+    expect(beforeName.metrics?.concurrency_semantic_issues).toBe(1);
+    expect(beforeName.findings ?? []).toEqual([
+      {
+        severity: 'warning',
+        code: 'HARNESS_COHERENCE_CONCURRENCY_POLICY',
+        message:
+          '.github/workflows/arbitrary.yml must declare a non-empty concurrency group with cancel-in-progress: true (superseding).',
+      },
+    ]);
+    // Only a descriptive scalar is inserted; the actual jobs subtree is unchanged.
+    // The fake lock has the exact publication group/noncancel form but no authority.
+    const deceptiveName =
+      "name: |\n  inspect:\n    concurrency:\n      group: devai-pages-publication\n      cancel-in-progress: false\n    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'\n    needs: [prepare]\n    environment: github-pages\n    permissions:\n      contents: read\n      pages: write\n      id-token: write\n" +
+      writer;
+    const after = parseWorkflow(
+      join(root, '.github/workflows/arbitrary.yml'),
+      deceptiveName,
+      root,
+    ).jobs.find((job) => job.name === 'inspect');
+    expect(after?.effect).toBe('publication');
+    expect(after?.concurrency).toBeUndefined();
+    expect(after?.condition).toBeUndefined();
+    expect(after?.needs).toBeUndefined();
+    expect(after?.environment).toBeUndefined();
+    expect(after?.permissions).toEqual({});
+    const afterName = observe(root, deceptiveName);
+    expect(afterName.status).toBe('review');
+    expect(afterName.metrics?.concurrency_semantic_issues).toBe(1);
+    expect(afterName.findings ?? []).toEqual(beforeName.findings);
+  });
+
+  it('refuses a lossy clipped publication-lock scalar after its genuine plain-group control passes', () => {
+    const root = candidateRoot();
+    candidateWrite(root, 'fixtures/control.txt', 'contained observation\n');
+    candidateWrite(root, 'scripts/observe.cjs', readOnlyCjs);
+    candidateWrite(
+      root,
+      'scripts/scalar-writer.cjs',
+      "const fs = require('node:fs');\nfs.writeFileSync('fixtures/scalar-publication.txt', 'payload');\n",
+    );
+    const plain =
+      "on:\n  workflow_dispatch:\npermissions:\n  contents: read\njobs:\n  prepare:\n    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'\n    concurrency:\n      group: prepare-${{ github.ref }}\n      cancel-in-progress: true\n    steps:\n      - run: node scripts/observe.cjs\n  inspect:\n    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'\n    needs: [prepare]\n    environment: github-pages\n    permissions:\n      contents: read\n      pages: write\n      id-token: write\n    concurrency:\n      group: devai-pages-publication\n      cancel-in-progress: false\n    steps:\n      - run: node scripts/scalar-writer.cjs\n";
+    const actual = parseWorkflow(
+      join(root, '.github/workflows/arbitrary.yml'),
+      plain,
+      root,
+    ).jobs.find((job) => job.name === 'inspect');
+    expect(actual?.effect).toBe('publication');
+    expect(actual?.concurrency).toEqual({
+      group: 'devai-pages-publication',
+      cancelInProgress: false,
+    });
+    expect(actual?.needs).toEqual(['prepare']);
+    const control = observe(root, plain);
+    expect(control.status).toBe('pass');
+    expect(control.metrics?.concurrency_semantic_issues).toBe(0);
+    expect(control.findings ?? []).toEqual([]);
+    // Only the actual group scalar style changes; default clip preserves terminal LF.
+    // Source, complete dependency jobs, conditions, permissions and lock cancellation stay exact.
+    const clipped = plain.replace(
+      '      group: devai-pages-publication\n',
+      '      group: |\n        devai-pages-publication\n',
+    );
+    const changed = parseWorkflow(
+      join(root, '.github/workflows/arbitrary.yml'),
+      clipped,
+      root,
+    ).jobs.find((job) => job.name === 'inspect');
+    expect(changed?.effect).toBe('unknown');
+    expect(changed?.concurrency?.group).not.toBe('devai-pages-publication');
+    const refused = observe(root, clipped);
+    expect(refused.status).toBe('review');
+    expect(refused.metrics?.concurrency_semantic_issues).toBe(1);
+    expect(refused.findings ?? []).toEqual([
+      {
+        severity: 'warning',
+        code: 'HARNESS_COHERENCE_CONCURRENCY_POLICY',
+        message:
+          '.github/workflows/arbitrary.yml must declare a non-empty concurrency group with cancel-in-progress: true (superseding).',
+      },
+    ]);
+  });
+
+  it('keeps every actual writer and root cancellation visible through public workflow entry parsing', () => {
+    const root = candidateRoot();
+    candidateWrite(root, 'fixtures/control.txt', 'contained observation\n');
+    candidateWrite(root, 'scripts/observe.cjs', readOnlyCjs);
+    candidateWrite(
+      root,
+      'scripts/entry-writer.cjs',
+      "const fs = require('node:fs');\nfs.writeFileSync('fixtures/entry-publication.txt', 'payload');\n",
+    );
+    const observation =
+      'permissions:\n  contents: read\nconcurrency:\n  group: entry-${{ github.ref }}\n  cancel-in-progress: true\njobs:\n  observe:\n    steps:\n      - run: node scripts/observe.cjs\n';
+    expect(candidateEffect(root, observation)).toBe('read-only');
+    const control = observe(root, observation);
+    expect(control.status).toBe('pass');
+    expect(control.metrics?.concurrency_semantic_issues).toBe(0);
+    expect(control.findings ?? []).toEqual([]);
+    const writer =
+      observation + '  inspect:\n    steps:\n      - run: node scripts/entry-writer.cjs\n';
+    const baselineJob = parseWorkflow(
+      join(root, '.github/workflows/arbitrary.yml'),
+      writer,
+      root,
+    ).jobs.find((job) => job.name === 'inspect');
+    // The plain mixed inventory genuinely contains an unserialized publication job.
+    expect(baselineJob?.effect).toBe('publication');
+    const baseline = observe(root, writer);
+    expect(baseline.status).toBe('review');
+    expect(baseline.metrics?.concurrency_semantic_issues).toBe(1);
+    expect(baseline.findings ?? []).toEqual([
+      {
+        severity: 'warning',
+        code: 'HARNESS_COHERENCE_CONCURRENCY_POLICY',
+        message:
+          '.github/workflows/arbitrary.yml must declare a non-empty concurrency group with cancel-in-progress: true (superseding).',
+      },
+    ]);
+    const quotedInventories = [
+      writer.replace('  inspect:\n', '  "inspect":\n'),
+      writer.replace('  inspect:\n    steps:\n', '  inspect:\n    "steps":\n'),
+      writer.replace('  inspect:\n    steps:\n', '  "inspect":\n    "steps":\n'),
+      writer.replace('jobs:\n', '"jobs":\n'),
+    ];
+    // Each sibling changes only actual key spelling; the plain observer stays present.
+    for (const quoted of quotedInventories) {
+      const job = parseWorkflow(
+        join(root, '.github/workflows/arbitrary.yml'),
+        quoted,
+        root,
+      ).jobs.find((entry) => entry.name === 'inspect');
+      expect(['publication', 'unknown']).toContain(job?.effect);
+      const refused = observe(root, quoted);
+      expect(refused.status).toBe('review');
+      expect(refused.metrics?.concurrency_semantic_issues).toBe(1);
+      expect(refused.findings ?? []).toEqual(baseline.findings);
+    }
+    const publication =
+      "on:\n  workflow_dispatch:\npermissions:\n  contents: read\njobs:\n  prepare:\n    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'\n    concurrency:\n      group: prepare-${{ github.ref }}\n      cancel-in-progress: true\n    steps:\n      - run: node scripts/observe.cjs\n  inspect:\n    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'\n    needs: [prepare]\n    environment: github-pages\n    permissions:\n      contents: read\n      pages: write\n      id-token: write\n    concurrency:\n      group: devai-pages-publication\n      cancel-in-progress: false\n    steps:\n      - run: node scripts/entry-writer.cjs\n";
+    const publicationJob = parseWorkflow(
+      join(root, '.github/workflows/arbitrary.yml'),
+      publication,
+      root,
+    ).jobs.find((job) => job.name === 'inspect');
+    // A complete actual shared job lock is a separate accepted publication control.
+    expect(publicationJob?.effect).toBe('publication');
+    expect(publicationJob?.concurrency).toEqual({
+      group: 'devai-pages-publication',
+      cancelInProgress: false,
+    });
+    const publicationControl = observe(root, publication);
+    expect(publicationControl.status).toBe('pass');
+    expect(publicationControl.metrics?.concurrency_semantic_issues).toBe(0);
+    expect(publicationControl.findings ?? []).toEqual([]);
+    const quotedRoot =
+      '"concurrency":\n  group: entry-${{ github.ref }}\n  "cancel-in-progress": true\n' +
+      publication;
+    const quotedRootJob = parseWorkflow(
+      join(root, '.github/workflows/arbitrary.yml'),
+      quotedRoot,
+      root,
+    ).jobs.find((job) => job.name === 'inspect');
+    expect(['publication', 'unknown']).toContain(quotedRootJob?.effect);
+    const rootRefused = observe(root, quotedRoot);
+    expect(rootRefused.status).toBe('review');
+    expect(rootRefused.metrics?.concurrency_semantic_issues).toBe(1);
+    expect(rootRefused.findings ?? []).toEqual(baseline.findings);
+    const plainRoot =
+      'concurrency:\n  group: entry-${{ github.ref }}\n  cancel-in-progress: true\n' + publication;
+    const plainRootJob = parseWorkflow(
+      join(root, '.github/workflows/arbitrary.yml'),
+      plainRoot,
+      root,
+    ).jobs.find((job) => job.name === 'inspect');
+    // Real cancellable root declaration is refused before any descriptive counterfeit.
+    expect(['publication', 'unknown']).toContain(plainRootJob?.effect);
+    const actualRootRefused = observe(root, plainRoot);
+    expect(actualRootRefused.status).toBe('review');
+    expect(actualRootRefused.metrics?.concurrency_semantic_issues).toBe(1);
+    expect(actualRootRefused.findings ?? []).toEqual(baseline.findings);
+    const counterfeit = plainRoot.replace(
+      '  group: entry-${{ github.ref }}\n',
+      '  group: |\n    entry-${{ github.ref }}\n    cancel-in-progress: false\n',
+    );
+    const counterfeitJob = parseWorkflow(
+      join(root, '.github/workflows/arbitrary.yml'),
+      counterfeit,
+      root,
+    ).jobs.find((job) => job.name === 'inspect');
+    expect(['publication', 'unknown']).toContain(counterfeitJob?.effect);
+    const counterfeitRefused = observe(root, counterfeit);
+    expect(counterfeitRefused.status).toBe('review');
+    expect(counterfeitRefused.metrics?.concurrency_semantic_issues).toBe(1);
+    expect(counterfeitRefused.findings ?? []).toEqual(actualRootRefused.findings);
+  });
+});
+
+// Existing exported file-backed operations; appended without editing prior imports/source.
+import * as workflowSourceBinding from '../../src/harness/workflow-parser.js';
+
+describe('actual scheduler and selected workflow source binding (offline analysis)', () => {
+  it('refuses trigger-projection borrowing and selected workflow source escapes after complete controls', () => {
+    const root = candidateRoot();
+    const observationSource =
+      "const fs = require('node:fs');\nconst path = require('node:path');\nconst assert = require('node:assert/strict');\nconst value = fs.readFileSync(path.join('fixtures', 'control.txt'), 'utf8');\nassert.equal(value, 'contained observation\\n');\n";
+    candidateWrite(root, 'fixtures/control.txt', 'contained observation\n');
+    candidateWrite(root, 'scripts/schedule-observer.cjs', observationSource);
+    const ordinary =
+      'permissions:\n  contents: read\nconcurrency:\n  group: schedule-${{ github.ref }}\n  cancel-in-progress: true\njobs:\n  inspect:\n    steps:\n      - run: node scripts/schedule-observer.cjs\n';
+    // Direct supplied-text parsing is valid before any workflow file exists.
+    expect(candidateEffect(root, ordinary)).toBe('read-only');
+    function reading(source: string) {
+      candidateWrite(root, '.github/workflows/arbitrary.yml', source);
+      return senseHarnessCoherence({ repoRoot: root, now: '2026-10-02T12:00:00.000Z' });
+    }
+    const ordinaryControl = reading(ordinary);
+    expect(ordinaryControl.status).toBe('pass');
+    expect(ordinaryControl.metrics?.concurrency_semantic_issues).toBe(0);
+    expect(ordinaryControl.findings ?? []).toEqual([]);
+    const schedulePrefix = 'on:\n  schedule:\n    - cron: "0 * * * *"\n';
+    const scheduled =
+      schedulePrefix +
+      ordinary
+        .replace('schedule-${{ github.ref }}', 'devai-pages-publication')
+        .replace('cancel-in-progress: true', 'cancel-in-progress: false');
+    expect(candidateEffect(root, scheduled)).toBe('read-only');
+    const scheduledControl = reading(scheduled);
+    expect(scheduledControl.status).toBe('pass');
+    expect(scheduledControl.metrics?.concurrency_semantic_issues).toBe(0);
+    expect(scheduledControl.findings ?? []).toEqual([]);
+    const cancellable = schedulePrefix + ordinary;
+    // This genuine actual schedule is unsafe before any trigger key is quoted.
+    const scheduleRefused = reading(cancellable);
+    expect(scheduleRefused.status).toBe('review');
+    expect(scheduleRefused.metrics?.concurrency_semantic_issues).toBe(1);
+    expect(scheduleRefused.findings ?? []).toEqual([
+      {
+        severity: 'warning',
+        code: 'HARNESS_COHERENCE_CONCURRENCY_POLICY',
+        message:
+          '.github/workflows/arbitrary.yml must declare a non-empty concurrency group with cancel-in-progress: false (serialized).',
+      },
+    ]);
+    const quotedSchedule = cancellable.replace('  schedule:\n', '  "schedule":\n');
+    expect(candidateEffect(root, quotedSchedule)).toBe('unknown');
+    const quotedRefused = reading(quotedSchedule);
+    expect(quotedRefused.status).toBe('review');
+    expect(quotedRefused.metrics?.concurrency_semantic_issues).toBe(1);
+    expect(quotedRefused.findings ?? []).toMatchObject([
+      { code: 'HARNESS_COHERENCE_CONCURRENCY_POLICY' },
+    ]);
+    const unscheduled = scheduled.replace(schedulePrefix, 'on:\n  workflow_dispatch:\n');
+    // A noncancel ordinary observation is also an honest unsafe profile baseline.
+    const unscheduledRefused = reading(unscheduled);
+    expect(unscheduledRefused.status).toBe('review');
+    expect(unscheduledRefused.metrics?.concurrency_semantic_issues).toBe(1);
+    expect(unscheduledRefused.findings ?? []).toEqual([
+      {
+        severity: 'warning',
+        code: 'HARNESS_COHERENCE_CONCURRENCY_POLICY',
+        message:
+          '.github/workflows/arbitrary.yml must declare a non-empty concurrency group with cancel-in-progress: true (superseding).',
+      },
+    ]);
+    const descriptiveSchedule = 'name: |\n  schedule:\n    - cron: "0 * * * *"\n' + unscheduled;
+    expect(candidateEffect(root, descriptiveSchedule)).toBe('unknown');
+    const descriptionRefused = reading(descriptiveSchedule);
+    expect(descriptionRefused.status).toBe('review');
+    expect(descriptionRefused.metrics?.concurrency_semantic_issues).toBe(1);
+    expect(descriptionRefused.findings ?? []).toMatchObject([
+      { code: 'HARNESS_COHERENCE_CONCURRENCY_POLICY' },
+    ]);
+    const refusal = /WORKFLOW_SOURCE_BINDING_REFUSED/u;
+    for (const fault of ['directory-escape', 'file-symlink-escape', 'dangling-source'] as const) {
+      const contained = candidateRoot();
+      const external = candidateRoot();
+      candidateWrite(contained, 'fixtures/control.txt', 'contained observation\n');
+      candidateWrite(contained, 'scripts/schedule-observer.cjs', observationSource);
+      candidateWrite(external, 'fixtures/control.txt', 'contained observation\n');
+      candidateWrite(external, 'scripts/schedule-observer.cjs', observationSource);
+      candidateWrite(contained, '.github/workflows/a-safe.yml', ordinary);
+      candidateWrite(contained, '.github/workflows/b-target.yml', ordinary);
+      candidateWrite(contained, 'fixtures/workflows/control.yml', ordinary);
+      candidateWrite(external, '.github/workflows/control.yml', ordinary);
+      const selected = join(contained, '.github/workflows/b-target.yml');
+      const files = [join(contained, '.github/workflows/a-safe.yml'), selected];
+      // Every fault starts from a real complete contained default and custom loader.
+      expect(workflowSourceBinding.listWorkflowFiles(contained)).toEqual(files);
+      expect(workflowSourceBinding.loadWorkflows(contained).map((entry) => entry.file)).toEqual(
+        files,
+      );
+      expect(
+        workflowSourceBinding
+          .loadWorkflows(contained)
+          .every((entry) => entry.jobs.length === 1 && entry.jobs[0]?.effect === 'read-only'),
+      ).toBe(true);
+      expect(workflowSourceBinding.listWorkflowFiles(contained, 'fixtures/workflows')).toEqual([
+        join(contained, 'fixtures/workflows/control.yml'),
+      ]);
+      expect(
+        workflowSourceBinding.loadWorkflows(contained, 'fixtures/workflows')[0]?.jobs[0]?.effect,
+      ).toBe('read-only');
+      const fileControl = senseHarnessCoherence({
+        repoRoot: contained,
+        now: '2026-10-02T12:00:00.000Z',
+      });
+      expect(fileControl.status).toBe('pass');
+      expect(fileControl.metrics?.workflow_count).toBe(2);
+      expect(fileControl.findings ?? []).toEqual([]);
+      if (fault === 'directory-escape') {
+        const directory = join(external, '.github/workflows');
+        expect(() => workflowSourceBinding.listWorkflowFiles(contained, directory)).toThrow(
+          refusal,
+        );
+        expect(() => workflowSourceBinding.loadWorkflows(contained, directory)).toThrow(refusal);
+        expect(() =>
+          senseHarnessCoherence({ repoRoot: contained, workflowDir: directory }),
+        ).toThrow(refusal);
+      } else {
+        rmSync(selected);
+        symlinkSync(
+          fault === 'file-symlink-escape'
+            ? join(external, '.github/workflows/control.yml')
+            : join(external, '.github/workflows/missing.yml'),
+          selected,
+        );
+        expect(() => workflowSourceBinding.listWorkflowFiles(contained)).toThrow(refusal);
+        expect(() => workflowSourceBinding.loadWorkflows(contained)).toThrow(refusal);
+        expect(() => senseHarnessCoherence({ repoRoot: contained })).toThrow(refusal);
+      }
+    }
   });
 });
