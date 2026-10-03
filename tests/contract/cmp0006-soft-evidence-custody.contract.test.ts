@@ -253,9 +253,7 @@ function fixture() {
   return { input, manifest, trust, seal, sealRaw, keys };
 }
 async function verifier() {
-  return (await import(
-    new URL('../../packages/sensors/src/ci-invariant-gate.js', import.meta.url).href
-  )) as {
+  return (await import('../../packages/sensors/src/ci-invariant-gate.js')) as {
     verifySoftGatePayload: (input: unknown) => {
       status: string;
     };

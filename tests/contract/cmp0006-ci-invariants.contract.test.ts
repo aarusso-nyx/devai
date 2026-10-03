@@ -349,9 +349,7 @@ function fixture() {
 type VerifiedResult = Readonly<{ status: string }>;
 type GateResult = { status: string; findings: readonly { invariant_id?: string; code?: string }[] };
 async function gateModule() {
-  return (await import(
-    new URL('../../packages/sensors/src/ci-invariant-gate.js', import.meta.url).href
-  )) as {
+  return (await import('../../packages/sensors/src/ci-invariant-gate.js')) as {
     verifySoftGatePayload: (input: unknown) => VerifiedResult;
     consumeVerifiedSoftGatePayload: (input: unknown) => VerifiedResult;
     validateScoredSoftGate: (input: unknown) => VerifiedResult;

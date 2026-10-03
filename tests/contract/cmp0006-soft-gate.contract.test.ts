@@ -5,13 +5,12 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 const ROOT = resolve(import.meta.dirname, '../..');
-const { validateScoredSoftGate } = (await import(
-  new URL('../../packages/sensors/src/ci-invariant-gate.js', import.meta.url).href
-)) as {
-  validateScoredSoftGate: (input: unknown) => {
-    status: string;
+const { validateScoredSoftGate } =
+  (await import('../../packages/sensors/src/ci-invariant-gate.js')) as {
+    validateScoredSoftGate: (input: unknown) => {
+      status: string;
+    };
   };
-};
 const dimensions = [
   'spec_coherence',
   'plant_idiomaticity',

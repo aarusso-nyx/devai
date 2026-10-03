@@ -162,9 +162,7 @@ function fixture() {
   };
 }
 async function validate(input: unknown) {
-  const module = (await import(
-    new URL('../../packages/sensors/src/ci-invariant-gate.js', import.meta.url).href
-  )) as {
+  const module = (await import('../../packages/sensors/src/ci-invariant-gate.js')) as {
     validateSitePreparationArtifact: (input: unknown) => {
       status: string;
       members?: unknown[];
