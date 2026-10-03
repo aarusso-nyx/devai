@@ -24,7 +24,7 @@ affected_rules:
 inspector_acceptance:
   - IA-001 -- A non-main manual dispatch or any added dispatch input refuses; preparation has no environment, journal/provider call or write permission.
   - IA-002 -- Preparation ref groups cancel superseded preparation only; publishing uses the shared case-insensitive devai-pages-publication group withcancel-in-progress false.
-  - IA-003 -- Top-level cancellation or incomplete job-effect coverage, aliases, bypass predicates and reusable/local-call ambiguity remain findings; an unknown effect remains a finding unless the job is admitted by the 2026-10-03 serialize-or-bound amendment, and an admitted unknown effect is still reported.
+  - IA-003 -- Top-level cancellation or incomplete job-effect coverage, aliases, bypass predicates, unknown effects and reusable/local-call ambiguity remain findings.
   - IA-004 -- Wrong run/artifact/source/tree/digest/member population, unsafe archive entries, duplicate paths or hidden/symlink/special members refuse before extraction.
   - IA-005 -- Publishing consumes the exact successful preparation without rebuilding; a cancelled/failed/skipped preparation never invokes publication.
   - IA-006 -- Known same-run submission resumes only its original artifact and Pages deploymentID; ambiguous intent or unknown cross-run predecessor refuses without duplicate publication.
@@ -54,15 +54,6 @@ Generic harness coherence derives actual effects, permissions, environments and 
 
 The credential matrix documents both exact jobs: preparation has no environment and onlycontents:read; publish-site keepsgithub-pages and the complete existing contents:read/pages:write/deployments:write/id-token:write set. GITHUB_TOKEN rows and workflow checker docs pins reflect this placement without expanding permissions or changing protections.
 
-## Amendment 2026-10-03: serialize-or-bound admission of unknown effects
-
-Owner decision CMP0006-OD-COHERENCE-20261003 amends only how concurrency coherence treats a job whose effect the parser cannot prove. Parser effect classification is unchanged: such a job still classifies as unknown. For concurrency coherence, an unknown-effect job is admitted only when one of these holds:
-
-1. Serialized publisher. Its job-level concurrency group is exactly the shared publication group devai-pages-publication (aliases compared case-insensitively) with literal cancel-in-progress false, no workflow-level or parent concurrency can cancel it, the workflow is triggered only by workflow_dispatch without inputs, and the job condition admits only refs/heads/main.
-2. Cancellable job with a capability bound. Its effective permissions are explicitly declared and every scope is read or none; it has no id-token write, no environment, no secret reference other than the ambient GITHUB_TOKEN, no credential-bearing action input other than the ambient token, no persisted write credential, no deploy or release action, and every local or reusable call it makes resolves and itself satisfies this bound. Omitted permissions never satisfy the bound. Cache and run-scoped artifact saves are not repository or deployment writes for this rule.
-
-Every other unknown-effect job keeps its concurrency finding. An admitted job is reported by name with its admission ground in the coherence reading and an unproved-effect metric; admission never converts an unknown effect into a proved one. Effects outside repository and deployment state, such as network calls from a cancelled read-only job, are outside the concurrency invariant and remain the subject of the effect classification and other gates.
-
 ## Consequences
 
 This makes the declared producer/validator boundary reviewable and testable. Missing observations or custody remain explicit refusals. Source checks establish only their declared source result; final candidate and actual effect gates remain mandatory.
@@ -87,7 +78,7 @@ Blanket exceptions, inferred successful observations, candidate-selected trust a
 
 - IA-001 -- A non-main manual dispatch or any added dispatch input refuses; preparation has no environment, journal/provider call or write permission.
 - IA-002 -- Preparation ref groups cancel superseded preparation only; publishing uses the shared case-insensitive devai-pages-publication group withcancel-in-progress false.
-- IA-003 -- Top-level cancellation or incomplete job-effect coverage, aliases, bypass predicates and reusable/local-call ambiguity remain findings; an unknown effect remains a finding unless the job is admitted by the 2026-10-03 serialize-or-bound amendment, and an admitted unknown effect is still reported.
+- IA-003 -- Top-level cancellation or incomplete job-effect coverage, aliases, bypass predicates, unknown effects and reusable/local-call ambiguity remain findings.
 - IA-004 -- Wrong run/artifact/source/tree/digest/member population, unsafe archive entries, duplicate paths or hidden/symlink/special members refuse before extraction.
 - IA-005 -- Publishing consumes the exact successful preparation without rebuilding; a cancelled/failed/skipped preparation never invokes publication.
 - IA-006 -- Known same-run submission resumes only its original artifact and Pages deploymentID; ambiguous intent or unknown cross-run predecessor refuses without duplicate publication.
