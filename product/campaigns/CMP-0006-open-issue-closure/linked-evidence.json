@@ -1,0 +1,892 @@
+{
+  "repository_head": "180a122787193f9bdfce9b7f4cd5600e85ae7854",
+  "repository_tree": "90c7c4b5acbd9c9bc4acd9aea54a2eb0b0c60921",
+  "linked_issues": [
+    {
+      "number": 69,
+      "state": "closed",
+      "title": "evidence export rejects the certify receipt, forcing a duplicate full verification run (1.4.5)",
+      "body": "## Summary\n\n`devai-evidence-export` accepts only a **profile-driven** receipt. The receipt produced by the capability-driven certify stage (`devai check --release-stage certify --release-intent ...`) is rejected with `POLICY_DIGEST_MISMATCH`, so a second, separate verification run is required to produce an acceptable receipt over identical work.\n\nAffects **1.4.5**.\n\n## Reproduction\n\n1. Run the documented release lifecycle to certification:\n\n```\ndevai check --release-stage preflight --release-profile <profile> --release-intent <intent> --base <sha> --run --write\ndevai check --release-stage certify   --release-profile <profile> --release-intent <intent> --preflight-receipt <path> --base <sha> --run --write\n```\n\nCertify passes and emits a receipt (`verdict: pass`).\n\n2. Export using that receipt:\n\n```\ndevai-evidence-export --repo . --receipt <certify-receipt> --results-dir <results> \\\n  --profile rc --commit <sha> --tree <tree> --toolchain <t.json> --environment <e.json> \\\n  --private-key <k.pem> --public-key <k.pub.pem> --signer-id <id> --output-dir <out>\n```\n\n**Observed:**\n\n```json\n{\"ok\":false,\"code\":\"POLICY_DIGEST_MISMATCH\",\"message\":\"candidate receipt policy digest does not match\"}\n```\n\nThe certify receipt's `taskPolicyDigest` is derived from the capability DAG built from `--release-intent`. `buildExpectedTaskPolicy` in `policy-builder.js` instead resolves a `profileId` from the descriptor's `profiles` array, producing a different digest. The two paths cannot agree.\n\n3. The only way forward is to produce a second receipt under a named profile:\n\n```\ndevai check --rc --run --write\n```\n\nwhich re-executes the population and yields a receipt export accepts.\n\n## Consequence\n\nThe duplicate run is not free. In the adopter case the release DAG's `test:mutation` node runs a 38-package Stryker population:\n\n- certify run: **3.58 hours**\n- second `--rc` run to satisfy export: **3.19 hours**\n\nBoth verify the same commit and tree and both pass. Roughly **3.2 hours of wall clock per certified release** is spent re-proving work already certified, because the two stages disagree on how the task policy is derived.\n\nNote also that `--profile` on `export-cli` takes a `profileId`, not a path, while `--release-profile` on `devai check` takes a path. Passing the profile file to export returns `PROFILE_UNKNOWN`, which reads as a missing profile rather than a wrong argument kind.\n\n## Suggested fix\n\nEither:\n\n1. Have export accept a certification receipt directly, deriving the expected task policy the same way certify did (from the release intent) when the receipt records that provenance; or\n2. Have the certify stage additionally emit a profile-bound receipt when the selected closure corresponds to a declared profile, so no second execution is needed.\n\nA smaller, separate improvement: distinguish \"profile id not found in descriptor\" from \"a path was supplied where an id was expected\" in the `PROFILE_UNKNOWN` message.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)",
+      "updated_at": "2026-10-01T21:04:50Z",
+      "url": "https://github.com/aarusso-nyx/devai/issues/69",
+      "comments": [
+        {
+          "url": "https://api.github.com/repos/aarusso-nyx/devai/issues/comments/5940530033",
+          "html_url": "https://github.com/aarusso-nyx/devai/issues/69#issuecomment-5940530033",
+          "issue_url": "https://api.github.com/repos/aarusso-nyx/devai/issues/69",
+          "id": 5940530033,
+          "node_id": "IC_kwDOT1g9Xs8AAAABYhVLcQ",
+          "user": {
+            "login": "aarusso-nyx",
+            "id": 43353790,
+            "node_id": "MDQ6VXNlcjQzMzUzNzkw",
+            "avatar_url": "https://avatars.githubusercontent.com/u/43353790?v=4",
+            "gravatar_id": "",
+            "url": "https://api.github.com/users/aarusso-nyx",
+            "html_url": "https://github.com/aarusso-nyx",
+            "followers_url": "https://api.github.com/users/aarusso-nyx/followers",
+            "following_url": "https://api.github.com/users/aarusso-nyx/following{/other_user}",
+            "gists_url": "https://api.github.com/users/aarusso-nyx/gists{/gist_id}",
+            "starred_url": "https://api.github.com/users/aarusso-nyx/starred{/owner}{/repo}",
+            "subscriptions_url": "https://api.github.com/users/aarusso-nyx/subscriptions",
+            "organizations_url": "https://api.github.com/users/aarusso-nyx/orgs",
+            "repos_url": "https://api.github.com/users/aarusso-nyx/repos",
+            "events_url": "https://api.github.com/users/aarusso-nyx/events{/privacy}",
+            "received_events_url": "https://api.github.com/users/aarusso-nyx/received_events",
+            "type": "User",
+            "user_view_type": "public",
+            "site_admin": false
+          },
+          "created_at": "2026-10-01T21:04:49Z",
+          "updated_at": "2026-10-01T21:04:49Z",
+          "body": "ADR-REL-0031, wave CTG-0433 (#227): `devai-evidence-export --release-intent` reconstructs the expected release task policy from the pinned intent, so a certify receipt built from a release intent exports without a second verification run. The canonical verifier change is devai-nyx/devai-verifier#12; the vendored copy and the mutation-evidence pin (ADR-MUT-0013) moved with it.\n\nResolved by CMP-0004 (trustworthy observations), closed on main at 180a1227 (#232).",
+          "author_association": "OWNER",
+          "pin": null,
+          "reactions": {
+            "url": "https://api.github.com/repos/aarusso-nyx/devai/issues/comments/5940530033/reactions",
+            "total_count": 0,
+            "+1": 0,
+            "-1": 0,
+            "laugh": 0,
+            "hooray": 0,
+            "confused": 0,
+            "heart": 0,
+            "rocket": 0,
+            "eyes": 0
+          },
+          "performed_via_github_app": null,
+          "minimized": null
+        }
+      ]
+    },
+    {
+      "number": 154,
+      "state": "closed",
+      "title": "Recompute the harness CI-history cells once 50 newer runs exist on main",
+      "body": "## Context\n`SC-20260927T205906-001` (head `86d8ccea`) reads F5:T9 `harness_green_main` FAIL (main success rate 40%), F5:T7 `harness_performance` FAIL (median 503s, p95 3925s) and F5:T8 `harness_robustness` REVIEW (flakiness 6%). The readings are dominated by the ledger-verification runs left waiting on the protected environment (see the ledger-verify trigger issue) and by rehearsal runs whose duration includes the approval wait. Cancelled runs still count as non-success.\n\n## Task\nAfter the push trigger is gone and 50 newer runs exist on main:\n1. Rerun the sweep as inspector at the then-current head, record the readings, and `audit observe` at that head.\n2. Copy the new scorecard beside the first one under `record/proofs/compliance/scorecards/` and note the delta in the campaign guide.\n\nConsider, by decision record, whether the harness sensors should measure only the pull-request gate workflow or also exclude runs whose duration is dominated by environment waits.",
+      "updated_at": "2026-10-01T21:04:52Z",
+      "url": "https://github.com/aarusso-nyx/devai/issues/154",
+      "comments": [
+        {
+          "url": "https://api.github.com/repos/aarusso-nyx/devai/issues/comments/5940530991",
+          "html_url": "https://github.com/aarusso-nyx/devai/issues/154#issuecomment-5940530991",
+          "issue_url": "https://api.github.com/repos/aarusso-nyx/devai/issues/154",
+          "id": 5940530991,
+          "node_id": "IC_kwDOT1g9Xs8AAAABYhVPLw",
+          "user": {
+            "login": "aarusso-nyx",
+            "id": 43353790,
+            "node_id": "MDQ6VXNlcjQzMzUzNzkw",
+            "avatar_url": "https://avatars.githubusercontent.com/u/43353790?v=4",
+            "gravatar_id": "",
+            "url": "https://api.github.com/users/aarusso-nyx",
+            "html_url": "https://github.com/aarusso-nyx",
+            "followers_url": "https://api.github.com/users/aarusso-nyx/followers",
+            "following_url": "https://api.github.com/users/aarusso-nyx/following{/other_user}",
+            "gists_url": "https://api.github.com/users/aarusso-nyx/gists{/gist_id}",
+            "starred_url": "https://api.github.com/users/aarusso-nyx/starred{/owner}{/repo}",
+            "subscriptions_url": "https://api.github.com/users/aarusso-nyx/subscriptions",
+            "organizations_url": "https://api.github.com/users/aarusso-nyx/orgs",
+            "repos_url": "https://api.github.com/users/aarusso-nyx/repos",
+            "events_url": "https://api.github.com/users/aarusso-nyx/events{/privacy}",
+            "received_events_url": "https://api.github.com/users/aarusso-nyx/received_events",
+            "type": "User",
+            "user_view_type": "public",
+            "site_admin": false
+          },
+          "created_at": "2026-10-01T21:04:51Z",
+          "updated_at": "2026-10-01T21:04:51Z",
+          "body": "ADR-SCR-0010, waves CTG-0441 (#230) and CTG-0442 (#231): the harness sensors sample the declared pull-request gate population and read UNKNOWN below the minimum. The second scorecard SC-20261001T194346-001 is recorded beside the first: F5:T7 PASS, F5:T8 PASS, F5:T9 REVIEW (85.5% green over 186 runs).\n\nResolved by CMP-0004 (trustworthy observations), closed on main at 180a1227 (#232).",
+          "author_association": "OWNER",
+          "pin": null,
+          "reactions": {
+            "url": "https://api.github.com/repos/aarusso-nyx/devai/issues/comments/5940530991/reactions",
+            "total_count": 0,
+            "+1": 0,
+            "-1": 0,
+            "laugh": 0,
+            "hooray": 0,
+            "confused": 0,
+            "heart": 0,
+            "rocket": 0,
+            "eyes": 0
+          },
+          "performed_via_github_app": null,
+          "minimized": null
+        }
+      ]
+    },
+    {
+      "number": 157,
+      "state": "closed",
+      "title": "Make recorded readings count as harness_invariant_alignment evidence (F5:T4)",
+      "body": "## Context\n`harness_invariant_alignment` now reads `.devai/state/sensor-readings` (CTG-0265), but `packages/sensors/src/harness-invariant-alignment-evidence.ts` counts a reading as evidence only when `record/proofs/chain.json` carries a matching `sense.readings.record` entry. `sense record` (`packages/cli/src/commands/sense/record.ts`) never writes such an entry, so F5:T4 reads REVIEW in `SC-20260927T205906-001`: INV-DEVAI-002 and INV-HARNESS-006 have no \"executable fail-closed CI step with fresh successful candidate-bound evidence\".\n\n## Task\nDecide which side moves: `sense record` appends the chain entry (harness-write, needs the self-dogfood policy row to cover the chain path), or the evidence model accepts a reading in the canonical store with its candidate binding. Do not weaken the candidate-binding requirement. Update the alignment suites and the sensor design note.",
+      "updated_at": "2026-10-01T21:04:36Z",
+      "url": "https://github.com/aarusso-nyx/devai/issues/157",
+      "comments": [
+        {
+          "url": "https://api.github.com/repos/aarusso-nyx/devai/issues/comments/5940525363",
+          "html_url": "https://github.com/aarusso-nyx/devai/issues/157#issuecomment-5940525363",
+          "issue_url": "https://api.github.com/repos/aarusso-nyx/devai/issues/157",
+          "id": 5940525363,
+          "node_id": "IC_kwDOT1g9Xs8AAAABYhU5Mw",
+          "user": {
+            "login": "aarusso-nyx",
+            "id": 43353790,
+            "node_id": "MDQ6VXNlcjQzMzUzNzkw",
+            "avatar_url": "https://avatars.githubusercontent.com/u/43353790?v=4",
+            "gravatar_id": "",
+            "url": "https://api.github.com/users/aarusso-nyx",
+            "html_url": "https://github.com/aarusso-nyx",
+            "followers_url": "https://api.github.com/users/aarusso-nyx/followers",
+            "following_url": "https://api.github.com/users/aarusso-nyx/following{/other_user}",
+            "gists_url": "https://api.github.com/users/aarusso-nyx/gists{/gist_id}",
+            "starred_url": "https://api.github.com/users/aarusso-nyx/starred{/owner}{/repo}",
+            "subscriptions_url": "https://api.github.com/users/aarusso-nyx/subscriptions",
+            "organizations_url": "https://api.github.com/users/aarusso-nyx/orgs",
+            "repos_url": "https://api.github.com/users/aarusso-nyx/repos",
+            "events_url": "https://api.github.com/users/aarusso-nyx/events{/privacy}",
+            "received_events_url": "https://api.github.com/users/aarusso-nyx/received_events",
+            "type": "User",
+            "user_view_type": "public",
+            "site_admin": false
+          },
+          "created_at": "2026-10-01T21:04:35Z",
+          "updated_at": "2026-10-01T21:04:35Z",
+          "body": "ADR-SCR-0008, wave CTG-0421 (#224): `sense record` appends a digest-bearing `sense.readings.record` chain entry that the alignment sensor counts. F5:T4 still reads REVIEW on the second scorecard for a different, measured reason (two gate invariants without a fail-closed CI step).\n\nResolved by CMP-0004 (trustworthy observations), closed on main at 180a1227 (#232).",
+          "author_association": "OWNER",
+          "pin": null,
+          "reactions": {
+            "url": "https://api.github.com/repos/aarusso-nyx/devai/issues/comments/5940525363/reactions",
+            "total_count": 0,
+            "+1": 0,
+            "-1": 0,
+            "laugh": 0,
+            "hooray": 0,
+            "confused": 0,
+            "heart": 0,
+            "rocket": 0,
+            "eyes": 0
+          },
+          "performed_via_github_app": null,
+          "minimized": null
+        }
+      ]
+    },
+    {
+      "number": 159,
+      "state": "closed",
+      "title": "Decide whether the inventory adherence and regeneration cells are N/A for a CLI-shaped repository (F4:T4, F4:T9)",
+      "body": "## Context\nOn the framework repository `inventory_regeneration` reads REVIEW with `INVENTORY_REGENERATION_NO_KINDS_TOUCHED` (F4:T9) and `inventory_adherence` reads UNKNOWN because `.devai/state/inventory/inventory.json` is absent (F4:T4). The http, database, and rbac surfaces are declared absent in `.devai/config/sensor-inputs.json` (ADR-SCR-0003), which leaves no inventory kind to regenerate; `audit observe` writes nothing under `record/derived/inventory/`.\n\n## Task\nDecide by decision record whether these two cells are N/A for a repository whose plant surfaces are all declared absent (the ledger route of `law/policy/scorecard-na.json`, ADR-SCR-0002) or whether an inventory kind should exist for the `actions` surface, which is declared present. Apply the decision and re-observe.",
+      "updated_at": "2026-10-01T21:04:41Z",
+      "url": "https://github.com/aarusso-nyx/devai/issues/159",
+      "comments": [
+        {
+          "url": "https://api.github.com/repos/aarusso-nyx/devai/issues/comments/5940527048",
+          "html_url": "https://github.com/aarusso-nyx/devai/issues/159#issuecomment-5940527048",
+          "issue_url": "https://api.github.com/repos/aarusso-nyx/devai/issues/159",
+          "id": 5940527048,
+          "node_id": "IC_kwDOT1g9Xs8AAAABYhU_yA",
+          "user": {
+            "login": "aarusso-nyx",
+            "id": 43353790,
+            "node_id": "MDQ6VXNlcjQzMzUzNzkw",
+            "avatar_url": "https://avatars.githubusercontent.com/u/43353790?v=4",
+            "gravatar_id": "",
+            "url": "https://api.github.com/users/aarusso-nyx",
+            "html_url": "https://github.com/aarusso-nyx",
+            "followers_url": "https://api.github.com/users/aarusso-nyx/followers",
+            "following_url": "https://api.github.com/users/aarusso-nyx/following{/other_user}",
+            "gists_url": "https://api.github.com/users/aarusso-nyx/gists{/gist_id}",
+            "starred_url": "https://api.github.com/users/aarusso-nyx/starred{/owner}{/repo}",
+            "subscriptions_url": "https://api.github.com/users/aarusso-nyx/subscriptions",
+            "organizations_url": "https://api.github.com/users/aarusso-nyx/orgs",
+            "repos_url": "https://api.github.com/users/aarusso-nyx/repos",
+            "events_url": "https://api.github.com/users/aarusso-nyx/events{/privacy}",
+            "received_events_url": "https://api.github.com/users/aarusso-nyx/received_events",
+            "type": "User",
+            "user_view_type": "public",
+            "site_admin": false
+          },
+          "created_at": "2026-10-01T21:04:40Z",
+          "updated_at": "2026-10-01T21:04:40Z",
+          "body": "ADR-SCR-0008, wave CTG-0421 (#224): F4:T4 and F4:T9 are both measured cells (the sensor registry governs cell identity); the ledger refuses N/A for a measured cell.\n\nResolved by CMP-0004 (trustworthy observations), closed on main at 180a1227 (#232).",
+          "author_association": "OWNER",
+          "pin": null,
+          "reactions": {
+            "url": "https://api.github.com/repos/aarusso-nyx/devai/issues/comments/5940527048/reactions",
+            "total_count": 0,
+            "+1": 0,
+            "-1": 0,
+            "laugh": 0,
+            "hooray": 0,
+            "confused": 0,
+            "heart": 0,
+            "rocket": 0,
+            "eyes": 0
+          },
+          "performed_via_github_app": null,
+          "minimized": null
+        }
+      ]
+    },
+    {
+      "number": 161,
+      "state": "closed",
+      "title": "Provide a coverage run for the framework so F3:T2 can be measured",
+      "body": "## Context\n`test_coverage_depth` reads `scratch/coverage/rc/coverage-final.json` (declared `coveragePath`). The only producer, `pnpm run test:coverage:rc`, refuses with `CHECK_RC_DB_TESTS_REQUIRED` unless `DEVAI_DB_TESTS=1` and a reachable test database are present. The maintainer decided on 2026-09-27 that no database is provided for the self-scorecard, so F3:T2 reads REVIEW in `SC-20260927T205906-001`.\n\n## Task\nEither provide a test database to the inspector session that records the next scorecard, or add a coverage configuration without the database gate (keeping the RC lane unchanged) and point `coveragePath` at its output.",
+      "updated_at": "2026-10-01T21:04:34Z",
+      "url": "https://github.com/aarusso-nyx/devai/issues/161",
+      "comments": [
+        {
+          "url": "https://api.github.com/repos/aarusso-nyx/devai/issues/comments/5940524402",
+          "html_url": "https://github.com/aarusso-nyx/devai/issues/161#issuecomment-5940524402",
+          "issue_url": "https://api.github.com/repos/aarusso-nyx/devai/issues/161",
+          "id": 5940524402,
+          "node_id": "IC_kwDOT1g9Xs8AAAABYhU1cg",
+          "user": {
+            "login": "aarusso-nyx",
+            "id": 43353790,
+            "node_id": "MDQ6VXNlcjQzMzUzNzkw",
+            "avatar_url": "https://avatars.githubusercontent.com/u/43353790?v=4",
+            "gravatar_id": "",
+            "url": "https://api.github.com/users/aarusso-nyx",
+            "html_url": "https://github.com/aarusso-nyx",
+            "followers_url": "https://api.github.com/users/aarusso-nyx/followers",
+            "following_url": "https://api.github.com/users/aarusso-nyx/following{/other_user}",
+            "gists_url": "https://api.github.com/users/aarusso-nyx/gists{/gist_id}",
+            "starred_url": "https://api.github.com/users/aarusso-nyx/starred{/owner}{/repo}",
+            "subscriptions_url": "https://api.github.com/users/aarusso-nyx/subscriptions",
+            "organizations_url": "https://api.github.com/users/aarusso-nyx/orgs",
+            "repos_url": "https://api.github.com/users/aarusso-nyx/repos",
+            "events_url": "https://api.github.com/users/aarusso-nyx/events{/privacy}",
+            "received_events_url": "https://api.github.com/users/aarusso-nyx/received_events",
+            "type": "User",
+            "user_view_type": "public",
+            "site_admin": false
+          },
+          "created_at": "2026-10-01T21:04:33Z",
+          "updated_at": "2026-10-01T21:04:33Z",
+          "body": "ADR-SCR-0007, wave CTG-0412 (#221): `tests/config/local.coverage.config.ts` measures the declared database-free local population with a population sidecar. F3:T2 is PASS (91.66% lines) on the second scorecard.\n\nResolved by CMP-0004 (trustworthy observations), closed on main at 180a1227 (#232).",
+          "author_association": "OWNER",
+          "pin": null,
+          "reactions": {
+            "url": "https://api.github.com/repos/aarusso-nyx/devai/issues/comments/5940524402/reactions",
+            "total_count": 0,
+            "+1": 0,
+            "-1": 0,
+            "laugh": 0,
+            "hooray": 0,
+            "confused": 0,
+            "heart": 0,
+            "rocket": 0,
+            "eyes": 0
+          },
+          "performed_via_github_app": null,
+          "minimized": null
+        }
+      ]
+    },
+    {
+      "number": 162,
+      "state": "closed",
+      "title": "Owner-side prerequisites for the next release and the site drift sensor",
+      "body": "## Items carried out of campaigns CMP-0001 and CMP-0002\n1. Admit the two read-only `gh api` GET shapes the `site_drift` sensor needs (deployments and the pages intent journal) in the authority broker; the specification is in the notes on #120. Until then `site_drift` reads unknown with `SITE_DRIFT_PROVENANCE_ADAPTER_REQUIRED`. Broker admission edits are a maintainer session change.\n2. Repoint `DEVAI_PROCESS_CONTROL_COMMIT` to the current main before the next release rehearsal, since the promotion scripts are taken from that commit.\n3. Reissue the pages migration audit (`DEVAI_PAGES_MIGRATION_AUDIT_JSON` / `_SHA256` in the `github-pages` environment) for the next tag; it is bound to tag and control commit.\n4. Decide the source `.devai/config/adopter-policy-binding.json` materializes from for the framework's own binding (law ledger or adopter default); it pins a stale digest for `scorecard-na.json`.\n5. Pin the ADR README catalog (R-0204 follow-up).",
+      "updated_at": "2026-09-29T05:08:25Z",
+      "url": "https://github.com/aarusso-nyx/devai/issues/162",
+      "comments": []
+    },
+    {
+      "number": 168,
+      "state": "closed",
+      "title": "Cross-check proof JSONL lines against chain anchors and support append-only orphan declarations",
+      "body": "## Problem\n\n`devai evidence verify --scope chain` validates `record/proofs/chain.json` cryptographically but does not cross-check every physical line in `record/proofs/work/**/*.jsonl` against the chain's `round_id=<R>` and `proof_sequence=<N>` notes. In the DETRAN adopter repository, a valid chain coexisted with 52 unanchored historical JSONL lines across R-0005, R-0007, R-0013 and R-0017. The verifier returned valid despite that gap.\n\n## Expected behavior\n\n- Check both directions: each evidence-record anchor resolves to exactly one JSONL line; each JSONL line has one direct anchor, except an explicitly governed historical declaration.\n- Reject duplicate anchors, malformed notes, missing lines, changed line bytes, duplicate declarations, and new undeclared orphans.\n- Allow a new append-only declaration that is itself directly anchored and names each historical orphan by canonical path, sequence and SHA-256 of the physical line bytes, without editing old proof lines or old chain entries.\n- Keep cryptographic chain verification intact. A declaration should identify the missing original anchor, not claim to restore it.\n\n## Adopter characterization\n\nR-0020 baseline: 119 JSONL lines, 67 directly anchored, 52 orphaned, zero duplicate anchors. An adopter-side `verify:proof-anchors` gate now checks line-level anchoring and runs alongside the existing DEVAI chain verifier. With the orphan lines undeclared, that gate fails while DEVAI's chain verifier succeeds. The adopter is preparing append-only declaration proofs rather than rewriting the historical records.\n\nThe contract and exact historical line hashes are in `work/rounds/R-0020/contracts/CTG-0002.md` of `aarusso-nyx/detran`.\n",
+      "updated_at": "2026-10-01T21:04:48Z",
+      "url": "https://github.com/aarusso-nyx/devai/issues/168",
+      "comments": [
+        {
+          "url": "https://api.github.com/repos/aarusso-nyx/devai/issues/comments/5894006021",
+          "html_url": "https://github.com/aarusso-nyx/devai/issues/168#issuecomment-5894006021",
+          "issue_url": "https://api.github.com/repos/aarusso-nyx/devai/issues/168",
+          "id": 5894006021,
+          "node_id": "IC_kwDOT1g9Xs8AAAABX09lBQ",
+          "user": {
+            "login": "aarusso-nyx",
+            "id": 43353790,
+            "node_id": "MDQ6VXNlcjQzMzUzNzkw",
+            "avatar_url": "https://avatars.githubusercontent.com/u/43353790?v=4",
+            "gravatar_id": "",
+            "url": "https://api.github.com/users/aarusso-nyx",
+            "html_url": "https://github.com/aarusso-nyx",
+            "followers_url": "https://api.github.com/users/aarusso-nyx/followers",
+            "following_url": "https://api.github.com/users/aarusso-nyx/following{/other_user}",
+            "gists_url": "https://api.github.com/users/aarusso-nyx/gists{/gist_id}",
+            "starred_url": "https://api.github.com/users/aarusso-nyx/starred{/owner}{/repo}",
+            "subscriptions_url": "https://api.github.com/users/aarusso-nyx/subscriptions",
+            "organizations_url": "https://api.github.com/users/aarusso-nyx/orgs",
+            "repos_url": "https://api.github.com/users/aarusso-nyx/repos",
+            "events_url": "https://api.github.com/users/aarusso-nyx/events{/privacy}",
+            "received_events_url": "https://api.github.com/users/aarusso-nyx/received_events",
+            "type": "User",
+            "user_view_type": "public",
+            "site_admin": false
+          },
+          "created_at": "2026-09-29T16:08:05Z",
+          "updated_at": "2026-09-29T16:08:05Z",
+          "body": "## 2026-09-29 implementation addendum from DETRAN R-0020\n\nThe adopter workaround has now been exercised after CTG-0003: 84 directly anchored lines, 53 explicitly declared historical orphans and zero undeclared orphans. This does not change the framework gap. The upstream verifier should make the cryptographic chain and the physical JSONL population one coherent acceptance boundary.\n\nSuggested algorithm:\n1. Validate the existing chain cryptographically first. Enumerate physical record/proofs/work/**/*.jsonl files in canonical path order; parse each line as bytes and enforce sequence = one-based physical line number and round_id = filename round.\n2. Extract exactly one round_id and one proof_sequence note from each evidence-record chain entry that claims a proof line. Reject malformed, duplicated or conflicting note pairs. Resolve each pair to exactly one physical line; reject missing line, duplicate anchor, unexpected path/kind and changed bytes according to the record's existing digest contract.\n3. Compute physical lines without direct anchors. An append-only historical declaration may cover only the exact canonical path + sequence + SHA-256 of physical line bytes, with a directly anchored declaration proof. Reject a reference to a directly anchored line, a changed historical byte, duplicated declarations, new orphans without declaration, and a declaration that tries to amend old chain entries.\n4. Report separate counts for direct anchors, declared historical exceptions and undeclared orphans. A cryptographically valid chain with undeclared physical lines must fail verification, not merely warn.\n\nTests should include missing lines, duplicate anchors, malformed notes, sequence gaps, wrong round filename, same sequence paired with the wrong hash, duplicate declarations, a new orphan after the baseline, tampered historical bytes and an honest append-only declaration. Re-running validation must be deterministic and read-only.\n\nDETRAN's reference implementation and tests are at https://github.com/aarusso-nyx/detran/blob/orchestra/devai-sensors/tools/devai/verify-proof-anchors.mjs and its CTG-0002 contract at https://github.com/aarusso-nyx/detran/blob/orchestra/devai-sensors/work/rounds/R-0020/contracts/CTG-0002.md . Those are adopter-side evidence, not a request to copy their hard-coded historical allowlist into DEVAI. Preserve the canonical framework schema and support a general governed declaration mechanism.\n",
+          "author_association": "OWNER",
+          "pin": null,
+          "reactions": {
+            "url": "https://api.github.com/repos/aarusso-nyx/devai/issues/comments/5894006021/reactions",
+            "total_count": 0,
+            "+1": 0,
+            "-1": 0,
+            "laugh": 0,
+            "hooray": 0,
+            "confused": 0,
+            "heart": 0,
+            "rocket": 0,
+            "eyes": 0
+          },
+          "performed_via_github_app": null,
+          "minimized": null
+        },
+        {
+          "url": "https://api.github.com/repos/aarusso-nyx/devai/issues/comments/5940529227",
+          "html_url": "https://github.com/aarusso-nyx/devai/issues/168#issuecomment-5940529227",
+          "issue_url": "https://api.github.com/repos/aarusso-nyx/devai/issues/168",
+          "id": 5940529227,
+          "node_id": "IC_kwDOT1g9Xs8AAAABYhVISw",
+          "user": {
+            "login": "aarusso-nyx",
+            "id": 43353790,
+            "node_id": "MDQ6VXNlcjQzMzUzNzkw",
+            "avatar_url": "https://avatars.githubusercontent.com/u/43353790?v=4",
+            "gravatar_id": "",
+            "url": "https://api.github.com/users/aarusso-nyx",
+            "html_url": "https://github.com/aarusso-nyx",
+            "followers_url": "https://api.github.com/users/aarusso-nyx/followers",
+            "following_url": "https://api.github.com/users/aarusso-nyx/following{/other_user}",
+            "gists_url": "https://api.github.com/users/aarusso-nyx/gists{/gist_id}",
+            "starred_url": "https://api.github.com/users/aarusso-nyx/starred{/owner}{/repo}",
+            "subscriptions_url": "https://api.github.com/users/aarusso-nyx/subscriptions",
+            "organizations_url": "https://api.github.com/users/aarusso-nyx/orgs",
+            "repos_url": "https://api.github.com/users/aarusso-nyx/repos",
+            "events_url": "https://api.github.com/users/aarusso-nyx/events{/privacy}",
+            "received_events_url": "https://api.github.com/users/aarusso-nyx/received_events",
+            "type": "User",
+            "user_view_type": "public",
+            "site_admin": false
+          },
+          "created_at": "2026-10-01T21:04:47Z",
+          "updated_at": "2026-10-01T21:04:47Z",
+          "body": "ADR-EVI-0002, wave CTG-0432 (#228): `evidence verify --scope chain` cross-checks every proof line both ways, records an append-only baseline (written only with `--write`), and accepts an Architect-authorized `historical-gap` declaration. The DETRAN baseline (119/67/52) fails listing its 52 orphans and passes after the declaration.\n\nResolved by CMP-0004 (trustworthy observations), closed on main at 180a1227 (#232).",
+          "author_association": "OWNER",
+          "pin": null,
+          "reactions": {
+            "url": "https://api.github.com/repos/aarusso-nyx/devai/issues/comments/5940529227/reactions",
+            "total_count": 0,
+            "+1": 0,
+            "-1": 0,
+            "laugh": 0,
+            "hooray": 0,
+            "confused": 0,
+            "heart": 0,
+            "rocket": 0,
+            "eyes": 0
+          },
+          "performed_via_github_app": null,
+          "minimized": null
+        }
+      ]
+    },
+    {
+      "number": 169,
+      "state": "closed",
+      "title": "Renderizar índice canônico de rodadas com ID do PhaseClosure para round seal",
+      "body": "## Contexto\n\nNo DETRAN, o `devai round seal` de DEVAI 1.5.6 exige que `record/derived/indexes/rounds.md` contenha o ID do PhaseClosure selecionado (`PC-*`). O renderer publicado `devai evidence render --kind rounds` concatena o corpo de `record.md` e não materializa esse ID no índice. O mesmo comportamento foi verificado no pacote 1.6.0 durante o selo de R-0017.\n\n## Resultado esperado\n\nO DEVAI deve produzir o índice canônico de rodadas a partir dos PhaseClosures, com pelo menos ID do PC, rodada, `supersedes` e `merged_as`, em ordem determinística. O verificador deve rejeitar divergência entre nome de arquivo e ID, duplicatas, ligação de supersessão ausente/cruzada, ciclos e múltiplos terminais por rodada; `--check` deve comparar bytes sem escrever.\n\n## Contorno local autorizado\n\nA decisão OD-R20-002=B da R-0020 autorizou `tools/devai/render-rounds-index.mjs` no DETRAN. O gerador local lê `record/proofs/compliance/closures/PC-*.json`, escreve `record/derived/indexes/rounds.md` de forma determinística e é coberto por `pnpm verify:rounds-index`/`pnpm test:rounds-index`. Ele foi necessário para selar R-0017 e agora para preparar R-0018 (PC-0020 supersede PC-0015). O contorno não edita PCs históricos.\n\nFontes no DETRAN: `work/rounds/R-0017/contracts/CTG-SEAL.md`, `work/rounds/R-0017/reports/seal-readiness-2026-09-27.md`, `work/rounds/R-0020/contracts/CTG-0003.md`.\n",
+      "updated_at": "2026-10-01T21:04:45Z",
+      "url": "https://github.com/aarusso-nyx/devai/issues/169",
+      "comments": [
+        {
+          "url": "https://api.github.com/repos/aarusso-nyx/devai/issues/comments/5894007453",
+          "html_url": "https://github.com/aarusso-nyx/devai/issues/169#issuecomment-5894007453",
+          "issue_url": "https://api.github.com/repos/aarusso-nyx/devai/issues/169",
+          "id": 5894007453,
+          "node_id": "IC_kwDOT1g9Xs8AAAABX09qnQ",
+          "user": {
+            "login": "aarusso-nyx",
+            "id": 43353790,
+            "node_id": "MDQ6VXNlcjQzMzUzNzkw",
+            "avatar_url": "https://avatars.githubusercontent.com/u/43353790?v=4",
+            "gravatar_id": "",
+            "url": "https://api.github.com/users/aarusso-nyx",
+            "html_url": "https://github.com/aarusso-nyx",
+            "followers_url": "https://api.github.com/users/aarusso-nyx/followers",
+            "following_url": "https://api.github.com/users/aarusso-nyx/following{/other_user}",
+            "gists_url": "https://api.github.com/users/aarusso-nyx/gists{/gist_id}",
+            "starred_url": "https://api.github.com/users/aarusso-nyx/starred{/owner}{/repo}",
+            "subscriptions_url": "https://api.github.com/users/aarusso-nyx/subscriptions",
+            "organizations_url": "https://api.github.com/users/aarusso-nyx/orgs",
+            "repos_url": "https://api.github.com/users/aarusso-nyx/repos",
+            "events_url": "https://api.github.com/users/aarusso-nyx/events{/privacy}",
+            "received_events_url": "https://api.github.com/users/aarusso-nyx/received_events",
+            "type": "User",
+            "user_view_type": "public",
+            "site_admin": false
+          },
+          "created_at": "2026-09-29T16:08:10Z",
+          "updated_at": "2026-09-29T16:08:10Z",
+          "body": "## 2026-09-29 implementation addendum from DETRAN R-0020\n\nThe local renderer has been used for sealed historical rounds, including a corrective PC chain for R-0018: PC-0020 supersedes PC-0015 while both source PCs remain immutable. The upstream command should make the canonical index a deterministic projection of record/proofs/compliance/closures/PC-*.json, not of free-form record.md text.\n\nSuggested acceptance fixture:\n- two rounds with ordinary PCs; one round with PC-0015 -> PC-0020 supersession; each row includes PC id, round id, supersedes (or dash) and merged_as (or dash);\n- numeric PC ordering and stable UTF-8/newline/Markdown escaping so repeated render has identical bytes;\n- exactly one terminal PC per round, while retaining all historical rows for an append-only correction;\n- --check compares the expected bytes to record/derived/indexes/rounds.md without writing; --write emits the canonical bytes and a following --check passes;\n- round seal accepts the generated index and refuses a stale one.\n\nNegative fixtures: filename/id mismatch, duplicate PC id, missing superseded PC, cross-round supersession, cycle, two terminal heads, malformed round id, missing closure directory and stale index. Symlink or path escape should not read outside the repository. A failed check/write must not leave a partly rewritten canonical index.\n\nReference adopter implementation: https://github.com/aarusso-nyx/detran/blob/orchestra/devai-sensors/tools/devai/render-rounds-index.mjs . The local tool is an approved workaround (OD-R20-002=B); migration upstream should preserve index semantics and historical PCs. This gap does not currently block CTG-0004 because the adopter gate is already active.\n",
+          "author_association": "OWNER",
+          "pin": null,
+          "reactions": {
+            "url": "https://api.github.com/repos/aarusso-nyx/devai/issues/comments/5894007453/reactions",
+            "total_count": 0,
+            "+1": 0,
+            "-1": 0,
+            "laugh": 0,
+            "hooray": 0,
+            "confused": 0,
+            "heart": 0,
+            "rocket": 0,
+            "eyes": 0
+          },
+          "performed_via_github_app": null,
+          "minimized": null
+        },
+        {
+          "url": "https://api.github.com/repos/aarusso-nyx/devai/issues/comments/5940528389",
+          "html_url": "https://github.com/aarusso-nyx/devai/issues/169#issuecomment-5940528389",
+          "issue_url": "https://api.github.com/repos/aarusso-nyx/devai/issues/169",
+          "id": 5940528389,
+          "node_id": "IC_kwDOT1g9Xs8AAAABYhVFBQ",
+          "user": {
+            "login": "aarusso-nyx",
+            "id": 43353790,
+            "node_id": "MDQ6VXNlcjQzMzUzNzkw",
+            "avatar_url": "https://avatars.githubusercontent.com/u/43353790?v=4",
+            "gravatar_id": "",
+            "url": "https://api.github.com/users/aarusso-nyx",
+            "html_url": "https://github.com/aarusso-nyx",
+            "followers_url": "https://api.github.com/users/aarusso-nyx/followers",
+            "following_url": "https://api.github.com/users/aarusso-nyx/following{/other_user}",
+            "gists_url": "https://api.github.com/users/aarusso-nyx/gists{/gist_id}",
+            "starred_url": "https://api.github.com/users/aarusso-nyx/starred{/owner}{/repo}",
+            "subscriptions_url": "https://api.github.com/users/aarusso-nyx/subscriptions",
+            "organizations_url": "https://api.github.com/users/aarusso-nyx/orgs",
+            "repos_url": "https://api.github.com/users/aarusso-nyx/repos",
+            "events_url": "https://api.github.com/users/aarusso-nyx/events{/privacy}",
+            "received_events_url": "https://api.github.com/users/aarusso-nyx/received_events",
+            "type": "User",
+            "user_view_type": "public",
+            "site_admin": false
+          },
+          "created_at": "2026-10-01T21:04:44Z",
+          "updated_at": "2026-10-01T21:04:44Z",
+          "body": "ADR-EVI-0001, wave CTG-0431 (#226): `evidence render --kind rounds` renders the canonical closure index (closure, round, supersedes, merged_as, terminal) with `--check`, and `round seal` requires the exact terminal row. Owner ruling: the DETRAN closures render the same rows and seal R-0017 through PC-0018; DETRAN can adopt the canonical rendering instead of its local generator.\n\nResolved by CMP-0004 (trustworthy observations), closed on main at 180a1227 (#232).",
+          "author_association": "OWNER",
+          "pin": null,
+          "reactions": {
+            "url": "https://api.github.com/repos/aarusso-nyx/devai/issues/comments/5940528389/reactions",
+            "total_count": 0,
+            "+1": 0,
+            "-1": 0,
+            "laugh": 0,
+            "hooray": 0,
+            "confused": 0,
+            "heart": 0,
+            "rocket": 0,
+            "eyes": 0
+          },
+          "performed_via_github_app": null,
+          "minimized": null
+        }
+      ]
+    },
+    {
+      "number": 187,
+      "state": "closed",
+      "title": "Classify check member applicability in adopters without self-only false failures",
+      "body": "## Problem\n\nDEVAI check exposes action-coverage, action-effects and cli-reference as selectable members in adopter repositories, but in DETRAN with @aarusso-nyx/devai 1.5.6 they behave as framework self-checks rather than adopter checks:\n- action-coverage returns ACTION_INVOCATION_REFUSED with scope=self, claimedCount=0 and registeredCount=57;\n- action-effects reads law/policy/subprocess-effects.json and tests/config/tsconfig.effects.json beneath the adopter root, where the DEVAI package's self-check inputs do not exist, leading to ENOENT;\n- cli-reference seeks law/policy/documentation-information-architecture.json beneath the adopter root, also ENOENT.\nThe framework's own policy/CLI catalog should not be copied into an adopter merely to turn these checks green. In main at 292dee8704a3e745c5eba381056f5b6828071449, adapters-reports.ts still calls runActionCoverageCheck with scope: self unconditionally, even though that lower-level function supports an adopter scope. The check adapter still dispatches all three members, and action-effects retains its repo-root defaults.\n\nAdopter characterization and exact baseline: https://github.com/aarusso-nyx/detran/blob/orchestra/devai-sensors/work/rounds/R-0020/contracts/CTG-0004-A1-proposal.md\nForced self scope: https://github.com/aarusso-nyx/devai/blob/292dee8704a3e745c5eba381056f5b6828071449/packages/cli/src/commands/check/adapters-reports.ts\nDispatch: https://github.com/aarusso-nyx/devai/blob/292dee8704a3e745c5eba381056f5b6828071449/packages/cli/src/commands/check/adapters.ts\nEffects defaults: https://github.com/aarusso-nyx/devai/blob/292dee8704a3e745c5eba381056f5b6828071449/packages/cli/src/commands/check/action-effects.ts\n\n## Requested behavior\n\nDefine repository applicability per member as part of the check contract. For action-coverage, remove the facade-level forced self scope and exercise the existing adopter-aware behavior where its required inputs are valid; if no substantive adopter population exists, report that explicitly instead of an empty PASS. For members that truly inspect the DEVAI framework itself, either:\nA. return a structured, explicit not-applicable result for an adopter (with member, detected repository kind, reason and evidence), or\nB. provide an explicitly supported package-owned input mode that evaluates the intended package sources without shadow copies in the adopter.\nDo not silently mark an unexecuted check ok:true. Do not turn missing required adopter sources into N/A. Keep policy errors, malformed explicit inputs and genuine framework self-check failures as failures.\n\nA structured N/A should be distinguishable from PASS, REVIEW and execution error in machine JSON, human output, aggregate status and CI documentation. It must be stable across reruns. The command should report how the repository kind was identified and which input source was selected.\n\n## Tests / acceptance\n\n- In a DEVAI self fixture, each member executes the original substantive check, and a regression still fails for a deliberately broken action/effect/catalogue or CLI reference.\n- In a minimal adopter fixture, each member produces the documented applicability result (or supported package-source execution) without ENOENT and without invented adopter files.\n- In an adopter that explicitly opts into a supported equivalent source, validate that source and fail on an invalid one; do not fall back from an invalid explicit path to N/A.\n- Check aggregator and --only produce the same classification; no false ok:true from empty populations.\n- Add CLI documentation explaining which members apply to adopters and how to test that classification.\n\nDETRAN's Owner has approved treating these three as explicit N/A pending an upstream applicability fix; they are not an immediate CTG-0004 release blocker. The accepted downstream CI list and its other required checks remain intact.\n",
+      "updated_at": "2026-09-30T09:10:30Z",
+      "url": "https://github.com/aarusso-nyx/devai/issues/187",
+      "comments": [
+        {
+          "url": "https://api.github.com/repos/aarusso-nyx/devai/issues/comments/5907987191",
+          "html_url": "https://github.com/aarusso-nyx/devai/issues/187#issuecomment-5907987191",
+          "issue_url": "https://api.github.com/repos/aarusso-nyx/devai/issues/187",
+          "id": 5907987191,
+          "node_id": "IC_kwDOT1g9Xs8AAAABYCS69w",
+          "user": {
+            "login": "aarusso-nyx",
+            "id": 43353790,
+            "node_id": "MDQ6VXNlcjQzMzUzNzkw",
+            "avatar_url": "https://avatars.githubusercontent.com/u/43353790?v=4",
+            "gravatar_id": "",
+            "url": "https://api.github.com/users/aarusso-nyx",
+            "html_url": "https://github.com/aarusso-nyx",
+            "followers_url": "https://api.github.com/users/aarusso-nyx/followers",
+            "following_url": "https://api.github.com/users/aarusso-nyx/following{/other_user}",
+            "gists_url": "https://api.github.com/users/aarusso-nyx/gists{/gist_id}",
+            "starred_url": "https://api.github.com/users/aarusso-nyx/starred{/owner}{/repo}",
+            "subscriptions_url": "https://api.github.com/users/aarusso-nyx/subscriptions",
+            "organizations_url": "https://api.github.com/users/aarusso-nyx/orgs",
+            "repos_url": "https://api.github.com/users/aarusso-nyx/repos",
+            "events_url": "https://api.github.com/users/aarusso-nyx/events{/privacy}",
+            "received_events_url": "https://api.github.com/users/aarusso-nyx/received_events",
+            "type": "User",
+            "user_view_type": "public",
+            "site_admin": false
+          },
+          "created_at": "2026-09-30T09:10:29Z",
+          "updated_at": "2026-09-30T09:10:29Z",
+          "body": "Fixed by ADR-CHK-0005 option A (wave CTG-0391, #203) and released in 1.7.0 (https://github.com/aarusso-nyx/devai/releases/tag/v1.7.0): check members declare applicability and a framework-only member reports a structured not-applicable in an adopter. Option B (package-owned input mode) stays open as a later record.",
+          "author_association": "OWNER",
+          "pin": null,
+          "reactions": {
+            "url": "https://api.github.com/repos/aarusso-nyx/devai/issues/comments/5907987191/reactions",
+            "total_count": 0,
+            "+1": 0,
+            "-1": 0,
+            "laugh": 0,
+            "hooray": 0,
+            "confused": 0,
+            "heart": 0,
+            "rocket": 0,
+            "eyes": 0
+          },
+          "performed_via_github_app": null,
+          "minimized": null
+        }
+      ]
+    }
+  ],
+  "linked_pull_requests": [
+    {
+      "number": 232,
+      "html_url": "https://github.com/aarusso-nyx/devai/pull/232",
+      "title": "plan(campaign): close R-0404 and CMP-0004",
+      "state": "closed",
+      "merged_at": "2026-10-01T21:04:06Z",
+      "merge_commit_sha": "180a122787193f9bdfce9b7f4cd5600e85ae7854"
+    },
+    {
+      "number": 231,
+      "html_url": "https://github.com/aarusso-nyx/devai/pull/231",
+      "title": "plan(scorecard): CTG-0442 record the second self-scorecard SC-20261001T194346-001 (ADR-SCR-0010, #154)",
+      "state": "closed",
+      "merged_at": "2026-10-01T20:58:01Z",
+      "merge_commit_sha": "c0326aa9cc986d0b4e4350ac14be02a3cf71b7ec"
+    },
+    {
+      "number": 230,
+      "html_url": "https://github.com/aarusso-nyx/devai/pull/230",
+      "title": "feat(sensors): CTG-0441 CI sampling contract for the harness sensors (ADR-SCR-0010, #154)",
+      "state": "closed",
+      "merged_at": "2026-10-01T19:43:47Z",
+      "merge_commit_sha": "c06810699ee53f931d4426ef103ace922f829ab9"
+    },
+    {
+      "number": 228,
+      "html_url": "https://github.com/aarusso-nyx/devai/pull/228",
+      "title": "feat(evidence): CTG-0432 proof-line anchoring and historical declarations (ADR-EVI-0002, #168)",
+      "state": "closed",
+      "merged_at": "2026-10-01T18:18:50Z",
+      "merge_commit_sha": "839075e765e3913ca5839b9628ae92e5c3b65af0"
+    },
+    {
+      "number": 227,
+      "html_url": "https://github.com/aarusso-nyx/devai/pull/227",
+      "title": "feat(release): CTG-0433 export reconstructs the release-intent policy (ADR-REL-0031, #69) and ADR-MUT-0013",
+      "state": "closed",
+      "merged_at": "2026-10-01T17:27:25Z",
+      "merge_commit_sha": "ce768667899cfcf2df2af6f8c6b183fcbe9b8c53"
+    },
+    {
+      "number": 226,
+      "html_url": "https://github.com/aarusso-nyx/devai/pull/226",
+      "title": "feat(evidence): CTG-0431 canonical rounds index and exact-membership seal (ADR-EVI-0001, #169)",
+      "state": "closed",
+      "merged_at": "2026-10-01T16:34:22Z",
+      "merge_commit_sha": "dfe6a7d52ff3369d0b705ca09f8660f4b9716232"
+    },
+    {
+      "number": 224,
+      "html_url": "https://github.com/aarusso-nyx/devai/pull/224",
+      "title": "feat(sense): CTG-0421 immutable readings and recording order (ADR-SCR-0008, #157-#160)",
+      "state": "closed",
+      "merged_at": "2026-10-01T15:33:27Z",
+      "merge_commit_sha": "24d869a2bebf776060cc989fe8954cfaa30c3bee"
+    },
+    {
+      "number": 221,
+      "html_url": "https://github.com/aarusso-nyx/devai/pull/221",
+      "title": "feat(sensors): CTG-0412 governed e2e and database-free coverage (ADR-SCR-0007, #156, #161)",
+      "state": "closed",
+      "merged_at": "2026-10-01T04:55:51Z",
+      "merge_commit_sha": "259197ac0c809f360884fc14da1d87ac92f3f0e2"
+    },
+    {
+      "number": 220,
+      "html_url": "https://github.com/aarusso-nyx/devai/pull/220",
+      "title": "feat(authority): CTG-0411 sensing process admission (ADR-AUT-0002, #155, #162)",
+      "state": "closed",
+      "merged_at": "2026-10-01T04:03:45Z",
+      "merge_commit_sha": "bde1e78cee0a63b81e30a6b77afb6033dce35313"
+    },
+    {
+      "number": 216,
+      "html_url": "https://github.com/aarusso-nyx/devai/pull/216",
+      "title": "feat: CMP-0005 governed multi-stack path authority, and roll the candidate to 1.8.0",
+      "state": "closed",
+      "merged_at": "2026-10-01T01:42:14Z",
+      "merge_commit_sha": "c7fb44cddf6295ba6221bcc40dfcaaa9da23594a"
+    },
+    {
+      "number": 198,
+      "html_url": "https://github.com/aarusso-nyx/devai/pull/198",
+      "title": "plan(campaign): close R-0301, R-0305, R-0306, and R-0307 and record the Owner effects OE-02 to OE-06",
+      "state": "closed",
+      "merged_at": "2026-09-30T02:27:37Z",
+      "merge_commit_sha": "1094bfe1d434fbb511a6fb5e29be9486028ea7aa"
+    }
+  ],
+  "releases": [
+    {
+      "id": 400589973,
+      "tag_name": "v1.8.0",
+      "html_url": "https://github.com/aarusso-nyx/devai/releases/tag/v1.8.0",
+      "published_at": "2026-10-01T02:04:08Z",
+      "target_commitish": "main"
+    },
+    {
+      "id": 399877143,
+      "tag_name": "v1.7.0",
+      "html_url": "https://github.com/aarusso-nyx/devai/releases/tag/v1.7.0",
+      "published_at": "2026-09-30T09:08:28Z",
+      "target_commitish": "main"
+    },
+    {
+      "id": 397354620,
+      "tag_name": "v1.6.0",
+      "html_url": "https://github.com/aarusso-nyx/devai/releases/tag/v1.6.0",
+      "published_at": "2026-09-26T18:47:00Z",
+      "target_commitish": "main"
+    }
+  ],
+  "canonical_verifier_pr": {
+    "number": 12,
+    "html_url": "https://github.com/devai-nyx/devai-verifier/pull/12",
+    "state": "closed",
+    "merged_at": "2026-10-01T16:34:23Z",
+    "merge_commit_sha": "097ef4a658c0478f79d5b21da28a22aea64b7ec3"
+  },
+  "pages_journal_probe": "gh-pages branch/tree returned HTTP 404 during drafting; not evidence of a verified deployment",
+  "prior_campaigns": [
+    {
+      "path": "product/campaigns/CMP-0003-harness-convergence/campaign.json",
+      "sha256": "747e79cbbe3ba024d47f99eebef507e7f4dbaab5cf7aa0167d328f7ae0be349b",
+      "id": "CMP-0003",
+      "status": "closed",
+      "rounds": [
+        {
+          "id": "R-0301",
+          "status": "closed",
+          "closure": {
+            "merged_head": "e5cfdb77a74217ce9288296c93022df96c1021db",
+            "closed_at": "2026-09-29T22:00:58Z",
+            "task_policy_digest": "4d284d804badf9b0971313a65af8539dc380160fc724555bac2ba1872d1cd5d1",
+            "phase_closure": null
+          }
+        },
+        {
+          "id": "R-0302",
+          "status": "closed",
+          "closure": {
+            "merged_head": "12d52fa57eff5278806e5b8c5108046da7bd58be",
+            "closed_at": "2026-09-29T16:51:15Z",
+            "task_policy_digest": null,
+            "phase_closure": null
+          }
+        },
+        {
+          "id": "R-0303",
+          "status": "closed",
+          "closure": {
+            "merged_head": "0a66e13ae4c4230f26d6e2cb7a2ac6017820b3e1",
+            "closed_at": "2026-09-29T16:51:15Z",
+            "task_policy_digest": null,
+            "phase_closure": null
+          }
+        },
+        {
+          "id": "R-0304",
+          "status": "closed",
+          "closure": {
+            "merged_head": "468de683d953f9ccc416919775c68e6901a806e5",
+            "closed_at": "2026-09-30T06:40:00Z",
+            "task_policy_digest": "4d284d804badf9b0971313a65af8539dc380160fc724555bac2ba1872d1cd5d1",
+            "phase_closure": null
+          }
+        },
+        {
+          "id": "R-0305",
+          "status": "closed",
+          "closure": {
+            "merged_head": "04b141fef447d84fae496391ec36133db4365447",
+            "closed_at": "2026-09-30T01:14:30Z",
+            "task_policy_digest": "4d284d804badf9b0971313a65af8539dc380160fc724555bac2ba1872d1cd5d1",
+            "phase_closure": null
+          }
+        },
+        {
+          "id": "R-0306",
+          "status": "closed",
+          "closure": {
+            "merged_head": "5eda694f6fe5f467f8dc3b3d85fbabfe22070a8e",
+            "closed_at": "2026-09-29T21:42:38Z",
+            "task_policy_digest": null,
+            "phase_closure": null
+          }
+        },
+        {
+          "id": "R-0307",
+          "status": "closed",
+          "closure": {
+            "merged_head": "90d5fc7dcab4e85a64528253531a3aefc3c9f93f",
+            "closed_at": "2026-09-29T21:22:15Z",
+            "task_policy_digest": null,
+            "phase_closure": null
+          }
+        },
+        {
+          "id": "R-0308",
+          "status": "closed",
+          "closure": {
+            "merged_head": "bda28a33dd4e8f5d4d3f78b8b5761208f73a2b0b",
+            "closed_at": "2026-09-30T09:15:00Z",
+            "task_policy_digest": null,
+            "phase_closure": null
+          }
+        },
+        {
+          "id": "R-0309",
+          "status": "closed",
+          "closure": {
+            "merged_head": "1587a0a99ab8ce0fd25a6a4cf062978384635319",
+            "closed_at": "2026-09-30T04:24:56Z",
+            "task_policy_digest": null,
+            "phase_closure": null
+          }
+        },
+        {
+          "id": "R-0310",
+          "status": "closed",
+          "closure": {
+            "merged_head": "b8c975f5506cd1aad8c7bb667100aae1126f4c7f",
+            "closed_at": "2026-09-30T05:22:04Z",
+            "task_policy_digest": null,
+            "phase_closure": null
+          }
+        },
+        {
+          "id": "R-0311",
+          "status": "closed",
+          "closure": {
+            "merged_head": "ff5190f84436879f0a9b8a98b4927e1544183643",
+            "closed_at": "2026-09-30T09:15:00Z",
+            "task_policy_digest": "95fc800ef9aed6887b0c97248f9b810039110912e7363f8a33ae4b2e52238cf6",
+            "phase_closure": null
+          }
+        }
+      ]
+    },
+    {
+      "path": "product/campaigns/CMP-0004-trustworthy-observations/campaign.json",
+      "sha256": "59daa50ae723653bfb547d3c8cb353755ae94e86053d30b55becd6d6e710aab4",
+      "id": "CMP-0004",
+      "status": "closed",
+      "rounds": [
+        {
+          "id": "R-0401",
+          "status": "closed",
+          "closure": {
+            "merged_head": "259197ac0c809f360884fc14da1d87ac92f3f0e2",
+            "closed_at": "2026-10-01T05:17:44Z",
+            "task_policy_digest": "a33e478245b2e05adbc0f768a2544c77c699a9edd68443d0528a8719013685ed",
+            "phase_closure": null
+          }
+        },
+        {
+          "id": "R-0402",
+          "status": "closed",
+          "closure": {
+            "merged_head": "24d869a2bebf776060cc989fe8954cfaa30c3bee",
+            "closed_at": "2026-10-01T15:41:57Z",
+            "task_policy_digest": null,
+            "phase_closure": null
+          }
+        },
+        {
+          "id": "R-0403",
+          "status": "closed",
+          "closure": {
+            "merged_head": "839075e765e3913ca5839b9628ae92e5c3b65af0",
+            "closed_at": "2026-10-01T18:40:11Z",
+            "task_policy_digest": null,
+            "phase_closure": null
+          }
+        },
+        {
+          "id": "R-0404",
+          "status": "closed",
+          "closure": {
+            "merged_head": "c0326aa9cc986d0b4e4350ac14be02a3cf71b7ec",
+            "closed_at": "2026-10-01T20:59:30Z",
+            "task_policy_digest": null,
+            "phase_closure": null
+          }
+        }
+      ]
+    },
+    {
+      "path": "product/campaigns/CMP-0005-multi-stack-path-authority/campaign.json",
+      "sha256": "35ff29887e0b378223e5fd543024df9e48faaeb4f2b42a081dc778cc1ee80b4d",
+      "id": "CMP-0005",
+      "status": "closed",
+      "rounds": [
+        {
+          "id": "R-0501",
+          "status": "closed",
+          "closure": {
+            "merged_head": "6f042f89a25e6695fe829b4aa37b696a29976b12",
+            "closed_at": "2026-09-30T15:29:11Z",
+            "task_policy_digest": null,
+            "phase_closure": null
+          }
+        },
+        {
+          "id": "R-0502",
+          "status": "closed",
+          "closure": {
+            "merged_head": "db218ee3502190f19e352f485483c5925331c39f",
+            "closed_at": "2026-09-30T16:27:57Z",
+            "task_policy_digest": null,
+            "phase_closure": null
+          }
+        },
+        {
+          "id": "R-0503",
+          "status": "closed",
+          "closure": {
+            "merged_head": "c7fb44cddf6295ba6221bcc40dfcaaa9da23594a",
+            "closed_at": "2026-10-01T02:05:15Z",
+            "task_policy_digest": "4a38295aa6a2962d55bc383e79fcebec2a99971f9460200c6ec33a062bf5b820",
+            "phase_closure": null
+          }
+        }
+      ]
+    }
+  ]
+}
