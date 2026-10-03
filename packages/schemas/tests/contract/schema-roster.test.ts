@@ -9,10 +9,11 @@ const ROOT = resolve(import.meta.dirname, '../../../..');
 // catalogue into the runtime roster (TASK-0353). ADR-AUT-0003 adds
 // path-authority-classes.schema.json (TASK-0523), and ADR-SCR-0008 adds
 // observation-backlog.schema.json (TASK-0423). ADR-EVI-0002 adds proof-anchor-baseline.schema.json
-// and proof-orphan-declaration.schema.json (TASK-0436), so the count is 99.
+// and proof-orphan-declaration.schema.json (TASK-0436). CMP-0006 adds the four soft-gate
+// schemas and thresholds.schema.json, so the count is 104.
 describe('schema roster', () => {
   it('holds the previous roster plus model-tiers, path-authority-classes, observation-backlog and the proof anchor schemas', () => {
-    expect(ROSTER).toHaveLength(99);
+    expect(ROSTER).toHaveLength(104);
     expect(ROSTER).toContain('model-tiers.schema.json');
     expect(ROSTER).toContain('path-authority-classes.schema.json');
     expect(ROSTER).toContain('observation-backlog.schema.json');
