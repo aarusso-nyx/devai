@@ -40,6 +40,9 @@ export interface TestCoverageDepthOptions {
 
 const DEFAULT_THRESHOLDS = { pass: 80, review: 50 } as const;
 
+/** Set on the coverage producer's environment so a nested sensor never starts another (#242). */
+export const COVERAGE_PRODUCER_MARKER = 'DEVAI_COVERAGE_PRODUCER_ACTIVE';
+
 export function senseTestCoverageDepth(opts: TestCoverageDepthOptions): SensorReading {
   const thresholds = opts.thresholds ?? DEFAULT_THRESHOLDS;
   let status: SensorStatus;
@@ -184,9 +187,28 @@ export function measureTestCoverageDepth(opts: MeasureTestCoverageDepthOptions):
 
   let producer: ProducerRun | undefined;
   if (!isFile(reportPath)) {
+    // #242: the producer runs the local suite, which may itself run this sensor. The producer
+    // carries a marker, and a sensor inside it never starts a nested producer, whatever the
+    // authority scope admits.
+    if (process.env[COVERAGE_PRODUCER_MARKER] === '1') {
+      return reading(
+        'unknown',
+        [
+          {
+            severity: 'warning',
+            code: 'COVERAGE_PRODUCER_RECURSION',
+            message: `The ${population} coverage producer was not started: this sensor already runs inside a coverage producer (${COVERAGE_PRODUCER_MARKER}=1).`,
+          },
+        ],
+        null,
+      );
+    }
     let result: ReturnType<typeof runCommand>;
     try {
-      result = runCommand(LOCAL_COVERAGE_PRODUCER_ARGV, { cwd: opts.repoRoot });
+      result = runCommand(LOCAL_COVERAGE_PRODUCER_ARGV, {
+        cwd: opts.repoRoot,
+        env: { [COVERAGE_PRODUCER_MARKER]: '1' },
+      });
     } catch (error) {
       // The host refused to start the producer (an authority scope that does not admit
       // it). A refusal measures nothing about the code, so the reading is an `unknown`
