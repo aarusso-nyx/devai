@@ -202,7 +202,15 @@ const PREFLIGHT_ALLOWED_SCRIPTS = [
 // The collapsed lane (ADR-CHK-0001): the step ids in order and the commands
 // each must carry.
 const PREFLIGHT_STEP_ID = 'preflight';
-const PREFLIGHT_LANE_STEP_IDS = ['install', PREFLIGHT_STEP_ID, 'affected'];
+const PREFLIGHT_LANE_STEP_IDS = ['install', PREFLIGHT_STEP_ID, 'affected', 'soft-gate'];
+// ADR-MDL-0004: the provider-free soft gate runs exactly these parsed command lines.
+const SOFT_GATE_RUN_LINES = [
+  'set -euo pipefail',
+  'node .devai/state/pr-bootstrap/cli/bin.js check --only trace --format json > "$RUNNER_TEMP/devai-trace.json"',
+  'node .devai/state/pr-bootstrap/cli/bin.js check --only test-trace --format json > "$RUNNER_TEMP/devai-test-trace.json"',
+  'node .devai/state/pr-bootstrap/cli/bin.js audit scorecard --repo-root . --at "$(git rev-parse HEAD)" --format json > "$RUNNER_TEMP/devai-scorecard.json"',
+  'node scripts/process/check-ci-invariant-gate.mjs --fetch-script scripts/process/fetch-ci-invariant-evidence.mjs --preflight "$RUNNER_TEMP/devai-preflight.json" --affected "$RUNNER_TEMP/devai-affected.json" --trace "$RUNNER_TEMP/devai-trace.json" --test-trace "$RUNNER_TEMP/devai-test-trace.json" --scorecard "$RUNNER_TEMP/devai-scorecard.json"',
+];
 // Per-event bindings (ADR-CHK-0004, remote-preflight-contract.md Queue
 // admission): the merge_group head and base under merge_group, the pull
 // request head and base otherwise; the job binds the base once and every base
@@ -553,6 +561,8 @@ export function credentialReferences(value) {
     names.add(match[1] ?? match[2]);
   }
   if (/\bgithub\s*\.\s*token\b/u.test(text)) names.add('GITHUB_TOKEN');
+  if (text.includes('vars.DEVAI_SOFT_GATE_TRUST_JSON')) names.add('DEVAI_SOFT_GATE_TRUST_JSON');
+
   return names;
 }
 
@@ -584,7 +594,20 @@ function checkCredentialBijection(root, sources, findings) {
       );
     }
     for (const [job, value] of Object.entries(object(jobs))) {
-      for (const name of credentialReferences(value)) {
+      const refs = credentialReferences(value);
+      // actions/checkout without an explicit token input authenticates with the job token
+      // implicitly. That use satisfies a declared GITHUB_TOKEN consumer for any job; it is
+      // derived from the steps and the manifest, never from a workflow or job name.
+      const implicitCheckoutToken =
+        Array.isArray(value?.steps) &&
+        value.steps.some(
+          (step) =>
+            String(object(step).uses ?? '').startsWith('actions/checkout@') &&
+            object(object(step).with).token === undefined,
+        );
+      if (implicitCheckoutToken && declared.has(`${workflowPath}#${job}#GITHUB_TOKEN`))
+        refs.add('GITHUB_TOKEN');
+      for (const name of refs) {
         referenced.add(`${workflowPath}#${job}#${name}`);
         if (!declared.has(`${workflowPath}#${job}#${name}`)) {
           findings.push(
@@ -993,16 +1016,44 @@ function checkPreflightWorkflow(file, workflow, source, findings, pins) {
     );
   }
 
-  // GitHub contexts also support bracket access and whole-context expressions.
-  // Dotted-name matching alone permits e.g. toJSON(secrets) to bypass this guard.
-  const protectedExpression = [...source.matchAll(/\$\{\{([\s\S]*?)\}\}/gu)].some((match) =>
+  // Exactly one independently controlled public metadata seam; all other protected reads refuse.
+  const softSteps =
+    object(workflow.jobs).preflight?.steps?.filter((step) => step.id === 'soft-gate') ?? [];
+  const trustExpression = '${{ vars.DEVAI_SOFT_GATE_TRUST_JSON }}';
+  const trustLine = `DEVAI_SOFT_GATE_TRUST_JSON: ${trustExpression}`;
+  const soft = object(softSteps[0]);
+  const validTrust =
+    softSteps.length === 1 &&
+    JSON.stringify(Object.keys(soft).sort()) ===
+      JSON.stringify(['env', 'id', 'name', 'run', 'shell']) &&
+    soft.shell === 'bash' &&
+    JSON.stringify(object(soft.env)) ===
+      JSON.stringify({ DEVAI_SOFT_GATE_TRUST_JSON: trustExpression }) &&
+    JSON.stringify(runLines(soft)) === JSON.stringify(SOFT_GATE_RUN_LINES);
+  // Raw-source scan: an implicit expression (e.g. `if: vars.X`) or bracket access is a read
+  // even outside `${{ }}`. Only the single exact trust env line is removed before scanning.
+  const trustLines = source.split('\n').filter((line) => line.trim() === trustLine);
+  const remainder = source
+    .split('\n')
+    .filter((line) => line.trim() !== trustLine)
+    .join('\n');
+  const protectedExpression = [...remainder.matchAll(/\$\{\{([\s\S]*?)\}\}/gu)].some((match) =>
     /\b(?:secrets|vars)\b/u.test(match[1] ?? ''),
   );
-  if (/\b(?:secrets|vars)\s*(?:\.|\[)/u.test(source) || protectedExpression) {
+  if (
+    !validTrust ||
+    trustLines.length !== 1 ||
+    source.split(trustExpression).length !== 2 ||
+    /\b(?:secrets|vars)\s*(?:\.|\[)/u.test(remainder) ||
+    protectedExpression
+  )
     findings.push(
-      finding('CI_PREFLIGHT_SECRET_ACCESS_FORBIDDEN', file, 'preflight must reference no secret'),
+      finding(
+        'CI_PREFLIGHT_SECRET_ACCESS_FORBIDDEN',
+        file,
+        'only one exact soft-gate env vars.DEVAI_SOFT_GATE_TRUST_JSON public trust read is permitted; every secret/other vars read refuses',
+      ),
     );
-  }
 
   const jobs = object(workflow.jobs);
   if (Object.keys(jobs).length === 0) {
@@ -1181,7 +1232,8 @@ function checkPreflightWorkflow(file, workflow, source, findings, pins) {
         PREFLIGHT_EVIDENCE_TOKENS.test(
           executed.replaceAll("'verifier-package'", "'package-check'"),
         ) &&
-        step.id !== PREFLIGHT_STEP_ID
+        step.id !== PREFLIGHT_STEP_ID &&
+        step.id !== 'soft-gate'
       ) {
         findings.push(
           finding(
@@ -1220,9 +1272,17 @@ const SITE_PUBLISH_COMMAND =
   'node scripts/process/publish-site.mjs docs/site/build site-publication-record';
 const SITE_PUBLISH_ENVIRONMENT = {
   GH_TOKEN: '${{ github.token }}',
-  PAGES_ARTIFACT_ID: '${{ steps.pages-artifact.outputs.artifact_id }}',
-  SOURCE_TREE: '${{ steps.source.outputs.tree }}',
+  PAGES_ARTIFACT_ID: '${{ needs.prepare-site.outputs.artifact_id }}',
+  SOURCE_TREE: '${{ needs.prepare-site.outputs.source_tree }}',
+  SITE_SHA256: '${{ needs.prepare-site.outputs.site_sha256 }}',
 };
+// ADR-REL-0034: the deployment step verifies the exact prepared artifact, then publishes it.
+const SITE_VERIFY_COMMAND =
+  'node scripts/process/verify-site-preparation-artifact.mjs fetch docs/site/build';
+const SITE_SOURCE_GUARD_LINES = [
+  'test "$GITHUB_REF" = refs/heads/main',
+  'test "$(git rev-parse HEAD)" = "$GITHUB_SHA"',
+];
 const SITE_LIVE_VERIFY_LINE = 'node scripts/process/verify-pages-bytes.mjs live docs/site/build';
 
 function runLines(step) {
@@ -1258,8 +1318,9 @@ function checkSiteWorkflow(file, workflow, source, findings) {
       finding('CI_WORKFLOW_PERMISSIONS_INVALID', file, 'only contents: read is permitted'),
     );
   }
-  const concurrency = object(workflow.concurrency);
+  const concurrency = object(object(workflow.jobs)['publish-site']?.concurrency);
   if (
+    workflow.concurrency !== undefined ||
     Object.keys(concurrency).length !== 2 ||
     concurrency.group !== 'devai-pages-publication' ||
     concurrency['cancel-in-progress'] !== false
@@ -1273,32 +1334,82 @@ function checkSiteWorkflow(file, workflow, source, findings) {
     );
   }
   const jobs = object(workflow.jobs);
-  if (JSON.stringify(Object.keys(jobs)) !== JSON.stringify([SITE_JOB])) {
+  if (JSON.stringify(Object.keys(jobs)) !== JSON.stringify(['prepare-site', SITE_JOB])) {
     findings.push(
-      finding('SITE_WORKFLOW_JOB_SET_INVALID', file, `exactly one job ${SITE_JOB} is permitted`),
+      finding(
+        'SITE_WORKFLOW_JOB_SET_INVALID',
+        file,
+        `exactly prepare-site and ${SITE_JOB} are permitted`,
+      ),
     );
   }
   const job = object(jobs[SITE_JOB]);
-  const steps = Array.isArray(job.steps) ? job.steps.map(object) : [];
-  const checkouts = steps.filter(
-    (step) => typeof step.uses === 'string' && step.uses.startsWith('actions/checkout@'),
-  );
-  const identity = steps.find((step) => step.id === 'source');
-  const identityLines = identity === undefined ? [] : runLines(identity);
+  const prepare = object(jobs['prepare-site']);
+  const preparation = Array.isArray(prepare.steps) ? prepare.steps.map(object) : [];
+  const pc = object(prepare.concurrency);
   if (
-    job.if !== SITE_MAIN_CONDITION ||
-    checkouts.length !== 1 ||
-    object(checkouts[0].with).ref !== '${{ github.sha }}' ||
-    object(checkouts[0].with)['persist-credentials'] !== false ||
-    object(checkouts[0].with).repository !== undefined ||
-    !identityLines.includes('test "$GITHUB_REF" = refs/heads/main') ||
-    !identityLines.includes('test "$(git rev-parse HEAD)" = "$GITHUB_SHA"')
-  ) {
+    prepare.if !== SITE_MAIN_CONDITION ||
+    prepare.environment !== undefined ||
+    JSON.stringify(prepare.permissions) !== JSON.stringify({ contents: 'read' }) ||
+    pc['cancel-in-progress'] !== true ||
+    typeof pc.group !== 'string' ||
+    !pc.group.includes('github.ref') ||
+    pc.group.toLowerCase() === concurrency.group?.toLowerCase() ||
+    job.needs !== 'prepare-site'
+  )
+    findings.push(
+      finding(
+        'SITE_WORKFLOW_CONCURRENCY_INVALID',
+        file,
+        'prepare-site must be read-only/main-guarded with separate ref-scoped cancellable lock; publication requires preparation success',
+      ),
+    );
+  if (
+    preparation.some((step) =>
+      /publish-site|publishPages|deploy-pages|produce-ci-invariant-evidence/u.test(
+        String(step.run ?? step.uses ?? ''),
+      ),
+    ) ||
+    (job.steps ?? []).some((step) =>
+      /npm[^\n]*(?:ci|build)|pnpm[^\n]*(?:install|build)/u.test(String(step.run ?? '')),
+    )
+  )
+    findings.push(
+      finding(
+        'SITE_WORKFLOW_BUILD_REQUIRED',
+        file,
+        'all build work belongs to read-only preparation only',
+      ),
+    );
+  const steps = Array.isArray(job.steps) ? job.steps.map(object) : [];
+  // Every job of the lane is main-guarded and binds its own checkout to the dispatched main
+  // commit; the guard is not specific to one job. The tree identity is bound once in
+  // preparation and carried to publication by the verified artifact custody.
+  const identity = preparation.find((step) => step.id === 'source');
+  const identityLines = identity === undefined ? [] : runLines(identity);
+  const mainGuarded =
+    SITE_SOURCE_GUARD_LINES.every((line) => identityLines.includes(line)) &&
+    [
+      [prepare, preparation],
+      [job, steps],
+    ].every(([guarded, jobSteps]) => {
+      const checkouts = jobSteps.filter(
+        (step) => typeof step.uses === 'string' && step.uses.startsWith('actions/checkout@'),
+      );
+      return (
+        guarded.if === SITE_MAIN_CONDITION &&
+        checkouts.length === 1 &&
+        object(checkouts[0].with).ref === '${{ github.sha }}' &&
+        object(checkouts[0].with)['persist-credentials'] === false &&
+        object(checkouts[0].with).repository === undefined
+      );
+    });
+  if (!mainGuarded) {
     findings.push(
       finding(
         'SITE_WORKFLOW_MAIN_GUARD_MISSING',
         file,
-        'publish-site must run only for a main dispatch and bind the checkout to github.sha',
+        'prepare-site and publish-site must run only for a main dispatch and bind the checkout to github.sha',
       ),
     );
   }
@@ -1322,7 +1433,7 @@ function checkSiteWorkflow(file, workflow, source, findings) {
       ),
     );
   }
-  const buildStep = steps.find((step) =>
+  const buildStep = preparation.find((step) =>
     runLines(step).includes('npm --prefix docs/site run build'),
   );
   const buildLines = buildStep === undefined ? [] : runLines(buildStep);
@@ -1340,13 +1451,14 @@ function checkSiteWorkflow(file, workflow, source, findings) {
     );
   }
   const deployment = steps.filter((step) => step.id === 'deployment');
-  const pagesArtifact = steps.find((step) => step.id === 'pages-artifact');
+  const pagesArtifact = preparation.find((step) => step.id === 'pages-artifact');
   const retain = steps.find((step) => step.name === 'Retain site publication identifiers');
   const liveVerify = steps.find((step) => step.name === 'Verify live documentation');
   const deploymentEnvironment = object(deployment[0]?.env);
   if (
     deployment.length !== 1 ||
-    deployment[0].run !== SITE_PUBLISH_COMMAND ||
+    JSON.stringify(runLines(deployment[0])) !==
+      JSON.stringify(['set -euo pipefail', SITE_VERIFY_COMMAND, SITE_PUBLISH_COMMAND]) ||
     deployment[0].if !== undefined ||
     JSON.stringify(Object.keys(deploymentEnvironment).sort()) !==
       JSON.stringify(Object.keys(SITE_PUBLISH_ENVIRONMENT).sort()) ||
