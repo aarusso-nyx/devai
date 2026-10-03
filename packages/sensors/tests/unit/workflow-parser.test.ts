@@ -695,6 +695,128 @@ describe('supplied candidate source provenance (offline analysis)', () => {
     }
   });
 
+  // WHOLE19-R2-001: GitHub hands each `with` key to the action as INPUT_<NAME in upper
+  // case>, so an input name is case-insensitive; classification follows the folded name.
+  it.each([
+    ['checkout Fetch-Depth', 'actions/checkout', ['fetch-depth: 0'], ['Fetch-Depth: 0']],
+    [
+      'checkout PERSIST-CREDENTIALS literal false',
+      'actions/checkout',
+      ['persist-credentials: false'],
+      ['PERSIST-CREDENTIALS: false'],
+    ],
+    [
+      'checkout Token ambient github.token',
+      'actions/checkout',
+      ['token: ${{ github.token }}'],
+      ['Token: ${{ github.token }}'],
+    ],
+    ['setup-node Node-Version', 'actions/setup-node', ['node-version: 24'], ['Node-Version: 24']],
+  ] as const)(
+    'keeps a pinned %s case variant read-only like its lowercase input',
+    (_name, action, lowercase, variant) => {
+      const root = candidateRoot();
+      completeCandidate(root);
+      expect(candidateEffect(root, stepsWorkflow(actionStep(`${action}@${pin}`)))).toBe(
+        'read-only',
+      );
+      expect(candidateEffect(root, stepsWorkflow(actionStep(`${action}@${pin}`, lowercase)))).toBe(
+        'read-only',
+      );
+      expect(candidateEffect(root, stepsWorkflow(actionStep(`${action}@${pin}`, variant)))).toBe(
+        'read-only',
+      );
+    },
+  );
+  it.each([
+    ['checkout Ref', 'actions/checkout', ['ref: evil'], ['Ref: evil']],
+    [
+      'checkout REPOSITORY',
+      'actions/checkout',
+      ['repository: evil/repo'],
+      ['REPOSITORY: evil/repo'],
+    ],
+    [
+      'checkout Token non-ambient',
+      'actions/checkout',
+      ['token: ${{ secrets.PAT }}'],
+      ['Token: ${{ secrets.PAT }}'],
+    ],
+    [
+      'checkout GITHUB-SERVER-URL',
+      'actions/checkout',
+      ['github-server-url: https://evil.example'],
+      ['GITHUB-SERVER-URL: https://evil.example'],
+    ],
+    [
+      'checkout Persist-Credentials true',
+      'actions/checkout',
+      ['persist-credentials: true'],
+      ['Persist-Credentials: true'],
+    ],
+    [
+      'setup-node Mirror',
+      'actions/setup-node',
+      ['mirror: https://evil.example'],
+      ['Mirror: https://evil.example'],
+    ],
+    [
+      'cache enablecrossosarchive',
+      'actions/cache',
+      ['enableCrossOsArchive: true'],
+      ['enablecrossosarchive: true'],
+    ],
+  ] as const)(
+    'refuses a pinned %s case variant like its declared input after the control passes',
+    (_name, action, declared, variant) => {
+      const root = candidateRoot();
+      completeCandidate(root);
+      expect(candidateEffect(root, stepsWorkflow(actionStep(`${action}@${pin}`)))).toBe(
+        'read-only',
+      );
+      expect(candidateEffect(root, stepsWorkflow(actionStep(`${action}@${pin}`, declared)))).toBe(
+        'unknown',
+      );
+      // Only the letter case of the input name changes.
+      expect(candidateEffect(root, stepsWorkflow(actionStep(`${action}@${pin}`, variant)))).toBe(
+        'unknown',
+      );
+    },
+  );
+  it('refuses a pinned github-script SCRIPT case variant like its executable script input', () => {
+    const root = candidateRoot();
+    completeCandidate(root);
+    const action = `actions/github-script@${pin}`;
+    expect(candidateEffect(root, stepsWorkflow(actionStep(action)))).toBe('publication');
+    expect(
+      candidateEffect(root, stepsWorkflow(actionStep(action, ['script: console.log(1)']))),
+    ).toBe('unknown');
+    expect(
+      candidateEffect(root, stepsWorkflow(actionStep(action, ['SCRIPT: console.log(1)']))),
+    ).toBe('unknown');
+  });
+  it.each([
+    ['selector ref and REF', ['ref: main', 'REF: evil'], 'unknown'],
+    ['inert fetch-depth and Fetch-Depth', ['fetch-depth: 0', 'Fetch-Depth: 1'], 'read-only'],
+    [
+      'reducing persist-credentials and PERSIST-CREDENTIALS',
+      ['persist-credentials: false', 'PERSIST-CREDENTIALS: false'],
+      'read-only',
+    ],
+  ] as const)(
+    'refuses two pinned checkout input names folding to one name (%s)',
+    (_name, inputs, alone) => {
+      const root = candidateRoot();
+      completeCandidate(root);
+      const action = `actions/checkout@${pin}`;
+      expect(candidateEffect(root, stepsWorkflow(actionStep(action)))).toBe('read-only');
+      for (const input of inputs)
+        expect(candidateEffect(root, stepsWorkflow(actionStep(action, [input])))).toBe(alone);
+      // Only the second spelling of the one folded name is added.
+      expect(candidateEffect(root, stepsWorkflow(actionStep(action, inputs)))).toBe('unknown');
+    },
+  );
+
   // WHOLE19-REV-012: cache restore and artifact download select workspace bytes; a later
   // workspace execution no longer runs the bytes that were analysed.
   it.each([
