@@ -373,6 +373,27 @@ function refusedProcessContext(request: AuthorityHostEffectRequest): {
   };
 }
 
+/**
+ * #241: a refused `sense run` process names the sensor and the declaration that admits its
+ * process, rather than the task descriptor wording used for `check`.
+ */
+function refusedSensorProcessContext(
+  request: AuthorityHostEffectRequest,
+  action: string,
+  argv: readonly string[],
+): object | undefined {
+  if (action !== 'sense run') return undefined;
+  const run = argv.findIndex((word, index) => word === 'run' && argv[index - 1] === 'sense');
+  const candidate = run < 0 ? undefined : argv[run + 1];
+  const sensor = candidate === undefined || candidate.startsWith('-') ? undefined : candidate;
+  return {
+    ...refusedProcessContext(request),
+    action,
+    ...(sensor === undefined ? {} : { sensor }),
+    descriptor_path: '.devai/config/sensor-inputs.json',
+  };
+}
+
 /** One repository-relative path under tests/: no option, no absolute path, no parent segment. */
 function governedTestPath(value: unknown): boolean {
   if (typeof value !== 'string' || isAbsolute(value)) return false;
@@ -1101,7 +1122,9 @@ export function createAuthorityHostBroker(input: BrokerInput): {
         const error = new Error('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED') as Error & {
           context?: object;
         };
-        error.context = refusedProcessContext(request);
+        error.context =
+          refusedSensorProcessContext(request, input.entry.name, input.argv) ??
+          refusedProcessContext(request);
         throw error;
       }
       const target = processTarget(
@@ -1119,7 +1142,10 @@ export function createAuthorityHostBroker(input: BrokerInput): {
         const error = new Error('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED') as Error & {
           context?: object;
         };
-        error.context = context ?? refusedProcessContext(request);
+        error.context =
+          context ??
+          refusedSensorProcessContext(request, input.entry.name, input.argv) ??
+          refusedProcessContext(request);
         throw error;
       }
       if (actionPlanner.kind === 'exact-plan') {

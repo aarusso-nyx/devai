@@ -120,6 +120,20 @@ describe('authority error values', () => {
     );
   });
 
+  it('names the sensor and its input declaration for a refused sense run process (#241)', () => {
+    expect(
+      authorityRemediation('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED', {
+        action: 'sense run',
+        sensor: 'coverage',
+        executable: 'pnpm',
+        argv: ['run', 'test:coverage:local'],
+        descriptor_path: '.devai/config/sensor-inputs.json',
+      }),
+    ).toBe(
+      'Declare the process for sensor coverage as its input in .devai/config/sensor-inputs.json; received pnpm ["run","test:coverage:local"].',
+    );
+  });
+
   it('distinguishes dependency remediation from ordinary refusal', () => {
     expect(authorityRemediation('OTHER', { category: 'dependency-error' })).toBe(
       'Materialize the required repository state, then retry.',

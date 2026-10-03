@@ -115,6 +115,10 @@ export function authorityRemediation(code: string, context: JsonRecord): string 
     const executable = String(context.executable ?? '<unknown>');
     const argv = Array.isArray(context.argv) ? JSON.stringify(context.argv) : '[]';
     const descriptor = String(context.descriptor_path ?? '<unknown>');
+    if (context.action === 'sense run') {
+      const sensor = String(context.sensor ?? '<sensor>');
+      return `Declare the process for sensor ${sensor} as its input in ${descriptor}; received ${executable} ${argv}.`;
+    }
     return `Declare the exact process in ${descriptor}; received ${executable} ${argv}.`;
   }
   return context.category === 'dependency-error'
