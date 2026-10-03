@@ -1054,4 +1054,79 @@ describe('causal candidate effect concurrency regressions (offline)', () => {
       expect(observe(root, locked).metrics?.concurrency_semantic_issues).toBe(0);
     }
   });
+  // WHOLE19-REV-002/-012: an action input or restore that selects the executed bytes, the
+  // runtime, the fetch server or a credential invalidates the analysed script proof.
+  it.each([
+    [
+      'checkout github-server-url',
+      `actions/checkout@${SHA}`,
+      ['github-server-url: https://evil.example'],
+    ],
+    ['checkout non-ambient token', `actions/checkout@${SHA}`, ['token: ${{ secrets.PAT }}']],
+    ['checkout ssh-strict false', `actions/checkout@${SHA}`, ['ssh-strict: false']],
+    ['setup-node mirror', `actions/setup-node@${SHA}`, ['mirror: https://evil.example/node']],
+    [
+      'foreign artifact download',
+      `actions/download-artifact@${SHA}`,
+      [
+        'repository: other/repo',
+        "run-id: '123'",
+        'github-token: ${{ secrets.PAT }}',
+        'path: scripts',
+      ],
+    ],
+    ['cache restore over scripts', `actions/cache@${SHA}`, ['path: scripts', 'key: anything']],
+    ['input-free artifact download', `actions/download-artifact@${SHA}`, []],
+    ['undeclared input on a branch ref', 'actions/checkout@main', ["schedule: '0 3 * * *'"]],
+  ] as const)(
+    'refuses %s before the proved script after the pinned control passes',
+    (_n, use, inputs) => {
+      const root = fixtureRoot('candidate-concurrency');
+      const source = complete(root);
+      function before(step: string): string {
+        return source.replace('    steps:\n', `    steps:\n${step}\n`);
+      }
+      const pinned = [
+        `      - uses: actions/checkout@${SHA}`,
+        '        with:',
+        "          schedule: '0 3 * * *'",
+      ];
+      const control = observe(root, before(pinned.join('\n')));
+      expect(control.status).toBe('pass');
+      expect(control.metrics?.concurrency_semantic_issues).toBe(0);
+      expect(codes(control)).toEqual([]);
+      const step = [`      - uses: ${use}`];
+      if (inputs.length) step.push('        with:', ...inputs.map((input) => `          ${input}`));
+      const rejected = observe(root, before(step.join('\n')));
+      expect(rejected.status).toBe('review');
+      expect(rejected.metrics?.concurrency_semantic_issues).toBe(1);
+      expect(codes(rejected)).toEqual(['HARNESS_COHERENCE_CONCURRENCY_POLICY']);
+    },
+  );
+  it.each([
+    ['secrets inherit', 'secrets: inherit'],
+    ['with inputs', 'with:\n      ref: refs/heads/other'],
+  ])(
+    'refuses a reusable workflow call forwarding %s after the plain call passes',
+    (_name, forwarded) => {
+      const root = fixtureRoot('candidate-concurrency');
+      write(
+        root,
+        '.github/workflows/reuse.yml',
+        complete(root).replace(
+          'permissions:\n',
+          'on:\n  workflow_call:\n    inputs:\n      ref:\n        type: string\npermissions:\n',
+        ),
+      );
+      const caller = `permissions:\n  contents: read\njobs:\n  call:\n    concurrency:\n      group: call-${'${{ github.ref }}'}\n      cancel-in-progress: true\n    uses: ./.github/workflows/reuse.yml\n`;
+      const control = observe(root, caller);
+      expect(control.status).toBe('pass');
+      expect(control.metrics?.concurrency_semantic_issues).toBe(0);
+      expect(codes(control)).toEqual([]);
+      const rejected = observe(root, `${caller}    ${forwarded}\n`);
+      expect(rejected.status).toBe('review');
+      expect(rejected.metrics?.concurrency_semantic_issues).toBe(1);
+      expect(codes(rejected)).toEqual(['HARNESS_COHERENCE_CONCURRENCY_POLICY']);
+    },
+  );
 });

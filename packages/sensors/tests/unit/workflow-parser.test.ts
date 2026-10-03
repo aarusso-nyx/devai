@@ -603,6 +603,171 @@ describe('supplied candidate source provenance (offline analysis)', () => {
     );
     expect(candidateEffect(root, nested)).toBe('unknown');
   });
+
+  // WHOLE19-REV-002 R1-R5: a registered action admits only its declared inert inputs, a
+  // capability-reducing literal, or the ambient token; every selector refuses.
+  const pin = '0123456789abcdef0123456789abcdef01234567';
+  function actionStep(use: string, inputs: readonly string[] = []): string {
+    const lines = [`      - uses: ${use}`];
+    if (inputs.length) lines.push('        with:', ...inputs.map((input) => `          ${input}`));
+    return lines.join('\n');
+  }
+  function stepsWorkflow(...steps: readonly string[]): string {
+    return `permissions:\n  contents: read\njobs:\n  inspect:\n    concurrency:\n      group: inspect-${'${{ github.ref }}'}\n      cancel-in-progress: true\n    steps:\n${steps.join('\n')}\n`;
+  }
+  it.each([
+    ['fetch-depth', ['fetch-depth: 0']],
+    ['persist-credentials literal false', ['persist-credentials: false']],
+    ['ambient secrets.GITHUB_TOKEN', ['token: ${{ secrets.GITHUB_TOKEN }}']],
+    ['ambient github.token', ['token: ${{ github.token }}']],
+    ['undeclared input on a full-SHA pin', ["schedule: '0 3 * * *'"]],
+  ] as const)('keeps a pinned checkout with %s read-only', (_name, inputs) => {
+    const root = candidateRoot();
+    completeCandidate(root);
+    expect(candidateEffect(root, stepsWorkflow(actionStep(`actions/checkout@${pin}`)))).toBe(
+      'read-only',
+    );
+    expect(
+      candidateEffect(root, stepsWorkflow(actionStep(`actions/checkout@${pin}`, inputs))),
+    ).toBe('read-only');
+  });
+  it.each([
+    ['checkout non-ambient token', 'actions/checkout', ['token: ${{ secrets.PAT }}']],
+    ['checkout ssh-key', 'actions/checkout', ['ssh-key: ${{ secrets.DEPLOY_KEY }}']],
+    ['checkout github-server-url', 'actions/checkout', ['github-server-url: https://evil.example']],
+    ['checkout ssh-strict false', 'actions/checkout', ['ssh-strict: false']],
+    ['checkout repository', 'actions/checkout', ['repository: other/repo']],
+    ['checkout ref', 'actions/checkout', ['ref: refs/heads/other']],
+    ['checkout path', 'actions/checkout', ['path: scripts']],
+    ['checkout submodules', 'actions/checkout', ['submodules: true']],
+    ['checkout lfs', 'actions/checkout', ['lfs: true']],
+    ['checkout sparse-checkout', 'actions/checkout', ['sparse-checkout: scripts']],
+    ['checkout persist-credentials true', 'actions/checkout', ['persist-credentials: true']],
+    [
+      'checkout persist-credentials expression',
+      'actions/checkout',
+      ['persist-credentials: ${{ inputs.persist }}'],
+    ],
+    ['checkout non-scalar input', 'actions/checkout', ['fetch-depth:', '  - 0']],
+    ['setup-node mirror', 'actions/setup-node', ['mirror: https://evil.example/dist']],
+    ['setup-node registry-url', 'actions/setup-node', ['registry-url: https://evil.example']],
+    ['setup-node non-ambient token', 'actions/setup-node', ['token: ${{ secrets.PAT }}']],
+    ['download-artifact repository', 'actions/download-artifact', ['repository: other/repo']],
+    ['download-artifact run-id', 'actions/download-artifact', ["run-id: '123'"]],
+    [
+      'download-artifact github-token',
+      'actions/download-artifact',
+      ['github-token: ${{ secrets.PAT }}'],
+    ],
+    ['download-artifact path', 'actions/download-artifact', ['path: scripts']],
+    [
+      'upload-artifact include-hidden-files',
+      'actions/upload-artifact',
+      ['include-hidden-files: true'],
+    ],
+    ['upload-artifact overwrite', 'actions/upload-artifact', ['overwrite: true']],
+    ['pnpm/action-setup dest', 'pnpm/action-setup', ['dest: node_modules/.bin']],
+  ] as const)(
+    'refuses %s after the same pinned registered action passes',
+    (_name, action, inputs) => {
+      const root = candidateRoot();
+      completeCandidate(root);
+      const control = stepsWorkflow(actionStep(`${action}@${pin}`));
+      expect(candidateEffect(root, control)).toBe('read-only');
+      // Only the selector, credential, reducing-value or shape of one input changes.
+      expect(candidateEffect(root, stepsWorkflow(actionStep(`${action}@${pin}`, inputs)))).toBe(
+        'unknown',
+      );
+    },
+  );
+  it.each([
+    ['branch ref', 'actions/checkout@main'],
+    ['absent ref', 'actions/checkout'],
+  ])('refuses inputs on a checkout with an unpinned %s', (_name, use) => {
+    const root = candidateRoot();
+    completeCandidate(root);
+    for (const inputs of [["schedule: '0 3 * * *'"], ['fetch-depth: 0']]) {
+      // The same inputs are inert only against the declared set of a pinned revision.
+      expect(
+        candidateEffect(root, stepsWorkflow(actionStep(`actions/checkout@${pin}`, inputs))),
+      ).toBe('read-only');
+      expect(candidateEffect(root, stepsWorkflow(actionStep(use, inputs)))).toBe('unknown');
+    }
+  });
+
+  // WHOLE19-REV-012: cache restore and artifact download select workspace bytes; a later
+  // workspace execution no longer runs the bytes that were analysed.
+  it.each([
+    ['download-artifact', actionStep(`actions/download-artifact@${pin}`)],
+    ['named download-artifact', actionStep(`actions/download-artifact@${pin}`, ['name: payload'])],
+    ['cache restore', actionStep(`actions/cache@${pin}`, ['path: scripts', 'key: anything'])],
+  ])('refuses %s followed by a workspace execution', (_name, selector) => {
+    const root = candidateRoot();
+    completeCandidate(root);
+    const execution = '      - run: "node scripts/process/publish-site.mjs"';
+    const composite = '      - uses: ./.github/actions/local';
+    expect(candidateEffect(root, stepsWorkflow(execution))).toBe('read-only');
+    expect(candidateEffect(root, stepsWorkflow(composite))).toBe('read-only');
+    expect(candidateEffect(root, stepsWorkflow(selector, execution))).toBe('unknown');
+    expect(candidateEffect(root, stepsWorkflow(selector, composite))).toBe('unknown');
+  });
+  it('keeps an input-free artifact download alone read-only, not before a workspace execution', () => {
+    const root = candidateRoot();
+    completeCandidate(root);
+    const download = actionStep(`actions/download-artifact@${pin}`);
+    expect(candidateEffect(root, stepsWorkflow(download))).toBe('read-only');
+    expect(
+      candidateEffect(
+        root,
+        stepsWorkflow(download, '      - run: "node scripts/process/publish-site.mjs"'),
+      ),
+    ).toBe('unknown');
+  });
+
+  // WHOLE19-REV-003 / R5: a reusable workflow call forwards inputs and secrets to its callee.
+  function reusableCall(use: string, forwarded = ''): string {
+    return `permissions:\n  contents: read\njobs:\n  inspect:\n    concurrency:\n      group: inspect-${'${{ github.ref }}'}\n      cancel-in-progress: true\n    uses: ${use}\n${forwarded}`;
+  }
+  function reusableCallee(root: string): void {
+    completeCandidate(root);
+    candidateWrite(
+      root,
+      '.github/workflows/reuse.yml',
+      'on:\n  workflow_call:\n    inputs:\n      ref:\n        type: string\npermissions:\n  contents: read\njobs:\n  inner:\n    steps:\n      - run: node scripts/process/publish-site.mjs\n',
+    );
+  }
+  it.each([
+    ['with', '    with:\n      ref: refs/heads/other\n'],
+    ['secrets inherit', '    secrets: inherit\n'],
+    ['explicit secrets', '    secrets:\n      token: ${{ secrets.PAT }}\n'],
+    ['with and secrets inherit', '    with:\n      ref: refs/heads/other\n    secrets: inherit\n'],
+  ])(
+    'refuses a local reusable workflow call with %s after the plain call passes',
+    (_n, forwarded) => {
+      const root = candidateRoot();
+      reusableCallee(root);
+      expect(candidateEffect(root, reusableCall('./.github/workflows/reuse.yml'))).toBe(
+        'read-only',
+      );
+      expect(candidateEffect(root, reusableCall('./.github/workflows/reuse.yml', forwarded))).toBe(
+        'unknown',
+      );
+    },
+  );
+  it.each([
+    ['with', '    with:\n      ref: refs/heads/other\n'],
+    ['secrets inherit', '    secrets: inherit\n'],
+  ])('refuses a remote reusable workflow call with %s', (_name, forwarded) => {
+    const root = candidateRoot();
+    reusableCallee(root);
+    expect(candidateEffect(root, reusableCall('./.github/workflows/reuse.yml'))).toBe('read-only');
+    expect(
+      candidateEffect(
+        root,
+        reusableCall(`octo/tools/.github/workflows/reuse.yml@${pin}`, forwarded),
+      ),
+    ).toBe('unknown');
+  });
 });
 
 describe('contained builtin capability effects (offline source analysis)', () => {
