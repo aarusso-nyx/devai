@@ -135,4 +135,16 @@ jobs:
 
       - name: Affected checks and profile-selected candidate preflight
         id: affected
-        run: pnpm run release:pr-gate -- "$DEVAI_PREFLIGHT_BASE" && node .devai/state/pr-bootstrap/cli/bin.js check --affected --run --base "$DEVAI_PREFLIGHT_BASE" --as-role inspector --write --format json
+        shell: bash
+        # The gate invocation is the local one (ADR-CHK-0001 IA-003); on failure its one-line
+        # report is summarized per failing node so the log names it (#248).
+        run: |
+          set -euo pipefail
+          pnpm run release:pr-gate -- "$DEVAI_PREFLIGHT_BASE"
+          report="$RUNNER_TEMP/devai-affected.json"
+          status=0
+          node .devai/state/pr-bootstrap/cli/bin.js check --affected --run --base "$DEVAI_PREFLIGHT_BASE" --as-role inspector --write --format json | tee "$report" || status=$?
+          if [ "$status" -ne 0 ]; then
+            node scripts/process/summarize-check-report.mjs "$report" || true
+          fi
+          exit "$status"
