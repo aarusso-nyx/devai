@@ -188,9 +188,9 @@ Backlog observed while running R-0305, outside every task boundary:
 - The `claude -p` envelope fields the bridge maps to a finish reason
   (`stop_reason`, `is_error`, `subtype`) come from the Inspector's fixtures and
   are not yet checked against a live CLI.
-- A rejected tie-breaker reply now escalates with confidence 0 instead of the
-  retired 0.5 midpoint; the calibration pages that quote the midpoint need a
-  pass.
+- A rejected tie-breaker reply escalates with confidence 0. No current page,
+  policy or source states a substituted midpoint any longer (#251, closed in
+  v1.9.0).
 - `docs/reference/error-codes.md` is generated from the CLI, authority and
   utils sources only; the campaign checker's kebab-case codes and the loop's
   `TASK_REGISTRY_IDENTITY_MISMATCH` have no home there until the generator's
