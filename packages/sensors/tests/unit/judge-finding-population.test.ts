@@ -25,7 +25,7 @@ function client(): JudgeLlmClient {
         temperature: 0,
         response_schema: 'review-verdict.schema.json',
       });
-      return { ...responseBase, text: '', json: responseJson };
+      return { ...responseBase, text: JSON.stringify(responseJson), json: responseJson };
     },
   };
 }

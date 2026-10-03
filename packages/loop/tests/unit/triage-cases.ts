@@ -70,7 +70,8 @@ function breaker(
     family: 'independent',
     model: 'fixture',
     complete: vi.fn().mockResolvedValue({
-      text: options?.asText ? JSON.stringify(result) : '',
+      // ADR-MDL-0003: a provider json body must agree with the selected reply text.
+      text: JSON.stringify(result),
       family: 'independent',
       model: 'fixture',
       usage: { input_tokens: 1, output_tokens: 1, cost_usd: 0 },

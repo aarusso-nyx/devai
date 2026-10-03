@@ -19,9 +19,10 @@ function client(capture: Capture): JudgeLlmClient {
       capture.options = { ...options };
       capture.system = messages.system;
       capture.user = messages.user;
+      const verdict = { verdict: 'pass', confidence: 0.9, rationale: 'fixture rationale', findings: [] };
       return {
-        text: '',
-        json: { verdict: 'pass', confidence: 0.9, rationale: 'fixture rationale', findings: [] },
+        text: JSON.stringify(verdict),
+        json: verdict,
         family: 'fixture-family',
         model: 'fixture-model',
         usage: { input_tokens: 3, output_tokens: 2, cost_usd: 0.01 },
