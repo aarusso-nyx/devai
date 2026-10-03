@@ -103,9 +103,13 @@ describe('site publication workflow contract', () => {
       [
         '        env:',
         '          GH_TOKEN: ${{ github.token }}',
-        '          PAGES_ARTIFACT_ID: ${{ steps.pages-artifact.outputs.artifact_id }}',
-        '          SOURCE_TREE: ${{ steps.source.outputs.tree }}',
-        '        run: node scripts/process/publish-site.mjs docs/site/build site-publication-record',
+        '          PAGES_ARTIFACT_ID: ${{ needs.prepare-site.outputs.artifact_id }}',
+        '          SOURCE_TREE: ${{ needs.prepare-site.outputs.source_tree }}',
+        '          SITE_SHA256: ${{ needs.prepare-site.outputs.site_sha256 }}',
+        '        run: |',
+        '          set -euo pipefail',
+        '          node scripts/process/verify-site-preparation-artifact.mjs fetch docs/site/build',
+        '          node scripts/process/publish-site.mjs docs/site/build site-publication-record',
       ].join('\n'),
       [
         '        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e',
