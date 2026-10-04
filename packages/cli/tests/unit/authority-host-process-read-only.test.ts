@@ -298,3 +298,31 @@ describe('gh run list is a declared read-only host process (ADR-SCR-0005 IA-004)
     }
   });
 });
+
+describe('the asynchronous process effect is never a read-only shortcut (ADR-MDL-0005 D-10)', () => {
+  it('refuses spawn for an argv that spawnSync would admit read-only', () => {
+    const host = createAuthorityHostBroker({
+      entry: action('sense run'),
+      entries,
+      argv: [process.execPath, 'devai', 'sense', 'run', 'harness_green_main'],
+      role: 'auditor',
+      declaration: { as_role: 'auditor' },
+      repository_root: ROOT,
+      package_version: resolveCliVersion(),
+      bootstrap_policy: true,
+    });
+    try {
+      expect(host.scope.apply_effect(effect('gh', [...BASE, ...TAIL]), () => 'allowed')).toBe(
+        'allowed',
+      );
+      expect(() =>
+        host.scope.apply_effect(
+          { kind: 'process', symbol: 'spawn', arguments: ['gh', [...BASE, ...TAIL]] },
+          () => 'allowed',
+        ),
+      ).toThrow(/AUTHORITY_/u);
+    } finally {
+      host.dispose();
+    }
+  });
+});
