@@ -124,13 +124,17 @@ export async function runRoundTasks(options: RunRoundTasksOptions): Promise<RunR
 }
 
 /**
- * A denied task is re-queued with a priority bump; after repeated denials it is
- * escalated for human review (Article 25; round-execution.json resources).
+ * A denied task is re-queued; after repeated denials it is escalated for human
+ * review (Article 25; round-execution.json resources). The re-queue returns the
+ * task to `ready` at once; its priority bump is applied by `bumpRequeuedPriority`
+ * after the run, because priority is part of the bound request and changing it
+ * mid-run would invalidate every later admission against the same plan.
  */
 function handleLockDenial(
   options: RunRoundTasksOptions,
   roundId: string,
   taskId: string,
+  requeued: string[],
 ): RoundTaskRunResult {
   const denials = recordLockDenial(options.repoRoot, roundId, taskId);
   if (denials >= LOCK_DENIAL_ESCALATION_THRESHOLD) {
@@ -138,13 +142,18 @@ function handleLockDenial(
     clearLockDenials(options.repoRoot, roundId, taskId);
     return { task_id: taskId, ok: false, code: 'TASK_RESOURCE_LOCK_DENIED_REPEATED' };
   }
-  const denied = loadTask(options.repoRoot, taskId);
-  saveTask(options.repoRoot, {
-    ...denied,
-    status: 'ready',
-    priority: Math.min(100, (denied.priority ?? 0) + 1),
-  });
+  saveTask(options.repoRoot, { ...loadTask(options.repoRoot, taskId), status: 'ready' });
+  requeued.push(taskId);
   return { task_id: taskId, ok: false, code: 'TASK_RESOURCE_LOCK_DENIED' };
+}
+
+/** Raise each re-queued task's priority by one once no admission still binds this plan. */
+function bumpRequeuedPriority(repoRoot: string, requeued: readonly string[]): void {
+  for (const taskId of requeued) {
+    const task = loadTask(repoRoot, taskId);
+    if (task.status !== 'ready') continue;
+    saveTask(repoRoot, { ...task, priority: Math.min(100, (task.priority ?? 0) + 1) });
+  }
 }
 
 async function runControlledRound(
@@ -159,6 +168,7 @@ async function runControlledRound(
   });
   const ordered = plan.orderedTaskIds.map((id) => requiredTask(population, id));
   const blocked = new Set<string>();
+  const requeued: string[] = [];
   const results: RoundTaskRunResult[] = [];
   for (const task of ordered) {
     // Re-read both authorization and immutable requests at each admission boundary.
@@ -190,7 +200,7 @@ async function runControlledRound(
         });
     if (started.lock_denied.length > 0) {
       blocked.add(task.id);
-      results.push(handleLockDenial(options, roundId, task.id));
+      results.push(handleLockDenial(options, roundId, task.id, requeued));
       continue;
     }
     clearLockDenials(options.repoRoot, roundId, task.id);
@@ -219,6 +229,7 @@ async function runControlledRound(
     });
     if (!result.ok) blocked.add(task.id);
   }
+  bumpRequeuedPriority(options.repoRoot, requeued);
   return {
     ok: results.every((result) => result.ok),
     round_id: roundId,
