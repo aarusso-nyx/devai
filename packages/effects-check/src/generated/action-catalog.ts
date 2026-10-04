@@ -244,6 +244,12 @@ export const ACTION_EFFECT_CONTRACTS = [
     capabilities: ['fs:f5-state', 'fs:proofs'],
   },
   {
+    action_id: 'round dispatch',
+    public_action_id: 'round dispatch',
+    effect: 'harness-write',
+    capabilities: ['fs:f5-state', 'fs:proofs', 'fs:worktree-admin', 'proc:dynamic'],
+  },
+  {
     action_id: 'round dispatch activate',
     public_action_id: 'round dispatch activate',
     effect: 'harness-write',
