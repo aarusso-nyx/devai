@@ -74,6 +74,14 @@ function sha256(text: string): string {
   return createHash('sha256').update(text, 'utf8').digest('hex');
 }
 
+/**
+ * The next boundary follows the previous one, except that a process that never
+ * started (no pid) goes straight from `intent` to `exited`.
+ */
+function nextBoundary(reached: number, position: number): boolean {
+  return position === reached + 1 || (reached === 0 && position === 2);
+}
+
 function key(event: Pick<DispatchJournalEvent, 'task_id' | 'attempt'>): string {
   return `${event.task_id}#${String(event.attempt)}`;
 }
@@ -106,7 +114,7 @@ export function readDispatchJournal(
     }
     const position = DISPATCH_JOURNAL_EVENTS.indexOf(event.event);
     const reached = progress.get(key(event)) ?? -1;
-    if (position !== reached + 1) fail('TASK_DISPATCH_JOURNAL_INVALID');
+    if (!nextBoundary(reached, position)) fail('TASK_DISPATCH_JOURNAL_INVALID');
     progress.set(key(event), position);
     events.push(event);
     previous = sha256(line);
@@ -138,8 +146,13 @@ export function appendDispatchJournalEvent(
     previous_sha256: last === undefined ? null : sha256(last),
   };
   if (!parsers.dispatchJournalEvent.safeParse(event).ok) fail('TASK_DISPATCH_JOURNAL_INVALID');
-  const reached = existing.filter((item) => key(item) === key(event)).length - 1;
-  if (DISPATCH_JOURNAL_EVENTS.indexOf(event.event) !== reached + 1) {
+  const reached = Math.max(
+    -1,
+    ...existing
+      .filter((item) => key(item) === key(event))
+      .map((item) => DISPATCH_JOURNAL_EVENTS.indexOf(item.event)),
+  );
+  if (!nextBoundary(reached, DISPATCH_JOURNAL_EVENTS.indexOf(event.event))) {
     fail('TASK_DISPATCH_JOURNAL_ORDER');
   }
   mkdirSync(dirname(path), { recursive: true });
