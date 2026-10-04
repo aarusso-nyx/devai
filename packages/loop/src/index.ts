@@ -1,4 +1,5 @@
 export * from './governance-ledger/index.js';
+export * from './campaign/index.js';
 export * from './inventory/index.js';
 export * from './loop/index.js';
 export * from './release/index.js';
