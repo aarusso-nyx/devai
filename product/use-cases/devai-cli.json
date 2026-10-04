@@ -1321,6 +1321,76 @@
       ]
     },
     {
+      "id": "UC-devai-campaign-controller",
+      "title": "Run a campaign round through the governed runtime",
+      "goal": "Project a campaign plan onto runtime state, materialize an open round's tasks through the single queue, and record the human ratification of reviewed work separately from merge.",
+      "actors": ["architect", "owner"],
+      "preconditions": [
+        "The campaign plan validates against law/schemas/campaign.schema.json.",
+        "The round is open in the plan and has an active governed round authorization."
+      ],
+      "triggers": ["The Architect opens a campaign round and wants its tasks in the runtime."],
+      "mainFlow": [
+        {
+          "id": "step-01",
+          "action": "Run `campaign status --campaign <CMP-id>`: read the plan beside runtime task state and every named drift, writing nothing.",
+          "actorRole": "architect",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "campaign status"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-02",
+          "action": "Run `campaign materialize --campaign <CMP-id> --round <round-id> --as-role architect --write`: write the round's tasks through the round task queue exactly as campaign-execution.json maps them.",
+          "actorRole": "architect",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "campaign materialize"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-03",
+          "action": "Run `round ratify --round <round-id> --task <task-id> --decision accept --as-role owner --write` once a reviewed task awaits human review: it moves to pre_merge; merging stays a separate human act.",
+          "actorRole": "owner",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "round ratify"
+              }
+            ]
+          }
+        }
+      ],
+      "alternateFlows": [],
+      "exceptions": [
+        {
+          "id": "exc-01",
+          "when": "A task record already exists with a different request.",
+          "handling": "campaign materialize refuses with TASK_RECORD_CONFLICT before writing anything."
+        },
+        {
+          "id": "exc-02",
+          "when": "round ratify targets a task that is not awaiting human review, or is invoked by a role other than the Owner or Architect.",
+          "handling": "The ratification is refused and nothing is recorded."
+        }
+      ],
+      "postconditions": [
+        "Plan and runtime agree or their drift is named; every ratification is a recorded human decision separate from merge."
+      ],
+      "acceptanceCriteria": [
+        "campaign status writes nothing.",
+        "campaign materialize writes only through the round task queue.",
+        "round ratify never merges, pushes, or closes a round."
+      ]
+    },
+    {
       "id": "UC-devai-adopter-upgrade",
       "title": "Upgrade an adopter repository to the installed DEVAI version",
       "goal": "Let the Architect move an adopter from its bound devai_version to the installed package version in one governed operation that names every adopter-facing change first and refuses anything that needs a decision.",
