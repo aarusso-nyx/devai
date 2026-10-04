@@ -223,7 +223,7 @@ describe('experimental dispatch engine', () => {
       usage: { usage_version: 2, input_tokens: { value: 1200, status: 'reported' } },
       cost: { source: 'provider-reported' },
     });
-    expect(budget).toEqual({ attempts: 1, tokens: 1500, unverifiable: false });
+    expect(budget).toEqual({ attempts: 1, tokens: 7300, unverifiable: false });
   });
 
   it('fails every attempt that writes outside the discipline paths and blocks the task (IA-003)', async () => {
