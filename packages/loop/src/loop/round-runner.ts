@@ -1,6 +1,13 @@
 import { join } from 'node:path';
 import { decideRoundTaskAdmission, planRoundTaskAdmission } from './round-task-admission.js';
 import { LOCK_RENEWAL_INTERVAL_MS, listLocks, renewLocks, taskLockTargets } from './locks.js';
+import {
+  LOCK_DENIAL_ESCALATION_THRESHOLD,
+  acquireRoundController,
+  clearLockDenials,
+  recordLockDenial,
+  releaseRoundController,
+} from './round-controller.js';
 import { listTaskRecords, loadTask, saveTask, type TaskRecord } from './tasks.js';
 import {
   escalateRoundTask,
@@ -108,6 +115,42 @@ async function dispatchWithLockRenewal(
 /** Validate the complete same-round population before any B3A dispatch. */
 export async function runRoundTasks(options: RunRoundTasksOptions): Promise<RunRoundTasksResult> {
   const roundId = requireActiveTaskRound(options);
+  const controller = acquireRoundController(options.repoRoot, roundId);
+  try {
+    return await runControlledRound(options, roundId);
+  } finally {
+    releaseRoundController(options.repoRoot, controller);
+  }
+}
+
+/**
+ * A denied task is re-queued with a priority bump; after repeated denials it is
+ * escalated for human review (Article 25; round-execution.json resources).
+ */
+function handleLockDenial(
+  options: RunRoundTasksOptions,
+  roundId: string,
+  taskId: string,
+): RoundTaskRunResult {
+  const denials = recordLockDenial(options.repoRoot, roundId, taskId);
+  if (denials >= LOCK_DENIAL_ESCALATION_THRESHOLD) {
+    escalateRoundTask({ repoRoot: options.repoRoot, round: roundId, taskId });
+    clearLockDenials(options.repoRoot, roundId, taskId);
+    return { task_id: taskId, ok: false, code: 'TASK_RESOURCE_LOCK_DENIED_REPEATED' };
+  }
+  const denied = loadTask(options.repoRoot, taskId);
+  saveTask(options.repoRoot, {
+    ...denied,
+    status: 'ready',
+    priority: Math.min(100, (denied.priority ?? 0) + 1),
+  });
+  return { task_id: taskId, ok: false, code: 'TASK_RESOURCE_LOCK_DENIED' };
+}
+
+async function runControlledRound(
+  options: RunRoundTasksOptions,
+  roundId: string,
+): Promise<RunRoundTasksResult> {
   const population = admissionPopulation(options.repoRoot);
   const plan = planRoundTaskAdmission({
     roundId,
@@ -147,9 +190,10 @@ export async function runRoundTasks(options: RunRoundTasksOptions): Promise<RunR
         });
     if (started.lock_denied.length > 0) {
       blocked.add(task.id);
-      results.push({ task_id: task.id, ok: false, code: 'TASK_RESOURCE_LOCK_DENIED' });
+      results.push(handleLockDenial(options, roundId, task.id));
       continue;
     }
+    clearLockDenials(options.repoRoot, roundId, task.id);
     const running: TaskRecord = {
       ...started.task,
       status: 'in_progress',
