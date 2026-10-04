@@ -51,7 +51,7 @@
     "human_approval_required": true
   },
   "tags": ["coupled-triplet", "pipeline", "merge-order", "article-24", "article-26"],
-  "measurable_via": ["round plan", "round run", "round assess", "round close"],
+  "measurable_via": ["round plan", "round run", "round assess", "round close", "round dispatch"],
   "provenance": ["ADR-SCR-0004", "CMP-0002:R-0203:TASK-0231"],
   "supersedes": null,
   "superseded_by": null
