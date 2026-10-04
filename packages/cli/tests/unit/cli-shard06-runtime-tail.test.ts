@@ -159,6 +159,9 @@ vi.mock('../../src/commands/round/tracking.js', () => ({
   roundTrackingStatus: harness.command('roundTrackingStatus'),
   roundTrackingSync: harness.command('roundTrackingSync'),
 }));
+vi.mock('../../src/commands/round/dispatch-activate.js', () => ({
+  roundDispatchActivate: harness.command('roundDispatchActivate'),
+}));
 vi.mock('../../src/commands/sense/inventory.js', () => ({
   senseInventoryCmd: harness.command('senseInventoryCmd'),
 }));

@@ -68,6 +68,15 @@ describe('define-command runtime contract boundaries', () => {
               },
             ]
           : []),
+        ...(entry.authority_contract.consent.experimental === true
+          ? [
+              {
+                flags: '--experimental',
+                description:
+                  'Authorize this experimental, non-promoting action in addition to --write.',
+              },
+            ]
+          : []),
         {
           flags: '--format <format>',
           description: 'Output format when supported: json or human.',

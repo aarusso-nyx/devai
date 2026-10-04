@@ -21,9 +21,15 @@ afterEach(() => {
 });
 
 describe('authority index helper values', () => {
-  it('keeps authority context absent for experimental argv', () => {
-    rememberResolvedInvocationAuthority('architect', 'cli-flag', ['--experimental']);
-    expect(declaredInvocationAuthority()).toBeUndefined();
+  it('records experimental consent only for the exact experimental flag', () => {
+    // Only an action whose registry consent requires --experimental reaches this point
+    // with it; every other action refuses the flag before dispatch (ADR-MDL-0006).
+    rememberResolvedInvocationAuthority('owner', 'cli-flag', ['--write', '--experimental']);
+    expect(declaredInvocationAuthority()?.consent).toEqual({
+      write: true,
+      allow_publish: false,
+      experimental: true,
+    });
   });
 
   it('records publish consent only for the exact publish flag', () => {
