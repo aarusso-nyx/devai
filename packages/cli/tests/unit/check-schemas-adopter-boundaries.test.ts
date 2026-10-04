@@ -182,7 +182,7 @@ describe('complete schema canon filesystem checks', () => {
     const report = checkSchemaCanon(canonFixture());
     // ADR-SCR-0008 adds observation-backlog.schema.json to the canon and TASK-0423
     // moves it from the source-only catalogue into the runtime roster.
-    expect(ROSTER).toHaveLength(107);
+    expect(ROSTER).toHaveLength(108);
     expect(report).toMatchObject({ ok: true, canonical_total: 124, findings: [] });
   });
   it.each(['missing-source-only', 'missing-runtime', 'unexpected'] as const)(
