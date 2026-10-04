@@ -130,8 +130,10 @@ topological generation as all of them (`TASK_GENERATION_BARRIER` otherwise) and 
 key with any of them (`TASK_RESOURCE_CONFLICT`); a blocked task waits for an in-flight task to
 finish instead of failing. With one worker the behavior is the serial runner, task for task.
 
-Concurrency overlaps only executors that yield while they run. A routine executor runs its argv
-synchronously, so routine tasks still execute one after another. Database and worktree identities
+Routine executors run their argv through the governed asynchronous process effect
+(ADR-MDL-0005 D-10): the process is authorized before it starts, bounded by the task's
+`timeout_ms`, stopped as a whole process group when it overruns, and its output retained up to
+1 MiB per stream, keeping the newest bytes. Concurrent routine tasks therefore overlap. Database and worktree identities
 are per task (`devai_task_<task id>`, `WT-<task id>`), so two distinct tasks never contend for
 them. There is no cross-round controller and no reviewer reserve yet; the policy records both.
 
