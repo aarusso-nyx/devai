@@ -1,3 +1,4 @@
+export * from './agent-cli/index.js';
 export * from './bootstrap/index.js';
 export * from './constitution/index.js';
 export * from './forbidden-actions/index.js';
