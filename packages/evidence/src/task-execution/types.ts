@@ -159,6 +159,8 @@ export interface TaskExecutionEvidenceFacts {
   readonly verdict: TaskExecutionVerdict;
   readonly failure?: TaskExecutionFailure | null;
   readonly evidence_refs: readonly string[];
+  /** Marks non-promoting experimental evidence (ADR-MDL-0005 D-9). */
+  readonly experimental?: true;
 }
 
 export type TaskExecutionEvidenceValidator = ((value: unknown) => boolean) & {
