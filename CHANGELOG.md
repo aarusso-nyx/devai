@@ -21,8 +21,9 @@
   `.devai/config/sensor-inputs.json` (#241); the inline `sense run --preset=<name>` form is refused
   with `SENSE_SELECTION_INVALID` (#252).
 - Release: the evidence verifier is re-vendored from devai-verifier `8b215d70` with the
-  release-intent certify export (ADR-REL-0031); the trusted local-RC verifier stays
-  `@aarusso-nyx/devai@1.5.4` until this release is published and repinned (#243).
+  release-intent certify export (ADR-REL-0031); this release is verified by the trusted local-RC
+  verifier `@aarusso-nyx/devai@1.5.4`, and after publication the pin moves to
+  `@aarusso-nyx/devai@1.9.0` (#243).
 - Pages publication is split into a cancellable read-only `prepare-site` job and a serialized
   journal-bound `publish-site` job (ADR-REL-0034, #234).
 - The error-code reference covers every package source (#250); the thresholds schema bounds
