@@ -1,4 +1,4 @@
-import { existsSync, execFileSync, readFileSync, spawnSync } from '@devai-nyx/authority';
+import { existsSync, execFileSync, readFileSync, spawn } from '@devai-nyx/authority';
 import {
   buildTaskExecutionEvidence,
   persistTaskExecutionEvidence,
@@ -68,6 +68,9 @@ function notApplicable(reason: string): Readonly<{ not_applicable_reason: string
   return { not_applicable_reason: reason };
 }
 
+/** Retained bytes per routine output stream, matching the former spawnSync buffer (1 MiB). */
+const ROUTINE_OUTPUT_BYTES = 1024 * 1024;
+
 function evidenceId(task: TaskRecord, startedAt: string, completedAt: string): string {
   return `TXE-${canonicalSha256({ task, startedAt, completedAt }).slice(0, 16)}`;
 }
@@ -97,15 +100,16 @@ async function dispatchRoutine(
       allow_publish: false,
       capabilities: [],
     },
-    runArgv: (argv, options) => {
-      const executed = spawnSync(argv[0] ?? '', argv.slice(1), {
+    runArgv: async (argv, options) => {
+      // Asynchronous so concurrent round workers overlap (ADR-MDL-0005 D-10).
+      const executed = await spawn(argv[0] ?? '', argv.slice(1), {
         cwd: resolve(executionRoot, options.cwd),
         shell: false,
         timeout: options.timeout,
-        encoding: 'utf8',
-      });
+        maxOutputBytes: ROUTINE_OUTPUT_BYTES,
+      }).result;
       return {
-        exit_code: executed.status,
+        exit_code: executed.exit_code,
         stdout: executed.stdout,
         stderr: executed.stderr,
       };

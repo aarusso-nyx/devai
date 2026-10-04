@@ -426,6 +426,8 @@ function readOnlyProcess(
   parentAction?: string,
   declaredCapabilities: readonly string[] = [],
 ): boolean {
+  // The asynchronous process effect is never a read-only shortcut; it needs a declared target.
+  if (request.symbol === 'spawn') return false;
   const executable = request.arguments[0];
   const args = request.arguments[1];
   if (typeof executable !== 'string' || !Array.isArray(args)) return false;
