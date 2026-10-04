@@ -2070,6 +2070,76 @@ export const ACTION_REGISTRY = [
     },
   },
   {
+    action_id: 'round dispatch',
+    handler: 'round dispatch',
+    path: ['round', 'dispatch'],
+    status: 'preview',
+    profiles: ['tier1', 'tier2', 'tier3'],
+    effect: 'harness-write',
+    authority: 'mesh_controller',
+    description:
+      'Dispatch admitted agent tasks of one active round through the experimental provider ladder under the Owner activation; evidence is non-promoting and results await human review.',
+    output_contract: {
+      schemaVersion: '1.0.0',
+      mode: 'action-envelope',
+      envelope_schema: 'law/schemas/action-result.schema.json',
+      success_channel: 'stdout',
+      payload_schema: null,
+    },
+    error_contract: {
+      schemaVersion: '1.0.0',
+      mode: 'structured-error-envelope',
+      envelope_schema: 'law/schemas/action-result.schema.json',
+      error_schema: 'law/schemas/error.schema.json',
+      error_channel: 'stderr',
+    },
+    authority_contract_version: '1.0.0',
+    authority_contract: {
+      schemaVersion: '1.0.0',
+      action_id: 'round dispatch',
+      effect: 'harness-write',
+      capabilities: ['fs:f5-state', 'fs:proofs', 'fs:worktree-admin', 'proc:dynamic'],
+      subject: {
+        kind: 'derived-machine',
+        actor: 'harness',
+        transition: 'harness-write',
+        initiator: {
+          allowed_roles: ['owner', 'architect', 'inspector', 'engineer'],
+          preserve_in_context: true,
+        },
+      },
+      consent: {
+        write: true,
+        allow_publish: false,
+        experimental: true,
+      },
+      planner: {
+        kind: 'bounded-batches',
+        planner_id: 'round-dispatch-bounded-plan',
+        target_kinds: ['fs', 'git-ref', 'remote'],
+        bounds: {
+          max_batches: 128,
+          max_targets_per_batch: 64,
+          max_total_targets: 8192,
+        },
+        recovery: 'preserve-and-report',
+      },
+      boundary: {
+        kind: 'mutation-adapters',
+        adapter_ids: [
+          'fs-authority-boundary',
+          'git-ref-authority-boundary',
+          'remote-authority-boundary',
+        ],
+        final_reverification: true,
+      },
+      readiness: {
+        requires_binding: true,
+        independent_acceptance_required: true,
+      },
+    },
+  },
+  {
     action_id: 'round dispatch activate',
     handler: 'round dispatch activate',
     path: ['round', 'dispatch', 'activate'],
