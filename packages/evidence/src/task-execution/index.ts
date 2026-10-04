@@ -14,6 +14,7 @@ import {
 export { TaskExecutionEvidenceError } from './types.js';
 export type {
   CostEvidence,
+  CostUnknown,
   DigestBinding,
   NotApplicableEvidence,
   PromptEvidence,
@@ -31,7 +32,9 @@ export type {
   TaskExecutionFailure,
   TaskExecutionVerdict,
   TaskRecordBinding,
+  UsageCounter,
   UsageEvidence,
+  UsageEvidenceV2,
   VersionBinding,
 } from './types.js';
 

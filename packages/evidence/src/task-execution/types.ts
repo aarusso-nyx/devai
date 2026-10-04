@@ -82,6 +82,29 @@ export interface CostEvidence {
   readonly source: 'provider-reported' | 'registry-estimate';
 }
 
+/** A provider counter: missing is null, never zero (ADR-MDL-0005 D-7). */
+export type UsageCounter =
+  | { readonly value: number; readonly status: 'reported' | 'derived' }
+  | { readonly value: null; readonly status: 'missing' };
+
+/** Version-2 usage for agent attempts, including cache counters and their provenance. */
+export interface UsageEvidenceV2 {
+  readonly usage_version: 2;
+  readonly counter_mode: 'per-attempt' | 'cumulative-delta';
+  readonly derivation?: string;
+  readonly input_tokens: UsageCounter;
+  readonly output_tokens: UsageCounter;
+  readonly cache_read_tokens: UsageCounter;
+  readonly cache_write_tokens: UsageCounter;
+}
+
+/** A cost the provider did not report is unknown, never 0. */
+export interface CostUnknown {
+  readonly amount: null;
+  readonly currency: 'USD';
+  readonly source: 'unknown';
+}
+
 export interface NotApplicableEvidence {
   readonly not_applicable_reason: string;
 }
@@ -108,13 +131,15 @@ export interface TaskExecutionEvidence {
   readonly output_digests: readonly DigestBinding[];
   readonly selection: SelectionEvidence;
   readonly prompt: PromptEvidence | NotApplicableEvidence;
-  readonly usage: UsageEvidence | NotApplicableEvidence;
-  readonly cost: CostEvidence | NotApplicableEvidence;
+  readonly usage: UsageEvidence | UsageEvidenceV2 | NotApplicableEvidence;
+  readonly cost: CostEvidence | CostUnknown | NotApplicableEvidence;
   readonly started_at: string;
   readonly completed_at: string;
   readonly verdict: TaskExecutionVerdict;
   readonly failure: TaskExecutionFailure | null;
   readonly evidence_refs: readonly string[];
+  /** Present only on non-promoting experimental evidence (ADR-MDL-0005 D-9). */
+  readonly experimental?: true;
 }
 
 export interface TaskExecutionEvidenceFacts {
@@ -127,8 +152,8 @@ export interface TaskExecutionEvidenceFacts {
   readonly output_digests: readonly DigestBinding[];
   readonly selection: SelectionEvidence;
   readonly prompt: PromptEvidence | NotApplicableEvidence;
-  readonly usage: UsageEvidence | NotApplicableEvidence;
-  readonly cost: CostEvidence | NotApplicableEvidence;
+  readonly usage: UsageEvidence | UsageEvidenceV2 | NotApplicableEvidence;
+  readonly cost: CostEvidence | CostUnknown | NotApplicableEvidence;
   readonly started_at: string;
   readonly completed_at: string;
   readonly verdict: TaskExecutionVerdict;
