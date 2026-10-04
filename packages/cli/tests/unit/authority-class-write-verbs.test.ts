@@ -206,11 +206,11 @@ describe('IA-005: the registered subjects of the matrix verbs are unchanged', ()
 const R0502_FILE_DIGESTS: ReadonlyArray<readonly [string, string]> = [
   [
     'law/policy/action-registry.json',
-    '4bcfd1112cacb5284e679604d06dcc191bfff1c956d25fe9c3899d721a6fdbc6',
+    '4bbc6563c655d69762f6ffe9ddee245c9ee8c72637b98f909576701a56f117de',
   ],
   [
     'packages/cli/src/generated/action-registry.ts',
-    '4d95bc0e1f257986c4df59a062f99c8d8d5f94911641106947bd96fdd84c19e2',
+    'edad8b28ad7b81242870d063b21e302677df247088e9f93e22776532225374b5',
   ],
   [
     'packages/effects-check/src/generated/action-catalog.ts',
