@@ -101,7 +101,12 @@ export function matchDeclaredRoundTaskProcess(
   invocationArgv: readonly string[],
   request: AuthorityHostEffectRequest,
 ): DeclaredRoundTaskProcess | undefined {
-  if (request.kind !== 'process' || request.symbol !== 'spawnSync') return undefined;
+  if (
+    request.kind !== 'process' ||
+    (request.symbol !== 'spawnSync' && request.symbol !== 'spawn')
+  ) {
+    return undefined;
+  }
   const roundId = flagValues(invocationArgv, '--round').at(-1);
   if (roundId === undefined || !/^R-[0-9]{4}$/u.test(roundId)) return undefined;
   const selectedTaskIds = flagValues(invocationArgv, '--task');
