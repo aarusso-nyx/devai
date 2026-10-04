@@ -111,7 +111,13 @@ describe('experimental consent at the front door (IA-001)', () => {
       allow_publish: false,
       experimental: true,
     });
-    expect(activateEntry.authority_contract.subject.initiator.allowed_roles).toEqual(['owner']);
+    expect(
+      (
+        activateEntry.authority_contract.subject as {
+          readonly initiator: { readonly allowed_roles: readonly string[] };
+        }
+      ).initiator.allowed_roles,
+    ).toEqual(['owner']);
   });
 
   it('admits only the Owner with both --write and --experimental', () => {
