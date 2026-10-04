@@ -2,7 +2,7 @@
 id: ADR-MDL-0005
 title: Opt-in experimental agent execution through host CLI providers
 type: adr
-status: proposed
+status: accepted
 date: 2026-10-04
 authority: Architect
 supersedes: []
@@ -41,9 +41,10 @@ inspector_acceptance:
 
 ## Status
 
-Proposed by the Architect on 2026-10-04 as orchestrator stage S3a. It needs Owner
-ratification before any S3 code is written. The decision points marked **D-n**
-record a recommended choice; the Owner may ratify, amend, or reject each one.
+Accepted. The Architect proposed it on 2026-10-04 as orchestrator stage S3a, and the
+Owner ratified decision points D-1 through D-10 as written the same day. It
+authorizes S3 design and fake-provider implementation only; the first live
+provider call (S3c) still needs a separate Owner authorization naming its budget.
 
 ## Context
 
