@@ -265,6 +265,13 @@ export const writeSync = guarded('writeSync', nodeWriteSync, 'mutation');
 export const execFileSync = guarded('execFileSync', nodeExecFileSync, 'process');
 export const spawnSync = guarded('spawnSync', nodeSpawnSync, 'process');
 
+export { spawn } from './host-process.js';
+export type {
+  GuardedChildProcess,
+  GuardedProcessResult,
+  GuardedSpawnOptions,
+} from './host-process.js';
+
 /** Exact read-only bootstrap exception used only to resolve the CLI version. */
 export const readProcessSync = nodeSpawnSync;
 
