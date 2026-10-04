@@ -47,7 +47,11 @@ async function attempt(runtime: AgentCliRuntime, scenario: string, timeoutMs = 1
         cwd,
         prompt: 'COMPOSED PROMPT BYTES',
         timeoutMs,
-        env: { ...process.env, FAKE_AGENT_SCENARIO: scenario },
+        env: {
+          ...process.env,
+          FAKE_AGENT_SCENARIO: scenario,
+          FAKE_AGENT_PROMPT_FILE: 'fake-agent-prompt.txt',
+        },
         onSpawned: (pid) => spawned.push(pid),
       }),
     );

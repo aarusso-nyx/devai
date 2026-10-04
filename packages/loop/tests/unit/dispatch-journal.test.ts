@@ -93,6 +93,24 @@ describe('dispatch journal', () => {
     expect(existsSync(dispatchJournalPath(root, ROUND))).toBe(false);
   });
 
+  it('records a process that never started as intent then exited, without a spawned event', async () => {
+    const root = repository();
+    await withAuthorityHostTestScope(async () => {
+      appendDispatchJournalEvent(root, ROUND, entry('intent'));
+      appendDispatchJournalEvent(root, ROUND, {
+        task_id: 'TASK-0040',
+        attempt: 1,
+        event: 'exited',
+        exit_code: null,
+        signal: null,
+        timed_out: false,
+      });
+      appendDispatchJournalEvent(root, ROUND, entry('evidence-written'));
+      appendDispatchJournalEvent(root, ROUND, entry('settled'));
+      expect(uncertainDispatches(readDispatchJournal(root, ROUND))).toEqual([]);
+    });
+  });
+
   it('blocks the round on uncertain work until a human disposes of the task', async () => {
     const root = repository();
     await withAuthorityHostTestScope(async () => {

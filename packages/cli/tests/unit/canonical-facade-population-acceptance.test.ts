@@ -1,5 +1,5 @@
 // Invariants: INV-DEVAI-001, INV-DEVAI-015, INV-DEVAI-017, INV-DEVAI-020
-// Inspector acceptance: the 62 current actions have a one-to-one executable
+// Inspector acceptance: the 63 current actions have a one-to-one executable
 // facade population, and every facade has a bounded, non-silent refusal probe.
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
@@ -48,6 +48,7 @@ import {
 import { roundWorkflowCommands } from '../../src/commands/round/workflow.js';
 import { roundTrackingCommands } from '../../src/commands/round/tracking.js';
 import { roundDispatchActivate } from '../../src/commands/round/dispatch-activate.js';
+import { roundDispatch } from '../../src/commands/round/dispatch-agents.js';
 import { senseInventoryCmd } from '../../src/commands/sense/inventory.js';
 import { senseMigrateCmd } from '../../src/commands/sense/migrate.js';
 import { senseRecordCmd } from '../../src/commands/sense/record.js';
@@ -109,6 +110,7 @@ const FACADES: readonly FacadeDefinition[] = [
   ...roundWorkflowCommands,
   ...roundTrackingCommands,
   roundDispatchActivate,
+  roundDispatch,
   senseInventoryCmd,
   senseMigrateCmd,
   senseRecordCmd,
@@ -160,6 +162,7 @@ const REFUSAL_PROBES: Readonly<Record<string, RefusalProbe>> = {
   'release verify': usage([]),
   'round assess': usage([]),
   'round close': usage([]),
+  'round dispatch': usage([]),
   'round dispatch activate': usage([]),
   'round gap create': usage([]),
   'round gap list': usage([]),
@@ -195,9 +198,9 @@ describe('canonical facade population acceptance', () => {
     const facadeNames = FACADES.map((definition) => definition.name).sort();
     const currentBindings = ACTION_REGISTRY.map((entry) => entry.handler).sort();
 
-    expect(FACADES).toHaveLength(62);
-    expect(ACTION_REGISTRY).toHaveLength(62);
-    expect(new Set(facadeNames).size).toBe(62);
+    expect(FACADES).toHaveLength(63);
+    expect(ACTION_REGISTRY).toHaveLength(63);
+    expect(new Set(facadeNames).size).toBe(63);
     expect(facadeNames).toEqual(currentBindings);
     expect(Object.keys(REFUSAL_PROBES).sort()).toEqual(currentBindings);
 
@@ -205,7 +208,7 @@ describe('canonical facade population acceptance', () => {
     for (const definition of FACADES) definition.register(cli);
   });
 
-  it('executes a bounded refusal probe for all 62 current facades without external effects', async () => {
+  it('executes a bounded refusal probe for all 63 current facades without external effects', async () => {
     const cli = cac('devai-canonical-facade-refusals');
     for (const definition of FACADES) definition.register(cli);
 
