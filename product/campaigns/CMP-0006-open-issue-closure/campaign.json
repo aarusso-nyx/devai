@@ -3,7 +3,7 @@
   "id": "CMP-0006",
   "title": "Close the complete open-issue backlog with attributable evidence",
   "type": "campaign",
-  "status": "active",
+  "status": "closed",
   "date": "2026-10-01",
   "authority": "Architect",
   "mandate": {
@@ -70,25 +70,29 @@
       "id": "OE-05",
       "description": "Sign and export the R-0401 receipt bound to 259197ac0c809f360884fc14da1d87ac92f3f0e2 and task-policy digest a33e478245b2e05adbc0f768a2544c77c699a9edd68443d0528a8719013685ed before any release plan uses that head; or record an explicit disposition that it will not be used and issue/sign/export a fresh receipt for the actual candidate. Do not attest old evidence to a new head.",
       "required_before": "R-0607",
-      "performed_at": null
+      "performed_at": "2026-10-04T04:00:16Z",
+      "outcome": "fallback"
     },
     {
       "id": "OE-06",
       "description": "Select the actual release version and exact candidate after R-0602 through R-0606 close. Authorize the candidate RC gate, signed export, exact-tag rehearsal and publication separately, with publish consent and protected environment approvals. Publish the immutable package/release carrying the re-vendored verifier under the current trusted verifier pin. Record candidate/tree, task-policy digest, tag and package identities, run IDs and exact artifact digests; no version is selected by this plan.",
       "required_before": "R-0607",
-      "performed_at": null
+      "performed_at": "2026-10-04T04:00:16Z",
+      "outcome": "performed"
     },
     {
       "id": "OE-07",
       "description": "Authorize the Pages control-commit/audit update and exact site deployment separately. Reissue the migration audit for the selected control commit, reconcile the Pages journal, deploy exact site bytes, and verify the journal and live bytes. A skipped or unverified deployment is unresolved, never performed by fallback.",
       "required_before": "R-0607",
-      "performed_at": null
+      "performed_at": "2026-10-04T05:07:28Z",
+      "outcome": "performed"
     },
     {
       "id": "OE-08",
       "description": "After the shipping release is immutable and the atomic step-4 repin lands, re-declare DEVAI_LEDGER_VERIFIER_PROVENANCE_SHA256 to the published provenance digest and record an independently checked identity. Do not expose any secret values.",
       "required_before": "R-0608",
-      "performed_at": null
+      "performed_at": "2026-10-04T05:08:32Z",
+      "outcome": "performed"
     },
     {
       "id": "OE-09",
@@ -120,7 +124,7 @@
       "id": "R-0601",
       "title": "Verify accepted contracts and establish campaign entry",
       "goal": "Verify accepted contracts, settled issue dispositions and the two-PR source integration entry; preserve exact checkpoint and effect boundaries.",
-      "status": "open",
+      "status": "closed",
       "records": ["ADR-EVI-0004", "ADR-SCR-0012", "ADR-EVI-0005", "ADR-MDL-0003", "ADR-CHK-0005"],
       "depends_on": [],
       "attestation_reissue": false,
@@ -159,7 +163,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "checkpoint",
+              "status": "cancelled",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -260,13 +264,19 @@
           ]
         }
       ],
-      "disposition": "Source-phase plan under CMP0006-OD-EXEC-20261002: 1 previously human-ratified task checkpoints; no closure or merged_as inferred. Round dispatch follows the three-round central permit and existing dependencies."
+      "disposition": "Entry contracts accepted (OE-01 fallback, OE-02, OE-03). #240 delivered by the amending ADRs that shipped in #255; #253 was closed not_planned by the Owner before entry. The task triplets were not executed as tasks after the 2026-10-03 Owner reset; the work landed as plain commits in #255.",
+      "closure": {
+        "merged_head": "c436ebd98b830c34cdceeed6d044d9adce01ee98",
+        "closed_at": "2026-10-04T05:30:00Z",
+        "task_policy_digest": null,
+        "phase_closure": null
+      }
     },
     {
       "id": "R-0602",
       "title": "Remove security findings and make CI trustworthy",
       "goal": "Resolve every high-severity advisory and produce reliable candidate gates with actionable failures.",
-      "status": "planned",
+      "status": "closed",
       "records": [
         "ADR-SEC-0001",
         "ADR-SCR-0010",
@@ -309,7 +319,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "checkpoint",
+              "status": "cancelled",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -374,7 +384,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0621",
-              "status": "checkpoint",
+              "status": "cancelled",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -463,7 +473,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0622",
-              "status": "checkpoint",
+              "status": "cancelled",
               "target_substrates": ["F2"],
               "boundary": {
                 "paths": [
@@ -626,7 +636,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "checkpoint",
+              "status": "cancelled",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -711,7 +721,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0624",
-              "status": "checkpoint",
+              "status": "cancelled",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -801,7 +811,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0625",
-              "status": "checkpoint",
+              "status": "cancelled",
               "target_substrates": ["F2"],
               "boundary": {
                 "paths": [
@@ -916,7 +926,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "cancelled",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -974,7 +984,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0627",
-              "status": "planned",
+              "status": "cancelled",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -1033,7 +1043,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0628",
-              "status": "planned",
+              "status": "cancelled",
               "target_substrates": ["F2"],
               "boundary": {
                 "paths": [
@@ -1120,7 +1130,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "cancelled",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -1173,7 +1183,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-06210",
-              "status": "planned",
+              "status": "cancelled",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -1234,7 +1244,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-06211",
-              "status": "planned",
+              "status": "cancelled",
               "target_substrates": ["F2"],
               "boundary": {
                 "paths": [
@@ -2067,7 +2077,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "cancelled",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -2149,7 +2159,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-06213",
-              "status": "planned",
+              "status": "cancelled",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -2937,7 +2947,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-06214",
-              "status": "planned",
+              "status": "cancelled",
               "target_substrates": ["F2"],
               "boundary": {
                 "paths": [
@@ -3016,7 +3026,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "cancelled",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -3073,13 +3083,19 @@
           ]
         }
       ],
-      "disposition": "Source-phase plan under CMP0006-OD-EXEC-20261002: 3 previously human-ratified task checkpoints; no closure or merged_as inferred. Round dispatch follows the three-round central permit and existing dependencies. Reviewed scope amendment separates CTG-0622 Pages/soft-validator source acceptance from CTG-0625 semantic test-trace repair and CTG-0626 Architect adoption. Real trace/test-trace and independent authenticated soft evidence remain final cumulative admission gates; no broad trace lock attaches to CTG-0622."
+      "disposition": "Delivered in #255 and v1.9.0: #233 (advisories; completed by lint-staged 17 and the libxmljs2 override), #234 (staged Pages preparation and serialized publication, ADR-REL-0034), #247 and #248. #235 is descoped by the Owner (the provider-free soft-gate step left the PR lane; scripts kept) and stays open as an issue. CTG-0624..CTG-0626 integration, trace and inventory support was superseded by the reset, and the serialize-or-bound admission of unknown effects was withdrawn.",
+      "closure": {
+        "merged_head": "c436ebd98b830c34cdceeed6d044d9adce01ee98",
+        "closed_at": "2026-10-04T05:30:00Z",
+        "task_policy_digest": null,
+        "phase_closure": null
+      }
     },
     {
       "id": "R-0603",
       "title": "Produce the inventory and stabilize observations",
       "goal": "Keep F4:T4/F4:T9 measured and make the coverage producer and reported load-sensitive cases repeatable.",
-      "status": "planned",
+      "status": "abandoned",
       "records": ["ADR-SCR-0012", "ADR-SCR-0004", "ADR-SCR-0007", "ADR-CHK-0003"],
       "depends_on": ["R-0601", "R-0602"],
       "attestation_reissue": false,
@@ -3112,7 +3128,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "cancelled",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -3173,7 +3189,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0631",
-              "status": "planned",
+              "status": "cancelled",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -3232,7 +3248,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0632",
-              "status": "planned",
+              "status": "cancelled",
               "target_substrates": ["F2"],
               "boundary": {
                 "paths": [
@@ -3316,7 +3332,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "cancelled",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -3375,7 +3391,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0634",
-              "status": "planned",
+              "status": "cancelled",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -3438,7 +3454,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0635",
-              "status": "planned",
+              "status": "cancelled",
               "target_substrates": ["F2"],
               "boundary": {
                 "paths": [
@@ -3523,7 +3539,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "cancelled",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": ["docs/dev/operations/open-issue-closure-campaign/load-test-matrix.md"],
@@ -3579,7 +3595,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0637",
-              "status": "planned",
+              "status": "cancelled",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -3646,7 +3662,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0638",
-              "status": "planned",
+              "status": "cancelled",
               "target_substrates": ["F2"],
               "boundary": {
                 "paths": [
@@ -3707,13 +3723,13 @@
           ]
         }
       ],
-      "disposition": "Source-phase plan under CMP0006-OD-EXEC-20261002: 0 previously human-ratified task checkpoints; no closure or merged_as inferred. Round dispatch follows the three-round central permit and existing dependencies."
+      "disposition": "Descoped by the Owner on 2026-10-03. #242 (coverage producer recursion guard) was delivered in #255; #236 (coverage producer inside the sweep), #237 (inventory, the Owner's option a) and #246 (load-sensitive cases) stay open as issues."
     },
     {
       "id": "R-0604",
       "title": "Finish exact closure membership and crash recovery",
       "goal": "Eliminate substring closure acceptance and expose a bounded append-only newest-line repair.",
-      "status": "planned",
+      "status": "closed",
       "records": ["ADR-EVI-0004", "ADR-EVI-0005"],
       "depends_on": ["R-0601"],
       "attestation_reissue": false,
@@ -3742,7 +3758,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "checkpoint",
+              "status": "cancelled",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": ["docs/dev/operations/open-issue-closure-campaign/closure-membership.md"],
@@ -3798,7 +3814,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0641",
-              "status": "planned",
+              "status": "cancelled",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -3857,7 +3873,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0642",
-              "status": "planned",
+              "status": "cancelled",
               "target_substrates": ["F2"],
               "boundary": {
                 "paths": [
@@ -3939,7 +3955,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "cancelled",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -3998,7 +4014,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0644",
-              "status": "planned",
+              "status": "cancelled",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -4057,7 +4073,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0645",
-              "status": "planned",
+              "status": "cancelled",
               "target_substrates": ["F2"],
               "boundary": {
                 "paths": [
@@ -4118,13 +4134,19 @@
           ]
         }
       ],
-      "disposition": "Source-phase plan under CMP0006-OD-EXEC-20261002: 1 previously human-ratified task checkpoints; no closure or merged_as inferred. Round dispatch follows the three-round central permit and existing dependencies."
+      "disposition": "Delivered in #255: #238 (exact terminal closure membership) and #239 (CLI newest-line recovery, ADR-EVI-0005).",
+      "closure": {
+        "merged_head": "c436ebd98b830c34cdceeed6d044d9adce01ee98",
+        "closed_at": "2026-10-04T05:30:00Z",
+        "task_policy_digest": null,
+        "phase_closure": null
+      }
     },
     {
       "id": "R-0605",
       "title": "Align CLI refusals and complete the references",
       "goal": "Refuse inline presets consistently, emit all selected readings and make current references complete.",
-      "status": "planned",
+      "status": "closed",
       "records": ["ADR-SCR-0011", "ADR-AUT-0002", "ADR-CHK-0005", "ADR-GOV-0021", "ADR-MDL-0003"],
       "depends_on": ["R-0601", "R-0602", "R-0603", "R-0604", "R-0606"],
       "attestation_reissue": false,
@@ -4154,7 +4176,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "cancelled",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -4214,7 +4236,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0651",
-              "status": "planned",
+              "status": "cancelled",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -4275,7 +4297,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0652",
-              "status": "planned",
+              "status": "cancelled",
               "target_substrates": ["F2"],
               "boundary": {
                 "paths": [
@@ -4357,7 +4379,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "cancelled",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -4416,7 +4438,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0654",
-              "status": "planned",
+              "status": "cancelled",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -4477,7 +4499,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0655",
-              "status": "planned",
+              "status": "cancelled",
               "target_substrates": ["F2"],
               "boundary": {
                 "paths": [
@@ -4555,7 +4577,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "cancelled",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -4613,7 +4635,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0657",
-              "status": "planned",
+              "status": "cancelled",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": ["tests/contract/cmp0006-error-code-reference.contract.test.ts"],
@@ -4668,7 +4690,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0658",
-              "status": "planned",
+              "status": "cancelled",
               "target_substrates": ["F2"],
               "boundary": {
                 "paths": ["scripts/generate-error-code-reference.mjs"],
@@ -4736,7 +4758,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "cancelled",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": ["docs/reference/error-codes.md"],
@@ -4798,7 +4820,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "cancelled",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -4845,13 +4867,19 @@
           ]
         }
       ],
-      "disposition": "Source-phase plan under CMP0006-OD-EXEC-20261002: 0 previously human-ratified task checkpoints; no closure or merged_as inferred. Round dispatch follows the three-round central permit and existing dependencies."
+      "disposition": "Delivered in #255: #241, #250, #251, #252 and #254.",
+      "closure": {
+        "merged_head": "c436ebd98b830c34cdceeed6d044d9adce01ee98",
+        "closed_at": "2026-10-04T05:30:00Z",
+        "task_policy_digest": null,
+        "phase_closure": null
+      }
     },
     {
       "id": "R-0606",
       "title": "Prove the live review bridge",
       "goal": "Finish offline host-envelope safety and obtain separately authorized live verdicts on both hosts.",
-      "status": "planned",
+      "status": "abandoned",
       "records": ["ADR-MDL-0003", "ADR-GOV-0023"],
       "depends_on": ["R-0601"],
       "attestation_reissue": false,
@@ -4894,7 +4922,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "checkpoint",
+              "status": "cancelled",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -4955,7 +4983,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0661",
-              "status": "planned",
+              "status": "cancelled",
               "target_substrates": ["F3"],
               "boundary": {
                 "paths": [
@@ -5031,7 +5059,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0662",
-              "status": "planned",
+              "status": "cancelled",
               "target_substrates": ["F2"],
               "boundary": {
                 "paths": [
@@ -5099,13 +5127,13 @@
           ]
         }
       ],
-      "disposition": "Source-phase plan under CMP0006-OD-EXEC-20261002: 1 previously human-ratified task checkpoints; no closure or merged_as inferred. Round dispatch follows the three-round central permit and existing dependencies."
+      "disposition": "The offline strict-reply contract (ADR-MDL-0003) shipped in #255 and v1.9.0; OE-04, the authorized live review on each host, was not performed. #249 stays open as an issue for that live run."
     },
     {
       "id": "R-0607",
       "title": "Prepare and authorize the shipping release and Pages deployment",
       "goal": "Bind closure, receipt, release and site evidence to the actual reviewed heads.",
-      "status": "planned",
+      "status": "closed",
       "records": ["ADR-REL-0031", "ADR-CHK-0006", "ADR-AUT-0002", "ADR-REL-0032"],
       "depends_on": ["R-0602", "R-0603", "R-0604", "R-0605", "R-0606"],
       "attestation_reissue": true,
@@ -5127,7 +5155,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "cancelled",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": ["docs/dev/operations/open-issue-closure-campaign/release-handoff.md"],
@@ -5183,7 +5211,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "cancelled",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": ["docs/dev/operations/open-issue-closure-campaign/pages-handoff.md"],
@@ -5224,13 +5252,19 @@
           ]
         }
       ],
-      "disposition": "Source-phase plan under CMP0006-OD-EXEC-20261002: 0 previously human-ratified task checkpoints; no closure or merged_as inferred. Round dispatch follows the three-round central permit and existing dependencies."
+      "disposition": "v1.9.0 published at 75343991 (rollover #256; release-path fixes #257, #258, #259, #260): rehearsal 37175145529, publication 37175631750 (OE-06). OE-05 resolved by its disposition branch: the R-0401 receipt for 259197ac is not used by any release plan, the 1.9.0 candidate was certified afresh. Pages deployed and journal-verified by run 37178714727 after the Owner reissued the audit (OE-07, #244).",
+      "closure": {
+        "merged_head": "75343991140c223240b51cea80c060c516226945",
+        "closed_at": "2026-10-04T05:30:00Z",
+        "task_policy_digest": null,
+        "phase_closure": null
+      }
     },
     {
       "id": "R-0608",
       "title": "Repin from the published artifact and prove adopter delivery",
       "goal": "Complete verifier step 4 and obtain independent DETRAN adoption confirmation.",
-      "status": "planned",
+      "status": "abandoned",
       "records": ["ADR-REL-0031", "ADR-CHK-0006", "ADR-EVI-0004", "ADR-EVI-0005", "ADR-AUT-0004"],
       "depends_on": ["R-0607"],
       "attestation_reissue": true,
@@ -5264,7 +5298,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "cancelled",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -5322,13 +5356,13 @@
           ]
         }
       ],
-      "disposition": "Source-phase plan under CMP0006-OD-EXEC-20261002: 0 previously human-ratified task checkpoints; no closure or merged_as inferred. Round dispatch follows the three-round central permit and existing dependencies."
+      "disposition": "The step-4 trusted-verifier repin to the published 1.9.0 package landed in #261 at 4ee265c7 and DEVAI_LEDGER_VERIFIER_PROVENANCE_SHA256 was re-declared (OE-08, #243). OE-09, the DETRAN notice and confirmation, is left to the Owner and tracked by #245."
     },
     {
       "id": "R-0609",
       "title": "Verify issue closure and reconcile the final live backlog",
       "goal": "Accept immutable evidence, close all snapshot issues under exact authority, and account for arrivals/reopens.",
-      "status": "planned",
+      "status": "abandoned",
       "records": ["ADR-SCR-0012", "ADR-EVI-0004", "ADR-EVI-0005", "ADR-MDL-0003", "ADR-REL-0031"],
       "depends_on": ["R-0608"],
       "attestation_reissue": false,
@@ -5361,7 +5395,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "cancelled",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -5426,7 +5460,48 @@
           ]
         }
       ],
-      "disposition": "Source-phase plan under CMP0006-OD-EXEC-20261002: 0 previously human-ratified task checkpoints; no closure or merged_as inferred. Round dispatch follows the three-round central permit and existing dependencies."
+      "disposition": "Superseded by the Owner's 2026-10-03 decision to let merged PRs close their issues: 16 of the 22 snapshot issues are closed (15 completed, #253 not_planned) through #255-#261 and evidence comments. OE-10 and OE-11 were not performed; the six open issues (#235, #236, #237, #245, #246, #249) move to the follow-up backlog."
     }
-  ]
+  ],
+  "models": {
+    "schemaVersion": "1.0.0",
+    "hosts": ["claude", "codex"],
+    "tiers": {
+      "architect": {
+        "rank": 1,
+        "claude": "fable",
+        "codex": "gpt-6-astra",
+        "default_effort": "high",
+        "use_for": "orchestration, contracts, schemas, policy, decision records"
+      },
+      "worker-high": {
+        "rank": 2,
+        "claude": "opus",
+        "codex": "gpt-6-sol",
+        "default_effort": "high",
+        "use_for": "implementation across several modules, runner, broker, sensor, and evidence changes, tests of runtime semantics"
+      },
+      "worker": {
+        "rank": 3,
+        "claude": "sonnet",
+        "codex": "gpt-6-sol",
+        "default_effort": "medium",
+        "use_for": "bounded tests, documentation, single-module changes"
+      },
+      "clerk": {
+        "rank": 4,
+        "claude": "haiku",
+        "codex": "gpt-6-luna",
+        "default_effort": "low",
+        "use_for": "mechanical edits, regeneration, mirrors, rollovers, formatting"
+      }
+    },
+    "escalation": {
+      "trigger": "one failed iteration, a blocked report, or a time budget exceeded without a pull request",
+      "step": "one-rank-up",
+      "ceiling": "architect",
+      "authority": "orchestrator"
+    }
+  },
+  "disposition": "Closed on 2026-10-04 after the Owner reset of 2026-10-03 (decision register, 'Owner reset and v1.9.0 descope'). The remaining issues shipped as plain PRs (#255-#261) and v1.9.0 instead of task triplets; rounds whose work landed are closed, rounds left with a descoped deliverable or an unperformed Owner effect (OE-04, OE-09, OE-10, OE-11) are abandoned with their disposition. Open follow-ups: #235, #236, #237, #245, #246, #249."
 }
