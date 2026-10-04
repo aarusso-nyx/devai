@@ -13,10 +13,11 @@ const ROOT = resolve(import.meta.dirname, '../../../..');
 // schemas and thresholds.schema.json. ADR-MDL-0005 adds experimental-execution,
 // experimental-activation and dispatch-journal-event, and promotes the source-only
 // prompt-composition schema to the runtime roster for the prompt composer. init upgrade (#264)
-// adds adopter-migrations.schema.json for the shipped migration manifest, so the count is 109.
+// adds adopter-migrations.schema.json for the shipped migration manifest, and ADR-GOV-0025
+// promotes campaign.schema.json for the campaign projection and materializer, so the count is 110.
 describe('schema roster', () => {
   it('holds the previous roster plus model-tiers, path-authority-classes, observation-backlog and the proof anchor schemas', () => {
-    expect(ROSTER).toHaveLength(109);
+    expect(ROSTER).toHaveLength(110);
     expect(ROSTER).toContain('model-tiers.schema.json');
     expect(ROSTER).toContain('path-authority-classes.schema.json');
     expect(ROSTER).toContain('observation-backlog.schema.json');
