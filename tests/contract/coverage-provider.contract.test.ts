@@ -19,7 +19,7 @@ interface CoverageData {
   readonly path: string;
   readonly statementMap: Record<string, Location>;
   readonly fnMap: Record<string, { decl: Location; loc: Location }>;
-  readonly branchMap: Record<string, { locations: Location[] }>;
+  readonly branchMap: Record<string, { loc?: Location; locations: Location[] }>;
   readonly s: Record<string, number>;
   readonly f: Record<string, number>;
   readonly b: Record<string, number[]>;
@@ -255,6 +255,46 @@ describe('subprocess coverage measurement integrity', () => {
         ),
       ).toThrow(/duplicate exact .* location/u);
     }
+  });
+
+  it('counts one shared operand of a twice-reported expression once and refuses other repeats', async () => {
+    const provider = (await import('../config/subprocess-v8-coverage-provider.js')) as unknown as {
+      mergeCanonicalHits?: (current: FixtureCoverageMap, subprocess: FixtureCoverageMap) => void;
+    };
+    // A module that awaits a dynamic import can source-map one `a ?? b` into two branch entries
+    // with the same overall loc that differ in the left operand and share the right one.
+    const twice = (left: Location): CoverageData => ({
+      ...fixtureCoverage(0, 0),
+      branchMap: {
+        first: { loc: outer, locations: [inner, second] },
+        again: { loc: outer, locations: [left, second] },
+      },
+      b: { first: [0, 0], again: [0, 0] },
+    });
+    const sibling: Location = { start: { line: 4, column: 2 }, end: { line: 7, column: 0 } };
+    const current = new FixtureCoverageMap(twice(sibling));
+    const subprocess = new FixtureCoverageMap({
+      ...fixtureCoverage(0, 0),
+      branchMap: { only: { loc: outer, locations: [inner, second] } },
+      b: { only: [0, 3] },
+    });
+    provider.mergeCanonicalHits?.(current, subprocess);
+    expect(current.data().b).toEqual({ first: [0, 3], again: [0, 0] });
+
+    const otherExpression: CoverageData = {
+      ...fixtureCoverage(0, 0),
+      branchMap: {
+        first: { loc: outer, locations: [inner, second] },
+        other: { loc: inner, locations: [sibling, second] },
+      },
+      b: { first: [0, 0], other: [0, 0] },
+    };
+    expect(() =>
+      provider.mergeCanonicalHits?.(
+        new FixtureCoverageMap(otherExpression),
+        new FixtureCoverageMap(fixtureCoverage(0, 0)),
+      ),
+    ).toThrow(/duplicate exact branch location/u);
   });
 
   it('fails closed on a duplicate parent location in a file absent from subprocess coverage', async () => {
