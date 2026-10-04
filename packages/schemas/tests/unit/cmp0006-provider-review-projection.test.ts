@@ -81,6 +81,12 @@ vi.mock('@devai-nyx/authority', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   spawnSync: spawnSyncMock,
 }));
+// The schemas package does not depend on @devai-nyx/authority: the local config aliases it to
+// source, while under the RC coverage config the bridge resolves the package's source entry.
+vi.mock('../../../authority/src/index.ts', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  spawnSync: spawnSyncMock,
+}));
 vi.mock('../../../skills/node_modules/@anthropic-ai/sdk/index.mjs', () => ({
   default: class {
     messages = { create: anthropicCreate };
