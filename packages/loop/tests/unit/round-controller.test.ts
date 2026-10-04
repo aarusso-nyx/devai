@@ -166,6 +166,29 @@ describe('lock denial requeue and escalation', () => {
     });
   });
 
+  it('lets an independent task run after a denial in the same run', async () => {
+    const root = repository();
+    await withAuthorityHostTestScope(async () => {
+      saveTask(root, task('TASK-0205'));
+      saveTask(root, { ...task('TASK-0206'), target_modules: ['MOD-b'] });
+      acquireLocks({
+        locksDir: join(root, '.devai/state/locks'),
+        taskId: 'TASK-0900',
+        targets: ['F2:MOD-a'],
+      });
+      const result = await runRoundTasks({
+        repoRoot: root,
+        round: ROUND,
+        dispatch: () => ({ ok: true }),
+      });
+      expect(result.results).toEqual([
+        { task_id: 'TASK-0205', ok: false, code: 'TASK_RESOURCE_LOCK_DENIED' },
+        { task_id: 'TASK-0206', ok: true },
+      ]);
+      expect(loadTask(root, 'TASK-0205')).toMatchObject({ status: 'ready', priority: 1 });
+    });
+  });
+
   it('starts the denial count afresh once the task acquires its locks', async () => {
     const root = repository();
     await withAuthorityHostTestScope(async () => {
