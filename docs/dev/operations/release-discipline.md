@@ -161,6 +161,9 @@ The docs dependency audit has a single Owner-authorized non-regression baseline 
 lists every currently observed moderate or high advisory by exact advisory and package, expires on
 2026-10-15, rejects critical advisories, and rejects any changed or additional advisory. A dependency
 or lockfile change must remove the applicable waiver or obtain a new explicitly recorded decision.
+On 2026-10-03 the Owner added two such decisions for v1.9.0: `braces` (GHSA-vfj7-8cjw-p6xm) and
+`http-cache-semantics` (GHSA-ch52-4w7c-c8xp) have no patched release and reach only the Docusaurus
+build tooling, so they carry the same expiry; the npm package itself carries no audit waiver (#233).
 
 Repository settings are separate Owner-authorized effects: enable immutable Releases,
 prohibit update/deletion of `v*` tags, require signed annotated release tags, configure the
