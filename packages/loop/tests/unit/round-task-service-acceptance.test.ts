@@ -257,6 +257,8 @@ describe('round runner acceptance', () => {
       saveTask(
         root,
         routineTask('TASK-7701', {
+          discipline: 'inspector',
+          target_substrates: ['F3'],
           coupled_task_group: 'CTG-0001',
           coupled_pipeline_position: 'inspector',
         }),
@@ -264,6 +266,8 @@ describe('round runner acceptance', () => {
       saveTask(
         root,
         routineTask('TASK-7702', {
+          discipline: 'architect',
+          target_substrates: ['F1'],
           coupled_task_group: 'CTG-0001',
           coupled_pipeline_position: 'architect',
         }),
@@ -282,11 +286,14 @@ describe('round runner acceptance', () => {
         taskIds: ['TASK-7704'],
         dispatch: (task) => {
           dispatched.push(task.id);
+          saveTask(root, { ...task, status: 'pre_merge' });
+          saveTask(root, { ...loadTask(root, task.id), status: 'merging' });
+          finishRoundTask({ repoRoot: root, round: 'R-0007', taskId: task.id });
           return { ok: true, evidence_id: `TEE-${task.id}` };
         },
       });
       expect(result.ok).toBe(true);
-      expect(result.ordered_task_ids).toEqual(['TASK-7701', 'TASK-7702', 'TASK-7703', 'TASK-7704']);
+      expect(result.ordered_task_ids).toEqual(['TASK-7702', 'TASK-7701', 'TASK-7703', 'TASK-7704']);
       expect(dispatched).toEqual(result.ordered_task_ids);
       expect(result.results.every((entry) => entry.evidence_id !== undefined)).toBe(true);
     });
