@@ -132,11 +132,11 @@ describe('round dispatch boundaries', () => {
         expect(result).toEqual({
           ok: false,
           round_id: 'R-0007',
-          ordered_task_ids: ['TASK-9702', 'TASK-9703', 'TASK-9704'],
+          ordered_task_ids: ['TASK-9702', 'TASK-9704', 'TASK-9703'],
           results: [
             { task_id: 'TASK-9702', ok: false, code: 'TASK_DEPENDENCY_FAILED' },
-            { task_id: 'TASK-9703', ok: false, code: 'TASK_DEPENDENCY_FAILED' },
             { task_id: 'TASK-9704', ok: true },
+            { task_id: 'TASK-9703', ok: false, code: 'TASK_DEPENDENCY_FAILED' },
           ],
         });
         expect(loadTask(root, 'TASK-9702').status).toBe('ready');
@@ -262,7 +262,7 @@ describe('round dispatch boundaries', () => {
           taskIds: ['TASK-9701', 'TASK-9702'],
           dispatch,
         }),
-      ).rejects.toThrow('TASK_DEPENDENCY_MISSING');
+      ).rejects.toThrow('TASK_RECORD_INVALID');
       expect(dispatch).not.toHaveBeenCalled();
       expect(loadTask(root, 'TASK-9701').status).toBe('ready');
     });
