@@ -117,7 +117,7 @@ function manifestFixture(overrides: { expectedActionCount?: number } = {}): Mani
       policy: 'law/policy/trusted-local-rc-verifier-package.json',
     },
     constants: {
-      expected_action_count: overrides.expectedActionCount ?? 61,
+      expected_action_count: overrides.expectedActionCount ?? 62,
       ledger_environment: 'devai-ledger-verification',
     },
   };

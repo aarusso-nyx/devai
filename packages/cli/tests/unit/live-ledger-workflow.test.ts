@@ -643,7 +643,7 @@ describe('live ledger-verification workflow', () => {
     expect(release).toContain('devai adopter espaço não-ASCII');
     expect(release).toContain('name: "devai-linux-adopter"');
     expect(release).not.toContain('npm init --yes');
-    expect(release).toContain('EXPECTED_ACTION_COUNT: 61');
+    expect(release).toContain('EXPECTED_ACTION_COUNT: 62');
     expect(verifierMaterializationScript(release)).toContain('echo "version=1.5.4"');
     expect(verifierMaterializationScript(release)).not.toContain(
       'require("./" + process.argv[1] + "/package.json").version',
@@ -810,7 +810,7 @@ describe('live ledger-verification workflow', () => {
     {
       name: 'stale installed action count',
       mutate: (source: string) =>
-        source.replace('EXPECTED_ACTION_COUNT: 61', 'EXPECTED_ACTION_COUNT: 41'),
+        source.replace('EXPECTED_ACTION_COUNT: 62', 'EXPECTED_ACTION_COUNT: 41'),
       diagnostic: 'RELEASE_IDENTITY_INVALID',
     },
     {
