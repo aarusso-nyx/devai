@@ -8,7 +8,7 @@ import {
 import { parsers } from '@devai-nyx/schemas';
 import { join } from 'node:path';
 import { provisionTask, dropTask } from './db.js';
-import { acquireLocks, releaseLocks } from './locks.js';
+import { acquireLocks, releaseLocks, taskLockTargets } from './locks.js';
 import { createWorktree, destroyWorktree } from './worktrees.js';
 import {
   classifyTaskRecord,
@@ -192,7 +192,7 @@ export function spawnTask(opts: SpawnTaskOptions): SpawnResult {
   const lockResult = acquireLocks({
     locksDir,
     taskId: requested.id,
-    targets: requested.target_modules.map((module) => `F2:${module}`),
+    targets: taskLockTargets(requested),
   });
 
   // Lock-denied: never attempt worktree/DB; persist the record and return.
