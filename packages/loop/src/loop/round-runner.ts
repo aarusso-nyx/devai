@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { decideRoundTaskAdmission, planRoundTaskAdmission } from './round-task-admission.js';
-import { listLocks } from './locks.js';
+import { LOCK_RENEWAL_INTERVAL_MS, listLocks, renewLocks, taskLockTargets } from './locks.js';
 import { listTaskRecords, loadTask, saveTask, type TaskRecord } from './tasks.js';
 import {
   escalateRoundTask,
@@ -23,6 +23,8 @@ export interface RunRoundTasksOptions {
   readonly dispatch: (
     task: TaskRecord,
   ) => RoundTaskDispatchResult | Promise<RoundTaskDispatchResult>;
+  /** How often held locks are renewed while a dispatch runs. Defaults to a quarter TTL. */
+  readonly lockRenewalIntervalMs?: number;
 }
 
 export interface RoundTaskRunResult {
@@ -58,9 +60,49 @@ function requiredTaskLocksHeld(repoRoot: string, task: TaskRecord): boolean {
     (lock) =>
       lock.task_id === task.id && Date.now() - new Date(lock.acquired_at).getTime() < lock.ttl_ms,
   );
-  return task.target_modules.every((module) =>
-    held.some((lock) => lock.substrate === 'F2' && lock.module === module),
+  return taskLockTargets(task).every((target) =>
+    held.some((lock) => `${lock.substrate}:${lock.module}` === target),
   );
+}
+
+/**
+ * Run one dispatch while renewing the task's locks, so a dispatch longer than the
+ * lock TTL is never taken over. A lock found missing or held by another task is a
+ * lost lock: the dispatch result cannot claim exclusive resources it no longer had.
+ */
+async function dispatchWithLockRenewal(
+  options: RunRoundTasksOptions,
+  task: TaskRecord,
+): Promise<RoundTaskDispatchResult> {
+  const locksDir = join(options.repoRoot, '.devai/state/locks');
+  const targets = taskLockTargets(task);
+  let lost = false;
+  const renew = (): void => {
+    if (lost || targets.length === 0) return;
+    try {
+      // A dispatch that completed or escalated the task released its locks legitimately.
+      if (loadTask(options.repoRoot, task.id).status !== 'in_progress') return;
+      lost = renewLocks({ locksDir, taskId: task.id, targets }).lost.length > 0;
+    } catch {
+      lost = true;
+    }
+  };
+  const timer = setInterval(renew, options.lockRenewalIntervalMs ?? LOCK_RENEWAL_INTERVAL_MS);
+  timer.unref();
+  let result: RoundTaskDispatchResult;
+  try {
+    result = await options.dispatch(task);
+  } catch (error) {
+    const code =
+      error instanceof Error && /^TASK_[A-Z0-9_]+$/u.test(error.message)
+        ? error.message
+        : 'TASK_EXECUTOR_DISPATCH_FAILED';
+    result = { ok: false, code };
+  } finally {
+    clearInterval(timer);
+  }
+  renew();
+  return lost ? { ok: false, code: 'TASK_RESOURCE_LOCK_LOST' } : result;
 }
 
 /** Validate the complete same-round population before any B3A dispatch. */
@@ -121,16 +163,7 @@ export async function runRoundTasks(options: RunRoundTasksOptions): Promise<RunR
       results.push({ task_id: task.id, ok: false, code: 'TASK_MAX_ITERATIONS_EXCEEDED' });
       continue;
     }
-    let result: RoundTaskDispatchResult;
-    try {
-      result = await options.dispatch(running);
-    } catch (error) {
-      const code =
-        error instanceof Error && /^TASK_[A-Z0-9_]+$/u.test(error.message)
-          ? error.message
-          : 'TASK_EXECUTOR_DISPATCH_FAILED';
-      result = { ok: false, code };
-    }
+    const result = await dispatchWithLockRenewal(options, running);
     if (!result.ok && loadTask(options.repoRoot, task.id).status === 'in_progress') {
       escalateRoundTask({ repoRoot: options.repoRoot, round: roundId, taskId: task.id });
     }

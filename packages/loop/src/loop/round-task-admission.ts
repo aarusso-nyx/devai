@@ -1,6 +1,7 @@
 import { parsers } from '@devai-nyx/schemas';
 import { canonicalSha256 } from '@devai-nyx/utils';
 import { validateCompositeExecutor } from './composite-executor.js';
+import { taskLockTargets, utf8Compare } from './lock-targets.js';
 import { TaskServiceError } from './task-queue-services.js';
 import type { TaskRecord } from './task-contract.js';
 
@@ -65,10 +66,6 @@ function coupledPosition(task: TaskRecord): number {
   return position == null ? Number.MAX_SAFE_INTEGER : POSITION[position];
 }
 
-function utf8Compare(a: string, b: string): number {
-  return Buffer.from(a).compare(Buffer.from(b));
-}
-
 function population(tasks: readonly TaskRecord[]): Map<string, TaskRecord> {
   const byId = new Map<string, TaskRecord>();
   for (const task of tasks) {
@@ -90,9 +87,7 @@ function executionContextDigest(task: TaskRecord): string {
 }
 
 function resources(task: TaskRecord): readonly string[] {
-  return [
-    ...new Set(task.target_substrates.flatMap((s) => task.target_modules.map((m) => `${s}:${m}`))),
-  ].sort(utf8Compare);
+  return taskLockTargets(task);
 }
 
 /**
