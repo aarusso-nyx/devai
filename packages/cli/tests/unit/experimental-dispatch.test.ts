@@ -341,7 +341,10 @@ describe('experimental admission rules', () => {
     ).toBe('EXPERIMENTAL_SELECTION_NOT_ACTIVATED');
     expect(
       experimentalTaskRefusal(
-        { ...task, executor: { ...task.executor, selection: { mode: 'preferred' } } } as unknown as TaskRecord,
+        {
+          ...task,
+          executor: { ...task.executor, selection: { mode: 'preferred' } },
+        } as unknown as TaskRecord,
         activation(),
       ),
     ).toBe('EXPERIMENTAL_SELECTION_NOT_EXACT');
