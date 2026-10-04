@@ -44,10 +44,19 @@
     "activation": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["record", "schema", "authority", "max_validity_days", "action", "consent"],
+      "required": [
+        "record",
+        "schema",
+        "authority",
+        "max_validity_days",
+        "action",
+        "consent",
+        "writer",
+        "amended_by"
+      ],
       "properties": {
         "record": {
-          "const": ".devai/config/experimental-execution.json"
+          "const": ".devai/state/experimental/activation.json"
         },
         "schema": {
           "const": "law/schemas/experimental-activation.schema.json"
@@ -65,6 +74,12 @@
         },
         "consent": {
           "const": "explicit --write and --experimental for the resolved invocation"
+        },
+        "writer": {
+          "const": "round dispatch activate"
+        },
+        "amended_by": {
+          "const": "ADR-MDL-0006"
         }
       }
     },
@@ -200,12 +215,14 @@
       "authority": "Architect",
       "decision": "ADR-MDL-0005",
       "activation": {
-        "record": ".devai/config/experimental-execution.json",
+        "record": ".devai/state/experimental/activation.json",
         "schema": "law/schemas/experimental-activation.schema.json",
         "authority": "Owner",
         "max_validity_days": 30,
         "action": "round dispatch",
-        "consent": "explicit --write and --experimental for the resolved invocation"
+        "consent": "explicit --write and --experimental for the resolved invocation",
+        "writer": "round dispatch activate",
+        "amended_by": "ADR-MDL-0006"
       },
       "disciplines": ["engineer", "inspector"],
       "runtimes": ["claude-cli", "codex-cli"],
