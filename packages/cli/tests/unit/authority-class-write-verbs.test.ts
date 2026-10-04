@@ -206,15 +206,15 @@ describe('IA-005: the registered subjects of the matrix verbs are unchanged', ()
 const R0502_FILE_DIGESTS: ReadonlyArray<readonly [string, string]> = [
   [
     'law/policy/action-registry.json',
-    'b2248a231a7fa61d82c13794a6ebbd75e093641dd52ca5c4a0d21a12a5e8867e',
+    '4bcfd1112cacb5284e679604d06dcc191bfff1c956d25fe9c3899d721a6fdbc6',
   ],
   [
     'packages/cli/src/generated/action-registry.ts',
-    'b89b670e46cf6c8b48f81d6523fe4383e257646aaa2e2c7528cf7ce20d165400',
+    '4d95bc0e1f257986c4df59a062f99c8d8d5f94911641106947bd96fdd84c19e2',
   ],
   [
     'packages/effects-check/src/generated/action-catalog.ts',
-    '9ead9b0c56d5f2a303f1f9356682acb47b4c3e524fb8438cc4fbee700bd21628',
+    'dd68a396b00421ad7674efded828a3afac99d9593eac94a07c3bfd8da8e05f8d',
   ],
   [
     'packages/sensors/src/generated/action-kinds.ts',
@@ -228,10 +228,10 @@ const R0502_FILE_DIGESTS: ReadonlyArray<readonly [string, string]> = [
 // cb0818d5, where `git diff 38a0a5df cb0818d5 -- packages/cli/src/authority
 // packages/cli/src/generated packages/authority/src law/policy/action-registry.json` is empty.
 // Re-pinned on 2026-10-04 when ADR-MDL-0006 added the Owner-only `round dispatch activate`
-// action: the registry, its generated views and the derived core source change with it, and
+// action and ADR-MDL-0005 the experimental `round dispatch` action: the registry, its generated views and the derived core source change with it, and
 // nothing else in the authority rule sources does.
 const FIXED_REPOSITORY_ID = 'devai-ia-005';
-const R0502_CORE_SOURCE_DIGEST = '13012efa6dbf556d2dae9e7cb92b9373bc2d1e84bb4bb659fd75752bb88b2bc9';
+const R0502_CORE_SOURCE_DIGEST = 'be1103140309a9a10db8a94bf449f2399d698b76fa7a53a8e9a0648ef1428069';
 const R0502_PACKAGE_EXTENSION_DIGEST =
   '089a2eaae03b4d32896a6149a4cefb7b5c5181c3cf839e26e2c8eca1f6eecab1';
 

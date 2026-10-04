@@ -1,11 +1,13 @@
 // Fake claude/codex CLI for ADR-MDL-0005 adapter tests. It never contacts a provider.
 // FAKE_AGENT_SCENARIO selects the scripted stream; stdin (the prompt) is recorded in cwd.
-import { writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
 
-const scenario = process.env.FAKE_AGENT_SCENARIO ?? 'claude-success';
+const scenario = process.argv[2] ?? process.env.FAKE_AGENT_SCENARIO ?? 'claude-success';
 const chunks = [];
 for await (const chunk of process.stdin) chunks.push(chunk);
-writeFileSync('fake-agent-prompt.txt', Buffer.concat(chunks));
+if (process.env.FAKE_AGENT_PROMPT_FILE)
+  writeFileSync(process.env.FAKE_AGENT_PROMPT_FILE, Buffer.concat(chunks));
 const emit = (value) =>
   process.stdout.write(`${typeof value === 'string' ? value : JSON.stringify(value)}\n`);
 
@@ -31,7 +33,13 @@ switch (scenario) {
     emit(claudeResult());
     break;
   case 'claude-writes':
-    writeFileSync('agent-output.txt', 'changed by the agent\n');
+    mkdirSync(dirname(process.env.FAKE_AGENT_WRITE_PATH ?? 'agent-output.txt'), {
+      recursive: true,
+    });
+    writeFileSync(
+      process.env.FAKE_AGENT_WRITE_PATH ?? 'agent-output.txt',
+      'changed by the agent\n',
+    );
     emit(claudeResult());
     break;
   case 'claude-missing-usage': {
