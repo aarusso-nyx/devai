@@ -13,8 +13,10 @@ import {
   execFileSync,
   existsSync,
   lstatSync,
+  mkdirSync,
   readFileSync,
   readdirSync,
+  writeFileSync,
 } from '@devai-nyx/authority';
 import {
   EXPERIMENTAL_BUMPED_TIER,
@@ -35,6 +37,7 @@ import {
 import {
   agentCliInvocation,
   composeAgentPrompt,
+  parseAgentCliOutput,
   runAgentCliAttempt,
   type AgentCliAttempt,
   type AgentCliInvocation,
@@ -190,9 +193,20 @@ function gitHead(cwd: string): string {
   }).trim();
 }
 
+/**
+ * Tokens an attempt spent against the invocation budget: every reported counter, cache
+ * reads and writes included. Missing input or output counters leave the spend unverifiable;
+ * a cache counter the provider never reports (codex cache writes) counts as zero spend.
+ */
 function counted(attempt: AgentCliAttempt): number | undefined {
-  const { input_tokens: input, output_tokens: output } = attempt.output.usage;
-  return input.value === null || output.value === null ? undefined : input.value + output.value;
+  const usage = attempt.output.usage;
+  if (usage.input_tokens.value === null || usage.output_tokens.value === null) return undefined;
+  return (
+    usage.input_tokens.value +
+    usage.output_tokens.value +
+    (usage.cache_read_tokens.value ?? 0) +
+    (usage.cache_write_tokens.value ?? 0)
+  );
 }
 
 interface AttemptPlan {
@@ -213,6 +227,70 @@ function ladder(task: TaskRecord, request: AgentRequest, activation: Experimenta
   }
   void task;
   return plans;
+}
+
+/** A stable code for an unexpected failure: the error message when it is one, else a generic code. */
+export function errorCode(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  return /^[A-Z][A-Z0-9_]{2,}$/u.test(message) ? message : 'EXPERIMENTAL_ATTEMPT_FAILED';
+}
+
+function refusedAttempt(runtime: AgentCliRuntime, code: string): AgentCliAttempt {
+  const output = parseAgentCliOutput(runtime, '');
+  return {
+    ok: false,
+    output: { ...output, failure: code },
+    process: {
+      exit_code: null,
+      signal: null,
+      stdout: '',
+      stderr: '',
+      stdout_truncated: false,
+      stderr_truncated: false,
+      timed_out: false,
+      spawn_error: code,
+    },
+  };
+}
+
+const DIAGNOSTIC_TAIL_BYTES = 8 * 1024;
+
+function tail(text: string): string {
+  const bytes = Buffer.from(text, 'utf8');
+  return bytes.length <= DIAGNOSTIC_TAIL_BYTES
+    ? text
+    : bytes.subarray(bytes.length - DIAGNOSTIC_TAIL_BYTES).toString('utf8');
+}
+
+/**
+ * Retain the bounded tail of the provider streams as diagnostics only
+ * (round-execution.json failure.partial_output), never as evidence of success.
+ */
+function writeDiagnostics(
+  repoRoot: string,
+  roundId: string,
+  name: string,
+  attempt: AgentCliAttempt,
+): void {
+  const dir = join(repoRoot, '.devai/state/round-runs', roundId, 'diagnostics');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(
+    join(dir, `${name}.json`),
+    `${JSON.stringify(
+      {
+        exit_code: attempt.process.exit_code,
+        signal: attempt.process.signal,
+        timed_out: attempt.process.timed_out,
+        spawn_error: attempt.process.spawn_error,
+        failure: attempt.output.failure,
+        stdout_tail: tail(attempt.process.stdout),
+        stderr_tail: tail(attempt.process.stderr),
+      },
+      null,
+      2,
+    )}\n`,
+    { flag: 'wx' },
+  );
 }
 
 function setStatus(repoRoot: string, taskId: string, status: TaskRecord['status']): void {
@@ -259,10 +337,20 @@ export async function dispatchExperimentalTask(
       break;
     }
     context.budget.attempts += 1;
-    const outcome = await runAttempt(context, task, request, plan, composed, wallClockMs);
+    let outcome: { readonly ok: boolean; readonly code: string; readonly evidence_id?: string };
+    try {
+      outcome = await runAttempt(context, task, request, plan, composed, wallClockMs);
+    } catch (error) {
+      // Setup failed before any provider started (for example the worktree was refused).
+      setStatus(context.repoRoot, task.id, 'experimental_blocked');
+      return { ok: false, code: errorCode(error) };
+    }
     if (outcome.ok) {
       setStatus(context.repoRoot, task.id, 'awaiting_human_review');
-      return { ok: true, evidence_id: outcome.evidence_id };
+      return {
+        ok: true,
+        ...(outcome.evidence_id !== undefined && { evidence_id: outcome.evidence_id }),
+      };
     }
     lastCode = outcome.code;
   }
@@ -286,14 +374,8 @@ async function runAttempt(
       ...entry,
     } as Parameters<typeof appendDispatchJournalEvent>[2]);
 
-  journal({
-    event: 'intent',
-    runtime: request.runtime,
-    model: plan.model,
-    effort: request.effort,
-    tier: plan.tier,
-    prompt_sha256: composed.prompt_sha256,
-  });
+  // The worktree is prepared before the intent: a setup failure starts no provider and
+  // must not leave an uncertain journal attempt behind.
   const worktreeId = `WT-${task.id}-A${String(plan.number)}`;
   const worktree = createWorktree({
     repoRoot,
@@ -303,26 +385,42 @@ async function runAttempt(
     taskId: task.id,
   });
   const before = snapshot(worktree.path);
+  journal({
+    event: 'intent',
+    runtime: request.runtime,
+    model: plan.model,
+    effort: request.effort,
+    tier: plan.tier,
+    prompt_sha256: composed.prompt_sha256,
+  });
   const invocation = (context.invocation ?? agentCliInvocation)({
     runtime: request.runtime,
     model: plan.model,
     effort: request.effort,
   });
   const startedAt = new Date().toISOString();
-  const attempt = await runAgentCliAttempt({
-    invocation,
-    cwd: worktree.path,
-    prompt: composed.prompt,
-    timeoutMs: wallClockMs,
-    ...(context.env !== undefined && { env: context.env }),
-    onSpawned: (pid) => journal({ event: 'spawned', pid }),
-  });
+  let attempt: AgentCliAttempt;
+  try {
+    attempt = await runAgentCliAttempt({
+      invocation,
+      cwd: worktree.path,
+      prompt: composed.prompt,
+      timeoutMs: wallClockMs,
+      ...(context.env !== undefined && { env: context.env }),
+      onSpawned: (pid) => journal({ event: 'spawned', pid }),
+    });
+  } catch (error) {
+    // The authority refused the spawn: no provider started, so the attempt settles as an
+    // error instead of staying uncertain.
+    attempt = refusedAttempt(request.runtime, errorCode(error));
+  }
   journal({
     event: 'exited',
     exit_code: attempt.process.exit_code,
     signal: attempt.process.signal,
     timed_out: attempt.process.timed_out,
   });
+  writeDiagnostics(repoRoot, roundId, `${task.id}-A${String(plan.number)}`, attempt);
   const completedAt = new Date().toISOString();
   const after = snapshot(worktree.path);
   const changed = changedPaths(before, after);
