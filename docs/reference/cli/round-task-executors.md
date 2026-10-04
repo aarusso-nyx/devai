@@ -405,3 +405,29 @@ activation untouched. It writes only `.devai/state/experimental/activation.json`
 
 `--experimental` is a consent flag like `--publish`: an experimental action refuses without
 it with `AUTHORITY_EXPERIMENTAL_CONSENT_REQUIRED`, and every other action refuses it.
+
+## Experimental agent dispatch
+
+```bash
+devai round dispatch --round R-0012 --repo-root . --as-role architect --write --experimental --format json
+```
+
+`round dispatch` runs the round's ready agent tasks, or the `--task` selection, under the
+in-force activation. Before any lock, worktree, or provider is touched it refuses an absent or
+expired activation, any selected task whose discipline, runtime, model, effort, or exact
+selection the activation does not admit, and a round whose dispatch journal holds an uncertain
+attempt (`TASK_DISPATCH_UNCERTAIN`) until a human runs `task escalate` on that task.
+
+Each task composes its prompt (Article 37) and must still match its bound
+`prompt_composition_id`, or it is refused with `TASK_PROMPT_COMPOSITION_DRIFT`. It then runs up
+to three attempts at the requested model and one at the next tier of
+`law/policy/model-tiers.json` when the activation also admits that model, bounded by the task's
+`max_iterations` and the activation budgets. Every attempt runs in a fresh worktree
+`WT-<task>-A<n>` and is journalled from `intent` to `settled`. Any changed path that Article 6
+does not give the task's discipline fails it with `EXPERIMENTAL_WRITE_SCOPE_VIOLATION`. Its
+evidence carries `experimental: true` and version-2 usage. A contained, completed attempt leaves
+the task `awaiting_human_review` with its worktree kept for review. Otherwise the worktree is
+removed, the changed-file digests stay in the evidence, and an exhausted ladder or budget ends
+the task `experimental_blocked`. Once a provider leaves a token counter unreported, no further
+attempt in the invocation may spend (`EXPERIMENTAL_USAGE_UNVERIFIABLE`). Nothing is pushed,
+merged, or retried automatically.
