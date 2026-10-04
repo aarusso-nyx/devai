@@ -1255,6 +1255,53 @@
         "The same reading classifies identically on every run.",
         "An inconclusive reading always routes to a human."
       ]
+    },
+    {
+      "id": "UC-devai-experimental-dispatch",
+      "title": "Activate experimental agent dispatch for a bounded period",
+      "goal": "Let the Owner permit experimental, non-promoting agent dispatch in one repository for a bounded period, with named runtimes, models, disciplines and budgets inside the experimental-execution policy ceilings.",
+      "actors": ["owner"],
+      "preconditions": [
+        "law/policy/experimental-execution.json is the framework policy (ADR-MDL-0005, ADR-MDL-0006).",
+        "Experimental dispatch is off until the Owner activates it, and the activation expires."
+      ],
+      "triggers": [
+        "The Owner wants agents to attempt engineer or inspector tasks under experimental policy."
+      ],
+      "mainFlow": [
+        {
+          "id": "step-01",
+          "action": "Run `round dispatch activate --input <activation.json> --as-role owner --write --experimental`: validate the Owner-authored activation against its schema, expiry window, and every policy ceiling, then record it in .devai/state/experimental/activation.json.",
+          "actorRole": "owner",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "round dispatch activate"
+              }
+            ]
+          }
+        }
+      ],
+      "alternateFlows": [],
+      "exceptions": [
+        {
+          "id": "exc-01",
+          "when": "Any role other than the Owner, or a missing --write or --experimental, invokes the activation.",
+          "handling": "The action is refused before any byte is written; experimental consent is never implied by --write."
+        },
+        {
+          "id": "exc-02",
+          "when": "The activation is schema-invalid, expired, valid for more than the policy's maximum days, or wider than a ceiling.",
+          "handling": "The action refuses with the specific code and leaves any earlier activation untouched."
+        }
+      ],
+      "postconditions": [
+        "Exactly one validated, expiring activation is in force, and only runtime state holds it."
+      ],
+      "acceptanceCriteria": [
+        "Activation requires the owner role, --write, and --experimental.",
+        "No action writes an experimental activation under .devai/config, and no file there is read as one."
+      ]
     }
   ]
 }
