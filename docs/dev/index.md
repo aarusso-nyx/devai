@@ -32,6 +32,7 @@ descriptor closure remain release gates.
 - [Worktrees](operations/worktree-runbook.md)
 - [Database isolation](operations/db-isolation.md)
 - [Evidence](operations/local-evidence-runbook.md)
+- [Orchestrator core promotion](operations/orchestrator-core-promotion.md)
 - [Release discipline](operations/release-discipline.md)
 - [rc.2 assessment convergence](operations/rc2-assessment-convergence.md)
 - [Incident response](operations/incident-playbook.md)
