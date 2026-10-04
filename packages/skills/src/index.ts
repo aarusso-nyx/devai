@@ -5,6 +5,7 @@ export * from './inv-override/index.js';
 export * from './model-bridge/index.js';
 export * from './pack-resolver/index.js';
 export * from './post-merge-auditor/index.js';
+export * from './prompt-composer/index.js';
 export * from './prompt-firewall/index.js';
 export * from './operations/index.js';
 export * from './recipes/index.js';
