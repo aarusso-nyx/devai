@@ -52,7 +52,13 @@
     "human_approval_required": true
   },
   "tags": ["authority", "role-declaration", "non-elevation", "article-7", "article-10"],
-  "measurable_via": ["task start", "task status", "task finish", "round dispatch activate"],
+  "measurable_via": [
+    "task start",
+    "task status",
+    "task finish",
+    "round dispatch activate",
+    "round ratify"
+  ],
   "provenance": ["ADR-SCR-0004", "CMP-0002:R-0203:TASK-0231"],
   "supersedes": null,
   "superseded_by": null
