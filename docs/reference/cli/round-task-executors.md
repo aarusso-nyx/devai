@@ -450,3 +450,28 @@ If the journal cannot record a started provider, its process group is stopped be
 fails with `AGENT_CLI_SPAWN_RECORD_FAILED`. A provider stopped at its wall clock whose process
 group cannot be confirmed gone fails with `PROCESS_GROUP_TERMINATION_UNCONFIRMED`, an error
 after spawn, so the attempt stays uncertain and keeps its worktree.
+
+## Campaigns, materialization, and ratification
+
+`campaign status --campaign <CMP-id>` reads a campaign plan beside the runtime task records
+and names each drift: a planned task with no runtime record in an open round, a runtime record
+ahead of or behind the plan, or a runtime task the plan does not name. It writes nothing.
+
+`campaign materialize --campaign <CMP-id> --round <round-id> --as-role architect --write` turns
+one open campaign round into queued task records through the round task queue, mapped as
+`law/policy/campaign-execution.json` declares. Each task gets:
+
+- its wave as the coupled group;
+- a `human` executor whose role is the discipline;
+- the campaign prompt as `instructions_ref`;
+- completion on a merged pull request, with escalation after the task's time budget.
+
+An identical existing record is reported, and a differing one refuses with
+`TASK_RECORD_CONFLICT` before anything is written. No external controller materializes
+campaign state (ADR-GOV-0025).
+
+`round ratify --round <round-id> --task <task-id> --decision accept|reject --as-role owner --write`
+records the Owner's or Architect's decision on a task in `awaiting_human_review` (for example
+after experimental dispatch). Accept moves the task to `pre_merge`, and reject escalates it.
+The record is written once to `.devai/state/round-runs/<round>/ratifications/<task>.json` with
+the reviewed evidence. Ratification never merges, pushes, or closes a round.
