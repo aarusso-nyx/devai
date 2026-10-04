@@ -276,25 +276,32 @@ export const roundRun = defineCommand({
   register(cli: CAC): void {
     withRoundOptions(cli.command('round-run', 'Advance active-round ready tasks'))
       .option('--task <task_id>', 'Explicit task identity (repeatable)')
-      .action(async (options: RoundOptions & { task?: string | string[] }) => {
-        try {
-          const repoRoot = root(options);
-          const result = await runRoundTasks({
-            repoRoot,
-            round: requiredRound(options),
-            ...(options.task !== undefined && { taskIds: asArray(options.task) }),
-            dispatch: (task) => dispatchRoundTask(repoRoot, task),
-          });
-          emit(
-            result,
-            options.human === true,
-            `round run: ${result.round_id}; ${String(result.results.length)} task(s)`,
-            result.ok,
-          );
-        } catch (error) {
-          failure('run', error);
-        }
-      });
+      .option(
+        '--workers <count>',
+        'Opt-in concurrent workers for same-generation, resource-disjoint tasks (default 1)',
+      )
+      .action(
+        async (options: RoundOptions & { task?: string | string[]; workers?: string | number }) => {
+          try {
+            const repoRoot = root(options);
+            const result = await runRoundTasks({
+              repoRoot,
+              round: requiredRound(options),
+              ...(options.task !== undefined && { taskIds: asArray(options.task) }),
+              ...(options.workers !== undefined && { maxWorkers: Number(options.workers) }),
+              dispatch: (task) => dispatchRoundTask(repoRoot, task),
+            });
+            emit(
+              result,
+              options.human === true,
+              `round run: ${result.round_id}; ${String(result.results.length)} task(s)`,
+              result.ok,
+            );
+          } catch (error) {
+            failure('run', error);
+          }
+        },
+      );
   },
 });
 
