@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://devai.nyxk.com.br/schemas/experimental-activation.schema.json",
   "title": "Experimental execution activation",
-  "description": "Owner-authored, expiring activation of experimental agent execution in one adopter repository (ADR-MDL-0005 D-1). It names the exact runtimes, models, efforts, disciplines, and budgets an invocation of `round dispatch --write --experimental` may use. Values never exceed law/policy/experimental-execution.json; the expiry is at most that policy's max_validity_days after issued_at, which the runtime checks.",
+  "description": "Owner-authored, expiring activation, written only by the Owner-only `round dispatch activate` action to .devai/state/experimental/activation.json (ADR-MDL-0006), of experimental agent execution in one adopter repository (ADR-MDL-0005 D-1). It names the exact runtimes, models, efforts, disciplines, and budgets an invocation of `round dispatch --write --experimental` may use. Values never exceed law/policy/experimental-execution.json; the expiry is at most that policy's max_validity_days after issued_at, which the runtime checks.",
   "schema_version": "1.0.0",
   "type": "object",
   "additionalProperties": false,
