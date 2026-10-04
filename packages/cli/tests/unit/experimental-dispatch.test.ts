@@ -20,14 +20,14 @@ import {
   runtimeApi,
 } from '../../../authority/tests/unit/authority-runtime-testkit.js';
 import {
-  composeAgentPrompt,
   loadTask,
   readDispatchJournal,
   runRoundTasks,
   saveTask,
   type ExperimentalActivation,
   type TaskRecord,
-} from '#runtime-core';
+} from '@devai-nyx/loop';
+import { composeAgentPrompt } from '@devai-nyx/skills';
 import {
   EXPERIMENTAL_TIER_ORDER,
   article6Role,
@@ -49,6 +49,12 @@ const FAKE = join(
 );
 const ROOT = join(import.meta.dirname, '..', '..', '..', '..');
 const ROUND = 'R-0012';
+// These fixtures create their own repositories; an inherited GIT_DIR or GIT_INDEX_FILE (for
+// example when a host test runs this file inside another fixture) must never retarget them.
+for (const name of Object.keys(process.env)) {
+  if (name.startsWith('GIT_')) Reflect.deleteProperty(process.env, name);
+}
+
 const roots: string[] = [];
 afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
@@ -335,7 +341,7 @@ describe('experimental admission rules', () => {
     ).toBe('EXPERIMENTAL_SELECTION_NOT_ACTIVATED');
     expect(
       experimentalTaskRefusal(
-        { ...task, executor: { ...task.executor, selection: { mode: 'preferred' } } } as TaskRecord,
+        { ...task, executor: { ...task.executor, selection: { mode: 'preferred' } } } as unknown as TaskRecord,
         activation(),
       ),
     ).toBe('EXPERIMENTAL_SELECTION_NOT_EXACT');
