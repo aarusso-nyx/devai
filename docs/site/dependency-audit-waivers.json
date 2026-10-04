@@ -80,6 +80,20 @@
       "reason": "Owner-authorized non-regression exception recorded 2026-09-30 for release v1.7.0: advisory published after v1.6.0 in a build-time transitive dependency of the documentation site; no compatible npm audit fix; not part of the published package.",
       "approved_by": "OWNER",
       "expires_at": "2026-10-15T23:59:59Z"
+    },
+    {
+      "advisory_id": "GHSA-vfj7-8cjw-p6xm",
+      "package": "braces",
+      "reason": "Owner-authorized exception (2026-10-03, v1.9.0): advisory published after the v1.4.5 baseline with no patched version in any release; present only in the Docusaurus 3.10.2 documentation build tooling, never in the npm package.",
+      "approved_by": "OWNER",
+      "expires_at": "2026-10-15T23:59:59Z"
+    },
+    {
+      "advisory_id": "GHSA-ch52-4w7c-c8xp",
+      "package": "http-cache-semantics",
+      "reason": "Owner-authorized exception (2026-10-03, v1.9.0): advisory published after the v1.4.5 baseline with no patched version in any release; present only in the Docusaurus 3.10.2 documentation build tooling, never in the npm package.",
+      "approved_by": "OWNER",
+      "expires_at": "2026-10-15T23:59:59Z"
     }
   ]
 }
