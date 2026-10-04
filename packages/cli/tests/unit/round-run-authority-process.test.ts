@@ -87,6 +87,10 @@ describe('round-run authority process matching', () => {
     expect(
       matchDeclaredRoundTaskProcess(root, invocation, request(root, { symbol: 'execFileSync' })),
     ).toBeUndefined();
+    // The asynchronous effect binds the same exact declared process (ADR-MDL-0005 D-10).
+    expect(
+      matchDeclaredRoundTaskProcess(root, invocation, request(root, { symbol: 'spawn' })),
+    ).toEqual({ taskId: 'TASK-7001', cwd: realpathSync(root) });
     expect(
       matchDeclaredRoundTaskProcess(root, invocation.with(7, 'TASK-9999'), request(root)),
     ).toBeUndefined();
