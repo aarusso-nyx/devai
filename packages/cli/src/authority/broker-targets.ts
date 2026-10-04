@@ -9,6 +9,7 @@ import {
   matchDeclaredReleaseTaskProcess,
 } from '../services/check-runner/authority-process.js';
 import { matchDeclaredRoundTaskProcess } from '../services/round-run/authority-process.js';
+import { matchExperimentalAgentProcess } from '../services/experimental-dispatch/authority-process.js';
 import { canonicalSha256 } from './policy.js';
 import { flagValue, type JsonRecord } from './broker-values.js';
 import { canonicalRelativePath } from './broker-paths.js';
@@ -57,6 +58,20 @@ export function processTarget(
         repository_id: repositoryId,
         canonical_relative_path: '.devai/state/check-cache/v1',
         operation: 'update',
+      };
+    }
+  }
+
+  if (actionName === 'round dispatch') {
+    const task = matchExperimentalAgentProcess(root, invocationArgv, request);
+    if (task !== undefined) {
+      return {
+        kind: 'remote',
+        id: `remote:local-command:experimental-agent:${task.taskId}`,
+        system_id: 'local-command',
+        endpoint_id: 'experimental-agent',
+        operation_id: 'invoke',
+        publication: false,
       };
     }
   }
@@ -399,6 +414,17 @@ export function boundedSelectors(
         kind: 'remote',
         system_id: 'local-command',
         endpoint_ids: ['test-runner'],
+        operation_ids: ['invoke'],
+        publication: false,
+      },
+    ];
+  }
+  if (actionName === 'round dispatch' && kind === 'remote') {
+    return [
+      {
+        kind: 'remote',
+        system_id: 'local-command',
+        endpoint_ids: ['experimental-agent'],
         operation_ids: ['invoke'],
         publication: false,
       },

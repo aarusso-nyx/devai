@@ -46,6 +46,16 @@ export function buildAdditiveAuthorityRules(input: {
       rationale: 'Adopter typed git-ref authority for work task spawn.',
     }),
     rule({
+      id: 'adopter-git-ref-experimental-dispatch-1',
+      origin: 'additive-extension',
+      precedence: 500,
+      actionIds: ['round dispatch'],
+      selector: gitSelector(repositoryId),
+      subjects: [harnessSubject(['owner', 'architect', 'inspector', 'engineer'])],
+      consent: { write: true, allow_publish: false, experimental: true },
+      rationale: 'Typed git-ref authority for experimental attempt worktrees (ADR-MDL-0005 D-3).',
+    }),
+    rule({
       id: 'adopter-git-ref-work-task-complete-1',
       origin: 'additive-extension',
       precedence: 500,
@@ -212,6 +222,23 @@ export function buildAdditiveAuthorityRules(input: {
       subjects: [machineSubject('harness')],
       consent: { write: true, allow_publish: true, experimental: false },
       rationale: 'Typed remote authority for sense run.',
+    }),
+    rule({
+      id: 'adopter-remote-round-dispatch-1',
+      origin: 'additive-extension',
+      precedence: 500,
+      actionIds: ['round dispatch'],
+      selector: {
+        kind: 'remote',
+        system_id: 'local-command',
+        endpoint_ids: ['experimental-agent'],
+        operation_ids: ['invoke'],
+        publication: false,
+      },
+      subjects: [machineSubject('harness')],
+      consent: { write: true, allow_publish: false, experimental: true },
+      rationale:
+        'Typed remote authority for the exact experimental agent CLI attempt of an admitted task (ADR-MDL-0005 D-10).',
     }),
     rule({
       id: 'adopter-remote-round-run-1',
