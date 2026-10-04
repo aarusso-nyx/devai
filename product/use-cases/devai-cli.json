@@ -1280,6 +1280,18 @@
               }
             ]
           }
+        },
+        {
+          "id": "step-02",
+          "action": "Run `round dispatch --round <round-id> --as-role architect --write --experimental`: dispatch the round's admitted agent tasks through the experimental ladder in per-attempt worktrees; a contained, completed attempt awaits human review and an exhausted ladder ends experimental_blocked.",
+          "actorRole": "architect",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "round dispatch"
+              }
+            ]
+          }
         }
       ],
       "alternateFlows": [],
@@ -1293,6 +1305,11 @@
           "id": "exc-02",
           "when": "The activation is schema-invalid, expired, valid for more than the policy's maximum days, or wider than a ceiling.",
           "handling": "The action refuses with the specific code and leaves any earlier activation untouched."
+        },
+        {
+          "id": "exc-03",
+          "when": "A dispatched attempt writes outside its discipline's Article 6 paths, or a journal attempt is uncertain after a crash.",
+          "handling": "The attempt fails with EXPERIMENTAL_WRITE_SCOPE_VIOLATION; uncertain work blocks the round with TASK_DISPATCH_UNCERTAIN until a human runs task escalate."
         }
       ],
       "postconditions": [
