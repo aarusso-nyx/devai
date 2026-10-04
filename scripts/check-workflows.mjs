@@ -114,7 +114,7 @@ const DEFAULT_PINS = toolchainPins(DEFAULT_TOOLCHAIN_MANIFEST);
 export const VERIFIER_PACKAGE = DEFAULT_PINS.verifierPackage;
 // Not modeled by the manifest: the trusted verifier policy owns source commits.
 export const VERIFIER_SOURCE_COMMIT = '4e202ca3c9aade41f3d3a0286a4e7a37a175790a';
-export const NEXT_VERIFIER_SOURCE_COMMIT = '8174749ebcfabab246031281a036032f636b8a39';
+export const NEXT_VERIFIER_SOURCE_COMMIT = '8b215d706a828af7361f9c6799b9cb0a30c9d00b';
 export const LEDGER_ENVIRONMENT = DEFAULT_PINS.ledgerEnvironment;
 export const CHECKOUT_COMMIT = manifestActionDigest(DEFAULT_TOOLCHAIN_MANIFEST, 'actions/checkout');
 export const SETUP_NODE_COMMIT = manifestActionDigest(
@@ -851,8 +851,8 @@ function checkWorkflow(file, source, findings, pins) {
     }
   }
   for (const marker of [
-    'trusted_commit="8b600ed16ebd101ff88ecfaac9cc04abcf0ce174"',
-    'trusted_tree="d2f60e0602ffc849e9b5b1b52ca54731eca7c8b1"',
+    'trusted_commit="75343991140c223240b51cea80c060c516226945"',
+    'trusted_tree="90f0f5b64bf594677f96eebf26ae80cf7da1149e"',
     'git -C candidate archive "$trusted_commit"',
     'package_root="$source/packages/cli"',
     'source_root="$package_root/vendor/evidence-verification"',
@@ -1790,8 +1790,8 @@ function checkReleaseWorkflow(file, workflow, source, findings, pins) {
     'node "$DEVAI_EVIDENCE_VERIFY"',
     'node "$DEVAI_EVIDENCE_POLICY"',
     'vars.DEVAI_LEDGER_VERIFIER_PROVENANCE_SHA256',
-    'trusted_commit="8b600ed16ebd101ff88ecfaac9cc04abcf0ce174"',
-    'trusted_tree="d2f60e0602ffc849e9b5b1b52ca54731eca7c8b1"',
+    'trusted_commit="75343991140c223240b51cea80c060c516226945"',
+    'trusted_tree="90f0f5b64bf594677f96eebf26ae80cf7da1149e"',
     'git -C candidate archive "$trusted_commit"',
     'package_root="$source/packages/cli"',
     'source_root="$package_root/vendor/evidence-verification"',
