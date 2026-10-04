@@ -3,6 +3,8 @@ import { decideRoundTaskAdmission, planRoundTaskAdmission } from './round-task-a
 import { LOCK_RENEWAL_INTERVAL_MS, listLocks, renewLocks, taskLockTargets } from './locks.js';
 import {
   LOCK_DENIAL_ESCALATION_THRESHOLD,
+  ROUND_DEFAULT_WORKERS,
+  ROUND_MAX_WORKERS,
   acquireRoundController,
   clearLockDenials,
   recordLockDenial,
@@ -30,6 +32,11 @@ export interface RunRoundTasksOptions {
   readonly dispatch: (
     task: TaskRecord,
   ) => RoundTaskDispatchResult | Promise<RoundTaskDispatchResult>;
+  /**
+   * Opt-in concurrent worker cap, bounded by `round-execution.json` capacity.max_workers.
+   * Omitted, the runner is serial (capacity.default_workers).
+   */
+  readonly maxWorkers?: number;
   /** How often held locks are renewed while a dispatch runs. Defaults to a quarter TTL. */
   readonly lockRenewalIntervalMs?: number;
 }
@@ -156,10 +163,33 @@ function bumpRequeuedPriority(repoRoot: string, requeued: readonly string[]): vo
   }
 }
 
+/** Blockers that may clear once an active task finishes; anything else is final. */
+const WAITABLE_BLOCKERS = new Set([
+  'TASK_WORKER_CAP',
+  'TASK_RESOURCE_CONFLICT',
+  'TASK_GENERATION_BARRIER',
+  'TASK_DEPENDENCY_NOT_COMPLETED',
+]);
+
+/** Resolve the opt-in worker cap against the `round-execution.json` capacity ceiling. */
+export function resolveRoundWorkers(requested: number | undefined): number {
+  if (requested === undefined) return ROUND_DEFAULT_WORKERS;
+  if (!Number.isInteger(requested) || requested < 1 || requested > ROUND_MAX_WORKERS) {
+    throw new TaskServiceError('TASK_WORKER_CAP_INVALID');
+  }
+  return requested;
+}
+
+/**
+ * Admit and dispatch the plan with at most `maxWorkers` tasks in flight. Admission
+ * stays in plan order and only shares a topological generation between resource-
+ * disjoint tasks; with one worker this is the serial runner, task for task.
+ */
 async function runControlledRound(
   options: RunRoundTasksOptions,
   roundId: string,
 ): Promise<RunRoundTasksResult> {
+  const workers = resolveRoundWorkers(options.maxWorkers);
   const population = admissionPopulation(options.repoRoot);
   const plan = planRoundTaskAdmission({
     roundId,
@@ -169,71 +199,110 @@ async function runControlledRound(
   const ordered = plan.orderedTaskIds.map((id) => requiredTask(population, id));
   const blocked = new Set<string>();
   const requeued: string[] = [];
-  const results: RoundTaskRunResult[] = [];
-  for (const task of ordered) {
-    // Re-read both authorization and immutable requests at each admission boundary.
-    requireActiveTaskRound(options);
-    const liveTasks = admissionPopulation(options.repoRoot);
-    const admission = decideRoundTaskAdmission(plan, {
-      taskId: task.id,
-      tasks: liveTasks,
-      failedTaskIds: [...blocked],
-    });
-    if (!admission.admitted) {
-      blocked.add(task.id);
-      results.push({ task_id: task.id, ok: false, code: admission.blockers[0] });
-      continue;
-    }
-    const current = requiredTask(liveTasks, task.id);
-    const started = requiredTaskLocksHeld(options.repoRoot, current)
-      ? {
-          task: current,
-          lock_denied: [],
-          worktree_path: null,
-          database: null,
-          rollback_reason: null,
-        }
-      : startRoundTask({
-          repoRoot: options.repoRoot,
-          round: roundId,
-          taskId: task.id,
-        });
-    if (started.lock_denied.length > 0) {
-      blocked.add(task.id);
-      results.push(handleLockDenial(options, roundId, task.id, requeued));
-      continue;
-    }
-    clearLockDenials(options.repoRoot, roundId, task.id);
-    const running: TaskRecord = {
-      ...started.task,
-      status: 'in_progress',
-      iteration_count: started.task.iteration_count + 1,
-      spawned_at: new Date().toISOString(),
-    };
-    saveTask(options.repoRoot, running);
-    if (running.max_iterations !== undefined && running.iteration_count > running.max_iterations) {
-      escalateRoundTask({ repoRoot: options.repoRoot, round: roundId, taskId: task.id });
-      blocked.add(task.id);
-      results.push({ task_id: task.id, ok: false, code: 'TASK_MAX_ITERATIONS_EXCEEDED' });
-      continue;
-    }
+  const results = new Map<string, RoundTaskRunResult>();
+  const pending = ordered.map((task) => task.id);
+  const active = new Map<string, Promise<void>>();
+
+  const finish = (result: RoundTaskRunResult): void => {
+    results.set(result.task_id, result);
+    if (!result.ok) blocked.add(result.task_id);
+  };
+
+  const execute = async (running: TaskRecord): Promise<void> => {
     const result = await dispatchWithLockRenewal(options, running);
-    if (!result.ok && loadTask(options.repoRoot, task.id).status === 'in_progress') {
-      escalateRoundTask({ repoRoot: options.repoRoot, round: roundId, taskId: task.id });
+    if (!result.ok && loadTask(options.repoRoot, running.id).status === 'in_progress') {
+      escalateRoundTask({ repoRoot: options.repoRoot, round: roundId, taskId: running.id });
     }
-    results.push({
-      task_id: task.id,
+    finish({
+      task_id: running.id,
       ok: result.ok,
       ...(result.evidence_id !== undefined && { evidence_id: result.evidence_id }),
       ...(result.code !== undefined && { code: result.code }),
     });
-    if (!result.ok) blocked.add(task.id);
+  };
+
+  const admit = (): void => {
+    for (const taskId of [...pending]) {
+      if (active.size >= workers) return;
+      // Re-read both authorization and immutable requests at each admission boundary.
+      requireActiveTaskRound(options);
+      const liveTasks = admissionPopulation(options.repoRoot);
+      const admission = decideRoundTaskAdmission(plan, {
+        taskId,
+        tasks: liveTasks,
+        failedTaskIds: [...blocked],
+        activeTaskIds: [...active.keys()],
+        maxWorkers: workers,
+      });
+      if (!admission.admitted) {
+        if (active.size > 0 && admission.blockers.every((code) => WAITABLE_BLOCKERS.has(code))) {
+          continue;
+        }
+        pending.splice(pending.indexOf(taskId), 1);
+        finish({ task_id: taskId, ok: false, code: admission.blockers[0] });
+        continue;
+      }
+      pending.splice(pending.indexOf(taskId), 1);
+      const current = requiredTask(liveTasks, taskId);
+      const started = requiredTaskLocksHeld(options.repoRoot, current)
+        ? {
+            task: current,
+            lock_denied: [],
+            worktree_path: null,
+            database: null,
+            rollback_reason: null,
+          }
+        : startRoundTask({
+            repoRoot: options.repoRoot,
+            round: roundId,
+            taskId,
+          });
+      if (started.lock_denied.length > 0) {
+        finish(handleLockDenial(options, roundId, taskId, requeued));
+        continue;
+      }
+      clearLockDenials(options.repoRoot, roundId, taskId);
+      const running: TaskRecord = {
+        ...started.task,
+        status: 'in_progress',
+        iteration_count: started.task.iteration_count + 1,
+        spawned_at: new Date().toISOString(),
+      };
+      saveTask(options.repoRoot, running);
+      if (
+        running.max_iterations !== undefined &&
+        running.iteration_count > running.max_iterations
+      ) {
+        escalateRoundTask({ repoRoot: options.repoRoot, round: roundId, taskId });
+        finish({ task_id: taskId, ok: false, code: 'TASK_MAX_ITERATIONS_EXCEEDED' });
+        continue;
+      }
+      active.set(
+        taskId,
+        execute(running).finally(() => active.delete(taskId)),
+      );
+    }
+  };
+
+  try {
+    admit();
+    while (active.size > 0) {
+      await Promise.race(active.values());
+      admit();
+    }
+  } catch (error) {
+    // Never abandon in-flight dispatches: settle them before reporting the failure.
+    await Promise.allSettled(active.values());
+    throw error;
   }
   bumpRequeuedPriority(options.repoRoot, requeued);
   return {
-    ok: results.every((result) => result.ok),
+    ok: ordered.every((task) => results.get(task.id)?.ok === true),
     round_id: roundId,
     ordered_task_ids: ordered.map((task) => task.id),
-    results,
+    results: ordered.flatMap((task) => {
+      const result = results.get(task.id);
+      return result === undefined ? [] : [result];
+    }),
   };
 }

@@ -227,6 +227,8 @@ export function decideRoundTaskAdmission(
     readonly tasks: readonly TaskRecord[];
     readonly failedTaskIds: readonly string[];
     readonly activeTaskIds?: readonly string[];
+    /** Concurrent worker cap; one unless a caller opted into bounded parallelism. */
+    readonly maxWorkers?: number;
   },
 ): RoundTaskAdmissionDecision {
   if (!plans.has(plan)) fail('TASK_ADMISSION_PLAN_INVALID');
@@ -263,6 +265,11 @@ export function decideRoundTaskAdmission(
   });
   if (activeRecords.some((task) => resources(task).some((key) => node.resourceKeys.includes(key))))
     blockers.push('TASK_RESOURCE_CONFLICT');
-  if (active.length) blockers.push('TASK_WORKER_CAP');
+  // Parallelism is same-topological-generation only (round-execution.json selection).
+  if (
+    active.some((id) => plan.tasks.find((bound) => bound.id === id)?.generation !== node.generation)
+  )
+    blockers.push('TASK_GENERATION_BARRIER');
+  if (active.length >= (options.maxWorkers ?? 1)) blockers.push('TASK_WORKER_CAP');
   return { admitted: blockers.length === 0, blockers };
 }
