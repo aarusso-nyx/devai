@@ -229,11 +229,12 @@ const R0502_FILE_DIGESTS: ReadonlyArray<readonly [string, string]> = [
 // packages/cli/src/generated packages/authority/src law/policy/action-registry.json` is empty.
 // Re-pinned on 2026-10-04 when ADR-MDL-0006 added the Owner-only `round dispatch activate`
 // action and ADR-MDL-0005 the experimental `round dispatch` action: the registry, its generated views and the derived core source change with it, and
-// nothing else in the authority rule sources does.
+// nothing else in the authority rule sources does. The package extension was re-pinned when
+// round dispatch gained its git-ref and experimental-agent rules (ADR-MDL-0005 D-3, D-10).
 const FIXED_REPOSITORY_ID = 'devai-ia-005';
 const R0502_CORE_SOURCE_DIGEST = 'be1103140309a9a10db8a94bf449f2399d698b76fa7a53a8e9a0648ef1428069';
 const R0502_PACKAGE_EXTENSION_DIGEST =
-  '089a2eaae03b4d32896a6149a4cefb7b5c5181c3cf839e26e2c8eca1f6eecab1';
+  '8c182616da67f55a2feb7115450ac8935f62e18d3d60523ba2d941cc769ac3e1';
 
 describe('IA-005: the registry, its views, the core rules, and devai-adopter-authority are byte-identical to R-0502', () => {
   it.each(R0502_FILE_DIGESTS)('%s is byte-identical to 38a0a5df', (path, digest) => {
