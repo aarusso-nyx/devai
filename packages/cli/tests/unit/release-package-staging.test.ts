@@ -17,7 +17,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 const root = resolve(import.meta.dirname, '../../../..');
 const output = mkdtempSync(join(tmpdir(), 'devai-release-stage-test-'));
 const SELECTED_RELEASE_VERSION = '1.9.0';
-const TRUSTED_VERIFIER_PACKAGE_VERSION = '1.5.4';
+const TRUSTED_VERIFIER_PACKAGE_VERSION = '1.9.0';
 const TRUSTED_VERIFIER_POLICY = JSON.parse(
   readFileSync(join(root, 'law/policy/trusted-local-rc-verifier-package.json'), 'utf8'),
 ) as {
@@ -172,10 +172,7 @@ describe('normalized release package staging', () => {
 
   it.each([
     ['wrong provenance', { provenance: 'f'.repeat(64) }],
-    [
-      'candidate package version instead of the trusted verifier',
-      { version: SELECTED_RELEASE_VERSION },
-    ],
+    ['the superseded 1.5.4 package version instead of the trusted verifier', { version: '1.5.4' }],
   ])('refuses %s verifier identity before writing a release manifest', (_name, identity) => {
     const manifest = join(output, `release-manifest-invalid-${_name.replaceAll(' ', '-')}.json`);
     expect(() =>
