@@ -78,7 +78,8 @@ export function readDeclarationRefusal(
     asRole !== undefined ||
     sessionId !== undefined ||
     argv.includes('--write') ||
-    argv.includes('--publish')
+    argv.includes('--publish') ||
+    argv.includes('--experimental')
   ) {
     return renderAuthorityResult(
       taggedFailure('usage-error', 'AUTHORITY_DECLARATION_NOT_APPLICABLE', {
@@ -89,6 +90,7 @@ export function readDeclarationRefusal(
           authority_session: sessionId !== undefined,
           write: argv.includes('--write'),
           allow_publish: argv.includes('--publish'),
+          experimental: argv.includes('--experimental'),
         },
         required: entry.authority_contract.consent,
       }),
@@ -177,6 +179,28 @@ export function declaredRoleConsentRefusal(
   ) {
     return renderAuthorityResult(
       taggedFailure('usage-error', 'AUTHORITY_PUBLISH_CONSENT_REQUIRED'),
+      format,
+    );
+  }
+  // Experimental consent is explicit and exact (ADR-MDL-0005 D-1, ADR-MDL-0006): an
+  // experimental action needs --experimental, and no other action may receive it.
+  const experimental = entry.authority_contract.consent.experimental === true;
+  if (experimental && !argv.includes('--experimental')) {
+    return renderAuthorityResult(
+      taggedFailure('usage-error', 'AUTHORITY_EXPERIMENTAL_CONSENT_REQUIRED', {
+        action_id: entry.name,
+      }),
+      format,
+    );
+  }
+  if (!experimental && argv.includes('--experimental')) {
+    return renderAuthorityResult(
+      taggedFailure('usage-error', 'AUTHORITY_DECLARATION_NOT_APPLICABLE', {
+        action_id: entry.name,
+        effect: entry.effects,
+        declared: { experimental: true },
+        required: entry.authority_contract.consent,
+      }),
       format,
     );
   }

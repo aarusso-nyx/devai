@@ -270,6 +270,12 @@ export function attachRuntimeContracts(
         description: 'Authorize remote publication in addition to --write.',
       });
     }
+    if (entry.authority_contract.consent.experimental === true) {
+      options.push({
+        flags: '--experimental',
+        description: 'Authorize this experimental, non-promoting action in addition to --write.',
+      });
+    }
     options.push({
       flags: '--format <format>',
       description: 'Output format when supported: json or human.',

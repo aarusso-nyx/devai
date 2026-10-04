@@ -406,7 +406,9 @@ export function routeArgv(
         exitCode: EXIT_USAGE,
       };
     }
-    let translated = remaining.filter((arg) => arg !== '--write' && arg !== '--publish');
+    let translated = remaining.filter(
+      (arg) => arg !== '--write' && arg !== '--publish' && arg !== '--experimental',
+    );
     if (exact.internal_name === 'init-bind' && remaining.includes('--write')) {
       translated = remaining.filter((arg) => arg !== '--publish');
     }

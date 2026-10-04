@@ -14,6 +14,7 @@ import {
   type ReleaseProvider,
 } from '../../services/release-lifecycle-execution.js';
 import { buildResolvedReleasePlanReceipt } from '../../services/release-lifecycle.js';
+import type { TrustedReleaseAuthority } from '../../services/release-lifecycle-execution-types.js';
 
 import { builtInReleaseLifecycleLocalProvider } from '../../services/release-lifecycle-local-adapters.js';
 import { createReleaseCertificationProvider } from '../../services/release-lifecycle-certification.js';
@@ -208,8 +209,15 @@ function lifecycleAction(
               );
               return;
             }
-            const authority = declaredInvocationAuthority();
-            if (authority === undefined) throw new Error('release-authority-context-invalid');
+            const declared = declaredInvocationAuthority();
+            // Release actions never carry experimental consent; the front door refuses it.
+            if (
+              declared === undefined ||
+              (declared.consent as { experimental?: boolean } | undefined)?.experimental === true
+            ) {
+              throw new Error('release-authority-context-invalid');
+            }
+            const authority = declared as TrustedReleaseAuthority;
             const result = await executeReleaseLifecycleAction({
               request,
               action: name,
