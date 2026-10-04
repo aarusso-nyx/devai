@@ -29,6 +29,7 @@ interface FunctionMapping {
 }
 
 interface BranchMapping {
+  readonly loc?: Location;
   readonly locations: readonly Location[];
 }
 
@@ -120,6 +121,40 @@ function branchLocationHits(
   );
 }
 
+/**
+ * The parent owner of every exact branch location. V8 source maps of a module that awaits a
+ * dynamic import can report one expression as two branch entries with the same overall loc
+ * that share an operand location; that operand is one counter, owned by its first entry. Any
+ * other repeated location stays ambiguous and is refused.
+ */
+function parentBranchOwners(
+  coverage: FileCoverageData,
+): Map<string, { readonly id: string; readonly index: number }> {
+  const owners = new Map<string, { readonly id: string; readonly index: number }>();
+  for (const [id, definition] of Object.entries(coverage.branchMap)) {
+    for (const [index, location] of definition.locations.entries()) {
+      const key = locationKey(location);
+      if (key === undefined) continue;
+      const owner = owners.get(key);
+      if (owner === undefined) {
+        owners.set(key, { id, index });
+        continue;
+      }
+      const ownerLoc = coverage.branchMap[owner.id]?.loc;
+      const sameExpression =
+        owner.id !== id &&
+        ownerLoc !== undefined &&
+        definition.loc !== undefined &&
+        locationKey(ownerLoc) !== undefined &&
+        locationKey(ownerLoc) === locationKey(definition.loc);
+      if (!sameExpression) {
+        throw new Error(`duplicate exact branch location ${key} in parent coverage map`);
+      }
+    }
+  }
+  return owners;
+}
+
 export function mergeCanonicalHits(
   coverageMap: MutableCoverageMap,
   subprocessMap: MutableCoverageMap,
@@ -129,7 +164,7 @@ export function mergeCanonicalHits(
     try {
       statementLocationHits(current, 'parent');
       functionLocationHits(current, 'parent');
-      branchLocationHits(current, 'parent');
+      parentBranchOwners(current);
     } catch (error) {
       // Name the source file: the location alone cannot be traced back after a full run.
       throw new Error(`${(error as Error).message}: ${filename}`, { cause: error });
@@ -157,13 +192,12 @@ export function mergeCanonicalHits(
       if (count !== undefined) current.f[id] = (current.f[id] ?? 0) + count;
     }
 
-    for (const [id, definition] of Object.entries(current.branchMap)) {
-      for (const [index, location] of definition.locations.entries()) {
-        const key = locationKey(location);
-        const count = key === undefined ? undefined : branchHits.get(key);
-        if (count !== undefined && current.b[id] !== undefined) {
-          current.b[id][index] = (current.b[id][index] ?? 0) + count;
-        }
+    const owners = parentBranchOwners(current);
+    for (const [key, count] of branchHits) {
+      const owner = owners.get(key);
+      const counts = owner === undefined ? undefined : current.b[owner.id];
+      if (owner !== undefined && counts !== undefined) {
+        counts[owner.index] = (counts[owner.index] ?? 0) + count;
       }
     }
   }
