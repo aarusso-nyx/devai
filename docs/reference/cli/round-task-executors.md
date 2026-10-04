@@ -109,6 +109,17 @@ human review. Locks are released at the policy-declared completion, escalation, 
 boundaries. The executor cannot expand a claim after resolution, and model capability cannot claim
 a path, database, or worktree.
 
+A denied task returns to `ready` with its priority raised by one and reports
+`TASK_RESOURCE_LOCK_DENIED`; the third consecutive denial escalates it with
+`TASK_RESOURCE_LOCK_DENIED_REPEATED`. The runner renews a task's locks while its executor runs, and
+a lock displaced during execution fails the attempt with `TASK_RESOURCE_LOCK_LOST`.
+
+One `round run` controls a round at a time. A second run of the same round refuses with
+`TASK_ROUND_CONTROLLER_BUSY` while the controller in `.devai/state/round-runs/<round>/controller.json`
+is alive or ran on another host. A controller left by a dead process on the same host is reclaimed;
+the tasks it left `in_progress` stay there for explicit human disposition, because only `ready`
+tasks are dispatched.
+
 ## Canonical executor-kind descriptors
 
 Choose a kind by the work contract: deterministic registered action or shell-free argv,
