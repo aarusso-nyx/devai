@@ -386,3 +386,22 @@ or authorize deployment.
 
 Canonical sources: [round execution policy](../../../law/policy/round-execution.json),
 [task execution schema](../../../law/schemas/task-execution-evidence.schema.json).
+
+## Experimental agent dispatch activation
+
+Agent tasks run only under experimental policy (ADR-MDL-0005). The Owner first records an
+expiring activation:
+
+```bash
+devai round dispatch activate --input activation.json --repo-root . --as-role owner --write --experimental --format json
+```
+
+The input follows `law/schemas/experimental-activation.schema.json`: the exact runtimes,
+models, and efforts, the `engineer` and `inspector` disciplines it admits, and budgets within
+`law/policy/experimental-execution.json`. The action refuses an invalid, expired, or
+over-long activation (at most 30 days) and any budget above a ceiling, leaving an earlier
+activation untouched. It writes only `.devai/state/experimental/activation.json`
+(ADR-MDL-0006); nothing under `.devai/config` is read as an activation.
+
+`--experimental` is a consent flag like `--publish`: an experimental action refuses without
+it with `AUTHORITY_EXPERIMENTAL_CONSENT_REQUIRED`, and every other action refuses it.
