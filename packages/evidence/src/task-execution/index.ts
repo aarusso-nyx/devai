@@ -98,6 +98,9 @@ function validateTimestamps(evidence: TaskExecutionEvidence): void {
   );
 }
 
+/** The fallback reason of the one bumped-tier experimental attempt (Article 19). */
+export const EXPERIMENTAL_BUMPED_TIER = 'experimental-bumped-tier';
+
 function validateAgentSelection(task: TaskRecordBinding, evidence: TaskExecutionEvidence): void {
   const request = task.executor;
   const requestedSelection = request['selection'];
@@ -140,7 +143,25 @@ function validateAgentSelection(task: TaskRecordBinding, evidence: TaskExecution
     'resolved recipe identity differs from the immutable request',
   );
 
-  if (requested['mode'] === 'exact') {
+  // ADR-MDL-0005 D-4: experimental evidence alone may record the one bumped-tier attempt
+  // of Article 19 — same runtime and registry identity, labelled as that fallback.
+  const bumped =
+    evidence.experimental === true &&
+    evidence.selection.fallback &&
+    evidence.selection.fallback_reason === EXPERIMENTAL_BUMPED_TIER;
+  if (requested['mode'] === 'exact' && bumped) {
+    const registryId = requested['registry_id'];
+    requireSemantic(
+      typeof registryId === 'string' &&
+        resolved.registry_id === registryId &&
+        evidence.selection.considered_registry_ids.length === 1 &&
+        evidence.selection.considered_registry_ids[0] === registryId &&
+        resolved.runtime === request['runtime'] &&
+        resolved.model !== request['model'],
+      'TASK_EXECUTION_EVIDENCE_EXACT_SUBSTITUTION',
+      'a bumped-tier attempt keeps the exact runtime and registry identity and changes only the model',
+    );
+  } else if (requested['mode'] === 'exact') {
     const registryId = requested['registry_id'];
     requireSemantic(
       typeof registryId === 'string' &&
@@ -354,6 +375,7 @@ export function buildTaskExecutionEvidence(
     verdict: facts.verdict,
     failure: facts.failure ?? null,
     evidence_refs: facts.evidence_refs,
+    ...(facts.experimental === true && { experimental: true as const }),
   });
   const validated = validateTaskExecutionEvidence(record, validator);
   assertTaskExecutionEvidenceBinding(validated, task, facts.candidate_sha);
