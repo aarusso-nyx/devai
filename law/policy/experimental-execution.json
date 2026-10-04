@@ -6,12 +6,14 @@
   "authority": "Architect",
   "decision": "ADR-MDL-0005",
   "activation": {
-    "record": ".devai/config/experimental-execution.json",
+    "record": ".devai/state/experimental/activation.json",
     "schema": "law/schemas/experimental-activation.schema.json",
     "authority": "Owner",
     "max_validity_days": 30,
     "action": "round dispatch",
-    "consent": "explicit --write and --experimental for the resolved invocation"
+    "consent": "explicit --write and --experimental for the resolved invocation",
+    "writer": "round dispatch activate",
+    "amended_by": "ADR-MDL-0006"
   },
   "disciplines": ["engineer", "inspector"],
   "runtimes": ["claude-cli", "codex-cli"],
