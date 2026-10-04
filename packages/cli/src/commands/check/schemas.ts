@@ -51,7 +51,6 @@ const SOURCE_ONLY_SCHEMAS = [
   'documentation-information-architecture.schema.json',
   'inv-override.schema.json',
   'preflight-probe.schema.json',
-  'prompt-composition.schema.json',
   'stack-adapter.schema.json',
   'targets.schema.json',
   'task-freshness.schema.json',

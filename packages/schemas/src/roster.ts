@@ -60,6 +60,7 @@ export const ROSTER = [
   'proof-orphan-declaration.schema.json',
   'project-config.schema.json',
   'rbac-inventory.schema.json',
+  'prompt-composition.schema.json',
   'record-meta.schema.json',
   'release-control.schema.json',
   'release-intent.schema.json',
