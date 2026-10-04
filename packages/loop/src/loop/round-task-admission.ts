@@ -76,10 +76,13 @@ function population(tasks: readonly TaskRecord[]): Map<string, TaskRecord> {
   return byId;
 }
 
+/** The requested task record without mutable lifecycle fields: what admission binds. */
+export function requestedTaskFields(task: TaskRecord): Readonly<Record<string, unknown>> {
+  return Object.fromEntries(Object.entries(task).filter(([key]) => !MUTABLE_FIELDS.has(key)));
+}
+
 function requestDigest(task: TaskRecord): string {
-  return canonicalSha256(
-    Object.fromEntries(Object.entries(task).filter(([key]) => !MUTABLE_FIELDS.has(key))),
-  );
+  return canonicalSha256(requestedTaskFields(task));
 }
 
 function executionContextDigest(task: TaskRecord): string {
