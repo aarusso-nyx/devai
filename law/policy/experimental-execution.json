@@ -1,0 +1,48 @@
+{
+  "$schema": "../schemas/experimental-execution.schema.json",
+  "schemaVersion": "1.0.0",
+  "id": "experimental-execution",
+  "status": "active",
+  "authority": "Architect",
+  "decision": "ADR-MDL-0005",
+  "activation": {
+    "record": ".devai/config/experimental-execution.json",
+    "schema": "law/schemas/experimental-activation.schema.json",
+    "authority": "Owner",
+    "max_validity_days": 30,
+    "action": "round dispatch",
+    "consent": "explicit --write and --experimental for the resolved invocation"
+  },
+  "disciplines": ["engineer", "inspector"],
+  "runtimes": ["claude-cli", "codex-cli"],
+  "attempts": {
+    "default_tier": 3,
+    "bumped_tier": 1,
+    "exhausted_status": "experimental_blocked",
+    "fallback": "forbidden"
+  },
+  "ceilings": {
+    "attempts_per_task": 4,
+    "attempts_per_invocation": 32,
+    "attempt_wall_clock_minutes": 60,
+    "tokens_per_invocation": "declared-by-activation-no-default"
+  },
+  "containment": {
+    "worktree": "per-task-from-round-base",
+    "provider_sandbox": "requested-never-claimed-verified",
+    "write_scope_check": "article-6-paths-after-each-attempt",
+    "remote_effects": "forbidden"
+  },
+  "journal": {
+    "path": ".devai/state/round-runs/{round}/dispatch-journal.jsonl",
+    "schema": "law/schemas/dispatch-journal-event.schema.json",
+    "events": ["intent", "spawned", "exited", "evidence-written", "settled"],
+    "uncertain": "blocks-round-until-human-task-escalate"
+  },
+  "evidence": {
+    "label": "experimental",
+    "promoting": false,
+    "usage": "task-execution-evidence usage version 2",
+    "missing_counter": "missing-never-zero"
+  }
+}

@@ -743,7 +743,8 @@
               "description": "Internal publication-consent bit satisfied only by explicit --publish; independent of and never implied by --write."
             },
             "experimental": {
-              "type": "boolean"
+              "type": "boolean",
+              "description": "Satisfied only by explicit --experimental consent for the resolved invocation; never implied by --write (ADR-MDL-0005 D-1)."
             }
           }
         },
