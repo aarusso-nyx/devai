@@ -406,9 +406,9 @@
           "planner_id": "campaign-materialize-bounded-plan",
           "target_kinds": ["fs"],
           "bounds": {
-            "max_batches": 16,
+            "max_batches": 2048,
             "max_targets_per_batch": 64,
-            "max_total_targets": 1024
+            "max_total_targets": 32768
           },
           "recovery": "preserve-and-report"
         },
@@ -2725,9 +2725,9 @@
           "planner_id": "round-ratify-bounded-plan",
           "target_kinds": ["fs"],
           "bounds": {
-            "max_batches": 4,
-            "max_targets_per_batch": 16,
-            "max_total_targets": 64
+            "max_batches": 128,
+            "max_targets_per_batch": 64,
+            "max_total_targets": 8192
           },
           "recovery": "preserve-and-report"
         },
