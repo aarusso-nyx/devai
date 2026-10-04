@@ -120,6 +120,21 @@ is alive or ran on another host. A controller left by a dead process on the same
 the tasks it left `in_progress` stay there for explicit human disposition, because only `ready`
 tasks are dispatched.
 
+## Bounded concurrency
+
+`round run` is serial by default. `--workers <count>` opts one invocation into bounded concurrent
+dispatch, up to the `capacity.max_workers` ceiling of `law/policy/round-execution.json`; a count
+outside 1 to that ceiling refuses with `TASK_WORKER_CAP_INVALID` before any task is touched.
+Admission still follows plan order. A task joins the tasks in flight only when it is in the same
+topological generation as all of them (`TASK_GENERATION_BARRIER` otherwise) and shares no lock
+key with any of them (`TASK_RESOURCE_CONFLICT`); a blocked task waits for an in-flight task to
+finish instead of failing. With one worker the behavior is the serial runner, task for task.
+
+Concurrency overlaps only executors that yield while they run. A routine executor runs its argv
+synchronously, so routine tasks still execute one after another. Database and worktree identities
+are per task (`devai_task_<task id>`, `WT-<task id>`), so two distinct tasks never contend for
+them. There is no cross-round controller and no reviewer reserve yet; the policy records both.
+
 ## Canonical executor-kind descriptors
 
 Choose a kind by the work contract: deterministic registered action or shell-free argv,
