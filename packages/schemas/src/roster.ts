@@ -12,6 +12,7 @@ export const ROSTER = [
   'api-map.schema.json',
   'assessment.schema.json',
   'audit-observation-result.schema.json',
+  'campaign.schema.json',
   'authority-policy.schema.json',
   'authority-session.schema.json',
   'backlog-item.schema.json',
