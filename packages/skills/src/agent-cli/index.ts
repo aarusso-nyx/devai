@@ -58,13 +58,20 @@ export function agentCliInvocation(options: AgentCliInvocationOptions): AgentCli
         '--output-format',
         'stream-json',
         '--no-session-persistence',
+        // Host user settings, hooks and MCP servers must not run inside a governed attempt.
+        '--setting-sources',
+        '',
+        '--strict-mcp-config',
+        '--mcp-config',
+        '{"mcpServers":{}}',
         '--permission-mode',
         'acceptEdits',
         '--model',
         options.model,
         ...(options.effort === 'default' ? [] : ['--effort', options.effort]),
       ],
-      requested_containment: 'claude --permission-mode acceptEdits with the task worktree as cwd',
+      requested_containment:
+        'claude --permission-mode acceptEdits without host settings or MCP servers, the task worktree as cwd',
     };
   }
   if (options.runtime === 'codex-cli') {
@@ -75,6 +82,8 @@ export function agentCliInvocation(options: AgentCliInvocationOptions): AgentCli
         'exec',
         '--json',
         '--ephemeral',
+        // Host user configuration (hooks, MCP servers, profiles) must not run in an attempt.
+        '--ignore-user-config',
         '--sandbox',
         'workspace-write',
         '--model',
@@ -83,7 +92,8 @@ export function agentCliInvocation(options: AgentCliInvocationOptions): AgentCli
         `model_reasoning_effort="${options.effort}"`,
         '-',
       ],
-      requested_containment: 'codex --sandbox workspace-write with the task worktree as cwd',
+      requested_containment:
+        'codex --sandbox workspace-write without host user configuration, the task worktree as cwd',
     };
   }
   throw new Error('AGENT_CLI_RUNTIME_UNSUPPORTED');
@@ -209,11 +219,11 @@ function parseCodex(stdout: string): AgentCliOutput {
             usage_version: 2,
             counter_mode: 'per-attempt',
             derivation:
-              'codex --json turn.completed.usage of one ephemeral turn; cached_input_tokens is the cache read; codex reports no cache write',
+              'codex --json turn.completed.usage of one ephemeral turn; cached_input_tokens is the cache read and cache_write_input_tokens the cache write',
             input_tokens: counter(usage?.['input_tokens']),
             output_tokens: counter(usage?.['output_tokens']),
             cache_read_tokens: counter(usage?.['cached_input_tokens']),
-            cache_write_tokens: MISSING,
+            cache_write_tokens: counter(usage?.['cache_write_input_tokens']),
           },
     // Codex reports no cost; it is unknown, never 0.
     cost: UNKNOWN_COST,
