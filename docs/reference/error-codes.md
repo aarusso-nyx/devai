@@ -785,6 +785,7 @@ authoritative for that invocation.
 | `TASK_NOT_FOUND` | task not found | Stable diagnostic for task not found. | Follow the structured envelope remediation and retry only after its condition is satisfied. | failure / 2 |
 | `TASK_NOT_READY` | task not ready | Stable diagnostic for task not ready. | Follow the structured envelope remediation and retry only after its condition is satisfied. | failure / 2 |
 | `TASK_OPERATION_FAILED` | task operation failed | Stable diagnostic for task operation failed. | Follow the structured envelope remediation and retry only after its condition is satisfied. | failure / 2 |
+| `TASK_PROMPT_COMPOSITION_DRIFT` | task prompt composition drift | Stable diagnostic for task prompt composition drift. | Follow the structured envelope remediation and retry only after its condition is satisfied. | failure / 2 |
 | `TASK_PROMPT_COMPOSITION_MISMATCH` | task prompt composition mismatch | Stable diagnostic for task prompt composition mismatch. | Follow the structured envelope remediation and retry only after its condition is satisfied. | failure / 2 |
 | `TASK_PROMPT_COMPOSITION_REQUIRED` | task prompt composition required | Stable diagnostic for task prompt composition required. | Follow the structured envelope remediation and retry only after its condition is satisfied. | failure / 2 |
 | `TASK_PUBLISH_CONSENT_REQUIRED` | task publish consent required | Stable diagnostic for task publish consent required. | Follow the structured envelope remediation and retry only after its condition is satisfied. | failure / 2 |
