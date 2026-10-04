@@ -155,14 +155,17 @@ async function commandsFor(domain: CommandDomain): Promise<readonly CommandDefin
         },
         { roundTrackingDisable, roundTrackingEnable, roundTrackingStatus, roundTrackingSync },
         { roundDispatchActivate },
+        { roundDispatch },
       ] = await Promise.all([
         import('./commands/round/workflow.js'),
         import('./commands/round/tracking.js'),
         import('./commands/round/dispatch-activate.js'),
+        import('./commands/round/dispatch-agents.js'),
       ]);
       return [
         roundAssess,
         roundClose,
+        roundDispatch,
         roundDispatchActivate,
         roundGapCreate,
         roundGapList,
