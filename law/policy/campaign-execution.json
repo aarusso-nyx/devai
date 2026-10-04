@@ -404,11 +404,17 @@
         "acceptance_commands": "task.acceptance_commands",
         "intent_diff.planned_files": "task.boundary.paths",
         "intent_diff.planned_steps": "task.deliverables",
-        "executor": "kind human with role equal to discipline and instructions_ref equal to the prompt path"
+        "executor": "kind human with role equal to discipline, instructions_ref equal to the campaign directory joined with prompt.path, completion_evidence [pull-request-merged], timeout_ms from execution.time_budget_minutes (default seven days), and timeout_behavior escalate",
+        "created_at": "campaign.date at 00:00:00Z, so an identical plan materializes byte-identical records",
+        "target_modules": "[] (campaign tasks bound paths, not modules)"
       }
     },
-    "when": "optional; a campaign may run entirely as human-driven pull requests without materialization",
-    "self_dogfood": "when constraints.self_dogfood is true, materialization is limited to what law/policy/self-dogfood.json permits and never dispatches an executor"
+    "when": "optional; a campaign may still run entirely as human-driven pull requests without materialization",
+    "self_dogfood": "when constraints.self_dogfood is true, materialization is limited to what law/policy/self-dogfood.json permits and never dispatches an executor",
+    "action": "campaign materialize (ADR-GOV-0025): an open campaign round with an active round authorization, through the round task queue only; an identical existing record is reported, a differing one is refused",
+    "projection": "campaign status (ADR-GOV-0025): read-only; plan status beside runtime task status with named drift",
+    "ratification": "round ratify (ADR-GOV-0025): an Owner or Architect decision on a task awaiting human review; accept moves it to pre_merge, reject escalates; merge stays a separate human act",
+    "external_controllers": "retired (ADR-GOV-0025): no controller outside the registered actions materializes, dispatches, or records campaign state; historical controller records stay evidence"
   },
   "fail_closed": [
     "unknown-status",

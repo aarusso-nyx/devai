@@ -39,6 +39,18 @@ export const ACTION_EFFECT_CONTRACTS = [
     capabilities: [],
   },
   {
+    action_id: 'campaign materialize',
+    public_action_id: 'campaign materialize',
+    effect: 'harness-write',
+    capabilities: ['fs:f5-state'],
+  },
+  {
+    action_id: 'campaign status',
+    public_action_id: 'campaign status',
+    effect: 'read',
+    capabilities: [],
+  },
+  {
     action_id: 'catalog actions',
     public_action_id: 'catalog actions',
     effect: 'read',
@@ -297,6 +309,12 @@ export const ACTION_EFFECT_CONTRACTS = [
       'proc:mmdc',
       'proc:which',
     ],
+  },
+  {
+    action_id: 'round ratify',
+    public_action_id: 'round ratify',
+    effect: 'harness-write',
+    capabilities: ['fs:f5-state'],
   },
   {
     action_id: 'round run',
