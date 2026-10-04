@@ -17,6 +17,7 @@
     "dependencies",
     "roles",
     "resources",
+    "capacity",
     "lifecycle",
     "failure",
     "rollback",
@@ -53,6 +54,47 @@
     },
     "resources": {
       "$ref": "#/$defs/section"
+    },
+    "capacity": {
+      "description": "Bounded concurrent admission within one round. Parallelism is opt-in per invocation and never exceeds the ceiling.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "default_workers",
+        "max_workers",
+        "activation",
+        "admission",
+        "lock_denial_escalation_threshold",
+        "cross_round_controller",
+        "review_reserve"
+      ],
+      "properties": {
+        "default_workers": {
+          "const": 1
+        },
+        "max_workers": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16
+        },
+        "activation": {
+          "const": "explicit-per-invocation"
+        },
+        "admission": {
+          "const": "same-topological-generation-and-resource-disjoint-only"
+        },
+        "lock_denial_escalation_threshold": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 10
+        },
+        "cross_round_controller": {
+          "const": "forbidden"
+        },
+        "review_reserve": {
+          "const": "not-applicable-until-review-tasks"
+        }
+      }
     },
     "lifecycle": {
       "type": "object",

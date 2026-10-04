@@ -71,6 +71,15 @@
     "release_on": ["completed", "escalated", "rgr_pending", "cancelled"],
     "resource_claim_from_model": "forbidden"
   },
+  "capacity": {
+    "default_workers": 1,
+    "max_workers": 4,
+    "activation": "explicit-per-invocation",
+    "admission": "same-topological-generation-and-resource-disjoint-only",
+    "lock_denial_escalation_threshold": 3,
+    "cross_round_controller": "forbidden",
+    "review_reserve": "not-applicable-until-review-tasks"
+  },
   "lifecycle": {
     "initial": "queued",
     "terminal": ["completed", "escalated", "cancelled"],
