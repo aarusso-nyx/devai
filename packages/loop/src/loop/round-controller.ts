@@ -23,9 +23,17 @@ export interface RoundControllerRecord {
   readonly token: string;
 }
 
+/*
+ * Mirrors of `law/policy/round-execution.json` capacity; a contract test pins them.
+ */
+/** Workers when a run does not opt in: serial (capacity.default_workers). */
+export const ROUND_DEFAULT_WORKERS = 1;
+/** The opt-in ceiling for concurrent workers in one round (capacity.max_workers). */
+export const ROUND_MAX_WORKERS = 4;
 /**
  * Consecutive lock denials after which a task is escalated for human review
- * instead of re-queued (Constitution Article 25, "after repeated denials").
+ * instead of re-queued (Constitution Article 25, "after repeated denials";
+ * capacity.lock_denial_escalation_threshold).
  */
 export const LOCK_DENIAL_ESCALATION_THRESHOLD = 3;
 

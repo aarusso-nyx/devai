@@ -750,6 +750,7 @@ authoritative for that invocation.
 | `TASK_EXECUTOR_REQUIRED` | task executor required | Stable diagnostic for task executor required. | Follow the structured envelope remediation and retry only after its condition is satisfied. | failure / 2 |
 | `TASK_GAP_MISMATCH` | task gap mismatch | Stable diagnostic for task gap mismatch. | Follow the structured envelope remediation and retry only after its condition is satisfied. | failure / 2 |
 | `TASK_GAP_REQUIRED` | task gap required | Stable diagnostic for task gap required. | Follow the structured envelope remediation and retry only after its condition is satisfied. | failure / 2 |
+| `TASK_GENERATION_BARRIER` | task generation barrier | Stable diagnostic for task generation barrier. | Follow the structured envelope remediation and retry only after its condition is satisfied. | failure / 2 |
 | `TASK_HOST_IDENTITY_REQUIRED` | task host identity required | Stable diagnostic for task host identity required. | Follow the structured envelope remediation and retry only after its condition is satisfied. | failure / 2 |
 | `TASK_HUMAN_COMPLETION_REQUIRED` | task human completion required | Stable diagnostic for task human completion required. | Follow the structured envelope remediation and retry only after its condition is satisfied. | failure / 2 |
 | `TASK_HUMAN_EVIDENCE_REQUIRED` | task human evidence required | Stable diagnostic for task human evidence required. | Follow the structured envelope remediation and retry only after its condition is satisfied. | failure / 2 |
@@ -823,6 +824,7 @@ authoritative for that invocation.
 | `TASK_START_STATUS_INVALID` | task start status invalid | Stable diagnostic for task start status invalid. | Follow the structured envelope remediation and retry only after its condition is satisfied. | failure / 2 |
 | `TASK_STATUS_NOT_PASS` | task status not pass | Stable diagnostic for task status not pass. | Follow the structured envelope remediation and retry only after its condition is satisfied. | failure / 2 |
 | `TASK_WORKER_CAP` | task worker cap | Stable diagnostic for task worker cap. | Follow the structured envelope remediation and retry only after its condition is satisfied. | failure / 2 |
+| `TASK_WORKER_CAP_INVALID` | task worker cap invalid | Stable diagnostic for task worker cap invalid. | Follow the structured envelope remediation and retry only after its condition is satisfied. | failure / 2 |
 | `TASK_WORKTREE_PATH_ESCAPE` | task worktree path escape | Stable diagnostic for task worktree path escape. | Follow the structured envelope remediation and retry only after its condition is satisfied. | failure / 2 |
 | `TASK_WORKTREE_REGISTRY_MISMATCH` | task worktree registry mismatch | Stable diagnostic for task worktree registry mismatch. | Follow the structured envelope remediation and retry only after its condition is satisfied. | failure / 2 |
 | `TASK_WRITE_CONSENT_REQUIRED` | task write consent required | Stable diagnostic for task write consent required. | Follow the structured envelope remediation and retry only after its condition is satisfied. | failure / 2 |
