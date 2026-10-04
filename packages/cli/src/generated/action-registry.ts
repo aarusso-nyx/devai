@@ -2070,6 +2070,72 @@ export const ACTION_REGISTRY = [
     },
   },
   {
+    action_id: 'round dispatch activate',
+    handler: 'round dispatch activate',
+    path: ['round', 'dispatch', 'activate'],
+    status: 'preview',
+    profiles: ['tier1', 'tier2', 'tier3'],
+    effect: 'harness-write',
+    authority: 'mesh_controller',
+    description:
+      'Record the Owner activation that permits experimental agent dispatch in this repository, within the experimental-execution policy ceilings and until it expires.',
+    output_contract: {
+      schemaVersion: '1.0.0',
+      mode: 'action-envelope',
+      envelope_schema: 'law/schemas/action-result.schema.json',
+      success_channel: 'stdout',
+      payload_schema: null,
+    },
+    error_contract: {
+      schemaVersion: '1.0.0',
+      mode: 'structured-error-envelope',
+      envelope_schema: 'law/schemas/action-result.schema.json',
+      error_schema: 'law/schemas/error.schema.json',
+      error_channel: 'stderr',
+    },
+    authority_contract_version: '1.0.0',
+    authority_contract: {
+      schemaVersion: '1.0.0',
+      action_id: 'round dispatch activate',
+      effect: 'harness-write',
+      capabilities: ['fs:f5-state'],
+      subject: {
+        kind: 'derived-machine',
+        actor: 'harness',
+        transition: 'harness-write',
+        initiator: {
+          allowed_roles: ['owner'],
+          preserve_in_context: true,
+        },
+      },
+      consent: {
+        write: true,
+        allow_publish: false,
+        experimental: true,
+      },
+      planner: {
+        kind: 'bounded-batches',
+        planner_id: 'round-dispatch-activate-bounded-plan',
+        target_kinds: ['fs'],
+        bounds: {
+          max_batches: 4,
+          max_targets_per_batch: 16,
+          max_total_targets: 64,
+        },
+        recovery: 'preserve-and-report',
+      },
+      boundary: {
+        kind: 'mutation-adapters',
+        adapter_ids: ['fs-authority-boundary'],
+        final_reverification: true,
+      },
+      readiness: {
+        requires_binding: true,
+        independent_acceptance_required: true,
+      },
+    },
+  },
+  {
     action_id: 'round gap create',
     handler: 'round gap create',
     path: ['round', 'gap', 'create'],
