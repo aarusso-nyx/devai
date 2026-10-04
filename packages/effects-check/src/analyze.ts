@@ -211,6 +211,8 @@ export async function analyzeEffectProgram(input: AnalysisInput): Promise<Effect
       'Authority wrapper preserves receiver semantics while installing the verified host-effect scope.',
     'packages/authority/src/boundaries/host-effects.ts':
       'The authority seam is the audited implementation boundary for wrapped host functions.',
+    'packages/authority/src/boundaries/host-process.ts':
+      'The governed asynchronous process effect starts its child only inside the authority scope apply callback (ADR-MDL-0005 D-10).',
     'packages/cli/src/commands/mutation/run.ts':
       'Mutation adapter loads the previously resolved local runner URL; runtime charter and authority checks precede execution.',
     'packages/cli/src/release-host-bootstrap.ts':
