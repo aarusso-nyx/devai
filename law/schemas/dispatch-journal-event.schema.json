@@ -1,0 +1,174 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/dispatch-journal-event.schema.json",
+  "title": "Dispatch journal event",
+  "description": "One fsynced line of .devai/state/round-runs/<round>/dispatch-journal.jsonl (ADR-MDL-0005 D-6). Each experimental attempt appends intent, spawned, exited, evidence-written, and settled in that order. An attempt with intent but no settled is uncertain and blocks the round until a human disposition; it is never retried or replayed automatically.",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "round_id",
+    "task_id",
+    "attempt",
+    "event",
+    "at",
+    "experimental",
+    "previous_sha256"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "round_id": {
+      "type": "string",
+      "pattern": "^R-[0-9]{4,}$"
+    },
+    "task_id": {
+      "type": "string",
+      "pattern": "^TASK-[0-9]{4,}$"
+    },
+    "attempt": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 4
+    },
+    "event": {
+      "enum": ["intent", "spawned", "exited", "evidence-written", "settled"]
+    },
+    "at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "experimental": {
+      "const": true
+    },
+    "previous_sha256": {
+      "description": "SHA-256 of the previous journal line's bytes, or null for the first line.",
+      "oneOf": [
+        {
+          "$ref": "common-defs.schema.json#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "runtime": {
+      "enum": ["claude-cli", "codex-cli"]
+    },
+    "model": {
+      "type": "string",
+      "minLength": 1
+    },
+    "effort": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tier": {
+      "enum": ["default", "bumped"]
+    },
+    "prompt_sha256": {
+      "$ref": "common-defs.schema.json#/$defs/sha256"
+    },
+    "pid": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "exit_code": {
+      "type": ["integer", "null"]
+    },
+    "signal": {
+      "type": ["string", "null"]
+    },
+    "timed_out": {
+      "type": "boolean"
+    },
+    "evidence_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "outcome": {
+      "enum": ["pass", "fail", "error", "cancelled"]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "intent"
+          }
+        }
+      },
+      "then": {
+        "required": ["runtime", "model", "effort", "tier", "prompt_sha256"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "spawned"
+          }
+        }
+      },
+      "then": {
+        "required": ["pid"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "exited"
+          }
+        }
+      },
+      "then": {
+        "required": ["exit_code", "signal", "timed_out"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "evidence-written"
+          }
+        }
+      },
+      "then": {
+        "required": ["evidence_id"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "settled"
+          }
+        }
+      },
+      "then": {
+        "required": ["outcome"]
+      }
+    }
+  ],
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "round_id": "R-0012",
+      "task_id": "TASK-0040",
+      "attempt": 1,
+      "event": "intent",
+      "at": "2026-10-04T12:05:00.000Z",
+      "experimental": true,
+      "previous_sha256": null,
+      "runtime": "claude-cli",
+      "model": "claude-opus-5-5",
+      "effort": "high",
+      "tier": "default",
+      "prompt_sha256": "3f79bb7b435b05321651daefd374cdc681dc06faa65e374e38337b88ca046dea"
+    }
+  ]
+}
