@@ -211,8 +211,8 @@ from the standalone pilot's proof.
 | CP-14 | Core provider adapter uses exact registry selection and preserves authority                                                               | Explicit experimental policy/action consent, prompt hashes, resolved runtime identities, host-enforcement boundary tests, fresh review contexts                                                                  | S3 (ADR-MDL-0005; live probe passed)                   |
 | CP-15 | Durable restart is safe after every dispatch boundary                                                                                     | Fault injection before/after intent, process spawn, evidence append, completion and cleanup; uncertain work requires explicit disposition, never blind retry                                                     | S3 (dispatch journal; uncertain work blocks the round) |
 | CP-16 | Usage accounting reports attributable observations and explicit unknowns                                                                  | Session cumulative-counter normalization, missing/regressed counters, cache inclusion/missingness and billing uncertainty, and budget overshoot tests                                                            | S3 (version-2 usage; missing never zero)               |
-| CP-17 | Full governed controller has no alternate task queue or automatic human gate                                                              | Backlog/campaign materialization, role-pure sessions, ratification/merge separation, no remote effects without exact Owner consent                                                                               | Deferred S4                                            |
-| CP-18 | Core runtime can replace legacy components without losing behavior/evidence                                                               | Caller inventory, adopter compatibility fixtures, migration/rollback rehearsal, retained historical evidence, exact release gates                                                                                | Deferred S4                                            |
+| CP-17 | Full governed controller has no alternate task queue or automatic human gate                                                              | Backlog/campaign materialization, role-pure sessions, ratification/merge separation, no remote effects without exact Owner consent                                                                               | S4 (ADR-GOV-0025; ratification separate from merge)    |
+| CP-18 | Core runtime can replace legacy components without losing behavior/evidence                                                               | Caller inventory, adopter compatibility fixtures, migration/rollback rehearsal, retained historical evidence, exact release gates                                                                                | S4 (external controller retired; legacy paths kept)    |
 
 ## Later promotion stages
 
@@ -276,6 +276,21 @@ and rollback have exact evidence. Do not delete the pilot or old implementation
 because a new API compiles. Complete adopter and release gates independently;
 local fixture success carries no production-readiness, merge, or publication
 authority.
+
+S4 landed under ADR-GOV-0025 on 2026-10-04:
+
+- `campaign status` projects a campaign onto runtime state and names drift;
+- `campaign materialize` writes an open round's tasks through the round task queue, with the
+  policy mapping;
+- `round ratify` records the Owner's or Architect's decision on reviewed work, separate from
+  merge.
+
+`campaign-execution.json` names these as the only materialization, projection and
+ratification paths, and records external controllers as retired. Nothing was deleted: the
+pilot stays archived, historical ledgers stay evidence, and hand-driven pull requests remain
+valid. Rollback is withdrawing the activation and not calling the new actions; no stored
+state migrates. All three actions ran end to end through the packed CLI against the S3c
+fixture.
 
 ## Rollback and stop conditions
 
