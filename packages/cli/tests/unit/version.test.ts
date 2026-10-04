@@ -10,12 +10,12 @@ import { resolveCliProvenance, resolveCliVersion } from '../../src/version.js';
 const ROOT = resolve(import.meta.dirname, '../../../..');
 const CANDIDATE_RELEASE_VERSION = '1.9.0';
 const PUBLISHED_RELEASE_VERSION = '1.5.4';
-const TRUSTED_VERIFIER_PACKAGE_VERSION = '1.5.4';
+const TRUSTED_VERIFIER_PACKAGE_VERSION = '1.9.0';
 const VENDORED_PROVENANCE = 'packages/cli/vendor/evidence-verification/provenance.json';
-// The verifier inside the published 1.5.4 package that the law policy trusts (step 4 pin).
+// The verifier inside the published 1.9.0 package that the law policy trusts (step 4 pin).
 const TRUSTED_VERIFIER = {
-  sourceCommit: '8174749ebcfabab246031281a036032f636b8a39',
-  provenanceSha256: '1035c8aad52f4b2beb6a6f010106a4d1866c92dadf3fbae1c6e36e1a4d2ceddf',
+  sourceCommit: '8b215d706a828af7361f9c6799b9cb0a30c9d00b',
+  provenanceSha256: '302161f378e54d0a2b14b743a68577f4bfc43a147a1f17568941e08e14e767a0',
 } as const;
 // The in-repository vendored copy, re-vendored at step 2 for ADR-REL-0031.
 const VENDORED_VERIFIER = {
@@ -103,18 +103,18 @@ describe('resolveCliVersion', () => {
     expect(policy.package.version).toBe(TRUSTED_VERIFIER_PACKAGE_VERSION);
     expect(policy.package).toMatchObject({
       tarball:
-        'https://npm.pkg.github.com/download/@aarusso-nyx/devai/1.5.4/e5c34a17bc27b47cc1dba711561e4f9c6394cac8',
-      shasum_sha1: 'e5c34a17bc27b47cc1dba711561e4f9c6394cac8',
+        'https://npm.pkg.github.com/download/@aarusso-nyx/devai/1.9.0/37594fb078f5098b83b3938a3bc70ac5488c3162',
+      shasum_sha1: '37594fb078f5098b83b3938a3bc70ac5488c3162',
       integrity_sri:
-        'sha512-neGgDPkoCiaex2f6GzSVrZsCIxaQhml6D0EC+bpHb2bgSDb4nm78Evx+Lo49VmH81gTwSI1WQFWb48PWj0/arQ==',
+        'sha512-5XPsmj5rOCEETMNAoGSN5WRqhrTgIEVcIHmWsU1aNpNPdfBjqh9IsAyHEUDka2csLQ1J1y7JuV3+A1VH+IfzAg==',
       release_source: {
-        commit: '8b600ed16ebd101ff88ecfaac9cc04abcf0ce174',
-        tree: 'd2f60e0602ffc849e9b5b1b52ca54731eca7c8b1',
+        commit: '75343991140c223240b51cea80c060c516226945',
+        tree: '90f0f5b64bf594677f96eebf26ae80cf7da1149e',
       },
     });
     expect(policy.verifier).toMatchObject({
-      provenance_sha256: '1035c8aad52f4b2beb6a6f010106a4d1866c92dadf3fbae1c6e36e1a4d2ceddf',
-      source_commit: '8174749ebcfabab246031281a036032f636b8a39',
+      provenance_sha256: '302161f378e54d0a2b14b743a68577f4bfc43a147a1f17568941e08e14e767a0',
+      source_commit: '8b215d706a828af7361f9c6799b9cb0a30c9d00b',
     });
     const currentReleaseNotes = readFileSync(join(ROOT, 'CHANGELOG.md'), 'utf8')
       .split(`## ${CANDIDATE_RELEASE_VERSION}`)[1]
@@ -125,7 +125,7 @@ describe('resolveCliVersion', () => {
     ).toContain(`@aarusso-nyx/devai@${TRUSTED_VERIFIER_PACKAGE_VERSION}`);
   });
 
-  it('binds the trusted verifier pin to the published 1.5.4 package, not to the vendored copy', () => {
+  it('binds the trusted verifier pin to the published 1.9.0 package, not to the vendored copy', () => {
     const policy = JSON.parse(
       readFileSync(join(ROOT, 'law/policy/trusted-local-rc-verifier-package.json'), 'utf8'),
     ) as {
@@ -143,8 +143,8 @@ describe('resolveCliVersion', () => {
     expect(policy.package.version).toBe(TRUSTED_VERIFIER_PACKAGE_VERSION);
     expect(policy.package.release_source).toEqual({
       repository: 'aarusso-nyx/devai',
-      commit: '8b600ed16ebd101ff88ecfaac9cc04abcf0ce174',
-      tree: 'd2f60e0602ffc849e9b5b1b52ca54731eca7c8b1',
+      commit: '75343991140c223240b51cea80c060c516226945',
+      tree: '90f0f5b64bf594677f96eebf26ae80cf7da1149e',
     });
     // The trusted identity is read from the published release's own vendored provenance,
     // at the release-source commit the policy pins, never from the working tree.
@@ -181,11 +181,12 @@ describe('resolveCliVersion', () => {
     }
   });
 
-  it('keeps the trusted pin one published release behind the vendored copy until the repin', () => {
+  it('binds the trusted pin to the vendored copy once the step-4 repin lands', () => {
     // Repin order (ADR-REL-0031, release-discipline.md): the vendored copy is rewritten at
     // step 2, a release ships it under the still-pinned verifier at step 3, and only a
     // law(release) change at step 4 moves the trusted pin. Between steps 2 and 4 the two
-    // identities differ by design; step 4 restates TRUSTED_VERIFIER here.
+    // identities differ by design; step 4 (the 1.9.0 repin, #243) makes them equal again
+    // until the next re-vendor opens step 2.
     const policy = JSON.parse(
       readFileSync(join(ROOT, 'law/policy/trusted-local-rc-verifier-package.json'), 'utf8'),
     ) as {
@@ -206,8 +207,8 @@ describe('resolveCliVersion', () => {
     expect(policy.verifier.source_commit).toBe(TRUSTED_VERIFIER.sourceCommit);
     const vendoredBytes = readFileSync(join(ROOT, VENDORED_PROVENANCE));
     expect(sha256(vendoredBytes)).toBe(VENDORED_VERIFIER.provenanceSha256);
-    expect(VENDORED_VERIFIER.provenanceSha256).not.toBe(TRUSTED_VERIFIER.provenanceSha256);
-    expect(VENDORED_VERIFIER.sourceCommit).not.toBe(TRUSTED_VERIFIER.sourceCommit);
+    expect(VENDORED_VERIFIER.provenanceSha256).toBe(TRUSTED_VERIFIER.provenanceSha256);
+    expect(VENDORED_VERIFIER.sourceCommit).toBe(TRUSTED_VERIFIER.sourceCommit);
   });
 });
 
