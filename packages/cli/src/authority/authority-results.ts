@@ -78,6 +78,7 @@ export function authorityRemediation(code: string, context: JsonRecord): string 
     const flags = [
       ...(declared.write === true ? ['--write'] : []),
       ...(declared.allow_publish === true ? ['--publish'] : []),
+      ...(declared.experimental === true ? ['--experimental'] : []),
       ...(declared.as_role === true ? ['--as-role'] : []),
       ...(declared.authority_session === true ? ['--authority-session'] : []),
     ];
@@ -97,6 +98,9 @@ export function authorityRemediation(code: string, context: JsonRecord): string 
   }
   if (code === 'AUTHORITY_PUBLISH_CONSENT_REQUIRED') {
     return 'Add --write and --publish after reviewing the remote effect.';
+  }
+  if (code === 'AUTHORITY_EXPERIMENTAL_CONSENT_REQUIRED') {
+    return 'Add --write and --experimental after reviewing the experimental, non-promoting effect.';
   }
   if (code === 'AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED') {
     const reason = String(context.reason ?? '');

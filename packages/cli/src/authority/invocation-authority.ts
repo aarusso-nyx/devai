@@ -14,7 +14,7 @@ let resolvedInvocationConsent:
   | Readonly<{
       write: true;
       allow_publish: boolean;
-      experimental: false;
+      experimental: boolean;
     }>
   | undefined;
 
@@ -32,7 +32,7 @@ export function declaredInvocationAuthority():
       consent: Readonly<{
         write: true;
         allow_publish: boolean;
-        experimental: false;
+        experimental: boolean;
       }>;
     }>
   | undefined {
@@ -55,16 +55,14 @@ export function rememberResolvedInvocationAuthority(
   declarationSource: 'cli-flag' | 'session-state',
   argv: readonly string[],
 ): void {
-  // A stable action cannot acquire experimental consent. Keeping the context
-  // absent fails closed if a caller somehow routes that undeclared flag past
-  // command parsing instead of letting a handler reinterpret it.
-  if (argv.includes('--experimental')) return;
+  // Only an action whose registry consent requires it reaches this point with
+  // --experimental: every other action refuses the flag before dispatch.
   resolvedInvocationRole = role;
   resolvedInvocationDeclarationSource = declarationSource;
   resolvedInvocationConsent = Object.freeze({
     write: true,
     allow_publish: argv.includes('--publish'),
-    experimental: false,
+    experimental: argv.includes('--experimental'),
   });
 }
 

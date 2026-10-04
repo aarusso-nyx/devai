@@ -340,6 +340,7 @@ export function authorizeCliArgv(
       argv.includes('--as-role') ||
       argv.includes('--authority-session') ||
       argv.includes('--write') ||
+      argv.includes('--experimental') ||
       argv.includes('--machine-actor')
     ) {
       return renderAuthorityResult(
@@ -399,6 +400,7 @@ export function authorizeCliArgv(
       argv.includes('--authority-session') ||
       argv.includes('--write') ||
       argv.includes('--publish') ||
+      argv.includes('--experimental') ||
       argv.includes('--machine-actor')
     ) {
       return renderAuthorityResult(
