@@ -393,7 +393,6 @@ describe('S06-A policy parsing and public selection residuals', () => {
 
 const SOURCE_ONLY_SCHEMAS = [
   'campaign-execution-policy.schema.json',
-  'campaign.schema.json',
   'change-taxonomy.schema.json',
   'commit-grammar.schema.json',
   'credential-requirements.schema.json',
@@ -440,7 +439,7 @@ describe('S06-A schema canon and dispatch residuals', () => {
 
     expect(checkSchemaCanon(root)).toEqual({
       ok: true,
-      canonical_total: 18,
+      canonical_total: 17,
       rules: [
         'recursive-closed-complete-objects',
         'predicate-fragments-valid',
@@ -515,7 +514,7 @@ describe('S06-A schema canon and dispatch residuals', () => {
     put(source, 'packages/schemas/src/roster.ts', 'source roster');
     expect(checkSchemasForRepository(source)).toEqual({
       ok: true,
-      canonical_total: 18,
+      canonical_total: 17,
       rules: [
         'recursive-closed-complete-objects',
         'predicate-fragments-valid',

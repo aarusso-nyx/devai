@@ -160,6 +160,13 @@ vi.mock('../../src/commands/round/tracking.js', () => ({
   roundTrackingStatus: harness.command('roundTrackingStatus'),
   roundTrackingSync: harness.command('roundTrackingSync'),
 }));
+vi.mock('../../src/commands/round/ratify.js', () => ({
+  roundRatify: harness.command('roundRatify'),
+}));
+vi.mock('../../src/commands/campaign/index.js', () => ({
+  campaignMaterialize: harness.command('campaignMaterialize'),
+  campaignStatusCmd: harness.command('campaignStatusCmd'),
+}));
 vi.mock('../../src/commands/round/dispatch-agents.js', () => ({
   roundDispatch: harness.command('roundDispatch'),
 }));
