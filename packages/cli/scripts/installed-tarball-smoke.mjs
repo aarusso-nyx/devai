@@ -1198,6 +1198,22 @@ try {
   if (chain?.records?.length !== 1 || chain.records[0]?.previous_hash !== 'GENESIS') {
     throw new Error('INSTALLED_FRESH_CHAIN_GENESIS_INVALID');
   }
+  // ADR-EVI-0002: a fresh chain records its first anchor baseline through the gated write
+  // before a read-only verification can pass.
+  run(binary, [
+    'evidence',
+    'verify',
+    '--scope',
+    'chain',
+    '--repo-root',
+    projectRoot,
+    '--write',
+    '--format',
+    'json',
+  ]);
+  if (!existsSync(join(projectRoot, 'record/proofs/anchor-baseline.json'))) {
+    throw new Error('INSTALLED_FRESH_CHAIN_BASELINE_MISSING');
+  }
   const chainVerification = JSON.parse(
     run(binary, [
       'evidence',
