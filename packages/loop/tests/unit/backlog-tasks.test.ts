@@ -244,7 +244,7 @@ describe('task record persistence', () => {
           discipline: 'inspector',
           title: 'Lock contender',
           target_modules: ['MOD-SHARED'],
-          target_substrates: ['F3'],
+          target_substrates: ['F2'],
           db_isolation: 'database',
           executor: routineExecutor(),
         },
