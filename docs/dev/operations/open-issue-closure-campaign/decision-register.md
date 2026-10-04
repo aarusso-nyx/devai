@@ -101,3 +101,26 @@ coordinator, retired every per-task worktree and branch (archived under
 - Reply fixtures follow the strict ADR-MDL-0003 contract; a json body that disagrees with
   the reply text is refused.
 - #237 (inventory) and the strict proof for #235 are deferred beyond v1.9.0.
+
+## Campaign close (2026-10-04)
+
+The Owner closed CMP-0006 after v1.9.0. Of the 22 snapshot issues, 16 are closed (15
+completed, #253 not_planned) through #255 to #261 and their evidence comments; six stay
+open as follow-up issues outside any campaign.
+
+| Round  | Ledger state | Outcome                                                                             |
+| ------ | ------------ | ----------------------------------------------------------------------------------- |
+| R-0601 | closed       | Entry contracts accepted; #240 delivered, #253 not_planned                          |
+| R-0602 | closed       | #233, #234, #247, #248 delivered; #235 descoped (soft-gate step out of the PR lane) |
+| R-0603 | abandoned    | #242 delivered; #236, #237, #246 descoped                                           |
+| R-0604 | closed       | #238, #239 delivered                                                                |
+| R-0605 | closed       | #241, #250, #251, #252, #254 delivered                                              |
+| R-0606 | abandoned    | Offline contract shipped; OE-04 live review not performed (#249 open)               |
+| R-0607 | closed       | v1.9.0 published (OE-06), Pages verified (OE-07, #244), OE-05 by disposition        |
+| R-0608 | abandoned    | Verifier repinned to 1.9.0 (OE-08, #243); OE-09 DETRAN notice pending (#245)        |
+| R-0609 | abandoned    | Closure by merged PRs under the Owner's decision; OE-10 and OE-11 not performed     |
+
+No task triplet ran to `merged` after the reset; every unexecuted task is `cancelled` and
+each round's disposition names the PRs that delivered its work. The ledger carries a frozen
+copy of the tier map it ran under, as closed campaigns must. Open follow-ups: #235, #236,
+#237, #245, #246, #249.
