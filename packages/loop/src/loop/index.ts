@@ -59,6 +59,7 @@ export type {
 export * from './dispatch-journal.js';
 export * from './experimental-activation.js';
 export * from './locks.js';
+export * from './ratification.js';
 export {
   MODEL_RUNTIME_REGISTRY_PATH,
   loadModelRuntimeRegistry,
