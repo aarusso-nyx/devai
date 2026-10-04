@@ -52,7 +52,14 @@
     "human_approval_required": true
   },
   "tags": ["backlog", "work-queue", "no-autonomy", "article-35", "article-3"],
-  "measurable_via": ["task queue add", "task queue next", "task queue complete", "task queue list"],
+  "measurable_via": [
+    "task queue add",
+    "task queue next",
+    "task queue complete",
+    "task queue list",
+    "campaign materialize",
+    "campaign status"
+  ],
   "provenance": ["ADR-SCR-0004", "CMP-0002:R-0203:TASK-0231"],
   "supersedes": null,
   "superseded_by": null
