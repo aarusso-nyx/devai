@@ -38,6 +38,7 @@ import {
 const DOMAIN_ORDER = [
   'audit',
   'backlog',
+  'campaign',
   'catalog',
   'check',
   'doctor',
@@ -84,6 +85,11 @@ async function commandsFor(domain: CommandDomain): Promise<readonly CommandDefin
       const { backlogAdd, backlogList, backlogResolve, backlogShow } =
         await import('./commands/backlog/index.js');
       return [backlogAdd, backlogList, backlogResolve, backlogShow];
+    }
+    case 'campaign': {
+      const { campaignMaterialize, campaignStatusCmd } =
+        await import('./commands/campaign/index.js');
+      return [campaignMaterialize, campaignStatusCmd];
     }
     case 'catalog': {
       const { actionsList } = await import('./commands/actions-list.js');
@@ -169,11 +175,13 @@ async function commandsFor(domain: CommandDomain): Promise<readonly CommandDefin
         { roundTrackingDisable, roundTrackingEnable, roundTrackingStatus, roundTrackingSync },
         { roundDispatchActivate },
         { roundDispatch },
+        { roundRatify },
       ] = await Promise.all([
         import('./commands/round/workflow.js'),
         import('./commands/round/tracking.js'),
         import('./commands/round/dispatch-activate.js'),
         import('./commands/round/dispatch-agents.js'),
+        import('./commands/round/ratify.js'),
       ]);
       return [
         roundAssess,
@@ -185,6 +193,7 @@ async function commandsFor(domain: CommandDomain): Promise<readonly CommandDefin
         roundGapResolve,
         roundGapShow,
         roundPlan,
+        roundRatify,
         roundRun,
         roundSeal,
         roundStatus,

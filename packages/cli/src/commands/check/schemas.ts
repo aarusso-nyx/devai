@@ -42,7 +42,6 @@ const RULES = [
 // They are not members of the current CLI/runtime validator roster.
 const SOURCE_ONLY_SCHEMAS = [
   'campaign-execution-policy.schema.json',
-  'campaign.schema.json',
   'change-taxonomy.schema.json',
   'commit-grammar.schema.json',
   'credential-requirements.schema.json',
