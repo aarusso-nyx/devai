@@ -504,26 +504,55 @@ devai round dispatch deactivate --repo-root . --as-role owner --write --experime
 ```
 
 - **`round dispatch dispose --task <task-id> --as retry|escalate`** holds the round controller, so
-  it never races a live dispatch. It disposes of one agent task with an open journal attempt,
-  left `in_progress`, or `experimental_blocked`.
+  it refuses with `TASK_ROUND_CONTROLLER_BUSY` while a dispatch owns the round. It disposes of one
+  agent task with an open journal attempt, an attempt a quarantined journal left open, left
+  `in_progress`, or `experimental_blocked`.
   - It writes `.devai/state/round-runs/<round>/dispositions/<DSP-id>.json`, then closes each open
-    attempt with a `settled` event of outcome `cancelled` naming that record.
+    attempt with a `settled` event of outcome `cancelled` naming that record. Last, it writes a
+    `<DSP-id>.applied` marker.
   - It releases the task's attempt worktrees. Locks follow `release_on`: a retried task keeps
     them and an escalated one releases them.
   - A retry returns the task to `ready`; escalate escalates it.
   - A retry refuses once the task's ladder is spent (`DISPOSITION_ATTEMPTS_EXHAUSTED`): a further
     try is a new task.
-  - `task escalate` also records a disposition for an agent task with open attempts.
+  - A disposition interrupted before its marker blocks the round. Issuing the same disposition
+    again resumes it; a different one refuses with `DISPOSITION_INCOMPLETE`.
+- **`task escalate`** on an agent task also takes the round controller, refusing with
+  `TASK_ROUND_CONTROLLER_BUSY` while a dispatch owns the round. It records a disposition when the
+  task has open or quarantined attempts, or is still `in_progress`.
 - **`round dispatch dispose --quarantine-journal`** handles a damaged journal, which otherwise
   refuses every dispatch with `TASK_DISPATCH_JOURNAL_INVALID`. It writes a disposition record,
   then moves the journal aside byte for byte as `dispatch-journal.quarantined-<sha256>.jsonl`. The
   next dispatch starts a fresh chain. A readable journal refuses (`TASK_DISPATCH_JOURNAL_VALID`).
-  Agent tasks left in flight still need their own disposition.
+  The record lists every attempt the damaged journal leaves open: those its verifiable prefix
+  does not settle, and any named only after the damage. Each keeps blocking the round, whatever
+  its task's status, until that task gets its own disposition.
 - **`round dispatch deactivate`** writes a withdrawal record under
   `.devai/state/experimental/withdrawals/`. The record names the time, the SHA-256 of the
   withdrawn record and its activation digest. The action then removes the activation, so the
   repository returns to the supported serial runner. A dispatch already running keeps the
-  activation it read at start.
+  activation it read at start. Activation writes and withdrawals take the same lock,
+  `.devai/state/experimental/activation.lock`, and refuse with `EXPERIMENTAL_ACTIVATION_BUSY`
+  while the other holds it. A withdrawal removes only the exact record it names.
+
+### Known limitations of experimental execution
+
+- **Write-scope checks compare snapshots.** The engine compares the attempt worktree before and
+  after the provider runs. A provider could create a symbolic link that escapes the worktree,
+  write through it, and remove it before the final snapshot. Snapshots cannot prove the
+  boundary; runtime filesystem enforcement belongs to the host sandbox. The adapters request the
+  provider's own containment:
+  - `codex exec --sandbox workspace-write --ignore-user-config`;
+  - `claude --permission-mode acceptEdits --setting-sources "" --strict-mcp-config` with an empty
+    MCP configuration.
+
+  Both run with the attempt worktree as their working directory. That containment is recorded
+  as requested, never as verified (ADR-MDL-0005 D-3).
+
+- **The state root must exist first.** Dispatch fsyncs every directory it creates below
+  `.devai/state`, but not a newly created `.devai/state` itself in `.devai`, which lies outside
+  the `fs:f5-state` domain. Initialize the state root before experimental dispatch:
+  `init apply harness` writes `.devai/state/counters.json`.
 
 A provider starts with an allowlisted environment, never the host's. It gets only `PATH`,
 `HOME`, `USER`, `LOGNAME`, `SHELL`, `TMPDIR`, `LANG`, `LC_*`, `TERM`, the proxy and CA variables,
