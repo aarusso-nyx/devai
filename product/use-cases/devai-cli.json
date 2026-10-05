@@ -5,7 +5,7 @@
     {
       "id": "UC-devai-cli-current-actions",
       "title": "Use the current DEVAI CLI",
-      "goal": "Select and run one of the 61 registered actions. This catalogue case lists the 41 general actions; the five journey cases that follow cover the remaining 20 (audit, backlog, release ceremony, round tracking, triage) in the order an operator uses them.",
+      "goal": "Select and run one of the 69 registered actions. This catalogue case lists the 41 general actions; the nine journey cases that follow cover the remaining 28 (audit, backlog, release ceremony, round tracking, triage, experimental dispatch, campaign controller, experimental recovery, adopter upgrade) in the order an operator uses them.",
       "actors": ["operator", "owner", "architect", "inspector", "engineer", "auditor"],
       "preconditions": [
         "DEVAI is installed in an adopter repository.",
