@@ -126,7 +126,124 @@ export function loadRunSteps(workflowFiles: readonly string[]): WorkflowRunStep[
   return steps;
 }
 
-export function shellSegments(script: string): readonly string[] {
+/** Programs whose here-document body is itself shell, so it keeps its control flow. */
+const SHELL_INTERPRETERS = new Set(['sh', 'bash', 'dash', 'ash', 'ksh', 'zsh', 'busybox']);
+const SHELL_EVALUATORS = new Set(['eval', 'source', '.', 'exec']);
+
+interface HeredocOperator {
+  readonly delimiter: string;
+  readonly stripTabs: boolean;
+}
+
+interface HeredocLine {
+  readonly operators: readonly HeredocOperator[];
+  /** The line pipes or redirects output onward, so a body may be run by a later line. */
+  readonly onward: boolean;
+}
+
+/**
+ * The here-document operators of one line, in order. `<<<` is a here-string and
+ * `<<` inside `$((` arithmetic is a shift, so neither opens a body. A line whose
+ * quoting cannot be followed yields null so the caller keeps the script unchanged.
+ */
+function heredocLine(line: string): HeredocLine | null {
+  const operators: HeredocOperator[] = [];
+  let onward = false;
+  let single = false;
+  let double = false;
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+    if (single) {
+      if (char === "'") single = false;
+      continue;
+    }
+    if (double) {
+      if (char === '\\') index += 1;
+      else if (char === '"') double = false;
+      continue;
+    }
+    if (char === '\\') {
+      index += 1;
+      continue;
+    }
+    if (char === "'") single = true;
+    else if (char === '"') double = true;
+    else if (char === '#' && (index === 0 || /\s/.test(line[index - 1] ?? ''))) break;
+    else if (char === '|' || char === '>') onward = true;
+    else if (char === '<' && line[index + 1] === '<') {
+      if (line[index + 2] === '<') {
+        index += 2;
+        continue;
+      }
+      const before = line.slice(0, index);
+      if ((before.match(/\$\(\(/g) ?? []).length > (before.match(/\)\)/g) ?? []).length) {
+        index += 1;
+        continue;
+      }
+      const rest = line.slice(index + 2);
+      const match = rest.match(/^(-?)[ \t]*(?:'([^']*)'|"([^"]*)"|((?:\\.|[^\s;&|<>()'"])+))/);
+      if (match === null) return null;
+      const delimiter = match[2] ?? match[3] ?? (match[4] ?? '').replace(/\\(.)/g, '$1');
+      if (delimiter === '') return null;
+      operators.push({ delimiter, stripTabs: match[1] === '-' });
+      index += 1 + match[0].length;
+    }
+  }
+  return single || double ? null : { operators, onward };
+}
+
+function feedsShell(line: string): boolean {
+  return line
+    .split(/[\s;&|()<>]+/)
+    .map((token) => executableName(token.replace(/^['"]|['"]$/g, '')))
+    .some((name) => SHELL_INTERPRETERS.has(name) || SHELL_EVALUATORS.has(name));
+}
+
+/**
+ * Remove the bodies of here-documents fed to a program other than a shell
+ * (ADR-SCR-0013). The body of `node - <<'NODE'` is that program's standard input,
+ * so its `if (` and `for (` lines are not shell control flow and a devai command
+ * written inside it is not executed by the step. A line that names a shell or an
+ * evaluator, or that pipes or redirects output onward (a body written to a file
+ * may be sourced later), keeps its bodies, so control flow they carry still makes
+ * the step non-binding; an unterminated or unreadable here-document leaves the
+ * script unchanged.
+ */
+export function stripHeredocBodies(script: string): string {
+  if (!script.includes('<<')) return script;
+  const lines = script.split('\n');
+  // A YAML block scalar reaches the shell without its common indentation, so the
+  // terminator is compared after removing the spaces every non-empty line shares.
+  const indent = Math.min(
+    ...lines.filter((line) => line.trim() !== '').map((line) => /^ */.exec(line)?.[0].length ?? 0),
+  );
+  const kept: string[] = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index] ?? '';
+    kept.push(line);
+    const parsed = heredocLine(line);
+    if (parsed === null) return script;
+    if (parsed.operators.length === 0) continue;
+    let end = index;
+    for (const operator of parsed.operators) {
+      let terminator = end + 1;
+      while (terminator < lines.length) {
+        const candidate = (lines[terminator] ?? '').slice(indent);
+        if ((operator.stripTabs ? candidate.replace(/^\t+/, '') : candidate) === operator.delimiter)
+          break;
+        terminator += 1;
+      }
+      if (terminator >= lines.length) return script;
+      end = terminator;
+    }
+    if (parsed.onward || feedsShell(line)) continue;
+    index = end;
+  }
+  return kept.join('\n');
+}
+
+export function shellSegments(rawScript: string): readonly string[] {
+  const script = stripHeredocBodies(rawScript);
   const segments: string[] = [];
   let start = 0;
   let quote: "'" | '"' | null = null;
