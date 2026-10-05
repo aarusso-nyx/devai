@@ -241,8 +241,13 @@ const GITHUB_ACTIONS_REBIND =
   'devai init bind --target . --host-adapter github-actions --as-role architect --write';
 
 /** Install, in a real checkout, a post-merge host adapter selected as the host identity. */
-async function bindPostMergeCheckout(repo: string, policy: JsonObject): Promise<void> {
+async function bindPostMergeCheckout(
+  repo: string,
+  policy: JsonObject,
+  manager: 'git' | 'husky' = 'git',
+): Promise<void> {
   initializeGitRepository(repo);
+  if (manager === 'husky') mkdirSync(join(repo, '.husky'));
   configureHostIntegrated(repo, policy, POST_MERGE_CONFIG, 'post-merge-host-adapter');
   put(repo, '.devai/config/authority-policy.json', policy);
   const binary = join(repo, 'node_modules/.bin/devai');
@@ -714,20 +719,36 @@ describe('Doctor post-merge bindings made in another checkout (#266)', () => {
     expect(result.errors?.[1]).toMatch(/^POST_MERGE_ADAPTER_UNVERIFIABLE_HERE: /u);
   }, 30_000);
 
+  /** Point the bound checkout's attestation at another checkout, without its key to re-sign it. */
+  function renameBinding(repo: string): string {
+    const elsewhere = join(tmpdir(), 'devai-removed-primary-checkout');
+    const path = join(repo, POST_MERGE_CONFIG);
+    const attestation = JSON.parse(readFileSync(path, 'utf8')) as JsonObject;
+    attestation['repository'] = elsewhere;
+    attestation['adapter_id'] = `post-merge-${'0'.repeat(16)}`;
+    put(repo, POST_MERGE_CONFIG, attestation);
+    return elsewhere;
+  }
+
+  function adminDirectory(repo: string): string {
+    return spawnSync('git', ['rev-parse', '--absolute-git-dir'], {
+      cwd: repo,
+      encoding: 'utf8',
+    }).stdout.trim();
+  }
+
   it('verifies, and refuses, a binding edited in the bound checkout to name another one', async () => {
+    let elsewhere = '';
     const result = await authorityCheck(async ({ repo, policy }) => {
       await bindPostMergeCheckout(repo, policy);
       await bindGithubActions(repo);
-      const path = join(repo, POST_MERGE_CONFIG);
-      const attestation = JSON.parse(readFileSync(path, 'utf8')) as JsonObject;
-      attestation['repository'] = join(tmpdir(), 'devai-removed-primary-checkout');
-      attestation['adapter_id'] = `post-merge-${'0'.repeat(16)}`;
-      put(repo, POST_MERGE_CONFIG, attestation);
+      elsewhere = renameBinding(repo);
     });
     expect(result).toMatchObject({
       ok: false,
       info: {
         local_post_merge_scope: 'this-checkout',
+        local_post_merge_state: ['key', 'issuer', 'git-hook', 'recorded-hook'],
         local_post_merge_enforced: false,
         local_post_merge_facts: {
           key_present: true,
@@ -735,18 +756,65 @@ describe('Doctor post-merge bindings made in another checkout (#266)', () => {
           repository_bound: false,
         },
         github_actions_enforced: true,
+        reason_ids: ['POST_MERGE_ADAPTER_LOCAL_STATE_PRESENT'],
       },
     });
-    expect(result.info).not.toHaveProperty('reason_ids');
     expect(result.errors).toEqual(
       expect.arrayContaining([
         POSTURE_ERROR,
         'POST_MERGE_ADAPTER_SIGNATURE_VALID_INVALID',
         'POST_MERGE_ADAPTER_REPOSITORY_BOUND_INVALID',
+        `POST_MERGE_ADAPTER_LOCAL_STATE_PRESENT: the post-merge attestation records ${elsewhere}, but this checkout carries post-merge adapter state (key, issuer, git-hook, recorded-hook), so the binding is verified here and refused; rebind it in the checkout that should hold it with \`${POST_MERGE_REBIND}\`, or run \`devai doctor\` in ${elsewhere}`,
       ]),
     );
     expect(result.errors?.join('\n')).not.toMatch(/ENOENT/u);
   }, 30_000);
+
+  it('refuses the bound checkout whose post-merge key was deleted', async () => {
+    const result = await authorityCheck(async ({ repo, policy }) => {
+      await bindPostMergeCheckout(repo, policy);
+      await bindGithubActions(repo);
+      rmSync(join(adminDirectory(repo), 'devai/post-merge.key'));
+    });
+    expect(result).toMatchObject({
+      ok: false,
+      info: {
+        local_post_merge_scope: 'this-checkout',
+        local_post_merge_facts: { key_present: false, hook_present: true },
+        github_actions_enforced: true,
+      },
+    });
+    expect(result.errors).toContain('POST_MERGE_ADAPTER_BINDING_MISSING');
+    expect(JSON.stringify(result)).not.toContain('POST_MERGE_ADAPTER_NOT_APPLICABLE_HERE');
+  }, 30_000);
+
+  it.each(['git', 'husky'] as const)(
+    'fails closed on a %s hook when the key and issuer are deleted and the binding renamed',
+    async (manager) => {
+      const result = await authorityCheck(async ({ repo, policy }) => {
+        await bindPostMergeCheckout(repo, policy, manager);
+        await bindGithubActions(repo);
+        const admin = adminDirectory(repo);
+        rmSync(join(admin, 'devai/post-merge.key'));
+        rmSync(join(admin, 'devai/issue-post-merge-receipt.cjs'));
+        renameBinding(repo);
+      });
+      expect(result).toMatchObject({
+        ok: false,
+        info: {
+          local_post_merge_scope: 'this-checkout',
+          local_post_merge_state:
+            manager === 'git' ? ['git-hook', 'recorded-hook'] : ['recorded-hook'],
+          local_post_merge_facts: { key_present: false, hook_present: true },
+          github_actions_enforced: true,
+          reason_ids: ['POST_MERGE_ADAPTER_LOCAL_STATE_PRESENT'],
+        },
+      });
+      expect(result.errors).toContain('POST_MERGE_ADAPTER_BINDING_MISSING');
+      expect(JSON.stringify(result)).not.toContain('POST_MERGE_ADAPTER_NOT_APPLICABLE_HERE');
+    },
+    30_000,
+  );
 
   it("warns when a later bind left this checkout's unselected post-merge binding stale", async () => {
     const result = await authorityCheck(async ({ repo, policy }) => {
