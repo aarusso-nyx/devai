@@ -406,7 +406,7 @@ describe('Doctor whole CheckResult identities', () => {
               {
                 "actual_sha256": "missing",
                 "file": "subprocess-effects.json",
-                "installed_sha256": "3cc41554c36e19d8b1fd6d18ded1dfd27ba536e4717b85c22c98a570f1b6b8cd",
+                "installed_sha256": "2a052d320f5f86dc4a0b062b44322e5c561301794746b7544a1317aedbb7ffe2",
                 "target": "<repo>/.devai/config/subprocess-effects.json",
               },
             ],
@@ -1025,7 +1025,7 @@ describe('Doctor whole CheckResult identities', () => {
             "mismatches": [
               {
                 "actual_sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
-                "expected_sha256": "3cc41554c36e19d8b1fd6d18ded1dfd27ba536e4717b85c22c98a570f1b6b8cd",
+                "expected_sha256": "2a052d320f5f86dc4a0b062b44322e5c561301794746b7544a1317aedbb7ffe2",
                 "file": ".devai/config/subprocess-effects.json",
               },
             ],
