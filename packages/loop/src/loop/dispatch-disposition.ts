@@ -21,7 +21,6 @@ import {
   type QuarantinedJournal,
 } from './dispatch-journal.js';
 import { writeCreateOnlyDurableSync } from './durable-files.js';
-import { releaseLocks } from './locks.js';
 import { acquireRoundController, releaseRoundController } from './round-controller.js';
 import { fail, requireActiveTaskRound } from './task-queue-services.js';
 import { escalateTask, listTasks, loadTask, saveTask, type TaskRecord } from './tasks.js';
@@ -225,11 +224,11 @@ function attemptLimit(task: TaskRecord): number {
  * The Owner's disposition of one uncertain or blocked agent task: an open journal
  * attempt (any status), an agent task left `in_progress` by a crashed dispatch, or an
  * `experimental_blocked` task. It holds the round controller, writes the disposition
- * record, closes every open attempt, releases the task's attempt worktrees and locks,
- * and then moves the task to `ready` (retry) or `escalated` (escalate). A retry
- * continues the task's attempt ladder and refuses once the ladder is spent; a terminal
- * task with open attempts may only be escalated, which closes them without a status
- * change.
+ * record, closes every open attempt, releases the task's attempt worktrees, and then
+ * moves the task to `ready` (retry, keeping its locks under release_on) or `escalated`
+ * (escalate, which releases them). A retry continues the task's attempt ladder and
+ * refuses once the ladder is spent; a terminal task with open attempts may only be
+ * escalated, which closes them without a status change.
  */
 export function disposeDispatchTask(options: {
   readonly repoRoot: string;
@@ -296,8 +295,9 @@ export function disposeDispatchTask(options: {
       const { worktree_id: _worktree, branch: _branch, ...rest } = current;
       void _worktree;
       void _branch;
+      // Locks follow round-execution.json release_on: a retried task keeps them, and the
+      // next dispatch reuses them while they are unexpired.
       saveTask(repoRoot, { ...rest, status: 'ready' });
-      releaseLocks({ locksDir: join(repoRoot, '.devai/state/locks'), taskId: task.id });
     } else {
       const { worktree_id: _worktree, ...rest } = current;
       void _worktree;
