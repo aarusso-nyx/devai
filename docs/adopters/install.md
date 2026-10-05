@@ -270,13 +270,38 @@ preserved in the execution report. Before this rule the plan said `skip-exists` 
 `--force` overwrote the guidance (issue #70).
 
 After the package and policy are bound, install each selected host adapter through the binding
-facade. Bind GitHub Actions before the local post-merge adapter when both are required so the
-selected host-policy identity is the local adapter while `doctor` continues to verify both:
+facade. When both are required, bind them in this order, from the checkout that will run the
+post-merge hook:
 
 ```bash
 pnpm exec devai init bind --target . --host-adapter github-actions --as-role architect --write
 pnpm exec devai init bind --target . --host-adapter post-merge --as-role architect --write
 ```
+
+This order holds in every checkout, for three reasons:
+
+- Each host-adapter bind selects its adapter as the host-policy identity
+  (`authority_enforcement.adapter_config` in `.devai/config/project.json`) and re-materializes
+  `.devai/config/authority-policy.json`.
+- The post-merge attestation, `.devai/config/post-merge-host-adapter.json`, records the absolute
+  path of the checkout that bound it, its hook, a signature by a key kept in that checkout's git
+  directory, and the digest of the authority policy. It verifies only in that checkout and only
+  against the policy it pinned, so the post-merge adapter is bound last.
+- The GitHub Actions adapter is the CI-verifiable one: every checkout, including the runner of
+  `devai-main-observation.yml`, verifies it from the tracked workflow and configuration and the
+  `origin` remote. `doctor` verifies the post-merge binding in full in the checkout that made it.
+  In every other checkout it reports `POST_MERGE_ADAPTER_NOT_APPLICABLE_HERE` and rests authority
+  enforcement on the GitHub Actions adapter instead; when that adapter is not bound or does not
+  verify there, it fails with `POST_MERGE_ADAPTER_UNVERIFIABLE_HERE` and names the commands to
+  run in the bound checkout.
+
+Do not bind GitHub Actions last to make it the selected identity. That bind re-materializes the
+authority policy after the post-merge attestation pinned it, so the post-merge adapter's merge
+receipts are refused as `HOST_RECEIPT_STALE`, and `doctor` warns
+`POST_MERGE_ADAPTER_BINDING_STALE` in the bound checkout; rebinding the post-merge adapter
+restores the order above. After a DEVAI upgrade, rebind both adapters in the same order: while a
+host-adapter configuration binds an older package, `doctor` warns
+`GITHUB_ACTIONS_ADAPTER_VERSION_LAG` or `POST_MERGE_ADAPTER_VERSION_LAG` and names the command.
 
 The GitHub adapter authenticates exact-main observations with GitHub OIDC. Its workflow may write
 only `refs/devai/post-merge/<sha>`, and only after both the dispatch input and repository consent
