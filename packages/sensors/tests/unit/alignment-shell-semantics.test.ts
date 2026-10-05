@@ -448,6 +448,36 @@ describe('here-document bodies in gate steps (ADR-SCR-0013)', () => {
     },
   );
 
+  it.each([
+    [`cat <<'SH' \\`, '  > gate.sh'],
+    [`cat > gate.sh \\`, `  <<'SH'`],
+    [`cat <<'SH' \\`, '  | tee gate.sh'],
+    [`cat <<'SH' \\`, '  | bash'],
+  ])('judges a heredoc opener continued across lines as one command: %s / %s', (first, second) => {
+    blockStep([
+      'set -euo pipefail',
+      first,
+      second,
+      'set +e',
+      'SH',
+      '. ./gate.sh',
+      `devai ${ACTION}`,
+    ]);
+    expect(sense().status).toBe('review');
+  });
+
+  it('starts a continued program heredoc body after its last continuation line', () => {
+    blockStep([
+      'set -euo pipefail',
+      'node - \\',
+      `  "$ARGUMENT" <<'NODE'`,
+      ...NODE_PROGRAM,
+      'NODE',
+      `devai ${ACTION}`,
+    ]);
+    expect(sense().status).toBe('pass');
+  });
+
   it('keeps errexit masking inside a shell heredoc visible', () => {
     blockStep([`bash <<'SH'`, 'set +e', 'SH', `devai ${ACTION}`]);
     expect(sense().status).toBe('review');
