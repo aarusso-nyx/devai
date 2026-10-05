@@ -60,12 +60,17 @@ stricter lock and controller rules below.
   recorded disposition, and `round dispatch deactivate` withdraws the activation with a
   withdrawal record. `task escalate` on an agent task also takes the round controller. Retained
   review, blocked and uncertain worktrees hold no worktree capacity.
-- Known limitations of experimental execution (opt-in and non-promoting; the full list is under
-  "Known limitations of experimental execution" in `docs/reference/cli/round-task-executors.md`):
-  write-scope checks compare worktree snapshots, so runtime filesystem enforcement belongs to the
-  host sandbox and the provider's containment is recorded as requested, never as verified; the
-  state root must exist first (`init apply harness`); and concurrent writers of one record, and
-  the worktree registry across processes, are not yet serialized.
+- Known limitations:
+  - Experimental execution (opt-in and non-promoting; the full list is under "Known limitations of
+    experimental execution" in `docs/reference/cli/round-task-executors.md`): write-scope checks
+    compare worktree snapshots, so runtime filesystem enforcement belongs to the host sandbox and
+    the provider's containment is recorded as requested, never as verified; the state root must
+    exist first (`init apply harness`); and concurrent writers of one record, and the worktree
+    registry across processes, are not yet serialized.
+  - Locks: a lock is not renewed while a task waits outside a dispatch, in `merging` or
+    `awaiting_human_review`, so a one-hour lock can expire and another task may take the module;
+    and a completion recorded outside a runner dispatch with `task finish` is not fenced against a
+    lock takeover.
 - `init upgrade` (#264): an Architect plans, and with `--write` applies, the move from the bound
   `devai_version` to the installed version from the shipped migration manifest. It refuses an
   undeclared key retirement before any write, rolls everything back if a post-check fails, and
