@@ -1,6 +1,14 @@
 // Invariants: INV-DEVAI-001, INV-DEVAI-015, INV-DEVAI-017
 import { spawnSync } from 'node:child_process';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -26,6 +34,7 @@ interface DoctorCheck {
   readonly ok: boolean;
   readonly info?: Record<string, unknown>;
   readonly errors?: readonly string[];
+  readonly warnings?: readonly string[];
 }
 
 interface DoctorReport {
@@ -105,10 +114,23 @@ function fixture(): { readonly repo: string; readonly policy: JsonObject } {
 }
 
 async function invoke(repo: string): Promise<DoctorReport> {
+  return JSON.parse(await invokeRaw(repo)) as DoctorReport;
+}
+
+async function invokeRaw(repo: string, ...extra: readonly string[]): Promise<string> {
   const cli = cac('devai-doctor-authority-enforcement-boundaries');
   doctor.register(cli);
   let stdout = '';
-  process.argv = ['node', 'devai', 'doctor', '--repo-root', repo, '--skip', 'docs-governance'];
+  process.argv = [
+    'node',
+    'devai',
+    'doctor',
+    '--repo-root',
+    repo,
+    '--skip',
+    'docs-governance',
+    ...extra,
+  ];
   process.exitCode = undefined;
   process.stdout.write = ((chunk: unknown) => {
     stdout += String(chunk);
@@ -136,7 +158,7 @@ async function invoke(repo: string): Promise<DoctorReport> {
   } catch (error) {
     if (!(error instanceof Error) || !error.message.startsWith('TEST_PROCESS_EXIT:')) throw error;
     await new Promise<void>((done) => setImmediate(done));
-    return JSON.parse(stdout) as DoctorReport;
+    return stdout;
   }
 }
 
@@ -209,6 +231,38 @@ function initializeGitRepository(repo: string): void {
     '-m',
     'fixture',
   ]);
+}
+
+const POST_MERGE_CONFIG = '.devai/config/post-merge-host-adapter.json';
+const GITHUB_ACTIONS_CONFIG = '.devai/config/github-actions-host-adapter.json';
+const POST_MERGE_REBIND =
+  'devai init bind --target . --host-adapter post-merge --as-role architect --write';
+const GITHUB_ACTIONS_REBIND =
+  'devai init bind --target . --host-adapter github-actions --as-role architect --write';
+
+/** Install, in a real checkout, a post-merge host adapter selected as the host identity. */
+async function bindPostMergeCheckout(repo: string, policy: JsonObject): Promise<void> {
+  initializeGitRepository(repo);
+  configureHostIntegrated(repo, policy, POST_MERGE_CONFIG, 'post-merge-host-adapter');
+  put(repo, '.devai/config/authority-policy.json', policy);
+  const binary = join(repo, 'node_modules/.bin/devai');
+  put(
+    repo,
+    'node_modules/.bin/devai',
+    `#!/usr/bin/env sh\nif [ "$1" = "--version" ]; then echo "devai/${resolveCliVersion()}"; fi\nexit 0\n`,
+  );
+  chmodSync(binary, 0o755);
+  const plan = buildHooksInstallPlan({
+    targetRoot: repo,
+    hook: 'post-merge',
+    devaiVersion: resolveCliVersion(),
+  });
+  await withAuthorityHostTestScope(() => executeHooksInstallPlan(plan));
+}
+
+async function bindGithubActions(repo: string): Promise<void> {
+  const plan = buildGithubActionsAdapterPlan(repo, resolveCliVersion());
+  await withAuthorityHostTestScope(() => executeGithubActionsAdapterPlan(plan));
 }
 
 describe('Doctor authority enforcement boundaries', () => {
@@ -414,34 +468,18 @@ describe('Doctor authority enforcement boundaries', () => {
   });
 
   it('accepts a fully installed and verified post-merge host adapter', async () => {
+    let bound = '';
     const result = await authorityCheck(async ({ repo, policy }) => {
-      initializeGitRepository(repo);
-      configureHostIntegrated(
-        repo,
-        policy,
-        '.devai/config/post-merge-host-adapter.json',
-        'post-merge-host-adapter',
-      );
-      put(repo, '.devai/config/authority-policy.json', policy);
-      const binary = join(repo, 'node_modules/.bin/devai');
-      put(
-        repo,
-        'node_modules/.bin/devai',
-        `#!/usr/bin/env sh\nif [ "$1" = "--version" ]; then echo "devai/${resolveCliVersion()}"; fi\nexit 0\n`,
-      );
-      chmodSync(binary, 0o755);
-      const plan = buildHooksInstallPlan({
-        targetRoot: repo,
-        hook: 'post-merge',
-        devaiVersion: resolveCliVersion(),
-      });
-      await withAuthorityHostTestScope(() => executeHooksInstallPlan(plan));
+      await bindPostMergeCheckout(repo, policy);
+      bound = realpathSync(repo);
     });
     expect(result).toMatchObject({
       ok: true,
       info: {
         selected_adapter_policy_bound: true,
         local_post_merge_enforced: true,
+        local_post_merge_scope: 'this-checkout',
+        local_post_merge_bound_checkout: bound,
         local_post_merge_facts: {
           hook_present: true,
           key_present: true,
@@ -584,4 +622,205 @@ describe('Doctor authority enforcement boundaries', () => {
       errors: [POSTURE_ERROR],
     });
   });
+});
+
+describe('Doctor post-merge bindings made in another checkout (#266)', () => {
+  /** A real checkout that bound the post-merge adapter; its tracked attestation is returned. */
+  async function primaryCheckout(): Promise<{
+    readonly root: string;
+    readonly attestation: string;
+  }> {
+    const primary = fixture();
+    await bindPostMergeCheckout(primary.repo, primary.policy);
+    return {
+      root: realpathSync(primary.repo),
+      attestation: readFileSync(join(primary.repo, POST_MERGE_CONFIG), 'utf8'),
+    };
+  }
+
+  /** Another checkout of the same repository: the committed attestation, but no key of its own. */
+  function foreignCheckout(repo: string, policy: JsonObject, attestation: string): void {
+    configureHostIntegrated(repo, policy, POST_MERGE_CONFIG, 'post-merge-host-adapter');
+    put(repo, POST_MERGE_CONFIG, attestation);
+  }
+
+  it('reports the post-merge binding not applicable and rests on a verified GitHub adapter', async () => {
+    const primary = await primaryCheckout();
+    let foreign = '';
+    const result = await authorityCheck(async ({ repo, policy }) => {
+      foreignCheckout(repo, policy, primary.attestation);
+      await bindGithubActions(repo);
+      foreign = repo;
+    });
+    expect(result).toMatchObject({
+      ok: true,
+      info: {
+        selected_adapter_policy_bound: true,
+        local_post_merge_enforced: false,
+        local_post_merge_facts: {},
+        local_post_merge_scope: 'other-checkout',
+        local_post_merge_bound_checkout: primary.root,
+        github_actions_enforced: true,
+        reason_ids: ['POST_MERGE_ADAPTER_NOT_APPLICABLE_HERE'],
+      },
+    });
+    expect(result.info?.['host_adapter_note']).toBe(
+      `POST_MERGE_ADAPTER_NOT_APPLICABLE_HERE: the post-merge host adapter was bound in ${primary.root} and is verifiable only in that checkout; run \`devai doctor\` there to verify it, or rebind it with \`${POST_MERGE_REBIND}\` in a live checkout if that one is gone. Here authority enforcement rests on the GitHub Actions adapter.`,
+    );
+    expect(result.errors).toBeUndefined();
+    expect(result.warnings).toBeUndefined();
+
+    const human = await invokeRaw(foreign, '--human');
+    expect(human).toContain('[✓] authority-enforcement');
+    expect(human).toContain('note: POST_MERGE_ADAPTER_NOT_APPLICABLE_HERE: the post-merge host');
+  }, 30_000);
+
+  it('fails clearly when another checkout bound the selected adapter and none verifies here', async () => {
+    const primary = await primaryCheckout();
+    const result = await authorityCheck(({ repo, policy }) => {
+      foreignCheckout(repo, policy, primary.attestation);
+    });
+    expect(result).toMatchObject({
+      ok: false,
+      info: {
+        selected_adapter_policy_bound: true,
+        local_post_merge_scope: 'other-checkout',
+        local_post_merge_bound_checkout: primary.root,
+        github_actions_enforced: false,
+        reason_ids: [
+          'POST_MERGE_ADAPTER_NOT_APPLICABLE_HERE',
+          'POST_MERGE_ADAPTER_UNVERIFIABLE_HERE',
+        ],
+      },
+      errors: [
+        POSTURE_ERROR,
+        `POST_MERGE_ADAPTER_UNVERIFIABLE_HERE: the selected post-merge host adapter was bound in ${primary.root} and this checkout binds no host adapter it can verify; in that checkout run \`${GITHUB_ACTIONS_REBIND}\`, then \`${POST_MERGE_REBIND}\`, and commit the result`,
+      ],
+    });
+    expect(String(result.info?.['host_adapter_note'])).toContain(
+      'rests on the GitHub Actions adapter, which this checkout does not verify.',
+    );
+  }, 30_000);
+
+  it('routes the failures of a GitHub adapter bound here that does not verify', async () => {
+    const primary = await primaryCheckout();
+    const result = await authorityCheck(async ({ repo, policy }) => {
+      foreignCheckout(repo, policy, primary.attestation);
+      await bindGithubActions(repo);
+      put(repo, '.github/workflows/devai-main-observation.yml', 'not: [valid\n');
+    });
+    expect(result.ok).toBe(false);
+    expect(result.errors).toContain('GITHUB_ACTIONS_WORKFLOW_SYNTAX_VALID_INVALID');
+    expect(result.errors?.[1]).toMatch(/^POST_MERGE_ADAPTER_UNVERIFIABLE_HERE: /u);
+  }, 30_000);
+
+  it('verifies, and refuses, a binding edited in the bound checkout to name another one', async () => {
+    const result = await authorityCheck(async ({ repo, policy }) => {
+      await bindPostMergeCheckout(repo, policy);
+      await bindGithubActions(repo);
+      const path = join(repo, POST_MERGE_CONFIG);
+      const attestation = JSON.parse(readFileSync(path, 'utf8')) as JsonObject;
+      attestation['repository'] = join(tmpdir(), 'devai-removed-primary-checkout');
+      attestation['adapter_id'] = `post-merge-${'0'.repeat(16)}`;
+      put(repo, POST_MERGE_CONFIG, attestation);
+    });
+    expect(result).toMatchObject({
+      ok: false,
+      info: {
+        local_post_merge_scope: 'this-checkout',
+        local_post_merge_enforced: false,
+        local_post_merge_facts: {
+          key_present: true,
+          signature_valid: false,
+          repository_bound: false,
+        },
+        github_actions_enforced: true,
+      },
+    });
+    expect(result.info).not.toHaveProperty('reason_ids');
+    expect(result.errors).toEqual(
+      expect.arrayContaining([
+        POSTURE_ERROR,
+        'POST_MERGE_ADAPTER_SIGNATURE_VALID_INVALID',
+        'POST_MERGE_ADAPTER_REPOSITORY_BOUND_INVALID',
+      ]),
+    );
+    expect(result.errors?.join('\n')).not.toMatch(/ENOENT/u);
+  }, 30_000);
+
+  it("warns when a later bind left this checkout's unselected post-merge binding stale", async () => {
+    const result = await authorityCheck(async ({ repo, policy }) => {
+      await bindPostMergeCheckout(repo, policy);
+      await bindGithubActions(repo);
+      // Binding GitHub Actions last selects it and re-materializes the policy the attestation pins.
+      configureHostIntegrated(
+        repo,
+        policy,
+        GITHUB_ACTIONS_CONFIG,
+        'github-actions-main-observation',
+      );
+    });
+    expect(result).toMatchObject({
+      ok: true,
+      info: {
+        selected_adapter_policy_bound: true,
+        local_post_merge_scope: 'this-checkout',
+        local_post_merge_enforced: false,
+        local_post_merge_facts: { key_present: true, policy_bound: false },
+        github_actions_enforced: true,
+        reason_ids: ['POST_MERGE_ADAPTER_BINDING_STALE'],
+      },
+      warnings: [
+        `POST_MERGE_ADAPTER_BINDING_STALE: this checkout's post-merge host adapter does not verify (POST_MERGE_ADAPTER_POLICY_BOUND_INVALID); it is not the selected host identity, so it does not decide this check, but its merge receipts are refused until it is rebound with \`${POST_MERGE_REBIND}\`, which selects it`,
+      ],
+    });
+    expect(result.errors).toBeUndefined();
+  }, 30_000);
+
+  it('warns on a host-adapter binding that lags the installed package, naming the rebind', async () => {
+    const primary = await primaryCheckout();
+    const lagging = JSON.parse(primary.attestation) as JsonObject;
+    lagging['package_binding'] = { name: '@aarusso-nyx/devai', version: '1.6.0' };
+    const foreign = await authorityCheck(async ({ repo, policy }) => {
+      foreignCheckout(repo, policy, `${JSON.stringify(lagging, null, 2)}\n`);
+      await bindGithubActions(repo);
+    });
+    expect(foreign).toMatchObject({
+      ok: true,
+      info: {
+        reason_ids: ['POST_MERGE_ADAPTER_NOT_APPLICABLE_HERE', 'POST_MERGE_ADAPTER_VERSION_LAG'],
+      },
+      warnings: [
+        `POST_MERGE_ADAPTER_VERSION_LAG: ${POST_MERGE_CONFIG} binds @aarusso-nyx/devai 1.6.0, behind the installed ${resolveCliVersion()}; rebind the post-merge adapter in the checkout that bound it (${primary.root}) with \`${POST_MERGE_REBIND}\``,
+      ],
+    });
+
+    let selected = '';
+    const github = await authorityCheck(async ({ repo, policy }) => {
+      configureHostIntegrated(
+        repo,
+        policy,
+        GITHUB_ACTIONS_CONFIG,
+        'github-actions-main-observation',
+      );
+      await bindGithubActions(repo);
+      const config = JSON.parse(
+        readFileSync(join(repo, GITHUB_ACTIONS_CONFIG), 'utf8'),
+      ) as JsonObject;
+      config['package_binding'] = { name: '@aarusso-nyx/devai', version: '1.6.0' };
+      put(repo, GITHUB_ACTIONS_CONFIG, config);
+      selected = repo;
+    });
+    expect(github).toMatchObject({
+      ok: false,
+      info: { reason_ids: ['GITHUB_ACTIONS_ADAPTER_VERSION_LAG'] },
+      warnings: [
+        `GITHUB_ACTIONS_ADAPTER_VERSION_LAG: ${GITHUB_ACTIONS_CONFIG} binds @aarusso-nyx/devai 1.6.0, behind the installed ${resolveCliVersion()}; rebind with \`${GITHUB_ACTIONS_REBIND}\``,
+      ],
+    });
+    expect(github.errors).toContain('GITHUB_ACTIONS_PACKAGE_BOUND_INVALID');
+    expect(await invokeRaw(selected, '--human')).toContain(
+      `warning: GITHUB_ACTIONS_ADAPTER_VERSION_LAG: ${GITHUB_ACTIONS_CONFIG} binds`,
+    );
+  }, 30_000);
 });
