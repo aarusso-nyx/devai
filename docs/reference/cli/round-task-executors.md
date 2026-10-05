@@ -128,9 +128,10 @@ is never displaced; a claim older than ten minutes that nothing proves abandoned
 host, or an unreadable claim) refuses with `TASK_RECORD_CLAIM_STALE`, naming the file to remove once
 no process there is still at work. A lock lost during execution fails the attempt with
 `TASK_RESOURCE_LOCK_LOST` whatever status the executor left, a completion included, and escalates
-the task instead of letting it merge. Each dispatch attempt is fenced under
+the task instead of letting it merge. Each dispatch attempt is fenced, durably, under
 `.devai/state/lock-fences/`, so every run first reconciles the attempts a stopped runner left
-unjudged and reports a lost lock among them under `reconciled`. Every run also applies the priority
+unjudged and reports a lost lock among them under `reconciled`; a fence nobody can read refuses
+the run with `TASK_LOCK_FENCE_INVALID`, naming the file to repair. Every run also applies the priority
 bump a re-queue still owes; an all-ready run re-queues tasks an interrupted denial left in
 `lock_denied`. A corrupt `lock-denials.json` refuses with `TASK_LOCK_DENIAL_STATE_INVALID`: repair
 the entry, or remove the file to reset every count.
