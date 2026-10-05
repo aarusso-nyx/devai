@@ -18,16 +18,17 @@ affected_rules:
   - packages/sensors/src/harness-invariant-alignment-workflow.ts
   - packages/sensors/src/harness-invariant-alignment.ts
   - packages/sensors/src/harness-invariant-alignment-evidence.ts
+  - packages/cli/src/commands/sense/record.ts
   - packages/cli/src/commands/sense/adapter-readers.ts
   - packages/cli/src/commands/sense/adapters.ts
   - packages/cli/src/commands/audit/scorecard.ts
 inspector_acceptance:
-  - IA-001 -- A gate step that feeds an inline Node program through a quoted heredoc whose body has if ( and for ( lines, followed by a fail-closed devai command, reads as binding; the same control flow inside a heredoc fed to bash, sh, cat piped into bash, or eval keeps the step non-binding, set +e inside such a shell heredoc is still seen, and a heredoc written to a file by redirection or tee and sourced later keeps its set +e visible.
+  - IA-001 -- A gate step that feeds an inline Node program through a quoted heredoc with if ( and for ( lines, then a fail-closed devai command, reads as binding; the same control flow fed to bash, sh, cat piped into bash, or eval keeps the step non-binding, and set +e stays visible in a shell heredoc and in a heredoc written to a file by redirection or tee and sourced later, also when the redirect or pipe sits on a backslash-continued line.
   - IA-002 -- A devai command written only inside a program heredoc body is never credited as a CI measurement, and an unterminated heredoc leaves the step as it was read before, so its control flow stays visible.
   - IA-003 -- On the pull request workflow the alignment sensor finds an executable fail-closed step for sense run and for audit scorecard in the preflight step; removing either producer line makes its invariant misaligned again, and the workflow contract still reports exactly the install, preflight, and affected run steps.
   - IA-004 -- The adapter observation names devai audit scorecard with the exact head, binds the head it ran at, and reads fail when the shared composition throws; an observation that fails, binds another head, or is stale or future-dated never aligns an invariant, and no observation aligns one without the fail-closed CI step.
   - IA-005 -- After the ordered recording protocol of ADR-SCR-0008 at a head that carries both producers, harness_invariant_alignment reads PASS with zero misaligned gate invariants, and removing the recorded sense run readings makes INV-DEVAI-002 misaligned again.
-  - IA-006 -- When the chain holds an earlier sense.readings.record receipt for the same store path at another head, a reading recorded at the candidate binds through the receipt whose digest names its current bytes; a candidate receipt whose digest names other bytes, or a reading edited after its receipt, never binds, and receipts without a digest keep the first-receipt rule.
+  - IA-006 -- With an earlier receipt for the same store path at another head, a reading recorded at the candidate binds through the receipt whose digest names its current bytes; a receipt naming other bytes or an edited reading never binds, and digest-free receipts keep the first-receipt rule. Re-recording the same bytes with sense record at a later candidate appends one receipt for that head, so the reading aligns there; a second re-record at that head appends nothing.
 ---
 
 # Gate invariant producers run in the preflight step, and audit scorecard is observed in process
@@ -90,9 +91,11 @@ other than a shell as that program's input, not as shell. A body fed to a
 shell or an evaluator (`sh`, `bash`, `eval`, `source`, and their peers), or
 one whose line pipes or redirects output onward, so that a later line may run
 it, stays in place, and its control flow and any `set +e` keep the step
-non-binding. An unterminated or unreadable here-document leaves the script
-unchanged, and a devai command written inside a removed body is never
-credited.
+non-binding. Physical lines joined by a trailing `\` are judged as one
+command, so a redirect, pipe, or shell on a continuation line counts, and the
+body starts after the command's last line. An unterminated or unreadable
+here-document leaves the script unchanged, and a devai command written inside
+a removed body is never credited.
 
 For a read-only action that persists nothing, the CLI adapter of
 `harness_invariant_alignment` observes the action in process at the
@@ -109,7 +112,11 @@ A stored reading binds through every `sense.readings.record` receipt whose
 artifact digest names the file's current bytes, as ADR-SCR-0008 makes the
 digest part of the receipt. A receipt whose digest names other bytes binds
 nothing, so an edited reading is never evidence. Receipts that carry no
-digest keep the earlier rule of the first receipt for the path.
+digest keep the earlier rule of the first receipt for the path. On the
+writer's side, `sense record` of bytes already in the store appends one
+receipt for the current candidate head when no receipt binds those bytes to
+it, and appends nothing when one does. A re-record is refused as a digest
+mismatch only when receipts name the path but none names the file's bytes.
 
 ## Consequences
 
@@ -144,14 +151,15 @@ stays out of the pull request lane, which makes no provider call.
 - `packages/sensors/src/harness-invariant-alignment-workflow.ts` removes program here-document bodies before splitting a step into commands.
 - `packages/sensors/src/harness-invariant-alignment.ts` accepts in-process observations beside the loaded evidence.
 - `packages/sensors/src/harness-invariant-alignment-evidence.ts` binds a stored reading through the receipts whose digest names its current bytes.
+- `packages/cli/src/commands/sense/record.ts` appends one receipt per candidate head when the same bytes are recorded again.
 - `packages/cli/src/commands/audit/scorecard.ts` exposes the exact-head composition the command runs.
 - `packages/cli/src/commands/sense/adapter-readers.ts` and `packages/cli/src/commands/sense/adapters.ts` observe `audit scorecard` at the candidate head for `harness_invariant_alignment`.
 
 ## Inspector Adversarial Acceptance
 
-- IA-001 -- A gate step that feeds an inline Node program through a quoted heredoc whose body has if ( and for ( lines, followed by a fail-closed devai command, reads as binding; the same control flow inside a heredoc fed to bash, sh, cat piped into bash, or eval keeps the step non-binding, set +e inside such a shell heredoc is still seen, and a heredoc written to a file by redirection or tee and sourced later keeps its set +e visible.
+- IA-001 -- A gate step that feeds an inline Node program through a quoted heredoc with if ( and for ( lines, then a fail-closed devai command, reads as binding; the same control flow fed to bash, sh, cat piped into bash, or eval keeps the step non-binding, and set +e stays visible in a shell heredoc and in a heredoc written to a file by redirection or tee and sourced later, also when the redirect or pipe sits on a backslash-continued line.
 - IA-002 -- A devai command written only inside a program heredoc body is never credited as a CI measurement, and an unterminated heredoc leaves the step as it was read before, so its control flow stays visible.
 - IA-003 -- On the pull request workflow the alignment sensor finds an executable fail-closed step for sense run and for audit scorecard in the preflight step; removing either producer line makes its invariant misaligned again, and the workflow contract still reports exactly the install, preflight, and affected run steps.
 - IA-004 -- The adapter observation names devai audit scorecard with the exact head, binds the head it ran at, and reads fail when the shared composition throws; an observation that fails, binds another head, or is stale or future-dated never aligns an invariant, and no observation aligns one without the fail-closed CI step.
 - IA-005 -- After the ordered recording protocol of ADR-SCR-0008 at a head that carries both producers, harness_invariant_alignment reads PASS with zero misaligned gate invariants, and removing the recorded sense run readings makes INV-DEVAI-002 misaligned again.
-- IA-006 -- When the chain holds an earlier sense.readings.record receipt for the same store path at another head, a reading recorded at the candidate binds through the receipt whose digest names its current bytes; a candidate receipt whose digest names other bytes, or a reading edited after its receipt, never binds, and receipts without a digest keep the first-receipt rule.
+- IA-006 -- With an earlier receipt for the same store path at another head, a reading recorded at the candidate binds through the receipt whose digest names its current bytes; a receipt naming other bytes or an edited reading never binds, and digest-free receipts keep the first-receipt rule. Re-recording the same bytes with sense record at a later candidate appends one receipt for that head, so the reading aligns there; a second re-record at that head appends nothing.
