@@ -10,7 +10,7 @@ import {
   writeFileSync,
 } from '@devai-nyx/authority';
 import { createHash, createHmac, randomBytes } from 'node:crypto';
-import { dirname, join, relative, resolve, sep } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**
@@ -122,8 +122,8 @@ function postMergeAdapterId(root: string): string {
   return `post-merge-${sha256(root).slice(0, 16)}`;
 }
 
-/** The real path of a recorded checkout, or its resolved path when it no longer exists. */
-function recordedCheckout(recorded: string): string {
+/** The real path of a recorded path, or its resolved path when it no longer exists. */
+function recordedPath(recorded: string): string {
   try {
     return realpathSync(resolve(recorded));
   } catch {
@@ -140,15 +140,62 @@ export interface PostMergeBindingLocation {
   readonly scope: 'absent' | 'this-checkout' | 'other-checkout';
   /** The checkout the attestation records, when it records one. */
   readonly bound_checkout?: string;
+  /** The post-merge adapter state this checkout itself carries: key, issuer, git-hook, recorded-hook. */
+  readonly local_state?: readonly string[];
+}
+
+function fileIncludes(path: string, text: string): boolean {
+  try {
+    return readFileSync(path, 'utf8').includes(text);
+  } catch {
+    return false;
+  }
+}
+
+function within(base: string, path: string): boolean {
+  const fromBase = relative(base, path);
+  return (
+    fromBase !== '' &&
+    fromBase !== '..' &&
+    !fromBase.startsWith(`..${sep}`) &&
+    !isAbsolute(fromBase)
+  );
+}
+
+/**
+ * The post-merge adapter state a checkout carries outside the tracked attestation: the key and
+ * receipt issuer in its git directory, a DEVAI post-merge hook in its git hooks directory, and
+ * the hook the attestation records when that hook lies inside the checkout or its git directories
+ * (a Husky hook of the bound checkout).
+ */
+function localPostMergeState(root: string, recordedHook: unknown): string[] {
+  const state: string[] = [];
+  const bases = [root];
+  try {
+    const adminRoot = gitAdminRoot(root);
+    const commonRoot = gitCommonRoot(root);
+    bases.push(adminRoot, commonRoot);
+    if (existsSync(join(adminRoot, 'devai/post-merge.key'))) state.push('key');
+    if (existsSync(join(adminRoot, 'devai/issue-post-merge-receipt.cjs'))) state.push('issuer');
+    if (fileIncludes(join(commonRoot, 'hooks', 'post-merge'), MARKER_START)) state.push('git-hook');
+  } catch {
+    // Without a git directory there is no key, issuer, or git hook to find.
+  }
+  if (typeof recordedHook === 'string' && recordedHook.length > 0) {
+    const hook = recordedPath(recordedHook);
+    if (bases.some((base) => within(base, hook)) && existsSync(hook)) state.push('recorded-hook');
+  }
+  return state;
 }
 
 /**
  * The attestation records the checkout's path, hook, and a signature by a key in that checkout's
  * git directory, so it is verifiable only there (#266). It is classified as another checkout's
  * only when it names neither this checkout's path nor this checkout's adapter id and this
- * checkout holds no post-merge key of its own. An unreadable attestation, and one in a checkout
- * that holds a key, stay this checkout's, so a moved, edited, or stale binding in the bound
- * checkout is still verified, and refused, in full.
+ * checkout carries no post-merge adapter state of its own. The classification fails closed: an
+ * unreadable attestation, or any key, issuer, or installed hook here, keeps the binding this
+ * checkout's, so a deleted key or an edited attestation in the bound checkout still leads to
+ * full verification, and refusal.
  */
 export function locatePostMergeBinding(targetRoot: string): PostMergeBindingLocation {
   const root = realpathSync(resolve(targetRoot));
@@ -160,21 +207,25 @@ export function locatePostMergeBinding(targetRoot: string): PostMergeBindingLoca
   } catch {
     return { scope: 'this-checkout' };
   }
-  const recorded =
-    attestation !== null && typeof attestation === 'object'
-      ? (attestation as Record<string, unknown>)['repository']
-      : undefined;
-  if (typeof recorded !== 'string' || recorded.length === 0) return { scope: 'this-checkout' };
-  const boundCheckout = recordedCheckout(recorded);
-  const adapterId = (attestation as Record<string, unknown>)['adapter_id'];
-  let localKey: boolean;
-  try {
-    localKey = existsSync(join(gitAdminRoot(root), 'devai/post-merge.key'));
-  } catch {
-    localKey = false;
+  if (attestation === null || typeof attestation !== 'object' || Array.isArray(attestation)) {
+    return { scope: 'this-checkout' };
   }
-  const foreign = boundCheckout !== root && adapterId !== postMergeAdapterId(root) && !localKey;
-  return { scope: foreign ? 'other-checkout' : 'this-checkout', bound_checkout: boundCheckout };
+  const recorded = (attestation as Record<string, unknown>)['repository'];
+  if (typeof recorded !== 'string' || recorded.length === 0) return { scope: 'this-checkout' };
+  const boundCheckout = recordedPath(recorded);
+  const localState = localPostMergeState(
+    root,
+    (attestation as Record<string, unknown>)['hook_path'],
+  );
+  const foreign =
+    boundCheckout !== root &&
+    (attestation as Record<string, unknown>)['adapter_id'] !== postMergeAdapterId(root) &&
+    localState.length === 0;
+  return {
+    scope: foreign ? 'other-checkout' : 'this-checkout',
+    bound_checkout: boundCheckout,
+    ...(localState.length > 0 && { local_state: localState }),
+  };
 }
 
 export function verifyInstalledPostMergeAdapter(
@@ -219,7 +270,7 @@ export function verifyInstalledPostMergeAdapter(
     // A recorded checkout that no longer exists is an unbound repository, never a raw ENOENT (#266).
     facts['repository_bound'] =
       typeof attestation['repository'] === 'string' &&
-      recordedCheckout(attestation['repository']) === root;
+      recordedPath(attestation['repository']) === root;
     facts['hook_bound'] = attestation['hook_digest_sha256'] === sha256(hook);
     facts['key_bound'] = attestation['key_digest_sha256'] === sha256(key);
     facts['policy_bound'] =
