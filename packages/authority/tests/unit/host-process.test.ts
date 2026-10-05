@@ -125,6 +125,8 @@ describe('governed asynchronous spawn (ADR-MDL-0005 D-10)', () => {
     [{ shell: true as unknown as false }, 'AUTHORITY_PROCESS_SHELL_FORBIDDEN'],
     [{ timeout: 0 }, 'AUTHORITY_PROCESS_TIMEOUT_REQUIRED'],
     [{ maxOutputBytes: 0 }, 'AUTHORITY_PROCESS_OUTPUT_BOUND_REQUIRED'],
+    [{ killGraceMs: Number.NaN }, 'AUTHORITY_PROCESS_TIMEOUT_REQUIRED'],
+    [{ killConfirmMs: -1 }, 'AUTHORITY_PROCESS_TIMEOUT_REQUIRED'],
   ])('refuses %j before authorization', async (change, code) => {
     await withScope(async (applyEffect) => {
       expect(() => spawn(node, ['-e', ''], options(change))).toThrow(code);
@@ -208,8 +210,69 @@ describe('governed asynchronous spawn (ADR-MDL-0005 D-10)', () => {
       const result = await child.result;
       expect(result.timed_out).toBe(false);
       expect(alive(grandchildPid(result.stdout))).toBe(false);
+      // The group really is gone, so the termination is confirmed.
+      expect(result.termination_error).toBeUndefined();
     });
   });
+
+  it('reports an unconfirmed termination while the group still answers its probe', async () => {
+    await withScope(async () => {
+      const realKill = process.kill.bind(process);
+      // Injected probe: every group liveness probe (signal 0 to a negative pid) answers that
+      // the group is alive, as for a member stuck in uninterruptible I/O. Real signals still
+      // reach the real processes.
+      vi.spyOn(process, 'kill').mockImplementation((pid: number, signal?: string | number) =>
+        signal === 0 && pid < 0 ? true : realKill(pid, signal),
+      );
+      const startedAt = Date.now();
+      const child = spawn(
+        node,
+        ['-e', 'setInterval(()=>{},1000)'],
+        options({ killGraceMs: 100, killConfirmMs: 300 }),
+      );
+      child.terminate();
+      const result = await child.result;
+      expect(result.signal).toBe('SIGTERM');
+      expect(result.termination_error).toBe('PROCESS_GROUP_TERMINATION_UNCONFIRMED');
+      // It waited out the grace period and the confirmation window before saying so.
+      expect(Date.now() - startedAt).toBeGreaterThanOrEqual(400);
+    });
+  });
+
+  it('reports an unconfirmed termination when an escaped descendant keeps its output open', async () => {
+    await withScope(async () => {
+      // A descendant in its own session survives the group kill and holds the child's
+      // stdout, so the child's streams never close on their own.
+      const script = [
+        'const { spawn } = require("child_process");',
+        'const escaped = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { detached: true, stdio: ["ignore", "inherit", "ignore"] });',
+        'process.stdout.write(`${escaped.pid}\\n`);',
+        'setInterval(() => {}, 1000);',
+      ].join('\n');
+      let escapedPid: number | undefined;
+      const child = spawn(
+        node,
+        ['-e', script],
+        options({
+          killGraceMs: 100,
+          killConfirmMs: 300,
+          onStdout: (chunk) => {
+            const pid = Number(/^(\d+)\n/u.exec(chunk)?.[1]);
+            if (escapedPid !== undefined || !Number.isInteger(pid) || pid <= 0) return;
+            escapedPid = pid;
+            strays.push(pid);
+            child.terminate();
+          },
+        }),
+      );
+      const result = await child.result;
+      expect(escapedPid).toBeDefined();
+      expect(alive(escapedPid ?? 0)).toBe(true);
+      expect(result.termination_error).toBe('PROCESS_GROUP_TERMINATION_UNCONFIRMED');
+      // The child itself exited on SIGTERM; only its streams stayed open.
+      expect(result.signal).toBe('SIGTERM');
+    });
+  }, 15_000);
 
   it('terminates on request', async () => {
     await withScope(async () => {
