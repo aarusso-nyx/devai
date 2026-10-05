@@ -525,7 +525,8 @@
         },
         "derivation": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "How the counters were obtained from the provider's report. Required for cumulative-delta, whose values are computed rather than reported as they stand."
         },
         "input_tokens": {
           "$ref": "#/$defs/usageCounter"
@@ -539,7 +540,22 @@
         "cache_write_tokens": {
           "$ref": "#/$defs/usageCounter"
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": ["counter_mode"],
+            "properties": {
+              "counter_mode": {
+                "const": "cumulative-delta"
+              }
+            }
+          },
+          "then": {
+            "required": ["derivation"]
+          }
+        }
+      ]
     },
     "costUnknown": {
       "type": "object",
