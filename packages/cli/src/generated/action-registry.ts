@@ -2388,6 +2388,138 @@ export const ACTION_REGISTRY = [
     },
   },
   {
+    action_id: 'round dispatch deactivate',
+    handler: 'round dispatch deactivate',
+    path: ['round', 'dispatch', 'deactivate'],
+    status: 'preview',
+    profiles: ['tier1', 'tier2', 'tier3'],
+    effect: 'harness-write',
+    authority: 'mesh_controller',
+    description:
+      'Withdraw the Owner activation of experimental agent dispatch, recording who withdrew it, when, and the digest of the withdrawn activation.',
+    output_contract: {
+      schemaVersion: '1.0.0',
+      mode: 'action-envelope',
+      envelope_schema: 'law/schemas/action-result.schema.json',
+      success_channel: 'stdout',
+      payload_schema: null,
+    },
+    error_contract: {
+      schemaVersion: '1.0.0',
+      mode: 'structured-error-envelope',
+      envelope_schema: 'law/schemas/action-result.schema.json',
+      error_schema: 'law/schemas/error.schema.json',
+      error_channel: 'stderr',
+    },
+    authority_contract_version: '1.0.0',
+    authority_contract: {
+      schemaVersion: '1.0.0',
+      action_id: 'round dispatch deactivate',
+      effect: 'harness-write',
+      capabilities: ['fs:f5-state'],
+      subject: {
+        kind: 'derived-machine',
+        actor: 'harness',
+        transition: 'harness-write',
+        initiator: {
+          allowed_roles: ['owner'],
+          preserve_in_context: true,
+        },
+      },
+      consent: {
+        write: true,
+        allow_publish: false,
+        experimental: true,
+      },
+      planner: {
+        kind: 'bounded-batches',
+        planner_id: 'round-dispatch-deactivate-bounded-plan',
+        target_kinds: ['fs'],
+        bounds: {
+          max_batches: 128,
+          max_targets_per_batch: 64,
+          max_total_targets: 8192,
+        },
+        recovery: 'preserve-and-report',
+      },
+      boundary: {
+        kind: 'mutation-adapters',
+        adapter_ids: ['fs-authority-boundary'],
+        final_reverification: true,
+      },
+      readiness: {
+        requires_binding: true,
+        independent_acceptance_required: true,
+      },
+    },
+  },
+  {
+    action_id: 'round dispatch dispose',
+    handler: 'round dispatch dispose',
+    path: ['round', 'dispatch', 'dispose'],
+    status: 'preview',
+    profiles: ['tier1', 'tier2', 'tier3'],
+    effect: 'harness-write',
+    authority: 'mesh_controller',
+    description:
+      'Record the Owner disposition of uncertain or blocked experimental work: retry or escalate one agent task, or quarantine a damaged dispatch journal, freeing its attempt worktrees.',
+    output_contract: {
+      schemaVersion: '1.0.0',
+      mode: 'action-envelope',
+      envelope_schema: 'law/schemas/action-result.schema.json',
+      success_channel: 'stdout',
+      payload_schema: null,
+    },
+    error_contract: {
+      schemaVersion: '1.0.0',
+      mode: 'structured-error-envelope',
+      envelope_schema: 'law/schemas/action-result.schema.json',
+      error_schema: 'law/schemas/error.schema.json',
+      error_channel: 'stderr',
+    },
+    authority_contract_version: '1.0.0',
+    authority_contract: {
+      schemaVersion: '1.0.0',
+      action_id: 'round dispatch dispose',
+      effect: 'harness-write',
+      capabilities: ['fs:f5-state', 'fs:worktree-admin'],
+      subject: {
+        kind: 'derived-machine',
+        actor: 'harness',
+        transition: 'harness-write',
+        initiator: {
+          allowed_roles: ['owner'],
+          preserve_in_context: true,
+        },
+      },
+      consent: {
+        write: true,
+        allow_publish: false,
+        experimental: true,
+      },
+      planner: {
+        kind: 'bounded-batches',
+        planner_id: 'round-dispatch-dispose-bounded-plan',
+        target_kinds: ['fs', 'git-ref'],
+        bounds: {
+          max_batches: 128,
+          max_targets_per_batch: 64,
+          max_total_targets: 8192,
+        },
+        recovery: 'preserve-and-report',
+      },
+      boundary: {
+        kind: 'mutation-adapters',
+        adapter_ids: ['fs-authority-boundary', 'git-ref-authority-boundary'],
+        final_reverification: true,
+      },
+      readiness: {
+        requires_binding: true,
+        independent_acceptance_required: true,
+      },
+    },
+  },
+  {
     action_id: 'round gap create',
     handler: 'round gap create',
     path: ['round', 'gap', 'create'],
@@ -2711,7 +2843,7 @@ export const ACTION_REGISTRY = [
       schemaVersion: '1.0.0',
       action_id: 'round ratify',
       effect: 'harness-write',
-      capabilities: ['fs:f5-state'],
+      capabilities: ['fs:f5-state', 'fs:worktree-admin'],
       subject: {
         kind: 'derived-machine',
         actor: 'harness',
@@ -2729,7 +2861,7 @@ export const ACTION_REGISTRY = [
       planner: {
         kind: 'bounded-batches',
         planner_id: 'round-ratify-bounded-plan',
-        target_kinds: ['fs'],
+        target_kinds: ['fs', 'git-ref'],
         bounds: {
           max_batches: 128,
           max_targets_per_batch: 64,
@@ -2739,7 +2871,7 @@ export const ACTION_REGISTRY = [
       },
       boundary: {
         kind: 'mutation-adapters',
-        adapter_ids: ['fs-authority-boundary'],
+        adapter_ids: ['fs-authority-boundary', 'git-ref-authority-boundary'],
         final_reverification: true,
       },
       readiness: {
@@ -3443,7 +3575,7 @@ export const ACTION_REGISTRY = [
       schemaVersion: '1.0.0',
       action_id: 'task escalate',
       effect: 'harness-write',
-      capabilities: ['fs:f5-state', 'fs:proofs'],
+      capabilities: ['fs:f5-state', 'fs:proofs', 'fs:worktree-admin'],
       subject: {
         kind: 'derived-machine',
         actor: 'harness',
@@ -3461,7 +3593,7 @@ export const ACTION_REGISTRY = [
       planner: {
         kind: 'bounded-batches',
         planner_id: 'task-escalate-bounded-plan',
-        target_kinds: ['fs'],
+        target_kinds: ['fs', 'git-ref'],
         bounds: {
           max_batches: 128,
           max_targets_per_batch: 64,
@@ -3471,7 +3603,7 @@ export const ACTION_REGISTRY = [
       },
       boundary: {
         kind: 'mutation-adapters',
-        adapter_ids: ['fs-authority-boundary'],
+        adapter_ids: ['fs-authority-boundary', 'git-ref-authority-boundary'],
         final_reverification: true,
       },
       readiness: {
