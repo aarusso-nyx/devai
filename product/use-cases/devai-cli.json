@@ -1319,6 +1319,63 @@
         "Activation requires the owner role, --write, and --experimental.",
         "No action writes an experimental activation under .devai/config, and no file there is read as one."
       ]
+    },
+    {
+      "id": "UC-devai-adopter-upgrade",
+      "title": "Upgrade an adopter repository to the installed DEVAI version",
+      "goal": "Let the Architect move an adopter from its bound devai_version to the installed package version in one governed operation that names every adopter-facing change first and refuses anything that needs a decision.",
+      "actors": ["architect"],
+      "preconditions": [
+        "The repository is bound: .devai/config/project.json carries devai_version and .devai/config/authority-policy.json exists.",
+        "The newer @aarusso-nyx/devai is installed and law/policy/adopter-migrations.json ships in it."
+      ],
+      "triggers": ["The adopter bumps the pinned DEVAI package version."],
+      "mainFlow": [
+        {
+          "id": "step-01",
+          "action": "Run `init upgrade --target . --as-role architect`: plan the move from the manifest entries in range, listing the files that would change, the owned keys a rebind would retire, the declarations that replace a changed default, the stale version stamps and the new obligations, without writing.",
+          "actorRole": "architect",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "init upgrade"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-02",
+          "action": "Run `init upgrade --target . --as-role architect --write`: run the bind segments in canonical order through the bind journal, require policy-materialization-current, authority-enforcement and constitution-binding to pass, and record .devai/config/upgrade-receipt.json.",
+          "actorRole": "architect",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "init upgrade"
+              }
+            ]
+          }
+        }
+      ],
+      "alternateFlows": [],
+      "exceptions": [
+        {
+          "id": "exc-01",
+          "when": "Rebinding the adopter policy would retire an owned project.json key the source does not declare, such as ci_economy.attested_rc.",
+          "handling": "The upgrade refuses with INIT_UPGRADE_RETIREMENT_UNDECLARED, naming the key, before any byte is written."
+        },
+        {
+          "id": "exc-02",
+          "when": "A doctor post-check fails after the segments ran.",
+          "handling": "The upgrade restores every byte it wrote and refuses with INIT_UPGRADE_POSTCHECK_FAILED, naming the failing checks."
+        }
+      ],
+      "postconditions": [
+        "devai_version equals the installed version and the upgrade receipt records the move."
+      ],
+      "acceptanceCriteria": [
+        "A second run at the same version writes nothing.",
+        "No owned key is retired by an upgrade."
+      ]
     }
   ]
 }
