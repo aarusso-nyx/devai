@@ -1,13 +1,20 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import {
+  closeSync,
   execFileSync,
   existsSync,
+  fileOpenConstants,
+  fsyncSync,
   mkdirSync,
+  openSync,
   readdirSync,
   readFileSync,
+  renameSync,
+  unlinkSync,
   writeFileSync,
+  writeSync,
 } from '@devai-nyx/authority';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { validators } from '@devai-nyx/schemas';
 import {
   buildSensorReading,
@@ -260,6 +267,8 @@ const REGENERATED_BODY_PATHS = {
 
 export type RegeneratedKind = keyof typeof REGENERATED_BODY_PATHS;
 
+const REGENERATED_KINDS = Object.keys(REGENERATED_BODY_PATHS) as readonly RegeneratedKind[];
+
 /** Declared plant surfaces (ADR-SCR-0003), as `.devai/config/sensor-inputs.json` states them. */
 export interface RegenerationSurfaces {
   readonly http: boolean;
@@ -283,10 +292,19 @@ export interface RegeneratedBody {
   readonly sha256: string;
 }
 
+/** The body of a kind the declaration no longer requires, removed so it stands in for nothing. */
+export interface ObsoleteBody {
+  readonly kind: RegeneratedKind;
+  readonly body_path: string;
+  readonly action: 'removed';
+}
+
 export interface RegenerationReport extends RebuildReport {
   /** The commit every regenerated body is bound to; null when none could be bound. */
   readonly integration_head: string | null;
+  /** The bodies this run published or found up to date; empty when nothing was published. */
   readonly regenerated: readonly RegeneratedBody[];
+  readonly obsolete: readonly ObsoleteBody[];
 }
 
 export interface RegenerateInventoryResult {
@@ -351,21 +369,144 @@ function resolveCandidate(repoRoot: string): RegenerationCandidate | SensorFindi
   }
 }
 
-/** Write a body unless the file already holds exactly these bytes. */
-function writeBody(
-  repoRoot: string,
-  relativePath: string,
-  body: unknown,
-): Pick<RegeneratedBody, 'action' | 'sha256'> {
-  const bytes = `${JSON.stringify(body, null, 2)}\n`;
-  const sha256 = createHash('sha256').update(bytes).digest('hex');
-  const target = join(repoRoot, relativePath);
-  if (existsSync(target) && readFileSync(target, 'utf8') === bytes) {
-    return { action: 'up-to-date', sha256 };
+interface BodyValidator {
+  (value: unknown): boolean;
+  readonly errors?: unknown;
+}
+
+/** Each body's own schema: every produced body is validated whatever its producer read. */
+function bodySchema(kind: RegeneratedBody['kind']): {
+  readonly schema: string;
+  readonly validate: BodyValidator;
+} {
+  if (kind === 'inventory')
+    return { schema: 'inventory.schema.json', validate: validators.inventory };
+  if (kind === 'inventory_dep_graph') {
+    return { schema: 'dep-graph.schema.json', validate: validators.depGraph };
   }
+  return { schema: 'coverage-matrix.schema.json', validate: validators.coverageMatrix };
+}
+
+/** A validated body and the exact bytes publication will write. */
+interface StagedBody extends RegeneratedBody {
+  readonly bytes: string;
+}
+
+function stageBody(
+  repoRoot: string,
+  kind: RegeneratedBody['kind'],
+  bodyPath: string,
+  producerStatus: SensorStatus,
+  body: unknown,
+): StagedBody {
+  const { schema, validate } = bodySchema(kind);
+  if (!validate(body)) throw new Error(`body fails ${schema}: ${JSON.stringify(validate.errors)}`);
+  const bytes = `${JSON.stringify(body, null, 2)}\n`;
+  const target = join(repoRoot, bodyPath);
+  const unchanged = existsSync(target) && readFileSync(target, 'utf8') === bytes;
+  return {
+    kind,
+    body_path: bodyPath,
+    action: unchanged ? 'up-to-date' : 'regenerated',
+    producer_status: producerStatus,
+    sha256: createHash('sha256').update(bytes).digest('hex'),
+    bytes,
+  };
+}
+
+function fsyncDirectory(directory: string): void {
+  const descriptor = openSync(
+    directory,
+    fileOpenConstants.O_RDONLY | (fileOpenConstants.O_DIRECTORY ?? 0),
+  );
+  try {
+    fsyncSync(descriptor);
+  } finally {
+    closeSync(descriptor);
+  }
+}
+
+/** Durable bytes in a fresh temporary file beside `target`; no walker reads a `.tmp` name. */
+function writeTemporary(target: string, bytes: string): string {
   mkdirSync(dirname(target), { recursive: true });
-  writeFileSync(target, bytes);
-  return { action: 'regenerated', sha256 };
+  const temporary = join(dirname(target), `.${basename(target)}.${randomUUID()}.tmp`);
+  const descriptor = openSync(temporary, 'wx', 0o644);
+  try {
+    writeSync(descriptor, bytes);
+    fsyncSync(descriptor);
+  } finally {
+    closeSync(descriptor);
+  }
+  return temporary;
+}
+
+function discardTemporary(temporary: string): void {
+  try {
+    if (existsSync(temporary)) unlinkSync(temporary);
+  } catch {
+    // An unpublished temporary that cannot be removed still never ends in `.json`.
+  }
+}
+
+/**
+ * Publish a complete set of validated bodies together. Every changed body is first written
+ * to a durable temporary file; only when all of them exist is each renamed over its target
+ * and its directory synced. A failure before the renames publishes nothing.
+ */
+function publishBodies(repoRoot: string, staged: readonly StagedBody[]): void {
+  const pending: { readonly temporary: string; readonly target: string }[] = [];
+  try {
+    for (const body of staged) {
+      if (body.action !== 'regenerated') continue;
+      const target = join(repoRoot, body.body_path);
+      pending.push({ temporary: writeTemporary(target, body.bytes), target });
+    }
+    for (const { temporary, target } of pending) {
+      renameSync(temporary, target);
+      fsyncDirectory(dirname(target));
+    }
+  } catch (error) {
+    for (const { temporary } of pending) discardTemporary(temporary);
+    throw error;
+  }
+}
+
+/** Remove the bodies of regenerated kinds the declaration no longer requires. */
+function removeObsoleteBodies(
+  repoRoot: string,
+  required: readonly RegeneratedKind[],
+): readonly ObsoleteBody[] {
+  const removed: ObsoleteBody[] = [];
+  for (const kind of REGENERATED_KINDS) {
+    if (required.includes(kind)) continue;
+    const target = join(repoRoot, REGENERATED_BODY_PATHS[kind]);
+    if (!existsSync(target)) continue;
+    unlinkSync(target);
+    fsyncDirectory(dirname(target));
+    removed.push({ kind, body_path: REGENERATED_BODY_PATHS[kind], action: 'removed' });
+  }
+  return removed;
+}
+
+/** Persist the aggregate reading as a new store file; the failure text when it cannot be. */
+function persistRegenerationReading(repoRoot: string, reading: SensorReading): string | undefined {
+  const target = join(
+    repoRoot,
+    '.devai/state/sensor-readings',
+    reading.sensor.kind,
+    `${reading.id}.json`,
+  );
+  let temporary: string | undefined;
+  try {
+    if (existsSync(target)) throw new Error(`reading ${reading.id} already exists`);
+    temporary = writeTemporary(target, `${JSON.stringify(reading, null, 2)}\n`);
+    renameSync(temporary, target);
+    fsyncDirectory(dirname(target));
+    return undefined;
+  } catch (error) {
+    if (temporary !== undefined) discardTemporary(temporary);
+    return `persist ${target} failed: ${messageOf(error)}`;
+  }
 }
 
 function regenerationReading(
@@ -418,10 +559,13 @@ function produceKind(
 /**
  * `sense run inventory_regeneration` (#237, ADR-SCR-0012). Regenerates, for the clean
  * HEAD commit, the combined F4 manifest `inventory_adherence` reads and the bodies of the
- * required kinds through their own typed producers and validators, then rebuilds the
- * remaining kinds from their bodies as `sense record --rebuild` does. A producer's REVIEW
- * stays REVIEW in the aggregate; an error or a missing required kind is never a PASS.
- * Without a clean candidate commit it reads UNKNOWN and writes nothing.
+ * required kinds through their own typed producers, validates every body against its
+ * schema, and publishes the set only when all of it is valid, by atomic replacement. It
+ * removes the body of a regenerated kind the declaration no longer requires, then rebuilds
+ * the kinds it does not regenerate from their bodies as `sense record --rebuild` does.
+ * A producer's REVIEW stays REVIEW; an error, a missing required kind, or an aggregate
+ * reading the store did not receive is a FAIL. Without a clean candidate commit it reads
+ * UNKNOWN and writes nothing.
  */
 export async function regenerateInventoryReadings(
   repoRoot: string,
@@ -439,6 +583,7 @@ export async function regenerateInventoryReadings(
         errors: [],
         integration_head: null,
         regenerated: [],
+        obsolete: [],
       },
       reading: regenerationReading('unknown', [candidate], {
         kinds_touched: 0,
@@ -450,8 +595,8 @@ export async function regenerateInventoryReadings(
   }
 
   const errors: string[] = [];
-  const regenerated: RegeneratedBody[] = [];
   const findings: SensorFinding[] = [];
+  const staged: StagedBody[] = [];
   let surfaceCount = 0;
   try {
     const inventory = await regenerateInventory({
@@ -459,22 +604,12 @@ export async function regenerateInventoryReadings(
       timestamp: candidate.timestamp,
       integrationHead: candidate.head,
     });
-    if (!validators.inventory(inventory)) {
-      throw new Error(
-        `body fails inventory.schema.json: ${JSON.stringify(validators.inventory.errors)}`,
-      );
-    }
     surfaceCount =
       inventory.modules.length +
       inventory.routes.length +
       inventory.components.length +
       inventory.dependency_graph.length;
-    regenerated.push({
-      kind: 'inventory',
-      body_path: INVENTORY_BODY_PATH,
-      producer_status: 'pass',
-      ...writeBody(repoRoot, INVENTORY_BODY_PATH, inventory),
-    });
+    staged.push(stageBody(repoRoot, 'inventory', INVENTORY_BODY_PATH, 'pass', inventory));
   } catch (error) {
     errors.push(`regenerate ${INVENTORY_BODY_PATH} failed: ${messageOf(error)}`);
   }
@@ -490,20 +625,36 @@ export async function regenerateInventoryReadings(
         );
         continue;
       }
-      regenerated.push({
-        kind,
-        body_path: bodyPath,
-        producer_status: produced.status,
-        ...writeBody(repoRoot, bodyPath, produced.body),
-      });
+      staged.push(stageBody(repoRoot, kind, bodyPath, produced.status, produced.body));
     } catch (error) {
       errors.push(`regenerate ${bodyPath} failed: ${messageOf(error)}`);
     }
   }
 
-  // Regenerated kinds never fall back to a reading synthesized from their bodies.
-  const walk = walkInventoryBodies(repoRoot, new Set(required));
-  errors.push(...walk.errors);
+  // Only a complete, validated set is published; any failure publishes and rebuilds nothing.
+  let regenerated: readonly RegeneratedBody[] = [];
+  let obsolete: readonly ObsoleteBody[] = [];
+  let walk: BodyWalk = { entries: [], errors: [], created: 0, skipped: 0 };
+  if (errors.length === 0) {
+    try {
+      publishBodies(repoRoot, staged);
+      regenerated = staged.map((body) => ({
+        kind: body.kind,
+        body_path: body.body_path,
+        action: body.action,
+        producer_status: body.producer_status,
+        sha256: body.sha256,
+      }));
+      obsolete = removeObsoleteBodies(repoRoot, required);
+    } catch (error) {
+      errors.push(`publish regenerated bodies failed: ${messageOf(error)}`);
+    }
+  }
+  if (errors.length === 0) {
+    // No regenerated kind, required or not, ever falls back to a body-synthesized reading.
+    walk = walkInventoryBodies(repoRoot, new Set<string>(REGENERATED_KINDS));
+    errors.push(...walk.errors);
+  }
   const kinds = regenerated.filter((body) => body.kind !== 'inventory');
   const kindsTouched = new Set([
     ...kinds.map((body) => body.kind),
@@ -541,29 +692,47 @@ export async function regenerateInventoryReadings(
   }
 
   const inventoryBody = regenerated.find((body) => body.kind === 'inventory');
-  const reading = regenerationReading(status, findings, {
+  const metrics = {
     kinds_touched: kindsTouched,
     kinds_rebuilt: walk.created + kinds.filter((body) => body.action === 'regenerated').length,
     kinds_up_to_date: walk.skipped + kinds.filter((body) => body.action === 'up-to-date').length,
     error_count: errors.length,
     required_kinds: required.length,
     missing_required_kinds: missing.length,
+    obsolete_bodies_removed: obsolete.length,
     integration_head: candidate.head,
     ...(inventoryBody === undefined ? {} : { inventory_body_sha256: inventoryBody.sha256 }),
     ...Object.fromEntries(kinds.map((body) => [`${body.kind}_status`, body.producer_status])),
-  });
-  persistSensorReading(reading, repoRoot);
+  };
+  const reading = regenerationReading(status, findings, metrics);
+  const unpersisted = persistRegenerationReading(repoRoot, reading);
+  const report = {
+    repo_root: repoRoot,
+    entries: walk.entries,
+    created: walk.created,
+    skipped: walk.skipped,
+    integration_head: candidate.head,
+    regenerated,
+    obsolete,
+  };
+  if (unpersisted === undefined) {
+    return { report: { ...report, ok: errors.length === 0, errors }, reading };
+  }
+  // The store holds no record of this run, so the run is a failure that says why.
+  errors.push(unpersisted);
   return {
-    report: {
-      ok: errors.length === 0,
-      repo_root: repoRoot,
-      entries: walk.entries,
-      created: walk.created,
-      skipped: walk.skipped,
-      errors,
-      integration_head: candidate.head,
-      regenerated,
-    },
-    reading,
+    report: { ...report, ok: false, errors },
+    reading: regenerationReading(
+      'fail',
+      [
+        {
+          severity: 'error',
+          code: 'INVENTORY_REGENERATION_READING_UNPERSISTED',
+          message: `The regeneration reading was not written to the readings store, so nothing records this run: ${unpersisted}`,
+        },
+        ...findings,
+      ],
+      { ...metrics, error_count: errors.length },
+    ),
   };
 }
