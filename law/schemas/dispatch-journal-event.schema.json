@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://devai.nyxk.com.br/schemas/dispatch-journal-event.schema.json",
   "title": "Dispatch journal event",
-  "description": "One fsynced line of .devai/state/round-runs/<round>/dispatch-journal.jsonl (ADR-MDL-0005 D-6). Each experimental attempt appends intent, spawned, exited, evidence-written, and settled in that order. An attempt with intent but no settled is uncertain and blocks the round until a human disposition; it is never retried or replayed automatically.",
+  "description": "One fsynced line of .devai/state/round-runs/<round>/dispatch-journal.jsonl (ADR-MDL-0005 D-6). Each experimental attempt appends intent, spawned, exited, evidence-written, and settled in that order. An attempt with intent but no settled is uncertain and blocks the round until a human disposition; it is never retried or replayed automatically. A human disposition (ADR-MDL-0007) is a settled event with outcome cancelled, which may close an open attempt at any boundary and names the disposition and its record.",
   "schema_version": "1.0.0",
   "type": "object",
   "additionalProperties": false,
@@ -90,6 +90,15 @@
     },
     "outcome": {
       "enum": ["pass", "fail", "error", "cancelled"]
+    },
+    "disposition": {
+      "description": "The human disposition that closed the attempt: retry returns the task to ready, escalate escalates it.",
+      "enum": ["retry", "escalate"]
+    },
+    "disposition_id": {
+      "description": "Identity of the disposition record under .devai/state/round-runs/<round>/dispositions/.",
+      "type": "string",
+      "pattern": "^DSP-[0-9a-f]{16}$"
     }
   },
   "allOf": [
@@ -151,6 +160,35 @@
       },
       "then": {
         "required": ["outcome"]
+      }
+    },
+    {
+      "if": {
+        "required": ["outcome"],
+        "properties": {
+          "outcome": {
+            "const": "cancelled"
+          }
+        }
+      },
+      "then": {
+        "required": ["disposition", "disposition_id"]
+      }
+    },
+    {
+      "if": {
+        "anyOf": [{ "required": ["disposition"] }, { "required": ["disposition_id"] }]
+      },
+      "then": {
+        "required": ["outcome"],
+        "properties": {
+          "event": {
+            "const": "settled"
+          },
+          "outcome": {
+            "const": "cancelled"
+          }
+        }
       }
     }
   ],
