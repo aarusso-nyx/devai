@@ -15,6 +15,7 @@ import {
   acquireLocks,
   listLocks,
   reapLock,
+  releaseLocks,
   renewLocks,
   taskLockTargets,
   type LockRecord,
@@ -216,6 +217,81 @@ describe('expired lock takeover', () => {
         true,
       );
       expect(lockFiles(root)).toEqual([]);
+    });
+  });
+
+  it('a stale reaper never drops a replacement its owner created but has not written', async () => {
+    const root = repository();
+    await withAuthorityHostTestScope(async () => {
+      mkdirSync(locksDir(root), { recursive: true });
+      // The replacement's owner created the key exclusively and is still writing its record.
+      writeFileSync(join(locksDir(root), 'F2~MOD-a.json'), '');
+      const stale = expiredRecord('TASK-0802', 'MOD-a');
+
+      expect(reapLock({ locksDir: locksDir(root), target: 'F2:MOD-a', expected: stale })).toBe(
+        false,
+      );
+
+      expect(readFileSync(join(locksDir(root), 'F2~MOD-a.json'), 'utf8')).toBe('');
+      expect(
+        acquireLocks({ locksDir: locksDir(root), taskId: 'TASK-0110', targets: ['F2:MOD-a'] })
+          .denied,
+      ).toEqual([{ target: 'F2:MOD-a', held_by: '<unreadable>' }]);
+    });
+  });
+
+  it('takeover, renewal, rollback, and release leave no claim or staged file behind', async () => {
+    const root = repository();
+    await withAuthorityHostTestScope(async () => {
+      mkdirSync(locksDir(root), { recursive: true });
+      writeFileSync(
+        join(locksDir(root), 'F2~MOD-a.json'),
+        JSON.stringify(expiredRecord('TASK-0803', 'MOD-a')),
+      );
+      acquireLocks({ locksDir: locksDir(root), taskId: 'TASK-0900', targets: ['F2:MOD-c'] });
+
+      expect(
+        acquireLocks({ locksDir: locksDir(root), taskId: 'TASK-0111', targets: ['F2:MOD-a'] })
+          .denied,
+      ).toEqual([]);
+      expect(
+        renewLocks({ locksDir: locksDir(root), taskId: 'TASK-0111', targets: ['F2:MOD-a'] }).lost,
+      ).toEqual([]);
+      // MOD-b is created then rolled back when MOD-c is denied; MOD-a was already held.
+      expect(
+        acquireLocks({
+          locksDir: locksDir(root),
+          taskId: 'TASK-0111',
+          targets: ['F2:MOD-a', 'F2:MOD-b', 'F2:MOD-c'],
+        }).denied,
+      ).toEqual([{ target: 'F2:MOD-c', held_by: 'TASK-0900' }]);
+      expect(lockFiles(root)).toEqual(['F2~MOD-a.json', 'F2~MOD-c.json']);
+      expect(releaseLocks({ locksDir: locksDir(root), taskId: 'TASK-0111' })).toMatchObject([
+        { task_id: 'TASK-0111', module: 'MOD-a' },
+      ]);
+
+      expect(lockFiles(root)).toEqual(['F2~MOD-c.json']);
+      const claims = join(root, '.devai/state/lock-claims');
+      expect(existsSync(claims) ? readdirSync(claims) : []).toEqual([]);
+    });
+  });
+
+  it('release removes only the exact record the task still holds', async () => {
+    const root = repository();
+    await withAuthorityHostTestScope(async () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-10-04T00:00:00.000Z'));
+      acquireLocks({
+        locksDir: locksDir(root),
+        taskId: 'TASK-0112',
+        targets: ['F2:MOD-a'],
+        ttlMs: 1_000,
+      });
+      vi.setSystemTime(new Date('2026-10-04T00:00:05.000Z'));
+      acquireLocks({ locksDir: locksDir(root), taskId: 'TASK-0900', targets: ['F2:MOD-a'] });
+
+      expect(releaseLocks({ locksDir: locksDir(root), taskId: 'TASK-0112' })).toEqual([]);
+      expect(listLocks({ locksDir: locksDir(root) })).toMatchObject([{ task_id: 'TASK-0900' }]);
     });
   });
 });
