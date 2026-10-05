@@ -216,6 +216,24 @@ describe('attempts a stopped runner left fenced are reconciled before planning',
     });
   });
 
+  it('treats a release interrupted before its receipt as a lost lock, never a clean one', async () => {
+    const root = repository();
+    fixedDate();
+
+    await withAuthorityHostTestScope(async () => {
+      // The record is gone but no receipt proves the task removed it itself.
+      saveTask(root, { ...task('TASK-9315'), status: 'completed' });
+      leaveFence(root, 'TASK-9315', false);
+
+      const result = await runRoundTasks({ repoRoot: root, round: ROUND, dispatch: vi.fn() });
+
+      expect(result.reconciled).toEqual([
+        { task_id: 'TASK-9315', ok: false, code: 'TASK_RESOURCE_LOCK_LOST' },
+      ]);
+      expect(loadTask(root, 'TASK-9315').status).toBe('escalated');
+    });
+  });
+
   it('escalates a pass handed off for merge whose fenced lock was taken', async () => {
     const root = repository();
     fixedDate();
