@@ -90,12 +90,19 @@ function resolveHookPath(
 }
 
 /**
- * The post-merge adapter files outside .devai/config an install may write: the hook, the HMAC
- * key and the receipt issuer. Path resolution only, no input validation, so the bind journal
- * can record and recover them (#264).
+ * The post-merge adapter files outside .devai/config an install may write: the hook where it is
+ * installed (`.husky/post-merge` in a Husky repository, else the git hooks directory), the HMAC
+ * key and the receipt issuer, resolved exactly as verifyInstalledPostMergeAdapter resolves
+ * them. Path resolution only, no input validation, so the bind journal can record and recover
+ * them (#264).
  */
 export function postMergeAdapterFiles(targetRoot: string): readonly string[] {
-  const root = resolve(targetRoot);
+  let root: string;
+  try {
+    root = realpathSync(resolve(targetRoot));
+  } catch {
+    root = resolve(targetRoot);
+  }
   const files = [resolveHookPath(root, 'post-merge').path];
   try {
     const runtimeRoot = join(gitAdminRoot(root), 'devai');
