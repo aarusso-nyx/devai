@@ -35,13 +35,24 @@ export interface GuardedProcessResult {
 
 export interface GuardedChildProcess {
   readonly pid: number | undefined;
-  /** Settles once, when the child and its streams have closed; never rejects. */
+  /**
+   * Settles once, when the child and its streams have closed and, after a timeout or
+   * `terminate()`, once its whole process group is gone; never rejects.
+   */
   readonly result: Promise<GuardedProcessResult>;
-  /** Stop the whole process group: SIGTERM, then SIGKILL after the grace period. */
+  /**
+   * Stop the whole process group: SIGTERM, then SIGKILL after the grace period to every
+   * member still alive, including descendants that outlive the child. A no-op once the
+   * result has settled.
+   */
   terminate(): void;
 }
 
 const DEFAULT_KILL_GRACE_MS = 5_000;
+/** Interval between liveness probes of a terminated process group. */
+const GROUP_POLL_MS = 20;
+/** How long a group may linger after SIGKILL before the result settles regardless. */
+const KILL_CONFIRM_MS = 2_000;
 
 class BoundedTail {
   private chunks: Buffer[] = [];
@@ -86,6 +97,43 @@ function signalGroup(child: ChildProcess, signal: NodeJS.Signals): void {
   }
 }
 
+/** Whether any member of the process group `pgid` is still alive. */
+function groupAlive(pgid: number): boolean {
+  try {
+    process.kill(-pgid, 0);
+    return true;
+  } catch (error) {
+    // EPERM: the group exists but may not be signalled; only ESRCH proves it is gone.
+    return (error as NodeJS.ErrnoException).code === 'EPERM';
+  }
+}
+
+/**
+ * Wait until a terminated process group is gone. The leader closing proves nothing
+ * about its descendants: one that ignores SIGTERM keeps the group alive, so SIGKILL
+ * goes to the group once `killDueAt` passes. The group id stays reserved while any
+ * member lives, so it is never signalled again after it is seen gone. A group that
+ * lingers beyond KILL_CONFIRM_MS after SIGKILL (an unreaped zombie) stops the wait.
+ * The probes keep the event loop alive, so a caller awaiting the result is not cut short.
+ */
+async function awaitGroupGone(pgid: number, killDueAt: number): Promise<void> {
+  let killedAt: number | undefined;
+  while (groupAlive(pgid)) {
+    const now = Date.now();
+    if (killedAt === undefined && now >= killDueAt) {
+      try {
+        process.kill(-pgid, 'SIGKILL');
+      } catch {
+        // gone between the probe and the signal
+      }
+      killedAt = now;
+    } else if (killedAt !== undefined && now - killedAt >= KILL_CONFIRM_MS) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, GROUP_POLL_MS));
+  }
+}
+
 function validate(command: string, args: readonly string[], options: GuardedSpawnOptions): void {
   if (typeof command !== 'string' || command.length === 0) {
     throw new Error('AUTHORITY_PROCESS_COMMAND_INVALID');
@@ -124,10 +172,16 @@ function start(
   let timedOut = false;
   let spawnError: string | null = null;
   let killTimer: NodeJS.Timeout | undefined;
+  /** Set by the first termination request: when SIGKILL is due to the whole group. */
+  let killDueAt: number | undefined;
+  let settled = false;
 
   const terminate = (): void => {
+    // After settlement the group is gone and its id may be reused: never signal it again.
+    if (settled) return;
     signalGroup(child, 'SIGTERM');
     if (killTimer === undefined) {
+      killDueAt = Date.now() + grace;
       killTimer = setTimeout(() => signalGroup(child, 'SIGKILL'), grace);
       killTimer.unref();
     }
@@ -153,7 +207,6 @@ function start(
   else child.stdin?.end();
 
   const result = new Promise<GuardedProcessResult>((resolve) => {
-    let settled = false;
     const settle = (exitCode: number | null, signal: NodeJS.Signals | null): void => {
       if (settled) return;
       settled = true;
@@ -174,7 +227,17 @@ function start(
       spawnError = error.code ?? error.message;
       if (child.pid === undefined) settle(null, null);
     });
-    child.on('close', (code, signal) => settle(code, signal));
+    child.on('close', (code, signal) => {
+      // The wall clock bounds the child itself; its exit ends that bound.
+      clearTimeout(deadline);
+      const pgid = child.pid;
+      if (killDueAt === undefined || pgid === undefined) {
+        settle(code, signal);
+        return;
+      }
+      // Termination was requested: escalate until every member of the group is gone.
+      void awaitGroupGone(pgid, killDueAt).then(() => settle(code, signal));
+    });
   });
 
   return { pid: child.pid, result, terminate };

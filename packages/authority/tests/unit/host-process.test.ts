@@ -11,9 +11,46 @@ import {
 import { createIssuer, runtimeApi } from './authority-runtime-testkit.js';
 
 const dirs: string[] = [];
+const strays: number[] = [];
 afterEach(() => {
   for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+  for (const pid of strays.splice(0)) {
+    try {
+      process.kill(pid, 'SIGKILL');
+    } catch {
+      // already gone
+    }
+  }
+  vi.restoreAllMocks();
 });
+
+function alive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * A leader that starts a grandchild ignoring SIGTERM, detached from the leader's pipes so
+ * the leader's close does not wait for it, and prints the grandchild pid once its handler
+ * is installed.
+ */
+const STUBBORN_GRANDCHILD = [
+  'const { spawn } = require("child_process");',
+  'const grandchild = spawn(process.execPath, ["-e", "process.on(\\"SIGTERM\\", () => {}); process.stdout.write(\\"ready\\"); setInterval(() => {}, 1000)"], { stdio: ["ignore", "pipe", "ignore"] });',
+  'grandchild.stdout.once("data", () => process.stdout.write(`${grandchild.pid}\\n`));',
+  'setInterval(() => {}, 1000);',
+].join('\n');
+
+function grandchildPid(stdout: string): number {
+  const pid = Number(/^(\d+)\n/u.exec(stdout)?.[1]);
+  expect(Number.isInteger(pid) && pid > 0).toBe(true);
+  strays.push(pid);
+  return pid;
+}
 
 function cwd(): string {
   const dir = mkdtempSync(join(tmpdir(), 'devai-host-process-'));
@@ -135,6 +172,45 @@ describe('governed asynchronous spawn (ADR-MDL-0005 D-10)', () => {
     });
   });
 
+  it('kills a group member that ignores SIGTERM after the leader exits on timeout', async () => {
+    await withScope(async () => {
+      let ready = false;
+      const child = spawn(
+        node,
+        ['-e', STUBBORN_GRANDCHILD],
+        options({
+          timeout: 2_000,
+          killGraceMs: 200,
+          onStdout: (chunk) => (ready ||= /\d+\n/u.test(chunk)),
+        }),
+      );
+      const result = await child.result;
+      expect(ready).toBe(true);
+      expect(result.timed_out).toBe(true);
+      expect(result.signal).toBe('SIGTERM');
+      // The leader died of SIGTERM; its grandchild survived it and must not outlive the result.
+      expect(alive(grandchildPid(result.stdout))).toBe(false);
+    });
+  });
+
+  it('kills a group member that ignores SIGTERM after a requested termination', async () => {
+    await withScope(async () => {
+      const child = spawn(
+        node,
+        ['-e', STUBBORN_GRANDCHILD],
+        options({
+          killGraceMs: 200,
+          onStdout: (chunk) => {
+            if (/\d+\n/u.test(chunk)) child.terminate();
+          },
+        }),
+      );
+      const result = await child.result;
+      expect(result.timed_out).toBe(false);
+      expect(alive(grandchildPid(result.stdout))).toBe(false);
+    });
+  });
+
   it('terminates on request', async () => {
     await withScope(async () => {
       const child = spawn(node, ['-e', 'setInterval(()=>{},1000)'], options());
@@ -142,6 +218,16 @@ describe('governed asynchronous spawn (ADR-MDL-0005 D-10)', () => {
       const result = await child.result;
       expect(result.signal).toBe('SIGTERM');
       expect(result.timed_out).toBe(false);
+    });
+  });
+
+  it('never signals a settled process group again', async () => {
+    await withScope(async () => {
+      const child = spawn(node, ['-e', ''], options());
+      await child.result;
+      const kill = vi.spyOn(process, 'kill');
+      child.terminate();
+      expect(kill).not.toHaveBeenCalled();
     });
   });
 
