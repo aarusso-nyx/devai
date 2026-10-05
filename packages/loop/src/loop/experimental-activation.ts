@@ -1,11 +1,22 @@
-import { existsSync, readFileSync, unlinkSync } from '@devai-nyx/authority';
+import {
+  closeSync,
+  existsSync,
+  fsyncSync,
+  openSync,
+  readFileSync,
+  statSync,
+  unlinkSync,
+} from '@devai-nyx/authority';
 import { parsers } from '@devai-nyx/schemas';
 import { canonicalSha256 } from '@devai-nyx/utils';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
+import { hostname } from 'node:os';
 import { dirname, join } from 'node:path';
 import {
   fsyncDirectorySync,
+  mkdirDurableSync,
   replaceDurableSync,
+  writeAllSync,
   writeCreateOnlyDurableSync,
 } from './durable-files.js';
 import { fail } from './task-queue-services.js';
@@ -148,8 +159,108 @@ export function writeExperimentalActivation(
   activation: ExperimentalActivation,
 ): string {
   const path = experimentalActivationPath(repoRoot);
-  replaceDurableSync(path, `${JSON.stringify(activation, null, 2)}\n`);
+  withActivationLock(repoRoot, () => {
+    replaceDurableSync(path, `${JSON.stringify(activation, null, 2)}\n`);
+  });
   return path;
+}
+
+/** Serializes every writer of the activation record: activation and withdrawal. */
+export const EXPERIMENTAL_ACTIVATION_LOCK = '.devai/state/experimental/activation.lock';
+/** An unreadable lock older than this was left by a writer that died mid-create. */
+const UNREADABLE_LOCK_STALE_MS = 60_000;
+
+interface ActivationLockOwner {
+  readonly pid: number;
+  readonly hostname: string;
+  readonly token: string;
+  readonly acquired_at: string;
+}
+
+function createLock(path: string, owner: ActivationLockOwner): boolean {
+  let fd: number;
+  try {
+    fd = openSync(path, 'wx');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'EEXIST') return false;
+    throw error;
+  }
+  try {
+    writeAllSync(fd, `${JSON.stringify(owner)}\n`);
+    fsyncSync(fd);
+  } finally {
+    closeSync(fd);
+  }
+  return true;
+}
+
+function readLock(path: string): ActivationLockOwner | 'unreadable' | undefined {
+  if (!existsSync(path)) return undefined;
+  try {
+    const value = JSON.parse(readFileSync(path, 'utf8')) as Partial<ActivationLockOwner>;
+    return typeof value.pid === 'number' &&
+      typeof value.hostname === 'string' &&
+      typeof value.token === 'string'
+      ? (value as ActivationLockOwner)
+      : 'unreadable';
+  } catch {
+    return existsSync(path) ? 'unreadable' : undefined;
+  }
+}
+
+/** True when the pid names a live process; EPERM means alive but not ours. */
+function processAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'EPERM';
+  }
+}
+
+/**
+ * Whether a held lock may be removed: its owner ran on this host and is gone, or it is
+ * unreadable and old enough that its writer must have died mid-create. A live owner, or
+ * one on another host, is never reclaimed.
+ */
+function staleLock(path: string, held: ActivationLockOwner | 'unreadable'): boolean {
+  if (held === 'unreadable') {
+    return Date.now() - statSync(path).mtimeMs > UNREADABLE_LOCK_STALE_MS;
+  }
+  return held.hostname === hostname() && !processAlive(held.pid);
+}
+
+/**
+ * Run `run` holding the activation lock, refusing with `EXPERIMENTAL_ACTIVATION_BUSY`
+ * while another activation or withdrawal holds it. A lock left by a provably gone writer
+ * is reclaimed once, and only while the path still holds exactly the stale lock.
+ */
+function withActivationLock<T>(repoRoot: string, run: () => T): T {
+  const path = join(repoRoot, EXPERIMENTAL_ACTIVATION_LOCK);
+  mkdirDurableSync(dirname(path));
+  const owner: ActivationLockOwner = {
+    pid: process.pid,
+    hostname: hostname(),
+    token: randomUUID(),
+    acquired_at: new Date().toISOString(),
+  };
+  if (!createLock(path, owner)) {
+    const held = readLock(path);
+    const reclaimable =
+      held !== undefined &&
+      staleLock(path, held) &&
+      JSON.stringify(readLock(path)) === JSON.stringify(held);
+    if (reclaimable) unlinkSync(path);
+    if (!reclaimable || !createLock(path, owner)) fail('EXPERIMENTAL_ACTIVATION_BUSY');
+  }
+  try {
+    return run();
+  } finally {
+    const current = readLock(path);
+    if (current !== undefined && current !== 'unreadable' && current.token === owner.token) {
+      unlinkSync(path);
+    }
+  }
 }
 
 /** The Owner's audit record of one withdrawn activation (ADR-MDL-0007). */
@@ -176,6 +287,16 @@ export interface ExperimentalActivationWithdrawal {
  * missing one refuses with `EXPERIMENTAL_ACTIVATION_MISSING`.
  */
 export function withdrawExperimentalActivation(options: {
+  readonly repoRoot: string;
+  readonly now?: Date;
+  readonly note?: string;
+}): Readonly<{ path: string; withdrawal: ExperimentalActivationWithdrawal }> {
+  // Under the activation lock no activation can replace the record between the read
+  // that names it in the withdrawal and the removal.
+  return withActivationLock(options.repoRoot, () => withdrawLocked(options));
+}
+
+function withdrawLocked(options: {
   readonly repoRoot: string;
   readonly now?: Date;
   readonly note?: string;
@@ -209,6 +330,13 @@ export function withdrawExperimentalActivation(options: {
   };
   const recordPath = join(options.repoRoot, EXPERIMENTAL_WITHDRAWALS_DIR, `${id}.json`);
   writeCreateOnlyDurableSync(recordPath, `${JSON.stringify(withdrawal, null, 2)}\n`);
+  // Remove only the exact record the withdrawal names.
+  if (
+    !existsSync(path) ||
+    createHash('sha256').update(readFileSync(path)).digest('hex') !== recordSha256
+  ) {
+    fail('EXPERIMENTAL_ACTIVATION_CHANGED');
+  }
   unlinkSync(path);
   fsyncDirectorySync(dirname(path));
   return { path: recordPath, withdrawal };
