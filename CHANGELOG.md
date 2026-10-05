@@ -57,7 +57,7 @@ stricter lock and controller rules below.
 - `init upgrade` (#264): an Architect plans, and with `--write` applies, the move from the bound
   `devai_version` to the installed version from the shipped migration manifest. It refuses an
   undeclared key retirement before any write, rolls everything back if a post-check fails, and
-  records `.devai/config/upgrade-receipt.json`; a second run is a no-op. <!-- verify after merge -->
+  records `.devai/config/upgrade-receipt.json`; a second run is a no-op.
 - Doctor (#265, #266): `docs-ia.workflow-page-set` honors `docs.ia.path_overrides`; a post-merge
   binding made in another checkout is reported as not applicable there only when this checkout
   holds no post-merge state of its own, otherwise it is verified and refused; host-adapter
