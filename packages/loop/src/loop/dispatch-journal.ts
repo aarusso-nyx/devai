@@ -11,7 +11,6 @@ import { createHash } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { fsyncDirectorySync, mkdirDurableSync, writeAllSync } from './durable-files.js';
 import { TaskServiceError, fail } from './task-queue-services.js';
-import type { TaskRecord } from './task-contract.js';
 
 /** The ordered boundaries of one experimental attempt (ADR-MDL-0005 D-6). */
 export const DISPATCH_JOURNAL_EVENTS = [
@@ -71,6 +70,10 @@ export interface UncertainDispatchFinding {
   /** The open attempt, or null for an agent task left in progress with no journal record. */
   readonly attempt: number | null;
   readonly last_event: DispatchJournalEventName | null;
+  /** The quarantine record whose moved-aside journal left this attempt open. */
+  readonly quarantine_id?: string;
+  /** The recorded disposition of this task whose application was interrupted. */
+  readonly disposition_id?: string;
 }
 
 /**
@@ -226,45 +229,47 @@ export function openDispatchAttempts(
 }
 
 /**
- * Every task that blocks the round until a human records a disposition: each attempt
- * with intent but no `settled` event, whatever the task's status, and each agent task
- * of the round left `in_progress` with no open attempt (a crash before the first
- * intent, or a journal moved aside by quarantine). A task status alone never clears
- * uncertainty (ADR-MDL-0005 D-6 as amended by ADR-MDL-0007).
+ * The attempts a damaged journal leaves open: every attempt with intent and no `settled`
+ * event in its verifiable prefix (complete, schema-valid, hash-linked and ordered lines up
+ * to the first damage), plus every attempt named by a schema-valid line after the damage
+ * that the prefix does not prove settled. Nothing unverifiable can close an attempt.
  */
-export function uncertainDispatchFindings(
-  repoRoot: string,
+export function damagedJournalOpenAttempts(
+  raw: string,
   roundId: string,
-  tasks: readonly Pick<TaskRecord, 'id' | 'round_id' | 'status' | 'executor'>[],
-): readonly UncertainDispatchFinding[] {
-  const open = uncertainDispatches(readDispatchJournal(repoRoot, roundId));
-  const findings: UncertainDispatchFinding[] = open.map((item) => ({ ...item }));
-  for (const task of tasks) {
-    if (
-      task.round_id === roundId &&
-      task.executor.kind === 'agent' &&
-      task.status === 'in_progress' &&
-      !open.some((item) => item.task_id === task.id)
-    ) {
-      findings.push({ task_id: task.id, attempt: null, last_event: null });
-    }
+): readonly UncertainDispatch[] {
+  const lines = raw.split('\n');
+  // The final element is either the empty string after the last newline or a torn line.
+  const complete = lines.slice(0, -1);
+  const prefix: DispatchJournalEvent[] = [];
+  const progress = new Map<string, number>();
+  let previous: string | null = null;
+  let verified = 0;
+  for (const line of complete) {
+    const parsed = parsers.dispatchJournalEvent.safeParseJson<DispatchJournalEvent>(line);
+    if (!parsed.ok) break;
+    const event = parsed.value;
+    if (event.round_id !== roundId || event.previous_sha256 !== previous) break;
+    if (!nextBoundary(progress.get(key(event)) ?? -1, event)) break;
+    progress.set(key(event), DISPATCH_JOURNAL_EVENTS.indexOf(event.event));
+    prefix.push(event);
+    previous = sha256(line);
+    verified += 1;
   }
-  return findings;
-}
-
-/**
- * Refuse to dispatch a round while any work is uncertain. A human disposes of it
- * with `round dispatch dispose` (retry or escalate) or `task escalate`, each of which
- * records the disposition; nothing here retries, replays, or cleans up an uncertain
- * attempt (ADR-MDL-0005 D-6, ADR-MDL-0007).
- */
-export function assertNoUncertainDispatch(
-  repoRoot: string,
-  roundId: string,
-  tasks: readonly Pick<TaskRecord, 'id' | 'round_id' | 'status' | 'executor'>[],
-): void {
-  const findings = uncertainDispatchFindings(repoRoot, roundId, tasks);
-  if (findings.length > 0) throw new DispatchUncertainError(findings);
+  const open = new Map(uncertainDispatches(prefix).map((item) => [key(item), item]));
+  const settled = new Set(prefix.filter((event) => event.event === 'settled').map(key));
+  for (const line of lines.slice(verified)) {
+    const parsed = parsers.dispatchJournalEvent.safeParseJson<DispatchJournalEvent>(line);
+    if (!parsed.ok || parsed.value.round_id !== roundId) continue;
+    const event = parsed.value;
+    if (settled.has(key(event)) || open.has(key(event))) continue;
+    open.set(key(event), {
+      task_id: event.task_id,
+      attempt: event.attempt,
+      last_event: event.event,
+    });
+  }
+  return [...open.values()];
 }
 
 /** Where a damaged journal is moved: beside it, named by the SHA-256 of its bytes. */
@@ -280,6 +285,7 @@ export function quarantinedJournalPath(repoRoot: string, roundId: string, digest
 export interface QuarantinedJournal {
   readonly sha256: string;
   readonly bytes: number;
+  /** Repository-relative path the journal is moved to. */
   readonly path: string;
 }
 
@@ -309,7 +315,7 @@ export function planDispatchJournalQuarantine(
   return {
     sha256: digest,
     bytes: bytes.length,
-    path: quarantinedJournalPath(repoRoot, roundId, digest),
+    path: `.devai/state/round-runs/${roundId}/dispatch-journal.quarantined-${digest}.jsonl`,
     raw: bytes.toString('utf8'),
   };
 }
@@ -327,6 +333,19 @@ export function applyDispatchJournalQuarantine(
   if (!existsSync(path) || sha256(readFileSync(path)) !== plan.sha256) {
     fail('TASK_DISPATCH_JOURNAL_CHANGED');
   }
-  renameSync(path, plan.path);
+  renameSync(path, quarantinedJournalPath(repoRoot, roundId, plan.sha256));
   fsyncDirectorySync(dirname(path));
+}
+
+/**
+ * Whether a quarantine of the journal with this SHA-256 has taken effect: the round's
+ * journal no longer holds exactly those bytes, because they were moved aside.
+ */
+export function dispatchJournalQuarantined(
+  repoRoot: string,
+  roundId: string,
+  digest: string,
+): boolean {
+  const path = dispatchJournalPath(repoRoot, roundId);
+  return !existsSync(path) || sha256(readFileSync(path)) !== digest;
 }
