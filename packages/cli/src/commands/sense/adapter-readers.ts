@@ -15,6 +15,7 @@ import {
   type SensorKind,
   type SensorReading,
 } from '@devai-nyx/sensors';
+import type { AlignmentObservation } from '@devai-nyx/sensors';
 import {
   computeReverseAdherence,
   loadDomains,
@@ -23,6 +24,41 @@ import {
   type GovernanceIntegrityReport,
 } from '#runtime-core';
 import { validators } from '@devai-nyx/schemas';
+import { composeExactHeadScorecard, scorecardHead } from '../audit/scorecard.js';
+
+const FULL_SHA = /^[0-9a-f]{40}$/u;
+
+/**
+ * ADR-SCR-0013: `audit scorecard` persists nothing, so no recorded reading can carry
+ * its candidate evidence. The F5:T4 adapter observes the same read-only exact-HEAD
+ * composition in process at the candidate head instead; the observation binds the
+ * head it ran at and reads `fail` when the composition throws. Without a readable
+ * full head there is nothing to bind, so nothing is observed.
+ */
+export function observeExactHeadScorecard(repoRoot: string): readonly AlignmentObservation[] {
+  const root = resolve(repoRoot);
+  let head: string;
+  try {
+    head = scorecardHead(root);
+  } catch {
+    return [];
+  }
+  if (!FULL_SHA.test(head)) return [];
+  let status: AlignmentObservation['status'] = 'pass';
+  try {
+    composeExactHeadScorecard(root, head);
+  } catch {
+    status = 'fail';
+  }
+  return [
+    {
+      command: `devai audit scorecard --repo-root . --at ${head}`,
+      status,
+      candidate_sha: head,
+      completed_at: new Date().toISOString(),
+    },
+  ];
+}
 
 export interface SenseAdapterRequest {
   readonly repoRoot: string;

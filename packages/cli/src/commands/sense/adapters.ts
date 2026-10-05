@@ -74,6 +74,7 @@ import {
   inventoryDeterminism,
   governanceReading,
   actionEffectInference,
+  observeExactHeadScorecard,
 } from './adapter-readers.js';
 export type { SenseAdapterRequest, SenseSensorAdapter } from './adapter-readers.js';
 
@@ -320,7 +321,10 @@ const ADAPTERS: Readonly<Record<SensorKind, SenseSensorAdapter>> = Object.freeze
   harness_depth: (request) => senseHarnessDepth({ repoRoot: request.repoRoot }),
   harness_coherence: (request) => senseHarnessCoherence({ repoRoot: request.repoRoot }),
   harness_invariant_alignment: (request) =>
-    senseHarnessInvariantAlignment({ repoRoot: request.repoRoot }),
+    senseHarnessInvariantAlignment({
+      repoRoot: request.repoRoot,
+      observations: observeExactHeadScorecard(request.repoRoot),
+    }),
   harness_idiomaticity: (request) =>
     senseHarnessIdiomaticity({
       repoRoot: request.repoRoot,
