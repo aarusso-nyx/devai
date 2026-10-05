@@ -391,16 +391,16 @@ export function isStaleClaim(error: unknown): boolean {
  * released only after the swap, so a writer that observed the same record and claims
  * it later re-reads the new state and stands down. A claim left by a claimant that is
  * provably gone is broken first; one that cannot be judged throws
- * `TASK_RECORD_CLAIM_STALE` naming the file to repair. `onVerified` runs under the
- * claim once the record is verified current, before it changes: what it writes is
- * true of exactly the observed record.
+ * `TASK_RECORD_CLAIM_STALE` naming the file to repair. `onSwapped` runs under the
+ * claim only after the observed record was replaced or removed: what it writes
+ * attests a completed swap of exactly that record, never an intended one.
  */
 export function swapObservedRecord(options: {
   readonly path: string;
   readonly claimsDir: string;
   readonly identity: string;
   readonly next?: string;
-  readonly onVerified?: () => void;
+  readonly onSwapped?: () => void;
 }): SwapOutcome {
   const held = acquireClaim(
     options.claimsDir,
@@ -412,9 +412,9 @@ export function swapObservedRecord(options: {
     if (current.kind !== 'record' || current.identity !== options.identity) return 'changed';
     // Live claimants are never displaced; a claim removed by hand is still never acted on.
     if (!stillClaimed(held)) return 'claimed';
-    options.onVerified?.();
     if (options.next === undefined) unlinkSync(options.path);
     else installStaged(options.path, options.next);
+    options.onSwapped?.();
     return 'swapped';
   } finally {
     releaseClaim(held);

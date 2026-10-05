@@ -13,12 +13,14 @@ import { basename, dirname, join } from 'node:path';
 import { utf8Compare } from './lock-targets.js';
 import {
   createRecordExclusive,
+  fsyncDirectory,
   isStaleClaim,
   observeRecord,
   recordIdentity,
   swapObservedRecord,
   type SwapOutcome,
 } from './record-claims.js';
+import { TaskServiceError } from './task-queue-services.js';
 
 export { taskLockTargets } from './lock-targets.js';
 export type { LockTargetSource } from './lock-targets.js';
@@ -413,14 +415,19 @@ export function openLockFence(opts: {
   const path = fencePath(opts.locksDir, opts.taskId);
   const staged = `${path}.${String(process.pid)}-${randomUUID()}.staged`;
   const body = `${JSON.stringify(fence)}\n`;
+  // The fence must survive a crash before the dispatch it guards begins: its staged
+  // bytes are fsynced, then the rename into place is made durable with the directory.
+  let written: boolean;
   try {
-    writeFileSync(staged, body, { flag: 'wx' });
+    written = createRecordExclusive(staged, body);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
     mkdirSync(fencesDir(opts.locksDir), { recursive: true });
-    writeFileSync(staged, body, { flag: 'wx' });
+    written = createRecordExclusive(staged, body);
   }
+  if (!written) throw Object.assign(new Error(`EEXIST: ${staged}`), { code: 'EEXIST' });
   renameSync(staged, path);
+  fsyncDirectory(fencesDir(opts.locksDir));
   return fence;
 }
 
@@ -443,32 +450,57 @@ export function listLockFences(opts: { readonly locksDir: string }): readonly Lo
   return readdirSync(dir)
     .filter((name) => name.endsWith('.json'))
     .sort(utf8Compare)
-    .flatMap((name) => {
-      const fence = readFence(join(dir, name));
-      return fence === undefined ? [] : [fence];
+    .map((name) => {
+      const path = join(dir, name);
+      const fence = readFence(path);
+      // An attempt nobody can judge is never skipped: it may hide a lost lock.
+      if (fence === undefined) throw invalidFence(path);
+      return fence;
     });
 }
 
-/** Retire a fence and its receipts once its attempt has been judged. */
+function invalidFence(path: string): TaskServiceError {
+  const error = new TaskServiceError('TASK_LOCK_FENCE_INVALID');
+  error.message =
+    `TASK_LOCK_FENCE_INVALID: ${path} is not a readable attempt fence, so the attempt it ` +
+    "guarded cannot be judged; check that task's lock and status by hand, then repair or " +
+    'remove the file';
+  return error;
+}
+
+/**
+ * Retire a fence once its attempt has been judged: the fence first, made durable, and
+ * only then its receipts. A fence that cannot be removed keeps its receipts, so a later
+ * run still judges the attempt with every proof it had; an unreadable fence in its
+ * place is left, with the receipts, for the next run to refuse.
+ */
 export function closeLockFence(opts: {
   readonly locksDir: string;
   readonly fence: LockFence;
 }): void {
+  const path = fencePath(opts.locksDir, opts.fence.task_id);
+  const current = observeRecord(path);
+  if (current.kind === 'unreadable') return;
+  if (current.kind === 'record') {
+    const standing = readFence(path);
+    if (standing === undefined) return;
+    if (standing.attempt === opts.fence.attempt) {
+      try {
+        unlinkSync(path);
+      } catch {
+        return;
+      }
+      fsyncDirectory(fencesDir(opts.locksDir));
+    }
+  }
   for (const target of opts.fence.targets) {
     const receipt = receiptPath(opts.locksDir, opts.fence, keyFileOf(target));
     if (!existsSync(receipt)) continue;
     try {
       unlinkSync(receipt);
     } catch {
-      // best-effort: a receipt names one attempt and is ignored by every other
+      // A receipt without its fence names one attempt and is ignored by every other.
     }
-  }
-  const path = fencePath(opts.locksDir, opts.fence.task_id);
-  if (readFence(path)?.attempt !== opts.fence.attempt) return;
-  try {
-    unlinkSync(path);
-  } catch {
-    // best-effort
   }
 }
 
@@ -488,9 +520,11 @@ export function releaseLocks(opts: { locksDir: string; taskId: string }): readon
         path,
         claimsDir: claimsDir(opts.locksDir),
         identity: observed.identity,
+        // The receipt follows the removal, under the claim: it attests a release that
+        // happened. One interrupted before its receipt is judged lost, never clean.
         ...(fence !== undefined &&
           fenced.has(name) && {
-            onVerified: () =>
+            onSwapped: () =>
               writeFileSync(receiptPath(opts.locksDir, fence, name), `${JSON.stringify(fence)}\n`),
           }),
       }) === 'swapped'
