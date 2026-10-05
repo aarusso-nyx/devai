@@ -710,15 +710,16 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-SCR-0010',
       'ADR-SCR-0011',
       'ADR-SCR-0012',
+      'ADR-SCR-0013',
       'ADR-SEC-0001',
     ]);
-    expect(records).toHaveLength(109);
+    expect(records).toHaveLength(110);
     expect(
       records.filter((record) => record.format === 'legacy-catalog').map((record) => record.adr_id),
     ).toEqual(['ADR-014', 'ADR-MUT-0005', 'ADR-REL-0017']);
     expect(records.filter((record) => record.adr_id === 'ADR-014')).toHaveLength(1);
-    expect(result.files_scanned).toBe(110);
-    expect(result.subject_authorities).toHaveLength(481);
+    expect(result.files_scanned).toBe(111);
+    expect(result.subject_authorities).toHaveLength(487);
     expect(result.effective_authorities).toEqual([
       'ADR-014',
       'ADR-AUT-0001',
@@ -806,6 +807,7 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-SCR-0010',
       'ADR-SCR-0011',
       'ADR-SCR-0012',
+      'ADR-SCR-0013',
       'ADR-SEC-0001',
     ]);
     // ADR-CHK-0006 IA-005: the record is the effective head of every subject it declares.
