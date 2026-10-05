@@ -55,6 +55,24 @@ switch (scenario) {
     emit(claudeResult());
     emit(claudeResult());
     break;
+  case 'claude-env':
+    // Records the environment the provider was started with, for the allowlist check.
+    writeFileSync('fake-agent-env.json', JSON.stringify(process.env));
+    emit(claudeResult());
+    break;
+  case 'claude-noise':
+    // A damaged line beside an otherwise valid successful stream.
+    emit({ type: 'system', subtype: 'init', session_id: 's-1' });
+    emit('{"type":"result","subtype":"error_during_execution","is_error":tr');
+    emit(claudeResult());
+    break;
+  case 'claude-long':
+    // More output than a small retained bound; the success event is the newest line.
+    for (let index = 0; index < 64; index += 1) {
+      emit({ type: 'assistant', message: { content: [{ type: 'text', text: 'x'.repeat(64) }] } });
+    }
+    emit(claudeResult());
+    break;
   case 'codex-success':
     emit({ type: 'thread.started', thread_id: 't-1' });
     emit({ type: 'turn.started' });

@@ -25,6 +25,42 @@ export type AgentCliCost =
 /** Host CLI runtimes experimental execution admits (law/policy/experimental-execution.json). */
 export type AgentCliRuntime = 'claude-cli' | 'codex-cli';
 
+/** Codes the adapter throws: no attempt output exists to interpret. */
+export type AgentCliErrorCode =
+  | 'AGENT_CLI_SELECTION_INVALID'
+  | 'AGENT_CLI_RUNTIME_UNSUPPORTED'
+  /**
+   * The provider started, but recording its start (journal `spawned`) failed. The
+   * adapter stopped its whole process group before throwing; the provider may already
+   * have changed its worktree, so the attempt is uncertain, never a refused spawn.
+   */
+  | 'AGENT_CLI_SPAWN_RECORD_FAILED';
+
+/** Codes an interpreted attempt fails with (`AgentCliOutput.failure`). */
+export type AgentCliFailureCode =
+  /** No single explicit terminal event was emitted. */
+  | 'AGENT_CLI_OUTPUT_INCOMPLETE'
+  /** A stream line is not a JSON object, so events may be missing from the parse. */
+  | 'AGENT_CLI_OUTPUT_MALFORMED'
+  /** The retained stream lost its oldest bytes to the output bound. */
+  | 'AGENT_CLI_OUTPUT_TRUNCATED'
+  | 'AGENT_CLI_OUTPUT_AMBIGUOUS'
+  | 'AGENT_CLI_REPORTED_FAILURE';
+
+export class AgentCliError extends Error {
+  /** The settled provider process, when one had started. */
+  readonly process: GuardedProcessResult | undefined;
+
+  constructor(
+    readonly code: AgentCliErrorCode,
+    options: { readonly cause?: unknown; readonly process?: GuardedProcessResult } = {},
+  ) {
+    super(code, 'cause' in options ? { cause: options.cause } : undefined);
+    this.name = 'AgentCliError';
+    this.process = options.process;
+  }
+}
+
 export interface AgentCliInvocation {
   readonly runtime: AgentCliRuntime;
   readonly command: string;
@@ -46,7 +82,7 @@ export interface AgentCliInvocationOptions {
  */
 export function agentCliInvocation(options: AgentCliInvocationOptions): AgentCliInvocation {
   if (options.model.length === 0 || options.effort.length === 0) {
-    throw new Error('AGENT_CLI_SELECTION_INVALID');
+    throw new AgentCliError('AGENT_CLI_SELECTION_INVALID');
   }
   if (options.runtime === 'claude-cli') {
     return {
@@ -96,7 +132,66 @@ export function agentCliInvocation(options: AgentCliInvocationOptions): AgentCli
         'codex --sandbox workspace-write without host user configuration, the task worktree as cwd',
     };
   }
-  throw new Error('AGENT_CLI_RUNTIME_UNSUPPORTED');
+  throw new AgentCliError('AGENT_CLI_RUNTIME_UNSUPPORTED');
+}
+
+/**
+ * Host variables a provider CLI needs and nothing more: executables on PATH, its own
+ * stored login under HOME (claude reads the keychain item of USER), a shell for its
+ * tools, a temporary directory, locale and terminal, and the proxy and CA settings that
+ * reach its API. Every other host variable stays out of the attempt — GH_TOKEN, cloud
+ * credentials, provider API keys, NODE_OPTIONS — so an allowlist, never a denylist.
+ */
+const AGENT_CLI_HOST_ENV: readonly string[] = [
+  'PATH',
+  'HOME',
+  'USER',
+  'LOGNAME',
+  'SHELL',
+  'TMPDIR',
+  'LANG',
+  'TERM',
+  'HTTP_PROXY',
+  'HTTPS_PROXY',
+  'NO_PROXY',
+  'ALL_PROXY',
+  'http_proxy',
+  'https_proxy',
+  'no_proxy',
+  'all_proxy',
+  'SSL_CERT_FILE',
+  'SSL_CERT_DIR',
+  'NODE_EXTRA_CA_CERTS',
+];
+
+/** Locale categories: LC_ALL, LC_CTYPE, and the rest. */
+const AGENT_CLI_HOST_ENV_PREFIX = 'LC_';
+
+/** A relocated provider configuration home, where that provider's stored login lives. */
+const AGENT_CLI_PROVIDER_ENV: Readonly<Record<AgentCliRuntime, readonly string[]>> = {
+  'claude-cli': ['CLAUDE_CONFIG_DIR'],
+  'codex-cli': ['CODEX_HOME'],
+};
+
+/**
+ * The environment one attempt starts with: only the allowlisted variables present in
+ * `host`. Host configuration is already kept out by argv (no setting sources and an
+ * empty strict MCP configuration for claude, --ignore-user-config for codex).
+ */
+export function agentCliEnvironment(
+  runtime: AgentCliRuntime,
+  host: NodeJS.ProcessEnv = process.env,
+): Record<string, string> {
+  if (!Object.hasOwn(AGENT_CLI_PROVIDER_ENV, runtime)) {
+    throw new AgentCliError('AGENT_CLI_RUNTIME_UNSUPPORTED');
+  }
+  const names = new Set([...AGENT_CLI_HOST_ENV, ...AGENT_CLI_PROVIDER_ENV[runtime]]);
+  const environment: Record<string, string> = {};
+  for (const [name, value] of Object.entries(host)) {
+    if (value === undefined) continue;
+    if (names.has(name) || name.startsWith(AGENT_CLI_HOST_ENV_PREFIX)) environment[name] = value;
+  }
+  return environment;
 }
 
 export interface AgentCliOutput {
@@ -154,8 +249,7 @@ function noUsage(derivation: string): AgentCliUsage {
   };
 }
 
-function parseClaude(stdout: string): AgentCliOutput {
-  const { parsed } = events(stdout);
+function parseClaude(parsed: readonly Record<string, unknown>[]): AgentCliOutput {
   const results = parsed.filter((event) => event['type'] === 'result');
   const terminal = results.at(-1);
   if (terminal === undefined) {
@@ -195,8 +289,7 @@ function parseClaude(stdout: string): AgentCliOutput {
   };
 }
 
-function parseCodex(stdout: string): AgentCliOutput {
-  const { parsed } = events(stdout);
+function parseCodex(parsed: readonly Record<string, unknown>[]): AgentCliOutput {
   const turns = parsed.filter((event) => event['type'] === 'turn.completed');
   const failed = parsed.some(
     (event) => event['type'] === 'turn.failed' || event['type'] === 'error',
@@ -237,13 +330,35 @@ function parseCodex(stdout: string): AgentCliOutput {
   };
 }
 
+/** What the process boundary knows about the retained stream. */
+export interface AgentCliStreamFacts {
+  /** The output bound dropped the oldest bytes (`GuardedProcessResult.stdout_truncated`). */
+  readonly truncated?: boolean;
+}
+
 /**
  * Interpret one attempt's stdout. Unknown or malformed output is never a pass
  * (round-execution.json failure.unknown_or_malformed_output); only a single,
- * explicit successful terminal event completes the attempt.
+ * explicit successful terminal event in a stream read whole completes the attempt.
+ * A truncated stream, or one with any line that is not a JSON object, may have lost
+ * a failure or a second terminal event, so it never passes on the strength of its
+ * tail. Its usage and cost are still read from the terminal event, since the
+ * provider spent them either way.
  */
-export function parseAgentCliOutput(runtime: AgentCliRuntime, stdout: string): AgentCliOutput {
-  return runtime === 'claude-cli' ? parseClaude(stdout) : parseCodex(stdout);
+export function parseAgentCliOutput(
+  runtime: AgentCliRuntime,
+  stdout: string,
+  stream: AgentCliStreamFacts = {},
+): AgentCliOutput {
+  const { parsed, malformed } = events(stdout);
+  const output = runtime === 'claude-cli' ? parseClaude(parsed) : parseCodex(parsed);
+  const damage: AgentCliFailureCode | null =
+    stream.truncated === true
+      ? 'AGENT_CLI_OUTPUT_TRUNCATED'
+      : malformed > 0
+        ? 'AGENT_CLI_OUTPUT_MALFORMED'
+        : null;
+  return damage === null ? output : { ...output, completed: false, failure: damage };
 }
 
 export interface AgentCliAttemptOptions {
@@ -253,8 +368,17 @@ export interface AgentCliAttemptOptions {
   readonly prompt: string;
   readonly timeoutMs: number;
   readonly maxOutputBytes?: number;
+  /**
+   * Variables the caller sets explicitly for this attempt, such as a scripted
+   * provider's settings, layered over the provider allowlist of `agentCliEnvironment`.
+   * The host environment itself never reaches the provider unless a caller copies it here.
+   */
   readonly env?: NodeJS.ProcessEnv;
-  /** Called once the child has a pid, before it is awaited (journal `spawned`). */
+  /**
+   * Called once the child has a pid, before it is awaited (journal `spawned`). If it
+   * throws, the provider's process group is stopped and awaited, and the attempt
+   * rejects with AGENT_CLI_SPAWN_RECORD_FAILED.
+   */
   readonly onSpawned?: (pid: number) => void;
 }
 
@@ -262,8 +386,8 @@ export interface AgentCliAttempt {
   readonly process: GuardedProcessResult;
   readonly output: AgentCliOutput;
   /**
-   * Completed output from a process that exited 0 without timing out. Truncation
-   * keeps the newest bytes, so the terminal event survives a long stream.
+   * Completed output from a process that exited 0 without timing out. A stream that
+   * outgrew the retained bound or carries a malformed line never completes.
    */
   readonly ok: boolean;
 }
@@ -274,17 +398,34 @@ const DEFAULT_OUTPUT_BYTES = 16 * 1024 * 1024;
 export async function runAgentCliAttempt(
   options: AgentCliAttemptOptions,
 ): Promise<AgentCliAttempt> {
+  const { runtime } = options.invocation;
   const child = spawn(options.invocation.command, options.invocation.args, {
     cwd: options.cwd,
     shell: false,
     timeout: options.timeoutMs,
     maxOutputBytes: options.maxOutputBytes ?? DEFAULT_OUTPUT_BYTES,
     input: options.prompt,
-    ...(options.env !== undefined && { env: options.env }),
+    // Always explicit: the guarded spawn would otherwise hand over the whole host environment.
+    env: { ...agentCliEnvironment(runtime), ...options.env },
   });
-  if (child.pid !== undefined) options.onSpawned?.(child.pid);
+  if (child.pid !== undefined && options.onSpawned !== undefined) {
+    try {
+      options.onSpawned(child.pid);
+    } catch (error) {
+      // The provider runs but its start is unrecorded: it must not outlive this attempt
+      // unsupervised, so its whole group is stopped and awaited before the failure surfaces.
+      child.terminate();
+      const settled = await child.result;
+      throw new AgentCliError('AGENT_CLI_SPAWN_RECORD_FAILED', {
+        cause: error,
+        process: settled,
+      });
+    }
+  }
   const process = await child.result;
-  const output = parseAgentCliOutput(options.invocation.runtime, process.stdout);
+  const output = parseAgentCliOutput(runtime, process.stdout, {
+    truncated: process.stdout_truncated,
+  });
   return {
     process,
     output,
