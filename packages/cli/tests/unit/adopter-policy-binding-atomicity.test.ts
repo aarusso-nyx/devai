@@ -145,6 +145,8 @@ const TARGETS = [
   '.devai/config/glob-guards.json',
 ] as const;
 const PAIR = [...TARGETS, BINDING] as const;
+/** The binding lock a killed bind leaves behind; removing it is the documented manual step. */
+const LOCK = '.devai/config/upgrade.lock';
 
 const ATTESTED_RC = {
   profile: 'rc',
@@ -574,6 +576,15 @@ describe('IA-003: atomic projection and receipt', () => {
     expect(bytesOf(repo, PAIR)).toEqual(previous);
     expect(pairIsComplete(repo)).toBe(true);
 
+    // The killed bind left its lock (#264): no run takes it over, so the rerun refuses until
+    // a human removes it, and only then recovers the journal.
+    expect(fs.existsSync(join(repo, LOCK))).toBe(true);
+    const blocked = await bind(repo);
+    expect(blocked.exit).not.toBe(0);
+    expect(blocked.stderr).toContain('INIT_UPGRADE_LOCKED');
+    expect(bytesOf(repo, PAIR)).toEqual(previous);
+    fs.rmSync(join(repo, LOCK));
+
     const rerun = await expectBound(repo);
     expect(pairIsComplete(repo)).toBe(true);
     expect(readJson(repo, PROJECT)).not.toHaveProperty('ci_economy');
@@ -603,6 +614,12 @@ describe('IA-003: atomic projection and receipt', () => {
       const leftReceipt = fs.readFileSync(join(repo, BINDING), 'utf8');
       const leftRetired =
         leftReceipt === previousReceipt ? [] : retired(JSON.parse(leftReceipt) as JsonObject);
+      if (fs.existsSync(join(repo, LOCK))) {
+        // A lock the killed run left blocks every rerun until it is removed by hand.
+        const blocked = await bind(repo);
+        expect(blocked.stderr, `kill point ${String(killAt)}`).toContain('INIT_UPGRADE_LOCKED');
+        fs.rmSync(join(repo, LOCK));
+      }
 
       const rerun = await bind(repo);
       expect(rerun.exit, `kill point ${String(killAt)}: ${rerun.stderr}`).toBe(0);
