@@ -319,19 +319,40 @@ export function finishRoundTask(
       ],
     });
     saveTask(options.repoRoot, { ...loadTask(options.repoRoot, task.id), status: 'merging' });
-  } else if (task.executor.kind === 'agent' && task.status === 'pre_merge') {
-    recordAgentCompletion(options.repoRoot, task, options.evidence ?? []);
+  } else if (task.executor.kind === 'agent') {
+    // Agent completion runs under the round controller, which `task escalate` also takes:
+    // the load, the completion record, the worktree release and both transitions see the
+    // current record, never a snapshot an escalation replaced (refuses with
+    // TASK_ROUND_CONTROLLER_BUSY while another holder owns the round).
+    const controller = acquireRoundController(options.repoRoot, task.round_id);
+    try {
+      const current = loadTask(options.repoRoot, task.id);
+      if (current.status === 'pre_merge') {
+        recordAgentCompletion(options.repoRoot, current, options.evidence ?? []);
+      } else if (current.status !== 'merging') {
+        fail('TASK_LIFECYCLE_TRANSITION_FORBIDDEN');
+      }
+      return reportCompletion(
+        options.repoRoot,
+        completeTask(transitionOptions({ ...options, operation: 'finish' })),
+      );
+    } finally {
+      releaseRoundController(options.repoRoot, controller);
+    }
   } else if (task.status !== 'merging') {
     fail('TASK_LIFECYCLE_TRANSITION_FORBIDDEN');
   }
-  const completed = completeTask(transitionOptions({ ...options, operation: 'finish' }));
-  trackTaskTransition(
+  return reportCompletion(
     options.repoRoot,
-    completed,
-    'action_completed',
-    `Task ${completed.id} completed.`,
-    { status: 'pass', checkpoint: true },
+    completeTask(transitionOptions({ ...options, operation: 'finish' })),
   );
+}
+
+function reportCompletion(repoRoot: string, completed: TaskRecord): TaskRecord {
+  trackTaskTransition(repoRoot, completed, 'action_completed', `Task ${completed.id} completed.`, {
+    status: 'pass',
+    checkpoint: true,
+  });
   return completed;
 }
 
