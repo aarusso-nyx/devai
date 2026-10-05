@@ -414,10 +414,12 @@ describe('task command registration and routing', () => {
     });
 
     await invoke(commands.taskEscalate, ['task-escalate', '--round', 'R-1', '--task', 'TASK-1']);
+    // An agent task escalates under the round controller, never beside a live dispatch.
     expect(runtime.escalate).toHaveBeenCalledWith({
       repoRoot: process.cwd(),
       round: 'R-1',
       taskId: 'TASK-1',
+      acquireRoundController: true,
     });
     await invoke(commands.taskPause, [
       'task-pause',
