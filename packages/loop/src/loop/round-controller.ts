@@ -158,12 +158,40 @@ function invalidDenialState(roundId: string): TaskServiceError {
   const error = new TaskServiceError('TASK_LOCK_DENIAL_STATE_INVALID');
   error.message =
     `TASK_LOCK_DENIAL_STATE_INVALID: .devai/state/round-runs/${roundId}/lock-denials.json ` +
-    'must be a JSON object of non-negative integer counts; repair the entry, or remove the ' +
-    "file to reset every task's lock-denial count";
+    'must map each task to a non-negative integer count (or to {count, pending_priority} ' +
+    "with a priority of 0 to 100); repair the entry, or remove the file to reset every task's " +
+    'lock-denial count';
   return error;
 }
 
-function readDenials(repoRoot: string, roundId: string): Record<string, number> {
+/**
+ * One task's lock-denial state. `pending_priority` is the priority its last re-queue
+ * owes it: written in the same write as the count, so a crash after the re-queue never
+ * loses the bump, and applied once no admission binds the run's plan (priority is part
+ * of the bound request). A bare number is a count with no bump owed.
+ */
+interface DenialEntry {
+  readonly count: number;
+  readonly pending_priority?: number;
+}
+
+function denialEntry(value: unknown): DenialEntry | undefined {
+  if (Number.isSafeInteger(value) && (value as number) >= 0) return { count: value as number };
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const entry = value as Record<string, unknown>;
+  if (Object.keys(entry).some((key) => key !== 'count' && key !== 'pending_priority')) {
+    return undefined;
+  }
+  if (!Number.isSafeInteger(entry.count) || (entry.count as number) < 0) return undefined;
+  const pending = entry.pending_priority;
+  if (pending === undefined) return { count: entry.count as number };
+  if (!Number.isSafeInteger(pending) || (pending as number) < 0 || (pending as number) > 100) {
+    return undefined;
+  }
+  return { count: entry.count as number, pending_priority: pending as number };
+}
+
+function readDenials(repoRoot: string, roundId: string): Record<string, DenialEntry> {
   let raw: string;
   try {
     raw = readFileSync(denialsPath(repoRoot, roundId), 'utf8');
@@ -180,19 +208,36 @@ function readDenials(repoRoot: string, roundId: string): Record<string, number> 
   if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
     throw invalidDenialState(roundId);
   }
-  for (const count of Object.values(parsed)) {
-    if (!Number.isSafeInteger(count) || (count as number) < 0) throw invalidDenialState(roundId);
+  const denials: Record<string, DenialEntry> = {};
+  for (const [taskId, value] of Object.entries(parsed)) {
+    const entry = denialEntry(value);
+    if (entry === undefined) throw invalidDenialState(roundId);
+    denials[taskId] = entry;
   }
-  return parsed as Record<string, number>;
+  return denials;
 }
 
-function writeDenials(repoRoot: string, roundId: string, denials: Record<string, number>): void {
+function writeDenials(
+  repoRoot: string,
+  roundId: string,
+  denials: Readonly<Record<string, DenialEntry>>,
+): void {
   const path = denialsPath(repoRoot, roundId);
   const staged = `${path}.${String(process.pid)}-${randomUUID()}`;
-  if (!createRecordExclusive(staged, JSON.stringify(denials, null, 2) + '\n')) {
+  const body = Object.fromEntries(
+    Object.entries(denials).map(([taskId, entry]) => [
+      taskId,
+      entry.pending_priority === undefined ? entry.count : entry,
+    ]),
+  );
+  if (!createRecordExclusive(staged, JSON.stringify(body, null, 2) + '\n')) {
     fail('TASK_ROUND_CONTROLLER_BUSY');
   }
   renameSync(staged, path);
+}
+
+function entryOf(denials: Readonly<Record<string, DenialEntry>>, taskId: string): DenialEntry {
+  return Object.hasOwn(denials, taskId) ? (denials[taskId] ?? { count: 0 }) : { count: 0 };
 }
 
 /** Refuse to run a round whose recorded lock-denial counts are corrupt. */
@@ -202,16 +247,49 @@ export function assertLockDenialsValid(repoRoot: string, roundId: string): void 
 
 /** The consecutive lock denials recorded for a task; 0 when none are recorded. */
 export function lockDenialCount(repoRoot: string, roundId: string, taskId: string): number {
-  const denials = readDenials(repoRoot, roundId);
-  return Object.hasOwn(denials, taskId) ? (denials[taskId] ?? 0) : 0;
+  return entryOf(readDenials(repoRoot, roundId), taskId).count;
 }
 
-/** Count one more consecutive lock denial for a task and return the new count. */
-export function recordLockDenial(repoRoot: string, roundId: string, taskId: string): number {
+/**
+ * Count one more consecutive lock denial for a task and return the new count. With
+ * `pendingPriority`, the same write records the priority bump its re-queue owes.
+ */
+export function recordLockDenial(
+  repoRoot: string,
+  roundId: string,
+  taskId: string,
+  pendingPriority?: number,
+): number {
   const denials = readDenials(repoRoot, roundId);
-  const count = (Object.hasOwn(denials, taskId) ? (denials[taskId] ?? 0) : 0) + 1;
-  writeDenials(repoRoot, roundId, { ...denials, [taskId]: count });
+  const count = entryOf(denials, taskId).count + 1;
+  writeDenials(repoRoot, roundId, {
+    ...denials,
+    [taskId]: {
+      count,
+      ...(pendingPriority !== undefined && { pending_priority: pendingPriority }),
+    },
+  });
   return count;
+}
+
+/** Priority bumps owed to re-queued tasks and not yet applied, by task. */
+export function pendingPriorityBumps(
+  repoRoot: string,
+  roundId: string,
+): ReadonlyMap<string, number> {
+  return new Map(
+    Object.entries(readDenials(repoRoot, roundId)).flatMap(([taskId, entry]) =>
+      entry.pending_priority === undefined ? [] : [[taskId, entry.pending_priority] as const],
+    ),
+  );
+}
+
+/** Mark a task's owed priority bump settled, keeping its denial count. */
+export function settlePendingPriorityBump(repoRoot: string, roundId: string, taskId: string): void {
+  const denials = readDenials(repoRoot, roundId);
+  const entry = entryOf(denials, taskId);
+  if (entry.pending_priority === undefined) return;
+  writeDenials(repoRoot, roundId, { ...denials, [taskId]: { count: entry.count } });
 }
 
 /** A task that acquired its locks starts its denial count afresh. */
