@@ -1,7 +1,7 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { hostname, tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 import { createAuthorityDecisionIssuer, runWithAuthorityHostEffects } from '@devai-nyx/authority';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -9,8 +9,11 @@ import {
   adoptWorktree,
   createWorktree,
   destroyWorktree,
+  holdsWorktreeCapacity,
   listWorktrees,
   reapWorktrees,
+  releaseTaskWorktrees,
+  retainWorktree,
   WORKTREE_CAP,
 } from '../../src/loop/worktrees.js';
 let root: string;
@@ -148,22 +151,101 @@ describe('managed worktree lifecycle in an owned temporary repository', () => {
     expect(existsSync(join(root, '.devai/state/worktrees.json'))).toBe(false);
     expect(existsSync(join(root, '.devai/worktrees/WT-main'))).toBe(false);
   });
-  it('enforces the non-adopted cap while preserving the registry and permits a human-adopted worktree', () => {
-    expect(WORKTREE_CAP).toBe(3);
+  it('derives the autonomous cap from round-execution.json capacity.max_workers (ADR-MDL-0007)', () => {
+    const policy = JSON.parse(
+      readFileSync(
+        join(import.meta.dirname, '..', '..', '..', '..', 'law/policy/round-execution.json'),
+        'utf8',
+      ),
+    ) as { capacity: { max_workers: number } };
+    expect(WORKTREE_CAP).toBe(policy.capacity.max_workers);
+  });
+  it('enforces the autonomous cap while preserving the registry and permits a human-adopted worktree', () => {
     for (let i = 0; i < WORKTREE_CAP; i++)
       run(() => createWorktree({ repoRoot: root, id: `WT-cap-${i}`, branch: `cap/${i}` }));
     const path = join(root, '.devai/state/worktrees.json');
     const before = readFileSync(path);
     expect(() =>
       run(() => createWorktree({ repoRoot: root, id: 'WT-over', branch: 'over' })),
-    ).toThrow('worktree cap exceeded: 3 non-adopted worktrees already active.');
+    ).toThrow(
+      `worktree cap exceeded: ${String(WORKTREE_CAP)} autonomous worktrees already active.`,
+    );
     expect(readFileSync(path)).toEqual(before);
     expect(git('branch', '--list', 'over')).toBe('');
     const adopted = run(() =>
       createWorktree({ repoRoot: root, id: 'WT-human', branch: 'human/new', humanAdopted: true }),
     );
     expect(adopted.human_adopted).toBe(true);
-    expect(run(() => listWorktrees({ repoRoot: root }))).toHaveLength(4);
+    expect(run(() => listWorktrees({ repoRoot: root }))).toHaveLength(WORKTREE_CAP + 1);
+  });
+  it('does not count retained worktrees or those left by a provably gone attempt process', () => {
+    for (let i = 0; i < WORKTREE_CAP; i++) {
+      run(() => createWorktree({ repoRoot: root, id: `WT-review-${i}`, branch: `review/${i}` }));
+      run(() => retainWorktree({ repoRoot: root, id: `WT-review-${i}` }));
+    }
+    const gone = spawnSync(process.execPath, ['--version']).pid;
+    run(() =>
+      createWorktree({
+        repoRoot: root,
+        id: 'WT-crashed',
+        branch: 'crashed',
+        owner: { pid: gone, hostname: hostname() },
+      }),
+    );
+    for (let i = 0; i < WORKTREE_CAP; i++)
+      run(() =>
+        createWorktree({
+          repoRoot: root,
+          id: `WT-live-${i}`,
+          branch: `live/${i}`,
+          owner: { pid: process.pid, hostname: hostname() },
+        }),
+      );
+    expect(() =>
+      run(() => createWorktree({ repoRoot: root, id: 'WT-over', branch: 'over' })),
+    ).toThrow('worktree cap exceeded');
+    const records = run(() => listWorktrees({ repoRoot: root }));
+    expect(records.filter(holdsWorktreeCapacity).map((record) => record.id)).toEqual(
+      Array.from({ length: WORKTREE_CAP }, (_, i) => `WT-live-${i}`),
+    );
+    // An owner on another host is never provably gone, so it keeps its slot.
+    expect(
+      holdsWorktreeCapacity({
+        id: 'WT-remote',
+        path: '/x',
+        branch: 'remote',
+        created_at: now,
+        owner: { pid: gone, hostname: `${hostname()}-elsewhere` },
+      }),
+    ).toBe(true);
+    expect(() => run(() => retainWorktree({ repoRoot: root, id: 'WT-missing' }))).toThrow(
+      'WORKTREE_NOT_REGISTERED',
+    );
+  });
+  it('releases every managed worktree bound to one task and keeps branches and other tasks', () => {
+    const first = run(() =>
+      createWorktree({ repoRoot: root, id: 'WT-TASK-0001-A1', branch: 'a/1', taskId: 'TASK-0001' }),
+    );
+    run(() =>
+      createWorktree({ repoRoot: root, id: 'WT-TASK-0001-A2', branch: 'a/2', taskId: 'TASK-0001' }),
+    );
+    run(() =>
+      createWorktree({ repoRoot: root, id: 'WT-TASK-0002-A1', branch: 'b/1', taskId: 'TASK-0002' }),
+    );
+    git('worktree', 'remove', '--force', first.path);
+    expect(run(() => releaseTaskWorktrees({ repoRoot: root, taskId: 'TASK-0001' }))).toEqual([
+      'WT-TASK-0001-A1',
+      'WT-TASK-0001-A2',
+    ]);
+    expect(run(() => listWorktrees({ repoRoot: root })).map((record) => record.id)).toEqual([
+      'WT-TASK-0002-A1',
+    ]);
+    expect(existsSync(join(root, '.devai/worktrees/WT-TASK-0001-A2'))).toBe(false);
+    expect(
+      git('branch', '--list', 'a/1', 'a/2')
+        .split('\n')
+        .map((line) => line.trim()),
+    ).toEqual(['a/1', 'a/2']);
   });
   it('does not turn a stale human-adopted registry entry into an extra autonomous slot', () => {
     const human = run(() =>
@@ -192,7 +274,7 @@ describe('managed worktree lifecycle in an owned temporary repository', () => {
     );
     for (let i = 0; i < WORKTREE_CAP; i++)
       run(() => createWorktree({ repoRoot: root, id: `WT-auto-${i}`, branch: `auto/${i}` }));
-    expect(run(() => listWorktrees({ repoRoot: root }))).toHaveLength(4);
+    expect(run(() => listWorktrees({ repoRoot: root }))).toHaveLength(WORKTREE_CAP + 1);
   });
   it.each(['WT-../escape', 'WT-a/b', 'wrong', 'WT-'])(
     'refuses invalid managed id %s without creating a branch or registry',
