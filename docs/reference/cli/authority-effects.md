@@ -50,7 +50,7 @@ and commit boundary.
 - **Stable ID:** owner
 - **User-facing label:** Owner
 - **Purpose:** Identify the human `owner` discipline; only matching action authority contracts permit an invocation.
-- **Population or projection:** 12 matching action contracts; effects `harness-write`, `local-write`, `remote-write`; actions `evidence collect`, `evidence record`, `evidence redact`, `evidence render`, `init apply owner`, `round close`, `round gap create`, `round gap resolve`, `round run`, `sense record`, `sense run`, `triage classify`.
+- **Population or projection:** 21 matching action contracts; effects `local-write`, `harness-write`, `remote-write`; actions `backlog add`, `backlog resolve`, `evidence collect`, `evidence record`, `evidence redact`, `evidence render`, `init apply owner`, `release evidence-publish`, `release publish`, `round close`, `round dispatch`, `round dispatch activate`, `round gap create`, `round gap resolve`, `round run`, `round tracking disable`, `round tracking enable`, `round tracking sync`, `sense record`, `sense run`, `triage classify`.
 - **Prerequisites:** An invocation-scoped `--as-role owner` declaration or live repository-bound authority session, plus a matching action contract.
 - **Required external tools:** Not applicable: a role is a governance discipline, not an executor or adapter.
 - **Accepted inputs:** `--as-role owner` only on a non-read action whose canonical authority contract allowlists this role.
@@ -74,7 +74,7 @@ and commit boundary.
 - **Stable ID:** architect
 - **User-facing label:** Architect
 - **Purpose:** Identify the human `architect` discipline; only matching action authority contracts permit an invocation.
-- **Population or projection:** 19 matching action contracts; effects `harness-write`, `local-write`, `remote-write`; actions `evidence collect`, `evidence record`, `evidence redact`, `evidence render`, `init apply architect`, `init apply harness`, `init bind`, `release check`, `release drift`, `release verify`, `round close`, `round gap create`, `round gap resolve`, `round plan`, `round run`, `round seal`, `sense record`, `sense run`, `triage classify`.
+- **Population or projection:** 25 matching action contracts; effects `local-write`, `harness-write`, `remote-write`; actions `backlog add`, `backlog resolve`, `evidence collect`, `evidence record`, `evidence redact`, `evidence render`, `init apply architect`, `init apply harness`, `init bind`, `init upgrade`, `release check`, `release drift`, `release export`, `release prepare`, `release verify`, `round close`, `round dispatch`, `round gap create`, `round gap resolve`, `round plan`, `round run`, `round seal`, `sense record`, `sense run`, `triage classify`.
 - **Prerequisites:** An invocation-scoped `--as-role architect` declaration or live repository-bound authority session, plus a matching action contract.
 - **Required external tools:** Not applicable: a role is a governance discipline, not an executor or adapter.
 - **Accepted inputs:** `--as-role architect` only on a non-read action whose canonical authority contract allowlists this role.
@@ -98,7 +98,7 @@ and commit boundary.
 - **Stable ID:** inspector
 - **User-facing label:** Inspector
 - **Purpose:** Identify the human `inspector` discipline; only matching action authority contracts permit an invocation.
-- **Population or projection:** 12 matching action contracts; effects `local-write`, `harness-write`, `remote-write`; actions `check`, `evidence collect`, `evidence record`, `evidence redact`, `evidence render`, `round close`, `round gap create`, `round gap resolve`, `round run`, `sense record`, `sense run`, `triage classify`.
+- **Population or projection:** 18 matching action contracts; effects `harness-write`, `local-write`, `remote-write`; actions `audit observe`, `backlog add`, `backlog resolve`, `check`, `evidence collect`, `evidence record`, `evidence redact`, `evidence render`, `release certify`, `release preflight`, `round close`, `round dispatch`, `round gap create`, `round gap resolve`, `round run`, `sense record`, `sense run`, `triage classify`.
 - **Prerequisites:** An invocation-scoped `--as-role inspector` declaration or live repository-bound authority session, plus a matching action contract.
 - **Required external tools:** Not applicable: a role is a governance discipline, not an executor or adapter.
 - **Accepted inputs:** `--as-role inspector` only on a non-read action whose canonical authority contract allowlists this role.
@@ -122,7 +122,7 @@ and commit boundary.
 - **Stable ID:** engineer
 - **User-facing label:** Engineer
 - **Purpose:** Identify the human `engineer` discipline; only matching action authority contracts permit an invocation.
-- **Population or projection:** 19 matching action contracts; effects `harness-write`, `local-write`, `remote-write`; actions `evidence collect`, `evidence record`, `evidence redact`, `evidence render`, `round close`, `round gap create`, `round gap resolve`, `round run`, `sense migrate`, `sense record`, `sense run`, `task escalate`, `task finish`, `task pause`, `task queue add`, `task queue complete`, `task resume`, `task start`, `triage classify`.
+- **Population or projection:** 22 matching action contracts; effects `local-write`, `harness-write`, `remote-write`; actions `backlog add`, `backlog resolve`, `evidence collect`, `evidence record`, `evidence redact`, `evidence render`, `round close`, `round dispatch`, `round gap create`, `round gap resolve`, `round run`, `sense migrate`, `sense record`, `sense run`, `task escalate`, `task finish`, `task pause`, `task queue add`, `task queue complete`, `task resume`, `task start`, `triage classify`.
 - **Prerequisites:** An invocation-scoped `--as-role engineer` declaration or live repository-bound authority session, plus a matching action contract.
 - **Required external tools:** Not applicable: a role is a governance discipline, not an executor or adapter.
 - **Accepted inputs:** `--as-role engineer` only on a non-read action whose canonical authority contract allowlists this role.
@@ -146,7 +146,7 @@ and commit boundary.
 - **Stable ID:** auditor
 - **User-facing label:** Auditor
 - **Purpose:** Identify the human `auditor` discipline; only matching action authority contracts permit an invocation.
-- **Population or projection:** 12 matching action contracts; effects `harness-write`, `remote-write`; actions `audit observe`, `evidence collect`, `evidence record`, `evidence redact`, `evidence render`, `round close`, `round gap create`, `round gap resolve`, `round run`, `sense record`, `sense run`, `triage classify`.
+- **Population or projection:** 14 matching action contracts; effects `harness-write`, `local-write`, `remote-write`; actions `audit observe`, `backlog add`, `backlog resolve`, `evidence collect`, `evidence record`, `evidence redact`, `evidence render`, `round close`, `round gap create`, `round gap resolve`, `round run`, `sense record`, `sense run`, `triage classify`.
 - **Prerequisites:** An invocation-scoped `--as-role auditor` declaration or live repository-bound authority session, plus a matching action contract.
 - **Required external tools:** Not applicable: a role is a governance discipline, not an executor or adapter.
 - **Accepted inputs:** `--as-role auditor` only on a non-read action whose canonical authority contract allowlists this role.

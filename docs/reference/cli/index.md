@@ -69,14 +69,26 @@ other. Preview or inspect whenever the leaf offers `--dry-run`, plan output, sta
 
 - **Stable identifier and label:** `init`; “Adoption and binding.”
 - **Purpose and exact projection:** plan the segmented adoption projection, apply a role-owned
-  segment, or bind the selected adoption. Its exact leaves are the registry projection defined above
-  with `W = init`.
+  segment, bind the selected adoption, or upgrade a bound adoption to the installed version. Its
+  exact leaves are the registry projection defined above with `W = init`.
 - **Prerequisites, tools, inputs, and defaults:** a target repository is required; `--target`
   defaults to the current directory. A tier may be selected explicitly. `init plan` needs no write
   authority; an apply needs the role that owns the projected paths. Binding follows the exact
   contract shown by `devai init bind --help`. `--adopter-policy` accepts only a validated source
   under `law/policy`; `--host-adapter` binds `github-actions` or `post-merge` as a verified
   transaction. Selected includes such as hooks or CI can require their host tools.
+- **Upgrade:** `init upgrade` (preview, Architect-initiated) plans without `--write`: it reads the
+  bound `devai_version`, selects the entries of the shipped
+  [migration manifest](../../../law/policy/adopter-migrations.json) above it and at or below the
+  installed version, and reports the files that would change, the owned keys a rebind would
+  retire, the adopter declarations that replace a changed default, stale version stamps, and the
+  new obligations. A retirement the source does not declare refuses the upgrade before any write
+  (`INIT_UPGRADE_RETIREMENT_UNDECLARED`, naming the key). With `--write` it runs constitution
+  (only with `--constitution`), operational law, subprocess effects, adopter policy, authority,
+  host adapters, and the CI verifier workflow in that order, lands the configuration set through
+  the bind journal, rolls everything back unless `policy-materialization-current`,
+  `authority-enforcement`, and `constitution-binding` pass (`INIT_UPGRADE_POSTCHECK_FAILED`), and
+  records `.devai/config/upgrade-receipt.json`. A second run at the same version is a no-op.
 - **Output and verdict:** plans report the exact projected operations; applies report bounded
   writes through the shared action envelope. Schema, target, authority, or write failures refuse
   the operation; planning is not an apply verdict.
@@ -85,7 +97,8 @@ other. Preview or inspect whenever the leaf offers `--dry-run`, plan output, sta
   is N/A because the chosen target and segment determine it.
 - **Use / do not use:** use for adoption planning, application, and binding. Do not use it to run checks,
   sensors, rounds, or a release ceremony.
-- **Example:** `devai init plan --target . --tier tier1 --format json`.
+- **Example:** `devai init plan --target . --tier tier1 --format json`; after a package bump,
+  `devai init upgrade --target . --as-role architect --format json`.
 - **Canonical source and related workflow:** [action registry](../../../law/policy/action-registry.json);
   follow with `doctor`.
 
