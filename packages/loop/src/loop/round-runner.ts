@@ -2,12 +2,17 @@ import { join } from 'node:path';
 import { decideRoundTaskAdmission, planRoundTaskAdmission } from './round-task-admission.js';
 import {
   LOCK_RENEWAL_INTERVAL_MS,
+  closeLockFence,
   inspectLocks,
+  listLockFences,
   listLocks,
+  lockFenceReleases,
   lockIdentity,
-  openReleaseJournal,
+  openLockFence,
+  releaseLocks,
   renewLocks,
   taskLockTargets,
+  type LockFence,
 } from './locks.js';
 import {
   LOCK_DENIAL_ESCALATION_THRESHOLD,
@@ -66,6 +71,11 @@ export interface RunRoundTasksResult {
   readonly round_id: string;
   readonly ordered_task_ids: readonly string[];
   readonly results: readonly RoundTaskRunResult[];
+  /**
+   * Attempts a stopped runner left unjudged and this run reconciled before planning;
+   * present only when one lost its lock (`TASK_RESOURCE_LOCK_LOST`).
+   */
+  readonly reconciled?: readonly RoundTaskRunResult[];
 }
 
 /** Unsupported or corrupt storage is preserved, never silently omitted from admission. */
@@ -104,8 +114,8 @@ const LOCK_HOLDING_STATUSES = new Set<TaskRecord['status']>([
 
 /**
  * True when every key is accounted for: it still holds exactly the record the task last
- * held there, or, after a transition that releases locks, that exact record was
- * released by the task's own release (and so was held up to it).
+ * held there, or, after a transition that releases locks, the task's own release left
+ * its receipt there (and so held the key up to that release).
  */
 function locksAccountedFor(
   locksDir: string,
@@ -123,7 +133,7 @@ function locksAccountedFor(
   return targets.every((target) => {
     const identity = held.get(target);
     return (
-      identity !== undefined && (current.get(target) === identity || releasedByTask.has(identity))
+      identity !== undefined && (current.get(target) === identity || releasedByTask.has(target))
     );
   });
 }
@@ -135,19 +145,19 @@ function locksAccountedFor(
  * dispatch result cannot claim exclusive resources it no longer had. The final check
  * runs whatever status the dispatch left. A transition that released the locks
  * (`round-execution.json` resources.release_on) is accepted only if the task's own
- * release removed exactly the records it held; a completion recorded after a takeover
- * released nothing, and fails.
+ * release left a receipt for every key in the attempt's fence; a completion recorded
+ * after a takeover released nothing, and fails.
  */
 async function dispatchWithLockRenewal(
   options: RunRoundTasksOptions,
   task: TaskRecord,
+  fence: LockFence | undefined,
 ): Promise<RoundTaskDispatchResult> {
   const locksDir = join(options.repoRoot, '.devai/state/locks');
   const targets = taskLockTargets(task);
   const initial = inspectLocks({ locksDir, taskId: task.id, targets });
   const held = new Map(initial.held.map((entry) => [entry.target, entry.identity]));
   let lost = initial.lost.length > 0;
-  const journal = openReleaseJournal();
   const renew = (): void => {
     if (lost || targets.length === 0) return;
     try {
@@ -175,7 +185,6 @@ async function dispatchWithLockRenewal(
     result = { ok: false, code };
   } finally {
     clearInterval(timer);
-    journal.close();
   }
   if (!lost && targets.length > 0) {
     try {
@@ -185,13 +194,58 @@ async function dispatchWithLockRenewal(
         task,
         targets,
         held,
-        released ? journal.released : new Set(),
+        released && fence !== undefined ? lockFenceReleases({ locksDir, fence }) : new Set(),
       );
     } catch {
       lost = true;
     }
   }
   return lost ? { ok: false, code: 'TASK_RESOURCE_LOCK_LOST' } : result;
+}
+
+/**
+ * Judge the attempts a stopped runner left fenced, before planning, under the round
+ * controller. A transition that released the task's locks (a completion recorded
+ * inside the dispatch, say) persisted before the runner could check it; it stands only
+ * if every fenced key was released by the task itself or still holds its record (which
+ * is then released). A key taken from it means the lock was lost: a completion is
+ * withdrawn by escalation, a gap pause escalated, and a pass handed off for merge or
+ * review escalated too. A task left `in_progress` stays for human disposition.
+ */
+function reconcileFencedAttempts(repoRoot: string, roundId: string): RoundTaskRunResult[] {
+  const locksDir = join(repoRoot, '.devai/state/locks');
+  const fences = listLockFences({ locksDir }).filter((fence) => fence.round_id === roundId);
+  if (fences.length === 0) return [];
+  const tasks = new Map(admissionPopulation(repoRoot).map((task) => [task.id, task]));
+  const reconciled: RoundTaskRunResult[] = [];
+  for (const fence of fences) {
+    const task = tasks.get(fence.task_id);
+    if (task !== undefined) {
+      const released = lockFenceReleases({ locksDir, fence });
+      const holding = new Set(
+        inspectLocks({ locksDir, taskId: task.id, targets: fence.targets }).held.map(
+          (entry) => entry.target,
+        ),
+      );
+      const lost = fence.targets.some((target) => !released.has(target) && !holding.has(target));
+      const lostCode = { task_id: task.id, ok: false, code: 'TASK_RESOURCE_LOCK_LOST' } as const;
+      if (LOCK_RELEASE_STATUSES.includes(task.status)) {
+        if (lost && task.status === 'completed') {
+          escalateTask({ repoRoot, taskId: task.id });
+        } else if (lost && task.status === 'rgr_pending') {
+          escalateRoundTask({ repoRoot, round: roundId, taskId: task.id });
+        }
+        if (lost) reconciled.push(lostCode);
+        // A transition that stopped before releasing leaves the task's own records behind.
+        releaseLocks({ locksDir, taskId: task.id });
+      } else if (lost && task.status !== 'in_progress' && LOCK_HOLDING_STATUSES.has(task.status)) {
+        escalateRoundTask({ repoRoot, round: roundId, taskId: task.id });
+        reconciled.push(lostCode);
+      }
+    }
+    closeLockFence({ locksDir, fence });
+  }
+  return reconciled;
 }
 
 /** Validate the complete same-round population before any B3A dispatch. */
@@ -309,8 +363,10 @@ async function runControlledRound(
 ): Promise<RunRoundTasksResult> {
   const workers = resolveRoundWorkers(options.maxWorkers);
   assertLockDenialsValid(options.repoRoot, roundId);
+  const reconciled = reconcileFencedAttempts(options.repoRoot, roundId);
   if (options.taskIds === undefined) requeueStrandedLockDenials(options.repoRoot, roundId);
   applyPendingPriorityBumps(options.repoRoot, roundId);
+  const locksDir = join(options.repoRoot, '.devai/state/locks');
   const population = admissionPopulation(options.repoRoot);
   const plan = planRoundTaskAdmission({
     roundId,
@@ -329,7 +385,15 @@ async function runControlledRound(
   };
 
   const execute = async (running: TaskRecord): Promise<void> => {
-    const result = await dispatchWithLockRenewal(options, running);
+    const targets = taskLockTargets(running);
+    // Fence the attempt before dispatch and retire the fence only once it is judged
+    // and any escalation persisted, so a runner that stops in between leaves evidence
+    // for the next run's reconciliation.
+    const fence =
+      targets.length > 0
+        ? openLockFence({ locksDir, taskId: running.id, roundId, targets })
+        : undefined;
+    const result = await dispatchWithLockRenewal(options, running, fence);
     if (!result.ok) {
       const status = loadTask(options.repoRoot, running.id).status;
       const lost = result.code === 'TASK_RESOURCE_LOCK_LOST';
@@ -345,6 +409,7 @@ async function runControlledRound(
         escalateRoundTask({ repoRoot: options.repoRoot, round: roundId, taskId: running.id });
       }
     }
+    if (fence !== undefined) closeLockFence({ locksDir, fence });
     finish({
       task_id: running.id,
       ok: result.ok,
@@ -429,12 +494,13 @@ async function runControlledRound(
   }
   applyPendingPriorityBumps(options.repoRoot, roundId);
   return {
-    ok: ordered.every((task) => results.get(task.id)?.ok === true),
+    ok: reconciled.length === 0 && ordered.every((task) => results.get(task.id)?.ok === true),
     round_id: roundId,
     ordered_task_ids: ordered.map((task) => task.id),
     results: ordered.flatMap((task) => {
       const result = results.get(task.id);
       return result === undefined ? [] : [result];
     }),
+    ...(reconciled.length > 0 && { reconciled }),
   };
 }
