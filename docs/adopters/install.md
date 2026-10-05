@@ -227,8 +227,20 @@ owned key the source does not declare refuses the plan (verdict `review`) and re
 before any byte is written with `INIT_UPGRADE_RETIREMENT_UNDECLARED`, naming the key, for example
 `ci_economy.attested_rc` that the deep merge before 1.7.0 preserved. Declare the key in the source
 and bump `policy_version`, or retire it deliberately with `init bind --adopter-policy`, then rerun.
-The constitution is rebound only on request: add `--constitution` once the Architect has reviewed
-the amendment.
+
+An obligation that needs a decision blocks the write the same way while it is `pending`, with
+`INIT_UPGRADE_DECISION_PENDING` naming the obligation and the command that settles it:
+
+- constitution 1.0.2 (`MIG-1.8.0-constitution-1-0-2`): the constitution is rebound only on request,
+  so add `--constitution` once the Architect has reviewed the amendment;
+- the proof-anchor baseline (`MIG-1.9.0-proof-anchor-baseline`), when `record/proofs/work` holds
+  proof lines and no `record/proofs/anchor-baseline.json` exists yet: run
+  `pnpm exec devai evidence verify --scope chain --write`, and have the Architect record a
+  `historical-gap` declaration for every legacy line it lists.
+
+Nothing is stamped while a decision is pending, so every retry names the same obligation. An
+obligation the receipt records as `pending` after an upgrade stays in the `obligations` of every
+later plan, marked `source: "receipt"`, until a fresh evaluation finds it settled.
 
 Apply the reviewed plan with `--write`:
 
@@ -241,14 +253,29 @@ law, subprocess effects, adopter policy, authority, the bound host adapters, the
 workflow that `init apply harness --include ci` generates. The order matters: operational law
 writes `domains.json`, `glob-guards.json`, `scorecard-na.json`, and `thresholds.json` from the
 package, and the adopter-policy projection then lands over them, so `policy-materialization-current`
-never sees a stale projection. The configuration set lands through the bind journal as one atomic
-write; the doctor checks `policy-materialization-current`, `authority-enforcement`, and
-`constitution-binding` then run, and unless all three pass every byte the upgrade wrote is restored
-and it refuses with `INIT_UPGRADE_POSTCHECK_FAILED`. On success it records
-`.devai/config/upgrade-receipt.json` beside the binding receipt: the from- and to-versions, the
-applied migration ids, the retired keys (always empty), every changed file with its digest, the
-refreshed stamps, the obligations, and the post-check results. Cite it from the adoption decision
-record.
+never sees a stale projection. The doctor checks `policy-materialization-current`,
+`authority-enforcement`, and `constitution-binding` then run, and unless all three pass every byte
+the upgrade wrote is restored and it refuses with `INIT_UPGRADE_POSTCHECK_FAILED`. On success it
+records `.devai/config/upgrade-receipt.json` beside the binding receipt: the from- and to-versions,
+the applied migration ids, the retired keys (always empty), every file whose bytes changed with its
+digest (measured after the writes, so the post-merge hook, issuer, and key an adapter reinstall
+replaced are listed too), the refreshed stamps, the obligations, and the post-check results. Cite it
+from the adoption decision record.
+
+The whole upgrade is one durable transaction. Before the first write the bind journal records the
+previous bytes of every file the upgrade may touch, from the configuration set to the authority
+policy, the adapter files, the constitution pin, the CI workflows, and the receipt; the receipt lands
+last and its commit drops the journal. A run killed at any point leaves the journal, and the next
+`init upgrade --write` (or `init bind --adopter-policy`) rolls every journaled file back to the
+previous version and the upgrade replays from it, so a new `devai_version` is never left without
+its receipt. A repository already bound at the installed version without a receipt for it is not a
+no-op either: the plan reports `receipt: "missing"`, and `--write` re-derives the receipt, marked
+`rederived: true`.
+
+`--write` holds the exclusive lock `.devai/config/upgrade.lock` across journal recovery, planning,
+every write, the post-checks, and the receipt commit. A second upgrade, or a bind that would recover
+the journal, refuses with `INIT_UPGRADE_LOCKED` while the holder runs; a lock whose process has
+exited is replaced on the next run.
 
 The upgrade is idempotent: a second run at the same version reports `no-op` and writes nothing.
 Review the diff and commit the refreshed materialization with the package update. Materialized
