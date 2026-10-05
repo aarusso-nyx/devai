@@ -25,10 +25,14 @@ stricter lock and controller rules below.
     (`TASK_GENERATION_BARRIER`, `TASK_WORKER_CAP_INVALID`); the default stays one.
   - Every action except the experimental ones refuses the `--experimental` flag
     (`AUTHORITY_DECLARATION_NOT_APPLICABLE`).
-- Lock-claim protocol: lock, controller and denial records change by a claimed compare-and-swap on
-  the exact observed record, a claim is broken only on proof that its claimant is gone
-  (`TASK_RECORD_CLAIM_STALE` otherwise), and durable lock fences let the next run reconcile a
-  stopped runner's dispatch. <!-- verify after merge -->
+- Lock-claim protocol (#280): lock, controller and denial records change by a claimed
+  compare-and-swap on the exact observed record, so a takeover, a renewal or a reclamation can no
+  longer overwrite another holder's record. A live claimant is never displaced: on this host only
+  a dead process or a later boot proves one gone, and anything else refuses with
+  `TASK_RECORD_CLAIM_STALE` until a person removes the named file. Each dispatch attempt opens a
+  durable lock fence, and the next run judges the fences a stopped runner left: a lock lost in
+  between withdraws a completion or escalates the task (`TASK_RESOURCE_LOCK_LOST`, reported as
+  `reconciled`), and a malformed fence refuses the run (`TASK_LOCK_FENCE_INVALID`).
 - Experimental agent execution (ADR-MDL-0005, ADR-MDL-0006): the Owner records an expiring
   activation with `round dispatch activate`, and `round dispatch --write --experimental` runs
   admitted engineer and inspector agent tasks through `claude-cli` or `codex-cli`. Each task
@@ -48,12 +52,18 @@ stricter lock and controller rules below.
   plan onto runtime state and names drift; `campaign materialize` writes an open round's tasks
   through the single queue; `round ratify` records the Owner's or Architect's decision on reviewed
   work, separate from merge. An agent task completes through `round ratify --decision accept`, the
-  human merge, then `task finish --evidence EV-…`. <!-- verify after merge -->
+  human merge, then `task finish --evidence EV-…`.
 - Recovery (Owner-only, `--write --experimental`): `round dispatch dispose --task T --as retry|escalate`
   and `--quarantine-journal` clear uncertain, blocked or damaged experimental work through a
   recorded disposition, and `round dispatch deactivate` withdraws the activation with a
-  withdrawal record. Retained review, blocked and uncertain worktrees hold no worktree capacity.
-  <!-- verify after merge -->
+  withdrawal record. `task escalate` on an agent task also takes the round controller. Retained
+  review, blocked and uncertain worktrees hold no worktree capacity.
+- Known limitations of experimental execution (opt-in and non-promoting; the full list is under
+  "Known limitations of experimental execution" in `docs/reference/cli/round-task-executors.md`):
+  write-scope checks compare worktree snapshots, so runtime filesystem enforcement belongs to the
+  host sandbox and the provider's containment is recorded as requested, never as verified; the
+  state root must exist first (`init apply harness`); and concurrent writers of one record, and
+  the worktree registry across processes, are not yet serialized.
 - `init upgrade` (#264): an Architect plans, and with `--write` applies, the move from the bound
   `devai_version` to the installed version from the shipped migration manifest. It refuses an
   undeclared key retirement before any write, rolls everything back if a post-check fails, and
@@ -63,9 +73,19 @@ stricter lock and controller rules below.
   holds no post-merge state of its own, otherwise it is verified and refused; host-adapter
   configs that lag the installed version warn (`POST_MERGE_ADAPTER_VERSION_LAG`,
   `GITHUB_ACTIONS_ADAPTER_VERSION_LAG`) through the new optional `CheckResult.warnings` field.
-- Scorecard (ADR-SCR-0013, refs #235): the pull-request gate carries fail-closed producers for the
-  gate invariants, and the alignment sensor reads a stored reading through the receipts that name
-  its current bytes. <!-- verify after merge -->
+- Scorecard gate invariants (ADR-SCR-0013, refs #235): the pull-request preflight step ends with
+  two fail-closed producers, `sense run trace_resolution` and `audit scorecard --at <head>`. The
+  invariant-alignment sensor now reads a here-document fed to a program as that program's input,
+  observes the exact-head scorecard at the candidate, and binds a stored reading through the
+  receipts that name its current bytes; `sense record` appends one digest-bound receipt per
+  candidate head. The measured F5:T4 verdict comes from the next recorded scorecard.
+- Scorecard inventory (ADR-SCR-0012, #237): `sense run inventory_regeneration` regenerates
+  DEVAI's own F4 inventory from the clean HEAD commit (the combined manifest, the dependency
+  graph and the coverage matrix under `.devai/state`), publishes the set atomically, and reads
+  `up-to-date` on a repeat. `inventory_adherence` reads UNKNOWN with
+  `INVENTORY_ADHERENCE_INPUT_INVALID`, `INVENTORY_ADHERENCE_INPUT_STALE` or
+  `INVENTORY_ADHERENCE_NO_SURFACES` rather than measure the wrong subject, so F4:T4 and F4:T9
+  stay measured cells with no N/A declaration.
 - Release: this release is verified by the trusted local-RC verifier
   `@aarusso-nyx/devai@1.9.0`; the ledger and release lanes restate that verifier version, and
   the publishable closure admits stable majors above 1.
@@ -73,7 +93,7 @@ stricter lock and controller rules below.
   `campaign status`, `campaign materialize`, `round ratify`, `round dispatch dispose`,
   `round dispatch deactivate`, `init upgrade`. The runtime schema roster adds the
   experimental-execution, activation, dispatch-journal, prompt-composition, campaign and
-  adopter-migrations schemas. <!-- verify after merge -->
+  adopter-migrations schemas.
 
 ## 1.9.0 — 2026-10-03
 
