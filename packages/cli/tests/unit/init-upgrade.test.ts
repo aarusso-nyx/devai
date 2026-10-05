@@ -19,8 +19,15 @@ import {
 import { hostname, tmpdir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { BIND_JOURNAL, BIND_JOURNAL_PATHS } from '../../src/commands/init/bind-adapters.js';
+import { withAuthorityHostTestScope } from '../../../skills/tests/unit/authority-host-test-scope.js';
+import {
+  BIND_JOURNAL,
+  BIND_JOURNAL_PATHS,
+  openBindJournal,
+  releaseBindJournal,
+} from '../../src/commands/init/bind-adapters.js';
 import { UPGRADE_LOCK } from '../../src/commands/init/upgrade-lock.js';
+import { postMergeAdapterFiles } from '../../src/services/hooks-install/index.js';
 import { resolveCliVersion } from '../../src/version.js';
 
 type JsonObject = Record<string, unknown>;
@@ -435,7 +442,7 @@ describe('#264 review: durability, decisions, exclusion and the measured receipt
     ]);
   }, 180_000);
 
-  it('refuses while another live upgrade holds the lock and replaces a stale one', async () => {
+  it('refuses while another live upgrade holds the lock and never takes over a stale one', async () => {
     const repo = await stynxAt160(true);
     put(repo, UPGRADE_LOCK, {
       schemaVersion: '1.0.0',
@@ -469,18 +476,127 @@ describe('#264 review: durability, decisions, exclusion and the measured receipt
     expect(bind.stderr).toContain('INIT_UPGRADE_LOCKED');
     expect(snapshot(repo)).toEqual(before);
 
+    // A lock whose owner has exited is never taken over: two contenders could both judge it
+    // stale. The run refuses with its own code, the recorded owner and the removal step.
     const exited = spawnSync(process.execPath, ['--version']);
-    put(repo, UPGRADE_LOCK, {
+    const stale = {
       schemaVersion: '1.0.0',
       action_id: 'init upgrade',
       token: 'crashed-run',
       pid: exited.pid,
       host: hostname(),
       acquired_at: new Date().toISOString(),
+    };
+    put(repo, UPGRADE_LOCK, stale);
+    const staleBefore = snapshot(repo);
+    const staleRefusal = await runCli(WRITE(repo));
+    expect(staleRefusal.exit).toBe(5);
+    const error = (JSON.parse(staleRefusal.stderr) as { error: JsonObject }).error;
+    expect(error).toMatchObject({
+      code: 'INIT_UPGRADE_LOCK_STALE',
+      context: expect.objectContaining({
+        holder: expect.objectContaining({ token: 'crashed-run', pid: exited.pid }),
+        removal: `rm "${join(repo, UPGRADE_LOCK)}"`,
+      }),
     });
+    expect(String(error['message'])).toContain(`pid ${String(exited.pid)}`);
+    expect(snapshot(repo)).toEqual(staleBefore);
+    const staleBind = await runCli([
+      'init',
+      'bind',
+      '--adopter-policy',
+      SOURCE,
+      '--target',
+      repo,
+      '--as-role',
+      'architect',
+      '--write',
+    ]);
+    expect(staleBind.stderr).toContain('INIT_UPGRADE_LOCK_STALE');
+    expect(snapshot(repo)).toEqual(staleBefore);
+
+    // The documented manual removal, then the upgrade runs and releases only its own lock.
+    rmSync(join(repo, UPGRADE_LOCK));
     const applied = await runCli(WRITE(repo));
     expect(applied.exit, applied.stderr).toBe(0);
     expect(existsSync(join(repo, UPGRADE_LOCK))).toBe(false);
+  }, 180_000);
+
+  it('rolls the post-merge hook back with the configuration when an upgrade is interrupted', async () => {
+    const repo = await stynxAt160(true, { postMerge: true });
+    const hookPath = join(repo, '.git/hooks/post-merge');
+    const marker = '# >>> devai hooks install >>>\n';
+    writeFileSync(
+      hookPath,
+      readFileSync(hookPath, 'utf8').replace(marker, `${marker}# installed by DEVAI 1.6.0\n`),
+    );
+    const staleHook = readFileSync(hookPath);
+
+    // Record the journal an upgrade opens over this pre-upgrade state, hook included, and
+    // set it aside while the upgrade runs to completion.
+    await withAuthorityHostTestScope(() => {
+      openBindJournal(repo, postMergeAdapterFiles(repo));
+      releaseBindJournal();
+    });
+    const journal = readFileSync(join(repo, BIND_JOURNAL));
+    const recorded = (JSON.parse(journal.toString('utf8')) as { entries: JsonObject[] }).entries;
+    expect(recorded).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: hookPath,
+          encoding: 'base64',
+          previous: staleHook.toString('base64'),
+        }),
+      ]),
+    );
+    rmSync(join(repo, BIND_JOURNAL));
+    expect((await runCli(WRITE(repo))).exit).toBe(0);
+    expect(readFileSync(hookPath)).not.toEqual(staleHook);
+
+    // The crash state: every write landed, the journal still holds the previous bytes, no
+    // receipt. Recovery restores the stale hook with the configuration, and the replay
+    // reinstalls it, so the receipt lists the hook as replaced.
+    writeFileSync(join(repo, BIND_JOURNAL), journal);
+    rmSync(join(repo, RECEIPT));
+    const recovered = await runCli(WRITE(repo));
+    expect(recovered.exit, recovered.stderr).toBe(0);
+    expect(value(recovered)['recovered_interrupted_bind']).toBe('rolled-back');
+    const receipt = json(repo, RECEIPT);
+    expect(receipt).toMatchObject({ from: '1.6.0' });
+    expect(receipt['changed_files']).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ path: '.git/hooks/post-merge', operation: 'update' }),
+      ]),
+    );
+    expect(readFileSync(hookPath)).not.toEqual(staleHook);
+  }, 180_000);
+
+  it('refuses to re-derive a receipt while a decision from earlier releases is open', async () => {
+    const repo = await stynxAt160(true);
+    expect((await runCli(WRITE(repo))).exit).toBe(0);
+    rmSync(join(repo, RECEIPT));
+    put(repo, 'record/proofs/work/generic/R-0001.jsonl', '{"kind":"generic","sequence":1}\n');
+    const before = snapshot(repo);
+
+    const planned = await runCli(PLAN(repo));
+    expect(planned.exit).toBe(1);
+    const plan = value(planned)['plan'] as JsonObject;
+    expect(plan).toMatchObject({ status: 'refused', receipt: 'missing' });
+    expect(plan['obligations']).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          change: 'MIG-1.9.0-proof-anchor-baseline',
+          status: 'pending',
+          source: 'history',
+        }),
+      ]),
+    );
+    const applied = await runCli(WRITE(repo));
+    expect(applied.exit).toBe(5);
+    expect((JSON.parse(applied.stderr) as { error: JsonObject }).error).toMatchObject({
+      code: 'INIT_UPGRADE_DECISION_PENDING',
+    });
+    expect(snapshot(repo)).toEqual(before);
   }, 180_000);
 
   it('lists the replaced post-merge hook with its digest among the changed files', async () => {
