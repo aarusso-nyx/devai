@@ -1,9 +1,11 @@
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ACTION_EFFECT_CONTRACTS } from '@devai-nyx/effects-check';
 import type { SensorKind } from '@devai-nyx/sensors';
+import type { withAuthorityHostTestScope as WithAuthorityHostTestScope } from '../../../authority/tests/unit/authority-host-test-scope.js';
 
 const sensors = vi.hoisted(() => ({
   executeRuntimeProbe: vi.fn(),
@@ -33,7 +35,7 @@ const runtime = vi.hoisted(() => ({
 }));
 
 const schemas = vi.hoisted(() => ({ runtimeCharter: vi.fn() }));
-const local = vi.hoisted(() => ({ rebuildSensorReadings: vi.fn() }));
+const local = vi.hoisted(() => ({ regenerateInventoryReadings: vi.fn() }));
 
 const simpleSensors = vi.hoisted(() =>
   Object.fromEntries(
@@ -118,6 +120,7 @@ vi.mock('../../src/commands/audit/scorecard.js', () => scorecard);
 import { SENSOR_READING_KINDS } from '@devai-nyx/sensors';
 
 let freshAdapters: typeof import('../../src/commands/sense/adapters.js');
+let withAuthorityHostTestScope: typeof WithAuthorityHostTestScope;
 
 function sensorAdapter(kind: SensorKind) {
   return freshAdapters.sensorAdapter(kind);
@@ -140,6 +143,45 @@ function put(root: string, path: string, value: unknown): string {
   return absolute;
 }
 
+/** Commit the fixture as it stands and return its HEAD. */
+function commitFixture(root: string): string {
+  const git = (...args: string[]) =>
+    execFileSync(
+      'git',
+      [
+        '-c',
+        'user.name=DEVAI Test',
+        '-c',
+        'user.email=test@example.invalid',
+        '-c',
+        'commit.gpgsign=false',
+        '-c',
+        'core.hooksPath=/dev/null',
+        ...args,
+      ],
+      { cwd: root, encoding: 'utf8' },
+    ).trim();
+  git('init', '--quiet');
+  git('add', '-A');
+  git('commit', '--quiet', '-m', 'fixture');
+  return git('rev-parse', 'HEAD');
+}
+
+/** A schema-valid combined inventory regenerated at `integrationHead`. */
+function inventoryBody(integrationHead: string) {
+  return {
+    schemaVersion: '1.0.0',
+    generated_at: '2026-10-05T00:00:00.000Z',
+    integration_head: integrationHead,
+    modules: [],
+    routes: [],
+    schemas: [],
+    components: [],
+    test_inventory: [],
+    dependency_graph_hash: 'a'.repeat(64),
+  };
+}
+
 beforeEach(async () => {
   vi.clearAllMocks();
   delete process.env['DEVAI_LLM_BACKEND'];
@@ -151,6 +193,9 @@ beforeEach(async () => {
   freshAdapters = await (import(
     '../../src/commands/sense/adapters.js' + '?fresh-adapters'
   ) as Promise<typeof import('../../src/commands/sense/adapters.js')>);
+  // The authority scope must come from the same reloaded module graph as the adapters.
+  ({ withAuthorityHostTestScope } =
+    await import('../../../authority/tests/unit/authority-host-test-scope.js'));
 });
 
 afterEach(() => {
@@ -351,25 +396,64 @@ describe('sense adapter deterministic boundaries', () => {
     expect(missingTrace.findings?.[0]?.message).toContain(join(root, 'law/trace.json'));
 
     put(root, 'law/trace.json', { links: [] });
+    // ADR-SCR-0012 IA-006: a malformed or schema-invalid body is a diagnostic.
+    expect(await sensorAdapter('inventory_adherence')({ repoRoot: root })).toMatchObject({
+      status: 'unknown',
+      findings: [{ code: 'INVENTORY_ADHERENCE_INPUT_INVALID' }],
+    });
+    writeFileSync(join(root, '.devai/state/inventory/inventory.json'), '{not json');
+    expect(await sensorAdapter('inventory_adherence')({ repoRoot: root })).toMatchObject({
+      status: 'unknown',
+      findings: [{ code: 'INVENTORY_ADHERENCE_INPUT_INVALID' }],
+    });
+    expect(runtime.computeReverseAdherence).not.toHaveBeenCalled();
+
+    // A body regenerated at another commit, or with no commit to compare, is stale.
+    const head = commitFixture(root);
+    put(root, '.devai/state/inventory/inventory.json', inventoryBody('b'.repeat(40)));
+    const outsideGit = await sensorAdapter('inventory_adherence')({ repoRoot: root });
+    expect(outsideGit).toMatchObject({
+      status: 'unknown',
+      findings: [{ code: 'INVENTORY_ADHERENCE_INPUT_STALE' }],
+    });
+    expect(outsideGit.findings?.[0]?.message).toContain('(unresolved)');
+    const stale = await withAuthorityHostTestScope(() =>
+      sensorAdapter('inventory_adherence')({ repoRoot: root }),
+    );
+    expect(stale).toMatchObject({
+      status: 'unknown',
+      findings: [{ code: 'INVENTORY_ADHERENCE_INPUT_STALE' }],
+    });
+    expect(stale.findings?.[0]?.message).toContain(`not HEAD ${head}`);
+    expect(runtime.computeReverseAdherence).not.toHaveBeenCalled();
+
+    put(root, '.devai/state/inventory/inventory.json', inventoryBody(head));
     const report = { ok: true, matches: [] };
     const reading = { id: 'adherence-reading' };
     runtime.computeReverseAdherence.mockReturnValue(report);
     sensors.senseInventoryAdherence.mockReturnValue(reading);
-    expect(await sensorAdapter('inventory_adherence')({ repoRoot: root })).toBe(reading);
+    expect(
+      await withAuthorityHostTestScope(() =>
+        sensorAdapter('inventory_adherence')({ repoRoot: root }),
+      ),
+    ).toBe(reading);
     expect(runtime.computeReverseAdherence).toHaveBeenCalledWith({
-      inventory: { modules: [] },
+      inventory: inventoryBody(head),
       trace: { links: [] },
     });
     expect(sensors.senseInventoryAdherence).toHaveBeenCalledWith({ report });
 
-    const explicitInventory = put(root, 'custom/inventory.json', { modules: ['explicit'] });
+    const explicit = { ...inventoryBody(head), modules: [{ id: 'MOD-explicit', file: 'a.ts' }] };
+    const explicitInventory = put(root, 'custom/inventory.json', explicit);
     const explicitTrace = put(root, 'custom/trace.json', { links: ['explicit'] });
-    await sensorAdapter('inventory_adherence')({
-      repoRoot: root,
-      inputs: { inventoryPath: explicitInventory, tracePath: explicitTrace },
-    });
+    await withAuthorityHostTestScope(() =>
+      sensorAdapter('inventory_adherence')({
+        repoRoot: root,
+        inputs: { inventoryPath: explicitInventory, tracePath: explicitTrace },
+      }),
+    );
     expect(runtime.computeReverseAdherence).toHaveBeenLastCalledWith({
-      inventory: { modules: ['explicit'] },
+      inventory: explicit,
       trace: { links: ['explicit'] },
     });
   });
@@ -394,11 +478,21 @@ describe('sense adapter deterministic boundaries', () => {
     });
   });
 
-  it('returns the persisted reading from inventory regeneration', async () => {
+  it('returns the persisted reading from inventory regeneration under the declared surfaces', async () => {
     const reading = { id: 'regenerated-reading' };
-    local.rebuildSensorReadings.mockResolvedValue({ reading });
+    local.regenerateInventoryReadings.mockResolvedValue({ reading });
     expect(await sensorAdapter('inventory_regeneration')({ repoRoot: '/repo' })).toBe(reading);
-    expect(local.rebuildSensorReadings).toHaveBeenCalledWith('/repo');
+    expect(local.regenerateInventoryReadings).toHaveBeenCalledWith('/repo', {});
+
+    const surfaces = { http: false, database: false, rbac: false, actions: true };
+    await sensorAdapter('inventory_regeneration')({ repoRoot: '/repo', inputs: { surfaces } });
+    expect(local.regenerateInventoryReadings).toHaveBeenLastCalledWith('/repo', { surfaces });
+    await expect(
+      sensorAdapter('inventory_regeneration')({
+        repoRoot: '/repo',
+        inputs: { surfaces: { http: false } },
+      }),
+    ).rejects.toThrow('SENSE_INPUT_INVALID:surfaces');
   });
 
   it('uses an explicit domains path and reports all attempted defaults when absent', async () => {
