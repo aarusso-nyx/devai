@@ -205,9 +205,13 @@ describe('campaign materialize (S4b, IA-002)', () => {
   it('builds the human executor from the campaign prompt', () => {
     const root = repository();
     const loaded = loadCampaign(root, 'CMP-0701');
-    const round = loaded.plan.rounds[0]!;
-    const wave = round.waves[0]!;
-    const record = campaignTaskRecord(loaded, round, wave, wave.tasks[0]!);
+    const [round] = loaded.plan.rounds;
+    const [wave] = round?.waves ?? [];
+    const [first] = wave?.tasks ?? [];
+    if (round === undefined || wave === undefined || first === undefined) {
+      throw new Error('fixture campaign must hold one round, wave and task');
+    }
+    const record = campaignTaskRecord(loaded, round, wave, first);
     expect(record.executor).toMatchObject({ kind: 'human', role: 'architect' });
     expect(record.created_at).toBe('2026-10-04T00:00:00.000Z');
   });
