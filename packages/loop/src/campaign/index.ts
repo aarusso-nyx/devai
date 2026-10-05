@@ -298,6 +298,24 @@ function sameQueueEntry(entry: BacklogEntry, record: TaskRecord): boolean {
   );
 }
 
+/** The queue fields the canonical materializer writes beside the entry's identity. */
+const QUEUE_FIELDS = [
+  'discipline',
+  'target_modules',
+  'target_substrates',
+  'db_isolation',
+  'lifecycle',
+  'acceptance_commands',
+] as const;
+
+/** Whether the entry carries any queue field with a value other than the record's. */
+function queueFieldConflict(entry: BacklogEntry, record: TaskRecord): boolean {
+  return QUEUE_FIELDS.some(
+    (field) =>
+      entry[field] !== undefined && JSON.stringify(entry[field]) !== JSON.stringify(record[field]),
+  );
+}
+
 /** A queued entry carrying every field the canonical materializer would write for the record. */
 function completeQueueEntry(entry: BacklogEntry, record: TaskRecord): boolean {
   return (
@@ -319,8 +337,9 @@ function completeQueueEntry(entry: BacklogEntry, record: TaskRecord): boolean {
  * record already carries the identical request is reported as existing. The batch is
  * recoverable: a task whose complete queue entry was written before an interruption has
  * only its record completed, never a second entry; a compatible but partial queued entry
- * is enriched through the canonical queue materializer; and an entry the queue no longer
- * holds as queued (for example completed) refuses.
+ * has only its absent fields added, through the canonical queue materializer; and an entry
+ * the queue no longer holds as queued (for example completed), or one with a field whose
+ * value differs from the record, refuses.
  */
 export function materializeCampaignRound(options: {
   readonly repoRoot: string;
@@ -361,6 +380,8 @@ export function materializeCampaignRound(options: {
       if (entry.status !== undefined && entry.status !== 'queued') {
         fail('TASK_QUEUE_MATERIALIZATION_CONFLICT');
       }
+      // Enrichment adds absent fields only; it never replaces a value the queue holds.
+      if (queueFieldConflict(entry, record)) fail('TASK_QUEUE_MATERIALIZATION_CONFLICT');
       if (completeQueueEntry(entry, record)) queued.push(record.id);
       continue;
     }
