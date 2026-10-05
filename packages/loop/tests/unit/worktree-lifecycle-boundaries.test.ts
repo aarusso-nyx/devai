@@ -3,7 +3,11 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { hostname, tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
-import { createAuthorityDecisionIssuer, runWithAuthorityHostEffects } from '@devai-nyx/authority';
+import {
+  createAuthorityDecisionIssuer,
+  runWithAuthorityHostEffects,
+  type AuthorityHostEffectRequest,
+} from '@devai-nyx/authority';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   adoptWorktree,
@@ -48,7 +52,7 @@ afterEach(() => {
   vi.useRealTimers();
   rmSync(root, { recursive: true, force: true });
 });
-function run<T>(callback: () => T): T {
+function run<T>(callback: () => T, effects?: AuthorityHostEffectRequest[]): T {
   const issuer = createAuthorityDecisionIssuer({
     issuer_id: 'worktree-lifecycle-test',
     issuer_version: '1.0.0',
@@ -69,9 +73,17 @@ function run<T>(callback: () => T): T {
         effect: 'local-write',
         receipt_store: issuer,
         apply_effect: (request, apply) => {
+          effects?.push(request);
           if (request.kind === 'filesystem') {
             const path = request.arguments[0];
-            if (typeof path !== 'string' || !resolve(path).startsWith(resolve(root) + sep))
+            // Descriptor effects (write, fsync, close) act on a file opened under the root.
+            const descriptor =
+              typeof path === 'number' &&
+              ['writeSync', 'fsyncSync', 'closeSync'].includes(request.symbol);
+            if (
+              !descriptor &&
+              (typeof path !== 'string' || !resolve(path).startsWith(resolve(root) + sep))
+            )
               throw new Error('WORKTREE_TEST_PATH_OUTSIDE_ROOT');
           } else if (request.kind === 'process') {
             const [executable, , opts] = request.arguments;
@@ -221,6 +233,47 @@ describe('managed worktree lifecycle in an owned temporary repository', () => {
     expect(() => run(() => retainWorktree({ repoRoot: root, id: 'WT-missing' }))).toThrow(
       'WORKTREE_NOT_REGISTERED',
     );
+  });
+  it('replaces the registry through a staged, fsynced file renamed into place, never in place', () => {
+    const registry = join(root, '.devai/state/worktrees.json');
+    run(() => createWorktree({ repoRoot: root, id: 'WT-durable-1', branch: 'durable/1' }));
+    const effects: AuthorityHostEffectRequest[] = [];
+    run(() => createWorktree({ repoRoot: root, id: 'WT-durable-2', branch: 'durable/2' }), effects);
+    expect(
+      effects.some(
+        (effect) =>
+          ['writeFileSync', 'appendFileSync'].includes(effect.symbol) &&
+          effect.arguments[0] === registry,
+      ),
+    ).toBe(false);
+    const staged = effects.findIndex(
+      (effect) =>
+        effect.symbol === 'openSync' &&
+        String(effect.arguments[0]).startsWith(`${registry}.`) &&
+        effect.arguments[1] === 'wx',
+    );
+    const synced = effects.findIndex(
+      (effect, index) => index > staged && effect.symbol === 'fsyncSync',
+    );
+    const renamed = effects.findIndex(
+      (effect) => effect.symbol === 'renameSync' && effect.arguments[1] === registry,
+    );
+    const directory = effects.findIndex(
+      (effect, index) =>
+        index > renamed &&
+        effect.symbol === 'openSync' &&
+        effect.arguments[0] === join(root, '.devai/state'),
+    );
+    expect(staged).toBeGreaterThanOrEqual(0);
+    expect(synced).toBeGreaterThan(staged);
+    expect(renamed).toBeGreaterThan(synced);
+    expect(directory).toBeGreaterThan(renamed);
+    expect(effects[directory + 1]?.symbol).toBe('fsyncSync');
+    expect(
+      (JSON.parse(readFileSync(registry, 'utf8')) as { worktrees: { id: string }[] }).worktrees.map(
+        (record) => record.id,
+      ),
+    ).toEqual(['WT-durable-1', 'WT-durable-2']);
   });
   it('releases every managed worktree bound to one task and keeps branches and other tasks', () => {
     const first = run(() =>

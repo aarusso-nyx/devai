@@ -27,16 +27,19 @@ import {
   DispatchUncertainError,
   appendDispatchJournalEvent,
   applyDispatchJournalQuarantine,
-  assertNoUncertainDispatch,
+  damagedJournalOpenAttempts,
   dispatchJournalPath,
   planDispatchJournalQuarantine,
   quarantinedJournalPath,
   readDispatchJournal,
-  uncertainDispatchFindings,
   uncertainDispatches,
   type DispatchDisposition,
   type DispatchJournalEntry,
 } from '../../src/loop/dispatch-journal.js';
+import {
+  assertNoUncertainDispatch,
+  uncertainDispatchFindings,
+} from '../../src/loop/dispatch-disposition.js';
 import type { TaskRecord } from '../../src/loop/tasks.js';
 
 const ROUND = 'R-0012';
@@ -297,6 +300,43 @@ describe('dispatch journal', () => {
     expect(opened(journalDir)).toBe(-1);
   });
 
+  it('names every attempt a damaged journal leaves open, from its prefix and its unproven tail', async () => {
+    const root = repository();
+    await withAuthorityHostTestScope(async () => {
+      appendThrough(root, 5, 'TASK-0040', 1);
+      appendThrough(root, 3, 'TASK-0041', 1);
+      appendThrough(root, 2, 'TASK-0042', 1);
+    });
+    const path = dispatchJournalPath(root, ROUND);
+    const intact = readFileSync(path, 'utf8');
+    const lines = intact.slice(0, -1).split('\n');
+    // Tamper with TASK-0041's spawned line: the next line no longer links to it, so the
+    // verifiable prefix ends after it and TASK-0042 is known only from the unproven tail.
+    const tampered = lines
+      .map((line, index) => (index === 6 ? line.replace('"pid":4242', '"pid":4243') : line))
+      .join('\n');
+    expect(damagedJournalOpenAttempts(`${tampered}\n`, ROUND)).toEqual([
+      { task_id: 'TASK-0041', attempt: 1, last_event: 'spawned' },
+      { task_id: 'TASK-0042', attempt: 1, last_event: 'intent' },
+    ]);
+    // A torn final line closes nothing, and a schema-valid line after the damage that the
+    // prefix does not prove settled is open too, even a settled one.
+    const settledElsewhere = JSON.stringify({
+      ...JSON.parse(lines[4] ?? '{}'),
+      task_id: 'TASK-0043',
+    });
+    expect(
+      damagedJournalOpenAttempts(
+        `${intact}${settledElsewhere}\n{"schemaVersion":"1.0.0","rou`,
+        ROUND,
+      ),
+    ).toEqual([
+      { task_id: 'TASK-0041', attempt: 1, last_event: 'exited' },
+      { task_id: 'TASK-0042', attempt: 1, last_event: 'spawned' },
+      { task_id: 'TASK-0043', attempt: 1, last_event: 'settled' },
+    ]);
+  });
+
   it('plans a quarantine only for a damaged journal and moves exactly its bytes aside', async () => {
     const root = repository();
     await withAuthorityHostTestScope(async () => {
@@ -314,7 +354,7 @@ describe('dispatch journal', () => {
     await withAuthorityHostTestScope(async () => {
       const plan = planDispatchJournalQuarantine(root, ROUND);
       expect(plan.sha256).toBe(createHash('sha256').update(damaged).digest('hex'));
-      expect(plan.path).toBe(quarantinedJournalPath(root, ROUND, plan.sha256));
+      expect(join(root, plan.path)).toBe(quarantinedJournalPath(root, ROUND, plan.sha256));
       appendFileSync(path, 'more');
       expect(() => applyDispatchJournalQuarantine(root, ROUND, plan)).toThrow(
         'TASK_DISPATCH_JOURNAL_CHANGED',
@@ -322,7 +362,7 @@ describe('dispatch journal', () => {
       writeFileSync(path, damaged);
       applyDispatchJournalQuarantine(root, ROUND, plan);
       expect(existsSync(path)).toBe(false);
-      expect(readFileSync(plan.path).equals(damaged)).toBe(true);
+      expect(readFileSync(join(root, plan.path)).equals(damaged)).toBe(true);
       // The next attempt starts a fresh hash chain.
       expect(
         appendDispatchJournalEvent(root, ROUND, entry('intent', 'TASK-0040', 2)),
