@@ -143,6 +143,11 @@ Database and worktree identities
 are per task (`devai_task_<task id>`, `WT-<task id>`), so two distinct tasks never contend for
 them. There is no cross-round controller and no reviewer reserve yet; the policy records both.
 
+Managed worktrees are capped per host at `capacity.max_workers` (ADR-MDL-0007), so every worker
+the policy admits can hold its worktree. A worktree kept after its attempt settles, for review or
+for a human disposition, holds no capacity. Neither does a worktree left by an attempt process that
+is provably gone. Human-adopted worktrees are exempt as before (Constitution Article 27).
+
 ## Canonical executor-kind descriptors
 
 Choose a kind by the work contract: deterministic registered action or shell-free argv,
@@ -197,7 +202,7 @@ The generated descriptors below own the complete kind population and every per-k
 - **When to use:** Use `agent` only when its closed execution contract matches the task.
 - **When not to use:** Do not use it to bypass round containment, role authority, or evidence requirements.
 - **Non-pass semantics:** `fail` is a negative finding; `error` is an execution or producer defect; `unknown` never passes; `review` requires human disposition; `skipped` reports an unexecuted member; `N/A` is valid only when the governing contract explicitly permits it.
-- **Example:** `devai round run --round R-1000 --repo-root . --as-role owner --write --format json`
+- **Example:** `devai round dispatch --round R-1000 --repo-root . --as-role owner --write --experimental --format json`
 - **Canonical source:** [`law/schemas/task.schema.json`](../../../law/schemas/task.schema.json#/properties/executor)
 - **Related workflow:** `round`
 
@@ -419,10 +424,18 @@ devai round dispatch --round R-0012 --repo-root . --as-role architect --write --
 ```
 
 `round dispatch` runs the round's ready agent tasks, or the `--task` selection, under the
-in-force activation. Before any lock, worktree, or provider is touched it refuses an absent or
-expired activation, any selected task whose discipline, runtime, model, effort, or exact
-selection the activation does not admit, and a round whose dispatch journal holds an uncertain
-attempt (`TASK_DISPATCH_UNCERTAIN`) until a human runs `task escalate` on that task.
+in-force activation. Before any lock, worktree, or provider is touched it refuses:
+
+- an absent or expired activation;
+- any task in the selection's whole same-round dependency closure, exactly as the runner will plan
+  it, whose discipline, runtime, model, effort, or exact selection the activation does not admit;
+- an effort the runtime registry does not list for its runtime;
+- a round with uncertain work (`TASK_DISPATCH_UNCERTAIN`).
+
+Uncertain work is an attempt with `intent` but no `settled`, whatever the task status, or an agent
+task left `in_progress` with no journal record. The refusal names each such task and attempt, and
+the round stays blocked until a recorded human disposition (see
+[recovering experimental work](#recovering-experimental-work)).
 
 Each task composes its prompt (Article 37) from four layers: the adopter's `AGENTS.md`, the
 discipline's role charter, the task record, and the task's recipe as the payload. A task without
@@ -430,15 +443,85 @@ discipline's role charter, the task record, and the task's recipe as the payload
 `prompt_composition_id`, or the task is refused with `TASK_PROMPT_COMPOSITION_DRIFT`. It then runs up
 to three attempts at the requested model and one at the next tier of
 `law/policy/model-tiers.json` when the activation also admits that model, bounded by the task's
-`max_iterations` and the activation budgets. Every attempt runs in a fresh worktree
-`WT-<task>-A<n>` and is journalled from `intent` to `settled`. Any changed path that Article 6
-does not give the task's discipline fails it with `EXPERIMENTAL_WRITE_SCOPE_VIOLATION`. Its
-evidence carries `experimental: true` and version-2 usage. A contained, completed attempt leaves
-the task `awaiting_human_review` with its worktree kept for review. Otherwise the worktree is
-removed, the changed-file digests stay in the evidence, and an exhausted ladder or budget ends
-the task `experimental_blocked`. Once a provider leaves a token counter unreported, no further
-attempt in the invocation may spend (`EXPERIMENTAL_USAGE_UNVERIFIABLE`). Nothing is pushed,
-merged, or retried automatically.
+`max_iterations` and the activation budgets. Attempts are numbered for the task's lifetime, so a
+retried task continues its ladder. Every attempt runs in a fresh worktree `WT-<task>-A<n>`, bound
+to the task, and is journalled from `intent` to `settled`.
+
+An attempt fails when:
+
+- Article 6 does not give the task's discipline a changed path
+  (`EXPERIMENTAL_WRITE_SCOPE_VIOLATION`);
+- it leaves a symbolic link resolving outside the worktree (`EXPERIMENTAL_SYMLINK_ESCAPE`); a base
+  tree holding one refuses before any provider starts;
+- the task lost a declared lock before its result could be accepted (`TASK_RESOURCE_LOCK_LOST`).
+
+Its evidence carries `experimental: true` and version-2 usage. The task's outcome and worktree
+binding are saved before the attempt settles:
+
+- A contained, completed attempt leaves the task `awaiting_human_review`, with its worktree
+  retained for review.
+- A failed attempt's worktree is removed when the next attempt starts; its changed-file digests
+  stay in the evidence.
+- An exhausted ladder or budget ends the task `experimental_blocked`, with the last failed
+  attempt's worktree retained and bound to it.
+- A task that could not start any attempt, because a budget ran out or its worktree could not be
+  prepared, stays `ready` with its locks released.
+
+Once a provider leaves any token counter unreported, cache counters included, no further attempt
+in the invocation may spend (`EXPERIMENTAL_USAGE_UNVERIFIABLE`). A failure after a provider
+started leaves the attempt uncertain and the task `experimental_blocked`, with the worktree kept.
+Nothing is pushed, merged, or retried automatically.
+
+## Completing agent work
+
+An accepted agent task completes through the registered path (ADR-MDL-0007):
+
+1. `round ratify --round <round-id> --task <task-id> --decision accept --as-role owner --write`
+   moves the reviewed task to `pre_merge`.
+2. A human integrates the attempt's changes from its retained worktree. Merge stays a separate
+   human act; record it as evidence, for example with `evidence record`.
+3. `task finish --round <round-id> --task <task-id> --evidence <EV-id> --as-role engineer --write`
+   records the completion.
+
+`task finish` refuses an agent task with no accepted ratification
+(`TASK_RATIFICATION_REQUIRED`), with no `EV-` merge evidence (`TASK_MERGE_EVIDENCE_REQUIRED`), or
+with an open journal attempt (`TASK_DISPATCH_UNCERTAIN`). On completion it writes
+`.devai/state/round-runs/<round>/completions/<task>.json`, binding the ratification digest and
+the merge evidence. It then moves the task through `merging` to `completed` and releases the
+attempt worktree; the branch is kept. A rejecting ratification or `task escalate` on an agent task
+releases its worktree too. Routine and human tasks complete exactly as before.
+
+## Recovering experimental work
+
+Every recovery action is Owner-only and needs `--write` and `--experimental`. Each writes a
+durable record before it changes anything else, and none runs a provider.
+
+```bash
+devai round dispatch dispose --round R-0012 --task TASK-0040 --as retry --repo-root . --as-role owner --write --experimental --format json
+devai round dispatch dispose --round R-0012 --quarantine-journal --repo-root . --as-role owner --write --experimental --format json
+devai round dispatch deactivate --repo-root . --as-role owner --write --experimental --format json
+```
+
+- **`round dispatch dispose --task <task-id> --as retry|escalate`** holds the round controller, so
+  it never races a live dispatch. It disposes of one agent task with an open journal attempt,
+  left `in_progress`, or `experimental_blocked`.
+  - It writes `.devai/state/round-runs/<round>/dispositions/<DSP-id>.json`, then closes each open
+    attempt with a `settled` event of outcome `cancelled` naming that record.
+  - It releases the task's attempt worktrees and locks.
+  - A retry returns the task to `ready`; escalate escalates it.
+  - A retry refuses once the task's ladder is spent (`DISPOSITION_ATTEMPTS_EXHAUSTED`): a further
+    try is a new task.
+  - `task escalate` also records a disposition for an agent task with open attempts.
+- **`round dispatch dispose --quarantine-journal`** handles a damaged journal, which otherwise
+  refuses every dispatch with `TASK_DISPATCH_JOURNAL_INVALID`. It writes a disposition record,
+  then moves the journal aside byte for byte as `dispatch-journal.quarantined-<sha256>.jsonl`. The
+  next dispatch starts a fresh chain. A readable journal refuses (`TASK_DISPATCH_JOURNAL_VALID`).
+  Agent tasks left in flight still need their own disposition.
+- **`round dispatch deactivate`** writes a withdrawal record under
+  `.devai/state/experimental/withdrawals/`. The record names the time, the SHA-256 of the
+  withdrawn record and its activation digest. The action then removes the activation, so the
+  repository returns to the supported serial runner. A dispatch already running keeps the
+  activation it read at start.
 
 A provider starts with an allowlisted environment, never the host's. It gets only `PATH`,
 `HOME`, `USER`, `LOGNAME`, `SHELL`, `TMPDIR`, `LANG`, `LC_*`, `TERM`, the proxy and CA variables,
