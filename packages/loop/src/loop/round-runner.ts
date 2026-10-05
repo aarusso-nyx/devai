@@ -1,12 +1,22 @@
 import { join } from 'node:path';
 import { decideRoundTaskAdmission, planRoundTaskAdmission } from './round-task-admission.js';
-import { LOCK_RENEWAL_INTERVAL_MS, listLocks, renewLocks, taskLockTargets } from './locks.js';
+import {
+  LOCK_RENEWAL_INTERVAL_MS,
+  inspectLocks,
+  listLocks,
+  lockIdentity,
+  renewLocks,
+  taskLockTargets,
+} from './locks.js';
 import {
   LOCK_DENIAL_ESCALATION_THRESHOLD,
+  LOCK_RELEASE_STATUSES,
   ROUND_DEFAULT_WORKERS,
   ROUND_MAX_WORKERS,
   acquireRoundController,
+  assertLockDenialsValid,
   clearLockDenials,
+  lockDenialCount,
   recordLockDenial,
   releaseRoundController,
 } from './round-controller.js';
@@ -79,10 +89,37 @@ function requiredTaskLocksHeld(repoRoot: string, task: TaskRecord): boolean {
   );
 }
 
+/** A dispatch that leaves its task here still holds the task's locks. */
+const LOCK_HOLDING_STATUSES = new Set<TaskRecord['status']>([
+  'in_progress',
+  'checkpoint',
+  'pre_merge',
+  'merging',
+  'awaiting_human_review',
+  'experimental_blocked',
+]);
+
+/** True when every key still holds exactly the record the task last held there. */
+function exactLocksHeld(
+  locksDir: string,
+  task: TaskRecord,
+  targets: readonly string[],
+  held: ReadonlyMap<string, string>,
+): boolean {
+  const current = inspectLocks({ locksDir, taskId: task.id, targets });
+  return (
+    current.lost.length === 0 &&
+    current.held.every((entry) => held.get(entry.target) === entry.identity)
+  );
+}
+
 /**
  * Run one dispatch while renewing the task's locks, so a dispatch longer than the
- * lock TTL is never taken over. A lock found missing or held by another task is a
- * lost lock: the dispatch result cannot claim exclusive resources it no longer had.
+ * lock TTL is never taken over. A lock found missing, held by another task, or
+ * replaced by any record other than the one this task last held is a lost lock: the
+ * dispatch result cannot claim exclusive resources it no longer had. The final check
+ * runs whatever status the dispatch left, except a transition that released the
+ * locks itself (`round-execution.json` resources.release_on).
  */
 async function dispatchWithLockRenewal(
   options: RunRoundTasksOptions,
@@ -90,13 +127,19 @@ async function dispatchWithLockRenewal(
 ): Promise<RoundTaskDispatchResult> {
   const locksDir = join(options.repoRoot, '.devai/state/locks');
   const targets = taskLockTargets(task);
-  let lost = false;
+  const initial = inspectLocks({ locksDir, taskId: task.id, targets });
+  const held = new Map(initial.held.map((entry) => [entry.target, entry.identity]));
+  let lost = initial.lost.length > 0;
   const renew = (): void => {
     if (lost || targets.length === 0) return;
     try {
-      // A dispatch that completed or escalated the task released its locks legitimately.
+      // Mid-dispatch, only a running task renews; the final check covers the rest.
       if (loadTask(options.repoRoot, task.id).status !== 'in_progress') return;
-      lost = renewLocks({ locksDir, taskId: task.id, targets }).lost.length > 0;
+      const renewal = renewLocks({ locksDir, taskId: task.id, targets });
+      for (const record of renewal.renewed) {
+        held.set(`${record.substrate}:${record.module}`, lockIdentity(record));
+      }
+      lost = renewal.lost.length > 0;
     } catch {
       lost = true;
     }
@@ -115,7 +158,16 @@ async function dispatchWithLockRenewal(
   } finally {
     clearInterval(timer);
   }
-  renew();
+  if (!lost && targets.length > 0) {
+    try {
+      const status = loadTask(options.repoRoot, task.id).status;
+      if (!LOCK_RELEASE_STATUSES.includes(status)) {
+        lost = !exactLocksHeld(locksDir, task, targets, held);
+      }
+    } catch {
+      lost = true;
+    }
+  }
   return lost ? { ok: false, code: 'TASK_RESOURCE_LOCK_LOST' } : result;
 }
 
@@ -154,6 +206,31 @@ function handleLockDenial(
   return { task_id: taskId, ok: false, code: 'TASK_RESOURCE_LOCK_DENIED' };
 }
 
+/**
+ * Re-queue (or escalate) the round's tasks left in `lock_denied`. A denial is counted
+ * and re-queued in two writes; a crash or a failed counter write between them would
+ * strand the task, because an all-ready run selects only `ready` tasks and a stranded
+ * dependency refuses planning. Runs under the round controller, before the plan binds
+ * requests, so the re-queue carries its priority bump at once. The interrupted denial
+ * is not counted again: it was counted unless the counter write itself failed. An
+ * explicit selection naming a `lock_denied` task still refuses with `TASK_NOT_READY`.
+ */
+function requeueStrandedLockDenials(repoRoot: string, roundId: string): void {
+  for (const task of admissionPopulation(repoRoot)) {
+    if (task.round_id !== roundId || task.status !== 'lock_denied') continue;
+    if (lockDenialCount(repoRoot, roundId, task.id) >= LOCK_DENIAL_ESCALATION_THRESHOLD) {
+      escalateRoundTask({ repoRoot, round: roundId, taskId: task.id });
+      clearLockDenials(repoRoot, roundId, task.id);
+      continue;
+    }
+    saveTask(repoRoot, {
+      ...task,
+      status: 'ready',
+      priority: Math.min(100, (task.priority ?? 0) + 1),
+    });
+  }
+}
+
 /** Raise each re-queued task's priority by one once no admission still binds this plan. */
 function bumpRequeuedPriority(repoRoot: string, requeued: readonly string[]): void {
   for (const taskId of requeued) {
@@ -190,6 +267,8 @@ async function runControlledRound(
   roundId: string,
 ): Promise<RunRoundTasksResult> {
   const workers = resolveRoundWorkers(options.maxWorkers);
+  assertLockDenialsValid(options.repoRoot, roundId);
+  if (options.taskIds === undefined) requeueStrandedLockDenials(options.repoRoot, roundId);
   const population = admissionPopulation(options.repoRoot);
   const plan = planRoundTaskAdmission({
     roundId,
@@ -210,8 +289,14 @@ async function runControlledRound(
 
   const execute = async (running: TaskRecord): Promise<void> => {
     const result = await dispatchWithLockRenewal(options, running);
-    if (!result.ok && loadTask(options.repoRoot, running.id).status === 'in_progress') {
-      escalateRoundTask({ repoRoot: options.repoRoot, round: roundId, taskId: running.id });
+    if (!result.ok) {
+      const status = loadTask(options.repoRoot, running.id).status;
+      // A pass recorded without exclusive resources is never left to finish or merge.
+      const lostAfterHandoff =
+        result.code === 'TASK_RESOURCE_LOCK_LOST' && LOCK_HOLDING_STATUSES.has(status);
+      if (status === 'in_progress' || lostAfterHandoff) {
+        escalateRoundTask({ repoRoot: options.repoRoot, round: roundId, taskId: running.id });
+      }
     }
     finish({
       task_id: running.id,
