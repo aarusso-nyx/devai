@@ -41,8 +41,8 @@ afterEach(() => {
 });
 
 describe('publishable closure package identity versions', () => {
-  it.each(['1.4.5', '1.5.0', '1.5.0-rc.0'])(
-    'accepts canonical 1.x %s through package identity before repository validation',
+  it.each(['1.4.5', '1.5.0', '1.5.0-rc.0', '2.0.0', '2.0.0-rc.1', '10.0.0'])(
+    'accepts canonical stable-major %s through package identity before repository validation',
     (version) => {
       const root = checkerFixture(version, {
         name: '@aarusso-nyx/devai',
@@ -58,7 +58,14 @@ describe('publishable closure package identity versions', () => {
     ['mismatched root and CLI versions', '1.5.0', '@aarusso-nyx/devai', '1.4.5'],
     ['a leading-zero minor version', '1.05.0', '@aarusso-nyx/devai', '1.05.0'],
     ['a leading-zero patch version', '1.5.00', '@aarusso-nyx/devai', '1.5.00'],
-    ['a 2.x version', '2.0.0', '@aarusso-nyx/devai', '2.0.0'],
+    ['a leading-zero major version', '02.0.0', '@aarusso-nyx/devai', '02.0.0'],
+    ['a pre-1.0 version', '0.9.0', '@aarusso-nyx/devai', '0.9.0'],
+    [
+      'a 2.x version that is not an rc prerelease',
+      '2.0.0-beta.1',
+      '@aarusso-nyx/devai',
+      '2.0.0-beta.1',
+    ],
     ['a foreign CLI package name', '1.5.0', '@devai-nyx/cli', '1.5.0'],
   ])(
     '%s refuses package identity before later closure checks',
