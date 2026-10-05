@@ -1,6 +1,10 @@
 import { existsSync, readdirSync, readFileSync } from '@devai-nyx/authority';
 import { join } from 'node:path';
-import { readPathOverrides, resolveDocsPathOverride } from '../doctor-support.js';
+import {
+  docsPathOutsideRealRoot,
+  readPathOverrides,
+  resolveDocsPathOverride,
+} from '../doctor-support.js';
 import type { GovernanceFinding, Builder } from './docs-governance-config-checks.js';
 
 // ---------------------------------------------------------------------------
@@ -285,6 +289,16 @@ export function checkDocsIaWorkflowPageSet(repoRoot: string): GovernanceFinding 
     };
   }
   const pages = resolution.path;
+  const outside = docsPathOutsideRealRoot(repoRoot, pages);
+  if (outside !== undefined) {
+    return {
+      ruleId,
+      severity: 'fail',
+      message: `DOCS_PATH_OUTSIDE_DOCS_ROOT: ${pages} resolves to ${outside}, outside the real docs/ root, so the workflow pages were not read`,
+      remediation: `Replace the symbolic link on ${pages} with a directory inside docs/, or relocate the pages under docs.ia.path_overrides.`,
+      locations: [pages],
+    };
+  }
   const workflowsDir = join(repoRoot, '.github/workflows');
   const pagesDir = join(repoRoot, pages);
   if (!existsSync(workflowsDir) && !existsSync(pagesDir)) {
