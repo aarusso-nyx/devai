@@ -1,5 +1,80 @@
 # Changelog
 
+## 2.0.0 — 2026-10-05
+
+DEVAI 2.0.0 marks the governed orchestrator: the round runner becomes a bounded controller with
+deterministic admission, race-free locks and capacity, and an Owner can opt a repository into
+experimental agent execution. No commit since v1.9.0 carries the breaking marker, so the commit
+grammar's bump floor over this range is minor; the major version is the Owner's decision, taken
+because adopters see changed round-runner behavior and a new class of governed operations. A
+repository that never writes an activation record keeps the supported serial runner, under the
+stricter lock and controller rules below.
+
+- Adopter-visible changes to `round run` (ADR-GOV-0025, ADR-MDL-0005, ADR-MDL-0007):
+  - Runtime locks cover every declared `(substrate, module)` pair (Constitution Article 25), taken
+    all-or-nothing in canonical order and renewed during a dispatch, so an F2 and an F3 lock on one
+    module no longer conflict and a displaced lock fails the task (`TASK_RESOURCE_LOCK_LOST`).
+  - A second controller for one round refuses with `TASK_ROUND_CONTROLLER_BUSY`. A crashed
+    controller is reclaimed only when it provably died on this host.
+  - A lock-denied task returns to `ready` with priority +1, and the third consecutive denial
+    escalates it (`TASK_RESOURCE_LOCK_DENIED`, `TASK_RESOURCE_LOCK_DENIED_REPEATED`).
+  - Admission is deterministic: topological generation, discipline, priority and identifier set the
+    order, a dependent runs only after a durably `completed` upstream record, and malformed or
+    drifted records and duplicate identifiers refuse before anything runs.
+  - `round run --workers <n>` opts into up to four same-generation, resource-disjoint tasks
+    (`TASK_GENERATION_BARRIER`, `TASK_WORKER_CAP_INVALID`); the default stays one.
+  - Every action except the experimental ones refuses the `--experimental` flag
+    (`AUTHORITY_DECLARATION_NOT_APPLICABLE`).
+- Lock-claim protocol: lock, controller and denial records change by a claimed compare-and-swap on
+  the exact observed record, a claim is broken only on proof that its claimant is gone
+  (`TASK_RECORD_CLAIM_STALE` otherwise), and durable lock fences let the next run reconcile a
+  stopped runner's dispatch. <!-- verify after merge -->
+- Experimental agent execution (ADR-MDL-0005, ADR-MDL-0006): the Owner records an expiring
+  activation with `round dispatch activate`, and `round dispatch --write --experimental` runs
+  admitted engineer and inspector agent tasks through `claude-cli` or `codex-cli`. Each task
+  gets a prompt composed deterministically from `AGENTS.md`, a packaged role charter, the task
+  record and its recipe (a task without `recipe_name` refuses with `PROMPT_RECIPE_REQUIRED`), up to
+  three attempts at the requested model and one at the next tier, each in a fresh worktree with an
+  Article 6 write-scope check and a hash-linked journal. Usage evidence is version 2, so a missing
+  counter or cost is never recorded as zero. Results await human review and carry
+  `experimental: true`; nothing is pushed, merged or retried automatically.
+- Agent hardening: provider processes run with an explicit environment allowlist, malformed or
+  truncated provider output never passes (`AGENT_CLI_OUTPUT_MALFORMED`,
+  `AGENT_CLI_OUTPUT_TRUNCATED`), a failed journal write after the provider started stops its
+  process group (`AGENT_CLI_SPAWN_RECORD_FAILED`), a routine task that times out is escalated
+  (`TASK_ROUTINE_TIMED_OUT`), and a process group still alive after SIGKILL is reported as
+  `PROCESS_GROUP_TERMINATION_UNCONFIRMED` instead of being cleaned up under a running writer.
+- Campaigns and completion (ADR-GOV-0025, ADR-MDL-0007): `campaign status` projects a campaign
+  plan onto runtime state and names drift; `campaign materialize` writes an open round's tasks
+  through the single queue; `round ratify` records the Owner's or Architect's decision on reviewed
+  work, separate from merge. An agent task completes through `round ratify --decision accept`, the
+  human merge, then `task finish --evidence EV-…`. <!-- verify after merge -->
+- Recovery (Owner-only, `--write --experimental`): `round dispatch dispose --task T --as retry|escalate`
+  and `--quarantine-journal` clear uncertain, blocked or damaged experimental work through a
+  recorded disposition, and `round dispatch deactivate` withdraws the activation with a
+  withdrawal record. Retained review, blocked and uncertain worktrees hold no worktree capacity.
+  <!-- verify after merge -->
+- `init upgrade` (#264): an Architect plans, and with `--write` applies, the move from the bound
+  `devai_version` to the installed version from the shipped migration manifest. It refuses an
+  undeclared key retirement before any write, rolls everything back if a post-check fails, and
+  records `.devai/config/upgrade-receipt.json`; a second run is a no-op. <!-- verify after merge -->
+- Doctor (#265, #266): `docs-ia.workflow-page-set` honors `docs.ia.path_overrides`; a post-merge
+  binding made in another checkout is reported as not applicable there only when this checkout
+  holds no post-merge state of its own, otherwise it is verified and refused; host-adapter
+  configs that lag the installed version warn (`POST_MERGE_ADAPTER_VERSION_LAG`,
+  `GITHUB_ACTIONS_ADAPTER_VERSION_LAG`) through the new optional `CheckResult.warnings` field.
+- Scorecard (ADR-SCR-0013, refs #235): the pull-request gate carries fail-closed producers for the
+  gate invariants, and the alignment sensor reads a stored reading through the receipts that name
+  its current bytes. <!-- verify after merge -->
+- Release: this release is verified by the trusted local-RC verifier
+  `@aarusso-nyx/devai@1.9.0`; the ledger and release lanes restate that verifier version, and
+  the publishable closure admits stable majors above 1.
+- The action set grows from 61 to 69: `round dispatch activate`, `round dispatch`,
+  `campaign status`, `campaign materialize`, `round ratify`, `round dispatch dispose`,
+  `round dispatch deactivate`, `init upgrade`. The runtime schema roster adds the
+  experimental-execution, activation, dispatch-journal, prompt-composition, campaign and
+  adopter-migrations schemas. <!-- verify after merge -->
+
 ## 1.9.0 — 2026-10-03
 
 - Sense and audit (CMP-0004): every new reading file gets its own chain entry and the sweep runs
