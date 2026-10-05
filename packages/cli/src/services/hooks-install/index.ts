@@ -116,6 +116,67 @@ export interface PostMergeAdapterVerification {
   readonly errors: readonly string[];
 }
 
+const POST_MERGE_ATTESTATION = '.devai/config/post-merge-host-adapter.json';
+
+function postMergeAdapterId(root: string): string {
+  return `post-merge-${sha256(root).slice(0, 16)}`;
+}
+
+/** The real path of a recorded checkout, or its resolved path when it no longer exists. */
+function recordedCheckout(recorded: string): string {
+  try {
+    return realpathSync(resolve(recorded));
+  } catch {
+    return resolve(recorded);
+  }
+}
+
+/**
+ * Where the tracked post-merge attestation was bound, seen from the checkout at a root (#266):
+ * `absent` without an attestation, `this-checkout` when the binding is this checkout's own, and
+ * `other-checkout` when it was made in another checkout, the only one able to verify it.
+ */
+export interface PostMergeBindingLocation {
+  readonly scope: 'absent' | 'this-checkout' | 'other-checkout';
+  /** The checkout the attestation records, when it records one. */
+  readonly bound_checkout?: string;
+}
+
+/**
+ * The attestation records the checkout's path, hook, and a signature by a key in that checkout's
+ * git directory, so it is verifiable only there (#266). It is classified as another checkout's
+ * only when it names neither this checkout's path nor this checkout's adapter id and this
+ * checkout holds no post-merge key of its own. An unreadable attestation, and one in a checkout
+ * that holds a key, stay this checkout's, so a moved, edited, or stale binding in the bound
+ * checkout is still verified, and refused, in full.
+ */
+export function locatePostMergeBinding(targetRoot: string): PostMergeBindingLocation {
+  const root = realpathSync(resolve(targetRoot));
+  const attestationPath = join(root, POST_MERGE_ATTESTATION);
+  if (!existsSync(attestationPath)) return { scope: 'absent' };
+  let attestation: unknown;
+  try {
+    attestation = JSON.parse(readFileSync(attestationPath, 'utf8'));
+  } catch {
+    return { scope: 'this-checkout' };
+  }
+  const recorded =
+    attestation !== null && typeof attestation === 'object'
+      ? (attestation as Record<string, unknown>)['repository']
+      : undefined;
+  if (typeof recorded !== 'string' || recorded.length === 0) return { scope: 'this-checkout' };
+  const boundCheckout = recordedCheckout(recorded);
+  const adapterId = (attestation as Record<string, unknown>)['adapter_id'];
+  let localKey: boolean;
+  try {
+    localKey = existsSync(join(gitAdminRoot(root), 'devai/post-merge.key'));
+  } catch {
+    localKey = false;
+  }
+  const foreign = boundCheckout !== root && adapterId !== postMergeAdapterId(root) && !localKey;
+  return { scope: foreign ? 'other-checkout' : 'this-checkout', bound_checkout: boundCheckout };
+}
+
 export function verifyInstalledPostMergeAdapter(
   targetRoot: string,
   devaiVersion: string,
@@ -155,9 +216,10 @@ export function verifyInstalledPostMergeAdapter(
     facts['signature_valid'] =
       typeof signature === 'string' &&
       createHmac('sha256', key).update(JSON.stringify(unsigned)).digest('hex') === signature;
+    // A recorded checkout that no longer exists is an unbound repository, never a raw ENOENT (#266).
     facts['repository_bound'] =
       typeof attestation['repository'] === 'string' &&
-      realpathSync(resolve(String(attestation['repository']))) === root;
+      recordedCheckout(attestation['repository']) === root;
     facts['hook_bound'] = attestation['hook_digest_sha256'] === sha256(hook);
     facts['key_bound'] = attestation['key_digest_sha256'] === sha256(key);
     facts['policy_bound'] =
@@ -332,7 +394,7 @@ function executePostMergeAdapter(plan: HooksInstallPlan): void {
   }
   const unsigned = {
     schemaVersion: '1.0.0',
-    adapter_id: `post-merge-${sha256(root).slice(0, 16)}`,
+    adapter_id: postMergeAdapterId(root),
     adapter_kind: 'installed-checkout',
     ...stableBindings,
     installed_at_head: headAt(root),
