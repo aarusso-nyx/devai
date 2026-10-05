@@ -622,7 +622,7 @@ describe('canonical production authority refusal acceptance', () => {
   });
 
   it('requires no declaration for reads and a declaration for every write-capable action', () => {
-    expect(current).toHaveLength(63);
+    expect(current).toHaveLength(64);
     const unbound = mkdtempSync(join(tmpdir(), 'devai-authority-unbound-'));
     try {
       for (const format of ['human', 'json'] as const) {
@@ -632,7 +632,9 @@ describe('canonical production authority refusal acceptance', () => {
               ? refusal(entry, ['--as-role', 'owner'], format)
               : refusal(
                   entry,
-                  entry.name === 'init bind'
+                  // init bind and init upgrade plan without --write (#264), so only an
+                  // explicit write needs the declaration.
+                  entry.name === 'init bind' || entry.name === 'init upgrade'
                     ? ['--write']
                     : entry.name === 'check'
                       ? ['--repo-root', unbound]
@@ -660,7 +662,7 @@ describe('canonical production authority refusal acceptance', () => {
         const role = allowedRoles(entry)[0];
         if (role === undefined)
           throw new Error(`write action has no initiating role: ${entry.name}`);
-        if (entry.name !== 'init bind') {
+        if (entry.name !== 'init bind' && entry.name !== 'init upgrade') {
           expectCode(
             refusal(entry, ['--as-role', role], format),
             'AUTHORITY_WRITE_CONSENT_REQUIRED',

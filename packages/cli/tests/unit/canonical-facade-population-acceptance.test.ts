@@ -1,5 +1,5 @@
 // Invariants: INV-DEVAI-001, INV-DEVAI-015, INV-DEVAI-017, INV-DEVAI-020
-// Inspector acceptance: the 63 current actions have a one-to-one executable
+// Inspector acceptance: the 64 current actions have a one-to-one executable
 // facade population, and every facade has a bounded, non-silent refusal probe.
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
@@ -29,6 +29,7 @@ import {
   initApplyOwner,
   initBind,
   initPlan,
+  initUpgrade,
 } from '../../src/commands/init/index.js';
 import {
   releaseCertify,
@@ -94,6 +95,7 @@ const FACADES: readonly FacadeDefinition[] = [
   initApplyOwner,
   initBind,
   initPlan,
+  initUpgrade,
   releaseCertify,
   releaseCheck,
   releaseDrift,
@@ -142,6 +144,7 @@ const REFUSAL_PROBES: Readonly<Record<string, RefusalProbe>> = {
   'init apply owner': usage(['--tier', 'not-a-tier']),
   'init plan': usage(['--tier', 'not-a-tier']),
   'init bind': usage(['--unknown-option']),
+  'init upgrade': usage(['--unknown-option']),
   'release certify': failed(['--request', 'missing-release-request.json']),
   'release check': usage(['--environment', 'not-an-environment']),
   'release drift': usage(['--environment', 'not-an-environment']),
@@ -198,9 +201,9 @@ describe('canonical facade population acceptance', () => {
     const facadeNames = FACADES.map((definition) => definition.name).sort();
     const currentBindings = ACTION_REGISTRY.map((entry) => entry.handler).sort();
 
-    expect(FACADES).toHaveLength(63);
-    expect(ACTION_REGISTRY).toHaveLength(63);
-    expect(new Set(facadeNames).size).toBe(63);
+    expect(FACADES).toHaveLength(64);
+    expect(ACTION_REGISTRY).toHaveLength(64);
+    expect(new Set(facadeNames).size).toBe(64);
     expect(facadeNames).toEqual(currentBindings);
     expect(Object.keys(REFUSAL_PROBES).sort()).toEqual(currentBindings);
 
@@ -208,7 +211,7 @@ describe('canonical facade population acceptance', () => {
     for (const definition of FACADES) definition.register(cli);
   });
 
-  it('executes a bounded refusal probe for all 63 current facades without external effects', async () => {
+  it('executes a bounded refusal probe for all 64 current facades without external effects', async () => {
     const cli = cac('devai-canonical-facade-refusals');
     for (const definition of FACADES) definition.register(cli);
 
