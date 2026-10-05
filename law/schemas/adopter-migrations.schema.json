@@ -1,0 +1,309 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/adopter-migrations.schema.json",
+  "title": "Adopter migration manifest",
+  "description": "The versioned list of adopter-facing changes between DEVAI releases, held canonically in law/policy/adopter-migrations.json and shipped in the package. init upgrade reads it to plan a move from the adopter's bound devai_version to the installed version: each release lists its changes, the bind segments that refresh them, the adopter files they touch, the owned project.json keys a rebind may retire, the package defaults that changed, the constitution move, and the obligations an adopter must satisfy. A change that needs an Owner or Architect decision is marked so the plan fails closed on it. Releases are listed in ascending semantic version order from the baseline, and every released version above the baseline that changed adopter-facing configuration has exactly one entry.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "id", "authority", "baseline", "segments", "releases"],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "id": {
+      "const": "adopter-migrations"
+    },
+    "authority": {
+      "const": "Architect"
+    },
+    "baseline": {
+      "$ref": "#/$defs/version",
+      "description": "The oldest bound version the manifest plans from. A bound devai_version below it is refused rather than planned from an incomplete list."
+    },
+    "segments": {
+      "description": "The canonical order in which init upgrade --write runs the bind segments.",
+      "const": [
+        "constitution",
+        "operational-law",
+        "subprocess-effects",
+        "adopter-policy",
+        "authority",
+        "host-adapters",
+        "harness-ci"
+      ]
+    },
+    "releases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/release"
+      }
+    }
+  },
+  "$defs": {
+    "version": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+    },
+    "segment": {
+      "enum": [
+        "constitution",
+        "operational-law",
+        "subprocess-effects",
+        "adopter-policy",
+        "authority",
+        "host-adapters",
+        "harness-ci"
+      ]
+    },
+    "release": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "status", "changes"],
+      "properties": {
+        "version": {
+          "$ref": "#/$defs/version"
+        },
+        "status": {
+          "enum": ["released", "unreleased"],
+          "description": "An unreleased entry is prepared ahead of its release and is planned only once the installed package carries that version."
+        },
+        "date": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        },
+        "changes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/change"
+          }
+        }
+      },
+      "if": {
+        "properties": {
+          "status": {
+            "const": "released"
+          }
+        }
+      },
+      "then": {
+        "required": ["date"]
+      }
+    },
+    "change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "summary", "decision_records", "segments", "files"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^MIG-(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "kind": {
+          "enum": [
+            "rebind",
+            "owned-key-retirement",
+            "changed-default",
+            "constitution",
+            "new-obligation",
+            "opt-in-capability",
+            "new-action"
+          ],
+          "description": "rebind: package bytes changed and the named segments rematerialize them. owned-key-retirement: the adopter-policy bind may delete owned project.json keys the source does not declare. changed-default: a package default changed, so an adopter source that declares the key replaces the new default. constitution: the installed constitution version moved. new-obligation: the adopter must satisfy a new requirement. opt-in-capability: a capability that changes nothing until the adopter enables it. new-action: a new registered action."
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 16
+        },
+        "decision_records": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^ADR-[A-Z]{3}-[0-9]{4}$"
+          }
+        },
+        "issues": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "segments": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/segment"
+          }
+        },
+        "files": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "decision_required": {
+          "type": "boolean",
+          "description": "True when applying the change can need an Owner or Architect decision; the plan fails closed on it until the decision is recorded in the adopter's own sources."
+        },
+        "retired_pointers": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^(/[a-z_]+)+$"
+          }
+        },
+        "default": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["policy", "source_key", "added"],
+          "properties": {
+            "policy": {
+              "enum": ["domains.json", "glob-guards.json", "scorecard-na.json", "thresholds.json"]
+            },
+            "source_key": {
+              "enum": ["domains", "glob_guards", "scorecard_na", "thresholds"],
+              "description": "The adopter policy source key whose declaration replaces the package default."
+            },
+            "added": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "constitution": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["from", "to"],
+          "properties": {
+            "from": {
+              "$ref": "#/$defs/version"
+            },
+            "to": {
+              "$ref": "#/$defs/version"
+            }
+          }
+        },
+        "obligation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["check", "requirement"],
+          "properties": {
+            "check": {
+              "enum": [
+                "adopter-policy-receipt",
+                "constitution-version",
+                "proof-anchor-baseline",
+                "thresholds-soft-gate"
+              ]
+            },
+            "requirement": {
+              "type": "string",
+              "minLength": 16
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "owned-key-retirement"
+              }
+            }
+          },
+          "then": {
+            "required": ["retired_pointers", "decision_required"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "changed-default"
+              }
+            }
+          },
+          "then": {
+            "required": ["default"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "constitution"
+              }
+            }
+          },
+          "then": {
+            "required": ["constitution", "obligation"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "new-obligation"
+              }
+            }
+          },
+          "then": {
+            "required": ["obligation"]
+          }
+        }
+      ]
+    }
+  },
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "id": "adopter-migrations",
+      "authority": "Architect",
+      "baseline": "1.6.0",
+      "segments": [
+        "constitution",
+        "operational-law",
+        "subprocess-effects",
+        "adopter-policy",
+        "authority",
+        "host-adapters",
+        "harness-ci"
+      ],
+      "releases": [
+        {
+          "version": "1.7.0",
+          "status": "released",
+          "date": "2026-09-30",
+          "changes": [
+            {
+              "id": "MIG-1.7.0-forbidden-actions-maintenance-exemption",
+              "kind": "rebind",
+              "summary": "The canonical forbidden-actions policy declares the registry maintenance exemption.",
+              "decision_records": ["ADR-GOV-0022"],
+              "segments": ["operational-law"],
+              "files": [".devai/config/forbidden-actions.json"]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

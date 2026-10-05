@@ -1,0 +1,213 @@
+{
+  "$schema": "../schemas/adopter-migrations.schema.json",
+  "schemaVersion": "1.0.0",
+  "id": "adopter-migrations",
+  "authority": "Architect",
+  "baseline": "1.6.0",
+  "segments": [
+    "constitution",
+    "operational-law",
+    "subprocess-effects",
+    "adopter-policy",
+    "authority",
+    "host-adapters",
+    "harness-ci"
+  ],
+  "releases": [
+    {
+      "version": "1.7.0",
+      "status": "released",
+      "date": "2026-09-30",
+      "changes": [
+        {
+          "id": "MIG-1.7.0-owned-key-retirement",
+          "kind": "owned-key-retirement",
+          "summary": "init bind --adopter-policy projects the owned project.json keys from the ownership matrix: a declared key replaces the current value as a whole, and an owned key the source does not declare is retired. A key the earlier deep merge preserved but the source never declared, such as ci_economy.attested_rc, is deleted on the first rebind.",
+          "decision_records": ["ADR-CFG-0002"],
+          "issues": [68],
+          "segments": ["adopter-policy"],
+          "files": [".devai/config/project.json", ".devai/config/adopter-policy-binding.json"],
+          "decision_required": true,
+          "retired_pointers": [
+            "/repo",
+            "/docs",
+            "/docs/ia",
+            "/ci_economy",
+            "/ci_economy/local_evidence",
+            "/ci_economy/attested_rc"
+          ]
+        },
+        {
+          "id": "MIG-1.7.0-scorecard-na-f4-t5",
+          "kind": "changed-default",
+          "summary": "The package scorecard N/A default gains F4:T5, Inventory x Idiomaticity, with its Article 5 reason. An adopter source that declares scorecard_na replaces the default as a whole, so F4:T5 stays scoreable unless the source lists it.",
+          "decision_records": ["ADR-SCR-0002"],
+          "segments": ["operational-law", "adopter-policy"],
+          "files": [".devai/config/scorecard-na.json"],
+          "default": {
+            "policy": "scorecard-na.json",
+            "source_key": "scorecard_na",
+            "added": ["F4:T5"]
+          }
+        },
+        {
+          "id": "MIG-1.7.0-forbidden-actions-maintenance-exemption",
+          "kind": "rebind",
+          "summary": "The canonical forbidden-actions policy exempts validated append-only maintenance of law/policy/forbidden-action-authorizations.json from FORBID-MUTATE-INVARIANTS, so a receipt commit is no longer a finding once operational law is rebound.",
+          "decision_records": ["ADR-GOV-0022"],
+          "issues": [67],
+          "segments": ["operational-law"],
+          "files": [".devai/config/forbidden-actions.json"]
+        },
+        {
+          "id": "MIG-1.7.0-subprocess-effects-read-templates",
+          "kind": "rebind",
+          "summary": "The subprocess effects registry declares the gh run list and governed vitest read templates the harness sensors run; rebinding subprocess effects materializes them byte for byte.",
+          "decision_records": ["ADR-SCR-0005"],
+          "segments": ["subprocess-effects"],
+          "files": [".devai/config/subprocess-effects.json"]
+        },
+        {
+          "id": "MIG-1.7.0-repository-kind-from-receipt",
+          "kind": "new-obligation",
+          "summary": "Check members classify the repository from the bound adopter-policy receipt. A repository without .devai/config/adopter-policy-binding.json is unclassified and fails closed with CHECK_REPOSITORY_KIND_INVALID.",
+          "decision_records": ["ADR-CHK-0005"],
+          "issues": [187],
+          "segments": ["adopter-policy"],
+          "files": [".devai/config/adopter-policy-binding.json"],
+          "obligation": {
+            "check": "adopter-policy-receipt",
+            "requirement": "Bind an adopter policy source under law/policy with init bind --adopter-policy so the receipt names a policy_id in the adopter's own namespace."
+          }
+        }
+      ]
+    },
+    {
+      "version": "1.8.0",
+      "status": "released",
+      "date": "2026-09-30",
+      "changes": [
+        {
+          "id": "MIG-1.8.0-constitution-1-0-2",
+          "kind": "constitution",
+          "summary": "Constitution 1.0.2 amends Article 6 so an adopter may declare client extensions by root and path class; the core path rows are unchanged. Binding it replaces the vendored copy and the project.json pin.",
+          "decision_records": ["ADR-GOV-0024"],
+          "issues": [186],
+          "segments": ["constitution", "authority"],
+          "files": [".devai/pin/constitution.md", ".devai/config/project.json"],
+          "decision_required": true,
+          "constitution": {
+            "from": "1.0.1",
+            "to": "1.0.2"
+          },
+          "obligation": {
+            "check": "constitution-version",
+            "requirement": "Bind the installed constitution with init upgrade --constitution (or init bind --constitution) after the Architect has reviewed the amendment."
+          }
+        },
+        {
+          "id": "MIG-1.8.0-adopter-authority-block",
+          "kind": "opt-in-capability",
+          "summary": "The adopter policy may declare an optional closed authority block naming roots, test selectors and architecture selectors; init bind compiles it into an additive authority extension recorded as authority_extension in the binding receipt. It requires constitution 1.0.2 bound first and changes nothing for a source without the block.",
+          "decision_records": ["ADR-AUT-0003", "ADR-AUT-0004"],
+          "issues": [186],
+          "segments": ["adopter-policy", "authority"],
+          "files": [
+            ".devai/config/adopter-policy-binding.json",
+            ".devai/config/authority-policy.json"
+          ]
+        }
+      ]
+    },
+    {
+      "version": "1.9.0",
+      "status": "released",
+      "date": "2026-10-03",
+      "changes": [
+        {
+          "id": "MIG-1.9.0-thresholds-soft-gate",
+          "kind": "new-obligation",
+          "summary": "The thresholds schema requires the soft_gate block, the scored soft gate constants. Rebinding operational law and the adopter policy materializes the package constants; a source that overrides thresholds.soft_gate must keep them.",
+          "decision_records": ["ADR-MDL-0004"],
+          "segments": ["operational-law", "adopter-policy"],
+          "files": [".devai/config/thresholds.json"],
+          "obligation": {
+            "check": "thresholds-soft-gate",
+            "requirement": "The materialized .devai/config/thresholds.json carries the soft_gate block and validates against law/schemas/thresholds.schema.json."
+          }
+        },
+        {
+          "id": "MIG-1.9.0-proof-anchor-baseline",
+          "kind": "new-obligation",
+          "summary": "evidence verify --scope chain cross-checks every proof line against the chain. The first verification writes the append-only record/proofs/anchor-baseline.json, and legacy proof lines without an anchor need an Architect-authorized historical-gap declaration; they are never re-anchored.",
+          "decision_records": ["ADR-EVI-0002", "ADR-EVI-0005"],
+          "issues": [168, 239],
+          "segments": [],
+          "files": ["record/proofs/anchor-baseline.json"],
+          "decision_required": true,
+          "obligation": {
+            "check": "proof-anchor-baseline",
+            "requirement": "Run evidence verify --scope chain; when it lists unanchored legacy lines, the Architect records one historical-gap declaration naming each line before the next verification."
+          }
+        },
+        {
+          "id": "MIG-1.9.0-subprocess-effects-sensing-templates",
+          "kind": "rebind",
+          "summary": "The subprocess effects registry declares the build template with its argv precedence, the two Pages gh api GET shapes, and the --workflow and --event gh run list forms; rebinding subprocess effects materializes them byte for byte.",
+          "decision_records": ["ADR-AUT-0002", "ADR-SCR-0010"],
+          "segments": ["subprocess-effects"],
+          "files": [".devai/config/subprocess-effects.json"]
+        }
+      ]
+    },
+    {
+      "version": "2.0.0",
+      "status": "unreleased",
+      "changes": [
+        {
+          "id": "MIG-2.0.0-experimental-agent-execution",
+          "kind": "opt-in-capability",
+          "summary": "Opt-in experimental agent execution: round dispatch runs agent tasks through host CLI providers only under an unexpired Owner activation record written by the Owner-only round dispatch activate into .devai/state/experimental/activation.json and an explicit --experimental consent. An adopter that writes no activation record sees no change.",
+          "decision_records": ["ADR-MDL-0005", "ADR-MDL-0006"],
+          "segments": ["authority"],
+          "files": [".devai/config/authority-policy.json"]
+        },
+        {
+          "id": "MIG-2.0.0-campaign-actions",
+          "kind": "new-action",
+          "summary": "Campaign rounds reach the runtime through campaign status, campaign materialize and round ratify; the authority policy is rematerialized from the installed action registry so the new actions are governed.",
+          "decision_records": [],
+          "segments": ["authority"],
+          "files": [".devai/config/authority-policy.json"]
+        },
+        {
+          "id": "MIG-2.0.0-init-upgrade",
+          "kind": "new-action",
+          "summary": "init upgrade plans the move from the bound devai_version to the installed version from this manifest, refuses an undeclared owned-key retirement before any write, and with --write runs the bind segments in canonical order, checks the result with doctor, and records an upgrade receipt.",
+          "decision_records": [],
+          "issues": [264],
+          "segments": ["authority"],
+          "files": [".devai/config/authority-policy.json", ".devai/config/upgrade-receipt.json"]
+        },
+        {
+          "id": "MIG-2.0.0-subprocess-effects-common-dir",
+          "kind": "rebind",
+          "summary": "The subprocess effects registry declares the git rev-parse --git-common-dir read the trusted authority sources run to derive the repository id; rebinding subprocess effects materializes it byte for byte.",
+          "decision_records": [],
+          "issues": [264],
+          "segments": ["subprocess-effects"],
+          "files": [".devai/config/subprocess-effects.json"]
+        },
+        {
+          "id": "MIG-2.0.0-trusted-verifier-pin",
+          "kind": "rebind",
+          "summary": "The trusted local-RC verifier pin moves from @aarusso-nyx/devai@1.5.4 to @aarusso-nyx/devai@1.9.0. A repository that declares ci_economy.attested_rc regenerates the byte-compared verifier workflow from the installed package.",
+          "decision_records": ["ADR-REL-0031", "ADR-CHK-0006"],
+          "issues": [243],
+          "segments": ["harness-ci"],
+          "files": [".github/workflows/devai-local-rc-verify.yml"]
+        }
+      ]
+    }
+  ]
+}
