@@ -15,7 +15,7 @@ import {
   writeSync,
 } from '@devai-nyx/authority';
 import { randomUUID } from 'node:crypto';
-import { dirname } from 'node:path';
+import { dirname, resolve, sep } from 'node:path';
 
 /** Write every byte of `text`, looping over short writes. */
 export function writeAllSync(fd: number, text: string): void {
@@ -38,13 +38,31 @@ export function fsyncDirectorySync(path: string): void {
   }
 }
 
+const STATE_ROOT = `${sep}.devai${sep}state`;
+
+/**
+ * The `.devai/state` directory that contains `path`, if any. Directory fsyncs stop there:
+ * an action holding state authority may touch only paths at or below it.
+ */
+function stateRoot(path: string): string | undefined {
+  const absolute = resolve(path);
+  const index = absolute.indexOf(`${STATE_ROOT}${sep}`);
+  if (index >= 0) return absolute.slice(0, index + STATE_ROOT.length);
+  return absolute.endsWith(STATE_ROOT) ? absolute : undefined;
+}
+
+function within(path: string, root: string): boolean {
+  return path === root || path.startsWith(`${root}${sep}`);
+}
+
 /**
  * Create `path` and any missing parents, then fsync the parent of every directory that
- * was created, outermost first, so the new chain of entries is durable.
+ * was created, outermost first, so the new chain of entries is durable. Under
+ * `.devai/state` the fsyncs stop at that root, which always exists once DEVAI is adopted.
  */
 export function mkdirDurableSync(path: string): void {
   const missing: string[] = [];
-  let current = path;
+  let current = resolve(path);
   while (!existsSync(current)) {
     missing.unshift(current);
     const parent = dirname(current);
@@ -53,7 +71,11 @@ export function mkdirDurableSync(path: string): void {
   }
   if (missing.length === 0) return;
   mkdirSync(path, { recursive: true });
-  for (const created of missing) fsyncDirectorySync(dirname(created));
+  const root = stateRoot(path);
+  for (const created of missing) {
+    const parent = dirname(created);
+    if (root === undefined || within(parent, root)) fsyncDirectorySync(parent);
+  }
 }
 
 /** Create a new file with exactly `text`, refusing to replace one, and make it durable. */
