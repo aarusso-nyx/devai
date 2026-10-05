@@ -40,6 +40,7 @@ import {
 import {
   buildHooksInstallPlan,
   executeHooksInstallPlan,
+  postMergeAdapterFiles,
   preflightHooksInstallPlan,
   verifyInstalledPostMergeAdapter,
 } from '../../services/hooks-install/index.js';
@@ -73,7 +74,12 @@ import {
   writeAdopterPolicyPairAtomically,
 } from './bind-adapters.js';
 import { DEFAULT_REPO_ROOT, emit } from './shared.js';
-import { UPGRADE_LOCK, UpgradeLockHeld, acquireUpgradeLock } from './upgrade-lock.js';
+import {
+  UPGRADE_LOCK,
+  UpgradeLockHeld,
+  UpgradeLockStale,
+  acquireUpgradeLock,
+} from './upgrade-lock.js';
 
 const PROJECT = '.devai/config/project.json';
 const PIN = '.devai/pin/constitution.md';
@@ -138,7 +144,7 @@ export interface UpgradeObligation {
   readonly status: 'satisfied' | 'satisfied-by-upgrade' | 'pending';
   readonly decision_required: boolean;
   /** Where the obligation was found: a manifest entry in range, or the standing receipt. */
-  readonly source: 'manifest' | 'receipt';
+  readonly source: 'manifest' | 'receipt' | 'history';
   /** The command that settles a pending obligation, when one exists. */
   readonly command?: string;
 }
@@ -673,6 +679,18 @@ export function prepareAdopterUpgrade(
     }
   }
 
+  // Re-deriving a receipt at an already stamped version cannot know which releases the move
+  // crossed, so every obligation of the applicable migration history is evaluated first.
+  if (from === installed && receiptState !== 'current') {
+    for (const change of releasesInRange(manifest, manifest.baseline, installed).flatMap(
+      (release) => release.changes,
+    )) {
+      if (obligations.some((known) => known.change === change.id)) continue;
+      const obligation = evaluate(change, 'history');
+      if (obligation !== undefined) obligations.push(obligation);
+    }
+  }
+
   // An obligation that needs an Owner or Architect decision blocks the upgrade until settled.
   for (const obligation of obligations) {
     if (obligation.status !== 'pending' || !obligation.decision_required) continue;
@@ -783,7 +801,12 @@ function landAdopterUpgrade(
   const absolute = (path: string) => join(targetRoot, path);
   // One durable transaction (#264): the journal records the previous bytes of every
   // journaled path first, and only the receipt commit below drops it.
-  openBindJournal(targetRoot);
+  // The post-merge hook, key and issuer an adapter reinstall may replace are journaled too,
+  // so a crash rolls them back with the configuration they are bound to.
+  openBindJournal(
+    targetRoot,
+    prepared.postMerge === undefined ? [] : postMergeAdapterFiles(targetRoot),
+  );
   for (const [path, bytes] of prepared.direct) {
     mkdirSync(dirname(absolute(path)), { recursive: true });
     writeFileSync(absolute(path), bytes);
@@ -1006,8 +1029,20 @@ export const initUpgrade = defineCommand({
               new UpgradePrecondition(
                 error.code,
                 error.detail,
-                'Wait for the other init upgrade to finish and rerun; a lock whose process has exited is replaced automatically.',
+                'Wait for the running init upgrade or init bind to finish, then rerun.',
                 { lock: UPGRADE_LOCK, holder: error.holder },
+              ),
+              human,
+            );
+            return;
+          }
+          if (error instanceof UpgradeLockStale) {
+            refuse(
+              new UpgradePrecondition(
+                error.code,
+                error.detail,
+                `Confirm that no init upgrade or init bind is running, remove the lock with ${error.removal}, then rerun.`,
+                { lock: UPGRADE_LOCK, holder: error.holder, removal: error.removal },
               ),
               human,
             );

@@ -89,6 +89,26 @@ function resolveHookPath(
   return { path: gitHookPath(targetRoot, hook), manager: 'git' };
 }
 
+/**
+ * The post-merge adapter files outside .devai/config an install may write: the hook, the HMAC
+ * key and the receipt issuer. Path resolution only, no input validation, so the bind journal
+ * can record and recover them (#264).
+ */
+export function postMergeAdapterFiles(targetRoot: string): readonly string[] {
+  const root = resolve(targetRoot);
+  const files = [resolveHookPath(root, 'post-merge').path];
+  try {
+    const runtimeRoot = join(gitAdminRoot(root), 'devai');
+    files.push(
+      join(runtimeRoot, 'post-merge.key'),
+      join(runtimeRoot, 'issue-post-merge-receipt.cjs'),
+    );
+  } catch {
+    // Without a Git admin directory only the hook path resolves.
+  }
+  return files;
+}
+
 function block(command: string): string {
   return `${MARKER_START}\n${command}\n${MARKER_END}`;
 }
