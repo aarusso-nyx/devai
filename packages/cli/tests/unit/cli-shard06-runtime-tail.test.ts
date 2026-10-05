@@ -118,6 +118,7 @@ vi.mock('../../src/commands/init/index.js', () => ({
   initApplyOwner: harness.command('initApplyOwner'),
   initBind: harness.command('initBind'),
   initPlan: harness.command('initPlan'),
+  initUpgrade: harness.command('initUpgrade'),
 }));
 vi.mock('../../src/commands/release/facade.js', () => ({
   releaseCertify: harness.command('releaseCertify'),

@@ -206,15 +206,15 @@ describe('IA-005: the registered subjects of the matrix verbs are unchanged', ()
 const R0502_FILE_DIGESTS: ReadonlyArray<readonly [string, string]> = [
   [
     'law/policy/action-registry.json',
-    '4bbc6563c655d69762f6ffe9ddee245c9ee8c72637b98f909576701a56f117de',
+    '284f9a2ab0d81304b669db54206012e796368822fed726ab090c3a21885f3a33',
   ],
   [
     'packages/cli/src/generated/action-registry.ts',
-    'edad8b28ad7b81242870d063b21e302677df247088e9f93e22776532225374b5',
+    'eb4597aca63000ffee4d5aff89b124b4927a1d5b946038e7bf8aadfe1122e783',
   ],
   [
     'packages/effects-check/src/generated/action-catalog.ts',
-    'dd68a396b00421ad7674efded828a3afac99d9593eac94a07c3bfd8da8e05f8d',
+    '03d743563784632de5b0b1b5eca0b8c2bea7eaba880ee4bcae8cb2482db37514',
   ],
   [
     'packages/sensors/src/generated/action-kinds.ts',
@@ -231,10 +231,13 @@ const R0502_FILE_DIGESTS: ReadonlyArray<readonly [string, string]> = [
 // action and ADR-MDL-0005 the experimental `round dispatch` action: the registry, its generated views and the derived core source change with it, and
 // nothing else in the authority rule sources does. The package extension was re-pinned when
 // round dispatch gained its git-ref and experimental-agent rules (ADR-MDL-0005 D-3, D-10).
+// Re-pinned again when init upgrade (#264) joined the registry: the core gains it through the
+// binding subject group, and the package extension names it beside init bind on the CI
+// scaffold and host-adapter rules.
 const FIXED_REPOSITORY_ID = 'devai-ia-005';
-const R0502_CORE_SOURCE_DIGEST = 'be1103140309a9a10db8a94bf449f2399d698b76fa7a53a8e9a0648ef1428069';
+const R0502_CORE_SOURCE_DIGEST = 'dd6acc38393af2490aeb188ce86ff52bb4981abd5b4a51d7c33b71f7d74650cb';
 const R0502_PACKAGE_EXTENSION_DIGEST =
-  '8c182616da67f55a2feb7115450ac8935f62e18d3d60523ba2d941cc769ac3e1';
+  'f1ec09852bbd4cea4a695669fd913702f3d5a3af78680a4f22788ffae328e163';
 
 describe('IA-005: the registry, its views, the core rules, and devai-adopter-authority are byte-identical to R-0502', () => {
   it.each(R0502_FILE_DIGESTS)('%s is byte-identical to 38a0a5df', (path, digest) => {
