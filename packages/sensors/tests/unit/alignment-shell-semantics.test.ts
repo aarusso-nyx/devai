@@ -372,3 +372,120 @@ describe('folded workflow commands', () => {
     expect(sense().status).toBe('pass');
   });
 });
+
+/** A block-scalar gate step whose body is `lines`, indented as a workflow writes it. */
+function blockStep(lines: readonly string[]): void {
+  workflowFile(
+    `jobs:\n  check:\n    steps:\n      - run: |\n${lines.map((line) => `          ${line}`).join('\n')}\n`,
+  );
+}
+
+const NODE_PROGRAM = [
+  `const manifest = JSON.parse(require('node:fs').readFileSync('package.json', 'utf8'));`,
+  `if (manifest.name !== 'fixture') throw new Error('identity');`,
+  `for (const key of Object.keys(manifest)) {`,
+  `  if (key === '') throw new Error('key');`,
+  `}`,
+];
+
+describe('here-document bodies in gate steps (ADR-SCR-0013)', () => {
+  it('reads the body of a heredoc fed to a program as input, not as shell control flow', () => {
+    blockStep(['set -euo pipefail', `node - <<'NODE'`, ...NODE_PROGRAM, 'NODE', `devai ${ACTION}`]);
+    expect(sense().status).toBe('pass');
+  });
+
+  it.each([`<<NODE`, `<<"NODE"`, `<<\\NODE`])('accepts the %s delimiter spelling', (operator) => {
+    blockStep([
+      'set -euo pipefail',
+      `node - ${operator}`,
+      ...NODE_PROGRAM,
+      'NODE',
+      `devai ${ACTION}`,
+    ]);
+    expect(sense().status).toBe('pass');
+  });
+
+  it('strips leading tabs from the terminator of a <<- heredoc', () => {
+    blockStep([`node - <<-NODE`, ...NODE_PROGRAM, '\tNODE', `devai ${ACTION}`]);
+    expect(sense().status).toBe('pass');
+  });
+
+  it.each([`bash <<'SH'`, `sh -s <<'SH'`, `cat <<'SH' | bash`, `eval "$(cat <<'SH'`])(
+    'keeps the control flow of a heredoc a shell executes: %s',
+    (opener) => {
+      blockStep([
+        opener,
+        'if [ -n "$CI" ]; then devai check --only dependencies; fi',
+        'SH',
+        `devai ${ACTION}`,
+      ]);
+      expect(sense().status).toBe('review');
+    },
+  );
+
+  it('does not credit a devai command written inside a program heredoc', () => {
+    blockStep([`node - <<'NODE'`, `devai ${ACTION}`, 'NODE', 'echo done']);
+    expect(sense().status).toBe('review');
+  });
+
+  it('leaves an unterminated heredoc unchanged, so its control flow stays visible', () => {
+    blockStep([`node - <<'NODE'`, ...NODE_PROGRAM, `devai ${ACTION}`]);
+    expect(sense().status).toBe('review');
+  });
+
+  it('reads a here-string and an arithmetic shift as neither opening a body', () => {
+    blockStep([`cat <<< "if (x) {"`, 'echo $((1 << 2))', 'if true; then :; fi', `devai ${ACTION}`]);
+    expect(sense().status).toBe('review');
+    blockStep([`cat <<< "x"`, 'echo $((1 << 2))', `devai ${ACTION}`]);
+    expect(sense().status).toBe('pass');
+  });
+
+  it.each([`cat <<'SH' > gate.sh`, `cat <<'SH' >> gate.sh`, `cat <<'SH' | tee gate.sh`])(
+    'keeps the body of a heredoc written onward, which a later line may run: %s',
+    (opener) => {
+      blockStep(['set -euo pipefail', opener, 'set +e', 'SH', '. ./gate.sh', `devai ${ACTION}`]);
+      expect(sense().status).toBe('review');
+    },
+  );
+
+  it('keeps errexit masking inside a shell heredoc visible', () => {
+    blockStep([`bash <<'SH'`, 'set +e', 'SH', `devai ${ACTION}`]);
+    expect(sense().status).toBe('review');
+  });
+});
+
+describe('in-process observations of read-only actions (ADR-SCR-0013)', () => {
+  function observed(status: 'pass' | 'fail', candidate = CANDIDATE, completedAt = RECENT) {
+    rmSync(join(root, 'evidence', 'result.json'), { force: true });
+    return senseHarnessInvariantAlignment({
+      repoRoot: root,
+      candidateHead: CANDIDATE,
+      now: NOW,
+      evidenceDir: 'evidence',
+      observations: [
+        {
+          command: `devai ${ACTION}`,
+          status,
+          candidate_sha: candidate,
+          completed_at: completedAt,
+        },
+      ],
+    });
+  }
+
+  it('accepts a passing candidate-bound observation as the action evidence', () => {
+    expect(observed('pass').status).toBe('pass');
+  });
+
+  it('refuses a failing, foreign-candidate, stale or future observation', () => {
+    expect(observed('fail').status).toBe('review');
+    expect(observed('pass', 'd'.repeat(40)).status).toBe('review');
+    expect(observed('pass', CANDIDATE, '2026-09-05T11:00:00.000Z').status).toBe('review');
+    expect(observed('pass', CANDIDATE, '2026-09-07T13:00:00.000Z').status).toBe('review');
+  });
+
+  it('still requires the fail-closed CI step for the observed action', () => {
+    workflow(`devai ${ACTION} || true`);
+    expect(observed('pass').status).toBe('review');
+  });
+});
