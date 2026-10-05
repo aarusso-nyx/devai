@@ -96,6 +96,28 @@ export function applyPathOverride(
   return override !== undefined ? `docs/${override}` : canonicalPath;
 }
 
+/**
+ * Resolves a canonical `docs/...` path through its longest overridden ancestor (#265): with
+ * `"dev/operations": "meta/ops"`, `docs/dev/operations/workflows` resolves to
+ * `docs/meta/ops/workflows`. A key naming the whole path wins over every ancestor, as in
+ * {@link applyPathOverride}; ancestors match on whole segments only, so `dev/ops` never
+ * relocates `docs/dev/operations`. Paths outside `docs/` pass through unchanged.
+ */
+export function resolveDocsPathOverride(
+  canonicalPath: string,
+  overrides: Readonly<Record<string, string>>,
+): string {
+  if (!canonicalPath.startsWith('docs/')) return canonicalPath;
+  const segments = canonicalPath.slice('docs/'.length).split('/');
+  for (let length = segments.length; length > 0; length -= 1) {
+    const override: unknown = overrides[segments.slice(0, length).join('/')];
+    if (typeof override === 'string') {
+      return ['docs', override, ...segments.slice(length)].join('/');
+    }
+  }
+  return canonicalPath;
+}
+
 export interface CliProbe {
   readonly family: 'claude-cli' | 'codex-cli';
   readonly cli: string;
