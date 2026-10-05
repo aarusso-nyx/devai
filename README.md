@@ -6,7 +6,7 @@ attributable evidence without replacing a project's build, test, or CI tools.
 
 DEVAI ships as one package, `@aarusso-nyx/devai`; the published installation
 below remains pinned to **1.5.4**. This source tree's machine catalog contains
-**57 actions** (32 stable, 14 preview, 11 internal), **59 sensors**, and
+**69 actions** (36 stable, 22 preview, 11 internal), **59 sensors**, and <!-- verify after merge -->
 **7 host-invoked recipes**. The ordinary public CLI is organized
 into nine workflow domains: `audit`, `init`, `doctor`, `check`, `sense`, `round`,
 `evidence`, `release`, and `triage`. `task` and `catalog` are internal plumbing exposed by

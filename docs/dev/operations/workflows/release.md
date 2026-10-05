@@ -38,7 +38,7 @@ There is no path filter. The concurrency group is `devai-release-<release tag>` 
 cancelled.
 
 Workflow-level `env`: `PACKAGE_NAME` (`@aarusso-nyx/devai`), `EXPECTED_ACTION_COUNT`
-(`61`, pinned against `.devai/config/toolchain.json` by `scripts/check-workflows.mjs`),
+(`69`, pinned against `.devai/config/toolchain.json` by `scripts/check-workflows.mjs`),
 `RELEASE_TAG` (the input under dispatch, `github.ref_name` under push), and
 `CANDIDATE_REF` (the tag under push or publication, `candidate_commit` under rehearsal).
 
@@ -96,7 +96,7 @@ two against each other. Every checkout uses `persist-credentials: false`.
   a 40-hex sha and appends it to `$GITHUB_STEP_SUMMARY`.
 - `verify-ledger`: checks out `CANDIDATE_REF` into `candidate/`; sets up the verifier
   runtime through the composite action; probes the credential presence flags; archives
-  the verifier package from the trusted commit `8b600ed1…` (tree `d2f60e06…`) inside the
+  the verifier package from the trusted commit `75343991…` (tree `90f0f5b6…`) inside the
   candidate clone and checks its identity, `bin` entries, provenance, population, and
   digests against `DEVAI_LEDGER_VERIFIER_PROVENANCE_SHA256`; checks out and binds the
   process controls at `DEVAI_PROCESS_CONTROL_COMMIT` into `release-control/`;
