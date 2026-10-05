@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
-import { appendVerbEvidence, loadChain } from '#runtime-core';
+import { appendVerbEvidence, gatherGitContext, loadChain } from '#runtime-core';
 import { mkdirSync, writeFileSync } from '@devai-nyx/authority';
 import { join, resolve } from 'node:path';
 import type { CAC } from 'cac';
@@ -40,19 +40,29 @@ interface ChainArtifactView {
   readonly sha256?: unknown;
 }
 
-/** The SHA-256 the latest chain entry naming `path` declares for it, if any. */
-function chainedDigest(repoRoot: string, path: string): string | undefined {
+interface ChainBinding {
+  readonly sha256: string;
+  readonly head: string | null;
+}
+
+/** Every digest and candidate head the chain's entries declare for `path`, in order. */
+function chainedBindings(repoRoot: string, path: string): readonly ChainBinding[] {
   const chainPath = join(repoRoot, SENSE_RECORD_CHAIN_PATH);
-  if (!existsSync(chainPath)) return undefined;
+  if (!existsSync(chainPath)) return [];
   const chain = loadChain(chainPath);
-  let digest: string | undefined;
+  const bindings: ChainBinding[] = [];
   for (const entry of chain.records) {
     if (entry.action !== SENSE_RECORD_CHAIN_ACTION) continue;
     for (const artifact of (entry.artifacts ?? []) as readonly ChainArtifactView[]) {
-      if (artifact.path === path) digest = String(artifact.sha256);
+      if (artifact.path === path) {
+        bindings.push({
+          sha256: String(artifact.sha256),
+          head: entry.context?.git?.head_sha ?? null,
+        });
+      }
     }
   }
-  return digest;
+  return bindings;
 }
 
 function appendChainEntry(
@@ -79,9 +89,12 @@ function digestOf(bytes: Buffer): string {
 }
 
 /**
- * The second write of a re-record: an already recorded file whose chain entry was
- * lost gains one `sense.readings.record` entry. An existing entry is never
- * rewritten; one whose digest disagrees with the file is a finding
+ * The second write of a re-record. An already recorded file gains one
+ * `sense.readings.record` entry when no entry binds its bytes to the current
+ * candidate head: the entry was lost, or the same bytes are recorded at a later
+ * candidate (ADR-SCR-0013). The append is idempotent per head, and an existing
+ * entry is never rewritten. When entries name the path but none names the file's
+ * bytes, the file is not what was recorded: a finding
  * (`SENSE_RECORD_CHAIN_DIGEST_MISMATCH`), never a repair.
  */
 function repairChainEntry(
@@ -91,12 +104,13 @@ function repairChainEntry(
   bytes: Buffer,
 ): void {
   const sha256 = digestOf(bytes);
-  const declared = chainedDigest(repoRoot, path);
-  if (declared === undefined) {
-    appendChainEntry(repoRoot, reading, path, sha256);
-    return;
+  const bindings = chainedBindings(repoRoot, path);
+  if (bindings.length > 0 && !bindings.some((binding) => binding.sha256 === sha256)) {
+    throw new Error(`SENSE_RECORD_CHAIN_DIGEST_MISMATCH:${reading.id}`);
   }
-  if (declared !== sha256) throw new Error(`SENSE_RECORD_CHAIN_DIGEST_MISMATCH:${reading.id}`);
+  const head = gatherGitContext(repoRoot).head_sha;
+  if (bindings.some((binding) => binding.sha256 === sha256 && binding.head === head)) return;
+  appendChainEntry(repoRoot, reading, path, sha256);
 }
 
 /**
