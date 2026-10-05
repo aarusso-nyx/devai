@@ -93,6 +93,7 @@ async function dispatchRoutine(
   const executionRoot = taskExecutionRoot(repoRoot, running);
   const startedAt = new Date().toISOString();
   let timedOut = false;
+  let terminationUnconfirmed = false;
   const result = await executeRoutineExecutor({
     executor,
     authority: {
@@ -110,10 +111,15 @@ async function dispatchRoutine(
         maxOutputBytes: ROUTINE_OUTPUT_BYTES,
       }).result;
       // A routine that outlives its deadline fails even if it then exits 0 (for example
-      // by trapping SIGTERM): its exit status no longer describes a bounded run.
+      // by trapping SIGTERM): its exit status no longer describes a bounded run. One whose
+      // process group could not be confirmed gone may even still be running.
       timedOut ||= executed.timed_out;
+      terminationUnconfirmed ||= executed.termination_error !== undefined;
       return {
-        exit_code: executed.timed_out ? null : executed.exit_code,
+        exit_code:
+          executed.timed_out || executed.termination_error !== undefined
+            ? null
+            : executed.exit_code,
         stdout: executed.stdout,
         stderr: executed.stderr,
       };
@@ -123,7 +129,20 @@ async function dispatchRoutine(
   const candidate = candidateSha(executionRoot);
   const tree = candidateTree(executionRoot);
   const id = evidenceId(running, startedAt, completedAt);
-  const succeeded = result.ok && !timedOut;
+  // An unconfirmed termination outranks the timeout that caused it: the routine may still run.
+  const processFailure = terminationUnconfirmed
+    ? {
+        code: 'PROCESS_GROUP_TERMINATION_UNCONFIRMED',
+        message:
+          'routine was terminated but its process group could not be confirmed gone; it may still be running',
+      }
+    : timedOut
+      ? {
+          code: 'TASK_ROUTINE_TIMED_OUT',
+          message: `routine exceeded its ${String(executor.timeout_ms)} ms deadline and was terminated`,
+        }
+      : undefined;
+  const succeeded = result.ok && processFailure === undefined;
   const resolvedArgv = result.ok ? (result.resolved.argv ?? []) : (executor.argv ?? []);
   const evidenceTask = running as unknown as TaskRecordBinding;
   const evidence: TaskExecutionEvidence = buildTaskExecutionEvidence(evidenceTask, {
@@ -155,19 +174,13 @@ async function dispatchRoutine(
     completed_at: completedAt,
     verdict: succeeded ? 'pass' : 'error',
     ...(!succeeded && {
-      failure: timedOut
-        ? {
-            code: 'TASK_ROUTINE_TIMED_OUT',
-            message: `routine exceeded its ${String(executor.timeout_ms)} ms deadline and was terminated`,
-            rollback_disposition: 'preserved-for-repair' as const,
-          }
-        : {
-            code: result.ok ? 'TASK_ROUTINE_EXIT_NONZERO' : result.code,
-            message: result.ok
-              ? 'literal argv failed without an adapter diagnostic'
-              : result.message,
-            rollback_disposition: 'preserved-for-repair' as const,
-          },
+      failure: {
+        ...(processFailure ?? {
+          code: result.ok ? 'TASK_ROUTINE_EXIT_NONZERO' : result.code,
+          message: result.ok ? 'literal argv failed without an adapter diagnostic' : result.message,
+        }),
+        rollback_disposition: 'preserved-for-repair' as const,
+      },
     }),
     evidence_refs: [],
   });
