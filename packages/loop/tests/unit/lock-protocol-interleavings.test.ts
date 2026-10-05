@@ -541,6 +541,42 @@ describe('attempt fences', () => {
     });
   });
 
+  it('makes a newly created fence directory durable in its parent before the dispatch', async () => {
+    const root = repository();
+    await withAuthorityHostTestScope(async () => {
+      saveTask(root, task('TASK-0424'));
+      const state = join(root, '.devai/state');
+      const fence = join(fencesDir(root), 'TASK-0424.json');
+      const opened = new Map<number, string>();
+      const events: string[] = [];
+      seam.after = (symbol, args, result) => {
+        if (symbol === 'openSync' && typeof result === 'number') {
+          opened.set(result, String(args[0]));
+        }
+        if (symbol === 'fsyncSync' && opened.get(args[0] as number) === state) {
+          events.push('fsync the state directory');
+        }
+        if (symbol === 'renameSync' && args[1] === fence) events.push('rename the fence');
+      };
+
+      await runRoundTasks({
+        repoRoot: root,
+        round: ROUND,
+        dispatch: () => {
+          events.push('dispatch');
+          return { ok: true };
+        },
+      });
+      seam.after = undefined;
+
+      expect(events.slice(0, 3)).toEqual([
+        'fsync the state directory',
+        'rename the fence',
+        'dispatch',
+      ]);
+    });
+  });
+
   it('writes the release receipt only after the lock record is removed', async () => {
     const root = repository();
     await withAuthorityHostTestScope(async () => {
@@ -635,6 +671,19 @@ describe('attempt fences', () => {
   it.each([
     ['unreadable', '{'],
     ['malformed', JSON.stringify({ task_id: 'TASK-0423' })],
+    [
+      'empty-target',
+      JSON.stringify({ task_id: 'TASK-0423', round_id: ROUND, attempt: 'attempt-1', targets: [] }),
+    ],
+    [
+      'misnamed',
+      JSON.stringify({
+        task_id: 'TASK-0499',
+        round_id: ROUND,
+        attempt: 'attempt-1',
+        targets: ['F2:MOD-a'],
+      }),
+    ],
   ])('refuses the run while an %s fence remains, naming it', async (_case, body) => {
     const root = repository();
     await withAuthorityHostTestScope(async () => {
