@@ -274,6 +274,18 @@ export const ACTION_EFFECT_CONTRACTS = [
     capabilities: ['fs:f5-state'],
   },
   {
+    action_id: 'round dispatch deactivate',
+    public_action_id: 'round dispatch deactivate',
+    effect: 'harness-write',
+    capabilities: ['fs:f5-state'],
+  },
+  {
+    action_id: 'round dispatch dispose',
+    public_action_id: 'round dispatch dispose',
+    effect: 'harness-write',
+    capabilities: ['fs:f5-state', 'fs:worktree-admin'],
+  },
+  {
     action_id: 'round gap create',
     public_action_id: 'round gap create',
     effect: 'harness-write',
@@ -314,7 +326,7 @@ export const ACTION_EFFECT_CONTRACTS = [
     action_id: 'round ratify',
     public_action_id: 'round ratify',
     effect: 'harness-write',
-    capabilities: ['fs:f5-state'],
+    capabilities: ['fs:f5-state', 'fs:worktree-admin'],
   },
   {
     action_id: 'round run',
@@ -386,7 +398,7 @@ export const ACTION_EFFECT_CONTRACTS = [
     action_id: 'task escalate',
     public_action_id: 'task escalate',
     effect: 'harness-write',
-    capabilities: ['fs:f5-state', 'fs:proofs'],
+    capabilities: ['fs:f5-state', 'fs:proofs', 'fs:worktree-admin'],
   },
   {
     action_id: 'task finish',
