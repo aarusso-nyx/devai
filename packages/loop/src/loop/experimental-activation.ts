@@ -19,7 +19,7 @@ import {
   writeAllSync,
   writeCreateOnlyDurableSync,
 } from './durable-files.js';
-import { fail } from './task-queue-services.js';
+import { TaskServiceError, fail } from './task-queue-services.js';
 
 /*
  * Mirrors of law/policy/experimental-execution.json (ADR-MDL-0005, ADR-MDL-0006);
@@ -219,9 +219,9 @@ function processAlive(pid: number): boolean {
 }
 
 /**
- * Whether a held lock may be removed: its owner ran on this host and is gone, or it is
+ * Whether a held lock was left behind: its owner ran on this host and is gone, or it is
  * unreadable and old enough that its writer must have died mid-create. A live owner, or
- * one on another host, is never reclaimed.
+ * one on another host, is never judged stale.
  */
 function staleLock(path: string, held: ActivationLockOwner | 'unreadable'): boolean {
   if (held === 'unreadable') {
@@ -231,9 +231,26 @@ function staleLock(path: string, held: ActivationLockOwner | 'unreadable'): bool
 }
 
 /**
+ * `EXPERIMENTAL_ACTIVATION_LOCK_STALE`: the activation lock was left by a writer that is
+ * gone. It is never taken over automatically, because two contenders could both judge it
+ * stale and remove each other's lock; removing it is a human step, named here.
+ */
+export class ExperimentalActivationLockStale extends TaskServiceError {
+  readonly detail: string;
+  readonly removal: string;
+
+  constructor(path: string) {
+    super('EXPERIMENTAL_ACTIVATION_LOCK_STALE');
+    this.removal = `rm "${path}"`;
+    this.detail = `${EXPERIMENTAL_ACTIVATION_LOCK} was left by an activation or withdrawal that is no longer running; once none is running, remove it with: ${this.removal}`;
+  }
+}
+
+/**
  * Run `run` holding the activation lock, refusing with `EXPERIMENTAL_ACTIVATION_BUSY`
- * while another activation or withdrawal holds it. A lock left by a provably gone writer
- * is reclaimed once, and only while the path still holds exactly the stale lock.
+ * while another activation or withdrawal holds it, and with
+ * `EXPERIMENTAL_ACTIVATION_LOCK_STALE` when the holder is gone. Nothing takes a lock over:
+ * only the owner whose token it records removes it.
  */
 function withActivationLock<T>(repoRoot: string, run: () => T): T {
   const path = join(repoRoot, EXPERIMENTAL_ACTIVATION_LOCK);
@@ -246,12 +263,9 @@ function withActivationLock<T>(repoRoot: string, run: () => T): T {
   };
   if (!createLock(path, owner)) {
     const held = readLock(path);
-    const reclaimable =
-      held !== undefined &&
-      staleLock(path, held) &&
-      JSON.stringify(readLock(path)) === JSON.stringify(held);
-    if (reclaimable) unlinkSync(path);
-    if (!reclaimable || !createLock(path, owner)) fail('EXPERIMENTAL_ACTIVATION_BUSY');
+    if (held !== undefined && staleLock(path, held))
+      throw new ExperimentalActivationLockStale(path);
+    fail('EXPERIMENTAL_ACTIVATION_BUSY');
   }
   try {
     return run();
