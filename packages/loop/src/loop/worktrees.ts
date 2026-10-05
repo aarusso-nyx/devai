@@ -6,10 +6,10 @@ import {
   readFileSync,
   realpathSync,
   rmSync,
-  writeFileSync,
 } from '@devai-nyx/authority';
 import { hostname } from 'node:os';
 import { join, resolve, sep } from 'node:path';
+import { replaceDurableSync } from './durable-files.js';
 
 /** The process running an autonomous attempt in a worktree. */
 export interface WorktreeOwner {
@@ -65,10 +65,13 @@ function loadRegistry(repoRoot: string): WorktreeRegistry {
   return JSON.parse(readFileSync(path, 'utf8')) as WorktreeRegistry;
 }
 
+/**
+ * Replace the registry atomically: the complete next registry goes to a staged, fsynced
+ * file renamed over it, and the directory entry is fsynced, so a crash leaves either the
+ * previous registry or the next one, never a partial file.
+ */
 function saveRegistry(repoRoot: string, registry: WorktreeRegistry): void {
-  const path = registryPath(repoRoot);
-  mkdirSync(join(repoRoot, '.devai/state'), { recursive: true });
-  writeFileSync(path, JSON.stringify(registry, null, 2) + '\n');
+  replaceDurableSync(registryPath(repoRoot), JSON.stringify(registry, null, 2) + '\n');
 }
 
 /**

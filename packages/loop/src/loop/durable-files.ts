@@ -12,6 +12,7 @@ import {
   mkdirSync,
   openSync,
   renameSync,
+  unlinkSync,
   writeSync,
 } from '@devai-nyx/authority';
 import { randomUUID } from 'node:crypto';
@@ -78,22 +79,8 @@ export function mkdirDurableSync(path: string): void {
   }
 }
 
-/** Create a new file with exactly `text`, refusing to replace one, and make it durable. */
-export function writeCreateOnlyDurableSync(path: string, text: string): void {
-  mkdirDurableSync(dirname(path));
-  const fd = openSync(path, 'wx');
-  try {
-    writeAllSync(fd, text);
-    fsyncSync(fd);
-  } finally {
-    closeSync(fd);
-  }
-  fsyncDirectorySync(dirname(path));
-}
-
-/** Replace `path` atomically with exactly `text`: a staged, fsynced file renamed into place. */
-export function replaceDurableSync(path: string, text: string): void {
-  mkdirDurableSync(dirname(path));
+/** Write `text` completely to a fresh staged file beside `path`, fsynced; returns its path. */
+function stage(path: string, text: string): string {
   const staged = `${path}.${String(process.pid)}-${randomUUID()}`;
   const fd = openSync(staged, 'wx');
   try {
@@ -102,6 +89,29 @@ export function replaceDurableSync(path: string, text: string): void {
   } finally {
     closeSync(fd);
   }
+  return staged;
+}
+
+/**
+ * Create `path` with exactly `text`, refusing (`DURABLE_RECORD_EXISTS`) when it exists. The
+ * bytes go to a staged, fsynced file that is renamed into place, so a crash never leaves a
+ * partial record at `path`; the directory entry is then fsynced.
+ */
+export function writeCreateOnlyDurableSync(path: string, text: string): void {
+  mkdirDurableSync(dirname(path));
+  if (existsSync(path)) throw new Error('DURABLE_RECORD_EXISTS');
+  const staged = stage(path, text);
+  if (existsSync(path)) {
+    unlinkSync(staged);
+    throw new Error('DURABLE_RECORD_EXISTS');
+  }
   renameSync(staged, path);
+  fsyncDirectorySync(dirname(path));
+}
+
+/** Replace `path` atomically with exactly `text`: a staged, fsynced file renamed into place. */
+export function replaceDurableSync(path: string, text: string): void {
+  mkdirDurableSync(dirname(path));
+  renameSync(stage(path, text), path);
   fsyncDirectorySync(dirname(path));
 }
