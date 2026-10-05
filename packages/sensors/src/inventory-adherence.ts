@@ -17,6 +17,8 @@ import {
  * orphan counts into a PASS / REVIEW / FAIL verdict.
  *
  * Status semantics:
+ *   - UNKNOWN: total_count == 0 (no surface was observed, so nothing is
+ *     measured; ADR-SCR-0012 IA-006).
  *   - PASS: orphan_count == 0 (every plant surface is claimed by
  *     some invariant's `code_areas[]`).
  *   - REVIEW: 0 < orphan_count ≤ max_orphans (the threshold; default
@@ -69,7 +71,16 @@ function measureInventoryAdherence(opts: InventoryAdherenceOptions): SensorReadi
   let status: SensorStatus;
   const findings: SensorFinding[] = [];
 
-  if (counts.orphan === 0) {
+  if (counts.total === 0) {
+    // ADR-SCR-0012 IA-006: an inventory with no surface is a diagnostic, never an empty PASS.
+    status = 'unknown';
+    findings.push({
+      severity: 'warning',
+      code: 'INVENTORY_ADHERENCE_NO_SURFACES',
+      message:
+        'The inventory holds no module, route, component, or dependency surface to measure. Regenerate it from source with sense run inventory_regeneration.',
+    });
+  } else if (counts.orphan === 0) {
     status = 'pass';
   } else if (counts.orphan <= maxOrphans) {
     status = 'review';
