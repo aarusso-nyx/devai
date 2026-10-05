@@ -37,7 +37,6 @@ import {
   dispatchAttemptFloor,
   listLocks,
   loadTask,
-  releaseLocks,
   retainWorktree,
   saveTask,
   taskLockTargets,
@@ -376,9 +375,11 @@ function budgetRefusal(context: ExperimentalDispatchContext): string | undefined
 }
 
 /**
- * A task whose ladder never started an attempt in this dispatch stays `ready`: its
- * locks are released and the runner's iteration count for it is undone, so a budget
- * that ran out or a host without capacity never blocks untouched work.
+ * A task whose ladder never started an attempt in this dispatch stays `ready`, and the
+ * runner's iteration count for it is undone, so a budget that ran out or a host without
+ * capacity never blocks untouched work. Its locks stay held: `round-execution.json`
+ * resources.release_on releases them only on completion, escalation, a gap pause or
+ * cancellation, and the next dispatch reuses them while they are unexpired.
  */
 function returnUntouched(
   context: ExperimentalDispatchContext,
@@ -391,7 +392,6 @@ function returnUntouched(
     status: 'ready',
     iteration_count: Math.max(0, current.iteration_count - 1),
   });
-  releaseLocks({ locksDir: join(context.repoRoot, '.devai/state/locks'), taskId: task.id });
   return { ok: false, code };
 }
 
