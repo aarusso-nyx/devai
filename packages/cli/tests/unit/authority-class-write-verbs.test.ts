@@ -235,6 +235,9 @@ const R0502_FILE_DIGESTS: ReadonlyArray<readonly [string, string]> = [
 // binding subject group, and the package extension names it beside init bind on the CI
 // scaffold and host-adapter rules.
 // Re-pinned when ADR-GOV-0025 added campaign status, campaign materialize and round ratify.
+// ADR-MDL-0007 re-pinned both: round dispatch deactivate and round dispatch dispose join the
+// registry, task escalate and round ratify gain git-ref targets to release attempt worktrees,
+// and the package extension grants those three actions typed git-ref authority.
 const FIXED_REPOSITORY_ID = 'devai-ia-005';
 const R0502_CORE_SOURCE_DIGEST = 'dd6acc38393af2490aeb188ce86ff52bb4981abd5b4a51d7c33b71f7d74650cb';
 const R0502_PACKAGE_EXTENSION_DIGEST =

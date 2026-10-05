@@ -173,6 +173,12 @@ vi.mock('../../src/commands/round/dispatch-agents.js', () => ({
 vi.mock('../../src/commands/round/dispatch-activate.js', () => ({
   roundDispatchActivate: harness.command('roundDispatchActivate'),
 }));
+vi.mock('../../src/commands/round/dispatch-deactivate.js', () => ({
+  roundDispatchDeactivate: harness.command('roundDispatchDeactivate'),
+}));
+vi.mock('../../src/commands/round/dispatch-dispose.js', () => ({
+  roundDispatchDispose: harness.command('roundDispatchDispose'),
+}));
 vi.mock('../../src/commands/sense/inventory.js', () => ({
   senseInventoryCmd: harness.command('senseInventoryCmd'),
 }));
