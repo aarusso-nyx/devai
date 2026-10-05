@@ -1,8 +1,8 @@
 # CLI reference
 
-The release-candidate CLI contains 48 actions: 23 stable public actions, 14 preview
-round actions, and 11 internal plumbing actions. The nine public domains and their
-operator contracts are documented in the [CLI overview](./cli/index.md).
+The release-candidate CLI contains 69 actions: 36 stable actions, 22 preview actions, and
+11 internal plumbing actions. The nine public domains and their operator contracts are
+documented in the [CLI overview](./cli/index.md). <!-- verify after merge -->
 
 Use the installed binary for the exact candidate catalog and per-action help:
 

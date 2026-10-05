@@ -22,10 +22,11 @@ without taking release authority away from its maintainers.
 
 ## Current product surface
 
-The stable release ships one publishable package, `@aarusso-nyx/devai`, with 43
-catalogued actions, 59 sensors, and 7 recipes. Seven public workflow domains cover
-adoption, diagnosis, validation, observation, work execution, evidence, and release
-inspection. The action catalog includes stable, preview, and internal status for every action.
+The stable release ships one publishable package, `@aarusso-nyx/devai`, with 69
+catalogued actions, 59 sensors, and 7 recipes. Nine public workflow domains cover
+adoption, diagnosis, validation, observation, work execution, evidence, release
+inspection, exact-commit audit, and failure triage. The action catalog includes stable,
+preview, and internal status for every action. <!-- verify after merge -->
 
 Start read-only:
 
