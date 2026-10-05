@@ -136,7 +136,10 @@ Routine executors run their argv through the governed asynchronous process effec
 1 MiB per stream, keeping the newest bytes. Concurrent routine tasks therefore overlap. An
 overrun sends SIGTERM to the group and, after a grace period, SIGKILL to every member still
 alive, descendants included; it fails the task with `TASK_ROUTINE_TIMED_OUT` even when the
-routine traps the signal and exits 0. Database and worktree identities
+routine traps the signal and exits 0. If the group, or a process holding its output, is still
+there 5 s after SIGKILL, the termination is never reported as done: the task fails with
+`PROCESS_GROUP_TERMINATION_UNCONFIRMED` instead, because the routine may still be running.
+Database and worktree identities
 are per task (`devai_task_<task id>`, `WT-<task id>`), so two distinct tasks never contend for
 them. There is no cross-round controller and no reviewer reserve yet; the policy records both.
 
@@ -444,4 +447,6 @@ as `GH_TOKEN` and cloud credentials stay out. Only a single explicit terminal ev
 read whole completes an attempt: a stream that outgrew its retained bound or carries a line
 that is not a JSON object fails with `AGENT_CLI_OUTPUT_TRUNCATED` or `AGENT_CLI_OUTPUT_MALFORMED`.
 If the journal cannot record a started provider, its process group is stopped before the attempt
-fails with `AGENT_CLI_SPAWN_RECORD_FAILED`.
+fails with `AGENT_CLI_SPAWN_RECORD_FAILED`. A provider stopped at its wall clock whose process
+group cannot be confirmed gone fails with `PROCESS_GROUP_TERMINATION_UNCONFIRMED`, an error
+after spawn, so the attempt stays uncertain and keeps its worktree.
