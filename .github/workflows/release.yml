@@ -192,7 +192,7 @@ jobs:
             echo "DEVAI_EVIDENCE_VERIFY=$verifier_root/src/cli.js"
             echo "DEVAI_EVIDENCE_BUNDLE_VERIFY=$verifier_root/src/bundle-cli.js"
           } >> "$GITHUB_ENV"
-          echo "version=1.5.4" >> "$GITHUB_OUTPUT"
+          echo "version=1.9.0" >> "$GITHUB_OUTPUT"
           echo "provenance_sha256=$actual_provenance_sha256" >> "$GITHUB_OUTPUT"
       - name: Check out approved process controls
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
