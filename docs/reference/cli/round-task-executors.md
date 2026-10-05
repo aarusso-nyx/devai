@@ -120,6 +120,15 @@ is alive or ran on another host. A controller left by a dead process on the same
 the tasks it left `in_progress` stay there for explicit human disposition, because only `ready`
 tasks are dispatched.
 
+Lock and controller records change only under a claim on the exact record read (kept in
+`.devai/state/lock-claims/` and the round's `controller-claims/`), so a stale reaper or a late
+renewal stands down instead of displacing a newer holder. A lock lost during execution fails the
+attempt with `TASK_RESOURCE_LOCK_LOST` whatever status the executor left, and escalates a recorded
+pass instead of letting it merge. An all-ready `round run` first re-queues tasks an interrupted
+denial left in `lock_denied`, and refuses with `TASK_LOCK_DENIAL_STATE_INVALID` while the round's
+`lock-denials.json` holds anything but non-negative integer counts: repair the entry, or remove the
+file to reset every count.
+
 ## Bounded concurrency
 
 `round run` is serial by default. `--workers <count>` opts one invocation into bounded concurrent
