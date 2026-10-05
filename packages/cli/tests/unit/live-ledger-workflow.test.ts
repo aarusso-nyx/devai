@@ -644,7 +644,12 @@ describe('live ledger-verification workflow', () => {
     expect(release).toContain('name: "devai-linux-adopter"');
     expect(release).not.toContain('npm init --yes');
     expect(release).toContain('EXPECTED_ACTION_COUNT: 69');
-    expect(verifierMaterializationScript(release)).toContain('echo "version=1.5.4"');
+    const verifierPolicy = JSON.parse(
+      readFileSync(join(ROOT, 'law/policy/trusted-local-rc-verifier-package.json'), 'utf8'),
+    ) as { package: { version: string } };
+    expect(verifierMaterializationScript(release)).toContain(
+      `echo "version=${verifierPolicy.package.version}"`,
+    );
     expect(verifierMaterializationScript(release)).not.toContain(
       'require("./" + process.argv[1] + "/package.json").version',
     );
