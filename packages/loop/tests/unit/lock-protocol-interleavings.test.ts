@@ -5,13 +5,15 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   statSync,
+  utimesSync,
   writeFileSync,
 } from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import { hostname, tmpdir } from 'node:os';
+import { hostname, tmpdir, uptime } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -49,11 +51,14 @@ import { withAuthorityHostTestScope } from '../../../skills/tests/unit/authority
 import {
   acquireLocks,
   listLocks,
+  lockIdentity,
   reapLock,
   releaseLocks,
   renewLocks,
+  type AcquireResult,
   type LockRecord,
 } from '../../src/loop/locks.js';
+import { recordIdentity } from '../../src/loop/record-claims.js';
 import { acquireRoundController } from '../../src/loop/round-controller.js';
 import { runRoundTasks } from '../../src/loop/round-runner.js';
 import { loadTask, saveTask, type TaskRecord } from '../../src/loop/tasks.js';
@@ -106,6 +111,52 @@ function onceReplaced(path: string, original: number | undefined, actor: () => v
     seam.after = undefined;
     actor();
   };
+}
+
+const HOUR = 60 * 60 * 1000;
+
+function deadPid(): number {
+  const child = spawnSync(process.execPath, ['-e', '']);
+  if (child.pid === undefined) throw new Error('no child pid');
+  return child.pid;
+}
+
+/** A claim file as its claimant writes it: who claimed, on which boot, and when. */
+function claimBody(overrides: Readonly<Record<string, unknown>> = {}): string {
+  return `${JSON.stringify({
+    token: 'claim-left-behind',
+    hostname: hostname(),
+    pid: deadPid(),
+    boot_at: Date.now() - uptime() * 1000,
+    claimed_at: new Date().toISOString(),
+    ...overrides,
+  })}\n`;
+}
+
+/** An expired lock, optionally with the claim its last writer left on it. */
+function abandonedLock(root: string, claim?: string): { record: LockRecord; claim: string } {
+  mkdirSync(locksDir(root), { recursive: true });
+  mkdirSync(join(root, '.devai/state/lock-claims'), { recursive: true });
+  const record: LockRecord = {
+    task_id: 'TASK-0810',
+    substrate: 'F2',
+    module: 'MOD-a',
+    acquired_at: '2026-01-01T00:00:00.000Z',
+    ttl_ms: 1,
+  };
+  writeFileSync(keyFile(root), JSON.stringify(record));
+  const path = join(root, '.devai/state/lock-claims', `${KEY}.${lockIdentity(record)}.claim`);
+  if (claim !== undefined) writeFileSync(path, claim);
+  return { record, claim: path };
+}
+
+function refusal(action: () => unknown): { code?: string; message?: string } {
+  try {
+    action();
+  } catch (error) {
+    return { code: (error as { code?: string }).code, message: (error as Error).message };
+  }
+  return {};
 }
 
 function task(id: string): TaskRecord {
@@ -247,17 +298,11 @@ describe('expired lock takeover against a stale reaper', () => {
   });
 });
 
+function controllerFile(root: string): string {
+  return join(root, '.devai/state/round-runs', ROUND, 'controller.json');
+}
+
 describe('round controller reclamation against a stale reclaimer', () => {
-  function controllerFile(root: string): string {
-    return join(root, '.devai/state/round-runs', ROUND, 'controller.json');
-  }
-
-  function deadPid(): number {
-    const child = spawnSync(process.execPath, ['-e', '']);
-    if (child.pid === undefined) throw new Error('no child pid');
-    return child.pid;
-  }
-
   it('never removes a controller another runner just claimed over a dead one', async () => {
     const root = repository();
     await withAuthorityHostTestScope(async () => {
@@ -326,6 +371,256 @@ describe('lock denial recovery', () => {
 
       expect(recovered.results).toEqual([{ task_id: 'TASK-0406', ok: true }]);
       expect(dispatch).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('a crash right after the re-queue never loses the priority bump', async () => {
+    const root = repository();
+    await withAuthorityHostTestScope(async () => {
+      saveTask(root, task('TASK-0407'));
+      acquireLocks({ locksDir: locksDir(root), taskId: 'TASK-0900', targets: ['F2:MOD-a'] });
+      const taskFile = join(root, '.devai/state/tasks/TASK-0407.json');
+      seam.after = (symbol, args) => {
+        if (symbol !== 'writeFileSync' || args[0] !== taskFile) return;
+        if (!String(args[1]).includes('"status": "ready"')) return;
+        seam.after = undefined;
+        throw new Error('injected crash right after the re-queue');
+      };
+
+      await expect(
+        runRoundTasks({ repoRoot: root, round: ROUND, dispatch: () => ({ ok: true }) }),
+      ).rejects.toThrow('injected crash');
+      expect(loadTask(root, 'TASK-0407').status).toBe('ready');
+
+      releaseLocks({ locksDir: locksDir(root), taskId: 'TASK-0900' });
+      const dispatched: (number | undefined)[] = [];
+      const recovered = await runRoundTasks({
+        repoRoot: root,
+        round: ROUND,
+        dispatch: (running) => {
+          dispatched.push(running.priority);
+          return { ok: true };
+        },
+      });
+
+      expect(recovered.results).toEqual([{ task_id: 'TASK-0407', ok: true }]);
+      expect(dispatched).toEqual([1]);
+    });
+  });
+});
+
+describe('claims left by a claimant that stopped', () => {
+  const elsewhere = () => `${hostname()}-elsewhere`;
+
+  it('breaks a claim whose claimant died on this host and takes the expired lock over', async () => {
+    const root = repository();
+    await withAuthorityHostTestScope(async () => {
+      const { claim } = abandonedLock(root, claimBody());
+
+      expect(
+        acquireLocks({ locksDir: locksDir(root), taskId: 'TASK-0411', targets: ['F2:MOD-a'] })
+          .denied,
+      ).toEqual([]);
+
+      expect(listLocks({ locksDir: locksDir(root) })).toMatchObject([{ task_id: 'TASK-0411' }]);
+      expect(existsSync(claim)).toBe(false);
+      expect(readdirSync(join(root, '.devai/state/lock-claims'))).toEqual([]);
+    });
+  });
+
+  it.each([
+    [
+      'its pid is alive but the claim outlived the age bound',
+      () => ({ pid: process.pid, claimed_at: new Date(Date.now() - HOUR).toISOString() }),
+    ],
+    [
+      'its pid is alive but the host has rebooted since',
+      () => ({ pid: process.pid, boot_at: Date.now() - uptime() * 1000 - 10 * HOUR }),
+    ],
+  ])('breaks a same-host claim when %s', async (_case, overrides) => {
+    const root = repository();
+    await withAuthorityHostTestScope(async () => {
+      abandonedLock(root, claimBody(overrides()));
+
+      expect(
+        acquireLocks({ locksDir: locksDir(root), taskId: 'TASK-0412', targets: ['F2:MOD-a'] })
+          .denied,
+      ).toEqual([]);
+    });
+  });
+
+  it.each([
+    ['another host within the age bound', () => claimBody({ hostname: elsewhere() })],
+    ['a live claimant on this host', () => claimBody({ pid: process.pid })],
+    ['a claimant still writing its claim', () => ''],
+  ])('stands down before a claim held by %s', async (_case, body) => {
+    const root = repository();
+    await withAuthorityHostTestScope(async () => {
+      const held = body();
+      const { claim } = abandonedLock(root, held);
+
+      expect(
+        acquireLocks({ locksDir: locksDir(root), taskId: 'TASK-0413', targets: ['F2:MOD-a'] })
+          .denied,
+      ).toEqual([{ target: 'F2:MOD-a', held_by: 'TASK-0810' }]);
+      expect(readFileSync(claim, 'utf8')).toBe(held);
+    });
+  });
+
+  it.each([
+    [
+      'another host past the age bound',
+      (claim: string) =>
+        writeFileSync(
+          claim,
+          claimBody({
+            hostname: elsewhere(),
+            claimed_at: new Date(Date.now() - HOUR).toISOString(),
+          }),
+        ),
+    ],
+    [
+      'an unreadable claim past the age bound',
+      (claim: string) => {
+        writeFileSync(claim, '');
+        const past = new Date(Date.now() - HOUR);
+        utimesSync(claim, past, past);
+      },
+    ],
+  ])('refuses with a repair code naming the claim left by %s', async (_case, leave) => {
+    const root = repository();
+    await withAuthorityHostTestScope(async () => {
+      const { record, claim } = abandonedLock(root);
+      leave(claim);
+      const left = readFileSync(claim, 'utf8');
+
+      const refused = refusal(() =>
+        acquireLocks({ locksDir: locksDir(root), taskId: 'TASK-0414', targets: ['F2:MOD-a'] }),
+      );
+
+      expect(refused.code).toBe('TASK_RECORD_CLAIM_STALE');
+      expect(refused.message).toContain(claim);
+      expect(readFileSync(claim, 'utf8')).toBe(left);
+      expect(JSON.parse(readFileSync(keyFile(root), 'utf8'))).toEqual(record);
+    });
+  });
+
+  it('two breakers of one abandoned claim never both win', async () => {
+    const root = repository();
+    await withAuthorityHostTestScope(async () => {
+      const { claim } = abandonedLock(root, claimBody());
+      let second: AcquireResult | undefined;
+      // The first breaker holds the claim on the claim; a second arrives before it finishes.
+      seam.before = (symbol, args) => {
+        if (symbol !== 'renameSync' || args[1] !== claim) return;
+        seam.before = undefined;
+        second = acquireLocks({
+          locksDir: locksDir(root),
+          taskId: 'TASK-0416',
+          targets: ['F2:MOD-a'],
+        });
+      };
+
+      const first = acquireLocks({
+        locksDir: locksDir(root),
+        taskId: 'TASK-0415',
+        targets: ['F2:MOD-a'],
+      });
+
+      expect(first.denied).toEqual([]);
+      expect(second?.denied).toEqual([{ target: 'F2:MOD-a', held_by: 'TASK-0810' }]);
+      expect(listLocks({ locksDir: locksDir(root) })).toMatchObject([{ task_id: 'TASK-0415' }]);
+    });
+  });
+
+  it('refuses with a repair code naming the marker of a breaker that died mid-break', async () => {
+    const root = repository();
+    await withAuthorityHostTestScope(async () => {
+      const { claim } = abandonedLock(root, claimBody());
+      writeFileSync(`${claim}.break`, claimBody());
+
+      const refused = refusal(() =>
+        acquireLocks({ locksDir: locksDir(root), taskId: 'TASK-0417', targets: ['F2:MOD-a'] }),
+      );
+
+      expect(refused.code).toBe('TASK_RECORD_CLAIM_STALE');
+      expect(refused.message).toContain(`${claim}.break`);
+    });
+  });
+
+  it('reclaims a dead controller whose runner died holding the claim on it', async () => {
+    const root = repository();
+    await withAuthorityHostTestScope(async () => {
+      const claims = join(root, '.devai/state/round-runs', ROUND, 'controller-claims');
+      mkdirSync(claims, { recursive: true });
+      const dead = {
+        round_id: ROUND,
+        pid: deadPid(),
+        hostname: hostname(),
+        started_at: '2026-10-04T00:00:00.000Z',
+        token: 'previous',
+      };
+      writeFileSync(controllerFile(root), JSON.stringify(dead));
+      writeFileSync(
+        join(claims, `controller.json.${recordIdentity(dead)}.claim`),
+        claimBody({ pid: dead.pid }),
+      );
+
+      const controller = acquireRoundController(root, ROUND);
+
+      expect(
+        (JSON.parse(readFileSync(controllerFile(root), 'utf8')) as { token: string }).token,
+      ).toBe(controller.token);
+    });
+  });
+
+  it('refuses a dead controller whose claim another host left, naming the claim', async () => {
+    const root = repository();
+    await withAuthorityHostTestScope(async () => {
+      const claims = join(root, '.devai/state/round-runs', ROUND, 'controller-claims');
+      mkdirSync(claims, { recursive: true });
+      const dead = {
+        round_id: ROUND,
+        pid: deadPid(),
+        hostname: hostname(),
+        started_at: '2026-10-04T00:00:00.000Z',
+        token: 'previous',
+      };
+      writeFileSync(controllerFile(root), JSON.stringify(dead));
+      const claim = join(claims, `controller.json.${recordIdentity(dead)}.claim`);
+      writeFileSync(
+        claim,
+        claimBody({ hostname: elsewhere(), claimed_at: new Date(Date.now() - HOUR).toISOString() }),
+      );
+
+      const refused = refusal(() => acquireRoundController(root, ROUND));
+
+      expect(refused.code).toBe('TASK_RECORD_CLAIM_STALE');
+      expect(refused.message).toContain(claim);
+    });
+  });
+});
+
+describe('lock record generations', () => {
+  it('a release racing a same-millisecond re-acquisition never removes the new lock', async () => {
+    const root = repository();
+    await withAuthorityHostTestScope(async () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-10-04T00:00:00.000Z'));
+      acquireLocks({ locksDir: locksDir(root), taskId: 'TASK-0418', targets: ['F2:MOD-a'] });
+      // While one release holds its read of the record, the task releases and re-acquires
+      // the key within the same millisecond: the two records differ only in generation.
+      beforeNextMutation(() => {
+        releaseLocks({ locksDir: locksDir(root), taskId: 'TASK-0418' });
+        expect(
+          acquireLocks({ locksDir: locksDir(root), taskId: 'TASK-0418', targets: ['F2:MOD-a'] })
+            .denied,
+        ).toEqual([]);
+      });
+
+      expect(releaseLocks({ locksDir: locksDir(root), taskId: 'TASK-0418' })).toEqual([]);
+
+      expect(listLocks({ locksDir: locksDir(root) })).toMatchObject([{ task_id: 'TASK-0418' }]);
     });
   });
 });
