@@ -21,8 +21,24 @@ import {
  * note at docs/theory/architecture/sensors/harness_invariant_alignment.md.
  */
 
+/**
+ * A candidate-bound observation the caller made in process of a read-only action
+ * that persists nothing, such as `audit scorecard` (ADR-SCR-0013). It carries its
+ * own candidate binding and completion time and is judged like any other evidence
+ * record: it must pass, bind the candidate head, be fresh, and name the action as
+ * a fail-closed devai command.
+ */
+export interface AlignmentObservation {
+  readonly command: string;
+  readonly status: 'pass' | 'fail';
+  readonly candidate_sha: string;
+  readonly completed_at: string;
+}
+
 export interface HarnessInvariantAlignmentOptions {
   readonly repoRoot: string;
+  /** In-process observations of read-only actions at the candidate head. */
+  readonly observations?: readonly AlignmentObservation[];
   readonly invariantsDir?: string;
   readonly workflowDir?: string;
   readonly gateSeverityValue?: string;
@@ -85,13 +101,15 @@ export function senseHarnessInvariantAlignment(
   const workflows = loadWorkflows(opts.repoRoot, opts.workflowDir);
   const runSteps = loadRunSteps(workflows.map((workflow) => workflow.file));
   const resolvedCandidateHead = candidateHead(opts.repoRoot, opts.candidateHead);
-  const evidence =
-    opts.evidenceDir !== undefined
+  const evidence = [
+    ...(opts.evidenceDir !== undefined
       ? loadEvidence(opts.repoRoot, abs(opts.repoRoot, opts.evidenceDir))
       : [
           ...loadEvidence(opts.repoRoot, abs(opts.repoRoot, DEFAULT_READINGS_DIR)),
           ...loadEvidence(opts.repoRoot, abs(opts.repoRoot, 'record/proofs/work/test-results')),
-        ];
+        ]),
+    ...(opts.observations ?? []),
+  ];
   const nowMs = Date.parse(opts.now ?? new Date().toISOString());
   const maxEvidenceAgeHours = opts.maxEvidenceAgeHours ?? 24;
   const maxAgeMs = maxEvidenceAgeHours * 60 * 60 * 1000;
