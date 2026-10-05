@@ -1,16 +1,31 @@
 // ADR-GOV-0025 IA-001..IA-003: campaign projection, materialization through the single queue,
 // and human ratification separate from merge.
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+  existsSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { runWithAuthorityHostEffects, type AuthorityHostEffectScope } from '@devai-nyx/authority';
+import {
+  createIssuer,
+  runtimeApi,
+} from '../../../authority/tests/unit/authority-runtime-testkit.js';
 import { withAuthorityHostTestScope } from '../../../skills/tests/unit/authority-host-test-scope.js';
 import {
+  campaignSemanticProblems,
   campaignStatus,
   campaignTaskRecord,
   loadCampaign,
   materializeCampaignRound,
 } from '../../src/campaign/index.js';
+import { appendBacklog, readBacklog } from '../../src/loop/backlog.js';
 import { ratifyRoundTask } from '../../src/loop/ratification.js';
 import { loadTask, saveTask, type TaskRecord } from '../../src/loop/tasks.js';
 
@@ -87,11 +102,21 @@ function repository(roundStatus = 'open', taskStatus = 'ready'): string {
       },
     ],
   };
-  mkdirSync(join(root, 'product/campaigns/CMP-0701-fixture'), { recursive: true });
+  mkdirSync(join(root, 'product/campaigns/CMP-0701-fixture/prompts'), { recursive: true });
   writeFileSync(
     join(root, 'product/campaigns/CMP-0701-fixture/campaign.json'),
     JSON.stringify(campaign),
   );
+  writeFileSync(
+    join(root, 'product/campaigns/CMP-0701-fixture/prompts/preamble.md'),
+    '# Preamble\n',
+  );
+  for (const id of ['TASK-7011', 'TASK-7012', 'TASK-7013']) {
+    writeFileSync(
+      join(root, 'product/campaigns/CMP-0701-fixture/prompts', `${id}.md`),
+      `# ${id}\n`,
+    );
+  }
   mkdirSync(join(root, 'work/rounds', ROUND), { recursive: true });
   writeFileSync(join(root, 'work/rounds', ROUND, 'AUTHORIZATION.md'), 'status: active\nGRANTED\n');
   return root;
@@ -125,6 +150,32 @@ describe('campaign status (S4a, IA-001)', () => {
       id: 'TASK-7012',
       plan_status: 'ready',
       runtime_status: 'queued',
+    });
+  });
+
+  it('names a planned task with no runtime record once its round is open', () => {
+    const root = repository('open', 'planned');
+    expect(campaignStatus(root, 'CMP-0701').drift).toEqual([
+      { round_id: ROUND, task_id: 'TASK-7011', kind: 'missing-runtime-record' },
+      { round_id: ROUND, task_id: 'TASK-7012', kind: 'missing-runtime-record' },
+      { round_id: ROUND, task_id: 'TASK-7013', kind: 'missing-runtime-record' },
+    ]);
+    expect(campaignStatus(repository('planned', 'planned'), 'CMP-0701').drift).toEqual([]);
+  });
+
+  it('matches runtime records by task id and round id together', async () => {
+    const root = repository();
+    await withAuthorityHostTestScope(async () => {
+      materializeCampaignRound({ repoRoot: root, campaignId: 'CMP-0701', roundId: ROUND });
+      saveTask(root, { ...loadTask(root, 'TASK-7012'), round_id: 'R-0702' });
+    });
+    const status = campaignStatus(root, 'CMP-0701');
+    expect(status.drift).toEqual([
+      { round_id: ROUND, task_id: 'TASK-7012', kind: 'missing-runtime-record' },
+    ]);
+    expect(status.rounds[0]?.waves[0]?.tasks[1]).toMatchObject({
+      id: 'TASK-7012',
+      runtime_status: null,
     });
   });
 
@@ -202,6 +253,78 @@ describe('campaign materialize (S4b, IA-002)', () => {
     });
   });
 
+  it('preflights the backlog queue too, so a conflict on a later task writes nothing', async () => {
+    const root = repository();
+    await withAuthorityHostTestScope(async () => {
+      appendBacklog(root, {
+        id: 'TASK-7013',
+        round_id: ROUND,
+        title: 'a different queued title',
+        priority: 50,
+        created_at: '2026-10-04T00:00:00.000Z',
+      });
+      expect(() =>
+        materializeCampaignRound({ repoRoot: root, campaignId: 'CMP-0701', roundId: ROUND }),
+      ).toThrow('TASK_QUEUE_MATERIALIZATION_CONFLICT');
+    });
+    expect(existsSync(join(root, '.devai/state/tasks'))).toBe(false);
+    expect(readBacklog(root).map((entry) => entry.id)).toEqual(['TASK-7013']);
+  });
+
+  it('completes an interrupted batch without a second queue entry', async () => {
+    const root = repository();
+    await withAuthorityHostTestScope(async () => {
+      materializeCampaignRound({ repoRoot: root, campaignId: 'CMP-0701', roundId: ROUND });
+    });
+    // The state an interruption after a queue entry and before its record leaves behind.
+    rmSync(join(root, '.devai/state/tasks/TASK-7013.json'));
+    const lines = readFileSync(join(root, '.devai/state/backlog.jsonl'), 'utf8');
+    await withAuthorityHostTestScope(async () => {
+      expect(
+        materializeCampaignRound({ repoRoot: root, campaignId: 'CMP-0701', roundId: ROUND }),
+      ).toMatchObject({ materialized: ['TASK-7013'], existing: ['TASK-7011', 'TASK-7012'] });
+    });
+    expect(readFileSync(join(root, '.devai/state/backlog.jsonl'), 'utf8')).toBe(lines);
+    expect(loadTask(root, 'TASK-7013').status).toBe('queued');
+  });
+
+  it('refuses a plan that fails the campaign checker rules before any write', async () => {
+    const root = repository();
+    rmSync(join(root, 'product/campaigns/CMP-0701-fixture/prompts/TASK-7012.md'));
+    expect(campaignSemanticProblems(root, loadCampaign(root, 'CMP-0701'))).toEqual([
+      'TASK-7012 prompt missing prompts/TASK-7012.md',
+    ]);
+    await withAuthorityHostTestScope(async () => {
+      expect(() =>
+        materializeCampaignRound({ repoRoot: root, campaignId: 'CMP-0701', roundId: ROUND }),
+      ).toThrow('CAMPAIGN_SEMANTICS_INVALID');
+    });
+    expect(existsSync(join(root, '.devai/state'))).toBe(false);
+    const path = join(root, 'product/campaigns/CMP-0701-fixture/campaign.json');
+    const plan = JSON.parse(readFileSync(path, 'utf8')) as {
+      rounds: {
+        depends_on: string[];
+        waves: { tasks: { id: string; upstream_task_id: string | null }[] }[];
+      }[];
+    };
+    const [round] = plan.rounds;
+    const tasks = round?.waves[0]?.tasks ?? [];
+    if (round === undefined || tasks.length !== 3) throw new Error('fixture shape changed');
+    writeFileSync(
+      join(root, 'product/campaigns/CMP-0701-fixture/prompts/TASK-7012.md'),
+      'TASK-7012\n',
+    );
+    round.depends_on = ['R-0799'];
+    tasks[2] = { ...tasks[2], id: 'TASK-7011', upstream_task_id: 'TASK-7011' } as never;
+    writeFileSync(path, JSON.stringify(plan));
+    expect(campaignSemanticProblems(root, loadCampaign(root, 'CMP-0701'))).toEqual([
+      `${ROUND} depends on R-0799`,
+      'duplicate id TASK-7011',
+      'TASK-7011 upstream must be TASK-7012',
+      'TASK-7011 prompt does not name the task',
+    ]);
+  });
+
   it('builds the human executor from the campaign prompt', () => {
     const root = repository();
     const loaded = loadCampaign(root, 'CMP-0701');
@@ -218,6 +341,17 @@ describe('campaign materialize (S4b, IA-002)', () => {
 });
 
 describe('round ratify (S4c, IA-003)', () => {
+  const AGENT_EXECUTOR = {
+    kind: 'agent',
+    runtime: 'claude-cli',
+    model: 'sonnet',
+    effort: 'high',
+    selection: { mode: 'exact', registry_id: 'claude-cli' },
+    prompt_composition_id: 'PC-0000000000000000',
+    max_iterations: 4,
+    capabilities: ['repository-context'],
+  };
+
   async function awaiting(root: string): Promise<void> {
     await withAuthorityHostTestScope(async () => {
       materializeCampaignRound({ repoRoot: root, campaignId: 'CMP-0701', roundId: ROUND });
@@ -225,9 +359,13 @@ describe('round ratify (S4c, IA-003)', () => {
         ...loadTask(root, 'TASK-7013'),
         status: 'awaiting_human_review',
         branch: 'experimental/TASK-7013/attempt-1',
-      });
+        executor: AGENT_EXECUTOR,
+      } as unknown as TaskRecord);
     });
   }
+
+  const decisionPath = (root: string) =>
+    join(root, '.devai/state/round-runs', ROUND, 'ratifications', 'TASK-7013.json');
 
   it('accepts into pre_merge and records the human decision once', async () => {
     const root = repository();
@@ -248,7 +386,8 @@ describe('round ratify (S4c, IA-003)', () => {
         branch: 'experimental/TASK-7013/attempt-1',
       });
       expect(loadTask(root, 'TASK-7013').status).toBe('pre_merge');
-      expect(() =>
+      // Repeating the identical decision is idempotent; a different one is refused.
+      expect(
         ratifyRoundTask({
           repoRoot: root,
           round: ROUND,
@@ -256,11 +395,20 @@ describe('round ratify (S4c, IA-003)', () => {
           decision: 'accept',
           role: 'owner',
         }),
-      ).toThrow('RATIFICATION_TASK_NOT_AWAITING_REVIEW');
+      ).toEqual(record);
+      expect(() =>
+        ratifyRoundTask({
+          repoRoot: root,
+          round: ROUND,
+          taskId: 'TASK-7013',
+          decision: 'reject',
+          role: 'owner',
+        }),
+      ).toThrow('RATIFICATION_EXISTS');
     });
   });
 
-  it('escalates a rejection and refuses other roles, decisions and states', async () => {
+  it('escalates a rejection and refuses other roles, decisions, executors and states', async () => {
     const root = repository();
     await awaiting(root);
     await withAuthorityHostTestScope(async () => {
@@ -271,6 +419,16 @@ describe('round ratify (S4c, IA-003)', () => {
       expect(() =>
         ratifyRoundTask({ ...base, decision: 'merge' as 'accept', role: 'owner' }),
       ).toThrow('RATIFICATION_DECISION_INVALID');
+      // A human executor completes through its own evidence contract, never ratify.
+      saveTask(root, { ...loadTask(root, 'TASK-7012'), status: 'awaiting_human_review' });
+      expect(() =>
+        ratifyRoundTask({ ...base, taskId: 'TASK-7012', decision: 'accept', role: 'owner' }),
+      ).toThrow('RATIFICATION_EXECUTOR_INELIGIBLE');
+      expect(loadTask(root, 'TASK-7012').status).toBe('awaiting_human_review');
+      saveTask(root, {
+        ...loadTask(root, 'TASK-7011'),
+        executor: AGENT_EXECUTOR,
+      } as unknown as TaskRecord);
       expect(() =>
         ratifyRoundTask({ ...base, taskId: 'TASK-7011', decision: 'accept', role: 'owner' }),
       ).toThrow('RATIFICATION_TASK_NOT_AWAITING_REVIEW');
@@ -279,5 +437,77 @@ describe('round ratify (S4c, IA-003)', () => {
       });
       expect(loadTask(root, 'TASK-7013').status).toBe('escalated');
     });
+  });
+
+  it('completes an interrupted ratification on retry and quarantines a torn decision', async () => {
+    const root = repository();
+    await awaiting(root);
+    await withAuthorityHostTestScope(async () => {
+      const base = { repoRoot: root, round: ROUND, taskId: 'TASK-7013' } as const;
+      const record = ratifyRoundTask({ ...base, decision: 'accept', role: 'owner' });
+      // The state a crash between the decision and the transition leaves behind.
+      saveTask(root, { ...loadTask(root, 'TASK-7013'), status: 'awaiting_human_review' });
+      expect(() => ratifyRoundTask({ ...base, decision: 'reject', role: 'owner' })).toThrow(
+        'RATIFICATION_EXISTS',
+      );
+      expect(ratifyRoundTask({ ...base, decision: 'accept', role: 'owner' })).toEqual(record);
+      expect(loadTask(root, 'TASK-7013').status).toBe('pre_merge');
+    });
+    const torn = repository();
+    await awaiting(torn);
+    mkdirSync(join(torn, '.devai/state/round-runs', ROUND, 'ratifications'), { recursive: true });
+    writeFileSync(decisionPath(torn), '{"schemaVersion":"1.0.0","round_id"');
+    await withAuthorityHostTestScope(async () => {
+      expect(
+        ratifyRoundTask({
+          repoRoot: torn,
+          round: ROUND,
+          taskId: 'TASK-7013',
+          decision: 'reject',
+          role: 'owner',
+        }),
+      ).toMatchObject({ decision: 'reject', resulting_status: 'escalated' });
+    });
+    expect(
+      readdirSync(join(torn, '.devai/state/round-runs', ROUND, 'ratifications')).some((name) =>
+        name.startsWith('TASK-7013.json.torn-'),
+      ),
+    ).toBe(true);
+  });
+
+  it('never overwrites a concurrent escalation back into pre_merge', async () => {
+    const root = repository();
+    await awaiting(root);
+    const issuer = createIssuer(await runtimeApi(), { invocation_id: 'ratify-race' });
+    const scope: AuthorityHostEffectScope = {
+      action_id: 'round ratify',
+      invocation_id: 'ratify-race',
+      effect: 'local-write',
+      receipt_store: issuer,
+      apply_effect: (request, apply) => {
+        const applied = apply();
+        // A concurrent `task escalate` lands right after the decision is recorded.
+        if (request.symbol === 'renameSync' && request.arguments[1] === decisionPath(root)) {
+          saveTask(root, { ...loadTask(root, 'TASK-7013'), status: 'escalated' });
+        }
+        return applied;
+      },
+    };
+    try {
+      await runWithAuthorityHostEffects(scope, async () => {
+        expect(() =>
+          ratifyRoundTask({
+            repoRoot: root,
+            round: ROUND,
+            taskId: 'TASK-7013',
+            decision: 'accept',
+            role: 'owner',
+          }),
+        ).toThrow('RATIFICATION_TASK_CHANGED');
+      });
+    } finally {
+      issuer.dispose();
+    }
+    expect(loadTask(root, 'TASK-7013').status).toBe('escalated');
   });
 });
