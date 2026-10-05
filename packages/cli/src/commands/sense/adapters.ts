@@ -58,7 +58,7 @@ import {
   roundRecordIntegrity,
 } from '#runtime-core';
 
-import { rebuildSensorReadings } from './readings-rebuild.js';
+import { regenerateInventoryReadings } from './readings-rebuild.js';
 import {
   type SenseAdapterRequest,
   type SenseSensorAdapter,
@@ -163,8 +163,13 @@ const ADAPTERS: Readonly<Record<SensorKind, SenseSensorAdapter>> = Object.freeze
         ? {}
         : { databaseUrl: stringInput(request, 'databaseUrl') }),
     }),
+  // #237: regenerate the inventory bodies from source under the declared surfaces.
   inventory_regeneration: async (request) =>
-    (await rebuildSensorReadings(request.repoRoot)).reading,
+    (
+      await regenerateInventoryReadings(request.repoRoot, {
+        ...optional('surfaces', surfacesInput(request)),
+      })
+    ).reading,
   test_weakening_review: (request) => senseTestWeakening({ cwd: request.repoRoot }),
   trace_resolution: (request) => senseTraceResolve({ repoRoot: request.repoRoot }),
   security_scan: (request) => senseSecurityScan({ repoRoot: request.repoRoot }),
