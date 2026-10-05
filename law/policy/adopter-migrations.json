@@ -162,7 +162,8 @@
     },
     {
       "version": "2.0.0",
-      "status": "unreleased",
+      "status": "released",
+      "date": "2026-10-05",
       "changes": [
         {
           "id": "MIG-2.0.0-experimental-agent-execution",
