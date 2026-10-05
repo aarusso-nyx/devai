@@ -2,7 +2,12 @@ import { mkdirSync, readFileSync, renameSync } from '@devai-nyx/authority';
 import { randomUUID } from 'node:crypto';
 import { hostname } from 'node:os';
 import { join } from 'node:path';
-import { createRecordExclusive, observeRecord, swapObservedRecord } from './record-claims.js';
+import {
+  createRecordExclusive,
+  observeRecord,
+  processAlive,
+  swapObservedRecord,
+} from './record-claims.js';
 import type { TaskStatus } from './task-contract.js';
 import { fail, TaskServiceError } from './task-queue-services.js';
 
@@ -75,16 +80,6 @@ function readController(path: string): ControllerObservation {
   };
 }
 
-/** True when the pid names a live process; EPERM means alive but not ours. */
-function processAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    return (error as NodeJS.ErrnoException).code === 'EPERM';
-  }
-}
-
 /**
  * A controller is provably gone only when it ran on this host and its pid is dead.
  * A controller on another host, or one whose record is unreadable, is never reclaimed.
@@ -101,7 +96,9 @@ function provablyDead(record: RoundControllerRecord): boolean {
  * tasks stay in progress for explicit human disposition, because admission dispatches
  * only `ready` tasks. A live controller, one on another host, an unreadable record,
  * or a reclamation another process is already making refuses with
- * `TASK_ROUND_CONTROLLER_BUSY`.
+ * `TASK_ROUND_CONTROLLER_BUSY`. A claim a dead reclaimer left on the dead record is
+ * broken when its claimant is provably gone; otherwise the reclamation refuses with
+ * `TASK_RECORD_CLAIM_STALE`, naming the claim to repair.
  */
 export function acquireRoundController(repoRoot: string, roundId: string): RoundControllerRecord {
   mkdirSync(roundRunDir(repoRoot, roundId), { recursive: true });

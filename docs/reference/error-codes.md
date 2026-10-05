@@ -894,6 +894,7 @@ authoritative for that invocation.
 | `TASK_QUEUE_TITLE_REQUIRED` | task queue title required | Stable diagnostic for task queue title required. | Follow the structured envelope remediation and retry only after its condition is satisfied. | failure / 2 |
 | `TASK_RATIFICATION_REQUIRED` | task ratification required | Stable diagnostic for task ratification required. | Follow the structured envelope remediation and retry only after its condition is satisfied. | failure / 2 |
 | `TASK_RECORD_CHANGED` | task record changed | Stable diagnostic for task record changed. | Follow the structured envelope remediation and retry only after its condition is satisfied. | failure / 2 |
+| `TASK_RECORD_CLAIM_STALE` | task record claim stale | Stable diagnostic for task record claim stale. | Follow the structured envelope remediation and retry only after its condition is satisfied. | failure / 2 |
 | `TASK_RECORD_CONFLICT` | task record conflict | Stable diagnostic for task record conflict. | Follow the structured envelope remediation and retry only after its condition is satisfied. | failure / 2 |
 | `TASK_RECORD_INVALID` | task record invalid | Stable diagnostic for task record invalid. | Follow the structured envelope remediation and retry only after its condition is satisfied. | failure / 2 |
 | `TASK_REGISTRY_IDENTITY_MISMATCH` | task registry identity mismatch | Stable diagnostic for task registry identity mismatch. | Follow the structured envelope remediation and retry only after its condition is satisfied. | failure / 2 |
