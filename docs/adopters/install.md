@@ -293,7 +293,10 @@ This order holds in every checkout, for three reasons:
   In every other checkout it reports `POST_MERGE_ADAPTER_NOT_APPLICABLE_HERE` and rests authority
   enforcement on the GitHub Actions adapter instead; when that adapter is not bound or does not
   verify there, it fails with `POST_MERGE_ADAPTER_UNVERIFIABLE_HERE` and names the commands to
-  run in the bound checkout.
+  run in the bound checkout. Any post-merge state a checkout carries itself (a key, a receipt
+  issuer, or a DEVAI post-merge hook) makes doctor verify the binding there instead. A Husky
+  repository tracks `.husky/post-merge`, so every one of its clones carries the hook, and doctor
+  refuses the binding in each clone but the one that made it.
 
 Do not bind GitHub Actions last to make it the selected identity. That bind re-materializes the
 authority policy after the post-merge attestation pinned it, so the post-merge adapter's merge
