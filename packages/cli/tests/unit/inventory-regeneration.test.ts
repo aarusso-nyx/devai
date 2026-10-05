@@ -1,5 +1,13 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -73,6 +81,24 @@ async function regenerate(root: string, options?: RegenerationOptions) {
 
 function json(root: string, path: string): Record<string, unknown> {
   return JSON.parse(readFileSync(join(root, path), 'utf8')) as Record<string, unknown>;
+}
+
+/** Temporary publication files left in any regenerated body directory. */
+function temporaries(root: string): string[] {
+  return [INVENTORY_BODY_PATH, DEP_GRAPH_BODY, COVERAGE_BODY]
+    .map((path) => dirname(join(root, path)))
+    .filter((path) => existsSync(path))
+    .flatMap((path) => readdirSync(path).filter((name) => name.endsWith('.tmp')));
+}
+
+/** Earlier published bodies, so a failed run can be shown to leave them byte-identical. */
+function seedPublishedBodies(root: string): Readonly<Record<string, string>> {
+  const earlier = {
+    [INVENTORY_BODY_PATH]: '{"earlier":"manifest"}\n',
+    [DEP_GRAPH_BODY]: '{"graph":{"earlier.ts":[]}}\n',
+  };
+  for (const [path, body] of Object.entries(earlier)) put(root, path, body);
+  return earlier;
 }
 
 describe('inventory regeneration from source (#237)', () => {
@@ -160,6 +186,8 @@ describe('inventory regeneration from source (#237)', () => {
     ).toEqual(first.reading);
     // Regeneration writes only ignored state, so the tree stays clean for the next run.
     expect(git(root, 'status', '--porcelain')).toBe('');
+    // Publication renames durable temporaries into place and leaves none behind.
+    expect(temporaries(root)).toEqual([]);
 
     const bytes = readFileSync(join(root, INVENTORY_BODY_PATH), 'utf8');
     const second = await regenerate(root, { surfaces: ACTIONS_ONLY });
@@ -245,6 +273,105 @@ describe('inventory regeneration from source (#237)', () => {
       status: 'review',
       findings: [expect.objectContaining({ code: 'INVENTORY_REGENERATION_EMPTY_INVENTORY' })],
     });
+  });
+
+  it('publishes nothing when a required kind fails and keeps earlier bodies byte for byte', async () => {
+    // With http presumed present, an unreadable api-map makes the coverage producer error.
+    const { root } = repository({
+      'src/a.ts': 'export const a = 1;\n',
+      'record/proofs/sensors/inventory_api/api-map.json': '{broken',
+    });
+    const earlier = seedPublishedBodies(root);
+
+    const result = await regenerate(root);
+
+    expect(result.reading).toMatchObject({
+      status: 'fail',
+      // The dep-graph body was valid, but nothing is published, so both kinds are missing.
+      metrics: { missing_required_kinds: 2, kinds_touched: 0 },
+      findings: [
+        expect.objectContaining({
+          code: 'READINGS_REBUILD_ERROR',
+          message: expect.stringContaining('inventory_coverage read error'),
+        }),
+      ],
+    });
+    expect(result.report).toMatchObject({ ok: false, regenerated: [], obsolete: [] });
+    for (const [path, body] of Object.entries(earlier)) {
+      expect(readFileSync(join(root, path), 'utf8')).toBe(body);
+    }
+    expect(existsSync(join(root, COVERAGE_BODY))).toBe(false);
+    expect(temporaries(root)).toEqual([]);
+  });
+
+  it('validates a REVIEW body against its schema before publishing anything', async () => {
+    // No api-map reads REVIEW; a numeric route id makes that REVIEW body schema-invalid.
+    const { root } = repository({
+      'src/a.ts': 'export const a = 1;\n',
+      'record/proofs/sensors/inventory_routes/routes-test.json': `${JSON.stringify({
+        routes: [{ id: 42, method: 'GET', path: '/a' }],
+      })}\n`,
+    });
+    const earlier = seedPublishedBodies(root);
+
+    const result = await regenerate(root);
+
+    expect(result.reading.status).toBe('fail');
+    expect(result.report.errors).toEqual([
+      expect.stringMatching(
+        /^regenerate \.devai\/state\/sensors\/inventory_coverage\/coverage-matrix\.json failed: body fails coverage-matrix\.schema\.json/u,
+      ),
+    ]);
+    expect(result.report.regenerated).toEqual([]);
+    for (const [path, body] of Object.entries(earlier)) {
+      expect(readFileSync(join(root, path), 'utf8')).toBe(body);
+    }
+    expect(existsSync(join(root, COVERAGE_BODY))).toBe(false);
+  });
+
+  it('removes the body of a kind no longer required so it can never stand in for a PASS', async () => {
+    const { root } = repository();
+    await regenerate(root, { surfaces: ACTIONS_ONLY });
+    expect(existsSync(join(root, COVERAGE_BODY))).toBe(true);
+    put(root, '.devai/state/sensors/inventory_coverage/stray.json', '{"links":[]}\n');
+
+    const result = await regenerate(root, {
+      surfaces: { http: false, database: false, rbac: false, actions: false },
+    });
+
+    expect(result.reading).toMatchObject({
+      status: 'pass',
+      metrics: { required_kinds: 1, kinds_touched: 1, obsolete_bodies_removed: 1 },
+    });
+    expect(result.report.obsolete).toEqual([
+      { kind: 'inventory_coverage', body_path: COVERAGE_BODY, action: 'removed' },
+    ]);
+    expect(existsSync(join(root, COVERAGE_BODY))).toBe(false);
+    // Neither the removed body nor any other file of a regenerated kind is synthesized.
+    expect(result.report.entries).toEqual([]);
+    expect(existsSync(join(root, '.devai/state/sensor-readings/inventory_coverage'))).toBe(false);
+  });
+
+  it('fails explicitly when its own reading cannot be persisted', async () => {
+    const { root } = repository();
+    // A file where the reading directory belongs makes the store write fail.
+    put(root, '.devai/state/sensor-readings/inventory_regeneration', 'not a directory\n');
+
+    const result = await regenerate(root, { surfaces: ACTIONS_ONLY });
+
+    expect(result.reading).toMatchObject({
+      status: 'fail',
+      findings: [
+        expect.objectContaining({
+          severity: 'error',
+          code: 'INVENTORY_REGENERATION_READING_UNPERSISTED',
+          message: expect.stringContaining('/sensor-readings/inventory_regeneration/'),
+        }),
+      ],
+      metrics: { error_count: 1 },
+    });
+    expect(result.report.ok).toBe(false);
+    expect(result.report.errors).toEqual([expect.stringMatching(/^persist .* failed: /u)]);
   });
 
   it('gives inventory_adherence a bound input it measures instead of reading it missing', async () => {
