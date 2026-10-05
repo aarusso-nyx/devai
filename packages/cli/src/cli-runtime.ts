@@ -103,9 +103,22 @@ async function commandsFor(domain: CommandDomain): Promise<readonly CommandDefin
       return [evidenceCollect, evidenceRecord, evidenceRedact, evidenceRender, evidenceVerify];
     }
     case 'init': {
-      const { initApplyArchitect, initApplyHarness, initApplyOwner, initBind, initPlan } =
-        await import('./commands/init/index.js');
-      return [initApplyArchitect, initApplyHarness, initApplyOwner, initBind, initPlan];
+      const {
+        initApplyArchitect,
+        initApplyHarness,
+        initApplyOwner,
+        initBind,
+        initPlan,
+        initUpgrade,
+      } = await import('./commands/init/index.js');
+      return [
+        initApplyArchitect,
+        initApplyHarness,
+        initApplyOwner,
+        initBind,
+        initPlan,
+        initUpgrade,
+      ];
     }
     case 'release': {
       const {

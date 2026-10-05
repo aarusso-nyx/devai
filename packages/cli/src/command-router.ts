@@ -94,7 +94,10 @@ export function invocationIsNonMutating(internalName: string, args: readonly str
     return true;
   }
   if (internalName === 'round-close' && args.includes('--post-merge-receipt')) return true;
-  return internalName === 'init-bind' && !args.includes('--write');
+  // init bind and init upgrade (#264) plan without --write under a read scope.
+  return (
+    (internalName === 'init-bind' || internalName === 'init-upgrade') && !args.includes('--write')
+  );
 }
 
 /**
@@ -409,7 +412,10 @@ export function routeArgv(
     let translated = remaining.filter(
       (arg) => arg !== '--write' && arg !== '--publish' && arg !== '--experimental',
     );
-    if (exact.internal_name === 'init-bind' && remaining.includes('--write')) {
+    if (
+      (exact.internal_name === 'init-bind' || exact.internal_name === 'init-upgrade') &&
+      remaining.includes('--write')
+    ) {
       translated = remaining.filter((arg) => arg !== '--publish');
     }
     return {

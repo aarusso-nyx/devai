@@ -53,10 +53,24 @@ function sha256Bytes(value: string | Buffer): string {
   return createHash('sha256').update(value).digest('hex');
 }
 
-const ADOPTER_POLICY_RECEIPT = '.devai/config/adopter-policy-binding.json';
+export const ADOPTER_POLICY_RECEIPT = '.devai/config/adopter-policy-binding.json';
 const ADOPTER_POLICY_JOURNAL = '.devai/config/adopter-policy-binding.journal.json';
 const ADOPTER_POLICY_STAGED_SUFFIX = '.devai-bind-staged';
 const ADOPTER_POLICY_PAIR: readonly string[] = [...ADOPTER_POLICY_TARGETS, ADOPTER_POLICY_RECEIPT];
+/** The upgrade receipt init upgrade records beside the binding receipt (#264). */
+export const UPGRADE_RECEIPT = '.devai/config/upgrade-receipt.json';
+/**
+ * The closed set of paths the bind journal may stage and roll back: the adopter-policy
+ * pair, plus the operational-law and subprocess-effects files and the upgrade receipt that
+ * init upgrade lands in the same journaled write set. A journal naming any other path is
+ * invalid and is never replayed.
+ */
+export const BIND_JOURNAL_PATHS: readonly string[] = [
+  ...ADOPTER_POLICY_PAIR,
+  '.devai/config/forbidden-actions.json',
+  '.devai/config/subprocess-effects.json',
+  UPGRADE_RECEIPT,
+];
 
 interface AdopterPolicyJournalEntry {
   readonly path: string;
@@ -82,9 +96,9 @@ function landByRename(path: string, bytes: string): void {
  * recomputes the projection from that complete previous pair. Staged files without a
  * journal never reached a final path and are discarded.
  */
-function recoverInterruptedAdopterPolicyBind(targetRoot: string): 'rolled-back' | null {
+export function recoverInterruptedAdopterPolicyBind(targetRoot: string): 'rolled-back' | null {
   const journalPath = join(targetRoot, ADOPTER_POLICY_JOURNAL);
-  const stagedPaths = ADOPTER_POLICY_PAIR.map(
+  const stagedPaths = BIND_JOURNAL_PATHS.map(
     (path) => `${join(targetRoot, path)}${ADOPTER_POLICY_STAGED_SUFFIX}`,
   );
   const journalBytes = readTextIfPresent(journalPath);
@@ -105,7 +119,7 @@ function recoverInterruptedAdopterPolicyBind(targetRoot: string): 'rolled-back' 
           (entry): entry is AdopterPolicyJournalEntry =>
             isJsonObject(entry) &&
             typeof entry['path'] === 'string' &&
-            ADOPTER_POLICY_PAIR.includes(entry['path']) &&
+            BIND_JOURNAL_PATHS.includes(entry['path']) &&
             (entry['previous'] === null || typeof entry['previous'] === 'string'),
         )
       ) {
@@ -134,10 +148,14 @@ function recoverInterruptedAdopterPolicyBind(targetRoot: string): 'rolled-back' 
  * at any point leaves either the previous complete pair or a journal the next bind
  * rolls back (ADR-CFG-0002, IA-003).
  */
-function writeAdopterPolicyPairAtomically(
+export function writeAdopterPolicyPairAtomically(
   targetRoot: string,
   writes: ReadonlyMap<string, string>,
 ): void {
+  const outside = [...writes.keys()].find((path) => !BIND_JOURNAL_PATHS.includes(path));
+  if (outside !== undefined) {
+    throw new Error(`ADOPTER_POLICY_BINDING_JOURNAL_PATH_INVALID:${outside}`);
+  }
   const journalPath = join(targetRoot, ADOPTER_POLICY_JOURNAL);
   const entries = [...writes.keys()].map((path) => ({
     path,
@@ -166,7 +184,8 @@ function writeAdopterPolicyPairAtomically(
   );
 }
 
-function materializeAdopterPolicy(targetRoot: string, sourceArgument: string) {
+/** Resolve an adopter policy source argument, refusing any path outside law/policy. */
+export function resolveAdopterPolicySource(targetRoot: string, sourceArgument: string): string {
   const lawPolicyRoot = realpathSync(resolve(targetRoot, 'law/policy'));
   const sourcePath = realpathSync(resolve(targetRoot, sourceArgument));
   const sourceRelative = relative(lawPolicyRoot, sourcePath);
@@ -177,19 +196,48 @@ function materializeAdopterPolicy(targetRoot: string, sourceArgument: string) {
   ) {
     throw new Error('ADOPTER_POLICY_SOURCE_OUTSIDE_LAW_POLICY');
   }
-  const recovery = recoverInterruptedAdopterPolicyBind(targetRoot);
+  return sourcePath;
+}
+
+export interface AdopterPolicyBindPlan {
+  readonly receipt: Readonly<Record<string, unknown>>;
+  readonly resolved: ReadonlyMap<string, string>;
+  readonly retiredKeys: readonly string[];
+  readonly authorityExtension: AdopterAuthorityExtension | undefined;
+  /** The exact write set a bind lands: empty when the projection and receipt stand. */
+  readonly writes: ReadonlyMap<string, string>;
+}
+
+/**
+ * Plan an adopter-policy bind without writing (ADR-CFG-0002): the projection over the given
+ * project.json, the owned keys it retires, the receipt, and the write set measured against
+ * the bytes on disk. init bind --adopter-policy lands the write set as is; init upgrade
+ * composes it after the earlier segments it runs in the same invocation.
+ */
+export function planAdopterPolicyBind(
+  targetRoot: string,
+  sourcePath: string,
+  options: {
+    readonly currentProject?: JsonObject;
+    readonly frameworkVersion?: string;
+    readonly constitutionVersion?: string;
+  } = {},
+): AdopterPolicyBindPlan {
   const sourceBytes = readFileSync(sourcePath, 'utf8');
   const policy: unknown = JSON.parse(sourceBytes);
   const document = policy as JsonObject;
   const projectPath = join(targetRoot, '.devai/config/project.json');
-  const currentProject = existsSync(projectPath)
-    ? (JSON.parse(readFileSync(projectPath, 'utf8')) as JsonObject)
-    : {};
+  const currentProject =
+    options.currentProject ??
+    (existsSync(projectPath) ? (JSON.parse(readFileSync(projectPath, 'utf8')) as JsonObject) : {});
   const projectionInput = {
     policy,
     currentProject,
-    frameworkVersion: resolveCliVersion(),
+    frameworkVersion: options.frameworkVersion ?? resolveCliVersion(),
     targetRoot,
+    ...(options.constitutionVersion !== undefined && {
+      constitutionVersion: options.constitutionVersion,
+    }),
   };
   const { files: resolved, retired_keys: retiredKeys } =
     resolveAdopterPolicyProjection(projectionInput);
@@ -236,6 +284,13 @@ function materializeAdopterPolicy(targetRoot: string, sourceArgument: string) {
       currentReceipt === jsonBytes({ ...receipt, retired_keys: recordedRetired });
     if (!standing) writes.set(ADOPTER_POLICY_RECEIPT, receiptBytes);
   }
+  return { receipt, resolved, retiredKeys, authorityExtension, writes };
+}
+
+function materializeAdopterPolicy(targetRoot: string, sourceArgument: string) {
+  const sourcePath = resolveAdopterPolicySource(targetRoot, sourceArgument);
+  const recovery = recoverInterruptedAdopterPolicyBind(targetRoot);
+  const { receipt, authorityExtension, writes } = planAdopterPolicyBind(targetRoot, sourcePath);
   if (writes.size > 0) writeAdopterPolicyPairAtomically(targetRoot, writes);
   return {
     receipt_path: ADOPTER_POLICY_RECEIPT,
@@ -252,7 +307,7 @@ function materializeAdopterPolicy(targetRoot: string, sourceArgument: string) {
  * the receipt and the policy name the same bytes without a second repository-identity
  * lookup. From then on the trusted sources hold the source to this receipt strictly.
  */
-function recordAuthorityExtension(
+export function recordAuthorityExtension(
   targetRoot: string,
   receipt: Readonly<Record<string, unknown>>,
   extension: AdopterAuthorityExtension | undefined,
