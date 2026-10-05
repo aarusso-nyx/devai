@@ -165,3 +165,45 @@ describe('ADR-SCR-0008 IA-004 store readings and candidate binding', () => {
     expectIgnored(sense());
   });
 });
+
+// ADR-SCR-0013: reading ids are content-derived, so a reading with the same content
+// lands on the same store path at every candidate and the append-only chain keeps
+// each earlier receipt for it. The receipt whose digest names the current bytes binds.
+describe('ADR-SCR-0013 receipts for a store path recorded at several candidates', () => {
+  it('binds the receipt whose digest names the current bytes, not the first for the path', () => {
+    const { path, sha256 } = recordInStore();
+    writeChain([chainEntry(path, 'a'.repeat(64), OTHER_HEAD), chainEntry(path, sha256, CANDIDATE)]);
+    expect(sense()).toMatchObject({ status: 'pass', metrics: { misaligned: 0 } });
+  });
+
+  it('binds every candidate that recorded the same bytes, in either order', () => {
+    const { path, sha256 } = recordInStore();
+    writeChain([chainEntry(path, sha256, CANDIDATE), chainEntry(path, sha256, OTHER_HEAD)]);
+    expect(sense()).toMatchObject({ status: 'pass', metrics: { evidence_records: 2 } });
+  });
+
+  it('ignores a candidate receipt whose digest names other bytes', () => {
+    const { path, sha256 } = recordInStore();
+    writeChain([chainEntry(path, sha256, OTHER_HEAD), chainEntry(path, 'a'.repeat(64), CANDIDATE)]);
+    expect(sense()).toMatchObject({ status: 'review', metrics: { misaligned: 1 } });
+  });
+
+  it('ignores a reading edited after its candidate receipt was appended', () => {
+    const { path, sha256 } = recordInStore();
+    writeChain([chainEntry(path, sha256, CANDIDATE)]);
+    put(path, `${readFileSync(join(root, path), 'utf8')} `);
+    expectIgnored(sense());
+  });
+
+  it('keeps the first-receipt rule for receipts that carry no digest', () => {
+    const { path } = recordInStore();
+    const legacy = (headSha: string): Record<string, unknown> => ({
+      ...chainEntry(path, '', headSha),
+      artifacts: [{ path }],
+    });
+    writeChain([legacy(CANDIDATE), legacy(OTHER_HEAD)]);
+    expect(sense().status).toBe('pass');
+    writeChain([legacy(OTHER_HEAD), legacy(CANDIDATE)]);
+    expectIgnored(sense());
+  });
+});
