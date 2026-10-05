@@ -17,6 +17,8 @@ const DEFAULT_DOMAINS = [
   'doctor',
   'check',
   'sense',
+  'backlog',
+  'campaign',
   'round',
   'evidence',
   'release',
@@ -51,7 +53,7 @@ function helpDomains(help: string): readonly string[] {
 }
 
 describe('public CLI bootstrap', () => {
-  it('renders exactly nine porcelain domains in default root help', async () => {
+  it('renders exactly eleven porcelain domains in default root help', async () => {
     const help = await rootHelp();
     expect(help).toContain('Usage: devai <command> [options]');
     expect(helpDomains(help)).toEqual(DEFAULT_DOMAINS);

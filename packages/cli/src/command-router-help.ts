@@ -2,6 +2,8 @@ import type { RegistryEntry } from './define-command.js';
 
 const DOMAIN_SUMMARIES: Readonly<Record<string, string>> = {
   audit: 'Create exact, non-promoting Auditor observations.',
+  backlog: 'Record and resolve the governed work backlog.',
+  campaign: 'Project campaigns onto runtime state and materialize their rounds.',
   catalog: 'Inspect the live action catalog.',
   check: 'Run governed validation suites and checks.',
   doctor: 'Diagnose the declared adoption posture.',
@@ -20,6 +22,8 @@ const DEFAULT_DOMAIN_ORDER = [
   'doctor',
   'check',
   'sense',
+  'backlog',
+  'campaign',
   'round',
   'evidence',
   'release',
