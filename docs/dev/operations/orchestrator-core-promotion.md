@@ -22,10 +22,11 @@ No public action, consent flag, law schema, policy permission, model default,
 release process, or historical record changes in S1.
 
 The user authorized this design and bounded local integration on 2026-10-03.
-The implementation worktree is the dedicated `codex/orchestrator-core-promotion`
-branch, starting at commit `180a122787193f9bdfce9b7f4cd5600e85ae7854`.
+Historically, S1 was implemented on the dedicated `codex/orchestrator-core-promotion`
+branch, starting at commit `180a122787193f9bdfce9b7f4cd5600e85ae7854`; that branch is
+superseded by the merged S1 to S4 history on `main` and is not a current reference.
 The source pilot is read-only. Merge, publication, deployment, and live paid
-provider invocations are outside this integration scope.
+provider invocations were outside the S1 integration scope.
 
 The completed pilot delivery has source-population SHA-256
 `5a3203c8b09b8edc7e52821a893ce11eb22352307f9cf69211169da3d121b37e`.
@@ -193,26 +194,26 @@ readiness for review and does not authorize merge.
 below. `Deferred` means a later promotion gate; it cannot be inferred from S1 or
 from the standalone pilot's proof.
 
-| ID    | Requirement and counterexample                                                                                                            | Evidence required                                                                                                                                                                                                | Stage                                                  |
-| ----- | ----------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| CP-01 | Kernel is consumed by the existing core runner, not an orphan planner                                                                     | Runner calls the exported typed plan/admission functions; end-to-end core fixture executes                                                                                                                       | **PASS S1**                                            |
-| CP-02 | Task/round identity is canonical; unknown, missing, duplicate, cross-round, malformed, and unsupported stored inputs fail before dispatch | Additive direct-kernel and runner counterexamples with zero dispatch/resource mutation on invalid plans; invalid bytes preserved and exact classification error retained                                         | **PASS S1**                                            |
-| CP-03 | Full selected dependency closure rejects cycles and missing prerequisites                                                                 | Explicit selection imports only same-round prerequisites; missing/cycle fixtures refuse                                                                                                                          | **PASS S1**                                            |
-| CP-04 | Generation precedes role/priority/identifier order                                                                                        | A high-priority newly unlocked generation-1 task cannot overtake remaining generation-0 work                                                                                                                     | **PASS S1**                                            |
-| CP-05 | Coupled order is Architect → Inspector → Engineer                                                                                         | Reversed Inspector/Architect baseline counterexample; unrelated coupled groups remain independent                                                                                                                | **PASS S1**                                            |
-| CP-06 | Only durable `completed` prerequisites unlock dependents                                                                                  | `ok: true` with persisted `in_progress` blocks downstream; failed/cancelled/escalated upstream blocks; unrelated branch continues only while immutable population remains bound                                  | **PASS S1**                                            |
-| CP-07 | Admission reflects current inputs and the planned execution context rather than a stale plan                                              | Missing, changed, malformed, or wrong-round live records refuse; current candidate branch/worktree redirection refuses before allocation; normal allocation and upstream escalation context changes remain valid | **PASS S1**                                            |
-| CP-08 | Resource planning is deterministic and conservative; no new parallel execution                                                            | Declared substrate/module keys and conflict tests; unchanged serial runner behavior and existing lock-ownership regressions                                                                                      | **PASS S1**                                            |
-| CP-09 | Request, discipline, executor, and evidence bindings remain intact                                                                        | Existing B3A boundary/evidence regressions plus actual routine fixture with canonical binding validation                                                                                                         | **PASS S1**                                            |
-| CP-10 | Registered action/consent and runtime activation defaults remain unchanged; historical records stay preserved and readable                | Action registry/policy/schema byte preservation, existing serial tests, no provider launches or new CLI commands                                                                                                 | **PASS S1**                                            |
-| CP-11 | Changes preserve tests and pass affected hygiene                                                                                          | Additive counterexamples, focused test results, typecheck, changed-file lint, diff check, no skips/weakening                                                                                                     | **PASS S1**                                            |
-| CP-12 | Local integration has exact independent review and reversible removal                                                                     | Auditor report bound to candidate; tested baseline behavior after restoring baseline source and sensor patches in a disposable checkout                                                                          | **PASS S1**                                            |
-| CP-13 | Parallel runtime capacity, review reserve, and session mutexes enforce bounds                                                             | Same-generation disjoint execution, contention and reserve exhaustion tests with canonical lock/evidence integration                                                                                             | S2 (reviewer reserve with S3)                          |
-| CP-14 | Core provider adapter uses exact registry selection and preserves authority                                                               | Explicit experimental policy/action consent, prompt hashes, resolved runtime identities, host-enforcement boundary tests, fresh review contexts                                                                  | S3 (ADR-MDL-0005; live probe passed)                   |
-| CP-15 | Durable restart is safe after every dispatch boundary                                                                                     | Fault injection before/after intent, process spawn, evidence append, completion and cleanup; uncertain work requires explicit disposition, never blind retry                                                     | S3 (dispatch journal; uncertain work blocks the round) |
-| CP-16 | Usage accounting reports attributable observations and explicit unknowns                                                                  | Session cumulative-counter normalization, missing/regressed counters, cache inclusion/missingness and billing uncertainty, and budget overshoot tests                                                            | S3 (version-2 usage; missing never zero)               |
-| CP-17 | Full governed controller has no alternate task queue or automatic human gate                                                              | Backlog/campaign materialization, role-pure sessions, ratification/merge separation, no remote effects without exact Owner consent                                                                               | S4 (ADR-GOV-0025; ratification separate from merge)    |
-| CP-18 | Core runtime can replace legacy components without losing behavior/evidence                                                               | Caller inventory, adopter compatibility fixtures, migration/rollback rehearsal, retained historical evidence, exact release gates                                                                                | S4 (external controller retired; legacy paths kept)    |
+| ID    | Requirement and counterexample                                                                                                            | Evidence required                                                                                                                                                                                                | Stage                                               |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| CP-01 | Kernel is consumed by the existing core runner, not an orphan planner                                                                     | Runner calls the exported typed plan/admission functions; end-to-end core fixture executes                                                                                                                       | **PASS S1**                                         |
+| CP-02 | Task/round identity is canonical; unknown, missing, duplicate, cross-round, malformed, and unsupported stored inputs fail before dispatch | Additive direct-kernel and runner counterexamples with zero dispatch/resource mutation on invalid plans; invalid bytes preserved and exact classification error retained                                         | **PASS S1**                                         |
+| CP-03 | Full selected dependency closure rejects cycles and missing prerequisites                                                                 | Explicit selection imports only same-round prerequisites; missing/cycle fixtures refuse                                                                                                                          | **PASS S1**                                         |
+| CP-04 | Generation precedes role/priority/identifier order                                                                                        | A high-priority newly unlocked generation-1 task cannot overtake remaining generation-0 work                                                                                                                     | **PASS S1**                                         |
+| CP-05 | Coupled order is Architect → Inspector → Engineer                                                                                         | Reversed Inspector/Architect baseline counterexample; unrelated coupled groups remain independent                                                                                                                | **PASS S1**                                         |
+| CP-06 | Only durable `completed` prerequisites unlock dependents                                                                                  | `ok: true` with persisted `in_progress` blocks downstream; failed/cancelled/escalated upstream blocks; unrelated branch continues only while immutable population remains bound                                  | **PASS S1**                                         |
+| CP-07 | Admission reflects current inputs and the planned execution context rather than a stale plan                                              | Missing, changed, malformed, or wrong-round live records refuse; current candidate branch/worktree redirection refuses before allocation; normal allocation and upstream escalation context changes remain valid | **PASS S1**                                         |
+| CP-08 | Resource planning is deterministic and conservative; no new parallel execution                                                            | Declared substrate/module keys and conflict tests; unchanged serial runner behavior and existing lock-ownership regressions                                                                                      | **PASS S1**                                         |
+| CP-09 | Request, discipline, executor, and evidence bindings remain intact                                                                        | Existing B3A boundary/evidence regressions plus actual routine fixture with canonical binding validation                                                                                                         | **PASS S1**                                         |
+| CP-10 | Registered action/consent and runtime activation defaults remain unchanged; historical records stay preserved and readable                | Action registry/policy/schema byte preservation, existing serial tests, no provider launches or new CLI commands                                                                                                 | **PASS S1**                                         |
+| CP-11 | Changes preserve tests and pass affected hygiene                                                                                          | Additive counterexamples, focused test results, typecheck, changed-file lint, diff check, no skips/weakening                                                                                                     | **PASS S1**                                         |
+| CP-12 | Local integration has exact independent review and reversible removal                                                                     | Auditor report bound to candidate; tested baseline behavior after restoring baseline source and sensor patches in a disposable checkout                                                                          | **PASS S1**                                         |
+| CP-13 | Parallel runtime capacity, review reserve, and session mutexes enforce bounds                                                             | Same-generation disjoint execution, contention and reserve exhaustion tests with canonical lock/evidence integration                                                                                             | S2; reviewer reserve not implemented                |
+| CP-14 | Core provider adapter uses exact registry selection and preserves authority                                                               | Explicit experimental policy/action consent, prompt hashes, resolved runtime identities, host-enforcement boundary tests, fresh review contexts                                                                  | S3 (ADR-MDL-0005; live probe passed)                |
+| CP-15 | Durable restart is safe after every dispatch boundary                                                                                     | Fault injection before/after intent, process spawn, evidence append, completion and cleanup; uncertain work requires explicit disposition, never blind retry                                                     | S3; recorded dispositions in ADR-MDL-0007           |
+| CP-16 | Usage accounting reports attributable observations and explicit unknowns                                                                  | Session cumulative-counter normalization, missing/regressed counters, cache inclusion/missingness and billing uncertainty, and budget overshoot tests                                                            | S3 (version-2 usage; missing never zero)            |
+| CP-17 | Full governed controller has no alternate task queue or automatic human gate                                                              | Backlog/campaign materialization, role-pure sessions, ratification/merge separation, no remote effects without exact Owner consent                                                                               | S4 (ADR-GOV-0025; ratification separate from merge) |
+| CP-18 | Core runtime can replace legacy components without losing behavior/evidence                                                               | Caller inventory, adopter compatibility fixtures, migration/rollback rehearsal, retained historical evidence, exact release gates                                                                                | S4; declarative retirement, legacy paths kept       |
 
 ## Later promotion stages
 
@@ -267,7 +268,7 @@ The probe found five integration defects that the permissive-scope unit tests co
 - host user configuration (hooks and MCP servers) running inside attempts;
 - cache reads and writes left out of the token budget.
 
-All five were fixed before release.
+All five were fixed on `main` before S3 closed; no published release carried them.
 
 **S4: governed controller and legacy migration.** Map backlog, campaigns, rounds,
 coupled tasks, integration, closure, and review onto canonical core identities.
@@ -292,6 +293,18 @@ valid. Rollback is withdrawing the activation and not calling the new actions; n
 state migrates. All three actions ran end to end through the packed CLI against the S3c
 fixture.
 
+ADR-MDL-0007 closed three gaps the S4 review found on 2026-10-05:
+
+- **Completion.** An accepted agent task completes through `task finish` with the
+  ratification and merge evidence, and its attempt worktree is released. Merge stays a
+  separate human act.
+- **Recovery.** `round dispatch dispose` records the Owner's retry or escalation of
+  uncertain or blocked work, and can quarantine a damaged journal. `round dispatch
+deactivate` withdraws the activation with an audit record. Uncertainty now clears only
+  through a recorded disposition.
+- **Capacity.** The worktree cap follows `capacity.max_workers`, and retained worktrees hold
+  no capacity.
+
 ## Rollback and stop conditions
 
 The first slice adds no durable schema or migration. Restoring all S1 source,
@@ -310,25 +323,25 @@ S1 requirement is an incomplete slice, not a waived gate.
 
 ## Candidate evidence and verdict
 
-**S1 locally integrated; full orchestrator promotion remains staged.** CP-01 through
-CP-12 have passing local candidate evidence and independent Auditor PASS. CP-13
-through CP-18 remain deferred and are not readiness claims.
+**S1 to S4 are delivered and the three orchestrator gaps are closed; promotion is not complete.**
+The record stands as follows:
 
-[The local integration report](orchestrator-core-promotion-report.md) binds the
-checks, actual routine proof, rollback, limitations, and
-[independent review](orchestrator-core-promotion-independent-review.md). The eight
-executable source/test files bind to SHA-256
-`0bd341193ff8f1df898f86d8722d279e0c7242c1d99e3659e41f3b9e3b7fe7da`.
-The Inspector passed 87 focused tests including 56 additive cases; the Auditor
-independently passed 76 focused tests and 160 caller regressions. Counts overlap.
+| Rows        | State                                                                                                                                                                                                                                                    |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CP-01–CP-12 | S1. Passing local candidate evidence and an independent Auditor PASS, bound in [the local integration report](orchestrator-core-promotion-report.md) and its [independent review](orchestrator-core-promotion-independent-review.md).                    |
+| CP-13       | Partial. S2 delivered bounded concurrent admission, all-or-nothing multi-substrate locks and one controller per round. The **reviewer reserve is not implemented**; `round-execution.json` records it as not applicable until review steps become tasks. |
+| CP-14–CP-16 | S3 under ADR-MDL-0005 and ADR-MDL-0006, with fake-provider counterexamples and the bounded S3c live probe. ADR-MDL-0007 adds recorded dispositions, journal quarantine and the durability fixes.                                                         |
+| CP-17       | S4 under ADR-GOV-0025: campaign projection, materialization through the single queue, and ratification separate from merge. ADR-MDL-0007 adds the completion path through `task finish`.                                                                 |
+| CP-18       | **Declarative.** `campaign-execution.json` records external controllers as retired and nothing was deleted. No caller inventory, adopter migration or rollback rehearsal beyond the fixtures above has run, so this is not a replacement claim.          |
 
-| Matrix rows         | Concrete candidate evidence                                                                                                                                                        |
-| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| CP-01, CP-06, CP-09 | Actual routine proof and raw canonical receipts; core integration fixture                                                                                                          |
-| CP-02–CP-08         | Inspector focused checks, with retained RED logs for baseline ordering/completion, malformed storage, and execution-context defects; direct admission and runner boundary fixtures |
-| CP-09–CP-11         | Verification summary and Auditor caller regressions                                                                                                                                |
-| CP-12               | Rollback rehearsal, independent baseline checks, and [independent review](orchestrator-core-promotion-independent-review.md)                                                       |
+The raw evidence these stages cite (receipts, logs, fixture output, probe transcripts and
+manifests) is kept outside the repository. This page and the decision records are the
+in-repository account. The S1 report and review keep their original bindings: eight source
+and test files under SHA-256
+`0bd341193ff8f1df898f86d8722d279e0c7242c1d99e3659e41f3b9e3b7fe7da`, 87 Inspector and
+76 Auditor focused tests, and 160 caller regressions. Later stages are evidenced by their
+merged tests and the pull-request gate.
 
-The current code remains uncommitted and local. All law policies/schemas and the
-supported action registry remain unchanged; there were no new provider calls or
-remote effects. This evidence closes only the bounded S1 acceptance contract.
+None of this is a production-readiness, release or merge claim. Experimental agent
+execution stays non-promoting (ADR-MDL-0005 D-9). Release eligibility is decided only by
+the release gates.
