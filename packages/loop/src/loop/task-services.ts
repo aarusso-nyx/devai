@@ -1,8 +1,14 @@
+import { existsSync, readFileSync } from '@devai-nyx/authority';
 import { EXIT_USAGE } from '@devai-nyx/utils';
+import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { clusterStatus } from './db.js';
+import { recordAgentEscalation } from './dispatch-disposition.js';
+import { dispatchJournalPath, openDispatchAttempts } from './dispatch-journal.js';
+import { writeCreateOnlyDurableSync } from './durable-files.js';
 import { completeHumanTask, type HumanExecutorRole } from './human-executor.js';
 import { listLocks } from './locks.js';
+import { ratificationPath, type RatificationRecord } from './ratification.js';
 
 import {
   completeTask,
@@ -19,7 +25,7 @@ import {
   type TaskRecord,
   type TransitionOptions,
 } from './tasks.js';
-import { listWorktrees } from './worktrees.js';
+import { listWorktrees, releaseTaskWorktrees } from './worktrees.js';
 
 import { trackGovernanceEvent } from '../tracking/hook.js';
 import type { GovernanceEventStatus } from '../tracking/events.js';
@@ -136,6 +142,102 @@ function transitionOptions(
   };
 }
 
+/** The record binding an agent task's completion to its ratification and merge evidence. */
+export interface AgentCompletionRecord {
+  readonly schemaVersion: '1.0.0';
+  readonly round_id: string;
+  readonly task_id: string;
+  readonly completed_at: string;
+  readonly ratification: { readonly path: string; readonly sha256: string };
+  readonly merge_evidence_refs: readonly string[];
+  readonly released_worktrees: readonly string[];
+}
+
+function agentCompletionPath(repoRoot: string, roundId: string, taskId: string): string {
+  return join(repoRoot, '.devai/state/round-runs', roundId, 'completions', `${taskId}.json`);
+}
+
+/**
+ * The registered completion path of an agent task (ADR-MDL-0007): `round ratify
+ * --decision accept` moved it to pre_merge, a human integrated the attempt's changes
+ * (merge stays a separate human act, ADR-GOV-0025), and `task finish` now records the
+ * completion with the accepted ratification and the merge evidence. It refuses without
+ * an accepted ratification, without merge evidence, or while the journal still holds an
+ * open attempt for the task. The attempt worktree is released and the task passes
+ * through merging; the caller then completes it.
+ */
+function recordAgentCompletion(
+  repoRoot: string,
+  task: TaskRecord,
+  evidence: readonly string[],
+): void {
+  const ratification = ratificationPath(repoRoot, task.round_id, task.id);
+  if (!existsSync(ratification)) fail('TASK_RATIFICATION_REQUIRED');
+  const bytes = readFileSync(ratification);
+  let decision: unknown;
+  let ratifiedAt: unknown;
+  try {
+    const record = JSON.parse(bytes.toString('utf8')) as Partial<RatificationRecord>;
+    if (record.task_id !== task.id || record.round_id !== task.round_id) {
+      fail('TASK_RATIFICATION_REQUIRED');
+    }
+    decision = record.decision;
+    ratifiedAt = record.ratified_at;
+  } catch {
+    fail('TASK_RATIFICATION_REQUIRED');
+  }
+  if (decision !== 'accept' || typeof ratifiedAt !== 'string') fail('TASK_RATIFICATION_REQUIRED');
+  const refs = [...new Set(evidence)];
+  if (
+    refs.length === 0 ||
+    refs.length !== evidence.length ||
+    refs.some((ref) => !/^EV-/u.test(ref))
+  ) {
+    fail('TASK_MERGE_EVIDENCE_REQUIRED');
+  }
+  if (
+    existsSync(dispatchJournalPath(repoRoot, task.round_id)) &&
+    openDispatchAttempts(repoRoot, task.round_id, task.id).length > 0
+  ) {
+    fail('TASK_DISPATCH_UNCERTAIN');
+  }
+  const now = new Date().toISOString();
+  const released = releaseTaskWorktrees({ repoRoot, taskId: task.id });
+  const completion: AgentCompletionRecord = {
+    schemaVersion: '1.0.0',
+    round_id: task.round_id,
+    task_id: task.id,
+    completed_at: now,
+    ratification: {
+      path: `.devai/state/round-runs/${task.round_id}/ratifications/${task.id}.json`,
+      sha256: createHash('sha256').update(bytes).digest('hex'),
+    },
+    merge_evidence_refs: refs,
+    released_worktrees: released,
+  };
+  const completionPath = agentCompletionPath(repoRoot, task.round_id, task.id);
+  // A crash after the record and before the transition leaves the record to be reused.
+  if (!existsSync(completionPath)) {
+    writeCreateOnlyDurableSync(completionPath, `${JSON.stringify(completion, null, 2)}\n`);
+  }
+  const { worktree_id: _worktree, ...rest } = task;
+  void _worktree;
+  saveTask(repoRoot, {
+    ...rest,
+    status: 'merging',
+    iteration_trail: [
+      ...(task.iteration_trail ?? []),
+      {
+        iteration: Math.max(1, task.iteration_count),
+        started_at: ratifiedAt,
+        ended_at: now,
+        verdict: 'PASS',
+        evidence_refs: refs,
+      },
+    ],
+  });
+}
+
 export function finishRoundTask(
   options: TransitionOptions & {
     readonly round?: string;
@@ -177,6 +279,8 @@ export function finishRoundTask(
       ],
     });
     saveTask(options.repoRoot, { ...loadTask(options.repoRoot, task.id), status: 'merging' });
+  } else if (task.executor.kind === 'agent' && task.status === 'pre_merge') {
+    recordAgentCompletion(options.repoRoot, task, options.evidence ?? []);
   } else if (task.status !== 'merging') {
     fail('TASK_LIFECYCLE_TRANSITION_FORBIDDEN');
   }
@@ -209,6 +313,9 @@ export function escalateRoundTask(
   ) {
     fail('TASK_LIFECYCLE_TRANSITION_FORBIDDEN');
   }
+  // An agent task's escalation is a recorded disposition of any open journal attempt, and
+  // it releases the attempt worktrees (ADR-MDL-0007); other executors are unchanged.
+  recordAgentEscalation({ repoRoot: options.repoRoot, roundId: task.round_id, task });
   const escalated = escalateTask(transitionOptions({ ...options, operation: 'escalate' }));
   trackTaskTransition(
     options.repoRoot,
