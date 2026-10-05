@@ -133,7 +133,10 @@ finish instead of failing. With one worker the behavior is the serial runner, ta
 Routine executors run their argv through the governed asynchronous process effect
 (ADR-MDL-0005 D-10): the process is authorized before it starts, bounded by the task's
 `timeout_ms`, stopped as a whole process group when it overruns, and its output retained up to
-1 MiB per stream, keeping the newest bytes. Concurrent routine tasks therefore overlap. Database and worktree identities
+1 MiB per stream, keeping the newest bytes. Concurrent routine tasks therefore overlap. An
+overrun sends SIGTERM to the group and, after a grace period, SIGKILL to every member still
+alive, descendants included; it fails the task with `TASK_ROUTINE_TIMED_OUT` even when the
+routine traps the signal and exits 0. Database and worktree identities
 are per task (`devai_task_<task id>`, `WT-<task id>`), so two distinct tasks never contend for
 them. There is no cross-round controller and no reviewer reserve yet; the policy records both.
 
@@ -418,8 +421,10 @@ expired activation, any selected task whose discipline, runtime, model, effort, 
 selection the activation does not admit, and a round whose dispatch journal holds an uncertain
 attempt (`TASK_DISPATCH_UNCERTAIN`) until a human runs `task escalate` on that task.
 
-Each task composes its prompt (Article 37) and must still match its bound
-`prompt_composition_id`, or it is refused with `TASK_PROMPT_COMPOSITION_DRIFT`. It then runs up
+Each task composes its prompt (Article 37) from four layers: the adopter's `AGENTS.md`, the
+discipline's role charter, the task record, and the task's recipe as the payload. A task without
+`recipe_name` refuses with `PROMPT_RECIPE_REQUIRED`. The prompt must still match its bound
+`prompt_composition_id`, or the task is refused with `TASK_PROMPT_COMPOSITION_DRIFT`. It then runs up
 to three attempts at the requested model and one at the next tier of
 `law/policy/model-tiers.json` when the activation also admits that model, bounded by the task's
 `max_iterations` and the activation budgets. Every attempt runs in a fresh worktree
@@ -431,3 +436,12 @@ removed, the changed-file digests stay in the evidence, and an exhausted ladder 
 the task `experimental_blocked`. Once a provider leaves a token counter unreported, no further
 attempt in the invocation may spend (`EXPERIMENTAL_USAGE_UNVERIFIABLE`). Nothing is pushed,
 merged, or retried automatically.
+
+A provider starts with an allowlisted environment, never the host's. It gets only `PATH`,
+`HOME`, `USER`, `LOGNAME`, `SHELL`, `TMPDIR`, `LANG`, `LC_*`, `TERM`, the proxy and CA variables,
+and its own `CLAUDE_CONFIG_DIR` or `CODEX_HOME`, so it runs on its stored login while tokens such
+as `GH_TOKEN` and cloud credentials stay out. Only a single explicit terminal event in a stream
+read whole completes an attempt: a stream that outgrew its retained bound or carries a line
+that is not a JSON object fails with `AGENT_CLI_OUTPUT_TRUNCATED` or `AGENT_CLI_OUTPUT_MALFORMED`.
+If the journal cannot record a started provider, its process group is stopped before the attempt
+fails with `AGENT_CLI_SPAWN_RECORD_FAILED`.
