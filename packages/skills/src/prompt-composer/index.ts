@@ -47,6 +47,8 @@ export interface ComposeAgentPromptOptions {
 
 const DEFAULT_RESOURCES_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../resources');
 const ROLE_DISCIPLINES = new Set(['engineer', 'inspector']);
+/** A packaged recipe directory name; nothing that could leave `resources/recipes/`. */
+const RECIPE_NAME = /^[a-z][a-z0-9-]*$/u;
 
 export class PromptCompositionError extends Error {
   constructor(readonly code: string) {
@@ -100,9 +102,9 @@ export function promptStackSha256(components: readonly PromptComponent[]): strin
  * Compose an experimental agent prompt deterministically (Article 37, ADR-MDL-0005
  * D-8) from four layers, in order: the adopter's `AGENTS.md`, the packaged role
  * charter for the task's discipline, the bound task request, and the declared
- * recipe. The same inputs give the same stack hash; a change to one input changes
- * exactly that component's hash. A missing or empty component refuses; nothing is
- * silently skipped.
+ * recipe as the payload. The same inputs give the same stack hash; a change to one
+ * input changes exactly that component's hash. A missing or empty component refuses,
+ * including the payload of a task that declares no recipe; nothing is silently skipped.
  */
 export function composeAgentPrompt(options: ComposeAgentPromptOptions): ComposedPrompt {
   const { task } = options;
@@ -110,6 +112,13 @@ export function composeAgentPrompt(options: ComposeAgentPromptOptions): Composed
     throw new PromptCompositionError('PROMPT_AGENT_TASK_REQUIRED');
   if (!ROLE_DISCIPLINES.has(task.discipline)) {
     throw new PromptCompositionError('PROMPT_DISCIPLINE_UNSUPPORTED');
+  }
+  // D-8 layer 4: the payload is the task's recipe. Without one the stack would have
+  // three layers, so the composition refuses rather than skipping the payload.
+  const recipe = (task.executor as { readonly recipe_name?: unknown }).recipe_name;
+  if (recipe === undefined) throw new PromptCompositionError('PROMPT_RECIPE_REQUIRED');
+  if (typeof recipe !== 'string' || !RECIPE_NAME.test(recipe)) {
+    throw new PromptCompositionError('PROMPT_RECIPE_INVALID');
   }
   const resources = options.resourcesRoot ?? DEFAULT_RESOURCES_ROOT;
   const bodies: { layer: PromptComponent['layer']; name: string; source: string; body: string }[] =
@@ -132,16 +141,13 @@ export function composeAgentPrompt(options: ComposeAgentPromptOptions): Composed
         source: `.devai/state/tasks/${task.id}.json`,
         body: taskBody(task),
       },
+      {
+        layer: 'payload',
+        name: `recipe.${recipe}`,
+        source: `resources/recipes/${recipe}/SKILL.md`,
+        body: readComponent(join(resources, 'recipes', recipe, 'SKILL.md')),
+      },
     ];
-  const recipe = (task.executor as { readonly recipe_name?: string }).recipe_name;
-  if (recipe !== undefined) {
-    bodies.push({
-      layer: 'payload',
-      name: `recipe.${recipe}`,
-      source: `resources/recipes/${recipe}/SKILL.md`,
-      body: readComponent(join(resources, 'recipes', recipe, 'SKILL.md')),
-    });
-  }
   const components: PromptComponent[] = bodies.map((entry) => ({
     layer: entry.layer,
     name: entry.name,

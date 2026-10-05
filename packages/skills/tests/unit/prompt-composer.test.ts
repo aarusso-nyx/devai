@@ -45,6 +45,7 @@ function task(
       prompt_composition_id: 'PC-0000000000000000',
       max_iterations: 4,
       capabilities: ['repository-context'],
+      recipe_name: 'devai-verify',
       ...executor,
     },
     ...overrides,
@@ -69,6 +70,7 @@ describe('agent prompt composition (ADR-MDL-0005 D-8)', () => {
       'global',
       'role',
       'task',
+      'payload',
     ]);
     expect(first.composition.id).toBe(`PC-${first.composition.stack_sha256.slice(0, 16)}`);
     expect(first.composition.stack_sha256).toBe(promptStackSha256(first.composition.components));
@@ -84,11 +86,13 @@ describe('agent prompt composition (ADR-MDL-0005 D-8)', () => {
     expect(retitled.global).toBe(base.global);
     expect(retitled.role).toBe(base.role);
     expect(retitled.task).not.toBe(base.task);
+    expect(retitled.payload).toBe(base.payload);
 
     const changedRules = hashes(repository('# Adopter rules\n\nKeep changes tiny.\n'), task());
     expect(changedRules.global).not.toBe(base.global);
     expect(changedRules.role).toBe(base.role);
     expect(changedRules.task).toBe(base.task);
+    expect(changedRules.payload).toBe(base.payload);
   });
 
   it('ignores lifecycle progress and its own bound composition id', () => {
@@ -105,13 +109,30 @@ describe('agent prompt composition (ADR-MDL-0005 D-8)', () => {
     const root = repository();
     const composed = composeAgentPrompt({
       repoRoot: root,
-      task: task({}, { recipe_name: 'devai-verify' }),
+      task: task({}, { recipe_name: 'devai-fix' }),
       generatedAt: AT,
     });
     expect(composed.composition.components.at(-1)).toMatchObject({
       layer: 'payload',
-      name: 'recipe.devai-verify',
+      name: 'recipe.devai-fix',
+      source: 'resources/recipes/devai-fix/SKILL.md',
     });
+    expect(composed.prompt).toContain('<!-- devai:payload recipe.devai-fix -->');
+  });
+
+  it('refuses a task without a recipe instead of composing three layers (D-8)', () => {
+    const root = repository();
+    expect(() =>
+      composeAgentPrompt({ repoRoot: root, task: task({}, { recipe_name: undefined }) }),
+    ).toThrow('PROMPT_RECIPE_REQUIRED');
+    for (const recipe_name of ['../roles', 'devai-fix/../../x', 'Devai-Fix', '', 7]) {
+      expect(() => composeAgentPrompt({ repoRoot: root, task: task({}, { recipe_name }) })).toThrow(
+        'PROMPT_RECIPE_INVALID',
+      );
+    }
+    expect(() =>
+      composeAgentPrompt({ repoRoot: root, task: task({}, { recipe_name: 'devai-absent' }) }),
+    ).toThrow('PROMPT_COMPONENT_MISSING');
   });
 
   it('refuses a missing component, an unsupported discipline and a non-agent task', () => {
