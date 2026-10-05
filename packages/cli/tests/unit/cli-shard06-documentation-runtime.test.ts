@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { withAuthorityHostTestScope } from '../../../authority/tests/unit/authority-host-test-scope.js';
 import { buildCanonicalDescriptorHandoffReport } from '../../src/commands/check/documentation-report.js';
 import { checkDocsGovernance } from '../../src/commands/check/docs-governance.js';
+import { resolveDocsPathOverride } from '../../src/commands/doctor-support.js';
 import { invokeDevaiCli } from '../../src/cli-runtime.js';
 
 const SOURCE_ROOT = resolve(import.meta.dirname, '../../../..');
@@ -582,6 +583,78 @@ describe('S06-B docs governance report', () => {
     expect(governanceFinding('docs-ia.constitution-published')).toMatchObject({ severity: 'pass' });
     write('docs/site/versions.json', 'not json\n');
     expect(governanceFinding('docs-ia.constitution-published')).toMatchObject({ severity: 'pass' });
+  });
+
+  it('resolves a docs path through its longest overridden ancestor on whole segments', () => {
+    const canonical = 'docs/dev/operations/workflows';
+    expect(resolveDocsPathOverride(canonical, {})).toBe(canonical);
+    expect(resolveDocsPathOverride(canonical, { 'dev/operations': 'meta/ops' })).toBe(
+      'docs/meta/ops/workflows',
+    );
+    expect(
+      resolveDocsPathOverride(canonical, {
+        dev: 'meta',
+        'dev/operations': 'meta/ops',
+        'dev/operations/workflows': 'pipelines',
+      }),
+    ).toBe('docs/pipelines');
+    expect(resolveDocsPathOverride(canonical, { dev: 'meta' })).toBe(
+      'docs/meta/operations/workflows',
+    );
+    expect(
+      resolveDocsPathOverride(canonical, { 'dev/ops': 'meta/ops', 'dev/operations/work': 'x' }),
+    ).toBe(canonical);
+    expect(resolveDocsPathOverride('law/adr', { law: 'charter' })).toBe('law/adr');
+  });
+
+  it('pairs workflow pages where docs.ia.path_overrides relocates dev/operations (#265)', () => {
+    const rule = 'docs-ia.workflow-page-set';
+    write('.github/workflows/ci.yml', 'name: ci\n');
+    write('.github/workflows/release.yaml', 'name: release\n');
+    write('docs/dev/operations/workflows/README.md', '# Workflows\n');
+    write('docs/dev/operations/workflows/ci.md', '# ci\n');
+    write('docs/dev/operations/workflows/release.md', '# release\n');
+    expect(governanceFinding(rule)).toEqual({
+      ruleId: rule,
+      severity: 'pass',
+      message: 'Workflow page set complete (2 workflows)',
+    });
+
+    writeJson('.devai/config/project.json', {
+      repo: { kind: 'application' },
+      docs: {
+        builder: 'docusaurus',
+        build_command: '',
+        ia: { path_overrides: { 'dev/operations': 'meta/ops' } },
+      },
+    });
+    // Pages left at the canonical path no longer count once the adopter relocated them.
+    expect(governanceFinding(rule)).toEqual({
+      ruleId: rule,
+      severity: 'fail',
+      message:
+        'DOCS_WORKFLOW_PAGE_MISSING: .github/workflows/ci has no page docs/meta/ops/workflows/ci.md; ' +
+        'DOCS_WORKFLOW_PAGE_MISSING: .github/workflows/release has no page docs/meta/ops/workflows/release.md',
+      remediation:
+        'Add or remove the page docs/meta/ops/workflows/<stem>.md so it pairs one to one with .github/workflows/<stem>.yml.',
+    });
+
+    rmSync(join(root, 'docs/dev'), { recursive: true, force: true });
+    write('docs/meta/ops/workflows/README.md', '# Workflows\n');
+    write('docs/meta/ops/workflows/ci.md', '# ci\n');
+    write('docs/meta/ops/workflows/release.md', '# release\n');
+    expect(governanceFinding(rule)).toEqual({
+      ruleId: rule,
+      severity: 'pass',
+      message: 'Workflow page set complete (2 workflows under docs/meta/ops/workflows)',
+    });
+
+    write('docs/meta/ops/workflows/ghost.md', '# ghost\n');
+    expect(governanceFinding(rule)).toMatchObject({
+      severity: 'fail',
+      message:
+        'DOCS_WORKFLOW_PAGE_MISSING: docs/meta/ops/workflows/ghost.md has no workflow file .github/workflows/ghost.yml',
+    });
   });
 
   it('requires curated sidebar labels and reports dashboard freshness', () => {
