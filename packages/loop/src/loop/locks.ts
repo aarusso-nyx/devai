@@ -3,9 +3,11 @@ import { dirname, join } from 'node:path';
 import { utf8Compare } from './lock-targets.js';
 import {
   createRecordExclusive,
+  isStaleClaim,
   observeRecord,
   recordIdentity,
   swapObservedRecord,
+  type SwapOutcome,
 } from './record-claims.js';
 
 export { taskLockTargets } from './lock-targets.js';
@@ -99,6 +101,19 @@ function expired(record: LockRecord, now = Date.now()): boolean {
 }
 
 /**
+ * A swap whose claim cannot be proven abandoned stands down like a live claim; callers
+ * that must surface the repair (acquisition, controller takeover) call the swap directly.
+ */
+function swapOrStandDown(options: Parameters<typeof swapObservedRecord>[0]): SwapOutcome | 'stale' {
+  try {
+    return swapObservedRecord(options);
+  } catch (error) {
+    if (isStaleClaim(error)) return 'stale';
+    throw error;
+  }
+}
+
+/**
  * Remove one expired lock only if it still is exactly the `expected` record.
  * Returns false, leaving the path untouched, when the lock is unexpired, gone,
  * unreadable, claimed by another writer, or was replaced after the caller read it.
@@ -111,7 +126,7 @@ export function reapLock(opts: {
   if (!expired(opts.expected)) return false;
   const { substrate, modulePart } = parseTarget(opts.target);
   return (
-    swapObservedRecord({
+    swapOrStandDown({
       path: lockPath(opts.locksDir, substrate, modulePart),
       claimsDir: claimsDir(opts.locksDir),
       identity: lockIdentity(opts.expected),
@@ -134,18 +149,15 @@ function parseTarget(target: string): { substrate: string; modulePart: string } 
  * Acquire every target all-or-nothing, in UTF-8 key order (`round-execution.json`
  * resources.acquisition_order). A key this task already holds unexpired counts as
  * held. On the first conflict, the exact records this call created are released and
- * the conflict is reported; keys held before the call are left untouched.
+ * the conflict is reported; keys held before the call are left untouched. An expired
+ * key whose claim cannot be proven abandoned refuses with `TASK_RECORD_CLAIM_STALE`,
+ * naming the claim to repair, after the same release.
  */
 export function acquireLocks(opts: AcquireLockOptions): AcquireResult {
   mkdirSync(opts.locksDir, { recursive: true });
   const claims = claimsDir(opts.locksDir);
-  const acquired: LockRecord[] = [];
   const created: { path: string; identity: string }[] = [];
-  const now = new Date().toISOString();
-  const ttlMs = opts.ttlMs ?? DEFAULT_LOCK_TTL_MS;
-  const targets = [...new Set(opts.targets)].sort(utf8Compare);
-
-  const deny = (target: string, held_by: string): AcquireResult => {
+  const rollBack = (): void => {
     for (const { path, identity } of created) {
       try {
         swapObservedRecord({ path, claimsDir: claims, identity });
@@ -153,6 +165,28 @@ export function acquireLocks(opts: AcquireLockOptions): AcquireResult {
         // best-effort: an unreleased record expires and stays this task's own
       }
     }
+  };
+  try {
+    return acquireAll(opts, claims, created, rollBack);
+  } catch (error) {
+    rollBack();
+    throw error;
+  }
+}
+
+function acquireAll(
+  opts: AcquireLockOptions,
+  claims: string,
+  created: { path: string; identity: string }[],
+  rollBack: () => void,
+): AcquireResult {
+  const acquired: LockRecord[] = [];
+  const now = new Date().toISOString();
+  const ttlMs = opts.ttlMs ?? DEFAULT_LOCK_TTL_MS;
+  const targets = [...new Set(opts.targets)].sort(utf8Compare);
+
+  const deny = (target: string, held_by: string): AcquireResult => {
+    rollBack();
     return { acquired: [], denied: [{ target, held_by }] };
   };
 
@@ -245,14 +279,23 @@ export function renewLocks(opts: {
       continue;
     }
     const record: LockRecord = { ...observed.record, acquired_at: now };
-    const outcome = swapObservedRecord({
+    const outcome = swapOrStandDown({
       path,
       claimsDir: claimsDir(opts.locksDir),
       identity: observed.identity,
       next: serialize(record),
     });
     if (outcome === 'swapped') renewed.push(record);
-    else lost.push({ target, held_by: outcome === 'claimed' ? '<claimed>' : holderOf(path) });
+    else
+      lost.push({
+        target,
+        held_by:
+          outcome === 'claimed'
+            ? '<claimed>'
+            : outcome === 'stale'
+              ? '<stale-claim>'
+              : holderOf(path),
+      });
   }
   return { renewed, lost };
 }
@@ -302,7 +345,7 @@ export function releaseLocks(opts: { locksDir: string; taskId: string }): readon
     const observed = observeLock(path);
     if (observed.kind !== 'held' || observed.record.task_id !== opts.taskId) continue;
     if (
-      swapObservedRecord({
+      swapOrStandDown({
         path,
         claimsDir: claimsDir(opts.locksDir),
         identity: observed.identity,
@@ -339,7 +382,7 @@ export function reapLocks(opts: { locksDir: string }): readonly LockRecord[] {
     const observed = observeLock(path);
     if (observed.kind !== 'held' || !expired(observed.record, now)) continue;
     if (
-      swapObservedRecord({
+      swapOrStandDown({
         path,
         claimsDir: claimsDir(opts.locksDir),
         identity: observed.identity,
