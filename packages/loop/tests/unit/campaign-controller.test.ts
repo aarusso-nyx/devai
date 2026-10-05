@@ -1,6 +1,7 @@
 // ADR-GOV-0025 IA-001..IA-003: campaign projection, materialization through the single queue,
 // and human ratification separate from merge.
 import {
+  appendFileSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -27,6 +28,7 @@ import {
 } from '../../src/campaign/index.js';
 import { appendBacklog, readBacklog } from '../../src/loop/backlog.js';
 import { ratifyRoundTask } from '../../src/loop/ratification.js';
+import { escalateRoundTask } from '../../src/loop/task-services.js';
 import { loadTask, saveTask, type TaskRecord } from '../../src/loop/tasks.js';
 
 const ROUND = 'R-0701';
@@ -325,6 +327,71 @@ describe('campaign materialize (S4b, IA-002)', () => {
     ]);
   });
 
+  it('refuses to recover beside a queue entry that is no longer queued', async () => {
+    const root = repository();
+    await withAuthorityHostTestScope(async () => {
+      materializeCampaignRound({ repoRoot: root, campaignId: 'CMP-0701', roundId: ROUND });
+    });
+    rmSync(join(root, '.devai/state/tasks/TASK-7013.json'));
+    const [entry] = readBacklog(root).filter((item) => item.id === 'TASK-7013');
+    appendFileSync(
+      join(root, '.devai/state/backlog.jsonl'),
+      `${JSON.stringify({ ...entry, status: 'completed' })}\n`,
+    );
+    await withAuthorityHostTestScope(async () => {
+      expect(() =>
+        materializeCampaignRound({ repoRoot: root, campaignId: 'CMP-0701', roundId: ROUND }),
+      ).toThrow('TASK_QUEUE_MATERIALIZATION_CONFLICT');
+    });
+    expect(existsSync(join(root, '.devai/state/tasks/TASK-7013.json'))).toBe(false);
+  });
+
+  it('enriches a compatible partial queue entry through the canonical materializer', async () => {
+    const root = repository();
+    await withAuthorityHostTestScope(async () => {
+      appendBacklog(root, {
+        id: 'TASK-7013',
+        round_id: ROUND,
+        title: 'engineer task TASK-7013',
+        priority: 50,
+        status: 'queued',
+        created_at: '2026-10-04T00:00:00.000Z',
+      });
+      expect(
+        materializeCampaignRound({ repoRoot: root, campaignId: 'CMP-0701', roundId: ROUND }),
+      ).toMatchObject({ materialized: ['TASK-7011', 'TASK-7012', 'TASK-7013'], existing: [] });
+    });
+    const [entry] = readBacklog(root).filter((item) => item.id === 'TASK-7013');
+    expect(entry).toMatchObject({
+      status: 'queued',
+      discipline: 'engineer',
+      target_substrates: ['F2'],
+      db_isolation: 'database',
+    });
+    expect(loadTask(root, 'TASK-7013').status).toBe('queued');
+  });
+
+  it('applies the one-task rule of a single-role wave before any write', async () => {
+    const root = repository();
+    const path = join(root, 'product/campaigns/CMP-0701-fixture/campaign.json');
+    const plan = JSON.parse(readFileSync(path, 'utf8')) as {
+      rounds: { waves: { type: string }[] }[];
+    };
+    const wave = plan.rounds[0]?.waves[0];
+    if (wave === undefined) throw new Error('fixture shape changed');
+    wave.type = 'single-role';
+    writeFileSync(path, JSON.stringify(plan));
+    expect(campaignSemanticProblems(root, loadCampaign(root, 'CMP-0701'))).toEqual([
+      'CTG-0701 single-role wave must hold one task',
+    ]);
+    await withAuthorityHostTestScope(async () => {
+      expect(() =>
+        materializeCampaignRound({ repoRoot: root, campaignId: 'CMP-0701', roundId: ROUND }),
+      ).toThrow('CAMPAIGN_SEMANTICS_INVALID');
+    });
+    expect(existsSync(join(root, '.devai/state'))).toBe(false);
+  });
+
   it('builds the human executor from the campaign prompt', () => {
     const root = repository();
     const loaded = loadCampaign(root, 'CMP-0701');
@@ -475,18 +542,18 @@ describe('round ratify (S4c, IA-003)', () => {
     ).toBe(true);
   });
 
-  it('never overwrites a concurrent escalation back into pre_merge', async () => {
+  it('refuses a ratification whose task changed before its load', async () => {
     const root = repository();
     await awaiting(root);
-    const issuer = createIssuer(await runtimeApi(), { invocation_id: 'ratify-race' });
+    const issuer = createIssuer(await runtimeApi(), { invocation_id: 'ratify-changed' });
     const scope: AuthorityHostEffectScope = {
       action_id: 'round ratify',
-      invocation_id: 'ratify-race',
+      invocation_id: 'ratify-changed',
       effect: 'local-write',
       receipt_store: issuer,
       apply_effect: (request, apply) => {
         const applied = apply();
-        // A concurrent `task escalate` lands right after the decision is recorded.
+        // A writer that ignores the round controller lands right after the decision.
         if (request.symbol === 'renameSync' && request.arguments[1] === decisionPath(root)) {
           saveTask(root, { ...loadTask(root, 'TASK-7013'), status: 'escalated' });
         }
@@ -508,6 +575,70 @@ describe('round ratify (S4c, IA-003)', () => {
     } finally {
       issuer.dispose();
     }
+    expect(loadTask(root, 'TASK-7013').status).toBe('escalated');
+  });
+
+  it('serializes a concurrent escalation landing between the load and the save', async () => {
+    const root = repository();
+    await awaiting(root);
+    const taskFile = join(root, '.devai/state/tasks/TASK-7013.json');
+    let concurrent: unknown;
+    const issuer = createIssuer(await runtimeApi(), { invocation_id: 'ratify-window' });
+    const scope: AuthorityHostEffectScope = {
+      action_id: 'round ratify',
+      invocation_id: 'ratify-window',
+      effect: 'local-write',
+      receipt_store: issuer,
+      apply_effect: (request, apply) => {
+        if (
+          concurrent === undefined &&
+          request.symbol === 'writeFileSync' &&
+          request.arguments[0] === taskFile &&
+          String(request.arguments[1]).includes('"status": "pre_merge"')
+        ) {
+          // `task escalate` arrives after ratify loaded the task and before it saves it.
+          concurrent = 'attempted';
+          try {
+            escalateRoundTask({
+              repoRoot: root,
+              round: ROUND,
+              taskId: 'TASK-7013',
+              acquireRoundController: true,
+            });
+            concurrent = 'escalated';
+          } catch (error) {
+            concurrent = (error as { code?: string }).code;
+          }
+        }
+        return apply();
+      },
+    };
+    try {
+      await runWithAuthorityHostEffects(scope, async () => {
+        expect(
+          ratifyRoundTask({
+            repoRoot: root,
+            round: ROUND,
+            taskId: 'TASK-7013',
+            decision: 'accept',
+            role: 'owner',
+          }),
+        ).toMatchObject({ resulting_status: 'pre_merge' });
+      });
+    } finally {
+      issuer.dispose();
+    }
+    // The escalation could not enter the window, so no update was lost.
+    expect(concurrent).toBe('TASK_ROUND_CONTROLLER_BUSY');
+    expect(loadTask(root, 'TASK-7013').status).toBe('pre_merge');
+    await withAuthorityHostTestScope(async () => {
+      escalateRoundTask({
+        repoRoot: root,
+        round: ROUND,
+        taskId: 'TASK-7013',
+        acquireRoundController: true,
+      });
+    });
     expect(loadTask(root, 'TASK-7013').status).toBe('escalated');
   });
 });
