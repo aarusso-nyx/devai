@@ -140,6 +140,25 @@ describe('experimental execution law (ADR-MDL-0005)', () => {
     expect(usage({ ...v2, input_tokens: counter(-1, 'derived') })).toBe(false);
   });
 
+  it('requires a cumulative-delta usage record to state its derivation', () => {
+    const usage = def('usageEvidenceV2');
+    const underived = {
+      usage_version: 2,
+      counter_mode: 'cumulative-delta',
+      input_tokens: counter(1200, 'derived'),
+      output_tokens: counter(300, 'derived'),
+      cache_read_tokens: counter(null, 'missing'),
+      cache_write_tokens: counter(null, 'missing'),
+    };
+    expect(usage(underived)).toBe(false);
+    expect(usage({ ...underived, derivation: '' })).toBe(false);
+    expect(usage({ ...underived, derivation: 'session total minus the previous total' })).toBe(
+      true,
+    );
+    // A per-attempt record reports its counters as they stand; the derivation stays optional.
+    expect(usage({ ...underived, counter_mode: 'per-attempt' })).toBe(true);
+  });
+
   it('keeps version-1 usage valid and admits an unknown cost only as null', () => {
     expect(def('usageEvidence')({ input_tokens: 1, output_tokens: 2 })).toBe(true);
     const unknown = def('costUnknown');

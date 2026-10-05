@@ -23,6 +23,7 @@ import {
   type TaskExecutionEvidenceFacts,
   type TaskExecutionEvidenceValidator,
   type TaskRecordBinding,
+  type UsageEvidenceV2,
 } from '../../src/task-execution/index.js';
 
 const concurrentWriter = vi.hoisted(() => ({
@@ -897,4 +898,60 @@ describe('task evidence path refusal diagnosis', () => {
       expect(readdirSync(repoRoot)).toEqual([]);
     },
   );
+});
+
+describe('version-2 usage provenance (ADR-MDL-0005 D-7)', () => {
+  const counters = {
+    input_tokens: { value: 1200, status: 'derived' },
+    output_tokens: { value: 300, status: 'reported' },
+    cache_read_tokens: { value: null, status: 'missing' },
+    cache_write_tokens: { value: null, status: 'missing' },
+  } as const;
+
+  function build(usage: UsageEvidenceV2) {
+    const { recipe_name: _name, recipe_variant: _variant, ...executor } = exactAgentTask().executor;
+    const boundTask = task('TASK-7904', {
+      ...executor,
+      prompt_composition_id: 'PC-5555555555555555',
+    });
+    return buildTaskExecutionEvidence(boundTask, {
+      ...agentFacts({
+        resolved_executor: { ...agentExecutor, recipe_name: null, recipe_variant: null },
+        usage,
+      }),
+      id: 'TXE-4444444444444444',
+      prompt: { prompt_composition_id: 'PC-5555555555555555', prompt_sha256: 'e'.repeat(64) },
+    });
+  }
+
+  it('requires a cumulative-delta record to say how its delta was derived', () => {
+    const derived = build({
+      usage_version: 2,
+      counter_mode: 'cumulative-delta',
+      derivation: 'session total minus the previous attempt total',
+      ...counters,
+    });
+    expect(checkTaskExecutionEvidence(derived).ok).toBe(true);
+    const underived = {
+      usage_version: 2,
+      counter_mode: 'cumulative-delta',
+      ...counters,
+    } as unknown as UsageEvidenceV2;
+    expect(code(() => build(underived))).toBe('TASK_EXECUTION_EVIDENCE_SCHEMA_INVALID');
+    expect(build({ usage_version: 2, counter_mode: 'per-attempt', ...counters }).usage).toEqual({
+      usage_version: 2,
+      counter_mode: 'per-attempt',
+      ...counters,
+    });
+  });
+
+  it('types a cumulative-delta record without its derivation as invalid', () => {
+    // @ts-expect-error -- ADR-MDL-0005 D-7: cumulative-delta usage must carry its derivation.
+    const usage: UsageEvidenceV2 = {
+      usage_version: 2,
+      counter_mode: 'cumulative-delta',
+      ...counters,
+    };
+    expect(usage.counter_mode).toBe('cumulative-delta');
+  });
 });
