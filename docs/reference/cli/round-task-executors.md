@@ -465,7 +465,8 @@ binding are saved before the attempt settles:
 - An exhausted ladder or budget ends the task `experimental_blocked`, with the last failed
   attempt's worktree retained and bound to it.
 - A task that could not start any attempt, because a budget ran out or its worktree could not be
-  prepared, stays `ready` with its locks released.
+  prepared, stays `ready`. It keeps its locks, which `release_on` frees only on completion,
+  escalation, a gap pause or cancellation; the next dispatch reuses them.
 
 Once a provider leaves any token counter unreported, cache counters included, no further attempt
 in the invocation may spend (`EXPERIMENTAL_USAGE_UNVERIFIABLE`). A failure after a provider
@@ -507,7 +508,8 @@ devai round dispatch deactivate --repo-root . --as-role owner --write --experime
   left `in_progress`, or `experimental_blocked`.
   - It writes `.devai/state/round-runs/<round>/dispositions/<DSP-id>.json`, then closes each open
     attempt with a `settled` event of outcome `cancelled` naming that record.
-  - It releases the task's attempt worktrees and locks.
+  - It releases the task's attempt worktrees. Locks follow `release_on`: a retried task keeps
+    them and an escalated one releases them.
   - A retry returns the task to `ready`; escalate escalates it.
   - A retry refuses once the task's ladder is spent (`DISPOSITION_ATTEMPTS_EXHAUSTED`): a further
     try is a new task.
