@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { withAuthorityHostTestScope } from '../../../skills/tests/unit/authority-host-test-scope.js';
 import {
   LOCK_DENIAL_ESCALATION_THRESHOLD,
+  LOCK_RELEASE_STATUSES,
   ROUND_DEFAULT_WORKERS,
   ROUND_MAX_WORKERS,
 } from '../../src/loop/round-controller.js';
@@ -97,7 +98,7 @@ describe('round worker capacity', () => {
   it('mirrors the round-execution.json capacity block', () => {
     const policy = JSON.parse(
       readFileSync(join(REPOSITORY_ROOT, 'law/policy/round-execution.json'), 'utf8'),
-    ) as { capacity: Record<string, unknown> };
+    ) as { capacity: Record<string, unknown>; resources: Record<string, unknown> };
     expect(policy.capacity).toMatchObject({
       default_workers: ROUND_DEFAULT_WORKERS,
       max_workers: ROUND_MAX_WORKERS,
@@ -105,6 +106,7 @@ describe('round worker capacity', () => {
       admission: 'same-topological-generation-and-resource-disjoint-only',
       cross_round_controller: 'forbidden',
     });
+    expect(policy.resources.release_on).toEqual(LOCK_RELEASE_STATUSES);
   });
 
   it('is serial unless a run opts in, and refuses a cap outside the ceiling', () => {
