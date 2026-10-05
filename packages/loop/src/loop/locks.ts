@@ -1,6 +1,15 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync } from '@devai-nyx/authority';
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from '@devai-nyx/authority';
 import { randomUUID } from 'node:crypto';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { utf8Compare } from './lock-targets.js';
 import {
   createRecordExclusive,
@@ -344,30 +353,131 @@ export function inspectLocks(opts: {
   return { held, lost };
 }
 
-const releaseJournals = new Set<Set<string>>();
+/** The durable fence of one dispatch attempt (see `openLockFence`). */
+export interface LockFence {
+  readonly task_id: string;
+  readonly round_id: string;
+  readonly attempt: string;
+  readonly targets: readonly string[];
+}
 
-export interface ReleaseJournal {
-  /** Identities of the lock records released through `releaseLocks` while open. */
-  readonly released: ReadonlySet<string>;
-  close(): void;
+function fencesDir(locksDir: string): string {
+  return join(dirname(locksDir), 'lock-fences');
+}
+
+function fencePath(locksDir: string, taskId: string): string {
+  return join(fencesDir(locksDir), `${taskId}.json`);
+}
+
+function receiptPath(locksDir: string, fence: LockFence, keyFile: string): string {
+  return join(fencesDir(locksDir), `${fence.task_id}.${fence.attempt}.${keyFile}.released`);
+}
+
+function keyFileOf(target: string): string {
+  const { substrate, modulePart } = parseTarget(target);
+  return basename(lockPath('.', substrate, modulePart));
+}
+
+function readFence(path: string): LockFence | undefined {
+  const observed = observeRecord(path);
+  if (observed.kind !== 'record') return undefined;
+  const value = observed.value;
+  return typeof value.task_id === 'string' &&
+    typeof value.round_id === 'string' &&
+    typeof value.attempt === 'string' &&
+    Array.isArray(value.targets) &&
+    value.targets.every((target) => typeof target === 'string')
+    ? (value as unknown as LockFence)
+    : undefined;
 }
 
 /**
- * Note, until closed, the identity of every lock record a task releases through
- * `releaseLocks` in this process. That release removes only the exact record the task
- * still holds, so a journaled record was held up to its release; a record that left
- * its key any other way was displaced first.
+ * Open the durable fence of one dispatch attempt. While it stands, the task's own
+ * `releaseLocks` leaves a receipt per key, written under the claim on the exact record
+ * it then removes. A receipt therefore proves the task held that key up to its own
+ * release; a key that is neither held nor receipted was taken from it. Because the
+ * receipts outlive a crash of the runner, the next run can still tell the two apart.
  */
-export function openReleaseJournal(): ReleaseJournal {
-  const released = new Set<string>();
-  releaseJournals.add(released);
-  return { released, close: () => releaseJournals.delete(released) };
+export function openLockFence(opts: {
+  readonly locksDir: string;
+  readonly taskId: string;
+  readonly roundId: string;
+  readonly targets: readonly string[];
+}): LockFence {
+  const fence: LockFence = {
+    task_id: opts.taskId,
+    round_id: opts.roundId,
+    attempt: randomUUID(),
+    targets: [...new Set(opts.targets)].sort(utf8Compare),
+  };
+  const path = fencePath(opts.locksDir, opts.taskId);
+  const staged = `${path}.${String(process.pid)}-${randomUUID()}.staged`;
+  const body = `${JSON.stringify(fence)}\n`;
+  try {
+    writeFileSync(staged, body, { flag: 'wx' });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    mkdirSync(fencesDir(opts.locksDir), { recursive: true });
+    writeFileSync(staged, body, { flag: 'wx' });
+  }
+  renameSync(staged, path);
+  return fence;
+}
+
+/** The fence's targets the task released itself during the attempt. */
+export function lockFenceReleases(opts: {
+  readonly locksDir: string;
+  readonly fence: LockFence;
+}): ReadonlySet<string> {
+  return new Set(
+    opts.fence.targets.filter((target) =>
+      existsSync(receiptPath(opts.locksDir, opts.fence, keyFileOf(target))),
+    ),
+  );
+}
+
+/** Every fence left open, by a dispatch in flight or by a runner that stopped. */
+export function listLockFences(opts: { readonly locksDir: string }): readonly LockFence[] {
+  const dir = fencesDir(opts.locksDir);
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir)
+    .filter((name) => name.endsWith('.json'))
+    .sort(utf8Compare)
+    .flatMap((name) => {
+      const fence = readFence(join(dir, name));
+      return fence === undefined ? [] : [fence];
+    });
+}
+
+/** Retire a fence and its receipts once its attempt has been judged. */
+export function closeLockFence(opts: {
+  readonly locksDir: string;
+  readonly fence: LockFence;
+}): void {
+  for (const target of opts.fence.targets) {
+    const receipt = receiptPath(opts.locksDir, opts.fence, keyFileOf(target));
+    if (!existsSync(receipt)) continue;
+    try {
+      unlinkSync(receipt);
+    } catch {
+      // best-effort: a receipt names one attempt and is ignored by every other
+    }
+  }
+  const path = fencePath(opts.locksDir, opts.fence.task_id);
+  if (readFence(path)?.attempt !== opts.fence.attempt) return;
+  try {
+    unlinkSync(path);
+  } catch {
+    // best-effort
+  }
 }
 
 /** Release every record the task still holds; records another task took over stay. */
 export function releaseLocks(opts: { locksDir: string; taskId: string }): readonly LockRecord[] {
   const released: LockRecord[] = [];
   if (!existsSync(opts.locksDir)) return released;
+  const fence = readFence(fencePath(opts.locksDir, opts.taskId));
+  const fenced = new Set(fence?.targets.map(keyFileOf));
   for (const name of readdirSync(opts.locksDir)) {
     if (!name.endsWith('.json')) continue;
     const path = join(opts.locksDir, name);
@@ -378,10 +488,14 @@ export function releaseLocks(opts: { locksDir: string; taskId: string }): readon
         path,
         claimsDir: claimsDir(opts.locksDir),
         identity: observed.identity,
+        ...(fence !== undefined &&
+          fenced.has(name) && {
+            onVerified: () =>
+              writeFileSync(receiptPath(opts.locksDir, fence, name), `${JSON.stringify(fence)}\n`),
+          }),
       }) === 'swapped'
     ) {
       released.push(observed.record);
-      for (const journal of releaseJournals) journal.add(observed.identity);
     }
   }
   return released;
