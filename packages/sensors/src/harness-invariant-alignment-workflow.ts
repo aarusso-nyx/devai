@@ -207,7 +207,7 @@ function feedsShell(line: string): boolean {
  * evaluator, or that pipes or redirects output onward (a body written to a file
  * may be sourced later), keeps its bodies, so control flow they carry still makes
  * the step non-binding; an unterminated or unreadable here-document leaves the
- * script unchanged.
+ * script unchanged. Lines joined by `\` continuations are judged as one command.
  */
 export function stripHeredocBodies(script: string): string {
   if (!script.includes('<<')) return script;
@@ -218,13 +218,21 @@ export function stripHeredocBodies(script: string): string {
     ...lines.filter((line) => line.trim() !== '').map((line) => /^ */.exec(line)?.[0].length ?? 0),
   );
   const kept: string[] = [];
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index] ?? '';
-    kept.push(line);
-    const parsed = heredocLine(line);
+  let index = 0;
+  while (index < lines.length) {
+    // One logical command: physical lines joined across `\` continuations, so a
+    // redirect, pipe, or shell named on a continuation line is judged with its
+    // opener, and the body starts after the command's last physical line.
+    let last = index;
+    while (last < lines.length - 1 && continuesLine(lines[last] ?? '')) last += 1;
+    const physical = lines.slice(index, last + 1);
+    kept.push(...physical);
+    const command = physical
+      .map((line, offset) => (offset < physical.length - 1 ? line.slice(0, -1) : line))
+      .join(' ');
+    const parsed = heredocLine(command);
     if (parsed === null) return script;
-    if (parsed.operators.length === 0) continue;
-    let end = index;
+    let end = last;
     for (const operator of parsed.operators) {
       let terminator = end + 1;
       while (terminator < lines.length) {
@@ -236,10 +244,16 @@ export function stripHeredocBodies(script: string): string {
       if (terminator >= lines.length) return script;
       end = terminator;
     }
-    if (parsed.onward || feedsShell(line)) continue;
-    index = end;
+    // A kept body is read on as lines of its own; a removed one is skipped whole.
+    index =
+      parsed.operators.length === 0 || parsed.onward || feedsShell(command) ? last + 1 : end + 1;
   }
   return kept.join('\n');
+}
+
+/** A line ending in an unescaped backslash continues onto the next physical line. */
+function continuesLine(line: string): boolean {
+  return (/\\+$/u.exec(line)?.[0].length ?? 0) % 2 === 1;
 }
 
 export function shellSegments(rawScript: string): readonly string[] {
