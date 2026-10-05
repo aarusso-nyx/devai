@@ -3,6 +3,7 @@ export const ROSTER = [
   'action-registry.schema.json',
   'action-result.schema.json',
   'actions-list-output.schema.json',
+  'adopter-migrations.schema.json',
   'adopter-policy.schema.json',
   'adr-v2.schema.json',
   'adr-validation-policy.schema.json',
