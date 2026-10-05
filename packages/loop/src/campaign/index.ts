@@ -7,10 +7,15 @@
 import { existsSync, readFileSync, readdirSync } from '@devai-nyx/authority';
 import { parsers } from '@devai-nyx/schemas';
 import { join } from 'node:path';
+import { readBacklog, type BacklogEntry } from '../loop/backlog.js';
 import { requestedTaskFields } from '../loop/round-task-admission.js';
 import type { TaskRecord } from '../loop/task-contract.js';
-import { fail, materializeRoundQueueTask } from '../loop/task-queue-services.js';
-import { listTaskRecords } from '../loop/tasks.js';
+import {
+  fail,
+  materializeRoundQueueTask,
+  requireActiveTaskRound,
+} from '../loop/task-queue-services.js';
+import { listTaskRecords, saveTask, validateTaskRecord } from '../loop/tasks.js';
 
 interface CampaignTask {
   readonly id: string;
@@ -30,6 +35,8 @@ interface CampaignTask {
 interface CampaignWave {
   readonly id: string;
   readonly title: string;
+  readonly type?: string;
+  readonly depends_on?: readonly string[];
   readonly tasks: readonly CampaignTask[];
 }
 
@@ -37,6 +44,7 @@ interface CampaignRound {
   readonly id: string;
   readonly title: string;
   readonly status: string;
+  readonly depends_on?: readonly string[];
   readonly waves: readonly CampaignWave[];
 }
 
@@ -45,6 +53,7 @@ export interface CampaignPlan {
   readonly title: string;
   readonly status: string;
   readonly date: string;
+  readonly prompts?: { readonly preamble: string };
   readonly rounds: readonly CampaignRound[];
 }
 
@@ -95,6 +104,84 @@ function runtimeTasks(repoRoot: string): ReadonlyMap<string, TaskRecord> {
   );
 }
 
+const POSITIONS = ['architect', 'inspector', 'engineer'] as const;
+
+/**
+ * The structural rules of the campaign checker (scripts/check-campaign.mjs) that a
+ * materialization depends on: unique round, wave and task ids; resolvable, acyclic round
+ * and wave dependencies; each wave's discipline order and upstream chain; and present
+ * prompts that name their task. An empty list means the plan may be materialized.
+ */
+export function campaignSemanticProblems(repoRoot: string, campaign: LoadedCampaign): string[] {
+  const { plan, directory } = campaign;
+  const problems: string[] = [];
+  const seen = new Set<string>();
+  const declare = (id: string): void => {
+    if (seen.has(id)) problems.push(`duplicate id ${id}`);
+    seen.add(id);
+  };
+  const preamble = plan.prompts?.preamble;
+  if (preamble === undefined || !existsSync(join(repoRoot, directory, preamble))) {
+    problems.push('preamble missing');
+  }
+  const roundIds = new Set(plan.rounds.map((round) => round.id));
+  for (const round of plan.rounds) {
+    declare(round.id);
+    for (const dependency of round.depends_on ?? []) {
+      if (!roundIds.has(dependency) || dependency === round.id) {
+        problems.push(`${round.id} depends on ${dependency}`);
+      }
+    }
+    const waveIds = new Set(round.waves.map((wave) => wave.id));
+    for (const wave of round.waves) {
+      declare(wave.id);
+      for (const dependency of wave.depends_on ?? []) {
+        if (!waveIds.has(dependency) || dependency === wave.id) {
+          problems.push(`${wave.id} depends on ${dependency}`);
+        }
+      }
+      if (
+        wave.type === 'coupled-triplet' &&
+        wave.tasks.map((task) => task.discipline).join() !== POSITIONS.join()
+      ) {
+        problems.push(`${wave.id} triplet must be architect, inspector, engineer`);
+      }
+      let upstream: string | null = null;
+      for (const task of wave.tasks) {
+        declare(task.id);
+        if (task.discipline !== task.coupled_pipeline_position) {
+          problems.push(`${task.id} discipline differs from position`);
+        }
+        if (task.upstream_task_id !== upstream) {
+          problems.push(`${task.id} upstream must be ${String(upstream)}`);
+        }
+        upstream = task.id;
+        const prompt = join(repoRoot, directory, task.prompt.path);
+        if (!existsSync(prompt)) problems.push(`${task.id} prompt missing ${task.prompt.path}`);
+        else if (!readFileSync(prompt, 'utf8').includes(task.id)) {
+          problems.push(`${task.id} prompt does not name the task`);
+        }
+      }
+    }
+  }
+  const byId = new Map(plan.rounds.map((round) => [round.id, round]));
+  const visiting = new Set<string>();
+  const done = new Set<string>();
+  const visit = (id: string): void => {
+    if (done.has(id)) return;
+    if (visiting.has(id)) {
+      problems.push(`round dependency cycle at ${id}`);
+      return;
+    }
+    visiting.add(id);
+    for (const dependency of byId.get(id)?.depends_on ?? []) visit(dependency);
+    visiting.delete(id);
+    done.add(id);
+  };
+  for (const round of plan.rounds) visit(round.id);
+  return problems;
+}
+
 /**
  * S4a: the read-only projection of a campaign onto runtime state. Every round, wave and
  * task appears with its plan status beside its runtime status, and every disagreement is
@@ -104,6 +191,7 @@ export function campaignStatus(repoRoot: string, campaignId: string) {
   const { plan, directory } = loadCampaign(repoRoot, campaignId);
   const runtime = runtimeTasks(repoRoot);
   const drift: CampaignDrift[] = [];
+  // A runtime record matches a plan task only by task id and round id together.
   const planned = new Set<string>();
   const rounds = plan.rounds.map((round) => ({
     id: round.id,
@@ -113,10 +201,13 @@ export function campaignStatus(repoRoot: string, campaignId: string) {
       id: wave.id,
       title: wave.title,
       tasks: wave.tasks.map((task) => {
-        planned.add(task.id);
-        const record = runtime.get(task.id);
+        planned.add(`${round.id}/${task.id}`);
+        const candidate = runtime.get(task.id);
+        const record = candidate?.round_id === round.id ? candidate : undefined;
         const active = ['open', 'closing'].includes(round.status);
-        if (record === undefined && active && !['planned', 'cancelled'].includes(task.status)) {
+        // ADR-GOV-0025: once the round is open every plan task needs a runtime record,
+        // a planned one included; only a cancelled task needs none.
+        if (record === undefined && active && task.status !== 'cancelled') {
           drift.push({ round_id: round.id, task_id: task.id, kind: 'missing-runtime-record' });
         }
         if (record?.status === 'completed' && task.status !== 'merged') {
@@ -136,7 +227,7 @@ export function campaignStatus(repoRoot: string, campaignId: string) {
   }));
   const roundIds = new Set(plan.rounds.map((round) => round.id));
   for (const record of runtime.values()) {
-    if (roundIds.has(record.round_id) && !planned.has(record.id)) {
+    if (roundIds.has(record.round_id) && !planned.has(`${record.round_id}/${record.id}`)) {
       drift.push({ round_id: record.round_id, task_id: record.id, kind: 'unplanned-runtime-task' });
     }
   }
@@ -193,10 +284,25 @@ export function campaignTaskRecord(
   } as unknown as TaskRecord;
 }
 
+/** Whether a backlog entry carries exactly the queue fields the task record would write. */
+function sameQueueEntry(entry: BacklogEntry, record: TaskRecord): boolean {
+  return (
+    entry.round_id === record.round_id &&
+    entry.title === record.title &&
+    entry.priority === (record.priority ?? 50) &&
+    entry.description === record.description &&
+    entry.created_at === record.created_at
+  );
+}
+
 /**
- * S4b: materialize one open campaign round through the round task queue. A task whose
- * runtime record already carries the identical request is reported as existing; any
- * difference refuses with TASK_RECORD_CONFLICT before anything is written.
+ * S4b: materialize one open campaign round through the round task queue. The plan must
+ * pass the campaign checker's structural rules, and every record is validated and
+ * checked against both stores — the task records and the backlog queue — before anything
+ * is written, so a conflict on any task leaves the queue untouched. A task whose runtime
+ * record already carries the identical request is reported as existing. The batch is
+ * recoverable: a task whose identical queue entry was written before an interruption has
+ * only its record completed, never a second entry.
  */
 export function materializeCampaignRound(options: {
   readonly repoRoot: string;
@@ -207,27 +313,50 @@ export function materializeCampaignRound(options: {
   const round = campaign.plan.rounds.find((candidate) => candidate.id === options.roundId);
   if (round === undefined) fail('CAMPAIGN_ROUND_NOT_FOUND');
   if (round.status !== 'open') fail('CAMPAIGN_ROUND_NOT_OPEN');
+  if (campaignSemanticProblems(options.repoRoot, campaign).length > 0) {
+    fail('CAMPAIGN_SEMANTICS_INVALID');
+  }
   const runtime = runtimeTasks(options.repoRoot);
+  const queue = new Map(readBacklog(options.repoRoot).map((entry) => [entry.id, entry]));
   const records = round.waves.flatMap((wave) =>
     wave.tasks
       .filter((task) => task.status !== 'cancelled')
       .map((task) => campaignTaskRecord(campaign, round, wave, task)),
   );
-  // Check every record before writing any, so a conflict leaves the queue untouched.
+  // Check every record against both stores before writing any.
   const existing: string[] = [];
+  const queued: string[] = [];
   for (const record of records) {
+    try {
+      validateTaskRecord(record);
+    } catch {
+      fail('TASK_RECORD_INVALID');
+    }
+    const entry = queue.get(record.id);
+    if (entry !== undefined && !sameQueueEntry(entry, record)) {
+      fail('TASK_QUEUE_MATERIALIZATION_CONFLICT');
+    }
     const current = runtime.get(record.id);
-    if (current === undefined) continue;
+    if (current === undefined) {
+      if (entry !== undefined) queued.push(record.id);
+      continue;
+    }
     const same =
       JSON.stringify(requestedTaskFields({ ...current, status: 'queued' })) ===
       JSON.stringify(requestedTaskFields(record));
     if (!same) fail('TASK_RECORD_CONFLICT');
     existing.push(record.id);
   }
+  requireActiveTaskRound({ repoRoot: options.repoRoot, round: round.id });
   const materialized: string[] = [];
   for (const record of records) {
     if (existing.includes(record.id)) continue;
-    materializeRoundQueueTask({ repoRoot: options.repoRoot, round: round.id, task: record });
+    if (queued.includes(record.id)) {
+      // An interrupted batch already queued this task: complete its record only.
+      saveTask(options.repoRoot, record);
+    } else {
+      materializeRoundQueueTask({ repoRoot: options.repoRoot, round: round.id, task: record });
+    }
     materialized.push(record.id);
   }
   return {
