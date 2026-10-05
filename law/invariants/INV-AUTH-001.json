@@ -57,7 +57,8 @@
     "init apply architect",
     "init apply owner",
     "init apply harness",
-    "init plan"
+    "init plan",
+    "init upgrade"
   ],
   "provenance": ["ADR-SCR-0004", "CMP-0002:R-0203:TASK-0231"],
   "supersedes": null,
