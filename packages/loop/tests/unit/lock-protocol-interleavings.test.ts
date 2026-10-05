@@ -17,7 +17,7 @@ import { hostname, tmpdir, uptime } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-type Hook = (symbol: string, args: readonly unknown[]) => void;
+type Hook = (symbol: string, args: readonly unknown[], result?: unknown) => void;
 const seam = vi.hoisted(() => ({
   before: undefined as undefined | Hook,
   after: undefined as undefined | Hook,
@@ -29,7 +29,7 @@ vi.mock('@devai-nyx/authority', async (importOriginal) => {
     ((...args: Parameters<T>) => {
       seam.before?.(symbol, args);
       const result = effect(...args);
-      seam.after?.(symbol, args);
+      seam.after?.(symbol, args, result);
       return result;
     }) as T;
   const readFileSync = ((path: unknown, ...rest: unknown[]) => {
@@ -40,6 +40,7 @@ vi.mock('@devai-nyx/authority', async (importOriginal) => {
   return {
     ...actual,
     openSync: wrap('openSync', actual.openSync),
+    fsyncSync: wrap('fsyncSync', actual.fsyncSync),
     renameSync: wrap('renameSync', actual.renameSync),
     unlinkSync: wrap('unlinkSync', actual.unlinkSync),
     writeFileSync: wrap('writeFileSync', actual.writeFileSync),
@@ -61,7 +62,7 @@ import {
 import { recordIdentity } from '../../src/loop/record-claims.js';
 import { acquireRoundController } from '../../src/loop/round-controller.js';
 import { runRoundTasks } from '../../src/loop/round-runner.js';
-import { loadTask, saveTask, type TaskRecord } from '../../src/loop/tasks.js';
+import { completeTask, loadTask, saveTask, type TaskRecord } from '../../src/loop/tasks.js';
 
 const roots: string[] = [];
 const ROUND = 'R-0007';
@@ -409,6 +410,89 @@ describe('lock denial recovery', () => {
   });
 });
 
+describe('durable denials and judged completions', () => {
+  it('makes the denial count and owed bump durable before the task is re-queued', async () => {
+    const root = repository();
+    await withAuthorityHostTestScope(async () => {
+      saveTask(root, task('TASK-0408'));
+      acquireLocks({ locksDir: locksDir(root), taskId: 'TASK-0900', targets: ['F2:MOD-a'] });
+      const runDir = join(root, '.devai/state/round-runs', ROUND);
+      const denials = join(runDir, 'lock-denials.json');
+      const taskFile = join(root, '.devai/state/tasks/TASK-0408.json');
+      const opened = new Map<number, string>();
+      const events: string[] = [];
+      seam.after = (symbol, args, result) => {
+        if (symbol === 'openSync' && typeof result === 'number') {
+          opened.set(result, String(args[0]));
+        }
+        if (symbol === 'renameSync' && args[1] === denials) events.push('rename the denials');
+        if (symbol === 'fsyncSync' && opened.get(args[0] as number) === runDir) {
+          events.push('fsync the round-run directory');
+        }
+        if (
+          symbol === 'writeFileSync' &&
+          args[0] === taskFile &&
+          String(args[1]).includes('"status": "ready"')
+        ) {
+          events.push('re-queue the task');
+        }
+      };
+
+      await runRoundTasks({ repoRoot: root, round: ROUND, dispatch: () => ({ ok: true }) });
+      seam.after = undefined;
+
+      expect(events.slice(0, 3)).toEqual([
+        'rename the denials',
+        'fsync the round-run directory',
+        're-queue the task',
+      ]);
+    });
+  });
+
+  it('a runner that stops between a completion and its judgment is reconciled next run', async () => {
+    const root = repository();
+    await withAuthorityHostTestScope(async () => {
+      saveTask(root, task('TASK-0409'));
+      const taskFile = join(root, '.devai/state/tasks/TASK-0409.json');
+      // The runner stops right before it can persist its verdict on the attempt.
+      seam.before = (symbol, args) => {
+        if (symbol !== 'writeFileSync' || args[0] !== taskFile) return;
+        if (!String(args[1]).includes('"status": "escalated"')) return;
+        seam.before = undefined;
+        throw new Error('injected stop before the runner judged the attempt');
+      };
+
+      await expect(
+        runRoundTasks({
+          repoRoot: root,
+          round: ROUND,
+          lockRenewalIntervalMs: 60_000,
+          dispatch: () => {
+            rmSync(keyFile(root));
+            acquireLocks({ locksDir: locksDir(root), taskId: 'TASK-0900', targets: ['F2:MOD-a'] });
+            completeTask({ repoRoot: root, taskId: 'TASK-0409' });
+            return { ok: true };
+          },
+        }),
+      ).rejects.toThrow('injected stop');
+      expect(loadTask(root, 'TASK-0409').status).toBe('completed');
+
+      const next = await runRoundTasks({
+        repoRoot: root,
+        round: ROUND,
+        dispatch: () => ({ ok: true }),
+      });
+
+      expect(next.reconciled).toEqual([
+        { task_id: 'TASK-0409', ok: false, code: 'TASK_RESOURCE_LOCK_LOST' },
+      ]);
+      expect(next.ok).toBe(false);
+      expect(loadTask(root, 'TASK-0409').status).toBe('escalated');
+      expect(listLocks({ locksDir: locksDir(root) })).toMatchObject([{ task_id: 'TASK-0900' }]);
+    });
+  });
+});
+
 describe('claims left by a claimant that stopped', () => {
   const elsewhere = () => `${hostname()}-elsewhere`;
 
@@ -428,19 +512,13 @@ describe('claims left by a claimant that stopped', () => {
     });
   });
 
-  it.each([
-    [
-      'its pid is alive but the claim outlived the age bound',
-      () => ({ pid: process.pid, claimed_at: new Date(Date.now() - HOUR).toISOString() }),
-    ],
-    [
-      'its pid is alive but the host has rebooted since',
-      () => ({ pid: process.pid, boot_at: Date.now() - uptime() * 1000 - 10 * HOUR }),
-    ],
-  ])('breaks a same-host claim when %s', async (_case, overrides) => {
+  it('breaks a same-host claim whose pid is alive but whose host has rebooted since', async () => {
     const root = repository();
     await withAuthorityHostTestScope(async () => {
-      abandonedLock(root, claimBody(overrides()));
+      abandonedLock(
+        root,
+        claimBody({ pid: process.pid, boot_at: Date.now() - uptime() * 1000 - 10 * HOUR }),
+      );
 
       expect(
         acquireLocks({ locksDir: locksDir(root), taskId: 'TASK-0412', targets: ['F2:MOD-a'] })
@@ -468,6 +546,14 @@ describe('claims left by a claimant that stopped', () => {
   });
 
   it.each([
+    [
+      'a live pid on this host past the age bound (never displaced)',
+      (claim: string) =>
+        writeFileSync(
+          claim,
+          claimBody({ pid: process.pid, claimed_at: new Date(Date.now() - HOUR).toISOString() }),
+        ),
+    ],
     [
       'another host past the age bound',
       (claim: string) =>
