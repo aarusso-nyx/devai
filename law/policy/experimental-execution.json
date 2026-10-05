@@ -39,7 +39,7 @@
     "path": ".devai/state/round-runs/{round}/dispatch-journal.jsonl",
     "schema": "law/schemas/dispatch-journal-event.schema.json",
     "events": ["intent", "spawned", "exited", "evidence-written", "settled"],
-    "uncertain": "blocks-round-until-human-task-escalate"
+    "uncertain": "blocks-round-until-recorded-human-disposition"
   },
   "evidence": {
     "label": "experimental",
