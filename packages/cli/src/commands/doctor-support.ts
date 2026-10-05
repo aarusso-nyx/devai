@@ -1,5 +1,5 @@
-import { existsSync, readFileSync } from '@devai-nyx/authority';
-import { join, posix } from 'node:path';
+import { existsSync, readFileSync, realpathSync } from '@devai-nyx/authority';
+import { isAbsolute, join, posix, relative, sep } from 'node:path';
 import type { AdoptionProfile } from '@devai-nyx/utils';
 
 export const DEFAULT_REPO_ROOT = '.';
@@ -131,6 +131,30 @@ export function resolveDocsPathOverride(
       : { path: path.replace(/\/+$/u, '') };
   }
   return { path: canonicalPath };
+}
+
+/**
+ * The real location of a resolved docs path when a symbolic link carries it outside the real
+ * `docs/` root, which the lexical check of {@link resolveDocsPathOverride} cannot see; undefined
+ * when the path is absent (nothing is read) or stays inside that root.
+ */
+export function docsPathOutsideRealRoot(repoRoot: string, docsPath: string): string | undefined {
+  let real: string;
+  try {
+    real = realpathSync(join(repoRoot, docsPath));
+  } catch {
+    return undefined;
+  }
+  let docsRoot: string;
+  try {
+    docsRoot = realpathSync(join(repoRoot, 'docs'));
+  } catch {
+    return real;
+  }
+  const fromRoot = relative(docsRoot, real);
+  return fromRoot === '..' || fromRoot.startsWith(`..${sep}`) || isAbsolute(fromRoot)
+    ? real
+    : undefined;
 }
 
 export interface CliProbe {
