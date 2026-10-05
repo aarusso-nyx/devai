@@ -263,19 +263,27 @@ replaced are listed too), the refreshed stamps, the obligations, and the post-ch
 from the adoption decision record.
 
 The whole upgrade is one durable transaction. Before the first write the bind journal records the
-previous bytes of every file the upgrade may touch, from the configuration set to the authority
-policy, the adapter files, the constitution pin, the CI workflows, and the receipt; the receipt lands
-last and its commit drops the journal. A run killed at any point leaves the journal, and the next
-`init upgrade --write` (or `init bind --adopter-policy`) rolls every journaled file back to the
-previous version and the upgrade replays from it, so a new `devai_version` is never left without
-its receipt. A repository already bound at the installed version without a receipt for it is not a
-no-op either: the plan reports `receipt: "missing"`, and `--write` re-derives the receipt, marked
-`rederived: true`.
+previous bytes of every file the upgrade may touch: the configuration set, the authority policy, the
+adapter configurations and workflow, the constitution pin and pointer, the CI workflows, the
+receipt, and, when the post-merge adapter is bound, its hook, receipt issuer, and key with their
+file modes. The journal and its directory are flushed to disk before the first target write, every
+written file and its directory are flushed before the commit, the receipt lands last, and only then
+is the journal removed and its directory flushed. A run killed at any point leaves the journal, and
+the next `init upgrade --write` (or `init bind --adopter-policy`) rolls every journaled file back to
+the previous version, adapter files included, and the upgrade replays from it, so a new
+`devai_version` is never left without its receipt. A repository already bound at the installed
+version without a receipt for it is not a no-op either: the plan reports `receipt: "missing"`,
+every decision obligation of the migration history is evaluated first, and `--write` then
+re-derives the receipt, marked `rederived: true`.
 
-`--write` holds the exclusive lock `.devai/config/upgrade.lock` across journal recovery, planning,
-every write, the post-checks, and the receipt commit. A second upgrade, or a bind that would recover
-the journal, refuses with `INIT_UPGRADE_LOCKED` while the holder runs; a lock whose process has
-exited is replaced on the next run.
+`init upgrade --write` and `init bind --adopter-policy --write` take the same exclusive lock,
+`.devai/config/upgrade.lock`, by exclusive create with an owner token, and hold it across journal
+recovery, planning, every write, the post-checks, and the receipt commit; only its owner removes
+it. A second run refuses with `INIT_UPGRADE_LOCKED` while the holder runs. A lock is never taken
+over: when its recorded owner has exited or aged out the run refuses with
+`INIT_UPGRADE_LOCK_STALE`, naming the file, the recorded owner, and the removal command. Confirm
+that no upgrade or bind is running, remove the lock with that command, and rerun; the rerun
+recovers any journal the killed run left.
 
 The upgrade is idempotent: a second run at the same version reports `no-op` and writes nothing.
 Review the diff and commit the refreshed materialization with the package update. Materialized
