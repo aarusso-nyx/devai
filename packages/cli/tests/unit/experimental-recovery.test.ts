@@ -36,6 +36,7 @@ import {
   finishRoundTask,
   holdsWorktreeCapacity,
   listDispatchDispositions,
+  listLocks,
   listTasks,
   listWorktrees,
   loadTask,
@@ -326,9 +327,12 @@ describe('recorded dispositions and recovery (gap 2)', () => {
       { task_id: 'TASK-0212', ok: false, code: 'EXPERIMENTAL_ATTEMPT_BUDGET_EXHAUSTED' },
     ]);
     expect(loadTask(root, 'TASK-0212')).toMatchObject({ status: 'ready', iteration_count: 0 });
+    // release_on frees locks only on completion, escalation, a gap pause or cancellation.
     expect(
-      readdirSync(join(root, '.devai/state/locks')).some((name) => name.includes('TASK-0212')),
-    ).toBe(false);
+      listLocks({ locksDir: join(root, '.devai/state/locks') }).filter(
+        (lock) => lock.task_id === 'TASK-0212',
+      ),
+    ).toHaveLength(1);
     expect(readDispatchJournal(root, ROUND).some((event) => event.task_id === 'TASK-0212')).toBe(
       false,
     );
