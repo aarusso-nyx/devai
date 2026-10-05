@@ -46,6 +46,7 @@ import {
   type JsonObject,
 } from '../../services/adopter-policy.js';
 import { DEFAULT_REPO_ROOT, emit, type InitBindOptions } from './shared.js';
+import { assertUpgradeLockFree } from './upgrade-lock.js';
 import { classWriteVerbs } from '../../authority/policy-support.js';
 import { canonicalRegistry } from '../../define-command.js';
 
@@ -60,22 +61,34 @@ const ADOPTER_POLICY_PAIR: readonly string[] = [...ADOPTER_POLICY_TARGETS, ADOPT
 /** The upgrade receipt init upgrade records beside the binding receipt (#264). */
 export const UPGRADE_RECEIPT = '.devai/config/upgrade-receipt.json';
 /**
- * The closed set of paths the bind journal may stage and roll back: the adopter-policy
- * pair, plus the operational-law and subprocess-effects files and the upgrade receipt that
- * init upgrade lands in the same journaled write set. A journal naming any other path is
- * invalid and is never replayed.
+ * The closed set of paths the bind journal may record and roll back: the adopter-policy
+ * pair, plus every file init upgrade lands in its one durable transaction (#264): the
+ * operational-law and subprocess-effects files, the authority policy, the host-adapter
+ * configurations and workflow, the constitution pin and pointer, the CI verifier workflows,
+ * and the upgrade receipt. A journal naming any other path is invalid and is never replayed.
  */
 export const BIND_JOURNAL_PATHS: readonly string[] = [
   ...ADOPTER_POLICY_PAIR,
   '.devai/config/forbidden-actions.json',
   '.devai/config/subprocess-effects.json',
+  '.devai/config/authority-policy.json',
+  '.devai/config/github-actions-host-adapter.json',
+  '.devai/config/post-merge-host-adapter.json',
   UPGRADE_RECEIPT,
+  '.devai/pin/constitution.md',
+  '.devai/constitution.md',
+  '.github/workflows/devai-ledger-verify.yml',
+  '.github/workflows/devai-local-rc-verify.yml',
+  '.github/workflows/devai-main-observation.yml',
 ];
 
 interface AdopterPolicyJournalEntry {
   readonly path: string;
   readonly previous: string | null;
 }
+
+/** The repository whose bind journal init upgrade holds open across its write set. */
+let openJournalRoot: string | undefined;
 
 function readTextIfPresent(path: string): string | null {
   return existsSync(path) ? readFileSync(path, 'utf8') : null;
@@ -90,13 +103,37 @@ function landByRename(path: string, bytes: string): void {
 }
 
 /**
+ * Restore one journaled path to its previous bytes. Files under .devai/config are staged
+ * and renamed; the pin, pointer and workflows are written in place, which is safe because
+ * recovery is idempotent and the journal stays until every path is restored.
+ */
+function restoreJournaledPath(targetRoot: string, path: string, previous: string | null): void {
+  const finalPath = join(targetRoot, path);
+  if (previous === null) {
+    rmSync(finalPath, { force: true });
+    return;
+  }
+  if (path.startsWith('.devai/config/')) {
+    landByRename(finalPath, previous);
+    return;
+  }
+  mkdirSync(dirname(finalPath), { recursive: true });
+  writeFileSync(finalPath, previous);
+}
+
+/**
  * Finish a bind a previous process left interrupted. A journal next to the receipt
  * marks a committed write set; its presence means some renames may have landed, so
  * every journaled path is rolled back to its previous bytes and the new bind below
  * recomputes the projection from that complete previous pair. Staged files without a
  * journal never reached a final path and are discarded.
  */
-export function recoverInterruptedAdopterPolicyBind(targetRoot: string): 'rolled-back' | null {
+export function recoverInterruptedAdopterPolicyBind(
+  targetRoot: string,
+  upgradeLockToken?: string,
+): 'rolled-back' | null {
+  // A live upgrade owns the journal: recovering it would roll back its writes in flight.
+  assertUpgradeLockFree(targetRoot, upgradeLockToken);
   const journalPath = join(targetRoot, ADOPTER_POLICY_JOURNAL);
   const stagedPaths = BIND_JOURNAL_PATHS.map(
     (path) => `${join(targetRoot, path)}${ADOPTER_POLICY_STAGED_SUFFIX}`,
@@ -126,11 +163,9 @@ export function recoverInterruptedAdopterPolicyBind(targetRoot: string): 'rolled
         throw new Error('ADOPTER_POLICY_BINDING_JOURNAL_INVALID');
       }
       for (const entry of entries) {
-        const finalPath = join(targetRoot, entry.path);
-        const current = readTextIfPresent(finalPath);
+        const current = readTextIfPresent(join(targetRoot, entry.path));
         if (current === entry.previous) continue;
-        if (entry.previous === null) rmSync(finalPath, { force: true });
-        else landByRename(finalPath, entry.previous);
+        restoreJournaledPath(targetRoot, entry.path, entry.previous);
       }
       recovered = 'rolled-back';
     }
@@ -155,6 +190,18 @@ export function writeAdopterPolicyPairAtomically(
   const outside = [...writes.keys()].find((path) => !BIND_JOURNAL_PATHS.includes(path));
   if (outside !== undefined) {
     throw new Error(`ADOPTER_POLICY_BINDING_JOURNAL_PATH_INVALID:${outside}`);
+  }
+  if (openJournalRoot === targetRoot) {
+    // The open upgrade journal already holds the previous bytes of every journaled path, so
+    // the set is staged and renamed without a journal of its own, which would replace it.
+    const staged = [...writes].map(([path, bytes]) => {
+      const final = join(targetRoot, path);
+      mkdirSync(dirname(final), { recursive: true });
+      writeFileSync(`${final}${ADOPTER_POLICY_STAGED_SUFFIX}`, bytes);
+      return final;
+    });
+    for (const final of staged) renameSync(`${final}${ADOPTER_POLICY_STAGED_SUFFIX}`, final);
+    return;
   }
   const journalPath = join(targetRoot, ADOPTER_POLICY_JOURNAL);
   const entries = [...writes.keys()].map((path) => ({
@@ -182,6 +229,56 @@ export function writeAdopterPolicyPairAtomically(
       rmSync(journalPath, { force: true });
     },
   );
+}
+
+/**
+ * Open the bind journal for a whole upgrade (#264): record the previous bytes of every
+ * journaled path before any of them is written. Until commitBindJournal drops it, a crash at
+ * any point leaves a journal the next recovery rolls back to that complete previous state,
+ * so a new version stamp is never left without its receipt.
+ */
+export function openBindJournal(targetRoot: string): void {
+  const journalPath = join(targetRoot, ADOPTER_POLICY_JOURNAL);
+  if (openJournalRoot !== undefined || existsSync(journalPath)) {
+    throw new Error('ADOPTER_POLICY_BINDING_JOURNAL_OPEN');
+  }
+  mkdirSync(dirname(journalPath), { recursive: true });
+  writeFileSync(
+    journalPath,
+    jsonBytes({
+      entries: BIND_JOURNAL_PATHS.map((path): AdopterPolicyJournalEntry => ({
+        path,
+        previous: readTextIfPresent(join(targetRoot, path)),
+      })),
+    }),
+  );
+  openJournalRoot = targetRoot;
+}
+
+/** Commit the open upgrade journal: every write and the receipt have landed. */
+export function commitBindJournal(targetRoot: string): void {
+  if (openJournalRoot !== targetRoot) throw new Error('ADOPTER_POLICY_BINDING_JOURNAL_NOT_OPEN');
+  rmSync(join(targetRoot, ADOPTER_POLICY_JOURNAL), { force: true });
+  openJournalRoot = undefined;
+}
+
+/** Forget an open journal after an in-process rollback has already removed its file. */
+export function releaseBindJournal(): void {
+  openJournalRoot = undefined;
+}
+
+/** The bind journal path, for rollback scopes that must remove it with the write set. */
+export const BIND_JOURNAL = ADOPTER_POLICY_JOURNAL;
+
+/** Every absolute path a journaled transaction may touch: finals, staged siblings, journal. */
+export function bindJournalTargets(targetRoot: string): readonly string[] {
+  return [
+    join(targetRoot, ADOPTER_POLICY_JOURNAL),
+    ...BIND_JOURNAL_PATHS.flatMap((path) => [
+      join(targetRoot, path),
+      `${join(targetRoot, path)}${ADOPTER_POLICY_STAGED_SUFFIX}`,
+    ]),
+  ];
 }
 
 /** Resolve an adopter policy source argument, refusing any path outside law/policy. */
