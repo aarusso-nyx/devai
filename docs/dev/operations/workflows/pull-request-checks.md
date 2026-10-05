@@ -75,7 +75,9 @@ step.
    `DEVAI_EVIDENCE_POLICY`, `DEVAI_EVIDENCE_VERIFY`, and `DEVAI_EVIDENCE_BUNDLE_VERIFY`;
    then runs `init bind --target . --as-role architect --write` and
    `check --preflight --run --base "$DEVAI_PREFLIGHT_BASE" --as-role inspector --write`
-   through the bootstrapped runner.
+   through the bootstrapped runner. It ends with the two gate invariant producers of
+   ADR-SCR-0013, each failing the step on its own: `sense run trace_resolution` for
+   INV-DEVAI-002 and `audit scorecard --at` the checked-out head for INV-HARNESS-006.
 6. **Affected checks and profile-selected candidate preflight** (`id: affected`):
    `pnpm run release:pr-gate -- "$DEVAI_PREFLIGHT_BASE"` (commit-range hygiene, the bump
    floor, and the release profile preflight for a version-changing pull request), then
