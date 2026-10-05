@@ -493,6 +493,170 @@ describe('durable denials and judged completions', () => {
   });
 });
 
+describe('attempt fences', () => {
+  function fencesDir(root: string): string {
+    return join(root, '.devai/state/lock-fences');
+  }
+
+  function completing(root: string) {
+    return (running: TaskRecord) => {
+      completeTask({ repoRoot: root, taskId: running.id });
+      return { ok: true };
+    };
+  }
+
+  it('makes the attempt fence durable before the dispatch starts', async () => {
+    const root = repository();
+    await withAuthorityHostTestScope(async () => {
+      saveTask(root, task('TASK-0419'));
+      const fence = join(fencesDir(root), 'TASK-0419.json');
+      const opened = new Map<number, string>();
+      const events: string[] = [];
+      seam.after = (symbol, args, result) => {
+        if (symbol === 'openSync' && typeof result === 'number') {
+          opened.set(result, String(args[0]));
+        }
+        const synced = symbol === 'fsyncSync' ? opened.get(args[0] as number) : undefined;
+        if (synced?.startsWith(`${fence}.`) === true) events.push('fsync the staged fence');
+        if (symbol === 'renameSync' && args[1] === fence) events.push('rename the fence');
+        if (synced === fencesDir(root)) events.push('fsync the fence directory');
+      };
+
+      await runRoundTasks({
+        repoRoot: root,
+        round: ROUND,
+        dispatch: () => {
+          events.push('dispatch');
+          return { ok: true };
+        },
+      });
+      seam.after = undefined;
+
+      expect(events.slice(0, 4)).toEqual([
+        'fsync the staged fence',
+        'rename the fence',
+        'fsync the fence directory',
+        'dispatch',
+      ]);
+    });
+  });
+
+  it('writes the release receipt only after the lock record is removed', async () => {
+    const root = repository();
+    await withAuthorityHostTestScope(async () => {
+      saveTask(root, task('TASK-0420'));
+      const events: string[] = [];
+      seam.after = (symbol, args) => {
+        if (symbol === 'unlinkSync' && args[0] === keyFile(root)) events.push('remove the lock');
+        if (symbol === 'writeFileSync' && String(args[0]).endsWith('.released')) {
+          events.push('write the receipt');
+        }
+      };
+
+      const result = await runRoundTasks({
+        repoRoot: root,
+        round: ROUND,
+        dispatch: completing(root),
+      });
+      seam.after = undefined;
+
+      expect(result.results).toEqual([{ task_id: 'TASK-0420', ok: true }]);
+      expect(events).toEqual(['remove the lock', 'write the receipt']);
+    });
+  });
+
+  it('retires the fence, durably, before its receipts', async () => {
+    const root = repository();
+    await withAuthorityHostTestScope(async () => {
+      saveTask(root, task('TASK-0421'));
+      const fence = join(fencesDir(root), 'TASK-0421.json');
+      const opened = new Map<number, string>();
+      const events: string[] = [];
+      let dispatched = false;
+      seam.after = (symbol, args, result) => {
+        if (symbol === 'openSync' && typeof result === 'number') {
+          opened.set(result, String(args[0]));
+        }
+        if (!dispatched) return;
+        if (symbol === 'unlinkSync' && args[0] === fence) events.push('remove the fence');
+        if (symbol === 'fsyncSync' && opened.get(args[0] as number) === fencesDir(root)) {
+          events.push('fsync the fence directory');
+        }
+        if (symbol === 'unlinkSync' && String(args[0]).endsWith('.released')) {
+          events.push('remove the receipt');
+        }
+      };
+
+      await runRoundTasks({
+        repoRoot: root,
+        round: ROUND,
+        dispatch: (running) => {
+          const outcome = completing(root)(running);
+          dispatched = true;
+          return outcome;
+        },
+      });
+      seam.after = undefined;
+
+      expect(events).toEqual([
+        'remove the fence',
+        'fsync the fence directory',
+        'remove the receipt',
+      ]);
+      expect(readdirSync(fencesDir(root))).toEqual([]);
+    });
+  });
+
+  it('keeps the receipts of a fence it could not retire', async () => {
+    const root = repository();
+    await withAuthorityHostTestScope(async () => {
+      saveTask(root, task('TASK-0422'));
+      const fence = join(fencesDir(root), 'TASK-0422.json');
+      seam.before = (symbol, args) => {
+        if (symbol !== 'unlinkSync' || args[0] !== fence) return;
+        seam.before = undefined;
+        throw Object.assign(new Error('EIO: injected fence retirement failure'), { code: 'EIO' });
+      };
+
+      const result = await runRoundTasks({
+        repoRoot: root,
+        round: ROUND,
+        dispatch: completing(root),
+      });
+
+      expect(result.results).toEqual([{ task_id: 'TASK-0422', ok: true }]);
+      expect(readdirSync(fencesDir(root)).sort()).toEqual([
+        expect.stringMatching(/^TASK-0422\..+\.F2~MOD-a\.json\.released$/u),
+        'TASK-0422.json',
+      ]);
+    });
+  });
+
+  it.each([
+    ['unreadable', '{'],
+    ['malformed', JSON.stringify({ task_id: 'TASK-0423' })],
+  ])('refuses the run while an %s fence remains, naming it', async (_case, body) => {
+    const root = repository();
+    await withAuthorityHostTestScope(async () => {
+      saveTask(root, task('TASK-0423'));
+      mkdirSync(fencesDir(root), { recursive: true });
+      const fence = join(fencesDir(root), 'TASK-0423.json');
+      writeFileSync(fence, body);
+      const dispatch = vi.fn(() => ({ ok: true }));
+
+      const refused = await runRoundTasks({ repoRoot: root, round: ROUND, dispatch }).catch(
+        (error: unknown) => error,
+      );
+
+      expect((refused as { code?: string }).code).toBe('TASK_LOCK_FENCE_INVALID');
+      expect((refused as Error).message).toContain(fence);
+      expect(dispatch).not.toHaveBeenCalled();
+      expect(loadTask(root, 'TASK-0423').status).toBe('ready');
+      expect(readFileSync(fence, 'utf8')).toBe(body);
+    });
+  });
+});
+
 describe('claims left by a claimant that stopped', () => {
   const elsewhere = () => `${hostname()}-elsewhere`;
 
