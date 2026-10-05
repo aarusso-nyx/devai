@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from '@devai-nyx/authority';
-import { join } from 'node:path';
+import { join, posix } from 'node:path';
 import type { AdoptionProfile } from '@devai-nyx/utils';
 
 export const DEFAULT_REPO_ROOT = '.';
@@ -98,26 +98,39 @@ export function applyPathOverride(
   return override !== undefined ? `docs/${override}` : canonicalPath;
 }
 
+/** A docs path resolved through `docs.ia.path_overrides`, or the override refused for leaving `docs/`. */
+export type DocsPathResolution =
+  | { readonly path: string; readonly rejected?: undefined }
+  | {
+      readonly path?: undefined;
+      readonly rejected: { readonly key: string; readonly value: string };
+    };
+
 /**
  * Resolves a canonical `docs/...` path through its longest overridden ancestor (#265): with
  * `"dev/operations": "meta/ops"`, `docs/dev/operations/workflows` resolves to
  * `docs/meta/ops/workflows`. A key naming the whole path wins over every ancestor, as in
  * {@link applyPathOverride}; ancestors match on whole segments only, so `dev/ops` never
- * relocates `docs/dev/operations`. Paths outside `docs/` pass through unchanged.
+ * relocates `docs/dev/operations`. The result is normalized, and an override that is absolute
+ * or resolves outside `docs/` is refused rather than applied, so no caller reads outside the
+ * repository's documentation tree. Paths outside `docs/` pass through unchanged.
  */
 export function resolveDocsPathOverride(
   canonicalPath: string,
   overrides: Readonly<Record<string, string>>,
-): string {
-  if (!canonicalPath.startsWith('docs/')) return canonicalPath;
+): DocsPathResolution {
+  if (!canonicalPath.startsWith('docs/')) return { path: canonicalPath };
   const segments = canonicalPath.slice('docs/'.length).split('/');
   for (let length = segments.length; length > 0; length -= 1) {
-    const override: unknown = overrides[segments.slice(0, length).join('/')];
-    if (typeof override === 'string') {
-      return ['docs', override, ...segments.slice(length)].join('/');
-    }
+    const key = segments.slice(0, length).join('/');
+    const override: unknown = overrides[key];
+    if (typeof override !== 'string') continue;
+    const path = posix.normalize(['docs', override, ...segments.slice(length)].join('/'));
+    return posix.isAbsolute(override) || (path !== 'docs' && !path.startsWith('docs/'))
+      ? { rejected: { key, value: override } }
+      : { path: path.replace(/\/+$/u, '') };
   }
-  return canonicalPath;
+  return { path: canonicalPath };
 }
 
 export interface CliProbe {
