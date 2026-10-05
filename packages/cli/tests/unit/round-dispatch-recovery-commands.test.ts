@@ -13,7 +13,8 @@ import {
   writeFileSync,
   writeSync as nodeWriteSync,
 } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { spawnSync } from 'node:child_process';
+import { hostname, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { cac } from 'cac';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -24,6 +25,7 @@ import {
 import { withAuthorityHostTestScope } from '../../../authority/tests/unit/authority-host-test-scope.js';
 import {
   EXPERIMENTAL_ACTIVATION_RECORD,
+  EXPERIMENTAL_ACTIVATION_LOCK,
   EXPERIMENTAL_WITHDRAWALS_DIR,
   loadTask,
   readExperimentalActivation,
@@ -210,6 +212,29 @@ describe('round dispatch deactivate', () => {
     ]);
     expect(again.exit).not.toBe(0);
     expect(JSON.parse(again.stderr)).toMatchObject({ code: 'EXPERIMENTAL_ACTIVATION_MISSING' });
+  });
+
+  it('names a stale activation lock and its manual removal step instead of taking it over', async () => {
+    const root = repository();
+    await withAuthorityHostTestScope(async () => {
+      writeExperimentalActivation(root, activation());
+    });
+    const lock = join(root, EXPERIMENTAL_ACTIVATION_LOCK);
+    const gone = spawnSync(process.execPath, ['--version']).pid;
+    writeFileSync(lock, JSON.stringify({ pid: gone, hostname: hostname(), token: 'gone' }));
+    const result = await invoke(roundDispatchDeactivate, 'round-dispatch-deactivate', [
+      '--repo-root',
+      root,
+    ]);
+    expect(result.exit).not.toBe(0);
+    const refusal = JSON.parse(result.stderr) as Record<string, string>;
+    expect(refusal).toMatchObject({
+      code: 'EXPERIMENTAL_ACTIVATION_LOCK_STALE',
+      removal: `rm "${lock}"`,
+    });
+    expect(refusal['detail']).toContain(EXPERIMENTAL_ACTIVATION_LOCK);
+    expect(existsSync(lock)).toBe(true);
+    expect(readExperimentalActivation(root, new Date())).toMatchObject({ ok: true });
   });
 
   it('writes a complete activation even when every write is short', async () => {
