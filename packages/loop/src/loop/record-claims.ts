@@ -138,9 +138,10 @@ function claimFile(claimsDir: string, path: string, identity: string): string {
 }
 
 /**
- * A claim older than this is presumed abandoned when its claimant cannot be checked
- * directly. A claim is held for a few filesystem calls, so the bound only ever applies
- * to a claimant that crashed, or a pid reused after one.
+ * A claim is held for a few filesystem calls. One older than this that nothing proves
+ * abandoned -- a live pid on this host (the claimant, or a pid reused after a crash),
+ * another host, or an unreadable claim -- refuses for repair instead of standing down
+ * as busy. Age alone never breaks a claim.
  */
 export const CLAIM_STALE_AFTER_MS = 10 * 60 * 1000;
 /** Boot times computed from uptime agree to well within this on one boot. */
@@ -237,9 +238,10 @@ function rebooted(
 
 /**
  * Judge a claim found in place. It is abandoned only with proof that its claimant is
- * gone -- on this host, a dead pid, a boot since, or a claim outliving the age bound
- * (a pid reused after a crash). A claim from another host, or one nobody can read,
- * is never broken: past the bound it refuses with a repair code instead.
+ * gone: on this host, a dead pid or a boot since the claim. A live pid on this boot is
+ * never displaced -- it may be the claimant, still between its check and its swap --
+ * so it stands down as busy, and past the age bound refuses for repair. A claim from
+ * another host, or one nobody can read, is never broken either.
  */
 function claimState(path: string): ClaimState {
   let raw: string;
@@ -265,13 +267,13 @@ function claimState(path: string): ClaimState {
   }
   const age = now - Date.parse(claim.claimed_at);
   const holder = `a claim by pid ${String(claim.pid)} on ${claim.hostname} since ${claim.claimed_at}`;
-  if (claim.hostname !== hostname()) {
-    return age < CLAIM_STALE_AFTER_MS ? { kind: 'live' } : { kind: 'stuck', holder };
-  }
-  if (!processAlive(claim.pid) || rebooted(claim, currentBoot()) || age >= CLAIM_STALE_AFTER_MS) {
+  if (
+    claim.hostname === hostname() &&
+    (!processAlive(claim.pid) || rebooted(claim, currentBoot()))
+  ) {
     return { kind: 'abandoned', raw };
   }
-  return { kind: 'live' };
+  return age < CLAIM_STALE_AFTER_MS ? { kind: 'live' } : { kind: 'stuck', holder };
 }
 
 function staleClaim(path: string, holder: string): TaskServiceError {
@@ -389,13 +391,16 @@ export function isStaleClaim(error: unknown): boolean {
  * released only after the swap, so a writer that observed the same record and claims
  * it later re-reads the new state and stands down. A claim left by a claimant that is
  * provably gone is broken first; one that cannot be judged throws
- * `TASK_RECORD_CLAIM_STALE` naming the file to repair.
+ * `TASK_RECORD_CLAIM_STALE` naming the file to repair. `onVerified` runs under the
+ * claim once the record is verified current, before it changes: what it writes is
+ * true of exactly the observed record.
  */
 export function swapObservedRecord(options: {
   readonly path: string;
   readonly claimsDir: string;
   readonly identity: string;
   readonly next?: string;
+  readonly onVerified?: () => void;
 }): SwapOutcome {
   const held = acquireClaim(
     options.claimsDir,
@@ -405,12 +410,39 @@ export function swapObservedRecord(options: {
   try {
     const current = observeRecord(options.path);
     if (current.kind !== 'record' || current.identity !== options.identity) return 'changed';
-    // A writer that stalled past the age bound may have lost its claim; never act on one.
+    // Live claimants are never displaced; a claim removed by hand is still never acted on.
     if (!stillClaimed(held)) return 'claimed';
+    options.onVerified?.();
     if (options.next === undefined) unlinkSync(options.path);
     else installStaged(options.path, options.next);
     return 'swapped';
   } finally {
     releaseClaim(held);
+  }
+}
+
+/**
+ * Make a rename in `dir` durable: fsync the directory itself, so the new name survives
+ * a power loss before anything that depends on it is written. Platforms that cannot
+ * open or fsync a directory (Windows) skip it.
+ */
+export function fsyncDirectory(dir: string): void {
+  let descriptor: number;
+  try {
+    descriptor = openSync(dir, 'r');
+  } catch (error) {
+    if (['EISDIR', 'EPERM', 'EACCES'].includes(String((error as NodeJS.ErrnoException).code))) {
+      return;
+    }
+    throw error;
+  }
+  try {
+    fsyncSync(descriptor);
+  } catch (error) {
+    if (!['EINVAL', 'ENOTSUP', 'EPERM'].includes(String((error as NodeJS.ErrnoException).code))) {
+      throw error;
+    }
+  } finally {
+    closeSync(descriptor);
   }
 }
