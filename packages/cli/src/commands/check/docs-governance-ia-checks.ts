@@ -272,7 +272,19 @@ const WORKFLOW_PAGES = 'docs/dev/operations/workflows';
  */
 export function checkDocsIaWorkflowPageSet(repoRoot: string): GovernanceFinding {
   const ruleId = 'docs-ia.workflow-page-set';
-  const pages = resolveDocsPathOverride(WORKFLOW_PAGES, readPathOverrides(repoRoot));
+  const resolution = resolveDocsPathOverride(WORKFLOW_PAGES, readPathOverrides(repoRoot));
+  if (resolution.rejected !== undefined) {
+    const { key, value } = resolution.rejected;
+    return {
+      ruleId,
+      severity: 'fail',
+      message: `DOCS_PATH_OVERRIDE_OUTSIDE_DOCS: docs.ia.path_overrides["${key}"] = "${value}" leaves the docs/ tree, so the workflow pages were not read`,
+      remediation:
+        'Declare the override in .devai/config/project.json as a relative path that stays inside docs/.',
+      locations: ['.devai/config/project.json'],
+    };
+  }
+  const pages = resolution.path;
   const workflowsDir = join(repoRoot, '.github/workflows');
   const pagesDir = join(repoRoot, pages);
   if (!existsSync(workflowsDir) && !existsSync(pagesDir)) {
