@@ -134,6 +134,20 @@ and the recording protocol is first pass, record, second pass, record. Recording
 harness-write step; the preset never records. F4:T7 and F5:T4 then read PASS or FAIL from the
 substrate, and never REVIEW for the absence of their own inputs.
 
+Inventory regeneration comes before the first pass (#237). `inventory_adherence`, a first-pass
+member, reads the combined manifest `.devai/state/inventory/inventory.json`, and only the
+harness-write `inventory_regeneration` sensor produces it. On a clean tree at the candidate head the
+inspector runs `devai sense run inventory_regeneration --repo-root . --as-role inspector --write`.
+It regenerates, for the HEAD commit, the combined manifest and the bodies of the required kinds,
+`.devai/state/sensors/inventory_dep_graph/dep-graph.json` and
+`.devai/state/sensors/inventory_coverage/coverage-matrix.json`, each through its own typed producer
+and schema, binds them to that commit and its commit time, and keeps a producer's REVIEW as REVIEW.
+On a tree that differs from HEAD it reads UNKNOWN and writes nothing, so it runs before any
+recording touches `record/proofs/chain.json`. The full protocol is regenerate, first pass, record,
+second pass, record, and the first recording includes the regeneration reading the sensor persisted
+in the store. `inventory_adherence` reads a manifest regenerated at another commit, or a malformed
+or empty one, as UNKNOWN with its diagnostic, never as an empty PASS.
+
 ### Per-cell applicability of F4:T4 and F4:T9
 
 Applicability is decided per cell from the subject the cell measures, never as a blanket N/A for a
