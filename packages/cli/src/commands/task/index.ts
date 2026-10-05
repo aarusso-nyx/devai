@@ -309,7 +309,8 @@ export const taskFinish = transitionCommand(
 export const taskEscalate = transitionCommand(
   'task escalate',
   'Escalate one round-subordinate task through hidden plumbing.',
-  escalateRoundTask,
+  // An agent task escalates under the round controller, never beside a live dispatch.
+  (options) => escalateRoundTask({ ...options, acquireRoundController: true }),
 );
 
 export const taskPause = defineCommand({
