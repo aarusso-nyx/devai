@@ -587,24 +587,58 @@ describe('S06-B docs governance report', () => {
 
   it('resolves a docs path through its longest overridden ancestor on whole segments', () => {
     const canonical = 'docs/dev/operations/workflows';
-    expect(resolveDocsPathOverride(canonical, {})).toBe(canonical);
-    expect(resolveDocsPathOverride(canonical, { 'dev/operations': 'meta/ops' })).toBe(
-      'docs/meta/ops/workflows',
-    );
+    const resolved = (overrides: Record<string, string>, path = canonical) =>
+      resolveDocsPathOverride(path, overrides);
+    expect(resolved({})).toEqual({ path: canonical });
+    expect(resolved({ 'dev/operations': 'meta/ops' })).toEqual({
+      path: 'docs/meta/ops/workflows',
+    });
     expect(
-      resolveDocsPathOverride(canonical, {
+      resolved({
         dev: 'meta',
         'dev/operations': 'meta/ops',
-        'dev/operations/workflows': 'pipelines',
+        'dev/operations/workflows': 'pipelines/',
       }),
-    ).toBe('docs/pipelines');
-    expect(resolveDocsPathOverride(canonical, { dev: 'meta' })).toBe(
-      'docs/meta/operations/workflows',
-    );
-    expect(
-      resolveDocsPathOverride(canonical, { 'dev/ops': 'meta/ops', 'dev/operations/work': 'x' }),
-    ).toBe(canonical);
-    expect(resolveDocsPathOverride('law/adr', { law: 'charter' })).toBe('law/adr');
+    ).toEqual({ path: 'docs/pipelines' });
+    expect(resolved({ dev: 'meta' })).toEqual({ path: 'docs/meta/operations/workflows' });
+    expect(resolved({ 'dev/ops': 'meta/ops', 'dev/operations/work': 'x' })).toEqual({
+      path: canonical,
+    });
+    expect(resolved({ law: 'charter' }, 'law/adr')).toEqual({ path: 'law/adr' });
+    // Normalized; a relocation that stays inside docs/ is applied, one that leaves it never is.
+    expect(resolved({ 'dev/operations': 'meta/./x/../ops' })).toEqual({
+      path: 'docs/meta/ops/workflows',
+    });
+    expect(resolved({ 'dev/operations/workflows': '.' })).toEqual({ path: 'docs' });
+    for (const [key, value] of [
+      ['dev/operations', '../../external'],
+      ['dev', '..'],
+      ['dev/operations/workflows', 'meta/../../docs-elsewhere'],
+      ['dev/operations', '/srv/ops'],
+    ] as const) {
+      expect(resolved({ [key]: value }), `${key}=${value}`).toEqual({ rejected: { key, value } });
+    }
+  });
+
+  it('refuses a workflow page override that leaves the docs tree without reading it', () => {
+    write('.github/workflows/ci.yml', 'name: ci\n');
+    writeJson('.devai/config/project.json', {
+      repo: { kind: 'application' },
+      docs: {
+        builder: 'docusaurus',
+        build_command: '',
+        ia: { path_overrides: { 'dev/operations': '../../external' } },
+      },
+    });
+    expect(governanceFinding('docs-ia.workflow-page-set')).toEqual({
+      ruleId: 'docs-ia.workflow-page-set',
+      severity: 'fail',
+      message:
+        'DOCS_PATH_OVERRIDE_OUTSIDE_DOCS: docs.ia.path_overrides["dev/operations"] = "../../external" leaves the docs/ tree, so the workflow pages were not read',
+      remediation:
+        'Declare the override in .devai/config/project.json as a relative path that stays inside docs/.',
+      locations: ['.devai/config/project.json'],
+    });
   });
 
   it('pairs workflow pages where docs.ia.path_overrides relocates dev/operations (#265)', () => {
