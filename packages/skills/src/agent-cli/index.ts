@@ -36,10 +36,17 @@ export type AgentCliErrorCode =
   | 'AGENT_CLI_RUNTIME_UNSUPPORTED'
   /**
    * The provider started, but recording its start (journal `spawned`) failed. The
-   * adapter stopped its whole process group before throwing; the provider may already
-   * have changed its worktree, so the attempt is uncertain, never a refused spawn.
+   * adapter terminated its whole process group before throwing (the error's `process`
+   * says whether that was confirmed); the provider may already have changed its
+   * worktree, so the attempt is uncertain, never a refused spawn.
    */
-  | 'AGENT_CLI_SPAWN_RECORD_FAILED';
+  | 'AGENT_CLI_SPAWN_RECORD_FAILED'
+  /**
+   * The provider was terminated (wall clock) but its process group, or a process holding
+   * its output, could not be confirmed gone: it may still be writing to the worktree, so
+   * the attempt is uncertain and its worktree must be kept.
+   */
+  | 'PROCESS_GROUP_TERMINATION_UNCONFIRMED';
 
 /** Codes an interpreted attempt fails with (`AgentCliOutput.failure`). */
 export type AgentCliFailureCode =
@@ -399,7 +406,11 @@ export interface AgentCliAttempt {
 
 const DEFAULT_OUTPUT_BYTES = 16 * 1024 * 1024;
 
-/** Run one attempt through the governed asynchronous process effect. */
+/**
+ * Run one attempt through the governed asynchronous process effect. It rejects instead
+ * of resolving when the provider's start cannot be recorded or its termination cannot be
+ * confirmed: either way the provider ran, so the attempt is uncertain.
+ */
 export async function runAgentCliAttempt(
   options: AgentCliAttemptOptions,
 ): Promise<AgentCliAttempt> {
@@ -428,6 +439,10 @@ export async function runAgentCliAttempt(
     }
   }
   const process = await child.result;
+  if (process.termination_error !== undefined) {
+    // Not an interpretable attempt: something it started may still be running.
+    throw new AgentCliError(process.termination_error, { process });
+  }
   const output = parseAgentCliOutput(runtime, process.stdout, {
     truncated: process.stdout_truncated,
   });
