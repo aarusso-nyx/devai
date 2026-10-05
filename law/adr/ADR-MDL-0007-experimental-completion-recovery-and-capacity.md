@@ -30,7 +30,7 @@ inspector_acceptance:
   - IA-002 -- An open journal attempt, or an agent task left in progress with no journal record, blocks round dispatch whatever the task status, and clears only through a recorded disposition that closes each open attempt; the refusal names every such task.
   - IA-003 -- Only the Owner with --write and --experimental can dispose or deactivate; each writes a durable record before it changes anything else, never runs a provider, and a retry continues the attempt ladder and refuses once it is spent.
   - IA-004 -- A damaged journal is quarantined only on the Owner's request, moved aside byte for byte under its SHA-256 name with a record written first; a readable journal is never quarantined, and tasks left in flight still need their own disposition.
-  - IA-005 -- A task whose ladder starts no attempt in a dispatch stays ready with its locks released; a budget never blocks untouched work.
+  - IA-005 -- A task whose ladder starts no attempt in a dispatch stays ready, keeping its locks under round-execution.json release_on; a budget never blocks untouched work.
   - IA-006 -- The worktree cap equals round-execution.json capacity.max_workers; worktrees retained for review or disposition, and those left by a provably gone attempt process, hold no capacity, so every admitted worker can run beside pending reviews.
 ---
 
@@ -81,7 +81,7 @@ Experimental agent work had no registered way to finish, recover, or fit in capa
    round controller, so it never races a live dispatch.
    - `--task T --as retry|escalate` disposes of one agent task: one with an open attempt,
      one left in progress, or one that is `experimental_blocked`. It releases the attempt
-     worktrees and locks.
+     worktrees; its locks follow `round-execution.json` release_on.
    - A retry returns the task to `ready`. Attempts are numbered for the task's lifetime, so
      the Article 19 ladder continues rather than restarting. Once the ladder is spent, a
      retry refuses: a further try is a new task.
@@ -91,7 +91,9 @@ Experimental agent work had no registered way to finish, recover, or fit in capa
    withdrawal record with the time and the withdrawn activation's digests, then removes the
    activation durably.
 5. **Untouched work stays ready.** When a budget or setup refusal means a task's ladder
-   starts no attempt in a dispatch, the task returns to `ready` with its locks released.
+   starts no attempt in a dispatch, the task returns to `ready` and keeps its locks, which
+   `round-execution.json` release_on frees only on completion, escalation, a gap pause or
+   cancellation; the next dispatch reuses them.
 6. **Capacity.** The worktree cap mirrors `round-execution.json` capacity.max_workers,
    pinned by a contract test, replacing D-52's value of 3. A worktree retained after its
    attempt settles holds no capacity, and neither does one left by an attempt process that is
