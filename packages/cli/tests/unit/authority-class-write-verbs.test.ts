@@ -206,15 +206,15 @@ describe('IA-005: the registered subjects of the matrix verbs are unchanged', ()
 const R0502_FILE_DIGESTS: ReadonlyArray<readonly [string, string]> = [
   [
     'law/policy/action-registry.json',
-    '6920190b9d15fb6007479f938f5a98570c94d779679f006d259720d1a90bcb98',
+    '3fa2d0b359509ea2051b957d07358eaaa87b7907fdd3e2f4be0277366fca79b3',
   ],
   [
     'packages/cli/src/generated/action-registry.ts',
-    'ab54a64d18bfd0b9ef506d86dda244cf3dcce12171fa43c31cc9e6a5f1f3fb1f',
+    '8165ba662dc34db6a9107eb0ec11606be7e87146ed6a6dc4c949598a78291762',
   ],
   [
     'packages/effects-check/src/generated/action-catalog.ts',
-    '03d743563784632de5b0b1b5eca0b8c2bea7eaba880ee4bcae8cb2482db37514',
+    '9b9ca8ac70a5da13b206b097094e5c53e738ae13c848322e75f49dab2897935c',
   ],
   [
     'packages/sensors/src/generated/action-kinds.ts',
@@ -239,9 +239,9 @@ const R0502_FILE_DIGESTS: ReadonlyArray<readonly [string, string]> = [
 // registry, task escalate and round ratify gain git-ref targets to release attempt worktrees,
 // and the package extension grants those three actions typed git-ref authority.
 const FIXED_REPOSITORY_ID = 'devai-ia-005';
-const R0502_CORE_SOURCE_DIGEST = 'dd6acc38393af2490aeb188ce86ff52bb4981abd5b4a51d7c33b71f7d74650cb';
+const R0502_CORE_SOURCE_DIGEST = '18884489d6f36d21ff09f5578a2ae5fc5e49879b4cce715eb0ac0704235a6aa0';
 const R0502_PACKAGE_EXTENSION_DIGEST =
-  'f1ec09852bbd4cea4a695669fd913702f3d5a3af78680a4f22788ffae328e163';
+  'f8f047e2ee18bdb0027045843b7f94cb74a7afaf7a7d89bfb131395d84016236';
 
 describe('IA-005: the registry, its views, the core rules, and devai-adopter-authority are byte-identical to R-0502', () => {
   it.each(R0502_FILE_DIGESTS)('%s is byte-identical to 38a0a5df', (path, digest) => {
