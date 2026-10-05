@@ -5,6 +5,7 @@ import {
   inspectLocks,
   listLocks,
   lockIdentity,
+  openReleaseJournal,
   renewLocks,
   taskLockTargets,
 } from './locks.js';
@@ -20,7 +21,7 @@ import {
   recordLockDenial,
   releaseRoundController,
 } from './round-controller.js';
-import { listTaskRecords, loadTask, saveTask, type TaskRecord } from './tasks.js';
+import { escalateTask, listTaskRecords, loadTask, saveTask, type TaskRecord } from './tasks.js';
 import {
   escalateRoundTask,
   requireActiveTaskRound,
@@ -99,18 +100,30 @@ const LOCK_HOLDING_STATUSES = new Set<TaskRecord['status']>([
   'experimental_blocked',
 ]);
 
-/** True when every key still holds exactly the record the task last held there. */
-function exactLocksHeld(
+/**
+ * True when every key is accounted for: it still holds exactly the record the task last
+ * held there, or, after a transition that releases locks, that exact record was
+ * released by the task's own release (and so was held up to it).
+ */
+function locksAccountedFor(
   locksDir: string,
   task: TaskRecord,
   targets: readonly string[],
   held: ReadonlyMap<string, string>,
+  releasedByTask: ReadonlySet<string>,
 ): boolean {
-  const current = inspectLocks({ locksDir, taskId: task.id, targets });
-  return (
-    current.lost.length === 0 &&
-    current.held.every((entry) => held.get(entry.target) === entry.identity)
+  const current = new Map(
+    inspectLocks({ locksDir, taskId: task.id, targets }).held.map((entry) => [
+      entry.target,
+      entry.identity,
+    ]),
   );
+  return targets.every((target) => {
+    const identity = held.get(target);
+    return (
+      identity !== undefined && (current.get(target) === identity || releasedByTask.has(identity))
+    );
+  });
 }
 
 /**
@@ -118,8 +131,10 @@ function exactLocksHeld(
  * lock TTL is never taken over. A lock found missing, held by another task, or
  * replaced by any record other than the one this task last held is a lost lock: the
  * dispatch result cannot claim exclusive resources it no longer had. The final check
- * runs whatever status the dispatch left, except a transition that released the
- * locks itself (`round-execution.json` resources.release_on).
+ * runs whatever status the dispatch left. A transition that released the locks
+ * (`round-execution.json` resources.release_on) is accepted only if the task's own
+ * release removed exactly the records it held; a completion recorded after a takeover
+ * released nothing, and fails.
  */
 async function dispatchWithLockRenewal(
   options: RunRoundTasksOptions,
@@ -130,6 +145,7 @@ async function dispatchWithLockRenewal(
   const initial = inspectLocks({ locksDir, taskId: task.id, targets });
   const held = new Map(initial.held.map((entry) => [entry.target, entry.identity]));
   let lost = initial.lost.length > 0;
+  const journal = openReleaseJournal();
   const renew = (): void => {
     if (lost || targets.length === 0) return;
     try {
@@ -157,13 +173,18 @@ async function dispatchWithLockRenewal(
     result = { ok: false, code };
   } finally {
     clearInterval(timer);
+    journal.close();
   }
   if (!lost && targets.length > 0) {
     try {
-      const status = loadTask(options.repoRoot, task.id).status;
-      if (!LOCK_RELEASE_STATUSES.includes(status)) {
-        lost = !exactLocksHeld(locksDir, task, targets, held);
-      }
+      const released = LOCK_RELEASE_STATUSES.includes(loadTask(options.repoRoot, task.id).status);
+      lost = !locksAccountedFor(
+        locksDir,
+        task,
+        targets,
+        held,
+        released ? journal.released : new Set(),
+      );
     } catch {
       lost = true;
     }
@@ -291,10 +312,16 @@ async function runControlledRound(
     const result = await dispatchWithLockRenewal(options, running);
     if (!result.ok) {
       const status = loadTask(options.repoRoot, running.id).status;
-      // A pass recorded without exclusive resources is never left to finish or merge.
-      const lostAfterHandoff =
-        result.code === 'TASK_RESOURCE_LOCK_LOST' && LOCK_HOLDING_STATUSES.has(status);
-      if (status === 'in_progress' || lostAfterHandoff) {
+      const lost = result.code === 'TASK_RESOURCE_LOCK_LOST';
+      if (lost && status === 'completed') {
+        // A completion recorded without exclusive resources is withdrawn for review;
+        // the lifecycle forbids leaving `completed`, so this bypasses its guard.
+        escalateTask({ repoRoot: options.repoRoot, taskId: running.id });
+      } else if (
+        status === 'in_progress' ||
+        // A pass recorded without exclusive resources is never left to finish or merge.
+        (lost && (LOCK_HOLDING_STATUSES.has(status) || status === 'rgr_pending'))
+      ) {
         escalateRoundTask({ repoRoot: options.repoRoot, round: roundId, taskId: running.id });
       }
     }

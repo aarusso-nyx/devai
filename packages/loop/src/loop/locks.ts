@@ -344,6 +344,26 @@ export function inspectLocks(opts: {
   return { held, lost };
 }
 
+const releaseJournals = new Set<Set<string>>();
+
+export interface ReleaseJournal {
+  /** Identities of the lock records released through `releaseLocks` while open. */
+  readonly released: ReadonlySet<string>;
+  close(): void;
+}
+
+/**
+ * Note, until closed, the identity of every lock record a task releases through
+ * `releaseLocks` in this process. That release removes only the exact record the task
+ * still holds, so a journaled record was held up to its release; a record that left
+ * its key any other way was displaced first.
+ */
+export function openReleaseJournal(): ReleaseJournal {
+  const released = new Set<string>();
+  releaseJournals.add(released);
+  return { released, close: () => releaseJournals.delete(released) };
+}
+
 /** Release every record the task still holds; records another task took over stay. */
 export function releaseLocks(opts: { locksDir: string; taskId: string }): readonly LockRecord[] {
   const released: LockRecord[] = [];
@@ -361,6 +381,7 @@ export function releaseLocks(opts: { locksDir: string; taskId: string }): readon
       }) === 'swapped'
     ) {
       released.push(observed.record);
+      for (const journal of releaseJournals) journal.add(observed.identity);
     }
   }
   return released;
