@@ -1,8 +1,8 @@
 # CMP-0006 — complete open-issue closure
 
-Status: source campaign active under the [standing Owner execution decision](execution-discipline.md). Six source checkpoints are ratified; TASK-0624 is committed pending acceptance under that mandate after central review. Completed contributions are integrated locally; no main merge, formal round closure or publication is claimed.
+Status: closed. The Owner closed CMP-0006 on 2026-10-04 after v1.9.0, and the [campaign ledger](../../../../product/campaigns/CMP-0006-open-issue-closure/campaign.json) reads `closed`. Of the 22 snapshot issues, 16 closed (15 completed, #253 not_planned); six stayed open as follow-up issues outside any campaign: #235, #236, #237, #245, #246 and #249. The campaign-close section of the [decision register](decision-register.md) records each round's disposition. The planning text below is kept as the campaign's history.
 
-The complete live snapshot contains 22 open issues (#233-#254). Five later Owner comments have been incorporated. There are 21 remediation/acceptance issues and one Owner not-planned disposition (#253); none is silently dropped.
+The entry snapshot contained 22 open issues (#233-#254). Five later Owner comments were incorporated. There were 21 remediation/acceptance issues and one Owner not-planned disposition (#253); none was silently dropped.
 
 Artifacts: [campaign ledger](../../../../product/campaigns/CMP-0006-open-issue-closure/campaign.json), [coverage map](../../../../product/campaigns/CMP-0006-open-issue-closure/coverage.md), [snapshot](../../../../product/campaigns/CMP-0006-open-issue-closure/issue-snapshot.json), [linked predecessor evidence](../../../../product/campaigns/CMP-0006-open-issue-closure/linked-evidence.json), [decision register](decision-register.md), [round/wave cards](rounds-and-waves.md), [source map](source-map.md), [closure register](closure-register.md), [revalidation](../../../../product/campaigns/CMP-0006-open-issue-closure/revalidation.json).
 
@@ -71,9 +71,9 @@ CTG-0624 supplies the bounded enforcement/generation support. See the
 and [decision register](decision-register.md). The two-PR discipline is accepted: cumulative remediation first, then the
 post-publication verifier repin. Main ancestry and release order remain intact.
 
-Current scope is 9 rounds, 22 CTGs and 50 tasks; CTG-0624 added three integration tasks; CTG-0625/CTG-0626 add four distinct trace repair/adoption tasks to the original 19-CTG/43-task draft. Current source checkpoints are recorded in checkpoint-register.md; no formal closure is inferred.
+The final scope was 9 rounds, 22 CTGs and 50 tasks; CTG-0624 added three integration tasks; CTG-0625/CTG-0626 added four distinct trace repair/adoption tasks to the original 19-CTG/43-task draft. Source checkpoints are recorded in checkpoint-register.md; the Owner closed the campaign on 2026-10-04.
 
-Final revalidation observes #253 already closed not_planned by aarusso-nyx at 2026-10-01T21:27:31Z, event 32290441966. Preserve that externally performed disposition; no duplicate issue-state effect is required. The original scope is 22 issues, and 21 remain open. All five later Owner comments, including the now-closed issue, are retained in the complete comment refresh.
+Final revalidation observed #253 already closed not_planned by aarusso-nyx at 2026-10-01T21:27:31Z, event 32290441966. That externally performed disposition is preserved; no duplicate issue-state effect was required. The original scope was 22 issues, of which 21 were open at that revalidation. All five later Owner comments, including the now-closed issue, are retained in the complete comment refresh.
 
 Fresh-session entry: [self-contained handoff](fresh-session-handoff.md).
 The two delivery PR populations and checkpoint/closure distinctions are fixed
