@@ -628,3 +628,23 @@ describe('#264 review: durability, decisions, exclusion and the measured receipt
     expect(changed.map((entry) => entry['path'])).not.toContain(RECEIPT);
   }, 180_000);
 });
+
+describe('#264: the journal records the post-merge hook where it is installed', () => {
+  it('resolves the git hooks directory, or .husky/post-merge in a Husky repository', () => {
+    const repo = realpathSync(mkdtempSync(join(tmpdir(), 'devai-upgrade-hook-path-')));
+    roots.push(repo);
+    execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo, stdio: 'pipe' });
+    const runtime = join(repo, '.git/devai');
+    expect(postMergeAdapterFiles(repo)).toEqual([
+      join(repo, '.git/hooks/post-merge'),
+      join(runtime, 'post-merge.key'),
+      join(runtime, 'issue-post-merge-receipt.cjs'),
+    ]);
+    mkdirSync(join(repo, '.husky'));
+    expect(postMergeAdapterFiles(repo)).toEqual([
+      join(repo, '.husky/post-merge'),
+      join(runtime, 'post-merge.key'),
+      join(runtime, 'issue-post-merge-receipt.cjs'),
+    ]);
+  });
+});
