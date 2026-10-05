@@ -782,8 +782,11 @@ function renderExecutorKinds(policy) {
         when_not_to_use:
           'Do not use it to bypass round containment, role authority, or evidence requirements.',
         failure_unknown_review_skipped_na_semantics: outcomeSemantics(),
+        // round run refuses agent tasks; they run only through experimental dispatch.
         example: code(
-          'devai round run --round R-1000 --repo-root . --as-role owner --write --format json',
+          id === 'agent'
+            ? 'devai round dispatch --round R-1000 --repo-root . --as-role owner --write --experimental --format json'
+            : 'devai round run --round R-1000 --repo-root . --as-role owner --write --format json',
         ),
         canonical_source_link: sourceRefs(policy),
         related_workflow: code('round'),
