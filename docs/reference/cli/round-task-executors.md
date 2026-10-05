@@ -473,6 +473,17 @@ in the invocation may spend (`EXPERIMENTAL_USAGE_UNVERIFIABLE`). A failure after
 started leaves the attempt uncertain and the task `experimental_blocked`, with the worktree kept.
 Nothing is pushed, merged, or retried automatically.
 
+A provider starts with an allowlisted environment, never the host's. It gets only `PATH`,
+`HOME`, `USER`, `LOGNAME`, `SHELL`, `TMPDIR`, `LANG`, `LC_*`, `TERM`, the proxy and CA variables,
+and its own `CLAUDE_CONFIG_DIR` or `CODEX_HOME`, so it runs on its stored login while tokens such
+as `GH_TOKEN` and cloud credentials stay out. Only a single explicit terminal event in a stream
+read whole completes an attempt: a stream that outgrew its retained bound or carries a line
+that is not a JSON object fails with `AGENT_CLI_OUTPUT_TRUNCATED` or `AGENT_CLI_OUTPUT_MALFORMED`.
+If the journal cannot record a started provider, its process group is stopped before the attempt
+fails with `AGENT_CLI_SPAWN_RECORD_FAILED`. A provider stopped at its wall clock whose process
+group cannot be confirmed gone fails with `PROCESS_GROUP_TERMINATION_UNCONFIRMED`, an error
+after spawn, so the attempt stays uncertain and keeps its worktree.
+
 ## Completing agent work
 
 An accepted agent task completes through the registered path (ADR-MDL-0007):
@@ -484,7 +495,9 @@ An accepted agent task completes through the registered path (ADR-MDL-0007):
 3. `task finish --round <round-id> --task <task-id> --evidence <EV-id> --as-role engineer --write`
    records the completion.
 
-`task finish` refuses an agent task with no accepted ratification
+`task finish` holds the round controller for an agent task, so it refuses with
+`TASK_ROUND_CONTROLLER_BUSY` while another holder owns the round, and it re-reads the task under
+the controller. It refuses an agent task with no accepted ratification
 (`TASK_RATIFICATION_REQUIRED`), with no `EV-` merge evidence (`TASK_MERGE_EVIDENCE_REQUIRED`), or
 with an open journal attempt (`TASK_DISPATCH_UNCERTAIN`). On completion it writes
 `.devai/state/round-runs/<round>/completions/<task>.json`, binding the ratification digest and
@@ -533,7 +546,10 @@ devai round dispatch deactivate --repo-root . --as-role owner --write --experime
   repository returns to the supported serial runner. A dispatch already running keeps the
   activation it read at start. Activation writes and withdrawals take the same lock,
   `.devai/state/experimental/activation.lock`, and refuse with `EXPERIMENTAL_ACTIVATION_BUSY`
-  while the other holds it. A withdrawal removes only the exact record it names.
+  while the other holds it. A withdrawal removes only the exact record it names. Nothing takes the
+  lock over: a lock left by a writer that is gone refuses with
+  `EXPERIMENTAL_ACTIVATION_LOCK_STALE`, naming the file and the command that removes it once no
+  activation or withdrawal is running.
 
 ### Known limitations of experimental execution
 
@@ -553,17 +569,11 @@ devai round dispatch deactivate --repo-root . --as-role owner --write --experime
   `.devai/state`, but not a newly created `.devai/state` itself in `.devai`, which lies outside
   the `fs:f5-state` domain. Initialize the state root before experimental dispatch:
   `init apply harness` writes `.devai/state/counters.json`.
-
-A provider starts with an allowlisted environment, never the host's. It gets only `PATH`,
-`HOME`, `USER`, `LOGNAME`, `SHELL`, `TMPDIR`, `LANG`, `LC_*`, `TERM`, the proxy and CA variables,
-and its own `CLAUDE_CONFIG_DIR` or `CODEX_HOME`, so it runs on its stored login while tokens such
-as `GH_TOKEN` and cloud credentials stay out. Only a single explicit terminal event in a stream
-read whole completes an attempt: a stream that outgrew its retained bound or carries a line
-that is not a JSON object fails with `AGENT_CLI_OUTPUT_TRUNCATED` or `AGENT_CLI_OUTPUT_MALFORMED`.
-If the journal cannot record a started provider, its process group is stopped before the attempt
-fails with `AGENT_CLI_SPAWN_RECORD_FAILED`. A provider stopped at its wall clock whose process
-group cannot be confirmed gone fails with `PROCESS_GROUP_TERMINATION_UNCONFIRMED`, an error
-after spawn, so the attempt stays uncertain and keeps its worktree.
+- **Concurrent writers of one record can replace each other.** A create-only record is
+  published by a check for its absence followed by a rename, because the authority layer offers
+  no atomic no-replace publish yet. This is a follow-up.
+- **The worktree registry is not serialized across processes.** Its read-modify-write can lose an
+  entry when rounds run concurrently. This is a follow-up.
 
 ## Campaigns, materialization, and ratification
 
