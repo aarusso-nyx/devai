@@ -18,8 +18,10 @@ import {
   assertLockDenialsValid,
   clearLockDenials,
   lockDenialCount,
+  pendingPriorityBumps,
   recordLockDenial,
   releaseRoundController,
+  settlePendingPriorityBump,
 } from './round-controller.js';
 import { escalateTask, listTaskRecords, loadTask, saveTask, type TaskRecord } from './tasks.js';
 import {
@@ -203,27 +205,31 @@ export async function runRoundTasks(options: RunRoundTasksOptions): Promise<RunR
   }
 }
 
+function bumpedPriority(task: TaskRecord): number {
+  return Math.min(100, (task.priority ?? 0) + 1);
+}
+
 /**
  * A denied task is re-queued; after repeated denials it is escalated for human
- * review (Article 25; round-execution.json resources). The re-queue returns the
- * task to `ready` at once; its priority bump is applied by `bumpRequeuedPriority`
- * after the run, because priority is part of the bound request and changing it
- * mid-run would invalidate every later admission against the same plan.
+ * review (Article 25; round-execution.json resources). The denial count and the
+ * priority bump the re-queue owes persist in one write before the task returns to
+ * `ready`, so a crash after the re-queue never loses the bump. The bump itself waits
+ * for `applyPendingPriorityBumps`, because priority is part of the bound request and
+ * changing it mid-run would invalidate every later admission against the same plan.
  */
 function handleLockDenial(
   options: RunRoundTasksOptions,
   roundId: string,
   taskId: string,
-  requeued: string[],
 ): RoundTaskRunResult {
-  const denials = recordLockDenial(options.repoRoot, roundId, taskId);
+  const task = loadTask(options.repoRoot, taskId);
+  const denials = recordLockDenial(options.repoRoot, roundId, taskId, bumpedPriority(task));
   if (denials >= LOCK_DENIAL_ESCALATION_THRESHOLD) {
     escalateRoundTask({ repoRoot: options.repoRoot, round: roundId, taskId });
     clearLockDenials(options.repoRoot, roundId, taskId);
     return { task_id: taskId, ok: false, code: 'TASK_RESOURCE_LOCK_DENIED_REPEATED' };
   }
-  saveTask(options.repoRoot, { ...loadTask(options.repoRoot, taskId), status: 'ready' });
-  requeued.push(taskId);
+  saveTask(options.repoRoot, { ...task, status: 'ready' });
   return { task_id: taskId, ok: false, code: 'TASK_RESOURCE_LOCK_DENIED' };
 }
 
@@ -232,11 +238,13 @@ function handleLockDenial(
  * and re-queued in two writes; a crash or a failed counter write between them would
  * strand the task, because an all-ready run selects only `ready` tasks and a stranded
  * dependency refuses planning. Runs under the round controller, before the plan binds
- * requests, so the re-queue carries its priority bump at once. The interrupted denial
- * is not counted again: it was counted unless the counter write itself failed. An
- * explicit selection naming a `lock_denied` task still refuses with `TASK_NOT_READY`.
+ * requests. A denial whose count was written already owes its bump through
+ * `applyPendingPriorityBumps`; one interrupted before that write is neither counted
+ * nor owed, and is bumped here. An explicit selection naming a `lock_denied` task still
+ * refuses with `TASK_NOT_READY`.
  */
 function requeueStrandedLockDenials(repoRoot: string, roundId: string): void {
+  const owed = pendingPriorityBumps(repoRoot, roundId);
   for (const task of admissionPopulation(repoRoot)) {
     if (task.round_id !== roundId || task.status !== 'lock_denied') continue;
     if (lockDenialCount(repoRoot, roundId, task.id) >= LOCK_DENIAL_ESCALATION_THRESHOLD) {
@@ -247,17 +255,29 @@ function requeueStrandedLockDenials(repoRoot: string, roundId: string): void {
     saveTask(repoRoot, {
       ...task,
       status: 'ready',
-      priority: Math.min(100, (task.priority ?? 0) + 1),
+      ...(!owed.has(task.id) && { priority: bumpedPriority(task) }),
     });
   }
 }
 
-/** Raise each re-queued task's priority by one once no admission still binds this plan. */
-function bumpRequeuedPriority(repoRoot: string, requeued: readonly string[]): void {
-  for (const taskId of requeued) {
-    const task = loadTask(repoRoot, taskId);
-    if (task.status !== 'ready') continue;
-    saveTask(repoRoot, { ...task, priority: Math.min(100, (task.priority ?? 0) + 1) });
+/**
+ * Apply every priority bump a re-queue owes, once no admission binds a plan: at the
+ * start of a run, before planning, and at its end. Idempotent: a bump raises the
+ * priority to the recorded value, never past it, so a crash between applying and
+ * settling a bump never applies it twice. A task still `lock_denied` keeps its bump
+ * until it is re-queued; a task no longer waiting to run settles it unapplied.
+ */
+function applyPendingPriorityBumps(repoRoot: string, roundId: string): void {
+  const owed = pendingPriorityBumps(repoRoot, roundId);
+  if (owed.size === 0) return;
+  const tasks = new Map(admissionPopulation(repoRoot).map((task) => [task.id, task]));
+  for (const [taskId, priority] of owed) {
+    const task = tasks.get(taskId);
+    if (task?.status === 'lock_denied') continue;
+    if (task?.status === 'ready' && (task.priority ?? 0) < priority) {
+      saveTask(repoRoot, { ...task, priority });
+    }
+    settlePendingPriorityBump(repoRoot, roundId, taskId);
   }
 }
 
@@ -290,6 +310,7 @@ async function runControlledRound(
   const workers = resolveRoundWorkers(options.maxWorkers);
   assertLockDenialsValid(options.repoRoot, roundId);
   if (options.taskIds === undefined) requeueStrandedLockDenials(options.repoRoot, roundId);
+  applyPendingPriorityBumps(options.repoRoot, roundId);
   const population = admissionPopulation(options.repoRoot);
   const plan = planRoundTaskAdmission({
     roundId,
@@ -298,7 +319,6 @@ async function runControlledRound(
   });
   const ordered = plan.orderedTaskIds.map((id) => requiredTask(population, id));
   const blocked = new Set<string>();
-  const requeued: string[] = [];
   const results = new Map<string, RoundTaskRunResult>();
   const pending = ordered.map((task) => task.id);
   const active = new Map<string, Promise<void>>();
@@ -370,7 +390,7 @@ async function runControlledRound(
             taskId,
           });
       if (started.lock_denied.length > 0) {
-        finish(handleLockDenial(options, roundId, taskId, requeued));
+        finish(handleLockDenial(options, roundId, taskId));
         continue;
       }
       clearLockDenials(options.repoRoot, roundId, taskId);
@@ -407,7 +427,7 @@ async function runControlledRound(
     await Promise.allSettled(active.values());
     throw error;
   }
-  bumpRequeuedPriority(options.repoRoot, requeued);
+  applyPendingPriorityBumps(options.repoRoot, roundId);
   return {
     ok: ordered.every((task) => results.get(task.id)?.ok === true),
     round_id: roundId,
