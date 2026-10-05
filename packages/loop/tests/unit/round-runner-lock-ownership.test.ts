@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -171,6 +171,100 @@ describe('round runner lock ownership boundaries', () => {
         results: [{ task_id: value.id, ok: false, code: 'TASK_RESOURCE_LOCK_DENIED' }],
       });
       expect(dispatch).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe('attempts a stopped runner left fenced are reconciled before planning', () => {
+  const FENCES = '.devai/state/lock-fences';
+
+  /** The fence a runner leaves while it dispatches, and the receipt of the task's own release. */
+  function leaveFence(root: string, taskId: string, released: boolean): void {
+    mkdirSync(join(root, FENCES), { recursive: true });
+    const fence = { task_id: taskId, round_id: ROUND, attempt: 'attempt-1', targets: ['F2:MOD-a'] };
+    writeFileSync(join(root, FENCES, `${taskId}.json`), JSON.stringify(fence));
+    if (released) {
+      writeFileSync(
+        join(root, FENCES, `${taskId}.attempt-1.F2~MOD-a.json.released`),
+        JSON.stringify(fence),
+      );
+    }
+  }
+
+  function fenceFiles(root: string): readonly string[] {
+    return existsSync(join(root, FENCES)) ? readdirSync(join(root, FENCES)) : [];
+  }
+
+  it('withdraws a completion whose fenced lock was taken before it was released', async () => {
+    const root = repository();
+    fixedDate();
+
+    await withAuthorityHostTestScope(async () => {
+      saveTask(root, { ...task('TASK-9311'), status: 'completed' });
+      acquireLocks({ locksDir: lockDir(root), taskId: 'TASK-9399', targets: ['F2:MOD-a'] });
+      leaveFence(root, 'TASK-9311', false);
+
+      const result = await runRoundTasks({ repoRoot: root, round: ROUND, dispatch: vi.fn() });
+
+      expect(result.reconciled).toEqual([
+        { task_id: 'TASK-9311', ok: false, code: 'TASK_RESOURCE_LOCK_LOST' },
+      ]);
+      expect(result.ok).toBe(false);
+      expect(loadTask(root, 'TASK-9311').status).toBe('escalated');
+      expect(listLocks({ locksDir: lockDir(root) })).toMatchObject([{ task_id: 'TASK-9399' }]);
+      expect(fenceFiles(root)).toEqual([]);
+    });
+  });
+
+  it('escalates a pass handed off for merge whose fenced lock was taken', async () => {
+    const root = repository();
+    fixedDate();
+
+    await withAuthorityHostTestScope(async () => {
+      saveTask(root, { ...task('TASK-9312'), status: 'merging' });
+      acquireLocks({ locksDir: lockDir(root), taskId: 'TASK-9399', targets: ['F2:MOD-a'] });
+      leaveFence(root, 'TASK-9312', false);
+
+      const result = await runRoundTasks({ repoRoot: root, round: ROUND, dispatch: vi.fn() });
+
+      expect(result.reconciled).toEqual([
+        { task_id: 'TASK-9312', ok: false, code: 'TASK_RESOURCE_LOCK_LOST' },
+      ]);
+      expect(loadTask(root, 'TASK-9312').status).toBe('escalated');
+    });
+  });
+
+  it('keeps a completion whose fenced lock the task released itself', async () => {
+    const root = repository();
+    fixedDate();
+
+    await withAuthorityHostTestScope(async () => {
+      saveTask(root, { ...task('TASK-9313'), status: 'completed' });
+      leaveFence(root, 'TASK-9313', true);
+
+      const result = await runRoundTasks({ repoRoot: root, round: ROUND, dispatch: vi.fn() });
+
+      expect(result.reconciled).toBeUndefined();
+      expect(loadTask(root, 'TASK-9313').status).toBe('completed');
+      expect(fenceFiles(root)).toEqual([]);
+    });
+  });
+
+  it('releases the locks of a completion that stopped before releasing them', async () => {
+    const root = repository();
+    fixedDate();
+
+    await withAuthorityHostTestScope(async () => {
+      saveTask(root, { ...task('TASK-9314'), status: 'completed' });
+      acquireLocks({ locksDir: lockDir(root), taskId: 'TASK-9314', targets: ['F2:MOD-a'] });
+      leaveFence(root, 'TASK-9314', false);
+
+      const result = await runRoundTasks({ repoRoot: root, round: ROUND, dispatch: vi.fn() });
+
+      expect(result.reconciled).toBeUndefined();
+      expect(loadTask(root, 'TASK-9314').status).toBe('completed');
+      expect(listLocks({ locksDir: lockDir(root) })).toEqual([]);
+      expect(fenceFiles(root)).toEqual([]);
     });
   });
 });
