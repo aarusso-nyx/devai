@@ -164,7 +164,8 @@
                       "task",
                       "catalog",
                       "triage",
-                      "backlog"
+                      "backlog",
+                      "campaign"
                     ]
                   }
                 ]
