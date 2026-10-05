@@ -123,6 +123,8 @@ function agentTask(root: string, id: string, overrides: Partial<TaskRecord> = {}
       prompt_composition_id: 'PC-0000000000000000',
       max_iterations: 4,
       capabilities: ['repository-context'],
+      // ADR-MDL-0005 D-8: the recipe is the prompt's payload layer, so it is required.
+      recipe_name: 'devai-fix',
     },
     ...overrides,
   } as TaskRecord;
