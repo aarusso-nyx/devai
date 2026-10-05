@@ -726,6 +726,7 @@ describe('Doctor post-merge bindings made in another checkout (#266)', () => {
     const attestation = JSON.parse(readFileSync(path, 'utf8')) as JsonObject;
     attestation['repository'] = elsewhere;
     attestation['adapter_id'] = `post-merge-${'0'.repeat(16)}`;
+    attestation['hook_path'] = join(elsewhere, '.husky/post-merge');
     put(repo, POST_MERGE_CONFIG, attestation);
     return elsewhere;
   }
@@ -748,7 +749,7 @@ describe('Doctor post-merge bindings made in another checkout (#266)', () => {
       ok: false,
       info: {
         local_post_merge_scope: 'this-checkout',
-        local_post_merge_state: ['key', 'issuer', 'git-hook', 'recorded-hook'],
+        local_post_merge_state: ['key', 'issuer', 'git-hook'],
         local_post_merge_enforced: false,
         local_post_merge_facts: {
           key_present: true,
@@ -764,7 +765,7 @@ describe('Doctor post-merge bindings made in another checkout (#266)', () => {
         POSTURE_ERROR,
         'POST_MERGE_ADAPTER_SIGNATURE_VALID_INVALID',
         'POST_MERGE_ADAPTER_REPOSITORY_BOUND_INVALID',
-        `POST_MERGE_ADAPTER_LOCAL_STATE_PRESENT: the post-merge attestation records ${elsewhere}, but this checkout carries post-merge adapter state (key, issuer, git-hook, recorded-hook), so the binding is verified here and refused; rebind it in the checkout that should hold it with \`${POST_MERGE_REBIND}\`, or run \`devai doctor\` in ${elsewhere}`,
+        `POST_MERGE_ADAPTER_LOCAL_STATE_PRESENT: the post-merge attestation records ${elsewhere}, but this checkout carries post-merge adapter state (key, issuer, git-hook), so the binding is verified here and refused; rebind it in the checkout that should hold it with \`${POST_MERGE_REBIND}\`, or run \`devai doctor\` in ${elsewhere}`,
       ]),
     );
     expect(result.errors?.join('\n')).not.toMatch(/ENOENT/u);
@@ -803,8 +804,7 @@ describe('Doctor post-merge bindings made in another checkout (#266)', () => {
         ok: false,
         info: {
           local_post_merge_scope: 'this-checkout',
-          local_post_merge_state:
-            manager === 'git' ? ['git-hook', 'recorded-hook'] : ['recorded-hook'],
+          local_post_merge_state: manager === 'git' ? ['git-hook'] : ['husky-hook'],
           local_post_merge_facts: { key_present: false, hook_present: true },
           github_actions_enforced: true,
           reason_ids: ['POST_MERGE_ADAPTER_LOCAL_STATE_PRESENT'],
