@@ -281,10 +281,14 @@ describe('dispatch journal', () => {
     expect(fileSync).toBeGreaterThan(fileOpened);
     expect(dirOpened).toBeGreaterThan(fileSync);
     expect(effects[dirOpened + 1]?.symbol).toBe('fsyncSync');
-    // Each created parent is made durable in its own parent before the journal is written.
-    for (const parent of [join(root, '.devai'), join(root, '.devai/state'), journalDir]) {
-      expect(opened(join(parent, '..')), parent).toBeGreaterThanOrEqual(0);
+    // Each created directory below the state root is made durable in its parent before the
+    // journal is written; nothing above .devai/state is touched, since state authority
+    // covers only that root.
+    for (const parent of [join(root, '.devai/state'), join(root, '.devai/state/round-runs')]) {
+      expect(opened(parent), parent).toBeGreaterThanOrEqual(0);
     }
+    expect(opened(root)).toBe(-1);
+    expect(opened(join(root, '.devai'))).toBe(-1);
     // A later append to the existing journal does not need the directory again.
     effects.length = 0;
     await recording(effects, () => {
