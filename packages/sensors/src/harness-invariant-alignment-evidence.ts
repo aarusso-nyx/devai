@@ -1,4 +1,5 @@
 import { execFileSync } from '@devai-nyx/authority';
+import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync, statSync, type Stats } from 'node:fs';
 import { join, relative } from 'node:path';
 import {
@@ -80,8 +81,38 @@ interface EvidenceChainRecord {
   readonly status?: unknown;
   readonly timestamp?: unknown;
   readonly context?: { readonly git?: { readonly head_sha?: unknown } };
-  readonly artifacts?: ReadonlyArray<{ readonly path?: unknown }>;
+  readonly artifacts?: ReadonlyArray<{ readonly path?: unknown; readonly sha256?: unknown }>;
   readonly notes?: readonly unknown[];
+}
+
+/**
+ * The `sense.readings.record` receipts that bind one stored reading file. Reading ids
+ * are content-derived, so the same store path is recorded again at every candidate
+ * whose reading has the same content, and the chain keeps every earlier receipt.
+ * Only a receipt whose digest names the file's current bytes binds it (ADR-SCR-0008,
+ * ADR-SCR-0013); a digest that names other bytes is a finding, never evidence. A chain
+ * whose receipts for the path carry no digest keeps the earlier first-receipt rule.
+ */
+function readingReceipts(
+  chainRecords: readonly EvidenceChainRecord[],
+  relativePath: string,
+  absolutePath: string,
+): readonly EvidenceChainRecord[] {
+  const receipts = chainRecords.filter(
+    (entry) =>
+      entry.action === 'sense.readings.record' &&
+      entry.artifacts?.some((artifact) => artifact.path === relativePath) === true,
+  );
+  const digestOf = (entry: EvidenceChainRecord): unknown =>
+    entry.artifacts?.find((artifact) => artifact.path === relativePath)?.sha256;
+  if (!receipts.some((entry) => typeof digestOf(entry) === 'string')) return receipts.slice(0, 1);
+  let bytes: string;
+  try {
+    bytes = createHash('sha256').update(readFileSync(absolutePath)).digest('hex');
+  } catch {
+    return [];
+  }
+  return receipts.filter((entry) => digestOf(entry) === bytes);
 }
 
 export function loadEvidence(repoRoot: string, dir: string): AlignmentEvidence[] {
@@ -97,8 +128,8 @@ export function loadEvidence(repoRoot: string, dir: string): AlignmentEvidence[]
     // their chain receipt remain deliberately non-promoting.
   }
 
-  return files.map(({ path, record }) => {
-    if (typeof record.candidate_sha === 'string') return record;
+  return files.flatMap(({ path, record }): AlignmentEvidence[] => {
+    if (typeof record.candidate_sha === 'string') return [record];
     const testResultId = record.id;
     const testResultCommit = record.env?.commit;
     if (typeof testResultId === 'string' && typeof testResultCommit === 'string') {
@@ -115,33 +146,39 @@ export function loadEvidence(repoRoot: string, dir: string): AlignmentEvidence[]
           ) === true,
       );
       if (receipt !== undefined) {
-        return {
-          ...record,
-          candidate_sha: testResultCommit,
-          completed_at:
-            typeof receipt.timestamp === 'string'
-              ? receipt.timestamp
-              : (record.completed_at ?? record.timestamp),
-          lifecycle: record.lifecycle ?? 'supported',
-        };
+        return [
+          {
+            ...record,
+            candidate_sha: testResultCommit,
+            completed_at:
+              typeof receipt.timestamp === 'string'
+                ? receipt.timestamp
+                : (record.completed_at ?? record.timestamp),
+            lifecycle: record.lifecycle ?? 'supported',
+          },
+        ];
       }
     }
     const relativePath = relative(repoRoot, path).replaceAll('\\', '/');
-    const receipt = chainRecords.find(
-      (entry) =>
-        entry.action === 'sense.readings.record' &&
-        entry.artifacts?.some((artifact) => artifact.path === relativePath) === true,
+    // One evidence view per binding receipt: the same bytes recorded at several
+    // candidates bind each of them, and an unbound reading stays as read.
+    const bound = readingReceipts(chainRecords, relativePath, path).flatMap(
+      (receipt): AlignmentEvidence[] => {
+        const candidateSha = receipt.context?.git?.head_sha;
+        if (typeof candidateSha !== 'string') return [];
+        return [
+          {
+            ...record,
+            candidate_sha: candidateSha,
+            completed_at:
+              typeof receipt.timestamp === 'string'
+                ? receipt.timestamp
+                : (record.completed_at ?? record.timestamp),
+          },
+        ];
+      },
     );
-    const candidateSha = receipt?.context?.git?.head_sha;
-    if (typeof candidateSha !== 'string') return record;
-    return {
-      ...record,
-      candidate_sha: candidateSha,
-      completed_at:
-        typeof receipt?.timestamp === 'string'
-          ? receipt.timestamp
-          : (record.completed_at ?? record.timestamp),
-    };
+    return bound.length > 0 ? bound : [record];
   });
 }
 
