@@ -65,6 +65,37 @@ export function buildAdditiveAuthorityRules(input: {
       rationale: 'Adopter typed git-ref authority for work task complete.',
     }),
     rule({
+      id: 'adopter-git-ref-work-task-escalate-1',
+      origin: 'additive-extension',
+      precedence: 500,
+      actionIds: ['task escalate'],
+      selector: gitSelector(repositoryId),
+      subjects: [harnessSubject(['engineer'])],
+      rationale:
+        'Typed git-ref authority to release an escalated agent task attempt worktree (ADR-MDL-0007).',
+    }),
+    rule({
+      id: 'adopter-git-ref-round-ratify-1',
+      origin: 'additive-extension',
+      precedence: 500,
+      actionIds: ['round ratify'],
+      selector: gitSelector(repositoryId),
+      subjects: [harnessSubject(['owner', 'architect'])],
+      rationale:
+        'Typed git-ref authority to release a rejected agent attempt worktree (ADR-MDL-0007).',
+    }),
+    rule({
+      id: 'adopter-git-ref-experimental-dispose-1',
+      origin: 'additive-extension',
+      precedence: 500,
+      actionIds: ['round dispatch dispose'],
+      selector: gitSelector(repositoryId),
+      subjects: [harnessSubject(['owner'])],
+      consent: { write: true, allow_publish: false, experimental: true },
+      rationale:
+        'Typed git-ref authority to release the attempt worktrees of a disposed experimental task (ADR-MDL-0007).',
+    }),
+    rule({
       id: 'adopter-git-ref-verify-translation-1',
       origin: 'additive-extension',
       precedence: 500,
