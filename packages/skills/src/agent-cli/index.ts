@@ -8,15 +8,20 @@ export type AgentCliUsageCounter =
   | { readonly value: number; readonly status: 'reported' | 'derived' }
   | { readonly value: null; readonly status: 'missing' };
 
-export interface AgentCliUsage {
+interface AgentCliUsageCounters {
   readonly usage_version: 2;
-  readonly counter_mode: 'per-attempt' | 'cumulative-delta';
-  readonly derivation?: string;
   readonly input_tokens: AgentCliUsageCounter;
   readonly output_tokens: AgentCliUsageCounter;
   readonly cache_read_tokens: AgentCliUsageCounter;
   readonly cache_write_tokens: AgentCliUsageCounter;
 }
+
+/** A cumulative-delta record must say how its delta was derived. */
+export type AgentCliUsage = AgentCliUsageCounters &
+  (
+    | { readonly counter_mode: 'per-attempt'; readonly derivation?: string }
+    | { readonly counter_mode: 'cumulative-delta'; readonly derivation: string }
+  );
 
 export type AgentCliCost =
   | { readonly amount: number; readonly currency: 'USD'; readonly source: 'provider-reported' }

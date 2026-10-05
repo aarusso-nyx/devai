@@ -87,16 +87,24 @@ export type UsageCounter =
   | { readonly value: number; readonly status: 'reported' | 'derived' }
   | { readonly value: null; readonly status: 'missing' };
 
-/** Version-2 usage for agent attempts, including cache counters and their provenance. */
-export interface UsageEvidenceV2 {
+interface UsageEvidenceV2Counters {
   readonly usage_version: 2;
-  readonly counter_mode: 'per-attempt' | 'cumulative-delta';
-  readonly derivation?: string;
   readonly input_tokens: UsageCounter;
   readonly output_tokens: UsageCounter;
   readonly cache_read_tokens: UsageCounter;
   readonly cache_write_tokens: UsageCounter;
 }
+
+/**
+ * Version-2 usage for agent attempts, including cache counters and their provenance.
+ * A cumulative-delta record computes its values from session totals, so it must say
+ * how (ADR-MDL-0005 D-7).
+ */
+export type UsageEvidenceV2 = UsageEvidenceV2Counters &
+  (
+    | { readonly counter_mode: 'per-attempt'; readonly derivation?: string }
+    | { readonly counter_mode: 'cumulative-delta'; readonly derivation: string }
+  );
 
 /** A cost the provider did not report is unknown, never 0. */
 export interface CostUnknown {
