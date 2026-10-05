@@ -3,8 +3,10 @@
 ## 2.0.0 — 2026-10-05
 
 DEVAI 2.0.0 marks the governed orchestrator: the round runner becomes a bounded controller with
-deterministic admission, race-free locks and capacity, and an Owner can opt a repository into
-experimental agent execution. No commit since v1.9.0 carries the breaking marker, so the commit
+deterministic admission and race-free locks, and an Owner can opt a repository into experimental
+agent execution. Worktree capacity matches `max_workers` within a round; admission across
+concurrent rounds is not yet serialized (see the known limitations below). No commit since v1.9.0
+carries the breaking marker, so the commit
 grammar's bump floor over this range is minor; the major version is the Owner's decision, taken
 because adopters see changed round-runner behavior and a new class of governed operations. A
 repository that never writes an activation record keeps the supported serial runner, under the
