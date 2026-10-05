@@ -10,7 +10,7 @@ because adopters see changed round-runner behavior and a new class of governed o
 repository that never writes an activation record keeps the supported serial runner, under the
 stricter lock and controller rules below.
 
-- Adopter-visible changes to `round run` (ADR-GOV-0025, ADR-MDL-0005, ADR-MDL-0007):
+- Adopter-visible changes to `round run` (`law/policy/round-execution.json`, ADR-MDL-0006):
   - Runtime locks cover every declared `(substrate, module)` pair (Constitution Article 25), taken
     all-or-nothing in canonical order and renewed during a dispatch, so an F2 and an F3 lock on one
     module no longer conflict and a displaced lock fails the task (`TASK_RESOURCE_LOCK_LOST`).
