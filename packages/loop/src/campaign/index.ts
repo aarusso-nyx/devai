@@ -146,6 +146,9 @@ export function campaignSemanticProblems(repoRoot: string, campaign: LoadedCampa
       ) {
         problems.push(`${wave.id} triplet must be architect, inspector, engineer`);
       }
+      if (wave.type === 'single-role' && wave.tasks.length !== 1) {
+        problems.push(`${wave.id} single-role wave must hold one task`);
+      }
       let upstream: string | null = null;
       for (const task of wave.tasks) {
         declare(task.id);
@@ -295,14 +298,29 @@ function sameQueueEntry(entry: BacklogEntry, record: TaskRecord): boolean {
   );
 }
 
+/** A queued entry carrying every field the canonical materializer would write for the record. */
+function completeQueueEntry(entry: BacklogEntry, record: TaskRecord): boolean {
+  return (
+    entry.status === 'queued' &&
+    entry.discipline === record.discipline &&
+    JSON.stringify(entry.target_modules) === JSON.stringify(record.target_modules) &&
+    JSON.stringify(entry.target_substrates) === JSON.stringify(record.target_substrates) &&
+    entry.db_isolation === record.db_isolation &&
+    entry.lifecycle === record.lifecycle &&
+    JSON.stringify(entry.acceptance_commands) === JSON.stringify(record.acceptance_commands)
+  );
+}
+
 /**
  * S4b: materialize one open campaign round through the round task queue. The plan must
  * pass the campaign checker's structural rules, and every record is validated and
  * checked against both stores — the task records and the backlog queue — before anything
  * is written, so a conflict on any task leaves the queue untouched. A task whose runtime
  * record already carries the identical request is reported as existing. The batch is
- * recoverable: a task whose identical queue entry was written before an interruption has
- * only its record completed, never a second entry.
+ * recoverable: a task whose complete queue entry was written before an interruption has
+ * only its record completed, never a second entry; a compatible but partial queued entry
+ * is enriched through the canonical queue materializer; and an entry the queue no longer
+ * holds as queued (for example completed) refuses.
  */
 export function materializeCampaignRound(options: {
   readonly repoRoot: string;
@@ -338,7 +356,12 @@ export function materializeCampaignRound(options: {
     }
     const current = runtime.get(record.id);
     if (current === undefined) {
-      if (entry !== undefined) queued.push(record.id);
+      if (entry === undefined) continue;
+      // Entries older than the status field are queued, as in the global picker.
+      if (entry.status !== undefined && entry.status !== 'queued') {
+        fail('TASK_QUEUE_MATERIALIZATION_CONFLICT');
+      }
+      if (completeQueueEntry(entry, record)) queued.push(record.id);
       continue;
     }
     const same =
@@ -352,9 +375,10 @@ export function materializeCampaignRound(options: {
   for (const record of records) {
     if (existing.includes(record.id)) continue;
     if (queued.includes(record.id)) {
-      // An interrupted batch already queued this task: complete its record only.
+      // An interrupted batch already wrote this task's complete entry: add its record only.
       saveTask(options.repoRoot, record);
     } else {
+      // A new task, or a compatible partial entry the canonical materializer enriches.
       materializeRoundQueueTask({ repoRoot: options.repoRoot, round: round.id, task: record });
     }
     materialized.push(record.id);
