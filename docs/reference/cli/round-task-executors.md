@@ -123,14 +123,17 @@ tasks are dispatched.
 Lock and controller records change only under a claim on the exact record read (kept in
 `.devai/state/lock-claims/` and the round's `controller-claims/`), so a stale reaper or a late
 renewal stands down instead of displacing a newer holder. A claim whose claimant provably stopped
-(a dead pid on this host, a reboot since, or a claim older than ten minutes) is broken by one writer
-at a time; a stale claim from another host, or one nobody can read, refuses with
-`TASK_RECORD_CLAIM_STALE`, naming the file to remove once no process there is still at work. A lock
-lost during execution fails the attempt with `TASK_RESOURCE_LOCK_LOST` whatever status the executor
-left, a completion included, and escalates the task instead of letting it merge. Every run first
-applies the priority bump a re-queue still owes; an all-ready run also re-queues tasks an
-interrupted denial left in `lock_denied`. A corrupt `lock-denials.json` refuses with
-`TASK_LOCK_DENIAL_STATE_INVALID`: repair the entry, or remove the file to reset every count.
+(a dead pid on this host, or a reboot since) is broken by one writer at a time, and a live claimant
+is never displaced; a claim older than ten minutes that nothing proves abandoned (a live pid, another
+host, or an unreadable claim) refuses with `TASK_RECORD_CLAIM_STALE`, naming the file to remove once
+no process there is still at work. A lock lost during execution fails the attempt with
+`TASK_RESOURCE_LOCK_LOST` whatever status the executor left, a completion included, and escalates
+the task instead of letting it merge. Each dispatch attempt is fenced under
+`.devai/state/lock-fences/`, so every run first reconciles the attempts a stopped runner left
+unjudged and reports a lost lock among them under `reconciled`. Every run also applies the priority
+bump a re-queue still owes; an all-ready run re-queues tasks an interrupted denial left in
+`lock_denied`. A corrupt `lock-denials.json` refuses with `TASK_LOCK_DENIAL_STATE_INVALID`: repair
+the entry, or remove the file to reset every count.
 
 ## Bounded concurrency
 
