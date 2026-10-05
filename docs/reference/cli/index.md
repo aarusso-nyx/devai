@@ -1,7 +1,7 @@
 # CLI overview
 
 DEVAI presents 69 actions: 36 stable actions, 22 preview actions, and 11 internal plumbing
-actions. <!-- verify after merge --> Nine workflow domains organize the public surface. Choose the domain from the outcome you need;
+actions. Nine workflow domains organize the public surface. Choose the domain from the outcome you need;
 then choose one leaf action, suite, preset, kind, slice, tier, round, or task selection inside
 that domain. The hidden `task` and `catalog` surfaces are plumbing, not additional workflows.
 

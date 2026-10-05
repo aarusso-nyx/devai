@@ -8,7 +8,6 @@ slug: /
 DEVAI is a human-supervised control harness for AI-assisted software development on a declared
 stack. The source tree behind this site provides one CLI package, 69 actions, 59 sensor kinds,
 and seven host-invoked recipes; the published installation guidance stays pinned to 1.5.4.
-<!-- verify after merge -->
 
 - [Start here](start/)
 - [Theory](theory/)
