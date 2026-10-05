@@ -136,6 +136,12 @@ export const ACTION_EFFECT_CONTRACTS = [
     capabilities: [],
   },
   {
+    action_id: 'init upgrade',
+    public_action_id: 'init upgrade',
+    effect: 'local-write',
+    capabilities: ['fs:f5-config', 'fs:workspace', 'proc:dynamic', 'proc:git'],
+  },
+  {
     action_id: 'release certify',
     public_action_id: 'release certify',
     effect: 'harness-write',
