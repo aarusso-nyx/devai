@@ -10,7 +10,7 @@ import {
   writeFileSync,
 } from '@devai-nyx/authority';
 import { createHash, createHmac, randomBytes } from 'node:crypto';
-import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**
@@ -140,7 +140,7 @@ export interface PostMergeBindingLocation {
   readonly scope: 'absent' | 'this-checkout' | 'other-checkout';
   /** The checkout the attestation records, when it records one. */
   readonly bound_checkout?: string;
-  /** The post-merge adapter state this checkout itself carries: key, issuer, git-hook, recorded-hook. */
+  /** The post-merge adapter state this checkout itself carries: key, issuer, git-hook, husky-hook. */
   readonly local_state?: readonly string[];
 }
 
@@ -152,39 +152,25 @@ function fileIncludes(path: string, text: string): boolean {
   }
 }
 
-function within(base: string, path: string): boolean {
-  const fromBase = relative(base, path);
-  return (
-    fromBase !== '' &&
-    fromBase !== '..' &&
-    !fromBase.startsWith(`..${sep}`) &&
-    !isAbsolute(fromBase)
-  );
-}
-
 /**
- * The post-merge adapter state a checkout carries outside the tracked attestation: the key and
- * receipt issuer in its git directory, a DEVAI post-merge hook in its git hooks directory, and
- * the hook the attestation records when that hook lies inside the checkout or its git directories
- * (a Husky hook of the bound checkout).
+ * The post-merge adapter state a checkout carries, read from where an installation puts it and
+ * never from the editable attestation: the key and receipt issuer in its git directory, and a
+ * DEVAI post-merge hook in its git hooks directory or in `.husky/post-merge`. A Husky hook is
+ * tracked, so every clone of a Husky repository carries it, and doctor verifies the binding there.
  */
-function localPostMergeState(root: string, recordedHook: unknown): string[] {
+function localPostMergeState(root: string): string[] {
   const state: string[] = [];
-  const bases = [root];
   try {
     const adminRoot = gitAdminRoot(root);
-    const commonRoot = gitCommonRoot(root);
-    bases.push(adminRoot, commonRoot);
     if (existsSync(join(adminRoot, 'devai/post-merge.key'))) state.push('key');
     if (existsSync(join(adminRoot, 'devai/issue-post-merge-receipt.cjs'))) state.push('issuer');
-    if (fileIncludes(join(commonRoot, 'hooks', 'post-merge'), MARKER_START)) state.push('git-hook');
+    if (fileIncludes(join(gitCommonRoot(root), 'hooks', 'post-merge'), MARKER_START)) {
+      state.push('git-hook');
+    }
   } catch {
     // Without a git directory there is no key, issuer, or git hook to find.
   }
-  if (typeof recordedHook === 'string' && recordedHook.length > 0) {
-    const hook = recordedPath(recordedHook);
-    if (bases.some((base) => within(base, hook)) && existsSync(hook)) state.push('recorded-hook');
-  }
+  if (fileIncludes(join(root, '.husky', 'post-merge'), MARKER_START)) state.push('husky-hook');
   return state;
 }
 
@@ -213,10 +199,7 @@ export function locatePostMergeBinding(targetRoot: string): PostMergeBindingLoca
   const recorded = (attestation as Record<string, unknown>)['repository'];
   if (typeof recorded !== 'string' || recorded.length === 0) return { scope: 'this-checkout' };
   const boundCheckout = recordedPath(recorded);
-  const localState = localPostMergeState(
-    root,
-    (attestation as Record<string, unknown>)['hook_path'],
-  );
+  const localState = localPostMergeState(root);
   const foreign =
     boundCheckout !== root &&
     (attestation as Record<string, unknown>)['adapter_id'] !== postMergeAdapterId(root) &&
