@@ -16,6 +16,11 @@ export interface GuardedSpawnOptions {
   readonly input?: string;
   /** Grace period between SIGTERM and SIGKILL when the child must stop. Default 5s. */
   readonly killGraceMs?: number;
+  /**
+   * How long after SIGKILL the process group may take to disappear before the termination
+   * is reported unconfirmed (`termination_error`). Default 5s.
+   */
+  readonly killConfirmMs?: number;
   /** Streaming observers; they see every byte, independent of the retained bound. */
   readonly onStdout?: (chunk: string) => void;
   readonly onStderr?: (chunk: string) => void;
@@ -31,13 +36,21 @@ export interface GuardedProcessResult {
   readonly timed_out: boolean;
   /** Set when the process could not start (for example ENOENT). */
   readonly spawn_error: string | null;
+  /**
+   * Present only when a requested termination could not be confirmed: a member of the
+   * process group was still alive `killConfirmMs` after SIGKILL, or the child or its
+   * output streams had still not closed by then. Something it started may still run,
+   * so its working directory must not be treated as quiescent or cleaned up.
+   */
+  readonly termination_error?: 'PROCESS_GROUP_TERMINATION_UNCONFIRMED';
 }
 
 export interface GuardedChildProcess {
   readonly pid: number | undefined;
   /**
    * Settles once, when the child and its streams have closed and, after a timeout or
-   * `terminate()`, once its whole process group is gone; never rejects.
+   * `terminate()`, once its whole process group is gone or its termination is reported
+   * unconfirmed; never rejects.
    */
   readonly result: Promise<GuardedProcessResult>;
   /**
@@ -49,10 +62,10 @@ export interface GuardedChildProcess {
 }
 
 const DEFAULT_KILL_GRACE_MS = 5_000;
+const DEFAULT_KILL_CONFIRM_MS = 5_000;
 /** Interval between liveness probes of a terminated process group. */
 const GROUP_POLL_MS = 20;
-/** How long a group may linger after SIGKILL before the result settles regardless. */
-const KILL_CONFIRM_MS = 2_000;
+const TERMINATION_UNCONFIRMED = 'PROCESS_GROUP_TERMINATION_UNCONFIRMED';
 
 class BoundedTail {
   private chunks: Buffer[] = [];
@@ -109,14 +122,19 @@ function groupAlive(pgid: number): boolean {
 }
 
 /**
- * Wait until a terminated process group is gone. The leader closing proves nothing
- * about its descendants: one that ignores SIGTERM keeps the group alive, so SIGKILL
- * goes to the group once `killDueAt` passes. The group id stays reserved while any
- * member lives, so it is never signalled again after it is seen gone. A group that
- * lingers beyond KILL_CONFIRM_MS after SIGKILL (an unreaped zombie) stops the wait.
- * The probes keep the event loop alive, so a caller awaiting the result is not cut short.
+ * Wait for a terminated process group to disappear and report whether it did. The
+ * leader closing proves nothing about its descendants: one that ignores SIGTERM keeps
+ * the group alive, so SIGKILL goes to the group once `killDueAt` passes. The group id
+ * stays reserved while any member lives, so it is never signalled again after it is
+ * seen gone. A group still alive `confirmMs` after its SIGKILL (a member stuck in
+ * uninterruptible I/O, or an unreaped zombie) is reported as not gone, never as
+ * stopped. The probes keep the event loop alive, so an awaiting caller is not cut short.
  */
-async function awaitGroupGone(pgid: number, killDueAt: number): Promise<void> {
+async function awaitGroupGone(
+  pgid: number,
+  killDueAt: number,
+  confirmMs: number,
+): Promise<boolean> {
   let killedAt: number | undefined;
   while (groupAlive(pgid)) {
     const now = Date.now();
@@ -127,11 +145,12 @@ async function awaitGroupGone(pgid: number, killDueAt: number): Promise<void> {
         // gone between the probe and the signal
       }
       killedAt = now;
-    } else if (killedAt !== undefined && now - killedAt >= KILL_CONFIRM_MS) {
-      return;
+    } else if (killedAt !== undefined && now - killedAt >= confirmMs) {
+      return false;
     }
     await new Promise((resolve) => setTimeout(resolve, GROUP_POLL_MS));
   }
+  return true;
 }
 
 function validate(command: string, args: readonly string[], options: GuardedSpawnOptions): void {
@@ -147,6 +166,12 @@ function validate(command: string, args: readonly string[], options: GuardedSpaw
   }
   if (!Number.isInteger(options.maxOutputBytes) || options.maxOutputBytes <= 0) {
     throw new Error('AUTHORITY_PROCESS_OUTPUT_BOUND_REQUIRED');
+  }
+  // The termination bounds must be finite too, or a stuck group would be awaited forever.
+  for (const bound of [options.killGraceMs, options.killConfirmMs]) {
+    if (bound !== undefined && (!Number.isInteger(bound) || bound < 0)) {
+      throw new Error('AUTHORITY_PROCESS_TIMEOUT_REQUIRED');
+    }
   }
 }
 
@@ -169,22 +194,58 @@ function start(
   const stdout = new BoundedTail(options.maxOutputBytes);
   const stderr = new BoundedTail(options.maxOutputBytes);
   const grace = options.killGraceMs ?? DEFAULT_KILL_GRACE_MS;
+  const confirm = options.killConfirmMs ?? DEFAULT_KILL_CONFIRM_MS;
   let timedOut = false;
   let spawnError: string | null = null;
   let killTimer: NodeJS.Timeout | undefined;
+  let confirmTimer: NodeJS.Timeout | undefined;
   /** Set by the first termination request: when SIGKILL is due to the whole group. */
   let killDueAt: number | undefined;
+  let terminationError: typeof TERMINATION_UNCONFIRMED | undefined;
+  /** The child's own exit, which can precede the close of its output streams. */
+  let exited: { readonly code: number | null; readonly signal: NodeJS.Signals | null } | undefined;
+  let closed = false;
   let settled = false;
+  let resolveResult: ((value: GuardedProcessResult) => void) | undefined;
+  const result = new Promise<GuardedProcessResult>((resolve) => {
+    resolveResult = resolve;
+  });
+
+  const settle = (exitCode: number | null, signal: NodeJS.Signals | null): void => {
+    if (settled) return;
+    settled = true;
+    clearTimeout(deadline);
+    clearTimeout(killTimer);
+    clearTimeout(confirmTimer);
+    resolveResult?.({
+      exit_code: exitCode,
+      signal,
+      stdout: stdout.text(),
+      stderr: stderr.text(),
+      stdout_truncated: stdout.truncated,
+      stderr_truncated: stderr.truncated,
+      timed_out: timedOut,
+      spawn_error: spawnError,
+      ...(terminationError !== undefined && { termination_error: terminationError }),
+    });
+  };
 
   const terminate = (): void => {
-    // After settlement the group is gone and its id may be reused: never signal it again.
+    // After settlement its group is gone or reported unconfirmed: never signal its id again.
     if (settled) return;
     signalGroup(child, 'SIGTERM');
-    if (killTimer === undefined) {
-      killDueAt = Date.now() + grace;
-      killTimer = setTimeout(() => signalGroup(child, 'SIGKILL'), grace);
-      killTimer.unref();
-    }
+    if (killTimer !== undefined) return;
+    killDueAt = Date.now() + grace;
+    killTimer = setTimeout(() => signalGroup(child, 'SIGKILL'), grace);
+    killTimer.unref();
+    // A child, or a process holding its output streams, that has still not closed when the
+    // group should be gone cannot be confirmed stopped; once the child closes, the group
+    // wait below decides instead.
+    confirmTimer = setTimeout(() => {
+      if (closed) return;
+      terminationError = TERMINATION_UNCONFIRMED;
+      settle(exited?.code ?? null, exited?.signal ?? null);
+    }, grace + confirm);
   };
   const deadline = setTimeout(() => {
     timedOut = true;
@@ -206,37 +267,27 @@ function start(
   if (options.input !== undefined) child.stdin?.end(options.input);
   else child.stdin?.end();
 
-  const result = new Promise<GuardedProcessResult>((resolve) => {
-    const settle = (exitCode: number | null, signal: NodeJS.Signals | null): void => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(deadline);
-      if (killTimer !== undefined) clearTimeout(killTimer);
-      resolve({
-        exit_code: exitCode,
-        signal,
-        stdout: stdout.text(),
-        stderr: stderr.text(),
-        stdout_truncated: stdout.truncated,
-        stderr_truncated: stderr.truncated,
-        timed_out: timedOut,
-        spawn_error: spawnError,
-      });
-    };
-    child.on('error', (error: NodeJS.ErrnoException) => {
-      spawnError = error.code ?? error.message;
-      if (child.pid === undefined) settle(null, null);
-    });
-    child.on('close', (code, signal) => {
-      // The wall clock bounds the child itself; its exit ends that bound.
-      clearTimeout(deadline);
-      const pgid = child.pid;
-      if (killDueAt === undefined || pgid === undefined) {
-        settle(code, signal);
-        return;
-      }
-      // Termination was requested: escalate until every member of the group is gone.
-      void awaitGroupGone(pgid, killDueAt).then(() => settle(code, signal));
+  child.on('error', (error: NodeJS.ErrnoException) => {
+    spawnError = error.code ?? error.message;
+    if (child.pid === undefined) settle(null, null);
+  });
+  child.on('exit', (code, signal) => {
+    exited = { code, signal };
+  });
+  child.on('close', (code, signal) => {
+    closed = true;
+    // The wall clock bounds the child itself; its exit ends that bound.
+    clearTimeout(deadline);
+    const pgid = child.pid;
+    if (killDueAt === undefined || pgid === undefined) {
+      settle(code, signal);
+      return;
+    }
+    // Termination was requested: escalate until every member of the group is gone, and
+    // never report a group that outlives the confirmation window as stopped.
+    void awaitGroupGone(pgid, killDueAt, confirm).then((gone) => {
+      if (!gone) terminationError = TERMINATION_UNCONFIRMED;
+      settle(code, signal);
     });
   });
 
