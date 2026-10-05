@@ -1197,9 +1197,9 @@ export const ACTION_REGISTRY = [
         planner_id: 'init-upgrade-bounded-plan',
         target_kinds: ['fs'],
         bounds: {
-          max_batches: 128,
+          max_batches: 2048,
           max_targets_per_batch: 64,
-          max_total_targets: 8192,
+          max_total_targets: 32768,
         },
         recovery: 'preserve-and-report',
       },
