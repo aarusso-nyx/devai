@@ -40,8 +40,8 @@ Inline versions still exist outside the manifest in
 `scripts/release-host/provision-dependencies.mjs`, and the node version the
 CI scaffold emits from `packages/cli/src/services/ci-scaffold`. The preflight
 workflow echoes verifier version 1.5.1 for the in-repo vendored verifier
-while the trusted provider is 1.5.4; the checker deliberately does not compare
-that literal.
+while the trusted provider is 1.9.0 (`law/policy/trusted-local-rc-verifier-package.json`);
+the checker deliberately does not compare that literal.
 
 ## Class selectors in DEVAI's own descriptor
 
