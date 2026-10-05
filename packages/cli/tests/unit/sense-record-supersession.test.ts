@@ -21,7 +21,11 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { verifyChain } from '@devai-nyx/evidence';
 import { filterLatestPerKind, loadReadingsFromDir, resolveScorecardInputs } from '@devai-nyx/loop';
 import { validators } from '@devai-nyx/schemas';
-import { buildSensorReading, type SensorReading } from '@devai-nyx/sensors';
+import {
+  buildSensorReading,
+  senseHarnessInvariantAlignment,
+  type SensorReading,
+} from '@devai-nyx/sensors';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { withAuthorityHostTestScope } from '../../../authority/tests/unit/authority-host-test-scope.js';
 import { recordSensorReading } from '../../src/commands/sense/record.js';
@@ -420,6 +424,59 @@ describe('ADR-SCR-0008 IA-002 the two ordered writes of a recording', () => {
     await expect(record(root, input)).rejects.toThrow(`SENSE_RECORD_ID_CONFLICT:${first.id}`);
     expect(readFileSync(join(root, CHAIN)).equals(chainBytes)).toBe(true);
     expect(entriesFor(root, path)).toHaveLength(1);
+  });
+});
+
+// ADR-SCR-0013: identical reading bytes re-recorded at a later candidate gain that
+// candidate's receipt once, through the real writer, and the alignment reader then
+// binds the stored reading at the later head.
+describe('ADR-SCR-0013 identical bytes recorded at a later candidate', () => {
+  function alignment(root: string, candidateHead: string) {
+    return withAuthorityHostTestScope(() =>
+      senseHarnessInvariantAlignment({ repoRoot: root, candidateHead }),
+    );
+  }
+
+  it('appends one receipt per candidate head and aligns the reading at the later head', async () => {
+    const { root, head: first } = repo();
+    put(
+      root,
+      '.github/workflows/ci.yml',
+      'jobs:\n  gate:\n    steps:\n      - run: devai sense run inventory_api\n',
+    );
+    put(
+      root,
+      'law/invariants/INV-RECORD-001.json',
+      JSON.stringify({ id: 'INV-RECORD-001', severity: 'gate', measurable_via: ['sense run'] }),
+    );
+    const value = reading(T1);
+    const input = stage(root, 'value', value);
+    expect((await record(root, input)).action).toBe('created');
+    const path = storePath(value);
+
+    put(root, 'README.md', 'fixture at a later candidate\n');
+    git(root, ['add', 'README.md']);
+    git(root, ['commit', '-qm', 'later candidate']);
+    const later = git(root, ['rev-parse', 'HEAD']);
+    // Only the first head's receipt names the bytes, so the later head cannot bind them.
+    expect((await alignment(root, later)).status).toBe('review');
+
+    expect((await record(root, input)).action).toBe('already-recorded');
+    const entries = entriesFor(root, path);
+    expect(entries.map((entry) => entry.context?.git?.head_sha)).toEqual([first, later]);
+    expect(new Set(entries.map((entry) => entry.artifacts?.[0]?.sha256))).toEqual(
+      new Set([digest(root, path)]),
+    );
+    expect(verifyChain(join(root, CHAIN))).toEqual({ valid: true, errors: [] });
+    expect(await alignment(root, later)).toMatchObject({
+      status: 'pass',
+      metrics: { misaligned: 0 },
+    });
+
+    // The per-head append is idempotent.
+    const chainBytes = readFileSync(join(root, CHAIN));
+    expect((await record(root, input)).action).toBe('already-recorded');
+    expect(readFileSync(join(root, CHAIN)).equals(chainBytes)).toBe(true);
   });
 });
 
