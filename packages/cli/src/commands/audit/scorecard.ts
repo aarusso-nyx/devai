@@ -42,6 +42,40 @@ function git(repoRoot: string, args: readonly string[], code: string): string {
   return result.stdout.trim();
 }
 
+/** The repository's current commit, as the exact-HEAD guard reads it. */
+export function scorecardHead(repoRoot: string): string {
+  return git(repoRoot, ['rev-parse', 'HEAD'], 'AUDIT_SCORECARD_HEAD_UNAVAILABLE');
+}
+
+/**
+ * The read-only exact-HEAD composition behind `audit scorecard`, shared with the
+ * F5:T4 alignment adapter so its in-process observation is this same computation
+ * (ADR-SCR-0013). It throws on a moved head, an unreadable commit, a rejected store
+ * reading, or a scorecard that fails its schema; it persists nothing.
+ */
+export function composeExactHeadScorecard(
+  repoRoot: string,
+  at: string,
+): ReturnType<typeof resolveScorecardInputs>['scorecard'] {
+  const head = scorecardHead(repoRoot);
+  if (head !== at) throw new Error('AUDIT_SCORECARD_EXACT_HEAD_REQUIRED');
+  const timestamp = git(
+    repoRoot,
+    ['show', '-s', '--format=%cI', at],
+    'AUDIT_SCORECARD_TIMESTAMP_UNAVAILABLE',
+  );
+  const { scorecard } = resolveScorecardInputs({
+    repoRoot,
+    inputs: undefined,
+    timestamp,
+    integrationHead: at,
+  });
+  if (!validators.scorecard(scorecard)) {
+    throw new Error(`AUDIT_SCORECARD_INVALID:${JSON.stringify(validators.scorecard.errors)}`);
+  }
+  return scorecard;
+}
+
 /**
  * Compute the exact-HEAD scorecard without persisting any audit or evidence artifact.
  *
@@ -73,24 +107,7 @@ export const auditScorecard = defineCommand({
         }
         const repoRoot = resolve(options.repoRoot);
         try {
-          const head = git(repoRoot, ['rev-parse', 'HEAD'], 'AUDIT_SCORECARD_HEAD_UNAVAILABLE');
-          if (head !== options.at) throw new Error('AUDIT_SCORECARD_EXACT_HEAD_REQUIRED');
-          const timestamp = git(
-            repoRoot,
-            ['show', '-s', '--format=%cI', options.at],
-            'AUDIT_SCORECARD_TIMESTAMP_UNAVAILABLE',
-          );
-          const { scorecard } = resolveScorecardInputs({
-            repoRoot,
-            inputs: undefined,
-            timestamp,
-            integrationHead: options.at,
-          });
-          if (!validators.scorecard(scorecard)) {
-            throw new Error(
-              `AUDIT_SCORECARD_INVALID:${JSON.stringify(validators.scorecard.errors)}`,
-            );
-          }
+          const scorecard = composeExactHeadScorecard(repoRoot, options.at);
           process.stdout.write(
             options.human === true
               ? `audit scorecard: ${scorecard.overall.verdict} ${options.at}\n`
