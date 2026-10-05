@@ -1,18 +1,10 @@
-import {
-  closeSync,
-  existsSync,
-  fsyncSync,
-  mkdirSync,
-  openSync,
-  readFileSync,
-  renameSync,
-  unlinkSync,
-  writeSync,
-} from '@devai-nyx/authority';
+import { mkdirSync, readFileSync, renameSync } from '@devai-nyx/authority';
 import { randomUUID } from 'node:crypto';
 import { hostname } from 'node:os';
 import { join } from 'node:path';
-import { fail } from './task-queue-services.js';
+import { createRecordExclusive, observeRecord, swapObservedRecord } from './record-claims.js';
+import type { TaskStatus } from './task-contract.js';
+import { fail, TaskServiceError } from './task-queue-services.js';
 
 /** The process that owns one round's controller. */
 export interface RoundControllerRecord {
@@ -24,7 +16,7 @@ export interface RoundControllerRecord {
 }
 
 /*
- * Mirrors of `law/policy/round-execution.json` capacity; a contract test pins them.
+ * Mirrors of `law/policy/round-execution.json`; a contract test pins them.
  */
 /** Workers when a run does not opt in: serial (capacity.default_workers). */
 export const ROUND_DEFAULT_WORKERS = 1;
@@ -36,6 +28,13 @@ export const ROUND_MAX_WORKERS = 4;
  * capacity.lock_denial_escalation_threshold).
  */
 export const LOCK_DENIAL_ESCALATION_THRESHOLD = 3;
+/** Transitions that release a task's locks (resources.release_on). */
+export const LOCK_RELEASE_STATUSES: readonly TaskStatus[] = [
+  'completed',
+  'escalated',
+  'rgr_pending',
+  'cancelled',
+];
 
 function roundRunDir(repoRoot: string, roundId: string): string {
   return join(repoRoot, '.devai/state/round-runs', roundId);
@@ -45,29 +44,35 @@ function controllerPath(repoRoot: string, roundId: string): string {
   return join(roundRunDir(repoRoot, roundId), 'controller.json');
 }
 
-function writeExclusive(path: string, body: string): boolean {
-  try {
-    const fd = openSync(path, 'wx');
-    try {
-      writeSync(fd, body);
-      fsyncSync(fd);
-    } finally {
-      closeSync(fd);
-    }
-    return true;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'EEXIST') return false;
-    throw error;
-  }
+function controllerClaimsDir(repoRoot: string, roundId: string): string {
+  return join(roundRunDir(repoRoot, roundId), 'controller-claims');
 }
 
-function readController(path: string): RoundControllerRecord | undefined | 'unreadable' {
-  if (!existsSync(path)) return undefined;
-  try {
-    return JSON.parse(readFileSync(path, 'utf8')) as RoundControllerRecord;
-  } catch {
-    return existsSync(path) ? 'unreadable' : undefined;
-  }
+type ControllerObservation =
+  | { readonly kind: 'absent' }
+  | { readonly kind: 'unreadable' }
+  | { readonly kind: 'record'; readonly record: RoundControllerRecord; readonly identity: string };
+
+function isControllerRecord(value: Readonly<Record<string, unknown>>): boolean {
+  return (
+    typeof value.round_id === 'string' &&
+    Number.isSafeInteger(value.pid) &&
+    (value.pid as number) > 0 &&
+    typeof value.hostname === 'string' &&
+    typeof value.started_at === 'string' &&
+    typeof value.token === 'string'
+  );
+}
+
+function readController(path: string): ControllerObservation {
+  const observed = observeRecord(path);
+  if (observed.kind !== 'record') return observed;
+  if (!isControllerRecord(observed.value)) return { kind: 'unreadable' };
+  return {
+    kind: 'record',
+    record: observed.value as unknown as RoundControllerRecord,
+    identity: observed.identity,
+  };
 }
 
 /** True when the pid names a live process; EPERM means alive but not ours. */
@@ -88,38 +93,15 @@ function provablyDead(record: RoundControllerRecord): boolean {
   return record.hostname === hostname() && !processAlive(record.pid);
 }
 
-/** Move the exact stale record aside; restore anything else that was moved by mistake. */
-function reclaimStale(path: string, stale: RoundControllerRecord): boolean {
-  const aside = `${path}.reclaim-${process.pid}-${randomUUID()}`;
-  try {
-    renameSync(path, aside);
-  } catch {
-    return false;
-  }
-  let raw = '';
-  let moved: RoundControllerRecord | undefined;
-  try {
-    raw = readFileSync(aside, 'utf8');
-    moved = JSON.parse(raw) as RoundControllerRecord;
-  } catch {
-    moved = undefined;
-  }
-  const exact = moved?.token === stale.token;
-  if (!exact && raw.length > 0) writeExclusive(path, raw);
-  try {
-    unlinkSync(aside);
-  } catch {
-    // best-effort
-  }
-  return exact;
-}
-
 /**
  * Claim exclusive control of one round, so two `round run` processes never advance
  * the same task population. A controller left by a dead process on this host is
- * reclaimed: its in-progress tasks stay in progress for explicit human disposition,
- * because admission dispatches only `ready` tasks. A live controller, one on another
- * host, or an unreadable record refuses with `TASK_ROUND_CONTROLLER_BUSY`.
+ * replaced in one step, and only while the path still holds exactly that dead record:
+ * a controller another process has just claimed is never removed. Its in-progress
+ * tasks stay in progress for explicit human disposition, because admission dispatches
+ * only `ready` tasks. A live controller, one on another host, an unreadable record,
+ * or a reclamation another process is already making refuses with
+ * `TASK_ROUND_CONTROLLER_BUSY`.
  */
 export function acquireRoundController(repoRoot: string, roundId: string): RoundControllerRecord {
   mkdirSync(roundRunDir(repoRoot, roundId), { recursive: true });
@@ -133,11 +115,20 @@ export function acquireRoundController(repoRoot: string, roundId: string): Round
   };
   const body = JSON.stringify(record, null, 2) + '\n';
   for (let attempt = 0; attempt < 2; attempt += 1) {
-    if (writeExclusive(path, body)) return record;
+    if (createRecordExclusive(path, body)) return record;
     const existing = readController(path);
-    if (existing === undefined) continue;
-    if (existing === 'unreadable' || !provablyDead(existing)) fail('TASK_ROUND_CONTROLLER_BUSY');
-    if (!reclaimStale(path, existing)) fail('TASK_ROUND_CONTROLLER_BUSY');
+    if (existing.kind === 'absent') continue;
+    if (existing.kind === 'unreadable' || !provablyDead(existing.record)) {
+      fail('TASK_ROUND_CONTROLLER_BUSY');
+    }
+    const replaced = swapObservedRecord({
+      path,
+      claimsDir: controllerClaimsDir(repoRoot, roundId),
+      identity: existing.identity,
+      next: body,
+    });
+    if (replaced === 'swapped') return record;
+    fail('TASK_ROUND_CONTROLLER_BUSY');
   }
   fail('TASK_ROUND_CONTROLLER_BUSY');
 }
@@ -146,9 +137,13 @@ export function acquireRoundController(repoRoot: string, roundId: string): Round
 export function releaseRoundController(repoRoot: string, record: RoundControllerRecord): void {
   const path = controllerPath(repoRoot, record.round_id);
   const current = readController(path);
-  if (current === undefined || current === 'unreadable' || current.token !== record.token) return;
+  if (current.kind !== 'record' || current.record.token !== record.token) return;
   try {
-    unlinkSync(path);
+    swapObservedRecord({
+      path,
+      claimsDir: controllerClaimsDir(repoRoot, record.round_id),
+      identity: current.identity,
+    });
   } catch {
     // best-effort
   }
@@ -158,32 +153,66 @@ function denialsPath(repoRoot: string, roundId: string): string {
   return join(roundRunDir(repoRoot, roundId), 'lock-denials.json');
 }
 
+/**
+ * Corrupt denial counts refuse the run instead of silently resetting: a count that
+ * never reaches the threshold would re-queue a conflicting task forever.
+ */
+function invalidDenialState(roundId: string): TaskServiceError {
+  const error = new TaskServiceError('TASK_LOCK_DENIAL_STATE_INVALID');
+  error.message =
+    `TASK_LOCK_DENIAL_STATE_INVALID: .devai/state/round-runs/${roundId}/lock-denials.json ` +
+    'must be a JSON object of non-negative integer counts; repair the entry, or remove the ' +
+    "file to reset every task's lock-denial count";
+  return error;
+}
+
 function readDenials(repoRoot: string, roundId: string): Record<string, number> {
-  const path = denialsPath(repoRoot, roundId);
-  if (!existsSync(path)) return {};
+  let raw: string;
   try {
-    const parsed = JSON.parse(readFileSync(path, 'utf8')) as unknown;
-    return parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
-      ? (parsed as Record<string, number>)
-      : {};
-  } catch {
-    return {};
+    raw = readFileSync(denialsPath(repoRoot, roundId), 'utf8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return {};
+    throw invalidDenialState(roundId);
   }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw) as unknown;
+  } catch {
+    throw invalidDenialState(roundId);
+  }
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw invalidDenialState(roundId);
+  }
+  for (const count of Object.values(parsed)) {
+    if (!Number.isSafeInteger(count) || (count as number) < 0) throw invalidDenialState(roundId);
+  }
+  return parsed as Record<string, number>;
 }
 
 function writeDenials(repoRoot: string, roundId: string, denials: Record<string, number>): void {
   const path = denialsPath(repoRoot, roundId);
-  const staged = `${path}.${process.pid}-${randomUUID()}`;
-  if (!writeExclusive(staged, JSON.stringify(denials, null, 2) + '\n')) {
+  const staged = `${path}.${String(process.pid)}-${randomUUID()}`;
+  if (!createRecordExclusive(staged, JSON.stringify(denials, null, 2) + '\n')) {
     fail('TASK_ROUND_CONTROLLER_BUSY');
   }
   renameSync(staged, path);
 }
 
+/** Refuse to run a round whose recorded lock-denial counts are corrupt. */
+export function assertLockDenialsValid(repoRoot: string, roundId: string): void {
+  readDenials(repoRoot, roundId);
+}
+
+/** The consecutive lock denials recorded for a task; 0 when none are recorded. */
+export function lockDenialCount(repoRoot: string, roundId: string, taskId: string): number {
+  const denials = readDenials(repoRoot, roundId);
+  return Object.hasOwn(denials, taskId) ? (denials[taskId] ?? 0) : 0;
+}
+
 /** Count one more consecutive lock denial for a task and return the new count. */
 export function recordLockDenial(repoRoot: string, roundId: string, taskId: string): number {
   const denials = readDenials(repoRoot, roundId);
-  const count = (denials[taskId] ?? 0) + 1;
+  const count = (Object.hasOwn(denials, taskId) ? (denials[taskId] ?? 0) : 0) + 1;
   writeDenials(repoRoot, roundId, { ...denials, [taskId]: count });
   return count;
 }
@@ -191,7 +220,7 @@ export function recordLockDenial(repoRoot: string, roundId: string, taskId: stri
 /** A task that acquired its locks starts its denial count afresh. */
 export function clearLockDenials(repoRoot: string, roundId: string, taskId: string): void {
   const denials = readDenials(repoRoot, roundId);
-  if (!(taskId in denials)) return;
+  if (!Object.hasOwn(denials, taskId)) return;
   const { [taskId]: _cleared, ...rest } = denials;
   void _cleared;
   writeDenials(repoRoot, roundId, rest);
