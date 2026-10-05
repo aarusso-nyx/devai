@@ -43,7 +43,10 @@ publication so build-frozen pages do not drift from their inputs.
 Application adopters with no downstream consumers may declare collapsed sections
 under `docs.ia.collapsed_sections`; each stub points to the upstream source.
 When a binding adopter ADR relocates a canonical documentation path, declare the
-mapping under `docs.ia.path_overrides` rather than maintaining a parallel tree.
+mapping under `docs.ia.path_overrides` rather than maintaining a parallel tree. The
+`docs-ia.workflow-page-set` rule follows the mapping of the page directory or its nearest
+relocated ancestor: with `"dev/operations": "meta/ops"`, the page for
+`.github/workflows/<stem>.yml` is `docs/meta/ops/workflows/<stem>.md`.
 
 ## Publication boundary
 
