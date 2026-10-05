@@ -57,7 +57,9 @@
     "task status",
     "task finish",
     "round dispatch activate",
-    "round ratify"
+    "round ratify",
+    "round dispatch deactivate",
+    "round dispatch dispose"
   ],
   "provenance": ["ADR-SCR-0004", "CMP-0002:R-0203:TASK-0231"],
   "supersedes": null,
