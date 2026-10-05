@@ -3,8 +3,11 @@
 // write, applies the bind segments with the doctor post-checks, and is idempotent. The fixture is
 // STYNX-shaped: tier1, platform-package, host-integrated through the GitHub Actions adapter, and
 // ci_economy.attested_rc, rolled back to the 1.6.0 state STYNX is upgrading from.
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
+  chmodSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -13,9 +16,11 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { hostname, tmpdir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { BIND_JOURNAL, BIND_JOURNAL_PATHS } from '../../src/commands/init/bind-adapters.js';
+import { UPGRADE_LOCK } from '../../src/commands/init/upgrade-lock.js';
 import { resolveCliVersion } from '../../src/version.js';
 
 type JsonObject = Record<string, unknown>;
@@ -111,25 +116,39 @@ async function bindOrFail(args: readonly string[]): Promise<void> {
  * devai_version 1.6.0, a host adapter stamped 1.4.5, thresholds without soft_gate, and
  * ci_economy.attested_rc in project.json that the old deep merge preserved.
  */
-async function stynxAt160(sourceDeclaresAttestedRc: boolean): Promise<string> {
+async function stynxAt160(
+  sourceDeclaresAttestedRc: boolean,
+  options: { readonly adopterPolicy?: boolean; readonly postMerge?: boolean } = {},
+): Promise<string> {
   const repo = realpathSync(mkdtempSync(join(tmpdir(), 'devai-init-upgrade-')));
   roots.push(repo);
   const git = (...args: string[]) => execFileSync('git', args, { cwd: repo, stdio: 'pipe' });
   git('init', '-q', '-b', 'main');
+  git('config', 'user.name', 'Upgrade Fixture');
+  git('config', 'user.email', 'fixture@example.invalid');
   git('remote', 'add', 'origin', 'https://github.com/stynx-nyx/stynx.git');
+  git('commit', '-q', '--allow-empty', '-m', 'fixture');
   const target = ['--target', repo, '--as-role', 'architect', '--write'];
   await bindOrFail(['init', 'bind', '--full', '--tier', 'tier1', ...target]);
-  put(repo, SOURCE, {
-    schemaVersion: '1.0.0',
-    policy_id: 'stynx.devai-adoption',
-    policy_version: '1.0.0',
-    project: { project_type: 'platform-package' },
-    ci_economy: sourceDeclaresAttestedRc
-      ? { profile: 'gate-staged', attested_rc: ATTESTED_RC }
-      : { profile: 'gate-staged' },
-  });
-  await bindOrFail(['init', 'bind', '--adopter-policy', SOURCE, ...target]);
+  if (options.adopterPolicy !== false) {
+    put(repo, SOURCE, {
+      schemaVersion: '1.0.0',
+      policy_id: 'stynx.devai-adoption',
+      policy_version: '1.0.0',
+      project: { project_type: 'platform-package' },
+      ci_economy: sourceDeclaresAttestedRc
+        ? { profile: 'gate-staged', attested_rc: ATTESTED_RC }
+        : { profile: 'gate-staged' },
+    });
+    await bindOrFail(['init', 'bind', '--adopter-policy', SOURCE, ...target]);
+  }
   await bindOrFail(['init', 'bind', '--host-adapter', 'github-actions', ...target]);
+  if (options.postMerge === true) {
+    // The post-merge adapter verifies the project-local binary at the installed version.
+    put(repo, 'node_modules/.bin/devai', `#!/bin/sh\nprintf "devai/${resolveCliVersion()}\\n"\n`);
+    chmodSync(join(repo, 'node_modules/.bin/devai'), 0o755);
+    await bindOrFail(['init', 'bind', '--host-adapter', 'post-merge', ...target]);
+  }
   const project = json(repo, '.devai/config/project.json');
   put(repo, '.devai/config/project.json', {
     ...project,
@@ -276,4 +295,220 @@ describe('#264: init upgrade on a STYNX-shaped adopter from 1.6.0', () => {
     });
     expect(snapshot(repo)).toEqual(before);
   }, 120_000);
+});
+
+const RECEIPT = '.devai/config/upgrade-receipt.json';
+const WRITE = (repo: string) => [
+  'init',
+  'upgrade',
+  '--target',
+  repo,
+  '--as-role',
+  'architect',
+  '--write',
+];
+const PLAN = (repo: string) => ['init', 'upgrade', '--target', repo, '--as-role', 'architect'];
+
+function withoutReceipt(files: Map<string, string>): Map<string, string> {
+  return new Map([...files].filter(([path]) => path !== RECEIPT));
+}
+
+describe('#264 review: durability, decisions, exclusion and the measured receipt', () => {
+  it('recovers an upgrade interrupted before its receipt commit instead of reporting no-op', async () => {
+    const repo = await stynxAt160(true);
+    const installed = resolveCliVersion();
+    const pre = snapshot(repo);
+    const first = await runCli(WRITE(repo));
+    expect(first.exit, first.stderr).toBe(0);
+    const post = snapshot(repo);
+
+    // The state a crash leaves after every write landed but before the receipt commit: the
+    // new version is stamped, the journal still holds the previous bytes, and no receipt.
+    put(repo, BIND_JOURNAL, {
+      entries: BIND_JOURNAL_PATHS.map((path) => ({ path, previous: pre.get(path) ?? null })),
+    });
+    rmSync(join(repo, RECEIPT));
+    expect(json(repo, '.devai/config/project.json')['devai_version']).toBe(installed);
+
+    const planned = await runCli(PLAN(repo));
+    expect(planned.exit, planned.stderr).toBe(0);
+    expect(value(planned)['plan']).toMatchObject({ interrupted_bind: true, receipt: 'missing' });
+    expect((value(planned)['plan'] as JsonObject)['status']).not.toBe('no-op');
+
+    const recovered = await runCli(WRITE(repo));
+    expect(recovered.exit, recovered.stderr).toBe(0);
+    expect(value(recovered)['recovered_interrupted_bind']).toBe('rolled-back');
+    expect(json(repo, RECEIPT)).toMatchObject({ from: '1.6.0', to: installed, retired_keys: [] });
+    expect(existsSync(join(repo, BIND_JOURNAL))).toBe(false);
+    expect(withoutReceipt(snapshot(repo))).toEqual(withoutReceipt(post));
+  }, 180_000);
+
+  it('re-derives a missing receipt for an already bound version instead of a no-op', async () => {
+    const repo = await stynxAt160(true);
+    const installed = resolveCliVersion();
+    expect((await runCli(WRITE(repo))).exit).toBe(0);
+    rmSync(join(repo, RECEIPT));
+
+    const planned = await runCli(PLAN(repo));
+    const plan = value(planned)['plan'] as JsonObject;
+    expect(plan).toMatchObject({ from: installed, status: 'ready', receipt: 'missing' });
+    expect(plan['changed_files']).toEqual([
+      { path: RECEIPT, operation: 'create', segment: 'receipt' },
+    ]);
+
+    const applied = await runCli(WRITE(repo));
+    expect(applied.exit, applied.stderr).toBe(0);
+    expect(json(repo, RECEIPT)).toMatchObject({ from: installed, to: installed, rederived: true });
+    const settled = await runCli(PLAN(repo));
+    expect(value(settled)['plan']).toMatchObject({ status: 'no-op', receipt: 'current' });
+  }, 180_000);
+
+  it('refuses while a decision-required obligation is pending and keeps it visible on retry', async () => {
+    const repo = await stynxAt160(true);
+    put(repo, 'record/proofs/work/generic/R-0001.jsonl', '{"kind":"generic","sequence":1}\n');
+    const before = snapshot(repo);
+    const pending = expect.objectContaining({
+      code: 'INIT_UPGRADE_DECISION_PENDING',
+      change: 'MIG-1.9.0-proof-anchor-baseline',
+      command: 'devai evidence verify --scope chain --write',
+    });
+
+    const planned = await runCli(PLAN(repo));
+    expect(planned.exit).toBe(1);
+    expect(value(planned)['plan']).toMatchObject({ status: 'refused' });
+    expect((value(planned)['plan'] as JsonObject)['refusals']).toEqual([pending]);
+
+    const applied = await runCli(WRITE(repo));
+    expect(applied.exit).toBe(5);
+    const error = (JSON.parse(applied.stderr) as { error: JsonObject }).error;
+    expect(error).toMatchObject({ code: 'INIT_UPGRADE_DECISION_PENDING' });
+    expect(String(error['remediation'])).toContain('devai evidence verify --scope chain --write');
+    expect(snapshot(repo)).toEqual(before);
+
+    // Nothing was stamped, so the retry names the same unresolved obligation.
+    const retried = await runCli(PLAN(repo));
+    expect((value(retried)['plan'] as JsonObject)['refusals']).toEqual([pending]);
+  }, 180_000);
+
+  it('refuses an unreviewed constitution move until --constitution settles it', async () => {
+    const repo = await stynxAt160(true);
+    const pin = readFileSync(join(repo, '.devai/pin/constitution.md'), 'utf8').replaceAll(
+      '1.0.2',
+      '1.0.1',
+    );
+    put(repo, '.devai/pin/constitution.md', pin);
+    const project = json(repo, '.devai/config/project.json');
+    put(repo, '.devai/config/project.json', {
+      ...project,
+      constitution: { version: '1.0.1', sha256: createHash('sha256').update(pin).digest('hex') },
+    });
+
+    const refused = await runCli(WRITE(repo));
+    expect(refused.exit).toBe(5);
+    expect((JSON.parse(refused.stderr) as { error: JsonObject }).error).toMatchObject({
+      code: 'INIT_UPGRADE_DECISION_PENDING',
+      context: expect.objectContaining({
+        refusals: [expect.objectContaining({ change: 'MIG-1.8.0-constitution-1-0-2' })],
+      }),
+    });
+
+    const applied = await runCli([...WRITE(repo), '--constitution']);
+    expect(applied.exit, applied.stderr).toBe(0);
+    expect(json(repo, '.devai/config/project.json')['constitution']).toMatchObject({
+      version: '1.0.2',
+    });
+    expect(json(repo, RECEIPT)['constitution']).toEqual({ from: '1.0.1', to: '1.0.2' });
+  }, 180_000);
+
+  it('keeps an obligation the receipt left pending visible after the upgrade', async () => {
+    const repo = await stynxAt160(true, { adopterPolicy: false });
+    expect((await runCli(WRITE(repo))).exit).toBe(0);
+    const settled = await runCli(PLAN(repo));
+    const plan = value(settled)['plan'] as JsonObject;
+    expect(plan['status']).toBe('no-op');
+    expect(plan['obligations']).toEqual([
+      expect.objectContaining({
+        change: 'MIG-1.7.0-repository-kind-from-receipt',
+        status: 'pending',
+        source: 'receipt',
+      }),
+    ]);
+  }, 180_000);
+
+  it('refuses while another live upgrade holds the lock and replaces a stale one', async () => {
+    const repo = await stynxAt160(true);
+    put(repo, UPGRADE_LOCK, {
+      schemaVersion: '1.0.0',
+      action_id: 'init upgrade',
+      token: 'another-run',
+      pid: process.pid,
+      host: hostname(),
+      acquired_at: new Date().toISOString(),
+    });
+    const before = snapshot(repo);
+
+    const refused = await runCli(WRITE(repo));
+    expect(refused.exit).toBe(5);
+    expect((JSON.parse(refused.stderr) as { error: JsonObject }).error).toMatchObject({
+      code: 'INIT_UPGRADE_LOCKED',
+    });
+    expect(snapshot(repo)).toEqual(before);
+    // A bind that would recover the journal refuses as well while the upgrade runs.
+    const bind = await runCli([
+      'init',
+      'bind',
+      '--adopter-policy',
+      SOURCE,
+      '--target',
+      repo,
+      '--as-role',
+      'architect',
+      '--write',
+    ]);
+    expect(bind.exit).not.toBe(0);
+    expect(bind.stderr).toContain('INIT_UPGRADE_LOCKED');
+    expect(snapshot(repo)).toEqual(before);
+
+    const exited = spawnSync(process.execPath, ['--version']);
+    put(repo, UPGRADE_LOCK, {
+      schemaVersion: '1.0.0',
+      action_id: 'init upgrade',
+      token: 'crashed-run',
+      pid: exited.pid,
+      host: hostname(),
+      acquired_at: new Date().toISOString(),
+    });
+    const applied = await runCli(WRITE(repo));
+    expect(applied.exit, applied.stderr).toBe(0);
+    expect(existsSync(join(repo, UPGRADE_LOCK))).toBe(false);
+  }, 180_000);
+
+  it('lists the replaced post-merge hook with its digest among the changed files', async () => {
+    const repo = await stynxAt160(true, { postMerge: true });
+    const hookPath = join(repo, '.git/hooks/post-merge');
+    const marker = '# >>> devai hooks install >>>\n';
+    writeFileSync(
+      hookPath,
+      readFileSync(hookPath, 'utf8').replace(marker, `${marker}# installed by DEVAI 1.6.0\n`),
+    );
+
+    const applied = await runCli(WRITE(repo));
+    expect(applied.exit, applied.stderr).toBe(0);
+    const changed = json(repo, RECEIPT)['changed_files'] as JsonObject[];
+    expect(changed).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: '.git/hooks/post-merge',
+          operation: 'update',
+          segment: 'host-adapters',
+          sha256: createHash('sha256').update(readFileSync(hookPath)).digest('hex'),
+        }),
+      ]),
+    );
+    // Only bytes that moved are listed: the attestation still binds the canonical hook.
+    expect(changed.map((entry) => entry['path'])).not.toContain(
+      '.devai/config/post-merge-host-adapter.json',
+    );
+    expect(changed.map((entry) => entry['path'])).not.toContain(RECEIPT);
+  }, 180_000);
 });
