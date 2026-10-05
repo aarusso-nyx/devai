@@ -127,3 +127,21 @@ it('matches every node-version pinned in .github/workflows/*.yml to the manifest
     expect(entry).toEqual({ file: entry.file, major: requiredMajor });
   }
 });
+
+// The ledger and release lanes restate the trusted verifier's package version as the
+// `verifier-package` step output, and create-release-manifest.mjs refuses a rehearsal whose
+// label differs from the policy. Nothing else read the label before a live run, so a repin
+// that moved the commit and tree but not the label failed only at the first rehearsal.
+it('binds the manifest and the workflow verifier labels to the trusted verifier package policy', () => {
+  const policy = JSON.parse(
+    readFileSync(resolve(ROOT, 'law/policy/trusted-local-rc-verifier-package.json'), 'utf8'),
+  ) as { package: { version: string } };
+  expect(manifest.verifier.version).toBe(policy.package.version);
+  for (const file of ['release.yml', 'devai-ledger-verify.yml']) {
+    const source = readFileSync(resolve(WORKFLOWS_DIR, file), 'utf8');
+    const labels = [...source.matchAll(/echo "version=([0-9.]+)" >> "\$GITHUB_OUTPUT"/gu)].map(
+      (match) => match[1],
+    );
+    expect({ file, labels }).toEqual({ file, labels: [policy.package.version] });
+  }
+});
