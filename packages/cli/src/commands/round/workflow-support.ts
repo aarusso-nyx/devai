@@ -35,7 +35,17 @@ export function failure(command: string, error: unknown): void {
         ? error.message
         : 'ROUND_OPERATION_FAILED';
   const exit = error instanceof TaskServiceError ? error.exitCode : 2;
-  process.stderr.write(`${JSON.stringify({ code, operation: command, exit })}\n`);
+  // A refusal that needs a human step (a stale lock) names it.
+  const guidance = error as { readonly detail?: unknown; readonly removal?: unknown };
+  process.stderr.write(
+    `${JSON.stringify({
+      code,
+      operation: command,
+      exit,
+      ...(typeof guidance.detail === 'string' && { detail: guidance.detail }),
+      ...(typeof guidance.removal === 'string' && { removal: guidance.removal }),
+    })}\n`,
+  );
   process.exitCode = exit;
 }
 
