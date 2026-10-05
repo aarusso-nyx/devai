@@ -2,16 +2,20 @@
  * `devai round dispatch` — experimental agent dispatch (ADR-MDL-0005). The generic
  * authority layer admits it only with `--write` and `--experimental`. Before any lock,
  * worktree, or provider is touched, the handler requires an in-force Owner activation,
- * refuses a selection with any task the activation does not admit, and refuses the
- * round while uncertain journal work awaits a human disposition. Each admitted task
- * then runs through the experimental ladder under the shared invocation budget.
+ * plans the selection exactly as the round runner will (its full same-round dependency
+ * closure) and refuses it when the activation does not admit every planned task, and
+ * refuses the round while uncertain work awaits a human disposition, naming each task.
+ * Each admitted task then runs through the experimental ladder under the shared
+ * invocation budget.
  */
 import type { CAC } from 'cac';
 import { EXIT_USAGE } from '@devai-nyx/utils';
 import {
+  DispatchUncertainError,
   TaskServiceError,
   assertNoUncertainDispatch,
   listTaskRecords,
+  planRoundTaskAdmission,
   readExperimentalActivation,
   runRoundTasks,
   type TaskRecord,
@@ -36,10 +40,25 @@ interface DispatchOptions extends RoundOptions {
   readonly workers?: string | number;
 }
 
-function currentTasks(repoRoot: string): readonly TaskRecord[] {
-  return listTaskRecords(repoRoot).flatMap((entry) =>
-    entry.kind === 'current' ? [entry.record] : [],
+/** The complete stored population; an unsupported or invalid record refuses with its code. */
+function population(repoRoot: string): readonly TaskRecord[] {
+  return listTaskRecords(repoRoot).map((entry) => {
+    if (entry.kind !== 'current') throw new TaskServiceError(entry.code);
+    return entry.record;
+  });
+}
+
+/** The uncertainty refusal, naming every task and attempt that needs a disposition. */
+function uncertainFailure(error: DispatchUncertainError): void {
+  process.stderr.write(
+    `${JSON.stringify({
+      code: error.code,
+      operation: 'dispatch',
+      exit: error.exitCode,
+      uncertain: error.uncertain,
+    })}\n`,
   );
+  process.exitCode = error.exitCode;
 }
 
 export const roundDispatch = defineCommand({
@@ -62,18 +81,22 @@ export const roundDispatch = defineCommand({
           const now = new Date();
           const activation = readExperimentalActivation(repoRoot, now);
           if (!activation.ok) throw new TaskServiceError(activation.code, EXIT_USAGE);
-          const tasks = currentTasks(repoRoot);
+          const tasks = population(repoRoot);
           const selected = asArray(options.task);
-          const population = tasks.filter(
-            (task) =>
-              task.round_id === round &&
-              (selected.length > 0 ? selected.includes(task.id) : task.status === 'ready'),
-          );
-          for (const task of population) {
+          assertNoUncertainDispatch(repoRoot, round, tasks);
+          // The runner dispatches the selection's whole dependency closure, so every task in
+          // that closure must be one the activation admits before anything is locked.
+          const plan = planRoundTaskAdmission({
+            roundId: round,
+            tasks,
+            ...(selected.length > 0 && { selectedTaskIds: selected }),
+          });
+          for (const id of plan.orderedTaskIds) {
+            const task = tasks.find((candidate) => candidate.id === id);
+            if (task === undefined) throw new TaskServiceError('TASK_DEPENDENCY_MISSING');
             const refusal = experimentalTaskRefusal(task, activation.activation);
             if (refusal !== undefined) throw new TaskServiceError(refusal, EXIT_USAGE);
           }
-          assertNoUncertainDispatch(repoRoot, round, tasks);
           const budget: ExperimentalBudget = { attempts: 0, tokens: 0, unverifiable: false };
           const result = await runRoundTasks({
             repoRoot,
@@ -93,7 +116,8 @@ export const roundDispatch = defineCommand({
             result.ok,
           );
         } catch (error) {
-          failure('dispatch', error);
+          if (error instanceof DispatchUncertainError) uncertainFailure(error);
+          else failure('dispatch', error);
         }
       });
   },

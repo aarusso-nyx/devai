@@ -4,7 +4,9 @@
  * ladder — up to three attempts at the requested model and one at the next tier —
  * each in a fresh task worktree, around the hash-linked dispatch journal, with the
  * Article 6 write-scope check and non-promoting evidence after every attempt.
- * Nothing here pushes, merges, publishes, or retries uncertain work.
+ * Attempts are numbered for the task's lifetime, so a retried task continues its
+ * ladder (ADR-MDL-0007). Nothing here pushes, merges, publishes, or retries uncertain
+ * work.
  */
 import {
   ENGINEER_ROOT_WORKSPACE_FILES,
@@ -16,6 +18,8 @@ import {
   mkdirSync,
   readFileSync,
   readdirSync,
+  readlinkSync,
+  realpathSync,
   writeFileSync,
 } from '@devai-nyx/authority';
 import {
@@ -26,13 +30,20 @@ import {
   type TaskRecordBinding,
 } from '@devai-nyx/evidence';
 import {
+  EXPERIMENTAL_RUNTIME_EFFORTS,
   appendDispatchJournalEvent,
   createWorktree,
   destroyWorktree,
+  dispatchAttemptFloor,
+  listLocks,
   loadTask,
+  releaseLocks,
+  retainWorktree,
   saveTask,
+  taskLockTargets,
   type ExperimentalActivation,
   type TaskRecord,
+  type WorktreeRecord,
 } from '@devai-nyx/loop';
 import {
   agentCliInvocation,
@@ -45,7 +56,8 @@ import {
 } from '@devai-nyx/skills';
 import { canonicalSha256 } from '@devai-nyx/utils';
 import { createHash } from 'node:crypto';
-import { join, relative, sep } from 'node:path';
+import { hostname } from 'node:os';
+import { dirname, join, relative, resolve, sep } from 'node:path';
 
 /**
  * Per-runtime model order from law/policy/model-tiers.json, lowest capability first;
@@ -120,6 +132,9 @@ export function experimentalTaskRefusal(
   }
   const runtime = activation.runtimes.find((entry) => entry.runtime === request.runtime);
   if (runtime === undefined) return 'EXPERIMENTAL_RUNTIME_NOT_ACTIVATED';
+  if (!(EXPERIMENTAL_RUNTIME_EFFORTS[request.runtime] ?? []).includes(request.effort)) {
+    return 'EXPERIMENTAL_EFFORT_NOT_SUPPORTED';
+  }
   if (!runtime.models.includes(request.model) || !runtime.efforts.includes(request.effort)) {
     return 'EXPERIMENTAL_SELECTION_NOT_ACTIVATED';
   }
@@ -161,26 +176,59 @@ export function article6Role(path: string): string | undefined {
   return authority?.length === 1 ? authority[0] : undefined;
 }
 
-/** SHA-256 of every regular file under `root`, excluding `.git`, by relative path. */
-function snapshot(root: string): Map<string, string> {
+/** A worktree's file digests, and the symbolic links in it that resolve outside it. */
+export interface WorktreeSnapshot {
+  readonly files: ReadonlyMap<string, string>;
+  readonly escaping: ReadonlySet<string>;
+}
+
+/**
+ * SHA-256 of every regular file under `root`, excluding `.git`, by relative path. A
+ * symbolic link is hashed by its target, so retargeting it is a change, and every link
+ * whose target resolves outside the worktree is named: writing through such a link
+ * would change a file the write-scope check cannot see.
+ */
+export function snapshotWorktree(root: string): WorktreeSnapshot {
+  const roots = new Set([resolve(root)]);
+  try {
+    roots.add(realpathSync(root));
+  } catch {
+    // The lexical root is enough when it cannot be resolved.
+  }
+  const inside = (target: string): boolean =>
+    [...roots].some((base) => target === base || target.startsWith(`${base}${sep}`));
   const files = new Map<string, string>();
+  const escaping = new Set<string>();
   const walk = (directory: string): void => {
     for (const name of readdirSync(directory)) {
       if (name === '.git') continue;
       const path = join(directory, name);
       const stat = lstatSync(path);
-      if (stat.isDirectory()) walk(path);
-      else if (stat.isFile() || stat.isSymbolicLink()) {
-        const bytes = stat.isSymbolicLink() ? Buffer.from(`symlink`) : readFileSync(path);
-        files.set(relative(root, path), createHash('sha256').update(bytes).digest('hex'));
+      const rel = relative(root, path);
+      if (stat.isSymbolicLink()) {
+        const target = readlinkSync(path);
+        let resolved = resolve(dirname(path), target);
+        try {
+          resolved = realpathSync(path);
+        } catch {
+          // A dangling link is judged by its lexical target.
+        }
+        if (!inside(resolved)) escaping.add(rel);
+        files.set(rel, createHash('sha256').update(`symlink:${target}`).digest('hex'));
+      } else if (stat.isDirectory()) walk(path);
+      else if (stat.isFile()) {
+        files.set(rel, createHash('sha256').update(readFileSync(path)).digest('hex'));
       }
     }
   };
   walk(root);
-  return files;
+  return { files, escaping };
 }
 
-function changedPaths(before: Map<string, string>, after: Map<string, string>): string[] {
+function changedPaths(
+  before: ReadonlyMap<string, string>,
+  after: ReadonlyMap<string, string>,
+): string[] {
   const paths = new Set([...before.keys(), ...after.keys()]);
   return [...paths].filter((path) => before.get(path) !== after.get(path)).sort();
 }
@@ -194,19 +242,23 @@ function gitHead(cwd: string): string {
 }
 
 /**
- * Tokens an attempt spent against the invocation budget: every reported counter, cache
- * reads and writes included. Missing input or output counters leave the spend unverifiable;
- * a cache counter the provider never reports (codex cache writes) counts as zero spend.
+ * Tokens an attempt spent against the invocation budget: every counter, cache reads and
+ * writes included. Any counter the provider left unreported makes the spend
+ * unverifiable; a missing counter is never charged as zero (ADR-MDL-0005 D-7).
  */
-function counted(attempt: AgentCliAttempt): number | undefined {
-  const usage = attempt.output.usage;
-  if (usage.input_tokens.value === null || usage.output_tokens.value === null) return undefined;
-  return (
-    usage.input_tokens.value +
-    usage.output_tokens.value +
-    (usage.cache_read_tokens.value ?? 0) +
-    (usage.cache_write_tokens.value ?? 0)
-  );
+export function attemptSpend(usage: AgentCliAttempt['output']['usage']): number | undefined {
+  const counters = [
+    usage.input_tokens,
+    usage.output_tokens,
+    usage.cache_read_tokens,
+    usage.cache_write_tokens,
+  ];
+  let total = 0;
+  for (const counter of counters) {
+    if (counter.value === null) return undefined;
+    total += counter.value;
+  }
+  return total;
 }
 
 interface AttemptPlan {
@@ -215,17 +267,24 @@ interface AttemptPlan {
   readonly tier: 'default' | 'bumped';
 }
 
-function ladder(task: TaskRecord, request: AgentRequest, activation: ExperimentalActivation) {
+/**
+ * The remaining Article 19 ladder: attempts `floor + 1` up to the task's bound, three
+ * at the requested model and the fourth at the bumped tier when the Owner admits it.
+ */
+function attemptPlans(
+  request: AgentRequest,
+  activation: ExperimentalActivation,
+  floor: number,
+): AttemptPlan[] {
   const limit = Math.min(activation.budgets.attempts_per_task, request.max_iterations, 4);
   const plans: AttemptPlan[] = [];
-  for (let number = 1; number <= Math.min(DEFAULT_TIER_ATTEMPTS, limit); number += 1) {
+  for (let number = floor + 1; number <= Math.min(DEFAULT_TIER_ATTEMPTS, limit); number += 1) {
     plans.push({ number, model: request.model, tier: 'default' });
   }
   const bumped = bumpedModel(request.runtime, request.model, activation);
-  if (limit > DEFAULT_TIER_ATTEMPTS && bumped !== undefined) {
+  if (limit > DEFAULT_TIER_ATTEMPTS && floor <= DEFAULT_TIER_ATTEMPTS && bumped !== undefined) {
     plans.push({ number: DEFAULT_TIER_ATTEMPTS + 1, model: bumped, tier: 'bumped' });
   }
-  void task;
   return plans;
 }
 
@@ -293,15 +352,111 @@ function writeDiagnostics(
   );
 }
 
-function setStatus(repoRoot: string, taskId: string, status: TaskRecord['status']): void {
-  saveTask(repoRoot, { ...loadTask(repoRoot, taskId), status });
+/** Whether the task still holds every lock it declared, unexpired. */
+function locksHeld(repoRoot: string, task: TaskRecord): boolean {
+  const now = Date.now();
+  const held = listLocks({ locksDir: join(repoRoot, '.devai/state/locks') }).filter(
+    (lock) => lock.task_id === task.id && now - new Date(lock.acquired_at).getTime() < lock.ttl_ms,
+  );
+  return taskLockTargets(task).every((target) =>
+    held.some((lock) => `${lock.substrate}:${lock.module}` === target),
+  );
+}
+
+function budgetRefusal(context: ExperimentalDispatchContext): string | undefined {
+  const budgets = context.activation.budgets;
+  if (context.budget.attempts >= budgets.attempts_per_invocation) {
+    return 'EXPERIMENTAL_ATTEMPT_BUDGET_EXHAUSTED';
+  }
+  if (context.budget.unverifiable) return 'EXPERIMENTAL_USAGE_UNVERIFIABLE';
+  if (context.budget.tokens >= budgets.tokens_per_invocation) {
+    return 'EXPERIMENTAL_TOKEN_BUDGET_EXHAUSTED';
+  }
+  return undefined;
 }
 
 /**
+ * A task whose ladder never started an attempt in this dispatch stays `ready`: its
+ * locks are released and the runner's iteration count for it is undone, so a budget
+ * that ran out or a host without capacity never blocks untouched work.
+ */
+function returnUntouched(
+  context: ExperimentalDispatchContext,
+  task: TaskRecord,
+  code: string,
+): ExperimentalDispatchResult {
+  const current = loadTask(context.repoRoot, task.id);
+  saveTask(context.repoRoot, {
+    ...current,
+    status: 'ready',
+    iteration_count: Math.max(0, current.iteration_count - 1),
+  });
+  releaseLocks({ locksDir: join(context.repoRoot, '.devai/state/locks'), taskId: task.id });
+  return { ok: false, code };
+}
+
+/** Bind the task to its current attempt worktree, so retained work is always found from it. */
+function bindWorktree(
+  repoRoot: string,
+  taskId: string,
+  worktree: Pick<WorktreeRecord, 'id' | 'branch'>,
+  status?: TaskRecord['status'],
+): void {
+  saveTask(repoRoot, {
+    ...loadTask(repoRoot, taskId),
+    worktree_id: worktree.id,
+    branch: worktree.branch,
+    ...(status !== undefined && { status }),
+  });
+}
+
+/**
+ * Create the attempt worktree from the round base, bound to the task and owned by this
+ * process, before any journal record: a failure here starts no provider. A base tree
+ * holding a symbolic link that escapes the worktree refuses before spawn.
+ */
+function prepareAttempt(
+  context: ExperimentalDispatchContext,
+  task: TaskRecord,
+  plan: AttemptPlan,
+): Readonly<{ worktree: WorktreeRecord; before: WorktreeSnapshot }> {
+  const worktree = createWorktree({
+    repoRoot: context.repoRoot,
+    id: `WT-${task.id}-A${String(plan.number)}`,
+    branch: `experimental/${task.id}/attempt-${String(plan.number)}`,
+    baseRef: context.baseRef ?? 'HEAD',
+    taskId: task.id,
+    owner: { pid: process.pid, hostname: hostname() },
+  });
+  try {
+    const before = snapshotWorktree(worktree.path);
+    if (before.escaping.size > 0) throw new Error('EXPERIMENTAL_SYMLINK_ESCAPE');
+    return { worktree, before };
+  } catch (error) {
+    destroyWorktree({ repoRoot: context.repoRoot, id: worktree.id });
+    throw error;
+  }
+}
+
+type AttemptOutcome =
+  | {
+      readonly kind: 'evidenced';
+      readonly passed: boolean;
+      /** True when no further attempt may follow (a lost lock). */
+      readonly stop: boolean;
+      readonly code: string;
+      readonly outcome: 'pass' | 'fail' | 'error';
+      readonly evidence_id: string;
+    }
+  | { readonly kind: 'uncertain'; readonly code: string };
+
+/**
  * Dispatch one admitted agent task through the experimental ladder. The task ends
- * `awaiting_human_review` with its passing attempt's worktree kept for review, or
- * `experimental_blocked` after the ladder or a budget is exhausted. The runner
- * already holds the task's locks and has marked it `in_progress`.
+ * `awaiting_human_review` with its passing attempt's worktree retained for review, or
+ * `experimental_blocked` with its last failed attempt's worktree retained after the
+ * ladder or a budget is exhausted (IA-006), or `ready` when no attempt could start.
+ * The task outcome and worktree binding are persisted before the attempt settles. The
+ * runner already holds the task's locks and has marked it `in_progress`.
  */
 export async function dispatchExperimentalTask(
   context: ExperimentalDispatchContext,
@@ -317,44 +472,104 @@ export async function dispatchExperimentalTask(
     // Article 37: drift is attributable; the Architect re-binds the task to the new id.
     return { ok: false, code: 'TASK_PROMPT_COMPOSITION_DRIFT' };
   }
-  const budgets = context.activation.budgets;
+  const { repoRoot, roundId } = context;
   const wallClockMs = Math.min(
-    budgets.attempt_wall_clock_minutes * 60_000,
+    context.activation.budgets.attempt_wall_clock_minutes * 60_000,
     request.timeout_ms ?? Number.POSITIVE_INFINITY,
   );
+  const plans = attemptPlans(
+    request,
+    context.activation,
+    dispatchAttemptFloor(repoRoot, roundId, task.id),
+  );
+  let started = 0;
+  let previous: WorktreeRecord | undefined;
   let lastCode = 'EXPERIMENTAL_LADDER_EXHAUSTED';
-  for (const plan of ladder(task, request, context.activation)) {
-    if (context.budget.attempts >= budgets.attempts_per_invocation) {
-      lastCode = 'EXPERIMENTAL_ATTEMPT_BUDGET_EXHAUSTED';
+  for (const [index, plan] of plans.entries()) {
+    const refusedByBudget = budgetRefusal(context);
+    if (refusedByBudget !== undefined) {
+      if (started === 0) return returnUntouched(context, task, refusedByBudget);
+      lastCode = refusedByBudget;
       break;
     }
-    if (context.budget.unverifiable) {
-      lastCode = 'EXPERIMENTAL_USAGE_UNVERIFIABLE';
-      break;
-    }
-    if (context.budget.tokens >= budgets.tokens_per_invocation) {
-      lastCode = 'EXPERIMENTAL_TOKEN_BUDGET_EXHAUSTED';
-      break;
-    }
-    context.budget.attempts += 1;
-    let outcome: { readonly ok: boolean; readonly code: string; readonly evidence_id?: string };
+    let prepared: Awaited<ReturnType<typeof prepareAttempt>>;
     try {
-      outcome = await runAttempt(context, task, request, plan, composed, wallClockMs);
+      prepared = prepareAttempt(context, task, plan);
+      bindWorktree(repoRoot, task.id, prepared.worktree);
+      appendDispatchJournalEvent(repoRoot, roundId, {
+        task_id: task.id,
+        attempt: plan.number,
+        event: 'intent',
+        runtime: request.runtime,
+        model: plan.model,
+        effort: request.effort,
+        tier: plan.tier,
+        prompt_sha256: composed.prompt_sha256,
+      });
     } catch (error) {
-      // Setup failed before any provider started (for example the worktree was refused).
-      setStatus(context.repoRoot, task.id, 'experimental_blocked');
-      return { ok: false, code: errorCode(error) };
+      // Nothing started: no intent was recorded, so the worktree is not evidence.
+      const code = errorCode(error);
+      const current = loadTask(repoRoot, task.id);
+      if (current.worktree_id === `WT-${task.id}-A${String(plan.number)}`) {
+        if (existsSync(join(repoRoot, '.devai/worktrees', current.worktree_id))) {
+          destroyWorktree({ repoRoot, id: current.worktree_id });
+        }
+        if (previous === undefined) {
+          const { worktree_id: _worktree, branch: _branch, ...rest } = current;
+          void _worktree;
+          void _branch;
+          saveTask(repoRoot, rest);
+        } else bindWorktree(repoRoot, task.id, previous);
+      }
+      if (started === 0) return returnUntouched(context, task, code);
+      lastCode = code;
+      break;
     }
-    if (outcome.ok) {
-      setStatus(context.repoRoot, task.id, 'awaiting_human_review');
-      return {
-        ok: true,
-        ...(outcome.evidence_id !== undefined && { evidence_id: outcome.evidence_id }),
-      };
+    started += 1;
+    context.budget.attempts += 1;
+    if (previous !== undefined && existsSync(previous.path)) {
+      // The earlier failed attempt's tree is superseded; its digests stay in its evidence.
+      destroyWorktree({ repoRoot, id: previous.id });
     }
+    previous = undefined;
+    const { worktree } = prepared;
+    const outcome = await runAttempt(context, task, request, plan, composed, wallClockMs, prepared);
+    if (outcome.kind === 'uncertain') {
+      // A provider may have run: the attempt stays open in the journal, its worktree is
+      // retained and bound, and the round blocks until a human disposition (D-6). Its
+      // spend is unknown, so nothing else in this invocation may spend either.
+      context.budget.unverifiable = true;
+      retainWorktree({ repoRoot, id: worktree.id });
+      bindWorktree(repoRoot, task.id, worktree, 'experimental_blocked');
+      return { ok: false, code: outcome.code };
+    }
+    const settle = (): void => {
+      appendDispatchJournalEvent(repoRoot, roundId, {
+        task_id: task.id,
+        attempt: plan.number,
+        event: 'settled',
+        outcome: outcome.outcome,
+      });
+    };
+    retainWorktree({ repoRoot, id: worktree.id });
+    if (outcome.passed) {
+      bindWorktree(repoRoot, task.id, worktree, 'awaiting_human_review');
+      settle();
+      return { ok: true, evidence_id: outcome.evidence_id };
+    }
+    const another = index + 1 < plans.length && budgetRefusal(context) === undefined;
+    if (outcome.stop || !another) {
+      bindWorktree(repoRoot, task.id, worktree, 'experimental_blocked');
+      settle();
+      return { ok: false, code: outcome.code };
+    }
+    settle();
+    previous = worktree;
     lastCode = outcome.code;
   }
-  setStatus(context.repoRoot, task.id, 'experimental_blocked');
+  // The ladder was already spent, or a budget or setup failure stopped it after an
+  // attempt; the last failed attempt's worktree stays retained and bound (IA-006).
+  saveTask(repoRoot, { ...loadTask(repoRoot, task.id), status: 'experimental_blocked' });
   return { ok: false, code: lastCode };
 }
 
@@ -365,40 +580,23 @@ async function runAttempt(
   plan: AttemptPlan,
   composed: ReturnType<typeof composeAgentPrompt>,
   wallClockMs: number,
-): Promise<{ readonly ok: boolean; readonly code: string; readonly evidence_id: string }> {
+  prepared: Readonly<{ worktree: WorktreeRecord; before: WorktreeSnapshot }>,
+): Promise<AttemptOutcome> {
   const { repoRoot, roundId } = context;
+  const { worktree, before } = prepared;
   const journal = (entry: Record<string, unknown>) =>
     appendDispatchJournalEvent(repoRoot, roundId, {
       task_id: task.id,
       attempt: plan.number,
       ...entry,
     } as Parameters<typeof appendDispatchJournalEvent>[2]);
-
-  // The worktree is prepared before the intent: a setup failure starts no provider and
-  // must not leave an uncertain journal attempt behind.
-  const worktreeId = `WT-${task.id}-A${String(plan.number)}`;
-  const worktree = createWorktree({
-    repoRoot,
-    id: worktreeId,
-    branch: `experimental/${task.id}/attempt-${String(plan.number)}`,
-    baseRef: context.baseRef ?? 'HEAD',
-    taskId: task.id,
-  });
-  const before = snapshot(worktree.path);
-  journal({
-    event: 'intent',
-    runtime: request.runtime,
-    model: plan.model,
-    effort: request.effort,
-    tier: plan.tier,
-    prompt_sha256: composed.prompt_sha256,
-  });
   const invocation = (context.invocation ?? agentCliInvocation)({
     runtime: request.runtime,
     model: plan.model,
     effort: request.effort,
   });
   const startedAt = new Date().toISOString();
+  let spawned = false;
   let attempt: AgentCliAttempt;
   try {
     attempt = await runAgentCliAttempt({
@@ -407,76 +605,96 @@ async function runAttempt(
       prompt: composed.prompt,
       timeoutMs: wallClockMs,
       ...(context.env !== undefined && { env: context.env }),
-      onSpawned: (pid) => journal({ event: 'spawned', pid }),
+      onSpawned: (pid) => {
+        spawned = true;
+        journal({ event: 'spawned', pid });
+      },
     });
   } catch (error) {
+    const code = errorCode(error);
+    if (spawned || code === 'AGENT_CLI_SPAWN_RECORD_FAILED') {
+      // A provider process existed: whatever it did is unknown, never a refused spawn.
+      return {
+        kind: 'uncertain',
+        code: code === 'EXPERIMENTAL_ATTEMPT_FAILED' ? 'TASK_DISPATCH_UNCERTAIN' : code,
+      };
+    }
     // The authority refused the spawn: no provider started, so the attempt settles as an
     // error instead of staying uncertain.
-    attempt = refusedAttempt(request.runtime, errorCode(error));
+    attempt = refusedAttempt(request.runtime, code);
   }
-  journal({
-    event: 'exited',
-    exit_code: attempt.process.exit_code,
-    signal: attempt.process.signal,
-    timed_out: attempt.process.timed_out,
-  });
-  writeDiagnostics(repoRoot, roundId, `${task.id}-A${String(plan.number)}`, attempt);
-  const completedAt = new Date().toISOString();
-  const after = snapshot(worktree.path);
-  const changed = changedPaths(before, after);
-  const outOfScope = changed.filter((path) => article6Role(path) !== task.discipline);
-  const tokens = counted(attempt);
-  if (tokens === undefined) context.budget.unverifiable = true;
-  else context.budget.tokens += tokens;
-
-  const code = !attempt.ok
-    ? (attempt.output.failure ??
-      (attempt.process.timed_out
-        ? 'AGENT_CLI_TIMED_OUT'
-        : attempt.process.spawn_error !== null
-          ? 'AGENT_CLI_SPAWN_FAILED'
-          : 'AGENT_CLI_EXIT_NONZERO'))
-    : outOfScope.length > 0
-      ? 'EXPERIMENTAL_WRITE_SCOPE_VIOLATION'
-      : '';
-  const passed = code === '';
-  const evidence = attemptEvidence(task, request, plan, {
-    candidateSha: gitHead(worktree.path),
-    composed,
-    attempt,
-    changed: changed.flatMap((path) =>
-      after.has(path) ? [{ id: path, digest_sha256: after.get(path) as string }] : [],
-    ),
-    startedAt,
-    completedAt,
-    code,
-    outOfScope,
-  });
-  persistTaskExecutionEvidence({
-    repoRoot,
-    relativePath: join(
-      '.devai/state/round-runs',
-      roundId,
-      'task-executions',
-      `${evidence.id}.json`,
-    ),
-    task: task as unknown as TaskRecordBinding,
-    candidate_sha: evidence.candidate_sha,
-    evidence,
-  });
-  journal({ event: 'evidence-written', evidence_id: evidence.id });
-  journal({ event: 'settled', outcome: passed ? 'pass' : attempt.ok ? 'fail' : 'error' });
-  if (passed) {
-    saveTask(repoRoot, {
-      ...loadTask(repoRoot, task.id),
-      worktree_id: worktreeId,
-      branch: worktree.branch,
+  try {
+    journal({
+      event: 'exited',
+      exit_code: attempt.process.exit_code,
+      signal: attempt.process.signal,
+      timed_out: attempt.process.timed_out,
     });
-  } else if (existsSync(worktree.path)) {
-    // The changed-file digests are retained in the evidence; the attempt's tree is not.
-    destroyWorktree({ repoRoot, id: worktreeId });
+    writeDiagnostics(repoRoot, roundId, `${task.id}-A${String(plan.number)}`, attempt);
+    const completedAt = new Date().toISOString();
+    const after = snapshotWorktree(worktree.path);
+    const changed = changedPaths(before.files, after.files);
+    const escaping = [...after.escaping].sort();
+    const outOfScope = changed.filter((path) => article6Role(path) !== task.discipline);
+    const tokens = attemptSpend(attempt.output.usage);
+    if (tokens === undefined) context.budget.unverifiable = true;
+    else context.budget.tokens += tokens;
+    const lockLost = attempt.ok && !locksHeld(repoRoot, task);
+    const code = !attempt.ok
+      ? (attempt.output.failure ??
+        (attempt.process.timed_out
+          ? 'AGENT_CLI_TIMED_OUT'
+          : attempt.process.spawn_error !== null
+            ? 'AGENT_CLI_SPAWN_FAILED'
+            : 'AGENT_CLI_EXIT_NONZERO'))
+      : escaping.length > 0
+        ? 'EXPERIMENTAL_SYMLINK_ESCAPE'
+        : outOfScope.length > 0
+          ? 'EXPERIMENTAL_WRITE_SCOPE_VIOLATION'
+          : lockLost
+            ? 'TASK_RESOURCE_LOCK_LOST'
+            : '';
+    const passed = code === '';
+    const verdict = passed ? 'pass' : attempt.ok && !lockLost ? 'fail' : 'error';
+    const evidence = attemptEvidence(task, request, plan, {
+      candidateSha: gitHead(worktree.path),
+      composed,
+      attempt,
+      changed: changed.flatMap((path) => {
+        const digest = after.files.get(path);
+        return digest === undefined ? [] : [{ id: path, digest_sha256: digest }];
+      }),
+      startedAt,
+      completedAt,
+      code,
+      verdict,
+      violations: escaping.length > 0 ? escaping : outOfScope,
+    });
+    persistTaskExecutionEvidence({
+      repoRoot,
+      relativePath: join(
+        '.devai/state/round-runs',
+        roundId,
+        'task-executions',
+        `${evidence.id}.json`,
+      ),
+      task: task as unknown as TaskRecordBinding,
+      candidate_sha: evidence.candidate_sha,
+      evidence,
+    });
+    journal({ event: 'evidence-written', evidence_id: evidence.id });
+    return {
+      kind: 'evidenced',
+      passed,
+      stop: lockLost,
+      code,
+      outcome: verdict,
+      evidence_id: evidence.id,
+    };
+  } catch (error) {
+    // The provider ran; a failure while recording its outcome leaves the attempt open.
+    return { kind: 'uncertain', code: errorCode(error) };
   }
-  return { ok: passed, code, evidence_id: evidence.id };
 }
 
 function attemptEvidence(
@@ -491,11 +709,20 @@ function attemptEvidence(
     readonly startedAt: string;
     readonly completedAt: string;
     readonly code: string;
-    readonly outOfScope: readonly string[];
+    readonly verdict: 'pass' | 'fail' | 'error';
+    readonly violations: readonly string[];
   },
 ): TaskExecutionEvidence {
   const id = `TXE-${canonicalSha256({ task: task.id, attempt: plan.number, at: facts.startedAt }).slice(0, 16)}`;
-  const passed = facts.code === '';
+  const passed = facts.verdict === 'pass';
+  const message =
+    facts.code === 'EXPERIMENTAL_SYMLINK_ESCAPE'
+      ? `symbolic links resolving outside the worktree: ${facts.violations.slice(0, 20).join(', ')}`
+      : facts.code === 'EXPERIMENTAL_WRITE_SCOPE_VIOLATION'
+        ? `writes outside the ${task.discipline} paths: ${facts.violations.slice(0, 20).join(', ')}`
+        : facts.code === 'TASK_RESOURCE_LOCK_LOST'
+          ? 'the task lost a declared resource lock before its result could be accepted'
+          : `the ${request.runtime} attempt did not complete successfully`;
   return buildTaskExecutionEvidence(task as unknown as TaskRecordBinding, {
     id,
     candidate_sha: facts.candidateSha,
@@ -528,14 +755,11 @@ function attemptEvidence(
     cost: facts.attempt.output.cost,
     started_at: facts.startedAt,
     completed_at: facts.completedAt,
-    verdict: passed ? 'pass' : facts.attempt.ok ? 'fail' : 'error',
+    verdict: facts.verdict,
     ...(!passed && {
       failure: {
         code: facts.code,
-        message:
-          facts.outOfScope.length > 0
-            ? `writes outside the ${task.discipline} paths: ${facts.outOfScope.slice(0, 20).join(', ')}`
-            : `the ${request.runtime} attempt did not complete successfully`,
+        message,
         rollback_disposition: 'preserved-for-repair' as const,
       },
     }),
