@@ -1,4 +1,13 @@
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -618,6 +627,41 @@ describe('S06-B docs governance report', () => {
     ] as const) {
       expect(resolved({ [key]: value }), `${key}=${value}`).toEqual({ rejected: { key, value } });
     }
+  });
+
+  it('refuses workflow pages a symbolic link carries outside the real docs root', () => {
+    const outside = mkdtempSync(join(tmpdir(), 'devai-cli-shard06-outside-pages-'));
+    roots.push(outside);
+    writeFileSync(join(outside, 'ci.md'), '# ci\n');
+    write('.github/workflows/ci.yml', 'name: ci\n');
+    writeJson('.devai/config/project.json', {
+      repo: { kind: 'application' },
+      docs: {
+        builder: 'docusaurus',
+        build_command: '',
+        ia: { path_overrides: { 'dev/operations': 'meta/ops' } },
+      },
+    });
+    mkdirSync(join(root, 'docs/meta/ops'), { recursive: true });
+    symlinkSync(outside, join(root, 'docs/meta/ops/workflows'));
+    expect(governanceFinding('docs-ia.workflow-page-set')).toEqual({
+      ruleId: 'docs-ia.workflow-page-set',
+      severity: 'fail',
+      message: `DOCS_PATH_OUTSIDE_DOCS_ROOT: docs/meta/ops/workflows resolves to ${realpathSync(outside)}, outside the real docs/ root, so the workflow pages were not read`,
+      remediation:
+        'Replace the symbolic link on docs/meta/ops/workflows with a directory inside docs/, or relocate the pages under docs.ia.path_overrides.',
+      locations: ['docs/meta/ops/workflows'],
+    });
+
+    // A link that stays inside the real docs root is followed.
+    rmSync(join(root, 'docs/meta/ops/workflows'));
+    write('docs/pages/ci.md', '# ci\n');
+    symlinkSync('../../pages', join(root, 'docs/meta/ops/workflows'));
+    expect(governanceFinding('docs-ia.workflow-page-set')).toEqual({
+      ruleId: 'docs-ia.workflow-page-set',
+      severity: 'pass',
+      message: 'Workflow page set complete (1 workflows under docs/meta/ops/workflows)',
+    });
   });
 
   it('refuses a workflow page override that leaves the docs tree without reading it', () => {
