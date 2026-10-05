@@ -23,6 +23,7 @@ import {
   EXPERIMENTAL_MAX_VALIDITY_DAYS,
   EXPERIMENTAL_RUNTIMES,
   EXPERIMENTAL_WITHDRAWALS_DIR,
+  ExperimentalActivationLockStale,
   checkExperimentalActivation,
   readExperimentalActivation,
   withdrawExperimentalActivation,
@@ -202,16 +203,40 @@ describe('activation writes and withdrawals serialize (ADR-MDL-0007)', () => {
     expect(readFileSync(record, 'utf8')).toContain('second');
   });
 
-  it('reclaims a lock its writer left behind and refuses one a live writer holds', async () => {
+  it('never takes a lock over: a gone writer refuses as stale with its removal step, a live one as busy', async () => {
     const root = mkdtempSync(join(tmpdir(), 'devai-experimental-activation-'));
     roots.push(root);
     const lock = join(root, EXPERIMENTAL_ACTIVATION_LOCK);
+    const record = join(root, EXPERIMENTAL_ACTIVATION_RECORD);
     mkdirSync(join(root, '.devai/state/experimental'), { recursive: true });
     const gone = spawnSync(process.execPath, ['--version']).pid;
-    writeFileSync(lock, JSON.stringify({ pid: gone, hostname: hostname(), token: 'gone' }));
+    const stale = JSON.stringify({ pid: gone, hostname: hostname(), token: 'gone' });
+    writeFileSync(lock, stale);
+    let refusal: unknown;
+    await effects(() => {
+      try {
+        writeExperimentalActivation(root, first());
+      } catch (error) {
+        refusal = error;
+      }
+    });
+    expect(refusal).toBeInstanceOf(ExperimentalActivationLockStale);
+    expect(refusal).toMatchObject({
+      code: 'EXPERIMENTAL_ACTIVATION_LOCK_STALE',
+      removal: `rm "${lock}"`,
+    });
+    expect((refusal as ExperimentalActivationLockStale).detail).toContain(
+      EXPERIMENTAL_ACTIVATION_LOCK,
+    );
+    // Nothing was taken over: the stale lock is untouched and nothing was written.
+    expect(readFileSync(lock, 'utf8')).toBe(stale);
+    expect(existsSync(record)).toBe(false);
+    // The human removal step, then the activation is admitted and its lock released.
+    rmSync(lock);
     await effects(() => writeExperimentalActivation(root, first()));
     expect(existsSync(lock)).toBe(false);
-    writeFileSync(lock, JSON.stringify({ pid: process.pid, hostname: hostname(), token: 'live' }));
+    const live = JSON.stringify({ pid: process.pid, hostname: hostname(), token: 'live' });
+    writeFileSync(lock, live);
     await effects(() => {
       expect(() => writeExperimentalActivation(root, second())).toThrow(
         'EXPERIMENTAL_ACTIVATION_BUSY',
@@ -220,8 +245,8 @@ describe('activation writes and withdrawals serialize (ADR-MDL-0007)', () => {
         'EXPERIMENTAL_ACTIVATION_BUSY',
       );
     });
-    expect(readFileSync(join(root, EXPERIMENTAL_ACTIVATION_RECORD), 'utf8')).not.toContain(
-      'second',
-    );
+    // Only the token owner removes a lock.
+    expect(readFileSync(lock, 'utf8')).toBe(live);
+    expect(readFileSync(record, 'utf8')).not.toContain('second');
   });
 });
