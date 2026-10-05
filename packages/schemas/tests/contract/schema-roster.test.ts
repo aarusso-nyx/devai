@@ -12,10 +12,11 @@ const ROOT = resolve(import.meta.dirname, '../../../..');
 // and proof-orphan-declaration.schema.json (TASK-0436). CMP-0006 adds the four soft-gate
 // schemas and thresholds.schema.json. ADR-MDL-0005 adds experimental-execution,
 // experimental-activation and dispatch-journal-event, and promotes the source-only
-// prompt-composition schema to the runtime roster for the prompt composer, so the count is 108.
+// prompt-composition schema to the runtime roster for the prompt composer. init upgrade (#264)
+// adds adopter-migrations.schema.json for the shipped migration manifest, so the count is 109.
 describe('schema roster', () => {
   it('holds the previous roster plus model-tiers, path-authority-classes, observation-backlog and the proof anchor schemas', () => {
-    expect(ROSTER).toHaveLength(108);
+    expect(ROSTER).toHaveLength(109);
     expect(ROSTER).toContain('model-tiers.schema.json');
     expect(ROSTER).toContain('path-authority-classes.schema.json');
     expect(ROSTER).toContain('observation-backlog.schema.json');
