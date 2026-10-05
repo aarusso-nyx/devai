@@ -505,7 +505,9 @@ describe('recorded dispositions and recovery (gap 2)', () => {
       in_flight_task_ids: ['TASK-0216'],
       attempt_floors: { 'TASK-0215': 1 },
     });
-    expect(readFileSync(record.quarantined_journal?.path ?? '').equals(damaged)).toBe(true);
+    expect(readFileSync(join(root, record.quarantined_journal?.path ?? '')).equals(damaged)).toBe(
+      true,
+    );
     expect(existsSync(path)).toBe(false);
     // The in-flight task still blocks the round until its own disposition.
     expect(() => assertNoUncertainDispatch(root, ROUND, listTasks(root))).toThrow(
