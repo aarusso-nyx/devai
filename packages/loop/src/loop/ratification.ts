@@ -19,11 +19,10 @@ import {
 } from '@devai-nyx/authority';
 import { createHash, randomUUID } from 'node:crypto';
 import { dirname, join } from 'node:path';
-import { recordAgentEscalation } from './dispatch-disposition.js';
-import { dispatchJournalPath, openDispatchAttempts } from './dispatch-journal.js';
+import { escalateAgentTask, taskDispatchBlockers } from './dispatch-disposition.js';
 import { fsyncDirectorySync, mkdirDurableSync, writeAllSync } from './durable-files.js';
 import { acquireRoundController, releaseRoundController } from './round-controller.js';
-import { escalateTask, loadTask, saveTask, type TaskRecord } from './tasks.js';
+import { loadTask, saveTask, type TaskRecord } from './tasks.js';
 import { fail, requireActiveTaskRound } from './task-queue-services.js';
 
 export type RatificationDecision = 'accept' | 'reject';
@@ -125,8 +124,10 @@ function writeDecision(path: string, record: RatificationRecord): void {
 
 /**
  * Apply a recorded decision as a compare-and-swap on the task: it re-reads the record and
- * transitions it only while it is still awaiting review, so a concurrent escalation is
- * never overwritten back into pre_merge.
+ * transitions it only while it is still awaiting review. The caller holds the round
+ * controller for the whole load-and-save window, and every other writer of an agent task
+ * (dispatch, dispose, and `task escalate`) needs that controller too, so no concurrent
+ * escalation can land between the read and the write and be overwritten into pre_merge.
  */
 function applyDecision(repoRoot: string, roundId: string, record: RatificationRecord): void {
   const current = loadTask(repoRoot, record.task_id);
@@ -136,8 +137,7 @@ function applyDecision(repoRoot: string, roundId: string, record: RatificationRe
     return;
   }
   // A rejected agent attempt releases its worktree (ADR-MDL-0007); the branch is kept.
-  recordAgentEscalation({ repoRoot, roundId, task: current });
-  escalateTask({ repoRoot, taskId: current.id });
+  escalateAgentTask({ repoRoot, roundId, task: current });
 }
 
 /**
@@ -181,10 +181,7 @@ export function ratifyRoundTask(options: {
       return prior;
     }
     if (task.status !== 'awaiting_human_review') fail('RATIFICATION_TASK_NOT_AWAITING_REVIEW');
-    if (
-      existsSync(dispatchJournalPath(options.repoRoot, roundId)) &&
-      openDispatchAttempts(options.repoRoot, roundId, task.id).length > 0
-    ) {
+    if (taskDispatchBlockers(options.repoRoot, roundId, task.id).length > 0) {
       // Reviewed evidence must come from a settled attempt; uncertain work needs a disposition.
       fail('TASK_DISPATCH_UNCERTAIN');
     }
