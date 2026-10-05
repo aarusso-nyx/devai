@@ -346,7 +346,7 @@ describe('campaign materialize (S4b, IA-002)', () => {
     expect(existsSync(join(root, '.devai/state/tasks/TASK-7013.json'))).toBe(false);
   });
 
-  it('enriches a compatible partial queue entry through the canonical materializer', async () => {
+  it('refuses an entry whose present queue field differs from the campaign record', async () => {
     const root = repository();
     await withAuthorityHostTestScope(async () => {
       appendBacklog(root, {
@@ -356,6 +356,28 @@ describe('campaign materialize (S4b, IA-002)', () => {
         priority: 50,
         status: 'queued',
         created_at: '2026-10-04T00:00:00.000Z',
+        discipline: 'inspector',
+      });
+      expect(() =>
+        materializeCampaignRound({ repoRoot: root, campaignId: 'CMP-0701', roundId: ROUND }),
+      ).toThrow('TASK_QUEUE_MATERIALIZATION_CONFLICT');
+    });
+    expect(existsSync(join(root, '.devai/state/tasks'))).toBe(false);
+    expect(readBacklog(root).find((item) => item.id === 'TASK-7013')?.discipline).toBe('inspector');
+  });
+
+  it('enriches only the absent fields of a compatible partial queue entry', async () => {
+    const root = repository();
+    await withAuthorityHostTestScope(async () => {
+      appendBacklog(root, {
+        id: 'TASK-7013',
+        round_id: ROUND,
+        title: 'engineer task TASK-7013',
+        priority: 50,
+        status: 'queued',
+        created_at: '2026-10-04T00:00:00.000Z',
+        // Present and equal to the campaign record, so it is kept as it is.
+        discipline: 'engineer',
       });
       expect(
         materializeCampaignRound({ repoRoot: root, campaignId: 'CMP-0701', roundId: ROUND }),

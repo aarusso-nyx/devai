@@ -481,6 +481,62 @@ describe('agent completion is durable before it releases anything (FIX 4, FIX 8)
     expect(listWorktrees({ repoRoot: root })).toEqual([]);
   });
 
+  it('serializes agent completion with escalation under the round controller', async () => {
+    const root = repository();
+    await accepted(root);
+    // An escalation that owns the round blocks completion; nothing is recorded meanwhile.
+    const escalating = await effects(() => acquireRoundController(root, ROUND));
+    await effects(() => {
+      expect(() =>
+        finishRoundTask({
+          repoRoot: root,
+          round: ROUND,
+          taskId: 'TASK-0341',
+          evidence: ['EV-0123456789abcdef'],
+        }),
+      ).toThrow('TASK_ROUND_CONTROLLER_BUSY');
+    });
+    expect(existsSync(completionPath(root))).toBe(false);
+    expect(loadTask(root, 'TASK-0341').status).toBe('pre_merge');
+    await effects(() => releaseRoundController(root, escalating));
+    // An escalation arriving inside completion's load-to-save window is refused.
+    const taskFile = join(root, '.devai/state/tasks/TASK-0341.json');
+    let concurrent: unknown;
+    await effects(
+      () =>
+        finishRoundTask({
+          repoRoot: root,
+          round: ROUND,
+          taskId: 'TASK-0341',
+          evidence: ['EV-0123456789abcdef'],
+        }),
+      (request, apply) => {
+        if (
+          concurrent === undefined &&
+          request.symbol === 'writeFileSync' &&
+          request.arguments[0] === taskFile &&
+          String(request.arguments[1]).includes('"status": "merging"')
+        ) {
+          concurrent = 'attempted';
+          try {
+            escalateRoundTask({
+              repoRoot: root,
+              round: ROUND,
+              taskId: 'TASK-0341',
+              acquireRoundController: true,
+            });
+            concurrent = 'escalated';
+          } catch (error) {
+            concurrent = (error as { code?: string }).code;
+          }
+        }
+        return apply();
+      },
+    );
+    expect(concurrent).toBe('TASK_ROUND_CONTROLLER_BUSY');
+    expect(loadTask(root, 'TASK-0341').status).toBe('completed');
+  });
+
   it('moves a truncated completion record aside instead of accepting it', async () => {
     const root = repository();
     await accepted(root);
