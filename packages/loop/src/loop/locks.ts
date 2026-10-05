@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync } from '@devai-nyx/authority';
+import { randomUUID } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { utf8Compare } from './lock-targets.js';
 import {
@@ -19,6 +20,12 @@ export interface LockRecord {
   readonly module: string;
   readonly acquired_at: string;
   readonly ttl_ms: number;
+  /**
+   * Unique per acquisition and renewal, so a release and re-acquisition by the same task
+   * within one millisecond still writes a different record. A record written before
+   * generations existed has none and is its own generation.
+   */
+  readonly generation?: string;
 }
 
 export interface AcquireLockOptions {
@@ -75,7 +82,8 @@ function isLockRecord(value: Readonly<Record<string, unknown>>): boolean {
     typeof value.task_id === 'string' &&
     typeof value.acquired_at === 'string' &&
     typeof value.ttl_ms === 'number' &&
-    Number.isFinite(value.ttl_ms)
+    Number.isFinite(value.ttl_ms) &&
+    (value.generation === undefined || typeof value.generation === 'string')
   );
 }
 
@@ -199,6 +207,7 @@ function acquireAll(
       module: modulePart,
       acquired_at: now,
       ttl_ms: ttlMs,
+      generation: randomUUID(),
     };
     const body = serialize(record);
     const take = (): void => {
@@ -278,7 +287,7 @@ export function renewLocks(opts: {
       lost.push({ target, held_by: observed.record.task_id });
       continue;
     }
-    const record: LockRecord = { ...observed.record, acquired_at: now };
+    const record: LockRecord = { ...observed.record, acquired_at: now, generation: randomUUID() };
     const outcome = swapOrStandDown({
       path,
       claimsDir: claimsDir(opts.locksDir),
