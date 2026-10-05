@@ -167,8 +167,8 @@
         {
           "id": "MIG-2.0.0-experimental-agent-execution",
           "kind": "opt-in-capability",
-          "summary": "Opt-in experimental agent execution: round dispatch runs agent tasks through host CLI providers only under an unexpired Owner activation record written by the Owner-only round dispatch activate into .devai/state/experimental/activation.json and an explicit --experimental consent. An adopter that writes no activation record sees no change.",
-          "decision_records": ["ADR-MDL-0005", "ADR-MDL-0006"],
+          "summary": "Opt-in experimental agent execution: round dispatch runs agent tasks through host CLI providers only under an unexpired Owner activation record written by the Owner-only round dispatch activate into .devai/state/experimental/activation.json and an explicit --experimental consent. An adopter that writes no activation record sees no change. The Owner-only round dispatch dispose and round dispatch deactivate record the disposition of uncertain work and the withdrawal of an activation (ADR-MDL-0007).",
+          "decision_records": ["ADR-MDL-0005", "ADR-MDL-0006", "ADR-MDL-0007"],
           "segments": ["authority"],
           "files": [".devai/config/authority-policy.json"]
         },
@@ -176,7 +176,7 @@
           "id": "MIG-2.0.0-campaign-actions",
           "kind": "new-action",
           "summary": "Campaign rounds reach the runtime through campaign status, campaign materialize and round ratify; the authority policy is rematerialized from the installed action registry so the new actions are governed.",
-          "decision_records": [],
+          "decision_records": ["ADR-GOV-0025"],
           "segments": ["authority"],
           "files": [".devai/config/authority-policy.json"]
         },
