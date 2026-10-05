@@ -46,6 +46,7 @@ const prefixes = new Set([
   'MUTATION',
   'POLICY',
   'POST',
+  'PROCESS',
   'PROMPT',
   'PROOF',
   'RECEIPT',
