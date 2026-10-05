@@ -283,6 +283,15 @@
       "owner": "architect"
     },
     {
+      "template_id": "git-common-dir",
+      "executable": "git",
+      "argv_shape": ["rev-parse", "--path-format=absolute", "--git-common-dir"],
+      "capabilities": ["proc:git-read"],
+      "effect": "read",
+      "reason": "The trusted authority sources read the common Git directory to derive the repository id, which the doctor post-checks of init upgrade recompute.",
+      "owner": "architect"
+    },
+    {
       "template_id": "git-verify-ref",
       "executable": "git",
       "argv_shape": ["rev-parse", "--verify", "<dynamic>"],
