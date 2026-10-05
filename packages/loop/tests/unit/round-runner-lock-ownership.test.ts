@@ -5,7 +5,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { withAuthorityHostTestScope } from '../../../skills/tests/unit/authority-host-test-scope.js';
 import { acquireLocks, listLocks, releaseLocks } from '../../src/loop/locks.js';
 import { runRoundTasks } from '../../src/loop/round-runner.js';
-import { loadTask, saveTask, type TaskRecord } from '../../src/loop/tasks.js';
+import {
+  completeTask,
+  loadTask,
+  pauseTaskForRgr,
+  saveTask,
+  type TaskRecord,
+} from '../../src/loop/tasks.js';
 
 const roots: string[] = [];
 const ROUND = 'R-0007';
@@ -224,6 +230,60 @@ describe('lost locks are reconciled whatever status the dispatch left', () => {
           releaseLocks({ locksDir: lockDir(root), taskId: 'TASK-9399' });
           saveTask(root, { ...running, status: 'awaiting_human_review' });
           return { ok: true, evidence_id: 'EV-9306' };
+        },
+      });
+
+      expect(result.results).toEqual([
+        { task_id: value.id, ok: false, code: 'TASK_RESOURCE_LOCK_LOST' },
+      ]);
+      expect(loadTask(root, value.id).status).toBe('escalated');
+    });
+  });
+
+  it('fails and withdraws a completion recorded inside the dispatch after a takeover', async () => {
+    const root = repository();
+    const value = task('TASK-9309');
+    fixedDate();
+
+    await withAuthorityHostTestScope(async () => {
+      saveTask(root, value);
+
+      const result = await runRoundTasks({
+        repoRoot: root,
+        round: ROUND,
+        lockRenewalIntervalMs: 60_000,
+        dispatch: () => {
+          takeOver(root);
+          // The completion finds no record of its own to release once the key was taken.
+          completeTask({ repoRoot: root, taskId: value.id });
+          return { ok: true, evidence_id: 'EV-9309' };
+        },
+      });
+
+      expect(result.results).toEqual([
+        { task_id: value.id, ok: false, code: 'TASK_RESOURCE_LOCK_LOST' },
+      ]);
+      expect(loadTask(root, value.id).status).toBe('escalated');
+      expect(listLocks({ locksDir: lockDir(root) })).toMatchObject([{ task_id: 'TASK-9399' }]);
+    });
+  });
+
+  it('fails and escalates a gap pause recorded inside the dispatch after a takeover', async () => {
+    const root = repository();
+    const value = task('TASK-9310');
+    fixedDate();
+
+    await withAuthorityHostTestScope(async () => {
+      saveTask(root, value);
+
+      const result = await runRoundTasks({
+        repoRoot: root,
+        round: ROUND,
+        lockRenewalIntervalMs: 60_000,
+        dispatch: () => {
+          takeOver(root);
+          pauseTaskForRgr({ repoRoot: root, taskId: value.id, rgrId: 'RGR-0001' });
+          return { ok: false, code: 'TASK_REFERENCE_GAP' };
         },
       });
 

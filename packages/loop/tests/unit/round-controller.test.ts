@@ -267,6 +267,12 @@ describe('lock denial requeue and escalation', () => {
     ['a non-numeric count', JSON.stringify({ 'TASK-0211': 'two' })],
     ['a negative count', JSON.stringify({ 'TASK-0211': -1 })],
     ['a fractional count', JSON.stringify({ 'TASK-0211': 1.5 })],
+    ['a negative count in an entry', JSON.stringify({ 'TASK-0211': { count: -1 } })],
+    [
+      'an out-of-range owed priority',
+      JSON.stringify({ 'TASK-0211': { count: 1, pending_priority: 101 } }),
+    ],
+    ['an unknown entry field', JSON.stringify({ 'TASK-0211': { count: 1, owed: 1 } })],
   ])('refuses %s lock-denial state before touching any task', async (_case, body) => {
     const root = repository();
     await withAuthorityHostTestScope(async () => {
@@ -312,6 +318,33 @@ describe('lock denial requeue and escalation', () => {
         dispatch: () => ({ ok: true }),
       });
       expect(repaired.results).toEqual([{ task_id: 'TASK-0212', ok: true }]);
+    });
+  });
+
+  it('applies a priority bump a re-queue still owes before planning the next run', async () => {
+    const root = repository();
+    await withAuthorityHostTestScope(async () => {
+      // The count and the owed bump were written; the run stopped before applying it.
+      saveTask(root, task('TASK-0213'));
+      mkdirSync(join(root, '.devai/state/round-runs', ROUND), { recursive: true });
+      writeFileSync(
+        denialsFile(root),
+        JSON.stringify({ 'TASK-0213': { count: 1, pending_priority: 1 } }),
+      );
+      const priorities: (number | undefined)[] = [];
+
+      const result = await runRoundTasks({
+        repoRoot: root,
+        round: ROUND,
+        dispatch: (running) => {
+          priorities.push(running.priority);
+          return { ok: true };
+        },
+      });
+
+      expect(result.results).toEqual([{ task_id: 'TASK-0213', ok: true }]);
+      expect(priorities).toEqual([1]);
+      expect(readDenials(root)).toEqual({});
     });
   });
 
