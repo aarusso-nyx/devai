@@ -4,6 +4,7 @@ import { hostname } from 'node:os';
 import { join } from 'node:path';
 import {
   createRecordExclusive,
+  fsyncDirectory,
   observeRecord,
   processAlive,
   swapObservedRecord,
@@ -234,6 +235,8 @@ function writeDenials(
     fail('TASK_ROUND_CONTROLLER_BUSY');
   }
   renameSync(staged, path);
+  // The count and the bump it owes must be durable before the task is re-queued.
+  fsyncDirectory(roundRunDir(repoRoot, roundId));
 }
 
 function entryOf(denials: Readonly<Record<string, DenialEntry>>, taskId: string): DenialEntry {
