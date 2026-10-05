@@ -45,6 +45,8 @@ export interface CheckResult {
   readonly advisory?: boolean;
   readonly info?: Record<string, unknown>;
   readonly errors?: readonly string[];
+  /** Findings worth acting on that never fail the check, each naming its remedy (#266). */
+  readonly warnings?: readonly string[];
 }
 
 export interface Report {

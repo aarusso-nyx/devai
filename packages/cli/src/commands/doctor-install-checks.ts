@@ -1,12 +1,16 @@
 import { existsSync, lstatSync, readFileSync, readlinkSync } from '@devai-nyx/authority';
 import { dirname, join, resolve } from 'node:path';
 import { readdirSync } from 'node:fs';
+import { lt, valid } from 'semver';
 import { validators } from '@devai-nyx/schemas';
 import { verifyChain } from '@devai-nyx/evidence';
 import { canonicalRegistry } from '../define-command.js';
 import { buildTrustedAuthoritySources, canonicalSha256 } from '../authority/policy.js';
 import { resolveCliProvenance, resolveCliVersion } from '../version.js';
-import { verifyInstalledPostMergeAdapter } from '../services/hooks-install/index.js';
+import {
+  locatePostMergeBinding,
+  verifyInstalledPostMergeAdapter,
+} from '../services/hooks-install/index.js';
 import { verifyGithubActionsAdapter } from '../services/github-actions-adapter/index.js';
 import { inspectRemoteLocalOnlyNodes, readAttestedRcConfig } from './check/ci-local-only.js';
 import {
@@ -279,6 +283,85 @@ function adopterExtensionReport(
   };
 }
 
+const POST_MERGE_CONFIG = '.devai/config/post-merge-host-adapter.json';
+const GITHUB_ACTIONS_CONFIG = '.devai/config/github-actions-host-adapter.json';
+const POST_MERGE_REBIND =
+  'devai init bind --target . --host-adapter post-merge --as-role architect --write';
+const GITHUB_ACTIONS_REBIND =
+  'devai init bind --target . --host-adapter github-actions --as-role architect --write';
+
+// The host-adapter finding ids of #266, quoted so the error-code reference lists them.
+const HOST_ADAPTER_REASONS = {
+  notApplicableHere: 'POST_MERGE_ADAPTER_NOT_APPLICABLE_HERE',
+  unverifiableHere: 'POST_MERGE_ADAPTER_UNVERIFIABLE_HERE',
+  bindingStale: 'POST_MERGE_ADAPTER_BINDING_STALE',
+  postMergeVersionLag: 'POST_MERGE_ADAPTER_VERSION_LAG',
+  githubActionsVersionLag: 'GITHUB_ACTIONS_ADAPTER_VERSION_LAG',
+} as const;
+
+/** The package version a host-adapter configuration binds, read leniently for reporting only. */
+function boundAdapterVersion(repoRoot: string, config: string): string | undefined {
+  try {
+    const parsed = JSON.parse(readFileSync(join(repoRoot, config), 'utf8')) as unknown;
+    const binding =
+      parsed !== null && typeof parsed === 'object'
+        ? (parsed as Record<string, unknown>)['package_binding']
+        : undefined;
+    const version =
+      binding !== null && typeof binding === 'object'
+        ? (binding as Record<string, unknown>)['version']
+        : undefined;
+    return typeof version === 'string' ? version : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * #266: warn on every host-adapter configuration whose package binding lags the installed
+ * package, naming the rebind that refreshes it. Rebinding GitHub Actions re-selects it and
+ * re-materializes the authority policy the post-merge attestation pins, so a bound post-merge
+ * adapter is rebound after it. A warning never fails the check: the selected adapter's own
+ * verification already refuses a binding to another version.
+ */
+function hostAdapterVersionLags(
+  repoRoot: string,
+  installed: string,
+  postMergeCheckout: string | undefined,
+): { readonly reasons: string[]; readonly warnings: string[] } {
+  const lagging = (config: string): string | undefined => {
+    const bound = boundAdapterVersion(repoRoot, config);
+    return bound !== undefined &&
+      valid(bound) !== null &&
+      valid(installed) !== null &&
+      lt(bound, installed)
+      ? bound
+      : undefined;
+  };
+  const postMergeRebind = `rebind the post-merge adapter in the checkout that bound it${
+    postMergeCheckout === undefined ? '' : ` (${postMergeCheckout})`
+  } with \`${POST_MERGE_REBIND}\``;
+  const reasons: string[] = [];
+  const warnings: string[] = [];
+  const githubActions = lagging(GITHUB_ACTIONS_CONFIG);
+  if (githubActions !== undefined) {
+    reasons.push(HOST_ADAPTER_REASONS.githubActionsVersionLag);
+    warnings.push(
+      `${HOST_ADAPTER_REASONS.githubActionsVersionLag}: ${GITHUB_ACTIONS_CONFIG} binds @aarusso-nyx/devai ${githubActions}, behind the installed ${installed}; rebind with \`${GITHUB_ACTIONS_REBIND}\`${
+        existsSync(join(repoRoot, POST_MERGE_CONFIG)) ? `, then ${postMergeRebind}` : ''
+      }`,
+    );
+  }
+  const postMerge = lagging(POST_MERGE_CONFIG);
+  if (postMerge !== undefined) {
+    reasons.push(HOST_ADAPTER_REASONS.postMergeVersionLag);
+    warnings.push(
+      `${HOST_ADAPTER_REASONS.postMergeVersionLag}: ${POST_MERGE_CONFIG} binds @aarusso-nyx/devai ${postMerge}, behind the installed ${installed}; ${postMergeRebind}`,
+    );
+  }
+  return { reasons, warnings };
+}
+
 export function checkAuthorityEnforcement(repoRoot: string): CheckResult {
   const projectPath = join(repoRoot, '.devai/config/project.json');
   const policyPath = join(repoRoot, '.devai/config/authority-policy.json');
@@ -314,21 +397,53 @@ export function checkAuthorityEnforcement(repoRoot: string): CheckResult {
       { mode?: string; adapter?: { adapter_id?: string } } | undefined;
     const declaredMode = project.authority_enforcement?.mode;
     const adapterConfig = project.authority_enforcement?.adapter_config;
+    const hostIntegrated = declaredMode === 'host-integrated';
+    const postMergeSelected = adapterConfig === POST_MERGE_CONFIG;
     const selectedAdapterBound =
-      declaredMode !== 'host-integrated' ||
-      (adapterConfig === '.devai/config/post-merge-host-adapter.json' &&
-        host?.adapter?.adapter_id === 'post-merge-host-adapter') ||
-      (adapterConfig === '.devai/config/github-actions-host-adapter.json' &&
+      !hostIntegrated ||
+      (postMergeSelected && host?.adapter?.adapter_id === 'post-merge-host-adapter') ||
+      (adapterConfig === GITHUB_ACTIONS_CONFIG &&
         host?.adapter?.adapter_id === 'github-actions-main-observation');
+    // #266: a post-merge binding made in another checkout is verifiable only there; here it is
+    // not applicable, and authority enforcement rests on an adapter this checkout can verify.
+    const postMergeLocation = hostIntegrated ? locatePostMergeBinding(repoRoot) : undefined;
+    const postMergeElsewhere = postMergeLocation?.scope === 'other-checkout';
+    const boundCheckout = postMergeLocation?.bound_checkout;
     const localPostMerge =
-      declaredMode === 'host-integrated'
+      hostIntegrated && !postMergeElsewhere
         ? verifyInstalledPostMergeAdapter(repoRoot, resolveCliVersion())
         : { ok: false, facts: {}, errors: [] as readonly string[] };
     const githubActions = verifyGithubActionsAdapter(repoRoot, resolveCliVersion());
+    const unverifiableHere = postMergeSelected && postMergeElsewhere && !githubActions.ok;
     const adapterDeclared =
-      declaredMode !== 'host-integrated' ||
-      (adapterConfig === '.devai/config/post-merge-host-adapter.json' && localPostMerge.ok) ||
-      (adapterConfig === '.devai/config/github-actions-host-adapter.json' && githubActions.ok);
+      !hostIntegrated ||
+      (postMergeSelected && (postMergeElsewhere ? githubActions.ok : localPostMerge.ok)) ||
+      (adapterConfig === GITHUB_ACTIONS_CONFIG && githubActions.ok);
+    const lags = hostIntegrated
+      ? hostAdapterVersionLags(repoRoot, resolveCliVersion(), boundCheckout)
+      : { reasons: [], warnings: [] };
+    // This checkout's own post-merge binding decides nothing while another adapter is selected,
+    // yet its merge receipts are refused while it does not verify, for example after a later
+    // host-adapter bind re-materialized the authority policy its attestation pins.
+    const bindingStale =
+      hostIntegrated &&
+      !postMergeSelected &&
+      postMergeLocation?.scope === 'this-checkout' &&
+      !localPostMerge.ok;
+    const warnings = [
+      ...(bindingStale
+        ? [
+            `${HOST_ADAPTER_REASONS.bindingStale}: this checkout's post-merge host adapter does not verify (${localPostMerge.errors.join(', ')}); it is not the selected host identity, so it does not decide this check, but its merge receipts are refused until it is rebound with \`${POST_MERGE_REBIND}\`, which selects it`,
+          ]
+        : []),
+      ...lags.warnings,
+    ];
+    const reasonIds = [
+      ...(postMergeElsewhere ? [HOST_ADAPTER_REASONS.notApplicableHere] : []),
+      ...(unverifiableHere ? [HOST_ADAPTER_REASONS.unverifiableHere] : []),
+      ...(bindingStale ? [HOST_ADAPTER_REASONS.bindingStale] : []),
+      ...lags.reasons,
+    ];
     const adopter = adopterExtensionReport(repoRoot, policy, sources, bindingMatches);
     const ok =
       bindingMatches &&
@@ -350,20 +465,34 @@ export function checkAuthorityEnforcement(repoRoot: string): CheckResult {
         cli_runtime_enforced: bindingMatches && enforcement?.mode === 'binding',
         local_post_merge_enforced: bindingMatches && localPostMerge.ok,
         local_post_merge_facts: localPostMerge.facts,
+        ...(postMergeLocation !== undefined && {
+          local_post_merge_scope: postMergeLocation.scope,
+          ...(boundCheckout !== undefined && { local_post_merge_bound_checkout: boundCheckout }),
+        }),
+        ...(postMergeElsewhere && {
+          host_adapter_note: `${HOST_ADAPTER_REASONS.notApplicableHere}: the post-merge host adapter was bound in ${String(boundCheckout)} and is verifiable only in that checkout; run \`devai doctor\` there to verify it, or rebind it with \`${POST_MERGE_REBIND}\` in a live checkout if that one is gone. Here authority enforcement rests on the GitHub Actions adapter${githubActions.ok ? '' : ', which this checkout does not verify'}.`,
+        }),
         github_actions_enforced: bindingMatches && githubActions.ok,
         github_actions_facts: githubActions.facts,
         arbitrary_host_tools_enforced: false,
+        ...(reasonIds.length > 0 && { reason_ids: reasonIds }),
       },
       ...(!ok && {
         errors: [
           'authority posture is missing, stale, non-binding, or inconsistent; re-materialize with `devai init bind --as-role architect --write`',
           ...adopter.errors,
           ...localPostMerge.errors,
-          ...(adapterConfig === '.devai/config/github-actions-host-adapter.json'
+          ...(unverifiableHere
+            ? [
+                `${HOST_ADAPTER_REASONS.unverifiableHere}: the selected post-merge host adapter was bound in ${String(boundCheckout)} and this checkout binds no host adapter it can verify; in that checkout run \`${GITHUB_ACTIONS_REBIND}\`, then \`${POST_MERGE_REBIND}\`, and commit the result`,
+              ]
+            : []),
+          ...(adapterConfig === GITHUB_ACTIONS_CONFIG || (postMergeSelected && postMergeElsewhere)
             ? githubActions.errors
             : []),
         ],
       }),
+      ...(warnings.length > 0 && { warnings }),
     };
   } catch (error) {
     return {

@@ -164,9 +164,12 @@ function renderHuman(report: Report): string {
         lines.push(`      ${e}`);
       }
     }
-    const tier3Note = (c.info as { tier3_note?: string } | undefined)?.tier3_note;
-    if (tier3Note !== undefined) {
-      lines.push(`      note: ${tier3Note}`);
+    for (const warning of c.warnings ?? []) {
+      lines.push(`      warning: ${warning}`);
+    }
+    const notes = c.info as { tier3_note?: string; host_adapter_note?: string } | undefined;
+    for (const note of [notes?.tier3_note, notes?.host_adapter_note]) {
+      if (note !== undefined) lines.push(`      note: ${note}`);
     }
     if (c.name === 'llm-bridges' && c.info !== undefined) {
       const bridges =
