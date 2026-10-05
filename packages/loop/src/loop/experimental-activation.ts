@@ -1,22 +1,22 @@
-import {
-  closeSync,
-  existsSync,
-  fsyncSync,
-  mkdirSync,
-  openSync,
-  readFileSync,
-  renameSync,
-  writeSync,
-} from '@devai-nyx/authority';
+import { existsSync, readFileSync, unlinkSync } from '@devai-nyx/authority';
 import { parsers } from '@devai-nyx/schemas';
-import { randomUUID } from 'node:crypto';
+import { canonicalSha256 } from '@devai-nyx/utils';
+import { createHash } from 'node:crypto';
 import { dirname, join } from 'node:path';
+import {
+  fsyncDirectorySync,
+  replaceDurableSync,
+  writeCreateOnlyDurableSync,
+} from './durable-files.js';
+import { fail } from './task-queue-services.js';
 
 /*
  * Mirrors of law/policy/experimental-execution.json (ADR-MDL-0005, ADR-MDL-0006);
  * a contract test pins them to the policy.
  */
 export const EXPERIMENTAL_ACTIVATION_RECORD = '.devai/state/experimental/activation.json';
+/** Owner withdrawals of the activation (`round dispatch deactivate`, ADR-MDL-0007). */
+export const EXPERIMENTAL_WITHDRAWALS_DIR = '.devai/state/experimental/withdrawals';
 export const EXPERIMENTAL_MAX_VALIDITY_DAYS = 30;
 export const EXPERIMENTAL_DISCIPLINES = ['engineer', 'inspector'] as const;
 export const EXPERIMENTAL_RUNTIMES = ['claude-cli', 'codex-cli'] as const;
@@ -25,6 +25,17 @@ export const EXPERIMENTAL_CEILINGS = {
   attempts_per_invocation: 32,
   attempt_wall_clock_minutes: 60,
 } as const;
+/**
+ * The efforts each experimental runtime accepts, mirroring `efforts` in
+ * law/policy/model-runtime-registry.json; a contract test pins this mirror. An
+ * activation or task naming any other effort refuses before a provider starts.
+ */
+export const EXPERIMENTAL_RUNTIME_EFFORTS: Readonly<
+  Record<(typeof EXPERIMENTAL_RUNTIMES)[number], readonly string[]>
+> = {
+  'claude-cli': ['default', 'low', 'medium', 'high'],
+  'codex-cli': ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'],
+};
 
 /** The Owner activation (law/schemas/experimental-activation.schema.json). */
 export interface ExperimentalActivation {
@@ -92,6 +103,13 @@ export function checkExperimentalActivation(
   if (new Set(runtimes).size !== runtimes.length) {
     return { ok: false, code: 'EXPERIMENTAL_ACTIVATION_INVALID' };
   }
+  if (
+    activation.runtimes.some((entry) =>
+      entry.efforts.some((effort) => !EXPERIMENTAL_RUNTIME_EFFORTS[entry.runtime].includes(effort)),
+    )
+  ) {
+    return { ok: false, code: 'EXPERIMENTAL_ACTIVATION_EFFORT_UNSUPPORTED' };
+  }
   return { ok: true, activation };
 }
 
@@ -121,22 +139,77 @@ export function readExperimentalActivation(
 
 /**
  * Replace the activation atomically with an already-checked record. A failed check
- * never reaches this point, so an earlier record is left untouched.
+ * never reaches this point, so an earlier record is left untouched; every byte is
+ * written and fsynced before the rename, so a short write can never replace a valid
+ * activation with a partial one.
  */
 export function writeExperimentalActivation(
   repoRoot: string,
   activation: ExperimentalActivation,
 ): string {
   const path = experimentalActivationPath(repoRoot);
-  mkdirSync(dirname(path), { recursive: true });
-  const staged = `${path}.${String(process.pid)}-${randomUUID()}`;
-  const fd = openSync(staged, 'wx');
-  try {
-    writeSync(fd, `${JSON.stringify(activation, null, 2)}\n`);
-    fsyncSync(fd);
-  } finally {
-    closeSync(fd);
-  }
-  renameSync(staged, path);
+  replaceDurableSync(path, `${JSON.stringify(activation, null, 2)}\n`);
   return path;
+}
+
+/** The Owner's audit record of one withdrawn activation (ADR-MDL-0007). */
+export interface ExperimentalActivationWithdrawal {
+  readonly schemaVersion: '1.0.0';
+  readonly id: string;
+  readonly withdrawn_at: string;
+  readonly role: 'owner';
+  /** SHA-256 of the withdrawn record's exact bytes. */
+  readonly record_sha256: string;
+  /** Canonical digest of the withdrawn activation, as `round dispatch activate` reported it; null when it no longer parses. */
+  readonly activation_digest_sha256: string | null;
+  readonly issued_at: string | null;
+  readonly expires_at: string | null;
+  /** Whether the withdrawn activation was still in force when it was withdrawn. */
+  readonly was_in_force: boolean;
+  readonly note: string | null;
+}
+
+/**
+ * Withdraw the activation: write a create-only withdrawal record naming the Owner, the
+ * time and the prior activation's digests, then remove the record that `round
+ * dispatch` reads, durably. An expired or invalid record is withdrawn just the same; a
+ * missing one refuses with `EXPERIMENTAL_ACTIVATION_MISSING`.
+ */
+export function withdrawExperimentalActivation(options: {
+  readonly repoRoot: string;
+  readonly now?: Date;
+  readonly note?: string;
+}): Readonly<{ path: string; withdrawal: ExperimentalActivationWithdrawal }> {
+  const now = options.now ?? new Date();
+  const path = experimentalActivationPath(options.repoRoot);
+  if (!existsSync(path)) fail('EXPERIMENTAL_ACTIVATION_MISSING');
+  const bytes = readFileSync(path);
+  let parsed: ExperimentalActivation | undefined;
+  try {
+    const value: unknown = JSON.parse(bytes.toString('utf8'));
+    const checked = parsers.experimentalActivation.safeParse<ExperimentalActivation>(value);
+    parsed = checked.ok ? checked.value : undefined;
+  } catch {
+    parsed = undefined;
+  }
+  const recordSha256 = createHash('sha256').update(bytes).digest('hex');
+  const withdrawnAt = now.toISOString();
+  const id = `EXW-${canonicalSha256({ record: recordSha256, at: withdrawnAt }).slice(0, 16)}`;
+  const withdrawal: ExperimentalActivationWithdrawal = {
+    schemaVersion: '1.0.0',
+    id,
+    withdrawn_at: withdrawnAt,
+    role: 'owner',
+    record_sha256: recordSha256,
+    activation_digest_sha256: parsed === undefined ? null : canonicalSha256(parsed),
+    issued_at: parsed?.issued_at ?? null,
+    expires_at: parsed?.expires_at ?? null,
+    was_in_force: checkExperimentalActivation(parsed, now).ok,
+    note: options.note ?? null,
+  };
+  const recordPath = join(options.repoRoot, EXPERIMENTAL_WITHDRAWALS_DIR, `${id}.json`);
+  writeCreateOnlyDurableSync(recordPath, `${JSON.stringify(withdrawal, null, 2)}\n`);
+  unlinkSync(path);
+  fsyncDirectorySync(dirname(path));
+  return { path: recordPath, withdrawal };
 }

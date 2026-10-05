@@ -56,6 +56,7 @@ export type {
   HumanExecutorRequest,
   HumanExecutorRole,
 } from './human-executor.js';
+export * from './dispatch-disposition.js';
 export * from './dispatch-journal.js';
 export * from './experimental-activation.js';
 export * from './locks.js';

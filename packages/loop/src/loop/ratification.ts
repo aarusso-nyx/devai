@@ -35,7 +35,7 @@ export interface RatificationRecord {
   readonly resulting_status: TaskRecord['status'];
 }
 
-function ratificationPath(repoRoot: string, roundId: string, taskId: string): string {
+export function ratificationPath(repoRoot: string, roundId: string, taskId: string): string {
   return join(repoRoot, '.devai/state/round-runs', roundId, 'ratifications', `${taskId}.json`);
 }
 

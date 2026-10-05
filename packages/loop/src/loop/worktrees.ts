@@ -8,7 +8,14 @@ import {
   rmSync,
   writeFileSync,
 } from '@devai-nyx/authority';
+import { hostname } from 'node:os';
 import { join, resolve, sep } from 'node:path';
+
+/** The process running an autonomous attempt in a worktree. */
+export interface WorktreeOwner {
+  readonly pid: number;
+  readonly hostname: string;
+}
 
 export interface WorktreeRecord {
   readonly id: string;
@@ -17,6 +24,13 @@ export interface WorktreeRecord {
   readonly task_id?: string;
   readonly created_at: string;
   readonly human_adopted?: boolean;
+  /**
+   * Kept after its attempt settled, for human review or disposition. A retained
+   * worktree no longer holds autonomous capacity (ADR-MDL-0007).
+   */
+  readonly retained?: boolean;
+  /** Set for an autonomous attempt; once this process is provably gone the worktree is retained. */
+  readonly owner?: WorktreeOwner;
 }
 
 export interface CreateWorktreeOptions {
@@ -29,6 +43,8 @@ export interface CreateWorktreeOptions {
   readonly baseRef?: string;
   readonly taskId?: string;
   readonly humanAdopted?: boolean;
+  /** The live process that runs an autonomous attempt in this worktree. */
+  readonly owner?: WorktreeOwner;
 }
 
 function worktreesDir(repoRoot: string): string {
@@ -56,23 +72,42 @@ function saveRegistry(repoRoot: string, registry: WorktreeRegistry): void {
 }
 
 /**
- * Per-host cap on concurrent non-adopted worktrees. Set by D-52
- * (Phase 16.C; supersedes D-11's earlier value of 6). Human-adopted
- * worktrees are cap-exempt — they reflect deliberate human review
- * paths, not autonomous-loop parallelism. The cap can be raised
- * project-locally by editing this constant; a future `.devai/config/
- * limits.json` override surface is documented in D-52 as the
- * migration path when adopters need higher concurrency.
+ * Per-host cap on concurrently active autonomous worktrees. ADR-MDL-0007 derives it
+ * from `law/policy/round-execution.json` capacity.max_workers (a contract test pins
+ * this mirror), replacing D-52's earlier value of 3, so every worker the policy
+ * admits can hold its attempt worktree. Human-adopted and retained worktrees are
+ * cap-exempt (Constitution Article 27): they hold work awaiting a human review or
+ * disposition, not autonomous-loop parallelism.
  */
-export const WORKTREE_CAP = 3;
+export const WORKTREE_CAP = 4;
+
+/** True when the pid names a live process; EPERM means alive but not ours. */
+function processAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'EPERM';
+  }
+}
+
+/** An attempt owner is provably gone only when it ran on this host and its pid is dead. */
+function ownerGone(owner: WorktreeOwner | undefined): boolean {
+  return owner !== undefined && owner.hostname === hostname() && !processAlive(owner.pid);
+}
 
 /**
- * Count active worktrees, excluding human-adopted ones (cap-exempt).
- * Active means present in the registry; orphan detection is the
+ * Whether a registry entry holds autonomous capacity: not human-adopted, not retained
+ * for review or disposition, and not left by an attempt process that is provably gone
+ * (that worktree waits for a human disposition instead). Orphan detection is the
  * separate `reapWorktrees` flow.
  */
+export function holdsWorktreeCapacity(record: WorktreeRecord): boolean {
+  return record.human_adopted !== true && record.retained !== true && !ownerGone(record.owner);
+}
+
 function activeNonAdoptedCount(registry: WorktreeRegistry): number {
-  return registry.worktrees.filter((w) => w.human_adopted !== true).length;
+  return registry.worktrees.filter(holdsWorktreeCapacity).length;
 }
 
 export function createWorktree(opts: CreateWorktreeOptions): WorktreeRecord {
@@ -81,20 +116,20 @@ export function createWorktree(opts: CreateWorktreeOptions): WorktreeRecord {
   }
   const registry = loadRegistry(opts.repoRoot);
 
-  // Cap enforcement (D-52). Human-adopted worktrees are cap-exempt.
-  // Replacing an existing autonomous entry does not add a slot. Replacing a
-  // human-adopted entry with an autonomous one does, so it must satisfy the cap.
+  // Cap enforcement (ADR-MDL-0007). Human-adopted and retained worktrees are cap-exempt.
+  // Replacing an entry that already holds capacity does not add a slot. Replacing an
+  // exempt entry with an active autonomous one does, so it must satisfy the cap.
   const existing = registry.worktrees.find((w) => w.id === opts.id);
-  const reusingExisting = existing !== undefined && existing.human_adopted !== true;
+  const reusingExisting = existing !== undefined && holdsWorktreeCapacity(existing);
   if (
     !reusingExisting &&
     opts.humanAdopted !== true &&
     activeNonAdoptedCount(registry) >= WORKTREE_CAP
   ) {
     throw new Error(
-      `worktree cap exceeded: ${String(WORKTREE_CAP)} non-adopted worktrees already active. ` +
+      `worktree cap exceeded: ${String(WORKTREE_CAP)} autonomous worktrees already active. ` +
         'Complete or cancel an active task before creating another managed worktree; ' +
-        'human-adopted worktrees are exempt.',
+        'human-adopted and retained worktrees are exempt.',
     );
   }
 
@@ -127,11 +162,51 @@ export function createWorktree(opts: CreateWorktreeOptions): WorktreeRecord {
     ...(opts.taskId !== undefined && { task_id: opts.taskId }),
     created_at: new Date().toISOString(),
     ...(opts.humanAdopted === true && { human_adopted: true }),
+    ...(opts.owner !== undefined && { owner: { ...opts.owner } }),
   };
   registry.worktrees = registry.worktrees.filter((w) => w.id !== opts.id);
   registry.worktrees.push(record);
   saveRegistry(opts.repoRoot, registry);
   return record;
+}
+
+/**
+ * Keep a settled attempt's worktree for human review or disposition: it stays bound to
+ * its task but no longer holds autonomous capacity.
+ */
+export function retainWorktree(opts: { readonly repoRoot: string; readonly id: string }): void {
+  const registry = loadRegistry(opts.repoRoot);
+  const record = registry.worktrees.find((w) => w.id === opts.id);
+  if (record === undefined) throw new Error('WORKTREE_NOT_REGISTERED');
+  registry.worktrees = registry.worktrees.map((w) =>
+    w.id === opts.id ? { ...w, retained: true } : w,
+  );
+  saveRegistry(opts.repoRoot, registry);
+}
+
+/**
+ * Release every managed worktree bound to one task: remove each checkout that still
+ * exists and drop its registry entry. Branches are kept, and human-adopted worktrees
+ * are never touched. Returns the released worktree ids in name order.
+ */
+export function releaseTaskWorktrees(opts: {
+  readonly repoRoot: string;
+  readonly taskId: string;
+}): readonly string[] {
+  const bound = loadRegistry(opts.repoRoot).worktrees.filter(
+    (w) => w.task_id === opts.taskId && w.human_adopted !== true,
+  );
+  const released: string[] = [];
+  for (const record of bound) {
+    if (existsSync(record.path)) destroyWorktree({ repoRoot: opts.repoRoot, id: record.id });
+    else {
+      const registry = loadRegistry(opts.repoRoot);
+      registry.worktrees = registry.worktrees.filter((w) => w.id !== record.id);
+      saveRegistry(opts.repoRoot, registry);
+    }
+    released.push(record.id);
+  }
+  return released.sort();
 }
 
 export function destroyWorktree(opts: {
