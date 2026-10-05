@@ -380,15 +380,24 @@ function keyFileOf(target: string): string {
   return basename(lockPath('.', substrate, modulePart));
 }
 
+const nonEmpty = (value: unknown): value is string => typeof value === 'string' && value.length > 0;
+
+/**
+ * Read a fence only if it can be judged: it names the task its file is named for, a
+ * round, an attempt, and at least one target. Anything less would let reconciliation
+ * judge an attempt clean that it never checked.
+ */
 function readFence(path: string): LockFence | undefined {
   const observed = observeRecord(path);
   if (observed.kind !== 'record') return undefined;
   const value = observed.value;
-  return typeof value.task_id === 'string' &&
-    typeof value.round_id === 'string' &&
-    typeof value.attempt === 'string' &&
+  return nonEmpty(value.task_id) &&
+    `${value.task_id}.json` === basename(path) &&
+    nonEmpty(value.round_id) &&
+    nonEmpty(value.attempt) &&
     Array.isArray(value.targets) &&
-    value.targets.every((target) => typeof target === 'string')
+    value.targets.length > 0 &&
+    value.targets.every(nonEmpty)
     ? (value as unknown as LockFence)
     : undefined;
 }
@@ -423,6 +432,9 @@ export function openLockFence(opts: {
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
     mkdirSync(fencesDir(opts.locksDir), { recursive: true });
+    // A new fence directory is itself a directory entry: make it durable in `.devai/state`
+    // so the first fence cannot vanish with it.
+    fsyncDirectory(dirname(fencesDir(opts.locksDir)));
     written = createRecordExclusive(staged, body);
   }
   if (!written) throw Object.assign(new Error(`EEXIST: ${staged}`), { code: 'EEXIST' });
