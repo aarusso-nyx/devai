@@ -1391,6 +1391,96 @@
       ]
     },
     {
+      "id": "UC-devai-experimental-recovery",
+      "title": "Complete, recover, and withdraw experimental agent work",
+      "goal": "Finish an accepted agent task after its human merge, dispose of uncertain or blocked experimental work with a recorded decision, and withdraw the experimental activation with an audit trail.",
+      "actors": ["owner", "engineer"],
+      "preconditions": [
+        "Experimental dispatch ran under an Owner activation, leaving work awaiting review, blocked, or uncertain."
+      ],
+      "triggers": [
+        "A reviewed attempt was merged by a human, a dispatch crashed or its journal was damaged, or the Owner ends the experiment."
+      ],
+      "mainFlow": [
+        {
+          "id": "step-01",
+          "action": "Run `task finish --round <round-id> --task <task-id> --evidence <EV-id> --as-role engineer --write` after `round ratify --decision accept` and the human merge: the task completes with the ratification and merge evidence, and its attempt worktree is released.",
+          "actorRole": "engineer",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "task finish"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-02",
+          "action": "Run `round dispatch dispose --round <round-id> --task <task-id> --as retry|escalate --as-role owner --write --experimental` for uncertain or blocked work: the disposition is recorded, each open attempt is closed in the journal, the attempt worktrees are freed, and the task returns to ready or is escalated.",
+          "actorRole": "owner",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "round dispatch dispose"
+              }
+            ]
+          }
+        },
+        {
+          "id": "step-03",
+          "action": "Run `round dispatch deactivate --as-role owner --write --experimental` to end the experiment: a withdrawal record names the time and the withdrawn activation digest, and the repository returns to the supported serial runner.",
+          "actorRole": "owner",
+          "refs": {
+            "actionRefs": [
+              {
+                "id": "round dispatch deactivate"
+              }
+            ]
+          }
+        }
+      ],
+      "alternateFlows": [
+        {
+          "id": "alt-01",
+          "when": "The dispatch journal is torn or damaged and every dispatch refuses with TASK_DISPATCH_JOURNAL_INVALID.",
+          "steps": [
+            {
+              "id": "alt-01-01",
+              "action": "Run `round dispatch dispose --round <round-id> --quarantine-journal --as-role owner --write --experimental`: the journal moves aside byte for byte, named by its SHA-256, with a disposition record; tasks left in flight still need their own disposition.",
+              "actorRole": "owner",
+              "refs": {
+                "actionRefs": [
+                  {
+                    "id": "round dispatch dispose"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "exceptions": [
+        {
+          "id": "exc-01",
+          "when": "A retry is requested for a task whose Article 19 ladder is spent.",
+          "handling": "round dispatch dispose refuses with DISPOSITION_ATTEMPTS_EXHAUSTED; a further try is a new task."
+        },
+        {
+          "id": "exc-02",
+          "when": "task finish targets an agent task without an accepted ratification or without merge evidence.",
+          "handling": "The completion is refused and nothing changes."
+        }
+      ],
+      "postconditions": [
+        "Every disposition, completion, and withdrawal is a durable record; no uncertain attempt clears without one."
+      ],
+      "acceptanceCriteria": [
+        "Uncertainty clears only through a recorded disposition.",
+        "A disposition never runs a provider, and a retry continues the attempt ladder.",
+        "Only the Owner with --write and --experimental may dispose or deactivate."
+      ]
+    },
+    {
       "id": "UC-devai-adopter-upgrade",
       "title": "Upgrade an adopter repository to the installed DEVAI version",
       "goal": "Let the Architect move an adopter from its bound devai_version to the installed package version in one governed operation that names every adopter-facing change first and refuses anything that needs a decision.",
