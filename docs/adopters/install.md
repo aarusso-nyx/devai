@@ -195,26 +195,76 @@ edit to `.devai/config`.
 
 ### Upgrading DEVAI
 
-Bump the pinned package version, then re-run both policy binding commands:
+Bump the pinned package version, then plan the upgrade. `init upgrade` reads the bound
+`devai_version` from `.devai/config/project.json` and the installed version, and lists every
+adopter-facing change between them from the migration manifest the package ships,
+[`law/policy/adopter-migrations.json`](../../law/policy/adopter-migrations.json) (one entry per
+release from 1.6.0, validated by `law/schemas/adopter-migrations.schema.json`). Without `--write`
+it writes nothing:
+
+```bash
+pnpm exec devai init upgrade --target . --as-role architect --format json
+```
+
+The plan reports, under `plan`:
+
+- `releases`: the manifest entries above the bound version and at or below the installed one, each
+  change with its kind, decision records, and the bind segments that refresh it;
+- `changed_files`: every file the upgrade would create or update, with its segment;
+- `retired_keys` and `refusals`: owned `project.json` keys the adopter-policy rebind would retire
+  because the source no longer declares them;
+- `replaced_defaults`: adopter declarations that replace a package default which changed in range,
+  such as a source `scorecard_na` that omits the F4:T5 cell added in 1.7.0;
+- `stale_version_stamps`: `devai_version`, the host adapter `package_binding.version`, the
+  `.devai/constitution.md` pointer, and the tracking binding when they name an older version (the
+  tracking binding is reported, not refreshed);
+- `obligations`: new requirements and whether they are `satisfied`, `satisfied-by-upgrade`, or
+  `pending`: constitution 1.0.2, the `thresholds.soft_gate` block, the proof-anchor baseline with
+  its `historical-gap` declarations, and the adopter-policy receipt the check members classify by.
+
+The upgrade fails closed on anything that needs an Owner or Architect decision. A retirement of an
+owned key the source does not declare refuses the plan (verdict `review`) and refuses `--write`
+before any byte is written with `INIT_UPGRADE_RETIREMENT_UNDECLARED`, naming the key, for example
+`ci_economy.attested_rc` that the deep merge before 1.7.0 preserved. Declare the key in the source
+and bump `policy_version`, or retire it deliberately with `init bind --adopter-policy`, then rerun.
+The constitution is rebound only on request: add `--constitution` once the Architect has reviewed
+the amendment.
+
+Apply the reviewed plan with `--write`:
+
+```bash
+pnpm exec devai init upgrade --target . --as-role architect --write --format json
+```
+
+It runs the bind segments in the canonical order: constitution (with `--constitution`), operational
+law, subprocess effects, adopter policy, authority, the bound host adapters, then the CI verifier
+workflow that `init apply harness --include ci` generates. The order matters: operational law
+writes `domains.json`, `glob-guards.json`, `scorecard-na.json`, and `thresholds.json` from the
+package, and the adopter-policy projection then lands over them, so `policy-materialization-current`
+never sees a stale projection. The configuration set lands through the bind journal as one atomic
+write; the doctor checks `policy-materialization-current`, `authority-enforcement`, and
+`constitution-binding` then run, and unless all three pass every byte the upgrade wrote is restored
+and it refuses with `INIT_UPGRADE_POSTCHECK_FAILED`. On success it records
+`.devai/config/upgrade-receipt.json` beside the binding receipt: the from- and to-versions, the
+applied migration ids, the retired keys (always empty), every changed file with its digest, the
+refreshed stamps, the obligations, and the post-check results. Cite it from the adoption decision
+record.
+
+The upgrade is idempotent: a second run at the same version reports `no-op` and writes nothing.
+Review the diff and commit the refreshed materialization with the package update. Materialized
+policy is a versioned snapshot, not a link; installing a newer package does not silently rewrite
+adopter-owned repository files. Do not hand-edit `.github/workflows/devai-local-rc-verify.yml`;
+`doctor` treats bytes that differ from the installed generator as stale.
+
+The individual segments remain available for stepwise diagnosis, in the same order:
 
 ```bash
 pnpm exec devai init bind --target . --operational-law --as-role architect --write
 pnpm exec devai init bind --target . --subprocess-effects --as-role architect --write
-```
-
-Run `pnpm exec devai doctor`, review every reported digest change, and commit the refreshed
-materialization with the package update. Materialized policy is a versioned snapshot, not a link;
-installing a newer package does not silently rewrite adopter-owned repository files.
-
-Repositories using trusted local RC evidence must also regenerate the byte-compared verifier
-workflow from the installed package and review the resulting diff:
-
-```bash
+pnpm exec devai init bind --target . --adopter-policy law/policy/devai-adoption.json --as-role architect --write
+pnpm exec devai init bind --target . --as-role architect --write
 pnpm exec devai init apply harness --target . --include ci --force
 ```
-
-Do not hand-edit `.github/workflows/devai-local-rc-verify.yml`; `doctor` treats bytes that differ
-from the installed generator as stale.
 
 The core CLI installs without model-provider or PostgreSQL clients. Install `openai` for the
 Codex API bridge, `@anthropic-ai/sdk` for the Claude API bridge, and `pg` for database-backed
