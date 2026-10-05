@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { isAbsolute, resolve } from 'node:path';
+import { execFileSync } from '@devai-nyx/authority';
 import { ACTION_EFFECT_CONTRACTS } from '@devai-nyx/effects-check';
 import {
   buildSensorReading,
@@ -185,6 +186,20 @@ function unknownReading(kind: SensorKind, code: string, message: string): Sensor
   });
 }
 
+/** The commit at HEAD, or undefined when none resolves. */
+function headCommit(repoRoot: string): string | undefined {
+  try {
+    const head = execFileSync('git', ['rev-parse', '--verify', 'HEAD^{commit}'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    return /^[0-9a-f]{40}$/u.test(head) ? head : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function inventoryAdherence(request: SenseAdapterRequest): Promise<SensorReading> {
   const inventoryPath = absolute(
     request.repoRoot,
@@ -201,9 +216,36 @@ export async function inventoryAdherence(request: SenseAdapterRequest): Promise<
       `Required input is absent: ${!existsSync(inventoryPath) ? inventoryPath : tracePath}`,
     );
   }
-  const inventory = JSON.parse(readFileSync(inventoryPath, 'utf8')) as Parameters<
-    typeof computeReverseAdherence
-  >[0]['inventory'];
+  // ADR-SCR-0012 IA-006: a body that is malformed or describes another commit is a
+  // diagnostic, never a measurement.
+  let body: unknown;
+  try {
+    body = JSON.parse(readFileSync(inventoryPath, 'utf8'));
+  } catch (error) {
+    return unknownReading(
+      'inventory_adherence',
+      'INVENTORY_ADHERENCE_INPUT_INVALID',
+      `${inventoryPath} is not JSON: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+  if (!validators.inventory(body)) {
+    return unknownReading(
+      'inventory_adherence',
+      'INVENTORY_ADHERENCE_INPUT_INVALID',
+      `${inventoryPath} fails inventory.schema.json: ${JSON.stringify(validators.inventory.errors)}`,
+    );
+  }
+  // The schema requires the string, so the validated body carries it.
+  const integrationHead = (body as { readonly integration_head: string }).integration_head;
+  const head = headCommit(request.repoRoot);
+  if (integrationHead !== head) {
+    return unknownReading(
+      'inventory_adherence',
+      'INVENTORY_ADHERENCE_INPUT_STALE',
+      `${inventoryPath} describes ${integrationHead}, not HEAD ${head ?? '(unresolved)'}. Run sense run inventory_regeneration at this commit.`,
+    );
+  }
+  const inventory = body as Parameters<typeof computeReverseAdherence>[0]['inventory'];
   const trace = JSON.parse(readFileSync(tracePath, 'utf8')) as Parameters<
     typeof computeReverseAdherence
   >[0]['trace'];
