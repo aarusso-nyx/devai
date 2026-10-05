@@ -247,7 +247,8 @@ const forbidden = [
   ['PUBLISHABLE_OLD_PACKAGE_IDENTITY', /@devai-nyx\/cli/u],
   ['PUBLISHABLE_OLD_REPOSITORY_IDENTITY', /devai-nyx\/devai\.git/u],
   ['PUBLISHABLE_OLD_VERSION', /1\.0\.0-rc\.1(?![0-9])/u],
-  ['PUBLISHABLE_REMOVED_ROUTE', /init upgrade/u],
+  // The 1.0.0-rc.2 removed-route guard for `init upgrade` is retired: #264 registers
+  // `init upgrade` again as the adopter upgrade action, so naming it is no longer stale.
   ['PUBLISHABLE_REMOVED_PRESET_ALIAS', /SENSE_PRESET_RETIRED/u],
   ['PUBLISHABLE_COMPATIBILITY_TABLE', /old-to-new-command-map/u],
   ['PUBLISHABLE_CAMPAIGN_RECORD', /\bR-0007\b/u],
