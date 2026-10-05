@@ -18,6 +18,7 @@ const notCodes = new Set(['ACTION_EFFECTS', 'GITHUB_TOKEN', 'POST_CUTOFF']);
 const prefixes = new Set([
   'ACTION',
   'ADOPTER',
+  'AGENT',
   'ARTIFACT',
   'AUDIT',
   'AUTHORITY',
