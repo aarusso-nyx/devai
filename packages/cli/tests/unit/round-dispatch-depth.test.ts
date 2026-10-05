@@ -1,9 +1,14 @@
+import { runWithAuthorityHostEffects, type AuthorityHostEffectScope } from '@devai-nyx/authority';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { TaskRecord } from '@devai-nyx/loop';
+import {
+  createIssuer,
+  runtimeApi,
+} from '../../../authority/tests/unit/authority-runtime-testkit.js';
 import { withAuthorityHostTestScope } from '../../../skills/tests/unit/authority-host-test-scope.js';
 import { dispatchRoundTask } from '../../src/commands/round/dispatch.js';
 
@@ -253,6 +258,57 @@ describe('round task dispatch adapter boundaries', () => {
       expect(() => readFileSync(join(repoRoot, '.devai/state/tasks/TASK-9701.json'))).toThrow();
     },
   );
+
+  it('fails a routine that outlives its deadline even when it then exits 0', async () => {
+    const repoRoot = root();
+    initializeRepository(repoRoot);
+    // The legacy test scope admits only read-only probes; this routine is an arbitrary argv.
+    const permissive = async <T>(run: () => Promise<T>): Promise<T> => {
+      const issuer = createIssuer(await runtimeApi(), { invocation_id: 'routine-deadline' });
+      const scope: AuthorityHostEffectScope = {
+        action_id: 'round run',
+        invocation_id: 'routine-deadline',
+        effect: 'local-write',
+        receipt_store: issuer,
+        apply_effect: (_request, apply) => apply(),
+      };
+      try {
+        return await runWithAuthorityHostEffects(scope, run);
+      } finally {
+        issuer.dispose();
+      }
+    };
+    const base = routineTask();
+    // Traps the deadline's SIGTERM and exits 0 later, inside the SIGKILL grace period.
+    const trapped = {
+      ...base,
+      executor: {
+        ...base.executor,
+        argv: [
+          process.execPath,
+          '-e',
+          'process.on("SIGTERM", () => {}); setTimeout(() => process.exit(0), 1500)',
+        ],
+        timeout_ms: 300,
+      },
+    } as TaskRecord;
+
+    const result = await permissive(() => dispatchRoundTask(repoRoot, trapped));
+
+    expect(result).toMatchObject({ ok: false, code: 'TASK_ROUTINE_TIMED_OUT' });
+    const evidenceRoot = join(repoRoot, '.devai/state/round-runs/R-9701/task-executions');
+    const [file] = readdirSync(evidenceRoot);
+    expect(JSON.parse(readFileSync(join(evidenceRoot, file ?? ''), 'utf8'))).toMatchObject({
+      verdict: 'error',
+      failure: {
+        code: 'TASK_ROUTINE_TIMED_OUT',
+        rollback_disposition: 'preserved-for-repair',
+      },
+    });
+    expect(
+      JSON.parse(readFileSync(join(repoRoot, '.devai/state/tasks/TASK-9701.json'), 'utf8')),
+    ).toMatchObject({ status: 'escalated' });
+  });
 
   it('refuses routine action dispatch before starting or persisting execution', async () => {
     const repoRoot = root();
