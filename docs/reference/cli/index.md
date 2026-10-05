@@ -88,7 +88,11 @@ other. Preview or inspect whenever the leaf offers `--dry-run`, plan output, sta
   host adapters, and the CI verifier workflow in that order, lands the configuration set through
   the bind journal, rolls everything back unless `policy-materialization-current`,
   `authority-enforcement`, and `constitution-binding` pass (`INIT_UPGRADE_POSTCHECK_FAILED`), and
-  records `.devai/config/upgrade-receipt.json`. A second run at the same version is a no-op.
+  records `.devai/config/upgrade-receipt.json`. A second run at the same version is a no-op. A
+  pending obligation that needs a decision refuses with `INIT_UPGRADE_DECISION_PENDING`, naming the
+  command that settles it. `--write` holds `.devai/config/upgrade.lock` (`INIT_UPGRADE_LOCKED` for a
+  concurrent run) and journals every file it may touch before the first write, receipt last, so an
+  interrupted run is rolled back and replayed rather than left stamped without a receipt.
 - **Output and verdict:** plans report the exact projected operations; applies report bounded
   writes through the shared action envelope. Schema, target, authority, or write failures refuse
   the operation; planning is not an apply verdict.
