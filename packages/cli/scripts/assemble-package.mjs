@@ -42,6 +42,7 @@ const verifierBins = [
 
 const policyFiles = [
   'action-registry.json',
+  'adopter-migrations.json',
   'check-suites.json',
   'domains.json',
   'forbidden-actions.json',
@@ -471,6 +472,7 @@ const __dirname = __devaiDirname(__filename);`,
     ...verifierBins.map((name) => join(verifierRuntimeRoot, 'src', name)),
     join(verifierRuntimeRoot, 'schemas/task-descriptor.schema.json'),
     join(verifierRuntimeRoot, 'provenance.json'),
+    join(distRoot, 'law/policy/adopter-migrations.json'),
     join(distRoot, 'law/policy/github-issues-tracking.json'),
     join(distRoot, 'law/policy/trusted-local-rc-verifier-package.json'),
     join(distRoot, 'law/policy/mutation-evidence-v2.json'),

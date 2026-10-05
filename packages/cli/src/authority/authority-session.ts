@@ -18,6 +18,7 @@ import {
 export function targetRoot(entry: RegistryEntry, argv: readonly string[]): string {
   const adoptionTarget = [
     'init bind',
+    'init upgrade',
     'init apply owner',
     'init apply architect',
     'init apply harness',

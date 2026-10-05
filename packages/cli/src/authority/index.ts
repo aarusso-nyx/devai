@@ -199,7 +199,8 @@ function stageHostScope(
     entry.name === 'init apply owner' ||
     entry.name === 'init apply architect' ||
     entry.name === 'init apply harness' ||
-    entry.name === 'init bind';
+    entry.name === 'init bind' ||
+    entry.name === 'init upgrade';
   const broker = createAuthorityHostBroker({
     entry,
     entries,

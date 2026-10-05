@@ -13,6 +13,7 @@ import { bindAdopterPolicy, bindHostAdapter, bindTrackingAdapter } from './bind-
 export { initApplyArchitect, initApplyHarness, initApplyOwner } from './apply.js';
 
 export { initPlan } from './plan.js';
+export { initUpgrade } from './upgrade.js';
 
 export const initBind = defineCommand({
   name: 'init bind',

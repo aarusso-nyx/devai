@@ -235,6 +235,15 @@ function isFullBindingBootstrap(input: BrokerInput): boolean {
   );
 }
 
+/** init upgrade --constitution rebinds the constitution in the same invocation (#264). */
+function isConstitutionUpgrade(input: BrokerInput): boolean {
+  return (
+    input.bootstrap_policy &&
+    input.entry.name === 'init upgrade' &&
+    input.argv.includes('--constitution')
+  );
+}
+
 const SAFE_UNBOUND_READ_ACTIONS = new Set([
   'audit scorecard',
   'catalog actions',
@@ -246,6 +255,7 @@ function usesInstalledConstitution(input: BrokerInput): boolean {
   return (
     isConstitutionBootstrap(input) ||
     isFullBindingBootstrap(input) ||
+    isConstitutionUpgrade(input) ||
     SAFE_UNBOUND_READ_ACTIONS.has(input.entry.name)
   );
 }
@@ -1453,8 +1463,10 @@ export function createAuthorityHostBroker(input: BrokerInput): {
             return record;
           }
         : undefined;
+  // init upgrade runs the binding segments of init bind in one invocation, so it
+  // materializes the authority policy through the same init bind authorization (#264).
   const policyMaterialization =
-    input.entry.name === 'init bind'
+    input.entry.name === 'init bind' || input.entry.name === 'init upgrade'
       ? () => {
           // Binding inputs may themselves have been atomically updated by the
           // current init-bind invocation (for example adopter policy or a host
