@@ -107,6 +107,14 @@ vi.mock('@devai-nyx/schemas', async (importOriginal) => {
 
 vi.mock('../../src/commands/sense/readings-rebuild.js', () => local);
 
+// ADR-SCR-0013: the F5:T4 adapter observes `audit scorecard` through this shared seam.
+// Its git reads need the broker's authority boundary, so the seam is mocked here.
+const scorecard = vi.hoisted(() => ({
+  scorecardHead: vi.fn(),
+  composeExactHeadScorecard: vi.fn(),
+}));
+vi.mock('../../src/commands/audit/scorecard.js', () => scorecard);
+
 import { SENSOR_READING_KINDS } from '@devai-nyx/sensors';
 
 let freshAdapters: typeof import('../../src/commands/sense/adapters.js');
@@ -283,10 +291,11 @@ describe('sense adapter deterministic boundaries', () => {
       ['harness_coverage', 'senseHarnessCoverage', { repoRoot: '/repo' }, false],
       ['harness_depth', 'senseHarnessDepth', { repoRoot: '/repo' }, false],
       ['harness_coherence', 'senseHarnessCoherence', { repoRoot: '/repo' }, false],
+      // '/repo' is not a repository, so the exact-head scorecard observation is empty.
       [
         'harness_invariant_alignment',
         'senseHarnessInvariantAlignment',
-        { repoRoot: '/repo' },
+        { repoRoot: '/repo', observations: [] },
         false,
       ],
       ['harness_idiomaticity', 'senseHarnessIdiomaticity', { repoRoot: '/repo' }, false],
@@ -632,5 +641,52 @@ describe('sense adapter deterministic boundaries', () => {
       summary: null,
       coveragePath: join(root, 'coverage/coverage-final.json'),
     });
+  });
+});
+
+describe('exact-head scorecard observation for F5:T4 (ADR-SCR-0013)', () => {
+  const HEAD = 'a'.repeat(40);
+
+  beforeEach(() => {
+    scorecard.scorecardHead.mockReset();
+    scorecard.composeExactHeadScorecard.mockReset();
+  });
+
+  async function observe(root: string) {
+    const { observeExactHeadScorecard } =
+      await import('../../src/commands/sense/adapter-readers.js');
+    return observeExactHeadScorecard(root);
+  }
+
+  it('binds a passing composition to the head it ran at', async () => {
+    scorecard.scorecardHead.mockReturnValue(HEAD);
+    scorecard.composeExactHeadScorecard.mockReturnValue({ cells: [] });
+    expect(await observe('/repo')).toEqual([
+      {
+        command: `devai audit scorecard --repo-root . --at ${HEAD}`,
+        status: 'pass',
+        candidate_sha: HEAD,
+        completed_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/u),
+      },
+    ]);
+    expect(scorecard.composeExactHeadScorecard).toHaveBeenCalledWith('/repo', HEAD);
+  });
+
+  it('reads fail when the composition throws, keeping the head binding', async () => {
+    scorecard.scorecardHead.mockReturnValue(HEAD);
+    scorecard.composeExactHeadScorecard.mockImplementation(() => {
+      throw new Error('SCORECARD_READING_UNPARSEABLE:build/SR-0000000000000000.json');
+    });
+    expect(await observe('/repo')).toMatchObject([{ status: 'fail', candidate_sha: HEAD }]);
+  });
+
+  it('observes nothing without a readable full head', async () => {
+    scorecard.scorecardHead.mockImplementation(() => {
+      throw new Error('AUDIT_SCORECARD_HEAD_UNAVAILABLE:not a repository');
+    });
+    expect(await observe('/repo')).toEqual([]);
+    scorecard.scorecardHead.mockReturnValue('HEAD');
+    expect(await observe('/repo')).toEqual([]);
+    expect(scorecard.composeExactHeadScorecard).not.toHaveBeenCalled();
   });
 });
