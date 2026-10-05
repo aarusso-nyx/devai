@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from '@devai-nyx/authority';
 import { join } from 'node:path';
+import { readPathOverrides, resolveDocsPathOverride } from '../doctor-support.js';
 import type { GovernanceFinding, Builder } from './docs-governance-config-checks.js';
 
 // ---------------------------------------------------------------------------
@@ -260,15 +261,20 @@ export function checkDocsIaDashboardCurrent(
   };
 }
 
+const WORKFLOW_PAGES = 'docs/dev/operations/workflows';
+
 /**
  * Rule docs-ia.workflow-page-set (ADR-GOV-0021) — every file under .github/workflows/ has one
  * reference page docs/dev/operations/workflows/<stem>.md and every page (README.md is the index)
- * has its workflow file. Repositories without either directory are out of scope.
+ * has its workflow file. Repositories without either directory are out of scope. An adopter
+ * that relocated the page directory, or one of its ancestors, under `docs.ia.path_overrides`
+ * keeps its pages at the relocated path (#265).
  */
 export function checkDocsIaWorkflowPageSet(repoRoot: string): GovernanceFinding {
   const ruleId = 'docs-ia.workflow-page-set';
+  const pages = resolveDocsPathOverride(WORKFLOW_PAGES, readPathOverrides(repoRoot));
   const workflowsDir = join(repoRoot, '.github/workflows');
-  const pagesDir = join(repoRoot, 'docs/dev/operations/workflows');
+  const pagesDir = join(repoRoot, pages);
   if (!existsSync(workflowsDir) && !existsSync(pagesDir)) {
     return { ruleId, severity: 'pass', message: 'Skipped — no workflows or workflow pages' };
   }
@@ -284,19 +290,19 @@ export function checkDocsIaWorkflowPageSet(repoRoot: string): GovernanceFinding 
     }
   };
   const workflows = stems(workflowsDir, /\.ya?ml$/u);
-  const pages = stems(pagesDir, /\.md$/u);
+  const pageStems = stems(pagesDir, /\.md$/u);
   const problems = [
     ...workflows
-      .filter((stem) => !pages.includes(stem))
+      .filter((stem) => !pageStems.includes(stem))
       .map(
         (stem) =>
-          `DOCS_WORKFLOW_PAGE_MISSING: .github/workflows/${stem} has no page docs/dev/operations/workflows/${stem}.md`,
+          `DOCS_WORKFLOW_PAGE_MISSING: .github/workflows/${stem} has no page ${pages}/${stem}.md`,
       ),
-    ...pages
+    ...pageStems
       .filter((stem) => !workflows.includes(stem))
       .map(
         (stem) =>
-          `DOCS_WORKFLOW_PAGE_MISSING: docs/dev/operations/workflows/${stem}.md has no workflow file .github/workflows/${stem}.yml`,
+          `DOCS_WORKFLOW_PAGE_MISSING: ${pages}/${stem}.md has no workflow file .github/workflows/${stem}.yml`,
       ),
   ];
   if (problems.length > 0) {
@@ -304,13 +310,12 @@ export function checkDocsIaWorkflowPageSet(repoRoot: string): GovernanceFinding 
       ruleId,
       severity: 'fail',
       message: problems.join('; '),
-      remediation:
-        'Add or remove the page docs/dev/operations/workflows/<stem>.md so it pairs one to one with .github/workflows/<stem>.yml.',
+      remediation: `Add or remove the page ${pages}/<stem>.md so it pairs one to one with .github/workflows/<stem>.yml.`,
     };
   }
   return {
     ruleId,
     severity: 'pass',
-    message: `Workflow page set complete (${workflows.length} workflows)`,
+    message: `Workflow page set complete (${workflows.length} workflows${pages === WORKFLOW_PAGES ? '' : ` under ${pages}`})`,
   };
 }
