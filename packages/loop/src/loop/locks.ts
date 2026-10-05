@@ -1,19 +1,12 @@
-import {
-  closeSync,
-  existsSync,
-  fsyncSync,
-  mkdirSync,
-  openSync,
-  readdirSync,
-  readFileSync,
-  renameSync,
-  statSync,
-  unlinkSync,
-  writeSync,
-} from '@devai-nyx/authority';
-import { randomUUID } from 'node:crypto';
-import { join } from 'node:path';
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync } from '@devai-nyx/authority';
+import { dirname, join } from 'node:path';
 import { utf8Compare } from './lock-targets.js';
+import {
+  createRecordExclusive,
+  observeRecord,
+  recordIdentity,
+  swapObservedRecord,
+} from './record-claims.js';
 
 export { taskLockTargets } from './lock-targets.js';
 export type { LockTargetSource } from './lock-targets.js';
@@ -43,113 +36,72 @@ export const DEFAULT_LOCK_TTL_MS = 60 * 60 * 1000;
 /** A holder renews well inside its TTL so a live dispatch never reads as expired. */
 export const LOCK_RENEWAL_INTERVAL_MS = DEFAULT_LOCK_TTL_MS / 4;
 
+/*
+ * Lock protocol (Constitution Article 25: module locks are mutually exclusive).
+ *
+ * A free key is taken with an exclusive create (O_CREAT|O_EXCL), so two acquirers can
+ * never both create it. Every other change to a key -- taking over an expired record,
+ * renewing, releasing, reaping, rolling back -- goes through `swapObservedRecord`: it
+ * claims the exact record it observed and re-reads it under that claim, then replaces
+ * the record with a complete staged file in one rename, or removes it. A key is never
+ * vacated and refilled during a takeover or renewal, and a record that is not provably
+ * the observed one is never moved, so a stale reaper or a late renewal can only stand
+ * down. Claims live beside the locks directory so it lists lock records only.
+ */
+
 function lockPath(locksDir: string, substrate: string, modulePart: string): string {
   // Module names may contain slashes (e.g. "apps/api/src/users"). Replace with
   // tildes for filesystem safety; restored when reading.
   return join(locksDir, `${substrate}~${modulePart.replace(/\//g, '~')}.json`);
 }
 
-/**
- * Atomically claim a lock file. Per Constitution Article 25, module locks
- * must be mutually exclusive. The previous implementation used
- *
- *   if (existsSync(path)) {…} else writeFileSync(path, …)
- *
- * which races: two agents both pass the existsSync check, both writeFile,
- * the later wins and the earlier silently believes it holds the lock.
- * We replace it with `openSync(path, 'wx')` — POSIX O_CREAT|O_EXCL — which
- * fails with EEXIST when the file already exists. fsync ensures the
- * record reaches disk before this call returns, so a concurrent reader
- * never sees a half-written lock.
- *
- * Returns true on successful atomic create.
- */
-function tryAtomicCreate(path: string, record: LockRecord): boolean {
-  try {
-    const fd = openSync(path, 'wx');
-    try {
-      writeSync(fd, JSON.stringify(record, null, 2) + '\n');
-      fsyncSync(fd);
-    } finally {
-      closeSync(fd);
-    }
-    return true;
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'EEXIST') return false;
-    throw err;
-  }
+function claimsDir(locksDir: string): string {
+  return join(dirname(locksDir), 'lock-claims');
 }
 
-/** Read a lock record, or `undefined` when gone, or `'unreadable'` when partial or corrupt. */
-function observeLock(path: string): LockRecord | undefined | 'unreadable' {
-  if (!existsSync(path)) return undefined;
-  try {
-    return JSON.parse(readFileSync(path, 'utf8')) as LockRecord;
-  } catch {
-    return existsSync(path) ? 'unreadable' : undefined;
-  }
+function serialize(record: LockRecord): string {
+  return JSON.stringify(record, null, 2) + '\n';
+}
+
+type LockObservation =
+  | { readonly kind: 'absent' }
+  | { readonly kind: 'unreadable' }
+  | { readonly kind: 'held'; readonly record: LockRecord; readonly identity: string };
+
+function isLockRecord(value: Readonly<Record<string, unknown>>): boolean {
+  return (
+    typeof value.task_id === 'string' &&
+    typeof value.acquired_at === 'string' &&
+    typeof value.ttl_ms === 'number' &&
+    Number.isFinite(value.ttl_ms)
+  );
+}
+
+/** Read a lock: gone, `unreadable` when partial, corrupt, or malformed, or held. */
+function observeLock(path: string): LockObservation {
+  const observed = observeRecord(path);
+  if (observed.kind !== 'record') return observed;
+  if (!isLockRecord(observed.value)) return { kind: 'unreadable' };
+  return {
+    kind: 'held',
+    record: observed.value as unknown as LockRecord,
+    identity: observed.identity,
+  };
+}
+
+/** The identity `swapObservedRecord` compares: the record's exact canonical content. */
+export function lockIdentity(record: LockRecord): string {
+  return recordIdentity(record);
 }
 
 function expired(record: LockRecord, now = Date.now()): boolean {
   return now - new Date(record.acquired_at).getTime() >= record.ttl_ms;
 }
 
-function sameRecord(a: LockRecord, b: LockRecord): boolean {
-  return a.task_id === b.task_id && a.acquired_at === b.acquired_at && a.ttl_ms === b.ttl_ms;
-}
-
-/**
- * Remove the exact expired lock record that was observed, never a newer one.
- *
- * Unlinking by path after a read races: two reapers both read the same expired
- * record, the first replaces it with a fresh lock, and the second then unlinks
- * that fresh lock. Instead the lock is renamed aside atomically (only one
- * renamer can move a given file) and the moved record is compared with the one
- * observed. A fresh lock moved by mistake is restored with an exclusive create;
- * if a third acquirer filled the path in that instant, the displaced holder
- * detects the loss at its next renewal (`renewLocks`).
- */
-function removeObservedExpired(path: string, observed: LockRecord): boolean {
-  const aside = `${path}.reap-${process.pid}-${randomUUID()}`;
-  try {
-    renameSync(path, aside);
-  } catch {
-    return false; // Already moved by another reaper.
-  }
-  let raw = '';
-  let moved: LockRecord | undefined;
-  try {
-    raw = readFileSync(aside, 'utf8');
-    moved = JSON.parse(raw) as LockRecord;
-  } catch {
-    moved = undefined;
-  }
-  const exact = moved !== undefined && sameRecord(moved, observed) && expired(moved);
-  if (!exact && raw.length > 0) {
-    try {
-      const fd = openSync(path, 'wx');
-      try {
-        writeSync(fd, raw);
-        fsyncSync(fd);
-      } finally {
-        closeSync(fd);
-      }
-    } catch {
-      // A third acquirer filled the path; the displaced holder sees the loss on renewal.
-    }
-  }
-  try {
-    unlinkSync(aside);
-  } catch {
-    // best-effort
-  }
-  return exact;
-}
-
 /**
  * Remove one expired lock only if it still is exactly the `expected` record.
  * Returns false, leaving the path untouched, when the lock is unexpired, gone,
- * or was replaced after the caller read it.
+ * unreadable, claimed by another writer, or was replaced after the caller read it.
  */
 export function reapLock(opts: {
   readonly locksDir: string;
@@ -158,13 +110,19 @@ export function reapLock(opts: {
 }): boolean {
   if (!expired(opts.expected)) return false;
   const { substrate, modulePart } = parseTarget(opts.target);
-  return removeObservedExpired(lockPath(opts.locksDir, substrate, modulePart), opts.expected);
+  return (
+    swapObservedRecord({
+      path: lockPath(opts.locksDir, substrate, modulePart),
+      claimsDir: claimsDir(opts.locksDir),
+      identity: lockIdentity(opts.expected),
+    }) === 'swapped'
+  );
 }
 
 function holderOf(path: string): string {
   const observed = observeLock(path);
-  if (observed === 'unreadable') return '<unreadable>';
-  return observed?.task_id ?? '<unknown>';
+  if (observed.kind === 'unreadable') return '<unreadable>';
+  return observed.kind === 'held' ? observed.record.task_id : '<unknown>';
 }
 
 function parseTarget(target: string): { substrate: string; modulePart: string } {
@@ -175,26 +133,24 @@ function parseTarget(target: string): { substrate: string; modulePart: string } 
 /**
  * Acquire every target all-or-nothing, in UTF-8 key order (`round-execution.json`
  * resources.acquisition_order). A key this task already holds unexpired counts as
- * held. On the first conflict, keys created by this call are released and the
- * conflict is reported; keys held before the call are left untouched.
+ * held. On the first conflict, the exact records this call created are released and
+ * the conflict is reported; keys held before the call are left untouched.
  */
 export function acquireLocks(opts: AcquireLockOptions): AcquireResult {
   mkdirSync(opts.locksDir, { recursive: true });
+  const claims = claimsDir(opts.locksDir);
   const acquired: LockRecord[] = [];
-  const created: string[] = [];
+  const created: { path: string; identity: string }[] = [];
   const now = new Date().toISOString();
   const ttlMs = opts.ttlMs ?? DEFAULT_LOCK_TTL_MS;
   const targets = [...new Set(opts.targets)].sort(utf8Compare);
 
   const deny = (target: string, held_by: string): AcquireResult => {
-    for (const path of created) {
-      const observed = observeLock(path);
-      if (observed !== undefined && observed !== 'unreadable' && observed.task_id === opts.taskId) {
-        try {
-          unlinkSync(path);
-        } catch {
-          // best-effort
-        }
+    for (const { path, identity } of created) {
+      try {
+        swapObservedRecord({ path, claimsDir: claims, identity });
+      } catch {
+        // best-effort: an unreleased record expires and stays this task's own
       }
     }
     return { acquired: [], denied: [{ target, held_by }] };
@@ -210,37 +166,43 @@ export function acquireLocks(opts: AcquireLockOptions): AcquireResult {
       acquired_at: now,
       ttl_ms: ttlMs,
     };
-
-    if (tryAtomicCreate(path, record)) {
+    const body = serialize(record);
+    const take = (): void => {
       acquired.push(record);
-      created.push(path);
+      created.push({ path, identity: lockIdentity(record) });
+    };
+
+    if (createRecordExclusive(path, body)) {
+      take();
       continue;
     }
 
     const observed = observeLock(path);
-    if (observed === 'unreadable') {
-      // Mid-write by another process, or corrupted: treat as held.
+    if (observed.kind === 'unreadable') {
+      // Mid-write by its creator, or corrupted: treat as held.
       return deny(target, '<unreadable>');
     }
-    if (observed === undefined) {
+    if (observed.kind === 'absent') {
       // Released between our create and read; one retry, then report the winner.
-      if (tryAtomicCreate(path, record)) {
-        acquired.push(record);
-        created.push(path);
+      if (createRecordExclusive(path, body)) {
+        take();
         continue;
       }
       return deny(target, holderOf(path));
     }
-    if (!expired(observed)) {
-      if (observed.task_id === opts.taskId) {
-        acquired.push(observed);
+    if (!expired(observed.record)) {
+      if (observed.record.task_id === opts.taskId) {
+        acquired.push(observed.record);
         continue;
       }
-      return deny(target, observed.task_id);
+      return deny(target, observed.record.task_id);
     }
-    if (removeObservedExpired(path, observed) && tryAtomicCreate(path, record)) {
-      acquired.push(record);
-      created.push(path);
+    // Take over exactly the expired record observed, never a newer one.
+    if (
+      swapObservedRecord({ path, claimsDir: claims, identity: observed.identity, next: body }) ===
+      'swapped'
+    ) {
+      take();
       continue;
     }
     return deny(target, holderOf(path));
@@ -256,10 +218,11 @@ export interface RenewLocksResult {
 }
 
 /**
- * Restart the TTL of every target the task still holds, so a dispatch longer
- * than one TTL keeps its locks. Each record is rewritten through a rename so a
- * reader never sees a partial file. A target held by another task, or missing,
- * is reported as lost and never reclaimed here.
+ * Restart the TTL of every target the task still holds, so a dispatch longer than
+ * one TTL keeps its locks. Each renewal replaces exactly the record observed, so a
+ * renewal that read its own expired record can never overwrite a takeover that
+ * happened since. A target held by another task, missing, or claimed by another
+ * writer is reported as lost and never reclaimed here.
  */
 export function renewLocks(opts: {
   readonly locksDir: string;
@@ -273,44 +236,79 @@ export function renewLocks(opts: {
     const { substrate, modulePart } = parseTarget(target);
     const path = lockPath(opts.locksDir, substrate, modulePart);
     const observed = observeLock(path);
-    if (observed === undefined || observed === 'unreadable') {
-      lost.push({ target, held_by: observed === undefined ? '<none>' : '<unreadable>' });
+    if (observed.kind !== 'held') {
+      lost.push({ target, held_by: observed.kind === 'absent' ? '<none>' : '<unreadable>' });
       continue;
     }
-    if (observed.task_id !== opts.taskId) {
-      lost.push({ target, held_by: observed.task_id });
+    if (observed.record.task_id !== opts.taskId) {
+      lost.push({ target, held_by: observed.record.task_id });
       continue;
     }
-    const record: LockRecord = { ...observed, acquired_at: now };
-    const staged = `${path}.renew-${process.pid}-${randomUUID()}`;
-    const fd = openSync(staged, 'wx');
-    try {
-      writeSync(fd, JSON.stringify(record, null, 2) + '\n');
-      fsyncSync(fd);
-    } finally {
-      closeSync(fd);
-    }
-    renameSync(staged, path);
-    renewed.push(record);
+    const record: LockRecord = { ...observed.record, acquired_at: now };
+    const outcome = swapObservedRecord({
+      path,
+      claimsDir: claimsDir(opts.locksDir),
+      identity: observed.identity,
+      next: serialize(record),
+    });
+    if (outcome === 'swapped') renewed.push(record);
+    else lost.push({ target, held_by: outcome === 'claimed' ? '<claimed>' : holderOf(path) });
   }
   return { renewed, lost };
 }
 
+export interface LockInspection {
+  /** Keys this task holds, with the identity of the exact record held. */
+  readonly held: readonly { target: string; record: LockRecord; identity: string }[];
+  /** Keys this task does not hold: missing, unreadable, or held by another task. */
+  readonly lost: readonly { target: string; held_by: string }[];
+}
+
+/** Read, without changing anything, which of `targets` the task holds right now. */
+export function inspectLocks(opts: {
+  readonly locksDir: string;
+  readonly taskId: string;
+  readonly targets: readonly string[];
+}): LockInspection {
+  const held: { target: string; record: LockRecord; identity: string }[] = [];
+  const lost: { target: string; held_by: string }[] = [];
+  for (const target of [...new Set(opts.targets)].sort(utf8Compare)) {
+    const { substrate, modulePart } = parseTarget(target);
+    const observed = observeLock(lockPath(opts.locksDir, substrate, modulePart));
+    if (observed.kind === 'held' && observed.record.task_id === opts.taskId) {
+      held.push({ target, record: observed.record, identity: observed.identity });
+      continue;
+    }
+    lost.push({
+      target,
+      held_by:
+        observed.kind === 'held'
+          ? observed.record.task_id
+          : observed.kind === 'absent'
+            ? '<none>'
+            : '<unreadable>',
+    });
+  }
+  return { held, lost };
+}
+
+/** Release every record the task still holds; records another task took over stay. */
 export function releaseLocks(opts: { locksDir: string; taskId: string }): readonly LockRecord[] {
   const released: LockRecord[] = [];
   if (!existsSync(opts.locksDir)) return released;
   for (const name of readdirSync(opts.locksDir)) {
     if (!name.endsWith('.json')) continue;
     const path = join(opts.locksDir, name);
-    let record: LockRecord;
-    try {
-      record = JSON.parse(readFileSync(path, 'utf8')) as LockRecord;
-    } catch {
-      continue;
-    }
-    if (record.task_id === opts.taskId) {
-      unlinkSync(path);
-      released.push(record);
+    const observed = observeLock(path);
+    if (observed.kind !== 'held' || observed.record.task_id !== opts.taskId) continue;
+    if (
+      swapObservedRecord({
+        path,
+        claimsDir: claimsDir(opts.locksDir),
+        identity: observed.identity,
+      }) === 'swapped'
+    ) {
+      released.push(observed.record);
     }
   }
   return released;
@@ -339,9 +337,15 @@ export function reapLocks(opts: { locksDir: string }): readonly LockRecord[] {
     if (!name.endsWith('.json')) continue;
     const path = join(opts.locksDir, name);
     const observed = observeLock(path);
-    if (observed === undefined || observed === 'unreadable') continue;
-    if (expired(observed, now) && removeObservedExpired(path, observed)) {
-      removed.push(observed);
+    if (observed.kind !== 'held' || !expired(observed.record, now)) continue;
+    if (
+      swapObservedRecord({
+        path,
+        claimsDir: claimsDir(opts.locksDir),
+        identity: observed.identity,
+      }) === 'swapped'
+    ) {
+      removed.push(observed.record);
     }
   }
   return removed;
