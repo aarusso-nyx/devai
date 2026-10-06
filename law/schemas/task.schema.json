@@ -472,6 +472,10 @@
           "type": "string",
           "pattern": "^[a-z][a-z0-9-]*$"
         },
+        "instructions_ref": {
+          "$ref": "#/$defs/relativePath",
+          "description": "Repository-relative task instructions, such as a campaign task prompt (ADR-MDL-0009). When present, its bytes are a hashed task-layer component of the composed prompt, so editing it changes the prompt composition id."
+        },
         "prompt_composition_id": {
           "type": "string",
           "pattern": "^PC-[a-f0-9]{16}$"
