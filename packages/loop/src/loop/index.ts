@@ -89,6 +89,7 @@ export type {
 export * from './scorecard.js';
 export * from './scorecard-na.js';
 export * from './sensor-integrity.js';
+export * from './state-root.js';
 export * from './round-runner.js';
 export * from './round-task-admission.js';
 export * from './tasks.js';
