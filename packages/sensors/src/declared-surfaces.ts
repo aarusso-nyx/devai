@@ -176,8 +176,12 @@ function readJson(path: string): unknown {
 }
 
 /** Registered action ids, or null when the registry is absent or unreadable. */
-export function readRegisteredActionIds(repoRoot: string): readonly string[] | null {
-  const registry = readJson(join(repoRoot, ACTION_REGISTRY_PATH)) as RegistryShape | undefined;
+export function readRegisteredActionIds(
+  repoRoot: string,
+  admit: (absolutePath: string) => boolean = () => true,
+): readonly string[] | null {
+  const path = join(repoRoot, ACTION_REGISTRY_PATH);
+  const registry = (admit(path) ? readJson(path) : undefined) as RegistryShape | undefined;
   if (typeof registry !== 'object' || registry === null || !Array.isArray(registry.entries)) {
     return null;
   }
@@ -188,12 +192,15 @@ export function readRegisteredActionIds(repoRoot: string): readonly string[] | n
 }
 
 /** Action ids referenced by `refs.actionRefs[].id` in any use-case step under `useCasesDir`. */
-function referencedActionIds(useCasesDir: string): Set<string> {
+function referencedActionIds(
+  useCasesDir: string,
+  admit: (absolutePath: string) => boolean,
+): Set<string> {
   const referenced = new Set<string>();
   let names: string[];
   try {
     names = readdirSync(useCasesDir)
-      .filter((name) => name.endsWith('.json'))
+      .filter((name) => name.endsWith('.json') && admit(join(useCasesDir, name)))
       .sort();
   } catch {
     return referenced;
@@ -227,10 +234,11 @@ function referencedActionIds(useCasesDir: string): Set<string> {
 export function measureActionLinkage(
   repoRoot: string,
   useCasesDir: string = join(repoRoot, 'product/use-cases'),
+  admit: (absolutePath: string) => boolean = () => true,
 ): ActionLinkage | null {
-  const actionIds = readRegisteredActionIds(repoRoot);
+  const actionIds = readRegisteredActionIds(repoRoot, admit);
   if (actionIds === null) return null;
-  const referenced = referencedActionIds(useCasesDir);
+  const referenced = referencedActionIds(useCasesDir, admit);
   const linkedIds = new Set(actionIds.filter((id) => referenced.has(id)));
   const unlinkedIds = actionIds.filter((id) => !linkedIds.has(id));
   const pct = actionIds.length === 0 ? 100 : (linkedIds.size / actionIds.length) * 100;
@@ -260,8 +268,11 @@ export function unlinkedActionFindings(
 }
 
 /** Evidence of the actions surface: the registry path and its action ids. */
-export function actionEvidence(repoRoot: string): SurfaceEvidence {
-  const ids = readRegisteredActionIds(repoRoot);
+export function actionEvidence(
+  repoRoot: string,
+  admit: (absolutePath: string) => boolean = () => true,
+): SurfaceEvidence {
+  const ids = readRegisteredActionIds(repoRoot, admit);
   return {
     surface: 'actions',
     items: ids === null || ids.length === 0 ? [] : [ACTION_REGISTRY_PATH, ...ids],

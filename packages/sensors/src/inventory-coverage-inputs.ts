@@ -83,6 +83,11 @@ export interface InventoryCoverageOptions {
    * semantics preserved).
    */
   readonly useCasesDir?: string;
+  /**
+   * Whether an absolute input path may be read. A body, use-case file or registry it
+   * refuses, such as one git ignores, reads as absent. Omitted: every input is read.
+   */
+  readonly admitFile?: (absolutePath: string) => boolean;
 }
 
 interface UseCasesStep {
@@ -149,7 +154,10 @@ interface LoadedUseCases {
   }>;
 }
 
-export function loadUseCasesFromDir(absDir: string): LoadedUseCases {
+export function loadUseCasesFromDir(
+  absDir: string,
+  admit: (absolutePath: string) => boolean = () => true,
+): LoadedUseCases {
   const findings: Array<{ severity: 'info' | 'warning' | 'error'; code: string; message: string }> =
     [];
   const cases: UseCasesCase[] = [];
@@ -167,7 +175,7 @@ export function loadUseCasesFromDir(absDir: string): LoadedUseCases {
   let entries: readonly string[];
   try {
     entries = readdirSync(absDir)
-      .filter((n) => n.endsWith('.json'))
+      .filter((n) => n.endsWith('.json') && admit(join(absDir, n)))
       .sort();
   } catch (err) {
     findings.push({
@@ -332,6 +340,7 @@ export function resolveRoutesPath(
   repoRoot: string,
   explicit: string | undefined,
   framework: string | undefined,
+  admit: (absolutePath: string) => boolean = () => true,
 ): RoutesPathResolution {
   if (explicit !== undefined) return { kind: 'resolved', path: explicit };
   const dir = join(repoRoot, 'record/proofs/sensors/inventory_routes');
@@ -341,7 +350,7 @@ export function resolveRoutesPath(
   if (existsSync(dir)) {
     try {
       const candidates = readdirSync(dir)
-        .filter((name) => /^routes-[^.]+\.json$/.test(name))
+        .filter((name) => /^routes-[^.]+\.json$/.test(name) && admit(join(dir, name)))
         .sort();
       if (candidates.length === 1) {
         return { kind: 'resolved', path: join(dir, candidates[0] as string) };

@@ -33,9 +33,10 @@ export type {
 function measureInventoryCoverage(opts: InventoryCoverageOptions): InventoryCoverageResult {
   const t0 = Date.now();
   const generatedAt = opts.now ?? new Date().toISOString();
+  const admit = opts.admitFile ?? (() => true);
   const apiMapPath =
     opts.apiMapPath ?? join(opts.repoRoot, 'record/proofs/sensors/inventory_api/api-map.json');
-  const routesResolution = resolveRoutesPath(opts.repoRoot, opts.routesPath, opts.framework);
+  const routesResolution = resolveRoutesPath(opts.repoRoot, opts.routesPath, opts.framework, admit);
 
   const findings: Array<{
     readonly severity: 'info' | 'warning' | 'error' | 'critical';
@@ -50,7 +51,7 @@ function measureInventoryCoverage(opts: InventoryCoverageOptions): InventoryCove
 
   if (!httpPresent) {
     // ADR-SCR-0003: http declared absent; no HTTP inventory is demanded.
-  } else if (!existsSync(apiMapPath)) {
+  } else if (!existsSync(apiMapPath) || !admit(apiMapPath)) {
     status = 'review';
     findings.push({
       severity: 'warning',
@@ -88,7 +89,7 @@ function measureInventoryCoverage(opts: InventoryCoverageOptions): InventoryCove
     });
   } else {
     const routesPath = routesResolution.path;
-    if (!existsSync(routesPath)) {
+    if (!existsSync(routesPath) || !admit(routesPath)) {
       if (status === 'pass') status = 'review';
       findings.push({
         severity: 'warning',
@@ -120,7 +121,7 @@ function measureInventoryCoverage(opts: InventoryCoverageOptions): InventoryCove
   // (or pack-configured dir) for authored use-cases and
   // synthesize triads into the matrix's links[].
   const useCasesDir = opts.useCasesDir ?? join(opts.repoRoot, 'product/use-cases');
-  const loadedUseCases = loadUseCasesFromDir(useCasesDir);
+  const loadedUseCases = loadUseCasesFromDir(useCasesDir, admit);
   for (const f of loadedUseCases.findings) findings.push(f);
   const validRouteIds = new Set(routeIds);
   const validEndpointIds = new Set(endpointIds);
@@ -202,7 +203,7 @@ function measureInventoryCoverage(opts: InventoryCoverageOptions): InventoryCove
   // ADR-SCR-0003 IA-004: registered actions measured against their specification links,
   // the way unmapped routes and endpoints read review above.
   const linkage = surfacePresent(opts.surfaces, 'actions')
-    ? measureActionLinkage(opts.repoRoot, useCasesDir)
+    ? measureActionLinkage(opts.repoRoot, useCasesDir, admit)
     : null;
   if (linkage !== null && linkage.unlinkedIds.length > 0) {
     if (status === 'pass') status = 'review';
@@ -301,17 +302,20 @@ const BOUND_SURFACES: readonly PlantSurface[] = ['http', 'actions'];
 /** Endpoints and routes an existing HTTP inventory body holds. */
 function httpEvidence(opts: InventoryCoverageOptions): SurfaceEvidence {
   const items: string[] = [];
+  const admit = opts.admitFile ?? (() => true);
   const apiMapPath =
     opts.apiMapPath ?? join(opts.repoRoot, 'record/proofs/sensors/inventory_api/api-map.json');
   try {
+    if (!admit(apiMapPath)) throw new Error('input not admitted');
     const apiMap = JSON.parse(readFileSync(apiMapPath, 'utf8')) as Partial<ApiMapShape>;
     for (const endpoint of apiMap.endpoints ?? []) items.push(endpointId(endpoint));
   } catch {
     // No readable api-map: no endpoint evidence.
   }
-  const routes = resolveRoutesPath(opts.repoRoot, opts.routesPath, opts.framework);
+  const routes = resolveRoutesPath(opts.repoRoot, opts.routesPath, opts.framework, admit);
   if (routes.kind === 'resolved') {
     try {
+      if (!admit(routes.path)) throw new Error('input not admitted');
       const inventory = JSON.parse(
         readFileSync(routes.path, 'utf8'),
       ) as Partial<RoutesInventoryShape>;
@@ -330,7 +334,8 @@ export function senseInventoryCoverage(opts: InventoryCoverageOptions): Inventor
   const result = measureInventoryCoverage(absent ? { ...opts, persistBody: false } : opts);
   const evidence: SurfaceEvidence[] = [];
   if (!surfacePresent(opts.surfaces, 'http')) evidence.push(httpEvidence(opts));
-  if (!surfacePresent(opts.surfaces, 'actions')) evidence.push(actionEvidence(opts.repoRoot));
+  if (!surfacePresent(opts.surfaces, 'actions'))
+    evidence.push(actionEvidence(opts.repoRoot, opts.admitFile));
   const reading = applySurfaceDeclaration(result.reading, opts.surfaces, BOUND_SURFACES, evidence);
   return { ...result, reading };
 }
