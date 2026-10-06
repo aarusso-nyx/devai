@@ -90,3 +90,12 @@ it('release.yml: the first job runs release-prerequisites.mjs and every other jo
 it('devai-ledger-verify.yml: the first job runs release-prerequisites.mjs and every other job needs it', () => {
   assertFirstJobGatesOnPrerequisites('.github/workflows/devai-ledger-verify.yml');
 });
+
+it('release-prerequisites.mjs certifies with a 30 minute per-task limit (#299)', () => {
+  const source = readFileSync(resolve(ROOT, PREREQUISITES_SCRIPT), 'utf8');
+  expect(source).toContain('const CERTIFICATION_TASK_TIMEOUT_MS = 30 * 60_000;');
+  const certify = source.slice(source.indexOf("'--rc',"));
+  expect(certify.slice(0, 200)).toMatch(
+    /'--run',\s+'--task-timeout-ms',\s+String\(CERTIFICATION_TASK_TIMEOUT_MS\),/u,
+  );
+});
