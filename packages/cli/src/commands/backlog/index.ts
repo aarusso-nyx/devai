@@ -3,7 +3,6 @@ import { spawnSync } from '@devai-nyx/authority';
 import { EXIT_USAGE } from '@devai-nyx/utils';
 import {
   addBacklogItem,
-  findUnprojectedBacklogItem,
   listBacklogItems,
   projectBacklogItem,
   resolveBacklogItem,
@@ -42,6 +41,7 @@ const ROLES: readonly BacklogRole[] = ['owner', 'architect', 'inspector', 'engin
 const STATUSES = ['open', 'resolved', 'all'] as const;
 const ID_PATTERN = /^BL-[0-9]{4,}$/u;
 const ROUND_PATTERN = /^R-[0-9]{4}$/u;
+const REQUEST_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/u;
 
 type Value = string | string[] | undefined;
 
@@ -128,6 +128,7 @@ interface AddOptions extends BacklogOptions {
   readonly class?: Value;
   readonly round?: Value;
   readonly role?: Value;
+  readonly requestId?: Value;
 }
 
 export const backlogAdd = defineCommand({
@@ -141,6 +142,10 @@ export const backlogAdd = defineCommand({
       .option('--body <text>', 'Item body')
       .option('--class <class>', 'Change class when the item concerns a path')
       .option('--round <round_id>', 'Explicit round attribution; never inferred')
+      .option(
+        '--request-id <id>',
+        'Durable request identity: a retry with the same id recovers the recorded item',
+      )
       .option(
         '--role <role>',
         'Assert the originating role; it must equal the declared invocation role',
@@ -166,6 +171,10 @@ export const backlogAdd = defineCommand({
           if (asserted !== undefined && asserted !== role) {
             throw new BacklogUsageError('BACKLOG_ROLE_MISMATCH');
           }
+          const requestId = single(options.requestId);
+          if (requestId !== undefined && !REQUEST_ID_PATTERN.test(requestId)) {
+            throw new BacklogUsageError('BACKLOG_REQUEST_ID_INVALID');
+          }
           const repoRoot = root(options);
           const input = {
             repoRoot,
@@ -174,6 +183,7 @@ export const backlogAdd = defineCommand({
             body,
             ...(itemClass === undefined ? {} : { class: itemClass }),
             ...(round === undefined ? {} : { roundId: round }),
+            ...(requestId === undefined ? {} : { requestId }),
             origin: {
               session: directCliChainId({
                 repositoryId: 'repository-backlog',
@@ -184,9 +194,9 @@ export const backlogAdd = defineCommand({
               commit: headCommit(repoRoot),
             },
           };
-          // A retry of an add that saved its item but failed to project it reuses
-          // that item and completes the projection instead of allocating another.
-          const item = findUnprojectedBacklogItem(input) ?? addBacklogItem(input);
+          // With a request id a retry recovers the recorded item and completes its
+          // projection; without one every add is new.
+          const item = addBacklogItem(input);
           if (item.round_id !== undefined) {
             try {
               projectBacklogItem({ repoRoot, id: item.id });

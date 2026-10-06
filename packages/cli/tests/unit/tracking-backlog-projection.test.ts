@@ -50,7 +50,11 @@ interface FacadeDefinition {
 
 /** The projector the Engineer must export from @devai-nyx/loop (repository-backlog module). */
 interface BacklogProjector {
-  projectBacklogItem(options: { readonly repoRoot: string; readonly id: string }): GovernanceEvent;
+  projectBacklogItem(options: {
+    readonly repoRoot: string;
+    readonly id: string;
+    readonly lock?: { readonly waitMs?: number; readonly ttlMs?: number };
+  }): GovernanceEvent;
 }
 
 const FACADES_URL = pathToFileURL(
@@ -346,7 +350,8 @@ describe('backlog projection under the disclosure profile', () => {
 });
 
 describe('backlog add with round tracking is idempotent and recoverable', () => {
-  const addArgs = (root: string) =>
+  const REQUEST = 'req-2026-10-06-0001';
+  const addArgs = (root: string, extra: readonly string[] = []) =>
     invoke(root, [
       'backlog-add',
       '--kind',
@@ -357,32 +362,56 @@ describe('backlog add with round tracking is idempotent and recoverable', () => 
       BODY,
       '--round',
       ROUND,
+      ...extra,
     ]);
+  const withRequest = (root: string, id = REQUEST) => addArgs(root, ['--request-id', id]);
   const itemFiles = (root: string) =>
     readdirSync(join(root, '.devai/state/backlog')).filter((name) => name.endsWith('.json'));
+  const logPath = (root: string) => join(root, '.devai/state/tracking', ROUND, 'events.jsonl');
+  const lockPath = (root: string) => join(root, '.devai/state/tracking', ROUND, 'projection.lock');
+  const foreignLock = (root: string, acquiredAt: string) =>
+    put(root, join('.devai/state/tracking', ROUND, 'projection.lock'), {
+      token: 'foreign-owner-token',
+      pid: 1,
+      acquired_at: acquiredAt,
+    });
 
-  it('reuses the saved item on retry and completes the missing tracking event', async () => {
+  it('recovers the recorded item by request id after a failed append', async () => {
     const root = repository({ activated: true });
     // A read-only log makes the append fail after the item is saved.
-    const log = join(root, '.devai/state/tracking', ROUND, 'events.jsonl');
     put(root, join('.devai/state/tracking', ROUND, 'events.jsonl'), '');
-    chmodSync(log, 0o444);
+    chmodSync(logPath(root), 0o444);
 
-    const failed = await addArgs(root);
+    const failed = await withRequest(root);
     expect(failed.exit).not.toBe(0);
     expect(itemFiles(root)).toEqual(['BL-0001.json']);
+    expect(existsSync(lockPath(root)), 'a failed append must release the round lock').toBe(false);
 
-    chmodSync(log, 0o644);
-    const retried = await addArgs(root);
+    chmodSync(logPath(root), 0o644);
+    const retried = await withRequest(root);
     expect(retried.exit, retried.stderr).toBe(0);
-    expect(JSON.parse(retried.stdout)).toMatchObject({ id: 'BL-0001' });
+    expect(JSON.parse(retried.stdout)).toMatchObject({ id: 'BL-0001', request_id: REQUEST });
     expect(itemFiles(root)).toEqual(['BL-0001.json']);
     const events = readGovernanceEvents({ repoRoot: root, round: ROUND });
     expect(events).toHaveLength(1);
     expect(events[0]?.evidence_refs).toContain('BL-0001');
   });
 
-  it('records a new item when an identical add was already projected', async () => {
+  it('returns the recorded outcome when the process died after the append', async () => {
+    const root = repository({ activated: true });
+    const first = await withRequest(root);
+    expect(first.exit, first.stderr).toBe(0);
+
+    // The caller never saw the response and retries with the same identity.
+    const retried = await withRequest(root);
+
+    expect(retried.exit, retried.stderr).toBe(0);
+    expect(JSON.parse(retried.stdout)).toEqual(JSON.parse(first.stdout));
+    expect(itemFiles(root)).toEqual(['BL-0001.json']);
+    expect(readGovernanceEvents({ repoRoot: root, round: ROUND })).toHaveLength(1);
+  });
+
+  it('always records a new item when no request id is given', async () => {
     const root = repository({ activated: true });
 
     expect((await addArgs(root)).exit).toBe(0);
@@ -394,13 +423,75 @@ describe('backlog add with round tracking is idempotent and recoverable', () => 
     expect(readGovernanceEvents({ repoRoot: root, round: ROUND })).toHaveLength(2);
   });
 
-  it('does not reuse an unprojected item while the round is not activated', async () => {
+  it('refuses a request id reused with different content', async () => {
+    const root = repository({ activated: true });
+    expect((await withRequest(root)).exit).toBe(0);
+
+    const conflict = await invoke(root, [
+      'backlog-add',
+      '--kind',
+      'finding',
+      '--title',
+      'A different finding',
+      '--body',
+      BODY,
+      '--round',
+      ROUND,
+      '--request-id',
+      REQUEST,
+    ]);
+
+    expect(conflict.exit).not.toBe(0);
+    expect(JSON.parse(conflict.stderr)).toMatchObject({ code: 'BACKLOG_REQUEST_ID_CONFLICT' });
+    expect(itemFiles(root)).toEqual(['BL-0001.json']);
+  });
+
+  it('refuses a malformed request id', async () => {
+    const root = repository({ activated: true });
+    const result = await withRequest(root, 'short');
+    expect(result.exit).not.toBe(0);
+    expect(JSON.parse(result.stderr)).toMatchObject({ code: 'BACKLOG_REQUEST_ID_INVALID' });
+  });
+
+  it('keeps the item local while the round is not activated and completes it once it is', async () => {
     const root = repository({ activated: false });
 
-    expect((await addArgs(root)).exit).toBe(0);
-    expect((await addArgs(root)).exit).toBe(0);
+    const local = await withRequest(root);
+    expect(local.exit, local.stderr).toBe(0);
+    expect(existsSync(join(root, '.devai/state/tracking'))).toBe(false);
 
-    expect(itemFiles(root)).toEqual(['BL-0001.json', 'BL-0002.json']);
+    put(root, join('.devai/state/tracking', ROUND, 'activation.json'), activation());
+    const completed = await withRequest(root);
+    expect(completed.exit, completed.stderr).toBe(0);
+    expect(JSON.parse(completed.stdout)).toMatchObject({ id: 'BL-0001' });
+    expect(itemFiles(root)).toEqual(['BL-0001.json']);
+    expect(readGovernanceEvents({ repoRoot: root, round: ROUND })).toHaveLength(1);
+  });
+
+  it('appends nothing when the activation is disabled after the item was saved', async () => {
+    const root = repository({ activated: true });
+    put(root, join('.devai/state/tracking', ROUND, 'events.jsonl'), '');
+    chmodSync(logPath(root), 0o444);
+    expect((await withRequest(root)).exit).not.toBe(0);
+    chmodSync(logPath(root), 0o644);
+    put(
+      root,
+      join('.devai/state/tracking', ROUND, 'activation.json'),
+      activation({
+        state: 'disabled',
+        disabled: {
+          disabled_at: '2026-08-28T12:00:00.000Z',
+          authority_session_id: SESSION,
+          pending_events: 0,
+        },
+      }),
+    );
+
+    const retried = await withRequest(root);
+
+    expect(retried.exit, retried.stderr).toBe(0);
+    expect(itemFiles(root)).toEqual(['BL-0001.json']);
+    expect(readGovernanceEvents({ repoRoot: root, round: ROUND })).toEqual([]);
   });
 
   it('projects an item once however often projection is requested', async () => {
@@ -414,6 +505,76 @@ describe('backlog add with round tracking is idempotent and recoverable', () => 
     const events = readGovernanceEvents({ repoRoot: root, round: ROUND });
     expect(events).toHaveLength(1);
     expect(again.event_id).toBe(events[0]?.event_id);
+  });
+
+  it('refuses to append while another holder owns the round lock and leaves that lock alone', async () => {
+    const root = repository({ activated: false });
+    const item = await add(root, ['--round', ROUND]);
+    put(root, join('.devai/state/tracking', ROUND, 'activation.json'), activation());
+    foreignLock(root, new Date().toISOString());
+
+    const code = await withAuthorityHostTestScope(() => {
+      try {
+        projector().projectBacklogItem({ repoRoot: root, id: item.id, lock: { waitMs: 0 } });
+      } catch (error) {
+        return (error as { code?: string }).code;
+      }
+      return undefined;
+    });
+
+    expect(code).toBe('BACKLOG_LOCK_HELD');
+    expect(readGovernanceEvents({ repoRoot: root, round: ROUND })).toEqual([]);
+    expect(JSON.parse(readFileSync(lockPath(root), 'utf8'))).toMatchObject({
+      token: 'foreign-owner-token',
+    });
+  });
+
+  it('refuses a stale round lock with a repair code and never takes it over', async () => {
+    const root = repository({ activated: false });
+    const item = await add(root, ['--round', ROUND]);
+    put(root, join('.devai/state/tracking', ROUND, 'activation.json'), activation());
+    foreignLock(root, '2020-01-01T00:00:00.000Z');
+
+    const code = await withAuthorityHostTestScope(() => {
+      try {
+        projector().projectBacklogItem({ repoRoot: root, id: item.id, lock: { waitMs: 0 } });
+      } catch (error) {
+        return (error as { code?: string }).code;
+      }
+      return undefined;
+    });
+
+    expect(code).toBe('BACKLOG_LOCK_STALE');
+    expect(existsSync(lockPath(root))).toBe(true);
+    expect(readGovernanceEvents({ repoRoot: root, round: ROUND })).toEqual([]);
+
+    // After an operator removes the stale lock, the retry completes.
+    rmSync(lockPath(root));
+    const event = await withAuthorityHostTestScope(() =>
+      projector().projectBacklogItem({ repoRoot: root, id: item.id }),
+    );
+    expect(event.kind).toBe('backlog_item_projected');
+  });
+
+  it('does not let a torn item file block an add without a request id', async () => {
+    const root = repository({ activated: true });
+    put(root, '.devai/state/backlog/BL-0001.json', '{"schemaVersion":"1.0.0","id":"BL-00');
+
+    const plain = await addArgs(root);
+
+    expect(plain.exit, plain.stderr).toBe(0);
+    expect(JSON.parse(plain.stdout)).toMatchObject({ id: 'BL-0002' });
+  });
+
+  it('refuses a request-id recovery with a repair code while an item file is unreadable', async () => {
+    const root = repository({ activated: true });
+    put(root, '.devai/state/backlog/BL-0001.json', '{"schemaVersion":"1.0.0","id":"BL-00');
+
+    const result = await withRequest(root);
+
+    expect(result.exit).not.toBe(0);
+    expect(JSON.parse(result.stderr)).toMatchObject({ code: 'BACKLOG_ITEM_UNREADABLE' });
+    expect(itemFiles(root)).toEqual(['BL-0001.json']);
   });
 });
 

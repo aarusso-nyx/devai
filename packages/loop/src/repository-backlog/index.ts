@@ -3,18 +3,30 @@ import {
   mkdirSync,
   readFileSync,
   readdirSync,
+  unlinkSync,
   writeFileSync,
 } from '@devai-nyx/authority';
-import { join } from 'node:path';
+import { randomUUID } from 'node:crypto';
+import { dirname, join } from 'node:path';
 import { getValidator } from '@devai-nyx/schemas';
-import { nextCounterId } from '@devai-nyx/utils';
+import { canonicalSha256, nextCounterId } from '@devai-nyx/utils';
 import {
   trackingFail,
   type GovernanceEvent,
   type GovernanceSessionSource,
 } from '../tracking/events.js';
+import {
+  PublicationIndeterminate,
+  fsyncDirectorySync,
+  publishCreateOnlyDurableSync,
+  replaceDurableSync,
+} from '../loop/durable-files.js';
 import { readRoundTrackingActivation } from '../tracking/projection.js';
-import { readGovernanceEvents, recordGovernanceEvent } from '../tracking/store.js';
+import {
+  readGovernanceEvents,
+  recordGovernanceEvent,
+  trackingStateDir,
+} from '../tracking/store.js';
 
 /**
  * Repository backlog store (ADR-GOV-0019).
@@ -27,6 +39,21 @@ import { readGovernanceEvents, recordGovernanceEvent } from '../tracking/store.j
  *
  * A backlog item is not a round gap: this module never reads or writes
  * `.devai/state/rgr/`, and a round is recorded only when the caller passes one.
+ *
+ * Durability and recovery guarantees:
+ * - An item is published atomically and create-only (staged, fsynced, linked
+ *   into place), so a reader never sees a partial record and a concurrent add
+ *   can never overwrite another item.
+ * - An add that passes a `requestId` is idempotent by that identity: the id is
+ *   recorded on the item, and a retry returns the recorded item instead of
+ *   allocating another. The same id with different content is refused. An add
+ *   without a request id is always new.
+ * - Projection of one item onto its round chain is serialized by a per-round
+ *   lock held across the existence check and the append, and an item is
+ *   projected at most once. The lock is a create-only record owned by a token;
+ *   it is released only by its owner. A lock that is held is waited for
+ *   briefly and then refused; a lock older than its TTL is refused with a
+ *   repair code and is never taken over automatically.
  */
 
 export type BacklogKind = 'finding' | 'proposition' | 'note' | 'flaky-test';
@@ -44,6 +71,7 @@ export interface BacklogOrigin {
 export interface BacklogItem {
   readonly schemaVersion: '1.0.0';
   readonly id: string;
+  readonly request_id?: string;
   readonly kind: BacklogKind;
   readonly class?: BacklogClass;
   readonly title: string;
@@ -68,6 +96,85 @@ export class BacklogStoreError extends Error {
 
 export const BACKLOG_STATE_DIR_REL = '.devai/state/backlog';
 export const BACKLOG_ID_PATTERN = /^BL-[0-9]{4,}$/u;
+export const BACKLOG_REQUEST_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/u;
+export const BACKLOG_LOCK_TTL_MS = 10 * 60 * 1000;
+const BACKLOG_LOCK_WAIT_MS = 2000;
+
+export interface BacklogLockOptions {
+  /** How long to wait for a held lock before refusing; defaults to two seconds. */
+  readonly waitMs?: number;
+  /** Age after which a held lock is reported stale for repair; defaults to ten minutes. */
+  readonly ttlMs?: number;
+}
+
+function sleepSync(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+function readLockToken(path: string): string | undefined {
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(path, 'utf8'));
+    const token = (parsed as { token?: unknown } | null)?.token;
+    return typeof token === 'string' ? token : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function lockAgeMs(path: string): number | undefined {
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(path, 'utf8'));
+    const at = Date.parse(String((parsed as { acquired_at?: unknown } | null)?.acquired_at));
+    return Number.isNaN(at) ? undefined : Date.now() - at;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Hold a create-only lock record across `run`. The record carries an owner
+ * token and is removed only while it still carries that token.
+ */
+function withLock<T>(path: string, options: BacklogLockOptions | undefined, run: () => T): T {
+  const token = randomUUID();
+  const record = `${JSON.stringify({ token, pid: process.pid, acquired_at: new Date().toISOString() })}\n`;
+  const deadline = Date.now() + (options?.waitMs ?? BACKLOG_LOCK_WAIT_MS);
+  for (;;) {
+    let acquired: boolean;
+    try {
+      acquired = publishCreateOnlyDurableSync(path, record);
+    } catch (error) {
+      // An indeterminate publication may have landed: it is ours only if it carries our token.
+      if (!(error instanceof PublicationIndeterminate) || readLockToken(path) !== token) {
+        throw error;
+      }
+      acquired = true;
+    }
+    if (acquired) break;
+    const age = lockAgeMs(path);
+    if (age === undefined || age > (options?.ttlMs ?? BACKLOG_LOCK_TTL_MS)) {
+      throw new BacklogStoreError('BACKLOG_LOCK_STALE', path);
+    }
+    if (Date.now() >= deadline) throw new BacklogStoreError('BACKLOG_LOCK_HELD', path);
+    sleepSync(25);
+  }
+  try {
+    return run();
+  } finally {
+    if (readLockToken(path) === token) {
+      unlinkSync(path);
+      fsyncDirectorySync(dirname(path));
+    }
+  }
+}
+
+function requestLockPath(repoRoot: string, requestId: string): string {
+  return join(backlogDir(repoRoot), '.locks', `request-${canonicalSha256(requestId)}.lock`);
+}
+
+function projectionLockPath(repoRoot: string, round: string): string {
+  return join(trackingStateDir(repoRoot, round), 'projection.lock');
+}
 
 const validateItem = getValidator('backlog-item.schema.json');
 
@@ -85,10 +192,21 @@ function assertValid(item: unknown): asserts item is BacklogItem {
   }
 }
 
+function serialize(item: BacklogItem): string {
+  return `${JSON.stringify(item, null, 2)}\n`;
+}
+
+/** Atomically replace an existing record: a staged, fsynced file renamed into place. */
 function write(repoRoot: string, item: BacklogItem): void {
-  const dir = backlogDir(repoRoot);
-  mkdirSync(dir, { recursive: true });
-  writeFileSync(join(dir, `${item.id}.json`), `${JSON.stringify(item, null, 2)}\n`);
+  replaceDurableSync(join(backlogDir(repoRoot), `${item.id}.json`), serialize(item));
+}
+
+/** Publish a new record only when its id is free; false means another add holds the id. */
+function publishNew(repoRoot: string, item: BacklogItem): boolean {
+  return publishCreateOnlyDurableSync(
+    join(backlogDir(repoRoot), `${item.id}.json`),
+    serialize(item),
+  );
 }
 
 function storedIds(repoRoot: string): readonly string[] {
@@ -128,6 +246,9 @@ export interface AddBacklogItemOptions {
   readonly body: string;
   readonly class?: BacklogClass;
   readonly roundId?: string;
+  /** Durable request identity; a retry with the same id recovers the recorded item. */
+  readonly requestId?: string;
+  readonly lock?: BacklogLockOptions;
   readonly origin: BacklogOrigin;
   readonly createdAt?: string;
 }
@@ -136,6 +257,7 @@ export function addBacklogItem(options: AddBacklogItemOptions): BacklogItem {
   const draft = (id: string): BacklogItem => ({
     schemaVersion: '1.0.0',
     id,
+    ...(options.requestId === undefined ? {} : { request_id: options.requestId }),
     kind: options.kind,
     ...(options.class === undefined ? {} : { class: options.class }),
     title: options.title,
@@ -152,10 +274,48 @@ export function addBacklogItem(options: AddBacklogItemOptions): BacklogItem {
   });
   // Validate before allocating so a refused item never consumes an id.
   assertValid(draft('BL-0001'));
-  const item = draft(allocateId(options.repoRoot));
-  assertValid(item);
-  write(options.repoRoot, item);
-  return item;
+  const create = (): BacklogItem => {
+    for (;;) {
+      const item = draft(allocateId(options.repoRoot));
+      assertValid(item);
+      if (publishNew(options.repoRoot, item)) return item;
+    }
+  };
+  const requestId = options.requestId;
+  if (requestId === undefined) return create();
+  return withLock(requestLockPath(options.repoRoot, requestId), options.lock, () => {
+    const recorded = findByRequestId(options.repoRoot, requestId);
+    if (recorded === undefined) return create();
+    if (
+      recorded.kind !== options.kind ||
+      recorded.title !== options.title ||
+      recorded.body !== options.body ||
+      recorded.class !== options.class ||
+      recorded.round_id !== options.roundId ||
+      recorded.origin.role !== options.origin.role
+    ) {
+      throw new BacklogStoreError('BACKLOG_REQUEST_ID_CONFLICT', requestId);
+    }
+    return recorded;
+  });
+}
+
+/**
+ * The item recorded under a request id. An unreadable record could be the one
+ * being recovered, so it refuses with a repair code naming it rather than
+ * guessing; adds without a request id never scan and are not affected.
+ */
+function findByRequestId(repoRoot: string, requestId: string): BacklogItem | undefined {
+  for (const id of storedIds(repoRoot)) {
+    let item: BacklogItem;
+    try {
+      item = showBacklogItem({ repoRoot, id });
+    } catch {
+      throw new BacklogStoreError('BACKLOG_ITEM_UNREADABLE', id);
+    }
+    if (item.request_id === requestId) return item;
+  }
+  return undefined;
 }
 
 export function listBacklogItems(options: {
@@ -211,37 +371,6 @@ function isProjectionOf(event: GovernanceEvent, id: string): boolean {
   return event.kind === 'backlog_item_projected' && event.evidence_refs.includes(id);
 }
 
-/**
- * The item an interrupted add left behind: same input and origin, attributed
- * to a round whose Owner activation is live, and still missing its
- * `backlog_item_projected` event. A retry reuses it and completes the
- * projection instead of allocating a second id. An item that was already
- * projected, or whose round is not activated, is never matched, so a
- * deliberate repeat of an identical add still records a new item.
- */
-export function findUnprojectedBacklogItem(
-  options: Omit<AddBacklogItemOptions, 'createdAt'>,
-): BacklogItem | undefined {
-  const round = options.roundId;
-  if (round === undefined) return undefined;
-  const activation = readRoundTrackingActivation({ repoRoot: options.repoRoot, round });
-  if (activation === undefined || activation.state === 'disabled') return undefined;
-  const events = readGovernanceEvents({ repoRoot: options.repoRoot, round });
-  const projected = (id: string): boolean => events.some((event) => isProjectionOf(event, id));
-  return listBacklogItems({ repoRoot: options.repoRoot, status: 'open', roundId: round })
-    .filter(
-      (item) =>
-        item.kind === options.kind &&
-        item.title === options.title &&
-        item.body === options.body &&
-        item.class === options.class &&
-        item.origin.session === options.origin.session &&
-        item.origin.role === options.origin.role &&
-        item.origin.commit === options.origin.commit,
-    )
-    .find((item) => !projected(item.id));
-}
-
 function sourceOf(identity: string): GovernanceSessionSource {
   return identity.startsWith('AUTH-SESSION-') ? 'session-state' : 'direct-cli';
 }
@@ -257,35 +386,46 @@ function sourceOf(identity: string): GovernanceSessionSource {
 export function projectBacklogItem(options: {
   readonly repoRoot: string;
   readonly id: string;
+  readonly lock?: BacklogLockOptions;
 }): GovernanceEvent {
   const item = showBacklogItem(options);
   const round = item.round_id;
   if (round === undefined) trackingFail('BACKLOG_PROJECTION_ROUND_REQUIRED');
-  const activation = readRoundTrackingActivation({ repoRoot: options.repoRoot, round });
-  if (activation === undefined || activation.state === 'disabled') {
-    trackingFail('BACKLOG_PROJECTION_NOT_ACTIVATED');
-  }
-  // Idempotent: an item already on the chain is reported, never appended twice.
-  const existing = readGovernanceEvents({ repoRoot: options.repoRoot, round }).find((event) =>
-    isProjectionOf(event, item.id),
-  );
-  if (existing !== undefined) return existing;
-  const identity = activation.authorization.authority_session_id;
-  return recordGovernanceEvent({
-    repoRoot: options.repoRoot,
-    repositoryId: activation.repository_id,
-    draft: {
-      round_id: round,
-      task_id: null,
-      authority_session_id: identity,
-      session_source: sourceOf(identity),
-      role: item.origin.role,
-      kind: 'backlog_item_projected',
-      commit_binding: null,
-      coverage: { mediated: true, adapter_id: null },
-      summary: `Backlog item ${item.id} (${item.kind}) is ${item.status}.`,
-      evidence_refs: [item.id],
-      payload: item,
-    },
+  const notActivated = (): boolean => {
+    const activation = readRoundTrackingActivation({ repoRoot: options.repoRoot, round });
+    return activation === undefined || activation.state === 'disabled';
+  };
+  if (notActivated()) trackingFail('BACKLOG_PROJECTION_NOT_ACTIVATED');
+  // The existence check and the append are one critical section per round, so two
+  // processes can neither both append nor interleave on the governance chain.
+  return withLock(projectionLockPath(options.repoRoot, round), options.lock, () => {
+    // The activation is read again under the lock: it may have been disabled meanwhile.
+    const activation = readRoundTrackingActivation({ repoRoot: options.repoRoot, round });
+    if (activation === undefined || activation.state === 'disabled') {
+      trackingFail('BACKLOG_PROJECTION_NOT_ACTIVATED');
+    }
+    // Idempotent: an item already on the chain is reported, never appended twice.
+    const existing = readGovernanceEvents({ repoRoot: options.repoRoot, round }).find((event) =>
+      isProjectionOf(event, item.id),
+    );
+    if (existing !== undefined) return existing;
+    const identity = activation.authorization.authority_session_id;
+    return recordGovernanceEvent({
+      repoRoot: options.repoRoot,
+      repositoryId: activation.repository_id,
+      draft: {
+        round_id: round,
+        task_id: null,
+        authority_session_id: identity,
+        session_source: sourceOf(identity),
+        role: item.origin.role,
+        kind: 'backlog_item_projected',
+        commit_binding: null,
+        coverage: { mediated: true, adapter_id: null },
+        summary: `Backlog item ${item.id} (${item.kind}) is ${item.status}.`,
+        evidence_refs: [item.id],
+        payload: item,
+      },
+    });
   });
 }
