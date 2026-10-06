@@ -2,6 +2,7 @@
 // before its identity is checked, so a swapped-in entry is put back and never removed.
 import {
   closeSync,
+  existsSync,
   linkSync,
   lstatSync,
   mkdirSync,
@@ -10,6 +11,7 @@ import {
   readFileSync,
   readdirSync,
   readlinkSync,
+  renameSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -63,7 +65,7 @@ describe('identity-bound removal steps', () => {
     expect(removeEntryIfIdentitySteps(path, identity)).toBe('absent');
   });
 
-  it('puts back a file that replaced the identity, byte for byte, with no quarantine left', () => {
+  it('leaves a file that replaced the identity untouched, with no quarantine', () => {
     const root = directory();
     const path = join(root, 'record.json');
     writeFileSync(path, 'mine\n');
@@ -100,12 +102,15 @@ describe('identity-bound removal steps', () => {
     writeFileSync(path, 'mine\n');
     const identity = identityOf(path);
     linkSync(path, join(root, 'kept-original'));
-    rmSync(path);
-    writeFileSync(path, 'foreign\n');
 
     let failure: unknown;
     try {
       removeEntryIfIdentitySteps(path, identity, {
+        // A foreign file replaces the matching one after the precheck, before the rename.
+        afterPrecheck: () => {
+          rmSync(path);
+          writeFileSync(path, 'foreign\n');
+        },
         afterQuarantine: () => writeFileSync(path, 'newest\n'),
       });
     } catch (error) {
@@ -117,7 +122,7 @@ describe('identity-bound removal steps', () => {
     expect(readFileSync(join(root, left ?? ''), 'utf8')).toBe('foreign\n');
   });
 
-  it('removes its own empty directory and puts back a non-empty one or a replacement', () => {
+  it('removes its own empty directory and leaves a non-empty one or a replacement untouched', () => {
     const root = directory();
     const empty = join(root, 'empty');
     mkdirSync(empty);
@@ -163,29 +168,36 @@ describe('identity-bound removal steps', () => {
     ['a directory', (path: string) => mkdirSync(path)],
     ['a symbolic link', (path: string) => symlinkSync('/nonexistent-target', path)],
   ])(
-    'keeps %s in quarantine rather than restore it over an entry that took the path',
+    'never moves back %s swapped in during the removal: it stays in quarantine and refuses',
     (_, make) => {
       const root = directory();
       const path = join(root, 'entry');
       make(path);
-      // An identity no entry here carries, so the quarantined entry must be put back.
-      const foreign = { dev: 0n, ino: 0n, birthtimeNs: 0n };
+      const identity = identityOf(path);
+      const kept = join(root, 'kept-original');
 
       let failure: unknown;
       try {
-        removeEntryIfIdentitySteps(path, foreign, {
-          afterQuarantine: () => writeFileSync(path, 'newest\n'),
+        removeEntryIfIdentitySteps(path, identity, {
+          // The matching entry is replaced by another of the same kind after the precheck.
+          afterPrecheck: () => {
+            renameSync(path, kept);
+            make(path);
+          },
         });
       } catch (error) {
         failure = error;
       }
       expect(failure).toMatchObject({ code: REMOVE_RESTORE_INCOMPLETE, path });
-      expect(readFileSync(path, 'utf8')).toBe('newest\n');
-      expect(quarantined(root)).toHaveLength(1);
+      const [left] = quarantined(root);
+      expect(left).toBeDefined();
+      expect((failure as { quarantine: string }).quarantine).toBe(join(root, left ?? ''));
+      expect(existsSync(path)).toBe(false);
+      expect(lstatSync(kept, { bigint: true }).ino).toBe(identity.ino);
     },
   );
 
-  it('restores a directory and a link that do not match, byte for byte in content', () => {
+  it('leaves a directory and a link that do not match untouched', () => {
     const root = directory();
     const folder = join(root, 'folder');
     mkdirSync(folder);
