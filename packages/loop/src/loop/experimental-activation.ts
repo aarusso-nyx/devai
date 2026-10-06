@@ -1,12 +1,4 @@
-import {
-  closeSync,
-  existsSync,
-  fsyncSync,
-  openSync,
-  readFileSync,
-  statSync,
-  unlinkSync,
-} from '@devai-nyx/authority';
+import { existsSync, readFileSync, statSync, unlinkSync } from '@devai-nyx/authority';
 import { parsers } from '@devai-nyx/schemas';
 import { canonicalSha256 } from '@devai-nyx/utils';
 import { createHash, randomUUID } from 'node:crypto';
@@ -15,8 +7,8 @@ import { dirname, join } from 'node:path';
 import {
   fsyncDirectorySync,
   mkdirDurableSync,
+  publishCreateOnlyDurableSync,
   replaceDurableSync,
-  writeAllSync,
   writeCreateOnlyDurableSync,
 } from './durable-files.js';
 import { TaskServiceError, fail } from './task-queue-services.js';
@@ -177,21 +169,9 @@ interface ActivationLockOwner {
   readonly acquired_at: string;
 }
 
+/** The lock appears only with its complete owner record (ADR-AUT-0005), never empty. */
 function createLock(path: string, owner: ActivationLockOwner): boolean {
-  let fd: number;
-  try {
-    fd = openSync(path, 'wx');
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'EEXIST') return false;
-    throw error;
-  }
-  try {
-    writeAllSync(fd, `${JSON.stringify(owner)}\n`);
-    fsyncSync(fd);
-  } finally {
-    closeSync(fd);
-  }
-  return true;
+  return publishCreateOnlyDurableSync(path, `${JSON.stringify(owner)}\n`);
 }
 
 function readLock(path: string): ActivationLockOwner | 'unreadable' | undefined {
