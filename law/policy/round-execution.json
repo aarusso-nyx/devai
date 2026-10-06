@@ -78,7 +78,15 @@
     "admission": "same-topological-generation-and-resource-disjoint-only",
     "lock_denial_escalation_threshold": 3,
     "cross_round_controller": "forbidden",
-    "review_reserve": "not-applicable-until-review-tasks"
+    "review_reserve": {
+      "disciplines": ["inspector", "auditor"],
+      "reserved_workers": 1,
+      "applies_when": "run-workers-exceed-reserved-and-a-same-generation-review-task-awaits-admission",
+      "non_review_ceiling": "run-workers-minus-reserved-workers",
+      "review_tasks": "may-use-every-run-worker",
+      "serial_runs": "unreserved",
+      "refusal": "TASK_WORKER_CAP"
+    }
   },
   "lifecycle": {
     "initial": "queued",
