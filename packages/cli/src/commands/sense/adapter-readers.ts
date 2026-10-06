@@ -1,5 +1,5 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { isAbsolute, resolve } from 'node:path';
+import { existsSync, lstatSync, readdirSync, readFileSync } from 'node:fs';
+import { isAbsolute, join, resolve } from 'node:path';
 import { execFileSync } from '@devai-nyx/authority';
 import { ACTION_EFFECT_CONTRACTS } from '@devai-nyx/effects-check';
 import {
@@ -109,13 +109,40 @@ export const GATE_SCOPED_PRODUCERS: readonly ScopedProducer[] = Object.freeze([
 ]);
 
 /**
+ * True when no component of `path` below `repoRoot`, and no entry beneath it when it is a
+ * directory, is a symbolic link. git tracks a link as its target text, so a clean status says
+ * nothing about the bytes a read through the link returns (#235).
+ */
+export function fixtureFreeOfLinks(repoRoot: string, path: string): boolean {
+  const parts = path.split('/').filter((part) => part !== '' && part !== '.');
+  if (parts.includes('..')) return false;
+  try {
+    let current = resolve(repoRoot);
+    for (const part of parts) {
+      current = join(current, part);
+      if (lstatSync(current).isSymbolicLink()) return false;
+    }
+    const walk = (directory: string): boolean =>
+      readdirSync(directory, { withFileTypes: true }).every((entry) => {
+        if (entry.isSymbolicLink()) return false;
+        if (entry.isDirectory()) return walk(join(directory, entry.name));
+        return entry.isFile();
+      });
+    return lstatSync(current).isDirectory() ? walk(current) : lstatSync(current).isFile();
+  } catch {
+    return false;
+  }
+}
+
+/**
  * The observation reads the fixture from the working tree, so it may only be labelled with
- * `head` when the tree holds exactly the committed bytes there: HEAD is `head`, and the
- * path has no modified, staged, untracked, or ignored entry. Otherwise the reading would
- * describe bytes the candidate does not contain.
+ * `head` when the tree holds exactly the committed bytes there: HEAD is `head`, no part of
+ * the path is a symbolic link, and the path has no modified, staged, untracked, or ignored
+ * entry. Otherwise the reading would describe bytes the candidate does not contain.
  */
 export function fixtureMatchesHead(repoRoot: string, head: string, path: string): boolean {
   if (headCommit(repoRoot) !== head) return false;
+  if (!fixtureFreeOfLinks(repoRoot, path)) return false;
   try {
     const status = execFileSync(
       'git',
