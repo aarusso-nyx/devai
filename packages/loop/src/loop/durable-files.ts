@@ -11,8 +11,8 @@ import {
   fsyncSync,
   mkdirSync,
   openSync,
+  publishFileNoReplaceSync,
   renameSync,
-  unlinkSync,
   writeSync,
 } from '@devai-nyx/authority';
 import { randomUUID } from 'node:crypto';
@@ -120,21 +120,41 @@ function stage(path: string, text: string): string {
   return staged;
 }
 
+/** Whether an error is the EEXIST refusal of a no-replace publication. */
+export function isExistsError(error: unknown): boolean {
+  return (error as NodeJS.ErrnoException | undefined)?.code === 'EEXIST';
+}
+
 /**
  * Create `path` with exactly `text`, refusing (`DURABLE_RECORD_EXISTS`) when it exists. The
- * bytes go to a staged, fsynced file that is renamed into place, so a crash never leaves a
- * partial record at `path`; the directory entry is then fsynced.
+ * governed no-replace publication (ADR-AUT-0005) links a staged, fsynced file into place and
+ * fsyncs the directory, so a crash never leaves a partial record and two concurrent writers
+ * of the same record never replace each other: exactly one succeeds.
  */
 export function writeCreateOnlyDurableSync(path: string, text: string): void {
   mkdirDurableSync(dirname(path));
-  if (existsSync(path)) throw new Error('DURABLE_RECORD_EXISTS');
-  const staged = stage(path, text);
-  if (existsSync(path)) {
-    unlinkSync(staged);
-    throw new Error('DURABLE_RECORD_EXISTS');
+  try {
+    publishFileNoReplaceSync(path, text);
+  } catch (error) {
+    if (isExistsError(error)) throw new Error('DURABLE_RECORD_EXISTS');
+    throw error;
   }
-  renameSync(staged, path);
-  fsyncDirectorySync(dirname(path));
+}
+
+/**
+ * Publish `text` at `path` only when `path` is absent, durably, returning false when it
+ * already exists. Used for exclusive records such as locks: a reader never sees an empty or
+ * partial file, because the name appears only once the complete bytes are linked into place.
+ */
+export function publishCreateOnlyDurableSync(path: string, text: string): boolean {
+  mkdirDurableSync(dirname(path));
+  try {
+    publishFileNoReplaceSync(path, text);
+    return true;
+  } catch (error) {
+    if (isExistsError(error)) return false;
+    throw error;
+  }
 }
 
 /** Replace `path` atomically with exactly `text`: a staged, fsynced file renamed into place. */
