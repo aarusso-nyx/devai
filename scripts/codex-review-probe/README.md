@@ -24,4 +24,6 @@ zsh scripts/codex-review-probe/probe.sh control  # the same run without the isol
 
 `tools.json` holds the raw tool items and `requests.jsonl` every recorded request. In capture mode, exit status 1 and a `devai_probe_capture` error are expected.
 
+**Safety.** Extra arguments that could redirect the request are refused: `--profile`/`-p`, `--oss`, `--local-provider`, and anything mentioning `base_url` or `model_provider`. The loopback setting comes last, so it wins. A run whose model request never reached the listener fails with `FAILED: the request did not reach the local listener`. Raw codex output stays in a temporary directory, and only redacted copies are saved. A model request body that cannot be decoded gives no conclusion; it never reads as "no tools". Set `CODEX_BIN` to probe a specific binary.
+
 **Keep in step.** The feature and config lists in `probe.sh` must match `CODEX_REVIEW_DISABLED_FEATURES` and `codexReviewArgv`.
