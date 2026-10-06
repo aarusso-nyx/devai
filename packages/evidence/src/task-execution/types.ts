@@ -117,6 +117,18 @@ export interface NotApplicableEvidence {
   readonly not_applicable_reason: string;
 }
 
+/**
+ * The write confinement the provider's own sandbox enforced for one experimental agent
+ * attempt (ADR-MDL-0008): its mode, and the exact confinement flags the broker asserted
+ * in the spawned argv, with the worktree path as `{attempt-worktree}`.
+ */
+export interface AttemptSandboxEvidence {
+  readonly mode: 'codex-workspace-write' | 'claude-restricted-sandbox';
+  readonly enforced_by: 'provider';
+  readonly write_root: 'attempt-worktree';
+  readonly flags: readonly string[];
+}
+
 export interface TaskExecutionFailure {
   readonly code: string;
   readonly message: string;
@@ -148,6 +160,8 @@ export interface TaskExecutionEvidence {
   readonly evidence_refs: readonly string[];
   /** Present only on non-promoting experimental evidence (ADR-MDL-0005 D-9). */
   readonly experimental?: true;
+  /** The provider-enforced write confinement of an experimental agent attempt (ADR-MDL-0008). */
+  readonly sandbox?: AttemptSandboxEvidence;
 }
 
 export interface TaskExecutionEvidenceFacts {
@@ -169,6 +183,8 @@ export interface TaskExecutionEvidenceFacts {
   readonly evidence_refs: readonly string[];
   /** Marks non-promoting experimental evidence (ADR-MDL-0005 D-9). */
   readonly experimental?: true;
+  /** The provider-enforced write confinement of an experimental agent attempt (ADR-MDL-0008). */
+  readonly sandbox?: AttemptSandboxEvidence;
 }
 
 export type TaskExecutionEvidenceValidator = ((value: unknown) => boolean) & {
