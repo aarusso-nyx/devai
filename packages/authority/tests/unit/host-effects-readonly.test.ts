@@ -15,6 +15,7 @@ import {
   closeReadOnlySync,
   fstatSync,
   openReadOnlyNoFollowSync,
+  openRegularFileReadOnlySync,
   readExactGitTreeSync,
   readCheckPolicyGitSync,
 } from '../../src/index.js';
@@ -26,6 +27,32 @@ function git(root: string, args: readonly string[]): string {
 }
 
 describe('read-only no-follow host seam', () => {
+  it('opens only a regular file, never blocking on or following a special entry (#313)', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'devai-readonly-regular-'));
+    const file = join(directory, 'record.json');
+    writeFileSync(file, '{"ok":true}\n');
+    const descriptor = openRegularFileReadOnlySync(file);
+    try {
+      expect(readFileSync(descriptor, 'utf8')).toBe('{"ok":true}\n');
+    } finally {
+      closeReadOnlySync(descriptor);
+    }
+    const fifo = join(directory, 'fifo');
+    expect(spawnSync('mkfifo', [fifo]).status).toBe(0);
+    const nested = join(directory, 'nested');
+    mkdirSync(nested);
+    for (const special of [fifo, nested]) {
+      expect(() => openRegularFileReadOnlySync(special)).toThrow(
+        expect.objectContaining({ code: 'ENOTREGULAR' }),
+      );
+    }
+    const link = join(directory, 'link');
+    symlinkSync(file, link);
+    expect(() => openRegularFileReadOnlySync(link)).toThrow(
+      expect.objectContaining({ code: expect.stringMatching(/^(ELOOP|EMLINK)$/u) }),
+    );
+  });
+
   it('opens the exact regular-file inode without an authority mutation scope', () => {
     const directory = mkdtempSync(join(tmpdir(), 'devai-readonly-host-'));
     const path = join(directory, 'record.json');
