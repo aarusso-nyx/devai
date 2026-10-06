@@ -121,6 +121,26 @@ export function loadAdopterMigrations(
   return parseAdopterMigrations(JSON.parse(readFileSync(path, 'utf8')) as unknown, validator);
 }
 
+/**
+ * The releases init upgrade plans and records from a bound version to the installed one: every
+ * release in range, plus every `unreleased` entry above both. An unreleased entry ships in the
+ * same package as the code that applies it, so it runs now and is planned now; once released it
+ * is an ordinary entry in range (#291).
+ */
+export function plannedReleases(
+  manifest: AdopterMigrations,
+  from: string,
+  installed: string,
+): readonly MigrationRelease[] {
+  const floor = compareVersions(from, installed) > 0 ? from : installed;
+  return manifest.releases.filter(
+    (release) =>
+      (compareVersions(release.version, from) > 0 &&
+        compareVersions(release.version, installed) <= 0) ||
+      (release.status === 'unreleased' && compareVersions(release.version, floor) > 0),
+  );
+}
+
 /** The releases strictly above `from` and at or below `to`, in ascending order. */
 export function releasesInRange(
   manifest: AdopterMigrations,

@@ -240,7 +240,9 @@ export function readPostMergeDeclaration(targetRoot: string): PostMergeDeclarati
  * The post-merge binding seen from the checkout at a root (#291). The tracked file only declares
  * that the adapter is required; the binding itself, the signed attestation with the key and the
  * receipt issuer, lives in each checkout's git directory.
- * - `absent`: no tracked declaration.
+ * - `absent`: no tracked declaration and no post-merge state in this checkout's git directory.
+ * - `undeclared`: no tracked declaration, yet this checkout carries post-merge state; the binding
+ *   is verified here, and refused, since a receipt needs the declaration too.
  * - `legacy`: the tracked file is a checkout-bound attestation from before #291; init upgrade
  *   converts it.
  * - `invalid`: the tracked file is neither form, so the binding is verified here, and refused.
@@ -248,7 +250,7 @@ export function readPostMergeDeclaration(targetRoot: string): PostMergeDeclarati
  * - `bound`: this checkout carries post-merge state, so the binding is verified here.
  */
 export interface PostMergeBindingLocation {
-  readonly scope: 'absent' | 'legacy' | 'invalid' | 'unbound' | 'bound';
+  readonly scope: 'absent' | 'undeclared' | 'legacy' | 'invalid' | 'unbound' | 'bound';
   /** The checkout the local attestation, or a legacy tracked attestation, records. */
   readonly bound_checkout?: string;
   /** The post-merge state in this checkout's git directory: attestation, key, issuer. */
@@ -291,23 +293,27 @@ function localBoundCheckout(root: string): string | undefined {
 /**
  * Classify the post-merge binding of a checkout. The classification fails closed (#278): any
  * attestation, key, or issuer in this checkout's git directory makes it `bound`, so a deleted
- * key or an edited attestation still leads to full verification, and refusal. Only a declared
- * checkout with none of them is `unbound`, which is every fresh clone, CI included.
+ * key or an edited attestation still leads to full verification, and refusal. The git
+ * directory is inspected before the declaration, so a live binding whose declaration was
+ * deleted is `undeclared`, never `absent`. Only a declared checkout with none of that state
+ * is `unbound`, which is every fresh clone, CI included.
  */
 export function locatePostMergeBinding(targetRoot: string): PostMergeBindingLocation {
   const root = realpathSync(resolve(targetRoot));
-  const declaration = readPostMergeDeclaration(root);
-  if (declaration.state === 'absent') return { scope: 'absent' };
   const localState = localPostMergeState(root);
+  const declaration = readPostMergeDeclaration(root);
+  if (declaration.state === 'absent' && localState.length === 0) return { scope: 'absent' };
   const boundCheckout =
     declaration.state === 'legacy' ? declaration.recorded_checkout : localBoundCheckout(root);
   return {
     scope:
-      declaration.state === 'legacy' || declaration.state === 'invalid'
-        ? declaration.state
-        : localState.length > 0
-          ? 'bound'
-          : 'unbound',
+      declaration.state === 'absent'
+        ? 'undeclared'
+        : declaration.state === 'legacy' || declaration.state === 'invalid'
+          ? declaration.state
+          : localState.length > 0
+            ? 'bound'
+            : 'unbound',
     ...(boundCheckout !== undefined && { bound_checkout: boundCheckout }),
     ...(localState.length > 0 && { local_state: localState }),
   };
@@ -342,6 +348,8 @@ export function verifyInstalledPostMergeAdapter(
     >;
     const { signature_hmac_sha256: signature, ...unsigned } = attestation;
     facts['declaration_current'] = readPostMergeDeclaration(root).state === 'declared';
+    // Failing facts surface as POST_MERGE_ADAPTER_<FACT>_INVALID, among them the tracked
+    // declaration's 'POST_MERGE_ADAPTER_DECLARATION_CURRENT_INVALID' (#291).
     const localBinary = join(root, 'node_modules/.bin/devai');
     facts['hook_local_binary'] = hook.includes('./node_modules/.bin/devai round close');
     facts['local_binary_present'] = existsSync(localBinary);

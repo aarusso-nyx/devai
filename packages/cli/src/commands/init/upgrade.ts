@@ -52,7 +52,7 @@ import { parseAdopterPolicyBinding } from '../../services/adopter-policy-binding
 import {
   compareVersions,
   loadAdopterMigrations,
-  releasesInRange,
+  plannedReleases,
   type MigrationChange,
   type ObligationCheck,
   type UpgradeSegment,
@@ -344,7 +344,7 @@ export function prepareAdopterUpgrade(
       'Reinstall @aarusso-nyx/devai and retry.',
     );
   }
-  const releases = releasesInRange(manifest, from, installed);
+  const releases = plannedReleases(manifest, from, installed);
   const changes = releases.flatMap((release) => release.changes);
   const refusals: UpgradeRefusal[] = [];
   const stale: UpgradeStaleStamp[] = [];
@@ -532,11 +532,16 @@ export function prepareAdopterUpgrade(
   // that holds its key moves it into its git directory; any other checkout only rewrites the
   // tracked file as the declaration, binding nothing locally.
   let postMerge: PreparedUpgrade['postMerge'];
-  const postMergeLocation = existsSync(join(targetRoot, POST_MERGE_CONFIG))
-    ? locatePostMergeBinding(targetRoot)
-    : undefined;
+  // The git directory is inspected even without a declaration: a live binding whose declaration
+  // was deleted is refreshed, restoring the declaration, while the post-merge adapter is the
+  // selected identity, and otherwise only reported, so no unselected binding is revived.
+  const located = locatePostMergeBinding(targetRoot);
+  const postMergeLocation = located.scope === 'absent' ? undefined : located;
   const postMergeLocalState = postMergeLocation?.local_state ?? [];
   const holdsPostMergeKey = postMergeLocalState.includes('key');
+  const undeclaredIdle =
+    postMergeLocation?.scope === 'undeclared' &&
+    stampAt(project, ['authority_enforcement', 'adapter_config']) !== POST_MERGE_CONFIG;
   if (
     postMergeLocation !== undefined &&
     (postMergeLocation.scope === 'legacy' || postMergeLocation.scope === 'invalid') &&
@@ -557,11 +562,13 @@ export function prepareAdopterUpgrade(
           : relative(targetRoot, postMergeAttestationPath(targetRoot)).split(sep).join('/'),
         field: 'package_binding.version',
         version: stamp,
-        refreshed: true,
+        refreshed: !undeclaredIdle,
       });
     }
     const verification = verifyInstalledPostMergeAdapter(targetRoot, installed);
-    if (
+    if (undeclaredIdle) {
+      // Reported above when its stamp lags; doctor warns that it does not verify.
+    } else if (
       legacy ||
       stamp !== installed ||
       !verification.ok ||
@@ -586,7 +593,11 @@ export function prepareAdopterUpgrade(
       if (postMergeLocation.scope !== 'bound') {
         // The tracked file becomes the declaration and the attestation moves to the git dir.
         changed.push(
-          { path: POST_MERGE_CONFIG, operation: 'update', segment: 'host-adapters' },
+          {
+            path: POST_MERGE_CONFIG,
+            operation: postMergeLocation.scope === 'undeclared' ? 'create' : 'update',
+            segment: 'host-adapters',
+          },
           {
             path: localAttestation,
             operation: postMergeLocalState.includes('attestation') ? 'update' : 'create',
@@ -721,7 +732,7 @@ export function prepareAdopterUpgrade(
   // Re-deriving a receipt at an already stamped version cannot know which releases the move
   // crossed, so every obligation of the applicable migration history is evaluated first.
   if (from === installed && receiptState !== 'current') {
-    for (const change of releasesInRange(manifest, manifest.baseline, installed).flatMap(
+    for (const change of plannedReleases(manifest, manifest.baseline, installed).flatMap(
       (release) => release.changes,
     )) {
       if (obligations.some((known) => known.change === change.id)) continue;
