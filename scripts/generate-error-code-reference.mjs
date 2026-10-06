@@ -55,6 +55,7 @@ const prefixes = new Set([
   'PROOF',
   'RATIFICATION',
   'RECEIPT',
+  'RECIPE',
   'RELEASE',
   'ROUND',
   'ROUTE',
