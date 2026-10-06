@@ -229,7 +229,14 @@ export interface VerifyResult {
 }
 
 export function verifyChain(chainPath: string): VerifyResult {
-  const chain = loadChain(chainPath);
+  return verifyLoadedChain(loadChain(chainPath));
+}
+
+/**
+ * The checks of `verifyChain` over a chain already loaded, so a caller that also reads the
+ * records verifies exactly the snapshot it reads.
+ */
+export function verifyLoadedChain(chain: EvidenceChain): VerifyResult {
   const errors: string[] = [];
   let prev: string | null = null;
   for (const [index, record] of chain.records.entries()) {

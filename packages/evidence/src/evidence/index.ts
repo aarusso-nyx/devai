@@ -3,6 +3,7 @@ export {
   extractManifestInputs,
   loadChain,
   verifyChain,
+  verifyLoadedChain,
   type EvidenceArtifact,
   type EvidenceChain,
   type EvidenceContext,
