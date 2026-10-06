@@ -34,6 +34,7 @@ import type { ProtectedReleaseRepositoryIdentity } from './release-repository-id
 import type { AuthorityHostEffectRequest } from './host-atomic-effects.js';
 import { scopes, type AuthorityHostEffectScope } from './host-scope.js';
 import { runSinkUnit } from './host-sink-filesystem.js';
+import { publishNoReplaceSteps } from './host-publish.js';
 import {
   currentRepositoryBinding,
   nextProtectedOperationSequence,
@@ -262,6 +263,18 @@ export const symlinkSync = guarded('symlinkSync', nodeSymlinkSync, 'mutation');
 export const unlinkSync = guarded('unlinkSync', nodeUnlinkSync, 'mutation');
 export const writeFileSync = guarded('writeFileSync', nodeWriteFileSync, 'mutation');
 export const writeSync = guarded('writeSync', nodeWriteSync, 'mutation');
+/**
+ * Governed atomic no-replace publication (ADR-AUT-0005): one authorized `create` of
+ * `path` that writes and fsyncs a staged file, links it into place (refusing with EEXIST
+ * when `path` exists), removes the staged name and fsyncs the directory.
+ */
+export const publishFileNoReplaceSync = guarded(
+  'publishFileNoReplaceSync',
+  (path: string, data: string | Uint8Array): void => {
+    publishNoReplaceSteps(path, data);
+  },
+  'mutation',
+);
 export const execFileSync = guarded('execFileSync', nodeExecFileSync, 'process');
 export const spawnSync = guarded('spawnSync', nodeSpawnSync, 'process');
 
