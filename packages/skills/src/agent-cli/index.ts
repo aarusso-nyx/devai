@@ -35,6 +35,12 @@ export type AgentCliErrorCode =
   | 'AGENT_CLI_SELECTION_INVALID'
   | 'AGENT_CLI_RUNTIME_UNSUPPORTED'
   /**
+   * The provider's own sandbox cannot confine writes to the attempt worktree on this
+   * host (no workspace-confined mode, or a platform the provider cannot sandbox), so no
+   * attempt may start (ADR-MDL-0008).
+   */
+  | 'AGENT_CLI_SANDBOX_UNAVAILABLE'
+  /**
    * The provider started, but recording its start (journal `spawned`) failed. The
    * adapter terminated its whole process group before throwing (the error's `process`
    * says whether that was confirmed); the provider may already have changed its
@@ -73,29 +79,145 @@ export class AgentCliError extends Error {
   }
 }
 
+/** The provider-enforced write confinement modes an attempt may run under (ADR-MDL-0008). */
+export type AgentCliSandboxMode = 'codex-workspace-write' | 'claude-restricted-sandbox';
+
+/**
+ * The write boundary the provider enforces for one attempt: its own sandbox confines
+ * every write to the attempt worktree. `flags` is the exact confinement subsequence of
+ * the argv, with the worktree path written as {@link AGENT_CLI_WORKTREE_PLACEHOLDER}, as
+ * the attempt evidence records it; the broker asserts it in the spawned argv.
+ */
+export interface AgentCliSandbox {
+  readonly mode: AgentCliSandboxMode;
+  readonly enforced_by: 'provider';
+  readonly write_root: 'attempt-worktree';
+  readonly flags: readonly string[];
+}
+
+/** Stands for the attempt worktree's path in recorded sandbox flags. */
+export const AGENT_CLI_WORKTREE_PLACEHOLDER = '{attempt-worktree}';
+
 export interface AgentCliInvocation {
   readonly runtime: AgentCliRuntime;
   readonly command: string;
   readonly args: readonly string[];
-  /** The containment the provider is asked for. It is recorded as requested, never verified. */
-  readonly requested_containment: string;
+  /** The provider-enforced write confinement the args carry. */
+  readonly sandbox: AgentCliSandbox;
 }
 
 export interface AgentCliInvocationOptions {
   readonly runtime: AgentCliRuntime;
   readonly model: string;
   readonly effort: string;
+  /** The attempt worktree: the provider's working directory and its only write root. */
+  readonly worktree: string;
+  /** The host platform; defaults to `process.platform`. */
+  readonly platform?: NodeJS.Platform;
+}
+
+/**
+ * Platforms on which both providers ship a filesystem sandbox: Seatbelt on macOS, and
+ * Landlock or bubblewrap on Linux. Anywhere else an attempt cannot be confined.
+ */
+const AGENT_CLI_SANDBOX_PLATFORMS: readonly NodeJS.Platform[] = ['darwin', 'linux'];
+
+/**
+ * Claude Code sandbox settings, passed with `--settings`: sandboxed shell commands, a
+ * refusal to start when no sandbox backend is available, and no unsandboxed retry.
+ */
+export const CLAUDE_SANDBOX_SETTINGS =
+  '{"sandbox":{"enabled":true,"failIfUnavailable":true,"allowUnsandboxedCommands":false}}';
+
+/** Claude built-in tools an attempt may use; `--restricted` confines the file tools. */
+export const CLAUDE_ATTEMPT_TOOLS = 'Bash,Read,Edit,Write,Glob,Grep';
+
+/**
+ * The confinement argv of each runtime, with the worktree as a placeholder.
+ * - codex: the workspace-write sandbox rooted at the worktree (`--cd`), no extra
+ *   writable roots, no sandboxed network, and no execpolicy rules, which could let a
+ *   command run outside the sandbox.
+ * - claude: restricted mode, which confines the file tools to the working directory and
+ *   ignores user, project and local settings, plus its shell sandbox, fail-closed, with
+ *   every permission prompt denied.
+ */
+function sandboxFor(runtime: AgentCliRuntime): AgentCliSandbox | undefined {
+  if (runtime === 'codex-cli') {
+    return {
+      mode: 'codex-workspace-write',
+      enforced_by: 'provider',
+      write_root: 'attempt-worktree',
+      flags: [
+        '--sandbox',
+        'workspace-write',
+        '--cd',
+        AGENT_CLI_WORKTREE_PLACEHOLDER,
+        '--ignore-rules',
+        '--config',
+        'sandbox_workspace_write.writable_roots=[]',
+        '--config',
+        'sandbox_workspace_write.network_access=false',
+      ],
+    };
+  }
+  if (runtime === 'claude-cli') {
+    return {
+      mode: 'claude-restricted-sandbox',
+      enforced_by: 'provider',
+      write_root: 'attempt-worktree',
+      flags: [
+        '--restricted',
+        '--tools',
+        CLAUDE_ATTEMPT_TOOLS,
+        '--settings',
+        CLAUDE_SANDBOX_SETTINGS,
+        '--permission-mode',
+        'acceptEdits',
+        '--permission-prompts',
+        'none',
+      ],
+    };
+  }
+  return undefined;
+}
+
+/**
+ * The provider-enforced sandbox for `runtime` on `platform`. It throws
+ * AGENT_CLI_SANDBOX_UNAVAILABLE when the runtime has no workspace-confined write mode or
+ * the platform has no provider sandbox: such an attempt never starts.
+ */
+export function agentCliSandbox(
+  runtime: AgentCliRuntime,
+  platform: NodeJS.Platform = process.platform,
+): AgentCliSandbox {
+  const sandbox = sandboxFor(runtime);
+  if (sandbox === undefined || !AGENT_CLI_SANDBOX_PLATFORMS.includes(platform)) {
+    throw new AgentCliError('AGENT_CLI_SANDBOX_UNAVAILABLE');
+  }
+  return sandbox;
+}
+
+/** The sandbox flags with the attempt worktree's path in place of the placeholder. */
+export function agentCliSandboxArgv(sandbox: AgentCliSandbox, worktree: string): string[] {
+  return sandbox.flags.map((flag) => (flag === AGENT_CLI_WORKTREE_PLACEHOLDER ? worktree : flag));
 }
 
 /**
  * The exact argv for one non-interactive, session-less attempt. The prompt is
- * written to stdin, never placed on the command line. The task worktree is the
- * working directory; nothing here grants network, push, or publish rights.
+ * written to stdin, never placed on the command line. The attempt worktree is the
+ * working directory and, through the provider's own sandbox, the only place the
+ * provider may write; nothing here grants network, push, or publish rights. A runtime
+ * that cannot be confined throws AGENT_CLI_SANDBOX_UNAVAILABLE.
  */
 export function agentCliInvocation(options: AgentCliInvocationOptions): AgentCliInvocation {
-  if (options.model.length === 0 || options.effort.length === 0) {
+  if (options.model.length === 0 || options.effort.length === 0 || options.worktree.length === 0) {
     throw new AgentCliError('AGENT_CLI_SELECTION_INVALID');
   }
+  if (options.runtime !== 'claude-cli' && options.runtime !== 'codex-cli') {
+    throw new AgentCliError('AGENT_CLI_RUNTIME_UNSUPPORTED');
+  }
+  const sandbox = agentCliSandbox(options.runtime, options.platform);
+  const confinement = agentCliSandboxArgv(sandbox, options.worktree);
   if (options.runtime === 'claude-cli') {
     return {
       runtime: 'claude-cli',
@@ -112,39 +234,32 @@ export function agentCliInvocation(options: AgentCliInvocationOptions): AgentCli
         '--strict-mcp-config',
         '--mcp-config',
         '{"mcpServers":{}}',
-        '--permission-mode',
-        'acceptEdits',
+        ...confinement,
         '--model',
         options.model,
         ...(options.effort === 'default' ? [] : ['--effort', options.effort]),
       ],
-      requested_containment:
-        'claude --permission-mode acceptEdits without host settings or MCP servers, the task worktree as cwd',
+      sandbox,
     };
   }
-  if (options.runtime === 'codex-cli') {
-    return {
-      runtime: 'codex-cli',
-      command: 'codex',
-      args: [
-        'exec',
-        '--json',
-        '--ephemeral',
-        // Host user configuration (hooks, MCP servers, profiles) must not run in an attempt.
-        '--ignore-user-config',
-        '--sandbox',
-        'workspace-write',
-        '--model',
-        options.model,
-        '--config',
-        `model_reasoning_effort="${options.effort}"`,
-        '-',
-      ],
-      requested_containment:
-        'codex --sandbox workspace-write without host user configuration, the task worktree as cwd',
-    };
-  }
-  throw new AgentCliError('AGENT_CLI_RUNTIME_UNSUPPORTED');
+  return {
+    runtime: 'codex-cli',
+    command: 'codex',
+    args: [
+      'exec',
+      '--json',
+      '--ephemeral',
+      // Host user configuration (hooks, MCP servers, profiles) must not run in an attempt.
+      '--ignore-user-config',
+      ...confinement,
+      '--model',
+      options.model,
+      '--config',
+      `model_reasoning_effort="${options.effort}"`,
+      '-',
+    ],
+    sandbox,
+  };
 }
 
 /**
