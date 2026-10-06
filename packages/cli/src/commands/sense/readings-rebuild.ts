@@ -14,7 +14,7 @@ import {
   writeFileSync,
   writeSync,
 } from '@devai-nyx/authority';
-import { basename, dirname, join } from 'node:path';
+import { basename, dirname, join, relative } from 'node:path';
 import { validators } from '@devai-nyx/schemas';
 import {
   buildSensorReading,
@@ -290,6 +290,27 @@ export interface RegeneratedBody {
   /** The producer's own status; the combined manifest reads pass once its schema validates. */
   readonly producer_status: SensorStatus;
   readonly sha256: string;
+  /** The typed producer's own reading, kept whole; absent for the combined manifest. */
+  readonly producer_reading?: ProducerReading;
+}
+
+/** What binds a producer's reading to the exact repository state and body it was read from. */
+export interface ProducerInputBinding {
+  readonly integration_head: string;
+  readonly integration_tree: string;
+  readonly generated_at: string;
+  readonly body_sha256: string;
+}
+
+/** A typed producer's own reading, preserved beside the aggregate that summarizes it. */
+export interface ProducerReading {
+  readonly sensor: { readonly name: string; readonly kind: string };
+  readonly status: SensorStatus;
+  readonly command: string;
+  readonly command_hash: string;
+  readonly findings: readonly SensorFinding[];
+  readonly metrics: Readonly<Record<string, number | string | boolean>>;
+  readonly input_binding: ProducerInputBinding;
 }
 
 /** The body of a kind the declaration no longer requires, removed so it stands in for nothing. */
@@ -314,6 +335,10 @@ export interface RegenerateInventoryResult {
 
 interface RegenerationCandidate {
   readonly head: string;
+  /** The tree of that commit: with the head, the identity the whole run is bound to. */
+  readonly tree: string;
+  /** The files git tracks at that commit; nothing else may enter a bound body. */
+  readonly tracked: ReadonlySet<string>;
   /** The commit time, so the same commit regenerates byte-identical bodies. */
   readonly timestamp: string;
 }
@@ -323,7 +348,30 @@ function git(repoRoot: string, args: readonly string[]): string {
     cwd: repoRoot,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'ignore'],
+    maxBuffer: 256 * 1024 * 1024,
   }).trim();
+}
+
+/** The repository-relative files git tracks, from its index, which a clean status pins to HEAD. */
+function trackedFiles(repoRoot: string): ReadonlySet<string> {
+  const listing = git(repoRoot, ['ls-files', '-z']);
+  return new Set(listing.split('\0').filter((path) => path.length > 0));
+}
+
+/** A change since the candidate was resolved, or undefined when its identity still holds. */
+function snapshotChange(repoRoot: string, candidate: RegenerationCandidate): string | undefined {
+  try {
+    const head = git(repoRoot, ['rev-parse', '--verify', 'HEAD^{commit}']);
+    if (head !== candidate.head) return `HEAD moved from ${candidate.head} to ${head}`;
+    const tree = git(repoRoot, ['rev-parse', '--verify', `${head}^{tree}`]);
+    if (tree !== candidate.tree) return `the tree of ${head} changed from ${candidate.tree}`;
+    if (git(repoRoot, ['status', '--porcelain']).length > 0) {
+      return `the working tree no longer matches ${head}`;
+    }
+    return undefined;
+  } catch (error) {
+    return `the repository state could not be read again: ${messageOf(error)}`;
+  }
 }
 
 function messageOf(error: unknown): string {
@@ -359,7 +407,13 @@ function resolveCandidate(repoRoot: string): RegenerationCandidate | SensorFindi
       };
     }
     const committed = git(repoRoot, ['log', '-1', '--format=%cI', head]);
-    return { head, timestamp: new Date(committed).toISOString() };
+    const tree = git(repoRoot, ['rev-parse', '--verify', `${head}^{tree}`]);
+    return {
+      head,
+      tree,
+      tracked: trackedFiles(repoRoot),
+      timestamp: new Date(committed).toISOString(),
+    };
   } catch (error) {
     return {
       severity: 'warning',
@@ -398,18 +452,25 @@ function stageBody(
   bodyPath: string,
   producerStatus: SensorStatus,
   body: unknown,
+  producer?: { readonly reading: SensorReading; readonly candidate: RegenerationCandidate },
 ): StagedBody {
   const { schema, validate } = bodySchema(kind);
   if (!validate(body)) throw new Error(`body fails ${schema}: ${JSON.stringify(validate.errors)}`);
   const bytes = `${JSON.stringify(body, null, 2)}\n`;
   const target = join(repoRoot, bodyPath);
   const unchanged = existsSync(target) && readFileSync(target, 'utf8') === bytes;
+  const sha256 = createHash('sha256').update(bytes).digest('hex');
   return {
     kind,
     body_path: bodyPath,
     action: unchanged ? 'up-to-date' : 'regenerated',
     producer_status: producerStatus,
-    sha256: createHash('sha256').update(bytes).digest('hex'),
+    sha256,
+    ...(producer === undefined
+      ? {}
+      : {
+          producer_reading: preserveProducerReading(producer.reading, producer.candidate, sha256),
+        }),
     bytes,
   };
 }
@@ -539,10 +600,21 @@ function produceKind(
   kind: RegeneratedKind,
   candidate: RegenerationCandidate,
   surfaces: RegenerationSurfaces | undefined,
-): { readonly status: SensorStatus; readonly codes: string; readonly body: unknown } {
+): {
+  readonly status: SensorStatus;
+  readonly codes: string;
+  readonly body: unknown;
+  readonly reading: SensorReading;
+} {
+  const admitFile = (path: string): boolean => candidate.tracked.has(relative(repoRoot, path));
   const produced =
     kind === 'inventory_dep_graph'
-      ? senseInventoryDepGraph({ repoRoot, persistBody: false, now: candidate.timestamp })
+      ? senseInventoryDepGraph({
+          repoRoot,
+          persistBody: false,
+          now: candidate.timestamp,
+          admitFile,
+        })
       : senseInventoryCoverage({
           repoRoot,
           persistBody: false,
@@ -553,6 +625,88 @@ function produceKind(
     status: produced.reading.status,
     codes: (produced.reading.findings ?? []).map((finding) => finding.code).join(','),
     body: produced.body,
+    reading: produced.reading,
+  };
+}
+
+/** The producer's own reading with the state and body it is bound to, kept beside the aggregate. */
+function preserveProducerReading(
+  reading: SensorReading,
+  candidate: RegenerationCandidate,
+  bodySha256: string,
+): ProducerReading {
+  return {
+    sensor: { name: reading.sensor.name, kind: reading.sensor.kind },
+    status: reading.status,
+    command: reading.command,
+    command_hash: reading.command_hash,
+    findings: (reading.findings ?? []).map((finding) => ({ ...finding })),
+    metrics: { ...(reading.metrics ?? {}) },
+    input_binding: {
+      integration_head: candidate.head,
+      integration_tree: candidate.tree,
+      generated_at: candidate.timestamp,
+      body_sha256: bodySha256,
+    },
+  };
+}
+
+/** The aggregate's record of one producer's reading: its findings, hash, binding and metrics. */
+function producerRecord(
+  repoRoot: string,
+  body: RegeneratedBody,
+): {
+  readonly findings: SensorFinding[];
+  readonly metrics: Record<string, number | string>;
+} {
+  const reading = body.producer_reading;
+  if (reading === undefined) return { findings: [], metrics: {} };
+  const metrics: Record<string, number | string> = {
+    [`${body.kind}_command_hash`]: reading.command_hash,
+    [`${body.kind}_input_sha256`]: reading.input_binding.body_sha256,
+    [`${body.kind}_finding_count`]: reading.findings.length,
+  };
+  for (const [name, value] of Object.entries(reading.metrics)) {
+    metrics[`${body.kind}_metric_${name}`] =
+      typeof value === 'number' || typeof value === 'string' ? value : String(value);
+  }
+  return {
+    findings: reading.findings.map((finding) => ({
+      severity: finding.severity,
+      code: 'INVENTORY_REGENERATION_PRODUCER_FINDING',
+      // The checkout's own location names no part of the reading the store keeps.
+      message:
+        `${body.kind} [${finding.code}]: ${finding.message.split(`${repoRoot}/`).join('')}`.slice(
+          0,
+          400,
+        ),
+      ...(finding.file === undefined ? {} : { file: finding.file }),
+      ...(finding.line === undefined ? {} : { line: finding.line }),
+    })),
+    metrics,
+  };
+}
+
+/** The run that bound no candidate or lost its snapshot: UNKNOWN, with nothing written. */
+function unwrittenResult(repoRoot: string, finding: SensorFinding): RegenerateInventoryResult {
+  return {
+    report: {
+      ok: false,
+      repo_root: repoRoot,
+      entries: [],
+      created: 0,
+      skipped: 0,
+      errors: [],
+      integration_head: null,
+      regenerated: [],
+      obsolete: [],
+    },
+    reading: regenerationReading('unknown', [finding], {
+      kinds_touched: 0,
+      kinds_rebuilt: 0,
+      kinds_up_to_date: 0,
+      error_count: 0,
+    }),
   };
 }
 
@@ -572,27 +726,7 @@ export async function regenerateInventoryReadings(
   options: RegenerationOptions = {},
 ): Promise<RegenerateInventoryResult> {
   const candidate = resolveCandidate(repoRoot);
-  if ('code' in candidate) {
-    return {
-      report: {
-        ok: false,
-        repo_root: repoRoot,
-        entries: [],
-        created: 0,
-        skipped: 0,
-        errors: [],
-        integration_head: null,
-        regenerated: [],
-        obsolete: [],
-      },
-      reading: regenerationReading('unknown', [candidate], {
-        kinds_touched: 0,
-        kinds_rebuilt: 0,
-        kinds_up_to_date: 0,
-        error_count: 0,
-      }),
-    };
-  }
+  if ('code' in candidate) return unwrittenResult(repoRoot, candidate);
 
   const errors: string[] = [];
   const findings: SensorFinding[] = [];
@@ -603,6 +737,7 @@ export async function regenerateInventoryReadings(
       repoRoot,
       timestamp: candidate.timestamp,
       integrationHead: candidate.head,
+      admittedFiles: candidate.tracked,
     });
     surfaceCount =
       inventory.modules.length +
@@ -625,7 +760,12 @@ export async function regenerateInventoryReadings(
         );
         continue;
       }
-      staged.push(stageBody(repoRoot, kind, bodyPath, produced.status, produced.body));
+      staged.push(
+        stageBody(repoRoot, kind, bodyPath, produced.status, produced.body, {
+          reading: produced.reading,
+          candidate,
+        }),
+      );
     } catch (error) {
       errors.push(`regenerate ${bodyPath} failed: ${messageOf(error)}`);
     }
@@ -636,6 +776,19 @@ export async function regenerateInventoryReadings(
   let obsolete: readonly ObsoleteBody[] = [];
   let walk: BodyWalk = { entries: [], errors: [], created: 0, skipped: 0 };
   if (errors.length === 0) {
+    // The walk was asynchronous: publish only if HEAD, its tree and a clean status still hold.
+    const changed = snapshotChange(repoRoot, candidate);
+    if (changed !== undefined) {
+      return unwrittenResult(repoRoot, {
+        severity: 'warning',
+        code: 'INVENTORY_REGENERATION_SNAPSHOT_CHANGED',
+        message:
+          `The repository changed while the inventory was regenerated (${changed}), so the bodies describe no single commit. Nothing was written.`.slice(
+            0,
+            400,
+          ),
+      });
+    }
     try {
       publishBodies(repoRoot, staged);
       regenerated = staged.map((body) => ({
@@ -644,6 +797,7 @@ export async function regenerateInventoryReadings(
         action: body.action,
         producer_status: body.producer_status,
         sha256: body.sha256,
+        ...(body.producer_reading === undefined ? {} : { producer_reading: body.producer_reading }),
       }));
       obsolete = removeObsoleteBodies(repoRoot, required);
     } catch (error) {
@@ -691,6 +845,9 @@ export async function regenerateInventoryReadings(
     }
   }
 
+  // Each producer's own reading rides with the aggregate instead of its bare status.
+  const records = kinds.map((body) => producerRecord(repoRoot, body));
+  findings.push(...records.flatMap((record) => record.findings));
   const inventoryBody = regenerated.find((body) => body.kind === 'inventory');
   const metrics = {
     kinds_touched: kindsTouched,
@@ -701,8 +858,10 @@ export async function regenerateInventoryReadings(
     missing_required_kinds: missing.length,
     obsolete_bodies_removed: obsolete.length,
     integration_head: candidate.head,
+    integration_tree: candidate.tree,
     ...(inventoryBody === undefined ? {} : { inventory_body_sha256: inventoryBody.sha256 }),
     ...Object.fromEntries(kinds.map((body) => [`${body.kind}_status`, body.producer_status])),
+    ...Object.assign({}, ...records.map((record) => record.metrics)),
   };
   const reading = regenerationReading(status, findings, metrics);
   const unpersisted = persistRegenerationReading(repoRoot, reading);
