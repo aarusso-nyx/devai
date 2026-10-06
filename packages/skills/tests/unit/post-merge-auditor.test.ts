@@ -96,7 +96,7 @@ function fixture(withMerge = true): HostFixture {
   const hookPath = put(root, '.git/hooks/post-merge', '#!/bin/sh\nexit 0\n');
   const key = Buffer.from('post-merge-test-key-32-bytes!!!');
   const keyPath = put(root, '.git/devai/post-merge.key', key);
-  const attestationPath = join(root, '.devai/config/post-merge-host-adapter.json');
+  const attestationPath = join(root, '.git/devai/post-merge-host-adapter.json');
   const receiptPath = join(root, '.git/devai/post-merge-receipt.json');
 
   const attestation = signed(
@@ -118,7 +118,7 @@ function fixture(withMerge = true): HostFixture {
     },
     key,
   );
-  put(root, '.devai/config/post-merge-host-adapter.json', `${JSON.stringify(attestation)}\n`);
+  put(root, '.git/devai/post-merge-host-adapter.json', `${JSON.stringify(attestation)}\n`);
   const receipt = signed(
     {
       schemaVersion: '1.0.0',
@@ -225,6 +225,7 @@ describe('post-merge host receipt verification', () => {
     const linked = {
       ...original,
       keyPath: join(adminRoot, 'devai/post-merge.key'),
+      attestationPath: join(adminRoot, 'devai/post-merge-host-adapter.json'),
       hookPath: join(adminRoot, 'hooks/post-merge'),
       receiptPath: join(adminRoot, 'devai/post-merge-receipt.json'),
     };
@@ -640,6 +641,7 @@ describe('post-merge authority host scope', () => {
     const linked = {
       ...original,
       keyPath: join(adminRoot, 'devai/post-merge.key'),
+      attestationPath: join(adminRoot, 'devai/post-merge-host-adapter.json'),
       hookPath: join(adminRoot, 'hooks/post-merge'),
       receiptPath: join(adminRoot, 'devai/post-merge-receipt.json'),
     };
