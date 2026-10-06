@@ -110,7 +110,9 @@ export function canonicalRelativePath(root: string, value: unknown): string {
 
 function pathOperation(symbol: string, targetPath: string): 'create' | 'update' | 'delete' {
   if (['rmSync', 'unlinkSync'].includes(symbol)) return 'delete';
-  if (['mkdirSync', 'mkdtempSync', 'symlinkSync'].includes(symbol)) return 'create';
+  // A no-replace publication only ever creates its target (ADR-AUT-0005).
+  if (['mkdirSync', 'mkdtempSync', 'symlinkSync', 'publishFileNoReplaceSync'].includes(symbol))
+    return 'create';
   return existsSync(targetPath) ? 'update' : 'create';
 }
 
