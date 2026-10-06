@@ -177,10 +177,34 @@ describe('agent CLI attempts against a fake provider', () => {
       final_text: 'Done.',
       cost: { amount: null, source: 'unknown' },
       usage: {
-        input_tokens: { value: 900, status: 'reported' },
+        input_tokens: { value: 1000, status: 'derived' },
         cache_read_tokens: { value: 4000, status: 'reported' },
         cache_write_tokens: { value: null, status: 'missing' },
       },
+    });
+  });
+
+  it('counts codex cached input once: input_tokens already includes the cached tokens (#289)', async () => {
+    const { result } = await attempt('codex-cli', 'codex-success');
+    const usage = result.output.usage;
+    // The provider reported 5000 input (4000 cached) and 200 output: 5200 tokens, not 9200.
+    expect((usage.input_tokens.value ?? 0) + (usage.cache_read_tokens.value ?? 0)).toBe(5000);
+    expect(usage.output_tokens.value).toBe(200);
+  });
+
+  it('leaves codex input missing when the cache count exceeds it, never inventing a figure', async () => {
+    const { result } = await attempt('codex-cli', 'codex-cache-exceeds-input');
+    expect(result.output.usage).toMatchObject({
+      input_tokens: { value: null, status: 'missing' },
+      cache_read_tokens: { value: 4000, status: 'reported' },
+    });
+  });
+
+  it('keeps the reported codex input as it stands when no cache count is reported', async () => {
+    const { result } = await attempt('codex-cli', 'codex-no-cache-count');
+    expect(result.output.usage).toMatchObject({
+      input_tokens: { value: 900, status: 'reported' },
+      cache_read_tokens: { value: null, status: 'missing' },
     });
   });
 

@@ -301,6 +301,21 @@ function parseClaude(parsed: readonly Record<string, unknown>[]): AgentCliOutput
   };
 }
 
+/**
+ * Codex follows the OpenAI usage format: `input_tokens` already contains the cached
+ * tokens. The v2 counters sum, so the input counter carries only the uncached part. A
+ * cache count larger than the input is incoherent and leaves the input missing; an
+ * unreported cache count leaves the reported input as it stands.
+ */
+function codexUncachedInput(usage: Record<string, unknown> | undefined): AgentCliUsageCounter {
+  const input = counter(usage?.['input_tokens']);
+  const cached = counter(usage?.['cached_input_tokens']);
+  if (input.value === null || cached.value === null) return input;
+  return cached.value > input.value
+    ? MISSING
+    : { value: input.value - cached.value, status: 'derived' };
+}
+
 function parseCodex(parsed: readonly Record<string, unknown>[]): AgentCliOutput {
   const turns = parsed.filter((event) => event['type'] === 'turn.completed');
   const failed = parsed.some(
@@ -324,8 +339,8 @@ function parseCodex(parsed: readonly Record<string, unknown>[]): AgentCliOutput 
             usage_version: 2,
             counter_mode: 'per-attempt',
             derivation:
-              'codex --json turn.completed.usage of one ephemeral turn; cached_input_tokens is the cache read and cache_write_input_tokens the cache write',
-            input_tokens: counter(usage?.['input_tokens']),
+              'codex --json turn.completed.usage of one ephemeral turn; codex input_tokens already includes cached_input_tokens, so input_tokens here is the uncached remainder (input_tokens - cached_input_tokens) and cache_read_tokens the cached part, which counts each input token once; cache_write_input_tokens is the cache write',
+            input_tokens: codexUncachedInput(usage),
             output_tokens: counter(usage?.['output_tokens']),
             cache_read_tokens: counter(usage?.['cached_input_tokens']),
             cache_write_tokens: counter(usage?.['cache_write_input_tokens']),

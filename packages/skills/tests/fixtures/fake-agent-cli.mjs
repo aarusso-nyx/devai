@@ -79,8 +79,21 @@ switch (scenario) {
     emit({ type: 'item.completed', item: { id: 'i-1', type: 'agent_message', text: 'Done.' } });
     emit({
       type: 'turn.completed',
+      usage: { input_tokens: 5000, cached_input_tokens: 4000, output_tokens: 200 },
+    });
+    break;
+  case 'codex-cache-exceeds-input':
+    emit({ type: 'turn.started' });
+    emit({ type: 'item.completed', item: { id: 'i-1', type: 'agent_message', text: 'Done.' } });
+    emit({
+      type: 'turn.completed',
       usage: { input_tokens: 900, cached_input_tokens: 4000, output_tokens: 200 },
     });
+    break;
+  case 'codex-no-cache-count':
+    emit({ type: 'turn.started' });
+    emit({ type: 'item.completed', item: { id: 'i-1', type: 'agent_message', text: 'Done.' } });
+    emit({ type: 'turn.completed', usage: { input_tokens: 900, output_tokens: 200 } });
     break;
   case 'codex-failed':
     emit({ type: 'turn.started' });
