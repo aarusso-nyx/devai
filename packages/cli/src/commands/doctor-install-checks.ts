@@ -425,6 +425,9 @@ export function checkAuthorityEnforcement(repoRoot: string): CheckResult {
     const scope = postMergeLocation?.scope;
     const notBoundHere = scope === 'unbound';
     const legacy = scope === 'legacy';
+    // A live binding in this checkout's git directory, declared or not: an undeclared one is
+    // verified too, and refused, rather than hidden.
+    const localBinding = scope === 'bound' || scope === 'undeclared';
     const boundCheckout = postMergeLocation?.bound_checkout;
     const localState = postMergeLocation?.local_state ?? [];
     const localPostMerge =
@@ -441,13 +444,12 @@ export function checkAuthorityEnforcement(repoRoot: string): CheckResult {
       (postMergeSelected && (notBoundHere ? githubActions.ok : !legacy && localPostMerge.ok)) ||
       (adapterConfig === GITHUB_ACTIONS_CONFIG && githubActions.ok);
     const lags = hostIntegrated
-      ? hostAdapterVersionLags(repoRoot, resolveCliVersion(), scope === 'bound')
+      ? hostAdapterVersionLags(repoRoot, resolveCliVersion(), localBinding)
       : { reasons: [], warnings: [] };
     // This checkout's own post-merge binding decides nothing while another adapter is selected,
     // yet its merge receipts are refused while it does not verify, for example after a later
     // host-adapter bind re-materialized the authority policy its attestation pins.
-    const bindingStale =
-      hostIntegrated && !postMergeSelected && scope === 'bound' && !localPostMerge.ok;
+    const bindingStale = hostIntegrated && !postMergeSelected && localBinding && !localPostMerge.ok;
     const legacyMessage = `${HOST_ADAPTER_REASONS.declarationLegacy}: ${POST_MERGE_CONFIG} is a checkout-bound post-merge attestation${
       boundCheckout === undefined ? '' : ` recording ${boundCheckout}`
     }, which verifies in no other checkout; convert it with \`${UPGRADE_COMMAND}\`, which moves the binding into the git directory of the checkout that holds its key and leaves a path-free declaration to commit`;
