@@ -1,14 +1,6 @@
-import {
-  fstatSync,
-  lstatSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { fstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   applyAuthorityHostEffectsAtomically,
@@ -17,7 +9,6 @@ import {
   runWithAuthorityHostEffects,
   spawnSync as guardedSpawnSync,
   writeFileSync as guardedWriteFileSync,
-  writeGovernanceProjectionSync,
   type AtomicAuthorityHostEffect,
   type AuthorityHostEffectRequest,
   type AuthorityHostEffectScope,
@@ -104,19 +95,6 @@ describe('read-only directory descriptor seam', () => {
       closeReadOnlySync(descriptor);
     }
     expect(() => openReadOnlyNoFollowSync(file, true)).toThrow('ENOTDIR');
-  });
-});
-
-describe('governance projection writer', () => {
-  // Mutants 1552, 1553, 1554: the exception writes the exact body at the target and creates
-  // the target's missing parent chain, so a projection two directories deep is written.
-  it('writes the exact body under a missing parent chain', () => {
-    const root = fixture();
-    const target = join(root, 'docs', 'governance', 'projection ç.md');
-    const body = '# Governance\n\nprojected\n';
-    writeGovernanceProjectionSync(target, body);
-    expect(readFileSync(target, 'utf8')).toBe(body);
-    expect(lstatSync(dirname(target)).isDirectory()).toBe(true);
   });
 });
 

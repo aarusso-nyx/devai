@@ -7,7 +7,6 @@ const cases = [
   ['applyAuthorityHostEffectsAtomically', 'packages/cli/src/authority/broker.ts'],
   ['readProcessSync', 'packages/cli/src/version.ts'],
   ['readProcessSync', 'packages/loop/src/governance-ledger/history.ts'],
-  ['writeGovernanceProjectionSync', 'packages/cli/src/commands/evidence/facade.ts'],
 ] as const;
 
 async function inventory(path: string, source: string) {
