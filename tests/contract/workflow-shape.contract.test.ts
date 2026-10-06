@@ -373,10 +373,13 @@ describe('concurrency and permissions blocks are uniform across the four workflo
     }
   });
 
-  it('serializes the ledger verification workflow by commit (never cancels a distinct sha) while superseding stale runs of the same sha', () => {
+  // #325: the job runs in the devai-ledger-verification environment, so F5:T3 requires it to
+  // serialize; a second dispatch of the same sha queues instead of cancelling the first.
+  it('serializes the ledger verification workflow by commit and never cancels a run in progress', () => {
     const source = readFileSync(join(WORKFLOWS_DIR, 'devai-ledger-verify.yml'), 'utf8');
     expect(source).toContain('group: devai-ledger-verify-${{ github.sha }}');
-    expect(source).toContain('cancel-in-progress: true');
+    expect(source).toContain('cancel-in-progress: false');
+    expect(source).not.toContain('cancel-in-progress: true');
   });
 });
 
