@@ -24,11 +24,15 @@ export const PUBLISH_INDETERMINATE = 'AUTHORITY_PUBLISH_CLEANUP_INCOMPLETE';
 /**
  * Identity of the file a publication created, taken by fstat of the staged descriptor it
  * wrote before the link. The target is a hard link to that file, so a caller can tell the
- * entry it published from any other entry later found at the same path (#313).
+ * entry it published from any other entry later found at the same path (#313). Inode
+ * numbers are reused as soon as a file is removed, so the identity also carries the inode's
+ * birth time in nanoseconds, which link(2) and unlink(2) never change; all three fields are
+ * bigint stat values.
  */
 export interface PublishedFileIdentity {
-  readonly dev: number;
-  readonly ino: number;
+  readonly dev: bigint;
+  readonly ino: bigint;
+  readonly birthtimeNs: bigint;
 }
 
 /** Error for an indeterminate publication; `cause` is the failed cleanup step's error. */
@@ -118,8 +122,8 @@ export function publishNoReplaceSteps(
         offset += written;
       }
       nodeFsyncSync(fd);
-      const stat = nodeFstatSync(fd);
-      identity = { dev: stat.dev, ino: stat.ino };
+      const stat = nodeFstatSync(fd, { bigint: true });
+      identity = { dev: stat.dev, ino: stat.ino, birthtimeNs: stat.birthtimeNs };
     } finally {
       nodeCloseSync(fd);
     }
