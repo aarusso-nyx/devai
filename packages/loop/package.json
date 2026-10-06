@@ -28,6 +28,7 @@
   },
   "dependencies": {
     "@devai-nyx/authority": "workspace:*",
+    "@devai-nyx/evidence": "workspace:*",
     "@devai-nyx/schemas": "workspace:*",
     "@devai-nyx/sensors": "workspace:*",
     "@devai-nyx/spec": "workspace:*",

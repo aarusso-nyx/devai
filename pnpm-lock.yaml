@@ -193,6 +193,9 @@ importers:
       '@devai-nyx/authority':
         specifier: workspace:*
         version: link:../authority
+      '@devai-nyx/evidence':
+        specifier: workspace:*
+        version: link:../evidence
       '@devai-nyx/schemas':
         specifier: workspace:*
         version: link:../schemas
