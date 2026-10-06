@@ -432,23 +432,22 @@ export const CODEX_REVIEW_DISABLED_FEATURES: readonly string[] = [
  * Codex review argv (ADR-MDL-0003): an ephemeral read-only run in the empty review
  * workspace, without the user's `config.toml` (its MCP servers, hooks and profiles) or
  * execpolicy rules, with the MCP server table and the tools table overridden empty for any
- * other configuration layer, cached web search and the skills instruction block off, and
- * with every tool-bearing feature that can be switched off disabled before launch
+ * other configuration layer, cached web search, the skills instruction block and sub-agents
+ * off, and with every tool-bearing feature that can be switched off disabled before launch
  * (`--disable`, advertised by `codex exec --help`).
  *
- * What the model is offered (#321), from the codex source at tag rust-v0.157.1, which the
- * installed `codex --version` reports: `add_shell_tools` in
- * codex-rs/core/src/tools/spec_plan.rs returns before registering any command tool when
- * `Feature::ShellTool` is disabled, and only after that gate does it choose between
- * `exec_command`/`write_stdin` (unified_exec on) and a one-shot exec. So with
- * `shell_tool` off no command tool exists, whatever `unified_exec` reports. gpt-6-sol runs
- * `tool_mode: code_mode_only` (the binary's embedded model catalog): its one tool is a V8
- * isolate (codex-rs/code-mode-runtime) with no imports, filesystem or network, which can only
- * call the registered tools. With these flags no registered tool reads a file. The ones left
- * are `update_plan` and `apply_patch`; the read-only sandbox refuses `apply_patch` writes.
- * Web search is a server tool, off through `web_search="disabled"` (default `cached`). Any
- * of these used anyway is an item other than `agent_message`/`reasoning` and refuses the
- * reply. This is source analysis: no live request's tool list has been observed.
+ * What the model is offered (#321), observed on codex-cli 0.157.1 with gpt-6-sol and the live
+ * server catalog by capturing the outgoing request at a local endpoint, no provider reached
+ * (scripts/codex-review-probe): no command, file-read or web tool. The direct tools are
+ * `exec` (code mode: a V8 isolate with no Node, filesystem or network), `wait` and
+ * `request_user_input`/`request_user_input_async`; `exec` can call only `apply_patch`
+ * (writes refused by the read-only sandbox), the goal tools and the clock. Without
+ * `agents.enabled=false` the `collaboration` sub-agent tools (`spawn_agent` and others) are
+ * offered too; `--disable multi_agent` does not remove them. The source agrees: at tag
+ * rust-v0.157.1, `add_shell_tools` (codex-rs/core/src/tools/spec_plan.rs) registers no
+ * command tool when `shell_tool` is disabled, whatever `unified_exec` reports. Any tool used
+ * anyway is an item other than `agent_message`/`reasoning` and refuses the reply. Rerun the
+ * probe's capture mode after a codex upgrade.
  */
 export function codexReviewArgv(
   model: string,
@@ -477,6 +476,8 @@ export function codexReviewArgv(
     'web_search="disabled"',
     '--config',
     'skills.include_instructions=false',
+    '--config',
+    'agents.enabled=false',
     ...CODEX_REVIEW_DISABLED_FEATURES.flatMap((feature) => ['--disable', feature]),
     ...(schemaPath === undefined ? [] : ['--output-schema', schemaPath]),
     prompt,
