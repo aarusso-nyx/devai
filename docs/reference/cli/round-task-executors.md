@@ -561,7 +561,17 @@ An accepted agent task completes through the registered path (ADR-MDL-0007):
 `TASK_ROUND_CONTROLLER_BUSY` while another holder owns the round, and it re-reads the task under
 the controller. It refuses an agent task with no accepted ratification
 (`TASK_RATIFICATION_REQUIRED`), with no `EV-` merge evidence (`TASK_MERGE_EVIDENCE_REQUIRED`), or
-with an open journal attempt (`TASK_DISPATCH_UNCERTAIN`). On completion it writes
+with an open journal attempt (`TASK_DISPATCH_UNCERTAIN`).
+
+Every `--evidence` reference must resolve to a record in `record/proofs/chain.json`, read with
+the same chain reader the `evidence` commands use. A missing or unreadable chain, or a reference
+the chain does not hold, refuses with `TASK_MERGE_EVIDENCE_REQUIRED` before anything is written.
+A record binds to the task only through what it names: a non-null `context.task_id` must be the
+finished task, and every `round_id=<round>` note must name the task's round. A record that names
+neither is accepted unbound, because the evidence writers do not stamp a task. A retry after an
+interruption resolves the same references again, so it still needs them in the chain.
+
+On completion it writes
 `.devai/state/round-runs/<round>/completions/<task>.json`, binding the ratification digest and
 the merge evidence. It then moves the task through `merging` to `completed` and releases the
 attempt worktree; the branch is kept. A rejecting ratification or `task escalate` on an agent task
