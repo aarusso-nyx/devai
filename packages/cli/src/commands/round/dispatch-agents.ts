@@ -1,7 +1,8 @@
 /**
  * `devai round dispatch` — experimental agent dispatch (ADR-MDL-0005). The generic
  * authority layer admits it only with `--write` and `--experimental`. Before any lock,
- * worktree, or provider is touched, the handler requires an in-force Owner activation,
+ * worktree, or provider is touched, the handler requires a state root that `init apply
+ * harness` durably initialized (#293) and an in-force Owner activation,
  * plans the selection exactly as the round runner will (its full same-round dependency
  * closure) and refuses it when the activation does not admit every planned task, and
  * refuses the round while uncertain work awaits a human disposition, naming each task.
@@ -18,6 +19,7 @@ import {
   planRoundTaskAdmission,
   readExperimentalActivation,
   runRoundTasks,
+  stateRootInitialized,
   type TaskRecord,
 } from '#runtime-core';
 import { defineCommand } from '../../define-command.js';
@@ -78,6 +80,11 @@ export const roundDispatch = defineCommand({
         try {
           const repoRoot = root(options);
           const round = requiredRound(options);
+          // #293: every dispatch record must live in a state root an authorized init step
+          // made durable in `.devai`; the dispatch itself holds no authority above the root.
+          if (!stateRootInitialized(repoRoot)) {
+            throw new TaskServiceError('EXPERIMENTAL_STATE_ROOT_UNINITIALIZED', EXIT_USAGE);
+          }
           const now = new Date();
           const activation = readExperimentalActivation(repoRoot, now);
           if (!activation.ok) throw new TaskServiceError(activation.code, EXIT_USAGE);
