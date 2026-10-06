@@ -368,28 +368,48 @@ This order holds in every checkout, for three reasons:
 - Each host-adapter bind selects its adapter as the host-policy identity
   (`authority_enforcement.adapter_config` in `.devai/config/project.json`) and re-materializes
   `.devai/config/authority-policy.json`.
-- The post-merge attestation, `.devai/config/post-merge-host-adapter.json`, records the absolute
-  path of the checkout that bound it, its hook, a signature by a key kept in that checkout's git
-  directory, and the digest of the authority policy. It verifies only in that checkout and only
-  against the policy it pinned, so the post-merge adapter is bound last.
+- The post-merge binding is checkout-bound and is never committed. Its attestation records the
+  absolute path of the checkout that bound it, its hook, the digest of the authority policy, and a
+  signature by a key; it lives with that key and the receipt issuer in the checkout's git
+  directory (`<git-dir>/devai/post-merge-host-adapter.json`). It verifies only against the policy
+  it pinned, so the post-merge adapter is bound last. The tracked
+  `.devai/config/post-merge-host-adapter.json` is a path-free declaration that the adapter is
+  required; it holds the same bytes in every clone, so commit it.
 - The GitHub Actions adapter is the CI-verifiable one: every checkout, including the runner of
   `devai-main-observation.yml`, verifies it from the tracked workflow and configuration and the
-  `origin` remote. `doctor` verifies the post-merge binding in full in the checkout that made it.
-  In every other checkout it reports `POST_MERGE_ADAPTER_NOT_APPLICABLE_HERE` and rests authority
-  enforcement on the GitHub Actions adapter instead; when that adapter is not bound or does not
-  verify there, it fails with `POST_MERGE_ADAPTER_UNVERIFIABLE_HERE` and names the commands to
-  run in the bound checkout. Any post-merge state a checkout carries itself (a key, a receipt
-  issuer, or a DEVAI post-merge hook) makes doctor verify the binding there instead. A Husky
-  repository tracks `.husky/post-merge`, so every one of its clones carries the hook, and doctor
-  refuses the binding in each clone but the one that made it.
+  `origin` remote.
+
+`doctor` reads the post-merge state from the checkout's own git directory:
+
+- Where an attestation, key, or receipt issuer exists there, the checkout is bound, and doctor
+  verifies the binding in full. It fails closed when that state is present but does not verify,
+  for example after a deleted key or an edited attestation.
+- Where the declaration exists but the checkout holds none of that state, as in every fresh clone
+  and CI runner, doctor reports `POST_MERGE_ADAPTER_NOT_BOUND_HERE` with the bind command and rests
+  authority enforcement on the GitHub Actions adapter. When that adapter is not bound or does not
+  verify there either, it fails with `POST_MERGE_ADAPTER_UNVERIFIABLE_HERE`. Hooks do not count as
+  local state: a Husky repository tracks `.husky/post-merge` and every worktree shares the git
+  hooks directory, so a hook alone never makes a clone bound.
+- To issue merge receipts from another checkout, run the post-merge bind there. It writes that
+  checkout's own attestation and leaves the tracked declaration unchanged.
 
 Do not bind GitHub Actions last to make it the selected identity. That bind re-materializes the
 authority policy after the post-merge attestation pinned it, so the post-merge adapter's merge
 receipts are refused as `HOST_RECEIPT_STALE`, and `doctor` warns
 `POST_MERGE_ADAPTER_BINDING_STALE` in the bound checkout; rebinding the post-merge adapter
-restores the order above. After a DEVAI upgrade, rebind both adapters in the same order: while a
-host-adapter configuration binds an older package, `doctor` warns
-`GITHUB_ACTIONS_ADAPTER_VERSION_LAG` or `POST_MERGE_ADAPTER_VERSION_LAG` and names the command.
+restores the order above. After a DEVAI upgrade, rebind both adapters in the same order: while the
+GitHub Actions configuration or this checkout's post-merge attestation binds an older package,
+`doctor` warns `GITHUB_ACTIONS_ADAPTER_VERSION_LAG` or `POST_MERGE_ADAPTER_VERSION_LAG` and names
+the command.
+
+Releases before 2.0.1 committed the checkout-bound attestation itself as
+`.devai/config/post-merge-host-adapter.json`. `doctor` reports such a file as
+`POST_MERGE_ADAPTER_DECLARATION_LEGACY`, a failure while the post-merge adapter is selected, and
+`devai init upgrade --target . --as-role architect --write` converts it
+(`MIG-2.0.1-post-merge-local-state`). Run in the checkout that holds the binding's key, the
+upgrade moves the attestation into that checkout's git directory, keeping its `installed_at_head`
+baseline while it still verifies; in any other checkout it only rewrites the tracked file as the
+declaration and binds nothing. Commit the declaration.
 
 The GitHub adapter authenticates exact-main observations with GitHub OIDC. Its workflow may write
 only `refs/devai/post-merge/<sha>`, and only after both the dispatch input and repository consent
