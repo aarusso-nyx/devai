@@ -1,7 +1,59 @@
-import { existsSync, lstatSync, readFileSync, realpathSync, statSync } from 'node:fs';
+import { existsSync, fstatSync, lstatSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
-import type { AuthorityHostEffectRequest } from '@devai-nyx/authority';
+import {
+  closeReadOnlySync,
+  openReadOnlyNoFollowSync,
+  type AuthorityHostEffectRequest,
+} from '@devai-nyx/authority';
 import type { JsonRecord } from './broker-values.js';
+
+/**
+ * Wraps the apply step of an identity-bound removal that is not bound to a publication (#317).
+ * Node has no directory-relative rename, so the effect renames by path. The parent's realpath
+ * is captured when the removal is authorized; at effect time the parent is opened without
+ * following a final link and pinned, and immediately before and after the effect its realpath
+ * must still be the admitted one and its identity the pinned one. Otherwise the removal refuses
+ * with AUTHORITY_REMOVE_PARENT_ESCAPED: before the effect nothing has run; after it, the entry
+ * renamed outside was either put back (any other identity) or was the caller's own identity.
+ * The residual is a swap and swap-back of an ancestor inside the effect itself, between the two
+ * checks.
+ */
+export function removalWithPinnedParent(requested: unknown, apply: () => unknown): () => unknown {
+  if (typeof requested !== 'string') throw new Error('AUTHORITY_FS_TARGET_INVALID');
+  const parent = dirname(resolve(requested));
+  const admitted = existingRealpath(parent);
+  return () => {
+    let descriptor: number;
+    try {
+      descriptor = openReadOnlyNoFollowSync(parent, true);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return 'absent';
+      throw new Error('AUTHORITY_REMOVE_PARENT_ESCAPED', { cause: error });
+    }
+    try {
+      const pinned = fstatSync(descriptor, { bigint: true });
+      const bound = (): boolean => {
+        try {
+          const current = statSync(parent, { bigint: true });
+          return (
+            realpathSync(parent) === admitted &&
+            current.dev === pinned.dev &&
+            current.ino === pinned.ino &&
+            current.birthtimeNs === pinned.birthtimeNs
+          );
+        } catch {
+          return false;
+        }
+      };
+      if (!bound()) throw new Error('AUTHORITY_REMOVE_PARENT_ESCAPED');
+      const result = apply();
+      if (!bound()) throw new Error('AUTHORITY_REMOVE_PARENT_ESCAPED');
+      return result;
+    } finally {
+      closeReadOnlySync(descriptor);
+    }
+  };
+}
 
 export function existingRealpath(path: string): string {
   let cursor = path;
