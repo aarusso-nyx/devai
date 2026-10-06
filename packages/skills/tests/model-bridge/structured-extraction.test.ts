@@ -689,6 +689,21 @@ describe('CMP-0006 API completion evidence (mocked clients only)', () => {
     expect(extract(response).ok).toBe(false);
   });
 
+  it('refuses a Claude API end_turn reply that reports server-side tool use (#249)', async () => {
+    anthropicCreate.mockResolvedValue({
+      content: [{ type: 'text', text: PASS_TEXT }],
+      usage: { input_tokens: 1, output_tokens: 1, server_tool_use: { web_search_requests: 1 } },
+      stop_reason: 'end_turn',
+    });
+    const response = await createModelBridge({ provider: 'claude', model: 'offline' }).complete(
+      { system: 'rubric', user: 'evidence' },
+      {},
+      { response_schema: REVIEW },
+    );
+    expect(response.finish_reason).toBe('error');
+    expect(extract(response).ok).toBe(false);
+  });
+
   it.each([
     ['missing completion', undefined, {}],
     ['tool finish', 'tool_calls', {}],

@@ -33,6 +33,15 @@ envelope whose `structured_output` was not preserved, so it cannot be re-derived
 structured bytes. It is declared as what it is and replayed on the text path (no
 provider `json`), where its bytes are the declared reply bytes.
 
+Codex review isolation is post-hoc. The bridge turns off before launch every
+tool-bearing feature that `codex features list --disable` (codex-cli 0.157.1)
+reports as off, `shell_tool` included. `unified_exec` still reports enabled, though,
+and no offline observation shows the effective tool list. A tool or MCP item in a
+Codex transcript refuses the reply, but that cannot undo what the model already read
+inside the read-only sandbox. Claude reviews start with no tools and no MCP servers,
+and a reply that reports any server-side tool use (`usage.server_tool_use`) is
+refused.
+
 <!-- adr-mdl-0001-provenance:start -->
 
 ```json

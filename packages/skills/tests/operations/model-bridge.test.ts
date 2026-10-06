@@ -580,6 +580,34 @@ describe('#249 Claude structured reply finish mapping', () => {
       { permission_denials: [{ tool_name: 'Bash', tool_use_id: 't', tool_input: {} }] },
     ],
     ['with an error subtype', { subtype: 'error_max_turns' }],
+    [
+      'with a server-side web search',
+      { usage: { ...liveShaped.usage, server_tool_use: { web_search_requests: 1 } } },
+    ],
+    [
+      'with a server-side web fetch',
+      {
+        usage: {
+          ...liveShaped.usage,
+          server_tool_use: { web_search_requests: 0, web_fetch_requests: 2 },
+        },
+      },
+    ],
+    [
+      'with a malformed server tool counter',
+      { usage: { ...liveShaped.usage, server_tool_use: { web_search_requests: '0' } } },
+    ],
+    [
+      'with a per-model web search count',
+      {
+        modelUsage: {
+          'synthetic-offline-model': {
+            ...liveShaped.modelUsage['synthetic-offline-model'],
+            webSearchRequests: 1,
+          },
+        },
+      },
+    ],
   ])('keeps the marker a provider error %s', async (_name, change) => {
     const response = await observe('claude-cli', JSON.stringify({ ...liveShaped, ...change }));
     expect(response.finish_reason).not.toBe('stop');
@@ -616,6 +644,22 @@ describe('#249 review process isolation (no MCP server, no tools, allowlisted en
     '--sandbox',
     '--config',
     '--output-schema',
+    '--disable',
+  ];
+  // Effective state confirmed with `codex features list --disable <feature>` (0.157.1).
+  const CODEX_DISABLED_FEATURES = [
+    'shell_tool',
+    'apps',
+    'browser_use',
+    'computer_use',
+    'in_app_browser',
+    'multi_agent',
+    'plugins',
+    'image_generation',
+    'view_image',
+    'sleep_tool',
+    'tool_suggest',
+    'skill_search',
   ];
   const secrets = ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'GH_TOKEN', 'NODE_OPTIONS'] as const;
   const saved = new Map<string, string | undefined>();
@@ -693,6 +737,11 @@ describe('#249 review process isolation (no MCP server, no tools, allowlisted en
     expect(flagValue(argv, '--cd')).toBe(cwd);
     const configs = argv.flatMap((value, index) => (value === '--config' ? [argv[index + 1]] : []));
     expect(configs).toEqual(['mcp_servers={}', 'tools={}']);
+    const disabled = argv.flatMap((value, index) =>
+      value === '--disable' ? [argv[index + 1]] : [],
+    );
+    expect(disabled).toEqual(CODEX_DISABLED_FEATURES);
+    expect(disabled).not.toContain('unified_exec');
     const flags = argv.filter((value) => value.startsWith('--'));
     expect(flags.filter((flag) => !CODEX_HELP_FLAGS.includes(flag))).toEqual([]);
   });
