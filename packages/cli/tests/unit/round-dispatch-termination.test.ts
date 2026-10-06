@@ -251,4 +251,57 @@ describe('routine dispatch of a process group whose termination is unconfirmed',
       JSON.parse(readFileSync(join(root, '.devai/state/lock-quarantine/TASK-9711.json'), 'utf8')),
     ).toMatchObject({ task_id: 'TASK-9711', pid: 4344, targets: ['F2:MOD-routine'] });
   });
+
+  it('leaves the task in_progress holding its locks when the quarantine cannot be persisted', async () => {
+    const root = repository();
+    mkdirSync(join(root, 'work/rounds/R-9711'), { recursive: true });
+    writeFileSync(join(root, 'work/rounds/R-9711/AUTHORIZATION.md'), 'status: active\nGRANTED\n');
+    const value: TaskRecord = { ...TASK, status: 'ready', target_modules: ['MOD-routine'] };
+    mkdirSync(join(root, '.devai/state/tasks'), { recursive: true });
+    writeFileSync(
+      join(root, '.devai/state/tasks/TASK-9711.json'),
+      `${JSON.stringify(value, null, 2)}\n`,
+    );
+    // A file where the quarantine directory must go: the record can never be written.
+    writeFileSync(join(root, '.devai/state/lock-quarantine'), 'not a directory\n');
+    spawn.mockClear();
+    spawn.mockReturnValueOnce({
+      pid: 4345,
+      result: Promise.resolve(unconfirmed),
+      terminate: vi.fn(),
+    } satisfies GuardedChildProcess);
+
+    const result = await permissive(() =>
+      runRoundTasks({
+        repoRoot: root,
+        round: 'R-9711',
+        dispatch: (running) => dispatchRoundTask(root, running),
+      }),
+    );
+
+    expect(result.results).toEqual([
+      { task_id: 'TASK-9711', ok: false, code: 'TASK_LOCK_QUARANTINE_UNPERSISTED' },
+    ]);
+    // Never escalated, so nothing released its locks; they lapse only by TTL.
+    expect(loadTask(root, 'TASK-9711').status).toBe('in_progress');
+    const locksDir = join(root, '.devai/state/locks');
+    expect(listLocks({ locksDir })).toMatchObject([
+      { task_id: 'TASK-9711', module: 'MOD-routine' },
+    ]);
+    expect(existsSync(join(root, '.devai/state/round-runs/R-9711/task-executions'))).toBe(false);
+    await permissive(async () => {
+      expect(
+        acquireLocks({ locksDir, taskId: 'TASK-9712', targets: ['F2:MOD-routine'] }).denied,
+      ).toEqual([{ target: 'F2:MOD-routine', held_by: 'TASK-9711' }]);
+      // A later run leaves the in_progress task and its locks for human disposition.
+      const next = await runRoundTasks({
+        repoRoot: root,
+        round: 'R-9711',
+        dispatch: () => ({ ok: true }),
+      });
+      expect(next.reconciled).toBeUndefined();
+    });
+    expect(loadTask(root, 'TASK-9711').status).toBe('in_progress');
+    expect(listLocks({ locksDir })).toMatchObject([{ task_id: 'TASK-9711' }]);
+  });
 });

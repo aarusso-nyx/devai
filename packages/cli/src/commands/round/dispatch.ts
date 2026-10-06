@@ -9,6 +9,7 @@ import {
 import {
   escalateTask,
   executeRoutineExecutor,
+  LOCK_QUARANTINE_UNPERSISTED,
   listWorktrees,
   quarantineLocks,
   saveTask,
@@ -138,18 +139,25 @@ async function dispatchRoutine(
     // before any fallible work (candidate resolution, evidence): whatever fails after this,
     // no escalation or reconciliation can release the task's locks. They stay held until
     // their TTL lapses, or a human removes the quarantine record.
-    quarantineLocks({
-      locksDir: join(repoRoot, '.devai/state/locks'),
-      quarantine: {
-        task_id: running.id,
-        round_id: running.round_id,
-        reason: 'PROCESS_GROUP_TERMINATION_UNCONFIRMED',
-        pid: livePid ?? null,
-        evidence_id: id,
-        targets: taskLockTargets(running),
-        recorded_at: completedAt,
-      },
-    });
+    try {
+      quarantineLocks({
+        locksDir: join(repoRoot, '.devai/state/locks'),
+        quarantine: {
+          task_id: running.id,
+          round_id: running.round_id,
+          reason: 'PROCESS_GROUP_TERMINATION_UNCONFIRMED',
+          pid: livePid ?? null,
+          evidence_id: id,
+          targets: taskLockTargets(running),
+          recorded_at: completedAt,
+        },
+      });
+    } catch {
+      // Without the record nothing would stop an escalation from releasing the locks. The
+      // runner leaves a task failing with this code `in_progress`, holding its locks until
+      // their TTL lapses, for explicit human disposition (round-runner.ts).
+      throw new Error(LOCK_QUARANTINE_UNPERSISTED);
+    }
   }
   const candidate = candidateSha(executionRoot);
   const tree = candidateTree(executionRoot);
