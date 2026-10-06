@@ -4,6 +4,7 @@ import { canonicalSha256 } from '@devai-nyx/utils';
 import { basename, dirname, isAbsolute, normalize, relative, resolve } from 'node:path';
 import {
   TaskExecutionEvidenceError,
+  type AttemptSandboxEvidence,
   type NotApplicableEvidence,
   type TaskExecutionEvidence,
   type TaskExecutionEvidenceFacts,
@@ -190,23 +191,63 @@ function validateAgentSelection(task: TaskRecordBinding, evidence: TaskExecution
   );
 }
 
-/** The provider-enforced sandbox mode each experimental runtime runs under (ADR-MDL-0008). */
-const SANDBOX_MODE_BY_RUNTIME: Readonly<Record<string, string>> = {
-  'claude-cli': 'claude-restricted-sandbox',
-  'codex-cli': 'codex-workspace-write',
+/**
+ * The provider-enforced sandbox each experimental runtime runs under (ADR-MDL-0008): its
+ * mode and the complete confinement flag sequence, with the worktree as
+ * `{attempt-worktree}`. A contract test pins this mirror to the agent CLI adapters.
+ */
+export const EXPERIMENTAL_SANDBOX_BY_RUNTIME: Readonly<
+  Record<
+    string,
+    { readonly mode: AttemptSandboxEvidence['mode']; readonly flags: readonly string[] }
+  >
+> = {
+  'claude-cli': {
+    mode: 'claude-restricted-sandbox',
+    flags: [
+      '--restricted',
+      '--tools',
+      'Bash,Read,Edit,Write,Glob,Grep',
+      '--settings',
+      '{"sandbox":{"enabled":true,"failIfUnavailable":true,"allowUnsandboxedCommands":false}}',
+      '--permission-mode',
+      'acceptEdits',
+      '--permission-prompts',
+      'none',
+    ],
+  },
+  'codex-cli': {
+    mode: 'codex-workspace-write',
+    flags: [
+      '--sandbox',
+      'workspace-write',
+      '--cd',
+      '{attempt-worktree}',
+      '--ignore-rules',
+      '--config',
+      'sandbox_workspace_write.writable_roots=[]',
+      '--config',
+      'sandbox_workspace_write.network_access=false',
+    ],
+  },
 };
 
-// ADR-MDL-0008: only an experimental agent attempt records a sandbox, and the mode is the
-// one its runtime enforces.
+// ADR-MDL-0008: only an experimental agent attempt whose provider process started records
+// a sandbox, in the mode its runtime enforces and with that mode's complete flag sequence.
 function validateSandbox(evidence: TaskExecutionEvidence): void {
   if (evidence.sandbox === undefined) return;
   const resolved = evidence.resolved_executor;
+  const expected =
+    resolved.kind === 'agent' && Object.hasOwn(EXPERIMENTAL_SANDBOX_BY_RUNTIME, resolved.runtime)
+      ? EXPERIMENTAL_SANDBOX_BY_RUNTIME[resolved.runtime]
+      : undefined;
   requireSemantic(
     evidence.experimental === true &&
-      resolved.kind === 'agent' &&
-      SANDBOX_MODE_BY_RUNTIME[resolved.runtime] === evidence.sandbox.mode,
+      expected !== undefined &&
+      expected.mode === evidence.sandbox.mode &&
+      sameOrderedStrings(evidence.sandbox.flags, expected.flags),
     'TASK_EXECUTION_EVIDENCE_SANDBOX_MISMATCH',
-    'a sandbox is recorded only on experimental agent evidence, in the mode its runtime enforces',
+    'a sandbox is recorded only on experimental agent evidence, in the mode and with the exact flags its runtime enforces',
   );
 }
 
