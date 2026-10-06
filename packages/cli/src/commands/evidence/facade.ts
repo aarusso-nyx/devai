@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import type { CAC } from 'cac';
-import { classifyAuthorityPath, mkdirSync, spawnSync, writeFileSync } from '@devai-nyx/authority';
+import { mkdirSync, realpathSync, spawnSync, writeFileSync } from '@devai-nyx/authority';
 import {
   LocalEvidenceError,
   appendProofEpochErrata,
@@ -31,12 +31,44 @@ const RENDER_KINDS = new Set(['decisions', 'rounds', 'round-narratives', 'test-m
 /** The committed rounds index that `--kind rounds --check` compares with (ADR-EVI-0001). */
 const ROUNDS_INDEX_PATH = 'record/derived/indexes/rounds.md';
 
-/**
- * The filesystem domains `evidence render` declares in law/policy/action-registry.json. A
- * rendered view is written only inside them, through the guarded host filesystem.
- */
+/** The only directory `evidence render --out` writes into; promotion to a committed path is a reviewed copy. */
+const RENDER_OUT_DIRECTORY = '.devai/state/render';
 const RENDER_OUT_OUTSIDE_SCOPE = 'EVIDENCE_RENDER_OUT_OUTSIDE_SCOPE';
-const EVIDENCE_RENDER_WRITE_DOMAINS: readonly string[] = ['fs:f5-state', 'fs:proofs'];
+
+function within(root: string, target: string): boolean {
+  const fromRoot = relative(root, target);
+  return (
+    fromRoot !== '' &&
+    fromRoot !== '..' &&
+    !fromRoot.startsWith(`..${sep}`) &&
+    !isAbsolute(fromRoot)
+  );
+}
+
+/** Nearest existing ancestor of a path, resolved through symlinks. */
+function realAncestor(path: string): string {
+  let current = path;
+  while (!existsSync(current)) {
+    const parent = dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+  return realpathSync(current);
+}
+
+/** True when `out` lexically and physically stays inside the dedicated projection directory. */
+function renderOutAllowed(repoRoot: string, out: string): boolean {
+  const directory = resolve(repoRoot, RENDER_OUT_DIRECTORY);
+  const target = resolve(repoRoot, out);
+  if (!within(directory, target)) return false;
+  const ancestor = realAncestor(dirname(target));
+  const physicalRepo = realpathSync(repoRoot);
+  if (ancestor !== physicalRepo && !within(physicalRepo, ancestor)) return false;
+  if (!existsSync(directory)) return true;
+  const physicalDirectory = realpathSync(directory);
+  if (existsSync(target) && !within(physicalDirectory, realpathSync(target))) return false;
+  return ancestor === physicalDirectory || within(physicalDirectory, ancestor);
+}
 
 interface RedactOptions {
   readonly round?: string;
@@ -187,14 +219,9 @@ export const evidenceRender = defineCommand({
           return;
         }
         const repoRoot = resolve(options.repoRoot ?? process.cwd());
-        if (
-          options.out !== undefined &&
-          !EVIDENCE_RENDER_WRITE_DOMAINS.includes(
-            classifyAuthorityPath(repoRoot, resolve(repoRoot, options.out)),
-          )
-        ) {
+        if (options.out !== undefined && !renderOutAllowed(repoRoot, options.out)) {
           process.stderr.write(
-            `devai evidence render: ${RENDER_OUT_OUTSIDE_SCOPE}: --out must stay inside ${EVIDENCE_RENDER_WRITE_DOMAINS.join(' or ')}\n`,
+            `devai evidence render: ${RENDER_OUT_OUTSIDE_SCOPE}: --out must stay inside ${RENDER_OUT_DIRECTORY}/\n`,
           );
           process.exitCode = EXIT_FAIL;
           return;

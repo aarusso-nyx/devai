@@ -14,6 +14,7 @@ import {
   rmSync,
   statSync,
   writeFileSync,
+  symlinkSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
@@ -577,6 +578,10 @@ describe('evidence render --out write scope', () => {
   it.each([
     ['the committed rounds index', INDEX],
     ['an arbitrary workspace file', 'docs/rendered.md'],
+    ['a proof record', 'record/proofs/chain.json'],
+    ['other runtime state', '.devai/state/tmp/rounds.md'],
+    ['the projection directory itself', '.devai/state/render'],
+    ['a traversal out of the projection directory', '.devai/state/render/../../../escaped.md'],
     ['a parent of the repository', '../escaped.md'],
     ['an absolute path outside the repository', join(tmpdir(), 'devai-render-escape.md')],
   ])('refuses %s and writes nothing', async (_name, out) => {
@@ -591,13 +596,33 @@ describe('evidence render --out write scope', () => {
     expect(existsSync(join(tmpdir(), 'devai-render-escape.md'))).toBe(false);
   });
 
-  it.each([
-    ['runtime state', '.devai/state/render/rounds.md'],
-    ['the proof store', 'record/proofs/rounds-view.md'],
-  ])('writes inside %s through the guarded filesystem', async (_name, out) => {
+  it('writes inside the projection directory through the guarded filesystem', async () => {
     const repo = superseding();
-    const result = await renderTo(repo, out);
+    const result = await renderTo(repo, '.devai/state/render/nested/rounds.md');
     expect(result.exit).toBe(0);
-    expect(readFileSync(join(repo, out), 'utf8')).toBe(SUPERSEDING_INDEX);
+    expect(readFileSync(join(repo, '.devai/state/render/nested/rounds.md'), 'utf8')).toBe(
+      SUPERSEDING_INDEX,
+    );
+  });
+
+  it('leaves an existing proof record intact when it is named as the target', async () => {
+    const repo = superseding();
+    const proof = join(repo, 'record/proofs/chain.json');
+    mkdirSync(dirname(proof), { recursive: true });
+    writeFileSync(proof, '{"keep":true}\n');
+    const result = await renderTo(repo, 'record/proofs/chain.json');
+    expect(result.exit).toBe(2);
+    expect(readFileSync(proof, 'utf8')).toBe('{"keep":true}\n');
+  });
+
+  it('refuses a projection path that a symlink redirects outside the repository', async () => {
+    const repo = superseding();
+    const outside = tempRoot();
+    mkdirSync(join(repo, '.devai/state'), { recursive: true });
+    symlinkSync(outside, join(repo, '.devai/state/render'));
+    const result = await renderTo(repo, '.devai/state/render/rounds.md');
+    expect(result.exit).toBe(2);
+    expect(result.stderr).toContain('EVIDENCE_RENDER_OUT_OUTSIDE_SCOPE');
+    expect(existsSync(join(outside, 'rounds.md'))).toBe(false);
   });
 });
