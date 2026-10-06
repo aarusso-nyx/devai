@@ -138,7 +138,7 @@
       "profiles": ["tier1", "tier2", "tier3"],
       "effect": "local-write",
       "authority": "mesh_controller",
-      "description": "Record one schema-validated repository backlog item (finding, proposition, note, or flaky-test) under .devai/state/backlog/ through the harness boundary; round attribution is opt-in through an explicit --round and is never inferred from the session, the branch, or the active round.",
+      "description": "Record one schema-validated repository backlog item (finding, proposition, note, or flaky-test) under .devai/state/backlog/ through the harness boundary; round attribution is opt-in through an explicit --round and is never inferred from the session, the branch, or the active round. The stored origin role is the admitted invocation role, and --role can only assert it. When the explicit round has a live Owner activation, add also appends one backlog_item_projected event to .devai/state/tracking/<round>/events.jsonl (a declared write, idempotent: a retry reuses the saved item and completes a missing event).",
       "output_contract": {
         "schemaVersion": "1.0.0",
         "mode": "action-envelope",
