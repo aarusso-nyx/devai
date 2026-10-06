@@ -806,6 +806,7 @@ describe('#249 review process isolation (no MCP server, no tools, allowlisted en
       'tools={}',
       'web_search="disabled"',
       'skills.include_instructions=false',
+      'agents.enabled=false',
     ]);
     const disabled = argv.flatMap((value, index) =>
       value === '--disable' ? [argv[index + 1]] : [],
