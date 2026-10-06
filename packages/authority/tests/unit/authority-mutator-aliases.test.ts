@@ -38,6 +38,8 @@ describe('raw mutation imports remain covered across call forms', () => {
     'renameSync',
     'rm',
     'rmSync',
+    'rmdir',
+    'rmdirSync',
     'spawn',
     'spawnSync',
     'symlinkSync',
