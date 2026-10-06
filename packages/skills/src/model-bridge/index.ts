@@ -1,6 +1,15 @@
-import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  accessSync,
+  constants as fsConstants,
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
-import { delimiter, join } from 'node:path';
+import { delimiter, isAbsolute, join } from 'node:path';
 import { spawnSync } from '@devai-nyx/authority';
 import { providerReplySchema, replyProjectionIdentity } from '@devai-nyx/schemas';
 import { agentCliEnvironment } from '../agent-cli/index.js';
@@ -474,41 +483,57 @@ export function codexReviewArgv(
   ];
 }
 
-/** Binaries (resolved path and `--version` output) already checked by this process. */
+/** Binaries (realpath and `--version` output) already checked by this process. */
 const codexCompatible = new Set<string>();
 
-function onPath(executable: string, pathValue: string | undefined): string | undefined {
+/**
+ * The `codex` a child process started with this PATH would run: the first PATH entry
+ * holding an executable regular file named `codex`, as execvp chooses it. The path is
+ * returned unresolved, so its basename stays `codex` for the broker's process target.
+ */
+export function resolveCodexExecutable(pathValue: string | undefined): string | undefined {
   for (const directory of (pathValue ?? '').split(delimiter)) {
-    if (directory.length === 0) continue;
-    const candidate = join(directory, executable);
-    if (existsSync(candidate)) return realpathSync(candidate);
+    if (directory.length === 0 || !isAbsolute(directory)) continue;
+    const candidate = join(directory, 'codex');
+    try {
+      if (!statSync(candidate).isFile()) continue;
+      accessSync(candidate, fsConstants.X_OK);
+      return candidate;
+    } catch {
+      continue;
+    }
   }
   return undefined;
 }
 
+const FEATURE_ROW = /^(\S+)\s+(\S+(?:\s+\S+)*?)\s+(true|false)$/u;
+
 /**
  * Refuses a Codex review before the provider is invoked unless the installed `codex`
  * knows every name in CODEX_REVIEW_DISABLED_FEATURES and reports each one off once
- * disabled (`codex features list --disable ...`, no provider call). An unknown name is
- * `MODEL_BRIDGE_CODEX_INCOMPATIBLE:unknown-feature:<name>`; a feature still on is
- * `...:feature-enabled:<name>`. A passing binary is remembered by resolved path and
- * version for the rest of the process.
+ * disabled (`codex features list --disable ...`, no provider call). Reasons:
+ * `executable:not-found`, `version:<status>`, `unknown-feature:<name>`,
+ * `listing-malformed:<name or line>` (a row that is not `name stage true|false`, or a
+ * feature listed twice), and `feature-enabled:<name>`. It returns the absolute executable
+ * that both probes ran, which the review must spawn; a passing binary is remembered by
+ * realpath and version for the rest of the process.
  */
 export function assertCodexReviewCompatibility(
   env: Readonly<Record<string, string>>,
   cwd: string,
   timeout_ms = 30_000,
-): void {
-  const run = (argv: string[]) =>
-    spawnSync('codex', argv, { cwd, env, encoding: 'utf8', timeout: timeout_ms });
+): string {
   const failed = (reason: string, detail: string): never => {
     throw new Error(`MODEL_BRIDGE_CODEX_INCOMPATIBLE:${reason}:${detail}`);
   };
+  const executable = resolveCodexExecutable(env['PATH']) ?? failed('executable', 'not-found');
+  const run = (argv: string[]) =>
+    spawnSync(executable, argv, { cwd, env, encoding: 'utf8', timeout: timeout_ms });
   const version = run(['--version']);
   if (version.error !== undefined || version.status !== 0)
     failed('version', version.error?.message ?? String(version.status));
-  const key = `${onPath('codex', env['PATH']) ?? 'codex'}\0${String(version.stdout).trim()}`;
-  if (codexCompatible.has(key)) return;
+  const key = `${realpathSync(executable)}\0${String(version.stdout).trim()}`;
+  if (codexCompatible.has(key)) return executable;
   const listing = run([
     'features',
     'list',
@@ -521,16 +546,25 @@ export function assertCodexReviewCompatibility(
   if (listing.error !== undefined || listing.status !== 0)
     failed('features-list', listing.error?.message ?? String(listing.status));
   const states = new Map<string, string>();
-  for (const line of String(listing.stdout ?? '').split('\n')) {
-    const match = /^(\S+)\s+.*\s(true|false)\s*$/u.exec(line);
-    if (match?.[1] !== undefined && match[2] !== undefined) states.set(match[1], match[2]);
-  }
+  String(listing.stdout ?? '')
+    .split('\n')
+    .forEach((line, index) => {
+      if (line.trim().length === 0) return;
+      const match = FEATURE_ROW.exec(line.trimEnd());
+      const name = match?.[1];
+      const state = match?.[3];
+      if (name === undefined || state === undefined)
+        return failed('listing-malformed', `line-${String(index + 1)}`);
+      if (states.has(name)) return failed('listing-malformed', name);
+      states.set(name, state);
+    });
   for (const feature of CODEX_REVIEW_DISABLED_FEATURES) {
     const state = states.get(feature);
     if (state === undefined) failed('unknown-feature', feature);
     if (state !== 'false') failed('feature-enabled', feature);
   }
   codexCompatible.add(key);
+  return executable;
 }
 
 function cliResponse(
@@ -567,8 +601,9 @@ function cliResponse(
     // Only the allowlisted host variables the agent-cli adapters admit: no provider API
     // keys, GH_TOKEN, cloud credentials or NODE_OPTIONS reach the reviewer.
     const env = agentCliEnvironment(options.provider === 'claude-cli' ? 'claude-cli' : 'codex-cli');
-    if (cli === 'codex') assertCodexReviewCompatibility(env, workspace);
-    result = spawnSync(cli, argv, {
+    // Codex: the very executable both compatibility probes ran (#321).
+    const executable = cli === 'codex' ? assertCodexReviewCompatibility(env, workspace) : cli;
+    result = spawnSync(executable, argv, {
       cwd: workspace,
       env,
       encoding: 'utf8',
