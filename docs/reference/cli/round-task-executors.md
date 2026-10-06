@@ -192,7 +192,12 @@ While an Inspector or Auditor task of the same topological generation is ready, 
 waiting, implementation tasks may hold at most the run's workers minus one; review tasks may use
 every worker. Admission refuses an implementation task over that share with the waitable
 `TASK_WORKER_CAP`, so it starts once a worker frees up. A serial run is unreserved, and a
-reserve with no review task waiting idles nothing.
+reserve with no admissible review task waiting idles nothing: a review task blocked by a
+resource conflict, an unfinished dependency or a failure holds no worker.
+
+An agent task that derives no lock key, such as a materialized campaign task, never runs beside
+another agent task, and no agent task runs beside it (`resources.keyless_agent_tasks`); the
+later one waits with `TASK_RESOURCE_CONFLICT`.
 
 Managed worktrees are capped per host at `capacity.max_workers` (ADR-MDL-0007), so every worker
 the policy admits can hold its worktree. A worktree kept after its attempt settles, for review or
@@ -504,6 +509,9 @@ An attempt fails when:
 
 - Article 6 does not give the task's discipline a changed path
   (`EXPERIMENTAL_WRITE_SCOPE_VIOLATION`);
+- a changed path lies outside the task's declared boundary, `intent_diff.planned_files`, where
+  an entry ending in `/` admits the paths under it (`EXPERIMENTAL_BOUNDARY_VIOLATION`,
+  ADR-MDL-0009); a task with no declared boundary is bounded by its role alone;
 - it leaves a symbolic link resolving outside the worktree (`EXPERIMENTAL_SYMLINK_ESCAPE`); a base
   tree holding one refuses before any provider starts;
 - the task lost a declared lock before its result could be accepted (`TASK_RESOURCE_LOCK_LOST`).
@@ -678,8 +686,11 @@ campaign state (ADR-GOV-0025).
 A campaign task may instead declare an agent `executor` with a `runtime`, `model`, `effort`
 and `recipe_name`, and optionally `recipe_variant`, `max_iterations` (default 4) and
 `capabilities` (ADR-MDL-0009). That task materializes with an agent executor that selects its
-runtime exactly and carries the composition id of its prompt, so `round dispatch
---experimental` can run it. Before anything is written, each contract is checked:
+runtime exactly, names the campaign prompt as `instructions_ref`, and carries the composition
+id of its prompt, so `round dispatch --experimental` can run it. The campaign prompt is a hashed
+component of the prompt the provider receives; editing it changes the id, and dispatch refuses
+with `TASK_PROMPT_COMPOSITION_DRIFT` until the task is re-bound. The campaign `boundary.paths`
+become the task's declared boundary. Before anything is written, each contract is checked:
 
 - the discipline must be engineer or inspector (`CAMPAIGN_AGENT_DISCIPLINE_UNSUPPORTED`);
 - the runtime must be an experimental runtime (`CAMPAIGN_AGENT_RUNTIME_UNSUPPORTED`);
