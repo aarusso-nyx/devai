@@ -611,16 +611,22 @@ devai round dispatch deactivate --repo-root . --as-role owner --write --experime
 
 - **The state root must be initialized first.** Dispatch fsyncs every directory it creates
   below `.devai/state`, but it holds no authority over `.devai`, which lies outside the
-  `fs:f5-state` domain. `init apply harness` creates the state root, fsyncs `.devai`, and then
-  publishes `.devai/state/state-root.json`; `round dispatch` refuses with
-  `EXPERIMENTAL_STATE_ROOT_UNINITIALIZED` until that marker exists (ADR-AUT-0005). Re-running
-  `init apply harness` on an adopted repository adds the marker and keeps the first one.
+  `fs:f5-state` domain. `init apply harness` creates the state root, fsyncs the repository
+  directory when it created `.devai`, fsyncs `.devai`, and then publishes
+  `.devai/state/state-root.json`; `round dispatch` refuses with
+  `EXPERIMENTAL_STATE_ROOT_UNINITIALIZED` until that marker exists, and with
+  `EXPERIMENTAL_STATE_ROOT_MARKER_INVALID` when anything other than a regular file with the
+  exact marker bytes is at its path (ADR-AUT-0005). Re-running `init apply harness` on an
+  adopted repository adds the marker and keeps a valid one; it refuses an invalid one with
+  `INIT_STATE_ROOT_MARKER_INVALID`.
 - **Create-only records and locks publish without replacement.** A create-only record, the
   activation lock and the worktree registry lock are written to a staged, fsynced file that is
   hard-linked into place, so the name appears only with its complete bytes and an existing one
   is never replaced: of two concurrent writers exactly one succeeds (ADR-AUT-0005). A crash
   between the link and the staged unlink leaves the complete record and a hidden
   `.<name>.<pid>-<uuid>.publish-staged` link, which no reader lists and which is safe to remove.
+  A failure after the link refuses with `DURABLE_PUBLICATION_INDETERMINATE`: the record holds
+  the writer's bytes but is not reported as created, and a lock holder removes its own lock.
   Resource locks adopt the same publication in a follow-up.
 - **Worktree registry updates are serialized across processes.** Every change to
   `.devai/state/worktrees.json` runs under `.devai/state/worktrees.lock`, so concurrent rounds
