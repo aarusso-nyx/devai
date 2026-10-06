@@ -5,7 +5,12 @@ import {
   type SensorReading,
   type SensorStatus,
 } from './sensor-reading.js';
-import { listWorkflowFiles, loadWorkflows, jobEffectFacts } from './harness/workflow-parser.js';
+import {
+  concurrencyGroupContexts,
+  listWorkflowFiles,
+  loadWorkflows,
+  jobEffectFacts,
+} from './harness/workflow-parser.js';
 
 /**
  * F5 harness coherence sensor (28.D; F5×T3). Per design note at
@@ -42,6 +47,23 @@ function concurrencyDeclaration(file: string): ConcurrencyDeclaration | null {
     group,
     cancelInProgress: cancel === undefined ? null : cancel === 'true',
   };
+}
+
+/**
+ * A superseding group cancels the older runs that share it, so it must be scoped to the run's
+ * own subject (#325): its ref, its commit, or both the pull request and the merge-queue entry
+ * it serves, as the pull request gate keys one group per pull request and one per queue head.
+ * A literal look-alike of a context never counts; only contexts the expression reads do.
+ */
+export function supersedingGroupScoped(group: string): boolean {
+  const contexts = concurrencyGroupContexts(group);
+  if (contexts === undefined) return false;
+  return (
+    contexts.includes('github.ref') ||
+    contexts.includes('github.sha') ||
+    (contexts.includes('github.event.pull_request.number') &&
+      contexts.includes('github.event.merge_group.head_sha'))
+  );
 }
 
 function requiresSerialization(relativeFile: string, file: string): boolean {
@@ -161,7 +183,8 @@ export function senseHarnessCoherence(opts: HarnessCoherenceOptions): SensorRead
             lock.group.toLowerCase() === 'devai-pages-publication'
           );
         return (
-          lock.cancelInProgress === !serialize && (serialize || lock.group.includes('github.ref'))
+          lock.cancelInProgress === !serialize &&
+          (serialize || concurrencyGroupContexts(lock.group)?.includes('github.ref') === true)
         );
       });
     const aliases = jobs.some((a) =>
@@ -169,7 +192,10 @@ export function senseHarnessCoherence(opts: HarnessCoherenceOptions): SensorRead
         (b) =>
           a !== b &&
           a.effect !== b.effect &&
-          a.concurrency?.group.toLowerCase() === b.concurrency?.group.toLowerCase(),
+          // Two jobs without a job-level group share no lock (#325).
+          a.concurrency !== undefined &&
+          b.concurrency !== undefined &&
+          a.concurrency.group.toLowerCase() === b.concurrency.group.toLowerCase(),
       ),
     );
     const bypass = jobs.some(
@@ -186,6 +212,7 @@ export function senseHarnessCoherence(opts: HarnessCoherenceOptions): SensorRead
         ? jobLocks
         : declaration.group.length > 0 &&
           declaration.cancelInProgress === !(serialize || effectful) &&
+          (declaration.cancelInProgress !== true || supersedingGroupScoped(declaration.group)) &&
           (!effectful || declaration.cancelInProgress === false));
     if (valid) continue;
     concurrencySemanticIssues += 1;
