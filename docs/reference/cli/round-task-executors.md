@@ -635,15 +635,14 @@ sandbox_workspace_write.network_access=false`;
   exact marker bytes is at its path (ADR-AUT-0005). Re-running `init apply harness` on an
   adopted repository adds the marker and keeps a valid one; it refuses an invalid one with
   `INIT_STATE_ROOT_MARKER_INVALID`.
-- **Create-only records and locks publish without replacement.** A create-only record, the
-  activation lock and the worktree registry lock are written to a staged, fsynced file that is
+- **Create-only records and locks publish without replacement.** A create-only record, a fresh
+  resource lock, the activation lock and the worktree registry lock are written to a staged, fsynced file that is
   hard-linked into place, so the name appears only with its complete bytes and an existing one
   is never replaced: of two concurrent writers exactly one succeeds (ADR-AUT-0005). A crash
   between the link and the staged unlink leaves the complete record and a hidden
   `.<name>.<pid>-<uuid>.publish-staged` link, which no reader lists and which is safe to remove.
   A failure after the link refuses with `DURABLE_PUBLICATION_INDETERMINATE`: the record holds
   the writer's bytes but is not reported as created, and a lock holder removes its own lock.
-  Resource locks adopt the same publication in a follow-up.
 - **Worktree registry updates are serialized across processes.** Every change to
   `.devai/state/worktrees.json` runs under `.devai/state/worktrees.lock`, so concurrent rounds
   never exceed the worktree cap or drop an entry. A second writer waits up to 30 seconds, then
