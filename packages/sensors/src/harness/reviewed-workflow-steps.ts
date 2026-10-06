@@ -348,12 +348,84 @@ export const REVIEWED_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = Object.f
         sha256: 'ee9966baddcb44969e6247668733f418db68b193f699945b67b6943dd2966f81',
       },
       {
+        path: 'docs/site/scripts/sync-docs.mjs',
+        sha256: '6f5d024f7ada2c166f0fa14642a2bbeb45b6ba7fa068b03165f0fe2dcf342360',
+      },
+      {
         path: 'package.json',
         sha256: '510a7038ad37b080fc214fa45c773cac502b137ddca2de5c66092da85d84ddd3',
       },
       {
+        path: 'packages/authority/package.json',
+        sha256: '18a1316615ca97e9e23d636901d5241d184764b42b8ce9ea98ebeaf41972ea3f',
+      },
+      {
+        path: 'packages/cli/package.json',
+        sha256: 'e51a2debbc2dbb83f05fc2151166b8cacd3d40992a6e5208c63b72498ee7dc91',
+      },
+      {
+        path: 'packages/cli/scripts/assemble-package.mjs',
+        sha256: 'b7ccff5df58df6f47fa38c2d903870e2202464c3512439b3b1218272abe5dcc1',
+      },
+      {
+        path: 'packages/effects-check/package.json',
+        sha256: '8023fe1c7d76acf954f7e3a72ea488f6414ea33738a5f37d1c9e721de235dd6f',
+      },
+      {
+        path: 'packages/evidence/package.json',
+        sha256: 'ba2f37fd27b2d60449b56f6067991106314db0ef4303cc7c6456c0bae042461a',
+      },
+      {
+        path: 'packages/loop/package.json',
+        sha256: 'a8243353d485251e1d484f22a3e901886ddf0997108e112b277146db5811850e',
+      },
+      {
+        path: 'packages/schemas/package.json',
+        sha256: '5293fc1ed7186095cb27b3808e266d80225abacdf1148c69946f1b0d12aa5087',
+      },
+      {
+        path: 'packages/schemas/scripts/copy-law.mjs',
+        sha256: 'a5e6cc4332f91d67026fa554c610372c1bfb2e5ce20b4e8673578f1537f0f6f3',
+      },
+      {
+        path: 'packages/sensors/package.json',
+        sha256: 'd36408de144faceac5d6c26ac8c453a438c7e6b97474287b00755d4c54e84048',
+      },
+      {
+        path: 'packages/sensors/scripts/copy-law.mjs',
+        sha256: 'edea57fb8021f6225fd9120b2e35d4404d23f338b585d50e9f20ed4dca124370',
+      },
+      {
+        path: 'packages/skills/package.json',
+        sha256: 'f355134f6574e0b4791f968a9085e72a20a62e6b31cc2d36b8371fd87e87c277',
+      },
+      {
+        path: 'packages/skills/scripts/copy-constitution.mjs',
+        sha256: '63d4dcaee5b8c9e1ca70f187c43af8f875d8a91bb358855e4797dbbdf97fb1bc',
+      },
+      {
+        path: 'packages/skills/scripts/copy-policy.mjs',
+        sha256: 'e9bf0e8593584e7b87ee31f30c4435a9bd644c699bc6cde779a2327829b15a17',
+      },
+      {
+        path: 'packages/spec/package.json',
+        sha256: '31f8d7bffc6dc8dd4184ec7133fcfeeffc7eabc099f7af02831bb01c04729282',
+      },
+      {
+        path: 'packages/utils/package.json',
+        sha256: '80ee9be4c10802f8eb42895f04475d41298247f6a37790eee87dbd1eb3db51bd',
+      },
+      {
         path: 'scripts/check-formatting.mjs',
         sha256: 'a9cae7b794ba08de3a795ae376018d7424d9984e5fb7678b0430f3061be79e55',
+      },
+      {
+        path: 'scripts/check-mutation-free-delivery.mjs',
+        sha256: '55ef4b0c1558e6b8dbce75e60a8731d52dc4d32703f6607e2f45e05e49cef920',
+      },
+      {
+        path: 'scripts/check-policy-materialization.mjs',
+        sha256: 'e906aff0ebdf1bbb6c2a8ded2f6a7481f70d7d1f5fd3c8554d95179d865e3832',
       },
       {
         path: 'scripts/check-publishable-closure.mjs',
@@ -362,6 +434,22 @@ export const REVIEWED_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = Object.f
       {
         path: 'scripts/check-release-static-integrity.mjs',
         sha256: 'd65d1622dbf56c590702b4cd152ac5b6a8f7082ac48bad6a9b265133c2562ead',
+      },
+      {
+        path: 'scripts/check-test-task-workspace-selectors.mjs',
+        sha256: '1088a5f6ed6b7e6734f3717f8297743da23daec4e88f18d3cb1fb4cb7f0e7151',
+      },
+      {
+        path: 'scripts/generate-action-registry.mjs',
+        sha256: '6c6ff06564fa19539adec3c750351b78e4f3383e102dca60799ec87af78a82ea',
+      },
+      {
+        path: 'scripts/generate-error-code-reference.mjs',
+        sha256: '2234ce94a9309e497b0c006429ff42da8f4de65e50d539e016c9865dbf528dd5',
+      },
+      {
+        path: 'scripts/generate-scorecard-page.mjs',
+        sha256: 'd558520cc9a8883d069205a3069777c075d93c1a2a8602de10267913ed243e40',
       },
     ],
   },
@@ -639,6 +727,10 @@ export const REVIEWED_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = Object.f
       {
         path: 'docs/site/scripts/check-image-size-patch.mjs',
         sha256: 'ee9966baddcb44969e6247668733f418db68b193f699945b67b6943dd2966f81',
+      },
+      {
+        path: 'docs/site/scripts/sync-docs.mjs',
+        sha256: '6f5d024f7ada2c166f0fa14642a2bbeb45b6ba7fa068b03165f0fe2dcf342360',
       },
       {
         path: 'scripts/process/verify-pages-bytes.mjs',
