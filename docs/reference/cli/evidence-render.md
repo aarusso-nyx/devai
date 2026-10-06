@@ -1,11 +1,10 @@
 # `evidence render` and the rounds index
 
 `devai evidence render` projects one evidence view from canonical records. It is read-only unless
-`--out` is given together with `--write`; it never edits the records it reads. `--out` is confined to
-the domains the action declares (`fs:f5-state` under `.devai/state`, `fs:proofs` under
-`record/proofs`) and is written through the guarded host filesystem; any other target, including a
-path outside the repository, is refused with `EVIDENCE_RENDER_OUT_OUTSIDE_SCOPE` and nothing is
-written. This page is the
+`--out` is given together with `--write`; it never edits the records it reads. `--out` is confined to the projection directory `.devai/state/render/` and is written through the
+guarded host filesystem; any other target, including a proof record, the committed index, a path
+outside the repository, or a path that a symlink redirects out of the directory, is refused with
+`EVIDENCE_RENDER_OUT_OUTSIDE_SCOPE` and nothing is written. This page is the
 reference for the `rounds` kind, which renders the canonical rounds index at
 `record/derived/indexes/rounds.md`, and for the exact-membership rule that `round seal` applies
 against that index. The governing record is
@@ -158,7 +157,7 @@ makes it pass.
 
 Regeneration is the explicit path: render with `--out .devai/state/render/rounds.md --write`, then
 copy the file over `record/derived/indexes/rounds.md` in a reviewed commit. The action cannot write
-the committed index in place because `record/derived` is outside its declared write scope. The
+the committed index in place because only `.devai/state/render/` is a permitted target. The
 check never repairs the file it checks.
 
 ## Freshness
