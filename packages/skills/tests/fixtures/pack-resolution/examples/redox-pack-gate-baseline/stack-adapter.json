@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "redox-pack-gate-baseline",
+  "name": "Gate fixture, baseline signal",
+  "version": "1.0.0",
+  "stack": { "backend": "fixture", "frontend": "fixture", "db": "fixture" },
+  "detect": {
+    "signals": [{ "kind": "file_present", "path": "fixture-stack.txt" }],
+    "priority": 90
+  }
+}

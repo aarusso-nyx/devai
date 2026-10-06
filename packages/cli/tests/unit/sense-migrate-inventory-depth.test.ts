@@ -511,6 +511,10 @@ describe('sense inventory direct contract', () => {
       ['--slice <name>', 'Required slice: all | review'],
       ['--repo-root <path>', 'Repository root (default: .)'],
       ['--adopter-root <path>', 'Adopter root for stack pack resolution'],
+      [
+        '--packs-root <path>',
+        'Pack registry root holding examples/redox-pack-* (default: repo root)',
+      ],
       ['--database-url <url>', 'Optional read-only database introspection URL'],
       ['--database-schema <name>', 'Optional database schema filter'],
       ['--coverage <path>', 'Coverage JSON path'],

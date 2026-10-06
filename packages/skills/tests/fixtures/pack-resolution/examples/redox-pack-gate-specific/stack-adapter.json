@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "redox-pack-gate-specific",
+  "name": "Gate fixture, specific signals",
+  "version": "1.0.0",
+  "stack": { "backend": "fixture", "frontend": "fixture", "db": "fixture" },
+  "detect": {
+    "signals": [
+      { "kind": "file_present", "path": "fixture-stack.txt" },
+      { "kind": "dir_present", "path": "src" }
+    ],
+    "priority": 10
+  }
+}

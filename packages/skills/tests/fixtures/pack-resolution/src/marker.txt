@@ -1,0 +1,1 @@
+Directory marker for the pack-resolution gate fixture (INV-HARNESS-010).
