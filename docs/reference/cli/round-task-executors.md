@@ -114,6 +114,24 @@ A denied task returns to `ready` with its priority raised by one and reports
 `TASK_RESOURCE_LOCK_DENIED_REPEATED`. The runner renews a task's locks while its executor runs, and
 a lock displaced during execution fails the attempt with `TASK_RESOURCE_LOCK_LOST`.
 
+A dispatch that leaves its task waiting outside any dispatch (`merging`, `awaiting_human_review`,
+`pre_merge`, `checkpoint` or `experimental_blocked`) renews its locks once more with a seven-day
+waiting lease instead of the one-hour dispatch TTL, because nothing renews a waiting task. The
+lease stays bounded, so an abandoned task does not hold its modules forever. Exact ownership is
+proven before every completion. `task finish` refuses with `TASK_RESOURCE_LOCK_LOST` before it
+writes anything when a key the task declares is missing or held by another task, and `round ratify
+--decision accept` refuses the same way. The completion itself (`completeTask`) checks again,
+renewing in place any record with less than five minutes left, so no takeover can land between
+the check and the release. A record that outlived its lease without anyone taking it still counts
+as held.
+
+When a routine's process group cannot be confirmed gone (`PROCESS_GROUP_TERMINATION_UNCONFIRMED`),
+the task is escalated but its locks are kept. The runner first writes
+`.devai/state/lock-quarantine/<task id>.json` durably, naming the process group leader's pid, the
+evidence id and the held keys. While that record stands, nothing releases the task's locks, not
+the escalation and not a later run's reconciliation. They lapse by their TTL. Removing the
+record, once the group is known to be gone, is the explicit human release.
+
 One `round run` controls a round at a time. A second run of the same round refuses with
 `TASK_ROUND_CONTROLLER_BUSY` while the controller in `.devai/state/round-runs/<round>/controller.json`
 is alive or ran on another host. A controller left by a dead process on the same host is reclaimed;
@@ -131,7 +149,10 @@ no process there is still at work. A lock lost during execution fails the attemp
 the task instead of letting it merge. Each dispatch attempt is fenced, durably, under
 `.devai/state/lock-fences/`, so every run first reconciles the attempts a stopped runner left
 unjudged and reports a lost lock among them under `reconciled`; a fence nobody can read refuses
-the run with `TASK_LOCK_FENCE_INVALID`, naming the file to repair. Every run also applies the priority
+the run with `TASK_LOCK_FENCE_INVALID`, naming the file to repair. Release receipts are fsynced
+with their directory entry, so a power loss cannot turn a clean release into a lost one. A run
+also removes the receipts that no standing fence names, which a stop between retiring a fence and
+its receipts leaves behind. Every run also applies the priority
 bump a re-queue still owes; an all-ready run re-queues tasks an interrupted denial left in
 `lock_denied`. A corrupt `lock-denials.json` refuses with `TASK_LOCK_DENIAL_STATE_INVALID`: repair
 the entry, or remove the file to reset every count.
@@ -154,7 +175,8 @@ overrun sends SIGTERM to the group and, after a grace period, SIGKILL to every m
 alive, descendants included; it fails the task with `TASK_ROUTINE_TIMED_OUT` even when the
 routine traps the signal and exits 0. If the group, or a process holding its output, is still
 there 5 s after SIGKILL, the termination is never reported as done: the task fails with
-`PROCESS_GROUP_TERMINATION_UNCONFIRMED` instead, because the routine may still be running.
+`PROCESS_GROUP_TERMINATION_UNCONFIRMED` instead, because the routine may still be running, and
+its resource locks stay quarantined (see Resources and isolation).
 Database and worktree identities
 are per task (`devai_task_<task id>`, `WT-<task id>`), so two distinct tasks never contend for
 them. There is no cross-round controller and no reviewer reserve yet; the policy records both.
