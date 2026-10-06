@@ -392,6 +392,11 @@ This order holds in every checkout, for three reasons:
   hooks directory, so a hook alone never makes a clone bound.
 - To issue merge receipts from another checkout, run the post-merge bind there. It writes that
   checkout's own attestation and leaves the tracked declaration unchanged.
+- Local state without the declaration is still a binding: doctor verifies it and refuses it as
+  `POST_MERGE_ADAPTER_BINDING_MISSING`, or warns `POST_MERGE_ADAPTER_BINDING_STALE` while another
+  adapter is selected. `round close --post-merge-receipt` accepts a receipt only while the
+  declaration is present and canonical, and `init upgrade` restores the declaration of a binding
+  whose post-merge adapter is still the selected identity.
 
 Do not bind GitHub Actions last to make it the selected identity. That bind re-materializes the
 authority policy after the post-merge attestation pinned it, so the post-merge adapter's merge
@@ -406,7 +411,8 @@ Releases before 2.0.1 committed the checkout-bound attestation itself as
 `.devai/config/post-merge-host-adapter.json`. `doctor` reports such a file as
 `POST_MERGE_ADAPTER_DECLARATION_LEGACY`, a failure while the post-merge adapter is selected, and
 `devai init upgrade --target . --as-role architect --write` converts it
-(`MIG-2.0.1-post-merge-local-state`). Run in the checkout that holds the binding's key, the
+(`MIG-2.0.1-post-merge-local-state`; the plan and the upgrade receipt list it as soon as the
+installed package applies it, even before 2.0.1 is released). Run in the checkout that holds the binding's key, the
 upgrade moves the attestation into that checkout's git directory, keeping its `installed_at_head`
 baseline while it still verifies; in any other checkout it only rewrites the tracked file as the
 declaration and binds nothing. Commit the declaration.
