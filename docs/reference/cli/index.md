@@ -286,8 +286,9 @@ other. Preview or inspect whenever the leaf offers `--dry-run`, plan output, sta
   ([ADR-GOV-0019](../../../law/adr/ADR-GOV-0019-backlog-action-family.md)). Its four stable
   leaves are the registry projection with `W = backlog`: `add`, `list`, `show`, and `resolve`.
 - **Prerequisites, tools, inputs, and defaults:** `--repo-root` defaults to the current directory.
-  `add` needs `--kind`, `--title`, and `--body`; `--class` and `--role` are optional, and the role
-  defaults to the declared invocation role. `list` shows open items unless `--status` selects
+  `add` needs `--kind`, `--title`, and `--body`; `--class` and `--role` are optional. The stored
+  origin role is always the admitted invocation role; `--role` only asserts it, and a different
+  value is refused with `BACKLOG_ROLE_MISMATCH` before anything is written. `list` shows open items unless `--status` selects
   `resolved` or `all`. `show` takes one `BL-NNNN` identifier. `resolve` takes one identifier and a
   required `--resolution` reference. Round attribution happens only through an explicit `--round`
   and is never inferred from the session, the branch, or the active round.
@@ -296,7 +297,10 @@ other. Preview or inspect whenever the leaf offers `--dry-run`, plan output, sta
   invalid input is a typed error, never an empty result.
 - **Effect, consent, and cost:** `add` and `resolve` are declared `local-write`: any of the five
   roles may initiate them with `--write`, and they write only the backlog directory and the shared
-  counters file. `list` and `show` are declared `read`. No leaf reaches the network or publishes.
+  counters file, with one declared addition: `add --round` on a round whose Owner activation is live
+  also appends one `backlog_item_projected` event to `.devai/state/tracking/<round>/events.jsonl`.
+  That projection is idempotent: repeating the same `add` after a failed append reuses the saved item
+  and completes the missing event instead of allocating a second item. `list` and `show` are declared `read`. No leaf reaches the network or publishes.
   Domain-level cost is N/A; every leaf is a bounded local operation.
 - **Use / do not use:** use to keep findings and propositions in the repository. Do not use a
   backlog item as a round gap, and resolving an item never pauses, resolves, or alters a gap.
