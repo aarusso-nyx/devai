@@ -8,26 +8,45 @@ import {
 import type { JsonRecord } from './broker-values.js';
 
 /**
- * Wraps the apply step of an identity-bound removal that is not bound to a publication (#317).
- * Node has no directory-relative rename, so the effect renames by path. The parent's realpath
- * is captured when the removal is authorized; at effect time the parent is opened without
- * following a final link and pinned, and immediately before and after the effect its realpath
- * must still be the admitted one and its identity the pinned one. Otherwise the removal refuses
- * with AUTHORITY_REMOVE_PARENT_ESCAPED: before the effect nothing has run; after it, the entry
- * renamed outside was either put back (any other identity) or was the caller's own identity.
- * The residual is a swap and swap-back of an ancestor inside the effect itself, between the two
- * checks.
+ * The physical parent directory of the canonical target the broker authorized: the
+ * repository's realpath joined with the target's parent, or the real Git metadata directory
+ * for a `.git/devai` or `.git/hooks` logical path.
  */
-export function removalWithPinnedParent(requested: unknown, apply: () => unknown): () => unknown {
+function authorizedCanonicalParent(root: string, canonicalPath: string): string {
+  const physical =
+    canonicalPath === '.git/devai' ||
+    canonicalPath.startsWith('.git/devai/') ||
+    canonicalPath === '.git/hooks' ||
+    canonicalPath.startsWith('.git/hooks/')
+      ? physicalCanonicalPath(root, canonicalPath)
+      : join(realpathSync(root), canonicalPath);
+  return dirname(physical);
+}
+
+/**
+ * Wraps the apply step of an identity-bound removal (#317). Node has no directory-relative
+ * rename, so the effect renames by path. At effect time the requested path's parent is opened
+ * without following a final link and pinned; immediately before the effect, and after it on
+ * success and on failure alike, that parent's realpath must be the parent of the canonical
+ * target the broker authorized and its identity the pinned one. Otherwise the removal refuses
+ * with AUTHORITY_REMOVE_PARENT_ESCAPED (with any failure of the effect as its cause): a missing
+ * parent refuses too, since the authorized parent existed. The residual is an ancestor swapped
+ * and swapped back inside the effect, between the two checks.
+ */
+export function removalWithPinnedParent(
+  root: string,
+  canonicalPath: string,
+  requested: unknown,
+  apply: () => unknown,
+): () => unknown {
   if (typeof requested !== 'string') throw new Error('AUTHORITY_FS_TARGET_INVALID');
   const parent = dirname(resolve(requested));
-  const admitted = existingRealpath(parent);
+  const authorizedParent = authorizedCanonicalParent(root, canonicalPath);
   return () => {
     let descriptor: number;
     try {
       descriptor = openReadOnlyNoFollowSync(parent, true);
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return 'absent';
       throw new Error('AUTHORITY_REMOVE_PARENT_ESCAPED', { cause: error });
     }
     try {
@@ -36,7 +55,7 @@ export function removalWithPinnedParent(requested: unknown, apply: () => unknown
         try {
           const current = statSync(parent, { bigint: true });
           return (
-            realpathSync(parent) === admitted &&
+            realpathSync(parent) === authorizedParent &&
             current.dev === pinned.dev &&
             current.ino === pinned.ino &&
             current.birthtimeNs === pinned.birthtimeNs
@@ -46,9 +65,23 @@ export function removalWithPinnedParent(requested: unknown, apply: () => unknown
         }
       };
       if (!bound()) throw new Error('AUTHORITY_REMOVE_PARENT_ESCAPED');
-      const result = apply();
-      if (!bound()) throw new Error('AUTHORITY_REMOVE_PARENT_ESCAPED');
-      return result;
+      // The post-effect check runs whether the effect returned or threw.
+      let outcome:
+        | { readonly ok: true; readonly value: unknown }
+        | { readonly ok: false; readonly error: unknown };
+      try {
+        outcome = { ok: true, value: apply() };
+      } catch (error) {
+        outcome = { ok: false, error };
+      }
+      if (!bound()) {
+        throw new Error(
+          'AUTHORITY_REMOVE_PARENT_ESCAPED',
+          outcome.ok ? {} : { cause: outcome.error },
+        );
+      }
+      if (!outcome.ok) throw outcome.error;
+      return outcome.value;
     } finally {
       closeReadOnlySync(descriptor);
     }
