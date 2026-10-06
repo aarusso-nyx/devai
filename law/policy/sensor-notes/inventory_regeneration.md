@@ -51,10 +51,13 @@ The bounded state bodies for the two required framework kinds are:
 
 These join `.devai/state/inventory/inventory.json` as machine outputs of the
 registered observation/rebuild path. `sense run inventory_regeneration` regenerates all
-of them for a clean HEAD commit, validates each against its schema, and publishes the
-set together by atomic replacement only when every body is valid; a failure before
-publication writes nothing, and a dirty working tree or missing candidate commit reads
-UNKNOWN. Existing direct sensor defaults under
+of them for a clean HEAD commit and validates each against its schema. The changed bodies
+are staged together as durable temporary files, and nothing is published unless every
+body is valid and staged; a failure before the first rename writes nothing. Publication
+then replaces the bodies one at a time, each by an atomic rename followed by a directory
+sync, so the set as a whole is not atomic: a crash between renames can leave bodies from
+two generations, and the next regeneration at the same HEAD replaces them. A dirty working
+tree or missing candidate commit reads UNKNOWN. Existing direct sensor defaults under
 `record/proofs/sensors/<kind>/` stay distinct and are not silently relocated.
 Read-only sweep adapters retain `persistBody: false`.
 
