@@ -132,9 +132,27 @@ async function dispatchRoutine(
     },
   });
   const completedAt = new Date().toISOString();
+  const id = evidenceId(running, startedAt, completedAt);
+  if (terminationUnconfirmed) {
+    // The group may still be running and using the task's resources. Record that durably
+    // before any fallible work (candidate resolution, evidence): whatever fails after this,
+    // no escalation or reconciliation can release the task's locks. They stay held until
+    // their TTL lapses, or a human removes the quarantine record.
+    quarantineLocks({
+      locksDir: join(repoRoot, '.devai/state/locks'),
+      quarantine: {
+        task_id: running.id,
+        round_id: running.round_id,
+        reason: 'PROCESS_GROUP_TERMINATION_UNCONFIRMED',
+        pid: livePid ?? null,
+        evidence_id: id,
+        targets: taskLockTargets(running),
+        recorded_at: completedAt,
+      },
+    });
+  }
   const candidate = candidateSha(executionRoot);
   const tree = candidateTree(executionRoot);
-  const id = evidenceId(running, startedAt, completedAt);
   // An unconfirmed termination outranks the timeout that caused it: the routine may still run.
   const processFailure = terminationUnconfirmed
     ? {
@@ -228,23 +246,7 @@ async function dispatchRoutine(
     saveTask(repoRoot, { ...running, status: 'pre_merge' });
     saveTask(repoRoot, { ...running, status: 'merging' });
   } else {
-    if (terminationUnconfirmed) {
-      // The group may still be running and using the task's resources: record the
-      // condition durably before the escalation, which then releases none of the locks.
-      // They stay held until their TTL lapses, or a human removes the quarantine record.
-      quarantineLocks({
-        locksDir: join(repoRoot, '.devai/state/locks'),
-        quarantine: {
-          task_id: running.id,
-          round_id: running.round_id,
-          reason: 'PROCESS_GROUP_TERMINATION_UNCONFIRMED',
-          pid: livePid ?? null,
-          evidence_id: id,
-          targets: taskLockTargets(running),
-          recorded_at: new Date().toISOString(),
-        },
-      });
-    }
+    // A quarantined task's escalation releases none of its locks.
     escalateTask({ repoRoot, taskId: running.id });
   }
   return { ok: succeeded, evidence_id: id, ...(!succeeded && { code: evidence.failure?.code }) };
