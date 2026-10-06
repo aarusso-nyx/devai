@@ -149,6 +149,7 @@ describe('campaign agent materialization (IA-004)', () => {
       effort: 'high',
       selection: { mode: 'exact', registry_id: 'claude-cli' },
       recipe_name: 'devai-fix',
+      instructions_ref: `${DIRECTORY}/prompts/TASK-8013.md`,
       prompt_composition_id: 'PC-aaaaaaaaaaaa8013',
       max_iterations: 4,
       capabilities: [],

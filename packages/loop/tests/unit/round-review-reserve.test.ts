@@ -144,8 +144,57 @@ describe('review reserve admission (IA-001, IA-002)', () => {
     expect(decide(tasks, 'TASK-0811', ['TASK-0810'], 2).admitted).toBe(true);
   });
 
+  it('holds nothing for a review task blocked by a resource conflict', () => {
+    // The waiting review task shares MOD-a with the running implementation task.
+    const tasks = [
+      task('TASK-0813', 'MOD-a'),
+      task('TASK-0814', 'MOD-b'),
+      task('TASK-0815', 'MOD-a', 'inspector'),
+    ];
+    expect(decide(tasks, 'TASK-0814', ['TASK-0813'], 2).admitted).toBe(true);
+  });
+
   it('leaves the serial runner unreserved', () => {
     expect(decide(population, 'TASK-0801', [], 1).admitted).toBe(true);
+  });
+});
+
+describe('keyless agent task serialization', () => {
+  const agent = (id: string, modules: readonly string[]): TaskRecord =>
+    task(id, 'MOD-unused', 'engineer', {
+      target_modules: [...modules],
+      executor: {
+        kind: 'agent',
+        runtime: 'claude-cli',
+        model: 'sonnet',
+        effort: 'high',
+        selection: { mode: 'exact', registry_id: 'claude-cli' },
+        recipe_name: 'devai-fix',
+        prompt_composition_id: 'PC-0000000000000000',
+        max_iterations: 4,
+        capabilities: [],
+      },
+    });
+
+  it('never runs a keyless agent task beside another agent task', () => {
+    const tasks = [agent('TASK-0831', []), agent('TASK-0832', []), agent('TASK-0833', ['MOD-c'])];
+    expect(decide(tasks, 'TASK-0832', ['TASK-0831'], 3).blockers).toEqual([
+      'TASK_RESOURCE_CONFLICT',
+    ]);
+    expect(decide(tasks, 'TASK-0833', ['TASK-0831'], 3).blockers).toEqual([
+      'TASK_RESOURCE_CONFLICT',
+    ]);
+  });
+
+  it('still overlaps keyed agent tasks and non-agent work', () => {
+    const tasks = [
+      agent('TASK-0834', ['MOD-a']),
+      agent('TASK-0835', ['MOD-b']),
+      task('TASK-0836', 'MOD-c'),
+      agent('TASK-0837', []),
+    ];
+    expect(decide(tasks, 'TASK-0835', ['TASK-0834'], 3).admitted).toBe(true);
+    expect(decide(tasks, 'TASK-0837', ['TASK-0836'], 3).admitted).toBe(true);
   });
 });
 
