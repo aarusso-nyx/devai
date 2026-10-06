@@ -19,6 +19,11 @@ import { getValidator } from '@devai-nyx/schemas';
 import type { CAC } from '../../node_modules/cac/dist/index.d.ts';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { processIsReadOnlyForTest } from '../../../skills/tests/unit/authority-host-test-scope.js';
+import {
+  clearResolvedInvocationAuthority,
+  rememberResolvedInvocationAuthority,
+} from '../../src/authority/invocation-authority.js';
+import type { HumanRole } from '../../src/authority/authority-results.js';
 import { ACTION_REGISTRY } from '../../src/generated/action-registry.js';
 
 const { cac } = createRequire(import.meta.url)('../../node_modules/cac/index-compat.js') as {
@@ -149,6 +154,7 @@ async function invoke(
   definitions: readonly FacadeDefinition[],
   root: string,
   argv: readonly string[],
+  role: HumanRole = 'engineer',
 ): Promise<{ exit: number; stdout: string; stderr: string; observation: Observation }> {
   const cli = cac('devai-backlog-actions');
   for (const definition of definitions) definition.register(cli);
@@ -178,6 +184,7 @@ async function invoke(
       process.exitCode = typeof code === 'number' ? code : 0;
       throw new Error(`TEST_PROCESS_EXIT:${String(process.exitCode)}`);
     }) as typeof process.exit;
+    rememberResolvedInvocationAuthority(role, 'cli-flag', []);
     cli.parse(process.argv, { run: false });
     try {
       await runWithAuthorityHostEffects(scope, () => cli.runMatchedCommand());
@@ -202,6 +209,7 @@ async function invoke(
     process.exitCode = previous.exitCode;
     process.stdout.write = previous.stdout;
     process.stderr.write = previous.stderr;
+    clearResolvedInvocationAuthority();
     (scope.receipt_store as { dispose(): void }).dispose();
   }
 }
@@ -324,7 +332,7 @@ describe('backlog actions with the network boundary denied', () => {
         '--body',
         `${title} body`,
         '--role',
-        'architect',
+        'engineer',
       ]);
     expect((await add('First note')).exit).toBe(0);
     expect((await add('Second note')).exit).toBe(0);
@@ -359,7 +367,7 @@ describe('backlog actions with the network boundary denied', () => {
       '--body',
       'Observed twice in shard 06; passes in isolation.',
       '--role',
-      'inspector',
+      'engineer',
     ]);
     expect(added.exit, added.stderr).toBe(0);
 
@@ -382,6 +390,53 @@ describe('backlog actions with the network boundary denied', () => {
     const all = await invoke(backlogCommands, root, ['backlog-list', '--status', 'all']);
     expect((JSON.parse(all.stdout) as { items: Array<{ id: string }> }).items).toHaveLength(1);
     expect(fetchCalls).toEqual([]);
+  });
+
+  it('stores the admitted invocation role as the origin role', async () => {
+    const { backlogCommands } = await facades();
+    const { root } = repository();
+    const base = ['backlog-add', '--kind', 'note', '--title', 'Role origin', '--body', 'body'];
+
+    const derived = await invoke(backlogCommands, root, base, 'auditor');
+    expect(derived.exit, derived.stderr).toBe(0);
+    expect(JSON.parse(derived.stdout)).toMatchObject({
+      id: 'BL-0001',
+      origin: { role: 'auditor' },
+    });
+
+    const asserted = await invoke(backlogCommands, root, [...base, '--role', 'auditor'], 'auditor');
+    expect(asserted.exit, asserted.stderr).toBe(0);
+    expect(JSON.parse(asserted.stdout)).toMatchObject({ origin: { role: 'auditor' } });
+  });
+
+  it('refuses a --role that differs from the admitted invocation role without writing', async () => {
+    const { backlogCommands } = await facades();
+    const { root } = repository();
+
+    const result = await invoke(
+      backlogCommands,
+      root,
+      [
+        'backlog-add',
+        '--kind',
+        'note',
+        '--title',
+        'Role forgery',
+        '--body',
+        'body',
+        '--role',
+        'owner',
+      ],
+      'auditor',
+    );
+
+    expect(result.exit).not.toBe(0);
+    expect(JSON.parse(result.stderr)).toMatchObject({ code: 'BACKLOG_ROLE_MISMATCH' });
+    expect(result.stdout).toBe('');
+    expect(
+      result.observation.writes.filter((path) => path.startsWith('.devai/state/')),
+      'a refused role must not consume an id or write an item',
+    ).toEqual([]);
   });
 
   it('refuses unknown ids and missing input without writing', async () => {

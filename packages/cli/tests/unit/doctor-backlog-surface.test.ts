@@ -12,6 +12,10 @@ import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { CAC } from 'cac';
 import { afterAll, describe, expect, it } from 'vitest';
+import {
+  clearResolvedInvocationAuthority,
+  rememberResolvedInvocationAuthority,
+} from '../../src/authority/invocation-authority.js';
 import { withAuthorityHostTestScope } from '../../../skills/tests/unit/authority-host-test-scope.js';
 import { runWithAuthorityPolicyMaterialization } from '../../src/authority/command-capabilities.js';
 import { doctor } from '../../src/commands/doctor.js';
@@ -89,6 +93,7 @@ async function invoke(
       process.exitCode = typeof code === 'number' ? code : 0;
       throw new Error(`TEST_PROCESS_EXIT:${String(process.exitCode)}`);
     }) as typeof process.exit;
+    rememberResolvedInvocationAuthority('engineer', 'cli-flag', []);
     cli.parse(process.argv, { run: false });
     try {
       await withAuthorityHostTestScope(() =>
@@ -112,6 +117,7 @@ async function invoke(
     process.exitCode = previous.exitCode;
     process.stdout.write = previous.stdout;
     process.stderr.write = previous.stderr;
+    clearResolvedInvocationAuthority();
   }
 }
 
@@ -240,7 +246,7 @@ describe('doctor backlog surface across sessions', () => {
       '--body',
       'A later session must not overwrite a committed item.',
       '--role',
-      'inspector',
+      'engineer',
     ]);
     expect(added.exit, added.stderr).toBe(0);
     expect((JSON.parse(added.stdout) as { id: string }).id).toBe('BL-0003');

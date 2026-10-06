@@ -3,7 +3,7 @@ import { spawnSync } from '@devai-nyx/authority';
 import { EXIT_USAGE } from '@devai-nyx/utils';
 import {
   addBacklogItem,
-  GovernanceTrackingError,
+  findUnprojectedBacklogItem,
   listBacklogItems,
   projectBacklogItem,
   resolveBacklogItem,
@@ -20,7 +20,10 @@ import { directCliChainId } from '../round/tracking-session.js';
  * Repository backlog actions (ADR-GOV-0019). Every action is local: add and
  * resolve write only under `.devai/state/backlog/` and the shared counters
  * file, list and show only read, and none of them reaches the network. A
- * round is attributed only through an explicit `--round`.
+ * round is attributed only through an explicit `--round`; when that round's
+ * Owner activation is live, `add` additionally appends one
+ * `backlog_item_projected` event to `.devai/state/tracking/<round>/events.jsonl`,
+ * the only write outside the backlog directory and the counters file.
  */
 
 const KINDS: readonly BacklogKind[] = ['finding', 'proposition', 'note', 'flaky-test'];
@@ -138,7 +141,10 @@ export const backlogAdd = defineCommand({
       .option('--body <text>', 'Item body')
       .option('--class <class>', 'Change class when the item concerns a path')
       .option('--round <round_id>', 'Explicit round attribution; never inferred')
-      .option('--role <role>', 'Originating role (default: the declared invocation role)')
+      .option(
+        '--role <role>',
+        'Assert the originating role; it must equal the declared invocation role',
+      )
       .action((options: AddOptions) => {
         try {
           const kind = oneOf(single(options.kind), KINDS, 'BACKLOG_KIND_INVALID');
@@ -152,11 +158,16 @@ export const backlogAdd = defineCommand({
           if (round !== undefined && !ROUND_PATTERN.test(round)) {
             throw new BacklogUsageError('BACKLOG_ROUND_INVALID');
           }
-          const role =
-            oneOf(single(options.role), ROLES, 'BACKLOG_ROLE_INVALID') ?? declaredInvocationRole();
+          // The stored origin is the admitted invocation authority. `--role` can
+          // only assert it: a different value is refused, never recorded.
+          const asserted = oneOf(single(options.role), ROLES, 'BACKLOG_ROLE_INVALID');
+          const role = declaredInvocationRole();
           if (role === undefined) throw new BacklogUsageError('BACKLOG_ROLE_REQUIRED');
+          if (asserted !== undefined && asserted !== role) {
+            throw new BacklogUsageError('BACKLOG_ROLE_MISMATCH');
+          }
           const repoRoot = root(options);
-          const item = addBacklogItem({
+          const input = {
             repoRoot,
             kind,
             title,
@@ -172,14 +183,23 @@ export const backlogAdd = defineCommand({
               role,
               commit: headCommit(repoRoot),
             },
-          });
+          };
+          // A retry of an add that saved its item but failed to project it reuses
+          // that item and completes the projection instead of allocating another.
+          const item = findUnprojectedBacklogItem(input) ?? addBacklogItem(input);
           if (item.round_id !== undefined) {
             try {
               projectBacklogItem({ repoRoot, id: item.id });
             } catch (error) {
               // Projection is opt-in through the round's Owner activation. Without
               // one the item stays local; tracking never alters the recorded item.
-              if (!(error instanceof GovernanceTrackingError)) throw error;
+              // Any other failure is reported, and the retry above completes it.
+              if (
+                !(error instanceof Error) ||
+                (error as { code?: unknown }).code !== 'BACKLOG_PROJECTION_NOT_ACTIVATED'
+              ) {
+                throw error;
+              }
             }
           }
           emit(item, options.human === true, `backlog add: ${item.id}`);
