@@ -128,6 +128,26 @@ export interface MeasureTestCoverageDepthOptions {
 }
 
 const STDERR_HEAD_LIMIT = 512;
+const FAILED_FILES_LIMIT = 10;
+// eslint-disable-next-line no-control-regex -- ANSI escape sequences are control characters.
+const ANSI_PATTERN = /\u001b\[[0-9;]*[A-Za-z]/gu;
+const FAILED_TEST_FILE_PATTERN = /^\s*FAIL\s+(?:\|[^|]*\|\s+)?(\S+\.(?:test|spec)\.[cm]?[jt]s)\b/u;
+const FAILED_SUMMARY_FILE_PATTERN =
+  /^\s*[\u276F>]\s+(\S+\.(?:test|spec)\.[cm]?[jt]s)\s+\(\d+ tests?\b.*\b\d+ failed\b/u;
+
+/**
+ * The test files a failed vitest run names, in first-seen order. The producer prints expected
+ * diagnostics from passing tests too, so its stderr head alone can name the wrong cause
+ * (#236); the failing files come from vitest's own FAIL and failed-summary lines.
+ */
+export function failedTestFiles(output: string): readonly string[] {
+  const found = new Set<string>();
+  for (const line of output.replace(ANSI_PATTERN, '').split('\n')) {
+    const match = FAILED_TEST_FILE_PATTERN.exec(line) ?? FAILED_SUMMARY_FILE_PATTERN.exec(line);
+    if (match?.[1] !== undefined) found.add(match[1]);
+  }
+  return [...found];
+}
 
 interface ProducerRun {
   readonly exit_code: number;
@@ -233,13 +253,18 @@ export function measureTestCoverageDepth(opts: MeasureTestCoverageDepthOptions):
     };
     if (result.exit_code !== 0) {
       const head = result.stderr.trim().slice(0, STDERR_HEAD_LIMIT);
+      const failed = failedTestFiles(`${result.stdout}\n${result.stderr}`);
+      const named =
+        failed.length > 0
+          ? ` Failing test files: ${failed.slice(0, FAILED_FILES_LIMIT).join(', ')}${failed.length > FAILED_FILES_LIMIT ? `, and ${String(failed.length - FAILED_FILES_LIMIT)} more` : ''}.`
+          : '';
       return reading(
         'fail',
         [
           {
             severity: 'error',
             code: 'COVERAGE_PRODUCER_FAILED',
-            message: `The ${population} coverage producer \`${LOCAL_COVERAGE_PRODUCER_ARGV.join(' ')}\` exited with code ${String(result.exit_code)}${head.length > 0 ? `: ${head}` : '.'}`,
+            message: `The ${population} coverage producer \`${LOCAL_COVERAGE_PRODUCER_ARGV.join(' ')}\` exited with code ${String(result.exit_code)}.${named}${head.length > 0 ? ` stderr head: ${head}` : ''}`,
           },
         ],
         null,
