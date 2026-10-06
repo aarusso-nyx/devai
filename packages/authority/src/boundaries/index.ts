@@ -26,6 +26,7 @@ const MUTATORS = new Set([
   'mkdtempSync',
   'openSync',
   'publishFileNoReplaceSync',
+  'removeEntryIfIdentitySync',
   'rename',
   'renameSync',
   'rm',
