@@ -88,6 +88,10 @@ export function createSelfContainedRepositoryFixture(
       ['core.fsmonitor', 'false'],
       ['commit.gpgSign', 'false'],
       ['tag.gpgSign', 'false'],
+      // No detached `git maintenance run --auto` after a commit: it outlives the call and
+      // races `cleanup()` with a lock file under the temporary parent.
+      ['maintenance.auto', 'false'],
+      ['gc.auto', '0'],
     ])
       git(['config', name as string, value as string]);
 
