@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Activated before any bridge/SDK import and retained through suite teardown.
@@ -76,7 +76,7 @@ vi.mock('@devai-nyx/authority', async (importOriginal) => ({
   spawnSync: spawnSyncMock,
 }));
 
-const { createModelBridge, extractStructuredReply } =
+const { createModelBridge, extractStructuredReply, replyProjectionIdentity, replySha256 } =
   await import('../../src/model-bridge/index.js');
 const REVIEW = 'review-verdict.schema.json';
 const PASS = {
@@ -111,7 +111,10 @@ const stream = (...events: unknown[]) =>
   events.map((event) => JSON.stringify(event)).join('\n') + '\n';
 const digest = (text: string) => createHash('sha256').update(text, 'utf8').digest('hex');
 
-beforeEach(() => spawnSyncMock.mockReset());
+// A block body: a returned mock would run again as the hook's cleanup.
+beforeEach(() => {
+  spawnSyncMock.mockReset();
+});
 
 async function observe(provider: 'claude-cli' | 'codex-cli', stdout: string) {
   spawnSyncMock.mockReturnValue({ status: 0, stdout, stderr: '', error: undefined });
@@ -514,5 +517,271 @@ describe('CMP-0006 fixture provenance', () => {
     expect(bytes).toBe(events.find((event) => event.type === 'item.completed')?.item?.text);
     expect(bytes).not.toBe(bytes.trim());
     expect(JSON.parse(bytes)).toHaveProperty('findings', null);
+  });
+});
+
+// Issue #249, offline part. Every host reply below is scripted; none is a live transcript,
+// and none proves that a live review on either host returns a valid verdict.
+describe('#249 Claude structured reply finish mapping', () => {
+  // The field set Claude Code 2.1.277 prints for `--print --output-format json
+  // --json-schema` (OE-05, 2026-09-29), with synthetic values.
+  const liveShaped = {
+    type: 'result',
+    subtype: 'success',
+    is_error: false,
+    duration_ms: 1200,
+    duration_api_ms: 1100,
+    num_turns: 2,
+    result: 'Prose that is not the selected reply.',
+    stop_reason: 'tool_use',
+    session_id: '00000000-0000-4000-8000-000000000000',
+    total_cost_usd: 0.01,
+    usage: {
+      input_tokens: 10,
+      cache_creation_input_tokens: 0,
+      cache_read_input_tokens: 0,
+      output_tokens: 20,
+      server_tool_use: { web_search_requests: 0, web_fetch_requests: 0 },
+      service_tier: 'standard',
+      cache_creation: { ephemeral_1h_input_tokens: 0, ephemeral_5m_input_tokens: 0 },
+    },
+    modelUsage: {
+      'synthetic-offline-model': {
+        inputTokens: 10,
+        outputTokens: 20,
+        cacheReadInputTokens: 0,
+        cacheCreationInputTokens: 0,
+        webSearchRequests: 0,
+        costUSD: 0.01,
+        contextWindow: 200000,
+      },
+    },
+    permission_denials: [],
+    terminal_reason: 'completed',
+    uuid: '00000000-0000-4000-8000-000000000001',
+    structured_output: PASS,
+  };
+
+  it('maps tool_use + terminal_reason completed + structured_output to a valid reply', async () => {
+    const response = await observe('claude-cli', JSON.stringify(liveShaped));
+    expect(response.finish_reason).toBe('stop');
+    expect(response.text).toBe(JSON.stringify(PASS));
+    expect(response.usage).toEqual({ input_tokens: 10, output_tokens: 20, cost_usd: 0.01 });
+    expect(extractStructuredReply(response, REVIEW)).toEqual({ ok: true, document: PASS });
+  });
+
+  it.each([
+    ['without structured_output', { structured_output: undefined }],
+    ['with a non-object structured_output', { structured_output: PASS_TEXT }],
+    ['with a non-completed terminal reason', { terminal_reason: 'max_turns' }],
+    ['without a terminal reason', { terminal_reason: undefined }],
+    [
+      'with a denied tool request',
+      { permission_denials: [{ tool_name: 'Bash', tool_use_id: 't', tool_input: {} }] },
+    ],
+    ['with an error subtype', { subtype: 'error_max_turns' }],
+  ])('keeps the marker a provider error %s', async (_name, change) => {
+    const response = await observe('claude-cli', JSON.stringify({ ...liveShaped, ...change }));
+    expect(response.finish_reason).not.toBe('stop');
+    const extracted = extractStructuredReply(response, REVIEW);
+    expect(extracted.ok).toBe(false);
+    if (!extracted.ok) expect(extracted.error.code).toBe('reply_provider_error');
+  });
+});
+
+describe('#249 review process isolation (no MCP server, no tools, allowlisted env)', () => {
+  // Flags as advertised by `claude --help` (Claude Code 2.1.277) and `codex exec --help`
+  // (codex-cli 0.157.1), inspected on 2026-10-06; the bridge may use no other flag.
+  const CLAUDE_HELP_FLAGS = [
+    '--print',
+    '--no-session-persistence',
+    '--safe-mode',
+    '--disable-slash-commands',
+    '--setting-sources',
+    '--strict-mcp-config',
+    '--mcp-config',
+    '--tools',
+    '--model',
+    '--output-format',
+    '--json-schema',
+  ];
+  const CODEX_HELP_FLAGS = [
+    '--model',
+    '--json',
+    '--ephemeral',
+    '--ignore-user-config',
+    '--ignore-rules',
+    '--skip-git-repo-check',
+    '--cd',
+    '--sandbox',
+    '--config',
+    '--output-schema',
+  ];
+  const secrets = ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'GH_TOKEN', 'NODE_OPTIONS'] as const;
+  const saved = new Map<string, string | undefined>();
+  beforeEach(() => {
+    for (const name of secrets) {
+      saved.set(name, process.env[name]);
+      process.env[name] = 'synthetic-offline-value';
+    }
+  });
+  afterEach(() => {
+    for (const name of secrets) {
+      const value = saved.get(name);
+      if (value === undefined) Reflect.deleteProperty(process.env, name);
+      else process.env[name] = value;
+    }
+  });
+
+  interface Spawned {
+    argv: string[];
+    cwd: string;
+    env: Record<string, string>;
+    workspaceEntries: string[];
+    schemaPath?: string;
+  }
+
+  async function spawnOf(provider: 'claude-cli' | 'codex-cli'): Promise<Spawned> {
+    let seen: Spawned | undefined;
+    spawnSyncMock.mockImplementation(
+      (_cli: string, argv: string[], options: { cwd: string; env: Record<string, string> }) => {
+        const at = argv.indexOf('--output-schema');
+        seen = {
+          argv,
+          cwd: options.cwd,
+          env: options.env,
+          workspaceEntries: readdirSync(options.cwd),
+          ...(at < 0 ? {} : { schemaPath: String(argv[at + 1]) }),
+        };
+        return {
+          status: 0,
+          stdout: provider === 'claude-cli' ? claudeFixture : codexFixture,
+          stderr: '',
+        };
+      },
+    );
+    const response = await createModelBridge({ provider, model: 'offline' }).complete(
+      messages,
+      {},
+      call,
+    );
+    expect(response.finish_reason).toBe('stop');
+    if (seen === undefined) throw new Error('OFFLINE_SPAWN_NOT_CAPTURED');
+    return seen;
+  }
+
+  const flagValue = (argv: string[], flag: string) => argv[argv.indexOf(flag) + 1];
+
+  it('runs Claude with no tools, only the empty MCP set and no settings or customizations', async () => {
+    const { argv } = await spawnOf('claude-cli');
+    expect(flagValue(argv, '--tools')).toBe('');
+    expect(argv).toContain('--strict-mcp-config');
+    expect(flagValue(argv, '--mcp-config')).toBe('{"mcpServers":{}}');
+    expect(flagValue(argv, '--setting-sources')).toBe('');
+    expect(argv).toEqual(expect.arrayContaining(['--safe-mode', '--disable-slash-commands']));
+    const flags = argv.filter((value) => value.startsWith('--'));
+    expect(flags.filter((flag) => !CLAUDE_HELP_FLAGS.includes(flag))).toEqual([]);
+  });
+
+  it('runs every Codex review without user config, rules or MCP servers in the workspace', async () => {
+    const { argv, cwd } = await spawnOf('codex-cli');
+    expect(argv[0]).toBe('exec');
+    expect(argv).toEqual(
+      expect.arrayContaining(['--ignore-user-config', '--ignore-rules', '--skip-git-repo-check']),
+    );
+    expect(flagValue(argv, '--sandbox')).toBe('read-only');
+    expect(flagValue(argv, '--cd')).toBe(cwd);
+    const configs = argv.flatMap((value, index) => (value === '--config' ? [argv[index + 1]] : []));
+    expect(configs).toEqual(['mcp_servers={}', 'tools={}']);
+    const flags = argv.filter((value) => value.startsWith('--'));
+    expect(flags.filter((flag) => !CODEX_HELP_FLAGS.includes(flag))).toEqual([]);
+  });
+
+  it.each(['claude-cli', 'codex-cli'] as const)(
+    '%s starts in a fresh empty workspace that is removed afterwards',
+    async (provider) => {
+      const { cwd, workspaceEntries, schemaPath } = await spawnOf(provider);
+      expect(workspaceEntries).toEqual([]);
+      expect(cwd.startsWith(process.cwd())).toBe(false);
+      if (schemaPath !== undefined) expect(schemaPath.startsWith(`${cwd}/`)).toBe(false);
+      expect(existsSync(cwd)).toBe(false);
+    },
+  );
+
+  it.each(['claude-cli', 'codex-cli'] as const)(
+    '%s receives only the agent-cli environment allowlist',
+    async (provider) => {
+      const { env } = await spawnOf(provider);
+      for (const name of secrets) expect(env).not.toHaveProperty(name);
+      if (process.env.PATH !== undefined) expect(env['PATH']).toBe(process.env.PATH);
+      const allowed = new Set([
+        ...['PATH', 'HOME', 'USER', 'LOGNAME', 'SHELL', 'TMPDIR', 'LANG', 'TERM'],
+        ...['HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY', 'ALL_PROXY'],
+        ...['http_proxy', 'https_proxy', 'no_proxy', 'all_proxy'],
+        ...['SSL_CERT_FILE', 'SSL_CERT_DIR', 'NODE_EXTRA_CA_CERTS'],
+        provider === 'claude-cli' ? 'CLAUDE_CONFIG_DIR' : 'CODEX_HOME',
+      ]);
+      for (const name of Object.keys(env))
+        expect(allowed.has(name) || name.startsWith('LC_'), name).toBe(true);
+    },
+  );
+});
+
+describe('#249 declared reply bytes: recording and replay agree', () => {
+  const readme = fixture('README.md');
+  const declared = <T>(marker: string): T[] =>
+    JSON.parse(
+      readme
+        .split(`<!-- ${marker}:start -->`)[1]
+        ?.split(`<!-- ${marker}:end -->`)[0]
+        ?.match(/```json\s*([\s\S]*?)\s*```/u)?.[1] ?? 'null',
+    ) as T[];
+
+  it.each([
+    ['claude-cli', 0],
+    ['codex-cli', 1],
+  ] as const)(
+    '%s: the recorded digest is the stored reply file digest and its replay extracts the same document',
+    async (provider, row) => {
+      const stored = declared<{ reply: { file: string; sha256: string } }>('cmp0006-provenance')[
+        row
+      ];
+      if (stored === undefined) throw new Error('fixture provenance row missing');
+      const response = await observe(
+        provider,
+        provider === 'claude-cli' ? claudeFixture : codexFixture,
+      );
+      const recorded = extractStructuredReply(response, REVIEW);
+      const bytes = fixture(stored.reply.file);
+      expect(response.text).toBe(bytes);
+      expect(replySha256(response)).toBe(stored.reply.sha256);
+      const replayed = extractStructuredReply(
+        {
+          text: bytes,
+          json: JSON.parse(bytes) as unknown,
+          finish_reason: 'stop',
+          ...(provider === 'codex-cli' ? { projection: replyProjectionIdentity(REVIEW) } : {}),
+        },
+        REVIEW,
+      );
+      expect(replayed.ok).toBe(true);
+      expect(replayed).toEqual(recorded);
+    },
+  );
+
+  it('declares the ADR-MDL-0001 fixture as envelope result bytes, replayed on the text path', () => {
+    const [row] = declared<{
+      origin: string;
+      reply: { file: string; bytes: number; sha256: string; transformation: string };
+    }>('adr-mdl-0001-provenance');
+    if (row === undefined) throw new Error('ADR-MDL-0001 fixture provenance missing');
+    expect(row.origin).toBe('captured-live');
+    expect(row.reply.transformation).toContain('envelope result string');
+    const bytes = fixture(row.reply.file);
+    expect(Buffer.byteLength(bytes, 'utf8')).toBe(row.reply.bytes);
+    expect(replySha256({ text: bytes })).toBe(row.reply.sha256);
+    const replayed = extractStructuredReply({ text: bytes, finish_reason: 'stop' }, REVIEW);
+    expect(replayed.ok).toBe(true);
+    if (replayed.ok) expect(replayed.document['verdict']).toBe('pass');
   });
 });

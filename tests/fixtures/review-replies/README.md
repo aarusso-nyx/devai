@@ -17,6 +17,42 @@ reply the CMP-0002 orchestrator session rejected by parsing it by hand was not
 preserved, so the first fixture comes from this campaign's own evaluator run. Nothing
 was redacted: the reply names only repository paths.
 
+## Declared reply bytes (ADR-MDL-0003, #249)
+
+A fixture's reply file stores exactly the bytes the bridge hands to the shared
+extractor, and its digest is `replySha256` of those bytes, the one function the
+judge, the extractor and these tests use for recording and replay:
+
+- Claude with `structured_output` present: UTF-8 `JSON.stringify(structured_output)`,
+  no appended newline. The envelope `result` string is not the reply.
+- Claude without `structured_output`: the envelope `result` string exactly.
+- Codex: the unique final `agent_message.text` exactly, without trimming or JSONL framing.
+
+The ADR-MDL-0001 fixture predates that rule: it stores the `result` string of an
+envelope whose `structured_output` was not preserved, so it cannot be re-derived as
+structured bytes. It is declared as what it is and replayed on the text path (no
+provider `json`), where its bytes are the declared reply bytes.
+
+<!-- adr-mdl-0001-provenance:start -->
+
+```json
+[
+  {
+    "origin": "captured-live",
+    "sanitization": "none; the reply names only repository paths",
+    "reply": {
+      "file": "cmp-0003-rejected-pass.txt",
+      "encoding": "UTF-8",
+      "transformation": "UTF-8 envelope result string as returned; structured_output not preserved; replayed as a text reply",
+      "bytes": 2813,
+      "sha256": "0d25caada4fafdeeb180faa7d86aaf3a636f53b46bb830bad9476b75d8e5cc2b"
+    }
+  }
+]
+```
+
+<!-- adr-mdl-0001-provenance:end -->
+
 Adding a fixture:
 
 - Store the reply as the host returned it, including any prose around the verdict
