@@ -28,27 +28,41 @@ const SAME_HOST_STALE_AFTER_MS = 6 * 60 * 60 * 1000;
 
 type Holder = Readonly<Record<string, unknown>>;
 
-/** Identity (dev and inode) of a file this process published. */
+/**
+ * Identity of a file this process published, as the ADR-AUT-0005 publication returns it:
+ * device, inode and the inode's birth time in nanoseconds (inode numbers are reused).
+ */
 export interface FileIdentity {
-  readonly dev: number;
-  readonly ino: number;
+  readonly dev: bigint;
+  readonly ino: bigint;
+  readonly birthtimeNs: bigint;
 }
 
 /** The identity an indeterminate ADR-AUT-0005 publication linked into place, if `error` is one. */
 export function indeterminateIdentity(error: unknown): FileIdentity | undefined {
   if ((error as { code?: unknown } | null)?.code !== PUBLISH_INDETERMINATE) return undefined;
   const identity = (error as { identity?: unknown }).identity as Partial<FileIdentity> | undefined;
-  return typeof identity?.dev === 'number' && typeof identity.ino === 'number'
-    ? { dev: identity.dev, ino: identity.ino }
+  return typeof identity?.dev === 'bigint' &&
+    typeof identity.ino === 'bigint' &&
+    typeof identity.birthtimeNs === 'bigint'
+    ? { dev: identity.dev, ino: identity.ino, birthtimeNs: identity.birthtimeNs }
     : undefined;
+}
+
+/** Whether the entry at `path` (lstat, never followed at its final component) is `identity`. */
+export function hasIdentity(path: string, identity: FileIdentity): boolean {
+  const stat = lstatSync(path, { bigint: true, throwIfNoEntry: false });
+  return (
+    stat?.isFile() === true &&
+    stat.dev === identity.dev &&
+    stat.ino === identity.ino &&
+    stat.birthtimeNs === identity.birthtimeNs
+  );
 }
 
 /** Unlinks `path` only while its lstat is a regular file with exactly `identity`. */
 export function unlinkIfIdentity(path: string, identity: FileIdentity): boolean {
-  const stat = lstatSync(path, { throwIfNoEntry: false });
-  if (stat?.isFile() !== true || stat.dev !== identity.dev || stat.ino !== identity.ino) {
-    return false;
-  }
+  if (!hasIdentity(path, identity)) return false;
   unlinkSync(path);
   return true;
 }

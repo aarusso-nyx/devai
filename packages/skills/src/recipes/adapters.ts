@@ -11,6 +11,7 @@ import {
 import { listOperations } from '../operations/catalog.js';
 import {
   acquireRecipeInstallLock,
+  hasIdentity,
   indeterminateIdentity,
   unlinkIfIdentity,
   type FileIdentity,
@@ -278,22 +279,31 @@ function createAncestors(file: ResolvedRecipeAdapterFile, journal: InstallJourna
  * a parent swapped for a link between the recheck and the link(2) is detected here, after the
  * fact; the escaped entry (the file this call created, wherever it landed) is unlinked by
  * identity and the installation refuses and rolls back.
+ *
+ * It also pins the published inode: a no-follow descriptor whose fstat is the identity stays
+ * open until the installation ends. An inode number is reused only once its last link and
+ * last descriptor are gone, so while the pin is held no other file can carry the identity,
+ * and the rollback removes only this call's file even if another writer replaced it.
  */
 function verifyPublished(
   file: ResolvedRecipeAdapterFile,
   identity: FileIdentity,
   realRoot: string,
+  pins: number[],
 ): void {
   const expected = join(realRoot, file.path);
   let bound = false;
   try {
-    const stat = lstatSync(file.absolutePath, { throwIfNoEntry: false });
+    const pin = openReadOnlyNoFollowSync(file.absolutePath);
+    pins.push(pin);
+    const pinned = fstatSync(pin, { bigint: true });
     bound =
+      pinned.dev === identity.dev &&
+      pinned.ino === identity.ino &&
+      pinned.birthtimeNs === identity.birthtimeNs &&
       realpathSync(dirname(file.absolutePath)) === dirname(expected) &&
       realpathSync(file.absolutePath) === expected &&
-      stat?.isFile() === true &&
-      stat.dev === identity.dev &&
-      stat.ino === identity.ino;
+      hasIdentity(file.absolutePath, identity);
   } catch {
     bound = false;
   }
@@ -352,6 +362,7 @@ export function executeRecipeAdapterPlan(
     throw new Error('RECIPE_INSTALL_REPOSITORY_MISMATCH');
   }
   const lock = acquireRecipeInstallLock(first.repoRoot);
+  const pins: number[] = [];
   try {
     for (const file of resolved) recheckTarget(file);
     const realRoot = realpathSync(first.repoRoot);
@@ -380,8 +391,8 @@ export function executeRecipeAdapterPlan(
           if (linked !== undefined) journal.files.push({ path: file.absolutePath, ...linked });
           throw error;
         }
-        journal.files.push({ path: file.absolutePath, dev: identity.dev, ino: identity.ino });
-        verifyPublished(file, identity, realRoot);
+        journal.files.push({ path: file.absolutePath, ...identity });
+        verifyPublished(file, identity, realRoot, pins);
         written.push(file.path);
       }
     } catch (error) {
@@ -390,6 +401,7 @@ export function executeRecipeAdapterPlan(
     }
     return { written, unchanged };
   } finally {
+    for (const pin of pins) closeReadOnlySync(pin);
     lock.release();
   }
 }
