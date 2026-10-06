@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "invariants": [
     {
       "id": "INV-AUTH-001",
@@ -165,7 +165,9 @@
       ],
       "code_areas": [
         "packages/cli/src/commands/check/**",
-        "packages/cli/src/services/check-runner/**"
+        "packages/cli/src/services/check-runner/**",
+        "packages/utils/src/glob-guards/**",
+        "packages/cli/src/commands/docs/links.ts"
       ]
     },
     {
@@ -283,6 +285,32 @@
         "packages/cli/src/commands/task/**",
         "packages/cli/src/commands/campaign/**",
         "packages/loop/src/campaign/**"
+      ]
+    },
+    {
+      "id": "INV-CORE-010",
+      "tests": [
+        {
+          "suite": "unit",
+          "path": "packages/cli/tests/unit/canonical-registry-constructor.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/cli/tests/unit/command-manifest-capability-values.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/cli/tests/unit/public-surface-bootstrap.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/cli/tests/unit/version.test.ts"
+        }
+      ],
+      "code_areas": [
+        "packages/cli/src/bin.ts",
+        "packages/cli/src/command-manifest.ts",
+        "packages/cli/src/version.ts"
       ]
     },
     {
@@ -476,6 +504,57 @@
       ]
     },
     {
+      "id": "INV-DEVAI-008",
+      "tests": [
+        {
+          "suite": "unit",
+          "path": "packages/skills/tests/unit/inv-override.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/skills/tests/unit/inv-override-boundaries.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/spec/tests/unit/pr-compliance.test.ts"
+        }
+      ],
+      "code_areas": [
+        "packages/skills/src/inv-override/**",
+        "packages/spec/src/pr-compliance/**"
+      ]
+    },
+    {
+      "id": "INV-DEVAI-010",
+      "tests": [
+        {
+          "suite": "unit",
+          "path": "packages/spec/tests/unit/blueprint-slice-boundaries.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/spec/tests/unit/blueprint-api-operations.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/skills/tests/operations/scaffold-runner-output.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/skills/tests/operations/scaffold-write-race.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/utils/tests/unit/templates.test.ts"
+        }
+      ],
+      "code_areas": [
+        "packages/spec/src/blueprint/**",
+        "packages/skills/src/operations/scaffold/**",
+        "packages/utils/src/templates/**"
+      ]
+    },
+    {
       "id": "INV-HARNESS-001",
       "tests": [
         {
@@ -531,7 +610,9 @@
         "packages/cli/src/commands/doctor-policy-checks.ts",
         "packages/cli/src/commands/doctor-support.ts",
         "packages/skills/src/bootstrap/**",
-        "packages/skills/src/constitution/**"
+        "packages/skills/src/constitution/**",
+        "packages/utils/src/constitution-version.ts",
+        "packages/utils/src/profile/**"
       ]
     },
     {
@@ -598,7 +679,8 @@
         "packages/loop/src/round-lifecycle/**",
         "packages/loop/src/tracking/**",
         "packages/skills/src/post-merge-auditor/**",
-        "packages/cli/src/services/github-issues-tracking/**"
+        "packages/cli/src/services/github-issues-tracking/**",
+        "packages/skills/src/operations/backlog.ts"
       ]
     },
     {
@@ -652,6 +734,84 @@
         "packages/loop/src/scorecard/**",
         "packages/loop/src/loop/**",
         "packages/skills/src/model-bridge/**"
+      ]
+    },
+    {
+      "id": "INV-HARNESS-007",
+      "tests": [
+        {
+          "suite": "unit",
+          "path": "packages/skills/tests/unit/prompt-composer.test.ts"
+        }
+      ],
+      "code_areas": [
+        "packages/skills/src/prompt-composer/**"
+      ]
+    },
+    {
+      "id": "INV-HARNESS-008",
+      "tests": [
+        {
+          "suite": "unit",
+          "path": "packages/skills/tests/unit/agent-cli.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/skills/tests/unit/agent-cli-termination.test.ts"
+        }
+      ],
+      "code_areas": [
+        "packages/skills/src/agent-cli/**",
+        "packages/cli/src/services/experimental-dispatch/**"
+      ]
+    },
+    {
+      "id": "INV-HARNESS-009",
+      "tests": [
+        {
+          "suite": "unit",
+          "path": "packages/skills/tests/recipes/adapters.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/skills/tests/recipes/validation-contract.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/skills/tests/operations/catalog.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/skills/tests/operations/materialize-boundaries.test.ts"
+        }
+      ],
+      "code_areas": [
+        "packages/skills/src/recipes/**",
+        "packages/skills/src/operations/catalog.ts",
+        "packages/skills/src/operations/host.ts",
+        "packages/skills/src/operations/materialize.ts",
+        "packages/skills/src/operations/types.ts",
+        "packages/skills/src/operations/index.ts"
+      ]
+    },
+    {
+      "id": "INV-HARNESS-010",
+      "tests": [
+        {
+          "suite": "unit",
+          "path": "packages/skills/tests/unit/pack-resolver-detection.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/skills/tests/unit/pack-resolver-sensor-params.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/skills/tests/unit/pack-manifest-boundaries.test.ts"
+        }
+      ],
+      "code_areas": [
+        "packages/skills/src/pack-resolver/**"
       ]
     },
     {
@@ -726,6 +886,18 @@
         "packages/cli/src/services/release-*.ts",
         "packages/cli/src/services/container-archive.ts",
         "packages/cli/src/release-host*.ts"
+      ]
+    },
+    {
+      "id": "INV-SEC-003",
+      "tests": [
+        {
+          "suite": "unit",
+          "path": "packages/cli/tests/unit/dependency-security.sec.test.ts"
+        }
+      ],
+      "code_areas": [
+        "packages/cli/src/services/dependency-security/**"
       ]
     }
   ],
