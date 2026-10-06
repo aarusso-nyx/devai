@@ -218,9 +218,56 @@
     "experimental": {
       "const": true,
       "description": "Present only on evidence from experimental execution (ADR-MDL-0005 D-9); such evidence is non-promoting."
+    },
+    "sandbox": {
+      "$ref": "#/$defs/sandboxEvidence"
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "required": ["sandbox"]
+      },
+      "then": {
+        "required": ["experimental"],
+        "properties": {
+          "resolved_executor": {
+            "properties": {
+              "kind": {
+                "const": "agent"
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
   "$defs": {
+    "sandboxEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "enforced_by", "write_root", "flags"],
+      "description": "The write confinement the provider's own sandbox enforced for one experimental agent attempt (ADR-MDL-0008). flags is the exact confinement subsequence the broker asserted in the spawned argv, with the attempt worktree's path written as {attempt-worktree}.",
+      "properties": {
+        "mode": {
+          "enum": ["codex-workspace-write", "claude-restricted-sandbox"]
+        },
+        "enforced_by": {
+          "const": "provider"
+        },
+        "write_root": {
+          "const": "attempt-worktree"
+        },
+        "flags": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
     "argv": {
       "type": "array",
       "minItems": 1,
