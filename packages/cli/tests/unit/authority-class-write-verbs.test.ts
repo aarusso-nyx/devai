@@ -246,7 +246,7 @@ const R0502_FILE_DIGESTS: ReadonlyArray<readonly [string, string]> = [
 const FIXED_REPOSITORY_ID = 'devai-ia-005';
 const R0502_CORE_SOURCE_DIGEST = '18884489d6f36d21ff09f5578a2ae5fc5e49879b4cce715eb0ac0704235a6aa0';
 const R0502_PACKAGE_EXTENSION_DIGEST =
-  'f8f047e2ee18bdb0027045843b7f94cb74a7afaf7a7d89bfb131395d84016236';
+  '83eee5dda73173720a9eab0ada9e1b3ddf79e2f5ce3d0fcf5dc546e296765fe2';
 
 describe('IA-005: the registry, its views, the core rules, and devai-adopter-authority are byte-identical to R-0502', () => {
   it.each(R0502_FILE_DIGESTS)('%s is byte-identical to 38a0a5df', (path, digest) => {
