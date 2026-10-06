@@ -1,0 +1,51 @@
+{
+  "schemaVersion": "1.0.0",
+  "version": "1.0.0",
+  "id": "INV-CORE-011",
+  "domain": "CORE",
+  "lifecycle": "supported",
+  "severity": "hard-fail",
+  "type": "api_contract",
+  "title": "Package barrels only re-export and match the package exports map",
+  "statement": "Every package index and the CLI runtime assembly barrel MUST contain only re-exports, each relative re-export MUST resolve to a module that exists, and the development entry that a workspace package declares for its root export MUST be its source index, so a module becomes part of a package public surface only by an explicit re-export that a reviewer can read in one place.",
+  "rationale": "A barrel that declares behavior, or an exports map that points past it, would widen a package public surface without a visible re-export; keeping barrels re-export-only keeps reachability and the inventory claims honest (issue #295).",
+  "status": "active",
+  "verification": {
+    "required_suites": ["unit"],
+    "oracle": "tests",
+    "strategy": {
+      "primary": "regression",
+      "deterministic_check_available": true,
+      "rationale": "A deterministic contract test reads each barrel and the package manifests; trace links the test."
+    }
+  },
+  "authority_docs": {
+    "docs": [
+      {
+        "doc": "law/adr/ADR-REL-0001-release-lifecycle-actions-and-state.md",
+        "anchor": "consequences"
+      }
+    ]
+  },
+  "scope": {
+    "components": ["cli", "loop", "skills", "spec", "utils"],
+    "code_areas": [
+      "packages/cli/src/index.ts",
+      "packages/cli/src/runtime-core.ts",
+      "packages/loop/src/index.ts",
+      "packages/skills/src/index.ts",
+      "packages/spec/src/index.ts",
+      "packages/utils/src/index.ts"
+    ]
+  },
+  "change_policy": {
+    "breaking_change_requires": ["doc_update", "trace_update", "test_update", "adr"],
+    "test_weakening_allowed": false,
+    "human_approval_required": false
+  },
+  "tags": ["public-surface", "package-barrel"],
+  "measurable_via": ["check"],
+  "provenance": ["ADR-REL-0001", "issue #295"],
+  "supersedes": null,
+  "superseded_by": null
+}
