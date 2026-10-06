@@ -7,7 +7,7 @@ import { escalateAgentTask, taskDispatchBlockers } from './dispatch-disposition.
 import { fsyncDirectorySync, writeCreateOnlyDurableSync } from './durable-files.js';
 import { acquireRoundController, releaseRoundController } from './round-controller.js';
 import { completeHumanTask, type HumanExecutorRole } from './human-executor.js';
-import { inspectLocks, listLocks, taskLockTargets } from './locks.js';
+import { assertLockOwnership, listLocks, taskLockTargets } from './locks.js';
 import { ratificationPath, type RatificationRecord } from './ratification.js';
 
 import {
@@ -29,7 +29,7 @@ import { listWorktrees, releaseTaskWorktrees } from './worktrees.js';
 
 import { trackGovernanceEvent } from '../tracking/hook.js';
 import type { GovernanceEventStatus } from '../tracking/events.js';
-import { requireActiveTaskRound, fail } from './task-queue-services.js';
+import { requireActiveTaskRound, fail, TaskServiceError } from './task-queue-services.js';
 export {
   addRoundQueueEntry,
   materializeRoundQueueTask,
@@ -287,17 +287,14 @@ export function finishRoundTask(
 ): TaskRecord {
   const { task } = roundBoundTask({ ...options, operation: 'finish' });
   // A task waits outside any dispatch before it finishes, so its locks may have lapsed and
-  // been taken over meanwhile. Refuse before writing anything; `completeTask` proves exact
-  // ownership again, renewing a lapsing record, right before it persists the completion.
-  if (
-    inspectLocks({
-      locksDir: join(options.repoRoot, '.devai/state/locks'),
-      taskId: task.id,
-      targets: taskLockTargets(task),
-    }).lost.length > 0
-  ) {
-    fail('TASK_RESOURCE_LOCK_LOST');
-  }
+  // been taken over meanwhile. Secure them before any transition: refuse after a takeover
+  // with nothing written, and renew a lapsing or expired own record by an exact-record swap
+  // so no takeover can land during the finish. `completeTask` proves ownership again.
+  assertLockOwnership({
+    locksDir: join(options.repoRoot, '.devai/state/locks'),
+    taskId: task.id,
+    targets: taskLockTargets(task),
+  });
   if (task.executor.kind === 'human') {
     if (task.status !== 'awaiting_human_review') {
       fail('TASK_LIFECYCLE_TRANSITION_FORBIDDEN');
@@ -331,6 +328,20 @@ export function finishRoundTask(
       ],
     });
     saveTask(options.repoRoot, { ...loadTask(options.repoRoot, task.id), status: 'merging' });
+    try {
+      return reportCompletion(
+        options.repoRoot,
+        completeTask(transitionOptions({ ...options, operation: 'finish' })),
+      );
+    } catch (error) {
+      // A human task cannot finish again from `merging`: a completion refused for a lost
+      // lock escalates it, as the runner does with a pass recorded without its locks,
+      // releasing only the records it still holds.
+      if (error instanceof TaskServiceError && error.code === 'TASK_RESOURCE_LOCK_LOST') {
+        escalateTask({ repoRoot: options.repoRoot, taskId: task.id });
+      }
+      throw error;
+    }
   } else if (task.executor.kind === 'agent') {
     // Agent completion runs under the round controller, which `task escalate` also takes:
     // the load, the completion record, the worktree release and both transitions see the
