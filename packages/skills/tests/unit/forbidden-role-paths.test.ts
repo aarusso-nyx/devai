@@ -8,6 +8,7 @@ import {
   scanForbiddenActions,
 } from '../../src/forbidden-actions/index.js';
 import { withAuthorityHostTestScope } from './authority-host-test-scope.js';
+import { disableGitAutoMaintenance } from './git-fixture-maintenance.js';
 
 const roots: string[] = [];
 aroundEach((runTest) => withAuthorityHostTestScope(runTest));
@@ -20,6 +21,7 @@ function scan(paths: string[], author: string, authorization: 'none' | 'exact' |
   const git = (...args: string[]) =>
     execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
   git('init', '-q');
+  disableGitAutoMaintenance(root);
   git('config', 'core.hooksPath', '/dev/null');
   git('config', 'commit.gpgsign', 'false');
   git('config', 'user.email', 'fixture@example.invalid');

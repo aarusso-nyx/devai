@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { afterEach, aroundEach, expect, it } from 'vitest';
 import { scanForbiddenActions } from '../../src/forbidden-actions/index.js';
 import { withAuthorityHostTestScope } from './authority-host-test-scope.js';
+import { disableGitAutoMaintenance } from './git-fixture-maintenance.js';
 
 const roots: string[] = [];
 aroundEach((runTest) => withAuthorityHostTestScope(runTest));
@@ -39,6 +40,7 @@ function fixture(body: unknown, malformed = false) {
   const authorizationPath = join(root, 'receipts.json');
   writeFileSync(authorizationPath, malformed ? String(body) : JSON.stringify(body));
   execFileSync('git', ['init', '-q'], { cwd: root });
+  disableGitAutoMaintenance(root);
   execFileSync('git', ['add', '.'], { cwd: root });
   execFileSync(
     'git',

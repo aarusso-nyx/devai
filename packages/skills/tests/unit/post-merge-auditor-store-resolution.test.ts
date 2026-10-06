@@ -28,6 +28,7 @@ import {
   runPostMergeAuditor,
 } from '../../src/post-merge-auditor/index.js';
 import { POST_MERGE_DECLARATION } from '../../src/post-merge-auditor/host-receipt.js';
+import { disableGitAutoMaintenance } from './git-fixture-maintenance.js';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -108,6 +109,7 @@ function boundCheckout(reading: JsonRecord): BoundCheckout {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'devai-post-merge-store-')));
   roots.push(root);
   git(root, ['init', '-q', '-b', 'main']);
+  disableGitAutoMaintenance(root);
   put(root, '.gitignore', '.devai/state/\n.devai/worktrees/\n');
   const constitutionPath = put(root, 'law/constitution.md', '# Constitution\n');
   const policyPath = put(root, '.devai/config/authority-policy.json', '{}\n');

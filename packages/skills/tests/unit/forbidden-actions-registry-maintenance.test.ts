@@ -8,6 +8,7 @@ import {
   type ForbiddenActionFinding,
 } from '../../src/forbidden-actions/index.js';
 import { withAuthorityHostTestScope } from './authority-host-test-scope.js';
+import { disableGitAutoMaintenance } from './git-fixture-maintenance.js';
 
 /*
  * ADR-GOV-0022: validated append-only maintenance of the declared authorization
@@ -69,6 +70,7 @@ function repository() {
   const git = (...args: string[]) =>
     execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
   git('init', '-q');
+  disableGitAutoMaintenance(root);
   git('config', 'core.hooksPath', '/dev/null');
   git('config', 'commit.gpgsign', 'false');
   git('config', 'user.email', 'fixture@example.invalid');

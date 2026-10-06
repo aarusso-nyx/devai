@@ -31,6 +31,7 @@ import {
 import { POST_MERGE_DECLARATION } from '../../src/post-merge-auditor/host-receipt.js';
 import { runWithAuthorityHostEffects, type AuthorityHostEffectRequest } from '@devai-nyx/authority';
 import { withAuthorityHostTestScope } from './authority-host-test-scope.js';
+import { disableGitAutoMaintenance } from './git-fixture-maintenance.js';
 
 const roots: string[] = [];
 const NOW = '2026-07-24T12:00:00.000Z';
@@ -146,6 +147,7 @@ function fixture(mergeCount = 1, readings: readonly (readonly unknown[])[] = [])
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'devai-post-merge-boundary-')));
   roots.push(root);
   git(root, ['init', '-q', '-b', 'main']);
+  disableGitAutoMaintenance(root);
   const constitutionPath = put(root, 'law/constitution.md', '# Constitution\n');
   const policyPath = put(root, '.devai/config/authority-policy.json', '{}\n');
   put(root, 'README.md', 'baseline\n');
@@ -746,6 +748,7 @@ describe('post-merge audit observation facade', () => {
     const root = realpathSync(mkdtempSync(join(tmpdir(), 'devai-audit-boundary-')));
     roots.push(root);
     git(root, ['init', '-q', '-b', 'main']);
+    disableGitAutoMaintenance(root);
     put(root, 'README.md', '# Fixture\n');
     git(root, ['add', 'README.md']);
     git(root, ['commit', '-qm', 'initial']);
