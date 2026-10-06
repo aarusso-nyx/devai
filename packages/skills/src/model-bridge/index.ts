@@ -1,9 +1,9 @@
-import { createHash } from 'node:crypto';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from '@devai-nyx/authority';
-import { loadSchema } from '@devai-nyx/schemas';
+import { providerReplySchema, replyProjectionIdentity } from '@devai-nyx/schemas';
+import { agentCliEnvironment } from '../agent-cli/index.js';
 import type { ReplySchemaName, StructuredReply } from './extract.js';
 
 export * from './extract.js';
@@ -40,64 +40,16 @@ export interface ModelBridgeCallOptions {
 
 type FinishReason = 'stop' | 'length' | 'tool_use' | 'error';
 
-/**
- * The consumer schema as a provider receives it: the governed document without its
- * identity and documentation-only members, which structured-output hosts do not read.
- */
+/** The consumer schema as a provider receives it; strict for the OpenAI-backed hosts. */
 function providerSchema(name: ReplySchemaName, strict: boolean): Record<string, unknown> {
-  const visit = (value: unknown, path: string): unknown => {
-    if (Array.isArray(value))
-      return value.map((member, index) => visit(member, `${path}/${index}`));
-    if (value === null || typeof value !== 'object') return value;
-    const node = value as Record<string, unknown>;
-    const out = Object.fromEntries(
-      Object.entries(node)
-        .filter(
-          ([key]) => !['$schema', '$id', 'schema_version', 'examples', 'default'].includes(key),
-        )
-        .map(([key, member]) => [key, visit(member, `${path}/${key}`)]),
-    );
-    if (strict && node['type'] === 'object') {
-      if (
-        node['additionalProperties'] !== false ||
-        !node['properties'] ||
-        !Array.isArray(node['required'])
-      ) {
-        throw new Error('MODEL_BRIDGE_SCHEMA_UNSUPPORTED');
-      }
-      const properties = out['properties'] as Record<string, unknown>;
-      for (const key of Object.keys(properties)) {
-        if ((node['required'] as string[]).includes(key)) continue;
-        const position = `${path}/properties/${key}`;
-        if (
-          name !== 'review-verdict.schema.json' ||
-          ![
-            '/properties/findings',
-            '/$defs/finding/properties/file',
-            '/$defs/finding/properties/line',
-          ].includes(position)
-        )
-          throw new Error('MODEL_BRIDGE_SCHEMA_UNSUPPORTED');
-        properties[key] = { anyOf: [properties[key], { type: 'null' }] };
-      }
-      out['required'] = Object.keys(properties);
-    }
-    return out;
-  };
-  return visit(loadSchema(name), '') as Record<string, unknown>;
+  return providerReplySchema(name, strict);
 }
 
 function projectionIdentity(
   name: ReplySchemaName | undefined,
   schema: Record<string, unknown> | undefined,
 ): StructuredReply['projection'] {
-  return name === undefined || schema === undefined
-    ? undefined
-    : {
-        version: 'strict-reply-v1',
-        schema: name,
-        schema_sha256: createHash('sha256').update(JSON.stringify(schema), 'utf8').digest('hex'),
-      };
+  return name === undefined || schema === undefined ? undefined : replyProjectionIdentity(name);
 }
 
 function providerSchemaName(name: ReplySchemaName): string {
@@ -359,7 +311,16 @@ function hostEvents(stdout: string): Record<string, unknown>[] {
   });
 }
 
+/**
+ * The Claude terminal envelope's finish (ADR-MDL-0003). `claude -p --json-schema` delivers
+ * the verdict through its structured-output formatter, so a completed structured reply
+ * ends `stop_reason: tool_use` with `terminal_reason: completed` and `structured_output`
+ * present: that conjunction is `stop`. The marker alone, a denied tool request, an error,
+ * a non-completed terminal reason or a truncation is never a completed review.
+ */
 function claudeCliFinish(envelope: Record<string, unknown>): FinishReason {
+  const denials = envelope['permission_denials'];
+  if (denials !== undefined && (!Array.isArray(denials) || denials.length > 0)) return 'error';
   if (
     envelope['type'] !== 'result' ||
     envelope['subtype'] !== 'success' ||
@@ -382,6 +343,75 @@ function claudeCliFinish(envelope: Record<string, unknown>): FinishReason {
     : 'error';
 }
 
+/**
+ * Claude review argv (ADR-MDL-0003): no built-in tools (`--tools ""`), no MCP server but
+ * the explicitly empty set (`--strict-mcp-config` with an empty `--mcp-config`), no user,
+ * project or local settings, no customizations (hooks, skills, plugins, CLAUDE.md:
+ * `--safe-mode`), no slash commands or skills, and no persisted session. Every flag is
+ * advertised by `claude --help` (Claude Code 2.1.277).
+ */
+export function claudeReviewArgv(
+  model: string,
+  schema: Record<string, unknown> | undefined,
+  prompt: string,
+): string[] {
+  return [
+    '--print',
+    '--no-session-persistence',
+    '--safe-mode',
+    '--disable-slash-commands',
+    '--setting-sources',
+    '',
+    '--strict-mcp-config',
+    '--mcp-config',
+    '{"mcpServers":{}}',
+    '--tools',
+    '',
+    '--model',
+    model,
+    '--output-format',
+    'json',
+    ...(schema === undefined ? [] : ['--json-schema', JSON.stringify(schema)]),
+    prompt,
+  ];
+}
+
+/**
+ * Codex review argv (ADR-MDL-0003): an ephemeral read-only run in the empty review
+ * workspace, without the user's `config.toml` (its MCP servers, hooks and profiles) or
+ * execpolicy rules, with the MCP server table and the tools table overridden empty for any
+ * other configuration layer. `codex exec --help` (codex-cli 0.157.1) advertises no flag
+ * that removes the built-in shell, so a tool or MCP item in the transcript still refuses
+ * the reply; the read-only sandbox only bounds writes.
+ */
+export function codexReviewArgv(
+  model: string,
+  workspace: string,
+  schemaPath: string | undefined,
+  prompt: string,
+): string[] {
+  return [
+    'exec',
+    '--model',
+    model,
+    '--json',
+    '--ephemeral',
+    '--ignore-user-config',
+    '--ignore-rules',
+    '--skip-git-repo-check',
+    '--cd',
+    workspace,
+    '--sandbox',
+    'read-only',
+    '--config',
+    'mcp_servers={}',
+    '--config',
+    'tools={}',
+    ...(schemaPath === undefined ? [] : ['--output-schema', schemaPath]),
+    prompt,
+  ];
+}
+
 function cliResponse(
   options: ModelBridgeOptions,
   system: string,
@@ -395,56 +425,35 @@ function cliResponse(
     call?.response_schema === undefined
       ? undefined
       : providerSchema(call.response_schema, options.provider.startsWith('codex'));
-  let schemaDir: string | undefined;
+  // One private directory per review: an empty working directory, so no project or
+  // ancestor instructions, settings or MCP configuration are discovered, and beside it
+  // (outside the workspace) the Codex output schema file.
+  const scratch = mkdtempSync(join(tmpdir(), 'devai-model-bridge-'));
+  const workspace = join(scratch, 'workspace');
   let schemaPath: string | undefined;
-  if (cli === 'codex' && schema !== undefined && call?.response_schema !== undefined) {
-    schemaDir = mkdtempSync(join(tmpdir(), 'devai-model-bridge-'));
-    schemaPath = join(schemaDir, call.response_schema);
-    writeFileSync(schemaPath, JSON.stringify(schema), 'utf8');
-  }
-  const argv =
-    cli === 'claude'
-      ? [
-          '--print',
-          '--no-session-persistence',
-          '--safe-mode',
-          '--setting-sources',
-          '',
-          '--strict-mcp-config',
-          '--mcp-config',
-          '{"mcpServers":{}}',
-          '--tools',
-          '',
-          '--model',
-          options.model,
-          '--output-format',
-          'json',
-          ...(schema === undefined ? [] : ['--json-schema', JSON.stringify(schema)]),
-          prompt,
-        ]
-      : [
-          'exec',
-          '--model',
-          options.model,
-          '--json',
-          '--ephemeral',
-          '--sandbox',
-          'read-only',
-          ...(call?.response_schema === 'soft-gate-score.schema.json'
-            ? ['--config', 'mcp_servers={}', '--config', 'tools={}']
-            : []),
-          ...(schemaPath === undefined ? [] : ['--output-schema', schemaPath]),
-          prompt,
-        ];
   let result: ReturnType<typeof spawnSync>;
+  let argv: string[];
   try {
+    mkdirSync(workspace);
+    if (cli === 'codex' && schema !== undefined && call?.response_schema !== undefined) {
+      schemaPath = join(scratch, call.response_schema);
+      writeFileSync(schemaPath, JSON.stringify(schema), 'utf8');
+    }
+    argv =
+      cli === 'claude'
+        ? claudeReviewArgv(options.model, schema, prompt)
+        : codexReviewArgv(options.model, workspace, schemaPath, prompt);
     result = spawnSync(cli, argv, {
+      cwd: workspace,
+      // Only the allowlisted host variables the agent-cli adapters admit: no provider API
+      // keys, GH_TOKEN, cloud credentials or NODE_OPTIONS reach the reviewer.
+      env: agentCliEnvironment(options.provider === 'claude-cli' ? 'claude-cli' : 'codex-cli'),
       encoding: 'utf8',
       timeout: call?.timeout_ms ?? options.timeout_ms ?? 120_000,
       maxBuffer: call?.max_output_bytes ?? 32 * 1024 * 1024,
     });
   } finally {
-    if (schemaDir !== undefined) rmSync(schemaDir, { recursive: true, force: true });
+    rmSync(scratch, { recursive: true, force: true });
   }
   if (result.error !== undefined || result.status !== 0) {
     throw new Error(
