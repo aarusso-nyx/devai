@@ -185,7 +185,14 @@ there 5 s after SIGKILL, the termination is never reported as done: the task fai
 its resource locks stay quarantined (see Resources and isolation).
 Database and worktree identities
 are per task (`devai_task_<task id>`, `WT-<task id>`), so two distinct tasks never contend for
-them. There is no cross-round controller and no reviewer reserve yet; the policy records both.
+them. There is no cross-round controller.
+
+The reviewer reserve (`capacity.review_reserve`, ADR-MDL-0009) keeps one worker for review work.
+While an Inspector or Auditor task of the same topological generation is ready, unblocked and
+waiting, implementation tasks may hold at most the run's workers minus one; review tasks may use
+every worker. Admission refuses an implementation task over that share with the waitable
+`TASK_WORKER_CAP`, so it starts once a worker frees up. A serial run is unreserved, and a
+reserve with no review task waiting idles nothing.
 
 Managed worktrees are capped per host at `capacity.max_workers` (ADR-MDL-0007), so every worker
 the policy admits can hold its worktree. A worktree kept after its attempt settles, for review or
@@ -667,6 +674,20 @@ one open campaign round into queued task records through the round task queue, m
 An identical existing record is reported, and a differing one refuses with
 `TASK_RECORD_CONFLICT` before anything is written. No external controller materializes
 campaign state (ADR-GOV-0025).
+
+A campaign task may instead declare an agent `executor` with a `runtime`, `model`, `effort`
+and `recipe_name`, and optionally `recipe_variant`, `max_iterations` (default 4) and
+`capabilities` (ADR-MDL-0009). That task materializes with an agent executor that selects its
+runtime exactly and carries the composition id of its prompt, so `round dispatch
+--experimental` can run it. Before anything is written, each contract is checked:
+
+- the discipline must be engineer or inspector (`CAMPAIGN_AGENT_DISCIPLINE_UNSUPPORTED`);
+- the runtime must be an experimental runtime (`CAMPAIGN_AGENT_RUNTIME_UNSUPPORTED`);
+- the effort must be one the runtime registry lists for it (`CAMPAIGN_AGENT_EFFORT_UNSUPPORTED`);
+- the model must be one of the runtime's tier aliases (`CAMPAIGN_AGENT_MODEL_UNSUPPORTED`).
+
+Materializing needs no activation. Dispatch still needs an in-force Owner activation that admits
+the selection.
 
 `round ratify --round <round-id> --task <task-id> --decision accept|reject --as-role owner --write`
 records the Owner's or Architect's decision on a task in `awaiting_human_review` (for example
