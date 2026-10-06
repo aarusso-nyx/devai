@@ -25,6 +25,11 @@
       "pattern": "^BL-[0-9]{4,}$",
       "description": "Stable repository-wide identifier allocated by backlog add and never reused."
     },
+    "request_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$",
+      "description": "Durable request identity supplied by the creator through --request-id. A retry of backlog add with the same identity recovers this item instead of allocating another. Absent when the add carried no identity; an add without one is always new."
+    },
     "kind": {
       "enum": ["finding", "proposition", "note", "flaky-test"]
     },
