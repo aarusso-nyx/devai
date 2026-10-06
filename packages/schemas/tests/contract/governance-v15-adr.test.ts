@@ -722,7 +722,7 @@ describe('ADR-v3 public result and semantic authority', () => {
     ).toEqual(['ADR-014', 'ADR-MUT-0005', 'ADR-REL-0017']);
     expect(records.filter((record) => record.adr_id === 'ADR-014')).toHaveLength(1);
     expect(result.files_scanned).toBe(114);
-    expect(result.subject_authorities).toHaveLength(515);
+    expect(result.subject_authorities).toHaveLength(518);
     expect(result.effective_authorities).toEqual([
       'ADR-014',
       'ADR-AUT-0001',
