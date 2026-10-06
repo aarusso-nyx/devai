@@ -7,7 +7,7 @@ import {
   closeReadOnlySync,
   openRegularFileReadOnlySync,
   publishFileNoReplaceSync,
-  unlinkSync,
+  removeEntryIfIdentitySync,
 } from '@devai-nyx/authority';
 
 /**
@@ -60,11 +60,13 @@ export function hasIdentity(path: string, identity: FileIdentity): boolean {
   );
 }
 
-/** Unlinks `path` only while its lstat is a regular file with exactly `identity`. */
+/**
+ * Removes the entry at `path` only when it is `identity`, through the governed identity-bound
+ * removal (#317): the entry is quarantined under a private name before it is checked, so an
+ * entry swapped in at `path` is put back, never removed. True when the entry was removed.
+ */
 export function unlinkIfIdentity(path: string, identity: FileIdentity): boolean {
-  if (!hasIdentity(path, identity)) return false;
-  unlinkSync(path);
-  return true;
+  return removeEntryIfIdentitySync(path, identity) === 'removed';
 }
 
 function ownerText(holder: Holder): string {
