@@ -262,16 +262,20 @@ describe('decision_citation_resolution on scoped identities (ADR-SCR-0006)', () 
 });
 
 describe('the governance ledger sensors on the repository (ADR-SCR-0006 IA-004)', () => {
-  // The scan reads the history of every record, so its duration grows with the
-  // catalogue (about 15 s for 96 records on a workstation); the default 15 s
-  // limit made it fail intermittently, including under RC coverage.
+  // The scan reads the history of every record (one `git log --follow` and one `git show`
+  // per revision), so its duration grows with the catalogue and with machine load: 30 s
+  // alone for the current tree, 83 s at load average 200 even in the serial lane, and past
+  // 120 s beside three parallel workers (#246). The file runs in the `local-serial` lane of
+  // tests/config/local.config.ts; this bound is the hang guard for that measured cost.
   it('decision_record_integrity reports zero findings over the real law/adr tree', () => {
     expect(decisionRecordIntegrity({ repoRoot: REPO_ROOT })).toEqual({ ok: true, findings: [] });
-  }, 120_000);
+  }, 240_000);
 
+  // A whole-repository citation scan: 2.8 s alone, 7.1 s at load average 200, which the RC
+  // coverage lane's 15 s default would not survive with instrumentation added.
   it('decision_citation_resolution reports zero findings over the repository', () => {
     expect(decisionCitationResolution({ repoRoot: REPO_ROOT })).toEqual({ ok: true, findings: [] });
-  });
+  }, 60_000);
 
   it('the repointed schema examples and scorecard notes cite no retired identity', () => {
     for (const path of [
