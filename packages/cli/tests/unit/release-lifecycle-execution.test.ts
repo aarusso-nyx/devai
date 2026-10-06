@@ -2358,52 +2358,75 @@ describe('release lifecycle execution kernel', () => {
   });
 
   it('refuses each task-policy identity defect before protected certification dispatch', async () => {
-    const wrongAction = certificationProviderBoundaryInput();
-    await expect(
-      createReleaseCertificationProvider(wrongAction.input)(request('release preflight')),
-    ).resolves.toMatchObject({ outcome: 'failure', code: 'release-task-policy-identity-mismatch' });
-    expect(wrongAction.certify).not.toHaveBeenCalled();
+    // The provider writes its diagnostic cause to stderr. Capture it so a passing run is silent
+    // and a failing sweep's stderr is not led by expected refusals (#236).
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    try {
+      const wrongAction = certificationProviderBoundaryInput();
+      await expect(
+        createReleaseCertificationProvider(wrongAction.input)(request('release preflight')),
+      ).resolves.toMatchObject({
+        outcome: 'failure',
+        code: 'release-task-policy-identity-mismatch',
+      });
+      expect(wrongAction.certify).not.toHaveBeenCalled();
 
-    const wrongUnit = certificationProviderBoundaryInput();
-    const wrongUnitRequest = request('release certify');
-    const originalUnit = required(
-      wrongUnitRequest.candidate_locator.release_units[0],
-      'missing release unit',
-    );
-    await expect(
-      createReleaseCertificationProvider(wrongUnit.input)({
-        ...wrongUnitRequest,
-        candidate_locator: {
-          ...wrongUnitRequest.candidate_locator,
-          release_units: [{ ...originalUnit, release_unit: '@foreign/unit' }],
-        },
-      }),
-    ).resolves.toMatchObject({ outcome: 'failure', code: 'release-task-policy-identity-mismatch' });
-    expect(wrongUnit.certify).not.toHaveBeenCalled();
+      const wrongUnit = certificationProviderBoundaryInput();
+      const wrongUnitRequest = request('release certify');
+      const originalUnit = required(
+        wrongUnitRequest.candidate_locator.release_units[0],
+        'missing release unit',
+      );
+      await expect(
+        createReleaseCertificationProvider(wrongUnit.input)({
+          ...wrongUnitRequest,
+          candidate_locator: {
+            ...wrongUnitRequest.candidate_locator,
+            release_units: [{ ...originalUnit, release_unit: '@foreign/unit' }],
+          },
+        }),
+      ).resolves.toMatchObject({
+        outcome: 'failure',
+        code: 'release-task-policy-identity-mismatch',
+      });
+      expect(wrongUnit.certify).not.toHaveBeenCalled();
 
-    const wrongDigest = certificationProviderBoundaryInput();
-    const secondUnit = { ...originalUnit, release_unit: '@foreign/unit' };
-    const policyInput = {
-      ...wrongDigest.input,
-      task_policies: [
-        wrongDigest.input.task_policies[0],
-        {
-          release_unit: '@foreign/unit',
-          task_policy_digest_sha256: '0'.repeat(64),
-          document: { nodes: ['foreign'] },
-        },
-      ],
-    } as Parameters<typeof createReleaseCertificationProvider>[0];
-    await expect(
-      createReleaseCertificationProvider(policyInput)({
-        ...wrongUnitRequest,
-        candidate_locator: {
-          ...wrongUnitRequest.candidate_locator,
-          release_units: [originalUnit, secondUnit],
-        },
-      }),
-    ).resolves.toMatchObject({ outcome: 'failure', code: 'release-task-policy-identity-mismatch' });
-    expect(wrongDigest.certify).not.toHaveBeenCalled();
+      const wrongDigest = certificationProviderBoundaryInput();
+      const secondUnit = { ...originalUnit, release_unit: '@foreign/unit' };
+      const policyInput = {
+        ...wrongDigest.input,
+        task_policies: [
+          wrongDigest.input.task_policies[0],
+          {
+            release_unit: '@foreign/unit',
+            task_policy_digest_sha256: '0'.repeat(64),
+            document: { nodes: ['foreign'] },
+          },
+        ],
+      } as Parameters<typeof createReleaseCertificationProvider>[0];
+      await expect(
+        createReleaseCertificationProvider(policyInput)({
+          ...wrongUnitRequest,
+          candidate_locator: {
+            ...wrongUnitRequest.candidate_locator,
+            release_units: [originalUnit, secondUnit],
+          },
+        }),
+      ).resolves.toMatchObject({
+        outcome: 'failure',
+        code: 'release-task-policy-identity-mismatch',
+      });
+      expect(wrongDigest.certify).not.toHaveBeenCalled();
+      const causes = stderr.mock.calls.map((call) => String(call[0]));
+      expect(causes).toHaveLength(3);
+      for (const cause of causes) {
+        expect(cause).toContain(
+          'release certify: cause: Error: release-task-policy-identity-mismatch',
+        );
+      }
+    } finally {
+      stderr.mockRestore();
+    }
   });
 
   it('preserves protected provider refusals and rejects incomplete success dispositions', async () => {
@@ -2479,38 +2502,55 @@ describe('release lifecycle execution kernel', () => {
   });
 
   it('rejects one mismatched package policy among otherwise matching release units', async () => {
-    const good = materialFor('release certify');
-    const unit = required(good.release_units[0], 'missing certified release unit');
-    const pkg = required(unit.packages[0], 'missing certified package');
-    const certification = required(pkg.certification_manifest, 'missing certification manifest');
-    const materialWithWrongPolicy: ReleaseStateMaterial = {
-      ...good,
-      release_units: [
-        {
-          ...unit,
-          packages: [
-            pkg,
-            {
-              ...pkg,
-              package_id: '@foreign/package',
-              certification_manifest: {
-                ...certification,
+    // The provider writes its diagnostic cause to stderr. Capture it so a passing run is silent
+    // and a failing sweep's stderr is not led by expected refusals (#236).
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    try {
+      const good = materialFor('release certify');
+      const unit = required(good.release_units[0], 'missing certified release unit');
+      const pkg = required(unit.packages[0], 'missing certified package');
+      const certification = required(pkg.certification_manifest, 'missing certification manifest');
+      const materialWithWrongPolicy: ReleaseStateMaterial = {
+        ...good,
+        release_units: [
+          {
+            ...unit,
+            packages: [
+              pkg,
+              {
+                ...pkg,
                 package_id: '@foreign/package',
-                task_policy_digest_sha256: '0'.repeat(64),
+                certification_manifest: {
+                  ...certification,
+                  package_id: '@foreign/package',
+                  task_policy_digest_sha256: '0'.repeat(64),
+                },
               },
-            },
-          ],
-        },
-      ],
-    };
-    const boundary = certificationProviderBoundaryInput(
-      vi.fn(() => ({ outcome: 'success' as const, material: materialWithWrongPolicy })),
-    );
+            ],
+          },
+        ],
+      };
+      const boundary = certificationProviderBoundaryInput(
+        vi.fn(() => ({ outcome: 'success' as const, material: materialWithWrongPolicy })),
+      );
 
-    await expect(
-      createReleaseCertificationProvider(boundary.input)(request('release certify')),
-    ).resolves.toMatchObject({ outcome: 'failure', code: 'release-task-policy-identity-mismatch' });
-    expect(boundary.certify).toHaveBeenCalledOnce();
+      await expect(
+        createReleaseCertificationProvider(boundary.input)(request('release certify')),
+      ).resolves.toMatchObject({
+        outcome: 'failure',
+        code: 'release-task-policy-identity-mismatch',
+      });
+      expect(boundary.certify).toHaveBeenCalledOnce();
+      const causes = stderr.mock.calls.map((call) => String(call[0]));
+      expect(causes).toHaveLength(1);
+      for (const cause of causes) {
+        expect(cause).toContain(
+          'release certify: cause: Error: release-task-policy-identity-mismatch',
+        );
+      }
+    } finally {
+      stderr.mockRestore();
+    }
   });
 
   it('requires both a live provider context value and its exact object identity', () => {
