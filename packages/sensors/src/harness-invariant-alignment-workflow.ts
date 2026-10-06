@@ -12,6 +12,55 @@ interface WorkflowRunStep {
   readonly script: string;
   readonly continueOnError: boolean;
   readonly disabled: boolean;
+  /**
+   * The step or its job carries an `if:` other than `success()` or `always()`, so the step
+   * may never run on a pull request (#235). Only scoped producers read it.
+   */
+  readonly conditional?: boolean;
+}
+
+/** An `if:` that cannot skip a step on a run that reaches it: `success()` or `always()`. */
+function unconditional(condition: string): boolean {
+  const value = unquoteYamlScalar(stripYamlComment(condition).trim());
+  const inner = /^\$\{\{\s*(.*?)\s*\}\}$/u.exec(value)?.[1] ?? value;
+  return /^(?:success|always)\(\s*\)$/u.test(inner.trim());
+}
+
+/**
+ * For each line, whether the job that encloses it carries a job-level `if:` other than
+ * `success()` or `always()`. Jobs are the keys one level under `jobs:`; a job-level key
+ * sits at the indentation of the job's first key.
+ */
+function jobConditions(lines: readonly string[]): readonly boolean[] {
+  const out: boolean[] = new Array<boolean>(lines.length).fill(false);
+  const indentOf = (line: string): number => line.length - line.trimStart().length;
+  const meaningful = (line: string): boolean => stripYamlComment(line).trim() !== '';
+  const jobsAt = lines.findIndex((line) => /^jobs\s*:\s*$/u.test(stripYamlComment(line)));
+  if (jobsAt < 0) return out;
+  let jobIndent: number | undefined;
+  let keyIndent: number | undefined;
+  let conditional = false;
+  for (let index = jobsAt + 1; index < lines.length; index += 1) {
+    const line = lines[index] ?? '';
+    if (!meaningful(line)) {
+      out[index] = conditional;
+      continue;
+    }
+    const indent = indentOf(line);
+    if (indent === 0) break;
+    jobIndent ??= indent;
+    if (indent === jobIndent) {
+      conditional = false;
+      keyIndent = undefined;
+    } else if (indent > jobIndent) {
+      keyIndent ??= indent;
+      const condition = stripYamlComment(line).match(/^\s*if\s*:\s*(.*?)\s*$/u)?.[1];
+      if (indent === keyIndent && condition !== undefined && !unconditional(condition))
+        conditional = true;
+    }
+    out[index] = conditional;
+  }
+  return out;
 }
 
 function stripYamlComment(line: string): string {
@@ -51,10 +100,13 @@ function unquoteYamlScalar(value: string): string {
 export function extractRunSteps(content: string): WorkflowRunStep[] {
   const lines = content.split('\n');
   const steps: WorkflowRunStep[] = [];
+  const jobConditional = jobConditions(lines);
 
   for (let start = 0; start < lines.length; start += 1) {
     const first = lines[start] ?? '';
-    const startMatch = first.match(/^(\s*)-\s+(?:name|id|run|uses|continue-on-error)\s*:/);
+    const startMatch = first.match(
+      /^(\s*)-\s+(?:name|id|if|run|uses|shell|env|with|working-directory|timeout-minutes|continue-on-error)\s*:/,
+    );
     if (startMatch === null) continue;
     const stepIndent = startMatch[1]?.length ?? 0;
     let end = start + 1;
@@ -84,6 +136,12 @@ export function extractRunSteps(content: string): WorkflowRunStep[] {
         /^(?:false|\$\{\{\s*false\s*\}\})(?:\s|#|$)/i.test(unquoteYamlScalar(condition))
       );
     });
+    const conditional =
+      jobConditional[start] === true ||
+      block.some((line) => {
+        const condition = stripYamlComment(line).match(/^\s*(?:-\s+)?if\s*:\s*(.*?)\s*$/)?.[1];
+        return condition !== undefined && !unconditional(condition);
+      });
     for (let offset = 0; offset < block.length; offset += 1) {
       const line = stripYamlComment(block[offset] ?? '');
       const runMatch = line.match(/^\s*(?:-\s+)?run\s*:\s*(.*)$/);
@@ -102,9 +160,10 @@ export function extractRunSteps(content: string): WorkflowRunStep[] {
           script: raw.startsWith('>') ? foldWorkflowLines(body) : body.join('\n'),
           continueOnError,
           disabled,
+          conditional,
         });
       } else {
-        steps.push({ script: unquoteYamlScalar(raw), continueOnError, disabled });
+        steps.push({ script: unquoteYamlScalar(raw), continueOnError, disabled, conditional });
       }
       break;
     }
@@ -549,7 +608,8 @@ export function sameArguments(
 /**
  * A scoped producer (#235) aligns only through a fail-closed CI segment that runs the
  * action with exactly the declared arguments, so a different invocation of the same
- * action, such as `check --preflight`, never stands in for it.
+ * action, such as `check --preflight`, never stands in for it. A step or job with an `if:`
+ * other than `success()` or `always()` may never run on a pull request, so it does not count.
  */
 export function hasExecutableProducer(
   steps: readonly WorkflowRunStep[],
@@ -560,6 +620,7 @@ export function hasExecutableProducer(
     (step) =>
       !step.continueOnError &&
       !step.disabled &&
+      step.conditional !== true &&
       !shellSegments(step.script).some(disablesErrexit) &&
       !hasNonBindingControlFlow(step.script) &&
       shellSegments(step.script).some(
