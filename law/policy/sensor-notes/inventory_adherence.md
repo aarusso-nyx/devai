@@ -21,7 +21,7 @@ Bound cells: F4×T4.
 ## Surfaces measured and cell applicability
 
 The registry pairing is `inventory_adherence` → F4:T4 (ADR-SCR-0012).
-The Owner chose inventory production on issue #237; the framework declares
+The Owner chose inventory production on issue #237 and it is shipped; the framework declares
 `actions: true` in `.devai/config/sensor-inputs.json`. F4:T4 remains measured.
 Only a declaration that every bound surface (`http`, `database`, `rbac`,
 `actions`) is absent can produce reading-driven `skipped`. A contradictory
@@ -74,15 +74,16 @@ store. It remains read-only and runs in the first sweep pass. Measured readings
 carry exact-head and input-digest evidence through existing reading metrics and
 the recording chain; do not invent an undeclared top-level candidate field.
 
-## Provisional preparation and acceptance
+## Shipped production and the trace claim
 
-TASK-0631 preparation specifies this repair; it does not report it implemented.
-See [inventory production](../../../docs/dev/operations/open-issue-closure-campaign/inventory-production.md)
-for the exact source map, planned output population, scope-amendment prerequisites
-and later adversarial acceptance. Original R-0601/R-0602 dependencies and all
-validation gates remain. Refresh and independently review the exact composed
-design after R-0602 source completion before downstream handoff. No generator,
-runtime observation, or recording is authorized by this note.
+The combined body is produced by the shipped `sense run inventory_regeneration` path
+(see the [inventory_regeneration note](./inventory_regeneration.md)), which is no longer
+provisional. The measured verdict depends on `law/trace.json` `code_areas`: a source
+file counts as claimed only when an invariant's `code_areas` entry names it or a
+directory prefix that contains it. Claims are made by the invariants that govern the area,
+never added to obtain PASS, and the thresholds and surface declarations stay unchanged.
+Regenerate the inventory before measuring: a stale body is a failure-to-observe, not a
+reading of the present tree.
 
 The sensor emits evidence only through its registered cells or diagnostic surface. Any
 future change to identity, standing, tier, or emitter requires an Architect disposition

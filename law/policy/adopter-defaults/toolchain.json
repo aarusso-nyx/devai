@@ -21,7 +21,7 @@
   },
   "verifier": {
     "package": "@aarusso-nyx/devai",
-    "version": "1.5.4",
+    "version": "1.9.0",
     "policy": "law/policy/trusted-local-rc-verifier-package.json"
   },
   "constants": {}

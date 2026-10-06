@@ -42,7 +42,7 @@ hash is not the sensor's `{graph: adjacency-list}` body. Generate each through i
 own typed producer and validator. The coverage matrix is not the combined F4
 manifest and its action-link metrics remain in the real reading.
 
-The planned bounded state bodies for the two required framework kinds are:
+The bounded state bodies for the two required framework kinds are:
 
 - `.devai/state/sensors/inventory_dep_graph/dep-graph.json`, validated by
   `law/schemas/dep-graph.schema.json`.
@@ -50,9 +50,11 @@ The planned bounded state bodies for the two required framework kinds are:
   `law/schemas/coverage-matrix.schema.json`.
 
 These join `.devai/state/inventory/inventory.json` as machine outputs of the
-existing registered observation/rebuild paths after the exact output-planner
-population is reviewed and admitted. These paths are design targets, not a grant
-to materialize them in TASK-0631 preparation. Existing direct sensor defaults under
+registered observation/rebuild path. `sense run inventory_regeneration` regenerates all
+of them for a clean HEAD commit, validates each against its schema, and publishes the
+set together by atomic replacement only when every body is valid; a failure before
+publication writes nothing, and a dirty working tree or missing candidate commit reads
+UNKNOWN. Existing direct sensor defaults under
 `record/proofs/sensors/<kind>/` stay distinct and are not silently relocated.
 Read-only sweep adapters retain `persistBody: false`.
 
@@ -81,14 +83,18 @@ refusal, exact-byte digest checking and chain append/repair semantics. A same-bo
 replay must not rewrite any recorded reading; timestamps do not select latest.
 The aggregate `inventory_regeneration` reading is recorded with the same custody.
 
-## Provisional preparation and acceptance
+## Shipped regeneration
 
-See [inventory production](../../../docs/dev/operations/open-issue-closure-campaign/inventory-production.md)
-for current source gaps, ordered protocol, output/boundary prerequisites and later
-Inspector vectors. This early Architect preparation permits only three prose
-paths. It grants no producer execution, generated body, proof, recording, later
-role dispatch, or final gate waiver. R-0602 completion, exact composed refresh,
-independent review and required validations precede downstream handoff.
+The repair is implemented in `packages/cli/src/commands/sense/readings-rebuild.ts` (#237,
+ADR-SCR-0012) and is no longer provisional. Regeneration produces the combined F4 body
+and the required kinds' bodies through their typed producers, keeps a producer's REVIEW
+as REVIEW, and reads FAIL for a producer error, a missing required kind, or an aggregate
+reading the store did not receive. It removes the body of a regenerated kind that the
+plant-surface declaration no longer requires, then rebuilds the kinds it does not
+regenerate from their recorded bodies. The coverage kind is required unless both `http` and
+`actions` are declared absent. Finding codes and metric names live in that source and in its
+tests; this note records only the contract. Its remaining acceptance is the next recorded
+scorecard, which reads F4:T9 from a regenerated, recorded instance.
 
 The sensor emits evidence only through its registered cells or diagnostic surface. Any
 future change to identity, standing, tier, or emitter requires an Architect disposition
