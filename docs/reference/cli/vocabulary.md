@@ -155,7 +155,7 @@ devai release status --help
 ### Porcelain
 
 **Porcelain** is the workflow-facing CLI surface. It is shown in default help and is organized
-around the seven domains in the [CLI overview](./index.md). Porcelain may orchestrate internal
+around the eleven domains in the [CLI overview](./index.md). Porcelain may orchestrate internal
 services, but it retains exact action, effect, consent, and output contracts.
 
 ```sh

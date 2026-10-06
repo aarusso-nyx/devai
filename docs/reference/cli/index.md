@@ -1,7 +1,7 @@
 # CLI overview
 
 DEVAI presents 69 actions: 36 stable actions, 22 preview actions, and 11 internal plumbing
-actions. Nine workflow domains organize the public surface. Choose the domain from the outcome you need;
+actions. Eleven workflow domains organize the public surface. Choose the domain from the outcome you need;
 then choose one leaf action, suite, preset, kind, slice, tier, round, or task selection inside
 that domain. The hidden `task` and `catalog` surfaces are plumbing, not additional workflows.
 
@@ -21,11 +21,13 @@ does not by itself establish release, deployment, or readiness.
 | inspect release control or enter a separately authorized release ceremony | `release`  | `devai release status --repo-root . --format json`                            |
 | compute a scorecard or create an exact non-promoting observation          | `audit`    | `devai audit scorecard --at <full-sha> --repo-root . --format json`           |
 | classify a sensor failure before remediation                              | `triage`   | `devai triage classify --input <reading.json> --as-role inspector --write`    |
+| record, list, show, or resolve a repository backlog item                  | `backlog`  | `devai backlog list --repo-root . --format json`                              |
+| project a campaign plan onto runtime state or materialize a round         | `campaign` | `devai campaign status --campaign CMP-0007 --repo-root . --format json`       |
 
 The examples above use only the current grammar. They are read-only or dry-run selections;
 replace the example identifiers with identifiers that exist in the target repository.
 
-## Contract shared by all nine workflows
+## Contract shared by all eleven workflows
 
 For workflow identifier `W`, its exact population is the ordered projection of entries in the
 [action registry](../../../law/policy/action-registry.json) whose status is `stable` or `preview`
@@ -275,6 +277,56 @@ other. Preview or inspect whenever the leaf offers `--dry-run`, plan output, sta
 - **Example:** `devai triage classify --input <reading.json> --as-role inspector --write`.
 - **Canonical source and related workflow:** [action registry](../../../law/policy/action-registry.json);
   return to `sense` for new observations and `check` for governed validation.
+
+### `backlog` — Repository backlog
+
+- **Stable identifier and label:** `backlog`; “Repository backlog.”
+- **Purpose and exact projection:** record, list, show, and resolve schema-validated repository
+  backlog items (finding, proposition, note, or flaky-test) under `.devai/state/backlog/`
+  ([ADR-GOV-0019](../../../law/adr/ADR-GOV-0019-backlog-action-family.md)). Its four stable
+  leaves are the registry projection with `W = backlog`: `add`, `list`, `show`, and `resolve`.
+- **Prerequisites, tools, inputs, and defaults:** `--repo-root` defaults to the current directory.
+  `add` needs `--kind`, `--title`, and `--body`; `--class` and `--role` are optional, and the role
+  defaults to the declared invocation role. `list` shows open items unless `--status` selects
+  `resolved` or `all`. `show` takes one `BL-NNNN` identifier. `resolve` takes one identifier and a
+  required `--resolution` reference. Round attribution happens only through an explicit `--round`
+  and is never inferred from the session, the branch, or the active round.
+- **Output and verdict:** `add`, `show`, and `resolve` return the schema-validated item;
+  `list` returns `{schemaVersion, items}`. An unknown identifier, an already resolved item, or
+  invalid input is a typed error, never an empty result.
+- **Effect, consent, and cost:** `add` and `resolve` are declared `local-write`: any of the five
+  roles may initiate them with `--write`, and they write only the backlog directory and the shared
+  counters file. `list` and `show` are declared `read`. No leaf reaches the network or publishes.
+  Domain-level cost is N/A; every leaf is a bounded local operation.
+- **Use / do not use:** use to keep findings and propositions in the repository. Do not use a
+  backlog item as a round gap, and resolving an item never pauses, resolves, or alters a gap.
+- **Example:** `devai backlog list --repo-root . --format json`.
+- **Canonical source and related workflow:** [action registry](../../../law/policy/action-registry.json),
+  [backlog item schema](../../../law/schemas/backlog-item.schema.json); round attribution connects
+  an item to `round`.
+
+### `campaign` — Campaign projection and materialization
+
+- **Stable identifier and label:** `campaign`; “Campaign projection and materialization.”
+- **Purpose and exact projection:** project one campaign plan onto canonical round and task state,
+  and materialize the tasks of one open campaign round through the round task queue
+  ([ADR-GOV-0025](../../../law/adr/ADR-GOV-0025-governed-campaign-controller.md)). Its two preview
+  leaves are the registry projection with `W = campaign`: `status` and `materialize`.
+- **Prerequisites, tools, inputs, and defaults:** both leaves take `--campaign <CMP-NNNN>` naming a
+  plan that follows the [campaign execution policy](../../../law/policy/campaign-execution.json).
+  `materialize` also requires `--round <R-NNNN>`, which must be an open campaign round.
+- **Output and verdict:** `status` names every drift between the plan and the runtime state.
+  `materialize` reports the newly materialized and the already existing tasks, so a repeated run
+  is idempotent. A missing campaign or round is a typed refusal.
+- **Effect, consent, and cost:** `status` is declared `read`. `materialize` is declared
+  `harness-write`, requires the Architect role plus `--write`, and writes only through the round
+  task queue. Neither leaf publishes. Domain-level cost is N/A because it follows the campaign size.
+- **Use / do not use:** use to check a campaign plan against runtime state and to queue the tasks
+  a ratified plan maps. Do not use `materialize` to start, dispatch, or merge work; those remain
+  separate governed steps.
+- **Example:** `devai campaign status --campaign CMP-0007 --repo-root . --format json`.
+- **Canonical source and related workflow:** [campaign execution policy](../../../law/policy/campaign-execution.json),
+  [round/task/executor guide](./round-task-executors.md); continue with `round`.
 
 ## Typical adoption-to-release journey
 
