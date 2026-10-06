@@ -28,6 +28,8 @@ describe('raw mutation imports remain covered across call forms', () => {
     'execFile',
     'execFileSync',
     'fsyncSync',
+    'link',
+    'linkSync',
     'mkdir',
     'mkdirSync',
     'mkdtempSync',
