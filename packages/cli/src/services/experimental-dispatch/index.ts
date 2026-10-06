@@ -35,7 +35,7 @@ import {
   createWorktree,
   destroyWorktree,
   dispatchAttemptFloor,
-  listLocks,
+  holdsLiveLocks,
   loadTask,
   retainWorktree,
   saveTask,
@@ -353,13 +353,12 @@ function writeDiagnostics(
 
 /** Whether the task still holds every lock it declared, unexpired. */
 function locksHeld(repoRoot: string, task: TaskRecord): boolean {
-  const now = Date.now();
-  const held = listLocks({ locksDir: join(repoRoot, '.devai/state/locks') }).filter(
-    (lock) => lock.task_id === task.id && now - new Date(lock.acquired_at).getTime() < lock.ttl_ms,
-  );
-  return taskLockTargets(task).every((target) =>
-    held.some((lock) => `${lock.substrate}:${lock.module}` === target),
-  );
+  // Read-only: the exact keys the task declares, never a listing of every lock record.
+  return holdsLiveLocks({
+    locksDir: join(repoRoot, '.devai/state/locks'),
+    taskId: task.id,
+    targets: taskLockTargets(task),
+  });
 }
 
 function budgetRefusal(context: ExperimentalDispatchContext): string | undefined {

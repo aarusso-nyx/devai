@@ -3,9 +3,16 @@
 // spawn is replaced by one whose settled result carries that report.
 import type { GuardedChildProcess, GuardedProcessResult } from '@devai-nyx/authority';
 import { runWithAuthorityHostEffects, type AuthorityHostEffectScope } from '@devai-nyx/authority';
-import type { TaskRecord } from '@devai-nyx/loop';
+import {
+  acquireLocks,
+  listLocks,
+  loadTask,
+  releaseLocks,
+  runRoundTasks,
+  type TaskRecord,
+} from '@devai-nyx/loop';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -89,20 +96,22 @@ async function permissive<T>(run: () => Promise<T>): Promise<T> {
   }
 }
 
+const unconfirmed: GuardedProcessResult = {
+  exit_code: 0,
+  signal: null,
+  stdout: '',
+  stderr: '',
+  stdout_truncated: false,
+  stderr_truncated: false,
+  timed_out: true,
+  spawn_error: null,
+  termination_error: 'PROCESS_GROUP_TERMINATION_UNCONFIRMED',
+};
+
 describe('routine dispatch of a process group whose termination is unconfirmed', () => {
   it('fails the run with its own code even though the routine exited 0', async () => {
     const root = repository();
-    const settled: GuardedProcessResult = {
-      exit_code: 0,
-      signal: null,
-      stdout: '',
-      stderr: '',
-      stdout_truncated: false,
-      stderr_truncated: false,
-      timed_out: true,
-      spawn_error: null,
-      termination_error: 'PROCESS_GROUP_TERMINATION_UNCONFIRMED',
-    };
+    const settled: GuardedProcessResult = unconfirmed;
     const child: GuardedChildProcess = {
       pid: 4343,
       result: Promise.resolve(settled),
@@ -126,5 +135,63 @@ describe('routine dispatch of a process group whose termination is unconfirmed',
     expect(
       JSON.parse(readFileSync(join(root, '.devai/state/tasks/TASK-9711.json'), 'utf8')),
     ).toMatchObject({ status: 'escalated' });
+  });
+
+  // #288: the escalation must not hand the task's resources to another task while the
+  // group may still be running; the locks stay held and the condition is recorded.
+  it('keeps the task locks quarantined and records the live process group', async () => {
+    const root = repository();
+    mkdirSync(join(root, 'work/rounds/R-9711'), { recursive: true });
+    writeFileSync(join(root, 'work/rounds/R-9711/AUTHORIZATION.md'), 'status: active\nGRANTED\n');
+    const value: TaskRecord = { ...TASK, status: 'ready', target_modules: ['MOD-routine'] };
+    mkdirSync(join(root, '.devai/state/tasks'), { recursive: true });
+    writeFileSync(
+      join(root, '.devai/state/tasks/TASK-9711.json'),
+      `${JSON.stringify(value, null, 2)}\n`,
+    );
+    spawn.mockClear();
+    spawn.mockReturnValueOnce({
+      pid: 4343,
+      result: Promise.resolve({ ...unconfirmed, exit_code: 0 }),
+      terminate: vi.fn(),
+    } satisfies GuardedChildProcess);
+
+    const result = await permissive(() =>
+      runRoundTasks({
+        repoRoot: root,
+        round: 'R-9711',
+        dispatch: (running) => dispatchRoundTask(root, running),
+      }),
+    );
+
+    expect(result.results).toMatchObject([
+      { task_id: 'TASK-9711', ok: false, code: 'PROCESS_GROUP_TERMINATION_UNCONFIRMED' },
+    ]);
+    const locksDir = join(root, '.devai/state/locks');
+    expect(loadTask(root, 'TASK-9711').status).toBe('escalated');
+    expect(listLocks({ locksDir })).toMatchObject([
+      { task_id: 'TASK-9711', substrate: 'F2', module: 'MOD-routine' },
+    ]);
+    const evidenceRoot = join(root, '.devai/state/round-runs/R-9711/task-executions');
+    const [evidenceFile = ''] = readdirSync(evidenceRoot);
+    expect(
+      JSON.parse(readFileSync(join(root, '.devai/state/lock-quarantine/TASK-9711.json'), 'utf8')),
+    ).toMatchObject({
+      task_id: 'TASK-9711',
+      round_id: 'R-9711',
+      reason: 'PROCESS_GROUP_TERMINATION_UNCONFIRMED',
+      pid: 4343,
+      evidence_id: evidenceFile.replace(/\.json$/u, ''),
+      targets: ['F2:MOD-routine'],
+    });
+    // Another task cannot take the module while the group may live, nor can a later run's
+    // reconciliation release it; the locks lapse only by their TTL.
+    await permissive(async () => {
+      expect(
+        acquireLocks({ locksDir, taskId: 'TASK-9712', targets: ['F2:MOD-routine'] }).denied,
+      ).toEqual([{ target: 'F2:MOD-routine', held_by: 'TASK-9711' }]);
+      expect(releaseLocks({ locksDir, taskId: 'TASK-9711' })).toEqual([]);
+    });
+    expect(spawn).toHaveBeenCalledTimes(1);
   });
 });

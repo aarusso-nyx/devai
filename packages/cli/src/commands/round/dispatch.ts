@@ -10,7 +10,9 @@ import {
   escalateTask,
   executeRoutineExecutor,
   listWorktrees,
+  quarantineLocks,
   saveTask,
+  taskLockTargets,
   type RoundTaskDispatchResult,
   type TaskRecord,
 } from '@devai-nyx/loop';
@@ -94,6 +96,8 @@ async function dispatchRoutine(
   const startedAt = new Date().toISOString();
   let timedOut = false;
   let terminationUnconfirmed = false;
+  /** The leader of a process group that may outlive the dispatch. */
+  let livePid: number | null | undefined;
   const result = await executeRoutineExecutor({
     executor,
     authority: {
@@ -104,12 +108,14 @@ async function dispatchRoutine(
     },
     runArgv: async (argv, options) => {
       // Asynchronous so concurrent round workers overlap (ADR-MDL-0005 D-10).
-      const executed = await spawn(argv[0] ?? '', argv.slice(1), {
+      const child = spawn(argv[0] ?? '', argv.slice(1), {
         cwd: resolve(executionRoot, options.cwd),
         shell: false,
         timeout: options.timeout,
         maxOutputBytes: ROUTINE_OUTPUT_BYTES,
-      }).result;
+      });
+      const executed = await child.result;
+      if (executed.termination_error !== undefined) livePid ??= child.pid ?? null;
       // A routine that outlives its deadline fails even if it then exits 0 (for example
       // by trapping SIGTERM): its exit status no longer describes a bounded run. One whose
       // process group could not be confirmed gone may even still be running.
@@ -134,7 +140,7 @@ async function dispatchRoutine(
     ? {
         code: 'PROCESS_GROUP_TERMINATION_UNCONFIRMED',
         message:
-          'routine was terminated but its process group could not be confirmed gone; it may still be running',
+          'routine was terminated but its process group could not be confirmed gone; it may still be running, so its resource locks are kept until they expire',
       }
     : timedOut
       ? {
@@ -222,6 +228,23 @@ async function dispatchRoutine(
     saveTask(repoRoot, { ...running, status: 'pre_merge' });
     saveTask(repoRoot, { ...running, status: 'merging' });
   } else {
+    if (terminationUnconfirmed) {
+      // The group may still be running and using the task's resources: record the
+      // condition durably before the escalation, which then releases none of the locks.
+      // They stay held until their TTL lapses, or a human removes the quarantine record.
+      quarantineLocks({
+        locksDir: join(repoRoot, '.devai/state/locks'),
+        quarantine: {
+          task_id: running.id,
+          round_id: running.round_id,
+          reason: 'PROCESS_GROUP_TERMINATION_UNCONFIRMED',
+          pid: livePid ?? null,
+          evidence_id: id,
+          targets: taskLockTargets(running),
+          recorded_at: new Date().toISOString(),
+        },
+      });
+    }
     escalateTask({ repoRoot, taskId: running.id });
   }
   return { ok: succeeded, evidence_id: id, ...(!succeeded && { code: evidence.failure?.code }) };
