@@ -2,7 +2,13 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import Ajv2020 from 'ajv/dist/2020.js';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getValidator, loadSchema } from '../../src/index.js';
+import {
+  getValidator,
+  loadSchema,
+  providerReplySchema,
+  REPLY_PROJECTION_VERSION,
+  replyProjectionIdentity,
+} from '../../src/index.js';
 
 // Activated before any bridge/SDK import and retained through suite teardown.
 // This is native denial, independent of vi mocks and per-test restoration.
@@ -420,4 +426,134 @@ describe('CMP-0006 strict response validation precedes optional-null normalizati
       }
     },
   );
+});
+
+// Issue #249 item 4: Codex `--output-schema` and the OpenAI API send the projection in
+// strict mode. The canonical review-verdict.schema.json is unchanged (ADR-MDL-0003); the
+// projection is what must be strict-acceptable, and it must not change what is accepted.
+describe('#249 strict projection is OpenAI strict-mode shaped and meaning-preserving', () => {
+  // The JSON Schema subset OpenAI strict structured outputs document.
+  const STRICT_KEYWORDS = new Set([
+    'type',
+    'properties',
+    'required',
+    'additionalProperties',
+    'items',
+    'enum',
+    'const',
+    'anyOf',
+    '$ref',
+    '$defs',
+    'title',
+    'description',
+    'pattern',
+    'format',
+    'minimum',
+    'maximum',
+    'exclusiveMinimum',
+    'exclusiveMaximum',
+    'multipleOf',
+    'minItems',
+    'maxItems',
+  ]);
+
+  function keywordsOf(schema: unknown, into = new Set<string>()): Set<string> {
+    if (Array.isArray(schema)) for (const member of schema) keywordsOf(member, into);
+    else if (schema !== null && typeof schema === 'object') {
+      for (const [key, member] of Object.entries(schema as Schema)) {
+        into.add(key);
+        if (key === 'properties' || key === '$defs') {
+          for (const child of Object.values(member as Schema)) keywordsOf(child, into);
+        } else if (key !== 'enum' && key !== 'const') keywordsOf(member, into);
+      }
+    }
+    return into;
+  }
+
+  function nodes(schema: unknown, into: Schema[] = []): Schema[] {
+    if (Array.isArray(schema)) for (const member of schema) nodes(member, into);
+    else if (schema !== null && typeof schema === 'object') {
+      into.push(schema as Schema);
+      for (const member of Object.values(schema as Schema)) nodes(member, into);
+    }
+    return into;
+  }
+
+  it.each([REVIEW, TRIAGE] as const)(
+    '%s strict projection uses only strict-mode keywords and types every enum',
+    (name) => {
+      const schema = providerReplySchema(name, true);
+      expect([...keywordsOf(schema)].filter((key) => !STRICT_KEYWORDS.has(key))).toEqual([]);
+      assertStrictObjects(schema);
+      for (const node of nodes(schema))
+        if (Array.isArray(node['enum'])) expect(node['type'], JSON.stringify(node)).toBe('string');
+    },
+  );
+
+  it.each(['codex', 'codex-cli'] as const)(
+    '%s receives exactly the shared strict projection and its identity',
+    async (provider) => {
+      const { schema, response } = await request(provider, pass);
+      expect(schema).toEqual(providerReplySchema(REVIEW, true));
+      expect(response.projection).toEqual(replyProjectionIdentity(REVIEW));
+      expect(response.projection?.version).toBe(REPLY_PROJECTION_VERSION);
+    },
+  );
+
+  it('keeps the canonical schema and the non-strict projection free of strict rewrites', () => {
+    const relaxed = providerReplySchema(REVIEW, false);
+    expect(keywordsOf(relaxed).has('minLength')).toBe(true);
+    expect((relaxed['required'] as string[]).includes('findings')).toBe(false);
+    expect(JSON.stringify(loadSchema(REVIEW))).toContain('"minLength":1');
+  });
+
+  // A document absent an optional member is sent as null by a strict host; filling the
+  // declared optional positions with null is the strict spelling of the same document.
+  const strictSpelling = (document: Record<string, unknown>) => {
+    const out = structuredClone(document);
+    if (!('findings' in out)) out['findings'] = null;
+    if (Array.isArray(out['findings']))
+      for (const finding of out['findings'] as Record<string, unknown>[]) {
+        if (finding === null || typeof finding !== 'object') continue;
+        if (!('file' in finding)) finding['file'] = null;
+        if (!('line' in finding)) finding['line'] = null;
+      }
+    return out;
+  };
+
+  it('accepts a document through projection and canonical validation exactly when the canonical schema does', () => {
+    const projected = validate(providerReplySchema(REVIEW, true));
+    const canonical = getValidator(REVIEW);
+    const corpus: Record<string, unknown>[] = [
+      ...(loadSchema(REVIEW)['examples'] as Record<string, unknown>[]),
+      pass,
+      { ...pass, rationale: '' },
+      { ...pass, rationale: ' ' },
+      { ...pass, rationale: '\n' },
+      { ...pass, rationale: '\u{1F600}' },
+      { ...pass, confidence: 1.1 },
+      { ...pass, verdict: 'maybe' },
+      { ...pass, extra: true },
+      { ...pass, findings: [{ severity: 'info', code: 'c', message: 'm', file: 'a', line: 1 }] },
+      { ...pass, findings: [{ severity: 'info', code: '', message: 'm' }] },
+      { ...pass, findings: [{ severity: 'info', code: 'c', message: '' }] },
+      { ...pass, findings: [{ severity: 'info', code: 'c', message: 'm', file: '' }] },
+      { ...pass, findings: [{ severity: 'info', code: 'c', message: 'm', line: 0 }] },
+      { ...pass, findings: [{ severity: 'note', code: 'c', message: 'm' }] },
+    ];
+    for (const document of corpus) {
+      const strict = strictSpelling(document);
+      const extracted = extractStructuredReply(
+        {
+          text: JSON.stringify(strict),
+          json: strict,
+          finish_reason: 'stop',
+          projection: replyProjectionIdentity(REVIEW),
+        },
+        REVIEW,
+      );
+      expect(projected(strict) && extracted.ok, JSON.stringify(document)).toBe(canonical(document));
+      if (extracted.ok) expect(extracted.document).toEqual(document);
+    }
+  });
 });
