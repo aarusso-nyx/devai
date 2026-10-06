@@ -26,7 +26,10 @@ import {
 import {
   buildHooksInstallPlan,
   executeHooksInstallPlan,
+  postMergeDeclaration,
+  postMergeDeclarationBytes,
 } from '../../src/services/hooks-install/index.js';
+import { POST_MERGE_DECLARATION as POST_MERGE_RECEIPT_DECLARATION } from '../../../skills/src/post-merge-auditor/host-receipt.js';
 import { resolveCliVersion } from '../../src/version.js';
 
 interface DoctorCheck {
@@ -985,4 +988,66 @@ describe('Doctor post-merge state kept out of tracked configuration (#266, #291)
       `warning: GITHUB_ACTIONS_ADAPTER_VERSION_LAG: ${GITHUB_ACTIONS_CONFIG} binds`,
     );
   }, 60_000);
+});
+
+describe('Doctor post-merge binding without its declaration (#291 review)', () => {
+  it('verifies, and refuses, a live git-dir binding whose declaration was deleted', async () => {
+    const unselected = await authorityCheck(async ({ repo, policy }) => {
+      await bindPostMergeCheckout(repo, policy);
+      await bindGithubActions(repo);
+      configureHostIntegrated(
+        repo,
+        policy,
+        GITHUB_ACTIONS_CONFIG,
+        'github-actions-main-observation',
+      );
+      rmSync(join(repo, POST_MERGE_CONFIG));
+    });
+    expect(unselected).toMatchObject({
+      ok: true,
+      info: {
+        local_post_merge_scope: 'undeclared',
+        local_post_merge_state: ['attestation', 'key', 'issuer'],
+        local_post_merge_facts: { declaration_present: false },
+        reason_ids: ['POST_MERGE_ADAPTER_BINDING_STALE'],
+      },
+    });
+    expect(unselected.warnings?.[0]).toMatch(
+      /^POST_MERGE_ADAPTER_BINDING_STALE: .*POST_MERGE_ADAPTER_BINDING_MISSING/u,
+    );
+
+    const selected = await authorityCheck(async ({ repo, policy }) => {
+      await bindPostMergeCheckout(repo, policy);
+      await bindGithubActions(repo);
+      rmSync(join(repo, POST_MERGE_CONFIG));
+    });
+    expect(selected).toMatchObject({
+      ok: false,
+      info: { local_post_merge_scope: 'undeclared', local_post_merge_enforced: false },
+    });
+    expect(selected.errors).toContain('POST_MERGE_ADAPTER_BINDING_MISSING');
+    expect(JSON.stringify(selected)).not.toContain('POST_MERGE_ADAPTER_NOT_BOUND_HERE');
+  }, 30_000);
+
+  it('refuses an altered declaration in a bound checkout', async () => {
+    const result = await authorityCheck(async ({ repo, policy }) => {
+      await bindPostMergeCheckout(repo, policy);
+      put(repo, POST_MERGE_CONFIG, { ...postMergeDeclaration(), required: false });
+    });
+    expect(result).toMatchObject({
+      ok: false,
+      info: {
+        local_post_merge_scope: 'invalid',
+        local_post_merge_facts: { declaration_current: false },
+      },
+    });
+    expect(result.errors).toContain('POST_MERGE_ADAPTER_DECLARATION_CURRENT_INVALID');
+  }, 30_000);
+
+  it('writes the declaration the post-merge receipt verifier requires', () => {
+    expect(postMergeDeclaration()).toEqual(POST_MERGE_RECEIPT_DECLARATION);
+    expect(postMergeDeclarationBytes()).toBe(
+      `${JSON.stringify(POST_MERGE_RECEIPT_DECLARATION, null, 2)}\n`,
+    );
+  });
 });

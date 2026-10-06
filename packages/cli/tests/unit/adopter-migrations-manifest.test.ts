@@ -9,6 +9,7 @@ import {
   compareVersions,
   loadAdopterMigrations,
   parseAdopterMigrations,
+  plannedReleases,
   releasesInRange,
 } from '../../src/services/adopter-migrations.js';
 import { resolveCliVersion } from '../../src/version.js';
@@ -73,6 +74,26 @@ describe('#264: the adopter migration manifest', () => {
       '1.9.0',
     ]);
     expect(releasesInRange(manifest, '1.9.0', '1.9.0')).toEqual([]);
+  });
+
+  it('plans an unreleased entry with the code that ships it, and a released one only in range (#291)', () => {
+    const versions = (from: string, installed: string, source = manifest) =>
+      plannedReleases(source, from, installed).map((release) => release.version);
+    // The 2.0.1 conversion ships in the installed package, so a plan at 2.0.0 records it.
+    expect(versions('2.0.0', '2.0.0')).toEqual(['2.0.1']);
+    expect(versions('1.9.0', '2.0.0')).toEqual(['2.0.0', '2.0.1']);
+    expect(versions('1.6.0', '2.0.0').slice(0, 4)).toEqual(['1.7.0', '1.8.0', '1.9.0', '2.0.0']);
+    // Once released and installed, it is an ordinary entry, planned only from below it.
+    const released = parseAdopterMigrations({
+      ...MANIFEST,
+      releases: (MANIFEST['releases'] as Record<string, unknown>[]).map((release) =>
+        release['status'] === 'unreleased'
+          ? { ...release, status: 'released', date: '2026-10-06' }
+          : release,
+      ),
+    });
+    expect(versions('2.0.1', '2.0.1', released)).toEqual([]);
+    expect(versions('2.0.0', '2.0.1', released)).toEqual(['2.0.1']);
   });
 
   it('cites only decision records that exist and names a canonical segment for each change', () => {
