@@ -14,10 +14,14 @@ const ROOT = resolve(import.meta.dirname, '../../../..');
 // experimental-activation and dispatch-journal-event, and promotes the source-only
 // prompt-composition schema to the runtime roster for the prompt composer. init upgrade (#264)
 // adds adopter-migrations.schema.json for the shipped migration manifest, and ADR-GOV-0025
-// promotes campaign.schema.json for the campaign projection and materializer, so the count is 110.
+// promotes campaign.schema.json for the campaign projection and materializer. The pack resolver
+// validates every stack-adapter.json through the roster, so stack-adapter.schema.json leaves the
+// source-only catalogue (#235); a source-only name throws in the packed runtime and no pack would
+// ever resolve. The count is 111.
 describe('schema roster', () => {
   it('holds the previous roster plus model-tiers, path-authority-classes, observation-backlog and the proof anchor schemas', () => {
-    expect(ROSTER).toHaveLength(110);
+    expect(ROSTER).toHaveLength(111);
+    expect(ROSTER).toContain('stack-adapter.schema.json');
     expect(ROSTER).toContain('model-tiers.schema.json');
     expect(ROSTER).toContain('path-authority-classes.schema.json');
     expect(ROSTER).toContain('observation-backlog.schema.json');

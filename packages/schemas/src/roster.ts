@@ -98,6 +98,7 @@ export const ROSTER = [
   'soft-gate-rubric.schema.json',
   'soft-gate-evidence.schema.json',
   'soft-gate-trust.schema.json',
+  'stack-adapter.schema.json',
   'thresholds.schema.json',
   'subprocess-effects.schema.json',
   'task-execution-evidence.schema.json',
