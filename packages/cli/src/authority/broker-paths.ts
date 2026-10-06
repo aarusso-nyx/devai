@@ -1,5 +1,5 @@
 import { existsSync, lstatSync, readFileSync, realpathSync, statSync } from 'node:fs';
-import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import type { AuthorityHostEffectRequest } from '@devai-nyx/authority';
 import type { JsonRecord } from './broker-values.js';
 
@@ -84,7 +84,7 @@ export function physicalCanonicalPath(root: string, canonicalRelativePath: strin
   return resolve(root, canonicalRelativePath);
 }
 
-export function canonicalRelativePath(root: string, value: unknown): string {
+export function canonicalRelativePath(root: string, value: unknown, followFinal = true): string {
   if (typeof value !== 'string' || value.length === 0) {
     throw new Error('AUTHORITY_FS_TARGET_INVALID');
   }
@@ -94,7 +94,11 @@ export function canonicalRelativePath(root: string, value: unknown): string {
   // a relative `--target` prefix (for example adopter/adopter/docs/...) and
   // produced a late UNCLASSIFIED_RESOURCE refusal after command dispatch.
   const absolute = resolve(value);
-  const canonical = existingRealpath(absolute);
+  // An effect on the entry itself (an identity-bound removal, #317) acts on a final symbolic
+  // link, not on what it points to: only the parent is resolved.
+  const canonical = followFinal
+    ? existingRealpath(absolute)
+    : join(existingRealpath(dirname(absolute)), basename(absolute));
   const canonicalRoot = realpathSync(root);
   if (canonical !== canonicalRoot && !canonical.startsWith(`${canonicalRoot}${sep}`)) {
     const metadataPath = gitMetadataLogicalPath(root, canonical);
@@ -109,7 +113,8 @@ export function canonicalRelativePath(root: string, value: unknown): string {
 }
 
 function pathOperation(symbol: string, targetPath: string): 'create' | 'update' | 'delete' {
-  if (['rmSync', 'rmdirSync', 'unlinkSync'].includes(symbol)) return 'delete';
+  if (['rmSync', 'rmdirSync', 'unlinkSync', 'removeEntryIfIdentitySync'].includes(symbol))
+    return 'delete';
   // A no-replace publication only ever creates its target (ADR-AUT-0005).
   if (['mkdirSync', 'mkdtempSync', 'symlinkSync', 'publishFileNoReplaceSync'].includes(symbol))
     return 'create';
@@ -149,7 +154,11 @@ export function fsTarget(
   }
   const rawPath = pathArgument(request);
   if (typeof rawPath !== 'string') throw new Error('AUTHORITY_FS_TARGET_INVALID');
-  const canonicalPath = canonicalRelativePath(root, rawPath);
+  const canonicalPath = canonicalRelativePath(
+    root,
+    rawPath,
+    request.symbol !== 'removeEntryIfIdentitySync',
+  );
   return {
     kind: 'fs',
     id: `fs:${canonicalPath}`,
