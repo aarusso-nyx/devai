@@ -133,9 +133,13 @@ jobs:
           node .devai/state/pr-bootstrap/cli/bin.js init bind --target . --as-role architect --write --format json
           node .devai/state/pr-bootstrap/cli/bin.js check --preflight --run --base "$DEVAI_PREFLIGHT_BASE" --as-role inspector --write --format json
           # Gate invariant producers (ADR-SCR-0013): trace resolution for INV-DEVAI-002 and the
-          # exact-head scorecard composition for INV-HARNESS-006, each failing the step on its own.
+          # exact-head scorecard composition for INV-HARNESS-006, blueprint validation of the
+          # committed gate fixture for INV-DEVAI-010, and pack resolution against the committed
+          # packs fixture for INV-HARNESS-010, each failing the step on its own.
           node .devai/state/pr-bootstrap/cli/bin.js sense run trace_resolution --as-role inspector --format json
           node .devai/state/pr-bootstrap/cli/bin.js audit scorecard --repo-root . --at "$(git rev-parse HEAD)" --format human
+          node .devai/state/pr-bootstrap/cli/bin.js check --only blueprint --file packages/skills/tests/operations/fixtures/blueprint.json --format human
+          node .devai/state/pr-bootstrap/cli/bin.js sense inventory --slice pack --packs-root packages/skills/tests/fixtures/pack-resolution --adopter-root packages/skills/tests/fixtures/pack-resolution --format human
 
       - name: Affected checks and profile-selected candidate preflight
         id: affected
