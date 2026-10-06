@@ -79,7 +79,7 @@ describe('reviewed workflow step registry', () => {
 
   // #331 review: a reviewed step is bound to the bytes of every repository file it executes.
   it('binds each entry to the current bytes of exactly the files its step executes', () => {
-    const filesBySha = new Map<string, readonly string[]>();
+    const filesBySha = new Map<string, readonly string[] | undefined>();
     for (const { text } of workflows()) {
       for (const step of workflowStepInventory(text, ROOT)) {
         if (step.sha256 !== undefined) filesBySha.set(step.sha256, step.files);
@@ -107,7 +107,9 @@ describe('reviewed workflow step registry', () => {
 
   it('reads unknown when an executed file changes or is missing', () => {
     const gate = readFileSync(join(WORKFLOWS, 'pull-request-checks.yml'), 'utf8');
-    const bound = [...new Set(workflowStepInventory(gate, ROOT).flatMap((step) => step.files))];
+    const bound = [
+      ...new Set(workflowStepInventory(gate, ROOT).flatMap((step) => step.files ?? [])),
+    ];
     const tree = mkdtempSync(join(tmpdir(), 'devai-reviewed-files-'));
     try {
       for (const path of bound) {
@@ -125,6 +127,50 @@ describe('reviewed workflow step registry', () => {
     } finally {
       rmSync(tree, { recursive: true, force: true });
     }
+  });
+
+  // #331 final review: package scripts are followed through npm pre/post hooks and nested
+  // runs, and an incomplete resolution leaves the step without a file set, so it reads unknown.
+  it('follows npm lifecycle scripts and fails closed on an incomplete resolution', () => {
+    const tree = mkdtempSync(join(tmpdir(), 'devai-executed-files-'));
+    const put = (path: string, text: string): void => {
+      mkdirSync(dirname(join(tree, path)), { recursive: true });
+      writeFileSync(join(tree, path), text);
+    };
+    const files = (run: string) =>
+      workflowStepInventory(`jobs:\n  build:\n    steps:\n      - run: ${run}\n`, tree)[0]?.files;
+    try {
+      put(
+        'site/package.json',
+        JSON.stringify({
+          scripts: {
+            prebuild: 'npm run sync',
+            sync: 'node scripts/sync.mjs',
+            build: 'node scripts/build.mjs',
+            postbuild: 'node scripts/after.mjs',
+          },
+        }),
+      );
+      expect(files('npm --prefix site run build')).toEqual([
+        'site/package.json',
+        'site/scripts/after.mjs',
+        'site/scripts/build.mjs',
+        'site/scripts/sync.mjs',
+      ]);
+      expect(files('npm --prefix site run missing')).toBeUndefined();
+      expect(files('npm --prefix absent run build')).toBeUndefined();
+      expect(files('pnpm --filter site build')).toBeUndefined();
+      expect(files('npx something')).toBeUndefined();
+    } finally {
+      rmSync(tree, { recursive: true, force: true });
+    }
+  });
+
+  it('binds the documentation sync script the site build reaches through prebuild', () => {
+    const site = REVIEWED_WORKFLOW_STEPS.find((entry) =>
+      entry.workflow.startsWith('site-publish.yml#prepare-site[3]'),
+    );
+    expect(site?.files.map((file) => file.path)).toContain('docs/site/scripts/sync-docs.mjs');
   });
 
   it('reads F5:T3 PASS on the committed workflows', () => {

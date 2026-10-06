@@ -6,7 +6,11 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { senseHarnessCoherence, supersedingGroupScoped } from '../../src/harness-coherence.js';
+import {
+  senseHarnessCoherence,
+  supersedingGroupScoped,
+  workflowEvents,
+} from '../../src/harness-coherence.js';
 import {
   concurrencyGroupContexts,
   jobEffectFacts,
@@ -68,7 +72,7 @@ describe('concurrency group expressions', () => {
   });
 
   it('scopes a superseding group to its ref, commit, or pull request and merge-queue entry', () => {
-    expect(supersedingGroupScoped(GATE_GROUP)).toBe(true);
+    expect(supersedingGroupScoped(GATE_GROUP, ['pull_request', 'merge_group'])).toBe(true);
     expect(supersedingGroupScoped('ci-${{ github.ref }}')).toBe(true);
     expect(supersedingGroupScoped('verify-${{ github.sha }}')).toBe(true);
     expect(supersedingGroupScoped('ci-${{ github.workflow }}')).toBe(false);
@@ -77,8 +81,63 @@ describe('concurrency group expressions', () => {
     expect(
       supersedingGroupScoped(
         "${{ format('{0}-pr-{1}', github.workflow, github.event.pull_request.number) }}",
+        ['pull_request'],
       ),
     ).toBe(true);
+  });
+
+  // #331 final review: an event-specific subject must be set on every event the workflow
+  // accepts, and a format() is keyed only by the arguments its placeholders reference.
+  it('requires event-specific subjects to cover every accepted event', () => {
+    const prOnly = "${{ format('{0}-pr-{1}', github.workflow, github.event.pull_request.number) }}";
+    expect(supersedingGroupScoped(prOnly, ['pull_request', 'merge_group'])).toBe(false);
+    expect(supersedingGroupScoped(prOnly)).toBe(false);
+    expect(supersedingGroupScoped(GATE_GROUP)).toBe(false);
+    expect(supersedingGroupScoped(GATE_GROUP, ['pull_request', 'merge_group', 'push'])).toBe(false);
+    expect(supersedingGroupScoped('ci-${{ github.ref }}', ['push', 'merge_group'])).toBe(true);
+    const swapped =
+      "${{ github.event_name == 'merge_group' && format('{0}', github.event.pull_request.number) || format('{0}', github.event.merge_group.head_sha) }}";
+    expect(supersedingGroupScoped(swapped, ['pull_request', 'merge_group'])).toBe(false);
+  });
+
+  it('keys a format() only by the arguments its placeholders reference', () => {
+    expect(supersedingGroupScoped("ci-${{ format('{1}', github.workflow, github.ref) }}")).toBe(
+      true,
+    );
+    expect(supersedingGroupScoped("ci-${{ format('{0}', github.workflow, github.ref) }}")).toBe(
+      false,
+    );
+    expect(supersedingGroupScoped("ci-${{ format('ci', github.ref) }}")).toBe(false);
+    expect(supersedingGroupScoped("ci-${{ format('{{0}}', github.ref) }}")).toBe(false);
+    expect(supersedingGroupScoped("ci-${{ format('{2}', github.ref) }}")).toBe(false);
+  });
+
+  it('reads the accepted events of block, list and scalar triggers', () => {
+    expect(
+      workflowEvents('on:\n  pull_request:\n    types: [opened]\n  merge_group:\n    types: [x]\n'),
+    ).toEqual(['pull_request', 'merge_group']);
+    expect(workflowEvents('on: [push, pull_request]\n')).toEqual(['push', 'pull_request']);
+    expect(workflowEvents('on: workflow_dispatch\n')).toEqual(['workflow_dispatch']);
+    expect(workflowEvents('jobs: {}\n')).toBeUndefined();
+  });
+
+  it('refuses the pull request gate group when the workflow also accepts push', () => {
+    const root = repository();
+    write(
+      root,
+      '.github/workflows/gate.yml',
+      gate(GATE_GROUP, true).replace('  pull_request: {}\n', '  pull_request: {}\n  push: {}\n'),
+    );
+    expect(sense(root).metrics).toMatchObject({ concurrency_semantic_issues: 1 });
+    write(
+      root,
+      '.github/workflows/gate.yml',
+      gate(GATE_GROUP, true).replace(
+        '  pull_request: {}\n',
+        '  pull_request: {}\n  merge_group: {}\n',
+      ),
+    );
+    expect(sense(root).status).toBe('pass');
   });
 
   // #331 review: a scope name that appears only inside a comparison or under another operator
