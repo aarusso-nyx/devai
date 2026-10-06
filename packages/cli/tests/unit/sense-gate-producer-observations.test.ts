@@ -12,6 +12,7 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -143,6 +144,46 @@ describe('fixture-bound gate producer observations', () => {
   });
 
   // Codex review MAJOR 3: the worktree bytes may differ from the head the reading names.
+  // #235 re-review: git tracks a link as its target text, so a clean status proves nothing
+  // about the bytes read through a committed link.
+  it('reads fail for a committed symbolic link anywhere in the fixture paths', async () => {
+    const outside = temporary();
+    writeFileSync(
+      join(outside, 'stack-adapter.json'),
+      readFileSync(
+        join(ROOT, GATE_PACK_FIXTURE, 'examples/redox-pack-gate-specific/stack-adapter.json'),
+      ),
+    );
+    const manifest = fixtureRepository();
+    const linked = join(
+      manifest.root,
+      GATE_PACK_FIXTURE,
+      'examples/redox-pack-gate-specific/stack-adapter.json',
+    );
+    rmSync(linked);
+    symlinkSync(join(outside, 'stack-adapter.json'), linked);
+    git(manifest.root, 'add', '-A');
+    git(manifest.root, 'commit', '-q', '-m', 'link the manifest');
+    const manifestHead = git(manifest.root, 'rev-parse', 'HEAD');
+    expect(git(manifest.root, 'status', '--porcelain')).toBe('');
+    expect(await observePackResolution(manifest.root, manifestHead)).toMatchObject([
+      { status: 'fail' },
+    ]);
+
+    const component = fixtureRepository();
+    const real = join(component.root, 'real-fixtures');
+    cpSync(join(component.root, dirname(GATE_BLUEPRINT_FIXTURE)), real, { recursive: true });
+    rmSync(join(component.root, dirname(GATE_BLUEPRINT_FIXTURE)), { recursive: true });
+    symlinkSync(real, join(component.root, dirname(GATE_BLUEPRINT_FIXTURE)));
+    git(component.root, 'add', '-A');
+    git(component.root, 'commit', '-q', '-m', 'link the fixture directory');
+    const componentHead = git(component.root, 'rev-parse', 'HEAD');
+    expect(git(component.root, 'status', '--porcelain')).toBe('');
+    expect(observeBlueprintCheck(component.root, componentHead)).toMatchObject([
+      { status: 'fail' },
+    ]);
+  });
+
   it('reads fail when the fixture bytes differ from the head the observation would name', async () => {
     const edited = fixtureRepository();
     writeFileSync(
