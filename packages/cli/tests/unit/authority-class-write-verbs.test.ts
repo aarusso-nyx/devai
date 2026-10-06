@@ -203,14 +203,17 @@ describe('IA-005: the registered subjects of the matrix verbs are unchanged', ()
 
 // Digests pinned from commit 38a0a5df (R-0502 closed): `git show 38a0a5df:<path> | shasum -a
 // 256`. The registry and its three generated views carry no change under ADR-AUT-0004.
+// The registry and its CLI view were re-pinned when `round run` and `task finish` raised
+// their planner max_batches from 128 to 2048 for the lock lease, fence and receipt writes
+// (#285, #296); no effect, capability, subject or target kind changed.
 const R0502_FILE_DIGESTS: ReadonlyArray<readonly [string, string]> = [
   [
     'law/policy/action-registry.json',
-    '3fa2d0b359509ea2051b957d07358eaaa87b7907fdd3e2f4be0277366fca79b3',
+    '6329397f170210e7c7a83eaba020f9bd895d373b9a7ede86ede0cafa569a34ff',
   ],
   [
     'packages/cli/src/generated/action-registry.ts',
-    '8165ba662dc34db6a9107eb0ec11606be7e87146ed6a6dc4c949598a78291762',
+    '18ce415236a1764f006f546c7dbdd3bfb566b7508d8f89ce5aa517c711f70ad1',
   ],
   [
     'packages/effects-check/src/generated/action-catalog.ts',
