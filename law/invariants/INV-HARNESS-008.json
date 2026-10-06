@@ -1,0 +1,58 @@
+{
+  "schemaVersion": "1.0.0",
+  "version": "1.0.0",
+  "id": "INV-HARNESS-008",
+  "domain": "HARNESS",
+  "lifecycle": "supported",
+  "severity": "hard-fail",
+  "type": "security",
+  "title": "Experimental agent attempts are provider-confined and never read as success by default",
+  "statement": "An experimental agent attempt MUST start only for a supported host runtime on a platform whose provider sandbox confines writes to the attempt worktree, with that runtime complete confinement sequence, host user configuration and MCP servers excluded, and the prompt written to stdin, and MUST otherwise refuse before any spawn; an attempt whose output lacks exactly one terminal event, is malformed or truncated, or reports failure MUST be interpreted as failed, a termination whose process group is not confirmed gone MUST be reported as uncertain, and a usage counter the provider did not report MUST be recorded as missing rather than invented.",
+  "rationale": "Article 3 admits automation only as explicitly enabled experimental policy; ADR-MDL-0005 and ADR-MDL-0008 bound each attempt to its worktree through the provider sandbox and keep incomplete or uncertain attempts from reading as success.",
+  "status": "active",
+  "verification": {
+    "required_suites": ["unit"],
+    "oracle": "tests",
+    "strategy": {
+      "primary": "regression",
+      "deterministic_check_available": true,
+      "rationale": "A deterministic test corpus under tests/ and packages/*/tests observes this obligation; trace links the tests."
+    }
+  },
+  "authority_docs": {
+    "docs": [
+      {
+        "doc": "law/constitution.md",
+        "anchor": "article-3-operating-mode"
+      },
+      {
+        "doc": "law/adr/ADR-MDL-0005-opt-in-experimental-agent-execution.md",
+        "anchor": "decision"
+      },
+      {
+        "doc": "law/adr/ADR-MDL-0008-provider-enforced-attempt-write-boundary.md",
+        "anchor": "decision"
+      }
+    ]
+  },
+  "scope": {
+    "components": ["agent-cli", "experimental-dispatch"],
+    "code_areas": ["packages/skills/src/agent-cli/**"]
+  },
+  "change_policy": {
+    "breaking_change_requires": [
+      "doc_update",
+      "trace_update",
+      "test_update",
+      "human_approval",
+      "adr"
+    ],
+    "test_weakening_allowed": false,
+    "human_approval_required": true
+  },
+  "tags": ["experimental", "sandbox", "containment"],
+  "measurable_via": ["round dispatch"],
+  "provenance": ["ADR-MDL-0005", "ADR-MDL-0008", "issue #295"],
+  "supersedes": null,
+  "superseded_by": null
+}

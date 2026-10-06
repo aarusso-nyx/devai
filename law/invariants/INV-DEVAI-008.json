@@ -1,0 +1,54 @@
+{
+  "schemaVersion": "1.0.0",
+  "version": "1.0.0",
+  "id": "INV-DEVAI-008",
+  "domain": "DEVAI",
+  "lifecycle": "supported",
+  "severity": "hard-fail",
+  "type": "governance",
+  "title": "Invariant citations resolve to the catalog and overrides respect severity and expiry",
+  "statement": "Every in-source inv-override annotation MUST carry an invariant id, a reason, a ticket, an expiry, and an approver, MUST name an invariant present in law/invariants/, and an override that is malformed, expired, names an unknown invariant, or names a constitutional or hard-fail invariant MUST be reported as a finding that fails the overrides check; every Inv-Compliance trailer MUST cite only well-formed, catalogued invariant ids, and a required trailer that is absent or empty MUST fail the pr-compliance check.",
+  "rationale": "Article 11 makes constitutional and hard-fail invariants non-overridable and admits only justified, expiring overrides of the rest; a citation of an id the catalog does not hold claims governance that does not exist.",
+  "status": "active",
+  "verification": {
+    "required_suites": ["unit"],
+    "oracle": "tests",
+    "strategy": {
+      "primary": "regression",
+      "deterministic_check_available": true,
+      "rationale": "A deterministic test corpus under tests/ and packages/*/tests observes this obligation; trace links the tests."
+    }
+  },
+  "authority_docs": {
+    "docs": [
+      {
+        "doc": "law/constitution.md",
+        "anchor": "article-11-invariant-as-atomic-spec-unit"
+      },
+      {
+        "doc": "law/constitution.md",
+        "anchor": "article-13-trace"
+      }
+    ]
+  },
+  "scope": {
+    "components": ["inv-override", "pr-compliance"],
+    "code_areas": ["packages/skills/src/inv-override/**", "packages/spec/src/pr-compliance/**"]
+  },
+  "change_policy": {
+    "breaking_change_requires": [
+      "doc_update",
+      "trace_update",
+      "test_update",
+      "human_approval",
+      "adr"
+    ],
+    "test_weakening_allowed": false,
+    "human_approval_required": true
+  },
+  "tags": ["override", "citation", "article-11"],
+  "measurable_via": ["check"],
+  "provenance": ["constitution Article 11", "issue #295"],
+  "supersedes": null,
+  "superseded_by": null
+}

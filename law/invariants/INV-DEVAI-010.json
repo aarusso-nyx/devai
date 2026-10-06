@@ -1,0 +1,52 @@
+{
+  "schemaVersion": "1.0.0",
+  "version": "1.0.0",
+  "id": "INV-DEVAI-010",
+  "domain": "DEVAI",
+  "lifecycle": "supported",
+  "severity": "gate",
+  "type": "data_contract",
+  "title": "Module blueprints validate before planning and scaffolds regenerate without overwriting drift",
+  "statement": "Every module blueprint MUST validate against law/schemas/module-blueprint.schema.json and MUST be rejected when it declares no entity, an entity with an empty primary key, a PII field without explicit retention, or an API operation that no RBAC permission grants; the scaffold plan and every rendered scaffold file MUST be a deterministic function of the blueprint, its canonical sha256, and the template, and a scaffold target that already exists with different bytes MUST be reported as drift for review and never overwritten.",
+  "rationale": "Article 17 requires contracts to validate and generated artifacts to regenerate to identical bytes; a blueprint is the architecture-class specification Article 6 names, so a scaffold that overwrites hand-edited output or derives from an invalid blueprint corrupts the plant silently.",
+  "status": "active",
+  "verification": {
+    "required_suites": ["unit"],
+    "oracle": "tests",
+    "strategy": {
+      "primary": "regression",
+      "deterministic_check_available": true,
+      "rationale": "A deterministic test corpus under tests/ and packages/*/tests observes this obligation; trace links the tests."
+    }
+  },
+  "authority_docs": {
+    "docs": [
+      {
+        "doc": "law/constitution.md",
+        "anchor": "article-17-hard-gate"
+      },
+      {
+        "doc": "law/constitution.md",
+        "anchor": "article-6-substrate-authority-by-path"
+      }
+    ]
+  },
+  "scope": {
+    "components": ["blueprint", "scaffold", "templates"],
+    "code_areas": [
+      "packages/spec/src/blueprint/**",
+      "packages/skills/src/operations/scaffold/**",
+      "packages/utils/src/templates/**"
+    ]
+  },
+  "change_policy": {
+    "breaking_change_requires": ["doc_update", "trace_update", "test_update", "adr"],
+    "test_weakening_allowed": false,
+    "human_approval_required": false
+  },
+  "tags": ["blueprint", "scaffold", "determinism", "article-17"],
+  "measurable_via": ["check", "round plan"],
+  "provenance": ["constitution Article 17", "issue #295"],
+  "supersedes": null,
+  "superseded_by": null
+}

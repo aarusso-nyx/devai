@@ -1,0 +1,54 @@
+{
+  "schemaVersion": "1.0.0",
+  "version": "1.0.0",
+  "id": "INV-SEC-003",
+  "domain": "SEC",
+  "lifecycle": "supported",
+  "severity": "hard-fail",
+  "type": "security",
+  "title": "Dependency advisories are judged only from a pinned, current scan with exact waivers",
+  "statement": "A dependency security result MUST read UNKNOWN when the scanner identity or version differs from the pin, the lockfile digest differs from the exact lockfile, or the scan or advisory database time is invalid or older than the declared age, MUST read FAIL for any unwaived high or critical advisory and for any waiver that is malformed, expired, names an unknown advisory, or names a different package, MUST read REVIEW for any other unwaived advisory, and a waiver MUST suppress only the advisory and package it names exactly.",
+  "rationale": "Article 39 requires explicit uncertainty over false precision and Article 41 forbids an observation failure from manufacturing a verdict; a stale or unpinned scan is a failure to observe, and a loose waiver would hide an advisory it never named.",
+  "status": "active",
+  "verification": {
+    "required_suites": ["unit", "sec"],
+    "oracle": "tests",
+    "strategy": {
+      "primary": "regression",
+      "deterministic_check_available": true,
+      "rationale": "A deterministic test corpus under tests/ and packages/*/tests observes this obligation; trace links the tests."
+    }
+  },
+  "authority_docs": {
+    "docs": [
+      {
+        "doc": "law/constitution.md",
+        "anchor": "article-39-explicit-uncertainty-over-false-precision"
+      },
+      {
+        "doc": "law/constitution.md",
+        "anchor": "article-41-evidence"
+      }
+    ]
+  },
+  "scope": {
+    "components": ["dependency-security"],
+    "code_areas": ["packages/cli/src/services/dependency-security/**"]
+  },
+  "change_policy": {
+    "breaking_change_requires": [
+      "doc_update",
+      "trace_update",
+      "test_update",
+      "human_approval",
+      "adr"
+    ],
+    "test_weakening_allowed": false,
+    "human_approval_required": true
+  },
+  "tags": ["supply-chain", "waiver", "article-39"],
+  "measurable_via": ["check"],
+  "provenance": ["constitution Article 39", "issue #295"],
+  "supersedes": null,
+  "superseded_by": null
+}
