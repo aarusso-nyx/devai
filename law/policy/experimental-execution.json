@@ -31,7 +31,7 @@
   },
   "containment": {
     "worktree": "per-task-from-round-base",
-    "provider_sandbox": "requested-never-claimed-verified",
+    "provider_sandbox": "provider-enforced-asserted-by-broker",
     "write_scope_check": "article-6-paths-after-each-attempt",
     "remote_effects": "forbidden"
   },
