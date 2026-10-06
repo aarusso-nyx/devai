@@ -69,7 +69,7 @@
         },
         "status": {
           "enum": ["released", "unreleased"],
-          "description": "An unreleased entry is prepared ahead of its release and is planned only once the installed package carries that version."
+          "description": "An unreleased entry is prepared ahead of its release and ships in the same package as the code that applies it, so init upgrade plans and records it whenever it lies above both the bound and the installed version; once released it is planned like any other entry in range."
         },
         "date": {
           "type": "string",
