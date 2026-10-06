@@ -286,7 +286,7 @@ other. Preview or inspect whenever the leaf offers `--dry-run`, plan output, sta
   ([ADR-GOV-0019](../../../law/adr/ADR-GOV-0019-backlog-action-family.md)). Its four stable
   leaves are the registry projection with `W = backlog`: `add`, `list`, `show`, and `resolve`.
 - **Prerequisites, tools, inputs, and defaults:** `--repo-root` defaults to the current directory.
-  `add` needs `--kind`, `--title`, and `--body`; `--class` and `--role` are optional. The stored
+  `add` needs `--kind`, `--title`, and `--body`; `--class`, `--request-id`, and `--role` are optional. The stored
   origin role is always the admitted invocation role; `--role` only asserts it, and a different
   value is refused with `BACKLOG_ROLE_MISMATCH` before anything is written. `list` shows open items unless `--status` selects
   `resolved` or `all`. `show` takes one `BL-NNNN` identifier. `resolve` takes one identifier and a
@@ -299,8 +299,17 @@ other. Preview or inspect whenever the leaf offers `--dry-run`, plan output, sta
   roles may initiate them with `--write`, and they write only the backlog directory and the shared
   counters file, with one declared addition: `add --round` on a round whose Owner activation is live
   also appends one `backlog_item_projected` event to `.devai/state/tracking/<round>/events.jsonl`.
-  That projection is idempotent: repeating the same `add` after a failed append reuses the saved item
-  and completes the missing event instead of allocating a second item. `list` and `show` are declared `read`. No leaf reaches the network or publishes.
+  While appending, `add` holds a create-only `projection.lock` beside that log, and its request-id
+  lock lives under `.devai/state/backlog/.locks/`. Items are published atomically and create-only,
+  so a partial record is never visible. `add` is idempotent only by an explicit `--request-id <id>`
+  (8 to 128 characters of letters, digits, `.`, `_`, `:`, `-`): the id is stored on the item, a retry
+  with the same id returns the recorded item and completes a missing tracking event, the same id with
+  different content is refused with `BACKLOG_REQUEST_ID_CONFLICT`, and a request-id recovery refuses
+  with `BACKLOG_ITEM_UNREADABLE` while an item file cannot be read. An `add` without an id is always a
+  new item. An item is projected at most once. A held lock is waited for briefly and refused with
+  `BACKLOG_LOCK_HELD`; a lock older than ten minutes is refused with `BACKLOG_LOCK_STALE` and is never
+  taken over automatically: remove it after confirming its holder is gone. The lock serializes backlog
+  projections only, not other writers of the same round log. `list` and `show` are declared `read`. No leaf reaches the network or publishes.
   Domain-level cost is N/A; every leaf is a bounded local operation.
 - **Use / do not use:** use to keep findings and propositions in the repository. Do not use a
   backlog item as a round gap, and resolving an item never pauses, resolves, or alters a gap.
