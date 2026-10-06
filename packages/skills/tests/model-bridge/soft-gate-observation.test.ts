@@ -71,7 +71,23 @@ afterAll(() => {
 const { spawnSyncMock } = vi.hoisted(() => ({ spawnSyncMock: vi.fn() }));
 vi.mock('@devai-nyx/authority', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  spawnSync: spawnSyncMock,
+  // The Codex compatibility probe (`--version`, `features list`) answers as a binary that
+  // honours every --disable; spawnSyncMock sees only the review itself.
+  spawnSync: (cli: string, argv: string[], options: unknown) =>
+    cli === 'codex' && (argv[0] === '--version' || argv[0] === 'features')
+      ? {
+          status: 0,
+          stderr: '',
+          stdout:
+            argv[0] === '--version'
+              ? 'codex-cli offline-stub\n'
+              : argv
+                  .flatMap((value, index) =>
+                    value === '--disable' ? [`${String(argv[index + 1])}  stable  false`] : [],
+                  )
+                  .join('\n'),
+        }
+      : (spawnSyncMock as (...args: unknown[]) => unknown)(cli, argv, options),
 }));
 
 const { createModelBridge } = await import('../../src/model-bridge/index.js');

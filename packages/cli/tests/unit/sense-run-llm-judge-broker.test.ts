@@ -93,6 +93,15 @@ function stubProvider(executable: 'claude' | 'codex', fixture: string): string {
     script,
     [
       '#!/bin/sh',
+      // The Codex compatibility probe (#321) runs through the same broker: answer it as a
+      // binary that honours every --disable, and record that it ran.
+      `if [ "$1" = "--version" ]; then echo 'codex-cli stub-${executable}'; exit 0; fi`,
+      'if [ "$1" = "features" ]; then',
+      `  touch '${record}.probed'`,
+      '  shift 2',
+      '  while [ "$#" -gt 0 ]; do [ "$1" = "--disable" ] && echo "$2  stable  false"; shift; done',
+      '  exit 0',
+      'fi',
       `printf '%s\\n' "$PWD" > '${record}.cwd'`,
       `ls -A > '${record}.entries'`,
       `printf '%s\\0' "$@" > '${record}.argv'`,
@@ -157,6 +166,8 @@ describe('#249 llm_judge host transports through the production broker (stub pro
       } else {
         expect(argv).toContain('--ignore-user-config');
         expect(argv[argv.indexOf('--disable') + 1]).toBe('shell_tool');
+        // The compatibility probe ran through the production broker before the review.
+        expect(existsSync(`${record}.probed`)).toBe(true);
       }
       expect(readdirSync(repo)).not.toContain('workspace');
     },

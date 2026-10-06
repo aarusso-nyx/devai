@@ -33,14 +33,18 @@ envelope whose `structured_output` was not preserved, so it cannot be re-derived
 structured bytes. It is declared as what it is and replayed on the text path (no
 provider `json`), where its bytes are the declared reply bytes.
 
-Codex review isolation is post-hoc. The bridge turns off before launch every
-tool-bearing feature that `codex features list --disable` (codex-cli 0.157.1)
-reports as off, `shell_tool` included. `unified_exec` still reports enabled, though,
-and no offline observation shows the effective tool list. A tool or MCP item in a
-Codex transcript refuses the reply, but that cannot undo what the model already read
-inside the read-only sandbox. Claude reviews start with no tools and no MCP servers,
-and a reply that reports any server-side tool use (`usage.server_tool_use`) is
-refused.
+Codex review isolation (#321). Before every review the bridge checks the installed
+binary: `codex features list --disable ...` must know every review feature and report it
+off, or the review is refused before the provider runs.
+`codex-0.157.1-features-review-disabled.txt` is that listing as codex-cli 0.157.1
+printed it on 2026-10-06, with no provider call. `unified_exec` still reports enabled
+there. In the codex source at tag rust-v0.157.1 (`add_shell_tools`,
+codex-rs/core/src/tools/spec_plan.rs), a disabled `shell_tool` returns before any command
+tool is registered, so no command tool is offered whatever `unified_exec` says. That is
+source analysis: no live request's tool list has been observed. A tool, MCP or web search
+item in a Codex transcript still refuses the reply. Claude reviews start with no tools and
+no MCP servers, and a reply that reports any server-side tool use
+(`usage.server_tool_use`) is refused.
 
 <!-- adr-mdl-0001-provenance:start -->
 
