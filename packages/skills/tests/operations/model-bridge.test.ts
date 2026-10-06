@@ -70,14 +70,50 @@ afterAll(() => {
   expect(offlineGuard.attempts).toEqual([]);
 });
 
-const { spawnSyncMock } = vi.hoisted(() => ({ spawnSyncMock: vi.fn() }));
+const { spawnSyncMock, codexProbe } = vi.hoisted(() => ({
+  spawnSyncMock: vi.fn(),
+  // The Codex compatibility probe (#321): by default a binary that honours every
+  // --disable. Tests replace `version` or `listing` to model an incompatible binary.
+  codexProbe: {
+    version: 'codex-cli offline-stub' as string | null,
+    listing: undefined as
+      undefined | ((argv: string[]) => { status: number; stdout: string; stderr: string }),
+    calls: [] as string[][],
+  },
+}));
 vi.mock('@devai-nyx/authority', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  spawnSync: spawnSyncMock,
+  spawnSync: (cli: string, argv: string[], options: unknown) => {
+    if (cli === 'codex' && (argv[0] === '--version' || argv[0] === 'features')) {
+      codexProbe.calls.push(argv);
+      if (argv[0] === '--version')
+        return codexProbe.version === null
+          ? { status: 127, stdout: '', stderr: 'not found' }
+          : { status: 0, stdout: `${codexProbe.version}\n`, stderr: '' };
+      return (
+        codexProbe.listing?.(argv) ?? {
+          status: 0,
+          stderr: '',
+          stdout: argv
+            .flatMap((value, index) =>
+              value === '--disable' ? [`${String(argv[index + 1])}  stable  false`] : [],
+            )
+            .join('\n'),
+        }
+      );
+    }
+    return (spawnSyncMock as (...args: unknown[]) => unknown)(cli, argv, options);
+  },
 }));
 
-const { createModelBridge, extractStructuredReply, replyProjectionIdentity, replySha256 } =
-  await import('../../src/model-bridge/index.js');
+const {
+  assertCodexReviewCompatibility,
+  CODEX_REVIEW_DISABLED_FEATURES,
+  createModelBridge,
+  extractStructuredReply,
+  replyProjectionIdentity,
+  replySha256,
+} = await import('../../src/model-bridge/index.js');
 const REVIEW = 'review-verdict.schema.json';
 const PASS = {
   verdict: 'pass',
@@ -736,7 +772,12 @@ describe('#249 review process isolation (no MCP server, no tools, allowlisted en
     expect(flagValue(argv, '--sandbox')).toBe('read-only');
     expect(flagValue(argv, '--cd')).toBe(cwd);
     const configs = argv.flatMap((value, index) => (value === '--config' ? [argv[index + 1]] : []));
-    expect(configs).toEqual(['mcp_servers={}', 'tools={}']);
+    expect(configs).toEqual([
+      'mcp_servers={}',
+      'tools={}',
+      'web_search="disabled"',
+      'skills.include_instructions=false',
+    ]);
     const disabled = argv.flatMap((value, index) =>
       value === '--disable' ? [argv[index + 1]] : [],
     );
@@ -832,5 +873,93 @@ describe('#249 declared reply bytes: recording and replay agree', () => {
     const replayed = extractStructuredReply({ text: bytes, finish_reason: 'stop' }, REVIEW);
     expect(replayed.ok).toBe(true);
     if (replayed.ok) expect(replayed.document['verdict']).toBe('pass');
+  });
+});
+
+describe('#321 Codex host compatibility check before a review', () => {
+  // `codex features list --disable <each review feature>` as codex-cli 0.157.1 printed it
+  // on 2026-10-06 (no provider call): every review feature off, unified_exec still on.
+  const installedListing = fixture('codex-0.157.1-features-review-disabled.txt');
+  let versions = 0;
+  beforeEach(() => {
+    // A fresh version per case, so the per-binary cache never hides a probe.
+    versions += 1;
+    codexProbe.version = `codex-cli 0.157.1-case-${String(versions)}`;
+    codexProbe.listing = undefined;
+    codexProbe.calls.length = 0;
+  });
+  afterEach(() => {
+    codexProbe.version = 'codex-cli offline-stub';
+    codexProbe.listing = undefined;
+  });
+  const env = { PATH: '/nonexistent-offline-bin' };
+
+  it('accepts the installed 0.157.1 listing, where unified_exec stays on', () => {
+    codexProbe.listing = () => ({ status: 0, stdout: installedListing, stderr: '' });
+    expect(() => assertCodexReviewCompatibility(env, '/')).not.toThrow();
+    expect(installedListing).toMatch(/^unified_exec\s+stable\s+true$/mu);
+    const listed = codexProbe.calls.find((argv) => argv[0] === 'features');
+    expect(
+      listed?.flatMap((value, index) => (value === '--disable' ? [listed[index + 1]] : [])),
+    ).toEqual([...CODEX_REVIEW_DISABLED_FEATURES]);
+  });
+
+  it('refuses a binary that does not know a review feature, before the provider runs', async () => {
+    codexProbe.listing = () => ({
+      status: 1,
+      stdout: '',
+      stderr: 'Error: Unknown feature flag: tool_suggest\n',
+    });
+    await expect(observe('codex-cli', codexFixture)).rejects.toThrow(
+      'MODEL_BRIDGE_CODEX_INCOMPATIBLE:unknown-feature:tool_suggest',
+    );
+    expect(spawnSyncMock).not.toHaveBeenCalled();
+  });
+
+  it('refuses a feature the binary still reports on after --disable', async () => {
+    codexProbe.listing = () => ({
+      status: 0,
+      stdout: installedListing.replace(/^shell_tool(\s+stable\s+)false$/mu, 'shell_tool$1true'),
+      stderr: '',
+    });
+    await expect(observe('codex-cli', codexFixture)).rejects.toThrow(
+      'MODEL_BRIDGE_CODEX_INCOMPATIBLE:feature-enabled:shell_tool',
+    );
+    expect(spawnSyncMock).not.toHaveBeenCalled();
+  });
+
+  it('refuses a listing that omits a review feature', async () => {
+    codexProbe.listing = () => ({
+      status: 0,
+      stdout: installedListing.replace(/^skill_search\s.*$/mu, ''),
+      stderr: '',
+    });
+    await expect(observe('codex-cli', codexFixture)).rejects.toThrow(
+      'MODEL_BRIDGE_CODEX_INCOMPATIBLE:unknown-feature:skill_search',
+    );
+  });
+
+  it('refuses when the version probe fails', async () => {
+    codexProbe.version = null;
+    await expect(observe('codex-cli', codexFixture)).rejects.toThrow(
+      'MODEL_BRIDGE_CODEX_INCOMPATIBLE:version:127',
+    );
+    expect(spawnSyncMock).not.toHaveBeenCalled();
+  });
+
+  it('checks each binary version once per process', async () => {
+    codexProbe.listing = () => ({ status: 0, stdout: installedListing, stderr: '' });
+    await observe('codex-cli', codexFixture);
+    await observe('codex-cli', codexFixture);
+    expect(codexProbe.calls.filter((argv) => argv[0] === 'features')).toHaveLength(1);
+    expect(codexProbe.calls.filter((argv) => argv[0] === '--version')).toHaveLength(2);
+    codexProbe.version = `${codexProbe.version}-upgraded`;
+    await observe('codex-cli', codexFixture);
+    expect(codexProbe.calls.filter((argv) => argv[0] === 'features')).toHaveLength(2);
+  });
+
+  it('never probes for a Claude review', async () => {
+    await observe('claude-cli', claudeFixture);
+    expect(codexProbe.calls).toEqual([]);
   });
 });

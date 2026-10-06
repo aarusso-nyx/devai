@@ -85,13 +85,45 @@ const { spawnSyncMock, anthropicCreate, openaiCreate } = vi.hoisted(() => ({
 }));
 vi.mock('@devai-nyx/authority', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  spawnSync: spawnSyncMock,
+  // The Codex compatibility probe (`--version`, `features list`) answers as a binary that
+  // honours every --disable; spawnSyncMock sees only the review itself.
+  spawnSync: (cli: string, argv: string[], options: unknown) =>
+    cli === 'codex' && (argv[0] === '--version' || argv[0] === 'features')
+      ? {
+          status: 0,
+          stderr: '',
+          stdout:
+            argv[0] === '--version'
+              ? 'codex-cli offline-stub\n'
+              : argv
+                  .flatMap((value, index) =>
+                    value === '--disable' ? [`${String(argv[index + 1])}  stable  false`] : [],
+                  )
+                  .join('\n'),
+        }
+      : (spawnSyncMock as (...args: unknown[]) => unknown)(cli, argv, options),
 }));
 // The schemas package does not depend on @devai-nyx/authority: the local config aliases it to
 // source, while under the RC coverage config the bridge resolves the package's source entry.
 vi.mock('../../../authority/src/index.ts', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  spawnSync: spawnSyncMock,
+  // The Codex compatibility probe (`--version`, `features list`) answers as a binary that
+  // honours every --disable; spawnSyncMock sees only the review itself.
+  spawnSync: (cli: string, argv: string[], options: unknown) =>
+    cli === 'codex' && (argv[0] === '--version' || argv[0] === 'features')
+      ? {
+          status: 0,
+          stderr: '',
+          stdout:
+            argv[0] === '--version'
+              ? 'codex-cli offline-stub\n'
+              : argv
+                  .flatMap((value, index) =>
+                    value === '--disable' ? [`${String(argv[index + 1])}  stable  false`] : [],
+                  )
+                  .join('\n'),
+        }
+      : (spawnSyncMock as (...args: unknown[]) => unknown)(cli, argv, options),
 }));
 vi.mock('../../../skills/node_modules/@anthropic-ai/sdk/index.mjs', () => ({
   default: class {
