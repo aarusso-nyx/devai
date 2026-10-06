@@ -106,7 +106,9 @@ describe('normalized release package staging', () => {
     });
     expect(packagePopulation).toContain('package/dist/runtime/evidence-verification/src/cli.js');
     expect(packagePopulation).not.toContain('package/dist/runtime/evidence-verification/test/');
-  }, 60_000);
+    // Two full `pnpm pack` reproductions: 13 to 18 s alone on a loaded workstation. The
+    // bound is the hang guard for that cost under load and in the RC coverage lane (#246).
+  }, 180_000);
 
   it('keeps the published landing page bound to the package version', () => {
     const packageVersion = (
@@ -216,7 +218,11 @@ describe('normalized release package staging', () => {
     mkdirSync(join(archive, 'docs/site/build'), { recursive: true });
     writeFileSync(join(archive, 'docs/site/build/stale.html'), '@devai-nyx/cli');
     expect(check).toThrow('PUBLISHABLE_OLD_PACKAGE_IDENTITY:docs/site/build/stale.html');
-  });
+    // A copy of the whole source tree plus three closure runs: 7 to 9 s alone, above the RC
+    // coverage lane's 15 s default once instrumented under load (#246). The copy reads the
+    // live tree, so the file also runs in the `local-serial` lane, where no sibling test
+    // writes into the tree while it is copied.
+  }, 120_000);
 
   it('keeps release closure bound to the selected public package version', () => {
     const closure = JSON.parse(
