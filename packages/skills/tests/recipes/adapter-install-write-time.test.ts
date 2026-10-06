@@ -10,9 +10,47 @@ import {
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { hostname, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { afterEach, aroundEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, aroundEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// Fault seam over the real authority effects: by default every call passes through. A test
+// may name one target whose publication links its bytes and then fails as indeterminate,
+// and the descriptor and unlink calls are recorded in order.
+const seam = vi.hoisted(() => ({
+  indeterminateAt: undefined as string | undefined,
+  events: [] as (readonly [string, string | number])[],
+}));
+vi.mock('@devai-nyx/authority', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@devai-nyx/authority')>();
+  return {
+    ...actual,
+    publishFileNoReplaceSync: (path: string, data: string | Uint8Array) => {
+      const identity = actual.publishFileNoReplaceSync(path, data);
+      if (path === seam.indeterminateAt) {
+        throw Object.assign(new Error(actual.PUBLISH_INDETERMINATE), {
+          code: actual.PUBLISH_INDETERMINATE,
+          identity,
+        });
+      }
+      return identity;
+    },
+    openRegularFileReadOnlySync: (path: string) => {
+      const descriptor = actual.openRegularFileReadOnlySync(path);
+      seam.events.push([`open ${path}`, descriptor]);
+      return descriptor;
+    },
+    closeReadOnlySync: (descriptor: number) => {
+      seam.events.push(['close', descriptor]);
+      actual.closeReadOnlySync(descriptor);
+    },
+    unlinkSync: (path: string) => {
+      seam.events.push(['unlink', path]);
+      actual.unlinkSync(path);
+    },
+  };
+});
 import {
   executeRecipeAdapterPlan,
   installRecipeAdapters,
@@ -63,6 +101,8 @@ beforeEach(() => {
   outside = join(fixture, 'outside');
   mkdirSync(join(repo, '.devai/state'), { recursive: true });
   mkdirSync(outside);
+  seam.indeterminateAt = undefined;
+  seam.events.length = 0;
 });
 afterEach(() => rmSync(fixture, { recursive: true, force: true }));
 
@@ -260,6 +300,42 @@ describe('atomic installation across targets', () => {
     ]);
   });
 
+  it('pins an indeterminate publication through the rollback that removes it', () => {
+    const resolved = preflightRecipeAdapterInstall(repo, plan);
+    seam.indeterminateAt = target(2);
+
+    expect(() => executeRecipeAdapterPlan(resolved)).toThrow(
+      expect.objectContaining({ code: 'AUTHORITY_PUBLISH_CLEANUP_INCOMPLETE' }),
+    );
+    // Every publication, the indeterminate one included, is rolled back.
+    expect(tree(repo)).toEqual([]);
+    const opened = seam.events.findIndex(([event]) => event === `open ${target(2)}`);
+    const pin = seam.events[opened]?.[1];
+    const unlinked = seam.events.findIndex(
+      ([event, path]) => event === 'unlink' && path === target(2),
+    );
+    const closed = seam.events.findIndex(
+      ([event, descriptor], index) => index > opened && event === 'close' && descriptor === pin,
+    );
+    expect(opened).toBeGreaterThanOrEqual(0);
+    expect(unlinked).toBeGreaterThan(opened);
+    expect(closed).toBeGreaterThan(unlinked);
+  });
+
+  it('refuses a FIFO swapped in at a target after preflight without blocking on it', () => {
+    mkdirSync(dirname(target(0)), { recursive: true });
+    writeFileSync(target(0), 'assess\n');
+    const resolved = preflightRecipeAdapterInstall(repo, plan);
+    rmSync(target(0));
+    execFileSync('mkfifo', [target(0)]);
+
+    expect(() => executeRecipeAdapterPlan(resolved)).toThrow(
+      'RECIPE_ADAPTER_DRIFT: .agents/skills/devai-assess/SKILL.md',
+    );
+    expect(lstatSync(target(0)).isFIFO()).toBe(true);
+    expect(existsSync(join(repo, '.claude'))).toBe(false);
+  });
+
   it('keeps the canonical installation idempotent', () => {
     const first = installRecipeAdapters({ repoRoot: repo });
     const second = installRecipeAdapters({ repoRoot: repo });
@@ -319,6 +395,19 @@ describe('the repository recipe-install lock', () => {
     ).toThrow('INJECTED_PUBLICATION_FAILURE');
     expect(seen).toEqual([true, true, true]);
     expect(existsSync(lockPath())).toBe(false);
+  });
+
+  it.each([
+    ['a FIFO', (path: string) => execFileSync('mkfifo', [path])],
+    ['a directory', (path: string) => mkdirSync(path)],
+  ])('refuses %s at the lock path without blocking, reading or removing it', (_, make) => {
+    const resolved = preflightRecipeAdapterInstall(repo, plan);
+    make(lockPath());
+
+    expect(() => executeRecipeAdapterPlan(resolved)).toThrow(/^RECIPE_INSTALL_LOCK_INVALID: /u);
+    expect(lstatSync(lockPath()).isFile()).toBe(false);
+    expect(existsSync(join(repo, '.agents'))).toBe(false);
+    expect(seam.events.filter(([event]) => event === `open ${lockPath()}`)).toEqual([]);
   });
 
   it('refuses without a state root rather than creating one', () => {
