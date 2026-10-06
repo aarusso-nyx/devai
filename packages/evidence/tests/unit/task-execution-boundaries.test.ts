@@ -186,6 +186,43 @@ describe('agent selection refusals name the exact drifted fact', () => {
   });
 });
 
+// ADR-MDL-0008: the provider-enforced sandbox is recorded only on experimental agent
+// evidence, in the mode its runtime enforces.
+describe('the recorded attempt sandbox', () => {
+  const SANDBOX = {
+    mode: 'codex-workspace-write',
+    enforced_by: 'provider',
+    write_root: 'attempt-worktree',
+    flags: ['--sandbox', 'workspace-write', '--cd', '{attempt-worktree}'],
+  } as const;
+  const exactTask = () => agentTask({ mode: 'exact', registry_id: AGENT.registry_id });
+
+  it('binds the sandbox of an experimental codex attempt', () => {
+    const record = succeeds(() =>
+      buildTaskExecutionEvidence(exactTask(), agentFacts({ experimental: true, sandbox: SANDBOX })),
+    );
+    expect(record.sandbox).toEqual(SANDBOX);
+  });
+
+  it('refuses a sandbox in another runtime mode or on non-experimental evidence', () => {
+    expect(
+      refusal(() =>
+        buildTaskExecutionEvidence(
+          exactTask(),
+          agentFacts({
+            experimental: true,
+            sandbox: { ...SANDBOX, mode: 'claude-restricted-sandbox' },
+          }),
+        ),
+      ).code,
+    ).toBe('TASK_EXECUTION_EVIDENCE_SANDBOX_MISMATCH');
+    // The schema itself refuses a sandbox on evidence that is not labelled experimental.
+    expect(
+      refusal(() => buildTaskExecutionEvidence(exactTask(), agentFacts({ sandbox: SANDBOX }))).code,
+    ).toBe('TASK_EXECUTION_EVIDENCE_SCHEMA_INVALID');
+  });
+});
+
 describe('failure detail on verdicts that neither passed nor failed', () => {
   const detail = {
     code: 'REVIEW_REQUIRED',
