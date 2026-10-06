@@ -59,13 +59,47 @@ function manifestEnvironment(input: {
 
 afterAll(() => rmSync(output, { recursive: true, force: true }));
 
+/**
+ * A Vitest timeout cannot interrupt a synchronous child: a hung `execFileSync` blocks the
+ * worker's event loop, so the case bound would never fire. The children of the bounded cases
+ * carry an enforced timeout under that bound, are killed with SIGKILL when it passes, and fail
+ * naming the command and the limit; every other failure propagates unchanged.
+ */
+const STAGE_TIMEOUT_MS = 150_000;
+const CHILD_TIMEOUT_MS = 30_000;
+
+function boundedExecFileSync(
+  file: string,
+  args: readonly string[],
+  options: Readonly<{ cwd?: string; stdio?: 'pipe' }>,
+  timeoutMs: number,
+): string {
+  try {
+    return execFileSync(file, [...args], {
+      ...options,
+      encoding: 'utf8',
+      timeout: timeoutMs,
+      killSignal: 'SIGKILL',
+    });
+  } catch (error) {
+    const failure = error as NodeJS.ErrnoException & { signal?: string | null };
+    if (failure.code === 'ETIMEDOUT' || failure.signal === 'SIGKILL') {
+      throw new Error(
+        `${[file, ...args].join(' ')} exceeded its enforced ${String(timeoutMs)} ms timeout and was killed`,
+      );
+    }
+    throw error;
+  }
+}
+
 describe('normalized release package staging', () => {
   it('requires two byte-identical packs and excludes private workspace packages', () => {
     const staged = JSON.parse(
-      execFileSync(
+      boundedExecFileSync(
         process.execPath,
         [join(root, 'scripts/stage-release-package.mjs'), '--output', output],
-        { cwd: root, encoding: 'utf8' },
+        { cwd: root },
+        STAGE_TIMEOUT_MS,
       ),
     ) as {
       tarball: string;
@@ -91,9 +125,12 @@ describe('normalized release package staging', () => {
     });
     expect(JSON.stringify(sbom)).not.toContain('@devai-nyx/');
     const manifest = JSON.parse(
-      execFileSync('tar', ['-xOf', staged.tarball, 'package/package.json'], {
-        encoding: 'utf8',
-      }),
+      boundedExecFileSync(
+        'tar',
+        ['-xOf', staged.tarball, 'package/package.json'],
+        {},
+        CHILD_TIMEOUT_MS,
+      ),
     ) as Record<string, unknown>;
     expect(manifest).toMatchObject({
       name: '@aarusso-nyx/devai',
@@ -101,9 +138,12 @@ describe('normalized release package staging', () => {
     });
     expect(manifest).not.toHaveProperty('devDependencies');
     expect(JSON.stringify(manifest)).not.toMatch(/workspace:|@devai-nyx\//u);
-    const packagePopulation = execFileSync('tar', ['-tzf', staged.tarball], {
-      encoding: 'utf8',
-    });
+    const packagePopulation = boundedExecFileSync(
+      'tar',
+      ['-tzf', staged.tarball],
+      {},
+      CHILD_TIMEOUT_MS,
+    );
     expect(packagePopulation).toContain('package/dist/runtime/evidence-verification/src/cli.js');
     expect(packagePopulation).not.toContain('package/dist/runtime/evidence-verification/test/');
     // Two full `pnpm pack` reproductions: 13 to 18 s alone on a loaded workstation. The
@@ -206,11 +246,12 @@ describe('normalized release package staging', () => {
     }
     expect(existsSync(join(archive, '.git'))).toBe(false);
     const check = () =>
-      execFileSync(process.execPath, [join(archive, 'scripts/check-publishable-closure.mjs')], {
-        cwd: archive,
-        encoding: 'utf8',
-        stdio: 'pipe',
-      });
+      boundedExecFileSync(
+        process.execPath,
+        [join(archive, 'scripts/check-publishable-closure.mjs')],
+        { cwd: archive, stdio: 'pipe' },
+        CHILD_TIMEOUT_MS,
+      );
     expect(JSON.parse(check()).package).toBe(`@aarusso-nyx/devai@${SELECTED_RELEASE_VERSION}`);
     writeFileSync(join(archive, 'docs/stale-package.md'), '@devai-nyx/cli');
     expect(check).toThrow('PUBLISHABLE_OLD_PACKAGE_IDENTITY:docs/stale-package.md');
