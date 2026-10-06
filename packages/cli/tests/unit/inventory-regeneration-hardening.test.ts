@@ -1,6 +1,14 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -12,7 +20,22 @@ import {
 } from '../../src/commands/sense/readings-rebuild.js';
 
 /** Runs after the real inventory walk and before publication: the async window of a run. */
-const interleave = vi.hoisted(() => ({ afterWalk: undefined as undefined | (() => void) }));
+const interleave = vi.hoisted(() => ({
+  afterWalk: undefined as undefined | (() => void),
+  /** Runs once the combined manifest is renamed into place, inside the publication window. */
+  afterPublish: undefined as undefined | (() => void),
+}));
+
+vi.mock('@devai-nyx/authority', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@devai-nyx/authority')>();
+  return {
+    ...original,
+    renameSync: (from: string, to: string) => {
+      original.renameSync(from, to);
+      if (to.endsWith('/inventory/inventory.json')) interleave.afterPublish?.();
+    },
+  };
+});
 
 vi.mock('#runtime-core', async (importOriginal) => {
   const original = await importOriginal<typeof import('../../src/runtime-core.js')>();
@@ -33,6 +56,7 @@ const ACTIONS_ONLY = { http: false, database: false, rbac: false, actions: true 
 
 afterEach(() => {
   interleave.afterWalk = undefined;
+  interleave.afterPublish = undefined;
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
@@ -68,11 +92,16 @@ const SOURCES: Readonly<Record<string, string>> = {
 };
 
 /** A committed repository with git-ignored files that the source walkers still match. */
-function repository(): { readonly root: string; readonly head: string; readonly tree: string } {
+function repository(
+  extra: Readonly<Record<string, string>> = {},
+  ignore = '',
+  beforeCommit: (root: string) => void = () => undefined,
+): { readonly root: string; readonly head: string; readonly tree: string } {
   const root = mkdtempSync(join(tmpdir(), 'devai-inventory-hardening-'));
   roots.push(root);
-  put(root, '.gitignore', '.devai/state/\nscratch/\nCLAUDE.md\n');
-  for (const [path, body] of Object.entries(SOURCES)) put(root, path, body);
+  put(root, '.gitignore', `.devai/state/\nscratch/\nCLAUDE.md\n${ignore}`);
+  for (const [path, body] of Object.entries({ ...SOURCES, ...extra })) put(root, path, body);
+  beforeCommit(root);
   git(root, 'init', '--quiet');
   git(root, 'add', '-A');
   git(root, 'commit', '--quiet', '-m', 'fixture');
@@ -275,5 +304,91 @@ describe('inventory regeneration preserves each producer reading (#294)', () => 
     expect(
       json(root, `.devai/state/sensor-readings/inventory_regeneration/${result.reading.id}.json`),
     ).toEqual(result.reading);
+  });
+});
+
+const USE_CASE = {
+  cases: [{ id: 'UC-1', mainFlow: [{ action: 'x', refs: { actionRefs: [{ id: 'a' }] } }] }],
+};
+const REGISTRY = `${JSON.stringify({ entries: [{ action_id: 'a' }] })}\n`;
+
+describe('inventory regeneration admits no ignored or linked input (#294)', () => {
+  it('reads an ignored coverage input as absent', async () => {
+    const { root } = repository(
+      { 'law/policy/action-registry.json': REGISTRY },
+      'product/use-cases/\nrecord/proofs/\n',
+    );
+    put(root, 'product/use-cases/linked.json', `${JSON.stringify(USE_CASE)}\n`);
+    put(root, 'record/proofs/sensors/inventory_api/api-map.json', '{"endpoints":[]}\n');
+    expect(git(root, 'status', '--porcelain')).toBe('');
+
+    const result = await regenerate(root);
+
+    const coverage = result.report.regenerated.find(({ kind }) => kind === 'inventory_coverage');
+    const codes = (coverage?.producer_reading?.findings ?? []).map(({ code }) => code);
+    // Neither the ignored api-map nor the ignored use case reached the tree-bound matrix.
+    expect(codes).toContain('COVERAGE_REQUIRES_API_MAP');
+    expect(codes).toContain('COVERAGE_UNLINKED_ACTION');
+    expect(coverage?.producer_reading?.metrics['linked_action_count']).toBe(0);
+    expect(JSON.stringify(json(root, COVERAGE_BODY))).not.toContain('UC-1');
+  });
+
+  it('counts a tracked coverage input', async () => {
+    const { root } = repository({
+      'law/policy/action-registry.json': REGISTRY,
+      'product/use-cases/linked.json': `${JSON.stringify(USE_CASE)}\n`,
+    });
+
+    const result = await regenerate(root);
+
+    const coverage = result.report.regenerated.find(({ kind }) => kind === 'inventory_coverage');
+    expect(coverage?.producer_reading?.metrics['linked_action_count']).toBe(1);
+  });
+
+  it('refuses a committed symlink whose target lies outside the checkout', async () => {
+    const outside = mkdtempSync(join(tmpdir(), 'devai-inventory-outside-'));
+    roots.push(outside);
+    put(outside, 'secret.ts', "import './leak.js';\n@Module({})\nexport class SecretModule {}\n");
+    put(outside, 'readme.md', '# outside\n');
+    const { root } = repository({}, '', (checkout) => {
+      symlinkSync(join(outside, 'secret.ts'), join(checkout, 'src/link.ts'));
+      symlinkSync(join(outside, 'readme.md'), join(checkout, 'README.md'));
+    });
+    expect(git(root, 'ls-files', 'src/link.ts')).toBe('src/link.ts');
+
+    const result = await regenerate(root, { surfaces: ACTIONS_ONLY });
+
+    expect(result.reading.status).toBe('pass');
+    const graph = json(root, DEP_GRAPH_BODY) as { graph: Record<string, string[]> };
+    expect(Object.keys(graph.graph)).not.toContain('src/link.ts');
+    const inventory = json(root, INVENTORY_BODY_PATH) as {
+      modules: { file: string }[];
+      dependency_graph: { file: string }[];
+      checksums: Record<string, string>;
+    };
+    expect(inventory.modules.map(({ file }) => file)).toEqual(['src/m.ts']);
+    expect(inventory.dependency_graph.map(({ file }) => file)).not.toContain('src/link.ts');
+    expect(Object.keys(inventory.checksums)).not.toContain('README.md');
+  });
+});
+
+describe('inventory regeneration re-verifies around publication (#294)', () => {
+  it('retracts what it published when the tree changes inside the publication window', async () => {
+    const { root } = repository();
+    interleave.afterPublish = () => put(root, 'src/b.ts', 'export const b = 2;\n');
+
+    const result = await regenerate(root, { surfaces: ACTIONS_ONLY });
+
+    expect(result.reading.status).toBe('unknown');
+    expect(result.reading.findings).toEqual([
+      expect.objectContaining({
+        code: 'INVENTORY_REGENERATION_SNAPSHOT_CHANGED',
+        message: expect.stringContaining('were removed'),
+      }),
+    ]);
+    expect(result.report).toMatchObject({ ok: false, regenerated: [] });
+    for (const path of [INVENTORY_BODY_PATH, DEP_GRAPH_BODY, COVERAGE_BODY]) {
+      expect(existsSync(join(root, path))).toBe(false);
+    }
   });
 });
