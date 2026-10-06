@@ -33,6 +33,13 @@ export interface AlignmentObservation {
   readonly status: 'pass' | 'fail';
   readonly candidate_sha: string;
   readonly completed_at: string;
+  /**
+   * The gate invariants this observation measures. An observation that names them aligns
+   * no other invariant, so a producer observed for one invariant never stands in for
+   * another invariant that lists the same action (#235). Absent, any invariant that lists
+   * the action may use it, as before.
+   */
+  readonly invariant_ids?: readonly string[];
 }
 
 export interface HarnessInvariantAlignmentOptions {
@@ -101,15 +108,23 @@ export function senseHarnessInvariantAlignment(
   const workflows = loadWorkflows(opts.repoRoot, opts.workflowDir);
   const runSteps = loadRunSteps(workflows.map((workflow) => workflow.file));
   const resolvedCandidateHead = candidateHead(opts.repoRoot, opts.candidateHead);
-  const evidence = [
+  const loaded = [
     ...(opts.evidenceDir !== undefined
       ? loadEvidence(opts.repoRoot, abs(opts.repoRoot, opts.evidenceDir))
       : [
           ...loadEvidence(opts.repoRoot, abs(opts.repoRoot, DEFAULT_READINGS_DIR)),
           ...loadEvidence(opts.repoRoot, abs(opts.repoRoot, 'record/proofs/work/test-results')),
         ]),
-    ...(opts.observations ?? []),
   ];
+  const observations = opts.observations ?? [];
+  const evidenceFor = (id: string): Parameters<typeof hasFreshCandidateEvidence>[1] => [
+    ...loaded,
+    ...observations.filter(
+      (observation) =>
+        observation.invariant_ids === undefined || observation.invariant_ids.includes(id),
+    ),
+  ];
+  const evidenceCount = loaded.length + observations.length;
   const nowMs = Date.parse(opts.now ?? new Date().toISOString());
   const maxEvidenceAgeHours = opts.maxEvidenceAgeHours ?? 24;
   const maxAgeMs = maxEvidenceAgeHours * 60 * 60 * 1000;
@@ -162,7 +177,7 @@ export function senseHarnessInvariantAlignment(
       }
       return hasFreshCandidateEvidence(
         opts.repoRoot,
-        evidence,
+        evidenceFor(id),
         candidate,
         resolvedCandidateHead,
         nowMs,
@@ -204,7 +219,7 @@ export function senseHarnessInvariantAlignment(
       misaligned,
       workflow_count: workflows.length,
       executable_run_steps: runSteps.length,
-      evidence_records: evidence.length,
+      evidence_records: evidenceCount,
       candidate_head_resolved: resolvedCandidateHead !== undefined,
     },
   });
