@@ -17,6 +17,15 @@
           "suite": "unit",
           "path": "packages/skills/tests/unit/forbidden-role-paths.test.ts"
         }
+      ],
+      "code_areas": [
+        "packages/authority/src/**",
+        "packages/cli/src/authority/**",
+        "packages/effects-check/src/**",
+        "packages/skills/src/forbidden-actions/**",
+        "packages/skills/src/prompt-firewall/**",
+        "packages/authority/tests/**",
+        "packages/effects-check/tests/**"
       ]
     },
     {
@@ -34,6 +43,13 @@
           "suite": "unit",
           "path": "packages/cli/tests/unit/self-dogfood-policy.test.ts"
         }
+      ],
+      "code_areas": [
+        "packages/authority/src/**",
+        "packages/cli/src/commands/task/**",
+        "packages/cli/src/services/round-run/authority-process.ts",
+        "packages/cli/src/services/experimental-dispatch/authority-process.ts",
+        "packages/authority/tests/**"
       ]
     },
     {
@@ -51,6 +67,13 @@
           "suite": "contract",
           "path": "packages/schemas/tests/contract/governance-v15-authorization.test.ts"
         }
+      ],
+      "code_areas": [
+        "packages/authority/src/**",
+        "packages/cli/src/commands/release/**",
+        "packages/cli/src/services/release-lifecycle-execution*.ts",
+        "packages/cli/src/services/release-protected-host-runner*.ts",
+        "packages/authority/tests/**"
       ]
     },
     {
@@ -68,6 +91,12 @@
           "suite": "contract",
           "path": "packages/schemas/tests/contract/governance-v15-self-dogfood.test.ts"
         }
+      ],
+      "code_areas": [
+        "packages/cli/src/authority/**",
+        "packages/cli/src/commands/sense/**",
+        "packages/cli/src/commands/audit/**",
+        "packages/cli/src/services/self-dogfood.ts"
       ]
     },
     {
@@ -85,6 +114,14 @@
           "suite": "unit",
           "path": "packages/cli/tests/unit/check-runner-preflight-blocked.test.ts"
         }
+      ],
+      "code_areas": [
+        "packages/cli/src/cli-error.ts",
+        "packages/cli/src/action-output.ts",
+        "packages/cli/src/validate-emit.ts",
+        "packages/cli/src/command-router*.ts",
+        "packages/cli/src/define-command.ts",
+        "packages/cli/src/cli-runtime.ts"
       ]
     },
     {
@@ -102,6 +139,12 @@
           "suite": "int",
           "path": "tests/integration/installed-inventory-api-sensor.integration.test.ts"
         }
+      ],
+      "code_areas": [
+        "packages/sensors/src/**",
+        "packages/cli/src/commands/sense/**",
+        "packages/loop/src/inventory/**",
+        "packages/sensors/tests/**"
       ]
     },
     {
@@ -119,6 +162,10 @@
           "suite": "contract",
           "path": "tests/contract/preflight-lane-parity.contract.test.ts"
         }
+      ],
+      "code_areas": [
+        "packages/cli/src/commands/check/**",
+        "packages/cli/src/services/check-runner/**"
       ]
     },
     {
@@ -132,6 +179,11 @@
           "suite": "unit",
           "path": "packages/cli/tests/unit/check-runner-preflight-blocked.test.ts"
         }
+      ],
+      "code_areas": [
+        "packages/cli/src/commands/check/**",
+        "packages/utils/src/exit.ts",
+        "packages/cli/src/services/check-runner/**"
       ]
     },
     {
@@ -145,6 +197,9 @@
           "suite": "unit",
           "path": "packages/cli/tests/unit/cli-shard06-control-facades.test.ts"
         }
+      ],
+      "code_areas": [
+        "packages/cli/src/commands/triage/**"
       ]
     },
     {
@@ -158,6 +213,12 @@
           "suite": "unit",
           "path": "packages/cli/tests/unit/backlog-actions.test.ts"
         }
+      ],
+      "code_areas": [
+        "packages/loop/src/repository-backlog/**",
+        "packages/cli/src/commands/task/**",
+        "packages/cli/src/commands/campaign/**",
+        "packages/utils/src/counters/**"
       ]
     },
     {
@@ -171,6 +232,14 @@
           "suite": "unit",
           "path": "packages/evidence/tests/unit/verb-evidence.test.ts"
         }
+      ],
+      "code_areas": [
+        "packages/evidence/src/**",
+        "packages/cli/src/commands/evidence/**",
+        "packages/cli/src/commands/record/**",
+        "packages/utils/src/canonical-json/**",
+        "packages/utils/src/repository-target.ts",
+        "packages/evidence/tests/**"
       ]
     },
     {
@@ -184,6 +253,12 @@
           "suite": "unit",
           "path": "packages/loop/tests/unit/rgr-persistence-boundaries.test.ts"
         }
+      ],
+      "code_areas": [
+        "packages/cli/src/commands/task/**",
+        "packages/loop/src/rgr/**",
+        "packages/cli/src/commands/round/**",
+        "packages/cli/src/services/experimental-dispatch/**"
       ]
     },
     {
@@ -201,6 +276,13 @@
           "suite": "unit",
           "path": "packages/loop/tests/unit/round-runner-independent-order.test.ts"
         }
+      ],
+      "code_areas": [
+        "packages/loop/src/round-lifecycle/**",
+        "packages/cli/src/commands/round/**",
+        "packages/cli/src/commands/task/**",
+        "packages/cli/src/commands/campaign/**",
+        "packages/loop/src/campaign/**"
       ]
     },
     {
@@ -214,6 +296,10 @@
           "suite": "unit",
           "path": "packages/sensors/tests/spec-substrate.test.ts"
         }
+      ],
+      "code_areas": [
+        "packages/sensors/src/inventory-data-handling.ts",
+        "packages/sensors/src/declared-surfaces.ts"
       ]
     },
     {
@@ -231,6 +317,15 @@
           "suite": "unit",
           "path": "packages/cli/tests/unit/execution-surface-inventory-output.test.ts"
         }
+      ],
+      "code_areas": [
+        "packages/schemas/src/**",
+        "packages/cli/src/commands/actions-list.ts",
+        "packages/cli/src/commands/backlog/**",
+        "packages/loop/src/repository-backlog/**",
+        "packages/cli/src/action-output.ts",
+        "packages/cli/src/validate-emit.ts",
+        "packages/schemas/tests/**"
       ]
     },
     {
@@ -244,6 +339,12 @@
           "suite": "unit",
           "path": "packages/spec/tests/unit/invariant-input-validity.test.ts"
         }
+      ],
+      "code_areas": [
+        "packages/spec/src/spec/**",
+        "packages/cli/src/commands/spec/**",
+        "packages/spec/src/inv-suggest/**",
+        "packages/spec/tests/**"
       ]
     },
     {
@@ -276,7 +377,10 @@
         "packages/sensors/src/trace-resolve.ts",
         "packages/spec/src/spec/test-trace-validator.ts",
         ".github/workflows/pull-request-checks.yml",
-        "packages/sensors/src/harness-invariant-alignment-workflow.ts"
+        "packages/sensors/src/harness-invariant-alignment-workflow.ts",
+        "packages/spec/src/rtd-manifest/**",
+        "packages/cli/src/commands/rtd/**",
+        "packages/spec/tests/**"
       ]
     },
     {
@@ -294,6 +398,12 @@
           "suite": "unit",
           "path": "packages/spec/tests/unit/rtd-manifest.test.ts"
         }
+      ],
+      "code_areas": [
+        "packages/spec/src/translation-validation/**",
+        "packages/loop/src/scorecard/**",
+        "packages/cli/src/commands/verify/**",
+        "packages/spec/tests/**"
       ]
     },
     {
@@ -311,6 +421,11 @@
           "suite": "contract",
           "path": "packages/schemas/tests/contract/governance-v15-adr.test.ts"
         }
+      ],
+      "code_areas": [
+        "packages/spec/src/adr/**",
+        "packages/loop/src/governance-ledger/**",
+        "packages/spec/tests/**"
       ]
     },
     {
@@ -328,6 +443,13 @@
           "suite": "unit",
           "path": "packages/cli/tests/unit/check-taxonomy-member.test.ts"
         }
+      ],
+      "code_areas": [
+        "scripts/check-commit-range.mjs",
+        "scripts/classify-paths.mjs",
+        "scripts/check-change-hygiene.mjs",
+        "packages/cli/src/services/change-taxonomy.ts",
+        "packages/cli/src/services/hooks-install/**"
       ]
     },
     {
@@ -341,6 +463,16 @@
           "suite": "unit",
           "path": "packages/sensors/tests/unit/test-weakening-config.test.ts"
         }
+      ],
+      "code_areas": [
+        "packages/sensors/src/test-weakening.ts",
+        "packages/spec/src/spec/test-trace-validator.ts",
+        "packages/cli/src/commands/mutation/**",
+        "packages/cli/src/commands/render/**",
+        "packages/cli/src/services/mutation-*.ts",
+        "packages/*/tests/**",
+        "tests/**",
+        "vitest.config.ts"
       ]
     },
     {
@@ -358,6 +490,13 @@
           "suite": "unit",
           "path": "packages/cli/tests/unit/check-runner-toolchain-digest.test.ts"
         }
+      ],
+      "code_areas": [
+        "scripts/check-workflows.mjs",
+        "packages/cli/src/commands/check/**",
+        "packages/cli/src/services/check-runner/**",
+        "packages/cli/src/services/ci-scaffold/**",
+        "packages/cli/src/commands/doctor-environment-checks.ts"
       ]
     },
     {
@@ -375,6 +514,24 @@
           "suite": "unit",
           "path": "packages/authority/tests/unit/authority-materialization-contracts.test.ts"
         }
+      ],
+      "code_areas": [
+        "packages/cli/src/commands/init/**",
+        "packages/cli/src/services/adopter-policy.ts",
+        "scripts/check-policy-materialization.mjs",
+        "packages/cli/src/services/adopter-migrations.ts",
+        "packages/cli/src/services/adopter-policy-binding.ts",
+        "packages/cli/src/services/adopter-policy-ownership.ts",
+        "packages/cli/src/services/github-actions-adapter/**",
+        "packages/cli/src/services/hooks-install/**",
+        "packages/cli/src/services/interactive-config.ts",
+        "packages/cli/src/services/schema-prompts.ts",
+        "packages/cli/src/commands/doctor.ts",
+        "packages/cli/src/commands/doctor-install-checks.ts",
+        "packages/cli/src/commands/doctor-policy-checks.ts",
+        "packages/cli/src/commands/doctor-support.ts",
+        "packages/skills/src/bootstrap/**",
+        "packages/skills/src/constitution/**"
       ]
     },
     {
@@ -392,6 +549,11 @@
           "suite": "unit",
           "path": "packages/cli/tests/unit/sense-inputs-declaration.test.ts"
         }
+      ],
+      "code_areas": [
+        "packages/cli/src/commands/sense/**",
+        "packages/sensors/src/declared-surfaces.ts",
+        "packages/cli/src/authority/sense-selection.ts"
       ]
     },
     {
@@ -409,6 +571,11 @@
           "suite": "unit",
           "path": "packages/loop/tests/scorecard.test.ts"
         }
+      ],
+      "code_areas": [
+        "packages/loop/src/scorecard/**",
+        "packages/cli/src/commands/audit/**",
+        "packages/cli/src/commands/sense/**"
       ]
     },
     {
@@ -426,6 +593,12 @@
           "suite": "unit",
           "path": "packages/loop/tests/unit/governance-tracking.test.ts"
         }
+      ],
+      "code_areas": [
+        "packages/loop/src/round-lifecycle/**",
+        "packages/loop/src/tracking/**",
+        "packages/skills/src/post-merge-auditor/**",
+        "packages/cli/src/services/github-issues-tracking/**"
       ]
     },
     {
@@ -475,7 +648,10 @@
         "packages/sensors/src/ci-invariant-gate.ts",
         "packages/skills/src/model-bridge/soft-gate-observation.ts",
         "scripts/process/fetch-ci-invariant-evidence.mjs",
-        "scripts/process/check-ci-invariant-gate.mjs"
+        "scripts/process/check-ci-invariant-gate.mjs",
+        "packages/loop/src/scorecard/**",
+        "packages/loop/src/loop/**",
+        "packages/skills/src/model-bridge/**"
       ]
     },
     {
@@ -493,6 +669,11 @@
           "suite": "unit",
           "path": "packages/sensors/tests/unit/mutation-wave8-perf-test.test.ts"
         }
+      ],
+      "code_areas": [
+        "packages/cli/src/commands/check/**",
+        "packages/sensors/src/harness-performance.ts",
+        "packages/sensors/src/perf-test.ts"
       ]
     },
     {
@@ -514,6 +695,12 @@
           "suite": "unit",
           "path": "packages/cli/tests/unit/preflight-diagnostics-redaction.test.ts"
         }
+      ],
+      "code_areas": [
+        "packages/cli/src/services/credential-probe.ts",
+        "packages/utils/src/redact.ts",
+        "packages/cli/src/commands/evidence/**",
+        "scripts/check-workflows.mjs"
       ]
     },
     {
@@ -531,6 +718,14 @@
           "suite": "unit",
           "path": "packages/loop/tests/unit/release-publication-runtime-coverage.test.ts"
         }
+      ],
+      "code_areas": [
+        "packages/cli/src/commands/release/**",
+        "packages/loop/src/release-lifecycle/**",
+        "packages/loop/src/release/**",
+        "packages/cli/src/services/release-*.ts",
+        "packages/cli/src/services/container-archive.ts",
+        "packages/cli/src/release-host*.ts"
       ]
     }
   ],
