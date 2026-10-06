@@ -139,6 +139,36 @@ describe('a task waiting outside a dispatch keeps its locks under the waiting le
     },
   );
 
+  it('returns a task dispatched again to the dispatch TTL at its first renewal', async () => {
+    const root = repository();
+    fixedDate();
+    await withAuthorityHostTestScope(async () => {
+      saveTask(root, task('TASK-0503'));
+      acquireLocks({
+        locksDir: locksDir(root),
+        taskId: 'TASK-0503',
+        targets: [KEY],
+        ttlMs: WAITING_LOCK_TTL_MS,
+      });
+      let during: readonly unknown[] = [];
+      await runRoundTasks({
+        repoRoot: root,
+        round: ROUND,
+        lockRenewalIntervalMs: 5,
+        dispatch: async (running) => {
+          await new Promise((resolve) => setTimeout(resolve, 40));
+          during = listLocks({ locksDir: locksDir(root) }).map((lock) => lock.ttl_ms);
+          saveTask(root, { ...running, status: 'merging' });
+          return { ok: true };
+        },
+      });
+      expect(during).toEqual([DEFAULT_LOCK_TTL_MS]);
+      expect(listLocks({ locksDir: locksDir(root) })).toMatchObject([
+        { task_id: 'TASK-0503', ttl_ms: WAITING_LOCK_TTL_MS },
+      ]);
+    });
+  });
+
   it('leaves a task the runner escalates no lease', async () => {
     const root = repository();
     fixedDate();
