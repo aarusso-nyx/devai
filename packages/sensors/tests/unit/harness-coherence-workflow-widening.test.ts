@@ -73,11 +73,57 @@ describe('concurrency group expressions', () => {
     expect(supersedingGroupScoped('verify-${{ github.sha }}')).toBe(true);
     expect(supersedingGroupScoped('ci-${{ github.workflow }}')).toBe(false);
     expect(supersedingGroupScoped('ci-github.ref')).toBe(false);
+    expect(supersedingGroupScoped('${{ github.workflow }}-${{ github.ref }}')).toBe(true);
     expect(
       supersedingGroupScoped(
         "${{ format('{0}-pr-{1}', github.workflow, github.event.pull_request.number) }}",
       ),
-    ).toBe(false);
+    ).toBe(true);
+  });
+
+  // #331 review: a scope name that appears only inside a comparison or under another operator
+  // does not key the group by that subject.
+  it.each([
+    "ci-${{ github.ref == 'refs/heads/main' }}",
+    "ci-${{ github.ref != 'refs/heads/main' }}",
+    'ci-${{ !github.ref }}',
+    'ci-${{ github.ref || github.workflow }}',
+    "ci-${{ github.event_name == 'push' && github.ref || 'all' }}",
+    "ci-${{ github.event_name == 'push' && github.ref || github.workflow }}",
+    "${{ format('{0}', github.workflow) }}",
+    "${{ format('{0}', github.event_name == 'push') }}",
+    "${{ format('{0}-{1}', github.workflow, github.event_name) }}",
+    'ci-${{ inputs.anything }}',
+  ])('refuses %s as a superseding group', (group) => {
+    expect(supersedingGroupScoped(group)).toBe(false);
+  });
+
+  it('refuses the comparison counterexample as a superseding root and job-level group', () => {
+    const root = repository();
+    write(
+      root,
+      '.github/workflows/gate.yml',
+      gate("ci-${{ github.ref == 'refs/heads/main' }}", true),
+    );
+    expect(sense(root).metrics).toMatchObject({ concurrency_semantic_issues: 1 });
+    write(
+      root,
+      '.github/workflows/gate.yml',
+      `on:
+  workflow_dispatch: {}
+permissions:
+  contents: read
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: prepare-\${{ github.ref == 'refs/heads/main' }}
+      cancel-in-progress: true
+    steps:
+      - run: echo ok
+`,
+    );
+    expect(sense(root).metrics).toMatchObject({ concurrency_semantic_issues: 1 });
   });
 });
 

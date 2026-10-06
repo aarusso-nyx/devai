@@ -2,8 +2,18 @@
 // entry matches a current step, every committed job has a proved effect, and removing a
 // reviewed step's entry makes its job unknown again, so an edited step reads unknown until it
 // is reviewed anew.
-import { readFileSync, readdirSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import {
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { senseHarnessCoherence } from '../../src/harness-coherence.js';
 import { jobEffectFacts, workflowStepInventory } from '../../src/harness/workflow-parser.js';
@@ -29,7 +39,7 @@ describe('reviewed workflow step registry', () => {
   it('has no stale or duplicate entry, and each entry names where it occurs', () => {
     const occurrences = new Map<string, string[]>();
     for (const { file, text } of workflows()) {
-      for (const step of workflowStepInventory(text)) {
+      for (const step of workflowStepInventory(text, ROOT)) {
         if (step.sha256 === undefined) continue;
         const list = occurrences.get(step.sha256) ?? [];
         list.push(`${file}#${step.job}[${String(step.index)}]`);
@@ -65,6 +75,56 @@ describe('reviewed workflow step registry', () => {
     const edited = release.replace('Verify canonical asset set', 'Verify the canonical asset set');
     expect(edited).not.toBe(release);
     expect(jobEffectFacts(edited, ROOT, 'finalize-release').effect).toBe('unknown');
+  });
+
+  // #331 review: a reviewed step is bound to the bytes of every repository file it executes.
+  it('binds each entry to the current bytes of exactly the files its step executes', () => {
+    const filesBySha = new Map<string, readonly string[]>();
+    for (const { text } of workflows()) {
+      for (const step of workflowStepInventory(text, ROOT)) {
+        if (step.sha256 !== undefined) filesBySha.set(step.sha256, step.files);
+      }
+    }
+    for (const entry of REVIEWED_WORKFLOW_STEPS) {
+      expect(
+        entry.files.map((file) => file.path),
+        entry.workflow,
+      ).toEqual(filesBySha.get(entry.sha256));
+      for (const file of entry.files) {
+        const digest = createHash('sha256')
+          .update(readFileSync(join(ROOT, file.path)))
+          .digest('hex');
+        expect(digest, `${entry.workflow} ${file.path}`).toBe(file.sha256);
+      }
+    }
+    const toolchain = REVIEWED_WORKFLOW_STEPS.find((entry) =>
+      entry.workflow.startsWith('pull-request-checks.yml#preflight[1]'),
+    );
+    expect(toolchain?.files.map((file) => file.path)).toEqual([
+      '.github/actions/setup-node-toolchain/action.yml',
+    ]);
+  });
+
+  it('reads unknown when an executed file changes or is missing', () => {
+    const gate = readFileSync(join(WORKFLOWS, 'pull-request-checks.yml'), 'utf8');
+    const bound = [...new Set(workflowStepInventory(gate, ROOT).flatMap((step) => step.files))];
+    const tree = mkdtempSync(join(tmpdir(), 'devai-reviewed-files-'));
+    try {
+      for (const path of bound) {
+        mkdirSync(dirname(join(tree, path)), { recursive: true });
+        cpSync(join(ROOT, path), join(tree, path));
+      }
+      expect(jobEffectFacts(gate, tree, 'preflight').effect).toBe('read-only');
+      const action = join(tree, '.github/actions/setup-node-toolchain/action.yml');
+      writeFileSync(action, `${readFileSync(action, 'utf8')}# changed\n`);
+      expect(jobEffectFacts(gate, tree, 'preflight').effect).toBe('unknown');
+      cpSync(join(ROOT, '.github/actions/setup-node-toolchain/action.yml'), action);
+      expect(jobEffectFacts(gate, tree, 'preflight').effect).toBe('read-only');
+      rmSync(join(tree, 'scripts/process/summarize-check-report.mjs'));
+      expect(jobEffectFacts(gate, tree, 'preflight').effect).toBe('unknown');
+    } finally {
+      rmSync(tree, { recursive: true, force: true });
+    }
   });
 
   it('reads F5:T3 PASS on the committed workflows', () => {
