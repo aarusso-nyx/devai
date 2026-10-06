@@ -1,4 +1,5 @@
 import { existsSync, readFileSync, renameSync } from '@devai-nyx/authority';
+import { loadChain, type EvidenceRecord } from '@devai-nyx/evidence';
 import { EXIT_USAGE } from '@devai-nyx/utils';
 import { createHash } from 'node:crypto';
 import { dirname, join } from 'node:path';
@@ -190,13 +191,55 @@ function priorCompletion(path: string, task: TaskRecord): AgentCompletionRecord 
   return undefined;
 }
 
+/** The evidence chain the evidence commands read and append to. */
+const EVIDENCE_CHAIN_PATH = 'record/proofs/chain.json';
+
+/**
+ * Whether every merge-evidence reference names a record in the repository's evidence
+ * chain, read through the same `loadChain` reader the evidence commands use (#319). A
+ * missing or unreadable chain resolves nothing. A record binds to the task only where it
+ * names one: a non-null `context.task_id` must be this task, and a `round_id=` note must
+ * name this task's round. A record that names neither is accepted unbound, because the
+ * verb evidence writers do not stamp a task.
+ */
+function mergeEvidenceResolves(
+  repoRoot: string,
+  task: TaskRecord,
+  refs: readonly string[],
+): boolean {
+  let records: readonly EvidenceRecord[];
+  try {
+    records = loadChain(join(repoRoot, EVIDENCE_CHAIN_PATH)).records;
+  } catch {
+    return false;
+  }
+  const byId = new Map<string, EvidenceRecord>();
+  for (const record of records) {
+    if (record !== null && typeof record === 'object' && typeof record.id === 'string') {
+      byId.set(record.id, record);
+    }
+  }
+  return refs.every((ref) => {
+    const record = byId.get(ref);
+    if (record === undefined) return false;
+    const taskId: unknown = (record.context as { task_id?: unknown } | undefined)?.task_id;
+    if (taskId !== undefined && taskId !== null && taskId !== task.id) return false;
+    const rounds = (Array.isArray(record.notes) ? record.notes : [])
+      .filter((note): note is string => typeof note === 'string' && note.startsWith('round_id='))
+      .map((note) => note.slice('round_id='.length));
+    return rounds.every((round) => round === task.round_id);
+  });
+}
+
 /**
  * The registered completion path of an agent task (ADR-MDL-0007): `round ratify
  * --decision accept` moved it to pre_merge, a human integrated the attempt's changes
  * (merge stays a separate human act, ADR-GOV-0025), and `task finish` now records the
  * completion with the accepted ratification and the merge evidence. It refuses without
  * an accepted ratification, without merge evidence, or while the task has uncertain
- * dispatch work. The completion record, naming the worktrees it releases, is written
+ * dispatch work. Every merge-evidence reference must resolve to a record in the evidence
+ * chain that does not name another task or round (#319). The completion record, naming
+ * the worktrees it releases, is written
  * atomically and durably first; only then are the worktrees released and the task moved
  * through merging, so a retry after any interruption reuses the identical record and
  * refuses a differing one. The caller then completes the task.
@@ -226,7 +269,8 @@ function recordAgentCompletion(
   if (
     refs.length === 0 ||
     refs.length !== evidence.length ||
-    refs.some((ref) => !/^EV-/u.test(ref))
+    refs.some((ref) => !/^EV-/u.test(ref)) ||
+    !mergeEvidenceResolves(repoRoot, task, refs)
   ) {
     fail('TASK_MERGE_EVIDENCE_REQUIRED');
   }

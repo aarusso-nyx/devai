@@ -10,6 +10,7 @@
     { "path": "../utils" },
     { "path": "../schemas" },
     { "path": "../authority" },
+    { "path": "../evidence" },
     { "path": "../spec" },
     { "path": "../sensors" }
   ]
