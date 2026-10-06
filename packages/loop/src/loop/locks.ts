@@ -12,6 +12,7 @@ import { basename, dirname, join } from 'node:path';
 import {
   PublicationIndeterminate,
   fsyncDirectorySync,
+  mkdirDurableSync,
   publishCreateOnlyDurableSync,
   replaceDurableSync,
 } from './durable-files.js';
@@ -180,21 +181,47 @@ function holderOf(path: string): string {
 }
 
 /**
+ * `TASK_LOCK_WITHDRAWAL_UNCONFIRMED`: a lock publication left this caller's complete record
+ * in place and its withdrawal could not be confirmed (another writer holds its claim, or
+ * the claim cannot be judged). The record may hold the key until it expires; a person
+ * inspects the named file and removes it once the task no longer runs.
+ */
+function lockWithdrawalUnconfirmed(
+  path: string,
+  cause: unknown,
+): TaskServiceError & { readonly lock: string; readonly detail: string } {
+  // Built on demand: task-queue-services and this module import each other, so a class
+  // extending TaskServiceError at module load could see it undefined.
+  return Object.assign(new TaskServiceError('TASK_LOCK_WITHDRAWAL_UNCONFIRMED'), {
+    lock: path,
+    detail: `the lock at ${path} was published but its withdrawal after a failed cleanup could not be confirmed; once the task no longer runs, inspect and remove it`,
+    cause,
+  });
+}
+
+/**
  * Create a fresh lock record only when its key is free, through the governed no-replace
  * publication (ADR-AUT-0005): the record appears only with its complete bytes, so no
  * reader sees an empty or partial lock. A publication whose cleanup failed left this
  * caller's complete record in place; it is withdrawn through the claim protocol before
- * the refusal propagates, so the key is never held by a record the caller does not know.
+ * the refusal propagates. When the withdrawal cannot be confirmed, the refusal is
+ * `TASK_LOCK_WITHDRAWAL_UNCONFIRMED`, naming the lock file a person must inspect.
  */
 function createLockRecord(path: string, body: string, claims: string, identity: string): boolean {
   try {
     return publishCreateOnlyDurableSync(path, body);
   } catch (error) {
     if (error instanceof PublicationIndeterminate) {
+      let outcome: SwapOutcome | undefined;
+      let failure: unknown;
       try {
-        swapObservedRecord({ path, claimsDir: claims, identity });
-      } catch {
-        // best-effort: an unreleased record expires and stays this task's own
+        outcome = swapObservedRecord({ path, claimsDir: claims, identity });
+      } catch (swapError) {
+        failure = swapError;
+      }
+      // `changed`: the path no longer holds our record, so it cannot be live.
+      if (outcome !== 'swapped' && outcome !== 'changed') {
+        throw lockWithdrawalUnconfirmed(path, failure ?? error);
       }
     } else if (
       error instanceof Error &&
@@ -221,7 +248,9 @@ function parseTarget(target: string): { substrate: string; modulePart: string } 
  * naming the claim to repair, after the same release.
  */
 export function acquireLocks(opts: AcquireLockOptions): AcquireResult {
-  mkdirSync(opts.locksDir, { recursive: true });
+  // A new locks directory is itself an entry: make it durable before the first lock, so
+  // an acknowledged lock cannot vanish with its directory on power loss.
+  mkdirDurableSync(opts.locksDir);
   const claims = claimsDir(opts.locksDir);
   const created: { path: string; identity: string }[] = [];
   const rollBack = (): void => {
