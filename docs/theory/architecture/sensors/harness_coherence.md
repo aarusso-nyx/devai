@@ -28,3 +28,25 @@ Across all workflows, detect inconsistencies:
 
 - **Node-version pinning per workflow.** Requires deeper `with:` parsing — defer.
 - **Reusable workflow extraction recommendations.** That's idiomaticity (F5×T5).
+
+## Concurrency effect proof (#325)
+
+Concurrency semantics depend on each job's proved effect. Under ADR-REL-0034 an unproved
+effect stays a finding. Steps the closed analysis cannot prove are listed in a reviewed-step
+registry (`packages/sensors/src/harness/reviewed-workflow-steps.ts`):
+
+- Each entry names one step by the sha256 of its canonical YAML.
+- Each entry records the sha256 of every repository file the step executes: local action
+  definitions, named scripts, the `package.json` files consulted, and the package scripts
+  reached through npm `pre`/`post` hooks, nested runs, and `pnpm -r`.
+- The analysis recomputes those hashes from the candidate tree. A changed, missing, or
+  unresolvable file reads unknown.
+
+A superseding concurrency group must be keyed by the run's own subject on every event the
+workflow accepts: its ref, its commit, the pull request number on pull request events, or
+the merge-queue head on merge-queue events.
+
+Residual: steps that run scripts from the `release-control/` checkout of
+`DEVAI_PROCESS_CONTROL_COMMIT` are hashed against the candidate tree's copy of those
+scripts. That commit is pinned, and the release-control flow rehearses it separately; this
+sensor does not read it.
