@@ -349,6 +349,28 @@ describe('test_coverage_depth runs the local producer and reads the measured rat
     expect(reading.metrics?.['population']).toBe('local');
   });
 
+  it('names the failing test files even when passing tests flood the stderr head (#236)', () => {
+    const root = fixtureRoot();
+    const noise = 'release certify: cause: Error: release-task-policy-identity-mismatch\n'.repeat(
+      20,
+    );
+    runCommandMock.mockReturnValue(
+      ran(
+        '',
+        1,
+        `${noise}\u001b[31m FAIL \u001b[39m  packages/cli/tests/unit/slow.test.ts > suite > case\n` +
+          ' \u276F packages/cli/tests/unit/slow.test.ts (3 tests | 1 failed) 30012ms\n' +
+          ' FAIL  |local coverage| packages/sensors/tests/other.test.ts > case\n',
+      ),
+    );
+    const reading = measure(declared(root));
+    expect(reading.status).toBe('fail');
+    expect(messages(reading)).toContain(
+      'Failing test files: packages/cli/tests/unit/slow.test.ts, packages/sensors/tests/other.test.ts.',
+    );
+    expect(codes(reading)).toEqual(['COVERAGE_PRODUCER_FAILED']);
+  });
+
   it('reads FAIL with COVERAGE_REPORT_MISSING when the report is missing after a zero exit', () => {
     const root = fixtureRoot();
     runCommandMock.mockReturnValue(ran(' Test Files  1 passed (1)\n', 0));
