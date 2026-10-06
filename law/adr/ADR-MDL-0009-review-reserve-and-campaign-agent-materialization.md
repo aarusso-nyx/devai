@@ -16,16 +16,22 @@ affected_rules:
   - law/schemas/round-execution.schema.json
   - law/policy/campaign-execution.json
   - law/schemas/campaign.schema.json
+  - law/schemas/task.schema.json
   - packages/loop/src/loop/round-task-admission.ts
   - packages/loop/src/campaign/index.ts
+  - packages/skills/src/prompt-composer/index.ts
+  - packages/cli/src/services/experimental-dispatch/index.ts
   - packages/cli/src/commands/campaign/index.ts
 inspector_acceptance:
   - IA-001 -- With more run workers than the reserve and a same-generation review task (inspector or auditor) admissible but for capacity, a non-review task is refused with TASK_WORKER_CAP once non-review tasks hold the run's workers minus the reserve, while the review task is admitted.
-  - IA-002 -- The reserve holds nothing when no review task awaits admission, when the review task is running, failed, or has a dependency that has not completed, and in a serial run; review tasks may use every worker.
+  - IA-002 -- The reserve holds nothing when no review task awaits admission, when the review task is running, failed, has a dependency that has not completed, or conflicts with an active task's resources, and in a serial run; review tasks may use every worker.
   - IA-003 -- In the round runner with two workers, a ready review task starts beside the first implementation task ahead of implementation tasks ordered before it, and the round still completes.
   - IA-004 -- campaign materialize writes a human executor for a task with no executor contract, and for a task that declares one an agent executor with exact selection of its runtime, the declared or default iteration and capability values, and the composed prompt composition id; an identical re-materialization is reported as existing.
   - IA-005 -- An agent contract on an architect task, or with a runtime, effort or model outside experimental-execution.json, the runtime registry or the model tiers, refuses the whole round before any queue write, and so does an agent contract without a binding.
   - IA-006 -- A materialized agent task passes the activation check of round dispatch, its composition id matches the prompt dispatch composes, and a fake-provider dispatch takes it to awaiting_human_review.
+  - IA-007 -- An attempt that changes a path inside the discipline's Article 6 paths but outside the task's declared boundary fails with EXPERIMENTAL_BOUNDARY_VIOLATION.
+  - IA-008 -- An agent task with no lock key is never admitted beside another active agent task, and no agent task is admitted beside an active keyless one; keyed agent tasks and non-agent tasks overlap as before.
+  - IA-009 -- The campaign prompt is a hashed component of the composed prompt handed to the provider; editing it changes the composition id, and dispatch then refuses with TASK_PROMPT_COMPOSITION_DRIFT.
 ---
 
 # Review work keeps reserved capacity and campaigns can materialize agent tasks
@@ -54,8 +60,9 @@ Two orchestrator design items were documented as not implemented:
    auditor) and reserves one worker for them:
    - While a review task of the candidate's topological generation could be admitted but
      for capacity, non-review tasks may hold at most the run's workers minus the reserve.
-     Such a review task is planned, `ready`, not active, not failed, and every dependency
-     it has is completed.
+     Such a review task passes every other admission check: it is planned, `ready` with its
+     bound request unchanged, not active, not failed, every dependency it has is completed,
+     and it shares no resource with an active task.
    - Review tasks may use every worker.
    - A run with no more workers than the reserve, including the default serial run, is
      unreserved.
@@ -80,12 +87,25 @@ Two orchestrator design items were documented as not implemented:
    an in-force activation that admits the discipline, runtime, model and effort.
 
 4. **Agent record.** The agent executor selects its runtime exactly, takes `timeout_ms`
-   from the task's time budget when one is declared, and is bound to the Article 37
-   composition id of the materialized record. The CLI supplies the model aliases and the
+   from the task's time budget when one is declared, names the campaign prompt as its new
+   optional `instructions_ref`, and is bound to the Article 37 composition id of the
+   materialized record. The prompt composer adds the bytes of `instructions_ref` as a hashed
+   task-layer component, so the provider receives the campaign prompt and editing it changes
+   the id. The CLI supplies the model aliases and the
    composer, because the loop package cannot depend on the prompt composer. A later change to
    a prompt component changes the id: re-materialization then refuses the differing record,
    and dispatch refuses with `TASK_PROMPT_COMPOSITION_DRIFT` until the Architect re-binds
    the task.
+5. **Declared boundary.** Dispatch fails an attempt that changes a path outside the task's
+   `intent_diff.planned_files`, which materialization fills from the campaign
+   `boundary.paths`, with `EXPERIMENTAL_BOUNDARY_VIOLATION`. An entry ending in `/` admits
+   the paths under it. The Article 6 role check still applies first; a task that declares no
+   boundary is bounded by its role alone.
+6. **Keyless agent tasks.** A materialized task has no module target, so it derives no lock
+   key and a lock could not separate two agent tasks editing the same files. Under
+   `round-execution.json` `resources.keyless_agent_tasks`, admission refuses an agent task
+   beside another active agent task when either derives no lock key, with the waitable
+   `TASK_RESOURCE_CONFLICT`. Keyed agent tasks and other executors overlap as before.
 
 ## Consequences
 
@@ -115,6 +135,6 @@ As listed in the frontmatter.
 
 ## Inspector Adversarial Acceptance
 
-The six counterexamples in the frontmatter must fail against an implementation that omits
+The nine counterexamples in the frontmatter must fail against an implementation that omits
 the corresponding rule and pass against the candidate. They run against fixtures and a fake
 provider. No live provider call is part of this acceptance.
