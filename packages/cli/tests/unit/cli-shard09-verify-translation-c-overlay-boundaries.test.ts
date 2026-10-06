@@ -255,7 +255,10 @@ beforeAll(() => {
   baseCommit = fixture.git(['rev-parse', 'HEAD']);
   writeJson('.devai/state/tasks/TASK-9010.json', task());
   writeJson('record/proofs/chain.json', { head: null, records: [] });
-});
+  // A self-contained copy of the whole repository, committed: about 13 s at load average 55,
+  // which outran both the local 30 s hook default under parallel load and the RC coverage
+  // lane's 10 s hook default (#246). The bound is the hang guard for that measured cost.
+}, 120_000);
 
 afterAll(() => fixture?.cleanup());
 
