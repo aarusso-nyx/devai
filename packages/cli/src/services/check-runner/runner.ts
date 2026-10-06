@@ -34,7 +34,7 @@ export { readProtectedCompletedTaskResults } from './runner-results.js';
 export { PROTECTED_MUTATION_PRODUCER } from './runner-release-binding.js';
 export { resolveRunnerToolchain } from './runner-plan.js';
 
-const DEFAULT_TIMEOUT_MS = 15 * 60_000;
+const DEFAULT_TIMEOUT_MS = 30 * 60_000;
 
 type AsyncTaskExecutor = (
   ...args: Parameters<NonNullable<CheckRunnerOptions['executeTask']>>
