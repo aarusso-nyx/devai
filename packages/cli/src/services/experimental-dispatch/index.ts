@@ -45,13 +45,16 @@ import {
   type WorktreeRecord,
 } from '@devai-nyx/loop';
 import {
+  AgentCliError,
   agentCliInvocation,
+  agentCliSandbox,
   composeAgentPrompt,
   parseAgentCliOutput,
   runAgentCliAttempt,
   type AgentCliAttempt,
   type AgentCliInvocation,
   type AgentCliRuntime,
+  type AgentCliSandbox,
 } from '@devai-nyx/skills';
 import { canonicalSha256 } from '@devai-nyx/utils';
 import { createHash } from 'node:crypto';
@@ -89,6 +92,7 @@ export interface ExperimentalDispatchContext {
     readonly runtime: AgentCliRuntime;
     readonly model: string;
     readonly effort: string;
+    readonly worktree: string;
   }) => Pick<AgentCliInvocation, 'runtime' | 'command' | 'args'>;
 }
 
@@ -123,6 +127,7 @@ function agentRequest(task: TaskRecord): AgentRequest | undefined {
 export function experimentalTaskRefusal(
   task: TaskRecord,
   activation: ExperimentalActivation,
+  platform: NodeJS.Platform = process.platform,
 ): string | undefined {
   const request = agentRequest(task);
   if (request === undefined) return 'EXPERIMENTAL_TASK_NOT_AGENT';
@@ -140,7 +145,23 @@ export function experimentalTaskRefusal(
   if (request.selection.mode !== 'exact' || request.selection.registry_id !== request.runtime) {
     return 'EXPERIMENTAL_SELECTION_NOT_EXACT';
   }
+  // ADR-MDL-0008: a runtime whose own sandbox cannot confine writes to the attempt
+  // worktree on this host never runs.
+  if (sandboxFor(request.runtime, platform) === undefined) {
+    return 'EXPERIMENTAL_SANDBOX_UNAVAILABLE';
+  }
   return undefined;
+}
+
+function sandboxFor(
+  runtime: AgentCliRuntime,
+  platform: NodeJS.Platform = process.platform,
+): AgentCliSandbox | undefined {
+  try {
+    return agentCliSandbox(runtime, platform);
+  } catch {
+    return undefined;
+  }
 }
 
 /** The single model one tier above, if the Owner's activation also admits it. */
@@ -589,15 +610,20 @@ async function runAttempt(
       attempt: plan.number,
       ...entry,
     } as Parameters<typeof appendDispatchJournalEvent>[2]);
-  const invocation = (context.invocation ?? agentCliInvocation)({
-    runtime: request.runtime,
-    model: plan.model,
-    effort: request.effort,
-  });
   const startedAt = new Date().toISOString();
+  // ADR-MDL-0008: the provider's own sandbox confines the attempt's writes to its
+  // worktree; a runtime that cannot be confined here refuses before any spawn.
+  const sandbox = sandboxFor(request.runtime);
   let spawned = false;
   let attempt: AgentCliAttempt;
   try {
+    if (sandbox === undefined) throw new AgentCliError('AGENT_CLI_SANDBOX_UNAVAILABLE');
+    const invocation = (context.invocation ?? agentCliInvocation)({
+      runtime: request.runtime,
+      model: plan.model,
+      effort: request.effort,
+      worktree: worktree.path,
+    });
     attempt = await runAgentCliAttempt({
       invocation,
       cwd: worktree.path,
@@ -668,6 +694,7 @@ async function runAttempt(
       code,
       verdict,
       violations: escaping.length > 0 ? escaping : outOfScope,
+      sandbox,
     });
     persistTaskExecutionEvidence({
       repoRoot,
@@ -710,6 +737,7 @@ function attemptEvidence(
     readonly code: string;
     readonly verdict: 'pass' | 'fail' | 'error';
     readonly violations: readonly string[];
+    readonly sandbox: AgentCliSandbox | undefined;
   },
 ): TaskExecutionEvidence {
   const id = `TXE-${canonicalSha256({ task: task.id, attempt: plan.number, at: facts.startedAt }).slice(0, 16)}`;
@@ -764,5 +792,13 @@ function attemptEvidence(
     }),
     evidence_refs: [],
     experimental: true,
+    ...(facts.sandbox !== undefined && {
+      sandbox: {
+        mode: facts.sandbox.mode,
+        enforced_by: facts.sandbox.enforced_by,
+        write_root: facts.sandbox.write_root,
+        flags: [...facts.sandbox.flags],
+      },
+    }),
   });
 }

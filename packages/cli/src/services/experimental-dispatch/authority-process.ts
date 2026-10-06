@@ -8,7 +8,13 @@
 import { existsSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 import type { AuthorityHostEffectRequest } from '@devai-nyx/authority';
-import { agentCliInvocation, type AgentCliRuntime } from '@devai-nyx/skills';
+import {
+  agentCliInvocation,
+  agentCliSandboxArgv,
+  type AgentCliInvocation,
+  type AgentCliRuntime,
+  type AgentCliSandbox,
+} from '@devai-nyx/skills';
 import { EXPERIMENTAL_TIER_ORDER } from './index.js';
 
 export interface DeclaredExperimentalAgentProcess {
@@ -53,6 +59,18 @@ function inProgressAgentTasks(repoRoot: string, roundId: string): readonly Agent
     });
 }
 
+/**
+ * ADR-MDL-0008: the provider-enforced sandbox is asserted, not assumed. The spawned argv
+ * must carry the runtime's whole confinement sequence, rooted at the spawn cwd, so a
+ * change that dropped a confinement flag from the adapter could never be admitted even
+ * if the exact-argv comparison were loosened.
+ */
+function carriesSandbox(argv: readonly unknown[], sandbox: AgentCliSandbox, cwd: string): boolean {
+  const flags = agentCliSandboxArgv(sandbox, cwd);
+  if (sandbox.enforced_by !== 'provider' || sandbox.write_root !== 'attempt-worktree') return false;
+  return argv.some((_, start) => flags.every((flag, offset) => argv[start + offset] === flag));
+}
+
 function models(runtime: AgentCliRuntime, model: string): readonly string[] {
   const order = EXPERIMENTAL_TIER_ORDER[runtime];
   const next = order[order.indexOf(model) + 1];
@@ -82,7 +100,8 @@ export function matchExperimentalAgentProcess(
   if (options.shell !== false || typeof options.cwd !== 'string' || !existsSync(options.cwd)) {
     return undefined;
   }
-  const cwd = realpathSync(options.cwd);
+  const spawnCwd = options.cwd;
+  const cwd = realpathSync(spawnCwd);
   for (const task of inProgressAgentTasks(repoRoot, roundId)) {
     if (selected.length > 0 && !selected.includes(task.id)) continue;
     const { runtime, model, effort } = task.executor;
@@ -94,9 +113,22 @@ export function matchExperimentalAgentProcess(
       continue;
     }
     const exact = models(runtime, model).some((candidate) => {
-      const expected = agentCliInvocation({ runtime, model: candidate, effort });
+      let expected: AgentCliInvocation;
+      try {
+        expected = agentCliInvocation({
+          runtime,
+          model: candidate,
+          effort,
+          worktree: spawnCwd,
+        });
+      } catch {
+        // A runtime that cannot be confined on this host is never admitted.
+        return false;
+      }
       return (
-        expected.command === executable && JSON.stringify(expected.args) === JSON.stringify(argv)
+        expected.command === executable &&
+        JSON.stringify(expected.args) === JSON.stringify(argv) &&
+        carriesSandbox(argv as readonly unknown[], expected.sandbox, spawnCwd)
       );
     });
     if (!exact) continue;
