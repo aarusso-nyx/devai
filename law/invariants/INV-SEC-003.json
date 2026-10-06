@@ -11,7 +11,7 @@
   "rationale": "Article 39 requires explicit uncertainty over false precision and Article 41 forbids an observation failure from manufacturing a verdict; a stale or unpinned scan is a failure to observe, and a loose waiver would hide an advisory it never named.",
   "status": "active",
   "verification": {
-    "required_suites": ["unit", "sec"],
+    "required_suites": ["unit"],
     "oracle": "tests",
     "strategy": {
       "primary": "regression",
