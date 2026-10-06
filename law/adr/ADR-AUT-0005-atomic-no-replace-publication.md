@@ -29,10 +29,10 @@ affected_rules:
   - docs/reference/cli/round-task-executors.md
 inspector_acceptance:
   - IA-001 -- A publication to a path that exists refuses with EEXIST and leaves the existing bytes and no staged file; of two interleaved publishers of one path exactly one succeeds and the other never replaces it.
-  - IA-002 -- A crash between the link and the staged unlink leaves the complete bytes at the target and a stray staged link that no `.json` reader lists, and a retry refuses rather than replacing the target.
+  - IA-002 -- A crash between the link and the staged unlink leaves the complete bytes at the target and a stray staged link that no `.json` reader lists, and a retry refuses rather than replacing the target; a failed staged unlink or directory fsync after the link refuses as an indeterminate publication with the staged name recovered, and a lock holder removes its own lock.
   - IA-003 -- The publication crosses the authority seam as one filesystem effect that the broker classifies as a `create` of its target alone, inside the action's declared path domain; a refused effect applies nothing.
   - IA-004 -- Two worktree registry writers interleaved at the first one's checkout never exceed the worktree cap and never drop an entry; a lock left by a gone process on this host refuses as stale and is never taken over.
-  - IA-005 -- `round dispatch` refuses with `EXPERIMENTAL_STATE_ROOT_UNINITIALIZED` before any lock until `init apply harness` has fsynced `.devai` and published the state-root marker, and a re-application keeps the first marker byte for byte.
+  - IA-005 -- `round dispatch` refuses before any lock until `init apply harness` has fsynced the repository directory (when it created `.devai`) and `.devai` and published the state-root marker; a marker that is not a regular file with the exact bytes refuses dispatch and initialization, and a re-application keeps a valid marker byte for byte.
 ---
 
 # A governed atomic no-replace publication among the authority effects
@@ -69,6 +69,12 @@ it appear with its complete bytes:
    - It hard-links the staged file to `path`. link(2) fails with EEXIST when `path` exists, so
      nothing is ever replaced. On any failure the staged file is removed.
    - It unlinks the staged name and fsyncs the directory. A returned call is durable.
+   - A failure after the link (the staged unlink or the directory fsync) is an indeterminate
+     publication: the target holds the caller's complete bytes but durability is not
+     established. The effect removes the staged name if it can and refuses with
+     `AUTHORITY_PUBLISH_CLEANUP_INCOMPLETE`, which the loop reports as
+     `DURABLE_PUBLICATION_INDETERMINATE`. The caller owns what it published: a create-only
+     writer never reports success, and a lock holder removes its own lock before refusing.
 2. **Authorization.** The publication crosses the seam as one filesystem effect. The broker
    classifies it as a `create` of `path` alone, whether or not `path` exists, so it needs only
    the create permission and path domain that writing `path` already needs. The staged name
@@ -80,15 +86,23 @@ it appear with its complete bytes:
    the same way.
 4. **The worktree registry** is changed only under `.devai/state/worktrees.lock`, a lock
    published through the effect. Admission (the cap check, the checkout and the registry
-   replace), retention, release, destruction and reaping all hold it. A second writer waits up
+   replace), retention, release, destruction and reaping all hold it, and the owner's release
+   unlinks the lock and fsyncs `.devai/state`. A second writer waits up
    to 30 seconds and then refuses with `WORKTREE_REGISTRY_BUSY`. A lock whose owner ran on this
    host and is provably gone refuses with `WORKTREE_REGISTRY_LOCK_STALE` and names its removal;
    like the activation lock, it is never taken over automatically.
 5. **The state root.** `init apply harness`, which holds workspace authority, creates
    `.devai/state` when it is missing, fsyncs `.devai`, and publishes
-   `.devai/state/state-root.json`. The marker carries no time or host, so an init replay
-   reproduces the same tree, and a re-application keeps it. `round dispatch` refuses with
-   `EXPERIMENTAL_STATE_ROOT_UNINITIALIZED` before anything else until the marker exists.
+   `.devai/state/state-root.json`. When it created `.devai` itself, it first fsyncs the
+   repository directory through `flushDirectoryEntrySync`, an exact flush exception: it opens
+   the directory read-only without following a link, changes no bytes, and the
+   direct-mutator guard admits it only in the state-root initializer, because the broker
+   never targets the repository root itself. The marker carries no time or host, so an init
+   replay reproduces the same tree, and a re-application keeps it. Only a regular file (not a
+   symbolic link) holding exactly the marker bytes is valid. `round dispatch` refuses before
+   anything else with `EXPERIMENTAL_STATE_ROOT_UNINITIALIZED` while the marker is absent and
+   with `EXPERIMENTAL_STATE_ROOT_MARKER_INVALID` while anything else is at its path, and
+   initialization refuses such a path with `INIT_STATE_ROOT_MARKER_INVALID`.
 
 ## Consequences
 
