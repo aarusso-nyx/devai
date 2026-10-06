@@ -1,14 +1,16 @@
 import {
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   readdirSync,
+  renameSync,
   rmSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { hostname, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, aroundEach, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -17,6 +19,7 @@ import {
   preflightRecipeAdapterInstall,
   type RecipeAdapterPlan,
 } from '../../src/recipes/adapters.js';
+import { RECIPE_INSTALL_LOCK } from '../../src/recipes/install-lock.js';
 import { withAuthorityHostTestScope } from '../unit/authority-host-test-scope.js';
 
 aroundEach((runTest) => withAuthorityHostTestScope(runTest));
@@ -43,16 +46,22 @@ function target(index: number): string {
   return join(repo, file.path);
 }
 
-/** Every entry under the repository, so a test sees stray staged names and directories. */
+/**
+ * Every entry under the repository outside the state root, so a test sees stray staged names
+ * and directories; it also asserts the install lock was released.
+ */
 function tree(root: string): readonly string[] {
-  return readdirSync(root, { recursive: true, encoding: 'utf8' }).sort();
+  expect(readdirSync(join(root, '.devai/state'))).toEqual([]);
+  return readdirSync(root, { recursive: true, encoding: 'utf8' })
+    .filter((entry) => entry !== '.devai' && !entry.startsWith('.devai/'))
+    .sort();
 }
 
 beforeEach(() => {
   fixture = mkdtempSync(join(tmpdir(), 'devai-recipe-write-time-'));
   repo = join(fixture, 'repository');
   outside = join(fixture, 'outside');
-  mkdirSync(repo);
+  mkdirSync(join(repo, '.devai/state'), { recursive: true });
   mkdirSync(outside);
 });
 afterEach(() => rmSync(fixture, { recursive: true, force: true }));
@@ -204,6 +213,53 @@ describe('atomic installation across targets', () => {
     ]);
   });
 
+  it('detects a parent swapped for a link before the publication, unlinks the escaped file and rolls back', () => {
+    const resolved = preflightRecipeAdapterInstall(repo, plan);
+    const moved = join(fixture, 'moved-devai-assess');
+
+    expect(() =>
+      executeRecipeAdapterPlan(resolved, {
+        beforePublish: (file, index) => {
+          if (index !== 3) return;
+          // After the recheck, the target's parent is replaced by a link leaving the repository.
+          renameSync(dirname(file.absolutePath), moved);
+          symlinkSync(outside, dirname(file.absolutePath));
+        },
+      }),
+    ).toThrow('RECIPE_INSTALL_ESCAPE_DETECTED: .claude/skills/devai-assess/devai.recipe.json');
+    // The file written through the link is removed, and no staged name is left outside.
+    expect(readdirSync(outside)).toEqual([]);
+    // The earlier publications are rolled back; the moved directory and the link are not ours.
+    expect(readdirSync(moved)).toEqual(['SKILL.md']);
+    expect(readFileSync(join(moved, 'SKILL.md'), 'utf8')).toBe('assess\n');
+    expect(tree(repo)).toEqual(['.claude', '.claude/skills', '.claude/skills/devai-assess']);
+    expect(lstatSync(join(repo, '.claude/skills/devai-assess')).isSymbolicLink()).toBe(true);
+  });
+
+  it('rolls back only the identity it published, never a file later placed at the path', () => {
+    const resolved = preflightRecipeAdapterInstall(repo, plan);
+
+    expect(() =>
+      executeRecipeAdapterPlan(resolved, {
+        beforePublish: (_file, index) => {
+          if (index !== 2) return;
+          // Another writer replaces a published target with its own file of the same bytes.
+          rmSync(target(0));
+          writeFileSync(target(0), 'assess\n');
+          throw new Error('INJECTED_PUBLICATION_FAILURE');
+        },
+      }),
+    ).toThrow('INJECTED_PUBLICATION_FAILURE');
+    expect(readFileSync(target(0), 'utf8')).toBe('assess\n');
+    // The non-recursive rollback keeps the directories that still hold the foreign file.
+    expect(tree(repo)).toEqual([
+      '.agents',
+      '.agents/skills',
+      '.agents/skills/devai-assess',
+      '.agents/skills/devai-assess/SKILL.md',
+    ]);
+  });
+
   it('keeps the canonical installation idempotent', () => {
     const first = installRecipeAdapters({ repoRoot: repo });
     const second = installRecipeAdapters({ repoRoot: repo });
@@ -211,5 +267,67 @@ describe('atomic installation across targets', () => {
     expect(first.written.length).toBeGreaterThan(0);
     expect(second.written).toEqual([]);
     expect(second.unchanged).toEqual(first.written);
+  });
+});
+
+describe('the repository recipe-install lock', () => {
+  const lockPath = () => join(repo, RECIPE_INSTALL_LOCK);
+  const holder = (pid: number, acquiredAt: string) =>
+    `${JSON.stringify({ schemaVersion: '1.0.0', action_id: 'recipe adapter install', token: 'other', pid, host: hostname(), acquired_at: acquiredAt })}\n`;
+
+  it('refuses while a live installer holds it, writing nothing and keeping the lock', () => {
+    const resolved = preflightRecipeAdapterInstall(repo, plan);
+    const record = holder(process.pid, new Date().toISOString());
+    writeFileSync(lockPath(), record);
+
+    expect(() => executeRecipeAdapterPlan(resolved)).toThrow(/^RECIPE_INSTALL_LOCKED: /u);
+    expect(readFileSync(lockPath(), 'utf8')).toBe(record);
+    expect(existsSync(join(repo, '.agents'))).toBe(false);
+    expect(existsSync(join(repo, '.claude'))).toBe(false);
+  });
+
+  it('refuses a stale lock with the manual removal step and never takes it over', () => {
+    const resolved = preflightRecipeAdapterInstall(repo, plan);
+    const record = holder(999_999, new Date().toISOString());
+    writeFileSync(lockPath(), record);
+
+    let failure: unknown;
+    try {
+      executeRecipeAdapterPlan(resolved);
+    } catch (error) {
+      failure = error;
+    }
+    expect(failure).toMatchObject({
+      code: 'RECIPE_INSTALL_LOCK_STALE',
+      removal: `rm "${lockPath()}"`,
+    });
+    expect(readFileSync(lockPath(), 'utf8')).toBe(record);
+    expect(existsSync(join(repo, '.agents'))).toBe(false);
+  });
+
+  it('holds the lock across every publication and releases it after a failure', () => {
+    const resolved = preflightRecipeAdapterInstall(repo, plan);
+    const seen: boolean[] = [];
+
+    expect(() =>
+      executeRecipeAdapterPlan(resolved, {
+        beforePublish: (_file, index) => {
+          seen.push(lstatSync(lockPath()).isFile());
+          if (index === 2) throw new Error('INJECTED_PUBLICATION_FAILURE');
+        },
+      }),
+    ).toThrow('INJECTED_PUBLICATION_FAILURE');
+    expect(seen).toEqual([true, true, true]);
+    expect(existsSync(lockPath())).toBe(false);
+  });
+
+  it('refuses without a state root rather than creating one', () => {
+    rmSync(join(repo, '.devai'), { recursive: true });
+    const resolved = preflightRecipeAdapterInstall(repo, plan);
+
+    expect(() => executeRecipeAdapterPlan(resolved)).toThrow(
+      'RECIPE_INSTALL_STATE_ROOT_MISSING: .devai',
+    );
+    expect(readdirSync(repo)).toEqual([]);
   });
 });
