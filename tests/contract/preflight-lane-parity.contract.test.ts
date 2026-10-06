@@ -49,8 +49,40 @@ type LaneStep = Readonly<{
   env: Environment;
 }>;
 
+/**
+ * A Vitest timeout cannot interrupt a synchronous child: a hung `spawnSync` blocks the
+ * worker's event loop, so the case bound would never fire. Every child here therefore
+ * carries its own enforced timeout under the bound of the case or hook that runs it, is
+ * killed with SIGKILL when it passes, and fails the case naming the command and the limit.
+ */
+const GIT_TIMEOUT_MS = 30_000;
+/** Three plans fit a 120 s case bound; one measures 3 to 5 s, even at load average 200. */
+const PLAN_TIMEOUT_MS = 35_000;
+/** The release bootstrap fits inside the 300 s hook bound of beforeAll. */
+const BOOTSTRAP_TIMEOUT_MS = 280_000;
+
+function refuseTimedOut(
+  result: ReturnType<typeof spawnSync>,
+  command: string,
+  timeoutMs: number,
+): void {
+  const code = (result.error as NodeJS.ErrnoException | undefined)?.code;
+  if (code === 'ETIMEDOUT' || result.signal === 'SIGKILL') {
+    throw new Error(
+      `${command} exceeded its enforced ${String(timeoutMs)} ms timeout and was killed (${code ?? String(result.signal)})`,
+    );
+  }
+  if (result.error !== undefined) throw result.error;
+}
+
 function git(args: readonly string[]): string {
-  const result = spawnSync('git', [...args], { cwd: ROOT, encoding: 'utf8' });
+  const result = spawnSync('git', [...args], {
+    cwd: ROOT,
+    encoding: 'utf8',
+    timeout: GIT_TIMEOUT_MS,
+    killSignal: 'SIGKILL',
+  });
+  refuseTimedOut(result, `git ${args.join(' ')}`, GIT_TIMEOUT_MS);
   if (result.status !== 0) throw new Error(`git ${args.join(' ')}: ${String(result.stderr)}`);
   return String(result.stdout).trim();
 }
@@ -151,7 +183,10 @@ function plannedNodeSet(args: readonly string[], base: string): string {
     encoding: 'utf8',
     maxBuffer: 64 * 1024 * 1024,
     env: { PATH: process.env.PATH ?? '', HOME: process.env.HOME ?? '', DEVAI_FORMAT_BASE: base },
+    timeout: PLAN_TIMEOUT_MS,
+    killSignal: 'SIGKILL',
   });
+  refuseTimedOut(result, `bootstrap CLI ${args.join(' ')}`, PLAN_TIMEOUT_MS);
   let output: { result?: { value?: { plan?: { tasks?: readonly PlannedNode[] } } } } | undefined;
   try {
     output = JSON.parse(String(result.stdout)) as typeof output;
@@ -186,7 +221,10 @@ beforeAll(() => {
     const bootstrap = spawnSync('pnpm', ['run', 'release:bootstrap'], {
       cwd: ROOT,
       encoding: 'utf8',
+      timeout: BOOTSTRAP_TIMEOUT_MS,
+      killSignal: 'SIGKILL',
     });
+    refuseTimedOut(bootstrap, 'pnpm run release:bootstrap', BOOTSTRAP_TIMEOUT_MS);
     if (bootstrap.status !== 0) {
       throw new Error(`pnpm run release:bootstrap failed: ${bootstrap.stdout}${bootstrap.stderr}`);
     }
