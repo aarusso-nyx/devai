@@ -50,12 +50,16 @@ type LaneStep = Readonly<{
 }>;
 
 /**
- * One enforced deadline per case or hook (#324). Every child of that case or hook gets only
- * the time remaining, so the children together never outrun the Vitest bound around them.
- * Each child leads its own process group; when the deadline passes the whole group gets
- * SIGKILL and is reaped before the case fails, so a nested `tsc` under `pnpm` cannot keep
- * writing `.devai/state/pr-bootstrap` after the test gave up. Only that deadline counts as
- * a timeout: a child killed by any other signal reports its own exit unchanged.
+ * One enforced deadline per bounded case or hook (#324). Every child of that case or hook gets
+ * only the time remaining, so the children together never outrun the Vitest bound around them.
+ * Each child leads its own process group. When the deadline passes, or a captured stream exceeds
+ * its cap, the whole group gets SIGKILL; the helper then waits a bounded grace for `close` and,
+ * if a descendant still holds the pipes, destroys them and fails instead of pending forever.
+ * Only the deadline counts as a timeout: any other exit or signal is the child's own result.
+ *
+ * Known limits, documented rather than handled: a descendant that calls setsid or setpgid
+ * leaves the group and escapes the group kill, and `close` proves only that every holder of
+ * the child's pipes has closed them, not that every grandchild has exited.
  */
 interface Deadline {
   readonly totalMs: number;
@@ -74,54 +78,100 @@ interface ChildResult {
   readonly stderr: string;
 }
 
+/** Captured bytes per stream before the group is killed. */
+const OUTPUT_CAP_BYTES = 1024 * 1024;
+/** How long `close` may take after the group kill before the pipes are destroyed. */
+const CLOSE_GRACE_MS = 2_000;
+
 function runBounded(
   command: string,
   args: readonly string[],
-  options: Readonly<{ env?: NodeJS.ProcessEnv }>,
+  options: Readonly<{ cwd: string; env?: NodeJS.ProcessEnv }>,
   limit: Deadline,
 ): Promise<ChildResult> {
   const label = [command, ...args].join(' ');
-  const exceeded = () =>
-    new Error(
-      `${label} exceeded the enforced ${String(limit.totalMs)} ms deadline of its case; its process group was killed`,
-    );
   const remaining = limit.remaining();
-  if (remaining === 0) return Promise.reject(exceeded());
+  if (remaining === 0) {
+    return Promise.reject(
+      new Error(
+        `${label} was not started: the ${String(limit.totalMs)} ms deadline of its case was already spent`,
+      ),
+    );
+  }
   return new Promise((resolvePromise, rejectPromise) => {
     const child = spawn(command, [...args], {
-      cwd: ROOT,
+      cwd: options.cwd,
       env: options.env ?? process.env,
       detached: true,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
-    let stdout = '';
-    let stderr = '';
-    let timedOut = false;
-    child.stdout.setEncoding('utf8').on('data', (chunk: string) => (stdout += chunk));
-    child.stderr.setEncoding('utf8').on('data', (chunk: string) => (stderr += chunk));
-    const timer = setTimeout(() => {
-      timedOut = true;
+    const captured = { stdout: [] as Buffer[], stderr: [] as Buffer[] };
+    const bytes = { stdout: 0, stderr: 0 };
+    let killReason: string | undefined;
+    let settled = false;
+    let graceTimer: NodeJS.Timeout | undefined;
+    const settle = (outcome: () => void): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(deadlineTimer);
+      clearTimeout(graceTimer);
+      outcome();
+    };
+    const killGroup = (reason: string): void => {
+      if (killReason !== undefined) return;
+      killReason = reason;
       try {
         if (child.pid !== undefined) process.kill(-child.pid, 'SIGKILL');
       } catch {
         // The group is already gone.
       }
-    }, remaining);
-    child.on('error', (error) => {
-      clearTimeout(timer);
-      rejectPromise(error);
-    });
-    // `close` fires once every member holding the group's pipes has exited: the reap.
+      graceTimer = setTimeout(() => {
+        child.stdout.destroy();
+        child.stderr.destroy();
+        settle(() =>
+          rejectPromise(
+            new Error(
+              `${label}: ${reason}; its process group was killed, but its pipes stayed open ${String(CLOSE_GRACE_MS)} ms later (a descendant outside the group still holds them)`,
+            ),
+          ),
+        );
+      }, CLOSE_GRACE_MS);
+    };
+    for (const stream of ['stdout', 'stderr'] as const) {
+      child[stream].on('data', (chunk: Buffer) => {
+        bytes[stream] += chunk.length;
+        if (bytes[stream] > OUTPUT_CAP_BYTES) {
+          killGroup(`its ${stream} exceeded the ${String(OUTPUT_CAP_BYTES)}-byte capture cap`);
+          return;
+        }
+        captured[stream].push(chunk);
+      });
+    }
+    const deadlineTimer = setTimeout(
+      () => killGroup(`it exceeded the enforced ${String(limit.totalMs)} ms deadline of its case`),
+      remaining,
+    );
+    child.on('error', (error) => settle(() => rejectPromise(error)));
+    // `close` fires once every holder of the child's pipes has closed them.
     child.on('close', (status, signal) => {
-      clearTimeout(timer);
-      if (timedOut) rejectPromise(exceeded());
-      else resolvePromise({ status, signal, stdout, stderr });
+      settle(() => {
+        if (killReason !== undefined) {
+          rejectPromise(new Error(`${label}: ${killReason}; its process group was killed`));
+          return;
+        }
+        resolvePromise({
+          status,
+          signal,
+          stdout: Buffer.concat(captured.stdout).toString('utf8'),
+          stderr: Buffer.concat(captured.stderr).toString('utf8'),
+        });
+      });
     });
   });
 }
 
 async function git(args: readonly string[], limit: Deadline): Promise<string> {
-  const result = await runBounded('git', args, {}, limit);
+  const result = await runBounded('git', args, { cwd: ROOT }, limit);
   if (result.status !== 0) throw new Error(`git ${args.join(' ')}: ${result.stderr}`);
   return result.stdout.trim();
 }
@@ -225,6 +275,7 @@ async function plannedNodeSet(
     process.execPath,
     [BOOTSTRAP_CLI, ...args, '--format', 'json'],
     {
+      cwd: ROOT,
       env: { PATH: process.env.PATH ?? '', HOME: process.env.HOME ?? '', DEVAI_FORMAT_BASE: base },
     },
     limit,
@@ -265,7 +316,7 @@ beforeAll(async () => {
   const limit = deadline(SETUP_DEADLINE_MS);
   // The lane compiles the bootstrap CLI before any check; do the same when it is absent.
   if (!existsSync(BOOTSTRAP_CLI)) {
-    const bootstrap = await runBounded('pnpm', ['run', 'release:bootstrap'], {}, limit);
+    const bootstrap = await runBounded('pnpm', ['run', 'release:bootstrap'], { cwd: ROOT }, limit);
     if (bootstrap.status !== 0) {
       throw new Error(`pnpm run release:bootstrap failed: ${bootstrap.stdout}${bootstrap.stderr}`);
     }
