@@ -694,7 +694,9 @@ async function runAttempt(
       code,
       verdict,
       violations: escaping.length > 0 ? escaping : outOfScope,
-      sandbox,
+      // The sandbox is recorded as provider-enforced only once a provider process started;
+      // a refused or failed spawn ran nothing, so its evidence names no sandbox.
+      sandbox: spawned ? sandbox : undefined,
     });
     persistTaskExecutionEvidence({
       repoRoot,
