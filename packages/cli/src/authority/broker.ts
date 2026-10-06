@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync, lstatSync, readFileSync, realpathSync } from 'node:fs';
-import { basename, dirname, isAbsolute, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import {
   authorizePolicyMaterialization,
   createAuthorityDecisionIssuer,
@@ -14,6 +14,8 @@ import { createAuthorityBoundaryRuntime } from '@devai-nyx/authority';
 import { assertAuthorityPathCapability } from '@devai-nyx/authority';
 import {
   applyAuthorityHostEffectsAtomically,
+  entryIdentityKey,
+  PUBLISH_INDETERMINATE,
   mkdirSync,
   writeFileSync,
   type AuthorityHostEffectRequest,
@@ -590,6 +592,14 @@ export function createAuthorityHostBroker(input: BrokerInput): {
   let effectApply: (() => unknown) | undefined;
   let exactUnitApply: (() => unknown) | undefined;
   let effectResult: unknown;
+  // #317: set only while an identity-bound removal is authorized. Such a removal acts on the
+  // entry itself, so its containment resolves the parent and never a final link ('entry').
+  // When it removes the exact file (path and identity) a publication of this invocation
+  // created, containment is the one established when that publication was authorized
+  // ('published'), so the cleanup of a file whose parent was later swapped for a link out of
+  // the repository is admitted, bound to that file's identity.
+  let removalContainment:
+    { readonly path: string; readonly mode: 'entry' | 'published' } | undefined;
   const runtime = createAuthorityBoundaryRuntime({
     receiptStore: issuer,
     invocation_id: invocationId,
@@ -597,6 +607,13 @@ export function createAuthorityHostBroker(input: BrokerInput): {
     repository_root: repositoryRoot,
     fs: {
       realpath: (path: string) => {
+        if (removalContainment !== undefined && removalContainment.path === path) {
+          if (removalContainment.mode === 'published') return resolve(repositoryRoot, path);
+          const entry = physicalCanonicalPath(repositoryRoot, path);
+          const physical = join(existingRealpath(dirname(entry)), basename(entry));
+          const metadataPath = gitMetadataLogicalPath(repositoryRoot, physical);
+          return metadataPath ? resolve(repositoryRoot, metadataPath) : physical;
+        }
         const physical = existingRealpath(physicalCanonicalPath(repositoryRoot, path));
         const metadataPath = gitMetadataLogicalPath(repositoryRoot, physical);
         // The broker has already admitted only the two exact Git metadata
@@ -785,6 +802,33 @@ export function createAuthorityHostBroker(input: BrokerInput): {
   };
   const exactEffects: CapturedFilesystemEffect[] = [];
   const descriptorTargets = new Map<number, JsonRecord>();
+  // #317: the target each no-replace publication was authorized for, keyed by its path and the
+  // identity it returned. An identity-bound removal of that exact file (path and identity) is
+  // classified by this target, so the cleanup of a publication whose parent was swapped for a
+  // link after the publication was authorized is not refused as a symlink escape.
+  const publishedTargets = new Map<string, JsonRecord>();
+  const publishedKey = (path: unknown, identityKey: string): string | undefined =>
+    typeof path === 'string' ? `${resolve(path)}\0${identityKey}` : undefined;
+  const recordPublished = (
+    request: AuthorityHostEffectRequest,
+    target: JsonRecord,
+    identity: unknown,
+  ): void => {
+    if (!isRecord(identity)) return;
+    const { dev, ino, birthtimeNs } = identity;
+    if (typeof dev !== 'bigint' || typeof ino !== 'bigint' || typeof birthtimeNs !== 'bigint') {
+      return;
+    }
+    const key = publishedKey(request.arguments[0], entryIdentityKey({ dev, ino, birthtimeNs }));
+    if (key !== undefined) publishedTargets.set(key, target);
+  };
+  const publishedRemovalTarget = (request: AuthorityHostEffectRequest): JsonRecord | undefined => {
+    const identityKey = request.arguments[1];
+    if (typeof identityKey !== 'string') return undefined;
+    const key = publishedKey(request.arguments[0], identityKey);
+    const published = key === undefined ? undefined : publishedTargets.get(key);
+    return published === undefined ? undefined : { ...published, operation: 'delete' };
+  };
 
   const authorizeTarget = (
     action: {
@@ -1192,6 +1236,29 @@ export function createAuthorityHostBroker(input: BrokerInput): {
       });
       return undefined;
     }
+    if (request.symbol === 'removeEntryIfIdentitySync') {
+      const published = publishedRemovalTarget(request);
+      const removal =
+        published ?? fsTarget(request, repositoryRoot, sources.repository_id, descriptorTargets);
+      const path = removal['canonical_relative_path'];
+      removalContainment =
+        typeof path === 'string'
+          ? { path, mode: published === undefined ? 'entry' : 'published' }
+          : undefined;
+      try {
+        return authorizeTarget(
+          {
+            name: input.entry.name,
+            effects: input.entry.effects,
+            authority_contract: input.entry.authority_contract,
+          },
+          removal,
+          apply,
+        );
+      } finally {
+        removalContainment = undefined;
+      }
+    }
     const target = fsTarget(request, repositoryRoot, sources.repository_id, descriptorTargets);
     if (request.symbol === 'closeSync') {
       try {
@@ -1209,15 +1276,29 @@ export function createAuthorityHostBroker(input: BrokerInput): {
         if (typeof descriptor === 'number') descriptorTargets.delete(descriptor);
       }
     }
-    const result = authorizeTarget(
-      {
-        name: input.entry.name,
-        effects: input.entry.effects,
-        authority_contract: input.entry.authority_contract,
-      },
-      target,
-      apply,
-    );
+    let result: unknown;
+    try {
+      result = authorizeTarget(
+        {
+          name: input.entry.name,
+          effects: input.entry.effects,
+          authority_contract: input.entry.authority_contract,
+        },
+        target,
+        apply,
+      );
+    } catch (error) {
+      // An indeterminate publication linked its file into place: its identity is the caller's.
+      if (
+        request.symbol === 'publishFileNoReplaceSync' &&
+        isRecord(error) &&
+        error['code'] === PUBLISH_INDETERMINATE
+      ) {
+        recordPublished(request, target, error['identity']);
+      }
+      throw error;
+    }
+    if (request.symbol === 'publishFileNoReplaceSync') recordPublished(request, target, result);
     if (request.symbol === 'openSync' && typeof result === 'number') {
       descriptorTargets.set(result, target);
     }
