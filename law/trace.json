@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "invariants": [
     {
       "id": "INV-AUTH-001",
@@ -311,6 +311,23 @@
         "packages/cli/src/bin.ts",
         "packages/cli/src/command-manifest.ts",
         "packages/cli/src/version.ts"
+      ]
+    },
+    {
+      "id": "INV-CORE-011",
+      "tests": [
+        {
+          "suite": "contract",
+          "path": "tests/contract/package-barrels.contract.test.ts"
+        }
+      ],
+      "code_areas": [
+        "packages/cli/src/index.ts",
+        "packages/cli/src/runtime-core.ts",
+        "packages/loop/src/index.ts",
+        "packages/skills/src/index.ts",
+        "packages/spec/src/index.ts",
+        "packages/utils/src/index.ts"
       ]
     },
     {
