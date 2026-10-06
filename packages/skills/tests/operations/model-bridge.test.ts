@@ -1,5 +1,17 @@
 import { createHash } from 'node:crypto';
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { delimiter, join } from 'node:path';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Activated before any bridge/SDK import and retained through suite teardown.
@@ -79,13 +91,15 @@ const { spawnSyncMock, codexProbe } = vi.hoisted(() => ({
     listing: undefined as
       undefined | ((argv: string[]) => { status: number; stdout: string; stderr: string }),
     calls: [] as string[][],
+    executables: [] as string[],
   },
 }));
 vi.mock('@devai-nyx/authority', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   spawnSync: (cli: string, argv: string[], options: unknown) => {
-    if (cli === 'codex' && (argv[0] === '--version' || argv[0] === 'features')) {
+    if (/(^|\/)codex$/u.test(cli) && (argv[0] === '--version' || argv[0] === 'features')) {
       codexProbe.calls.push(argv);
+      codexProbe.executables.push(cli);
       if (argv[0] === '--version')
         return codexProbe.version === null
           ? { status: 127, stdout: '', stderr: 'not found' }
@@ -105,6 +119,17 @@ vi.mock('@devai-nyx/authority', async (importOriginal) => ({
     return (spawnSyncMock as (...args: unknown[]) => unknown)(cli, argv, options);
   },
 }));
+// #321: the bridge resolves `codex` on PATH to an executable regular file before it
+// spawns; this placeholder is that file. The spawn is mocked and never runs it.
+{
+  const { chmodSync, mkdtempSync, writeFileSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { delimiter, join } = await import('node:path');
+  const bin = mkdtempSync(join(tmpdir(), 'devai-codex-placeholder-'));
+  writeFileSync(join(bin, 'codex'), '#!/bin/sh\nexit 99\n');
+  chmodSync(join(bin, 'codex'), 0o755);
+  process.env.PATH = `${bin}${delimiter}${process.env.PATH ?? ''}`;
+}
 
 const {
   assertCodexReviewCompatibility,
@@ -113,6 +138,7 @@ const {
   extractStructuredReply,
   replyProjectionIdentity,
   replySha256,
+  resolveCodexExecutable,
 } = await import('../../src/model-bridge/index.js');
 const REVIEW = 'review-verdict.schema.json';
 const PASS = {
@@ -164,7 +190,9 @@ async function observe(provider: 'claude-cli' | 'codex-cli', stdout: string) {
 
 function expectFixtureConsumed(provider: 'claude-cli' | 'codex-cli') {
   expect(spawnSyncMock).toHaveBeenCalledTimes(1);
-  expect(spawnSyncMock.mock.calls[0]?.[0]).toBe(provider === 'claude-cli' ? 'claude' : 'codex');
+  expect(String(spawnSyncMock.mock.calls[0]?.[0])).toMatch(
+    provider === 'claude-cli' ? /^claude$/u : /\/codex$/u,
+  );
 }
 
 /** A transport can refuse before extraction or return an incomplete diagnostic. */
@@ -892,7 +920,7 @@ describe('#321 Codex host compatibility check before a review', () => {
     codexProbe.version = 'codex-cli offline-stub';
     codexProbe.listing = undefined;
   });
-  const env = { PATH: '/nonexistent-offline-bin' };
+  const env = { PATH: process.env.PATH ?? '' };
 
   it('accepts the installed 0.157.1 listing, where unified_exec stays on', () => {
     codexProbe.listing = () => ({ status: 0, stdout: installedListing, stderr: '' });
@@ -961,5 +989,91 @@ describe('#321 Codex host compatibility check before a review', () => {
   it('never probes for a Claude review', async () => {
     await observe('claude-cli', claudeFixture);
     expect(codexProbe.calls).toEqual([]);
+  });
+});
+
+describe('#321 Codex executable resolution and listing integrity', () => {
+  let versions = 0;
+  const savedPath = process.env.PATH;
+  const dirs: string[] = [];
+  beforeEach(() => {
+    versions += 1;
+    codexProbe.version = `codex-cli resolution-case-${String(versions)}`;
+    codexProbe.listing = undefined;
+    codexProbe.calls.length = 0;
+    codexProbe.executables.length = 0;
+  });
+  afterEach(() => {
+    process.env.PATH = savedPath;
+    codexProbe.version = 'codex-cli offline-stub';
+    codexProbe.listing = undefined;
+    for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+  });
+  const dir = () => {
+    const created = realpathSync(mkdtempSync(join(tmpdir(), 'devai-codex-resolve-')));
+    dirs.push(created);
+    return created;
+  };
+
+  it('skips a non-executable or non-file codex and runs one executable for probes and review', async () => {
+    const shadow = dir();
+    writeFileSync(join(shadow, 'codex'), '#!/bin/sh\nexit 99\n');
+    chmodSync(join(shadow, 'codex'), 0o644);
+    const directoryShadow = dir();
+    mkdirSync(join(directoryShadow, 'codex'));
+    const real = dir();
+    writeFileSync(join(real, 'codex'), '#!/bin/sh\nexit 99\n');
+    chmodSync(join(real, 'codex'), 0o755);
+    process.env.PATH = [shadow, directoryShadow, real, savedPath ?? ''].join(delimiter);
+    expect(resolveCodexExecutable(process.env.PATH)).toBe(join(real, 'codex'));
+    const response = await observe('codex-cli', codexFixture);
+    expect(response.finish_reason).toBe('stop');
+    expect(new Set(codexProbe.executables)).toEqual(new Set([join(real, 'codex')]));
+    expect(spawnSyncMock.mock.calls[0]?.[0]).toBe(join(real, 'codex'));
+  });
+
+  it('refuses before any spawn when no executable codex is on PATH', async () => {
+    const shadow = dir();
+    writeFileSync(join(shadow, 'codex'), 'not executable');
+    process.env.PATH = shadow;
+    await expect(observe('codex-cli', codexFixture)).rejects.toThrow(
+      'MODEL_BRIDGE_CODEX_INCOMPATIBLE:executable:not-found',
+    );
+    expect(codexProbe.calls).toEqual([]);
+    expect(spawnSyncMock).not.toHaveBeenCalled();
+  });
+
+  const rows = (overrides: Record<string, string> = {}) =>
+    CODEX_REVIEW_DISABLED_FEATURES.map(
+      (feature) => overrides[feature] ?? `${feature}  stable  false`,
+    ).join('\n');
+
+  it.each([
+    [
+      'a duplicate row that would flip the state',
+      `${rows()}\nshell_tool  stable  true`,
+      'shell_tool',
+    ],
+    ['a duplicate row with the same state', `shell_tool  stable  false\n${rows()}`, 'shell_tool'],
+    ['a row without a state', rows({ apps: 'apps  stable' }), 'line-2'],
+    ['a row with an unknown state', rows({ plugins: 'plugins  stable  maybe' }), 'line-7'],
+    ['a stray error line', `Error: something else\n${rows()}`, 'line-1'],
+  ])('refuses a listing with %s', async (_name, stdout, detail) => {
+    codexProbe.listing = () => ({ status: 0, stdout, stderr: '' });
+    await expect(observe('codex-cli', codexFixture)).rejects.toThrow(
+      `MODEL_BRIDGE_CODEX_INCOMPATIBLE:listing-malformed:${detail}`,
+    );
+    expect(spawnSyncMock).not.toHaveBeenCalled();
+  });
+
+  it('accepts multi-word stages such as under development', async () => {
+    codexProbe.listing = () => ({
+      status: 0,
+      stdout: `${rows()}\nagent_message_board                      under development  false\n`,
+      stderr: '',
+    });
+    await expect(observe('codex-cli', codexFixture)).resolves.toMatchObject({
+      finish_reason: 'stop',
+    });
   });
 });

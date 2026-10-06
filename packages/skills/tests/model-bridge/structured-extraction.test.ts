@@ -100,7 +100,7 @@ vi.mock('@devai-nyx/authority', async (importOriginal) => ({
   // The Codex compatibility probe (`--version`, `features list`) answers as a binary that
   // honours every --disable; spawnSyncMock sees only the review itself.
   spawnSync: (cli: string, argv: string[], options: unknown) =>
-    cli === 'codex' && (argv[0] === '--version' || argv[0] === 'features')
+    /(^|\/)codex$/u.test(cli) && (argv[0] === '--version' || argv[0] === 'features')
       ? {
           status: 0,
           stderr: '',
@@ -115,6 +115,17 @@ vi.mock('@devai-nyx/authority', async (importOriginal) => ({
         }
       : (spawnSyncMock as (...args: unknown[]) => unknown)(cli, argv, options),
 }));
+// #321: the bridge resolves `codex` on PATH to an executable regular file before it
+// spawns; this placeholder is that file. The spawn is mocked and never runs it.
+{
+  const { chmodSync, mkdtempSync, writeFileSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { delimiter, join } = await import('node:path');
+  const bin = mkdtempSync(join(tmpdir(), 'devai-codex-placeholder-'));
+  writeFileSync(join(bin, 'codex'), '#!/bin/sh\nexit 99\n');
+  chmodSync(join(bin, 'codex'), 0o755);
+  process.env.PATH = `${bin}${delimiter}${process.env.PATH ?? ''}`;
+}
 
 const { anthropicCreate, openaiCreate } = vi.hoisted(() => ({
   anthropicCreate: vi.fn(),
