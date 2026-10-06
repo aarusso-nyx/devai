@@ -4,7 +4,7 @@ import { dirname, join, resolve, sep } from 'node:path';
 import {
   closeReadOnlySync,
   mkdirSync,
-  openReadOnlyNoFollowSync,
+  openRegularFileReadOnlySync,
   publishFileNoReplaceSync,
   rmdirSync,
 } from '@devai-nyx/authority';
@@ -164,15 +164,16 @@ function observeTarget(path: string): TargetObservation {
   if (!stat.isFile()) return { kind: 'other' };
   let descriptor: number;
   try {
-    descriptor = openReadOnlyNoFollowSync(path);
+    // Non-blocking: a FIFO swapped in after the lstat is refused, never waited on.
+    descriptor = openRegularFileReadOnlySync(path);
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
     if (code === 'ENOENT') return { kind: 'absent' };
     if (code === 'ELOOP' || code === 'EMLINK') return { kind: 'link' };
+    if (code === 'ENOTREGULAR') return { kind: 'other' };
     throw error;
   }
   try {
-    if (!fstatSync(descriptor).isFile()) return { kind: 'other' };
     return { kind: 'file', sha256: sha256(readFileSync(descriptor)) };
   } finally {
     closeReadOnlySync(descriptor);
@@ -285,6 +286,25 @@ function createAncestors(file: ResolvedRecipeAdapterFile, journal: InstallJourna
  * last descriptor are gone, so while the pin is held no other file can carry the identity,
  * and the rollback removes only this call's file even if another writer replaced it.
  */
+/**
+ * Opens a non-blocking, no-follow descriptor on `path` and keeps it in `pins` until the
+ * installation ends; true when that descriptor is the published `identity`.
+ */
+function pinPublished(path: string, identity: FileIdentity, pins: number[]): boolean {
+  try {
+    const pin = openRegularFileReadOnlySync(path);
+    pins.push(pin);
+    const pinned = fstatSync(pin, { bigint: true });
+    return (
+      pinned.dev === identity.dev &&
+      pinned.ino === identity.ino &&
+      pinned.birthtimeNs === identity.birthtimeNs
+    );
+  } catch {
+    return false;
+  }
+}
+
 function verifyPublished(
   file: ResolvedRecipeAdapterFile,
   identity: FileIdentity,
@@ -294,13 +314,8 @@ function verifyPublished(
   const expected = join(realRoot, file.path);
   let bound = false;
   try {
-    const pin = openReadOnlyNoFollowSync(file.absolutePath);
-    pins.push(pin);
-    const pinned = fstatSync(pin, { bigint: true });
     bound =
-      pinned.dev === identity.dev &&
-      pinned.ino === identity.ino &&
-      pinned.birthtimeNs === identity.birthtimeNs &&
+      pinPublished(file.absolutePath, identity, pins) &&
       realpathSync(dirname(file.absolutePath)) === dirname(expected) &&
       realpathSync(file.absolutePath) === expected &&
       hasIdentity(file.absolutePath, identity);
@@ -387,8 +402,13 @@ export function executeRecipeAdapterPlan(
             throw new Error(`RECIPE_ADAPTER_DRIFT: ${file.path}`, { cause: error });
           }
           // An indeterminate publication linked the bytes into place: the journal owns them.
+          // Its inode is pinned through the rollback like any other publication, so its
+          // identity cannot be reused by another file before the journal removes it.
           const linked = indeterminateIdentity(error);
-          if (linked !== undefined) journal.files.push({ path: file.absolutePath, ...linked });
+          if (linked !== undefined) {
+            journal.files.push({ path: file.absolutePath, ...linked });
+            pinPublished(file.absolutePath, linked, pins);
+          }
           throw error;
         }
         journal.files.push({ path: file.absolutePath, ...identity });

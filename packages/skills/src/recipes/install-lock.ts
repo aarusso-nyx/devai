@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto';
-import { fstatSync, lstatSync, readFileSync } from 'node:fs';
+import { lstatSync, readFileSync } from 'node:fs';
 import { hostname } from 'node:os';
 import { join } from 'node:path';
 import {
   PUBLISH_INDETERMINATE,
   closeReadOnlySync,
-  openReadOnlyNoFollowSync,
+  openRegularFileReadOnlySync,
   publishFileNoReplaceSync,
   unlinkSync,
 } from '@devai-nyx/authority';
@@ -104,12 +104,12 @@ export class RecipeInstallLockStale extends Error {
 function readHolder(path: string): Holder | undefined {
   let descriptor: number;
   try {
-    descriptor = openReadOnlyNoFollowSync(path);
+    // Non-blocking and no-follow: a FIFO or other special entry is refused before any read.
+    descriptor = openRegularFileReadOnlySync(path);
   } catch {
     return undefined;
   }
   try {
-    if (!fstatSync(descriptor).isFile()) return undefined;
     const parsed: unknown = JSON.parse(readFileSync(descriptor, 'utf8'));
     return parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
       ? (parsed as Holder)
@@ -133,6 +133,15 @@ function processAlive(pid: number): boolean {
 function refuseHeld(path: string): never {
   const stat = lstatSync(path, { throwIfNoEntry: false });
   if (stat === undefined) throw new RecipeInstallLocked({});
+  if (!stat.isFile()) {
+    // A link, FIFO, directory or socket is never a lock record: never read, never removed here.
+    throw Object.assign(
+      new Error(
+        `RECIPE_INSTALL_LOCK_INVALID: ${RECIPE_INSTALL_LOCK} is not a regular file; once no recipe installation is running, inspect and remove it with: rm -r "${path}"`,
+      ),
+      { code: 'RECIPE_INSTALL_LOCK_INVALID' },
+    );
+  }
   const holder = readHolder(path);
   const recorded = holder ?? {};
   const acquired =
