@@ -136,6 +136,24 @@ describe('atomic no-replace publication steps', () => {
     // The target holds the caller's complete bytes, and the staged name was recovered.
     expect(readFileSync(target, 'utf8')).toBe('published\n');
     expect(readdirSync(root)).toEqual(['record.json']);
+    // #313: the error names the identity of the file it linked, which the caller owns.
+    const stat = lstatSync(target);
+    expect((failure as PublishIndeterminateError).identity).toEqual({
+      dev: stat.dev,
+      ino: stat.ino,
+    });
+  });
+
+  it('returns the identity of the file it created, taken before the link (#313)', () => {
+    const root = directory();
+    const target = join(root, 'record.json');
+    const identity = publishNoReplaceSteps(target, 'bytes\n');
+    const stat = lstatSync(target);
+    expect(identity).toEqual({ dev: stat.dev, ino: stat.ino });
+    // A different file later found at the path does not carry that identity.
+    unlinkSync(target);
+    writeFileSync(target, 'bytes\n');
+    expect(lstatSync(target).ino).not.toBe(identity.ino);
   });
 
   it('removes its staged file when the link fails for any reason', () => {
@@ -173,7 +191,8 @@ describe('the guarded publication effect', () => {
           apply_effect,
         },
         () => {
-          publishFileNoReplaceSync(target, 'bytes\n');
+          const identity = publishFileNoReplaceSync(target, 'bytes\n');
+          expect(identity).toEqual({ dev: lstatSync(target).dev, ino: lstatSync(target).ino });
           expect(() => publishFileNoReplaceSync(target, 'other\n')).toThrow(
             expect.objectContaining({ code: 'EEXIST' }),
           );

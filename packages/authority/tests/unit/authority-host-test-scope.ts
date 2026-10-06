@@ -166,7 +166,7 @@ function targetFor(
       id: `fs:${path}`,
       repository_id: 'devai-test-scope',
       canonical_relative_path: path,
-      operation: ['rmSync', 'unlinkSync'].includes(request.symbol)
+      operation: ['rmSync', 'rmdirSync', 'unlinkSync'].includes(request.symbol)
         ? 'delete'
         : [
               'mkdirSync',
