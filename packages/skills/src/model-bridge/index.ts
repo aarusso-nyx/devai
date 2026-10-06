@@ -120,10 +120,29 @@ function unsafeEvent(value: unknown): boolean {
       (!Array.isArray(node['tool_calls']) || node['tool_calls'].length > 0))
   )
     return true;
+  if (serverToolUse(node)) return true;
   for (const key of ['tools', 'mcp_servers']) {
     if (node[key] !== undefined && (!Array.isArray(node[key]) || node[key].length > 0)) return true;
   }
   return Object.values(node).some(unsafeEvent);
+}
+
+/**
+ * Server-side tool use the provider reports only as usage counters (web search or fetch
+ * run by the API itself, never as a transcript event): any `server_tool_use` counter or
+ * per-model `webSearchRequests`/`webFetchRequests` that is not exactly zero.
+ */
+function serverToolUse(node: Record<string, unknown>): boolean {
+  const counters = node['server_tool_use'];
+  if (
+    counters !== undefined &&
+    (record(counters) === undefined ||
+      Object.values(counters as Record<string, unknown>).some((count) => count !== 0))
+  )
+    return true;
+  return ['webSearchRequests', 'webFetchRequests'].some(
+    (key) => node[key] !== undefined && node[key] !== 0,
+  );
 }
 
 function statusMatches(values: readonly unknown[], allowed: readonly string[]): boolean {
@@ -259,6 +278,8 @@ function apiFinish(provider: ModelProvider, value: unknown): FinishReason {
           ? 'length'
           : undefined;
   if (finish === undefined || !statusMatches(containers, ['completed'])) return 'error';
+  const usage = record(response['usage']);
+  if (usage !== undefined && serverToolUse(usage)) return 'error';
   for (const node of containers) {
     if (
       node['is_error'] === true ||
@@ -377,12 +398,36 @@ export function claudeReviewArgv(
 }
 
 /**
+ * Codex features that expose a tool to the model and that `codex features list --disable
+ * <feature>` (codex-cli 0.157.1, 2026-10-06) reports as effectively off. `unified_exec`
+ * is not here: the same listing still reports it enabled after `--disable unified_exec`.
+ */
+export const CODEX_REVIEW_DISABLED_FEATURES: readonly string[] = [
+  'shell_tool',
+  'apps',
+  'browser_use',
+  'computer_use',
+  'in_app_browser',
+  'multi_agent',
+  'plugins',
+  'image_generation',
+  'view_image',
+  'sleep_tool',
+  'tool_suggest',
+  'skill_search',
+];
+
+/**
  * Codex review argv (ADR-MDL-0003): an ephemeral read-only run in the empty review
  * workspace, without the user's `config.toml` (its MCP servers, hooks and profiles) or
  * execpolicy rules, with the MCP server table and the tools table overridden empty for any
- * other configuration layer. `codex exec --help` (codex-cli 0.157.1) advertises no flag
- * that removes the built-in shell, so a tool or MCP item in the transcript still refuses
- * the reply; the read-only sandbox only bounds writes.
+ * other configuration layer, and with every tool-bearing feature that can be switched off
+ * disabled before launch (`--disable`, advertised by `codex exec --help`).
+ *
+ * Codex review isolation is still post-hoc. `unified_exec` stays enabled whatever the
+ * flags say, and no offline observation shows the effective tool list, so a command the
+ * model runs may still read files the read-only sandbox lets it see. A tool or MCP item
+ * in the transcript refuses the reply, but that refusal cannot undo what the model read.
  */
 export function codexReviewArgv(
   model: string,
@@ -407,6 +452,7 @@ export function codexReviewArgv(
     'mcp_servers={}',
     '--config',
     'tools={}',
+    ...CODEX_REVIEW_DISABLED_FEATURES.flatMap((feature) => ['--disable', feature]),
     ...(schemaPath === undefined ? [] : ['--output-schema', schemaPath]),
     prompt,
   ];
