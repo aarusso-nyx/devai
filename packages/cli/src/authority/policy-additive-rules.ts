@@ -255,6 +255,26 @@ export function buildAdditiveAuthorityRules(input: {
       rationale: 'Typed remote authority for sense run.',
     }),
     rule({
+      id: 'adopter-remote-sense-run-llm-1',
+      origin: 'additive-extension',
+      precedence: 500,
+      actionIds: ['sense run'],
+      // The exact target the broker derives for the llm_judge host transports
+      // (remote:local-llm:<claude|codex>); the sensor-runtime selector above never
+      // matches it, so without this rule every host-CLI judge was UNCLASSIFIED_RESOURCE.
+      selector: {
+        kind: 'remote',
+        system_id: 'local-llm',
+        endpoint_ids: ['claude', 'codex'],
+        operation_ids: ['invoke'],
+        publication: false,
+      },
+      subjects: [machineSubject('harness')],
+      consent: { write: true, allow_publish: true, experimental: false },
+      rationale:
+        'Typed remote authority for the llm_judge host CLI review invocation of sense run (ADR-MDL-0003): an explicit --publish consent, an isolated reviewer process, no publication.',
+    }),
+    rule({
       id: 'adopter-remote-round-dispatch-1',
       origin: 'additive-extension',
       precedence: 500,
