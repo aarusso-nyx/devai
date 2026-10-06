@@ -13,6 +13,8 @@ import {
   type Stats,
 } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { createHash } from 'node:crypto';
+import { REVIEWED_WORKFLOW_STEPS } from './reviewed-workflow-steps.js';
 
 /**
  * Shared workflow YAML parser for Phase 28 harness sensors. Walks
@@ -482,6 +484,100 @@ const yamlBoolean = (value: ExecutionYaml | undefined): boolean | undefined => {
   return value.value.toLowerCase() === 'true';
 };
 
+/**
+ * Contexts a concurrency group may read (#325). Each names the run's own scope: its ref, its
+ * workflow, its commit, its event, the pull request or merge-queue entry it serves, or a
+ * dispatch input. None selects code, a credential or a runtime.
+ */
+const CONCURRENCY_CONTEXTS = new Set([
+  'github.ref',
+  'github.ref_name',
+  'github.workflow',
+  'github.sha',
+  'github.event_name',
+  'github.event.pull_request.number',
+  'github.event.merge_group.head_sha',
+]);
+
+/**
+ * The contexts one `${{ … }}` concurrency expression reads, or undefined when it uses
+ * anything outside a closed grammar: allowlisted contexts and `inputs.<name>`, quoted
+ * literals, `==`, `!=`, `&&`, `||`, `!`, parentheses, and `format(literal, …)`.
+ */
+export function concurrencyExpressionContexts(expression: string): readonly string[] | undefined {
+  const token = /\s*(?:('(?:[^']|'')*')|([A-Za-z_][A-Za-z0-9_.-]*)|(==|!=|&&|\|\||[!(),]))/uy;
+  const tokens: string[] = [];
+  let offset = 0;
+  while (offset < expression.length) {
+    token.lastIndex = offset;
+    const match = token.exec(expression);
+    if (!match) {
+      if (expression.slice(offset).trim() !== '') return undefined;
+      break;
+    }
+    tokens.push(match[1] ?? match[2] ?? match[3] ?? '');
+    if (tokens.length > 256) return undefined;
+    offset = token.lastIndex;
+  }
+  const contexts: string[] = [];
+  let cursor = 0;
+  function primary(): boolean {
+    const value = tokens[cursor++];
+    if (value === undefined) return false;
+    if (value === '!') return primary();
+    if (value === '(') return expression_() && tokens[cursor++] === ')';
+    if (value.startsWith("'")) return true;
+    if (value === 'format') {
+      if (tokens[cursor++] !== '(' || !tokens[cursor]?.startsWith("'")) return false;
+      cursor++;
+      while (tokens[cursor] === ',') {
+        cursor++;
+        if (!expression_()) return false;
+      }
+      return tokens[cursor++] === ')';
+    }
+    if (CONCURRENCY_CONTEXTS.has(value) || /^inputs\.[A-Za-z_][A-Za-z0-9_-]*$/u.test(value)) {
+      contexts.push(value);
+      return true;
+    }
+    return false;
+  }
+  function comparison(): boolean {
+    if (!primary()) return false;
+    if (tokens[cursor] === '==' || tokens[cursor] === '!=') {
+      cursor++;
+      return primary();
+    }
+    return true;
+  }
+  function expression_(): boolean {
+    if (!comparison()) return false;
+    while (tokens[cursor] === '&&' || tokens[cursor] === '||') {
+      cursor++;
+      if (!comparison()) return false;
+    }
+    return true;
+  }
+  return expression_() && cursor === tokens.length ? contexts : undefined;
+}
+
+/** The contexts a whole concurrency group reads, or undefined when any part is refused. */
+export function concurrencyGroupContexts(group: string): readonly string[] | undefined {
+  const contexts: string[] = [];
+  let rest = group;
+  for (;;) {
+    const open = rest.indexOf('${{');
+    if (open < 0) return rest.includes('}}') ? undefined : contexts;
+    if (rest.slice(0, open).includes('}}')) return undefined;
+    const close = rest.indexOf('}}', open + 3);
+    if (close < 0) return undefined;
+    const read = concurrencyExpressionContexts(rest.slice(open + 3, close));
+    if (read === undefined) return undefined;
+    contexts.push(...read);
+    rest = rest.slice(close + 2);
+  }
+}
+
 /** undefined is absent; null refuses; values have typed actual scoped authority. */
 function controlConcurrency(value: ExecutionYaml | undefined): WorkflowJob['concurrency'] | null {
   if (value === undefined) return undefined;
@@ -490,14 +586,7 @@ function controlConcurrency(value: ExecutionYaml | undefined): WorkflowJob['conc
     return null;
   const group = yamlString(fields.get('group'));
   if (group === undefined || /[\r\n]/u.test(group)) return null;
-  const references = [...group.matchAll(/\$\{\{\s*([A-Za-z_.]+)\s*\}\}/gu)].map((m) => m[1] ?? '');
-  const literal = group.replace(/\$\{\{\s*[A-Za-z_.]+\s*\}\}/gu, '');
-  if (
-    literal.includes('${{') ||
-    references.some((key) => !['github.ref', 'github.workflow'].includes(key)) ||
-    (group.includes('github.ref') && !references.includes('github.ref'))
-  )
-    return null;
+  if (concurrencyGroupContexts(group) === undefined) return null;
   const cancellation = fields.get('cancel-in-progress');
   const cancel = cancellation === undefined ? null : yamlBoolean(cancellation);
   return cancel === undefined ? null : { group, cancelInProgress: cancel };
@@ -973,6 +1062,71 @@ const REGISTERED_ACTIONS: ReadonlyMap<string, RegisteredAction> = new Map<string
     ],
   ],
 );
+/**
+ * The canonical form of one step's YAML: maps with sorted keys, lists in order, scalars by
+ * value. Undefined when any node is opaque, since its bytes would escape the digest.
+ */
+function canonicalStep(value: ExecutionYaml): unknown {
+  switch (value.kind) {
+    case 'scalar':
+      return value.value;
+    case 'list': {
+      const items = value.items.map(canonicalStep);
+      return items.includes(undefined) ? undefined : items;
+    }
+    case 'map': {
+      const entries = [...value.entries.entries()]
+        .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+        .map(([key, item]) => [key, canonicalStep(item)] as const);
+      return entries.some(([, item]) => item === undefined)
+        ? undefined
+        : Object.fromEntries(entries);
+    }
+    default:
+      return undefined;
+  }
+}
+
+/** sha256 of a step's canonical YAML, or undefined for a step with an opaque node. */
+export function workflowStepDigest(step: ExecutionYaml): string | undefined {
+  const canonical = canonicalStep(step);
+  if (canonical === undefined || typeof canonical !== 'object' || Array.isArray(canonical))
+    return undefined;
+  return createHash('sha256').update(JSON.stringify(canonical)).digest('hex');
+}
+
+const REVIEWED_STEP_EFFECTS: ReadonlyMap<string, 'read-only' | 'publication'> = new Map(
+  REVIEWED_WORKFLOW_STEPS.map((entry) => [entry.sha256, entry.effect] as const),
+);
+
+function reviewedStepEffect(step: ExecutionYaml): 'read-only' | 'publication' | undefined {
+  const digest = workflowStepDigest(step);
+  return digest === undefined ? undefined : REVIEWED_STEP_EFFECTS.get(digest);
+}
+
+/** Every step of every job in a workflow source with its canonical digest (#325 review aid). */
+export function workflowStepInventory(
+  content: string,
+): readonly { job: string; index: number; name: string; sha256: string | undefined }[] {
+  const jobs = yamlMap(yamlMap(executionYaml(content))?.get('jobs'));
+  if (!jobs) return [];
+  const out: { job: string; index: number; name: string; sha256: string | undefined }[] = [];
+  for (const [job, definition] of jobs) {
+    const steps = yamlMap(definition)?.get('steps');
+    if (steps?.kind !== 'list') continue;
+    steps.items.forEach((step, index) => {
+      out.push({
+        job,
+        index,
+        name:
+          yamlString(yamlMap(step)?.get('name')) ?? yamlString(yamlMap(step)?.get('uses')) ?? '',
+        sha256: workflowStepDigest(step),
+      });
+    });
+  }
+  return out;
+}
+
 /** A remote owner/repo[@ref] step reference; nested paths and docker:// never match. */
 function remoteActionReference(use: string): { target: string; ref?: string } | undefined {
   const match = /^([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)(?:@([A-Za-z0-9_./-]+))?$/u.exec(use);
@@ -1042,12 +1196,21 @@ export function jobEffectFacts(
         ? 'publication'
         : 'read-only';
   // Registered application data only; unproved loader/runtime/output/config selectors refuse.
+  // #325: the job- and workflow-level data names the four DEVAI workflows declare. Each
+  // carries a commit, a tag, a ref, a package name or a count; none selects code, a loader,
+  // a runtime, an output path or configuration. Step-level env is reviewed with its step.
   const inertEnvironment = new Set([
     'OBSERVATION_ONLY',
     'DESTINATION',
     'CI',
     'GH_TOKEN',
     'GITHUB_TOKEN',
+    'DEVAI_PREFLIGHT_BASE',
+    'CANDIDATE_SHA',
+    'CANDIDATE_REF',
+    'PACKAGE_NAME',
+    'EXPECTED_ACTION_COUNT',
+    'RELEASE_TAG',
   ]);
   function loaderVariable(key: string): boolean {
     return !inertEnvironment.has(key);
@@ -1056,10 +1219,13 @@ export function jobEffectFacts(
     const environment = fields.get('env');
     if (environment !== undefined) {
       const entries = yamlMap(environment);
-      if (
-        !entries ||
-        [...entries].some(([key, value]) => loaderVariable(key) || yamlString(value) === undefined)
-      )
+      // A plain decimal integer is data too (#325: EXPECTED_ACTION_COUNT: 69).
+      const dataValue = (value: ExecutionYaml): boolean =>
+        yamlString(value) !== undefined ||
+        (value.kind === 'scalar' &&
+          value.syntax === 'plain' &&
+          /^(?:0|[1-9]\d{0,8})$/u.test(value.value));
+      if (!entries || [...entries].some(([key, value]) => loaderVariable(key) || !dataValue(value)))
         return false;
     }
     if (fields.has('container') || fields.has('services')) return false;
@@ -1101,6 +1267,8 @@ export function jobEffectFacts(
     uses: ActionStep[];
     bytesSelected: boolean;
     bytesReplaced: boolean;
+    /** Declared effects of steps found in the reviewed-step registry (#325). */
+    reviewed: Effect[];
   };
   function executionSteps(value: ExecutionYaml | undefined): Executions | undefined {
     if (value?.kind !== 'list') return undefined;
@@ -1109,6 +1277,7 @@ export function jobEffectFacts(
       uses: [],
       bytesSelected: false,
       bytesReplaced: false,
+      reviewed: [],
     };
     const allowed = new Set([
       'name',
@@ -1124,6 +1293,18 @@ export function jobEffectFacts(
       'timeout-minutes',
     ]);
     for (const step of value.items) {
+      // A reviewed step contributes its declared effect; its inputs, env and the bytes it
+      // runs were judged in review against its exact canonical YAML (#325). A byte selector
+      // among reviewed steps still replaces the bytes any later unreviewed step would run.
+      const reviewed = reviewedStepEffect(step);
+      if (reviewed !== undefined) {
+        const reference = yamlString(yamlMap(step)?.get('uses'));
+        const remote = reference === undefined ? undefined : remoteActionReference(reference);
+        if (remote && REGISTERED_ACTIONS.get(remote.target)?.bytesSelector)
+          result.bytesSelected = true;
+        result.reviewed.push(reviewed);
+        continue;
+      }
       const fields = yamlMap(step);
       if (
         !fields ||
@@ -1201,7 +1382,14 @@ export function jobEffectFacts(
       const value = tokens[cursor++];
       if (!value) return false;
       if (statuses.has(value)) return tokens[cursor++] === '(' && tokens[cursor++] === ')';
-      return value.startsWith("'") || contexts.has(value) || ['true', 'false'].includes(value);
+      // #325: a workflow_dispatch input is run data the dispatcher chose, never a status or
+      // code selector, so a job condition may read it.
+      return (
+        value.startsWith("'") ||
+        contexts.has(value) ||
+        /^inputs\.[a-z_][a-z0-9_-]*$/u.test(value) ||
+        ['true', 'false'].includes(value)
+      );
     }
     function comparison(): boolean {
       if (!primary()) return false;
@@ -1341,6 +1529,7 @@ export function jobEffectFacts(
           uses: [{ reference }],
           bytesSelected: false,
           bytesReplaced: false,
+          reviewed: [],
         };
     } else executions = executionSteps(jobFields.get('steps'));
   }
@@ -2152,6 +2341,7 @@ export function jobEffectFacts(
       if (!nested || nested.bytesSelected) return 'unknown';
       let result: Effect = 'read-only';
       for (const script of nested.scripts) result = combine(result, scriptEffect(script));
+      for (const declared of nested.reviewed) result = combine(result, declared);
       for (const step of nested.uses)
         result = combine(result, actionEffect(step.reference, step.inputs));
       return result;
@@ -2161,6 +2351,7 @@ export function jobEffectFacts(
   }
   if (!root) mark('unknown');
   for (const script of executions?.scripts ?? []) mark(scriptEffect(script));
+  for (const declared of executions?.reviewed ?? []) mark(declared);
   for (const step of executions?.uses ?? []) mark(actionEffect(step.reference, step.inputs));
   return {
     effect,
