@@ -13,6 +13,7 @@ import {
 } from './types.js';
 export { TaskExecutionEvidenceError } from './types.js';
 export type {
+  AttemptSandboxEvidence,
   CostEvidence,
   CostUnknown,
   DigestBinding,
@@ -189,6 +190,26 @@ function validateAgentSelection(task: TaskRecordBinding, evidence: TaskExecution
   );
 }
 
+/** The provider-enforced sandbox mode each experimental runtime runs under (ADR-MDL-0008). */
+const SANDBOX_MODE_BY_RUNTIME: Readonly<Record<string, string>> = {
+  'claude-cli': 'claude-restricted-sandbox',
+  'codex-cli': 'codex-workspace-write',
+};
+
+// ADR-MDL-0008: only an experimental agent attempt records a sandbox, and the mode is the
+// one its runtime enforces.
+function validateSandbox(evidence: TaskExecutionEvidence): void {
+  if (evidence.sandbox === undefined) return;
+  const resolved = evidence.resolved_executor;
+  requireSemantic(
+    evidence.experimental === true &&
+      resolved.kind === 'agent' &&
+      SANDBOX_MODE_BY_RUNTIME[resolved.runtime] === evidence.sandbox.mode,
+    'TASK_EXECUTION_EVIDENCE_SANDBOX_MISMATCH',
+    'a sandbox is recorded only on experimental agent evidence, in the mode its runtime enforces',
+  );
+}
+
 function validateExecutionSemantics(
   task: TaskRecordBinding,
   evidence: TaskExecutionEvidence,
@@ -199,6 +220,7 @@ function validateExecutionSemantics(
     'resolved executor kind differs from the immutable request',
   );
   validateTimestamps(evidence);
+  validateSandbox(evidence);
 
   const failed = ['fail', 'error', 'cancelled'].includes(evidence.verdict);
   requireSemantic(
@@ -376,6 +398,7 @@ export function buildTaskExecutionEvidence(
     failure: facts.failure ?? null,
     evidence_refs: facts.evidence_refs,
     ...(facts.experimental === true && { experimental: true as const }),
+    ...(facts.sandbox !== undefined && { sandbox: facts.sandbox }),
   });
   const validated = validateTaskExecutionEvidence(record, validator);
   assertTaskExecutionEvidenceBinding(validated, task, facts.candidate_sha);
