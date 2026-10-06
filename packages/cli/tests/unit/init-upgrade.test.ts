@@ -671,6 +671,10 @@ describe('#291: init upgrade converts a committed checkout-bound post-merge bind
     expect(planned.exit, planned.stderr).toBe(0);
     const plan = value(planned)['plan'] as JsonObject;
     expect(plan['status']).toBe('ready');
+    // The unreleased conversion runs in this package, so the plan names it.
+    expect((plan['releases'] as JsonObject[]).map((release) => release['version'])).toContain(
+      '2.0.1',
+    );
     expect(plan['changed_files']).toEqual(
       expect.arrayContaining([
         { path: DECLARATION, operation: 'update', segment: 'host-adapters' },
@@ -687,6 +691,8 @@ describe('#291: init upgrade converts a committed checkout-bound post-merge bind
     expect(json(repo, LOCAL)['installed_at_head']).toBe(
       (JSON.parse(legacy) as JsonObject)['installed_at_head'],
     );
+    // The receipt records the conversion that ran.
+    expect(json(repo, RECEIPT)['migrations']).toContain('MIG-2.0.1-post-merge-local-state');
     expect(json(repo, RECEIPT)['postchecks']).toEqual([
       { name: 'policy-materialization-current', ok: true },
       { name: 'authority-enforcement', ok: true },
@@ -700,6 +706,23 @@ describe('#291: init upgrade converts a committed checkout-bound post-merge bind
     expect((value(again)['plan'] as JsonObject)['status']).toBe('no-op');
     expect(snapshot(repo)).toEqual(settled);
     expect(readFileSync(join(repo, LOCAL), 'utf8')).toBe(local);
+  }, 180_000);
+
+  it('restores the declaration of a selected live binding whose declaration was deleted', async () => {
+    const repo = await stynxAt160(true, { postMerge: true });
+    expect((await runCli(WRITE(repo))).exit).toBe(0);
+    rmSync(join(repo, DECLARATION));
+    const applied = await runCli(WRITE(repo));
+    expect(applied.exit, applied.stderr).toBe(0);
+    expect(readFileSync(join(repo, DECLARATION), 'utf8')).not.toContain(repo);
+    expect(json(repo, RECEIPT)['changed_files']).toEqual(
+      expect.arrayContaining([expect.objectContaining({ path: DECLARATION, operation: 'create' })]),
+    );
+    const settled = snapshot(repo);
+    const again = await runCli(WRITE(repo));
+    expect(again.exit, again.stderr).toBe(0);
+    expect((value(again)['plan'] as JsonObject)['status']).toBe('no-op');
+    expect(snapshot(repo)).toEqual(settled);
   }, 180_000);
 
   it('only rewrites the declaration in a checkout that never held the binding', async () => {
