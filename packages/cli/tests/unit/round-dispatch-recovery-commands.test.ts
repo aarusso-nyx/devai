@@ -307,6 +307,26 @@ describe('round dispatch preflight', () => {
     expect(loadTask(root, 'TASK-0314').status).toBe('ready');
   });
 
+  it('refuses a marker that is not the exact published one', async () => {
+    const root = repository();
+    await withAuthorityHostTestScope(async () => {
+      writeExperimentalActivation(root, activation());
+      saveTask(root, task(root, 'TASK-0315'));
+    });
+    writeFileSync(join(root, STATE_ROOT_MARKER), '{"id":"state-root"}\n');
+    const refused = await invoke(roundDispatch, 'round-dispatch', [
+      '--repo-root',
+      root,
+      '--round',
+      ROUND,
+    ]);
+    expect(refused.exit).not.toBe(0);
+    expect(JSON.parse(refused.stderr)).toMatchObject({
+      code: 'EXPERIMENTAL_STATE_ROOT_MARKER_INVALID',
+    });
+    expect(existsSync(join(root, '.devai/state/locks'))).toBe(false);
+  });
+
   it('refuses a selection whose dependency closure holds a task the activation does not admit, before any lock', async () => {
     const root = repository();
     await withAuthorityHostTestScope(async () => {
