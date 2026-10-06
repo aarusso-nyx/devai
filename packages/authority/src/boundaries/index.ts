@@ -62,7 +62,7 @@ const GIT_READ_OWNERS: Readonly<Record<string, ReadonlySet<string>>> = {
 const DIRECTORY_FLUSH_EXCEPTION = 'flushDirectoryEntrySync';
 const DIRECTORY_FLUSH_OWNER = 'packages/loop/src/loop/state-root.ts';
 const GOVERNANCE_PROJECTION_EXCEPTION = 'writeGovernanceProjectionSync';
-const GOVERNANCE_PROJECTION_OWNER = 'packages/cli/src/commands/docs/governance-render.ts';
+const GOVERNANCE_PROJECTION_OWNER = 'packages/cli/src/commands/evidence/facade.ts';
 const HOST_EFFECTS_MODULE = '@devai-nyx/authority';
 const CANONICAL_SOURCE_ROOTS = [
   'packages/authority/src',
