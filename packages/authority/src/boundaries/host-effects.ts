@@ -36,6 +36,13 @@ import { scopes, type AuthorityHostEffectScope } from './host-scope.js';
 import { runSinkUnit } from './host-sink-filesystem.js';
 import { publishNoReplaceSteps, type PublishedFileIdentity } from './host-publish.js';
 import {
+  entryIdentityKey,
+  parseEntryIdentityKey,
+  removeEntryIfIdentitySteps,
+  type EntryIdentity,
+  type RemoveEntryOutcome,
+} from './host-remove.js';
+import {
   currentRepositoryBinding,
   nextProtectedOperationSequence,
   requireScope,
@@ -306,6 +313,37 @@ export const publishFileNoReplaceSync = guarded(
   'mutation',
 );
 export { PUBLISH_INDETERMINATE, type PublishedFileIdentity } from './host-publish.js';
+
+const removeEntryIfIdentityEffect = guarded(
+  'removeEntryIfIdentitySync',
+  (path: string, identityKey: string): RemoveEntryOutcome => {
+    const identity = parseEntryIdentityKey(identityKey);
+    if (identity === undefined) throw new Error('AUTHORITY_REMOVE_IDENTITY_INVALID');
+    return removeEntryIfIdentitySteps(path, identity);
+  },
+  'mutation',
+);
+
+/**
+ * Governed identity-bound removal (#317): one authorized `delete` of `path` that quarantines
+ * the entry under a private name, removes it only when it is `identity` (a non-recursive rmdir
+ * for a directory) and puts any other entry back. The broker may classify the removal of a
+ * file this invocation published by the target it authorized for that publication.
+ */
+export function removeEntryIfIdentitySync(
+  path: string,
+  identity: EntryIdentity,
+): RemoveEntryOutcome {
+  return removeEntryIfIdentityEffect(path, entryIdentityKey(identity));
+}
+export {
+  REMOVE_QUARANTINE_SUFFIX,
+  REMOVE_RESTORE_INCOMPLETE,
+  entryIdentityKey,
+  parseEntryIdentityKey,
+  type EntryIdentity,
+  type RemoveEntryOutcome,
+} from './host-remove.js';
 
 /**
  * Exact flush exception (ADR-AUT-0005): fsync one directory opened read-only and without
