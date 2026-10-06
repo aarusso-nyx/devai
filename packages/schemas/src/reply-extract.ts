@@ -26,7 +26,7 @@ export interface StructuredReply {
   readonly finish_reason?: ReplyFinishReason;
   /** Exact strict request identity; raw replies validate before optional-null removal. */
   readonly projection?: {
-    readonly version: 'strict-reply-v1';
+    readonly version: typeof REPLY_PROJECTION_VERSION;
     readonly schema: ReplySchemaName;
     readonly schema_sha256: string;
   };
@@ -158,6 +158,18 @@ function describeErrors(errors: readonly ErrorObject[] | null | undefined): stri
 }
 
 /**
+ * The one reply digest every recording stores and every replay recomputes (ADR-MDL-0003):
+ * lowercase hexadecimal SHA-256 of the UTF-8 reply bytes the bridge selected, before
+ * normalization or redaction. For a Claude envelope whose `structured_output` supplies the
+ * verdict those bytes are `JSON.stringify(structured_output)` with no newline, never the
+ * envelope's `result` string; for a text reply they are that text exactly.
+ */
+export function replySha256(reply: Pick<StructuredReply, 'text'>): string {
+  const text = typeof reply.text === 'string' ? reply.text : '';
+  return createHash('sha256').update(text, 'utf8').digest('hex');
+}
+
+/**
  * Read one structured reply against its consumer schema (ADR-MDL-0001).
  */
 export function extractStructuredReply(
@@ -165,7 +177,7 @@ export function extractStructuredReply(
   schema: ReplySchemaName,
 ): ReplyExtraction {
   const text = typeof reply.text === 'string' ? reply.text : '';
-  const reply_sha256 = createHash('sha256').update(text, 'utf8').digest('hex');
+  const reply_sha256 = replySha256(reply);
   const fail = (code: ReplyErrorCode, message: string, source = text, focus?: string) =>
     ({
       ok: false,
@@ -234,12 +246,12 @@ export function extractStructuredReply(
     if (projection === null || typeof projection !== 'object' || Array.isArray(projection)) {
       return fail('reply_invalid', 'the strict reply projection must be an exact identity object');
     }
-    const expected = strictReplySchema(schema);
-    const digest = createHash('sha256').update(JSON.stringify(expected), 'utf8').digest('hex');
+    const expected = providerReplySchema(schema, true);
+    const identity = replyProjectionIdentity(schema);
     if (
-      projection.version !== 'strict-reply-v1' ||
+      projection.version !== identity.version ||
       projection.schema !== schema ||
-      projection.schema_sha256 !== digest ||
+      projection.schema_sha256 !== identity.schema_sha256 ||
       Object.keys(projection).sort().join(',') !== 'schema,schema_sha256,version'
     ) {
       return fail(
@@ -277,8 +289,44 @@ export function extractStructuredReply(
   return { ok: true, document: document as Record<string, unknown> };
 }
 
-/** Reconstruct the declared strict request from the immutable consumer contract. */
-function strictReplySchema(name: ReplySchemaName): Record<string, unknown> {
+/** The version of the provider schema projection below; part of a strict reply's identity. */
+export const REPLY_PROJECTION_VERSION = 'strict-reply-v2';
+
+/** The optional positions a strict projection may turn into required-and-nullable members. */
+const NULLABLE_POSITIONS: Readonly<Partial<Record<ReplySchemaName, readonly string[]>>> = {
+  'review-verdict.schema.json': [
+    '/properties/findings',
+    '/$defs/finding/properties/file',
+    '/$defs/finding/properties/line',
+  ],
+};
+
+/**
+ * Consumers whose string length bounds a strict projection restates as an equivalent
+ * `pattern`: OpenAI strict structured outputs, which `codex exec --output-schema` uses,
+ * admit `pattern` but not `minLength`/`maxLength`. The soft-gate score keeps its bounds
+ * because its strings already carry a pattern that one regular expression cannot join.
+ */
+const LENGTH_AS_PATTERN: readonly ReplySchemaName[] = [
+  'review-verdict.schema.json',
+  'triage-breaker.schema.json',
+];
+
+/**
+ * The consumer schema as a provider receives it (ADR-MDL-0003): the governed document
+ * without its identity and documentation-only members, which structured-output hosts do
+ * not read. The strict projection, for OpenAI strict mode and `codex exec
+ * --output-schema`, also lists every property in `required`, makes the declared optional
+ * positions nullable instead of absent, types string enums explicitly, and restates a
+ * string length bound as the equivalent code-point pattern. It never changes what a
+ * document means: a reply that passes the projection still has its declared nulls removed
+ * and is validated against the canonical schema.
+ */
+export function providerReplySchema(
+  name: ReplySchemaName,
+  strict: boolean,
+): Record<string, unknown> {
+  const nullable = NULLABLE_POSITIONS[name] ?? [];
   const visit = (value: unknown, path: string): unknown => {
     if (Array.isArray(value))
       return value.map((member, index) => visit(member, `${path}/${index}`));
@@ -291,6 +339,7 @@ function strictReplySchema(name: ReplySchemaName): Record<string, unknown> {
         )
         .map(([key, member]) => [key, visit(member, `${path}/${key}`)]),
     );
+    if (!strict) return out;
     if (node['type'] === 'object') {
       if (
         node['additionalProperties'] !== false ||
@@ -302,21 +351,47 @@ function strictReplySchema(name: ReplySchemaName): Record<string, unknown> {
       const properties = out['properties'] as Record<string, unknown>;
       for (const key of Object.keys(properties)) {
         if ((node['required'] as string[]).includes(key)) continue;
-        const position = `${path}/properties/${key}`;
-        if (
-          name !== 'review-verdict.schema.json' ||
-          ![
-            '/properties/findings',
-            '/$defs/finding/properties/file',
-            '/$defs/finding/properties/line',
-          ].includes(position)
-        )
+        if (!nullable.includes(`${path}/properties/${key}`))
           throw new Error('MODEL_BRIDGE_SCHEMA_UNSUPPORTED');
         properties[key] = { anyOf: [properties[key], { type: 'null' }] };
       }
       out['required'] = Object.keys(properties);
     }
+    if (
+      node['type'] === undefined &&
+      Array.isArray(node['enum']) &&
+      node['enum'].every((member) => typeof member === 'string')
+    ) {
+      out['type'] = 'string';
+    }
+    if (
+      LENGTH_AS_PATTERN.includes(name) &&
+      node['type'] === 'string' &&
+      (node['minLength'] !== undefined || node['maxLength'] !== undefined)
+    ) {
+      if (node['pattern'] !== undefined) throw new Error('MODEL_BRIDGE_SCHEMA_UNSUPPORTED');
+      const min = (node['minLength'] ?? 0) as number;
+      const max = node['maxLength'] as number | undefined;
+      if (!Number.isSafeInteger(min) || (max !== undefined && !Number.isSafeInteger(max)))
+        throw new Error('MODEL_BRIDGE_SCHEMA_UNSUPPORTED');
+      delete out['minLength'];
+      delete out['maxLength'];
+      out['pattern'] = `^[\\s\\S]{${String(min)},${max === undefined ? '' : String(max)}}$`;
+    }
     return out;
   };
   return visit(loadSchema(name), '') as Record<string, unknown>;
+}
+
+/** The identity a strict reply carries: the projection version, schema name and digest. */
+export function replyProjectionIdentity(
+  name: ReplySchemaName,
+): NonNullable<StructuredReply['projection']> {
+  return {
+    version: REPLY_PROJECTION_VERSION,
+    schema: name,
+    schema_sha256: createHash('sha256')
+      .update(JSON.stringify(providerReplySchema(name, true)), 'utf8')
+      .digest('hex'),
+  };
 }

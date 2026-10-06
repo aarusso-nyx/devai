@@ -15,7 +15,14 @@ export type { CanonFinding } from './schema-canon.js';
 
 export { ROSTER } from './roster.js';
 export type { SchemaName } from './roster.js';
-export { extractStructuredReply, REPLY_EXCERPT_MAX_CHARS } from './reply-extract.js';
+export {
+  extractStructuredReply,
+  providerReplySchema,
+  REPLY_EXCERPT_MAX_CHARS,
+  REPLY_PROJECTION_VERSION,
+  replyProjectionIdentity,
+  replySha256,
+} from './reply-extract.js';
 export type {
   ReplyErrorCode,
   ReplyExtraction,
