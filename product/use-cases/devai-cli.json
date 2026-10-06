@@ -1368,7 +1368,38 @@
           }
         }
       ],
-      "alternateFlows": [],
+      "alternateFlows": [
+        {
+          "id": "alt-01",
+          "when": "A campaign task declares an agent executor contract (ADR-MDL-0009).",
+          "steps": [
+            {
+              "id": "alt-01-01",
+              "action": "Run `campaign materialize --campaign <CMP-id> --round <round-id> --as-role architect --write`: the task is written with an agent executor that selects its runtime exactly and is bound to its composed prompt; every other task keeps its human executor.",
+              "actorRole": "architect",
+              "refs": {
+                "actionRefs": [
+                  {
+                    "id": "campaign materialize"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "alt-01-02",
+              "action": "Run `round dispatch --round <round-id> --as-role architect --write --experimental` under an in-force Owner activation that admits the task's selection: the agent task runs through the experimental ladder and awaits human review.",
+              "actorRole": "architect",
+              "refs": {
+                "actionRefs": [
+                  {
+                    "id": "round dispatch"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
       "exceptions": [
         {
           "id": "exc-01",
@@ -1379,6 +1410,11 @@
           "id": "exc-02",
           "when": "round ratify targets a task that is not awaiting human review, or is invoked by a role other than the Owner or Architect.",
           "handling": "The ratification is refused and nothing is recorded."
+        },
+        {
+          "id": "exc-03",
+          "when": "An agent executor contract names an architect task, or a runtime, effort or model that experimental execution, the runtime registry or the model tiers do not admit.",
+          "handling": "campaign materialize refuses the whole round with the matching CAMPAIGN_AGENT_ code before writing anything."
         }
       ],
       "postconditions": [
@@ -1387,6 +1423,7 @@
       "acceptanceCriteria": [
         "campaign status writes nothing.",
         "campaign materialize writes only through the round task queue.",
+        "campaign materialize writes a human executor unless the campaign task declares a valid agent executor contract.",
         "round ratify never merges, pushes, or closes a round."
       ]
     },
