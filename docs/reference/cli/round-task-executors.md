@@ -474,6 +474,8 @@ in-force activation. Before any lock, worktree, or provider is touched it refuse
 - any task in the selection's whole same-round dependency closure, exactly as the runner will plan
   it, whose discipline, runtime, model, effort, or exact selection the activation does not admit;
 - an effort the runtime registry does not list for its runtime;
+- a runtime whose own sandbox cannot confine writes to the attempt worktree on this host
+  (`EXPERIMENTAL_SANDBOX_UNAVAILABLE`, ADR-MDL-0008);
 - a round with uncertain work (`TASK_DISPATCH_UNCERTAIN`).
 
 Uncertain work is an attempt with `intent` but no `settled`, whatever the task status, or an agent
@@ -499,7 +501,8 @@ An attempt fails when:
   tree holding one refuses before any provider starts;
 - the task lost a declared lock before its result could be accepted (`TASK_RESOURCE_LOCK_LOST`).
 
-Its evidence carries `experimental: true` and version-2 usage. The task's outcome and worktree
+Its evidence carries `experimental: true`, version-2 usage, and a `sandbox` object naming the
+provider-enforced write confinement and its exact flags. The task's outcome and worktree
 binding are saved before the attempt settles:
 
 - A contained, completed attempt leaves the task `awaiting_human_review`, with its worktree
@@ -597,17 +600,28 @@ devai round dispatch deactivate --repo-root . --as-role owner --write --experime
 
 ### Known limitations of experimental execution
 
-- **Write-scope checks compare snapshots.** The engine compares the attempt worktree before and
-  after the provider runs. A provider could create a symbolic link that escapes the worktree,
-  write through it, and remove it before the final snapshot. Snapshots cannot prove the
-  boundary; runtime filesystem enforcement belongs to the host sandbox. The adapters request the
-  provider's own containment:
-  - `codex exec --sandbox workspace-write --ignore-user-config`;
-  - `claude --permission-mode acceptEdits --setting-sources "" --strict-mcp-config` with an empty
-    MCP configuration.
+- **The write boundary is the provider's own sandbox.** Snapshots alone cannot prove the
+  boundary: a provider could create a symbolic link that escapes the worktree, write through it,
+  and remove it before the final snapshot. So the provider's own sandbox enforces it while the
+  provider runs (ADR-MDL-0008). Each adapter passes the strongest workspace-confined write mode
+  its CLI offers, rooted at the attempt worktree:
+  - codex (`codex-workspace-write`): `codex exec --ignore-user-config --sandbox workspace-write
+--cd <worktree> --ignore-rules --config sandbox_workspace_write.writable_roots=[] --config
+sandbox_workspace_write.network_access=false`;
+  - claude (`claude-restricted-sandbox`): `claude --setting-sources "" --strict-mcp-config` with
+    an empty MCP configuration, `--restricted --tools Bash,Read,Edit,Write,Glob,Grep`, the
+    sandbox settings `{"sandbox":{"enabled":true,"failIfUnavailable":true,"allowUnsandboxedCommands":false}}`,
+    `--permission-mode acceptEdits` and `--permission-prompts none`.
 
-  Both run with the attempt worktree as their working directory. That containment is recorded
-  as requested, never as verified (ADR-MDL-0005 D-3).
+  The broker admits the provider process only when its argv carries that whole sequence, rooted
+  at the spawn cwd. Dispatch refuses a runtime it cannot confine, or a host other than macOS or
+  Linux, with `EXPERIMENTAL_SANDBOX_UNAVAILABLE` before any lock or worktree is touched. Every
+  attempt's evidence records the enforced mode and flags in its `sandbox` object. Limits remain:
+  - DEVAI asserts the flags it passes; it does not observe the provider's kernel sandbox, so a
+    defect in that sandbox is outside DEVAI's proof.
+  - Both providers leave their temporary directories writable, outside the repository.
+  - The Article 6 write-scope check and the symbolic-link check still compare snapshots. They
+    catch writes inside the worktree that fall outside the discipline's paths.
 
 - **The state root must be initialized first.** Dispatch fsyncs every directory it creates
   below `.devai/state`, but it holds no authority over `.devai`, which lies outside the
