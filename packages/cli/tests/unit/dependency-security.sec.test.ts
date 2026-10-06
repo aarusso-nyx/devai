@@ -1,4 +1,4 @@
-// Invariants: INV-DEVAI-018
+// Invariants: INV-SEC-003
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -136,5 +136,60 @@ describe('dependency-security provenance evaluator', () => {
         ],
       }),
     ).toMatchObject({ status: 'fail', findings: [{ code: 'DEPENDENCY_WAIVER_INVALID' }] });
+  });
+
+  it('fails an expired waiver instead of applying it', () => {
+    const value = fixture('low-moderate.json') as Record<string, unknown>;
+    const advisories = value.advisories as Array<Record<string, unknown>>;
+    const result = evaluateValue({
+      ...value,
+      waivers: [
+        {
+          advisory_id: advisories[0]?.id,
+          package: advisories[0]?.package,
+          reason: 'Owner accepted the exposure until a date already past.',
+          approved_by: 'owner',
+          expires_at: '2026-07-16T00:00:00.000Z',
+        },
+      ],
+    });
+    expect(result).toMatchObject({ status: 'fail', applied_waivers: [] });
+    expect(result.findings?.map((finding) => finding.code)).toContain('DEPENDENCY_WAIVER_EXPIRED');
+  });
+
+  it('fails a waiver that names an advisory the scan does not report', () => {
+    const value = fixture('low-moderate.json') as Record<string, unknown>;
+    const advisories = value.advisories as Array<Record<string, unknown>>;
+    const result = evaluateValue({
+      ...value,
+      waivers: [
+        {
+          advisory_id: 'GHSA-none-such-advisory',
+          package: advisories[0]?.package,
+          reason: 'Owner waived an advisory this scan never reported.',
+          approved_by: 'owner',
+          expires_at: '2026-07-18T00:00:00.000Z',
+        },
+      ],
+    });
+    expect(result).toMatchObject({ status: 'fail', applied_waivers: [] });
+    expect(result.findings?.map((finding) => finding.code)).toContain('DEPENDENCY_WAIVER_UNKNOWN');
+  });
+
+  it.each([
+    ['high', 'DEPENDENCY_ADVISORY_HIGH'],
+    ['critical', 'DEPENDENCY_ADVISORY_CRITICAL'],
+  ])('fails an unwaived %s advisory', (severity, code) => {
+    const value = fixture('low-moderate.json') as Record<string, unknown>;
+    const advisories = value.advisories as Array<Record<string, unknown>>;
+    const advisory = advisories[0];
+    if (advisory === undefined) throw new Error('fixture advisory is required');
+    const result = evaluateValue({
+      ...value,
+      advisories: [{ ...advisory, severity }],
+      waivers: [],
+    });
+    expect(result).toMatchObject({ status: 'fail' });
+    expect(result.findings?.map((finding) => finding.code)).toEqual([code]);
   });
 });
