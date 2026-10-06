@@ -10,9 +10,12 @@ import {
   runtimeApi,
 } from '../../../authority/tests/unit/authority-runtime-testkit.js';
 import {
+  AGENT_CLI_WORKTREE_PLACEHOLDER,
   AgentCliError,
   agentCliEnvironment,
   agentCliInvocation,
+  agentCliSandbox,
+  agentCliSandboxArgv,
   parseAgentCliOutput,
   runAgentCliAttempt,
   type AgentCliAttemptOptions,
@@ -96,9 +99,17 @@ async function attempt(
 }
 
 describe('agent CLI invocation', () => {
+  const WT = '/repo/.devai/worktrees/WT-TASK-0001-A1';
+
   it('builds exact, session-less argv that never carries the prompt', () => {
     expect(
-      agentCliInvocation({ runtime: 'claude-cli', model: 'claude-opus-5-5', effort: 'high' }),
+      agentCliInvocation({
+        runtime: 'claude-cli',
+        model: 'claude-opus-5-5',
+        effort: 'high',
+        worktree: WT,
+        platform: 'darwin',
+      }),
     ).toEqual({
       runtime: 'claude-cli',
       command: 'claude',
@@ -113,35 +124,109 @@ describe('agent CLI invocation', () => {
         '--strict-mcp-config',
         '--mcp-config',
         '{"mcpServers":{}}',
+        '--restricted',
+        '--tools',
+        'Bash,Read,Edit,Write,Glob,Grep',
+        '--settings',
+        '{"sandbox":{"enabled":true,"failIfUnavailable":true,"allowUnsandboxedCommands":false}}',
         '--permission-mode',
         'acceptEdits',
+        '--permission-prompts',
+        'none',
         '--model',
         'claude-opus-5-5',
         '--effort',
         'high',
       ],
-      requested_containment: expect.stringContaining('acceptEdits'),
+      sandbox: {
+        mode: 'claude-restricted-sandbox',
+        enforced_by: 'provider',
+        write_root: 'attempt-worktree',
+        flags: expect.arrayContaining(['--restricted']) as unknown,
+      },
     });
     expect(
-      agentCliInvocation({ runtime: 'claude-cli', model: 'm', effort: 'default' }).args,
+      agentCliInvocation({ runtime: 'claude-cli', model: 'm', effort: 'default', worktree: WT })
+        .args,
     ).not.toContain('--effort');
-    const codex = agentCliInvocation({ runtime: 'codex-cli', model: 'gpt-x', effort: 'high' });
+    expect(() =>
+      agentCliInvocation({
+        runtime: 'other' as AgentCliRuntime,
+        model: 'm',
+        effort: 'e',
+        worktree: WT,
+      }),
+    ).toThrow('AGENT_CLI_RUNTIME_UNSUPPORTED');
+    expect(() =>
+      agentCliInvocation({ runtime: 'codex-cli', model: 'm', effort: 'e', worktree: '' }),
+    ).toThrow('AGENT_CLI_SELECTION_INVALID');
+  });
+
+  it('roots the codex workspace-write sandbox at the attempt worktree', () => {
+    const codex = agentCliInvocation({
+      runtime: 'codex-cli',
+      model: 'gpt-x',
+      effort: 'high',
+      worktree: WT,
+      platform: 'linux',
+    });
     expect(codex.command).toBe('codex');
-    expect(codex.args).toEqual(
-      expect.arrayContaining([
-        'exec',
-        '--json',
-        '--ephemeral',
-        '--ignore-user-config',
+    expect(codex.args).toEqual([
+      'exec',
+      '--json',
+      '--ephemeral',
+      '--ignore-user-config',
+      '--sandbox',
+      'workspace-write',
+      '--cd',
+      WT,
+      '--ignore-rules',
+      '--config',
+      'sandbox_workspace_write.writable_roots=[]',
+      '--config',
+      'sandbox_workspace_write.network_access=false',
+      '--model',
+      'gpt-x',
+      '--config',
+      'model_reasoning_effort="high"',
+      '-',
+    ]);
+    expect(codex.args).not.toContain('--add-dir');
+    expect(codex.args).not.toContain('--dangerously-bypass-approvals-and-sandbox');
+    expect(codex.sandbox).toEqual({
+      mode: 'codex-workspace-write',
+      enforced_by: 'provider',
+      write_root: 'attempt-worktree',
+      flags: [
         '--sandbox',
         'workspace-write',
-        '-',
-      ]),
+        '--cd',
+        AGENT_CLI_WORKTREE_PLACEHOLDER,
+        '--ignore-rules',
+        '--config',
+        'sandbox_workspace_write.writable_roots=[]',
+        '--config',
+        'sandbox_workspace_write.network_access=false',
+      ],
+    });
+    // The recorded flags, with the worktree substituted, are exactly what the argv carries.
+    const flags = agentCliSandboxArgv(codex.sandbox, WT);
+    const start = codex.args.indexOf('--sandbox');
+    expect(codex.args.slice(start, start + flags.length)).toEqual(flags);
+  });
+
+  it('refuses a runtime whose provider sandbox cannot confine this platform', () => {
+    for (const runtime of ['claude-cli', 'codex-cli'] as const) {
+      expect(agentCliSandbox(runtime, 'darwin').write_root).toBe('attempt-worktree');
+      expect(agentCliSandbox(runtime, 'linux').enforced_by).toBe('provider');
+      expect(() => agentCliSandbox(runtime, 'win32')).toThrow('AGENT_CLI_SANDBOX_UNAVAILABLE');
+      expect(() =>
+        agentCliInvocation({ runtime, model: 'm', effort: 'e', worktree: WT, platform: 'win32' }),
+      ).toThrow(AgentCliError);
+    }
+    expect(() => agentCliSandbox('other' as AgentCliRuntime, 'darwin')).toThrow(
+      'AGENT_CLI_SANDBOX_UNAVAILABLE',
     );
-    expect(codex.args).toContain('model_reasoning_effort="high"');
-    expect(() =>
-      agentCliInvocation({ runtime: 'other' as AgentCliRuntime, model: 'm', effort: 'e' }),
-    ).toThrow('AGENT_CLI_RUNTIME_UNSUPPORTED');
   });
 });
 
