@@ -208,7 +208,7 @@ function fixture(options: FixtureOptions = {}): HostFixture {
   const hookPath = put(root, '.git/hooks/post-merge', '#!/bin/sh\nexit 0\n');
   const key = Buffer.from('post-merge-observation-key-32b!');
   put(root, '.git/devai/post-merge.key', key);
-  const attestationPath = join(root, '.devai/config/post-merge-host-adapter.json');
+  const attestationPath = join(root, '.git/devai/post-merge-host-adapter.json');
   const receiptPath = join(root, '.git/devai/post-merge-receipt.json');
   const constitutionDigest =
     constitutionPath !== null
@@ -235,7 +235,7 @@ function fixture(options: FixtureOptions = {}): HostFixture {
     },
     key,
   );
-  put(root, '.devai/config/post-merge-host-adapter.json', `${JSON.stringify(attestation)}\n`);
+  put(root, '.git/devai/post-merge-host-adapter.json', `${JSON.stringify(attestation)}\n`);
   const receipt = signed(
     {
       schemaVersion: '1.0.0',
