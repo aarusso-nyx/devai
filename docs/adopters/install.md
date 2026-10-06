@@ -407,12 +407,12 @@ GitHub Actions configuration or this checkout's post-merge attestation binds an 
 `doctor` warns `GITHUB_ACTIONS_ADAPTER_VERSION_LAG` or `POST_MERGE_ADAPTER_VERSION_LAG` and names
 the command.
 
-Releases before 2.0.1 committed the checkout-bound attestation itself as
+Releases before 2.1.0 committed the checkout-bound attestation itself as
 `.devai/config/post-merge-host-adapter.json`. `doctor` reports such a file as
 `POST_MERGE_ADAPTER_DECLARATION_LEGACY`, a failure while the post-merge adapter is selected, and
 `devai init upgrade --target . --as-role architect --write` converts it
-(`MIG-2.0.1-post-merge-local-state`; the plan and the upgrade receipt list it as soon as the
-installed package applies it, even before 2.0.1 is released). Run in the checkout that holds the binding's key, the
+(`MIG-2.1.0-post-merge-local-state`; the plan and the upgrade receipt list it). Run in the
+checkout that holds the binding's key, the
 upgrade moves the attestation into that checkout's git directory, keeping its `installed_at_head`
 baseline while it still verifies; in any other checkout it only rewrites the tracked file as the
 declaration and binds nothing. Commit the declaration.
