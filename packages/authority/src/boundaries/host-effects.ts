@@ -243,7 +243,35 @@ export function openReadOnlyNoFollowSync(path: string, directory = false): numbe
   );
 }
 
-/** Closes a descriptor created by openReadOnlyNoFollowSync. */
+/**
+ * Opens an existing regular file read-only without following a final link and without
+ * blocking: O_NONBLOCK keeps an open of a FIFO (or another special file swapped in after an
+ * lstat) from waiting for a writer, and an entry whose fstat is not a regular file is closed
+ * and refused with code `ENOTREGULAR` before any read (#313). O_NONBLOCK does not change reads
+ * of a regular file.
+ */
+export function openRegularFileReadOnlySync(path: string): number {
+  const descriptor = nodeOpenSync(
+    path,
+    nodeFileConstants.O_RDONLY |
+      (nodeFileConstants.O_NOFOLLOW ?? 0) |
+      (nodeFileConstants.O_NONBLOCK ?? 0),
+  );
+  let regular = false;
+  try {
+    regular = fstatSync(descriptor).isFile();
+  } finally {
+    if (!regular) nodeCloseSync(descriptor);
+  }
+  if (!regular) {
+    throw Object.assign(new Error(`AUTHORITY_READ_NOT_REGULAR_FILE: ${path}`), {
+      code: 'ENOTREGULAR',
+    });
+  }
+  return descriptor;
+}
+
+/** Closes a descriptor created by openReadOnlyNoFollowSync or openRegularFileReadOnlySync. */
 export function closeReadOnlySync(descriptor: number): void {
   nodeCloseSync(descriptor);
 }
