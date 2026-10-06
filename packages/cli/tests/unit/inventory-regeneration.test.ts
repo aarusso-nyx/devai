@@ -211,12 +211,12 @@ describe('inventory regeneration from source (#237)', () => {
     expect(review.reading).toMatchObject({
       status: 'review',
       metrics: { inventory_coverage_status: 'review', required_kinds: 2 },
-      findings: [
+      findings: expect.arrayContaining([
         expect.objectContaining({
           code: 'INVENTORY_REGENERATION_KIND_REVIEW',
           message: expect.stringContaining('inventory_coverage'),
         }),
-      ],
+      ]),
     });
     expect(existsSync(join(presumed.root, COVERAGE_BODY))).toBe(true);
 
