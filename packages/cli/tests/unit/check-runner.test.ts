@@ -607,7 +607,14 @@ describe('content-addressed check runner', () => {
   });
 
   it('selects authority after a committed utils change in a detached repository fixture', () => {
-    const fixture = createSelfContainedRepositoryFixture(REPOSITORY_ROOT);
+    // The selection is a function of the real descriptor and the changed path, so the fixture
+    // carries the real descriptor, the changed utils source, and the authority entry point.
+    // Copying the whole repository (thousands of files under one `git add`) cost six seconds
+    // alone and timed out under parallel load without exercising more selection logic: the
+    // plan still selects test:authority because its utils selector matched the changed path.
+    const fixture = createSelfContainedRepositoryFixture(REPOSITORY_ROOT, {
+      paths: ['packages/authority/src/index.ts', 'packages/utils/src/index.ts', 'test-tasks.json'],
+    });
     sourceFixtures.push(fixture);
     const clone = fixture.root;
     const base = fixture.commit;
@@ -640,7 +647,7 @@ describe('content-addressed check runner', () => {
     );
     expect(affected.changedPaths).toContain('packages/utils/src/index.ts');
     expect(affected.tasks.map((task) => task.nodeId)).toContain('test:authority');
-  }, 15_000);
+  });
 
   it('accounts for both sides of renames and for deleted paths', () => {
     const renamed = repository();
