@@ -31,6 +31,18 @@ export interface RoundTaskAdmissionDecision {
   readonly blockers: readonly string[];
 }
 
+/*
+ * Mirror of `law/policy/round-execution.json` capacity.review_reserve (ADR-MDL-0009); a
+ * contract test pins it. While a same-generation review task awaits admission, non-review
+ * tasks may hold at most the run's workers minus the reserve, so implementation work
+ * cannot starve review. Review tasks may use every worker, and a run with no more workers
+ * than the reserve (the serial runner) is unreserved.
+ */
+export const ROUND_REVIEW_RESERVE = Object.freeze({
+  disciplines: Object.freeze(['inspector', 'auditor'] as const),
+  reserved_workers: 1,
+});
+
 const TERMINAL = new Set<TaskRecord['status']>(['completed', 'escalated', 'cancelled']);
 const FAILED = new Set<TaskRecord['status']>([
   'escalated',
@@ -91,6 +103,11 @@ function executionContextDigest(task: TaskRecord): string {
 
 function resources(task: TaskRecord): readonly string[] {
   return taskLockTargets(task);
+}
+
+/** Whether a task's discipline is one the review reserve serves. */
+export function isReviewDiscipline(task: Pick<TaskRecord, 'discipline'>): boolean {
+  return (ROUND_REVIEW_RESERVE.disciplines as readonly string[]).includes(task.discipline);
 }
 
 /**
@@ -222,6 +239,30 @@ export function planRoundTaskAdmission(
   return plan;
 }
 
+/**
+ * Whether a review-discipline task of the candidate's generation could be admitted but for
+ * capacity: planned, live `ready`, not active, not failed, and with every dependency
+ * completed. Only such a task holds the reserve, so a review task that can never run in
+ * this generation never idles a worker.
+ */
+function reviewAwaitsAdmission(
+  plan: RoundTaskAdmissionPlan,
+  candidate: RoundTaskAdmissionNode,
+  byId: ReadonlyMap<string, TaskRecord>,
+  active: ReadonlySet<string>,
+  failed: ReadonlySet<string>,
+): boolean {
+  return plan.tasks.some((node) => {
+    if (node.id === candidate.id || node.generation !== candidate.generation) return false;
+    if (!plan.orderedTaskIds.includes(node.id) || active.has(node.id) || failed.has(node.id)) {
+      return false;
+    }
+    const task = byId.get(node.id);
+    if (task === undefined || task.status !== 'ready' || !isReviewDiscipline(task)) return false;
+    return node.dependsOn.every((id) => byId.get(id)?.status === 'completed');
+  });
+}
+
 /** A plan and callback success never substitute for live, durably completed prerequisites. */
 export function decideRoundTaskAdmission(
   plan: RoundTaskAdmissionPlan,
@@ -273,6 +314,16 @@ export function decideRoundTaskAdmission(
     active.some((id) => plan.tasks.find((bound) => bound.id === id)?.generation !== node.generation)
   )
     blockers.push('TASK_GENERATION_BARRIER');
-  if (active.length >= (options.maxWorkers ?? 1)) blockers.push('TASK_WORKER_CAP');
+  const workers = options.maxWorkers ?? 1;
+  if (active.length >= workers) blockers.push('TASK_WORKER_CAP');
+  else if (
+    !isReviewDiscipline(live) &&
+    workers > ROUND_REVIEW_RESERVE.reserved_workers &&
+    activeRecords.filter((task) => !isReviewDiscipline(task)).length >=
+      workers - ROUND_REVIEW_RESERVE.reserved_workers &&
+    reviewAwaitsAdmission(plan, node, byId, new Set(active), failed)
+  )
+    // The review reserve narrows the worker cap for non-review tasks (ADR-MDL-0009).
+    blockers.push('TASK_WORKER_CAP');
   return { admitted: blockers.length === 0, blockers };
 }
