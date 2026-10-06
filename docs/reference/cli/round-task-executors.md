@@ -133,7 +133,10 @@ the task is escalated but its locks are kept. The runner first writes
 `.devai/state/lock-quarantine/<task id>.json` durably, naming the process group leader's pid, the
 evidence id and the held keys. While that record stands, nothing releases the task's locks, not
 the escalation and not a later run's reconciliation. They lapse by their TTL. Removing the
-record, once the group is known to be gone, is the explicit human release.
+record, once the group is known to be gone, is the explicit human release. If the record itself
+cannot be written, the attempt fails with `TASK_LOCK_QUARANTINE_UNPERSISTED` and the runner does
+not escalate the task. It stays `in_progress`, holding its locks until their TTL lapses, for
+explicit human disposition.
 
 One `round run` controls a round at a time. A second run of the same round refuses with
 `TASK_ROUND_CONTROLLER_BUSY` while the controller in `.devai/state/round-runs/<round>/controller.json`
