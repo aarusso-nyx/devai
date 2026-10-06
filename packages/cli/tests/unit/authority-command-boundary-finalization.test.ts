@@ -56,13 +56,14 @@ async function governedCommand(
       },
     };
   });
-  const [
-    { attachAuthorityCommandBoundaries, authorizeCliArgv, disposeCliInvocationAuthority },
-    { canonicalRegistry },
-  ] = await Promise.all([
-    import('../../src/authority/index.js'),
-    import('../../src/define-command.js'),
-  ]);
+  // Import one module at a time. Each dynamic import flushes Vitest's pending mock queue
+  // (here the previous test's doUnmock, then this doMock), and the queue is cleared only after
+  // every entry resolves. Two concurrent imports flush the same queue twice, so under load one
+  // import's replayed unmock could land after the other's mock and load the real broker, which
+  // refuses with AUTHORITY_POLICY_MISSING or records no commit/dispose events.
+  const { attachAuthorityCommandBoundaries, authorizeCliArgv, disposeCliInvocationAuthority } =
+    await import('../../src/authority/index.js');
+  const { canonicalRegistry } = await import('../../src/define-command.js');
   const actionName = options.dryRun === true ? 'sense run' : 'round plan';
   const canonical = canonicalRegistry();
   const selected = canonical.find((candidate) => candidate.name === actionName);
