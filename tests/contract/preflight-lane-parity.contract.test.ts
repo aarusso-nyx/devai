@@ -13,7 +13,7 @@
 // and step-aggregator run steps and no direct check invocation; the check
 // command rejects `--preflight` as an unknown option; and test-tasks.json
 // declares no `preflight-v1` node.
-import { spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -50,41 +50,80 @@ type LaneStep = Readonly<{
 }>;
 
 /**
- * A Vitest timeout cannot interrupt a synchronous child: a hung `spawnSync` blocks the
- * worker's event loop, so the case bound would never fire. Every child here therefore
- * carries its own enforced timeout under the bound of the case or hook that runs it, is
- * killed with SIGKILL when it passes, and fails the case naming the command and the limit.
+ * One enforced deadline per case or hook (#324). Every child of that case or hook gets only
+ * the time remaining, so the children together never outrun the Vitest bound around them.
+ * Each child leads its own process group; when the deadline passes the whole group gets
+ * SIGKILL and is reaped before the case fails, so a nested `tsc` under `pnpm` cannot keep
+ * writing `.devai/state/pr-bootstrap` after the test gave up. Only that deadline counts as
+ * a timeout: a child killed by any other signal reports its own exit unchanged.
  */
-const GIT_TIMEOUT_MS = 30_000;
-/** Three plans fit a 120 s case bound; one measures 3 to 5 s, even at load average 200. */
-const PLAN_TIMEOUT_MS = 35_000;
-/** The release bootstrap fits inside the 300 s hook bound of beforeAll. */
-const BOOTSTRAP_TIMEOUT_MS = 280_000;
-
-function refuseTimedOut(
-  result: ReturnType<typeof spawnSync>,
-  command: string,
-  timeoutMs: number,
-): void {
-  const code = (result.error as NodeJS.ErrnoException | undefined)?.code;
-  if (code === 'ETIMEDOUT' || result.signal === 'SIGKILL') {
-    throw new Error(
-      `${command} exceeded its enforced ${String(timeoutMs)} ms timeout and was killed (${code ?? String(result.signal)})`,
-    );
-  }
-  if (result.error !== undefined) throw result.error;
+interface Deadline {
+  readonly totalMs: number;
+  remaining(): number;
 }
 
-function git(args: readonly string[]): string {
-  const result = spawnSync('git', [...args], {
-    cwd: ROOT,
-    encoding: 'utf8',
-    timeout: GIT_TIMEOUT_MS,
-    killSignal: 'SIGKILL',
+function deadline(totalMs: number): Deadline {
+  const end = performance.now() + totalMs;
+  return { totalMs, remaining: () => Math.max(0, Math.floor(end - performance.now())) };
+}
+
+interface ChildResult {
+  readonly status: number | null;
+  readonly signal: NodeJS.Signals | null;
+  readonly stdout: string;
+  readonly stderr: string;
+}
+
+function runBounded(
+  command: string,
+  args: readonly string[],
+  options: Readonly<{ env?: NodeJS.ProcessEnv }>,
+  limit: Deadline,
+): Promise<ChildResult> {
+  const label = [command, ...args].join(' ');
+  const exceeded = () =>
+    new Error(
+      `${label} exceeded the enforced ${String(limit.totalMs)} ms deadline of its case; its process group was killed`,
+    );
+  const remaining = limit.remaining();
+  if (remaining === 0) return Promise.reject(exceeded());
+  return new Promise((resolvePromise, rejectPromise) => {
+    const child = spawn(command, [...args], {
+      cwd: ROOT,
+      env: options.env ?? process.env,
+      detached: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    let timedOut = false;
+    child.stdout.setEncoding('utf8').on('data', (chunk: string) => (stdout += chunk));
+    child.stderr.setEncoding('utf8').on('data', (chunk: string) => (stderr += chunk));
+    const timer = setTimeout(() => {
+      timedOut = true;
+      try {
+        if (child.pid !== undefined) process.kill(-child.pid, 'SIGKILL');
+      } catch {
+        // The group is already gone.
+      }
+    }, remaining);
+    child.on('error', (error) => {
+      clearTimeout(timer);
+      rejectPromise(error);
+    });
+    // `close` fires once every member holding the group's pipes has exited: the reap.
+    child.on('close', (status, signal) => {
+      clearTimeout(timer);
+      if (timedOut) rejectPromise(exceeded());
+      else resolvePromise({ status, signal, stdout, stderr });
+    });
   });
-  refuseTimedOut(result, `git ${args.join(' ')}`, GIT_TIMEOUT_MS);
-  if (result.status !== 0) throw new Error(`git ${args.join(' ')}: ${String(result.stderr)}`);
-  return String(result.stdout).trim();
+}
+
+async function git(args: readonly string[], limit: Deadline): Promise<string> {
+  const result = await runBounded('git', args, {}, limit);
+  if (result.status !== 0) throw new Error(`git ${args.join(' ')}: ${result.stderr}`);
+  return result.stdout.trim();
 }
 
 function laneRunSteps(): readonly LaneStep[] {
@@ -177,26 +216,29 @@ function laneCheckArguments(step: LaneStep, base: string): readonly string[] {
 type PlannedNode = Readonly<{ nodeId: string; dependencies: readonly string[] }>;
 
 /** Runs the bootstrap CLI and returns the canonical bytes of its planned node set. */
-function plannedNodeSet(args: readonly string[], base: string): string {
-  const result = spawnSync(process.execPath, [BOOTSTRAP_CLI, ...args, '--format', 'json'], {
-    cwd: ROOT,
-    encoding: 'utf8',
-    maxBuffer: 64 * 1024 * 1024,
-    env: { PATH: process.env.PATH ?? '', HOME: process.env.HOME ?? '', DEVAI_FORMAT_BASE: base },
-    timeout: PLAN_TIMEOUT_MS,
-    killSignal: 'SIGKILL',
-  });
-  refuseTimedOut(result, `bootstrap CLI ${args.join(' ')}`, PLAN_TIMEOUT_MS);
+async function plannedNodeSet(
+  args: readonly string[],
+  base: string,
+  limit: Deadline,
+): Promise<string> {
+  const result = await runBounded(
+    process.execPath,
+    [BOOTSTRAP_CLI, ...args, '--format', 'json'],
+    {
+      env: { PATH: process.env.PATH ?? '', HOME: process.env.HOME ?? '', DEVAI_FORMAT_BASE: base },
+    },
+    limit,
+  );
   let output: { result?: { value?: { plan?: { tasks?: readonly PlannedNode[] } } } } | undefined;
   try {
-    output = JSON.parse(String(result.stdout)) as typeof output;
+    output = JSON.parse(result.stdout) as typeof output;
   } catch {
     output = undefined;
   }
   const tasks = output?.result?.value?.plan?.tasks;
   if (tasks === undefined) {
     throw new Error(
-      `${args.join(' ')} planned nothing (exit ${String(result.status)}): ${String(result.stdout)}${String(result.stderr)}`,
+      `${args.join(' ')} planned nothing (exit ${String(result.status)}, signal ${String(result.signal)}): ${result.stdout}${result.stderr}`,
     );
   }
   return JSON.stringify(
@@ -213,24 +255,23 @@ function preflightNodeIds(): readonly string[] {
     .map((task) => task.nodeId);
 }
 
+/** The hook bound, and inside it the one deadline its bootstrap and `git` children share. */
+const SETUP_HOOK_TIMEOUT_MS = 300_000;
+const SETUP_DEADLINE_MS = 290_000;
+
 let base = '';
 
-beforeAll(() => {
+beforeAll(async () => {
+  const limit = deadline(SETUP_DEADLINE_MS);
   // The lane compiles the bootstrap CLI before any check; do the same when it is absent.
   if (!existsSync(BOOTSTRAP_CLI)) {
-    const bootstrap = spawnSync('pnpm', ['run', 'release:bootstrap'], {
-      cwd: ROOT,
-      encoding: 'utf8',
-      timeout: BOOTSTRAP_TIMEOUT_MS,
-      killSignal: 'SIGKILL',
-    });
-    refuseTimedOut(bootstrap, 'pnpm run release:bootstrap', BOOTSTRAP_TIMEOUT_MS);
+    const bootstrap = await runBounded('pnpm', ['run', 'release:bootstrap'], {}, limit);
     if (bootstrap.status !== 0) {
       throw new Error(`pnpm run release:bootstrap failed: ${bootstrap.stdout}${bootstrap.stderr}`);
     }
   }
-  base = git(['rev-parse', 'HEAD~1^{commit}']);
-}, 300_000);
+  base = await git(['rev-parse', 'HEAD~1^{commit}'], limit);
+}, SETUP_HOOK_TIMEOUT_MS);
 
 describe('preflight lane parity (ADR-CHK-0001 IA-003)', () => {
   it('reduces the pull-request lane to install, preflight check, affected check', () => {
@@ -255,17 +296,20 @@ describe('preflight lane parity (ADR-CHK-0001 IA-003)', () => {
   // Each plan is a bootstrap CLI process that fingerprints the live working tree: 3 to 4 s
   // alone, so a case of two or three plans costs 7 to 11 s alone and 10 s at load average
   // 200 (#246). The RC coverage lane's 15 s default and the local 30 s default both fell
-  // under that once parallel workers shared the machine, so each case carries its own bound.
+  // under that once parallel workers shared the machine, so each case carries its own bound,
+  // and its plans share one deadline inside it (#324).
   // The file also runs in the `local-serial` lane: consecutive plans are byte-identical only
   // while no sibling test writes into the same working tree between them.
   const PLAN_CASE_TIMEOUT_MS = 120_000;
+  const PLAN_CASE_DEADLINE_MS = 110_000;
 
   it.each(['--preflight', '--affected'] as const)(
     'plans a byte-identical node set for the local %s invocation on consecutive runs',
-    (target) => {
+    async (target) => {
+      const limit = deadline(PLAN_CASE_DEADLINE_MS);
       const args = ['check', target, '--task-plan', '--base', base];
-      const first = plannedNodeSet(args, base);
-      const second = plannedNodeSet(args, base);
+      const first = await plannedNodeSet(args, base, limit);
+      const second = await plannedNodeSet(args, base, limit);
       expect(second, `consecutive local ${target} plans`).toBe(first);
       const planned = (JSON.parse(first) as PlannedNode[]).map((task) => task.nodeId);
       for (const nodeId of preflightNodeIds()) {
@@ -280,14 +324,21 @@ describe('preflight lane parity (ADR-CHK-0001 IA-003)', () => {
     ['check:affected', '--affected'],
   ] as const)(
     'plans the lane %s invocation exactly as the local invocation',
-    (kind, target) => {
+    async (kind, target) => {
+      const limit = deadline(PLAN_CASE_DEADLINE_MS);
       const step = laneRunSteps().find((candidate) => candidate.kind === kind);
       expect(step, `the lane carries a ${kind} step`).toBeDefined();
       if (step === undefined) return;
       const laneArgs = laneCheckArguments(step, base);
-      const lane = plannedNodeSet(laneArgs, base);
-      expect(plannedNodeSet(laneArgs, base), `consecutive lane ${kind} plans`).toBe(lane);
-      const local = plannedNodeSet(['check', target, '--task-plan', '--base', base], base);
+      const lane = await plannedNodeSet(laneArgs, base, limit);
+      expect(await plannedNodeSet(laneArgs, base, limit), `consecutive lane ${kind} plans`).toBe(
+        lane,
+      );
+      const local = await plannedNodeSet(
+        ['check', target, '--task-plan', '--base', base],
+        base,
+        limit,
+      );
       expect(lane, `lane ${kind} and local ${target} planned node sets`).toBe(local);
     },
     PLAN_CASE_TIMEOUT_MS,

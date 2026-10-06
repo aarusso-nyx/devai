@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import {
   cpSync,
   existsSync,
@@ -60,95 +60,133 @@ function manifestEnvironment(input: {
 afterAll(() => rmSync(output, { recursive: true, force: true }));
 
 /**
- * A Vitest timeout cannot interrupt a synchronous child: a hung `execFileSync` blocks the
- * worker's event loop, so the case bound would never fire. The children of the bounded cases
- * carry an enforced timeout under that bound, are killed with SIGKILL when it passes, and fail
- * naming the command and the limit; every other failure propagates unchanged.
+ * One enforced deadline per bounded case (#324). Every child of the case gets only the time
+ * remaining, so the children together never outrun the Vitest bound around them. Each child
+ * leads its own process group; when the deadline passes the whole group (the staging script
+ * and its `pnpm pack` children) gets SIGKILL and is reaped before the case fails. Only that
+ * deadline counts as a timeout: a non-zero exit, or a kill by any other signal, fails with the
+ * child's own exit and stderr, as `execFileSync` did.
  */
-const STAGE_TIMEOUT_MS = 150_000;
-const CHILD_TIMEOUT_MS = 30_000;
-
-function boundedExecFileSync(
-  file: string,
-  args: readonly string[],
-  options: Readonly<{ cwd?: string; stdio?: 'pipe' }>,
-  timeoutMs: number,
-): string {
-  try {
-    return execFileSync(file, [...args], {
-      ...options,
-      encoding: 'utf8',
-      timeout: timeoutMs,
-      killSignal: 'SIGKILL',
-    });
-  } catch (error) {
-    const failure = error as NodeJS.ErrnoException & { signal?: string | null };
-    if (failure.code === 'ETIMEDOUT' || failure.signal === 'SIGKILL') {
-      throw new Error(
-        `${[file, ...args].join(' ')} exceeded its enforced ${String(timeoutMs)} ms timeout and was killed`,
-      );
-    }
-    throw error;
-  }
+interface Deadline {
+  readonly totalMs: number;
+  remaining(): number;
 }
 
+function deadline(totalMs: number): Deadline {
+  const end = performance.now() + totalMs;
+  return { totalMs, remaining: () => Math.max(0, Math.floor(end - performance.now())) };
+}
+
+function execBounded(
+  file: string,
+  args: readonly string[],
+  cwd: string,
+  limit: Deadline,
+): Promise<string> {
+  const label = [file, ...args].join(' ');
+  const exceeded = () =>
+    new Error(
+      `${label} exceeded the enforced ${String(limit.totalMs)} ms deadline of its case; its process group was killed`,
+    );
+  const remaining = limit.remaining();
+  if (remaining === 0) return Promise.reject(exceeded());
+  return new Promise((resolvePromise, rejectPromise) => {
+    const child = spawn(file, [...args], {
+      cwd,
+      detached: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    let timedOut = false;
+    child.stdout.setEncoding('utf8').on('data', (chunk: string) => (stdout += chunk));
+    child.stderr.setEncoding('utf8').on('data', (chunk: string) => (stderr += chunk));
+    const timer = setTimeout(() => {
+      timedOut = true;
+      try {
+        if (child.pid !== undefined) process.kill(-child.pid, 'SIGKILL');
+      } catch {
+        // The group is already gone.
+      }
+    }, remaining);
+    child.on('error', (error) => {
+      clearTimeout(timer);
+      rejectPromise(error);
+    });
+    // `close` fires once every member holding the group's pipes has exited: the reap.
+    child.on('close', (status, signal) => {
+      clearTimeout(timer);
+      if (timedOut) rejectPromise(exceeded());
+      else if (status === 0) resolvePromise(stdout);
+      else
+        rejectPromise(
+          new Error(
+            `Command failed: ${label} (exit ${String(status)}, signal ${String(signal)})\n${stderr}`,
+          ),
+        );
+    });
+  });
+}
+
+/** Each bounded case, and inside it the one deadline all its children share. */
+const STAGE_CASE_TIMEOUT_MS = 180_000;
+const STAGE_CASE_DEADLINE_MS = 170_000;
+const ARCHIVE_CASE_TIMEOUT_MS = 120_000;
+const ARCHIVE_CASE_DEADLINE_MS = 110_000;
+
 describe('normalized release package staging', () => {
-  it('requires two byte-identical packs and excludes private workspace packages', () => {
-    const staged = JSON.parse(
-      boundedExecFileSync(
-        process.execPath,
-        [join(root, 'scripts/stage-release-package.mjs'), '--output', output],
-        { cwd: root },
-        STAGE_TIMEOUT_MS,
-      ),
-    ) as {
-      tarball: string;
-      sha256: string;
-      sbom: string;
-      sbom_subject_sha256: string;
-      reproductions: number;
-      version: string;
-    };
-    expect(staged.reproductions).toBe(2);
-    expect(staged.version).toBe(SELECTED_RELEASE_VERSION);
-    expect(staged.sha256).toMatch(/^[0-9a-f]{64}$/u);
-    expect(staged.sbom_subject_sha256).toBe(staged.sha256);
-    const sbom = JSON.parse(readFileSync(staged.sbom, 'utf8')) as {
-      metadata: { component: { hashes: Array<{ alg: string; content: string }> } };
-    };
-    expect(staged.sbom).toMatch(
-      new RegExp(`devai-${SELECTED_RELEASE_VERSION.replaceAll('.', '\\.')}\\.cdx\\.json$`, 'u'),
-    );
-    expect(sbom.metadata.component.hashes).toContainEqual({
-      alg: 'SHA-256',
-      content: staged.sha256,
-    });
-    expect(JSON.stringify(sbom)).not.toContain('@devai-nyx/');
-    const manifest = JSON.parse(
-      boundedExecFileSync(
-        'tar',
-        ['-xOf', staged.tarball, 'package/package.json'],
-        {},
-        CHILD_TIMEOUT_MS,
-      ),
-    ) as Record<string, unknown>;
-    expect(manifest).toMatchObject({
-      name: '@aarusso-nyx/devai',
-      version: SELECTED_RELEASE_VERSION,
-    });
-    expect(manifest).not.toHaveProperty('devDependencies');
-    expect(JSON.stringify(manifest)).not.toMatch(/workspace:|@devai-nyx\//u);
-    const packagePopulation = boundedExecFileSync(
-      'tar',
-      ['-tzf', staged.tarball],
-      {},
-      CHILD_TIMEOUT_MS,
-    );
-    expect(packagePopulation).toContain('package/dist/runtime/evidence-verification/src/cli.js');
-    expect(packagePopulation).not.toContain('package/dist/runtime/evidence-verification/test/');
-    // Two full `pnpm pack` reproductions: 13 to 18 s alone on a loaded workstation. The
-    // bound is the hang guard for that cost under load and in the RC coverage lane (#246).
-  }, 180_000);
+  it(
+    'requires two byte-identical packs and excludes private workspace packages',
+    async () => {
+      const limit = deadline(STAGE_CASE_DEADLINE_MS);
+      const staged = JSON.parse(
+        await execBounded(
+          process.execPath,
+          [join(root, 'scripts/stage-release-package.mjs'), '--output', output],
+          root,
+          limit,
+        ),
+      ) as {
+        tarball: string;
+        sha256: string;
+        sbom: string;
+        sbom_subject_sha256: string;
+        reproductions: number;
+        version: string;
+      };
+      expect(staged.reproductions).toBe(2);
+      expect(staged.version).toBe(SELECTED_RELEASE_VERSION);
+      expect(staged.sha256).toMatch(/^[0-9a-f]{64}$/u);
+      expect(staged.sbom_subject_sha256).toBe(staged.sha256);
+      const sbom = JSON.parse(readFileSync(staged.sbom, 'utf8')) as {
+        metadata: { component: { hashes: Array<{ alg: string; content: string }> } };
+      };
+      expect(staged.sbom).toMatch(
+        new RegExp(`devai-${SELECTED_RELEASE_VERSION.replaceAll('.', '\\.')}\\.cdx\\.json$`, 'u'),
+      );
+      expect(sbom.metadata.component.hashes).toContainEqual({
+        alg: 'SHA-256',
+        content: staged.sha256,
+      });
+      expect(JSON.stringify(sbom)).not.toContain('@devai-nyx/');
+      const manifest = JSON.parse(
+        await execBounded('tar', ['-xOf', staged.tarball, 'package/package.json'], root, limit),
+      ) as Record<string, unknown>;
+      expect(manifest).toMatchObject({
+        name: '@aarusso-nyx/devai',
+        version: SELECTED_RELEASE_VERSION,
+      });
+      expect(manifest).not.toHaveProperty('devDependencies');
+      expect(JSON.stringify(manifest)).not.toMatch(/workspace:|@devai-nyx\//u);
+      const packagePopulation = await execBounded('tar', ['-tzf', staged.tarball], root, limit);
+      expect(packagePopulation).toContain('package/dist/runtime/evidence-verification/src/cli.js');
+      expect(packagePopulation).not.toContain('package/dist/runtime/evidence-verification/test/');
+      // Two full `pnpm pack` reproductions: 13 to 18 s alone on a loaded workstation. The
+      // bound is the hang guard for that cost under load and in the RC coverage lane (#246);
+      // the staging run and both `tar` reads share one deadline inside it (#324).
+    },
+    STAGE_CASE_TIMEOUT_MS,
+  );
 
   it('keeps the published landing page bound to the package version', () => {
     const packageVersion = (
@@ -227,43 +265,55 @@ describe('normalized release package staging', () => {
     expect(existsSync(manifest)).toBe(false);
   });
 
-  it('checks the real source archive without Git metadata and catches added stale documentation', () => {
-    const archive = join(output, 'source archive ç');
-    cpSync(root, archive, {
-      recursive: true,
-      filter: (path) => {
-        const name = relative(root, path);
-        return !name
-          .split('/')
-          .some((part) => ['.git', 'node_modules', 'scratch', 'worktrees'].includes(part));
-      },
-    });
-    symlinkSync(join(root, 'node_modules'), join(archive, 'node_modules'), 'dir');
-    for (const name of readdirSync(join(root, 'packages'))) {
-      const dependencies = join(root, 'packages', name, 'node_modules');
-      if (existsSync(dependencies))
-        symlinkSync(dependencies, join(archive, 'packages', name, 'node_modules'), 'dir');
-    }
-    expect(existsSync(join(archive, '.git'))).toBe(false);
-    const check = () =>
-      boundedExecFileSync(
-        process.execPath,
-        [join(archive, 'scripts/check-publishable-closure.mjs')],
-        { cwd: archive, stdio: 'pipe' },
-        CHILD_TIMEOUT_MS,
+  it(
+    'checks the real source archive without Git metadata and catches added stale documentation',
+    async () => {
+      const limit = deadline(ARCHIVE_CASE_DEADLINE_MS);
+      const archive = join(output, 'source archive ç');
+      cpSync(root, archive, {
+        recursive: true,
+        filter: (path) => {
+          const name = relative(root, path);
+          return !name
+            .split('/')
+            .some((part) => ['.git', 'node_modules', 'scratch', 'worktrees'].includes(part));
+        },
+      });
+      symlinkSync(join(root, 'node_modules'), join(archive, 'node_modules'), 'dir');
+      for (const name of readdirSync(join(root, 'packages'))) {
+        const dependencies = join(root, 'packages', name, 'node_modules');
+        if (existsSync(dependencies))
+          symlinkSync(dependencies, join(archive, 'packages', name, 'node_modules'), 'dir');
+      }
+      expect(existsSync(join(archive, '.git'))).toBe(false);
+      const check = () =>
+        execBounded(
+          process.execPath,
+          [join(archive, 'scripts/check-publishable-closure.mjs')],
+          archive,
+          limit,
+        );
+      expect(JSON.parse(await check()).package).toBe(
+        `@aarusso-nyx/devai@${SELECTED_RELEASE_VERSION}`,
       );
-    expect(JSON.parse(check()).package).toBe(`@aarusso-nyx/devai@${SELECTED_RELEASE_VERSION}`);
-    writeFileSync(join(archive, 'docs/stale-package.md'), '@devai-nyx/cli');
-    expect(check).toThrow('PUBLISHABLE_OLD_PACKAGE_IDENTITY:docs/stale-package.md');
-    rmSync(join(archive, 'docs/stale-package.md'));
-    mkdirSync(join(archive, 'docs/site/build'), { recursive: true });
-    writeFileSync(join(archive, 'docs/site/build/stale.html'), '@devai-nyx/cli');
-    expect(check).toThrow('PUBLISHABLE_OLD_PACKAGE_IDENTITY:docs/site/build/stale.html');
-    // A copy of the whole source tree plus three closure runs: 7 to 9 s alone, above the RC
-    // coverage lane's 15 s default once instrumented under load (#246). The copy reads the
-    // live tree, so the file also runs in the `local-serial` lane, where no sibling test
-    // writes into the tree while it is copied.
-  }, 120_000);
+      writeFileSync(join(archive, 'docs/stale-package.md'), '@devai-nyx/cli');
+      await expect(check()).rejects.toThrow(
+        'PUBLISHABLE_OLD_PACKAGE_IDENTITY:docs/stale-package.md',
+      );
+      rmSync(join(archive, 'docs/stale-package.md'));
+      mkdirSync(join(archive, 'docs/site/build'), { recursive: true });
+      writeFileSync(join(archive, 'docs/site/build/stale.html'), '@devai-nyx/cli');
+      await expect(check()).rejects.toThrow(
+        'PUBLISHABLE_OLD_PACKAGE_IDENTITY:docs/site/build/stale.html',
+      );
+      // A copy of the whole source tree plus three closure runs: 7 to 9 s alone, above the RC
+      // coverage lane's 15 s default once instrumented under load (#246). The copy reads the
+      // live tree, so the file also runs in the `local-serial` lane, where no sibling test
+      // writes into the tree while it is copied. The copy and the three closure runs share one
+      // deadline inside the bound (#324); the copy itself is in-process.
+    },
+    ARCHIVE_CASE_TIMEOUT_MS,
+  );
 
   it('keeps release closure bound to the selected public package version', () => {
     const closure = JSON.parse(
