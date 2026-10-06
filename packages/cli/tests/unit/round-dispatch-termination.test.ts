@@ -12,7 +12,15 @@ import {
   type TaskRecord,
 } from '@devai-nyx/loop';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -23,10 +31,19 @@ import {
 import { dispatchRoundTask } from '../../src/commands/round/dispatch.js';
 
 const spawn = vi.hoisted(() => vi.fn());
-vi.mock('@devai-nyx/authority', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@devai-nyx/authority')>()),
-  spawn,
-}));
+/** When set, the dispatcher's candidate resolution (`git rev-parse`) fails once. */
+const candidateFailure = vi.hoisted(() => ({ armed: false }));
+vi.mock('@devai-nyx/authority', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@devai-nyx/authority')>();
+  const execFileSync = ((...args: Parameters<typeof actual.execFileSync>) => {
+    if (candidateFailure.armed && args[0] === 'git') {
+      candidateFailure.armed = false;
+      throw new Error('injected candidate resolution failure');
+    }
+    return (actual.execFileSync as (...forwarded: unknown[]) => unknown)(...args);
+  }) as typeof actual.execFileSync;
+  return { ...actual, spawn, execFileSync };
+});
 
 const roots: string[] = [];
 afterEach(() => {
@@ -193,5 +210,45 @@ describe('routine dispatch of a process group whose termination is unconfirmed',
       expect(releaseLocks({ locksDir, taskId: 'TASK-9711' })).toEqual([]);
     });
     expect(spawn).toHaveBeenCalledTimes(1);
+  });
+
+  it('quarantines the locks before any fallible evidence work, so a failure there keeps them', async () => {
+    const root = repository();
+    mkdirSync(join(root, 'work/rounds/R-9711'), { recursive: true });
+    writeFileSync(join(root, 'work/rounds/R-9711/AUTHORIZATION.md'), 'status: active\nGRANTED\n');
+    const value: TaskRecord = { ...TASK, status: 'ready', target_modules: ['MOD-routine'] };
+    mkdirSync(join(root, '.devai/state/tasks'), { recursive: true });
+    writeFileSync(
+      join(root, '.devai/state/tasks/TASK-9711.json'),
+      `${JSON.stringify(value, null, 2)}\n`,
+    );
+    spawn.mockClear();
+    spawn.mockReturnValueOnce({
+      pid: 4344,
+      result: Promise.resolve(unconfirmed),
+      terminate: vi.fn(),
+    } satisfies GuardedChildProcess);
+    candidateFailure.armed = true;
+
+    const result = await permissive(() =>
+      runRoundTasks({
+        repoRoot: root,
+        round: 'R-9711',
+        dispatch: (running) => dispatchRoundTask(root, running),
+      }),
+    );
+
+    expect(candidateFailure.armed).toBe(false);
+    // The dispatch failed before writing evidence; the runner escalated the running task.
+    expect(result.results).toMatchObject([{ task_id: 'TASK-9711', ok: false }]);
+    expect(existsSync(join(root, '.devai/state/round-runs/R-9711/task-executions'))).toBe(false);
+    expect(loadTask(root, 'TASK-9711').status).toBe('escalated');
+    const locksDir = join(root, '.devai/state/locks');
+    expect(listLocks({ locksDir })).toMatchObject([
+      { task_id: 'TASK-9711', module: 'MOD-routine' },
+    ]);
+    expect(
+      JSON.parse(readFileSync(join(root, '.devai/state/lock-quarantine/TASK-9711.json'), 'utf8')),
+    ).toMatchObject({ task_id: 'TASK-9711', pid: 4344, targets: ['F2:MOD-routine'] });
   });
 });
