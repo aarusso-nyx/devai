@@ -50,7 +50,9 @@ export function verifyPostMergeHostReceipt(
   const gitAdminRoot = gitAdministrationRoot(root);
   const runtimeRoot = join(gitAdminRoot, 'devai');
   const keyPath = join(runtimeRoot, 'post-merge.key');
-  const attestationPath = join(root, '.devai/config/post-merge-host-adapter.json');
+  // The checkout-bound attestation lives beside the key in this checkout's git directory; the
+  // tracked .devai/config/post-merge-host-adapter.json only declares the adapter (#291).
+  const attestationPath = join(runtimeRoot, 'post-merge-host-adapter.json');
   if (!existsSync(keyPath) || !existsSync(attestationPath)) {
     throw new Error('HOST_RECEIPT_UNVERIFIED');
   }
