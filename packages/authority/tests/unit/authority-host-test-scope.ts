@@ -168,8 +168,13 @@ function targetFor(
       canonical_relative_path: path,
       operation: ['rmSync', 'unlinkSync'].includes(request.symbol)
         ? 'delete'
-        : ['mkdirSync', 'mkdtempSync', 'openSync', 'symlinkSync'].includes(request.symbol) ||
-            !existsSync(absolute)
+        : [
+              'mkdirSync',
+              'mkdtempSync',
+              'openSync',
+              'symlinkSync',
+              'publishFileNoReplaceSync',
+            ].includes(request.symbol) || !existsSync(absolute)
           ? 'create'
           : 'update',
     },
