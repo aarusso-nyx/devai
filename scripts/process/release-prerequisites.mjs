@@ -25,6 +25,9 @@ const requireValue = (value, code) => {
 };
 const read = (path) => JSON.parse(readFileSync(path, 'utf8'));
 const publicPem = (key) => createPublicKey(key).export({ type: 'spki', format: 'pem' });
+// Owner mandate (2026-10-05, #299): the certification per-task limit is 30 minutes.
+const CERTIFICATION_TASK_TIMEOUT_MS = 30 * 60_000;
+
 const minimalEnvironment = () =>
   Object.fromEntries(
     ['PATH', 'HOME', 'TMPDIR']
@@ -470,6 +473,8 @@ function run() {
         'check',
         '--rc',
         '--run',
+        '--task-timeout-ms',
+        String(CERTIFICATION_TASK_TIMEOUT_MS),
         '--as-role',
         'inspector',
         '--write',
