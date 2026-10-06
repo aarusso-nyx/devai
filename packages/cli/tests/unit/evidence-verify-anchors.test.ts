@@ -232,6 +232,12 @@ function initializeRepository(repo: string): void {
   git(repo, ['init', '-q', '-b', 'main']);
   git(repo, ['config', 'user.name', 'Evidence Anchor Fixture']);
   git(repo, ['config', 'user.email', 'evidence-anchor@example.invalid']);
+  // `git commit` otherwise starts `git maintenance run --auto --detach`, a background process
+  // that takes `.git/objects/maintenance.lock` after the commit returns. Under load it lands
+  // inside a `snapshot()` window and the "writes nothing" comparison sees a lock file the
+  // verifier never wrote. The fixture owns its repository, so it turns auto-maintenance off.
+  git(repo, ['config', 'maintenance.auto', 'false']);
+  git(repo, ['config', 'gc.auto', '0']);
 }
 
 describe('IA-001 evidence verify --scope chain over the DETRAN baseline', () => {
