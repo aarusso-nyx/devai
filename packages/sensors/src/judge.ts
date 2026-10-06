@@ -1,4 +1,4 @@
-import { extractStructuredReply, getValidator } from '@devai-nyx/schemas';
+import { extractStructuredReply, getValidator, replySha256 } from '@devai-nyx/schemas';
 import {
   buildSensorReading,
   type FindingSeverity,
@@ -234,10 +234,8 @@ export async function senseJudge(
       confidence: parsed.confidence,
       ...(opts.mode === 'scored'
         ? {
-            reply_sha256: (await import('node:crypto'))
-              .createHash('sha256')
-              .update(response.text)
-              .digest('hex'),
+            // The same declared reply bytes the extractor hashes on failure (ADR-MDL-0003).
+            reply_sha256: replySha256(response),
             score_projection: JSON.stringify(extracted.document),
           }
         : {}),
