@@ -88,6 +88,8 @@ describe('v1 RC recipe adapters', () => {
 
   it('installs atomically and is idempotent', () => {
     const repo = mkdtempSync(join(tmpdir(), 'devai-recipes-'));
+    // #313: the installer takes its lock under the state root that init apply harness creates.
+    mkdirSync(join(repo, '.devai/state'), { recursive: true });
     const first = installRecipeAdapters({ repoRoot: repo });
     const second = installRecipeAdapters({ repoRoot: repo });
 
@@ -167,6 +169,7 @@ function splitSkill(markdown: string): { header: Record<string, unknown>; body: 
 describe('generated host projections (IA-004)', () => {
   it('installs both projections of every recipe with identical bodies and core front matter', () => {
     const repo = mkdtempSync(join(tmpdir(), 'devai-recipes-projections-'));
+    mkdirSync(join(repo, '.devai/state'), { recursive: true });
     try {
       const result = installRecipeAdapters({ repoRoot: repo });
       expect(result.written).toHaveLength(49);
