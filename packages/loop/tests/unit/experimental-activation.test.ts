@@ -152,8 +152,9 @@ describe('activation writes and withdrawals serialize (ADR-MDL-0007)', () => {
         const applied = apply();
         if (
           concurrent === undefined &&
-          request.symbol === 'renameSync' &&
-          String(request.arguments[1]).includes(EXPERIMENTAL_WITHDRAWALS_DIR)
+          // The create-only withdrawal record is published without replacement (ADR-AUT-0005).
+          request.symbol === 'publishFileNoReplaceSync' &&
+          String(request.arguments[0]).includes(EXPERIMENTAL_WITHDRAWALS_DIR)
         ) {
           // An activation arrives between the withdrawal record and the removal.
           try {
@@ -191,8 +192,9 @@ describe('activation writes and withdrawals serialize (ADR-MDL-0007)', () => {
         const applied = apply();
         if (
           !replaced &&
-          request.symbol === 'renameSync' &&
-          String(request.arguments[1]).includes(EXPERIMENTAL_WITHDRAWALS_DIR)
+          // The create-only withdrawal record is published without replacement (ADR-AUT-0005).
+          request.symbol === 'publishFileNoReplaceSync' &&
+          String(request.arguments[0]).includes(EXPERIMENTAL_WITHDRAWALS_DIR)
         ) {
           replaced = true;
           writeFileSync(record, `${JSON.stringify(second(), null, 2)}\n`);
