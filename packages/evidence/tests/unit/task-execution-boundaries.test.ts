@@ -193,7 +193,17 @@ describe('the recorded attempt sandbox', () => {
     mode: 'codex-workspace-write',
     enforced_by: 'provider',
     write_root: 'attempt-worktree',
-    flags: ['--sandbox', 'workspace-write', '--cd', '{attempt-worktree}'],
+    flags: [
+      '--sandbox',
+      'workspace-write',
+      '--cd',
+      '{attempt-worktree}',
+      '--ignore-rules',
+      '--config',
+      'sandbox_workspace_write.writable_roots=[]',
+      '--config',
+      'sandbox_workspace_write.network_access=false',
+    ],
   } as const;
   const exactTask = () => agentTask({ mode: 'exact', registry_id: AGENT.registry_id });
 
@@ -220,6 +230,27 @@ describe('the recorded attempt sandbox', () => {
     expect(
       refusal(() => buildTaskExecutionEvidence(exactTask(), agentFacts({ sandbox: SANDBOX }))).code,
     ).toBe('TASK_EXECUTION_EVIDENCE_SCHEMA_INVALID');
+  });
+
+  it('refuses flags that are not the complete sequence of the recorded mode', () => {
+    const weakened = SANDBOX.flags.map((flag) =>
+      flag === 'workspace-write' ? 'danger-full-access' : flag,
+    );
+    for (const flags of [
+      weakened,
+      SANDBOX.flags.filter((flag) => flag !== '--ignore-rules'),
+      SANDBOX.flags.map((flag) => (flag === '{attempt-worktree}' ? '/' : flag)),
+      [...SANDBOX.flags, '--add-dir', '/'],
+    ]) {
+      expect(
+        refusal(() =>
+          buildTaskExecutionEvidence(
+            exactTask(),
+            agentFacts({ experimental: true, sandbox: { ...SANDBOX, flags } }),
+          ),
+        ).code,
+      ).toBe('TASK_EXECUTION_EVIDENCE_SANDBOX_MISMATCH');
+    }
   });
 });
 
