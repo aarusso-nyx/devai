@@ -245,7 +245,7 @@ function* runCheckTaskSteps(
     }
 
     const startedAt = now();
-    const started = Date.now();
+    const started = performance.now();
     const descriptorTask = descriptorById.get(task.nodeId);
     if (descriptorTask === undefined) {
       throw new Error(`CHECK_RUNNER_INTERNAL: planned task ${task.nodeId} is not declared`);
@@ -281,7 +281,7 @@ function* runCheckTaskSteps(
       preflight = probeStep.value;
     }
     if (preflight !== undefined && preflight.outcome !== 'PASS') {
-      const durationMs = Math.max(0, Date.now() - started);
+      const durationMs = Math.max(0, Math.round(performance.now() - started));
       const finishedAt = now();
       const probeResult: TaskExecutionResult = {
         status: preflight.outcome === 'FAIL' ? 1 : null,
@@ -347,7 +347,7 @@ function* runCheckTaskSteps(
                     nodeId: task.nodeId,
                     taskKey: task.taskKey,
                   });
-    const durationMs = Math.max(0, Date.now() - started);
+    const durationMs = Math.max(0, Math.round(performance.now() - started));
     const finishedAt = now();
     const outcome = executionOutcome(result);
     if (outcome !== 'PASS') {
