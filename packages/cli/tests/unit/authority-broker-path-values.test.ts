@@ -11,6 +11,7 @@ import {
   physicalCanonicalPath,
   within,
 } from '../../src/authority/broker.js';
+import { fsTarget } from '../../src/authority/broker-paths.js';
 
 const roots: string[] = [];
 function temporary(prefix: string): string {
@@ -118,6 +119,32 @@ describe('authority broker canonical path values', () => {
     expect(() => canonicalRelativePath(root, root)).toThrow('AUTHORITY_FS_TARGET_INVALID');
     expect(() => canonicalRelativePath(root, outside)).toThrow('AUTHORITY_FS_SYMLINK_ESCAPE');
     expect(() => canonicalRelativePath(root, join(root, 'escape', 'file'))).toThrow(
+      'AUTHORITY_FS_SYMLINK_ESCAPE',
+    );
+  });
+
+  // ADR-AUT-0005: a no-replace publication is authorized as a create of its target alone,
+  // whether or not the target exists (the effect itself refuses an existing one).
+  it('classifies a no-replace publication as a create of its target', () => {
+    const root = temporary('devai-publish-target-');
+    mkdirSync(join(root, '.devai', 'state'), { recursive: true });
+    const target = join(root, '.devai', 'state', 'record.json');
+    const request = (path: string) => ({
+      kind: 'filesystem' as const,
+      symbol: 'publishFileNoReplaceSync',
+      arguments: [path, '{}\n'],
+    });
+    const expected = {
+      kind: 'fs',
+      id: 'fs:.devai/state/record.json',
+      repository_id: 'repo',
+      canonical_relative_path: '.devai/state/record.json',
+      operation: 'create',
+    };
+    expect(fsTarget(request(target), root, 'repo')).toEqual(expected);
+    writeFileSync(target, '{}\n');
+    expect(fsTarget(request(target), root, 'repo')).toEqual(expected);
+    expect(() => fsTarget(request(temporary('devai-outside-')), root, 'repo')).toThrow(
       'AUTHORITY_FS_SYMLINK_ESCAPE',
     );
   });
