@@ -156,6 +156,7 @@ async function dispatch(
     readonly scenario: (model: string) => string;
     readonly writes?: string;
     readonly taskIds?: readonly string[];
+    readonly command?: string;
   },
 ) {
   const budget: ExperimentalBudget = { attempts: 0, tokens: 0, unverifiable: false };
@@ -177,7 +178,7 @@ async function dispatch(
             },
             invocation: (selection) => ({
               runtime: selection.runtime,
-              command: process.execPath,
+              command: options.command ?? process.execPath,
               args: [FAKE, options.scenario(selection.model)],
             }),
           },
@@ -233,6 +234,25 @@ describe('experimental dispatch engine', () => {
       },
     });
     expect(budget).toEqual({ attempts: 1, tokens: 7300, unverifiable: false });
+  });
+
+  // ADR-MDL-0008: a sandbox is provider-enforced only once a provider process started.
+  it('records no provider-enforced sandbox for an attempt whose provider never started', async () => {
+    const root = repository();
+    await permissive(async () => {
+      saveTask(root, agentTask(root, 'TASK-0109'));
+    });
+    await dispatch(root, {
+      scenario: () => 'claude-writes',
+      command: join(root, 'no-such-provider-binary'),
+    });
+    const records = evidence(root);
+    expect(records.length).toBeGreaterThan(0);
+    for (const record of records) {
+      expect(record).toMatchObject({ experimental: true, verdict: 'error' });
+      expect(record).not.toHaveProperty('sandbox');
+    }
+    expect(readDispatchJournal(root, ROUND).map((event) => event.event)).not.toContain('spawned');
   });
 
   it('fails every attempt that writes outside the discipline paths and blocks the task (IA-003)', async () => {
