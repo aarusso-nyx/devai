@@ -1538,7 +1538,7 @@ describe('authority broker production boundary depth', () => {
   });
 
   it.each(['claude', 'codex'] as const)(
-    'classifies %s only for the public sense action before policy refusal',
+    'admits %s only for the public sense action under its typed local-llm rule (#249)',
     (executable) => {
       const senseArgv = [
         process.execPath,
@@ -1553,12 +1553,21 @@ describe('authority broker production boundary depth', () => {
       ] as const;
       const sense = resolvedBroker('sense run', 'auditor', senseArgv);
       try {
-        expect(() =>
+        // adopter-remote-sense-run-llm-1 classifies remote:local-llm:<executable>; before it,
+        // the only sense run remote rule named sensor-runtime and every host-CLI judge was
+        // UNCLASSIFIED_RESOURCE.
+        expect(
           sense.scope.apply_effect(
             effect('spawnSync', [executable, ['exec', 'fixture']], 'process'),
             () => 'sense-result',
           ),
-        ).toThrow('UNCLASSIFIED_RESOURCE');
+        ).toBe('sense-result');
+        expect(() =>
+          sense.scope.apply_effect(
+            effect('spawnSync', [`${executable}-other`, ['exec', 'fixture']], 'process'),
+            () => 'sense-result',
+          ),
+        ).toThrow();
       } finally {
         sense.dispose();
       }
