@@ -63,19 +63,25 @@ describe('sense adapter acceptance', () => {
     );
   });
 
-  it('executes the complete local read-safe adapter population without implicit persistence', async () => {
-    const results = [];
-    for (const kind of LOCAL_READ_KINDS) {
+  // One case per local read sensor, each bounded on its own (#246). As a single 42-sensor
+  // loop over the real repository the sweep cost 107 s at load average 65 against a 120 s
+  // bound, and a timeout named no sensor. Every adapter still runs in the same order with the
+  // inputs the repository declares, and each case keeps the loop's assertions for its own
+  // reading. The shared bound is sized for the costliest member, decision_record_integrity,
+  // whose history scan measures 30 s alone and 83 s at load average 200.
+  it.each(LOCAL_READ_KINDS)(
+    'executes the local read-safe adapter %s without implicit persistence',
+    async (kind) => {
       // Read-safe under the inputs the repository declares, as `sense run` calls the adapters.
       const inputs = resolveDeclaredSensorInputs({ repoRoot: ROOT, sensorKind: kind });
-      results.push(
-        await withAuthorityHostTestScope(() => sensorAdapter(kind)({ repoRoot: ROOT, inputs })),
+      const reading = await withAuthorityHostTestScope(() =>
+        sensorAdapter(kind)({ repoRoot: ROOT, inputs }),
       );
-    }
-    expect(results).toHaveLength(LOCAL_READ_KINDS.length);
-    expect(results.map((reading) => reading.sensor.kind)).toEqual(LOCAL_READ_KINDS);
-    expect(results.every((reading) => typeof reading.status === 'string')).toBe(true);
-  }, 120_000);
+      expect(reading.sensor.kind).toBe(kind);
+      expect(typeof reading.status).toBe('string');
+    },
+    240_000,
+  );
 
   it('rejects missing or malformed adapter-specific inputs before remote or DB execution', async () => {
     expect(() => sensorAdapter('llm_judge')({ repoRoot: ROOT })).toThrow(

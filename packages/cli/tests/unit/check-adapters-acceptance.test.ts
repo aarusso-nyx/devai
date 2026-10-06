@@ -16,6 +16,46 @@ import {
 
 const ROOT = resolve(import.meta.dirname, '../../../..');
 const FIXTURE_ROOT = mkdtempSync(join(tmpdir(), 'devai-r0007-check-acceptance-'));
+const PR_BODY = join(FIXTURE_ROOT, 'pr-body.md');
+writeFileSync(PR_BODY, '## Verification\n\n- Inspector acceptance\n', 'utf8');
+
+const READ_SAFE_SERVICES: ReadonlyArray<
+  readonly [serviceId: string, options?: Readonly<Record<string, unknown>>]
+> = [
+  ['schema-config-load'],
+  ['schemas'],
+  ['invariant-validation'],
+  ['invariants'],
+  ['journey-validation'],
+  ['journeys'],
+  ['glossary-validation'],
+  ['glossary'],
+  ['trace-validation'],
+  ['trace'],
+  ['test-trace-validation'],
+  ['test-trace'],
+  ['strategy-validation'],
+  ['invariant-strategies'],
+  ['action-coverage'],
+  ['inventory-integrity'],
+  ['mutation'],
+  ['mutation-verification'],
+  ['release-scorecard'],
+  ['dependency-security'],
+  ['dependencies'],
+  ['provenance-readiness'],
+  ['cli-reference'],
+  ['docs-links'],
+  ['adrs'],
+  ['ci-economy'],
+  ['docs-governance', { skipPublishCheck: true }],
+  ['forbidden-actions', { maxCommits: 1 }],
+  ['glob-guards'],
+  ['overrides'],
+  ['pr-compliance', { prBodyFile: PR_BODY, optional: true }],
+  ['prompt-overlays'],
+  ['sensor-integrity'],
+];
 
 function member(serviceId: string): ResolvedCheckMember {
   return {
@@ -143,65 +183,24 @@ describe('canonical check adapter acceptance', () => {
     });
   });
 
-  it('executes every non-recursive read-safe check service as a total structured result', async () => {
-    const prBody = join(FIXTURE_ROOT, 'pr-body.md');
-    writeFileSync(prBody, '## Verification\n\n- Inspector acceptance\n', 'utf8');
+  // One case per service, each bounded on its own (#246). As a single 33-service loop the
+  // sweep cost 14 s alone and 157 s under parallel load against a 120 s bound, and a timeout
+  // named no service. Every service still runs in the same order with the same options, and
+  // each case keeps the loop's assertions for its own result. Split, the cost is one service:
+  // inventory-integrity scans the real tree (22.6 s at load average 175; every other service
+  // under 4 s, the first only for module warm-up), so the shared bound is sized for it.
+  it.each(READ_SAFE_SERVICES.map(([serviceId, options]) => ({ serviceId, options })))(
+    'executes the non-recursive read-safe check service $serviceId as a total structured result',
+    async ({ serviceId, options }) => {
+      const result = await execute(serviceId, options);
 
-    const services: ReadonlyArray<
-      readonly [serviceId: string, options?: Readonly<Record<string, unknown>>]
-    > = [
-      ['schema-config-load'],
-      ['schemas'],
-      ['invariant-validation'],
-      ['invariants'],
-      ['journey-validation'],
-      ['journeys'],
-      ['glossary-validation'],
-      ['glossary'],
-      ['trace-validation'],
-      ['trace'],
-      ['test-trace-validation'],
-      ['test-trace'],
-      ['strategy-validation'],
-      ['invariant-strategies'],
-      ['action-coverage'],
-      ['inventory-integrity'],
-      ['mutation'],
-      ['mutation-verification'],
-      ['release-scorecard'],
-      ['dependency-security'],
-      ['dependencies'],
-      ['provenance-readiness'],
-      ['cli-reference'],
-      ['docs-links'],
-      ['adrs'],
-      ['ci-economy'],
-      ['docs-governance', { skipPublishCheck: true }],
-      ['forbidden-actions', { maxCommits: 1 }],
-      ['glob-guards'],
-      ['overrides'],
-      ['pr-compliance', { prBodyFile: prBody, optional: true }],
-      ['prompt-overlays'],
-      ['sensor-integrity'],
-    ];
-
-    const results = [];
-    for (const [serviceId, options] of services) {
-      results.push(await execute(serviceId, options));
-    }
-
-    expect(results).toHaveLength(services.length);
-    expect(results.map((result) => result.id)).toEqual(services.map(([serviceId]) => serviceId));
-    expect(
-      results.every(
-        (result) =>
-          Number.isInteger(result.duration_ms) &&
-          result.duration_ms >= 0 &&
-          ['pass', 'review', 'fail', 'unknown', 'na', 'error'].includes(result.status),
-      ),
-    ).toBe(true);
-    expect(results.filter((result) => result.code === 'CHECK_SERVICE_ERROR')).toEqual([]);
-  }, 120_000);
+      expect(result.id).toBe(serviceId);
+      expect(Number.isInteger(result.duration_ms) && result.duration_ms >= 0).toBe(true);
+      expect(['pass', 'review', 'fail', 'unknown', 'na', 'error']).toContain(result.status);
+      expect([result].filter((entry) => entry.code === 'CHECK_SERVICE_ERROR')).toEqual([]);
+    },
+    120_000,
+  );
 
   it('returns structured validation failures for bounded migrated inputs', async () => {
     const schema = join(FIXTURE_ROOT, 'schema.json');
