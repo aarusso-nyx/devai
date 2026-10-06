@@ -586,7 +586,7 @@ function cliResponse(
   user: string,
   call: ModelBridgeCallOptions | undefined,
 ): BridgeResponse {
-  const started = Date.now();
+  const started = performance.now();
   const cli = options.provider === 'claude-cli' ? 'claude' : 'codex';
   const prompt = `[SYSTEM]\n${system}\n\n[USER]\n${user}`;
   const schema =
@@ -701,7 +701,7 @@ function cliResponse(
         cost_usd: Number(envelope['total_cost_usd'] ?? 0),
       },
       finish_reason: finish,
-      latency_ms: Date.now() - started,
+      latency_ms: Math.round(performance.now() - started),
       host_observation: hostObservation,
       ...(structured === undefined ? {} : { json: structured }),
       ...(isolation === undefined ? {} : { isolation }),
@@ -807,7 +807,7 @@ function cliResponse(
     usage: { input_tokens: inputTokens, output_tokens: outputTokens, cost_usd: 0 },
     finish_reason:
       completed === 1 && finals.length === 1 && !failed && state.complete() ? 'stop' : 'error',
-    latency_ms: Date.now() - started,
+    latency_ms: Math.round(performance.now() - started),
     host_observation: hostObservation,
     ...(parsedJson(text, true) === undefined ? {} : { json: parsedJson(text, true) }),
     ...(projection === undefined ? {} : { projection }),
@@ -831,7 +831,7 @@ export function createModelBridge(options: ModelBridgeOptions) {
       }
       if (options.provider.endsWith('-cli'))
         return cliResponse(options, messages.system, messages.user, call);
-      const started = Date.now();
+      const started = performance.now();
       const schema =
         call?.response_schema === undefined
           ? undefined
@@ -871,7 +871,7 @@ export function createModelBridge(options: ModelBridgeOptions) {
             cost_usd: 0,
           },
           finish_reason: apiFinish(options.provider, response),
-          latency_ms: Date.now() - started,
+          latency_ms: Math.round(performance.now() - started),
           ...(parsedJson(text, wantsJson) === undefined ? {} : { json: parsedJson(text, true) }),
         };
       }
@@ -919,7 +919,7 @@ export function createModelBridge(options: ModelBridgeOptions) {
         },
         finish_reason: apiFinish(options.provider, response),
         ...(projection === undefined ? {} : { projection }),
-        latency_ms: Date.now() - started,
+        latency_ms: Math.round(performance.now() - started),
         ...(parsedJson(text, wantsJson) === undefined ? {} : { json: parsedJson(text, true) }),
       };
     },
