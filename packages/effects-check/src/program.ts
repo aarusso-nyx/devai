@@ -10,6 +10,8 @@ export const FS_MUTATORS = new Set([
   'copyFileSync',
   'cp',
   'cpSync',
+  'link',
+  'linkSync',
   'mkdir',
   'mkdirSync',
   'rename',
