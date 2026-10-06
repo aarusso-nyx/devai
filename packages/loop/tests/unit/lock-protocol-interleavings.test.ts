@@ -575,7 +575,10 @@ describe('attempt fences', () => {
       });
       seam.after = undefined;
 
-      expect(events.slice(0, 3)).toEqual([
+      // The first fsync makes the new locks directory durable before the first lock
+      // (ADR-AUT-0005); the second makes the new fence directory durable before the fence.
+      expect(events.slice(0, 4)).toEqual([
+        'fsync the state directory',
         'fsync the state directory',
         'rename the fence',
         'dispatch',
