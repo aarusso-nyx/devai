@@ -127,9 +127,34 @@ it appear with its complete bytes:
 - **Let dispatch fsync `.devai` itself.** Rejected: dispatch would need workspace authority
   over `.devai`, widening its declared path domains.
 
+## Amendment: publication-bound identity removal (issue #317)
+
+Proposed on 2026-10-06 for issue #317. It narrowly widens what the broker authorizes, and it
+takes effect only with the Owner's sign-off.
+
+- **The effect.** `removeEntryIfIdentitySync(path, identity)` joins the guarded effects. It
+  renames the entry to a fresh private quarantine name beside it and checks that entry against
+  the caller's identity (device, inode and birth time). It unlinks the entry, or removes it with
+  a non-recursive rmdir, only on a match. Anything else is put back without replacing whatever
+  holds the path by then; if the path is occupied, the entry stays in quarantine and the effect
+  refuses with `AUTHORITY_REMOVE_RESTORE_INCOMPLETE`. The broker classifies it as a `delete` of
+  the entry itself, resolving only the parent.
+- **The widening.** In one invocation, a removal that names exactly the path and the identity a
+  `publishFileNoReplaceSync` of that invocation returned is authorized against the target that
+  publication was authorized for, and keeps the containment that publication established. It is
+  admitted even when the file now resolves outside the repository because an ancestor was
+  swapped for a link after the publication was authorized. Nothing else is widened: the removal
+  can act only on an entry carrying that identity, which only that publication created.
+- **Every other identity-bound removal** keeps repository containment. The broker pins the
+  parent with a no-follow directory descriptor at effect time and checks the parent's realpath
+  and identity immediately before and after the effect. On a mismatch it refuses with
+  `AUTHORITY_REMOVE_PARENT_ESCAPED`. Node has no directory-relative rename, so an ancestor that
+  is swapped and swapped back between those two checks remains a residual window.
+
 ## Affected Rules
 
-As listed in the frontmatter.
+As listed in the frontmatter, together with `packages/authority/src/boundaries/host-remove.ts`
+and `packages/cli/src/authority/broker.ts` for the amendment above.
 
 ## Inspector Adversarial Acceptance
 
