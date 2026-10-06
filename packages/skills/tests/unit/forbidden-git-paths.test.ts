@@ -8,6 +8,7 @@ import {
   scanForbiddenActions,
 } from '../../src/forbidden-actions/index.js';
 import { withAuthorityHostTestScope } from './authority-host-test-scope.js';
+import { disableGitAutoMaintenance } from './git-fixture-maintenance.js';
 const roots: string[] = [];
 aroundEach((runTest) => withAuthorityHostTestScope(runTest));
 afterEach(() => {
@@ -33,6 +34,7 @@ function fixture(path: string, operation: string, author = 'Fixture') {
   const root = mkdtempSync(join(tmpdir(), 'devai-forbidden-paths-'));
   roots.push(root);
   git(root, ['init', '-q']);
+  disableGitAutoMaintenance(root);
   git(root, ['config', 'core.quotePath', 'true']);
   const registryPath = join(root, 'registry.json');
   writeFileSync(registryPath, JSON.stringify({ actions: CANONICAL_FORBIDDEN_ACTIONS }));

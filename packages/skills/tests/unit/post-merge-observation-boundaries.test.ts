@@ -35,6 +35,7 @@ import { POST_MERGE_DECLARATION } from '../../src/post-merge-auditor/host-receip
 import { runWithAuthorityHostEffects } from '@devai-nyx/authority';
 import { resolveScorecardInputs } from '@devai-nyx/loop';
 import { withAuthorityHostTestScope } from './authority-host-test-scope.js';
+import { disableGitAutoMaintenance } from './git-fixture-maintenance.js';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -175,6 +176,7 @@ function fixture(options: FixtureOptions = {}): HostFixture {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'devai-post-merge-observation-')));
   roots.push(root);
   git(root, ['init', '-q', '-b', 'main']);
+  disableGitAutoMaintenance(root);
   disableBackgroundPacking(root);
   const constitutionRelative =
     options.constitution === undefined ? 'law/constitution.md' : options.constitution;
@@ -697,6 +699,7 @@ describe('post-merge audit observation facade', () => {
     const root = realpathSync(mkdtempSync(join(tmpdir(), 'devai-audit-observation-')));
     roots.push(root);
     git(root, ['init', '-q', '-b', 'main']);
+    disableGitAutoMaintenance(root);
     put(root, 'README.md', '# Fixture\n');
     git(root, ['add', 'README.md']);
     git(root, ['commit', '-qm', 'initial']);

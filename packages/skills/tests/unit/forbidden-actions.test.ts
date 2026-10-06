@@ -18,6 +18,7 @@ import {
   scanForbiddenActions,
 } from '../../src/forbidden-actions/index.js';
 import { withAuthorityHostTestScope } from './authority-host-test-scope.js';
+import { disableGitAutoMaintenance } from './git-fixture-maintenance.js';
 
 aroundEach((runTest) => withAuthorityHostTestScope(runTest));
 
@@ -141,6 +142,7 @@ describe('scanForbiddenActions', () => {
   function seedRepository(): void {
     writeFileSync(join(dir, 'README.md'), 'seed\n');
     execFileSync('git', ['init', '-q'], { cwd: dir });
+    disableGitAutoMaintenance(dir);
     execFileSync('git', ['add', '.'], { cwd: dir });
     execFileSync(
       'git',
@@ -565,6 +567,7 @@ describe('scanForbiddenActions', () => {
     );
     writeFileSync(join(dir, 'law/constitution.md'), 'governed\n');
     execFileSync('git', ['init', '-q'], { cwd: dir });
+    disableGitAutoMaintenance(dir);
     execFileSync('git', ['add', '.'], { cwd: dir });
     execFileSync(
       'git',
@@ -601,6 +604,7 @@ describe('scanForbiddenActions', () => {
     );
     writeFileSync(join(dir, 'packages/demo/index.ts'), 'export {};\n');
     execFileSync('git', ['init', '-q'], { cwd: dir });
+    disableGitAutoMaintenance(dir);
     execFileSync('git', ['add', '.'], { cwd: dir });
     execFileSync(
       'git',
@@ -639,6 +643,7 @@ describe('scanForbiddenActions', () => {
     );
     writeFileSync(join(dir, '.devai/config/authority-policy.json'), '{"version":1}\n');
     execFileSync('git', ['init', '-q'], { cwd: dir });
+    disableGitAutoMaintenance(dir);
     execFileSync('git', ['add', '.'], { cwd: dir });
     execFileSync(
       'git',
@@ -678,6 +683,7 @@ describe('scanForbiddenActions', () => {
     );
     writeFileSync(source, 'export const value = 1;\n');
     execFileSync('git', ['init', '-q'], { cwd: dir });
+    disableGitAutoMaintenance(dir);
     execFileSync('git', ['add', '.'], { cwd: dir });
     execFileSync(
       'git',
@@ -728,6 +734,7 @@ describe('scanForbiddenActions', () => {
     );
     writeFileSync(join(dir, path), initial);
     execFileSync('git', ['init', '-q'], { cwd: dir });
+    disableGitAutoMaintenance(dir);
     execFileSync('git', ['add', '.'], { cwd: dir });
     execFileSync(
       'git',
@@ -765,6 +772,7 @@ describe('scanForbiddenActions', () => {
     );
     writeFileSync(join(dir, 'law/constitution.md'), 'governed\n');
     execFileSync('git', ['init', '-q'], { cwd: dir });
+    disableGitAutoMaintenance(dir);
     execFileSync('git', ['add', '.'], { cwd: dir });
     execFileSync(
       'git',
@@ -804,6 +812,7 @@ describe('scanForbiddenActions', () => {
     writeFileSync(join(dir, 'law/constitution.md'), 'governed\n');
     writeFileSync(join(dir, 'README.md'), 'seed\n');
     execFileSync('git', ['init', '-q'], { cwd: dir });
+    disableGitAutoMaintenance(dir);
     execFileSync('git', ['add', '.'], { cwd: dir });
     execFileSync(
       'git',
@@ -871,6 +880,7 @@ describe('scanForbiddenActions', () => {
     );
     writeFileSync(join(dir, 'README.md'), 'seed\n');
     execFileSync('git', ['init', '-q'], { cwd: dir });
+    disableGitAutoMaintenance(dir);
     execFileSync('git', ['add', '.'], { cwd: dir });
     execFileSync(
       'git',
@@ -934,6 +944,7 @@ describe('scanForbiddenActions', () => {
       JSON.stringify({ schemaVersion: '1.0.0', actions: CANONICAL_FORBIDDEN_ACTIONS }),
     );
     execFileSync('git', ['init', '-q'], { cwd: dir });
+    disableGitAutoMaintenance(dir);
     execFileSync('git', ['add', '.devai/config/forbidden-actions.json'], { cwd: dir });
     execFileSync(
       'git',
@@ -974,6 +985,7 @@ describe('scanForbiddenActions', () => {
       JSON.stringify({ schemaVersion: '1.0.0', actions: CANONICAL_FORBIDDEN_ACTIONS }),
     );
     execFileSync('git', ['init', '-q'], { cwd: dir });
+    disableGitAutoMaintenance(dir);
     execFileSync('git', ['add', '.devai/config/forbidden-actions.json'], { cwd: dir });
     execFileSync(
       'git',
@@ -1013,6 +1025,7 @@ describe('scanForbiddenActions', () => {
       JSON.stringify({ schemaVersion: '1.0.0', actions: CANONICAL_FORBIDDEN_ACTIONS }),
     );
     execFileSync('git', ['init', '-q'], { cwd: dir });
+    disableGitAutoMaintenance(dir);
     execFileSync('git', ['add', '.devai/config/forbidden-actions.json'], { cwd: dir });
     execFileSync(
       'git',

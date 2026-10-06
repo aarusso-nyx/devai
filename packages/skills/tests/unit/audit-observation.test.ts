@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { runAuditObservation } from '../../src/post-merge-auditor/index.js';
 import { withAuthorityHostTestScope } from './authority-host-test-scope.js';
+import { disableGitAutoMaintenance } from './git-fixture-maintenance.js';
 
 const roots: string[] = [];
 
@@ -33,6 +34,7 @@ describe('explicit Auditor observation', () => {
     const root = mkdtempSync(join(tmpdir(), 'devai-audit-observation-'));
     roots.push(root);
     git(root, ['init', '-b', 'main']);
+    disableGitAutoMaintenance(root);
     writeFileSync(join(root, 'README.md'), '# Fixture\n');
     git(root, ['add', 'README.md']);
     git(root, ['commit', '-m', 'test: initial']);
