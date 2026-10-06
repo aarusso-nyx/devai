@@ -10,8 +10,13 @@ import {
 } from '@devai-nyx/authority';
 import { randomUUID } from 'node:crypto';
 import { hostname } from 'node:os';
-import { join, resolve, sep } from 'node:path';
-import { publishCreateOnlyDurableSync, replaceDurableSync } from './durable-files.js';
+import { dirname, join, resolve, sep } from 'node:path';
+import {
+  PublicationIndeterminate,
+  fsyncDirectorySync,
+  publishCreateOnlyDurableSync,
+  replaceDurableSync,
+} from './durable-files.js';
 
 /** The process running an autonomous attempt in a worktree. */
 export interface WorktreeOwner {
@@ -155,7 +160,25 @@ export function withWorktreeRegistryLock<T>(
   };
   const body = `${JSON.stringify(owner)}\n`;
   const deadline = Date.now() + (options.lockWaitMs ?? WORKTREE_REGISTRY_LOCK_WAIT_MS);
-  while (!publishCreateOnlyDurableSync(path, body)) {
+  // Only the owner whose token the lock records removes it, durably. A crash before release
+  // leaves a lock naming a dead process, which refuses as stale rather than being taken over.
+  const release = (): void => {
+    const current = readRegistryLock(path);
+    if (current !== undefined && current !== 'unreadable' && current.token === owner.token) {
+      unlinkSync(path);
+      fsyncDirectorySync(dirname(path));
+    }
+  };
+  const acquire = (): boolean => {
+    try {
+      return publishCreateOnlyDurableSync(path, body);
+    } catch (error) {
+      // An indeterminate publication left our complete lock in place: it is ours to remove.
+      if (error instanceof PublicationIndeterminate) release();
+      throw error;
+    }
+  };
+  while (!acquire()) {
     const held = readRegistryLock(path);
     if (
       held !== undefined &&
@@ -171,12 +194,7 @@ export function withWorktreeRegistryLock<T>(
   try {
     return run();
   } finally {
-    // Only the owner whose token the lock records removes it. A crash before this point
-    // leaves a lock naming a dead process, which refuses as stale rather than being taken over.
-    const current = readRegistryLock(path);
-    if (current !== undefined && current !== 'unreadable' && current.token === owner.token) {
-      unlinkSync(path);
-    }
+    release();
   }
 }
 

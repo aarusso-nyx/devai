@@ -11,6 +11,7 @@ import {
   fsyncSync,
   mkdirSync,
   openSync,
+  PUBLISH_INDETERMINATE,
   publishFileNoReplaceSync,
   renameSync,
   writeSync,
@@ -126,6 +127,33 @@ export function isExistsError(error: unknown): boolean {
 }
 
 /**
+ * `DURABLE_PUBLICATION_INDETERMINATE`: the record is in place with the caller's complete
+ * bytes, but the publication's cleanup failed, so its durability is not established. The
+ * caller owns the record: a lock holder releases it, and a create-only writer must not
+ * report success.
+ */
+export class PublicationIndeterminate extends Error {
+  readonly code = 'DURABLE_PUBLICATION_INDETERMINATE';
+  readonly path: string;
+
+  constructor(path: string, cause: unknown) {
+    super('DURABLE_PUBLICATION_INDETERMINATE', { cause });
+    this.path = path;
+  }
+}
+
+function publish(path: string, text: string): void {
+  try {
+    publishFileNoReplaceSync(path, text);
+  } catch (error) {
+    if ((error as { code?: unknown } | undefined)?.code === PUBLISH_INDETERMINATE) {
+      throw new PublicationIndeterminate(path, error);
+    }
+    throw error;
+  }
+}
+
+/**
  * Create `path` with exactly `text`, refusing (`DURABLE_RECORD_EXISTS`) when it exists. The
  * governed no-replace publication (ADR-AUT-0005) links a staged, fsynced file into place and
  * fsyncs the directory, so a crash never leaves a partial record and two concurrent writers
@@ -134,7 +162,7 @@ export function isExistsError(error: unknown): boolean {
 export function writeCreateOnlyDurableSync(path: string, text: string): void {
   mkdirDurableSync(dirname(path));
   try {
-    publishFileNoReplaceSync(path, text);
+    publish(path, text);
   } catch (error) {
     if (isExistsError(error)) throw new Error('DURABLE_RECORD_EXISTS');
     throw error;
@@ -145,11 +173,12 @@ export function writeCreateOnlyDurableSync(path: string, text: string): void {
  * Publish `text` at `path` only when `path` is absent, durably, returning false when it
  * already exists. Used for exclusive records such as locks: a reader never sees an empty or
  * partial file, because the name appears only once the complete bytes are linked into place.
+ * An indeterminate publication throws `PublicationIndeterminate`: the record is the caller's.
  */
 export function publishCreateOnlyDurableSync(path: string, text: string): boolean {
   mkdirDurableSync(dirname(path));
   try {
-    publishFileNoReplaceSync(path, text);
+    publish(path, text);
     return true;
   } catch (error) {
     if (isExistsError(error)) return false;
