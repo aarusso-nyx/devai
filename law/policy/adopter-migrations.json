@@ -211,11 +211,12 @@
       ]
     },
     {
-      "version": "2.0.1",
-      "status": "unreleased",
+      "version": "2.1.0",
+      "status": "released",
+      "date": "2026-10-06",
       "changes": [
         {
-          "id": "MIG-2.0.1-post-merge-local-state",
+          "id": "MIG-2.1.0-post-merge-local-state",
           "kind": "rebind",
           "summary": "The post-merge host adapter keeps its checkout-bound attestation (absolute repository path, hook path, and the HMAC over the checkout key) in the checkout's git directory beside the key, and the tracked .devai/config/post-merge-host-adapter.json becomes a path-free declaration that the adapter is required. init upgrade converts a committed checkout-bound attestation: the checkout that holds its key moves the attestation into its git directory, keeping its installed_at_head while it still verifies, and every other checkout only rewrites the tracked declaration. Commit the declaration; other clones, CI included, report the adapter as not bound in that checkout until it is bound there.",
           "decision_records": [],
