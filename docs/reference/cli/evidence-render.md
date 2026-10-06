@@ -1,7 +1,11 @@
 # `evidence render` and the rounds index
 
 `devai evidence render` projects one evidence view from canonical records. It is read-only unless
-`--out` is given together with `--write`; it never edits the records it reads. This page is the
+`--out` is given together with `--write`; it never edits the records it reads. `--out` is confined to
+the domains the action declares (`fs:f5-state` under `.devai/state`, `fs:proofs` under
+`record/proofs`) and is written through the guarded host filesystem; any other target, including a
+path outside the repository, is refused with `EVIDENCE_RENDER_OUT_OUTSIDE_SCOPE` and nothing is
+written. This page is the
 reference for the `rounds` kind, which renders the canonical rounds index at
 `record/derived/indexes/rounds.md`, and for the exact-membership rule that `round seal` applies
 against that index. The governing record is
@@ -33,7 +37,7 @@ Usage:
 devai evidence render --kind rounds --repo-root .                  # render to stdout, write nothing
 devai evidence render --kind rounds --repo-root . --check          # compare with the committed file, write nothing
 devai evidence render --kind rounds --repo-root . \
-  --out record/derived/indexes/rounds.md --write                   # regenerate the committed file
+  --out .devai/state/render/rounds.md --write                      # render a copy inside the declared scope
 devai evidence render --kind round-narratives --repo-root .        # the former concatenation
 ```
 
@@ -152,8 +156,10 @@ makes it pass.
   (IA-004).
 - `--check` is incompatible with `--out`; passing both is a usage error.
 
-Regeneration is the explicit path: `--out record/derived/indexes/rounds.md --write`. The check
-never repairs the file it checks.
+Regeneration is the explicit path: render with `--out .devai/state/render/rounds.md --write`, then
+copy the file over `record/derived/indexes/rounds.md` in a reviewed commit. The action cannot write
+the committed index in place because `record/derived` is outside its declared write scope. The
+check never repairs the file it checks.
 
 ## Freshness
 
