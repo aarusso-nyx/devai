@@ -1,5 +1,5 @@
 import { existsSync, lstatSync, realpathSync } from 'node:fs';
-import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import {
   runWithAuthorityHostEffects,
   type AuthorityHostEffectRequest,
@@ -153,7 +153,11 @@ function targetFor(
     return { ...bound, target: { ...bound.target, operation: 'update' } };
   }
   const absolute = absolutePath(requestPath(request));
-  const canonical = existingRealpath(absolute);
+  // An identity-bound removal acts on the entry itself, never through a final link (#317).
+  const canonical =
+    request.symbol === 'removeEntryIfIdentitySync'
+      ? join(existingRealpath(dirname(absolute)), basename(absolute))
+      : existingRealpath(absolute);
   const repositoryRoot = repositoryRootFor(absolute);
   const path = relative(repositoryRoot, canonical).split(sep).join('/');
   if (path.length === 0 || path.startsWith('../') || isAbsolute(path)) {
@@ -166,7 +170,9 @@ function targetFor(
       id: `fs:${path}`,
       repository_id: 'devai-test-scope',
       canonical_relative_path: path,
-      operation: ['rmSync', 'rmdirSync', 'unlinkSync'].includes(request.symbol)
+      operation: ['rmSync', 'rmdirSync', 'unlinkSync', 'removeEntryIfIdentitySync'].includes(
+        request.symbol,
+      )
         ? 'delete'
         : [
               'mkdirSync',
@@ -261,7 +267,13 @@ export async function withAuthorityHostTestScope<T>(
         canonicalSha256,
         repository_root: repositoryRoot,
         fs: {
-          realpath: (path: string) => existingRealpath(resolve(repositoryRoot, path)),
+          realpath: (path: string) =>
+            request.symbol === 'removeEntryIfIdentitySync'
+              ? join(
+                  existingRealpath(dirname(resolve(repositoryRoot, path))),
+                  basename(resolve(repositoryRoot, path)),
+                )
+              : existingRealpath(resolve(repositoryRoot, path)),
           lstat: (path: string) => snapshot(repositoryRoot, path),
           writeAtomic: () => {
             result = apply();
