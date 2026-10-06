@@ -129,6 +129,16 @@ function underProductionBroker<T>(
   }
 }
 
+/** The error `callback` throws, or undefined. */
+function caught(callback: () => unknown): unknown {
+  try {
+    callback();
+  } catch (error) {
+    return error;
+  }
+  return undefined;
+}
+
 /** Entries under the repository outside the state root. */
 function tree(): readonly string[] {
   return readdirSync(repo, { recursive: true, encoding: 'utf8' })
@@ -149,7 +159,7 @@ describe('recipe adapter installation under the production broker (#317)', () =>
     const resolved = preflightRecipeAdapterInstall(repo, plan);
     const moved = join(fixture, 'moved-devai-assess');
 
-    expect(() =>
+    const failure = caught(() =>
       underProductionBroker(() =>
         executeRecipeAdapterPlan(resolved, {
           beforePublish: (file, index) => {
@@ -159,19 +169,27 @@ describe('recipe adapter installation under the production broker (#317)', () =>
           },
         }),
       ),
-    ).toThrow('AUTHORITY_FS_SYMLINK_ESCAPE');
+    );
+    // The publication is refused, and so is the rollback of the earlier file now behind the
+    // link: the broker never authorizes a removal outside the repository, so it is residue.
+    expect(failure).toMatchObject({ code: 'RECIPE_INSTALL_ROLLBACK_INCOMPLETE' });
+    const errors = (failure as AggregateError).errors as Error[];
+    expect(errors[0]?.message).toContain('AUTHORITY_FS_SYMLINK_ESCAPE');
+    expect(errors.slice(1).map((error) => error.message)).toEqual([
+      expect.stringContaining('AUTHORITY_FS_SYMLINK_ESCAPE'),
+    ]);
     expect(readdirSync(outside)).toEqual([]);
     expect(existsSync(join(repo, '.agents'))).toBe(false);
     expect(readdirSync(join(repo, '.devai/state'))).toEqual([]);
   });
 
-  it('removes an escaped publication through the broker, bound to the file it created', () => {
+  it('detects an escaped publication and reports it without deleting anything outside the repository', () => {
     const resolved = preflightRecipeAdapterInstall(repo, plan);
     const moved = join(fixture, 'moved-devai-assess');
     const last = plan.files[3]?.path ?? '';
     let swapped = false;
 
-    expect(() =>
+    const failure = caught(() =>
       underProductionBroker(
         () => executeRecipeAdapterPlan(resolved),
         (request) => {
@@ -188,11 +206,20 @@ describe('recipe adapter installation under the production broker (#317)', () =>
           symlinkSync(outside, dirname(join(repo, last)));
         },
       ),
-    ).toThrow('RECIPE_INSTALL_ESCAPE_DETECTED: .claude/skills/devai-assess/devai.recipe.json');
+    );
     expect(swapped).toBe(true);
-    // The escaped file is gone from outside the repository, with no staged or quarantine name.
-    expect(readdirSync(outside)).toEqual([]);
-    // Every earlier publication is rolled back; the moved directory and the link are left.
+    // The escape is the first error; the earlier file behind the link is rollback residue.
+    expect(failure).toMatchObject({ code: 'RECIPE_INSTALL_ROLLBACK_INCOMPLETE' });
+    const errors = (failure as AggregateError).errors as Error[];
+    expect(errors[0]).toMatchObject({
+      code: 'RECIPE_INSTALL_ESCAPE_DETECTED',
+      residue: [join(repo, last)],
+    });
+    expect(errors[0]?.message).toContain(`RECIPE_INSTALL_ESCAPE_DETECTED: ${last}`);
+    // The escaped file stays where it landed: nothing outside the repository is deleted.
+    expect(readdirSync(outside)).toEqual(['devai.recipe.json']);
+    // Every earlier publication inside the repository is rolled back; the moved directory and
+    // the link are left.
     expect(existsSync(join(repo, '.agents'))).toBe(false);
     expect(readdirSync(moved)).toEqual(['SKILL.md']);
     expect(lstatSync(join(repo, '.claude/skills/devai-assess')).isSymbolicLink()).toBe(true);
@@ -248,6 +275,45 @@ describe('recipe adapter installation under the production broker (#317)', () =>
     expect(readFileSync(foreign, 'utf8')).toBe('outside\n');
     expect(readdirSync(outside)).toEqual(['entry.txt']);
     expect(readFileSync(join(moved, 'entry.txt'), 'utf8')).toBe('inside\n');
+  });
+
+  it('refuses a removal whose authorized parent is missing at effect time', () => {
+    const missing = join(repo, '.claude/skills/absent-directory/entry.txt');
+
+    expect(() =>
+      underProductionBroker(() =>
+        removeEntryIfIdentitySync(missing, { dev: 1n, ino: 2n, birthtimeNs: 3n }),
+      ),
+    ).toThrow('AUTHORITY_REMOVE_PARENT_ESCAPED');
+  });
+
+  it('checks the parent after a removal that failed, keeping the failure as the cause', () => {
+    const skills = join(repo, '.claude/skills');
+    mkdirSync(skills, { recursive: true });
+    const inside = join(skills, 'entry.txt');
+    writeFileSync(inside, 'inside\n');
+    const stat = lstatSync(inside, { bigint: true });
+
+    const failure = caught(() =>
+      underProductionBroker(
+        () =>
+          removeEntryIfIdentitySync(inside, {
+            dev: stat.dev,
+            ino: stat.ino,
+            birthtimeNs: stat.birthtimeNs,
+          }),
+        (request) => {
+          if (request.symbol !== 'removeEntryIfIdentitySync') return;
+          renameSync(skills, join(fixture, 'moved-skills'));
+          symlinkSync(outside, skills);
+          throw new Error('INJECTED_EFFECT_FAILURE');
+        },
+      ),
+    );
+    expect(failure).toMatchObject({
+      message: expect.stringContaining('AUTHORITY_REMOVE_PARENT_ESCAPED'),
+      cause: expect.objectContaining({ message: 'INJECTED_EFFECT_FAILURE' }),
+    });
   });
 
   it('refuses an identity-bound removal through a link out of the repository for a file it did not publish', () => {
