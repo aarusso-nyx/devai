@@ -14,7 +14,7 @@ import {
 } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { createHash } from 'node:crypto';
-import { REVIEWED_WORKFLOW_STEPS } from './reviewed-workflow-steps.js';
+import { REVIEWED_WORKFLOW_STEPS, type ReviewedWorkflowStep } from './reviewed-workflow-steps.js';
 
 /**
  * Shared workflow YAML parser for Phase 28 harness sensors. Walks
@@ -1095,22 +1095,117 @@ export function workflowStepDigest(step: ExecutionYaml): string | undefined {
   return createHash('sha256').update(JSON.stringify(canonical)).digest('hex');
 }
 
-const REVIEWED_STEP_EFFECTS: ReadonlyMap<string, 'read-only' | 'publication'> = new Map(
-  REVIEWED_WORKFLOW_STEPS.map((entry) => [entry.sha256, entry.effect] as const),
+const REVIEWED_STEPS: ReadonlyMap<string, ReviewedWorkflowStep> = new Map(
+  REVIEWED_WORKFLOW_STEPS.map((entry) => [entry.sha256, entry] as const),
 );
 
-function reviewedStepEffect(step: ExecutionYaml): 'read-only' | 'publication' | undefined {
+function reviewedStep(step: ExecutionYaml): ReviewedWorkflowStep | undefined {
   const digest = workflowStepDigest(step);
-  return digest === undefined ? undefined : REVIEWED_STEP_EFFECTS.get(digest);
+  return digest === undefined ? undefined : REVIEWED_STEPS.get(digest);
+}
+
+/** A repository script a run line names, optionally through the candidate or control checkout. */
+const EXECUTED_SCRIPT =
+  /(?:^|[\s'"=(])(?:candidate\/|release-control\/)?((?:scripts|docs|packages|\.github)\/[A-Za-z0-9_./-]+\.(?:mjs|cjs|js|ts|py|sh))(?=$|[\s'")])/gmu;
+
+/**
+ * The repository files a step executes, by repository-relative path (#325): the action.yml
+ * of a local action, every script a run line names, and the package.json whose scripts a
+ * package-manager command runs (`npm --prefix <dir>` names `<dir>/package.json`), plus
+ * every script a package script the step runs names, one level deep, read through `read`.
+ * Their bytes are bound into the reviewed entry, so changing them re-opens the review.
+ */
+export function stepExecutedFiles(
+  step: ExecutionYaml,
+  read?: (path: string) => string | undefined,
+): readonly string[] {
+  const fields = yamlMap(step);
+  const files = new Set<string>();
+  const use = yamlString(fields?.get('uses'));
+  if (use?.startsWith('./')) files.add(`${use.slice(2).replace(/\/+$/u, '')}/action.yml`);
+  const run = yamlText(fields?.get('run'));
+  if (run !== undefined) {
+    for (const match of run.matchAll(EXECUTED_SCRIPT)) {
+      const path = match[1];
+      if (path !== undefined && !path.split('/').includes('..')) files.add(path);
+    }
+    for (const match of run.matchAll(/\bnpm\s+--prefix\s+([A-Za-z0-9_./-]+)/gu)) {
+      const prefix = match[1];
+      if (prefix !== undefined && !prefix.split('/').includes('..'))
+        files.add(`${prefix.replace(/\/+$/u, '')}/package.json`);
+    }
+    if (/(?:^|[\s;&|(])pnpm\s/mu.test(run) || /(?:^|[\s;&|(])npm\s+(?!--prefix)/mu.test(run))
+      files.add('package.json');
+    // Package scripts the step runs by name: `pnpm run x`, `pnpm x`, `npm [--prefix d] run x`.
+    const invoked: { dir: string; name: string }[] = [];
+    const builtins = new Set([
+      'install',
+      'i',
+      'add',
+      'exec',
+      'dlx',
+      'run',
+      'ci',
+      'pack',
+      'publish',
+    ]);
+    for (const match of run.matchAll(/\bpnpm\s+(?:run\s+)?([a-z][\w:.-]*)/gu)) {
+      const name = match[1];
+      if (name !== undefined && !builtins.has(name)) invoked.push({ dir: '', name });
+    }
+    for (const match of run.matchAll(
+      /\bnpm\s+(?:--prefix\s+([A-Za-z0-9_./-]+)\s+)?run\s+([\w:.-]+)/gu,
+    )) {
+      const name = match[2];
+      if (name !== undefined) invoked.push({ dir: (match[1] ?? '').replace(/\/+$/u, ''), name });
+    }
+    for (const { dir, name } of invoked) {
+      if (read === undefined || dir.split('/').includes('..')) continue;
+      let scripts: unknown;
+      try {
+        scripts = (
+          JSON.parse(read(dir === '' ? 'package.json' : `${dir}/package.json`) ?? '{}') as {
+            scripts?: unknown;
+          }
+        ).scripts;
+      } catch {
+        continue;
+      }
+      const body =
+        typeof scripts === 'object' && scripts !== null
+          ? (scripts as Record<string, unknown>)[name]
+          : undefined;
+      if (typeof body !== 'string') continue;
+      for (const match of body.matchAll(EXECUTED_SCRIPT)) {
+        const path = match[1];
+        if (path !== undefined && !path.split('/').includes('..'))
+          files.add(dir === '' ? path : `${dir}/${path}`);
+      }
+    }
+  }
+  return [...files].sort();
 }
 
 /** Every step of every job in a workflow source with its canonical digest (#325 review aid). */
 export function workflowStepInventory(
   content: string,
-): readonly { job: string; index: number; name: string; sha256: string | undefined }[] {
+  repoRoot?: string,
+): readonly {
+  job: string;
+  index: number;
+  name: string;
+  sha256: string | undefined;
+  files: readonly string[];
+}[] {
   const jobs = yamlMap(yamlMap(executionYaml(content))?.get('jobs'));
   if (!jobs) return [];
-  const out: { job: string; index: number; name: string; sha256: string | undefined }[] = [];
+  const out: {
+    job: string;
+    index: number;
+    name: string;
+    sha256: string | undefined;
+    files: readonly string[];
+  }[] = [];
   for (const [job, definition] of jobs) {
     const steps = yamlMap(definition)?.get('steps');
     if (steps?.kind !== 'list') continue;
@@ -1121,6 +1216,18 @@ export function workflowStepInventory(
         name:
           yamlString(yamlMap(step)?.get('name')) ?? yamlString(yamlMap(step)?.get('uses')) ?? '',
         sha256: workflowStepDigest(step),
+        files: stepExecutedFiles(
+          step,
+          repoRoot === undefined
+            ? undefined
+            : (path) => {
+                try {
+                  return readFileSync(join(repoRoot, path), 'utf8');
+                } catch {
+                  return undefined;
+                }
+              },
+        ),
       });
     });
   }
@@ -1267,8 +1374,8 @@ export function jobEffectFacts(
     uses: ActionStep[];
     bytesSelected: boolean;
     bytesReplaced: boolean;
-    /** Declared effects of steps found in the reviewed-step registry (#325). */
-    reviewed: Effect[];
+    /** Steps found in the reviewed-step registry (#325), verified once the root is known. */
+    reviewed: { entry: ReviewedWorkflowStep; step: ExecutionYaml }[];
   };
   function executionSteps(value: ExecutionYaml | undefined): Executions | undefined {
     if (value?.kind !== 'list') return undefined;
@@ -1296,13 +1403,13 @@ export function jobEffectFacts(
       // A reviewed step contributes its declared effect; its inputs, env and the bytes it
       // runs were judged in review against its exact canonical YAML (#325). A byte selector
       // among reviewed steps still replaces the bytes any later unreviewed step would run.
-      const reviewed = reviewedStepEffect(step);
+      const reviewed = reviewedStep(step);
       if (reviewed !== undefined) {
         const reference = yamlString(yamlMap(step)?.get('uses'));
         const remote = reference === undefined ? undefined : remoteActionReference(reference);
         if (remote && REGISTERED_ACTIONS.get(remote.target)?.bytesSelector)
           result.bytesSelected = true;
-        result.reviewed.push(reviewed);
+        result.reviewed.push({ entry: reviewed, step });
         continue;
       }
       const fields = yamlMap(step);
@@ -2283,6 +2390,32 @@ export function jobEffectFacts(
     return result;
   }
 
+  /**
+   * A reviewed step keeps its reviewed effect only while the files it executes hold the
+   * reviewed bytes in the candidate tree; a missing, escaping, or changed file, or a file set
+   * that differs from the entry's, reads unknown (#325).
+   */
+  function reviewedEffect(reviewed: { entry: ReviewedWorkflowStep; step: ExecutionYaml }): Effect {
+    const expected = stepExecutedFiles(reviewed.step, (path) => contained(path)?.source);
+    const bound = reviewed.entry.files;
+    if (
+      expected.length !== bound.length ||
+      expected.some((path, index) => bound[index]?.path !== path)
+    )
+      return 'unknown';
+    for (const file of bound) {
+      const resolved = contained(file.path);
+      if (!resolved) return 'unknown';
+      try {
+        if (createHash('sha256').update(readFileSync(resolved.path)).digest('hex') !== file.sha256)
+          return 'unknown';
+      } catch {
+        return 'unknown';
+      }
+    }
+    return reviewed.entry.effect;
+  }
+
   function actionEffect(use: string, inputs?: Map<string, ExecutionYaml>): Effect {
     // Structural YAML has decoded this scalar exactly once.
     if (use.includes('${{') || /\s/u.test(use)) return 'unknown';
@@ -2341,7 +2474,7 @@ export function jobEffectFacts(
       if (!nested || nested.bytesSelected) return 'unknown';
       let result: Effect = 'read-only';
       for (const script of nested.scripts) result = combine(result, scriptEffect(script));
-      for (const declared of nested.reviewed) result = combine(result, declared);
+      for (const declared of nested.reviewed) result = combine(result, reviewedEffect(declared));
       for (const step of nested.uses)
         result = combine(result, actionEffect(step.reference, step.inputs));
       return result;
@@ -2351,7 +2484,7 @@ export function jobEffectFacts(
   }
   if (!root) mark('unknown');
   for (const script of executions?.scripts ?? []) mark(scriptEffect(script));
-  for (const declared of executions?.reviewed ?? []) mark(declared);
+  for (const declared of executions?.reviewed ?? []) mark(reviewedEffect(declared));
   for (const step of executions?.uses ?? []) mark(actionEffect(step.reference, step.inputs));
   return {
     effect,
