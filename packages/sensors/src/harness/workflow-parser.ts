@@ -1108,82 +1108,209 @@ function reviewedStep(step: ExecutionYaml): ReviewedWorkflowStep | undefined {
 const EXECUTED_SCRIPT =
   /(?:^|[\s'"=(])(?:candidate\/|release-control\/)?((?:scripts|docs|packages|\.github)\/[A-Za-z0-9_./-]+\.(?:mjs|cjs|js|ts|py|sh))(?=$|[\s'")])/gmu;
 
+/** Reads a repository-relative text file, or lists a repository-relative directory. */
+export interface ExecutedFileReader {
+  readonly read: (path: string) => string | undefined;
+  readonly list: (path: string) => readonly string[] | undefined;
+}
+
+const PNPM_BUILTINS = new Set([
+  'install',
+  'i',
+  'add',
+  'remove',
+  'exec',
+  'dlx',
+  'run',
+  'ci',
+  'pack',
+  'publish',
+  'view',
+]);
+/** Lifecycle scripts a package manager runs for an install in that package. */
+const INSTALL_LIFECYCLE = ['preinstall', 'install', 'postinstall', 'prepare'];
+
+function joinRelative(dir: string, path: string): string {
+  return dir === '' ? path : `${dir}/${path}`;
+}
+
 /**
  * The repository files a step executes, by repository-relative path (#325): the action.yml
- * of a local action, every script a run line names, and the package.json whose scripts a
- * package-manager command runs (`npm --prefix <dir>` names `<dir>/package.json`), plus
- * every script a package script the step runs names, one level deep, read through `read`.
- * Their bytes are bound into the reviewed entry, so changing them re-opens the review.
+ * of a local action, every script a run line names, and, through `reader`, every package
+ * script the step runs. A package script is followed with its npm `pre`/`post` scripts, the
+ * install lifecycle of an install, nested `npm run`, `pnpm run`, `pnpm <script>` and
+ * `pnpm -r <script>` invocations across the workspace, and the scripts each body names; every
+ * package.json consulted is bound too. Resolution fails closed: a missing package.json, a
+ * named script that does not exist, an unparsed package-runner form (`pnpm --filter`, `npx`,
+ * `yarn`, a computed prefix), a workspace pattern other than `dir/*`, or depth beyond eight
+ * yields undefined, so the step reads unknown. Without a reader only the direct files are
+ * listed. Scripts run from the `release-control/` checkout are bound to the candidate tree's
+ * copy; that checkout is the pinned process-control commit the release flow rehearses.
  */
 export function stepExecutedFiles(
   step: ExecutionYaml,
-  read?: (path: string) => string | undefined,
-): readonly string[] {
+  reader?: ExecutedFileReader,
+): readonly string[] | undefined {
   const fields = yamlMap(step);
   const files = new Set<string>();
   const use = yamlString(fields?.get('uses'));
   if (use?.startsWith('./')) files.add(`${use.slice(2).replace(/\/+$/u, '')}/action.yml`);
   const run = yamlText(fields?.get('run'));
-  if (run !== undefined) {
-    for (const match of run.matchAll(EXECUTED_SCRIPT)) {
+  if (run === undefined) return [...files].sort();
+  let complete = true;
+  const safe = (path: string): boolean => path !== '' && !path.split('/').includes('..');
+  const scripts = (body: string, dir: string): void => {
+    for (const match of body.matchAll(EXECUTED_SCRIPT)) {
       const path = match[1];
-      if (path !== undefined && !path.split('/').includes('..')) files.add(path);
+      if (path === undefined || !safe(path)) complete = false;
+      else files.add(joinRelative(dir, path));
     }
-    for (const match of run.matchAll(/\bnpm\s+--prefix\s+([A-Za-z0-9_./-]+)/gu)) {
-      const prefix = match[1];
-      if (prefix !== undefined && !prefix.split('/').includes('..'))
-        files.add(`${prefix.replace(/\/+$/u, '')}/package.json`);
-    }
-    if (/(?:^|[\s;&|(])pnpm\s/mu.test(run) || /(?:^|[\s;&|(])npm\s+(?!--prefix)/mu.test(run))
-      files.add('package.json');
-    // Package scripts the step runs by name: `pnpm run x`, `pnpm x`, `npm [--prefix d] run x`.
-    const invoked: { dir: string; name: string }[] = [];
-    const builtins = new Set([
-      'install',
-      'i',
-      'add',
-      'exec',
-      'dlx',
-      'run',
-      'ci',
-      'pack',
-      'publish',
-    ]);
-    for (const match of run.matchAll(/\bpnpm\s+(?:run\s+)?([a-z][\w:.-]*)/gu)) {
-      const name = match[1];
-      if (name !== undefined && !builtins.has(name)) invoked.push({ dir: '', name });
-    }
-    for (const match of run.matchAll(
-      /\bnpm\s+(?:--prefix\s+([A-Za-z0-9_./-]+)\s+)?run\s+([\w:.-]+)/gu,
-    )) {
-      const name = match[2];
-      if (name !== undefined) invoked.push({ dir: (match[1] ?? '').replace(/\/+$/u, ''), name });
-    }
-    for (const { dir, name } of invoked) {
-      if (read === undefined || dir.split('/').includes('..')) continue;
-      let scripts: unknown;
-      try {
-        scripts = (
-          JSON.parse(read(dir === '' ? 'package.json' : `${dir}/package.json`) ?? '{}') as {
-            scripts?: unknown;
-          }
-        ).scripts;
-      } catch {
-        continue;
-      }
-      const body =
-        typeof scripts === 'object' && scripts !== null
-          ? (scripts as Record<string, unknown>)[name]
+  };
+  const manifests = new Map<string, Record<string, unknown> | undefined>();
+  const manifest = (dir: string): Record<string, unknown> | undefined => {
+    if (manifests.has(dir)) return manifests.get(dir);
+    const path = joinRelative(dir, 'package.json');
+    files.add(path);
+    let value: Record<string, unknown> | undefined;
+    try {
+      const parsed = JSON.parse(reader?.read(path) ?? 'null') as { scripts?: unknown } | null;
+      const table = parsed?.scripts ?? {};
+      value =
+        parsed !== null && typeof table === 'object' && table !== null && !Array.isArray(table)
+          ? (table as Record<string, unknown>)
           : undefined;
-      if (typeof body !== 'string') continue;
-      for (const match of body.matchAll(EXECUTED_SCRIPT)) {
-        const path = match[1];
-        if (path !== undefined && !path.split('/').includes('..'))
-          files.add(dir === '' ? path : `${dir}/${path}`);
+    } catch {
+      value = undefined;
+    }
+    manifests.set(dir, value);
+    return value;
+  };
+  const workspace = (): readonly string[] | undefined => {
+    const text = reader?.read('pnpm-workspace.yaml');
+    if (text === undefined) return undefined;
+    const patterns = [...text.matchAll(/^\s*-\s*['"]?([^'"\s#]+)['"]?\s*$/gmu)].map(
+      (m) => m[1] ?? '',
+    );
+    const dirs: string[] = [];
+    for (const pattern of patterns) {
+      const match = /^([A-Za-z0-9_.-]+)\/\*$/u.exec(pattern);
+      if (!match?.[1]) return undefined;
+      const children = reader?.list(match[1]);
+      if (children === undefined) return undefined;
+      for (const child of children) {
+        const dir = `${match[1]}/${child}`;
+        if (reader?.read(`${dir}/package.json`) !== undefined) dirs.push(dir);
       }
     }
+    return dirs.sort();
+  };
+  const visited = new Set<string>();
+  const runScript = (dir: string, name: string, required: boolean, depth: number): void => {
+    if (!complete) return;
+    if (depth > 8) {
+      complete = false;
+      return;
+    }
+    const key = `${dir}\u0000${name}`;
+    if (visited.has(key)) return;
+    visited.add(key);
+    const table = manifest(dir);
+    if (table === undefined) {
+      complete = false;
+      return;
+    }
+    const body = table[name];
+    if (body === undefined) {
+      if (required) complete = false;
+      return;
+    }
+    if (typeof body !== 'string') {
+      complete = false;
+      return;
+    }
+    if (required) {
+      runScript(dir, `pre${name}`, false, depth + 1);
+    }
+    command(body, dir, depth + 1);
+    if (required) runScript(dir, `post${name}`, false, depth + 1);
+  };
+  const install = (dir: string, depth: number): void => {
+    for (const name of INSTALL_LIFECYCLE) runScript(dir, name, false, depth);
+  };
+  // One shell text, run in package directory `dir`: its scripts and package-runner calls.
+  const command = (text: string, dir: string, depth: number): void => {
+    scripts(text, dir);
+    if (/(?:^|[\s;&|(])(?:npx|yarn|bun)\s/mu.test(text)) complete = false;
+    for (const match of text.matchAll(/(?:^|[\s;&|(])pnpm((?:[ \t]+[^\s;&|)]+)+)/gmu)) {
+      const words = (match[1] ?? '').trim().split(/\s+/u);
+      let index = 0;
+      let recursive = false;
+      while (words[index]?.startsWith('-') === true) {
+        const flag = words[index] ?? '';
+        if (flag === '-r' || flag === '--recursive') recursive = true;
+        else if (!['--frozen-lockfile', '--silent', '-s'].includes(flag)) {
+          complete = false;
+          return;
+        }
+        index++;
+      }
+      let name = words[index] ?? '';
+      if (name === 'run') name = words[index + 1] ?? '';
+      else if (name === 'install' || name === 'i') {
+        if (recursive) complete = false;
+        else install(dir, depth);
+        continue;
+      } else if (PNPM_BUILTINS.has(name)) continue;
+      if (!/^[a-z][\w:.-]*$/u.test(name)) {
+        complete = false;
+        return;
+      }
+      if (recursive) {
+        const dirs = workspace();
+        if (dirs === undefined) {
+          complete = false;
+          return;
+        }
+        for (const member of dirs) runScript(member, name, false, depth);
+      } else runScript(dir, name, true, depth);
+    }
+    for (const match of text.matchAll(/(?:^|[\s;&|(])npm((?:[ \t]+[^\s;&|)]+)+)/gmu)) {
+      const words = (match[1] ?? '').trim().split(/\s+/u);
+      let target = dir;
+      let index = 0;
+      if (words[0] === '--prefix') {
+        const prefix = (words[1] ?? '').replace(/\/+$/u, '');
+        if (!/^[A-Za-z0-9_./-]+$/u.test(prefix) || !safe(prefix)) {
+          // A computed prefix (`"$project"`) names a directory outside the tree.
+          if (/^["']?\$/u.test(prefix)) continue;
+          complete = false;
+          return;
+        }
+        target = joinRelative(dir, prefix);
+        index = 2;
+      }
+      const verb = words[index] ?? '';
+      if (verb === 'run' || verb === 'run-script') {
+        const name = words[index + 1] ?? '';
+        if (!/^[a-z][\w:.-]*$/u.test(name)) {
+          complete = false;
+          return;
+        }
+        runScript(target, name, true, depth);
+      } else if (verb === 'ci' || verb === 'install' || verb === 'i') {
+        // An install of a named package or tarball elsewhere runs no repository script; a bare
+        // install in the package runs its install lifecycle.
+        if (words.length === index + 1) install(target, depth);
+        else manifest(target);
+      } else manifest(target);
+    }
+  };
+  if (reader === undefined) {
+    scripts(run, '');
+    return [...files].sort();
   }
-  return [...files].sort();
+  command(run, '', 0);
+  return complete ? [...files].sort() : undefined;
 }
 
 /** Every step of every job in a workflow source with its canonical digest (#325 review aid). */
@@ -1195,7 +1322,7 @@ export function workflowStepInventory(
   index: number;
   name: string;
   sha256: string | undefined;
-  files: readonly string[];
+  files: readonly string[] | undefined;
 }[] {
   const jobs = yamlMap(yamlMap(executionYaml(content))?.get('jobs'));
   if (!jobs) return [];
@@ -1204,7 +1331,7 @@ export function workflowStepInventory(
     index: number;
     name: string;
     sha256: string | undefined;
-    files: readonly string[];
+    files: readonly string[] | undefined;
   }[] = [];
   for (const [job, definition] of jobs) {
     const steps = yamlMap(definition)?.get('steps');
@@ -1220,12 +1347,24 @@ export function workflowStepInventory(
           step,
           repoRoot === undefined
             ? undefined
-            : (path) => {
-                try {
-                  return readFileSync(join(repoRoot, path), 'utf8');
-                } catch {
-                  return undefined;
-                }
+            : {
+                read: (path) => {
+                  try {
+                    return readFileSync(join(repoRoot, path), 'utf8');
+                  } catch {
+                    return undefined;
+                  }
+                },
+                list: (path) => {
+                  try {
+                    return readdirSync(join(repoRoot, path), { withFileTypes: true })
+                      .filter((entry) => entry.isDirectory())
+                      .map((entry) => entry.name)
+                      .sort();
+                  } catch {
+                    return undefined;
+                  }
+                },
               },
         ),
       });
@@ -2396,9 +2535,27 @@ export function jobEffectFacts(
    * that differs from the entry's, reads unknown (#325).
    */
   function reviewedEffect(reviewed: { entry: ReviewedWorkflowStep; step: ExecutionYaml }): Effect {
-    const expected = stepExecutedFiles(reviewed.step, (path) => contained(path)?.source);
+    const expected = stepExecutedFiles(reviewed.step, {
+      read: (path) => contained(path)?.source,
+      list: (path) => {
+        if (!root || path.split('/').includes('..')) return undefined;
+        try {
+          const directory = resolve(root, path);
+          const real = realpathSync(directory);
+          const rel = relative(root, real);
+          if (!rel || rel.startsWith('..') || isAbsolute(rel)) return undefined;
+          return readdirSync(real, { withFileTypes: true })
+            .filter((entry) => entry.isDirectory())
+            .map((entry) => entry.name)
+            .sort();
+        } catch {
+          return undefined;
+        }
+      },
+    });
     const bound = reviewed.entry.files;
     if (
+      expected === undefined ||
       expected.length !== bound.length ||
       expected.some((path, index) => bound[index]?.path !== path)
     )
