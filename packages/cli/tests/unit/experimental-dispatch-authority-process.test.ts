@@ -2,7 +2,8 @@
 // process of an in-progress agent task, at its model or the one bumped tier, inside that
 // task's own attempt worktree.
 import type { AuthorityHostEffectRequest } from '@devai-nyx/authority';
-import { agentCliInvocation } from '@devai-nyx/skills';
+import { EXPERIMENTAL_SANDBOX_BY_RUNTIME } from '@devai-nyx/evidence';
+import { agentCliInvocation, agentCliSandbox } from '@devai-nyx/skills';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -189,5 +190,23 @@ describe('experimental agent process matching', () => {
         withArgs(codex(), (args) => [...args.slice(0, -1), '--add-dir', root, '-']),
       ),
     ).toBeUndefined();
+  });
+});
+
+describe('the evidence sandbox mirror', () => {
+  // ADR-MDL-0008: the evidence binding checks each runtime's complete confinement flags, so
+  // its mirror must equal what the adapters pass and the broker asserts.
+  it('equals the agent CLI adapters mode and flags for every runtime', () => {
+    expect(Object.keys(EXPERIMENTAL_SANDBOX_BY_RUNTIME).sort()).toEqual([
+      'claude-cli',
+      'codex-cli',
+    ]);
+    for (const runtime of ['claude-cli', 'codex-cli'] as const) {
+      const sandbox = agentCliSandbox(runtime, 'linux');
+      expect(EXPERIMENTAL_SANDBOX_BY_RUNTIME[runtime]).toEqual({
+        mode: sandbox.mode,
+        flags: [...sandbox.flags],
+      });
+    }
   });
 });
