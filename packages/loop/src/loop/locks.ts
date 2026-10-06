@@ -397,12 +397,15 @@ export function holdsLiveLocks(opts: {
  * this refuses with `TASK_RESOURCE_LOCK_LOST` without writing anything. A record with less
  * than `COMPLETION_LOCK_MARGIN_MS` left is first renewed in place -- a swap of exactly the
  * record observed, which a takeover since would make fail -- so no takeover can land
- * between this check and the completion's release.
+ * between this check and the completion's release. A renewed record gets `ttlMs`
+ * (default `DEFAULT_LOCK_TTL_MS`; a task that keeps waiting passes the waiting lease),
+ * never its own possibly short TTL.
  */
 export function assertLockOwnership(opts: {
   readonly locksDir: string;
   readonly taskId: string;
   readonly targets: readonly string[];
+  readonly ttlMs?: number;
 }): void {
   const inspection = inspectLocks(opts);
   if (inspection.lost.length > 0) throw new TaskServiceError('TASK_RESOURCE_LOCK_LOST');
@@ -411,7 +414,12 @@ export function assertLockOwnership(opts: {
     .filter(({ record }) => remainingMs(record, now) < COMPLETION_LOCK_MARGIN_MS)
     .map(({ target }) => target);
   if (expiring.length === 0) return;
-  const renewal = renewLocks({ locksDir: opts.locksDir, taskId: opts.taskId, targets: expiring });
+  const renewal = renewLocks({
+    locksDir: opts.locksDir,
+    taskId: opts.taskId,
+    targets: expiring,
+    ttlMs: opts.ttlMs ?? DEFAULT_LOCK_TTL_MS,
+  });
   if (renewal.lost.length > 0) throw new TaskServiceError('TASK_RESOURCE_LOCK_LOST');
 }
 

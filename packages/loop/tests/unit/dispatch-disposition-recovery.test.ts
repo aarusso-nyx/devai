@@ -40,7 +40,12 @@ import {
   readDispatchJournal,
   type DispatchJournalEntry,
 } from '../../src/loop/dispatch-journal.js';
-import { acquireLocks, inspectLocks, taskLockTargets } from '../../src/loop/locks.js';
+import {
+  WAITING_LOCK_TTL_MS,
+  acquireLocks,
+  inspectLocks,
+  taskLockTargets,
+} from '../../src/loop/locks.js';
 import { ratifyRoundTask } from '../../src/loop/ratification.js';
 import { acquireRoundController, releaseRoundController } from '../../src/loop/round-controller.js';
 import { escalateRoundTask, finishRoundTask } from '../../src/loop/task-services.js';
@@ -622,6 +627,89 @@ describe('a lock taken over while an agent task waits is caught before acceptanc
           targets: taskLockTargets(task),
         }).lost,
       ).toEqual([]);
+    });
+  });
+
+  it('refuses to apply a recorded acceptance after a takeover when the ratification is retried', async () => {
+    const root = repository();
+    const task = await effects(() => {
+      const value = withWorktree(root, agentTask('TASK-0353', 'awaiting_human_review'));
+      saveTask(root, value);
+      acquireLocks({ locksDir: locksDir(root), taskId: value.id, targets: taskLockTargets(value) });
+      journal(root, value.id, 1, 5);
+      return value;
+    });
+    const taskFile = join(root, '.devai/state/tasks/TASK-0353.json');
+    // The decision is recorded, then the process stops before the task moves to pre_merge.
+    await effects(
+      () => {
+        expect(() =>
+          ratifyRoundTask({
+            repoRoot: root,
+            round: ROUND,
+            taskId: task.id,
+            decision: 'accept',
+            role: 'owner',
+          }),
+        ).toThrow('INTERRUPTED');
+      },
+      (request, apply) => {
+        if (request.symbol === 'writeFileSync' && request.arguments[0] === taskFile) {
+          throw new Error('INTERRUPTED');
+        }
+        return apply();
+      },
+    );
+    expect(existsSync(join(root, '.devai/state/round-runs', ROUND, 'ratifications'))).toBe(true);
+
+    await effects(() => {
+      takeOver(root, task);
+      expect(() =>
+        ratifyRoundTask({
+          repoRoot: root,
+          round: ROUND,
+          taskId: task.id,
+          decision: 'accept',
+          role: 'owner',
+        }),
+      ).toThrow('TASK_RESOURCE_LOCK_LOST');
+      expect(loadTask(root, task.id).status).toBe('awaiting_human_review');
+    });
+  });
+
+  it('renews an expired own lock with the waiting lease before recording an acceptance', async () => {
+    const root = repository();
+    await effects(() => {
+      const task = withWorktree(root, agentTask('TASK-0354', 'awaiting_human_review'));
+      saveTask(root, task);
+      acquireLocks({
+        locksDir: locksDir(root),
+        taskId: task.id,
+        targets: taskLockTargets(task),
+        ttlMs: 1,
+      });
+      const start = Date.now();
+      while (Date.now() - start < 5) {
+        // let the one-millisecond record expire, untaken
+      }
+      journal(root, task.id, 1, 5);
+
+      ratifyRoundTask({
+        repoRoot: root,
+        round: ROUND,
+        taskId: task.id,
+        decision: 'accept',
+        role: 'owner',
+      });
+
+      expect(loadTask(root, task.id).status).toBe('pre_merge');
+      const [held] = inspectLocks({
+        locksDir: locksDir(root),
+        taskId: task.id,
+        targets: taskLockTargets(task),
+      }).held;
+      expect(held?.record.ttl_ms).toBe(WAITING_LOCK_TTL_MS);
+      expect(Date.parse(held?.record.acquired_at ?? '')).toBeGreaterThanOrEqual(start + 5);
     });
   });
 

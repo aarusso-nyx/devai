@@ -21,7 +21,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { escalateAgentTask, taskDispatchBlockers } from './dispatch-disposition.js';
 import { fsyncDirectorySync, mkdirDurableSync, writeAllSync } from './durable-files.js';
-import { inspectLocks, taskLockTargets } from './locks.js';
+import { WAITING_LOCK_TTL_MS, assertLockOwnership, taskLockTargets } from './locks.js';
 import { acquireRoundController, releaseRoundController } from './round-controller.js';
 import { loadTask, saveTask, type TaskRecord } from './tasks.js';
 import { fail, requireActiveTaskRound } from './task-queue-services.js';
@@ -142,6 +142,22 @@ function applyDecision(repoRoot: string, roundId: string, record: RatificationRe
 }
 
 /**
+ * Prove, before an acceptance is recorded or applied, that the task still owns every key,
+ * refusing with `TASK_RESOURCE_LOCK_LOST` after a takeover while it awaited review (the
+ * attempt no longer had exclusive resources; rejecting it escalates as usual). A lapsing or
+ * expired own record is renewed by an exact-record swap with the waiting lease, since the
+ * accepted task keeps waiting for its merge, so no takeover lands before the acceptance.
+ */
+function secureAcceptedLocks(repoRoot: string, task: TaskRecord): void {
+  assertLockOwnership({
+    locksDir: join(repoRoot, '.devai/state/locks'),
+    taskId: task.id,
+    targets: taskLockTargets(task),
+    ttlMs: WAITING_LOCK_TTL_MS,
+  });
+}
+
+/**
  * Record one human decision on an agent task awaiting review: accept moves it to
  * pre_merge, reject escalates it. It holds the round controller throughout. Human
  * executors are refused: they complete through their own evidence contract with `task
@@ -177,7 +193,9 @@ export function ratifyRoundTask(options: {
       }
       if (task.status === prior.resulting_status) return prior;
       if (task.status !== 'awaiting_human_review') fail('RATIFICATION_EXISTS');
-      // The decision was recorded but its transition was interrupted: complete it.
+      // The decision was recorded but its transition was interrupted: complete it. A
+      // recorded acceptance is applied only while the task still owns its locks.
+      if (prior.decision === 'accept') secureAcceptedLocks(options.repoRoot, task);
       applyDecision(options.repoRoot, roundId, prior);
       return prior;
     }
@@ -186,18 +204,7 @@ export function ratifyRoundTask(options: {
       // Reviewed evidence must come from a settled attempt; uncertain work needs a disposition.
       fail('TASK_DISPATCH_UNCERTAIN');
     }
-    if (
-      options.decision === 'accept' &&
-      inspectLocks({
-        locksDir: join(options.repoRoot, '.devai/state/locks'),
-        taskId: task.id,
-        targets: taskLockTargets(task),
-      }).lost.length > 0
-    ) {
-      // A key taken over while the task awaited review: the attempt no longer had exclusive
-      // resources, so it is never accepted (rejecting it escalates as usual).
-      fail('TASK_RESOURCE_LOCK_LOST');
-    }
+    if (options.decision === 'accept') secureAcceptedLocks(options.repoRoot, task);
     const record: RatificationRecord = {
       schemaVersion: '1.0.0',
       round_id: roundId,
