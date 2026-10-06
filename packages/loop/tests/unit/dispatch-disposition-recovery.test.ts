@@ -49,6 +49,7 @@ import {
 import { ratifyRoundTask } from '../../src/loop/ratification.js';
 import { acquireRoundController, releaseRoundController } from '../../src/loop/round-controller.js';
 import { escalateRoundTask, finishRoundTask } from '../../src/loop/task-services.js';
+import { computeManifestHash, extractManifestInputs } from '@devai-nyx/evidence';
 import { listTasks, loadTask, saveTask, type TaskRecord } from '../../src/loop/tasks.js';
 import { createWorktree, listWorktrees, retainWorktree } from '../../src/loop/worktrees.js';
 
@@ -397,31 +398,64 @@ describe('an interrupted disposition resumes (FIX 5)', () => {
 });
 
 /**
- * Writes the evidence chain `task finish` resolves merge evidence against (#319). Each entry
- * carries only the fields the resolver reads; the chain writer itself is exercised end to end
- * by the CLI experimental-recovery suite.
+ * Writes the evidence chain `task finish` resolves merge evidence against (#319): schema-valid
+ * records whose manifest hashes and predecessor links pass the evidence package's
+ * `verifyChain`, so the context can name a task as no verb writer does.
  */
 function recordEvidence(
   root: string,
   entries: readonly { id: string; task_id?: string | null; notes?: string[] }[],
 ): void {
   mkdirSync(join(root, 'record/proofs'), { recursive: true });
-  const records = entries.map((entry) => ({
-    schemaVersion: '1.0.0',
-    id: entry.id,
-    action: 'evidence record',
-    status: 'completed',
-    context: {
-      repo_root: root,
-      task_id: entry.task_id ?? null,
-      git: { head_sha: null, dirty_files: [] },
-    },
-    artifacts: [],
-    ...(entry.notes === undefined ? {} : { notes: entry.notes }),
-  }));
-  writeFileSync(
-    join(root, 'record/proofs/chain.json'),
-    `${JSON.stringify({ head: null, records }, null, 2)}\n`,
+  let previous: string | null = null;
+  const records = entries.map((entry, index) => {
+    const draft = {
+      schemaVersion: '1.0.0' as const,
+      id: entry.id,
+      timestamp: new Date(Date.UTC(2026, 9, 6, 0, 0, index)).toISOString(),
+      actor: 'devai',
+      actor_role: 'harness',
+      action: 'evidence record',
+      status: 'completed',
+      context: {
+        repo_root: root,
+        task_id: entry.task_id ?? null,
+        git: { head_sha: null, dirty_files: [] },
+      },
+      artifacts: [],
+      ...(entry.notes === undefined ? {} : { notes: entry.notes }),
+      previous_run_hash: previous,
+      manifest_hash: '',
+    };
+    draft.manifest_hash = computeManifestHash(extractManifestInputs(draft));
+    previous = draft.manifest_hash;
+    return draft;
+  });
+  writeChain(root, { head: previous, records });
+}
+
+function writeChain(root: string, chain: unknown): void {
+  mkdirSync(join(root, 'record/proofs'), { recursive: true });
+  writeFileSync(join(root, 'record/proofs/chain.json'), `${JSON.stringify(chain, null, 2)}\n`);
+}
+
+function readChain(root: string): { head: string | null; records: Record<string, unknown>[] } {
+  return JSON.parse(readFileSync(join(root, 'record/proofs/chain.json'), 'utf8')) as {
+    head: string | null;
+    records: Record<string, unknown>[];
+  };
+}
+
+/** Every lock file's bytes, to prove a refusal renewed nothing. */
+function lockBytes(root: string): Record<string, string> {
+  const dir = join(root, '.devai/state/locks');
+  return Object.fromEntries(
+    readdirSync(dir, { recursive: true, withFileTypes: true })
+      .filter((entry) => entry.isFile())
+      .map((entry) => {
+        const path = join(entry.parentPath, entry.name);
+        return [path, readFileSync(path, 'utf8')];
+      }),
   );
 }
 
@@ -583,9 +617,10 @@ describe('agent completion is durable before it releases anything (FIX 4, FIX 8)
     expect(loadTask(root, 'TASK-0341').status).toBe('completed');
   });
 
-  it('refuses merge evidence the chain does not hold or that names another task or round (#319)', async () => {
+  it('refuses merge evidence the chain does not hold, cannot verify, or binds elsewhere, writing nothing (#319)', async () => {
     const root = repository();
     await accepted(root);
+    const locks = lockBytes(root);
     const finish = (evidence: string[]) => () =>
       finishRoundTask({ repoRoot: root, round: ROUND, taskId: 'TASK-0341', evidence });
     await effects(() => {
@@ -604,6 +639,27 @@ describe('agent completion is durable before it releases anything (FIX 4, FIX 8)
       expect(finish(['EV-1111111111111111'])).toThrow('TASK_MERGE_EVIDENCE_REQUIRED');
       expect(finish(['EV-2222222222222222'])).toThrow('TASK_MERGE_EVIDENCE_REQUIRED');
     });
+    const intact = readChain(root);
+    // A readable chain whose referenced entry is a bare id is not evidence.
+    writeChain(root, { head: null, records: [{ id: 'EV-0123456789abcdef' }] });
+    await effects(() => {
+      expect(finish(['EV-0123456789abcdef'])).toThrow('TASK_MERGE_EVIDENCE_REQUIRED');
+    });
+    // An entry whose manifest hash no longer recomputes breaks the chain.
+    writeChain(root, {
+      ...intact,
+      records: intact.records.map((record, index) =>
+        index === 0 ? { ...record, action: 'evidence forged' } : record,
+      ),
+    });
+    await effects(() => {
+      expect(finish(['EV-0123456789abcdef'])).toThrow('TASK_MERGE_EVIDENCE_REQUIRED');
+    });
+    // A dropped predecessor breaks the links of every later entry.
+    writeChain(root, { ...intact, records: intact.records.slice(1) });
+    await effects(() => {
+      expect(finish(['EV-1111111111111111'])).toThrow('TASK_MERGE_EVIDENCE_REQUIRED');
+    });
     // An unreadable chain resolves nothing.
     writeFileSync(join(root, 'record/proofs/chain.json'), '{"head":null,"rec');
     await effects(() => {
@@ -613,12 +669,86 @@ describe('agent completion is durable before it releases anything (FIX 4, FIX 8)
     await effects(() => {
       expect(finish(['EV-0123456789abcdef'])).toThrow('TASK_MERGE_EVIDENCE_REQUIRED');
     });
-    // Nothing was recorded or released by any refusal.
+    // Nothing was recorded, renewed or released by any refusal.
+    expect(lockBytes(root)).toEqual(locks);
     expect(existsSync(completionPath(root))).toBe(false);
     expect(loadTask(root, 'TASK-0341').status).toBe('pre_merge');
     expect(listWorktrees({ repoRoot: root }).map((worktree) => worktree.id)).toEqual([
       'WT-TASK-0341-A1',
     ]);
+  });
+
+  it('revalidates the completion record and its evidence on a retry from merging (#319)', async () => {
+    const root = repository();
+    await accepted(root);
+    const taskFile = join(root, '.devai/state/tasks/TASK-0341.json');
+    await effects(
+      () => {
+        expect(() =>
+          finishRoundTask({
+            repoRoot: root,
+            round: ROUND,
+            taskId: 'TASK-0341',
+            evidence: ['EV-0123456789abcdef'],
+          }),
+        ).toThrow('INTERRUPTED');
+      },
+      (request, apply) => {
+        if (
+          request.symbol === 'writeFileSync' &&
+          request.arguments[0] === taskFile &&
+          String(request.arguments[1]).includes('"status": "completed"')
+        ) {
+          throw new Error('INTERRUPTED');
+        }
+        return apply();
+      },
+    );
+    expect(loadTask(root, 'TASK-0341').status).toBe('merging');
+    const finish = (evidence?: string[]) => () =>
+      finishRoundTask({
+        repoRoot: root,
+        round: ROUND,
+        taskId: 'TASK-0341',
+        ...(evidence === undefined ? {} : { evidence }),
+      });
+    const ratification = join(
+      root,
+      '.devai/state/round-runs',
+      ROUND,
+      'ratifications/TASK-0341.json',
+    );
+    const ratified = readFileSync(ratification, 'utf8');
+    const chain = readFileSync(join(root, 'record/proofs/chain.json'), 'utf8');
+    await effects(() => {
+      // No evidence, or evidence other than the record names, does not complete it.
+      expect(finish()).toThrow('TASK_MERGE_EVIDENCE_REQUIRED');
+      expect(finish(['EV-fedcba9876543210'])).toThrow('TASK_COMPLETION_CONFLICT');
+    });
+    // The recorded evidence must still resolve.
+    rmSync(join(root, 'record'), { recursive: true, force: true });
+    await effects(() => {
+      expect(finish(['EV-0123456789abcdef'])).toThrow('TASK_MERGE_EVIDENCE_REQUIRED');
+    });
+    mkdirSync(join(root, 'record/proofs'), { recursive: true });
+    writeFileSync(join(root, 'record/proofs/chain.json'), chain);
+    // The ratification bytes the record binds must be unchanged.
+    writeFileSync(ratification, `${ratified}\n`);
+    await effects(() => {
+      expect(finish(['EV-0123456789abcdef'])).toThrow('TASK_COMPLETION_CONFLICT');
+    });
+    writeFileSync(ratification, ratified);
+    // A missing completion record cannot be rebuilt from merging.
+    const completion = readFileSync(completionPath(root), 'utf8');
+    rmSync(completionPath(root));
+    await effects(() => {
+      expect(finish(['EV-0123456789abcdef'])).toThrow('TASK_COMPLETION_CONFLICT');
+    });
+    writeFileSync(completionPath(root), completion);
+    expect(loadTask(root, 'TASK-0341').status).toBe('merging');
+    await effects(() => {
+      expect(finish(['EV-0123456789abcdef'])().status).toBe('completed');
+    });
   });
 
   it('moves a truncated completion record aside instead of accepting it', async () => {
@@ -786,6 +916,7 @@ describe('a lock taken over while an agent task waits is caught before acceptanc
 
   it('refuses to finish an accepted task whose lock was taken over, before writing anything', async () => {
     const root = repository();
+    recordEvidence(root, [{ id: 'EV-0123456789abcdef' }]);
     await effects(() => {
       const task = withWorktree(root, agentTask('TASK-0352', 'awaiting_human_review'));
       saveTask(root, task);
