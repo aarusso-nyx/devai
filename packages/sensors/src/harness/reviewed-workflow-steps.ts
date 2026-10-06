@@ -163,7 +163,7 @@ export const REVIEWED_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = Object.f
     ],
   },
   {
-    sha256: '1c5497258c0f5b47de2c97cc790270363575d635638d66f95d68f22c0bd608e8',
+    sha256: '8b7b48e343a0f1e593f5ee0c40d28158841a79e234c03f1deb517340f540bc2b',
     effect: 'read-only',
     workflow: 'pull-request-checks.yml#preflight[4]',
     step: 'Preflight probes',
