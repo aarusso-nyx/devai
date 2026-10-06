@@ -9,11 +9,11 @@ title: Self-scorecard
 This page renders the newest self-scorecard recorded under `record/proofs/compliance/scorecards/`. The record
 files linked below are authoritative; this page is regenerated from them.
 
-- Scorecard: `SC-20261006T141503-001`
-- Integration head: [`61a2b07c`](https://github.com/aarusso-nyx/devai/commit/61a2b07ca828e0e20fa6f611615c5d14546f12b9)
-- Generated at: 2026-10-06T11:15:03-03:00
+- Scorecard: `SC-20261006T215814-001`
+- Integration head: [`df109aad`](https://github.com/aarusso-nyx/devai/commit/df109aad4db0a96859a487fcb393a3a7597bcc61)
+- Generated at: 2026-10-06T18:58:14-03:00
 - Overall verdict: **FAIL**
-- Cells: PASS 33, REVIEW 6, FAIL 2, UNKNOWN 1, N/A 3
+- Cells: PASS 36, REVIEW 4, FAIL 1, UNKNOWN 1, N/A 3
 
 ## Aspect grid
 
@@ -25,8 +25,8 @@ note, listed below when the cell is not at PASS.
 | F1 Specification | N/A         | PASS        | PASS         | PASS         | PASS            | PASS                    | PASS                          | PASS          | PASS          |
 | F2 Plant         | PASS        | REVIEW      | PASS         | UNKNOWN      | PASS            | REVIEW (nd)             | PASS (nd)                     | PASS          | PASS          |
 | F3 Observation   | PASS (nd)   | FAIL (note) | PASS         | PASS         | PASS            | PASS                    | PASS                          | PASS          | PASS          |
-| F4 Inventory     | PASS        | PASS        | PASS         | PASS         | N/A             | N/A (note)              | REVIEW                        | PASS          | PASS          |
-| F5 Harness       | PASS        | PASS        | FAIL (note)  | REVIEW       | PASS            | PASS                    | REVIEW (nd)                   | PASS (nd)     | REVIEW (nd)   |
+| F4 Inventory     | PASS        | PASS        | PASS         | PASS         | N/A             | N/A (note)              | PASS                          | PASS          | PASS          |
+| F5 Harness       | PASS        | PASS        | PASS         | PASS         | PASS            | PASS                    | REVIEW (nd)                   | PASS (nd)     | REVIEW (nd)   |
 
 ## Cells not at PASS
 
@@ -34,21 +34,18 @@ note, listed below when the cell is not at PASS.
 - F2 × T2: REVIEW; readings `SR-ac6fd08870d0d0cb`
 - F2 × T4: UNKNOWN; no sensor readings
 - F2 × T6: REVIEW; readings `SR-a96646142553c04d`
-- F3 × T2: FAIL; readings `SR-333014e94493cbae`; note: latest test_coverage_depth failure at 2026-10-06T15:28:50.140Z
+- F3 × T2: FAIL; readings `SR-333014e94493cbae`; note: latest test_coverage_depth failure at 2026-10-06T23:40:45.858Z
 - F4 × T5: N/A; no sensor readings
 - F4 × T6: N/A; readings `SR-ea7f14f9392071a3`, `SR-3ac77c1640471e1c`; note: N/A-declaration: inventory_data_handling: Not measured: .devai/config/sensor-inputs.json declares the surface rbac absent, and no evidence of it was found.; inventory_rbac: Not measured: .devai/config/sensor-inputs.json declares the surface rbac absent, and no evidence of it was found.
-- F4 × T7: REVIEW; readings `SR-59691a42d898a9af`
-- F5 × T3: FAIL; readings `SR-7de753841401da4a`, `SR-08eab6fc69d4e3ac`; note: latest harness_coherence failure at 2026-10-06T15:29:53.409Z
-- F5 × T4: REVIEW; readings `SR-423fe8572b392f41`
 - F5 × T7: REVIEW; readings `SR-dbad3930fe3a1fa0`
 - F5 × T9: REVIEW; readings `SR-9ea807e4f22f7c62`
 
 ## Assessment
 
-Overall: RED. 33/45 cells passing. 2 cell(s) failing. 6 cell(s) in review. 1 cell(s) unknown (sensor coverage gap).
+Overall: RED. 36/45 cells passing. 1 cell(s) failing. 4 cell(s) in review. 1 cell(s) unknown (sensor coverage gap).
 
 ## Record
 
-- [Scorecard](../../record/proofs/compliance/scorecards/SC-20261006T141503-001.json)
-- [Assessment](../../record/proofs/compliance/scorecards/SC-20261006T141503-001.assessment.json)
-- [Backlog](../../record/proofs/compliance/scorecards/SC-20261006T141503-001.backlog.json)
+- [Scorecard](../../record/proofs/compliance/scorecards/SC-20261006T215814-001.json)
+- [Assessment](../../record/proofs/compliance/scorecards/SC-20261006T215814-001.assessment.json)
+- [Backlog](../../record/proofs/compliance/scorecards/SC-20261006T215814-001.backlog.json)
