@@ -6,10 +6,12 @@ import {
   readFileSync,
   realpathSync,
   rmSync,
+  unlinkSync,
 } from '@devai-nyx/authority';
+import { randomUUID } from 'node:crypto';
 import { hostname } from 'node:os';
 import { join, resolve, sep } from 'node:path';
-import { replaceDurableSync } from './durable-files.js';
+import { publishCreateOnlyDurableSync, replaceDurableSync } from './durable-files.js';
 
 /** The process running an autonomous attempt in a worktree. */
 export interface WorktreeOwner {
@@ -33,7 +35,7 @@ export interface WorktreeRecord {
   readonly owner?: WorktreeOwner;
 }
 
-export interface CreateWorktreeOptions {
+export interface CreateWorktreeOptions extends RegistryLockOptions {
   readonly repoRoot: string;
   /** Worktree id, e.g. WT-<task-id> or WT-human-<branch>. */
   readonly id: string;
@@ -72,6 +74,110 @@ function loadRegistry(repoRoot: string): WorktreeRegistry {
  */
 function saveRegistry(repoRoot: string, registry: WorktreeRegistry): void {
   replaceDurableSync(registryPath(repoRoot), JSON.stringify(registry, null, 2) + '\n');
+}
+
+/** Serializes every read-modify-replace of the registry across processes (#286). */
+export const WORKTREE_REGISTRY_LOCK = '.devai/state/worktrees.lock';
+/** How long a registry writer waits for another one by default. */
+export const WORKTREE_REGISTRY_LOCK_WAIT_MS = 30_000;
+const LOCK_POLL_MS = 25;
+
+interface RegistryLockOwner {
+  readonly pid: number;
+  readonly hostname: string;
+  readonly token: string;
+  readonly acquired_at: string;
+}
+
+/** Options every registry writer accepts. */
+export interface RegistryLockOptions {
+  /** Bound on the wait for another registry writer (default 30 s); 0 refuses at once. */
+  readonly lockWaitMs?: number;
+}
+
+/**
+ * `WORKTREE_REGISTRY_LOCK_STALE`: the registry lock was left by a writer on this host that
+ * is gone. It is never taken over automatically, since two contenders could both judge it
+ * stale and remove each other's lock; removing it is a human step, named here.
+ */
+export class WorktreeRegistryLockStale extends Error {
+  readonly code = 'WORKTREE_REGISTRY_LOCK_STALE';
+  readonly removal: string;
+
+  constructor(path: string) {
+    super('WORKTREE_REGISTRY_LOCK_STALE');
+    this.removal = `rm "${path}"`;
+  }
+}
+
+function readRegistryLock(path: string): RegistryLockOwner | 'unreadable' | undefined {
+  let raw: string;
+  try {
+    raw = readFileSync(path, 'utf8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+    return 'unreadable';
+  }
+  try {
+    const value = JSON.parse(raw) as Partial<RegistryLockOwner>;
+    return typeof value.pid === 'number' &&
+      typeof value.hostname === 'string' &&
+      typeof value.token === 'string'
+      ? (value as RegistryLockOwner)
+      : 'unreadable';
+  } catch {
+    return 'unreadable';
+  }
+}
+
+function sleepSync(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+/**
+ * Run `run` holding the registry lock. The lock is published atomically and never
+ * replaced (ADR-AUT-0005), so no reader ever sees an empty or partial lock and exactly one
+ * writer holds it. Another writer waits up to `lockWaitMs`, then refuses with
+ * `WORKTREE_REGISTRY_BUSY`; a lock left by a provably gone process on this host refuses with
+ * `WORKTREE_REGISTRY_LOCK_STALE`. The lock is not re-entrant.
+ */
+export function withWorktreeRegistryLock<T>(
+  repoRoot: string,
+  run: () => T,
+  options: RegistryLockOptions = {},
+): T {
+  const path = join(repoRoot, WORKTREE_REGISTRY_LOCK);
+  const owner: RegistryLockOwner = {
+    pid: process.pid,
+    hostname: hostname(),
+    token: randomUUID(),
+    acquired_at: new Date().toISOString(),
+  };
+  const body = `${JSON.stringify(owner)}\n`;
+  const deadline = Date.now() + (options.lockWaitMs ?? WORKTREE_REGISTRY_LOCK_WAIT_MS);
+  while (!publishCreateOnlyDurableSync(path, body)) {
+    const held = readRegistryLock(path);
+    if (
+      held !== undefined &&
+      held !== 'unreadable' &&
+      held.hostname === hostname() &&
+      !processAlive(held.pid)
+    ) {
+      throw new WorktreeRegistryLockStale(path);
+    }
+    if (Date.now() >= deadline) throw new Error('WORKTREE_REGISTRY_BUSY');
+    sleepSync(LOCK_POLL_MS);
+  }
+  try {
+    return run();
+  } finally {
+    // Only the owner whose token the lock records removes it. A crash before this point
+    // leaves a lock naming a dead process, which refuses as stale rather than being taken over.
+    const current = readRegistryLock(path);
+    if (current !== undefined && current !== 'unreadable' && current.token === owner.token) {
+      unlinkSync(path);
+    }
+  }
 }
 
 /**
@@ -113,10 +219,19 @@ function activeNonAdoptedCount(registry: WorktreeRegistry): number {
   return registry.worktrees.filter(holdsWorktreeCapacity).length;
 }
 
+/**
+ * Create and register a managed worktree. The cap check, the checkout and the registry
+ * replace run under the registry lock, so concurrent admitters in other processes never
+ * exceed the cap and never drop each other's entries (#286).
+ */
 export function createWorktree(opts: CreateWorktreeOptions): WorktreeRecord {
   if (!/^WT-[A-Za-z0-9._-]+$/u.test(opts.id)) {
     throw new Error(`invalid managed worktree id: ${opts.id}`);
   }
+  return withWorktreeRegistryLock(opts.repoRoot, () => createWorktreeLocked(opts), opts);
+}
+
+function createWorktreeLocked(opts: CreateWorktreeOptions): WorktreeRecord {
   const registry = loadRegistry(opts.repoRoot);
 
   // Cap enforcement (ADR-MDL-0007). Human-adopted and retained worktrees are cap-exempt.
@@ -177,14 +292,22 @@ export function createWorktree(opts: CreateWorktreeOptions): WorktreeRecord {
  * Keep a settled attempt's worktree for human review or disposition: it stays bound to
  * its task but no longer holds autonomous capacity.
  */
-export function retainWorktree(opts: { readonly repoRoot: string; readonly id: string }): void {
-  const registry = loadRegistry(opts.repoRoot);
-  const record = registry.worktrees.find((w) => w.id === opts.id);
-  if (record === undefined) throw new Error('WORKTREE_NOT_REGISTERED');
-  registry.worktrees = registry.worktrees.map((w) =>
-    w.id === opts.id ? { ...w, retained: true } : w,
+export function retainWorktree(
+  opts: { readonly repoRoot: string; readonly id: string } & RegistryLockOptions,
+): void {
+  withWorktreeRegistryLock(
+    opts.repoRoot,
+    () => {
+      const registry = loadRegistry(opts.repoRoot);
+      const record = registry.worktrees.find((w) => w.id === opts.id);
+      if (record === undefined) throw new Error('WORKTREE_NOT_REGISTERED');
+      registry.worktrees = registry.worktrees.map((w) =>
+        w.id === opts.id ? { ...w, retained: true } : w,
+      );
+      saveRegistry(opts.repoRoot, registry);
+    },
+    opts,
   );
-  saveRegistry(opts.repoRoot, registry);
 }
 
 /**
@@ -192,35 +315,50 @@ export function retainWorktree(opts: { readonly repoRoot: string; readonly id: s
  * exists and drop its registry entry. Branches are kept, and human-adopted worktrees
  * are never touched. Returns the released worktree ids in name order.
  */
-export function releaseTaskWorktrees(opts: {
-  readonly repoRoot: string;
-  readonly taskId: string;
-}): readonly string[] {
-  const bound = loadRegistry(opts.repoRoot).worktrees.filter(
-    (w) => w.task_id === opts.taskId && w.human_adopted !== true,
+export function releaseTaskWorktrees(
+  opts: {
+    readonly repoRoot: string;
+    readonly taskId: string;
+  } & RegistryLockOptions,
+): readonly string[] {
+  return withWorktreeRegistryLock(
+    opts.repoRoot,
+    () => {
+      const bound = loadRegistry(opts.repoRoot).worktrees.filter(
+        (w) => w.task_id === opts.taskId && w.human_adopted !== true,
+      );
+      const released: string[] = [];
+      for (const record of bound) {
+        if (existsSync(record.path)) {
+          destroyWorktreeLocked({ repoRoot: opts.repoRoot, id: record.id });
+        } else {
+          const registry = loadRegistry(opts.repoRoot);
+          registry.worktrees = registry.worktrees.filter((w) => w.id !== record.id);
+          saveRegistry(opts.repoRoot, registry);
+        }
+        released.push(record.id);
+      }
+      return released.sort();
+    },
+    opts,
   );
-  const released: string[] = [];
-  for (const record of bound) {
-    if (existsSync(record.path)) destroyWorktree({ repoRoot: opts.repoRoot, id: record.id });
-    else {
-      const registry = loadRegistry(opts.repoRoot);
-      registry.worktrees = registry.worktrees.filter((w) => w.id !== record.id);
-      saveRegistry(opts.repoRoot, registry);
-    }
-    released.push(record.id);
-  }
-  return released.sort();
 }
 
-export function destroyWorktree(opts: {
+interface DestroyWorktreeOptions extends RegistryLockOptions {
   repoRoot: string;
   id: string;
   forceHumanAdopted?: boolean;
   deleteBranch?: boolean;
-}): void {
+}
+
+export function destroyWorktree(opts: DestroyWorktreeOptions): void {
   if (!/^WT-[A-Za-z0-9._-]+$/u.test(opts.id)) {
     throw new Error(`invalid managed worktree id: ${opts.id}`);
   }
+  withWorktreeRegistryLock(opts.repoRoot, () => destroyWorktreeLocked(opts), opts);
+}
+
+function destroyWorktreeLocked(opts: DestroyWorktreeOptions): void {
   const registry = loadRegistry(opts.repoRoot);
   const record = registry.worktrees.find((w) => w.id === opts.id);
   if (record?.human_adopted === true && opts.forceHumanAdopted !== true) {
@@ -295,20 +433,26 @@ export function adoptWorktree(opts: AdoptWorktreeOptions): WorktreeRecord {
 }
 
 /** Detect orphan worktrees and either log or remove them. */
-export function reapWorktrees(opts: { repoRoot: string }): readonly string[] {
-  const reaped: string[] = [];
-  const registry = loadRegistry(opts.repoRoot);
-  const remaining: WorktreeRecord[] = [];
-  for (const w of registry.worktrees) {
-    if (!existsSync(w.path)) {
-      reaped.push(w.id);
-      continue;
-    }
-    remaining.push(w);
-  }
-  // Unknown directories are deliberately preserved: they may be unrelated or
-  // human-managed worktrees and the registry has no authority to delete them.
-  registry.worktrees = remaining;
-  saveRegistry(opts.repoRoot, registry);
-  return reaped.sort();
+export function reapWorktrees(opts: { repoRoot: string } & RegistryLockOptions): readonly string[] {
+  return withWorktreeRegistryLock(
+    opts.repoRoot,
+    () => {
+      const reaped: string[] = [];
+      const registry = loadRegistry(opts.repoRoot);
+      const remaining: WorktreeRecord[] = [];
+      for (const w of registry.worktrees) {
+        if (!existsSync(w.path)) {
+          reaped.push(w.id);
+          continue;
+        }
+        remaining.push(w);
+      }
+      // Unknown directories are deliberately preserved: they may be unrelated or
+      // human-managed worktrees and the registry has no authority to delete them.
+      registry.worktrees = remaining;
+      saveRegistry(opts.repoRoot, registry);
+      return reaped.sort();
+    },
+    opts,
+  );
 }
