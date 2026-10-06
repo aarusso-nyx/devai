@@ -7,8 +7,10 @@
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
+  readdirSync,
   mkdtempSync,
   readFileSync,
   realpathSync,
@@ -31,6 +33,10 @@ import {
   type RoundTrackingActivation,
 } from '@devai-nyx/loop';
 import { validators } from '@devai-nyx/schemas';
+import {
+  clearResolvedInvocationAuthority,
+  rememberResolvedInvocationAuthority,
+} from '../../src/authority/invocation-authority.js';
 import { withAuthorityHostTestScope } from '../../../skills/tests/unit/authority-host-test-scope.js';
 
 const { cac } = createRequire(import.meta.url)('../../node_modules/cac/index-compat.js') as {
@@ -154,6 +160,7 @@ async function invoke(
       process.exitCode = typeof code === 'number' ? code : 0;
       throw new Error(`TEST_PROCESS_EXIT:${String(process.exitCode)}`);
     }) as typeof process.exit;
+    rememberResolvedInvocationAuthority('engineer', 'cli-flag', []);
     cli.parse(process.argv, { run: false });
     try {
       await withAuthorityHostTestScope(() => cli.runMatchedCommand());
@@ -172,6 +179,7 @@ async function invoke(
     process.exitCode = previous.exitCode;
     process.stdout.write = previous.stdout;
     process.stderr.write = previous.stderr;
+    clearResolvedInvocationAuthority();
   }
 }
 
@@ -334,6 +342,78 @@ describe('backlog projection under the disclosure profile', () => {
 
     expect(item).not.toHaveProperty('round_id');
     expect(readGovernanceEvents({ repoRoot: root, round: ROUND })).toEqual([]);
+  });
+});
+
+describe('backlog add with round tracking is idempotent and recoverable', () => {
+  const addArgs = (root: string) =>
+    invoke(root, [
+      'backlog-add',
+      '--kind',
+      'finding',
+      '--title',
+      TITLE,
+      '--body',
+      BODY,
+      '--round',
+      ROUND,
+    ]);
+  const itemFiles = (root: string) =>
+    readdirSync(join(root, '.devai/state/backlog')).filter((name) => name.endsWith('.json'));
+
+  it('reuses the saved item on retry and completes the missing tracking event', async () => {
+    const root = repository({ activated: true });
+    // A read-only log makes the append fail after the item is saved.
+    const log = join(root, '.devai/state/tracking', ROUND, 'events.jsonl');
+    put(root, join('.devai/state/tracking', ROUND, 'events.jsonl'), '');
+    chmodSync(log, 0o444);
+
+    const failed = await addArgs(root);
+    expect(failed.exit).not.toBe(0);
+    expect(itemFiles(root)).toEqual(['BL-0001.json']);
+
+    chmodSync(log, 0o644);
+    const retried = await addArgs(root);
+    expect(retried.exit, retried.stderr).toBe(0);
+    expect(JSON.parse(retried.stdout)).toMatchObject({ id: 'BL-0001' });
+    expect(itemFiles(root)).toEqual(['BL-0001.json']);
+    const events = readGovernanceEvents({ repoRoot: root, round: ROUND });
+    expect(events).toHaveLength(1);
+    expect(events[0]?.evidence_refs).toContain('BL-0001');
+  });
+
+  it('records a new item when an identical add was already projected', async () => {
+    const root = repository({ activated: true });
+
+    expect((await addArgs(root)).exit).toBe(0);
+    const second = await addArgs(root);
+
+    expect(second.exit, second.stderr).toBe(0);
+    expect(JSON.parse(second.stdout)).toMatchObject({ id: 'BL-0002' });
+    expect(itemFiles(root)).toEqual(['BL-0001.json', 'BL-0002.json']);
+    expect(readGovernanceEvents({ repoRoot: root, round: ROUND })).toHaveLength(2);
+  });
+
+  it('does not reuse an unprojected item while the round is not activated', async () => {
+    const root = repository({ activated: false });
+
+    expect((await addArgs(root)).exit).toBe(0);
+    expect((await addArgs(root)).exit).toBe(0);
+
+    expect(itemFiles(root)).toEqual(['BL-0001.json', 'BL-0002.json']);
+  });
+
+  it('projects an item once however often projection is requested', async () => {
+    const root = repository({ activated: true });
+    const item = await add(root, ['--round', ROUND]);
+
+    const again = await withAuthorityHostTestScope(() =>
+      projector().projectBacklogItem({ repoRoot: root, id: item.id }),
+    );
+
+    const events = readGovernanceEvents({ repoRoot: root, round: ROUND });
+    expect(events).toHaveLength(1);
+    expect(again.event_id).toBe(events[0]?.event_id);
   });
 });
 

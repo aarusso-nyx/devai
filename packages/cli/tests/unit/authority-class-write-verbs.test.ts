@@ -209,11 +209,11 @@ describe('IA-005: the registered subjects of the matrix verbs are unchanged', ()
 const R0502_FILE_DIGESTS: ReadonlyArray<readonly [string, string]> = [
   [
     'law/policy/action-registry.json',
-    '6329397f170210e7c7a83eaba020f9bd895d373b9a7ede86ede0cafa569a34ff',
+    'cd2b107d99261137f4769ca6c9eff1770aaf0c34a701acfea055f92bd2820340',
   ],
   [
     'packages/cli/src/generated/action-registry.ts',
-    '18ce415236a1764f006f546c7dbdd3bfb566b7508d8f89ce5aa517c711f70ad1',
+    '577aee633411b005cc5f847f79e63e12eda5588e6c80c069ff8cb7835b9645dc',
   ],
   [
     'packages/effects-check/src/generated/action-catalog.ts',
@@ -241,6 +241,8 @@ const R0502_FILE_DIGESTS: ReadonlyArray<readonly [string, string]> = [
 // ADR-MDL-0007 re-pinned both: round dispatch deactivate and round dispatch dispose join the
 // registry, task escalate and round ratify gain git-ref targets to release attempt worktrees,
 // and the package extension grants those three actions typed git-ref authority.
+// The backlog add description declared its round tracking write (#306, #307): only the registry
+// and its generated view changed.
 const FIXED_REPOSITORY_ID = 'devai-ia-005';
 const R0502_CORE_SOURCE_DIGEST = '18884489d6f36d21ff09f5578a2ae5fc5e49879b4cce715eb0ac0704235a6aa0';
 const R0502_PACKAGE_EXTENSION_DIGEST =

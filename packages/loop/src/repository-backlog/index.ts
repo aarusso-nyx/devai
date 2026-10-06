@@ -14,7 +14,7 @@ import {
   type GovernanceSessionSource,
 } from '../tracking/events.js';
 import { readRoundTrackingActivation } from '../tracking/projection.js';
-import { recordGovernanceEvent } from '../tracking/store.js';
+import { readGovernanceEvents, recordGovernanceEvent } from '../tracking/store.js';
 
 /**
  * Repository backlog store (ADR-GOV-0019).
@@ -207,6 +207,41 @@ export function resolveBacklogItem(options: {
   return next;
 }
 
+function isProjectionOf(event: GovernanceEvent, id: string): boolean {
+  return event.kind === 'backlog_item_projected' && event.evidence_refs.includes(id);
+}
+
+/**
+ * The item an interrupted add left behind: same input and origin, attributed
+ * to a round whose Owner activation is live, and still missing its
+ * `backlog_item_projected` event. A retry reuses it and completes the
+ * projection instead of allocating a second id. An item that was already
+ * projected, or whose round is not activated, is never matched, so a
+ * deliberate repeat of an identical add still records a new item.
+ */
+export function findUnprojectedBacklogItem(
+  options: Omit<AddBacklogItemOptions, 'createdAt'>,
+): BacklogItem | undefined {
+  const round = options.roundId;
+  if (round === undefined) return undefined;
+  const activation = readRoundTrackingActivation({ repoRoot: options.repoRoot, round });
+  if (activation === undefined || activation.state === 'disabled') return undefined;
+  const events = readGovernanceEvents({ repoRoot: options.repoRoot, round });
+  const projected = (id: string): boolean => events.some((event) => isProjectionOf(event, id));
+  return listBacklogItems({ repoRoot: options.repoRoot, status: 'open', roundId: round })
+    .filter(
+      (item) =>
+        item.kind === options.kind &&
+        item.title === options.title &&
+        item.body === options.body &&
+        item.class === options.class &&
+        item.origin.session === options.origin.session &&
+        item.origin.role === options.origin.role &&
+        item.origin.commit === options.origin.commit,
+    )
+    .find((item) => !projected(item.id));
+}
+
 function sourceOf(identity: string): GovernanceSessionSource {
   return identity.startsWith('AUTH-SESSION-') ? 'session-state' : 'direct-cli';
 }
@@ -217,6 +252,7 @@ function sourceOf(identity: string): GovernanceSessionSource {
  * activation and the public-safe disclosure profile: the summary names only
  * the id and kind, and the title and body travel as the payload digest.
  * A round is never inferred, and an absent or disabled activation refuses.
+ * Projecting an already projected item returns its recorded event.
  */
 export function projectBacklogItem(options: {
   readonly repoRoot: string;
@@ -229,6 +265,11 @@ export function projectBacklogItem(options: {
   if (activation === undefined || activation.state === 'disabled') {
     trackingFail('BACKLOG_PROJECTION_NOT_ACTIVATED');
   }
+  // Idempotent: an item already on the chain is reported, never appended twice.
+  const existing = readGovernanceEvents({ repoRoot: options.repoRoot, round }).find((event) =>
+    isProjectionOf(event, item.id),
+  );
+  if (existing !== undefined) return existing;
   const identity = activation.authorization.authority_session_id;
   return recordGovernanceEvent({
     repoRoot: options.repoRoot,
