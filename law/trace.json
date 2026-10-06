@@ -791,6 +791,10 @@
         },
         {
           "suite": "unit",
+          "path": "packages/skills/tests/recipes/adapter-install-write-time.test.ts"
+        },
+        {
+          "suite": "unit",
           "path": "packages/skills/tests/recipes/validation-contract.test.ts"
         },
         {
