@@ -120,10 +120,13 @@ waiting lease instead of the one-hour dispatch TTL, because nothing renews a wai
 lease stays bounded, so an abandoned task does not hold its modules forever. Exact ownership is
 proven before every completion. `task finish` refuses with `TASK_RESOURCE_LOCK_LOST` before it
 writes anything when a key the task declares is missing or held by another task, and `round ratify
---decision accept` refuses the same way. The completion itself (`completeTask`) checks again,
-renewing in place any record with less than five minutes left, so no takeover can land between
-the check and the release. A record that outlived its lease without anyone taking it still counts
-as held.
+--decision accept` refuses the same way, including when it retries an acceptance it already
+recorded. Each of these checks renews in place any own record with less than five minutes left,
+expired ones included, so no takeover can land before the step completes. An accepted task gets
+the waiting lease again. The completion itself (`completeTask`) checks once more right before it
+persists. If that final check still refuses a human task, the task is escalated instead of being
+left in `merging`, which it could not finish from. A record that outlived its lease without anyone
+taking it still counts as held.
 
 When a routine's process group cannot be confirmed gone (`PROCESS_GROUP_TERMINATION_UNCONFIRMED`),
 the task is escalated but its locks are kept. The runner first writes
