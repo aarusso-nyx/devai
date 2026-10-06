@@ -11,6 +11,8 @@ export const commands = [
   defineCommand({ name: 'fs copyFileSync', run: () => fs.copyFileSync('source', 'target') }),
   defineCommand({ name: 'fs cp', run: () => fs.cp('source', 'target', () => {}) }),
   defineCommand({ name: 'fs cpSync', run: () => fs.cpSync('source', 'target') }),
+  defineCommand({ name: 'fs link', run: () => fs.link('source', 'target', () => {}) }),
+  defineCommand({ name: 'fs linkSync', run: () => fs.linkSync('source', 'target') }),
   defineCommand({ name: 'fs mkdir', run: () => fs.mkdir('target', () => {}) }),
   defineCommand({ name: 'fs mkdirSync', run: () => fs.mkdirSync('target') }),
   defineCommand({ name: 'fs rename', run: () => fs.rename('source', 'target', () => {}) }),

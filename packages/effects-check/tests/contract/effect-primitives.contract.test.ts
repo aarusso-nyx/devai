@@ -12,6 +12,8 @@ const filesystem = [
   'copyFileSync',
   'cp',
   'cpSync',
+  'link',
+  'linkSync',
   'mkdir',
   'mkdirSync',
   'rename',
@@ -115,8 +117,8 @@ it('keeps under-declaration findings separate from advisory-pattern violations',
   expect(report.advisory_patterns).toEqual({ violations: 0, dispositions: [] });
   expect(report.metrics).toMatchObject({
     program_files: 1,
-    catalog_actions: 29,
-    extracted_actions: 29,
+    catalog_actions: 31,
+    extracted_actions: 31,
     unresolved_edges: 0,
   });
 });
