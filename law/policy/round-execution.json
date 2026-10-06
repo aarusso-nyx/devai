@@ -69,7 +69,8 @@
     "conflict": "lock_denied-and-requeue",
     "repeated_conflict": "escalate-for-human-review",
     "release_on": ["completed", "escalated", "rgr_pending", "cancelled"],
-    "resource_claim_from_model": "forbidden"
+    "resource_claim_from_model": "forbidden",
+    "keyless_agent_tasks": "an agent task deriving no lock key never runs beside another agent task, and no agent task runs beside one (ADR-MDL-0009)"
   },
   "capacity": {
     "default_workers": 1,

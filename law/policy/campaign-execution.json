@@ -405,7 +405,7 @@
         "intent_diff.planned_files": "task.boundary.paths",
         "intent_diff.planned_steps": "task.deliverables",
         "executor": "kind human with role equal to discipline, instructions_ref equal to the campaign directory joined with prompt.path, completion_evidence [pull-request-merged], timeout_ms from execution.time_budget_minutes (default seven days), and timeout_behavior escalate; when task.executor declares kind agent, the agent_executor mapping instead",
-        "agent_executor": "kind agent with runtime, model, effort, recipe_name and recipe_variant from task.executor, selection {mode exact, registry_id runtime}, max_iterations from task.executor (default 4), capabilities from task.executor (default []), timeout_ms from execution.time_budget_minutes when declared, and prompt_composition_id composed from the materialized record (law/constitution.md Article 37, ADR-MDL-0009)",
+        "agent_executor": "kind agent with runtime, model, effort, recipe_name and recipe_variant from task.executor, selection {mode exact, registry_id runtime}, instructions_ref equal to the campaign directory joined with prompt.path (its bytes are hashed into the composed prompt), max_iterations from task.executor (default 4), capabilities from task.executor (default []), timeout_ms from execution.time_budget_minutes when declared, and prompt_composition_id composed from the materialized record (law/constitution.md Article 37, ADR-MDL-0009)",
         "created_at": "campaign.date at 00:00:00Z, so an identical plan materializes byte-identical records",
         "target_modules": "[] (campaign tasks bound paths, not modules)"
       }
@@ -418,6 +418,8 @@
       "model": "one of the runtime's host model aliases in law/policy/model-tiers.json",
       "activation": "not required to materialize; round dispatch --experimental still requires an in-force Owner activation that admits the discipline, runtime, model and effort",
       "refusal": "a contract that fails any rule refuses the whole round before any queue write",
+      "boundary": "round dispatch fails an attempt that changes a path outside intent_diff.planned_files, the task's boundary.paths, with EXPERIMENTAL_BOUNDARY_VIOLATION; an entry ending in / admits the paths under it",
+      "locks": "materialized tasks carry no module target, so per round-execution.json resources.keyless_agent_tasks an agent task never runs beside another agent task",
       "prompt_drift": "a later change to a prompt component changes the composition id, so re-materialization refuses the differing record and dispatch refuses with TASK_PROMPT_COMPOSITION_DRIFT until the Architect re-binds the task"
     },
     "when": "optional; a campaign may still run entirely as human-driven pull requests without materialization",
