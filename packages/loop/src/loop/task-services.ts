@@ -7,7 +7,7 @@ import { escalateAgentTask, taskDispatchBlockers } from './dispatch-disposition.
 import { fsyncDirectorySync, writeCreateOnlyDurableSync } from './durable-files.js';
 import { acquireRoundController, releaseRoundController } from './round-controller.js';
 import { completeHumanTask, type HumanExecutorRole } from './human-executor.js';
-import { listLocks } from './locks.js';
+import { inspectLocks, listLocks, taskLockTargets } from './locks.js';
 import { ratificationPath, type RatificationRecord } from './ratification.js';
 
 import {
@@ -286,6 +286,18 @@ export function finishRoundTask(
   },
 ): TaskRecord {
   const { task } = roundBoundTask({ ...options, operation: 'finish' });
+  // A task waits outside any dispatch before it finishes, so its locks may have lapsed and
+  // been taken over meanwhile. Refuse before writing anything; `completeTask` proves exact
+  // ownership again, renewing a lapsing record, right before it persists the completion.
+  if (
+    inspectLocks({
+      locksDir: join(options.repoRoot, '.devai/state/locks'),
+      taskId: task.id,
+      targets: taskLockTargets(task),
+    }).lost.length > 0
+  ) {
+    fail('TASK_RESOURCE_LOCK_LOST');
+  }
   if (task.executor.kind === 'human') {
     if (task.status !== 'awaiting_human_review') {
       fail('TASK_LIFECYCLE_TRANSITION_FORBIDDEN');

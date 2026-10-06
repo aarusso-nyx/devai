@@ -8,7 +8,7 @@ import {
 import { parsers } from '@devai-nyx/schemas';
 import { join } from 'node:path';
 import { provisionTask, dropTask } from './db.js';
-import { acquireLocks, releaseLocks, taskLockTargets } from './locks.js';
+import { acquireLocks, assertLockOwnership, releaseLocks, taskLockTargets } from './locks.js';
 import { createWorktree, destroyWorktree } from './worktrees.js';
 import {
   classifyTaskRecord,
@@ -351,8 +351,15 @@ export interface TransitionOptions {
   readonly destroyWorktree?: boolean;
 }
 
+/**
+ * Persist a completion and release the task's locks. Exact lock ownership is proven first
+ * (`assertLockOwnership`): a task whose key was taken over refuses with
+ * `TASK_RESOURCE_LOCK_LOST` before anything is written, wherever the completion comes from.
+ */
 export function completeTask(opts: TransitionOptions): TaskRecord {
   const task = loadTask(opts.repoRoot, opts.taskId);
+  const locksDir = join(opts.repoRoot, '.devai/state/locks');
+  assertLockOwnership({ locksDir, taskId: task.id, targets: taskLockTargets(task) });
   const updated: TaskRecord = {
     ...task,
     status: 'completed',
@@ -367,7 +374,7 @@ export function completeTask(opts: TransitionOptions): TaskRecord {
     }
   }
   maybeDropTaskDb(opts.databaseUrl, opts.taskId);
-  releaseLocks({ locksDir: join(opts.repoRoot, '.devai/state/locks'), taskId: opts.taskId });
+  releaseLocks({ locksDir, taskId: opts.taskId });
   return updated;
 }
 

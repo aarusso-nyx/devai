@@ -29,11 +29,39 @@ export function writeAllSync(fd: number, text: string): void {
   }
 }
 
-/** Fsync one directory so a created, renamed or removed entry in it is durable. */
-export function fsyncDirectorySync(path: string): void {
-  const fd = openSync(path, fileOpenConstants.O_RDONLY | (fileOpenConstants.O_DIRECTORY ?? 0));
+export interface DirectoryFsyncOptions {
+  /**
+   * `skip` returns quietly where the platform or filesystem cannot open or fsync a
+   * directory at all (Windows, some network filesystems); the default throws.
+   */
+  readonly unsupported?: 'throw' | 'skip';
+}
+
+const UNSUPPORTED_DIRECTORY_OPEN = new Set(['EISDIR', 'EPERM', 'EACCES']);
+const UNSUPPORTED_DIRECTORY_FSYNC = new Set(['EINVAL', 'ENOTSUP', 'EPERM']);
+
+function errorCode(error: unknown): string {
+  return String((error as NodeJS.ErrnoException).code);
+}
+
+/**
+ * Fsync one directory so a created, renamed or removed entry in it is durable. This is the
+ * one directory fsync of the loop: experimental records use the strict default, and the
+ * lock and controller records pass `unsupported: 'skip'`.
+ */
+export function fsyncDirectorySync(path: string, options: DirectoryFsyncOptions = {}): void {
+  const skip = options.unsupported === 'skip';
+  let fd: number;
+  try {
+    fd = openSync(path, fileOpenConstants.O_RDONLY | (fileOpenConstants.O_DIRECTORY ?? 0));
+  } catch (error) {
+    if (skip && UNSUPPORTED_DIRECTORY_OPEN.has(errorCode(error))) return;
+    throw error;
+  }
   try {
     fsyncSync(fd);
+  } catch (error) {
+    if (!(skip && UNSUPPORTED_DIRECTORY_FSYNC.has(errorCode(error)))) throw error;
   } finally {
     closeSync(fd);
   }

@@ -467,10 +467,16 @@ describe('durable denials and judged completions', () => {
           repoRoot: root,
           round: ROUND,
           lockRenewalIntervalMs: 60_000,
-          dispatch: () => {
+          dispatch: (running) => {
             rmSync(keyFile(root));
             acquireLocks({ locksDir: locksDir(root), taskId: 'TASK-0900', targets: ['F2:MOD-a'] });
-            completeTask({ repoRoot: root, taskId: 'TASK-0409' });
+            // `completeTask` itself refuses after the takeover; a completion persisted
+            // without that check (by an older release, say) is still judged next run.
+            expect(() => completeTask({ repoRoot: root, taskId: 'TASK-0409' })).toThrow(
+              'TASK_RESOURCE_LOCK_LOST',
+            );
+            expect(loadTask(root, 'TASK-0409').status).toBe('in_progress');
+            saveTask(root, { ...running, status: 'completed', completed_at: running.created_at });
             return { ok: true };
           },
         }),
@@ -577,15 +583,29 @@ describe('attempt fences', () => {
     });
   });
 
-  it('writes the release receipt only after the lock record is removed', async () => {
+  it('writes the release receipt only after the lock record is removed, and makes it durable', async () => {
     const root = repository();
     await withAuthorityHostTestScope(async () => {
       saveTask(root, task('TASK-0420'));
       const events: string[] = [];
-      seam.after = (symbol, args) => {
+      const descriptors = new Map<unknown, 'receipt' | 'fences'>();
+      seam.after = (symbol, args, result) => {
         if (symbol === 'unlinkSync' && args[0] === keyFile(root)) events.push('remove the lock');
-        if (symbol === 'writeFileSync' && String(args[0]).endsWith('.released')) {
-          events.push('write the receipt');
+        if (symbol === 'openSync') {
+          const path = String(args[0]);
+          if (path.endsWith('.released')) {
+            events.push('write the receipt');
+            descriptors.set(result, 'receipt');
+          } else if (path === fencesDir(root)) {
+            descriptors.set(result, 'fences');
+          } else {
+            descriptors.delete(result);
+          }
+        }
+        if (symbol === 'fsyncSync') {
+          const kind = descriptors.get(args[0]);
+          if (kind === 'receipt') events.push('fsync the receipt');
+          if (kind === 'fences') events.push('fsync the fence directory');
         }
       };
 
@@ -597,7 +617,15 @@ describe('attempt fences', () => {
       seam.after = undefined;
 
       expect(result.results).toEqual([{ task_id: 'TASK-0420', ok: true }]);
-      expect(events).toEqual(['remove the lock', 'write the receipt']);
+      // The fence opens (one directory fsync), the release removes the record and writes
+      // its fsynced receipt, whose entry is made durable before the release returns.
+      expect(events.slice(0, 5)).toEqual([
+        'fsync the fence directory',
+        'remove the lock',
+        'write the receipt',
+        'fsync the receipt',
+        'fsync the fence directory',
+      ]);
     });
   });
 

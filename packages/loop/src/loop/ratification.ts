@@ -21,6 +21,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { escalateAgentTask, taskDispatchBlockers } from './dispatch-disposition.js';
 import { fsyncDirectorySync, mkdirDurableSync, writeAllSync } from './durable-files.js';
+import { inspectLocks, taskLockTargets } from './locks.js';
 import { acquireRoundController, releaseRoundController } from './round-controller.js';
 import { loadTask, saveTask, type TaskRecord } from './tasks.js';
 import { fail, requireActiveTaskRound } from './task-queue-services.js';
@@ -184,6 +185,18 @@ export function ratifyRoundTask(options: {
     if (taskDispatchBlockers(options.repoRoot, roundId, task.id).length > 0) {
       // Reviewed evidence must come from a settled attempt; uncertain work needs a disposition.
       fail('TASK_DISPATCH_UNCERTAIN');
+    }
+    if (
+      options.decision === 'accept' &&
+      inspectLocks({
+        locksDir: join(options.repoRoot, '.devai/state/locks'),
+        taskId: task.id,
+        targets: taskLockTargets(task),
+      }).lost.length > 0
+    ) {
+      // A key taken over while the task awaited review: the attempt no longer had exclusive
+      // resources, so it is never accepted (rejecting it escalates as usual).
+      fail('TASK_RESOURCE_LOCK_LOST');
     }
     const record: RatificationRecord = {
       schemaVersion: '1.0.0',
