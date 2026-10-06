@@ -30,6 +30,8 @@ const MUTATORS = new Set([
   'renameSync',
   'rm',
   'rmSync',
+  'rmdir',
+  'rmdirSync',
   'spawn',
   'spawnSync',
   'symlinkSync',
