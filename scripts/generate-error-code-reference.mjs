@@ -14,7 +14,9 @@ const sourceRoots = readdirSync(join(root, 'packages'), { withFileTypes: true })
   .concat(['packages/cli/vendor/evidence-verification/src'])
   .sort();
 // Quoted identifiers that share a code prefix but name a constant or credential, not a code.
-const notCodes = new Set(['ACTION_EFFECTS', 'GITHUB_TOKEN', 'POST_CUTOFF']);
+// Quoted names that match a code prefix but are not codes; RELEASE_TAG is a workflow data
+// variable the harness effect analysis admits (#325).
+const notCodes = new Set(['ACTION_EFFECTS', 'GITHUB_TOKEN', 'POST_CUTOFF', 'RELEASE_TAG']);
 const prefixes = new Set([
   'ACTION',
   'ADOPTER',
