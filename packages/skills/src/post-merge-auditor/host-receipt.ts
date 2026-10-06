@@ -35,6 +35,32 @@ function hmacValid(value: JsonRecord, key: Buffer): boolean {
   return timingSafeEqual(Buffer.from(signature, 'hex'), expected);
 }
 
+/**
+ * The canonical tracked post-merge declaration, field for field as `devai init bind
+ * --host-adapter post-merge` writes it (postMergeDeclaration in the CLI hooks-install service).
+ */
+export const POST_MERGE_DECLARATION_PATH = '.devai/config/post-merge-host-adapter.json';
+export const POST_MERGE_DECLARATION = Object.freeze({
+  schemaVersion: '2.0.0',
+  adapter_id: 'post-merge-host-adapter',
+  adapter_kind: 'installed-checkout',
+  required: true,
+  local_state: 'git-dir',
+  bind_command: 'devai init bind --target . --host-adapter post-merge --as-role architect --write',
+});
+
+/** Whether the checkout carries the canonical post-merge declaration, never throwing. */
+function postMergeDeclared(root: string): boolean {
+  try {
+    const parsed: unknown = JSON.parse(
+      readFileSync(join(root, POST_MERGE_DECLARATION_PATH), 'utf8'),
+    );
+    return JSON.stringify(parsed) === JSON.stringify(POST_MERGE_DECLARATION);
+  } catch {
+    return false;
+  }
+}
+
 export interface VerifiedPostMergeHostReceipt {
   readonly mergeSha: string;
   readonly baselineSha: string;
@@ -51,9 +77,10 @@ export function verifyPostMergeHostReceipt(
   const runtimeRoot = join(gitAdminRoot, 'devai');
   const keyPath = join(runtimeRoot, 'post-merge.key');
   // The checkout-bound attestation lives beside the key in this checkout's git directory; the
-  // tracked .devai/config/post-merge-host-adapter.json only declares the adapter (#291).
+  // tracked .devai/config/post-merge-host-adapter.json declares the adapter, and a receipt is
+  // accepted only while that declaration is present and canonical (#291).
   const attestationPath = join(runtimeRoot, 'post-merge-host-adapter.json');
-  if (!existsSync(keyPath) || !existsSync(attestationPath)) {
+  if (!existsSync(keyPath) || !existsSync(attestationPath) || !postMergeDeclared(root)) {
     throw new Error('HOST_RECEIPT_UNVERIFIED');
   }
   const key = readFileSync(keyPath);
