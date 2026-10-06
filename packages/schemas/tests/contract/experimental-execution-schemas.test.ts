@@ -159,6 +159,81 @@ describe('experimental execution law (ADR-MDL-0005)', () => {
     expect(usage({ ...underived, counter_mode: 'per-attempt' })).toBe(true);
   });
 
+  // ADR-MDL-0008: the attempt write boundary is the provider's own sandbox.
+  it('records the provider-enforced sandbox of an experimental attempt', () => {
+    const policy = json('law/policy/experimental-execution.json') as {
+      containment: Record<string, unknown>;
+    };
+    expect(policy.containment['provider_sandbox']).toBe('provider-enforced-asserted-by-broker');
+    const sandbox = def('sandboxEvidence');
+    const codex = {
+      mode: 'codex-workspace-write',
+      enforced_by: 'provider',
+      write_root: 'attempt-worktree',
+      flags: ['--sandbox', 'workspace-write', '--cd', '{attempt-worktree}'],
+    };
+    expect(sandbox(codex)).toBe(true);
+    expect(sandbox({ ...codex, mode: 'claude-restricted-sandbox' })).toBe(true);
+    expect(sandbox({ ...codex, mode: 'danger-full-access' })).toBe(false);
+    expect(sandbox({ ...codex, enforced_by: 'requested' })).toBe(false);
+    expect(sandbox({ ...codex, write_root: '/' })).toBe(false);
+    expect(sandbox({ ...codex, flags: [] })).toBe(false);
+
+    const validate = getValidator('task-execution-evidence.schema.json');
+    const agent = {
+      schemaVersion: '1.0.0',
+      id: 'TXE-0123456789abcdef',
+      task_id: 'TASK-0001',
+      round_id: 'R-0001',
+      candidate_sha: '0'.repeat(40),
+      task_record_digest_sha256: '0'.repeat(64),
+      requested_executor_digest_sha256: '1'.repeat(64),
+      resolved_executor: {
+        kind: 'agent',
+        registry_id: 'codex-cli',
+        runtime: 'codex-cli',
+        model: 'gpt-6-sol',
+        effort: 'high',
+        recipe_name: null,
+        recipe_variant: null,
+      },
+      adapter_versions: [{ id: '@devai-nyx/skills:agent-cli:codex-cli', version: '1.0.0' }],
+      tool_versions: [],
+      input_digests: [],
+      output_digests: [],
+      selection: {
+        mode: 'exact',
+        considered_registry_ids: ['codex-cli'],
+        selected_registry_id: 'codex-cli',
+        rejection_codes: [],
+        fallback: false,
+        fallback_reason: null,
+      },
+      prompt: { prompt_composition_id: 'PC-0123456789abcdef', prompt_sha256: 'a'.repeat(64) },
+      usage: {
+        usage_version: 2,
+        counter_mode: 'per-attempt',
+        input_tokens: counter(1, 'reported'),
+        output_tokens: counter(1, 'reported'),
+        cache_read_tokens: counter(null, 'missing'),
+        cache_write_tokens: counter(null, 'missing'),
+      },
+      cost: { amount: null, currency: 'USD', source: 'unknown' },
+      started_at: '2026-10-05T00:00:00.000Z',
+      completed_at: '2026-10-05T00:00:01.000Z',
+      verdict: 'pass',
+      failure: null,
+      evidence_refs: [],
+      experimental: true,
+      sandbox: codex,
+    };
+    expect(validate(agent)).toBe(true);
+    // Only experimental evidence records a sandbox.
+    const { experimental: _label, ...unlabelled } = agent;
+    void _label;
+    expect(validate(unlabelled)).toBe(false);
+  });
+
   it('keeps version-1 usage valid and admits an unknown cost only as null', () => {
     expect(def('usageEvidence')({ input_tokens: 1, output_tokens: 2 })).toBe(true);
     const unknown = def('costUnknown');
