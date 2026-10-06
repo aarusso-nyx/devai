@@ -20,6 +20,7 @@ import {
   runPostMergeAuditor,
   verifyPostMergeHostReceipt,
 } from '../../src/post-merge-auditor/index.js';
+import { POST_MERGE_DECLARATION } from '../../src/post-merge-auditor/host-receipt.js';
 import { runWithAuthorityHostEffects, type AuthorityHostEffectRequest } from '@devai-nyx/authority';
 import { withAuthorityHostTestScope } from './authority-host-test-scope.js';
 
@@ -119,6 +120,11 @@ function fixture(withMerge = true): HostFixture {
     key,
   );
   put(root, '.git/devai/post-merge-host-adapter.json', `${JSON.stringify(attestation)}\n`);
+  put(
+    root,
+    '.devai/config/post-merge-host-adapter.json',
+    `${JSON.stringify(POST_MERGE_DECLARATION, null, 2)}\n`,
+  );
   const receipt = signed(
     {
       schemaVersion: '1.0.0',
@@ -269,6 +275,26 @@ describe('post-merge host receipt verification', () => {
       JSON.stringify({ ...fx.attestation, signature_hmac_sha256: 'x' }),
     );
     expect(() => verify(fx)).toThrow('HOST_RECEIPT_UNVERIFIED');
+  });
+
+  it('refuses a valid local binding whose tracked declaration is deleted or altered (#291)', async () => {
+    const fx = fixture();
+    const declarationPath = join(fx.root, '.devai/config/post-merge-host-adapter.json');
+    const declaration = readFileSync(declarationPath, 'utf8');
+    await withAuthorityHostTestScope(() => {
+      expect(verify(fx)).toMatchObject({ mergeSha: fx.mergeSha });
+      rmSync(declarationPath);
+      expect(() => verify(fx)).toThrow('HOST_RECEIPT_UNVERIFIED');
+      writeFileSync(
+        declarationPath,
+        JSON.stringify({ ...POST_MERGE_DECLARATION, required: false }, null, 2),
+      );
+      expect(() => verify(fx)).toThrow('HOST_RECEIPT_UNVERIFIED');
+      writeFileSync(declarationPath, '{');
+      expect(() => verify(fx)).toThrow('HOST_RECEIPT_UNVERIFIED');
+      writeFileSync(declarationPath, declaration);
+      expect(verify(fx)).toMatchObject({ mergeSha: fx.mergeSha });
+    });
   });
 
   it('rejects signed repository identity and SHA shape mismatches', async () => {

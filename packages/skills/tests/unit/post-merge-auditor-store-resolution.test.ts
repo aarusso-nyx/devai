@@ -27,6 +27,7 @@ import {
   createPostMergeHostScope,
   runPostMergeAuditor,
 } from '../../src/post-merge-auditor/index.js';
+import { POST_MERGE_DECLARATION } from '../../src/post-merge-auditor/host-receipt.js';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -157,6 +158,11 @@ function boundCheckout(reading: JsonRecord): BoundCheckout {
     key,
   );
   put(root, '.git/devai/post-merge-host-adapter.json', `${JSON.stringify(attestation)}\n`);
+  put(
+    root,
+    '.devai/config/post-merge-host-adapter.json',
+    `${JSON.stringify(POST_MERGE_DECLARATION, null, 2)}\n`,
+  );
   const receipt = signed(
     {
       schemaVersion: '1.0.0',

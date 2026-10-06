@@ -31,6 +31,7 @@ import {
   runPostMergeAuditor,
   verifyPostMergeHostReceipt,
 } from '../../src/post-merge-auditor/index.js';
+import { POST_MERGE_DECLARATION } from '../../src/post-merge-auditor/host-receipt.js';
 import { runWithAuthorityHostEffects } from '@devai-nyx/authority';
 import { resolveScorecardInputs } from '@devai-nyx/loop';
 import { withAuthorityHostTestScope } from './authority-host-test-scope.js';
@@ -236,6 +237,11 @@ function fixture(options: FixtureOptions = {}): HostFixture {
     key,
   );
   put(root, '.git/devai/post-merge-host-adapter.json', `${JSON.stringify(attestation)}\n`);
+  put(
+    root,
+    '.devai/config/post-merge-host-adapter.json',
+    `${JSON.stringify(POST_MERGE_DECLARATION, null, 2)}\n`,
+  );
   const receipt = signed(
     {
       schemaVersion: '1.0.0',
