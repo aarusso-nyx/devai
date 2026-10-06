@@ -159,11 +159,22 @@ function writeReadingsRound(root: string, round: readonly unknown[]): void {
   }
 }
 
+/**
+ * Tests that delete a loose object need it to stay loose: with background auto
+ * maintenance enabled a runner's git can pack the object first, so the deletion no
+ * longer makes the commit unreadable (#292).
+ */
+function disableBackgroundPacking(root: string): void {
+  git(root, ['config', 'gc.auto', '0']);
+  git(root, ['config', 'maintenance.auto', 'false']);
+}
+
 function fixture(options: FixtureOptions = {}): HostFixture {
   const mergeCount = options.merges ?? 1;
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'devai-post-merge-observation-')));
   roots.push(root);
   git(root, ['init', '-q', '-b', 'main']);
+  disableBackgroundPacking(root);
   const constitutionRelative =
     options.constitution === undefined ? 'law/constitution.md' : options.constitution;
   const constitutionPath =
@@ -417,6 +428,16 @@ describe('post-merge receipt input validity', () => {
     await withAuthorityHostTestScope(() => {
       expect(() => verify(linked)).toThrow('HOST_RECEIPT_UNVERIFIED');
     });
+  });
+
+  it('keeps the fixture repository from repacking loose objects in the background (#292)', () => {
+    const fx = fixture();
+    expect(git(fx.root, ['config', '--get', 'gc.auto'])).toBe('0');
+    expect(git(fx.root, ['config', '--get', 'maintenance.auto'])).toBe('false');
+    git(fx.root, ['gc', '--auto', '-q']);
+    expect(
+      existsSync(join(adminRootOf(fx), 'objects', fx.mergeSha.slice(0, 2), fx.mergeSha.slice(2))),
+    ).toBe(true);
   });
 
   it('reports an unreadable merge commit as an invalid receipt, not a mismatch', async () => {
