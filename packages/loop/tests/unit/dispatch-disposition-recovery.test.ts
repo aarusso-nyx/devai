@@ -43,6 +43,7 @@ import {
 import {
   WAITING_LOCK_TTL_MS,
   acquireLocks,
+  assertLockOwnership,
   inspectLocks,
   taskLockTargets,
 } from '../../src/loop/locks.js';
@@ -459,6 +460,32 @@ function lockBytes(root: string): Record<string, string> {
   );
 }
 
+/**
+ * Leaves each of the task's own lock records one minute before expiry, inside
+ * `COMPLETION_LOCK_MARGIN_MS`, so the next lock-ownership check would renew it in place.
+ */
+function nearExpiry(root: string, taskId: string): void {
+  for (const path of Object.keys(lockBytes(root))) {
+    if (!path.endsWith('.json')) continue;
+    const record = JSON.parse(readFileSync(path, 'utf8')) as {
+      task_id?: unknown;
+      substrate?: unknown;
+      acquired_at?: unknown;
+      ttl_ms: number;
+    };
+    if (
+      record.task_id !== taskId ||
+      typeof record.substrate !== 'string' ||
+      typeof record.acquired_at !== 'string' ||
+      typeof record.ttl_ms !== 'number'
+    ) {
+      continue;
+    }
+    const acquiredAt = new Date(Date.now() - record.ttl_ms + 60_000).toISOString();
+    writeFileSync(path, `${JSON.stringify({ ...record, acquired_at: acquiredAt }, null, 2)}\n`);
+  }
+}
+
 describe('agent completion is durable before it releases anything (FIX 4, FIX 8)', () => {
   async function accepted(root: string): Promise<void> {
     recordEvidence(root, [
@@ -620,6 +647,9 @@ describe('agent completion is durable before it releases anything (FIX 4, FIX 8)
   it('refuses merge evidence the chain does not hold, cannot verify, or binds elsewhere, writing nothing (#319)', async () => {
     const root = repository();
     await accepted(root);
+    // Own locks inside the completion margin: a finish that reached its lock check would
+    // renew them, so unchanged bytes prove every refusal came before it.
+    nearExpiry(root, 'TASK-0341');
     const locks = lockBytes(root);
     const finish = (evidence: string[]) => () =>
       finishRoundTask({ repoRoot: root, round: ROUND, taskId: 'TASK-0341', evidence });
@@ -676,6 +706,16 @@ describe('agent completion is durable before it releases anything (FIX 4, FIX 8)
     expect(listWorktrees({ repoRoot: root }).map((worktree) => worktree.id)).toEqual([
       'WT-TASK-0341-A1',
     ]);
+    // Control: the lock check itself does renew these records.
+    await effects(() => {
+      const task = loadTask(root, 'TASK-0341');
+      assertLockOwnership({
+        locksDir: join(root, '.devai/state/locks'),
+        taskId: task.id,
+        targets: taskLockTargets(task),
+      });
+    });
+    expect(lockBytes(root)).not.toEqual(locks);
   });
 
   it('revalidates the completion record and its evidence on a retry from merging (#319)', async () => {
@@ -740,6 +780,18 @@ describe('agent completion is durable before it releases anything (FIX 4, FIX 8)
     writeFileSync(ratification, ratified);
     // A missing completion record cannot be rebuilt from merging.
     const completion = readFileSync(completionPath(root), 'utf8');
+    // An incomplete or mistyped completion record is not trusted.
+    const parsed = JSON.parse(completion) as Record<string, unknown>;
+    for (const broken of [
+      { ...parsed, released_worktrees: [1] },
+      { ...parsed, ratification: { sha256: (parsed.ratification as { sha256: string }).sha256 } },
+      { ...parsed, completed_at: 'yesterday' },
+    ]) {
+      writeFileSync(completionPath(root), `${JSON.stringify(broken, null, 2)}\n`);
+      await effects(() => {
+        expect(finish(['EV-0123456789abcdef'])).toThrow('TASK_COMPLETION_CONFLICT');
+      });
+    }
     rmSync(completionPath(root));
     await effects(() => {
       expect(finish(['EV-0123456789abcdef'])).toThrow('TASK_COMPLETION_CONFLICT');
