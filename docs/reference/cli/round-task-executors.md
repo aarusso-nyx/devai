@@ -564,22 +564,29 @@ the controller. It refuses an agent task with no accepted ratification
 with an open journal attempt (`TASK_DISPATCH_UNCERTAIN`).
 
 Every `--evidence` reference must resolve to a valid record in `record/proofs/chain.json`, read
-with the same chain reader the `evidence` commands use. The whole chain must pass the evidence
-package's chain verification: every record's manifest hash recomputes, each record links to its
-predecessor, and the head names the last record. Each referenced record must also satisfy the
+with the same chain reader the `evidence` commands use. One loaded snapshot of the whole chain
+must pass the evidence package's chain verification, and the references resolve against that same
+snapshot: every record's manifest hash recomputes, each record links to its predecessor, and the
+head names the last record. Each referenced record must also satisfy the
 evidence schema. Proof-line anchors are not re-resolved, because that needs the anchor baseline
 that `evidence verify --scope chain` keeps. A missing, unreadable or broken chain, a reference the
 chain does not hold, or a referenced record that fails the schema refuses with
-`TASK_MERGE_EVIDENCE_REQUIRED`. These checks and the ratification check run before anything is
-written, including a lock renewal.
+`TASK_MERGE_EVIDENCE_REQUIRED`. These checks and the ratification check first run before
+anything is written, including a lock renewal, so a refusal at that point writes nothing. They
+run again under the round controller after the locks are secured. If the chain or the
+ratification changes in between, that second check can refuse after a lock was renewed; the
+renewal is then the only write.
 
 A record binds to the task only through what it names: a non-null `context.task_id` must be the
 finished task, and every `round_id=<round>` note must name the task's round. A record that names
-neither is accepted unbound, because the evidence writers do not stamp a task.
+neither is accepted unbound, because the evidence writers do not stamp a task. The binding is
+best-effort against a hand-edited chain: the manifest hash does not cover `context.task_id` or
+the notes, so an edit to either leaves the chain verifiable.
 
 A retry after an interruption needs the same `--evidence` again. From `pre_merge` it reuses an
 identical completion record. From `merging`, after the worktrees were released, the completion
-record must still exist, bind the current ratification bytes, and name exactly the given
+record must still exist and be complete, with every field present and correctly typed. It must
+also bind the current ratification bytes and name exactly the given
 references, which must still resolve; otherwise it refuses with `TASK_COMPLETION_CONFLICT` or
 `TASK_MERGE_EVIDENCE_REQUIRED`.
 
