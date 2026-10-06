@@ -25,6 +25,8 @@ function write(root: string, relative: string, contents: string): void {
   writeFileSync(path, contents);
 }
 
+// #325: a superseding group must be scoped to its ref, commit, or pull request and merge-queue
+// entry, so the fixtures that supersede use a ref-scoped group.
 describe('wave6 concurrency declaration semantics', () => {
   it('does not treat job-level concurrency as a top-level declaration', () => {
     const root = fixtureRoot();
@@ -76,7 +78,7 @@ jobs:
     steps:
       - run: echo ok
 concurrency:
-  group: ci
+  group: ci-${'${{ github.ref }}'}
   cancel-in-progress: true`,
     );
 
@@ -119,7 +121,7 @@ jobs:
   schedule-disabled:
     - cron: '0 0 * * *'
 concurrency:
-  group: ci
+  group: ci-${'${{ github.ref }}'}
   cancel-in-progress: true
 jobs:
   build:
@@ -143,7 +145,7 @@ describe('wave6 score accumulation and thresholds', () => {
       `permissions:
   contents: read
 concurrency:
-  group: ci
+  group: ci-${'${{ github.ref }}'}
   cancel-in-progress: true
 jobs:
   build:
@@ -155,7 +157,7 @@ jobs:
       root,
       '.github/workflows/ci-b.yml',
       `concurrency:
-  group: ci
+  group: ci-${'${{ github.ref }}'}
   cancel-in-progress: true
 jobs:
   build:
