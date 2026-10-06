@@ -9,44 +9,46 @@ title: Self-scorecard
 This page renders the newest self-scorecard recorded under `record/proofs/compliance/scorecards/`. The record
 files linked below are authoritative; this page is regenerated from them.
 
-- Scorecard: `SC-20261001T194346-001`
-- Integration head: [`c0681069`](https://github.com/aarusso-nyx/devai/commit/c06810699ee53f931d4426ef103ace922f829ab9)
-- Generated at: 2026-10-01T16:43:46-03:00
+- Scorecard: `SC-20261006T141503-001`
+- Integration head: [`61a2b07c`](https://github.com/aarusso-nyx/devai/commit/61a2b07ca828e0e20fa6f611615c5d14546f12b9)
+- Generated at: 2026-10-06T11:15:03-03:00
 - Overall verdict: **FAIL**
-- Cells: PASS 35, REVIEW 4, FAIL 1, UNKNOWN 2, N/A 3
+- Cells: PASS 33, REVIEW 6, FAIL 2, UNKNOWN 1, N/A 3
 
 ## Aspect grid
 
 A cell marked `nd` was computed from a non-deterministic reading; a cell marked `note` carries a
 note, listed below when the cell is not at PASS.
 
-| Substrate        | T1 Coverage | T2 Depth | T3 Coherence | T4 Alignment | T5 Idiomaticity | T6 Security and Privacy | T7 Performance and Efficiency | T8 Robustness | T9 Discipline |
-| ---------------- | ----------- | -------- | ------------ | ------------ | --------------- | ----------------------- | ----------------------------- | ------------- | ------------- |
-| F1 Specification | N/A         | PASS     | PASS         | PASS         | PASS            | PASS                    | PASS                          | PASS          | PASS          |
-| F2 Plant         | PASS        | PASS     | PASS         | UNKNOWN      | PASS            | FAIL (nd, note)         | PASS (nd)                     | PASS          | PASS          |
-| F3 Observation   | PASS (nd)   | PASS     | PASS         | PASS         | PASS            | PASS                    | PASS                          | PASS          | PASS          |
-| F4 Inventory     | PASS        | PASS     | PASS         | UNKNOWN      | N/A             | N/A (note)              | PASS                          | PASS          | REVIEW        |
-| F5 Harness       | PASS        | PASS     | REVIEW       | REVIEW       | PASS            | PASS                    | PASS (nd)                     | PASS (nd)     | REVIEW (nd)   |
+| Substrate        | T1 Coverage | T2 Depth    | T3 Coherence | T4 Alignment | T5 Idiomaticity | T6 Security and Privacy | T7 Performance and Efficiency | T8 Robustness | T9 Discipline |
+| ---------------- | ----------- | ----------- | ------------ | ------------ | --------------- | ----------------------- | ----------------------------- | ------------- | ------------- |
+| F1 Specification | N/A         | PASS        | PASS         | PASS         | PASS            | PASS                    | PASS                          | PASS          | PASS          |
+| F2 Plant         | PASS        | REVIEW      | PASS         | UNKNOWN      | PASS            | REVIEW (nd)             | PASS (nd)                     | PASS          | PASS          |
+| F3 Observation   | PASS (nd)   | FAIL (note) | PASS         | PASS         | PASS            | PASS                    | PASS                          | PASS          | PASS          |
+| F4 Inventory     | PASS        | PASS        | PASS         | PASS         | N/A             | N/A (note)              | REVIEW                        | PASS          | PASS          |
+| F5 Harness       | PASS        | PASS        | FAIL (note)  | REVIEW       | PASS            | PASS                    | REVIEW (nd)                   | PASS (nd)     | REVIEW (nd)   |
 
 ## Cells not at PASS
 
 - F1 × T1: N/A; no sensor readings
+- F2 × T2: REVIEW; readings `SR-ac6fd08870d0d0cb`
 - F2 × T4: UNKNOWN; no sensor readings
-- F2 × T6: FAIL; readings `SR-94d55faaafb86baf`; note: latest security_scan failure at 2026-10-01T20:18:52.845Z
-- F4 × T4: UNKNOWN; readings `SR-5eabaffb2d7e3428`
+- F2 × T6: REVIEW; readings `SR-a96646142553c04d`
+- F3 × T2: FAIL; readings `SR-333014e94493cbae`; note: latest test_coverage_depth failure at 2026-10-06T15:28:50.140Z
 - F4 × T5: N/A; no sensor readings
 - F4 × T6: N/A; readings `SR-ea7f14f9392071a3`, `SR-3ac77c1640471e1c`; note: N/A-declaration: inventory_data_handling: Not measured: .devai/config/sensor-inputs.json declares the surface rbac absent, and no evidence of it was found.; inventory_rbac: Not measured: .devai/config/sensor-inputs.json declares the surface rbac absent, and no evidence of it was found.
-- F4 × T9: REVIEW; readings `SR-5b6ca1cf6cf2f391`
-- F5 × T3: REVIEW; readings `SR-7de753841401da4a`, `SR-f925456fd16c0d23`
+- F4 × T7: REVIEW; readings `SR-59691a42d898a9af`
+- F5 × T3: FAIL; readings `SR-7de753841401da4a`, `SR-08eab6fc69d4e3ac`; note: latest harness_coherence failure at 2026-10-06T15:29:53.409Z
 - F5 × T4: REVIEW; readings `SR-423fe8572b392f41`
-- F5 × T9: REVIEW; readings `SR-19eae5a6facc41f8`
+- F5 × T7: REVIEW; readings `SR-dbad3930fe3a1fa0`
+- F5 × T9: REVIEW; readings `SR-9ea807e4f22f7c62`
 
 ## Assessment
 
-Overall: RED. 35/45 cells passing. 1 cell(s) failing. 4 cell(s) in review. 2 cell(s) unknown (sensor coverage gap).
+Overall: RED. 33/45 cells passing. 2 cell(s) failing. 6 cell(s) in review. 1 cell(s) unknown (sensor coverage gap).
 
 ## Record
 
-- [Scorecard](../../record/proofs/compliance/scorecards/SC-20261001T194346-001.json)
-- [Assessment](../../record/proofs/compliance/scorecards/SC-20261001T194346-001.assessment.json)
-- [Backlog](../../record/proofs/compliance/scorecards/SC-20261001T194346-001.backlog.json)
+- [Scorecard](../../record/proofs/compliance/scorecards/SC-20261006T141503-001.json)
+- [Assessment](../../record/proofs/compliance/scorecards/SC-20261006T141503-001.assessment.json)
+- [Backlog](../../record/proofs/compliance/scorecards/SC-20261006T141503-001.backlog.json)
