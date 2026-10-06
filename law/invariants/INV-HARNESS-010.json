@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "1.0.0",
+  "version": "1.0.0",
+  "id": "INV-HARNESS-010",
+  "domain": "HARNESS",
+  "lifecycle": "supported",
+  "severity": "gate",
+  "type": "governance",
+  "title": "Stack-adapter packs resolve deterministically and report ambiguity",
+  "statement": "A stack-adapter pack MUST be a resolution candidate only when its stack-adapter.json validates against law/schemas/stack-adapter.schema.json, an explicitly named pack MUST take precedence over detection and resolve to nothing when absent, detection MUST rank matching packs by signal hits, then declared priority, then id, and MUST report a tie at the top as ambiguous, and sensor parameters MUST come only from the resolved pack under an explicitly supplied packs root, with no resolution when that root is absent.",
+  "rationale": "Article 1 admits adjacent stacks only through stack-adapter packs carried as F5 policy and requires each adopter to declare one resolved stack; a silent tie or a pack found outside the declared root would change extraction without a declaration.",
+  "status": "active",
+  "verification": {
+    "required_suites": ["unit"],
+    "oracle": "tests",
+    "strategy": {
+      "primary": "regression",
+      "deterministic_check_available": true,
+      "rationale": "A deterministic test corpus under tests/ and packages/*/tests observes this obligation; trace links the tests."
+    }
+  },
+  "authority_docs": {
+    "docs": [
+      {
+        "doc": "law/constitution.md",
+        "anchor": "article-1-purpose"
+      }
+    ]
+  },
+  "scope": {
+    "components": ["pack-resolver"],
+    "code_areas": ["packages/skills/src/pack-resolver/**"]
+  },
+  "change_policy": {
+    "breaking_change_requires": ["doc_update", "trace_update", "test_update", "adr"],
+    "test_weakening_allowed": false,
+    "human_approval_required": false
+  },
+  "tags": ["stack-adapter", "declared-stack", "article-1"],
+  "measurable_via": ["sense inventory"],
+  "provenance": ["constitution Article 1", "issue #295"],
+  "supersedes": null,
+  "superseded_by": null
+}

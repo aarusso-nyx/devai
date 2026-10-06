@@ -1,0 +1,52 @@
+{
+  "schemaVersion": "1.0.0",
+  "version": "1.0.0",
+  "id": "INV-CORE-010",
+  "domain": "CORE",
+  "lifecycle": "supported",
+  "severity": "hard-fail",
+  "type": "api_contract",
+  "title": "The public CLI dispatches exactly the canonical action registry",
+  "statement": "Every command handler the CLI registers MUST resolve to one entry of law/policy/action-registry.json and take its path, effect, output and error contracts, and authority contract from that entry, a handler absent from the registry or whose declared authority or lifecycle differs from it MUST be refused when the registry is constructed rather than dispatched, an effect derived from network capabilities MUST be remote-write ahead of any local or harness capability, and the version the CLI reports MUST be the version of its own package manifest.",
+  "rationale": "The approved action set is a registry-declared contract before it is code (ADR-REL-0001, ADR-MDL-0007); a handler that exists outside the registry, or that drifts from its entry, would widen effects and authority without any recorded decision.",
+  "status": "active",
+  "verification": {
+    "required_suites": ["unit"],
+    "oracle": "tests",
+    "strategy": {
+      "primary": "regression",
+      "deterministic_check_available": true,
+      "rationale": "A deterministic test corpus under tests/ and packages/*/tests observes this obligation; trace links the tests."
+    }
+  },
+  "authority_docs": {
+    "docs": [
+      {
+        "doc": "law/adr/ADR-REL-0001-release-lifecycle-actions-and-state.md",
+        "anchor": "consequences"
+      },
+      {
+        "doc": "law/adr/ADR-MDL-0007-experimental-completion-recovery-and-capacity.md",
+        "anchor": "consequences"
+      }
+    ]
+  },
+  "scope": {
+    "components": ["cli", "action-registry"],
+    "code_areas": [
+      "packages/cli/src/bin.ts",
+      "packages/cli/src/command-manifest.ts",
+      "packages/cli/src/version.ts"
+    ]
+  },
+  "change_policy": {
+    "breaking_change_requires": ["doc_update", "trace_update", "test_update", "adr"],
+    "test_weakening_allowed": false,
+    "human_approval_required": false
+  },
+  "tags": ["action-registry", "public-surface", "cli"],
+  "measurable_via": ["catalog actions", "check"],
+  "provenance": ["ADR-REL-0001", "ADR-MDL-0007", "issue #295"],
+  "supersedes": null,
+  "superseded_by": null
+}

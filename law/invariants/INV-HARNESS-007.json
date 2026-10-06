@@ -1,0 +1,52 @@
+{
+  "schemaVersion": "1.0.0",
+  "version": "1.0.0",
+  "id": "INV-HARNESS-007",
+  "domain": "HARNESS",
+  "lifecycle": "supported",
+  "severity": "hard-fail",
+  "type": "governance",
+  "title": "Agent prompts are composed deterministically from four hashed layers",
+  "statement": "Every experimental agent prompt MUST be composed, in order, from the repository AGENTS.md, the packaged charter of the task discipline, the bound task request without its own composition id followed by the task declared instructions file when it names one, and the declared recipe as payload, MUST record each component sha256 and the stack sha256 under law/schemas/prompt-composition.schema.json so that a change to one input changes exactly that component hash, and a missing or empty component, an instructions reference outside the repository, an absent or invalid recipe, an unsupported discipline, or a non-agent task MUST refuse rather than compose a shorter stack.",
+  "rationale": "Article 37 requires prompt composition to be deterministic and every component drift detectable and attributable; ADR-MDL-0005 D-8 fixes the four layers and forbids silently skipping one, and ADR-MDL-0009 adds the declared task instructions as a hashed task-layer component.",
+  "status": "active",
+  "verification": {
+    "required_suites": ["unit"],
+    "oracle": "tests",
+    "strategy": {
+      "primary": "regression",
+      "deterministic_check_available": true,
+      "rationale": "A deterministic test corpus under tests/ and packages/*/tests observes this obligation; trace links the tests."
+    }
+  },
+  "authority_docs": {
+    "docs": [
+      {
+        "doc": "law/constitution.md",
+        "anchor": "article-37-prompt-composition-is-governed"
+      },
+      {
+        "doc": "law/adr/ADR-MDL-0005-opt-in-experimental-agent-execution.md",
+        "anchor": "decision"
+      },
+      {
+        "doc": "law/adr/ADR-MDL-0009-review-reserve-and-campaign-agent-materialization.md",
+        "anchor": "decision"
+      }
+    ]
+  },
+  "scope": {
+    "components": ["prompt-composer"],
+    "code_areas": ["packages/skills/src/prompt-composer/**"]
+  },
+  "change_policy": {
+    "breaking_change_requires": ["doc_update", "trace_update", "test_update", "adr"],
+    "test_weakening_allowed": false,
+    "human_approval_required": false
+  },
+  "tags": ["prompt-composition", "article-37", "experimental"],
+  "measurable_via": ["round dispatch"],
+  "provenance": ["ADR-MDL-0005", "ADR-MDL-0009", "issue #295"],
+  "supersedes": null,
+  "superseded_by": null
+}

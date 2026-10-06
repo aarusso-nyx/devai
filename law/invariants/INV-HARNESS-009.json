@@ -1,0 +1,55 @@
+{
+  "schemaVersion": "1.0.0",
+  "version": "1.0.0",
+  "id": "INV-HARNESS-009",
+  "domain": "HARNESS",
+  "lifecycle": "supported",
+  "severity": "hard-fail",
+  "type": "governance",
+  "title": "Recipes are host-invoked contracts bounded by their declared variant",
+  "statement": "Every recipe MUST have one canonical source whose manifest validates and whose SKILL.md front matter matches it, its host projections MUST be byte copies of that source with a symlink or a drifted target refusing the whole installation before any write, and every typed operation MUST run only as part of a manifest-declared variant of a known recipe, with an effect no wider than the variant, explicit repository-relative write paths inside the variant write scope for any non-read operation, and an existing materialized file with different bytes reported as drift rather than overwritten.",
+  "rationale": "ADR-GOV-0020 keeps one canonical recipe source with generated projections, and the recipe contract keeps deterministic work in typed operations whose effects and write scopes the declared variant bounds; a recipe that widens its scope would act outside any authorized boundary.",
+  "status": "active",
+  "verification": {
+    "required_suites": ["unit"],
+    "oracle": "tests",
+    "strategy": {
+      "primary": "regression",
+      "deterministic_check_available": true,
+      "rationale": "A deterministic test corpus under tests/ and packages/*/tests observes this obligation; trace links the tests."
+    }
+  },
+  "authority_docs": {
+    "docs": [
+      {
+        "doc": "law/adr/ADR-GOV-0020-canonical-instructions-and-host-projections.md",
+        "anchor": "decision"
+      },
+      {
+        "doc": "law/constitution.md",
+        "anchor": "article-36-devai-evaluates-the-configured-repository-substrate"
+      }
+    ]
+  },
+  "scope": {
+    "components": ["recipes", "operations"],
+    "code_areas": [
+      "packages/skills/src/recipes/**",
+      "packages/skills/src/operations/catalog.ts",
+      "packages/skills/src/operations/host.ts",
+      "packages/skills/src/operations/materialize.ts",
+      "packages/skills/src/operations/types.ts",
+      "packages/skills/src/operations/index.ts"
+    ]
+  },
+  "change_policy": {
+    "breaking_change_requires": ["doc_update", "trace_update", "test_update", "adr"],
+    "test_weakening_allowed": false,
+    "human_approval_required": false
+  },
+  "tags": ["recipes", "operations", "write-scope"],
+  "measurable_via": ["init apply harness", "check"],
+  "provenance": ["ADR-GOV-0020", "issue #295"],
+  "supersedes": null,
+  "superseded_by": null
+}
