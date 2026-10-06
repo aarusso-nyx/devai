@@ -22,6 +22,12 @@ import type { LoadedRecipe } from './types.js';
 
 export type RecipeHost = 'codex' | 'claude';
 
+/**
+ * Code of an installation that failed and whose rollback left entries behind: the error is an
+ * AggregateError whose first error is the original failure and whose others name the residue.
+ */
+export const RECIPE_INSTALL_ROLLBACK_INCOMPLETE = 'RECIPE_INSTALL_ROLLBACK_INCOMPLETE';
+
 export interface RecipeAdapterFile {
   readonly host: RecipeHost;
   readonly path: string;
@@ -255,7 +261,11 @@ function recheckTarget(file: ResolvedRecipeAdapterFile): void {
 }
 
 interface InstallJournal {
-  readonly directories: (FileIdentity & { readonly path: string })[];
+  /**
+   * Directories this call made, in creation order. `identity` is undefined when the pin after
+   * the mkdir failed: such a directory is unverified, never removed, and reported as residue.
+   */
+  readonly directories: { readonly path: string; identity?: FileIdentity }[];
   readonly files: (FileIdentity & { readonly path: string })[];
 }
 
@@ -276,15 +286,13 @@ function createAncestors(
     if (stat === undefined) {
       // Non-recursive: EEXIST refuses an entry that appeared after the lstat.
       mkdirSync(ancestor);
+      // Journaled before the fallible pin, so a failed pin leaves a known, unverified entry.
+      const entry: { readonly path: string; identity?: FileIdentity } = { path: ancestor };
+      journal.directories.push(entry);
       const pin = openReadOnlyNoFollowSync(ancestor, true);
       pins.push(pin);
       const created = fstatSync(pin, { bigint: true });
-      journal.directories.push({
-        path: ancestor,
-        dev: created.dev,
-        ino: created.ino,
-        birthtimeNs: created.birthtimeNs,
-      });
+      entry.identity = { dev: created.dev, ino: created.ino, birthtimeNs: created.birthtimeNs };
       continue;
     }
     if (stat.isSymbolicLink()) throw new Error(`RECIPE_INSTALL_SYMLINK_REFUSED: ${file.path}`);
@@ -327,6 +335,7 @@ function verifyPublished(
   identity: FileIdentity,
   realRoot: string,
   pins: number[],
+  journal: InstallJournal,
 ): void {
   const expected = join(realRoot, file.path);
   let bound = false;
@@ -340,8 +349,27 @@ function verifyPublished(
     bound = false;
   }
   if (!bound) {
-    unlinkIfIdentity(file.absolutePath, identity);
-    throw new Error(`RECIPE_INSTALL_ESCAPE_DETECTED: ${file.path}`);
+    // One cleanup attempt, bound to the publication's identity; the rollback never retries this
+    // file by path, because the parent may have moved again. Anything but `removed` is residue.
+    journal.files.pop();
+    let outcome: string;
+    try {
+      outcome = removeEntryIfIdentitySync(file.absolutePath, identity);
+    } catch (error) {
+      outcome = `failed (${error instanceof Error ? error.message : String(error)})`;
+    }
+    if (outcome === 'removed') {
+      throw Object.assign(new Error(`RECIPE_INSTALL_ESCAPE_DETECTED: ${file.path}`), {
+        code: 'RECIPE_INSTALL_ESCAPE_DETECTED',
+        residue: [],
+      });
+    }
+    throw Object.assign(
+      new Error(
+        `RECIPE_INSTALL_ESCAPE_DETECTED: ${file.path} (escaped residue not removed: ${outcome})`,
+      ),
+      { code: 'RECIPE_INSTALL_ESCAPE_DETECTED', residue: [file.absolutePath] },
+    );
   }
 }
 
@@ -365,7 +393,18 @@ function rollBack(journal: InstallJournal): readonly unknown[] {
   };
   for (const file of journal.files.toReversed()) attempt(() => unlinkIfIdentity(file.path, file));
   for (const directory of journal.directories.toReversed()) {
-    attempt(() => removeEntryIfIdentitySync(directory.path, directory));
+    const identity = directory.identity;
+    if (identity === undefined) {
+      // Created but never pinned: its identity is unknown, so it is left and reported.
+      failures.push(
+        Object.assign(new Error(`RECIPE_INSTALL_UNVERIFIED_DIRECTORY: ${directory.path}`), {
+          code: 'RECIPE_INSTALL_UNVERIFIED_DIRECTORY',
+          path: directory.path,
+        }),
+      );
+      continue;
+    }
+    attempt(() => removeEntryIfIdentitySync(directory.path, identity));
   }
   return failures;
 }
@@ -435,15 +474,18 @@ export function executeRecipeAdapterPlan(
           throw error;
         }
         journal.files.push({ path: file.absolutePath, ...identity });
-        verifyPublished(file, identity, realRoot, pins);
+        verifyPublished(file, identity, realRoot, pins, journal);
         written.push(file.path);
       }
     } catch (error) {
       const residue = rollBack(journal);
       if (residue.length > 0) {
-        throw new AggregateError([error, ...residue], 'RECIPE_INSTALL_ROLLBACK_INCOMPLETE', {
-          cause: error,
-        });
+        throw Object.assign(
+          new AggregateError([error, ...residue], RECIPE_INSTALL_ROLLBACK_INCOMPLETE, {
+            cause: error,
+          }),
+          { code: RECIPE_INSTALL_ROLLBACK_INCOMPLETE },
+        );
       }
       throw error;
     }
