@@ -1,4 +1,3 @@
-import { dirname } from 'node:path';
 import {
   constants as nodeFileConstants,
   appendFileSync as nodeAppendFileSync,
@@ -308,16 +307,6 @@ export type {
 
 /** Exact read-only bootstrap exception used only to resolve the CLI version. */
 export const readProcessSync = nodeSpawnSync;
-
-/**
- * Exact conditional-effect exception for governance render --out. The caller
- * is statically restricted by the direct-mutator guard and completes the
- * Architect/write-consent check before invoking this helper.
- */
-export function writeGovernanceProjectionSync(target: string, body: string): void {
-  nodeMkdirSync(dirname(target), { recursive: true });
-  nodeWriteFileSync(target, body);
-}
 
 /** Exact read-only Git object lookup used by the first-parent gate guard. */
 export function readGitObjectSync(repoRoot: string, revision: string, path: string): string {

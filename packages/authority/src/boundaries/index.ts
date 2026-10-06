@@ -61,8 +61,6 @@ const GIT_READ_OWNERS: Readonly<Record<string, ReadonlySet<string>>> = {
 };
 const DIRECTORY_FLUSH_EXCEPTION = 'flushDirectoryEntrySync';
 const DIRECTORY_FLUSH_OWNER = 'packages/loop/src/loop/state-root.ts';
-const GOVERNANCE_PROJECTION_EXCEPTION = 'writeGovernanceProjectionSync';
-const GOVERNANCE_PROJECTION_OWNER = 'packages/cli/src/commands/evidence/facade.ts';
 const HOST_EFFECTS_MODULE = '@devai-nyx/authority';
 const CANONICAL_SOURCE_ROOTS = [
   'packages/authority/src',
@@ -200,15 +198,6 @@ function unauthorizedMutatorCalls(
         calls.push({
           line: file.getLineAndCharacterOfPosition(node.getStart()).line + 1,
           symbol: DIRECTORY_FLUSH_EXCEPTION,
-        });
-      }
-      if (
-        importedSymbol === GOVERNANCE_PROJECTION_EXCEPTION &&
-        (fileName !== GOVERNANCE_PROJECTION_OWNER || importedModule !== HOST_EFFECTS_MODULE)
-      ) {
-        calls.push({
-          line: file.getLineAndCharacterOfPosition(node.getStart()).line + 1,
-          symbol: GOVERNANCE_PROJECTION_EXCEPTION,
         });
       }
     }
