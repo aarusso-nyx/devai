@@ -18,13 +18,13 @@ function readJson<T>(path: string): T {
   return JSON.parse(readFileSync(path, 'utf8')) as T;
 }
 
-/** Every workspace package that publishes a root export, derived from its manifest. */
+/** Every workspace package that declares a root export, whatever its shape, from its manifest. */
 const ROOT_EXPORT_PACKAGES = readdirSync('packages', { withFileTypes: true })
   .filter((entry) => entry.isDirectory() && existsSync(`packages/${entry.name}/package.json`))
   .map((entry) => entry.name)
   .filter((name) => {
     const root = readJson<Manifest>(`packages/${name}/package.json`).exports?.['.'];
-    return root !== undefined && typeof root !== 'string';
+    return root !== undefined;
   })
   .sort();
 
@@ -76,7 +76,10 @@ describe('package barrels', () => {
   it.each(ROOT_EXPORT_PACKAGES)(
     '@devai-nyx/%s root export is its source index in development and its build in production',
     (name) => {
-      const root = readJson<Manifest>(`packages/${name}/package.json`).exports?.['.'] as RootExport;
+      const declared = readJson<Manifest>(`packages/${name}/package.json`).exports?.['.'];
+      // A string or any non-conditional shape cannot carry the development and production entries.
+      expect(typeof declared).toBe('object');
+      const root = declared as RootExport;
       expect(root.development).toBe('./src/index.ts');
       expect(root.default).toBe('./dist/index.js');
       expect(root.types).toBe('./dist/index.d.ts');
