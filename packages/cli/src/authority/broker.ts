@@ -57,6 +57,7 @@ import {
   gitMetadataLayout,
   gitMetadataLogicalPath,
   physicalCanonicalPath,
+  removalWithPinnedParent,
   snapshot,
   within,
 } from './broker-paths.js';
@@ -1245,6 +1246,10 @@ export function createAuthorityHostBroker(input: BrokerInput): {
         typeof path === 'string'
           ? { path, mode: published === undefined ? 'entry' : 'published' }
           : undefined;
+      // An unpublished removal renames by path: its parent, admitted inside the repository at
+      // authorization, is pinned and re-verified around the effect (#317).
+      const removalApply =
+        published === undefined ? removalWithPinnedParent(request.arguments[0], apply) : apply;
       try {
         return authorizeTarget(
           {
@@ -1253,7 +1258,7 @@ export function createAuthorityHostBroker(input: BrokerInput): {
             authority_contract: input.entry.authority_contract,
           },
           removal,
-          apply,
+          removalApply,
         );
       } finally {
         removalContainment = undefined;
