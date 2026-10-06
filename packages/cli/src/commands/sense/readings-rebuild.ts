@@ -7,6 +7,7 @@ import {
   fsyncSync,
   mkdirSync,
   openSync,
+  lstatSync,
   readdirSync,
   readFileSync,
   renameSync,
@@ -337,8 +338,11 @@ interface RegenerationCandidate {
   readonly head: string;
   /** The tree of that commit: with the head, the identity the whole run is bound to. */
   readonly tree: string;
-  /** The files git tracks at that commit; nothing else may enter a bound body. */
-  readonly tracked: ReadonlySet<string>;
+  /**
+   * Whether an input may enter a bound body: git tracks it and it is a regular file. A
+   * tracked symlink is refused, since its target need not be in the commit or the checkout.
+   */
+  readonly admit: (absolutePath: string) => boolean;
   /** The commit time, so the same commit regenerates byte-identical bodies. */
   readonly timestamp: string;
 }
@@ -356,6 +360,20 @@ function git(repoRoot: string, args: readonly string[]): string {
 function trackedFiles(repoRoot: string): ReadonlySet<string> {
   const listing = git(repoRoot, ['ls-files', '-z']);
   return new Set(listing.split('\0').filter((path) => path.length > 0));
+}
+
+function admissionOf(
+  repoRoot: string,
+  tracked: ReadonlySet<string>,
+): (absolutePath: string) => boolean {
+  return (absolutePath) => {
+    if (!tracked.has(relative(repoRoot, absolutePath))) return false;
+    try {
+      return lstatSync(absolutePath).isFile();
+    } catch {
+      return false;
+    }
+  };
 }
 
 /** A change since the candidate was resolved, or undefined when its identity still holds. */
@@ -411,7 +429,7 @@ function resolveCandidate(repoRoot: string): RegenerationCandidate | SensorFindi
     return {
       head,
       tree,
-      tracked: trackedFiles(repoRoot),
+      admit: admissionOf(repoRoot, trackedFiles(repoRoot)),
       timestamp: new Date(committed).toISOString(),
     };
   } catch (error) {
@@ -606,7 +624,7 @@ function produceKind(
   readonly body: unknown;
   readonly reading: SensorReading;
 } {
-  const admitFile = (path: string): boolean => candidate.tracked.has(relative(repoRoot, path));
+  const admitFile = candidate.admit;
   const produced =
     kind === 'inventory_dep_graph'
       ? senseInventoryDepGraph({
@@ -619,6 +637,7 @@ function produceKind(
           repoRoot,
           persistBody: false,
           now: candidate.timestamp,
+          admitFile,
           ...(surfaces === undefined ? {} : { surfaces }),
         });
   return {
@@ -687,6 +706,39 @@ function producerRecord(
   };
 }
 
+/** Remove the bodies this run published after the snapshot moved; absence reads as missing, never stale. */
+function retractedResult(
+  repoRoot: string,
+  staged: readonly StagedBody[],
+  changed: string,
+): RegenerateInventoryResult {
+  const failures: string[] = [];
+  for (const body of staged) {
+    const target = join(repoRoot, body.body_path);
+    try {
+      if (existsSync(target)) {
+        unlinkSync(target);
+        fsyncDirectory(dirname(target));
+      }
+    } catch (error) {
+      failures.push(`${body.body_path}: ${messageOf(error)}`);
+    }
+  }
+  const outcome =
+    failures.length === 0
+      ? 'The bodies just published were removed, so none stands for a commit it does not describe.'
+      : `Removing the bodies just published failed (${failures.join('; ')}), so they may be stale.`;
+  return unwrittenResult(repoRoot, {
+    severity: failures.length === 0 ? 'warning' : 'error',
+    code: 'INVENTORY_REGENERATION_SNAPSHOT_CHANGED',
+    message:
+      `The repository changed while the inventory was published (${changed}). ${outcome}`.slice(
+        0,
+        400,
+      ),
+  });
+}
+
 /** The run that bound no candidate or lost its snapshot: UNKNOWN, with nothing written. */
 function unwrittenResult(repoRoot: string, finding: SensorFinding): RegenerateInventoryResult {
   return {
@@ -737,7 +789,7 @@ export async function regenerateInventoryReadings(
       repoRoot,
       timestamp: candidate.timestamp,
       integrationHead: candidate.head,
-      admittedFiles: candidate.tracked,
+      admitFile: candidate.admit,
     });
     surfaceCount =
       inventory.modules.length +
@@ -800,6 +852,10 @@ export async function regenerateInventoryReadings(
         ...(body.producer_reading === undefined ? {} : { producer_reading: body.producer_reading }),
       }));
       obsolete = removeObsoleteBodies(repoRoot, required);
+      // Publication is not atomic with the check above: a commit or edit can land between
+      // them. Check again afterwards; a stale set is retracted, so no body outlives its HEAD.
+      const late = snapshotChange(repoRoot, candidate);
+      if (late !== undefined) return retractedResult(repoRoot, staged, late);
     } catch (error) {
       errors.push(`publish regenerated bodies failed: ${messageOf(error)}`);
     }
