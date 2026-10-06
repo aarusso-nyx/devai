@@ -9,6 +9,7 @@ import { hostname, tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 import {
   createAuthorityDecisionIssuer,
+  PUBLISH_INDETERMINATE,
   runWithAuthorityHostEffects,
   type AuthorityHostEffectRequest,
 } from '@devai-nyx/authority';
@@ -26,6 +27,9 @@ import {
 
 let root: string;
 let interleave: (() => void) | undefined;
+/** Fault injection: the lock publication links its target, then its cleanup fails. */
+let indeterminateLock = false;
+let requests: AuthorityHostEffectRequest[] = [];
 
 function git(...args: string[]): string {
   return execFileSync('git', args, {
@@ -37,6 +41,8 @@ function git(...args: string[]): string {
 
 beforeEach(() => {
   interleave = undefined;
+  indeterminateLock = false;
+  requests = [];
   root = mkdtempSync(join(tmpdir(), 'devai-worktree-registry-'));
   git('init', '--quiet', '--initial-branch=main');
   writeFileSync(join(root, '.gitignore'), '.devai/\n');
@@ -82,6 +88,16 @@ function run<T>(callback: () => T): T {
         effect: 'local-write',
         receipt_store: issuer,
         apply_effect: (request: AuthorityHostEffectRequest, apply) => {
+          requests.push(request);
+          if (
+            indeterminateLock &&
+            request.symbol === 'publishFileNoReplaceSync' &&
+            request.arguments[0] === join(root, WORKTREE_REGISTRY_LOCK)
+          ) {
+            indeterminateLock = false;
+            apply();
+            throw Object.assign(new Error(PUBLISH_INDETERMINATE), { code: PUBLISH_INDETERMINATE });
+          }
           if (request.kind === 'filesystem') {
             const path = request.arguments[0];
             if (typeof path === 'string' && !resolve(path).startsWith(resolve(root) + sep))
@@ -235,5 +251,31 @@ describe('serialized worktree registry updates', () => {
     rmSync(lock);
     run(() => admit('WT-b', 0));
     expect(registryIds()).toEqual(['WT-a', 'WT-b']);
+  });
+
+  it('removes its own lock and refuses when the lock publication is indeterminate', () => {
+    run(() => admit('WT-a'));
+    indeterminateLock = true;
+    const refused = run(() => attempt(() => admit('WT-b')));
+    expect(refused).toMatchObject({ code: 'DURABLE_PUBLICATION_INDETERMINATE' });
+    expect(existsSync(join(root, WORKTREE_REGISTRY_LOCK))).toBe(false);
+    expect(registryIds()).toEqual(['WT-a']);
+    expect(existsSync(join(root, '.devai/worktrees/WT-b'))).toBe(false);
+    run(() => admit('WT-b'));
+    expect(registryIds()).toEqual(['WT-a', 'WT-b']);
+  });
+
+  it('fsyncs the state directory after removing its lock', () => {
+    run(() => admit('WT-a'));
+    const lock = join(root, WORKTREE_REGISTRY_LOCK);
+    const removal = requests.findIndex(
+      (request) => request.symbol === 'unlinkSync' && request.arguments[0] === lock,
+    );
+    expect(removal).toBeGreaterThanOrEqual(0);
+    expect(requests[removal + 1]).toMatchObject({
+      symbol: 'openSync',
+      arguments: [join(root, '.devai/state'), expect.any(Number)],
+    });
+    expect(requests[removal + 2]?.symbol).toBe('fsyncSync');
   });
 });
