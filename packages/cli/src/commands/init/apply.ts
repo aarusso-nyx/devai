@@ -12,6 +12,7 @@ import {
   preflightBootstrapPlan,
   preflightRecipeAdapterInstall,
 } from '@devai-nyx/skills';
+import { initializeStateRootSync, stateRootMarkerPath } from '#runtime-core';
 import { EXIT_PASS, EXIT_USAGE } from '@devai-nyx/utils';
 import { defineCommand } from '../../define-command.js';
 import { resolveCliVersion } from '../../version.js';
@@ -185,6 +186,7 @@ function initApplyDefinition(segment: InitSegment) {
           [
             ...coreTargets,
             ...(segment === 'harness' && introspection !== null ? [introspectionPath] : []),
+            ...(segment === 'harness' ? [stateRootMarkerPath(targetRoot)] : []),
             ...preparedIncludes.flatMap((component) => component.targets),
           ],
           () => {
@@ -193,6 +195,9 @@ function initApplyDefinition(segment: InitSegment) {
               mkdirSync(dirname(introspectionPath), { recursive: true });
               writeFileSync(introspectionPath, JSON.stringify(introspection, null, 2) + '\n');
             }
+            // #293: make the state root durable in `.devai` and publish its marker, which
+            // experimental dispatch requires; a re-application keeps the first marker.
+            if (segment === 'harness') initializeStateRootSync(targetRoot);
             return { result, included: executeIncludedComponents(preparedIncludes) };
           },
         );
