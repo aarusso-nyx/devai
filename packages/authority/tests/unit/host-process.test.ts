@@ -255,7 +255,12 @@ describe('governed asynchronous spawn (ADR-MDL-0005 D-10)', () => {
         ['-e', script],
         options({
           killGraceMs: 100,
-          killConfirmMs: 300,
+          // The escaped descendant keeps the streams open, so this window, not a close, settles
+          // the result, and `result.signal` is whatever exit the child reported before it ends.
+          // Node runs due timers before it polls for the child's exit, so a 300 ms window lost
+          // that race whenever a loaded worker stalled its event loop past it. Two seconds keep
+          // the same unconfirmed outcome while the leader's SIGTERM exit (tens of ms) lands first.
+          killConfirmMs: 2_000,
           onStdout: (chunk) => {
             const pid = Number(/^(\d+)\n/u.exec(chunk)?.[1]);
             if (escapedPid !== undefined || !Number.isInteger(pid) || pid <= 0) return;
