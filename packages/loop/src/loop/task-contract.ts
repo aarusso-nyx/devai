@@ -43,6 +43,8 @@ export interface AgentTaskExecutor {
   readonly selection: AgentSelection;
   readonly recipe_name?: string;
   readonly recipe_variant?: string;
+  /** Task instructions hashed into the composed prompt (ADR-MDL-0009). */
+  readonly instructions_ref?: string;
   readonly prompt_composition_id: string;
   readonly max_iterations: number;
   readonly capabilities: readonly string[];

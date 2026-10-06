@@ -315,7 +315,11 @@ function humanExecutor(campaign: LoadedCampaign, task: CampaignTask) {
   };
 }
 
-function agentExecutor(task: CampaignTask, contract: CampaignAgentExecutor) {
+function agentExecutor(
+  campaign: LoadedCampaign,
+  task: CampaignTask,
+  contract: CampaignAgentExecutor,
+) {
   return {
     kind: 'agent',
     runtime: contract.runtime,
@@ -324,6 +328,8 @@ function agentExecutor(task: CampaignTask, contract: CampaignAgentExecutor) {
     selection: { mode: 'exact', registry_id: contract.runtime },
     recipe_name: contract.recipe_name,
     ...(contract.recipe_variant !== undefined && { recipe_variant: contract.recipe_variant }),
+    // The campaign prompt joins the composed prompt as a hashed component (ADR-MDL-0009).
+    instructions_ref: `${campaign.directory}/${task.prompt.path}`,
     // Replaced below by the composed id; the composition excludes this field.
     prompt_composition_id: 'PC-0000000000000000',
     max_iterations: contract.max_iterations ?? DEFAULT_AGENT_MAX_ITERATIONS,
@@ -373,7 +379,9 @@ export function campaignTaskRecord(
     acceptance_commands: task.acceptance_commands,
     intent_diff: { planned_files: task.boundary.paths, planned_steps: task.deliverables },
     executor:
-      contract === undefined ? humanExecutor(campaign, task) : agentExecutor(task, contract),
+      contract === undefined
+        ? humanExecutor(campaign, task)
+        : agentExecutor(campaign, task, contract),
   } as unknown as TaskRecord;
   if (contract === undefined || agent === undefined) return record;
   return {

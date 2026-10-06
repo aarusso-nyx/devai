@@ -105,6 +105,25 @@ function resources(task: TaskRecord): readonly string[] {
   return taskLockTargets(task);
 }
 
+/**
+ * Whether a task may not run beside the given active tasks: they share a lock key, or (round-
+ * execution.json resources.keyless_agent_tasks, ADR-MDL-0009) it is an agent task and either
+ * it or an active agent task derives no lock key. A keyless agent task has no enforceable
+ * write scope a lock could serialize, so it never overlaps another agent task.
+ */
+function resourceConflict(
+  task: TaskRecord,
+  keys: readonly string[],
+  active: readonly TaskRecord[],
+): boolean {
+  if (active.some((other) => resources(other).some((key) => keys.includes(key)))) return true;
+  if (task.executor.kind !== 'agent') return false;
+  return active.some(
+    (other) =>
+      other.executor.kind === 'agent' && (keys.length === 0 || resources(other).length === 0),
+  );
+}
+
 /** Whether a task's discipline is one the review reserve serves. */
 export function isReviewDiscipline(task: Pick<TaskRecord, 'discipline'>): boolean {
   return (ROUND_REVIEW_RESERVE.disciplines as readonly string[]).includes(task.discipline);
@@ -240,26 +259,34 @@ export function planRoundTaskAdmission(
 }
 
 /**
- * Whether a review-discipline task of the candidate's generation could be admitted but for
- * capacity: planned, live `ready`, not active, not failed, and with every dependency
- * completed. Only such a task holds the reserve, so a review task that can never run in
- * this generation never idles a worker.
+ * Whether a review-discipline task of the candidate's generation would pass every admission
+ * check except capacity: planned, live `ready` with its bound request unchanged, not active,
+ * not failed, every dependency completed, and no resource conflict with an active task.
+ * Only such a task holds the reserve, so a blocked review task never idles a worker.
  */
 function reviewAwaitsAdmission(
   plan: RoundTaskAdmissionPlan,
   candidate: RoundTaskAdmissionNode,
   byId: ReadonlyMap<string, TaskRecord>,
-  active: ReadonlySet<string>,
+  active: readonly TaskRecord[],
   failed: ReadonlySet<string>,
 ): boolean {
+  const activeIds = new Set(active.map((task) => task.id));
   return plan.tasks.some((node) => {
     if (node.id === candidate.id || node.generation !== candidate.generation) return false;
-    if (!plan.orderedTaskIds.includes(node.id) || active.has(node.id) || failed.has(node.id)) {
+    if (!plan.orderedTaskIds.includes(node.id) || activeIds.has(node.id) || failed.has(node.id)) {
       return false;
     }
     const task = byId.get(node.id);
     if (task === undefined || task.status !== 'ready' || !isReviewDiscipline(task)) return false;
-    return node.dependsOn.every((id) => byId.get(id)?.status === 'completed');
+    if (
+      requestDigest(task) !== node.taskDigest ||
+      executionContextDigest(task) !== node.executionContextDigest
+    ) {
+      return false;
+    }
+    if (!node.dependsOn.every((id) => byId.get(id)?.status === 'completed')) return false;
+    return !resourceConflict(task, node.resourceKeys, active);
   });
 }
 
@@ -307,7 +334,7 @@ export function decideRoundTaskAdmission(
     if (!task) fail('TASK_DEPENDENCY_MISSING');
     return task;
   });
-  if (activeRecords.some((task) => resources(task).some((key) => node.resourceKeys.includes(key))))
+  if (resourceConflict(live, node.resourceKeys, activeRecords))
     blockers.push('TASK_RESOURCE_CONFLICT');
   // Parallelism is same-topological-generation only (round-execution.json selection).
   if (
@@ -321,7 +348,7 @@ export function decideRoundTaskAdmission(
     workers > ROUND_REVIEW_RESERVE.reserved_workers &&
     activeRecords.filter((task) => !isReviewDiscipline(task)).length >=
       workers - ROUND_REVIEW_RESERVE.reserved_workers &&
-    reviewAwaitsAdmission(plan, node, byId, new Set(active), failed)
+    reviewAwaitsAdmission(plan, node, byId, activeRecords, failed)
   )
     // The review reserve narrows the worker cap for non-review tasks (ADR-MDL-0009).
     blockers.push('TASK_WORKER_CAP');
