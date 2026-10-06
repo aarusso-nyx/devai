@@ -1,34 +1,66 @@
 // ADR-AUT-0005 in the loop: create-only records publish without replacement (#287), and an
 // authorized init step durably initializes the .devai/state root (#293).
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import {
+  PUBLISH_INDETERMINATE,
   createAuthorityDecisionIssuer,
   runWithAuthorityHostEffects,
   type AuthorityHostEffectRequest,
 } from '@devai-nyx/authority';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const flushes = vi.hoisted(() => [] as string[]);
+vi.mock('@devai-nyx/authority', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@devai-nyx/authority')>();
+  return {
+    ...actual,
+    flushDirectoryEntrySync: (path: string) => {
+      flushes.push(path);
+      actual.flushDirectoryEntrySync(path);
+    },
+  };
+});
 import {
+  PublicationIndeterminate,
   publishCreateOnlyDurableSync,
   writeCreateOnlyDurableSync,
 } from '../../src/loop/durable-files.js';
+import {
+  EXPERIMENTAL_ACTIVATION_LOCK,
+  withdrawExperimentalActivation,
+} from '../../src/loop/experimental-activation.js';
 import {
   STATE_ROOT_MARKER,
   STATE_ROOT_MARKER_BODY,
   initializeStateRootSync,
   stateRootInitialized,
+  stateRootMarkerStatus,
 } from '../../src/loop/state-root.js';
 
 let root: string;
 let requests: AuthorityHostEffectRequest[];
 let beforePublish: ((request: AuthorityHostEffectRequest) => void) | undefined;
+/** Fault injection: this publication links its target, then its cleanup fails. */
+let indeterminatePath: string | undefined;
 
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), 'devai-durable-publication-'));
   requests = [];
   beforePublish = undefined;
+  indeterminatePath = undefined;
+  flushes.length = 0;
 });
 afterEach(() => rmSync(root, { recursive: true, force: true }));
 
@@ -58,6 +90,14 @@ function run<T>(callback: () => T): T {
             const interleaved = beforePublish;
             beforePublish = undefined;
             interleaved(request);
+          }
+          if (
+            request.symbol === 'publishFileNoReplaceSync' &&
+            request.arguments[0] === indeterminatePath
+          ) {
+            indeterminatePath = undefined;
+            apply();
+            throw Object.assign(new Error(PUBLISH_INDETERMINATE), { code: PUBLISH_INDETERMINATE });
           }
           return apply();
         },
@@ -106,6 +146,37 @@ describe('create-only durable records', () => {
   });
 });
 
+describe('indeterminate publications', () => {
+  it('never reports a create-only record whose cleanup failed as created', () => {
+    const path = join(root, '.devai/state/records/R-3.json');
+    indeterminatePath = path;
+    let failure: unknown;
+    run(() => {
+      try {
+        writeCreateOnlyDurableSync(path, 'bytes\n');
+      } catch (error) {
+        failure = error;
+      }
+    });
+    expect(failure).toBeInstanceOf(PublicationIndeterminate);
+    expect(failure).toMatchObject({ code: 'DURABLE_PUBLICATION_INDETERMINATE', path });
+    // The bytes are in place; a retry refuses rather than replacing them.
+    expect(readFileSync(path, 'utf8')).toBe('bytes\n');
+    expect(() => run(() => writeCreateOnlyDurableSync(path, 'again\n'))).toThrow(
+      'DURABLE_RECORD_EXISTS',
+    );
+  });
+
+  it('removes its own activation lock when the lock publication is indeterminate', () => {
+    const lock = join(root, EXPERIMENTAL_ACTIVATION_LOCK);
+    indeterminatePath = lock;
+    expect(() => run(() => withdrawExperimentalActivation({ repoRoot: root }))).toThrow(
+      'DURABLE_PUBLICATION_INDETERMINATE',
+    );
+    expect(existsSync(lock)).toBe(false);
+  });
+});
+
 describe('durable state root initialization', () => {
   it('fsyncs .devai, publishes the marker once, and keeps it on re-application', () => {
     mkdirSync(join(root, '.devai'));
@@ -133,5 +204,36 @@ describe('durable state root initialization', () => {
     run(() => initializeStateRootSync(root));
     expect(existsSync(join(root, '.devai/state'))).toBe(true);
     expect(stateRootInitialized(root)).toBe(true);
+  });
+
+  it('fsyncs the repository directory only when it creates .devai', () => {
+    run(() => initializeStateRootSync(root));
+    expect(flushes).toEqual([root]);
+    expect(stateRootInitialized(root)).toBe(true);
+    flushes.length = 0;
+    rmSync(join(root, '.devai/state'), { recursive: true });
+    run(() => initializeStateRootSync(root));
+    expect(flushes).toEqual([]);
+  });
+
+  it.each([
+    ['other bytes', () => writeFileSync(join(root, STATE_ROOT_MARKER), '{"id":"state-root"}\n')],
+    ['a directory', () => mkdirSync(join(root, STATE_ROOT_MARKER))],
+    [
+      'a symbolic link to the exact bytes',
+      () => {
+        writeFileSync(join(root, 'elsewhere.json'), STATE_ROOT_MARKER_BODY);
+        symlinkSync(join(root, 'elsewhere.json'), join(root, STATE_ROOT_MARKER));
+      },
+    ],
+  ])('treats %s at the marker path as invalid and refuses to initialize over it', (_, plant) => {
+    mkdirSync(join(root, '.devai/state'), { recursive: true });
+    plant();
+    expect(stateRootMarkerStatus(root)).toBe('invalid');
+    expect(stateRootInitialized(root)).toBe(false);
+    expect(() => run(() => initializeStateRootSync(root))).toThrow(
+      'INIT_STATE_ROOT_MARKER_INVALID',
+    );
+    expect(stateRootMarkerStatus(root)).toBe('invalid');
   });
 });
