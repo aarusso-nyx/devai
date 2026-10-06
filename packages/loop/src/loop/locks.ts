@@ -9,7 +9,12 @@ import {
 } from '@devai-nyx/authority';
 import { randomUUID } from 'node:crypto';
 import { basename, dirname, join } from 'node:path';
-import { fsyncDirectorySync, replaceDurableSync } from './durable-files.js';
+import {
+  PublicationIndeterminate,
+  fsyncDirectorySync,
+  publishCreateOnlyDurableSync,
+  replaceDurableSync,
+} from './durable-files.js';
 import { utf8Compare } from './lock-targets.js';
 import {
   createRecordExclusive,
@@ -174,6 +179,34 @@ function holderOf(path: string): string {
   return observed.kind === 'held' ? observed.record.task_id : '<unknown>';
 }
 
+/**
+ * Create a fresh lock record only when its key is free, through the governed no-replace
+ * publication (ADR-AUT-0005): the record appears only with its complete bytes, so no
+ * reader sees an empty or partial lock. A publication whose cleanup failed left this
+ * caller's complete record in place; it is withdrawn through the claim protocol before
+ * the refusal propagates, so the key is never held by a record the caller does not know.
+ */
+function createLockRecord(path: string, body: string, claims: string, identity: string): boolean {
+  try {
+    return publishCreateOnlyDurableSync(path, body);
+  } catch (error) {
+    if (error instanceof PublicationIndeterminate) {
+      try {
+        swapObservedRecord({ path, claimsDir: claims, identity });
+      } catch {
+        // best-effort: an unreleased record expires and stays this task's own
+      }
+    } else if (
+      error instanceof Error &&
+      error.message === 'AUTHORITY_RESOURCE_CHANGED_AFTER_PREPARE'
+    ) {
+      // The broker saw the key change between prepare and apply: another writer won.
+      return false;
+    }
+    throw error;
+  }
+}
+
 function parseTarget(target: string): { substrate: string; modulePart: string } {
   const [substrate = 'F2', ...rest] = target.split(':');
   return { substrate, modulePart: rest.join(':') };
@@ -241,19 +274,20 @@ function acquireAll(
       created.push({ path, identity: lockIdentity(record) });
     };
 
-    if (createRecordExclusive(path, body)) {
+    if (createLockRecord(path, body, claims, lockIdentity(record))) {
       take();
       continue;
     }
 
     const observed = observeLock(path);
     if (observed.kind === 'unreadable') {
-      // Mid-write by its creator, or corrupted: treat as held.
+      // A fresh lock appears only complete (ADR-AUT-0005), so this one is corrupted:
+      // treat it as held.
       return deny(target, '<unreadable>');
     }
     if (observed.kind === 'absent') {
       // Released between our create and read; one retry, then report the winner.
-      if (createRecordExclusive(path, body)) {
+      if (createLockRecord(path, body, claims, lockIdentity(record))) {
         take();
         continue;
       }
