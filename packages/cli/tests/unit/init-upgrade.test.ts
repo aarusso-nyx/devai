@@ -655,13 +655,18 @@ describe('#291: init upgrade converts a committed checkout-bound post-merge bind
   const DECLARATION = '.devai/config/post-merge-host-adapter.json';
   const LOCAL = '.git/devai/post-merge-host-adapter.json';
 
-  /** An adopter upgraded to the installed version, then put back in the layout before #291. */
+  /**
+   * An adopter upgraded to the installed version, then put back in the layout before #291 and
+   * stamped with 2.0.0, the last release that committed the checkout-bound attestation.
+   */
   async function legacyLayout(): Promise<{ readonly repo: string; readonly legacy: string }> {
     const repo = await stynxAt160(true, { postMerge: true });
     expect((await runCli(WRITE(repo))).exit).toBe(0);
     const legacy = readFileSync(join(repo, LOCAL), 'utf8');
     put(repo, DECLARATION, legacy);
     rmSync(join(repo, LOCAL));
+    const project = json(repo, '.devai/config/project.json');
+    put(repo, '.devai/config/project.json', { ...project, devai_version: '2.0.0' });
     return { repo, legacy };
   }
 
@@ -671,9 +676,9 @@ describe('#291: init upgrade converts a committed checkout-bound post-merge bind
     expect(planned.exit, planned.stderr).toBe(0);
     const plan = value(planned)['plan'] as JsonObject;
     expect(plan['status']).toBe('ready');
-    // The unreleased conversion runs in this package, so the plan names it.
+    // The 2.1.0 conversion lies above the bound 2.0.0, so the plan names it.
     expect((plan['releases'] as JsonObject[]).map((release) => release['version'])).toContain(
-      '2.0.1',
+      '2.1.0',
     );
     expect(plan['changed_files']).toEqual(
       expect.arrayContaining([
@@ -692,7 +697,7 @@ describe('#291: init upgrade converts a committed checkout-bound post-merge bind
       (JSON.parse(legacy) as JsonObject)['installed_at_head'],
     );
     // The receipt records the conversion that ran.
-    expect(json(repo, RECEIPT)['migrations']).toContain('MIG-2.0.1-post-merge-local-state');
+    expect(json(repo, RECEIPT)['migrations']).toContain('MIG-2.1.0-post-merge-local-state');
     expect(json(repo, RECEIPT)['postchecks']).toEqual([
       { name: 'policy-materialization-current', ok: true },
       { name: 'authority-enforcement', ok: true },
