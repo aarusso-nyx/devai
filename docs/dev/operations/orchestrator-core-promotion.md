@@ -314,8 +314,10 @@ ADR-MDL-0009 closed issue #297 on 2026-10-05, which the Owner put in the next re
 - **Campaign to agent.** A campaign task may declare an agent executor contract: runtime,
   model, effort and recipe. `campaign materialize` then writes an agent executor with exact
   selection, after checking the contract against experimental execution, the runtime
-  registry and the model tiers. It binds the executor to the composed prompt, so the task
-  can go to `round dispatch --experimental`. Human executors stay the default.
+  registry and the model tiers. It binds the executor to the composed prompt, which now
+  includes the campaign prompt, so the task can go to `round dispatch --experimental`.
+  Dispatch holds the attempt to the task's declared boundary, and keyless agent tasks never
+  overlap. Human executors stay the default.
 
 ## Rollback and stop conditions
 
