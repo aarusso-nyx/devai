@@ -19,13 +19,16 @@ import {
 import type { AlignmentObservation } from '@devai-nyx/sensors';
 import {
   computeReverseAdherence,
+  loadBlueprint,
   loadDomains,
   regenerateInventory,
+  validateBlueprint,
   validateInvariants,
   type GovernanceIntegrityReport,
 } from '#runtime-core';
 import { validators } from '@devai-nyx/schemas';
 import { composeExactHeadScorecard, scorecardHead } from '../audit/scorecard.js';
+import { executeInventorySlice } from './inventory.js';
 
 const FULL_SHA = /^[0-9a-f]{40}$/u;
 
@@ -58,6 +61,104 @@ export function observeExactHeadScorecard(repoRoot: string): readonly AlignmentO
       candidate_sha: head,
       completed_at: new Date().toISOString(),
     },
+  ];
+}
+
+/**
+ * The committed subjects of the INV-DEVAI-010 and INV-HARNESS-010 gate producers in the
+ * pull request preflight step. The CI lines run `check --only blueprint` and
+ * `sense inventory --slice pack` on exactly these paths, and the F5:T4 adapter observes the
+ * same read-only compositions on the same paths, so both sides measure one subject.
+ */
+export const GATE_BLUEPRINT_FIXTURE = 'packages/skills/tests/operations/fixtures/blueprint.json';
+export const GATE_PACK_FIXTURE = 'packages/skills/tests/fixtures/pack-resolution';
+
+function observedHead(root: string): string | undefined {
+  try {
+    const head = scorecardHead(root);
+    return FULL_SHA.test(head) ? head : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * INV-DEVAI-010: `check --only blueprint` persists nothing. The observation runs the
+ * blueprint load and validation the check member runs, on the committed gate fixture, and
+ * reads `fail` when the blueprint is unreadable, schema-invalid, or violates a rule.
+ */
+export function observeBlueprintCheck(
+  repoRoot: string,
+  head: string,
+): readonly AlignmentObservation[] {
+  if (!FULL_SHA.test(head)) return [];
+  let status: AlignmentObservation['status'] = 'fail';
+  try {
+    const loaded = loadBlueprint(resolve(repoRoot, GATE_BLUEPRINT_FIXTURE));
+    if (loaded.ok && loaded.blueprint !== undefined && validateBlueprint(loaded.blueprint).ok) {
+      status = 'pass';
+    }
+  } catch {
+    status = 'fail';
+  }
+  return [
+    {
+      command: `devai check --only blueprint --file ${GATE_BLUEPRINT_FIXTURE}`,
+      status,
+      candidate_sha: head,
+      completed_at: new Date().toISOString(),
+      invariant_ids: ['INV-DEVAI-010'],
+    },
+  ];
+}
+
+/**
+ * INV-HARNESS-010: `sense inventory` persists nothing. The observation runs the `pack`
+ * slice against the committed packs root and adopter fixture and passes only when one pack
+ * resolves without ambiguity, the outcome the CI line needs to exit zero.
+ */
+export async function observePackResolution(
+  repoRoot: string,
+  head: string,
+): Promise<readonly AlignmentObservation[]> {
+  if (!FULL_SHA.test(head)) return [];
+  const fixture = resolve(repoRoot, GATE_PACK_FIXTURE);
+  let status: AlignmentObservation['status'] = 'fail';
+  try {
+    const output = await executeInventorySlice('pack', {
+      repoRoot,
+      packsRoot: fixture,
+      adopterRoot: fixture,
+    });
+    if (output.status === 'pass') status = 'pass';
+  } catch {
+    status = 'fail';
+  }
+  return [
+    {
+      command: `devai sense inventory --slice pack --packs-root ${GATE_PACK_FIXTURE} --adopter-root ${GATE_PACK_FIXTURE}`,
+      status,
+      candidate_sha: head,
+      completed_at: new Date().toISOString(),
+      invariant_ids: ['INV-HARNESS-010'],
+    },
+  ];
+}
+
+/**
+ * Every in-process observation the F5:T4 adapter hands the alignment sensor: the exact-head
+ * scorecard (ADR-SCR-0013) and the two fixture-bound producers above, all at one head.
+ */
+export async function observeGateProducers(
+  repoRoot: string,
+): Promise<readonly AlignmentObservation[]> {
+  const root = resolve(repoRoot);
+  const head = observedHead(root);
+  if (head === undefined) return [];
+  return [
+    ...observeExactHeadScorecard(root),
+    ...observeBlueprintCheck(root, head),
+    ...(await observePackResolution(root, head)),
   ];
 }
 

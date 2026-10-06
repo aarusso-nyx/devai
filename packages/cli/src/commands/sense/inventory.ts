@@ -24,6 +24,7 @@ interface InventoryOptions {
   readonly slice?: string;
   readonly repoRoot?: string;
   readonly adopterRoot?: string;
+  readonly packsRoot?: string;
   readonly databaseUrl?: string;
   readonly databaseSchema?: string;
   readonly coverage?: string;
@@ -54,8 +55,10 @@ async function inventoryMember(
 ): Promise<InventoryMemberResult> {
   switch (member) {
     case 'stack-adapter-pack-resolution': {
+      // An explicit packs root replaces the repository root as the canonical pack registry
+      // (INV-HARNESS-010); the adopter root still defaults to the repository root.
       const value = resolveStackAdapterPack({
-        repoRoot,
+        repoRoot: options.packsRoot === undefined ? repoRoot : resolve(options.packsRoot),
         adopterRoot: options.adopterRoot ?? repoRoot,
       });
       return {
@@ -165,6 +168,10 @@ export const senseInventoryCmd = defineCommand({
       )
       .option('--repo-root <path>', 'Repository root (default: .)')
       .option('--adopter-root <path>', 'Adopter root for stack pack resolution')
+      .option(
+        '--packs-root <path>',
+        'Pack registry root holding examples/redox-pack-* (default: repo root)',
+      )
       .option('--database-url <url>', 'Optional read-only database introspection URL')
       .option('--database-schema <name>', 'Optional database schema filter')
       .option('--coverage <path>', 'Coverage JSON path')
