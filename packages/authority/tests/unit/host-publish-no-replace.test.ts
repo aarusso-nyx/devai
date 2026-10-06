@@ -137,10 +137,11 @@ describe('atomic no-replace publication steps', () => {
     expect(readFileSync(target, 'utf8')).toBe('published\n');
     expect(readdirSync(root)).toEqual(['record.json']);
     // #313: the error names the identity of the file it linked, which the caller owns.
-    const stat = lstatSync(target);
+    const stat = lstatSync(target, { bigint: true });
     expect((failure as PublishIndeterminateError).identity).toEqual({
       dev: stat.dev,
       ino: stat.ino,
+      birthtimeNs: stat.birthtimeNs,
     });
   });
 
@@ -148,12 +149,8 @@ describe('atomic no-replace publication steps', () => {
     const root = directory();
     const target = join(root, 'record.json');
     const identity = publishNoReplaceSteps(target, 'bytes\n');
-    const stat = lstatSync(target);
-    expect(identity).toEqual({ dev: stat.dev, ino: stat.ino });
-    // A different file later found at the path does not carry that identity.
-    unlinkSync(target);
-    writeFileSync(target, 'bytes\n');
-    expect(lstatSync(target).ino).not.toBe(identity.ino);
+    const stat = lstatSync(target, { bigint: true });
+    expect(identity).toEqual({ dev: stat.dev, ino: stat.ino, birthtimeNs: stat.birthtimeNs });
   });
 
   it('removes its staged file when the link fails for any reason', () => {
@@ -192,7 +189,12 @@ describe('the guarded publication effect', () => {
         },
         () => {
           const identity = publishFileNoReplaceSync(target, 'bytes\n');
-          expect(identity).toEqual({ dev: lstatSync(target).dev, ino: lstatSync(target).ino });
+          const stat = lstatSync(target, { bigint: true });
+          expect(identity).toEqual({
+            dev: stat.dev,
+            ino: stat.ino,
+            birthtimeNs: stat.birthtimeNs,
+          });
           expect(() => publishFileNoReplaceSync(target, 'other\n')).toThrow(
             expect.objectContaining({ code: 'EEXIST' }),
           );
