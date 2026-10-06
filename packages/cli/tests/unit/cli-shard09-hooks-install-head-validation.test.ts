@@ -49,7 +49,7 @@ async function install(root: string, version = '1.2.3'): Promise<Record<string, 
   });
   await withAuthorityHostTestScope(() => executeHooksInstallPlan(plan));
   return JSON.parse(
-    readFileSync(join(root, '.devai/config/post-merge-host-adapter.json'), 'utf8'),
+    readFileSync(join(root, '.git/devai/post-merge-host-adapter.json'), 'utf8'),
   ) as Record<string, unknown>;
 }
 

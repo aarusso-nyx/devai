@@ -42,7 +42,9 @@ describe('#264: the adopter migration manifest', () => {
       '1.8.0',
       '1.9.0',
       '2.0.0',
+      '2.0.1',
     ]);
+    expect(manifest.releases.at(-1)).toMatchObject({ version: '2.0.1', status: 'unreleased' });
   });
 
   it('has exactly one entry for every changelog release above the baseline', () => {

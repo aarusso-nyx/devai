@@ -639,12 +639,90 @@ describe('#264: the journal records the post-merge hook where it is installed', 
       join(repo, '.git/hooks/post-merge'),
       join(runtime, 'post-merge.key'),
       join(runtime, 'issue-post-merge-receipt.cjs'),
+      join(runtime, 'post-merge-host-adapter.json'),
     ]);
     mkdirSync(join(repo, '.husky'));
     expect(postMergeAdapterFiles(repo)).toEqual([
       join(repo, '.husky/post-merge'),
       join(runtime, 'post-merge.key'),
       join(runtime, 'issue-post-merge-receipt.cjs'),
+      join(runtime, 'post-merge-host-adapter.json'),
     ]);
   });
+});
+
+describe('#291: init upgrade converts a committed checkout-bound post-merge binding', () => {
+  const DECLARATION = '.devai/config/post-merge-host-adapter.json';
+  const LOCAL = '.git/devai/post-merge-host-adapter.json';
+
+  /** An adopter upgraded to the installed version, then put back in the layout before #291. */
+  async function legacyLayout(): Promise<{ readonly repo: string; readonly legacy: string }> {
+    const repo = await stynxAt160(true, { postMerge: true });
+    expect((await runCli(WRITE(repo))).exit).toBe(0);
+    const legacy = readFileSync(join(repo, LOCAL), 'utf8');
+    put(repo, DECLARATION, legacy);
+    rmSync(join(repo, LOCAL));
+    return { repo, legacy };
+  }
+
+  it('moves the binding into the git directory of the checkout that holds its key, idempotently', async () => {
+    const { repo, legacy } = await legacyLayout();
+    const planned = await runCli(PLAN(repo));
+    expect(planned.exit, planned.stderr).toBe(0);
+    const plan = value(planned)['plan'] as JsonObject;
+    expect(plan['status']).toBe('ready');
+    expect(plan['changed_files']).toEqual(
+      expect.arrayContaining([
+        { path: DECLARATION, operation: 'update', segment: 'host-adapters' },
+        { path: LOCAL, operation: 'create', segment: 'host-adapters' },
+      ]),
+    );
+
+    const applied = await runCli(WRITE(repo));
+    expect(applied.exit, applied.stderr).toBe(0);
+    const declaration = readFileSync(join(repo, DECLARATION), 'utf8');
+    expect(declaration).not.toContain(repo);
+    expect(JSON.parse(declaration)).toMatchObject({ required: true, local_state: 'git-dir' });
+    // The attestation still verifies here, so it moves with its installed_at_head baseline.
+    expect(json(repo, LOCAL)['installed_at_head']).toBe(
+      (JSON.parse(legacy) as JsonObject)['installed_at_head'],
+    );
+    expect(json(repo, RECEIPT)['postchecks']).toEqual([
+      { name: 'policy-materialization-current', ok: true },
+      { name: 'authority-enforcement', ok: true },
+      { name: 'constitution-binding', ok: true },
+    ]);
+
+    const settled = snapshot(repo);
+    const local = readFileSync(join(repo, LOCAL), 'utf8');
+    const again = await runCli(WRITE(repo));
+    expect(again.exit, again.stderr).toBe(0);
+    expect((value(again)['plan'] as JsonObject)['status']).toBe('no-op');
+    expect(snapshot(repo)).toEqual(settled);
+    expect(readFileSync(join(repo, LOCAL), 'utf8')).toBe(local);
+  }, 180_000);
+
+  it('only rewrites the declaration in a checkout that never held the binding', async () => {
+    const { repo } = await legacyLayout();
+    // A clone carries the tracked files but none of the bound checkout's git directory state.
+    for (const file of ['post-merge.key', 'issue-post-merge-receipt.cjs']) {
+      rmSync(join(repo, '.git/devai', file));
+    }
+    const applied = await runCli(WRITE(repo));
+    expect(applied.exit, applied.stderr).toBe(0);
+    expect(readFileSync(join(repo, DECLARATION), 'utf8')).not.toContain(repo);
+    expect(existsSync(join(repo, LOCAL))).toBe(false);
+    expect(existsSync(join(repo, '.git/devai/post-merge.key'))).toBe(false);
+    const changed = (json(repo, RECEIPT)['changed_files'] as JsonObject[]).map(
+      (entry) => entry['path'],
+    );
+    expect(changed).toContain(DECLARATION);
+    expect(changed).not.toContain(LOCAL);
+
+    const settled = snapshot(repo);
+    const again = await runCli(WRITE(repo));
+    expect(again.exit, again.stderr).toBe(0);
+    expect((value(again)['plan'] as JsonObject)['status']).toBe('no-op');
+    expect(snapshot(repo)).toEqual(settled);
+  }, 180_000);
 });

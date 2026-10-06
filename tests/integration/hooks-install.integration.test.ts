@@ -256,7 +256,13 @@ describe('devai init apply architect --include hooks', () => {
       expect(readFileSync(hookPath, 'utf8')).toContain(
         'devai round close --post-merge-receipt --host-receipt',
       );
-      expect(existsSync(join(tempDir, '.devai/config/post-merge-host-adapter.json'))).toBe(true);
+      // #291: the tracked declaration names no checkout; the signed attestation stays in .git.
+      const declaration = readFileSync(
+        join(tempDir, '.devai/config/post-merge-host-adapter.json'),
+        'utf8',
+      );
+      expect(declaration).not.toContain(tempDir);
+      expect(existsSync(join(tempDir, '.git/devai/post-merge-host-adapter.json'))).toBe(true);
     },
     CLI_TIMEOUT_MS,
   );
