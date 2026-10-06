@@ -510,6 +510,66 @@ export function isFailClosedExecutableSegment(segment: string, candidate: string
   return invokesDevaiAction(command, candidate);
 }
 
+/**
+ * The arguments a devai invocation passes after its launcher, with the output-format
+ * option removed: `node .devai/state/pr-bootstrap/cli/bin.js check --only blueprint
+ * --file x --format human` reads as `check --only blueprint --file x`. Null when the
+ * command is not a devai invocation.
+ */
+export function devaiArguments(command: string): readonly string[] | null {
+  const words = shellWords(stripYamlComment(command).trim());
+  if (words === null) return null;
+  const start = devaiActionStart(words);
+  if (start === null) return null;
+  const rest = words.slice(start);
+  const out: string[] = [];
+  for (let index = 0; index < rest.length; index += 1) {
+    const word = rest[index] ?? '';
+    if (word === '--format') {
+      index += 1;
+      continue;
+    }
+    if (word.startsWith('--format=')) continue;
+    out.push(word);
+  }
+  return out;
+}
+
+export function sameArguments(
+  actual: readonly string[] | null,
+  expected: readonly string[],
+): boolean {
+  return (
+    actual !== null &&
+    actual.length === expected.length &&
+    actual.every((word, index) => word === expected[index])
+  );
+}
+
+/**
+ * A scoped producer (#235) aligns only through a fail-closed CI segment that runs the
+ * action with exactly the declared arguments, so a different invocation of the same
+ * action, such as `check --preflight`, never stands in for it.
+ */
+export function hasExecutableProducer(
+  steps: readonly WorkflowRunStep[],
+  action: string,
+  expected: readonly string[],
+): boolean {
+  return steps.some(
+    (step) =>
+      !step.continueOnError &&
+      !step.disabled &&
+      !shellSegments(step.script).some(disablesErrexit) &&
+      !hasNonBindingControlFlow(step.script) &&
+      shellSegments(step.script).some(
+        (segment) =>
+          isFailClosedExecutableSegment(segment, action) &&
+          sameArguments(devaiArguments(segment), expected),
+      ),
+  );
+}
+
 export function hasExecutableMeasurement(
   steps: readonly WorkflowRunStep[],
   candidate: string,

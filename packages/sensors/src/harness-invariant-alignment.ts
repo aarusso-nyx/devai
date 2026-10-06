@@ -8,7 +8,13 @@ import {
 } from './sensor-reading.js';
 
 import { loadWorkflows } from './harness/workflow-parser.js';
-import { loadRunSteps, hasExecutableMeasurement } from './harness-invariant-alignment-workflow.js';
+import {
+  loadRunSteps,
+  hasExecutableMeasurement,
+  hasExecutableProducer,
+  devaiArguments,
+  sameArguments,
+} from './harness-invariant-alignment-workflow.js';
 import {
   safeStat,
   candidateHead,
@@ -42,8 +48,23 @@ export interface AlignmentObservation {
   readonly invariant_ids?: readonly string[];
 }
 
+/**
+ * A producer bound to one gate invariant and one subject (#235). For that invariant the
+ * generic action match is replaced: a fail-closed CI segment must run `action` with
+ * exactly `arguments` (the output format aside), and an in-process observation scoped to
+ * the invariant, with the same arguments, must pass at the candidate. Persisted evidence
+ * for another invocation of the same action never aligns the invariant.
+ */
+export interface ScopedProducer {
+  readonly invariant_id: string;
+  readonly action: string;
+  readonly arguments: readonly string[];
+}
+
 export interface HarnessInvariantAlignmentOptions {
   readonly repoRoot: string;
+  /** Producers that alone may align their invariant (#235). */
+  readonly scopedProducers?: readonly ScopedProducer[];
   /** In-process observations of read-only actions at the candidate head. */
   readonly observations?: readonly AlignmentObservation[];
   readonly invariantsDir?: string;
@@ -184,6 +205,39 @@ export function senseHarnessInvariantAlignment(
         maxAgeMs,
       );
     };
+    const scoped = (opts.scopedProducers ?? []).filter((producer) => producer.invariant_id === id);
+    if (scoped.length > 0) {
+      const producerAligned = (producer: ScopedProducer): boolean =>
+        candidates.includes(producer.action) &&
+        hasExecutableProducer(runSteps, producer.action, producer.arguments) &&
+        resolvedCandidateHead !== undefined &&
+        /^[0-9a-f]{40}$/i.test(resolvedCandidateHead) &&
+        hasFreshCandidateEvidence(
+          opts.repoRoot,
+          observations.filter(
+            (observation) =>
+              observation.invariant_ids?.includes(id) === true &&
+              sameArguments(devaiArguments(observation.command), producer.arguments),
+          ),
+          producer.action,
+          resolvedCandidateHead,
+          nowMs,
+          maxAgeMs,
+        );
+      if (!scoped.every(producerAligned)) {
+        misaligned += 1;
+        findings.push({
+          severity: 'warning',
+          code: 'HARNESS_INVARIANT_ALIGNMENT_UNMEASURED_IN_CI',
+          message: `Gate invariant ${id} is bound to the scoped producer [${scoped
+            .map((producer) => producer.arguments.join(' '))
+            .join(
+              '; ',
+            )}], which needs its exact fail-closed CI step and a passing scoped observation at the candidate.`,
+        });
+      }
+      continue;
+    }
     const mode = inv.measurable_via_mode ?? 'any';
     const aligned = mode === 'all' ? candidates.every(matched) : candidates.some(matched);
     if (!aligned) {
