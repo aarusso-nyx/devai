@@ -21,7 +21,7 @@ affected_rules:
 inspector_acceptance:
   - IA-001 -- The broker admits a provider process only when its argv carries that runtime's whole confinement sequence rooted at the spawn cwd; dropping or weakening any confinement flag, or rooting the codex sandbox elsewhere, refuses the spawn.
   - IA-002 -- A runtime with no workspace-confined write mode, or a platform its provider cannot sandbox, refuses with EXPERIMENTAL_SANDBOX_UNAVAILABLE before any lock, worktree or provider is touched.
-  - IA-003 -- Every experimental attempt's evidence records the enforced sandbox mode and its flags; the schema refuses a sandbox on evidence not labelled experimental, and the evidence binding refuses a mode its runtime does not enforce.
+  - IA-003 -- The evidence of every experimental attempt whose provider process started records the enforced sandbox mode and its complete flags, and an attempt refused before any provider ran records none; the schema refuses a sandbox on evidence not labelled experimental, and the evidence binding refuses a mode or flag sequence its runtime does not enforce.
 ---
 
 # The provider's own sandbox enforces the experimental attempt write boundary
@@ -68,7 +68,10 @@ acceptEdits` and `--permission-prompts none`.
 4. **Recorded in evidence.** Every experimental attempt's task-execution evidence carries a
    `sandbox` object: the mode (`codex-workspace-write` or `claude-restricted-sandbox`),
    `enforced_by: provider`, `write_root: attempt-worktree`, and the exact confinement flags
-   with the worktree path written as `{attempt-worktree}`. The policy's
+   with the worktree path written as `{attempt-worktree}`. Only an attempt whose provider
+   process started records it: a spawn the broker refused, or one that failed before any
+   provider ran, records no sandbox, since nothing was enforced. The evidence binding
+   refuses a mode or a flag sequence other than the runtime's complete one. The policy's
    `containment.provider_sandbox` becomes `provider-enforced-asserted-by-broker`.
 5. **The snapshot check stays.** The Article 6 write-scope check and the symbolic-link
    check still run after every attempt. They catch writes inside the worktree that fall
