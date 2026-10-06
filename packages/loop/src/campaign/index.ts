@@ -8,6 +8,11 @@ import { existsSync, readFileSync, readdirSync } from '@devai-nyx/authority';
 import { parsers } from '@devai-nyx/schemas';
 import { join } from 'node:path';
 import { readBacklog, type BacklogEntry } from '../loop/backlog.js';
+import {
+  EXPERIMENTAL_DISCIPLINES,
+  EXPERIMENTAL_RUNTIME_EFFORTS,
+  EXPERIMENTAL_RUNTIMES,
+} from '../loop/experimental-activation.js';
 import { requestedTaskFields } from '../loop/round-task-admission.js';
 import type { TaskRecord } from '../loop/task-contract.js';
 import {
@@ -30,6 +35,29 @@ interface CampaignTask {
   readonly acceptance_commands: readonly (readonly string[])[];
   readonly prompt: { readonly path: string };
   readonly execution: { readonly time_budget_minutes?: number };
+  readonly executor?: CampaignAgentExecutor;
+}
+
+/** The optional agent executor contract of a campaign task (ADR-MDL-0009). */
+export interface CampaignAgentExecutor {
+  readonly kind: 'agent';
+  readonly runtime: string;
+  readonly model: string;
+  readonly effort: string;
+  readonly recipe_name: string;
+  readonly recipe_variant?: string;
+  readonly max_iterations?: number;
+  readonly capabilities?: readonly string[];
+}
+
+/**
+ * What materialization needs from outside the loop package to emit an agent executor:
+ * the model aliases each runtime admits (law/policy/model-tiers.json) and the Article 37
+ * prompt composition id of a materialized record. The CLI supplies both.
+ */
+export interface CampaignAgentBinding {
+  readonly models: Readonly<Record<string, readonly string[]>>;
+  readonly promptCompositionId: (record: TaskRecord) => string;
 }
 
 interface CampaignWave {
@@ -77,6 +105,8 @@ export interface CampaignDrift {
 
 const CAMPAIGNS_DIR = 'product/campaigns';
 const DEFAULT_HUMAN_TIMEOUT_MS = 7 * 24 * 60 * 60 * 1000;
+/** The Article 19 ladder: three attempts at the requested model and one bumped. */
+const DEFAULT_AGENT_MAX_ITERATIONS = 4;
 
 /** Load and schema-validate one campaign by its CMP- identity. */
 export function loadCampaign(repoRoot: string, campaignId: string): LoadedCampaign {
@@ -246,17 +276,86 @@ export function campaignStatus(repoRoot: string, campaignId: string) {
 }
 
 /**
+ * Why a campaign task's agent executor contract cannot be materialized, or undefined when
+ * it can: the discipline must be one experimental execution admits, the runtime one of its
+ * runtimes, the effort one the runtime registry lists for it, and the model one of the
+ * runtime's tier aliases. The Owner activation is checked later, by round dispatch.
+ */
+export function campaignAgentExecutorRefusal(
+  task: Pick<CampaignTask, 'discipline' | 'executor'>,
+  models: Readonly<Record<string, readonly string[]>>,
+): string | undefined {
+  const executor = task.executor;
+  if (executor === undefined) return undefined;
+  if (!(EXPERIMENTAL_DISCIPLINES as readonly string[]).includes(task.discipline)) {
+    return 'CAMPAIGN_AGENT_DISCIPLINE_UNSUPPORTED';
+  }
+  if (!(EXPERIMENTAL_RUNTIMES as readonly string[]).includes(executor.runtime)) {
+    return 'CAMPAIGN_AGENT_RUNTIME_UNSUPPORTED';
+  }
+  const runtime = executor.runtime as (typeof EXPERIMENTAL_RUNTIMES)[number];
+  if (!EXPERIMENTAL_RUNTIME_EFFORTS[runtime].includes(executor.effort)) {
+    return 'CAMPAIGN_AGENT_EFFORT_UNSUPPORTED';
+  }
+  if (!(models[runtime] ?? []).includes(executor.model)) return 'CAMPAIGN_AGENT_MODEL_UNSUPPORTED';
+  return undefined;
+}
+
+function humanExecutor(campaign: LoadedCampaign, task: CampaignTask) {
+  return {
+    kind: 'human',
+    role: task.discipline,
+    instructions_ref: `${campaign.directory}/${task.prompt.path}`,
+    completion_evidence: ['pull-request-merged'],
+    timeout_ms:
+      task.execution.time_budget_minutes === undefined
+        ? DEFAULT_HUMAN_TIMEOUT_MS
+        : task.execution.time_budget_minutes * 60_000,
+    timeout_behavior: 'escalate',
+  };
+}
+
+function agentExecutor(task: CampaignTask, contract: CampaignAgentExecutor) {
+  return {
+    kind: 'agent',
+    runtime: contract.runtime,
+    model: contract.model,
+    effort: contract.effort,
+    selection: { mode: 'exact', registry_id: contract.runtime },
+    recipe_name: contract.recipe_name,
+    ...(contract.recipe_variant !== undefined && { recipe_variant: contract.recipe_variant }),
+    // Replaced below by the composed id; the composition excludes this field.
+    prompt_composition_id: 'PC-0000000000000000',
+    max_iterations: contract.max_iterations ?? DEFAULT_AGENT_MAX_ITERATIONS,
+    capabilities: contract.capabilities ?? [],
+    ...(task.execution.time_budget_minutes !== undefined && {
+      timeout_ms: task.execution.time_budget_minutes * 60_000,
+    }),
+  };
+}
+
+/**
  * The queued task record of campaign-execution.json materialization.governed_task_record:
  * the task fields, the wave as coupled group, and a human executor whose role is the
- * discipline and whose instructions are the campaign prompt.
+ * discipline and whose instructions are the campaign prompt. A task that declares an
+ * agent executor contract gets an agent executor instead (ADR-MDL-0009), validated by
+ * campaignAgentExecutorRefusal and bound to its composed prompt; without a binding such
+ * a task refuses.
  */
 export function campaignTaskRecord(
   campaign: LoadedCampaign,
   round: CampaignRound,
   wave: CampaignWave,
   task: CampaignTask,
+  agent?: CampaignAgentBinding,
 ): TaskRecord {
-  return {
+  const contract = task.executor;
+  if (contract !== undefined) {
+    if (agent === undefined) fail('CAMPAIGN_AGENT_BINDING_REQUIRED');
+    const refusal = campaignAgentExecutorRefusal(task, agent.models);
+    if (refusal !== undefined) fail(refusal);
+  }
+  const record = {
     schemaVersion: '2.0.0',
     id: task.id,
     round_id: round.id,
@@ -273,18 +372,14 @@ export function campaignTaskRecord(
     upstream_task_id: task.upstream_task_id,
     acceptance_commands: task.acceptance_commands,
     intent_diff: { planned_files: task.boundary.paths, planned_steps: task.deliverables },
-    executor: {
-      kind: 'human',
-      role: task.discipline,
-      instructions_ref: `${campaign.directory}/${task.prompt.path}`,
-      completion_evidence: ['pull-request-merged'],
-      timeout_ms:
-        task.execution.time_budget_minutes === undefined
-          ? DEFAULT_HUMAN_TIMEOUT_MS
-          : task.execution.time_budget_minutes * 60_000,
-      timeout_behavior: 'escalate',
-    },
+    executor:
+      contract === undefined ? humanExecutor(campaign, task) : agentExecutor(task, contract),
   } as unknown as TaskRecord;
+  if (contract === undefined || agent === undefined) return record;
+  return {
+    ...record,
+    executor: { ...record.executor, prompt_composition_id: agent.promptCompositionId(record) },
+  } as TaskRecord;
 }
 
 /** Whether a backlog entry carries exactly the queue fields the task record would write. */
@@ -345,6 +440,8 @@ export function materializeCampaignRound(options: {
   readonly repoRoot: string;
   readonly campaignId: string;
   readonly roundId: string;
+  /** Required when the round holds a task with an agent executor contract (ADR-MDL-0009). */
+  readonly agent?: CampaignAgentBinding;
 }) {
   const campaign = loadCampaign(options.repoRoot, options.campaignId);
   const round = campaign.plan.rounds.find((candidate) => candidate.id === options.roundId);
@@ -358,7 +455,7 @@ export function materializeCampaignRound(options: {
   const records = round.waves.flatMap((wave) =>
     wave.tasks
       .filter((task) => task.status !== 'cancelled')
-      .map((task) => campaignTaskRecord(campaign, round, wave, task)),
+      .map((task) => campaignTaskRecord(campaign, round, wave, task, options.agent)),
   );
   // Check every record against both stores before writing any.
   const existing: string[] = [];
