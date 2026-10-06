@@ -606,4 +606,34 @@ describe('scoped producers (#235)', () => {
     expect(scopedSense('fail').status).toBe('review');
     expect(scopedSense('pass', 'INV-TEST-002').status).toBe('review');
   });
+
+  // #235 re-review: a producer step that may be skipped on a pull request proves nothing.
+  it.each([
+    [
+      'a step condition',
+      `      - if: github.event_name == 'push'\n        run: ${'COMMAND'}\n`,
+      '',
+    ],
+    [
+      'a quoted step condition',
+      `      - if: \${{ github.ref == 'refs/heads/main' }}\n        run: ${'COMMAND'}\n`,
+      '',
+    ],
+    ['a job condition', `      - run: ${'COMMAND'}\n`, "    if: github.event_name == 'push'\n"],
+  ])('refuses a scoped producer behind %s', (_label, step, jobCondition) => {
+    workflowFile(`jobs:\n  check:\n${jobCondition}    steps:\n${step.replace('COMMAND', COMMAND)}`);
+    expect(scopedSense().status).toBe('review');
+  });
+
+  it.each([
+    ['success()', `      - if: success()\n        run: COMMAND\n`, ''],
+    ['${{ always() }}', `      - if: \${{ always() }}\n        run: COMMAND\n`, ''],
+    ['a job-level always()', `      - run: COMMAND\n`, '    if: always()\n'],
+    ['a condition on another job', `      - run: COMMAND\n`, ''],
+  ])('accepts a scoped producer under %s', (_label, step, jobCondition) => {
+    workflowFile(
+      `jobs:\n  other:\n    if: github.event_name == 'push'\n    steps:\n      - run: echo other\n  check:\n${jobCondition}    steps:\n${step.replace('COMMAND', COMMAND)}`,
+    );
+    expect(scopedSense().status).toBe('pass');
+  });
 });
