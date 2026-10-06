@@ -518,4 +518,42 @@ describe('in-process observations of read-only actions (ADR-SCR-0013)', () => {
     workflow(`devai ${ACTION} || true`);
     expect(observed('pass').status).toBe('review');
   });
+
+  // #235: two gate invariants list the same action; an observation that names the
+  // invariant it measures aligns that one only and never stands in for the other.
+  it('aligns only the invariants an observation names', () => {
+    writeFileSync(
+      join(root, 'law/invariants/INV-TEST-002.json'),
+      JSON.stringify({ id: 'INV-TEST-002', severity: 'gate', measurable_via: [ACTION] }),
+    );
+    rmSync(join(root, 'evidence', 'result.json'), { force: true });
+    const scoped = (invariantIds?: readonly string[]) =>
+      senseHarnessInvariantAlignment({
+        repoRoot: root,
+        candidateHead: CANDIDATE,
+        now: NOW,
+        evidenceDir: 'evidence',
+        observations: [
+          {
+            command: `devai ${ACTION}`,
+            status: 'pass',
+            candidate_sha: CANDIDATE,
+            completed_at: RECENT,
+            ...(invariantIds !== undefined && { invariant_ids: invariantIds }),
+          },
+        ],
+      });
+    const one = scoped(['INV-TEST-002']);
+    expect(one.status).toBe('review');
+    expect(one.metrics).toMatchObject({ gate_invariants: 2, misaligned: 1 });
+    expect((one.findings ?? []).map((finding) => finding.message).join('\n')).toContain(
+      'INV-TEST-001',
+    );
+    expect((one.findings ?? []).map((finding) => finding.message).join('\n')).not.toContain(
+      'INV-TEST-002',
+    );
+    expect(scoped(['INV-TEST-001', 'INV-TEST-002']).status).toBe('pass');
+    expect(scoped().status).toBe('pass');
+    expect(scoped([]).status).toBe('review');
+  });
 });
