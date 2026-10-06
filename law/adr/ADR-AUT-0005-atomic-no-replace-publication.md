@@ -127,34 +127,41 @@ it appear with its complete bytes:
 - **Let dispatch fsync `.devai` itself.** Rejected: dispatch would need workspace authority
   over `.devai`, widening its declared path domains.
 
-## Amendment: publication-bound identity removal (issue #317)
+## Amendment: identity-bound removal and escaped publications (issue #317)
 
-Proposed on 2026-10-06 for issue #317. It narrowly widens what the broker authorizes, and it
-takes effect only with the Owner's sign-off.
+Recorded on 2026-10-06 for issue #317. It adds one guarded effect inside the existing
+authorization model. It does not widen what the broker authorizes.
 
 - **The effect.** `removeEntryIfIdentitySync(path, identity)` joins the guarded effects. It
-  renames the entry to a fresh private quarantine name beside it and checks that entry against
-  the caller's identity (device, inode and birth time). It unlinks the entry, or removes it with
-  a non-recursive rmdir, only on a match. Anything else is put back without replacing whatever
-  holds the path by then; if the path is occupied, the entry stays in quarantine and the effect
-  refuses with `AUTHORITY_REMOVE_RESTORE_INCOMPLETE`. The broker classifies it as a `delete` of
-  the entry itself, resolving only the parent.
-- **The widening.** In one invocation, a removal that names exactly the path and the identity a
-  `publishFileNoReplaceSync` of that invocation returned is authorized against the target that
-  publication was authorized for, and keeps the containment that publication established. It is
-  admitted even when the file now resolves outside the repository because an ancestor was
-  swapped for a link after the publication was authorized. Nothing else is widened: the removal
-  can act only on an entry carrying that identity, which only that publication created.
-- **Every other identity-bound removal** keeps repository containment. The broker pins the
-  parent with a no-follow directory descriptor at effect time and checks the parent's realpath
-  and identity immediately before and after the effect. On a mismatch it refuses with
-  `AUTHORITY_REMOVE_PARENT_ESCAPED`. Node has no directory-relative rename, so an ancestor that
-  is swapped and swapped back between those two checks remains a residual window.
+  first lstat-checks the entry at `path` against the caller's identity (device, inode and birth
+  time). It leaves any other entry, and a matching directory that holds entries, untouched. It
+  renames a matching entry to a fresh private quarantine name beside it, checks the quarantined
+  entry again, and only then unlinks it or removes it with a non-recursive rmdir. If a regular
+  file was swapped in before the rename, it is put back by a no-replace hard link. A directory
+  or symbolic link swapped in is never moved back, because Node has no no-replace primitive for
+  them: it stays in quarantine. Any entry that is not put back refuses with
+  `AUTHORITY_REMOVE_RESTORE_INCOMPLETE`, which names the quarantine path. The broker classifies
+  the effect as a `delete` of the entry itself, resolving only its parent.
+- **Repository containment always holds.** The broker never authorizes a removal that resolves
+  outside the repository. At effect time it pins the requested path's parent with a no-follow
+  directory descriptor. Immediately before the effect, and again after it on success or
+  failure, the parent's realpath must be the parent of the canonical target it authorized and
+  its identity must be the pinned one. A missing parent also refuses. On any mismatch it refuses
+  with `AUTHORITY_REMOVE_PARENT_ESCAPED`, keeping a failure of the effect as the cause. Node has
+  no directory-relative rename, so an ancestor that is swapped and swapped back between those
+  two checks remains a residual window.
+- **Escaped publications are detected and reported, never deleted.** An inode identity does not
+  name a directory entry: a hard link to a published file outside the repository, together with
+  an ancestor swap, could make a path-based cleanup delete an entry the publication never
+  created. So a recipe installation whose publication resolves outside the repository refuses
+  with `RECIPE_INSTALL_ESCAPE_DETECTED`, naming the residue path. It attempts no deletion there,
+  and it rolls back only what remains inside the repository.
 
 ## Affected Rules
 
-As listed in the frontmatter, together with `packages/authority/src/boundaries/host-remove.ts`
-and `packages/cli/src/authority/broker.ts` for the amendment above.
+As listed in the frontmatter, together with `packages/authority/src/boundaries/host-remove.ts`,
+`packages/cli/src/authority/broker.ts`, `packages/cli/src/authority/broker-paths.ts` and
+`packages/skills/src/recipes/adapters.ts` for the amendment above.
 
 ## Inspector Adversarial Acceptance
 
