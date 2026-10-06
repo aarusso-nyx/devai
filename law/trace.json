@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "invariants": [
     {
       "id": "INV-AUTH-001",
@@ -792,6 +792,14 @@
         {
           "suite": "unit",
           "path": "packages/skills/tests/recipes/adapter-install-write-time.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/cli/tests/unit/recipe-install-production-broker.test.ts"
+        },
+        {
+          "suite": "unit",
+          "path": "packages/authority/tests/unit/host-remove-identity.test.ts"
         },
         {
           "suite": "unit",
