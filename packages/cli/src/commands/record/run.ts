@@ -81,18 +81,19 @@ interface RunResult {
 }
 
 function runChild(cmd: string, repoRoot: string): RunResult {
-  const start = Date.now();
+  // Elapsed time comes from the monotonic clock: a wall-clock step cannot make it negative.
+  const start = performance.now();
   const r = spawnSync('sh', ['-c', cmd], {
     cwd: repoRoot,
     encoding: 'utf8',
     maxBuffer: 1024 * 1024 * 64,
   });
-  const end = Date.now();
+  const end = performance.now();
   const combined = (r.stdout ?? '') + (r.stderr ?? '');
   return {
     exitCode: r.status ?? 1,
     signal: r.signal ?? null,
-    durationMs: end - start,
+    durationMs: Math.round(end - start),
     log: combined,
   };
 }

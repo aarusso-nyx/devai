@@ -247,8 +247,9 @@ describe('S07-D record command exact boundaries', () => {
 
   it('preserves failed Git identity, nullable process output, signal and elapsed time', async () => {
     const root = fixture();
-    const clock = vi.spyOn(Date, 'now');
-    clock.mockReturnValueOnce(100).mockReturnValueOnce(145).mockReturnValue(33);
+    // Elapsed time reads the monotonic clock; identifiers still read the wall clock.
+    vi.spyOn(performance, 'now').mockReturnValueOnce(100).mockReturnValueOnce(145);
+    vi.spyOn(Date, 'now').mockReturnValue(33);
     spawnSyncMock.mockImplementation((command: string) => {
       if (command === 'git') return { status: 3, stdout: 'ignored\n', stderr: 'no git\n' };
       return { status: 7, stdout: null, stderr: undefined, signal: 'SIGTERM' };
