@@ -92,9 +92,9 @@ function resolveHookPath(
 /**
  * The post-merge adapter files outside .devai/config an install may write: the hook where it is
  * installed (`.husky/post-merge` in a Husky repository, else the git hooks directory), the HMAC
- * key and the receipt issuer, resolved exactly as verifyInstalledPostMergeAdapter resolves
- * them. Path resolution only, no input validation, so the bind journal can record and recover
- * them (#264).
+ * key, the receipt issuer and the checkout-bound attestation (#291), resolved exactly as
+ * verifyInstalledPostMergeAdapter resolves them. Path resolution only, no input validation, so
+ * the bind journal can record and recover them (#264).
  */
 export function postMergeAdapterFiles(targetRoot: string): readonly string[] {
   let root: string;
@@ -109,6 +109,7 @@ export function postMergeAdapterFiles(targetRoot: string): readonly string[] {
     files.push(
       join(runtimeRoot, 'post-merge.key'),
       join(runtimeRoot, 'issue-post-merge-receipt.cjs'),
+      join(runtimeRoot, POST_MERGE_ATTESTATION_FILE),
     );
   } catch {
     // Without a Git admin directory only the hook path resolves.
@@ -143,7 +144,43 @@ export interface PostMergeAdapterVerification {
   readonly errors: readonly string[];
 }
 
-const POST_MERGE_ATTESTATION = '.devai/config/post-merge-host-adapter.json';
+/**
+ * The tracked, path-free declaration that the post-merge host adapter is required (#291). It
+ * names no checkout, hook path, or key digest, so every clone carries the same bytes, and the
+ * project configuration still selects the adapter through this path.
+ */
+export const POST_MERGE_DECLARATION = '.devai/config/post-merge-host-adapter.json';
+/** The checkout-bound, signed attestation, kept beside the key in the checkout's git directory. */
+const POST_MERGE_ATTESTATION_FILE = 'post-merge-host-adapter.json';
+export const POST_MERGE_BIND_COMMAND =
+  'devai init bind --target . --host-adapter post-merge --as-role architect --write';
+
+/** The declaration's canonical content; any other content is not a current declaration. */
+export function postMergeDeclaration(): Readonly<Record<string, unknown>> {
+  return {
+    schemaVersion: '2.0.0',
+    adapter_id: 'post-merge-host-adapter',
+    adapter_kind: 'installed-checkout',
+    required: true,
+    local_state: 'git-dir',
+    bind_command: POST_MERGE_BIND_COMMAND,
+  };
+}
+
+export function postMergeDeclarationBytes(): string {
+  return `${JSON.stringify(postMergeDeclaration(), null, 2)}\n`;
+}
+
+/** Where a checkout's signed post-merge attestation lives: its own git directory (#291). */
+export function postMergeAttestationPath(targetRoot: string): string {
+  let root: string;
+  try {
+    root = realpathSync(resolve(targetRoot));
+  } catch {
+    root = resolve(targetRoot);
+  }
+  return join(gitAdminRoot(root), 'devai', POST_MERGE_ATTESTATION_FILE);
+}
 
 function postMergeAdapterId(root: string): string {
   return `post-merge-${sha256(root).slice(0, 16)}`;
@@ -158,82 +195,120 @@ function recordedPath(recorded: string): string {
   }
 }
 
-/**
- * Where the tracked post-merge attestation was bound, seen from the checkout at a root (#266):
- * `absent` without an attestation, `this-checkout` when the binding is this checkout's own, and
- * `other-checkout` when it was made in another checkout, the only one able to verify it.
- */
-export interface PostMergeBindingLocation {
-  readonly scope: 'absent' | 'this-checkout' | 'other-checkout';
-  /** The checkout the attestation records, when it records one. */
-  readonly bound_checkout?: string;
-  /** The post-merge adapter state this checkout itself carries: key, issuer, git-hook, husky-hook. */
-  readonly local_state?: readonly string[];
-}
-
-function fileIncludes(path: string, text: string): boolean {
+function readTextIfPresent(path: string): string | null {
   try {
-    return readFileSync(path, 'utf8').includes(text);
+    return readFileSync(path, 'utf8');
   } catch {
-    return false;
+    return null;
   }
 }
 
 /**
- * The post-merge adapter state a checkout carries, read from where an installation puts it and
- * never from the editable attestation: the key and receipt issuer in its git directory, and a
- * DEVAI post-merge hook in its git hooks directory or in `.husky/post-merge`. A Husky hook is
- * tracked, so every clone of a Husky repository carries it, and doctor verifies the binding there.
+ * What the tracked post-merge file holds: `absent`; the current path-free `declared` form; a
+ * `legacy` checkout-bound attestation committed before #291, with the checkout it records; or
+ * `invalid` content that is neither.
+ */
+export interface PostMergeDeclarationState {
+  readonly state: 'absent' | 'declared' | 'legacy' | 'invalid';
+  readonly recorded_checkout?: string;
+}
+
+export function readPostMergeDeclaration(targetRoot: string): PostMergeDeclarationState {
+  const text = readTextIfPresent(join(resolve(targetRoot), POST_MERGE_DECLARATION));
+  if (text === null) return { state: 'absent' };
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return { state: 'invalid' };
+  }
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return { state: 'invalid' };
+  }
+  const record = parsed as Record<string, unknown>;
+  if (JSON.stringify(record) === JSON.stringify(postMergeDeclaration())) {
+    return { state: 'declared' };
+  }
+  const recorded = record['repository'];
+  if (typeof recorded === 'string' && recorded.length > 0) {
+    return { state: 'legacy', recorded_checkout: recordedPath(recorded) };
+  }
+  return { state: typeof record['signature_hmac_sha256'] === 'string' ? 'legacy' : 'invalid' };
+}
+
+/**
+ * The post-merge binding seen from the checkout at a root (#291). The tracked file only declares
+ * that the adapter is required; the binding itself, the signed attestation with the key and the
+ * receipt issuer, lives in each checkout's git directory.
+ * - `absent`: no tracked declaration.
+ * - `legacy`: the tracked file is a checkout-bound attestation from before #291; init upgrade
+ *   converts it.
+ * - `invalid`: the tracked file is neither form, so the binding is verified here, and refused.
+ * - `unbound`: declared, and this checkout carries no post-merge state of its own.
+ * - `bound`: this checkout carries post-merge state, so the binding is verified here.
+ */
+export interface PostMergeBindingLocation {
+  readonly scope: 'absent' | 'legacy' | 'invalid' | 'unbound' | 'bound';
+  /** The checkout the local attestation, or a legacy tracked attestation, records. */
+  readonly bound_checkout?: string;
+  /** The post-merge state in this checkout's git directory: attestation, key, issuer. */
+  readonly local_state?: readonly string[];
+}
+
+/**
+ * The post-merge adapter state a checkout carries, read from its own git directory and never
+ * from tracked files: the attestation, the key and the receipt issuer. Hooks are not local
+ * state: a Husky hook is tracked and a git hook is shared by every worktree of a repository, so
+ * neither shows that this checkout was bound (#291).
  */
 function localPostMergeState(root: string): string[] {
   const state: string[] = [];
   try {
-    const adminRoot = gitAdminRoot(root);
-    if (existsSync(join(adminRoot, 'devai/post-merge.key'))) state.push('key');
-    if (existsSync(join(adminRoot, 'devai/issue-post-merge-receipt.cjs'))) state.push('issuer');
-    if (fileIncludes(join(gitCommonRoot(root), 'hooks', 'post-merge'), MARKER_START)) {
-      state.push('git-hook');
-    }
+    const runtimeRoot = join(gitAdminRoot(root), 'devai');
+    if (existsSync(join(runtimeRoot, POST_MERGE_ATTESTATION_FILE))) state.push('attestation');
+    if (existsSync(join(runtimeRoot, 'post-merge.key'))) state.push('key');
+    if (existsSync(join(runtimeRoot, 'issue-post-merge-receipt.cjs'))) state.push('issuer');
   } catch {
-    // Without a git directory there is no key, issuer, or git hook to find.
+    // Without a git directory there is no local post-merge state to find.
   }
-  if (fileIncludes(join(root, '.husky', 'post-merge'), MARKER_START)) state.push('husky-hook');
   return state;
 }
 
+/** The checkout a local attestation records, read leniently for reporting only. */
+function localBoundCheckout(root: string): string | undefined {
+  try {
+    const attestation = JSON.parse(readFileSync(postMergeAttestationPath(root), 'utf8')) as unknown;
+    const recorded =
+      attestation !== null && typeof attestation === 'object'
+        ? (attestation as Record<string, unknown>)['repository']
+        : undefined;
+    return typeof recorded === 'string' && recorded.length > 0 ? recordedPath(recorded) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /**
- * The attestation records the checkout's path, hook, and a signature by a key in that checkout's
- * git directory, so it is verifiable only there (#266). It is classified as another checkout's
- * only when it names neither this checkout's path nor this checkout's adapter id and this
- * checkout carries no post-merge adapter state of its own. The classification fails closed: an
- * unreadable attestation, or any key, issuer, or installed hook here, keeps the binding this
- * checkout's, so a deleted key or an edited attestation in the bound checkout still leads to
- * full verification, and refusal.
+ * Classify the post-merge binding of a checkout. The classification fails closed (#278): any
+ * attestation, key, or issuer in this checkout's git directory makes it `bound`, so a deleted
+ * key or an edited attestation still leads to full verification, and refusal. Only a declared
+ * checkout with none of them is `unbound`, which is every fresh clone, CI included.
  */
 export function locatePostMergeBinding(targetRoot: string): PostMergeBindingLocation {
   const root = realpathSync(resolve(targetRoot));
-  const attestationPath = join(root, POST_MERGE_ATTESTATION);
-  if (!existsSync(attestationPath)) return { scope: 'absent' };
-  let attestation: unknown;
-  try {
-    attestation = JSON.parse(readFileSync(attestationPath, 'utf8'));
-  } catch {
-    return { scope: 'this-checkout' };
-  }
-  if (attestation === null || typeof attestation !== 'object' || Array.isArray(attestation)) {
-    return { scope: 'this-checkout' };
-  }
-  const recorded = (attestation as Record<string, unknown>)['repository'];
-  if (typeof recorded !== 'string' || recorded.length === 0) return { scope: 'this-checkout' };
-  const boundCheckout = recordedPath(recorded);
+  const declaration = readPostMergeDeclaration(root);
+  if (declaration.state === 'absent') return { scope: 'absent' };
   const localState = localPostMergeState(root);
-  const foreign =
-    boundCheckout !== root &&
-    (attestation as Record<string, unknown>)['adapter_id'] !== postMergeAdapterId(root) &&
-    localState.length === 0;
+  const boundCheckout =
+    declaration.state === 'legacy' ? declaration.recorded_checkout : localBoundCheckout(root);
   return {
-    scope: foreign ? 'other-checkout' : 'this-checkout',
-    bound_checkout: boundCheckout,
+    scope:
+      declaration.state === 'legacy' || declaration.state === 'invalid'
+        ? declaration.state
+        : localState.length > 0
+          ? 'bound'
+          : 'unbound',
+    ...(boundCheckout !== undefined && { bound_checkout: boundCheckout }),
     ...(localState.length > 0 && { local_state: localState }),
   };
 }
@@ -245,7 +320,7 @@ export function verifyInstalledPostMergeAdapter(
   const root = realpathSync(resolve(targetRoot));
   const hookPath = resolveHookPath(root, 'post-merge').path;
   const keyPath = join(gitAdminRoot(root), 'devai/post-merge.key');
-  const attestationPath = join(root, '.devai/config/post-merge-host-adapter.json');
+  const attestationPath = postMergeAttestationPath(root);
   const policyPath = join(root, '.devai/config/authority-policy.json');
   const errors: string[] = [];
   const facts: Record<string, boolean> = {};
@@ -253,6 +328,7 @@ export function verifyInstalledPostMergeAdapter(
     facts['hook_present'] = existsSync(hookPath);
     facts['key_present'] = existsSync(keyPath);
     facts['attestation_present'] = existsSync(attestationPath);
+    facts['declaration_present'] = existsSync(join(root, POST_MERGE_DECLARATION));
     facts['policy_present'] = existsSync(policyPath);
     if (Object.values(facts).some((value) => !value)) {
       errors.push('POST_MERGE_ADAPTER_BINDING_MISSING');
@@ -265,6 +341,7 @@ export function verifyInstalledPostMergeAdapter(
       unknown
     >;
     const { signature_hmac_sha256: signature, ...unsigned } = attestation;
+    facts['declaration_current'] = readPostMergeDeclaration(root).state === 'declared';
     const localBinary = join(root, 'node_modules/.bin/devai');
     facts['hook_local_binary'] = hook.includes('./node_modules/.bin/devai round close');
     facts['local_binary_present'] = existsSync(localBinary);
@@ -387,7 +464,7 @@ const { readFileSync, realpathSync, writeFileSync } = require('node:fs');
 const { join } = require('node:path');
 const repository = realpathSync(execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim());
 const key = readFileSync(join(__dirname, 'post-merge.key'));
-const attestationPath = join(repository, '.devai/config/post-merge-host-adapter.json');
+const attestationPath = join(__dirname, '${POST_MERGE_ATTESTATION_FILE}');
 const attestationBytes = readFileSync(attestationPath);
 const attestation = JSON.parse(attestationBytes.toString('utf8'));
 const mergeSha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repository, encoding: 'utf8' }).trim();
@@ -410,13 +487,21 @@ writeFileSync(join(__dirname, 'post-merge-receipt.json'), JSON.stringify({ ...un
 function executePostMergeAdapter(plan: HooksInstallPlan): void {
   const root = realpathSync(resolve(plan.targetRoot));
   const runtimeRoot = join(gitAdminRoot(root), 'devai');
-  const configRoot = join(root, '.devai/config');
   const keyPath = join(runtimeRoot, 'post-merge.key');
   const issuerPath = join(runtimeRoot, 'issue-post-merge-receipt.cjs');
-  const attestationPath = join(configRoot, 'post-merge-host-adapter.json');
+  const attestationPath = join(runtimeRoot, POST_MERGE_ATTESTATION_FILE);
+  const declarationPath = join(root, POST_MERGE_DECLARATION);
   const policyPath = join(root, '.devai/config/authority-policy.json');
+  // A checkout-bound attestation committed before #291 moves into the git directory when it
+  // still verifies here, keeping its installed_at_head baseline.
+  const legacyAttestation =
+    readPostMergeDeclaration(root).state === 'legacy' ? readTextIfPresent(declarationPath) : null;
   mkdirSync(runtimeRoot, { recursive: true });
-  mkdirSync(configRoot, { recursive: true });
+  mkdirSync(dirname(declarationPath), { recursive: true });
+  // The tracked file carries only the path-free declaration, identical in every clone.
+  if (readTextIfPresent(declarationPath) !== postMergeDeclarationBytes()) {
+    writeFileSync(declarationPath, postMergeDeclarationBytes(), 'utf8');
+  }
   const key = existsSync(keyPath) ? readFileSync(keyPath) : randomBytes(32);
   if (!existsSync(keyPath)) {
     writeFileSync(keyPath, key, { mode: 0o600 });
@@ -437,9 +522,10 @@ function executePostMergeAdapter(plan: HooksInstallPlan): void {
     constitution_digest_sha256: sha256(constitution),
     package_binding: { name: '@aarusso-nyx/devai', version: plan.devaiVersion },
   };
-  if (existsSync(attestationPath)) {
+  const existingBytes = readTextIfPresent(attestationPath) ?? legacyAttestation;
+  if (existingBytes !== null) {
     try {
-      const existing = JSON.parse(readFileSync(attestationPath, 'utf8')) as Record<string, unknown>;
+      const existing = JSON.parse(existingBytes) as Record<string, unknown>;
       const { signature_hmac_sha256: existingSignature, ...existingUnsigned } = existing;
       const validSignature =
         typeof existingSignature === 'string' &&
@@ -448,7 +534,12 @@ function executePostMergeAdapter(plan: HooksInstallPlan): void {
       const stable = Object.entries(stableBindings).every(
         ([field, value]) => JSON.stringify(existing[field]) === JSON.stringify(value),
       );
-      if (validSignature && stable) return;
+      if (validSignature && stable) {
+        if (readTextIfPresent(attestationPath) !== existingBytes) {
+          writeFileSync(attestationPath, existingBytes, { encoding: 'utf8', mode: 0o600 });
+        }
+        return;
+      }
     } catch {
       // A stale or malformed attestation is replaced by a newly bound one.
     }
@@ -544,7 +635,8 @@ export function preflightHooksInstallPlan(plan: HooksInstallPlan): readonly stri
     targets.push(
       join(runtimeRoot, 'post-merge.key'),
       join(runtimeRoot, 'issue-post-merge-receipt.cjs'),
-      join(root, '.devai/config/post-merge-host-adapter.json'),
+      join(runtimeRoot, POST_MERGE_ATTESTATION_FILE),
+      join(root, POST_MERGE_DECLARATION),
     );
   }
   const trustedRoots = [root];

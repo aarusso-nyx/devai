@@ -40,7 +40,10 @@ import {
 import {
   buildHooksInstallPlan,
   executeHooksInstallPlan,
+  locatePostMergeBinding,
   postMergeAdapterFiles,
+  postMergeAttestationPath,
+  postMergeDeclarationBytes,
   preflightHooksInstallPlan,
   verifyInstalledPostMergeAdapter,
 } from '../../services/hooks-install/index.js';
@@ -522,14 +525,36 @@ export function prepareAdopterUpgrade(
     changed.push({ path: AUTHORITY_POLICY, operation: 'update', segment: 'authority' });
   }
 
-  // the post-merge attestation binds the authority policy digest, so it moves with it
+  // The post-merge attestation binds the authority policy digest, so it moves with it. Since
+  // #291 the attestation lives in each checkout's git directory and the tracked file is a
+  // path-free declaration: a checkout without local post-merge state is not rebound here, and
+  // a legacy checkout-bound attestation in tracked configuration is converted. The checkout
+  // that holds its key moves it into its git directory; any other checkout only rewrites the
+  // tracked file as the declaration, binding nothing locally.
   let postMerge: PreparedUpgrade['postMerge'];
-  if (existsSync(join(targetRoot, POST_MERGE_CONFIG))) {
-    const config = readJsonObject(join(targetRoot, POST_MERGE_CONFIG));
-    const stamp = stampAt(config, ['package_binding', 'version']) ?? 'missing';
+  const postMergeLocation = existsSync(join(targetRoot, POST_MERGE_CONFIG))
+    ? locatePostMergeBinding(targetRoot)
+    : undefined;
+  const postMergeLocalState = postMergeLocation?.local_state ?? [];
+  const holdsPostMergeKey = postMergeLocalState.includes('key');
+  if (
+    postMergeLocation !== undefined &&
+    (postMergeLocation.scope === 'legacy' || postMergeLocation.scope === 'invalid') &&
+    !holdsPostMergeKey
+  ) {
+    journaled.set(POST_MERGE_CONFIG, postMergeDeclarationBytes());
+    changed.push({ path: POST_MERGE_CONFIG, operation: 'update', segment: 'host-adapters' });
+  } else if (postMergeLocation !== undefined && postMergeLocation.scope !== 'unbound') {
+    const legacy = postMergeLocation.scope === 'legacy';
+    const attestation = legacy
+      ? readJsonObject(join(targetRoot, POST_MERGE_CONFIG))
+      : readJsonObject(postMergeAttestationPath(targetRoot));
+    const stamp = stampAt(attestation, ['package_binding', 'version']) ?? 'missing';
     if (stamp !== installed) {
       stale.push({
-        path: POST_MERGE_CONFIG,
+        path: legacy
+          ? POST_MERGE_CONFIG
+          : relative(targetRoot, postMergeAttestationPath(targetRoot)).split(sep).join('/'),
         field: 'package_binding.version',
         version: stamp,
         refreshed: true,
@@ -537,6 +562,7 @@ export function prepareAdopterUpgrade(
     }
     const verification = verifyInstalledPostMergeAdapter(targetRoot, installed);
     if (
+      legacy ||
       stamp !== installed ||
       !verification.ok ||
       changed.some((entry) => entry.path === AUTHORITY_POLICY)
@@ -554,9 +580,22 @@ export function prepareAdopterUpgrade(
           segment: 'host-adapters',
         });
       }
-      // The signed attestation moves only with its stamp or the authority policy it binds.
-      if (stamp !== installed || changed.some((entry) => entry.path === AUTHORITY_POLICY)) {
-        changed.push({ path: POST_MERGE_CONFIG, operation: 'update', segment: 'host-adapters' });
+      const localAttestation = relative(targetRoot, postMergeAttestationPath(targetRoot))
+        .split(sep)
+        .join('/');
+      if (postMergeLocation.scope !== 'bound') {
+        // The tracked file becomes the declaration and the attestation moves to the git dir.
+        changed.push(
+          { path: POST_MERGE_CONFIG, operation: 'update', segment: 'host-adapters' },
+          {
+            path: localAttestation,
+            operation: postMergeLocalState.includes('attestation') ? 'update' : 'create',
+            segment: 'host-adapters',
+          },
+        );
+      } else if (stamp !== installed || changed.some((entry) => entry.path === AUTHORITY_POLICY)) {
+        // The signed attestation moves only with its stamp or the authority policy it binds.
+        changed.push({ path: localAttestation, operation: 'update', segment: 'host-adapters' });
       }
     }
   }
