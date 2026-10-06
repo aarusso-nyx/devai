@@ -31,7 +31,7 @@ export type {
 } from './inventory-coverage-inputs.js';
 
 function measureInventoryCoverage(opts: InventoryCoverageOptions): InventoryCoverageResult {
-  const t0 = Date.now();
+  const t0 = performance.now();
   const generatedAt = opts.now ?? new Date().toISOString();
   const admit = opts.admitFile ?? (() => true);
   const apiMapPath =
@@ -271,7 +271,7 @@ function measureInventoryCoverage(opts: InventoryCoverageOptions): InventoryCove
     status,
     deterministic: true,
     tier: 'L0',
-    duration_ms: Date.now() - t0,
+    duration_ms: Math.round(performance.now() - t0),
     timestamp: generatedAt,
     ...(findings.length > 0 && { findings }),
     // Phase 33.B (closes D-A-35): mirror the just-built matrix body.

@@ -81,14 +81,14 @@ async function runOneDataProbe(
   charter: RuntimeProbeCharter,
   step: RuntimeProbeStep,
 ): Promise<ProbeOutcome> {
-  const t0 = Date.now();
+  const t0 = performance.now();
   if (step.query === undefined || step.query.length === 0) {
     return {
       pid: step.pid,
       name: step.name,
       verdict: 'error',
       failed_expectations: ['data-kind probe requires a non-empty `query` field'],
-      duration_ms: Date.now() - t0,
+      duration_ms: Math.round(performance.now() - t0),
       ...(step.expect.invariant !== undefined && { invariant: step.expect.invariant }),
     };
   }
@@ -100,7 +100,7 @@ async function runOneDataProbe(
       failed_expectations: [
         `read-only policy: only SELECT/WITH/EXPLAIN/SHOW queries are permitted; got: ${step.query.slice(0, 80)}…`,
       ],
-      duration_ms: Date.now() - t0,
+      duration_ms: Math.round(performance.now() - t0),
       ...(step.expect.invariant !== undefined && { invariant: step.expect.invariant }),
     };
   }
@@ -115,7 +115,7 @@ async function runOneDataProbe(
       verdict,
       observed_body_excerpt: rowsAsText(rows).slice(0, 2048),
       failed_expectations: failed,
-      duration_ms: Date.now() - t0,
+      duration_ms: Math.round(performance.now() - t0),
       ...(step.expect.invariant !== undefined && { invariant: step.expect.invariant }),
     };
   } catch (err) {
@@ -126,7 +126,7 @@ async function runOneDataProbe(
       failed_expectations: [
         `query execution error: ${err instanceof Error ? err.message : String(err)}`,
       ],
-      duration_ms: Date.now() - t0,
+      duration_ms: Math.round(performance.now() - t0),
       ...(step.expect.invariant !== undefined && { invariant: step.expect.invariant }),
     };
   }

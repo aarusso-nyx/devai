@@ -150,7 +150,7 @@ export function senseMigrateCheck(opts: MigrateCheckOptions): SensorReading {
         ];
   const command = ['psql', opts.databaseUrl ?? '<unset>', '-f', '<each migration>'];
   const timeoutMs = opts.timeoutMs ?? 60_000;
-  const phaseStart = Date.now();
+  const phaseStart = performance.now();
 
   if (opts.databaseUrl === undefined) {
     return buildSensorReading({
@@ -267,7 +267,7 @@ export function senseMigrateCheck(opts: MigrateCheckOptions): SensorReading {
           migrations_failed: 0,
           pre_seed_applied: preSeedApplied,
           pre_seed_failed: preSeedFailed,
-          total_duration_ms: Date.now() - phaseStart,
+          total_duration_ms: Math.round(performance.now() - phaseStart),
         },
       });
     }
@@ -351,11 +351,11 @@ export function senseMigrateCheck(opts: MigrateCheckOptions): SensorReading {
       }
     }
 
-    const migStart = Date.now();
+    const migStart = performance.now();
     const r = runCommand(['psql', opts.databaseUrl, '-v', 'ON_ERROR_STOP=1', '-f', path], {
       timeoutMs,
     });
-    const migDuration = Date.now() - migStart;
+    const migDuration = Math.round(performance.now() - migStart);
     perMigration.push({ file, exit_code: r.exit_code, duration_ms: migDuration });
     if (r.exit_code !== 0) {
       findings.push({
@@ -423,7 +423,7 @@ export function senseMigrateCheck(opts: MigrateCheckOptions): SensorReading {
       migrations_failed: migrationsFailed,
       pre_seed_applied: preSeedApplied,
       pre_seed_failed: preSeedFailed,
-      total_duration_ms: Date.now() - phaseStart,
+      total_duration_ms: Math.round(performance.now() - phaseStart),
       // Carried-over metrics (Phase 29.D + earlier).
       migrations_total: filePairs.length,
       migrations_already_applied: alreadyApplied,

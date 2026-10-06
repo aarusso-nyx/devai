@@ -42,7 +42,7 @@ function existingDir(repoRoot: string, rel: string): string | null {
 }
 
 function measureInventoryDataModel(opts: InventoryDataModelOptions): InventoryDataModelResult {
-  const t0 = Date.now();
+  const t0 = performance.now();
   const generatedAt = opts.now ?? new Date().toISOString();
   const dialect = opts.dialect ?? 'postgres';
   const ignoreDirs = opts.ignoreDirs ?? DEFAULT_IGNORE_DIRS;
@@ -166,7 +166,7 @@ function measureInventoryDataModel(opts: InventoryDataModelOptions): InventoryDa
     status,
     deterministic: true,
     tier: 'L0',
-    duration_ms: Date.now() - t0,
+    duration_ms: Math.round(performance.now() - t0),
     timestamp: generatedAt,
     ...(findings.length > 0 && { findings }),
     metrics: {

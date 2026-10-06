@@ -101,7 +101,7 @@ function buildBody(repoRoot: string, files: readonly string[]): DepGraphBody {
 }
 
 export function senseInventoryDepGraph(opts: InventoryDepGraphOptions): InventoryDepGraphResult {
-  const t0 = Date.now();
+  const t0 = performance.now();
   const ignoreDirs = opts.ignoreDirs ?? DEFAULT_IGNORE_DIRS;
   const scanDir = opts.scanDir ?? opts.repoRoot;
   const findings: Array<{
@@ -170,7 +170,7 @@ export function senseInventoryDepGraph(opts: InventoryDepGraphOptions): Inventor
     status,
     deterministic: true,
     tier: 'L0',
-    duration_ms: Date.now() - t0,
+    duration_ms: Math.round(performance.now() - t0),
     ...(opts.now !== undefined && { timestamp: opts.now }),
     ...(findings.length > 0 && { findings }),
     metrics: { node_count: nodeCount, edge_count: edgeCount },

@@ -165,7 +165,7 @@ export interface InventoryDataHandlingResult {
 function measureInventoryDataHandling(
   opts: InventoryDataHandlingOptions,
 ): InventoryDataHandlingResult {
-  const t0 = Date.now();
+  const t0 = performance.now();
   const generatedAt = opts.now ?? new Date().toISOString();
   const dataModelPath =
     opts.dataModelPath ??
@@ -276,7 +276,7 @@ function measureInventoryDataHandling(
     status,
     deterministic: true,
     tier: 'L0',
-    duration_ms: Date.now() - t0,
+    duration_ms: Math.round(performance.now() - t0),
     timestamp: generatedAt,
     ...(findings.length > 0 && { findings }),
     metrics: {

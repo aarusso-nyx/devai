@@ -21,7 +21,7 @@ export function runCommand(argv: readonly string[], opts: RunOptions = {}): RunR
   if (bin === undefined) {
     return { stdout: '', stderr: 'empty command', exit_code: -1, duration_ms: 0, killed: false };
   }
-  const start = Date.now();
+  const start = performance.now();
   const result = spawnSync(bin, args, {
     cwd: opts.cwd,
     encoding: 'utf8',
@@ -29,7 +29,7 @@ export function runCommand(argv: readonly string[], opts: RunOptions = {}): RunR
     env: opts.env !== undefined ? { ...process.env, ...opts.env } : process.env,
     ...(opts.input !== undefined && { input: opts.input }),
   });
-  const duration_ms = Date.now() - start;
+  const duration_ms = Math.round(performance.now() - start);
   if (result.error !== undefined) {
     return {
       stdout: result.stdout ?? '',
