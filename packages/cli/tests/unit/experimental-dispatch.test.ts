@@ -224,6 +224,13 @@ describe('experimental dispatch engine', () => {
       verdict: 'pass',
       usage: { usage_version: 2, input_tokens: { value: 1200, status: 'reported' } },
       cost: { source: 'provider-reported' },
+      // ADR-MDL-0008: the evidence names the provider-enforced write confinement.
+      sandbox: {
+        mode: 'claude-restricted-sandbox',
+        enforced_by: 'provider',
+        write_root: 'attempt-worktree',
+        flags: expect.arrayContaining(['--restricted', '--settings']) as unknown,
+      },
     });
     expect(budget).toEqual({ attempts: 1, tokens: 7300, unverifiable: false });
   });
@@ -350,6 +357,11 @@ describe('experimental admission rules', () => {
         activation(),
       ),
     ).toBe('EXPERIMENTAL_SELECTION_NOT_EXACT');
+    // ADR-MDL-0008: a runtime its provider cannot sandbox on this platform never runs.
+    expect(experimentalTaskRefusal(task, activation(), 'win32')).toBe(
+      'EXPERIMENTAL_SANDBOX_UNAVAILABLE',
+    );
+    expect(experimentalTaskRefusal(task, activation(), 'linux')).toBeUndefined();
   });
 
   it('bumps only to the next tier the Owner also activated, mirroring model-tiers.json', () => {
