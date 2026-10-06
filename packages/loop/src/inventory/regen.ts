@@ -8,7 +8,12 @@ import { extractModules } from './module-extractor.js';
 import { extractRoutes } from './route-extractor.js';
 import { discoverSchemas } from './schemas-discoverer.js';
 import { discoverTests } from './test-discoverer.js';
-import { walkFiles } from './walker.js';
+import {
+  inventoryAdmits,
+  walkFiles,
+  withInventoryReadSnapshot,
+  type InventoryAdmission,
+} from './walker.js';
 
 export interface RegenOptions {
   readonly repoRoot: string;
@@ -28,6 +33,12 @@ export interface RegenOptions {
   readonly checksumPaths?: readonly string[];
   /** Forwarded to every extractor; see walker WalkOptions. */
   readonly ignoreDirs?: ReadonlySet<string>;
+  /**
+   * The repository-relative files the inventory may describe, typically the git tree at
+   * the integration head. A file outside it, such as one git ignores, never enters any
+   * surface, hash, or checksum. Omitted: the working tree is walked as it stands.
+   */
+  readonly admittedFiles?: ReadonlySet<string>;
 }
 
 /**
@@ -87,6 +98,13 @@ const DEFAULT_GOVERNANCE_FILES = [
 ];
 
 export async function regenerateInventory(opts: RegenOptions): Promise<InventoryRecord> {
+  const { admittedFiles } = opts;
+  if (admittedFiles === undefined) return buildInventory(opts);
+  const admit: InventoryAdmission = (path) => admittedFiles.has(relative(opts.repoRoot, path));
+  return withInventoryReadSnapshot(() => buildInventory(opts), admit);
+}
+
+async function buildInventory(opts: RegenOptions): Promise<InventoryRecord> {
   const { repoRoot, timestamp, integrationHead, ignoreDirs } = opts;
   const modulesArr = extractModules({ repoRoot, ignoreDirs });
   const routesArr = extractRoutes({ repoRoot, ignoreDirs });
@@ -194,7 +212,7 @@ function computeChecksumPaths(repoRoot: string, override?: readonly string[]): r
   const paths: string[] = [];
   for (const name of DEFAULT_GOVERNANCE_FILES) {
     const p = join(repoRoot, name);
-    if (existsSync(p)) paths.push(p);
+    if (existsSync(p) && inventoryAdmits(p)) paths.push(p);
   }
   const schemasDir = join(repoRoot, 'law/schemas');
   if (existsSync(schemasDir)) {

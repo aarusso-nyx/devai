@@ -32,7 +32,11 @@ export interface WalkOptions {
   readonly ignoreDirs?: ReadonlySet<string>;
 }
 
+/** Whether a file may enter the walk; the files git does not track at HEAD are refused. */
+export type InventoryAdmission = (absolutePath: string) => boolean;
+
 interface InventoryReadSnapshot {
+  readonly admit?: InventoryAdmission;
   readonly walks: Map<string, readonly string[]>;
   readonly sources: Map<string, string>;
   readonly values: Map<string, unknown>;
@@ -45,12 +49,24 @@ const inventoryReadSnapshot = new AsyncLocalStorage<InventoryReadSnapshot>();
  * The store is discarded when the operation settles, so no later invocation can
  * substitute cached repository state.
  */
-export function withInventoryReadSnapshot<T>(operation: () => T): T {
-  if (inventoryReadSnapshot.getStore() !== undefined) return operation();
+export function withInventoryReadSnapshot<T>(operation: () => T, admit?: InventoryAdmission): T {
+  // A snapshot with an admission rule is always its own, so no outer, unbound cache serves it.
+  if (admit === undefined && inventoryReadSnapshot.getStore() !== undefined) return operation();
   return inventoryReadSnapshot.run(
-    { walks: new Map(), sources: new Map(), values: new Map() },
+    {
+      ...(admit === undefined ? {} : { admit }),
+      walks: new Map(),
+      sources: new Map(),
+      values: new Map(),
+    },
     operation,
   );
+}
+
+/** Whether a path outside a walk, such as a named governance file, may enter the inventory. */
+export function inventoryAdmits(absolutePath: string): boolean {
+  const admit = inventoryReadSnapshot.getStore()?.admit;
+  return admit === undefined || admit(absolutePath);
 }
 
 /** Reuse a derived value only inside the active inventory invocation. */
@@ -91,7 +107,7 @@ export function walkFiles(root: string, opts: WalkOptions = {}): string[] {
   const cached = snapshot?.walks.get(key);
   if (cached !== undefined) return [...cached];
   const results: string[] = [];
-  walk(root, ignore, exts, results);
+  walk(root, ignore, exts, results, snapshot?.admit);
   results.sort();
   snapshot?.walks.set(key, results);
   return [...results];
@@ -105,6 +121,7 @@ function walk(
   ignore: ReadonlySet<string>,
   exts: readonly string[] | undefined,
   out: string[],
+  admit: InventoryAdmission | undefined,
 ): void {
   let entries: string[];
   try {
@@ -126,9 +143,12 @@ function walk(
     }
     if (s.isSymbolicLink()) continue;
     if (s.isDirectory()) {
-      walk(full, ignore, exts, out);
+      walk(full, ignore, exts, out, admit);
     } else if (s.isFile()) {
-      if (exts === undefined || exts.some((e) => name.endsWith(e))) {
+      if (
+        (exts === undefined || exts.some((e) => name.endsWith(e))) &&
+        (admit === undefined || admit(full))
+      ) {
         out.push(full);
       }
     }
