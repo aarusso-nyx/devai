@@ -3,6 +3,7 @@ import { basename, dirname, join } from 'node:path';
 import {
   constants as nodeFileConstants,
   closeSync as nodeCloseSync,
+  fstatSync as nodeFstatSync,
   fsyncSync as nodeFsyncSync,
   linkSync as nodeLinkSync,
   openSync as nodeOpenSync,
@@ -20,17 +21,35 @@ export const PUBLISH_STAGED_SUFFIX = '.publish-staged';
  */
 export const PUBLISH_INDETERMINATE = 'AUTHORITY_PUBLISH_CLEANUP_INCOMPLETE';
 
+/**
+ * Identity of the file a publication created, taken by fstat of the staged descriptor it
+ * wrote before the link. The target is a hard link to that file, so a caller can tell the
+ * entry it published from any other entry later found at the same path (#313).
+ */
+export interface PublishedFileIdentity {
+  readonly dev: number;
+  readonly ino: number;
+}
+
 /** Error for an indeterminate publication; `cause` is the failed cleanup step's error. */
 export class PublishIndeterminateError extends Error {
   readonly code = PUBLISH_INDETERMINATE;
   readonly path: string;
   /** Whether the staged name is still present after the recovery attempt. */
   readonly staged_remaining: boolean;
+  /** Identity of the file linked into place, which the caller owns. */
+  readonly identity: PublishedFileIdentity;
 
-  constructor(path: string, stagedRemaining: boolean, cause: unknown) {
+  constructor(
+    path: string,
+    stagedRemaining: boolean,
+    cause: unknown,
+    identity: PublishedFileIdentity,
+  ) {
     super(PUBLISH_INDETERMINATE, { cause });
     this.path = path;
     this.staged_remaining = stagedRemaining;
+    this.identity = identity;
   }
 }
 
@@ -69,6 +88,8 @@ function removeIfPresent(path: string): boolean {
  * fsynced last, so a returned call is durable. A reader sees either no file or the whole
  * file, never a partial one.
  *
+ * It returns the identity of the published file from the staged descriptor's fstat.
+ *
  * A failure before the link removes the staged file and rethrows: nothing was published.
  * A failure after the link is an indeterminate publication: the staged name is removed if
  * it can be, and `PublishIndeterminateError` reports that the target holds the caller's
@@ -79,7 +100,7 @@ export function publishNoReplaceSteps(
   path: string,
   data: string | Uint8Array,
   hooks: PublishNoReplaceHooks = {},
-): void {
+): PublishedFileIdentity {
   const bytes = typeof data === 'string' ? Buffer.from(data, 'utf8') : Buffer.from(data);
   const directory = dirname(path);
   const staged = join(
@@ -87,6 +108,7 @@ export function publishNoReplaceSteps(
     `.${basename(path)}.${String(process.pid)}-${randomUUID()}${PUBLISH_STAGED_SUFFIX}`,
   );
   const fd = nodeOpenSync(staged, 'wx');
+  let identity: PublishedFileIdentity;
   try {
     try {
       let offset = 0;
@@ -96,6 +118,8 @@ export function publishNoReplaceSteps(
         offset += written;
       }
       nodeFsyncSync(fd);
+      const stat = nodeFstatSync(fd);
+      identity = { dev: stat.dev, ino: stat.ino };
     } finally {
       nodeCloseSync(fd);
     }
@@ -109,6 +133,7 @@ export function publishNoReplaceSteps(
     (hooks.unlinkStaged ?? nodeUnlinkSync)(staged);
     (hooks.fsyncDirectory ?? fsyncDirectory)(directory);
   } catch (error) {
-    throw new PublishIndeterminateError(path, removeIfPresent(staged), error);
+    throw new PublishIndeterminateError(path, removeIfPresent(staged), error, identity);
   }
+  return identity;
 }

@@ -18,6 +18,7 @@ import {
   realpathSync,
   renameSync as nodeRenameSync,
   rmSync as nodeRmSync,
+  rmdirSync as nodeRmdirSync,
   statSync,
   symlinkSync as nodeSymlinkSync,
   unlinkSync as nodeUnlinkSync,
@@ -33,7 +34,7 @@ import type { ProtectedReleaseRepositoryIdentity } from './release-repository-id
 import type { AuthorityHostEffectRequest } from './host-atomic-effects.js';
 import { scopes, type AuthorityHostEffectScope } from './host-scope.js';
 import { runSinkUnit } from './host-sink-filesystem.js';
-import { publishNoReplaceSteps } from './host-publish.js';
+import { publishNoReplaceSteps, type PublishedFileIdentity } from './host-publish.js';
 import {
   currentRepositoryBinding,
   nextProtectedOperationSequence,
@@ -258,6 +259,8 @@ export const mkdtempSync = guarded('mkdtempSync', nodeMkdtempSync, 'mutation');
 export const openSync = guarded('openSync', nodeOpenSync, 'mutation');
 export const renameSync = guarded('renameSync', nodeRenameSync, 'mutation');
 export const rmSync = guarded('rmSync', nodeRmSync, 'mutation');
+/** Non-recursive directory removal: it refuses (ENOTEMPTY) a directory that holds any entry. */
+export const rmdirSync = guarded('rmdirSync', nodeRmdirSync, 'mutation');
 export const symlinkSync = guarded('symlinkSync', nodeSymlinkSync, 'mutation');
 export const unlinkSync = guarded('unlinkSync', nodeUnlinkSync, 'mutation');
 export const writeFileSync = guarded('writeFileSync', nodeWriteFileSync, 'mutation');
@@ -265,16 +268,16 @@ export const writeSync = guarded('writeSync', nodeWriteSync, 'mutation');
 /**
  * Governed atomic no-replace publication (ADR-AUT-0005): one authorized `create` of
  * `path` that writes and fsyncs a staged file, links it into place (refusing with EEXIST
- * when `path` exists), removes the staged name and fsyncs the directory.
+ * when `path` exists), removes the staged name and fsyncs the directory. It returns the
+ * published file's identity, taken from the staged descriptor before the link.
  */
 export const publishFileNoReplaceSync = guarded(
   'publishFileNoReplaceSync',
-  (path: string, data: string | Uint8Array): void => {
-    publishNoReplaceSteps(path, data);
-  },
+  (path: string, data: string | Uint8Array): PublishedFileIdentity =>
+    publishNoReplaceSteps(path, data),
   'mutation',
 );
-export { PUBLISH_INDETERMINATE } from './host-publish.js';
+export { PUBLISH_INDETERMINATE, type PublishedFileIdentity } from './host-publish.js';
 
 /**
  * Exact flush exception (ADR-AUT-0005): fsync one directory opened read-only and without
