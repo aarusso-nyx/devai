@@ -122,7 +122,7 @@ describe('evidence render public facade boundaries', () => {
         '--repo-root',
         repo,
         '--out',
-        'record/derived/matrix.html',
+        '.devai/state/render/matrix.html',
         '--in',
         'reports/tests',
         '--format',
@@ -145,7 +145,7 @@ describe('evidence render public facade boundaries', () => {
     expect(matrixService.options).toEqual([
       {
         repoRoot: resolve(repo),
-        out: 'record/derived/matrix.html',
+        out: '.devai/state/render/matrix.html',
         in: 'reports/tests',
         format: 'html',
         filter: 'tier=unit',
@@ -160,7 +160,7 @@ describe('evidence render public facade boundaries', () => {
     ]);
     expect(result).toEqual({
       exit: 0,
-      stdout: '{"kind":"test-matrix","out":"record/derived/matrix.html"}\n',
+      stdout: '{"kind":"test-matrix","out":".devai/state/render/matrix.html"}\n',
       stderr: '',
     });
   });
@@ -213,7 +213,7 @@ describe('evidence render public facade boundaries', () => {
       stderr: '',
     });
 
-    const out = 'record/derived/decisions.md';
+    const out = '.devai/state/render/decisions.md';
     const written = await invoke(
       ['evidence-render', '--kind', 'decisions', '--repo-root', repo, '--out', out],
       { writeConsent: true },

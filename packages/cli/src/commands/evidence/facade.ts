@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import type { CAC } from 'cac';
-import { spawnSync, writeGovernanceProjectionSync } from '@devai-nyx/authority';
+import { classifyAuthorityPath, mkdirSync, spawnSync, writeFileSync } from '@devai-nyx/authority';
 import {
   LocalEvidenceError,
   appendProofEpochErrata,
@@ -30,6 +30,13 @@ const DEFAULT_CHAIN_PATH = 'record/proofs/chain.json';
 const RENDER_KINDS = new Set(['decisions', 'rounds', 'round-narratives', 'test-matrix']);
 /** The committed rounds index that `--kind rounds --check` compares with (ADR-EVI-0001). */
 const ROUNDS_INDEX_PATH = 'record/derived/indexes/rounds.md';
+
+/**
+ * The filesystem domains `evidence render` declares in law/policy/action-registry.json. A
+ * rendered view is written only inside them, through the guarded host filesystem.
+ */
+const RENDER_OUT_OUTSIDE_SCOPE = 'EVIDENCE_RENDER_OUT_OUTSIDE_SCOPE';
+const EVIDENCE_RENDER_WRITE_DOMAINS: readonly string[] = ['fs:f5-state', 'fs:proofs'];
 
 interface RedactOptions {
   readonly round?: string;
@@ -180,6 +187,18 @@ export const evidenceRender = defineCommand({
           return;
         }
         const repoRoot = resolve(options.repoRoot ?? process.cwd());
+        if (
+          options.out !== undefined &&
+          !EVIDENCE_RENDER_WRITE_DOMAINS.includes(
+            classifyAuthorityPath(repoRoot, resolve(repoRoot, options.out)),
+          )
+        ) {
+          process.stderr.write(
+            `devai evidence render: ${RENDER_OUT_OUTSIDE_SCOPE}: --out must stay inside ${EVIDENCE_RENDER_WRITE_DOMAINS.join(' or ')}\n`,
+          );
+          process.exitCode = EXIT_FAIL;
+          return;
+        }
         try {
           if (options.kind === 'test-matrix') {
             const service = await invokeCommandService(renderMatrix, [
@@ -223,14 +242,14 @@ export const evidenceRender = defineCommand({
             const committedPath = resolve(repoRoot, ROUNDS_INDEX_PATH);
             if (!existsSync(committedPath)) {
               process.stderr.write(
-                `devai evidence render: ${ROUNDS_INDEX_PATH} is missing; regenerate it with --kind rounds --out ${ROUNDS_INDEX_PATH} --write\n`,
+                `devai evidence render: ${ROUNDS_INDEX_PATH} is missing; render it with --kind rounds --out .devai/state/render/rounds.md --write and copy it over it\n`,
               );
               process.exitCode = EXIT_FAIL;
               return;
             }
             if (readFileSync(committedPath, 'utf8') !== rendered) {
               process.stderr.write(
-                `devai evidence render: ${ROUNDS_INDEX_PATH} differs from the phase closures; regenerate it with --kind rounds --out ${ROUNDS_INDEX_PATH} --write\n`,
+                `devai evidence render: ${ROUNDS_INDEX_PATH} differs from the phase closures; render it with --kind rounds --out .devai/state/render/rounds.md --write and copy it over it\n`,
               );
               process.exitCode = EXIT_FAIL;
               return;
@@ -253,7 +272,9 @@ export const evidenceRender = defineCommand({
           if (options.out === undefined) {
             process.stdout.write(body.endsWith('\n') ? body : `${body}\n`);
           } else {
-            writeGovernanceProjectionSync(resolve(repoRoot, options.out), body);
+            const target = resolve(repoRoot, options.out);
+            mkdirSync(dirname(target), { recursive: true });
+            writeFileSync(target, body);
             process.stdout.write(
               options.human === true
                 ? `evidence render: wrote ${options.kind} to ${options.out}\n`

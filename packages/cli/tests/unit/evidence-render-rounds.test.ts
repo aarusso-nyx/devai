@@ -31,6 +31,9 @@ const { cac } = createRequire(import.meta.url)('../../node_modules/cac/index-com
 
 const CLOSURES = 'record/proofs/compliance/closures';
 const INDEX = 'record/derived/indexes/rounds.md';
+// `--out` is confined to the action's declared state and proof domains; the committed index
+// is promoted from a rendered copy, never written in place by this action.
+const OUT = '.devai/state/render/rounds.md';
 const DETRAN = fileURLToPath(
   new URL('../../../../tests/fixtures/closures/detran', import.meta.url),
 );
@@ -98,7 +101,7 @@ function render(repo: string, extra: readonly string[] = []): Promise<Invocation
   return invoke(['evidence-render', '--kind', 'rounds', '--repo-root', repo, ...extra]);
 }
 
-function renderTo(repo: string, out = INDEX): Promise<InvocationResult> {
+function renderTo(repo: string, out = OUT): Promise<InvocationResult> {
   return invoke(['evidence-render', '--kind', 'rounds', '--repo-root', repo, '--out', out], {
     writeConsent: true,
   });
@@ -255,7 +258,9 @@ describe('evidence render --kind rounds: canonical bytes (IA-004)', () => {
     const written = await renderTo(repo);
 
     expect(written.exit).toBe(0);
-    expect(readFileSync(join(repo, INDEX), 'utf8')).toBe(SUPERSEDING_INDEX);
+    expect(readFileSync(join(repo, OUT), 'utf8')).toBe(SUPERSEDING_INDEX);
+    mkdirSync(join(repo, dirname(INDEX)), { recursive: true });
+    cpSync(join(repo, OUT), join(repo, INDEX));
     const before = tree(repo);
     const checked = await check(repo);
     expect(checked).toMatchObject({ exit: 0, stderr: '' });
@@ -367,6 +372,7 @@ describe('evidence render --kind rounds: rejections write nothing (IA-001, IA-00
       const repo = rejected(files);
 
       expectRejected(await renderTo(repo), file);
+      expect(existsSync(join(repo, OUT))).toBe(false);
       expect(existsSync(join(repo, INDEX))).toBe(false);
     },
   );
@@ -561,7 +567,37 @@ describe('evidence render --kind rounds against the DETRAN closures fixture (IA-
     expect(tree(repo)).toEqual(before);
 
     expect((await renderTo(repo)).exit).toBe(0);
-    expect(readFileSync(join(repo, INDEX), 'utf8')).toBe(DETRAN_INDEX);
+    expect(readFileSync(join(repo, OUT), 'utf8')).toBe(DETRAN_INDEX);
+    cpSync(join(repo, OUT), join(repo, INDEX));
     expect((await check(repo)).exit).toBe(0);
+  });
+});
+
+describe('evidence render --out write scope', () => {
+  it.each([
+    ['the committed rounds index', INDEX],
+    ['an arbitrary workspace file', 'docs/rendered.md'],
+    ['a parent of the repository', '../escaped.md'],
+    ['an absolute path outside the repository', join(tmpdir(), 'devai-render-escape.md')],
+  ])('refuses %s and writes nothing', async (_name, out) => {
+    const repo = superseding();
+    const before = tree(repo);
+    const result = await renderTo(repo, out);
+    expect(result.exit).toBe(2);
+    expect(result.stdout).toBe('');
+    expect(result.stderr).toContain('EVIDENCE_RENDER_OUT_OUTSIDE_SCOPE');
+    expect(tree(repo)).toEqual(before);
+    expect(existsSync(join(repo, '..', 'escaped.md'))).toBe(false);
+    expect(existsSync(join(tmpdir(), 'devai-render-escape.md'))).toBe(false);
+  });
+
+  it.each([
+    ['runtime state', '.devai/state/render/rounds.md'],
+    ['the proof store', 'record/proofs/rounds-view.md'],
+  ])('writes inside %s through the guarded filesystem', async (_name, out) => {
+    const repo = superseding();
+    const result = await renderTo(repo, out);
+    expect(result.exit).toBe(0);
+    expect(readFileSync(join(repo, out), 'utf8')).toBe(SUPERSEDING_INDEX);
   });
 });

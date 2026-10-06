@@ -923,7 +923,7 @@ describe('evidence render and verify acceptance', () => {
           '--kind',
           'decisions',
           '--out',
-          'record/derived/indexes/decisions.md',
+          '.devai/state/render/decisions.md',
           '--repo-root',
           repo,
         ])
@@ -968,7 +968,7 @@ describe('evidence render and verify acceptance', () => {
         '--kind',
         'decisions',
         '--out',
-        'record/derived/indexes/decisions.md',
+        '.devai/state/render/decisions.md',
         '--repo-root',
         repo,
         '--human',
@@ -977,7 +977,7 @@ describe('evidence render and verify acceptance', () => {
     );
     expect(written).toMatchObject({ exit: 0, stderr: '' });
     expect(written.stdout).toContain('evidence render: wrote decisions');
-    expect(readFileSync(join(repo, 'record/derived/indexes/decisions.md'), 'utf8')).toContain(
+    expect(readFileSync(join(repo, '.devai/state/render/decisions.md'), 'utf8')).toContain(
       '# Design Decisions',
     );
     const matrix = await invoke(evidenceRender, [
