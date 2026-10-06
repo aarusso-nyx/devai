@@ -2,6 +2,7 @@ import { join } from 'node:path';
 import { decideRoundTaskAdmission, planRoundTaskAdmission } from './round-task-admission.js';
 import {
   DEFAULT_LOCK_TTL_MS,
+  LOCK_QUARANTINE_UNPERSISTED,
   LOCK_RENEWAL_INTERVAL_MS,
   WAITING_LOCK_TTL_MS,
   closeLockFence,
@@ -428,7 +429,11 @@ async function runControlledRound(
     if (!result.ok) {
       const status = loadTask(options.repoRoot, running.id).status;
       const lost = result.code === 'TASK_RESOURCE_LOCK_LOST';
-      if (lost && status === 'completed') {
+      if (result.code === LOCK_QUARANTINE_UNPERSISTED) {
+        // Its process group may live and no quarantine record protects its locks: never
+        // escalate (that releases them). It stays `in_progress`, holding its locks until
+        // their TTL lapses, for explicit human disposition.
+      } else if (lost && status === 'completed') {
         // A completion recorded without exclusive resources is withdrawn for review;
         // the lifecycle forbids leaving `completed`, so this bypasses its guard.
         escalateTask({ repoRoot: options.repoRoot, taskId: running.id });

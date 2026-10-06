@@ -439,6 +439,14 @@ export interface LockQuarantine {
   readonly recorded_at: string;
 }
 
+/**
+ * The dispatch failure of a task whose locks had to be quarantined but whose quarantine
+ * record could not be written. The round runner never escalates such a task (that would
+ * release its locks while its process group may live): it stays `in_progress`, holding its
+ * locks until their TTL lapses, for explicit human disposition.
+ */
+export const LOCK_QUARANTINE_UNPERSISTED = 'TASK_LOCK_QUARANTINE_UNPERSISTED';
+
 function quarantinePath(locksDir: string, taskId: string): string {
   return join(dirname(locksDir), 'lock-quarantine', `${taskId}.json`);
 }
