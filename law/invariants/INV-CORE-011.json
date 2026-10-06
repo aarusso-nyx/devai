@@ -6,8 +6,8 @@
   "lifecycle": "supported",
   "severity": "hard-fail",
   "type": "api_contract",
-  "title": "Package barrels only re-export and match the package exports map",
-  "statement": "Every package index and the CLI runtime assembly barrel MUST contain only re-exports, each relative re-export MUST resolve to a module that exists, and the development entry that a workspace package declares for its root export MUST be its source index, so a module becomes part of a package public surface only by an explicit re-export that a reviewer can read in one place.",
+  "title": "Claimed package barrels only re-export and match the package exports map",
+  "statement": "The package indexes of loop, skills, spec, and utils and the CLI index and runtime assembly barrel MUST contain only re-exports, each relative re-export MUST resolve to a module that exists, and the root export of every workspace package that declares one MUST point its development entry at the source index and its production entry at the build of that index, so a module becomes part of a package public surface only by an explicit re-export that a reviewer can read in one place.",
   "rationale": "A barrel that declares behavior, or an exports map that points past it, would widen a package public surface without a visible re-export; keeping barrels re-export-only keeps reachability and the inventory claims honest (issue #295).",
   "status": "active",
   "verification": {
