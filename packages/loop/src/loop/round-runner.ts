@@ -2,14 +2,16 @@ import { join } from 'node:path';
 import { decideRoundTaskAdmission, planRoundTaskAdmission } from './round-task-admission.js';
 import {
   LOCK_RENEWAL_INTERVAL_MS,
+  WAITING_LOCK_TTL_MS,
   closeLockFence,
+  holdsLiveLocks,
   inspectLocks,
   listLockFences,
-  listLocks,
   lockFenceReleases,
   lockIdentity,
   openLockFence,
   releaseLocks,
+  removeOrphanLockReceipts,
   renewLocks,
   taskLockTargets,
   type LockFence,
@@ -93,13 +95,11 @@ function requiredTask(tasks: readonly TaskRecord[], id: string): TaskRecord {
 }
 
 function requiredTaskLocksHeld(repoRoot: string, task: TaskRecord): boolean {
-  const held = listLocks({ locksDir: join(repoRoot, '.devai/state/locks') }).filter(
-    (lock) =>
-      lock.task_id === task.id && Date.now() - new Date(lock.acquired_at).getTime() < lock.ttl_ms,
-  );
-  return taskLockTargets(task).every((target) =>
-    held.some((lock) => `${lock.substrate}:${lock.module}` === target),
-  );
+  return holdsLiveLocks({
+    locksDir: join(repoRoot, '.devai/state/locks'),
+    taskId: task.id,
+    targets: taskLockTargets(task),
+  });
 }
 
 /** A dispatch that leaves its task here still holds the task's locks. */
@@ -111,6 +111,14 @@ const LOCK_HOLDING_STATUSES = new Set<TaskRecord['status']>([
   'awaiting_human_review',
   'experimental_blocked',
 ]);
+
+/**
+ * Statuses in which a task waits outside any dispatch, still holding its locks, for a
+ * human review, a merge, a disposition, or its next dispatch.
+ */
+const WAITING_STATUSES = new Set<TaskRecord['status']>(
+  [...LOCK_HOLDING_STATUSES].filter((status) => status !== 'in_progress'),
+);
 
 /**
  * True when every key is accounted for: it still holds exactly the record the task last
@@ -140,7 +148,10 @@ function locksAccountedFor(
 
 /**
  * Run one dispatch while renewing the task's locks, so a dispatch longer than the
- * lock TTL is never taken over. A lock found missing, held by another task, or
+ * lock TTL is never taken over. A dispatch that leaves its task waiting outside any
+ * dispatch (`WAITING_STATUSES`) hands it the waiting lease (`WAITING_LOCK_TTL_MS`):
+ * nothing renews a waiting task, and a lease lapsing during a human review would let
+ * another task take the module before the completion. A lock found missing, held by another task, or
  * replaced by any record other than the one this task last held is a lost lock: the
  * dispatch result cannot claim exclusive resources it no longer had. The final check
  * runs whatever status the dispatch left. A transition that released the locks
@@ -188,7 +199,8 @@ async function dispatchWithLockRenewal(
   }
   if (!lost && targets.length > 0) {
     try {
-      const released = LOCK_RELEASE_STATUSES.includes(loadTask(options.repoRoot, task.id).status);
+      const status = loadTask(options.repoRoot, task.id).status;
+      const released = LOCK_RELEASE_STATUSES.includes(status);
       lost = !locksAccountedFor(
         locksDir,
         task,
@@ -196,6 +208,15 @@ async function dispatchWithLockRenewal(
         held,
         released && fence !== undefined ? lockFenceReleases({ locksDir, fence }) : new Set(),
       );
+      if (!lost && WAITING_STATUSES.has(status)) {
+        const lease = renewLocks({
+          locksDir,
+          taskId: task.id,
+          targets,
+          ttlMs: WAITING_LOCK_TTL_MS,
+        });
+        lost = lease.lost.length > 0;
+      }
     } catch {
       lost = true;
     }
@@ -214,6 +235,8 @@ async function dispatchWithLockRenewal(
  */
 function reconcileFencedAttempts(repoRoot: string, roundId: string): RoundTaskRunResult[] {
   const locksDir = join(repoRoot, '.devai/state/locks');
+  // Receipts a stop left between retiring a fence and its receipts name a judged attempt.
+  removeOrphanLockReceipts({ locksDir });
   const fences = listLockFences({ locksDir }).filter((fence) => fence.round_id === roundId);
   if (fences.length === 0) return [];
   const tasks = new Map(admissionPopulation(repoRoot).map((task) => [task.id, task]));

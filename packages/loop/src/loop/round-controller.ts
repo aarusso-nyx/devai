@@ -2,9 +2,9 @@ import { mkdirSync, readFileSync, renameSync } from '@devai-nyx/authority';
 import { randomUUID } from 'node:crypto';
 import { hostname } from 'node:os';
 import { join } from 'node:path';
+import { fsyncDirectorySync } from './durable-files.js';
 import {
   createRecordExclusive,
-  fsyncDirectory,
   observeRecord,
   processAlive,
   swapObservedRecord,
@@ -236,7 +236,7 @@ function writeDenials(
   }
   renameSync(staged, path);
   // The count and the bump it owes must be durable before the task is re-queued.
-  fsyncDirectory(roundRunDir(repoRoot, roundId));
+  fsyncDirectorySync(roundRunDir(repoRoot, roundId), { unsupported: 'skip' });
 }
 
 function entryOf(denials: Readonly<Record<string, DenialEntry>>, taskId: string): DenialEntry {

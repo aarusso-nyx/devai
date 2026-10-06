@@ -40,6 +40,7 @@ import {
   readDispatchJournal,
   type DispatchJournalEntry,
 } from '../../src/loop/dispatch-journal.js';
+import { acquireLocks, inspectLocks, taskLockTargets } from '../../src/loop/locks.js';
 import { ratifyRoundTask } from '../../src/loop/ratification.js';
 import { acquireRoundController, releaseRoundController } from '../../src/loop/round-controller.js';
 import { escalateRoundTask, finishRoundTask } from '../../src/loop/task-services.js';
@@ -393,7 +394,14 @@ describe('an interrupted disposition resumes (FIX 5)', () => {
 describe('agent completion is durable before it releases anything (FIX 4, FIX 8)', () => {
   async function accepted(root: string): Promise<void> {
     await effects(() => {
-      saveTask(root, withWorktree(root, agentTask('TASK-0341', 'awaiting_human_review')));
+      const task = withWorktree(root, agentTask('TASK-0341', 'awaiting_human_review'));
+      saveTask(root, task);
+      // A task awaiting review still holds the locks its dispatch acquired.
+      acquireLocks({
+        locksDir: join(root, '.devai/state/locks'),
+        taskId: task.id,
+        targets: taskLockTargets(task),
+      });
       journal(root, 'TASK-0341', 1, 5);
       ratifyRoundTask({
         repoRoot: root,
@@ -560,5 +568,94 @@ describe('agent completion is durable before it releases anything (FIX 4, FIX 8)
         name.startsWith('TASK-0341.json.torn-'),
       ),
     ).toBe(true);
+  });
+});
+
+describe('a lock taken over while an agent task waits is caught before acceptance or completion (#285)', () => {
+  const locksDir = (root: string) => join(root, '.devai/state/locks');
+
+  /** Another task takes the waiting task's key, as it may once the lease lapsed. */
+  function takeOver(root: string, task: TaskRecord): void {
+    rmSync(join(locksDir(root), `F2~MOD-${task.id}.json`));
+    expect(
+      acquireLocks({
+        locksDir: locksDir(root),
+        taskId: 'TASK-0999',
+        targets: taskLockTargets(task),
+      }).denied,
+    ).toEqual([]);
+  }
+
+  it('refuses to accept a review whose lock was taken over, before recording any decision', async () => {
+    const root = repository();
+    await effects(() => {
+      const task = withWorktree(root, agentTask('TASK-0351', 'awaiting_human_review'));
+      saveTask(root, task);
+      acquireLocks({ locksDir: locksDir(root), taskId: task.id, targets: taskLockTargets(task) });
+      journal(root, task.id, 1, 5);
+      takeOver(root, task);
+
+      expect(() =>
+        ratifyRoundTask({
+          repoRoot: root,
+          round: ROUND,
+          taskId: task.id,
+          decision: 'accept',
+          role: 'owner',
+        }),
+      ).toThrow('TASK_RESOURCE_LOCK_LOST');
+      expect(loadTask(root, task.id).status).toBe('awaiting_human_review');
+      expect(existsSync(join(root, '.devai/state/round-runs', ROUND, 'ratifications'))).toBe(false);
+      // Rejecting it still escalates, and leaves the new holder's lock alone.
+      ratifyRoundTask({
+        repoRoot: root,
+        round: ROUND,
+        taskId: task.id,
+        decision: 'reject',
+        role: 'owner',
+      });
+      expect(loadTask(root, task.id).status).toBe('escalated');
+      expect(
+        inspectLocks({
+          locksDir: locksDir(root),
+          taskId: 'TASK-0999',
+          targets: taskLockTargets(task),
+        }).lost,
+      ).toEqual([]);
+    });
+  });
+
+  it('refuses to finish an accepted task whose lock was taken over, before writing anything', async () => {
+    const root = repository();
+    await effects(() => {
+      const task = withWorktree(root, agentTask('TASK-0352', 'awaiting_human_review'));
+      saveTask(root, task);
+      acquireLocks({ locksDir: locksDir(root), taskId: task.id, targets: taskLockTargets(task) });
+      journal(root, task.id, 1, 5);
+      ratifyRoundTask({
+        repoRoot: root,
+        round: ROUND,
+        taskId: task.id,
+        decision: 'accept',
+        role: 'owner',
+      });
+      takeOver(root, task);
+
+      expect(() =>
+        finishRoundTask({
+          repoRoot: root,
+          round: ROUND,
+          taskId: task.id,
+          evidence: ['EV-0123456789abcdef'],
+        }),
+      ).toThrow('TASK_RESOURCE_LOCK_LOST');
+      expect(loadTask(root, task.id).status).toBe('pre_merge');
+      expect(
+        existsSync(join(root, '.devai/state/round-runs', ROUND, 'completions', `${task.id}.json`)),
+      ).toBe(false);
+      expect(listWorktrees({ repoRoot: root }).map((worktree) => worktree.task_id)).toContain(
+        task.id,
+      );
+    });
   });
 });

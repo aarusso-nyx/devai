@@ -420,29 +420,3 @@ export function swapObservedRecord(options: {
     releaseClaim(held);
   }
 }
-
-/**
- * Make a rename in `dir` durable: fsync the directory itself, so the new name survives
- * a power loss before anything that depends on it is written. Platforms that cannot
- * open or fsync a directory (Windows) skip it.
- */
-export function fsyncDirectory(dir: string): void {
-  let descriptor: number;
-  try {
-    descriptor = openSync(dir, 'r');
-  } catch (error) {
-    if (['EISDIR', 'EPERM', 'EACCES'].includes(String((error as NodeJS.ErrnoException).code))) {
-      return;
-    }
-    throw error;
-  }
-  try {
-    fsyncSync(descriptor);
-  } catch (error) {
-    if (!['EINVAL', 'ENOTSUP', 'EPERM'].includes(String((error as NodeJS.ErrnoException).code))) {
-      throw error;
-    }
-  } finally {
-    closeSync(descriptor);
-  }
-}

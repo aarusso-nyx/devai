@@ -6,14 +6,13 @@ import {
   renameSync,
   statSync,
   unlinkSync,
-  writeFileSync,
 } from '@devai-nyx/authority';
 import { randomUUID } from 'node:crypto';
 import { basename, dirname, join } from 'node:path';
+import { fsyncDirectorySync, replaceDurableSync } from './durable-files.js';
 import { utf8Compare } from './lock-targets.js';
 import {
   createRecordExclusive,
-  fsyncDirectory,
   isStaleClaim,
   observeRecord,
   recordIdentity,
@@ -55,6 +54,18 @@ export interface AcquireResult {
 export const DEFAULT_LOCK_TTL_MS = 60 * 60 * 1000;
 /** A holder renews well inside its TTL so a live dispatch never reads as expired. */
 export const LOCK_RENEWAL_INTERVAL_MS = DEFAULT_LOCK_TTL_MS / 4;
+/**
+ * The lease of a task waiting outside a dispatch (`merging`, `awaiting_human_review`,
+ * ...). Nothing renews a waiting task, so the runner leaves it a lease long enough for a
+ * human review and merge; it stays bounded, so an abandoned task never holds its modules
+ * forever. A completion after the lease lapsed still succeeds while nobody took a key over.
+ */
+export const WAITING_LOCK_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+/**
+ * A completion renews any lock with less than this left before it persists, so no takeover
+ * can land between its ownership check and its release.
+ */
+export const COMPLETION_LOCK_MARGIN_MS = 5 * 60 * 1000;
 
 /*
  * Lock protocol (Constitution Article 25: module locks are mutually exclusive).
@@ -115,8 +126,12 @@ export function lockIdentity(record: LockRecord): string {
   return recordIdentity(record);
 }
 
+function remainingMs(record: LockRecord, now = Date.now()): number {
+  return new Date(record.acquired_at).getTime() + record.ttl_ms - now;
+}
+
 function expired(record: LockRecord, now = Date.now()): boolean {
-  return now - new Date(record.acquired_at).getTime() >= record.ttl_ms;
+  return remainingMs(record, now) <= 0;
 }
 
 /**
@@ -276,12 +291,14 @@ export interface RenewLocksResult {
  * one TTL keeps its locks. Each renewal replaces exactly the record observed, so a
  * renewal that read its own expired record can never overwrite a takeover that
  * happened since. A target held by another task, missing, or claimed by another
- * writer is reported as lost and never reclaimed here.
+ * writer is reported as lost and never reclaimed here. `ttlMs` sets the renewed
+ * records' TTL (the waiting lease); omitted, each keeps its own.
  */
 export function renewLocks(opts: {
   readonly locksDir: string;
   readonly taskId: string;
   readonly targets: readonly string[];
+  readonly ttlMs?: number;
 }): RenewLocksResult {
   const renewed: LockRecord[] = [];
   const lost: { target: string; held_by: string }[] = [];
@@ -298,7 +315,12 @@ export function renewLocks(opts: {
       lost.push({ target, held_by: observed.record.task_id });
       continue;
     }
-    const record: LockRecord = { ...observed.record, acquired_at: now, generation: randomUUID() };
+    const record: LockRecord = {
+      ...observed.record,
+      acquired_at: now,
+      ...(opts.ttlMs !== undefined && { ttl_ms: opts.ttlMs }),
+      generation: randomUUID(),
+    };
     const outcome = swapOrStandDown({
       path,
       claimsDir: claimsDir(opts.locksDir),
@@ -353,6 +375,88 @@ export function inspectLocks(opts: {
     });
   }
   return { held, lost };
+}
+
+/** True when the task holds every one of `targets` right now, each record unexpired. */
+export function holdsLiveLocks(opts: {
+  readonly locksDir: string;
+  readonly taskId: string;
+  readonly targets: readonly string[];
+}): boolean {
+  const now = Date.now();
+  const inspection = inspectLocks(opts);
+  return (
+    inspection.lost.length === 0 && inspection.held.every(({ record }) => !expired(record, now))
+  );
+}
+
+/**
+ * Prove, before a completion is persisted, that the task still holds every key: each is
+ * this task's own record, expired or not (an expired record nobody took was never held by
+ * anyone else). A key missing, unreadable, or held by another task was taken from it, so
+ * this refuses with `TASK_RESOURCE_LOCK_LOST` without writing anything. A record with less
+ * than `COMPLETION_LOCK_MARGIN_MS` left is first renewed in place -- a swap of exactly the
+ * record observed, which a takeover since would make fail -- so no takeover can land
+ * between this check and the completion's release.
+ */
+export function assertLockOwnership(opts: {
+  readonly locksDir: string;
+  readonly taskId: string;
+  readonly targets: readonly string[];
+}): void {
+  const inspection = inspectLocks(opts);
+  if (inspection.lost.length > 0) throw new TaskServiceError('TASK_RESOURCE_LOCK_LOST');
+  const now = Date.now();
+  const expiring = inspection.held
+    .filter(({ record }) => remainingMs(record, now) < COMPLETION_LOCK_MARGIN_MS)
+    .map(({ target }) => target);
+  if (expiring.length === 0) return;
+  const renewal = renewLocks({ locksDir: opts.locksDir, taskId: opts.taskId, targets: expiring });
+  if (renewal.lost.length > 0) throw new TaskServiceError('TASK_RESOURCE_LOCK_LOST');
+}
+
+/**
+ * Why a task's locks are held past its own release: its process group outlived a
+ * termination nobody could confirm (`PROCESS_GROUP_TERMINATION_UNCONFIRMED`), so the
+ * resources may still be in use.
+ */
+export interface LockQuarantine {
+  readonly task_id: string;
+  readonly round_id: string;
+  readonly reason: 'PROCESS_GROUP_TERMINATION_UNCONFIRMED';
+  /** The process group leader, when the spawn reported one. */
+  readonly pid: number | null;
+  readonly evidence_id: string | null;
+  readonly targets: readonly string[];
+  readonly recorded_at: string;
+}
+
+function quarantinePath(locksDir: string, taskId: string): string {
+  return join(dirname(locksDir), 'lock-quarantine', `${taskId}.json`);
+}
+
+/**
+ * Record, durably, that the task's locks must outlive its own release. While the record
+ * stands, `releaseLocks` releases nothing for the task -- not its escalation, not a later
+ * run's reconciliation -- so its keys stay held until their TTL lapses. Removing the
+ * record is the explicit human release.
+ */
+export function quarantineLocks(opts: {
+  readonly locksDir: string;
+  readonly quarantine: LockQuarantine;
+}): void {
+  replaceDurableSync(
+    quarantinePath(opts.locksDir, opts.quarantine.task_id),
+    `${JSON.stringify(opts.quarantine, null, 2)}\n`,
+  );
+}
+
+/** True while a quarantine record, readable or not, stands for the task. */
+export function locksQuarantined(opts: {
+  readonly locksDir: string;
+  readonly taskId: string;
+}): boolean {
+  return existsSync(quarantinePath(opts.locksDir, opts.taskId));
 }
 
 /** The durable fence of one dispatch attempt (see `openLockFence`). */
@@ -434,12 +538,12 @@ export function openLockFence(opts: {
     mkdirSync(fencesDir(opts.locksDir), { recursive: true });
     // A new fence directory is itself a directory entry: make it durable in `.devai/state`
     // so the first fence cannot vanish with it.
-    fsyncDirectory(dirname(fencesDir(opts.locksDir)));
+    fsyncDirectorySync(dirname(fencesDir(opts.locksDir)), { unsupported: 'skip' });
     written = createRecordExclusive(staged, body);
   }
   if (!written) throw Object.assign(new Error(`EEXIST: ${staged}`), { code: 'EEXIST' });
   renameSync(staged, path);
-  fsyncDirectory(fencesDir(opts.locksDir));
+  fsyncDirectorySync(fencesDir(opts.locksDir), { unsupported: 'skip' });
   return fence;
 }
 
@@ -502,7 +606,7 @@ export function closeLockFence(opts: {
       } catch {
         return;
       }
-      fsyncDirectory(fencesDir(opts.locksDir));
+      fsyncDirectorySync(fencesDir(opts.locksDir), { unsupported: 'skip' });
     }
   }
   for (const target of opts.fence.targets) {
@@ -516,12 +620,57 @@ export function closeLockFence(opts: {
   }
 }
 
-/** Release every record the task still holds; records another task took over stay. */
+/**
+ * Remove the receipts no standing fence names. `closeLockFence` removes a fence before its
+ * receipts, so a stop in between leaves receipts of an attempt that is already judged. A
+ * receipt exists only after its fence was opened and attempts are never reused, so one
+ * whose task has no fence, or a fence of another attempt, can never be needed again; a
+ * fence that cannot be read keeps every receipt of its task. Returns the removed names.
+ */
+export function removeOrphanLockReceipts(opts: { readonly locksDir: string }): readonly string[] {
+  const dir = fencesDir(opts.locksDir);
+  if (!existsSync(dir)) return [];
+  const removed: string[] = [];
+  for (const name of readdirSync(dir).sort(utf8Compare)) {
+    if (!name.endsWith('.released')) continue;
+    // Task ids carry no dot (task.schema.json), and neither does an attempt id.
+    const [taskId = '', attempt = ''] = name.split('.');
+    // Judged against the fence as it stands now, never a listing taken earlier.
+    const path = fencePath(opts.locksDir, taskId);
+    if (observeRecord(path).kind !== 'absent') {
+      const fence = readFence(path);
+      if (fence === undefined || fence.attempt === attempt) continue;
+    }
+    try {
+      unlinkSync(join(dir, name));
+      removed.push(name);
+    } catch {
+      // Gone already, or left for the next run.
+    }
+  }
+  return removed;
+}
+
+/**
+ * Write the receipt of one fenced release, fsynced and created once; `releaseLocks` makes
+ * its directory entry durable before it returns, so a power loss cannot turn a clean
+ * release into one that reads as lost.
+ */
+function writeReceipt(locksDir: string, fence: LockFence, keyFile: string): void {
+  createRecordExclusive(receiptPath(locksDir, fence, keyFile), `${JSON.stringify(fence)}\n`);
+}
+
+/**
+ * Release every record the task still holds; records another task took over stay. A task
+ * whose locks are quarantined (`quarantineLocks`) releases nothing.
+ */
 export function releaseLocks(opts: { locksDir: string; taskId: string }): readonly LockRecord[] {
   const released: LockRecord[] = [];
   if (!existsSync(opts.locksDir)) return released;
+  if (locksQuarantined(opts)) return released;
   const fence = readFence(fencePath(opts.locksDir, opts.taskId));
   const fenced = new Set(fence?.targets.map(keyFileOf));
+  let receipted = false;
   for (const name of readdirSync(opts.locksDir)) {
     if (!name.endsWith('.json')) continue;
     const path = join(opts.locksDir, name);
@@ -536,14 +685,17 @@ export function releaseLocks(opts: { locksDir: string; taskId: string }): readon
         // happened. One interrupted before its receipt is judged lost, never clean.
         ...(fence !== undefined &&
           fenced.has(name) && {
-            onSwapped: () =>
-              writeFileSync(receiptPath(opts.locksDir, fence, name), `${JSON.stringify(fence)}\n`),
+            onSwapped: () => {
+              writeReceipt(opts.locksDir, fence, name);
+              receipted = true;
+            },
           }),
       }) === 'swapped'
     ) {
       released.push(observed.record);
     }
   }
+  if (receipted) fsyncDirectorySync(fencesDir(opts.locksDir), { unsupported: 'skip' });
   return released;
 }
 
