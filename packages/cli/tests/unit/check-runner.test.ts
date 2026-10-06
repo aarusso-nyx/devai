@@ -271,6 +271,19 @@ afterEach(() => {
 });
 
 describe('content-addressed check runner', () => {
+  it('gives each task 30 minutes unless the caller sets a limit (#299)', () => {
+    const limits: number[] = [];
+    const executeTask: CheckRunnerOptions['executeTask'] = (_argv, _cwd, timeoutMs) => {
+      limits.push(timeoutMs);
+      return PASS;
+    };
+    run(repository().root, { executeTask });
+    run(repository().root, { executeTask, timeoutMs: 1234 });
+    expect(limits.length).toBeGreaterThanOrEqual(2);
+    expect(limits[0]).toBe(1_800_000);
+    expect(limits).toContain(1234);
+  });
+
   it('snapshots a Git-free source without traversing excluded directories or directory symlinks', () => {
     const parent = mkdtempSync(join(tmpdir(), 'devai git-free source ç-'));
     roots.push(parent);
