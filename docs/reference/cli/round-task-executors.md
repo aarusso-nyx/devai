@@ -563,13 +563,25 @@ the controller. It refuses an agent task with no accepted ratification
 (`TASK_RATIFICATION_REQUIRED`), with no `EV-` merge evidence (`TASK_MERGE_EVIDENCE_REQUIRED`), or
 with an open journal attempt (`TASK_DISPATCH_UNCERTAIN`).
 
-Every `--evidence` reference must resolve to a record in `record/proofs/chain.json`, read with
-the same chain reader the `evidence` commands use. A missing or unreadable chain, or a reference
-the chain does not hold, refuses with `TASK_MERGE_EVIDENCE_REQUIRED` before anything is written.
+Every `--evidence` reference must resolve to a valid record in `record/proofs/chain.json`, read
+with the same chain reader the `evidence` commands use. The whole chain must pass the evidence
+package's chain verification: every record's manifest hash recomputes, each record links to its
+predecessor, and the head names the last record. Each referenced record must also satisfy the
+evidence schema. Proof-line anchors are not re-resolved, because that needs the anchor baseline
+that `evidence verify --scope chain` keeps. A missing, unreadable or broken chain, a reference the
+chain does not hold, or a referenced record that fails the schema refuses with
+`TASK_MERGE_EVIDENCE_REQUIRED`. These checks and the ratification check run before anything is
+written, including a lock renewal.
+
 A record binds to the task only through what it names: a non-null `context.task_id` must be the
 finished task, and every `round_id=<round>` note must name the task's round. A record that names
-neither is accepted unbound, because the evidence writers do not stamp a task. A retry after an
-interruption resolves the same references again, so it still needs them in the chain.
+neither is accepted unbound, because the evidence writers do not stamp a task.
+
+A retry after an interruption needs the same `--evidence` again. From `pre_merge` it reuses an
+identical completion record. From `merging`, after the worktrees were released, the completion
+record must still exist, bind the current ratification bytes, and name exactly the given
+references, which must still resolve; otherwise it refuses with `TASK_COMPLETION_CONFLICT` or
+`TASK_MERGE_EVIDENCE_REQUIRED`.
 
 On completion it writes
 `.devai/state/round-runs/<round>/completions/<task>.json`, binding the ratification digest and
