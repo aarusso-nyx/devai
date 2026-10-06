@@ -1,6 +1,6 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { delimiter, join } from 'node:path';
 import { spawnSync } from '@devai-nyx/authority';
 import { providerReplySchema, replyProjectionIdentity } from '@devai-nyx/schemas';
 import { agentCliEnvironment } from '../agent-cli/index.js';
@@ -400,7 +400,9 @@ export function claudeReviewArgv(
 /**
  * Codex features that expose a tool to the model and that `codex features list --disable
  * <feature>` (codex-cli 0.157.1, 2026-10-06) reports as effectively off. `unified_exec`
- * is not here: the same listing still reports it enabled after `--disable unified_exec`.
+ * is not here: the same listing still reports it enabled after `--disable unified_exec`,
+ * which does not matter (see codexReviewArgv). assertCodexReviewCompatibility checks this
+ * list against the installed binary before every review.
  */
 export const CODEX_REVIEW_DISABLED_FEATURES: readonly string[] = [
   'shell_tool',
@@ -421,13 +423,23 @@ export const CODEX_REVIEW_DISABLED_FEATURES: readonly string[] = [
  * Codex review argv (ADR-MDL-0003): an ephemeral read-only run in the empty review
  * workspace, without the user's `config.toml` (its MCP servers, hooks and profiles) or
  * execpolicy rules, with the MCP server table and the tools table overridden empty for any
- * other configuration layer, and with every tool-bearing feature that can be switched off
- * disabled before launch (`--disable`, advertised by `codex exec --help`).
+ * other configuration layer, cached web search and the skills instruction block off, and
+ * with every tool-bearing feature that can be switched off disabled before launch
+ * (`--disable`, advertised by `codex exec --help`).
  *
- * Codex review isolation is still post-hoc. `unified_exec` stays enabled whatever the
- * flags say, and no offline observation shows the effective tool list, so a command the
- * model runs may still read files the read-only sandbox lets it see. A tool or MCP item
- * in the transcript refuses the reply, but that refusal cannot undo what the model read.
+ * What the model is offered (#321), from the codex source at tag rust-v0.157.1, which the
+ * installed `codex --version` reports: `add_shell_tools` in
+ * codex-rs/core/src/tools/spec_plan.rs returns before registering any command tool when
+ * `Feature::ShellTool` is disabled, and only after that gate does it choose between
+ * `exec_command`/`write_stdin` (unified_exec on) and a one-shot exec. So with
+ * `shell_tool` off no command tool exists, whatever `unified_exec` reports. gpt-6-sol runs
+ * `tool_mode: code_mode_only` (the binary's embedded model catalog): its one tool is a V8
+ * isolate (codex-rs/code-mode-runtime) with no imports, filesystem or network, which can only
+ * call the registered tools. With these flags no registered tool reads a file. The ones left
+ * are `update_plan` and `apply_patch`; the read-only sandbox refuses `apply_patch` writes.
+ * Web search is a server tool, off through `web_search="disabled"` (default `cached`). Any
+ * of these used anyway is an item other than `agent_message`/`reasoning` and refuses the
+ * reply. This is source analysis: no live request's tool list has been observed.
  */
 export function codexReviewArgv(
   model: string,
@@ -452,10 +464,73 @@ export function codexReviewArgv(
     'mcp_servers={}',
     '--config',
     'tools={}',
+    '--config',
+    'web_search="disabled"',
+    '--config',
+    'skills.include_instructions=false',
     ...CODEX_REVIEW_DISABLED_FEATURES.flatMap((feature) => ['--disable', feature]),
     ...(schemaPath === undefined ? [] : ['--output-schema', schemaPath]),
     prompt,
   ];
+}
+
+/** Binaries (resolved path and `--version` output) already checked by this process. */
+const codexCompatible = new Set<string>();
+
+function onPath(executable: string, pathValue: string | undefined): string | undefined {
+  for (const directory of (pathValue ?? '').split(delimiter)) {
+    if (directory.length === 0) continue;
+    const candidate = join(directory, executable);
+    if (existsSync(candidate)) return realpathSync(candidate);
+  }
+  return undefined;
+}
+
+/**
+ * Refuses a Codex review before the provider is invoked unless the installed `codex`
+ * knows every name in CODEX_REVIEW_DISABLED_FEATURES and reports each one off once
+ * disabled (`codex features list --disable ...`, no provider call). An unknown name is
+ * `MODEL_BRIDGE_CODEX_INCOMPATIBLE:unknown-feature:<name>`; a feature still on is
+ * `...:feature-enabled:<name>`. A passing binary is remembered by resolved path and
+ * version for the rest of the process.
+ */
+export function assertCodexReviewCompatibility(
+  env: Readonly<Record<string, string>>,
+  cwd: string,
+  timeout_ms = 30_000,
+): void {
+  const run = (argv: string[]) =>
+    spawnSync('codex', argv, { cwd, env, encoding: 'utf8', timeout: timeout_ms });
+  const failed = (reason: string, detail: string): never => {
+    throw new Error(`MODEL_BRIDGE_CODEX_INCOMPATIBLE:${reason}:${detail}`);
+  };
+  const version = run(['--version']);
+  if (version.error !== undefined || version.status !== 0)
+    failed('version', version.error?.message ?? String(version.status));
+  const key = `${onPath('codex', env['PATH']) ?? 'codex'}\0${String(version.stdout).trim()}`;
+  if (codexCompatible.has(key)) return;
+  const listing = run([
+    'features',
+    'list',
+    ...CODEX_REVIEW_DISABLED_FEATURES.flatMap((feature) => ['--disable', feature]),
+  ]);
+  const unknown = /Unknown feature flag: (\S+)/u.exec(
+    `${String(listing.stderr ?? '')}\n${String(listing.stdout ?? '')}`,
+  );
+  if (unknown?.[1] !== undefined) failed('unknown-feature', unknown[1]);
+  if (listing.error !== undefined || listing.status !== 0)
+    failed('features-list', listing.error?.message ?? String(listing.status));
+  const states = new Map<string, string>();
+  for (const line of String(listing.stdout ?? '').split('\n')) {
+    const match = /^(\S+)\s+.*\s(true|false)\s*$/u.exec(line);
+    if (match?.[1] !== undefined && match[2] !== undefined) states.set(match[1], match[2]);
+  }
+  for (const feature of CODEX_REVIEW_DISABLED_FEATURES) {
+    const state = states.get(feature);
+    if (state === undefined) failed('unknown-feature', feature);
+    if (state !== 'false') failed('feature-enabled', feature);
+  }
+  codexCompatible.add(key);
 }
 
 function cliResponse(
@@ -489,11 +564,13 @@ function cliResponse(
       cli === 'claude'
         ? claudeReviewArgv(options.model, schema, prompt)
         : codexReviewArgv(options.model, workspace, schemaPath, prompt);
+    // Only the allowlisted host variables the agent-cli adapters admit: no provider API
+    // keys, GH_TOKEN, cloud credentials or NODE_OPTIONS reach the reviewer.
+    const env = agentCliEnvironment(options.provider === 'claude-cli' ? 'claude-cli' : 'codex-cli');
+    if (cli === 'codex') assertCodexReviewCompatibility(env, workspace);
     result = spawnSync(cli, argv, {
       cwd: workspace,
-      // Only the allowlisted host variables the agent-cli adapters admit: no provider API
-      // keys, GH_TOKEN, cloud credentials or NODE_OPTIONS reach the reviewer.
-      env: agentCliEnvironment(options.provider === 'claude-cli' ? 'claude-cli' : 'codex-cli'),
+      env,
       encoding: 'utf8',
       timeout: call?.timeout_ms ?? options.timeout_ms ?? 120_000,
       maxBuffer: call?.max_output_bytes ?? 32 * 1024 * 1024,
