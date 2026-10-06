@@ -32,6 +32,11 @@ export interface InventoryDepGraphOptions {
   /** False for pure observation callers that must not materialize canonical state. */
   readonly persistBody?: boolean;
   readonly now?: string;
+  /**
+   * The absolute source files the graph may describe. A walked file outside it, such as one
+   * git ignores, never enters the graph. Omitted: every walked file is described.
+   */
+  readonly admitFile?: (absolutePath: string) => boolean;
 }
 
 export interface DepGraphBody {
@@ -110,7 +115,8 @@ export function senseInventoryDepGraph(opts: InventoryDepGraphOptions): Inventor
   let bodyPath: string | null = null;
 
   try {
-    const files = walkTs(scanDir, ignoreDirs);
+    const admit = opts.admitFile;
+    const files = walkTs(scanDir, ignoreDirs).filter((file) => admit === undefined || admit(file));
     body = buildBody(opts.repoRoot, files);
   } catch (err) {
     status = 'error';
