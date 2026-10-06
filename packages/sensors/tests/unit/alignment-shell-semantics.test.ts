@@ -557,3 +557,53 @@ describe('in-process observations of read-only actions (ADR-SCR-0013)', () => {
     expect(scoped([]).status).toBe('review');
   });
 });
+
+// #235 Codex review: a scoped producer aligns its invariant only through its exact CI
+// invocation and its own passing observation; another invocation of the same action, or
+// persisted evidence for it, never stands in.
+describe('scoped producers (#235)', () => {
+  const PRODUCER = {
+    invariant_id: 'INV-TEST-001',
+    action: ACTION,
+    arguments: ['check', '--only', 'dependencies', '--file', 'fixture.json'],
+  };
+  const COMMAND = `devai ${PRODUCER.arguments.join(' ')}`;
+  function scopedSense(status: 'pass' | 'fail' = 'pass', invariant = 'INV-TEST-001') {
+    return senseHarnessInvariantAlignment({
+      repoRoot: root,
+      candidateHead: CANDIDATE,
+      now: NOW,
+      evidenceDir: 'evidence',
+      scopedProducers: [PRODUCER],
+      observations: [
+        {
+          command: COMMAND,
+          status,
+          candidate_sha: CANDIDATE,
+          completed_at: RECENT,
+          invariant_ids: [invariant],
+        },
+      ],
+    });
+  }
+
+  it('aligns through the exact invocation, the output format aside', () => {
+    workflow(`${COMMAND} --format human`);
+    expect(scopedSense().status).toBe('pass');
+  });
+
+  it('refuses another invocation of the same action in CI, with generic evidence passing', () => {
+    workflow(`devai ${ACTION}`);
+    expect(sense().status).toBe('pass');
+    expect(scopedSense().status).toBe('review');
+    workflow(`devai check --only dependencies --file other.json`);
+    expect(scopedSense().status).toBe('review');
+  });
+
+  it('refuses a failing or foreign-scoped observation even beside passing persisted evidence', () => {
+    workflow(COMMAND);
+    evidence(COMMAND);
+    expect(scopedSense('fail').status).toBe('review');
+    expect(scopedSense('pass', 'INV-TEST-002').status).toBe('review');
+  });
+});
