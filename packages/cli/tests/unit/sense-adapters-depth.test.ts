@@ -336,11 +336,19 @@ describe('sense adapter deterministic boundaries', () => {
       ['harness_coverage', 'senseHarnessCoverage', { repoRoot: '/repo' }, false],
       ['harness_depth', 'senseHarnessDepth', { repoRoot: '/repo' }, false],
       ['harness_coherence', 'senseHarnessCoherence', { repoRoot: '/repo' }, false],
-      // '/repo' is not a repository, so the exact-head scorecard observation is empty.
+      // '/repo' is not a repository, so no gate producer is observed; the two scoped
+      // producers of #235 are always declared.
       [
         'harness_invariant_alignment',
         'senseHarnessInvariantAlignment',
-        { repoRoot: '/repo', observations: [] },
+        {
+          repoRoot: '/repo',
+          observations: [],
+          scopedProducers: [
+            expect.objectContaining({ invariant_id: 'INV-DEVAI-010', action: 'check' }),
+            expect.objectContaining({ invariant_id: 'INV-HARNESS-010', action: 'sense inventory' }),
+          ],
+        },
         false,
       ],
       ['harness_idiomaticity', 'senseHarnessIdiomaticity', { repoRoot: '/repo' }, false],
