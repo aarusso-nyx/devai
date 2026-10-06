@@ -16,7 +16,7 @@ import {
   type SensorKind,
   type SensorReading,
 } from '@devai-nyx/sensors';
-import type { AlignmentObservation } from '@devai-nyx/sensors';
+import type { AlignmentObservation, ScopedProducer } from '@devai-nyx/sensors';
 import {
   computeReverseAdherence,
   loadBlueprint,
@@ -83,66 +83,120 @@ function observedHead(root: string): string | undefined {
 }
 
 /**
+ * The two scoped producers (#235): the exact CI invocations, output format aside, whose
+ * passing in-process observation alone aligns their invariant.
+ */
+export const GATE_SCOPED_PRODUCERS: readonly ScopedProducer[] = Object.freeze([
+  {
+    invariant_id: 'INV-DEVAI-010',
+    action: 'check',
+    arguments: ['check', '--only', 'blueprint', '--file', GATE_BLUEPRINT_FIXTURE],
+  },
+  {
+    invariant_id: 'INV-HARNESS-010',
+    action: 'sense inventory',
+    arguments: [
+      'sense',
+      'inventory',
+      '--slice',
+      'pack',
+      '--packs-root',
+      GATE_PACK_FIXTURE,
+      '--adopter-root',
+      GATE_PACK_FIXTURE,
+    ],
+  },
+]);
+
+/**
+ * The observation reads the fixture from the working tree, so it may only be labelled with
+ * `head` when the tree holds exactly the committed bytes there: HEAD is `head`, and the
+ * path has no modified, staged, untracked, or ignored entry. Otherwise the reading would
+ * describe bytes the candidate does not contain.
+ */
+export function fixtureMatchesHead(repoRoot: string, head: string, path: string): boolean {
+  if (headCommit(repoRoot) !== head) return false;
+  try {
+    const status = execFileSync(
+      'git',
+      ['status', '--porcelain=v1', '--untracked-files=all', '--ignored=matching', '--', path],
+      { cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
+    );
+    return status.trim() === '';
+  } catch {
+    return false;
+  }
+}
+
+function producerObservation(
+  producer: ScopedProducer,
+  head: string,
+  status: AlignmentObservation['status'],
+): AlignmentObservation {
+  return {
+    command: `devai ${producer.arguments.join(' ')}`,
+    status,
+    candidate_sha: head,
+    completed_at: new Date().toISOString(),
+    invariant_ids: [producer.invariant_id],
+  };
+}
+
+/**
  * INV-DEVAI-010: `check --only blueprint` persists nothing. The observation runs the
  * blueprint load and validation the check member runs, on the committed gate fixture, and
- * reads `fail` when the blueprint is unreadable, schema-invalid, or violates a rule.
+ * reads `fail` when the fixture differs from the head, is unreadable or schema-invalid, or
+ * violates a rule.
  */
 export function observeBlueprintCheck(
   repoRoot: string,
   head: string,
 ): readonly AlignmentObservation[] {
   if (!FULL_SHA.test(head)) return [];
+  const [producer] = GATE_SCOPED_PRODUCERS;
+  if (producer === undefined) return [];
   let status: AlignmentObservation['status'] = 'fail';
   try {
-    const loaded = loadBlueprint(resolve(repoRoot, GATE_BLUEPRINT_FIXTURE));
-    if (loaded.ok && loaded.blueprint !== undefined && validateBlueprint(loaded.blueprint).ok) {
-      status = 'pass';
+    if (fixtureMatchesHead(repoRoot, head, GATE_BLUEPRINT_FIXTURE)) {
+      const loaded = loadBlueprint(resolve(repoRoot, GATE_BLUEPRINT_FIXTURE));
+      if (loaded.ok && loaded.blueprint !== undefined && validateBlueprint(loaded.blueprint).ok) {
+        status = 'pass';
+      }
     }
   } catch {
     status = 'fail';
   }
-  return [
-    {
-      command: `devai check --only blueprint --file ${GATE_BLUEPRINT_FIXTURE}`,
-      status,
-      candidate_sha: head,
-      completed_at: new Date().toISOString(),
-      invariant_ids: ['INV-DEVAI-010'],
-    },
-  ];
+  return [producerObservation(producer, head, status)];
 }
 
 /**
  * INV-HARNESS-010: `sense inventory` persists nothing. The observation runs the `pack`
- * slice against the committed packs root and adopter fixture and passes only when one pack
- * resolves without ambiguity, the outcome the CI line needs to exit zero.
+ * slice against the committed packs root and adopter fixture and passes only when the
+ * fixture matches the head and one pack resolves without ambiguity, the outcome the CI
+ * line needs to exit zero.
  */
 export async function observePackResolution(
   repoRoot: string,
   head: string,
 ): Promise<readonly AlignmentObservation[]> {
   if (!FULL_SHA.test(head)) return [];
+  const producer = GATE_SCOPED_PRODUCERS[1];
+  if (producer === undefined) return [];
   const fixture = resolve(repoRoot, GATE_PACK_FIXTURE);
   let status: AlignmentObservation['status'] = 'fail';
   try {
-    const output = await executeInventorySlice('pack', {
-      repoRoot,
-      packsRoot: fixture,
-      adopterRoot: fixture,
-    });
-    if (output.status === 'pass') status = 'pass';
+    if (fixtureMatchesHead(repoRoot, head, GATE_PACK_FIXTURE)) {
+      const output = await executeInventorySlice('pack', {
+        repoRoot,
+        packsRoot: fixture,
+        adopterRoot: fixture,
+      });
+      if (output.status === 'pass') status = 'pass';
+    }
   } catch {
     status = 'fail';
   }
-  return [
-    {
-      command: `devai sense inventory --slice pack --packs-root ${GATE_PACK_FIXTURE} --adopter-root ${GATE_PACK_FIXTURE}`,
-      status,
-      candidate_sha: head,
-      completed_at: new Date().toISOString(),
-      invariant_ids: ['INV-HARNESS-010'],
-    },
-  ];
+  return [producerObservation(producer, head, status)];
 }
 
 /**
