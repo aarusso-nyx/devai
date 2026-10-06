@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, relative, resolve } from 'node:path';
 import { extractComponents } from './component-extractor.js';
 import { extractDependencies } from './dependency-graph.js';
 import { sha256Hex } from './id.js';
@@ -34,11 +34,12 @@ export interface RegenOptions {
   /** Forwarded to every extractor; see walker WalkOptions. */
   readonly ignoreDirs?: ReadonlySet<string>;
   /**
-   * The repository-relative files the inventory may describe, typically the git tree at
-   * the integration head. A file outside it, such as one git ignores, never enters any
-   * surface, hash, or checksum. Omitted: the working tree is walked as it stands.
+   * Whether a file may enter the inventory, typically membership of the git tree at the
+   * integration head. A file it refuses, such as one git ignores, never enters any
+   * surface, hash, or checksum, including a path named in `checksumPaths`. Omitted: the
+   * working tree is walked as it stands.
    */
-  readonly admittedFiles?: ReadonlySet<string>;
+  readonly admitFile?: InventoryAdmission;
 }
 
 /**
@@ -98,10 +99,9 @@ const DEFAULT_GOVERNANCE_FILES = [
 ];
 
 export async function regenerateInventory(opts: RegenOptions): Promise<InventoryRecord> {
-  const { admittedFiles } = opts;
-  if (admittedFiles === undefined) return buildInventory(opts);
-  const admit: InventoryAdmission = (path) => admittedFiles.has(relative(opts.repoRoot, path));
-  return withInventoryReadSnapshot(() => buildInventory(opts), admit);
+  const { admitFile } = opts;
+  if (admitFile === undefined) return buildInventory(opts);
+  return withInventoryReadSnapshot(() => buildInventory(opts), admitFile);
 }
 
 async function buildInventory(opts: RegenOptions): Promise<InventoryRecord> {
@@ -208,7 +208,8 @@ function dependencyId(filePath: string): string {
 }
 
 function computeChecksumPaths(repoRoot: string, override?: readonly string[]): readonly string[] {
-  if (override !== undefined) return override;
+  if (override !== undefined)
+    return override.filter((path) => inventoryAdmits(resolve(repoRoot, path)));
   const paths: string[] = [];
   for (const name of DEFAULT_GOVERNANCE_FILES) {
     const p = join(repoRoot, name);
