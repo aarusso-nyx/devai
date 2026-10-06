@@ -47,9 +47,13 @@ it('prevents accidental engine installation in DEVAI', () => {
     'package.json: @stryker-mutator/core',
   );
 });
+// The real repository is the one case that parses every script its workflows and task argv
+// reach with the TypeScript compiler: 2.4 s alone, 17 s at load average 200, 26 s in the RC
+// coverage lane, whose default bound is 15 s (#246). The fixture cases above stay well under
+// 50 ms. The bound is a hang guard sized for that measured cost, not a performance claim.
 it('accepts the current mutation-free delivery manifests and workflows', () => {
   expect(checkMutationFreeDelivery(resolve('.'))).toEqual({ ok: true, violations: [] });
-});
+}, 90_000);
 
 function put(root: string, name: string, content: string) {
   const path = join(root, name);
