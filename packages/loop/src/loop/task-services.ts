@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, renameSync } from '@devai-nyx/authority';
-import { loadChain, type EvidenceRecord } from '@devai-nyx/evidence';
+import { loadChain, verifyChain, type EvidenceRecord } from '@devai-nyx/evidence';
+import { validators } from '@devai-nyx/schemas';
 import { EXIT_USAGE } from '@devai-nyx/utils';
 import { createHash } from 'node:crypto';
 import { dirname, join } from 'node:path';
@@ -162,93 +163,62 @@ function sha256(bytes: Buffer): string {
   return createHash('sha256').update(bytes).digest('hex');
 }
 
+/** Whether parsed bytes are a complete completion record for this task. */
+function isCompletionRecord(value: unknown, task: TaskRecord): value is AgentCompletionRecord {
+  const record = value as Partial<AgentCompletionRecord> | null;
+  return (
+    record !== null &&
+    typeof record === 'object' &&
+    record.schemaVersion === '1.0.0' &&
+    record.round_id === task.round_id &&
+    record.task_id === task.id &&
+    typeof record.completed_at === 'string' &&
+    typeof record.ratification?.sha256 === 'string' &&
+    Array.isArray(record.merge_evidence_refs) &&
+    record.merge_evidence_refs.every((ref) => typeof ref === 'string') &&
+    Array.isArray(record.released_worktrees)
+  );
+}
+
+/** Reads the completion record without changing anything; `torn` names unusable bytes. */
+function readCompletion(
+  path: string,
+  task: TaskRecord,
+): { readonly record?: AgentCompletionRecord; readonly torn?: Buffer } {
+  if (!existsSync(path)) return {};
+  const bytes = readFileSync(path);
+  try {
+    const value: unknown = JSON.parse(bytes.toString('utf8'));
+    if (isCompletionRecord(value, task)) return { record: value };
+  } catch {
+    // Unusable bytes: reported as torn.
+  }
+  return { torn: bytes };
+}
+
 /**
  * The completion record already written for the task, if any. A file that is not a
  * complete record for this task (left by an interrupted write) is moved aside under its
  * SHA-256 and treated as absent; its bytes stay for inspection.
  */
 function priorCompletion(path: string, task: TaskRecord): AgentCompletionRecord | undefined {
-  if (!existsSync(path)) return undefined;
-  const bytes = readFileSync(path);
-  try {
-    const value = JSON.parse(bytes.toString('utf8')) as Partial<AgentCompletionRecord>;
-    if (
-      value.schemaVersion === '1.0.0' &&
-      value.round_id === task.round_id &&
-      value.task_id === task.id &&
-      typeof value.completed_at === 'string' &&
-      typeof value.ratification?.sha256 === 'string' &&
-      Array.isArray(value.merge_evidence_refs) &&
-      Array.isArray(value.released_worktrees)
-    ) {
-      return value as AgentCompletionRecord;
-    }
-  } catch {
-    // Fall through to move it aside.
+  const { record, torn } = readCompletion(path, task);
+  if (torn !== undefined) {
+    renameSync(path, `${path}.torn-${sha256(torn)}`);
+    fsyncDirectorySync(dirname(path));
   }
-  renameSync(path, `${path}.torn-${sha256(bytes)}`);
-  fsyncDirectorySync(dirname(path));
-  return undefined;
-}
-
-/** The evidence chain the evidence commands read and append to. */
-const EVIDENCE_CHAIN_PATH = 'record/proofs/chain.json';
-
-/**
- * Whether every merge-evidence reference names a record in the repository's evidence
- * chain, read through the same `loadChain` reader the evidence commands use (#319). A
- * missing or unreadable chain resolves nothing. A record binds to the task only where it
- * names one: a non-null `context.task_id` must be this task, and a `round_id=` note must
- * name this task's round. A record that names neither is accepted unbound, because the
- * verb evidence writers do not stamp a task.
- */
-function mergeEvidenceResolves(
-  repoRoot: string,
-  task: TaskRecord,
-  refs: readonly string[],
-): boolean {
-  let records: readonly EvidenceRecord[];
-  try {
-    records = loadChain(join(repoRoot, EVIDENCE_CHAIN_PATH)).records;
-  } catch {
-    return false;
-  }
-  const byId = new Map<string, EvidenceRecord>();
-  for (const record of records) {
-    if (record !== null && typeof record === 'object' && typeof record.id === 'string') {
-      byId.set(record.id, record);
-    }
-  }
-  return refs.every((ref) => {
-    const record = byId.get(ref);
-    if (record === undefined) return false;
-    const taskId: unknown = (record.context as { task_id?: unknown } | undefined)?.task_id;
-    if (taskId !== undefined && taskId !== null && taskId !== task.id) return false;
-    const rounds = (Array.isArray(record.notes) ? record.notes : [])
-      .filter((note): note is string => typeof note === 'string' && note.startsWith('round_id='))
-      .map((note) => note.slice('round_id='.length));
-    return rounds.every((round) => round === task.round_id);
-  });
+  return record;
 }
 
 /**
- * The registered completion path of an agent task (ADR-MDL-0007): `round ratify
- * --decision accept` moved it to pre_merge, a human integrated the attempt's changes
- * (merge stays a separate human act, ADR-GOV-0025), and `task finish` now records the
- * completion with the accepted ratification and the merge evidence. It refuses without
- * an accepted ratification, without merge evidence, or while the task has uncertain
- * dispatch work. Every merge-evidence reference must resolve to a record in the evidence
- * chain that does not name another task or round (#319). The completion record, naming
- * the worktrees it releases, is written
- * atomically and durably first; only then are the worktrees released and the task moved
- * through merging, so a retry after any interruption reuses the identical record and
- * refuses a differing one. The caller then completes the task.
+ * The accepted ratification of the task, read without changing anything; refuses with
+ * `TASK_RATIFICATION_REQUIRED` when it is absent, unreadable, for another task, or not an
+ * acceptance.
  */
-function recordAgentCompletion(
+function acceptedRatification(
   repoRoot: string,
   task: TaskRecord,
-  evidence: readonly string[],
-): void {
+): { readonly bytes: Buffer; readonly ratifiedAt: string } {
   const ratification = ratificationPath(repoRoot, task.round_id, task.id);
   if (!existsSync(ratification)) fail('TASK_RATIFICATION_REQUIRED');
   const bytes = readFileSync(ratification);
@@ -265,6 +235,60 @@ function recordAgentCompletion(
     fail('TASK_RATIFICATION_REQUIRED');
   }
   if (decision !== 'accept' || typeof ratifiedAt !== 'string') fail('TASK_RATIFICATION_REQUIRED');
+  return { bytes, ratifiedAt };
+}
+
+/** The evidence chain the evidence commands read and append to. */
+const EVIDENCE_CHAIN_PATH = 'record/proofs/chain.json';
+
+/**
+ * Whether every merge-evidence reference names a valid record of an intact evidence chain
+ * (#319). The chain must pass the evidence package's own `verifyChain`: every record's
+ * manifest hash recomputes and links to its predecessor, and the head names the last record.
+ * Each referenced record must also satisfy the evidence schema the chain writer validates
+ * against. A missing or unreadable chain resolves nothing. Proof-line anchors are not
+ * re-resolved here: that needs the anchor baseline `evidence verify --scope chain` keeps.
+ *
+ * A record binds to the task only where it names one: a non-null `context.task_id` must be
+ * this task, and a `round_id=` note must name this task's round. A record that names neither
+ * is accepted unbound, because the verb evidence writers do not stamp a task.
+ */
+function mergeEvidenceResolves(
+  repoRoot: string,
+  task: TaskRecord,
+  refs: readonly string[],
+): boolean {
+  const chainPath = join(repoRoot, EVIDENCE_CHAIN_PATH);
+  let records: readonly EvidenceRecord[];
+  try {
+    if (!verifyChain(chainPath).valid) return false;
+    records = loadChain(chainPath).records;
+  } catch {
+    return false;
+  }
+  const byId = new Map<string, EvidenceRecord>();
+  for (const record of records) byId.set(record.id, record);
+  return refs.every((ref) => {
+    const record = byId.get(ref);
+    if (record === undefined || !validators.evidence(record)) return false;
+    const taskId = record.context.task_id;
+    if (taskId !== undefined && taskId !== null && taskId !== task.id) return false;
+    return (record.notes ?? [])
+      .filter((note) => note.startsWith('round_id='))
+      .every((note) => note.slice('round_id='.length) === task.round_id);
+  });
+}
+
+/**
+ * The merge-evidence references of an agent finish, read-only: a non-empty list of unique
+ * `EV-` ids that each resolve through `mergeEvidenceResolves`, or
+ * `TASK_MERGE_EVIDENCE_REQUIRED`.
+ */
+function resolvedMergeEvidence(
+  repoRoot: string,
+  task: TaskRecord,
+  evidence: readonly string[],
+): readonly string[] {
   const refs = [...new Set(evidence)];
   if (
     refs.length === 0 ||
@@ -274,10 +298,62 @@ function recordAgentCompletion(
   ) {
     fail('TASK_MERGE_EVIDENCE_REQUIRED');
   }
+  return refs;
+}
+
+/**
+ * The read-only preconditions of an agent finish, checked before anything is written (lock
+ * renewal included): an accepted ratification and resolvable merge evidence. A task in
+ * `merging` must also carry the completion record its earlier finish wrote, still bound to
+ * the current ratification bytes and naming exactly these references; anything else refuses
+ * with `TASK_COMPLETION_CONFLICT`.
+ */
+function assertAgentFinishable(
+  repoRoot: string,
+  task: TaskRecord,
+  evidence: readonly string[],
+): {
+  readonly ratification: Buffer;
+  readonly ratifiedAt: string;
+  readonly refs: readonly string[];
+} {
+  const { bytes, ratifiedAt } = acceptedRatification(repoRoot, task);
+  const refs = resolvedMergeEvidence(repoRoot, task, evidence);
+  if (task.status === 'merging') {
+    const { record } = readCompletion(agentCompletionPath(repoRoot, task.round_id, task.id), task);
+    if (
+      record === undefined ||
+      record.ratification.sha256 !== sha256(bytes) ||
+      JSON.stringify(record.merge_evidence_refs) !== JSON.stringify(refs)
+    ) {
+      fail('TASK_COMPLETION_CONFLICT');
+    }
+  }
+  return { ratification: bytes, ratifiedAt, refs };
+}
+
+/**
+ * The registered completion path of an agent task (ADR-MDL-0007): `round ratify
+ * --decision accept` moved it to pre_merge, a human integrated the attempt's changes
+ * (merge stays a separate human act, ADR-GOV-0025), and `task finish` now records the
+ * completion with the accepted ratification and the merge evidence. It refuses without
+ * an accepted ratification, without resolvable merge evidence (`assertAgentFinishable`),
+ * or while the task has uncertain dispatch work. The completion record, naming the
+ * worktrees it releases, is written atomically and durably first; only then are the
+ * worktrees released and the task moved through merging, so a retry after any
+ * interruption reuses the identical record and refuses a differing one. The caller then
+ * completes the task.
+ */
+function recordAgentCompletion(
+  repoRoot: string,
+  task: TaskRecord,
+  evidence: readonly string[],
+): void {
+  const { ratification, ratifiedAt, refs } = assertAgentFinishable(repoRoot, task, evidence);
   if (taskDispatchBlockers(repoRoot, task.round_id, task.id).length > 0) {
     fail('TASK_DISPATCH_UNCERTAIN');
   }
-  const ratificationSha256 = sha256(bytes);
+  const ratificationSha256 = sha256(ratification);
   const path = agentCompletionPath(repoRoot, task.round_id, task.id);
   let completion = priorCompletion(path, task);
   if (completion === undefined) {
@@ -330,6 +406,15 @@ export function finishRoundTask(
   },
 ): TaskRecord {
   const { task } = roundBoundTask({ ...options, operation: 'finish' });
+  // An agent finish checks its read-only preconditions first, so a refusal for a missing
+  // ratification or unresolved merge evidence writes nothing, not even a lock renewal. They
+  // are checked again under the round controller against the re-read task.
+  if (
+    task.executor.kind === 'agent' &&
+    (task.status === 'pre_merge' || task.status === 'merging')
+  ) {
+    assertAgentFinishable(options.repoRoot, task, options.evidence ?? []);
+  }
   // A task waits outside any dispatch before it finishes, so its locks may have lapsed and
   // been taken over meanwhile. Secure them before any transition: refuse after a takeover
   // with nothing written, and renew a lapsing or expired own record by an exact-record swap
@@ -396,7 +481,11 @@ export function finishRoundTask(
       const current = loadTask(options.repoRoot, task.id);
       if (current.status === 'pre_merge') {
         recordAgentCompletion(options.repoRoot, current, options.evidence ?? []);
-      } else if (current.status !== 'merging') {
+      } else if (current.status === 'merging') {
+        // A retry after the worktrees were released: the completion record must still bind
+        // the current ratification and exactly the merge evidence given, all resolvable.
+        assertAgentFinishable(options.repoRoot, current, options.evidence ?? []);
+      } else {
         fail('TASK_LIFECYCLE_TRANSITION_FORBIDDEN');
       }
       return reportCompletion(
