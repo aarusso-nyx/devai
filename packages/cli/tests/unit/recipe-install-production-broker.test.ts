@@ -218,6 +218,38 @@ describe('recipe adapter installation under the production broker (#317)', () =>
     expect(tree()).toEqual(['.claude', '.claude/skills', '.claude/skills/devai-assess']);
   });
 
+  it('refuses an unpublished removal whose parent was swapped after authorization, and puts the outside entry back', () => {
+    const skills = join(repo, '.claude/skills');
+    mkdirSync(skills, { recursive: true });
+    const inside = join(skills, 'entry.txt');
+    writeFileSync(inside, 'inside\n');
+    const stat = lstatSync(inside, { bigint: true });
+    const foreign = join(outside, 'entry.txt');
+    writeFileSync(foreign, 'outside\n');
+    const moved = join(fixture, 'moved-skills');
+
+    expect(() =>
+      underProductionBroker(
+        () =>
+          removeEntryIfIdentitySync(inside, {
+            dev: stat.dev,
+            ino: stat.ino,
+            birthtimeNs: stat.birthtimeNs,
+          }),
+        (request) => {
+          if (request.symbol !== 'removeEntryIfIdentitySync') return;
+          // After authorization, the parent is replaced by a link leaving the repository.
+          renameSync(skills, moved);
+          symlinkSync(outside, skills);
+        },
+      ),
+    ).toThrow('AUTHORITY_REMOVE_PARENT_ESCAPED');
+    // The outside entry is another identity: it was quarantined, checked and put back.
+    expect(readFileSync(foreign, 'utf8')).toBe('outside\n');
+    expect(readdirSync(outside)).toEqual(['entry.txt']);
+    expect(readFileSync(join(moved, 'entry.txt'), 'utf8')).toBe('inside\n');
+  });
+
   it('refuses an identity-bound removal through a link out of the repository for a file it did not publish', () => {
     const foreign = join(outside, 'foreign.txt');
     writeFileSync(foreign, 'outside\n');
