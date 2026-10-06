@@ -159,6 +159,48 @@ describe('identity-bound removal steps', () => {
     expect(readFileSync(target, 'utf8')).toBe('outside\n');
   });
 
+  it.each([
+    ['a directory', (path: string) => mkdirSync(path)],
+    ['a symbolic link', (path: string) => symlinkSync('/nonexistent-target', path)],
+  ])(
+    'keeps %s in quarantine rather than restore it over an entry that took the path',
+    (_, make) => {
+      const root = directory();
+      const path = join(root, 'entry');
+      make(path);
+      // An identity no entry here carries, so the quarantined entry must be put back.
+      const foreign = { dev: 0n, ino: 0n, birthtimeNs: 0n };
+
+      let failure: unknown;
+      try {
+        removeEntryIfIdentitySteps(path, foreign, {
+          afterQuarantine: () => writeFileSync(path, 'newest\n'),
+        });
+      } catch (error) {
+        failure = error;
+      }
+      expect(failure).toMatchObject({ code: REMOVE_RESTORE_INCOMPLETE, path });
+      expect(readFileSync(path, 'utf8')).toBe('newest\n');
+      expect(quarantined(root)).toHaveLength(1);
+    },
+  );
+
+  it('restores a directory and a link that do not match, byte for byte in content', () => {
+    const root = directory();
+    const folder = join(root, 'folder');
+    mkdirSync(folder);
+    writeFileSync(join(folder, 'inside'), 'x');
+    const link = join(root, 'link');
+    symlinkSync('/nonexistent-target', link);
+    const foreign = { dev: 0n, ino: 0n, birthtimeNs: 0n };
+
+    expect(removeEntryIfIdentitySteps(folder, foreign)).toBe('mismatch');
+    expect(readdirSync(folder)).toEqual(['inside']);
+    expect(removeEntryIfIdentitySteps(link, foreign)).toBe('mismatch');
+    expect(readlinkSync(link)).toBe('/nonexistent-target');
+    expect(quarantined(root)).toEqual([]);
+  });
+
   it('round-trips the identity text form and rejects any other value', () => {
     const identity = { dev: 1n, ino: 2n, birthtimeNs: 3n };
     expect(parseEntryIdentityKey(entryIdentityKey(identity))).toEqual(identity);
