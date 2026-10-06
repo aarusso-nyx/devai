@@ -27,6 +27,8 @@ import {
   EXPERIMENTAL_ACTIVATION_RECORD,
   EXPERIMENTAL_ACTIVATION_LOCK,
   EXPERIMENTAL_WITHDRAWALS_DIR,
+  STATE_ROOT_MARKER,
+  initializeStateRootSync,
   loadTask,
   readExperimentalActivation,
   saveTask,
@@ -284,9 +286,31 @@ describe('round dispatch dispose arguments', () => {
 });
 
 describe('round dispatch preflight', () => {
+  it('refuses until an authorized init step durably initialized the state root, before any lock', async () => {
+    const root = repository();
+    await withAuthorityHostTestScope(async () => {
+      writeExperimentalActivation(root, activation());
+      saveTask(root, task(root, 'TASK-0314'));
+    });
+    const refused = await invoke(roundDispatch, 'round-dispatch', [
+      '--repo-root',
+      root,
+      '--round',
+      ROUND,
+    ]);
+    expect(refused.exit).not.toBe(0);
+    expect(JSON.parse(refused.stderr)).toMatchObject({
+      code: 'EXPERIMENTAL_STATE_ROOT_UNINITIALIZED',
+    });
+    expect(existsSync(join(root, STATE_ROOT_MARKER))).toBe(false);
+    expect(existsSync(join(root, '.devai/state/locks'))).toBe(false);
+    expect(loadTask(root, 'TASK-0314').status).toBe('ready');
+  });
+
   it('refuses a selection whose dependency closure holds a task the activation does not admit, before any lock', async () => {
     const root = repository();
     await withAuthorityHostTestScope(async () => {
+      initializeStateRootSync(root);
       writeExperimentalActivation(root, activation());
       saveTask(
         root,
@@ -321,6 +345,7 @@ describe('round dispatch preflight', () => {
   it('names every task whose uncertain work needs a disposition', async () => {
     const root = repository();
     await withAuthorityHostTestScope(async () => {
+      initializeStateRootSync(root);
       writeExperimentalActivation(root, activation());
       saveTask(root, task(root, 'TASK-0312', { status: 'in_progress' }));
       saveTask(root, task(root, 'TASK-0313'));
