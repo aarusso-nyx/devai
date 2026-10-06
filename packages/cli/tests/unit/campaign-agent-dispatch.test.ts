@@ -23,6 +23,7 @@ import { campaignAgentBinding } from '../../src/commands/campaign/index.js';
 import {
   dispatchExperimentalTask,
   experimentalTaskRefusal,
+  withinDeclaredBoundary,
   type ExperimentalBudget,
 } from '../../src/services/experimental-dispatch/index.js';
 
@@ -164,50 +165,95 @@ async function permissive<T>(run: () => Promise<T>): Promise<T> {
   }
 }
 
+async function materialize(root: string): Promise<void> {
+  await permissive(async () => {
+    materializeCampaignRound({
+      repoRoot: root,
+      campaignId: 'CMP-0009',
+      roundId: ROUND,
+      agent: campaignAgentBinding(root),
+    });
+    // The readying step a human takes before dispatch; status is not part of the request.
+    saveTask(root, { ...loadTask(root, 'TASK-0901'), status: 'ready' });
+  });
+}
+
+async function dispatch(root: string, writes: string) {
+  const budget: ExperimentalBudget = { attempts: 0, tokens: 0, unverifiable: false };
+  return permissive(() =>
+    runRoundTasks({
+      repoRoot: root,
+      round: ROUND,
+      dispatch: (running) =>
+        dispatchExperimentalTask(
+          {
+            repoRoot: root,
+            roundId: ROUND,
+            activation: ACTIVATION,
+            budget,
+            env: { ...process.env, FAKE_AGENT_WRITE_PATH: writes },
+            invocation: (selection) => ({
+              runtime: selection.runtime,
+              command: process.execPath,
+              args: [FAKE, 'claude-writes'],
+            }),
+          },
+          running,
+        ),
+    }),
+  );
+}
+
 describe('campaign-to-agent materialization (IA-006)', () => {
   it('materializes an agent task that round dispatch admits and runs to human review', async () => {
     const root = repository();
-    await permissive(async () => {
-      materializeCampaignRound({
-        repoRoot: root,
-        campaignId: 'CMP-0009',
-        roundId: ROUND,
-        agent: campaignAgentBinding(root),
-      });
-      // The readying step a human takes before dispatch; status is not part of the request.
-      saveTask(root, { ...loadTask(root, 'TASK-0901'), status: 'ready' });
-    });
+    await materialize(root);
     const task = loadTask(root, 'TASK-0901');
+    const composed = composeAgentPrompt({ repoRoot: root, task });
     expect(task.executor).toMatchObject({
       kind: 'agent',
       selection: { mode: 'exact', registry_id: 'claude-cli' },
-      prompt_composition_id: composeAgentPrompt({ repoRoot: root, task }).composition.id,
+      instructions_ref: `${DIRECTORY}/prompts/TASK-0901.md`,
+      prompt_composition_id: composed.composition.id,
     });
-    expect(experimentalTaskRefusal(task, ACTIVATION)).toBeUndefined();
-    const budget: ExperimentalBudget = { attempts: 0, tokens: 0, unverifiable: false };
-    const result = await permissive(() =>
-      runRoundTasks({
-        repoRoot: root,
-        round: ROUND,
-        dispatch: (running) =>
-          dispatchExperimentalTask(
-            {
-              repoRoot: root,
-              roundId: ROUND,
-              activation: ACTIVATION,
-              budget,
-              env: { ...process.env, FAKE_AGENT_WRITE_PATH: 'packages/app/src/feature.ts' },
-              invocation: (selection) => ({
-                runtime: selection.runtime,
-                command: process.execPath,
-                args: [FAKE, 'claude-writes'],
-              }),
-            },
-            running,
-          ),
-      }),
+    // The campaign prompt is a hashed component handed to the provider.
+    expect(composed.composition.components.map((component) => component.name)).toContain(
+      'task.instructions',
     );
+    expect(composed.prompt).toContain('# TASK-0901');
+    expect(experimentalTaskRefusal(task, ACTIVATION)).toBeUndefined();
+    const result = await dispatch(root, 'packages/app/src/feature.ts');
     expect(result.results).toMatchObject([{ task_id: 'TASK-0901', ok: true }]);
     expect(loadTask(root, 'TASK-0901').status).toBe('awaiting_human_review');
+  });
+
+  it('fails an attempt that writes inside the role paths but outside the task boundary', async () => {
+    const root = repository();
+    await materialize(root);
+    const result = await dispatch(root, 'packages/app/src/other.ts');
+    expect(result.results).toMatchObject([
+      { task_id: 'TASK-0901', ok: false, code: 'EXPERIMENTAL_BOUNDARY_VIOLATION' },
+    ]);
+    expect(loadTask(root, 'TASK-0901').status).toBe('experimental_blocked');
+  });
+
+  it('refuses dispatch after the campaign prompt changes until the task is re-bound', async () => {
+    const root = repository();
+    await materialize(root);
+    writeFileSync(join(root, DIRECTORY, 'prompts/TASK-0901.md'), '# TASK-0901\nEdited.\n');
+    const result = await dispatch(root, 'packages/app/src/feature.ts');
+    expect(result.results).toMatchObject([
+      { task_id: 'TASK-0901', ok: false, code: 'TASK_PROMPT_COMPOSITION_DRIFT' },
+    ]);
+  });
+});
+
+describe('declared task boundary', () => {
+  it('admits exact paths and paths under a directory entry only', () => {
+    const boundary = ['packages/app/src/feature.ts', 'docs/notes/'];
+    expect(withinDeclaredBoundary('packages/app/src/feature.ts', boundary)).toBe(true);
+    expect(withinDeclaredBoundary('docs/notes/a.md', boundary)).toBe(true);
+    expect(withinDeclaredBoundary('packages/app/src/feature.tsx', boundary)).toBe(false);
+    expect(withinDeclaredBoundary('docs/notes.md', boundary)).toBe(false);
   });
 });
