@@ -49,6 +49,7 @@ import {
   type ExperimentalActivation,
   type TaskRecord,
 } from '@devai-nyx/loop';
+import { appendVerbEvidence } from '@devai-nyx/evidence';
 import { composeAgentPrompt } from '@devai-nyx/skills';
 import {
   attemptSpend,
@@ -214,6 +215,20 @@ async function dispatch(
   return { result, budget };
 }
 
+/** Records one merge-evidence entry through the evidence chain writer and returns its id. */
+function recordMergeEvidence(root: string, notes: readonly string[] = []): string {
+  const recorded = appendVerbEvidence({
+    repoRoot: root,
+    action: 'evidence record',
+    status: 'completed',
+    notes,
+  });
+  if (!recorded.ok || recorded.id === undefined) {
+    throw new Error(`evidence append failed: ${recorded.error ?? 'no id'}`);
+  }
+  return recorded.id;
+}
+
 function worktreePath(root: string, id: string): string {
   return join(root, '.devai/worktrees', id);
 }
@@ -223,6 +238,7 @@ describe('agent completion path (gap 1)', () => {
     const root = repository();
     await seed(root, agentTask(root, 'TASK-0201'));
     await dispatch(root);
+    let merged = '';
     expect(loadTask(root, 'TASK-0201')).toMatchObject({
       status: 'awaiting_human_review',
       worktree_id: 'WT-TASK-0201-A1',
@@ -252,11 +268,32 @@ describe('agent completion path (gap 1)', () => {
           evidence: ['merged-by-hand'],
         }),
       ).toThrow('TASK_MERGE_EVIDENCE_REQUIRED');
+      // An id shaped like evidence that the chain does not hold is refused (#319).
+      expect(() =>
+        finishRoundTask({
+          repoRoot: root,
+          round: ROUND,
+          taskId: 'TASK-0201',
+          evidence: ['EV-0123456789abcdef'],
+        }),
+      ).toThrow('TASK_MERGE_EVIDENCE_REQUIRED');
+      merged = recordMergeEvidence(root, [`round_id=${ROUND}`]);
+      // A recorded entry that names another round does not bind to this task.
+      const elsewhere = recordMergeEvidence(root, ['round_id=R-9999']);
+      expect(() =>
+        finishRoundTask({
+          repoRoot: root,
+          round: ROUND,
+          taskId: 'TASK-0201',
+          evidence: [merged, elsewhere],
+        }),
+      ).toThrow('TASK_MERGE_EVIDENCE_REQUIRED');
+      expect(loadTask(root, 'TASK-0201').status).toBe('pre_merge');
       const completed = finishRoundTask({
         repoRoot: root,
         round: ROUND,
         taskId: 'TASK-0201',
-        evidence: ['EV-0123456789abcdef'],
+        evidence: [merged],
       });
       expect(completed.status).toBe('completed');
     });
@@ -264,7 +301,7 @@ describe('agent completion path (gap 1)', () => {
     expect(task.worktree_id).toBeUndefined();
     expect(task.iteration_trail?.at(-1)).toMatchObject({
       verdict: 'PASS',
-      evidence_refs: ['EV-0123456789abcdef'],
+      evidence_refs: [merged],
     });
     expect(existsSync(worktreePath(root, 'WT-TASK-0201-A1'))).toBe(false);
     expect(listWorktrees({ repoRoot: root })).toEqual([]);
@@ -276,7 +313,7 @@ describe('agent completion path (gap 1)', () => {
     ) as Record<string, unknown>;
     expect(completion).toMatchObject({
       task_id: 'TASK-0201',
-      merge_evidence_refs: ['EV-0123456789abcdef'],
+      merge_evidence_refs: [merged],
       released_worktrees: ['WT-TASK-0201-A1'],
       ratification: {
         path: `.devai/state/round-runs/${ROUND}/ratifications/TASK-0201.json`,
