@@ -21,9 +21,18 @@ case "$mode" in
   control) [[ ${#extra} -eq 0 ]] || { echo "control takes no extra arguments" >&2; exit 2; } ;;
   *) echo "usage: probe.sh capture [extra codex args] | probe.sh control" >&2; exit 2 ;;
 esac
+# Extra arguments may never redirect the request away from the loopback listener.
+for arg in $extra; do
+  if [[ "$arg" == (-p|--profile|--profile=*|--oss|--local-provider|--local-provider=*) ]] ||
+    [[ "$arg" == *base_url* || "$arg" == *model_provider* ]]; then
+    echo "REFUSED: extra argument '$arg' could send the request to a provider" >&2
+    exit 2
+  fi
+done
 out="${PROBE_OUT:-${TMPDIR:-/tmp}/devai-codex-review-probe}/$mode-$(date -u +%Y%m%dT%H%M%SZ)"
 mkdir -p "$out"
-codex_bin="$(command -v codex)" || { echo "codex is not on PATH" >&2; exit 4; }
+# CODEX_BIN selects a specific binary to probe; by default the codex on PATH.
+codex_bin="${CODEX_BIN:-$(command -v codex)}" || { echo "codex is not on PATH" >&2; exit 4; }
 "$codex_bin" --version > "$out/codex-version.txt"
 
 # The bridge's private review layout: an empty workspace, the schema file beside it.
@@ -61,13 +70,15 @@ for name in ${(k)parameters[(I)LC_*]}; do envs+=("$name=${(P)name}"); done
 
 argv=(exec --model gpt-6-sol --json --ephemeral --ignore-user-config --ignore-rules
   --skip-git-repo-check --cd "$workspace" --sandbox read-only $isolation
-  --output-schema "$scratch/review-verdict.schema.json"
+  --output-schema "$scratch/review-verdict.schema.json" $extra
   --config "openai_base_url=\"http://127.0.0.1:$port/backend-api/codex\""
-  $extra "$prompt")
+  "$prompt")
 print -r -- "${(j: :)${(q)argv}}" > "$out/argv.txt"
 
+# Raw codex output stays in the scratch directory (removed on exit); only redacted copies
+# reach $out.
 ( cd "$workspace" && env -i "${envs[@]}" "$codex_bin" "${argv[@]}" ) \
-  > "$out/transcript.raw.jsonl" 2> "$out/stderr.raw.txt" < /dev/null
+  > "$scratch/transcript.raw.jsonl" 2> "$scratch/stderr.raw.txt" < /dev/null
 echo $? > "$out/exit-status.txt"
 sleep 0.5
 kill $server 2>/dev/null
@@ -79,8 +90,14 @@ for pair in transcript:jsonl stderr:txt; do
   sed -E -e 's/sk-[A-Za-z0-9_-]{16,}/[REDACTED api-key]/g' \
     -e 's/eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/[REDACTED jwt]/g' \
     -e 's/[Bb]earer [A-Za-z0-9._~+\/-]{16,}=*/Bearer [REDACTED]/g' \
-    "$out/$file.raw.$ext" > "$out/$file.$ext" && rm "$out/$file.raw.$ext"
+    "$scratch/$file.raw.$ext" > "$out/$file.$ext"
 done
 
-node "$here/summarize.mjs" "$out" | tee "$out/summary.txt"
+# Self-check: a model request that never reached the listener went somewhere else.
+if ! grep -q '"model_request":true' "$out/requests.jsonl" 2>/dev/null; then
+  echo "FAILED: the request did not reach the local listener; see $out/stderr.txt" >&2
+  exit 7
+fi
+
+node "$here/summarize.mjs" "$out" | tee "$out/summary.txt" || exit 8
 echo "results: $out"

@@ -21,7 +21,22 @@ if (model.length === 0) {
   console.log('RESULT: no model request was captured; see stderr.txt');
   process.exit(1);
 }
-const body = model[0].body ?? {};
+// An undecodable or unexpected body must never read as "no tools".
+for (const request of model) {
+  const parsed = request.body;
+  if (
+    request.body_error !== undefined ||
+    parsed === null ||
+    typeof parsed !== 'object' ||
+    !(Array.isArray(parsed.tools) || Array.isArray(parsed.input))
+  ) {
+    console.log(
+      `RESULT: a model request body could not be read (${String(request.body_error ?? 'no tools or input array')}); no conclusion`,
+    );
+    process.exit(1);
+  }
+}
+const body = model[0].body;
 const top = [];
 const sources = [
   ...(Array.isArray(body.tools) ? [{ where: 'tools', tools: body.tools }] : []),
