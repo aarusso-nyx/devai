@@ -396,8 +396,41 @@ describe('an interrupted disposition resumes (FIX 5)', () => {
   });
 });
 
+/**
+ * Writes the evidence chain `task finish` resolves merge evidence against (#319). Each entry
+ * carries only the fields the resolver reads; the chain writer itself is exercised end to end
+ * by the CLI experimental-recovery suite.
+ */
+function recordEvidence(
+  root: string,
+  entries: readonly { id: string; task_id?: string | null; notes?: string[] }[],
+): void {
+  mkdirSync(join(root, 'record/proofs'), { recursive: true });
+  const records = entries.map((entry) => ({
+    schemaVersion: '1.0.0',
+    id: entry.id,
+    action: 'evidence record',
+    status: 'completed',
+    context: {
+      repo_root: root,
+      task_id: entry.task_id ?? null,
+      git: { head_sha: null, dirty_files: [] },
+    },
+    artifacts: [],
+    ...(entry.notes === undefined ? {} : { notes: entry.notes }),
+  }));
+  writeFileSync(
+    join(root, 'record/proofs/chain.json'),
+    `${JSON.stringify({ head: null, records }, null, 2)}\n`,
+  );
+}
+
 describe('agent completion is durable before it releases anything (FIX 4, FIX 8)', () => {
   async function accepted(root: string): Promise<void> {
+    recordEvidence(root, [
+      { id: 'EV-0123456789abcdef', task_id: 'TASK-0341', notes: [`round_id=${ROUND}`] },
+      { id: 'EV-fedcba9876543210' },
+    ]);
     await effects(() => {
       const task = withWorktree(root, agentTask('TASK-0341', 'awaiting_human_review'));
       saveTask(root, task);
@@ -548,6 +581,44 @@ describe('agent completion is durable before it releases anything (FIX 4, FIX 8)
     );
     expect(concurrent).toBe('TASK_ROUND_CONTROLLER_BUSY');
     expect(loadTask(root, 'TASK-0341').status).toBe('completed');
+  });
+
+  it('refuses merge evidence the chain does not hold or that names another task or round (#319)', async () => {
+    const root = repository();
+    await accepted(root);
+    const finish = (evidence: string[]) => () =>
+      finishRoundTask({ repoRoot: root, round: ROUND, taskId: 'TASK-0341', evidence });
+    await effects(() => {
+      // Shaped like an evidence id but never recorded.
+      expect(finish(['EV-0000000000000000'])).toThrow('TASK_MERGE_EVIDENCE_REQUIRED');
+      expect(finish(['EV-0123456789abcdef', 'EV-0000000000000000'])).toThrow(
+        'TASK_MERGE_EVIDENCE_REQUIRED',
+      );
+    });
+    recordEvidence(root, [
+      { id: 'EV-0123456789abcdef', task_id: 'TASK-0341' },
+      { id: 'EV-1111111111111111', task_id: 'TASK-9999' },
+      { id: 'EV-2222222222222222', notes: ['round_id=R-9999'] },
+    ]);
+    await effects(() => {
+      expect(finish(['EV-1111111111111111'])).toThrow('TASK_MERGE_EVIDENCE_REQUIRED');
+      expect(finish(['EV-2222222222222222'])).toThrow('TASK_MERGE_EVIDENCE_REQUIRED');
+    });
+    // An unreadable chain resolves nothing.
+    writeFileSync(join(root, 'record/proofs/chain.json'), '{"head":null,"rec');
+    await effects(() => {
+      expect(finish(['EV-0123456789abcdef'])).toThrow('TASK_MERGE_EVIDENCE_REQUIRED');
+    });
+    rmSync(join(root, 'record'), { recursive: true, force: true });
+    await effects(() => {
+      expect(finish(['EV-0123456789abcdef'])).toThrow('TASK_MERGE_EVIDENCE_REQUIRED');
+    });
+    // Nothing was recorded or released by any refusal.
+    expect(existsSync(completionPath(root))).toBe(false);
+    expect(loadTask(root, 'TASK-0341').status).toBe('pre_merge');
+    expect(listWorktrees({ repoRoot: root }).map((worktree) => worktree.id)).toEqual([
+      'WT-TASK-0341-A1',
+    ]);
   });
 
   it('moves a truncated completion record aside instead of accepting it', async () => {
