@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, renameSync } from '@devai-nyx/authority';
-import { loadChain, verifyChain, type EvidenceRecord } from '@devai-nyx/evidence';
+import { loadChain, verifyLoadedChain, type EvidenceRecord } from '@devai-nyx/evidence';
 import { validators } from '@devai-nyx/schemas';
 import { EXIT_USAGE } from '@devai-nyx/utils';
 import { createHash } from 'node:crypto';
@@ -163,20 +163,36 @@ function sha256(bytes: Buffer): string {
   return createHash('sha256').update(bytes).digest('hex');
 }
 
-/** Whether parsed bytes are a complete completion record for this task. */
+function ratificationRecordPath(task: TaskRecord): string {
+  return `.devai/state/round-runs/${task.round_id}/ratifications/${task.id}.json`;
+}
+
+function isStringArray(value: unknown): value is readonly string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string');
+}
+
+/**
+ * Whether parsed bytes are a complete completion record for this task: every field present
+ * with its type, the ratification named at its canonical path by a SHA-256 digest, and the
+ * evidence and worktree lists made of strings. Only such a record is trusted on a retry.
+ */
 function isCompletionRecord(value: unknown, task: TaskRecord): value is AgentCompletionRecord {
-  const record = value as Partial<AgentCompletionRecord> | null;
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  const ratification = record.ratification as Record<string, unknown> | null | undefined;
   return (
-    record !== null &&
-    typeof record === 'object' &&
     record.schemaVersion === '1.0.0' &&
     record.round_id === task.round_id &&
     record.task_id === task.id &&
     typeof record.completed_at === 'string' &&
-    typeof record.ratification?.sha256 === 'string' &&
-    Array.isArray(record.merge_evidence_refs) &&
-    record.merge_evidence_refs.every((ref) => typeof ref === 'string') &&
-    Array.isArray(record.released_worktrees)
+    !Number.isNaN(Date.parse(record.completed_at)) &&
+    ratification !== null &&
+    typeof ratification === 'object' &&
+    ratification.path === ratificationRecordPath(task) &&
+    typeof ratification.sha256 === 'string' &&
+    /^[a-f0-9]{64}$/u.test(ratification.sha256) &&
+    isStringArray(record.merge_evidence_refs) &&
+    isStringArray(record.released_worktrees)
   );
 }
 
@@ -243,7 +259,8 @@ const EVIDENCE_CHAIN_PATH = 'record/proofs/chain.json';
 
 /**
  * Whether every merge-evidence reference names a valid record of an intact evidence chain
- * (#319). The chain must pass the evidence package's own `verifyChain`: every record's
+ * (#319). One loaded snapshot of the chain must pass the evidence package's own chain checks
+ * (`verifyLoadedChain`, the body of `verifyChain`): every record's
  * manifest hash recomputes and links to its predecessor, and the head names the last record.
  * Each referenced record must also satisfy the evidence schema the chain writer validates
  * against. A missing or unreadable chain resolves nothing. Proof-line anchors are not
@@ -261,8 +278,10 @@ function mergeEvidenceResolves(
   const chainPath = join(repoRoot, EVIDENCE_CHAIN_PATH);
   let records: readonly EvidenceRecord[];
   try {
-    if (!verifyChain(chainPath).valid) return false;
-    records = loadChain(chainPath).records;
+    // One snapshot: the records resolved are exactly the records verified.
+    const chain = loadChain(chainPath);
+    if (!verifyLoadedChain(chain).valid) return false;
+    records = chain.records;
   } catch {
     return false;
   }
@@ -363,7 +382,7 @@ function recordAgentCompletion(
       task_id: task.id,
       completed_at: new Date().toISOString(),
       ratification: {
-        path: `.devai/state/round-runs/${task.round_id}/ratifications/${task.id}.json`,
+        path: ratificationRecordPath(task),
         sha256: ratificationSha256,
       },
       merge_evidence_refs: refs,
