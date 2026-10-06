@@ -2929,7 +2929,7 @@ export const ACTION_REGISTRY = [
         planner_id: 'round-run-bounded-plan',
         target_kinds: ['fs', 'git-ref', 'remote'],
         bounds: {
-          max_batches: 128,
+          max_batches: 2048,
           max_targets_per_batch: 64,
           max_total_targets: 8192,
         },
@@ -3660,7 +3660,7 @@ export const ACTION_REGISTRY = [
         planner_id: 'task-finish-bounded-plan',
         target_kinds: ['fs', 'git-ref', 'db'],
         bounds: {
-          max_batches: 128,
+          max_batches: 2048,
           max_targets_per_batch: 64,
           max_total_targets: 8192,
         },
