@@ -196,6 +196,24 @@ export function article6Role(path: string): string | undefined {
   return authority?.length === 1 ? authority[0] : undefined;
 }
 
+/**
+ * Whether a changed path lies inside the task's declared boundary (`intent_diff.planned_files`,
+ * the campaign `boundary.paths`; ADR-MDL-0009): an exact path, or a path under an entry that
+ * ends with `/`. A task that declares no boundary is bounded by its Article 6 role alone.
+ */
+export function withinDeclaredBoundary(path: string, boundary: readonly string[]): boolean {
+  const normalized = path.split(sep).join('/');
+  return boundary.some((entry) =>
+    entry.endsWith('/') ? normalized.startsWith(entry) : normalized === entry,
+  );
+}
+
+function declaredBoundary(task: TaskRecord): readonly string[] {
+  const planned = (task as { readonly intent_diff?: { readonly planned_files?: unknown } })
+    .intent_diff?.planned_files;
+  return Array.isArray(planned) ? (planned as string[]) : [];
+}
+
 /** A worktree's file digests, and the symbolic links in it that resolve outside it. */
 export interface WorktreeSnapshot {
   readonly files: ReadonlyMap<string, string>;
@@ -661,6 +679,11 @@ async function runAttempt(
     const changed = changedPaths(before.files, after.files);
     const escaping = [...after.escaping].sort();
     const outOfScope = changed.filter((path) => article6Role(path) !== task.discipline);
+    const boundary = declaredBoundary(task);
+    const outOfBoundary =
+      boundary.length === 0
+        ? []
+        : changed.filter((path) => !withinDeclaredBoundary(path, boundary));
     const tokens = attemptSpend(attempt.output.usage);
     if (tokens === undefined) context.budget.unverifiable = true;
     else context.budget.tokens += tokens;
@@ -676,9 +699,11 @@ async function runAttempt(
         ? 'EXPERIMENTAL_SYMLINK_ESCAPE'
         : outOfScope.length > 0
           ? 'EXPERIMENTAL_WRITE_SCOPE_VIOLATION'
-          : lockLost
-            ? 'TASK_RESOURCE_LOCK_LOST'
-            : '';
+          : outOfBoundary.length > 0
+            ? 'EXPERIMENTAL_BOUNDARY_VIOLATION'
+            : lockLost
+              ? 'TASK_RESOURCE_LOCK_LOST'
+              : '';
     const passed = code === '';
     const verdict = passed ? 'pass' : attempt.ok && !lockLost ? 'fail' : 'error';
     const evidence = attemptEvidence(task, request, plan, {
@@ -693,7 +718,8 @@ async function runAttempt(
       completedAt,
       code,
       verdict,
-      violations: escaping.length > 0 ? escaping : outOfScope,
+      violations:
+        escaping.length > 0 ? escaping : outOfScope.length > 0 ? outOfScope : outOfBoundary,
       // The sandbox is recorded as provider-enforced only once a provider process started;
       // a refused or failed spawn ran nothing, so its evidence names no sandbox.
       sandbox: spawned ? sandbox : undefined,
@@ -749,9 +775,11 @@ function attemptEvidence(
       ? `symbolic links resolving outside the worktree: ${facts.violations.slice(0, 20).join(', ')}`
       : facts.code === 'EXPERIMENTAL_WRITE_SCOPE_VIOLATION'
         ? `writes outside the ${task.discipline} paths: ${facts.violations.slice(0, 20).join(', ')}`
-        : facts.code === 'TASK_RESOURCE_LOCK_LOST'
-          ? 'the task lost a declared resource lock before its result could be accepted'
-          : `the ${request.runtime} attempt did not complete successfully`;
+        : facts.code === 'EXPERIMENTAL_BOUNDARY_VIOLATION'
+          ? `writes outside the declared task boundary: ${facts.violations.slice(0, 20).join(', ')}`
+          : facts.code === 'TASK_RESOURCE_LOCK_LOST'
+            ? 'the task lost a declared resource lock before its result could be accepted'
+            : `the ${request.runtime} attempt did not complete successfully`;
   return buildTaskExecutionEvidence(task as unknown as TaskRecordBinding, {
     id,
     candidate_sha: facts.candidateSha,
