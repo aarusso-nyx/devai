@@ -9,7 +9,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { delimiter, isAbsolute, join } from 'node:path';
+import { delimiter, isAbsolute, join, resolve } from 'node:path';
 import { spawnSync } from '@devai-nyx/authority';
 import { providerReplySchema, replyProjectionIdentity } from '@devai-nyx/schemas';
 import { agentCliEnvironment } from '../agent-cli/index.js';
@@ -487,13 +487,17 @@ export function codexReviewArgv(
 const codexCompatible = new Set<string>();
 
 /**
- * The `codex` a child process started with this PATH would run: the first PATH entry
- * holding an executable regular file named `codex`, as execvp chooses it. The path is
+ * The `codex` a child process started with this PATH in `cwd` would run: the first PATH
+ * entry holding an executable regular file named `codex`, as execvp chooses it, with a
+ * relative or empty entry resolved against the child's working directory. The path is
  * returned unresolved, so its basename stays `codex` for the broker's process target.
  */
-export function resolveCodexExecutable(pathValue: string | undefined): string | undefined {
-  for (const directory of (pathValue ?? '').split(delimiter)) {
-    if (directory.length === 0 || !isAbsolute(directory)) continue;
+export function resolveCodexExecutable(
+  pathValue: string | undefined,
+  cwd: string,
+): string | undefined {
+  for (const entry of (pathValue ?? '').split(delimiter)) {
+    const directory = isAbsolute(entry) ? entry : resolve(cwd, entry);
     const candidate = join(directory, 'codex');
     try {
       if (!statSync(candidate).isFile()) continue;
@@ -506,7 +510,9 @@ export function resolveCodexExecutable(pathValue: string | undefined): string | 
   return undefined;
 }
 
-const FEATURE_ROW = /^(\S+)\s+(\S+(?:\s+\S+)*?)\s+(true|false)$/u;
+/** A listing row: name, one stage of the closed 0.157.1 set, exactly one state. */
+const FEATURE_ROW =
+  /^(\S+)\s+(?:stable|experimental|under development|deprecated|removed)\s+(true|false)$/u;
 
 /**
  * Refuses a Codex review before the provider is invoked unless the installed `codex`
@@ -516,7 +522,11 @@ const FEATURE_ROW = /^(\S+)\s+(\S+(?:\s+\S+)*?)\s+(true|false)$/u;
  * `listing-malformed:<name or line>` (a row that is not `name stage true|false`, or a
  * feature listed twice), and `feature-enabled:<name>`. It returns the absolute executable
  * that both probes ran, which the review must spawn; a passing binary is remembered by
- * realpath and version for the rest of the process.
+ * realpath, size, mtime, inode and version for the rest of the process.
+ *
+ * The check guards against version drift and an incompatible install, not against a local
+ * attacker who can write a PATH entry: such an attacker already controls every command,
+ * and could swap the binary between this probe and the review spawn.
  */
 export function assertCodexReviewCompatibility(
   env: Readonly<Record<string, string>>,
@@ -526,13 +536,16 @@ export function assertCodexReviewCompatibility(
   const failed = (reason: string, detail: string): never => {
     throw new Error(`MODEL_BRIDGE_CODEX_INCOMPATIBLE:${reason}:${detail}`);
   };
-  const executable = resolveCodexExecutable(env['PATH']) ?? failed('executable', 'not-found');
+  const executable = resolveCodexExecutable(env['PATH'], cwd) ?? failed('executable', 'not-found');
   const run = (argv: string[]) =>
     spawnSync(executable, argv, { cwd, env, encoding: 'utf8', timeout: timeout_ms });
   const version = run(['--version']);
   if (version.error !== undefined || version.status !== 0)
     failed('version', version.error?.message ?? String(version.status));
-  const key = `${realpathSync(executable)}\0${String(version.stdout).trim()}`;
+  // A replaced or rebuilt file under the same path and version is checked again.
+  const real = realpathSync(executable);
+  const file = statSync(real);
+  const key = [real, file.size, file.mtimeMs, file.ino, String(version.stdout).trim()].join('\0');
   if (codexCompatible.has(key)) return executable;
   const listing = run([
     'features',
@@ -552,7 +565,7 @@ export function assertCodexReviewCompatibility(
       if (line.trim().length === 0) return;
       const match = FEATURE_ROW.exec(line.trimEnd());
       const name = match?.[1];
-      const state = match?.[3];
+      const state = match?.[2];
       if (name === undefined || state === undefined)
         return failed('listing-malformed', `line-${String(index + 1)}`);
       if (states.has(name)) return failed('listing-malformed', name);
