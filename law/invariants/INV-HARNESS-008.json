@@ -37,7 +37,10 @@
   },
   "scope": {
     "components": ["agent-cli", "experimental-dispatch"],
-    "code_areas": ["packages/skills/src/agent-cli/**"]
+    "code_areas": [
+      "packages/skills/src/agent-cli/**",
+      "packages/cli/src/services/experimental-dispatch/**"
+    ]
   },
   "change_policy": {
     "breaking_change_requires": [
