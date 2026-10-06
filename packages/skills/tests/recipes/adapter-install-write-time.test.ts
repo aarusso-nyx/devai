@@ -20,6 +20,11 @@ import { afterEach, aroundEach, beforeEach, describe, expect, it, vi } from 'vit
 // and the descriptor and unlink calls are recorded in order.
 const seam = vi.hoisted(() => ({
   indeterminateAt: undefined as string | undefined,
+  // A created directory whose pin (the no-follow directory open after its mkdir) fails.
+  failDirectoryPinAt: undefined as string | undefined,
+  // A path whose identity-bound removal reports this outcome without acting.
+  removalOutcomeAt: undefined as { readonly path: string; readonly outcome: string } | undefined,
+  removals: [] as string[],
   events: [] as (readonly [string, string | number])[],
 }));
 vi.mock('@devai-nyx/authority', async (importOriginal) => {
@@ -45,10 +50,20 @@ vi.mock('@devai-nyx/authority', async (importOriginal) => {
       seam.events.push(['close', descriptor]);
       actual.closeReadOnlySync(descriptor);
     },
+    openReadOnlyNoFollowSync: (path: string, directory?: boolean) => {
+      if (directory === true && path === seam.failDirectoryPinAt) {
+        throw Object.assign(new Error('EMFILE: injected pin failure'), { code: 'EMFILE' });
+      }
+      return actual.openReadOnlyNoFollowSync(path, directory);
+    },
     removeEntryIfIdentitySync: (
       path: string,
       identity: Parameters<typeof actual.removeEntryIfIdentitySync>[1],
     ) => {
+      seam.removals.push(path);
+      if (seam.removalOutcomeAt?.path === path) {
+        return seam.removalOutcomeAt.outcome as ReturnType<typeof actual.removeEntryIfIdentitySync>;
+      }
       const outcome = actual.removeEntryIfIdentitySync(path, identity);
       if (outcome === 'removed') seam.events.push(['unlink', path]);
       return outcome;
@@ -106,6 +121,9 @@ beforeEach(() => {
   mkdirSync(join(repo, '.devai/state'), { recursive: true });
   mkdirSync(outside);
   seam.indeterminateAt = undefined;
+  seam.failDirectoryPinAt = undefined;
+  seam.removalOutcomeAt = undefined;
+  seam.removals.length = 0;
   seam.events.length = 0;
 });
 afterEach(() => rmSync(fixture, { recursive: true, force: true }));
@@ -323,6 +341,54 @@ describe('atomic installation across targets', () => {
     expect(readdirSync(created)).toEqual([]);
     // Its parents hold the replacement, so they stay; the codex projection is rolled back.
     expect(tree(repo)).toEqual(['.claude', '.claude/skills', '.claude/skills/devai-assess']);
+  });
+
+  it('leaves a created directory it could not pin and reports it as rollback residue', () => {
+    const resolved = preflightRecipeAdapterInstall(repo, plan);
+    const unpinned = join(repo, '.claude/skills');
+    seam.failDirectoryPinAt = unpinned;
+
+    let failure: unknown;
+    try {
+      executeRecipeAdapterPlan(resolved);
+    } catch (error) {
+      failure = error;
+    }
+    expect(failure).toMatchObject({ code: 'RECIPE_INSTALL_ROLLBACK_INCOMPLETE' });
+    const errors = (failure as AggregateError).errors;
+    expect(errors[0]).toMatchObject({ code: 'EMFILE' });
+    expect(errors.slice(1)).toEqual([
+      expect.objectContaining({ code: 'RECIPE_INSTALL_UNVERIFIED_DIRECTORY', path: unpinned }),
+    ]);
+    // The unverified directory is left, so its parent stays too; the codex set is rolled back.
+    expect(tree(repo)).toEqual(['.claude', '.claude/skills']);
+    expect(seam.removals).not.toContain(unpinned);
+  });
+
+  it('reports an escaped publication it could not remove as residue and never retries it by path', () => {
+    const resolved = preflightRecipeAdapterInstall(repo, plan);
+    const moved = join(fixture, 'moved-devai-assess');
+    seam.removalOutcomeAt = { path: target(3), outcome: 'absent' };
+
+    let failure: unknown;
+    try {
+      executeRecipeAdapterPlan(resolved, {
+        beforePublish: (file, index) => {
+          if (index !== 3) return;
+          renameSync(dirname(file.absolutePath), moved);
+          symlinkSync(outside, dirname(file.absolutePath));
+        },
+      });
+    } catch (error) {
+      failure = error;
+    }
+    expect(failure).toMatchObject({
+      code: 'RECIPE_INSTALL_ESCAPE_DETECTED',
+      message: `RECIPE_INSTALL_ESCAPE_DETECTED: ${plan.files[3]?.path ?? ''} (escaped residue not removed: absent)`,
+      residue: [target(3)],
+    });
+    expect(seam.removals.filter((path) => path === target(3))).toHaveLength(1);
+    expect(readdirSync(outside)).toEqual(['devai.recipe.json']);
   });
 
   it('pins an indeterminate publication through the rollback that removes it', () => {
