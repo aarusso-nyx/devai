@@ -50,20 +50,86 @@ function concurrencyDeclaration(file: string): ConcurrencyDeclaration | null {
 }
 
 /**
- * A superseding group cancels the older runs that share it, so it must be scoped to the run's
- * own subject (#325): its ref, its commit, or both the pull request and the merge-queue entry
- * it serves, as the pull request gate keys one group per pull request and one per queue head.
- * A literal look-alike of a context never counts; only contexts the expression reads do.
+ * The subjects a superseding group may be keyed by: the run's ref, its commit, the pull
+ * request it serves, the merge-queue entry it serves, or the release tag it builds.
+ */
+const SCOPED_SUBJECTS = new Set([
+  'github.ref',
+  'github.sha',
+  'github.event.pull_request.number',
+  'github.event.merge_group.head_sha',
+  'inputs.release_tag',
+]);
+/** Contexts that may appear beside a scoped subject but never scope a group alone. */
+const UNSCOPED_VALUES = new Set(['github.workflow']);
+
+/**
+ * Whether one `${{ … }}` expression always evaluates to a value keyed by a scoped subject.
+ * Accepted shapes only: a plain scoped context; `format('literal', …)` with at least one
+ * scoped argument and every argument a plain allowlisted context; and
+ * `<context> == 'literal' && <scoped> || <scoped>`, where both branches are scoped. A
+ * comparison as the value, any other operator, or any other context is unproved.
+ */
+function scopedExpression(expression: string): boolean {
+  const token = /\s*(?:('(?:[^']|'')*')|([A-Za-z_][A-Za-z0-9_.-]*)|(==|&&|\|\||[(),]))/uy;
+  const tokens: string[] = [];
+  let offset = 0;
+  while (offset < expression.length) {
+    token.lastIndex = offset;
+    const match = token.exec(expression);
+    if (!match) {
+      if (expression.slice(offset).trim() !== '') return false;
+      break;
+    }
+    tokens.push(match[1] ?? match[2] ?? match[3] ?? '');
+    offset = token.lastIndex;
+  }
+  let cursor = 0;
+  // A scoped value: a plain scoped context, or format() over plain contexts with one scoped.
+  function value(): boolean {
+    const head = tokens[cursor++];
+    if (head === undefined) return false;
+    if (SCOPED_SUBJECTS.has(head)) return true;
+    if (head !== 'format' || tokens[cursor++] !== '(') return false;
+    if (!tokens[cursor++]?.startsWith("'")) return false;
+    let scoped = false;
+    while (tokens[cursor] === ',') {
+      cursor++;
+      const argument = tokens[cursor++] ?? '';
+      if (SCOPED_SUBJECTS.has(argument)) scoped = true;
+      else if (!UNSCOPED_VALUES.has(argument)) return false;
+    }
+    return tokens[cursor++] === ')' && scoped;
+  }
+  function condition(): boolean {
+    const left = tokens[cursor++] ?? '';
+    if (!/^github\.[a-z_.]+$/u.test(left) || tokens[cursor++] !== '==') return false;
+    return tokens[cursor++]?.startsWith("'") === true;
+  }
+  const start = cursor;
+  if (value() && cursor === tokens.length) return true;
+  cursor = start;
+  return (
+    condition() &&
+    tokens[cursor++] === '&&' &&
+    value() &&
+    tokens[cursor++] === '||' &&
+    value() &&
+    cursor === tokens.length
+  );
+}
+
+/**
+ * A superseding group cancels the older runs that share it, so it must be keyed by the run's
+ * own subject (#325): every `${{ … }}` part must be a proved shape, and at least one must be
+ * scoped. Literal text between parts is free; a literal look-alike of a context never counts.
  */
 export function supersedingGroupScoped(group: string): boolean {
-  const contexts = concurrencyGroupContexts(group);
-  if (contexts === undefined) return false;
-  return (
-    contexts.includes('github.ref') ||
-    contexts.includes('github.sha') ||
-    (contexts.includes('github.event.pull_request.number') &&
-      contexts.includes('github.event.merge_group.head_sha'))
-  );
+  if (concurrencyGroupContexts(group) === undefined) return false;
+  const parts = [...group.matchAll(/\$\{\{(.*?)\}\}/gu)].map((match) => (match[1] ?? '').trim());
+  // A plain unscoped context such as github.workflow may sit beside a scoped part.
+  const proved = parts.every((part) => UNSCOPED_VALUES.has(part) || scopedExpression(part));
+  return proved && parts.some((part) => scopedExpression(part));
 }
 
 function requiresSerialization(relativeFile: string, file: string): boolean {
@@ -184,7 +250,9 @@ export function senseHarnessCoherence(opts: HarnessCoherenceOptions): SensorRead
           );
         return (
           lock.cancelInProgress === !serialize &&
-          (serialize || concurrencyGroupContexts(lock.group)?.includes('github.ref') === true)
+          (serialize ||
+            (supersedingGroupScoped(lock.group) &&
+              concurrencyGroupContexts(lock.group)?.includes('github.ref') === true))
         );
       });
     const aliases = jobs.some((a) =>
