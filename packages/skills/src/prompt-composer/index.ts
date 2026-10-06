@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from '@devai-nyx/authority';
 import { requestedTaskFields, type TaskRecord } from '@devai-nyx/loop';
 import { canonicalJson } from '@devai-nyx/utils';
 import { createHash } from 'node:crypto';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /** One hashed layer of a composed prompt (law/schemas/prompt-composition.schema.json). */
@@ -89,6 +89,25 @@ function taskBody(task: TaskRecord): string {
   return `${canonicalJson(requested)}\n`;
 }
 
+/**
+ * The task's declared instructions (`executor.instructions_ref`, ADR-MDL-0009), such as a
+ * campaign task prompt, as a second task-layer component; none when the task declares none.
+ * The reference must stay inside the repository, and a missing or empty file refuses.
+ */
+function taskInstructions(
+  repoRoot: string,
+  task: TaskRecord,
+): { layer: PromptComponent['layer']; name: string; source: string; body: string }[] {
+  const ref = (task.executor as { readonly instructions_ref?: unknown }).instructions_ref;
+  if (ref === undefined) return [];
+  const root = resolve(repoRoot);
+  const path = typeof ref === 'string' ? resolve(root, ref) : '';
+  if (typeof ref !== 'string' || ref.length === 0 || !path.startsWith(`${root}${sep}`)) {
+    throw new PromptCompositionError('PROMPT_INSTRUCTIONS_INVALID');
+  }
+  return [{ layer: 'task', name: 'task.instructions', source: ref, body: readComponent(path) }];
+}
+
 /** SHA-256 over each component's layer, name and body hash, in composition order. */
 export function promptStackSha256(components: readonly PromptComponent[]): string {
   return sha256(
@@ -101,7 +120,8 @@ export function promptStackSha256(components: readonly PromptComponent[]): strin
 /**
  * Compose an experimental agent prompt deterministically (Article 37, ADR-MDL-0005
  * D-8) from four layers, in order: the adopter's `AGENTS.md`, the packaged role
- * charter for the task's discipline, the bound task request, and the declared
+ * charter for the task's discipline, the bound task request (followed by the task's
+ * declared instructions file when it names one, ADR-MDL-0009), and the declared
  * recipe as the payload. The same inputs give the same stack hash; a change to one
  * input changes exactly that component's hash. A missing or empty component refuses,
  * including the payload of a task that declares no recipe; nothing is silently skipped.
@@ -141,6 +161,7 @@ export function composeAgentPrompt(options: ComposeAgentPromptOptions): Composed
         source: `.devai/state/tasks/${task.id}.json`,
         body: taskBody(task),
       },
+      ...taskInstructions(options.repoRoot, task),
       {
         layer: 'payload',
         name: `recipe.${recipe}`,
