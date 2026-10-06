@@ -1562,6 +1562,13 @@ describe('authority broker production boundary depth', () => {
             () => 'sense-result',
           ),
         ).toBe('sense-result');
+        // The bridge spawns the resolved absolute executable (#321); the target is its basename.
+        expect(
+          sense.scope.apply_effect(
+            effect('spawnSync', [`/opt/devai-test/bin/${executable}`, ['--version']], 'process'),
+            () => 'absolute-result',
+          ),
+        ).toBe('absolute-result');
         expect(() =>
           sense.scope.apply_effect(
             effect('spawnSync', [`${executable}-other`, ['exec', 'fixture']], 'process'),
