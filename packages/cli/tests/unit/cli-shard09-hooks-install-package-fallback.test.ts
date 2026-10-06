@@ -68,7 +68,7 @@ describe('CLI shard 09 hooks install package fallback', () => {
     executeHooksInstallPlan(plan);
 
     const attestation = JSON.parse(
-      readFileSync(join(root, '.devai/config/post-merge-host-adapter.json'), 'utf8'),
+      readFileSync(join(root, '.git/devai/post-merge-host-adapter.json'), 'utf8'),
     ) as Record<string, unknown>;
     expect(attestation['constitution_digest_sha256']).toBe(
       createHash('sha256').update(constitution).digest('hex'),

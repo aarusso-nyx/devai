@@ -77,7 +77,7 @@ async function installedAdapter() {
     plan,
     hookPath: plan.path,
     keyPath: join(root, '.git/devai/post-merge.key'),
-    attestationPath: join(root, '.devai/config/post-merge-host-adapter.json'),
+    attestationPath: join(root, '.git/devai/post-merge-host-adapter.json'),
     policyPath: join(root, '.devai/config/authority-policy.json'),
     constitutionPath: join(root, '.devai/pin/constitution.md'),
     binary,
@@ -116,7 +116,9 @@ describe('hooks install exact verification boundaries', () => {
         hook_present: true,
         key_present: true,
         attestation_present: true,
+        declaration_present: true,
         policy_present: true,
+        declaration_current: true,
         hook_local_binary: true,
         local_binary_present: true,
         local_binary_version: true,
@@ -136,6 +138,7 @@ describe('hooks install exact verification boundaries', () => {
       [fixture.hookPath, 'hook_present'],
       [fixture.keyPath, 'key_present'],
       [fixture.attestationPath, 'attestation_present'],
+      [join(fixture.root, '.devai/config/post-merge-host-adapter.json'), 'declaration_present'],
       [fixture.policyPath, 'policy_present'],
     ] as const) {
       const bytes = readFileSync(path);
@@ -295,6 +298,7 @@ describe('hooks install exact verification boundaries', () => {
       fixture.keyPath,
       join(fixture.root, '.git/devai/issue-post-merge-receipt.cjs'),
       fixture.attestationPath,
+      join(fixture.root, '.devai/config/post-merge-host-adapter.json'),
     ]);
 
     const base = buildHooksInstallPlan({ targetRoot: fixture.root, hook: 'pre-commit' });

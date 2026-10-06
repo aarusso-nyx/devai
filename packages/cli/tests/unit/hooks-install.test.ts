@@ -15,6 +15,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   buildHooksInstallPlan,
   executeHooksInstallPlan,
+  locatePostMergeBinding,
+  postMergeDeclarationBytes,
   verifyInstalledPostMergeAdapter,
 } from '../../src/services/hooks-install/index.js';
 import { withAuthorityHostTestScope } from '../../../skills/tests/unit/authority-host-test-scope.js';
@@ -161,7 +163,7 @@ describe('hooks install planning and execution', () => {
     });
 
     await withAuthorityHostTestScope(() => executeHooksInstallPlan(plan));
-    const attestationPath = join(repo, '.devai/config/post-merge-host-adapter.json');
+    const attestationPath = join(repo, '.git/devai/post-merge-host-adapter.json');
     const first = readFileSync(attestationPath, 'utf8');
     const attestation = JSON.parse(first) as Record<string, unknown>;
     expect(attestation).toMatchObject({
@@ -172,6 +174,13 @@ describe('hooks install planning and execution', () => {
     });
     expect(attestation['signature_hmac_sha256']).toMatch(/^[0-9a-f]{64}$/);
     expect(statSync(join(repo, '.git/devai/post-merge.key')).mode & 0o077).toBe(0);
+    // #291: the tracked file is the path-free declaration, the same bytes in every clone.
+    const declaration = readFileSync(
+      join(repo, '.devai/config/post-merge-host-adapter.json'),
+      'utf8',
+    );
+    expect(declaration).toBe(postMergeDeclarationBytes());
+    expect(declaration).not.toContain(repo);
 
     await withAuthorityHostTestScope(() => executeHooksInstallPlan(plan));
     expect(readFileSync(attestationPath, 'utf8')).toBe(first);
@@ -181,6 +190,40 @@ describe('hooks install planning and execution', () => {
     expect(JSON.parse(readFileSync(attestationPath, 'utf8'))).toMatchObject({
       installed_at_head: 'a'.repeat(40),
     });
+  });
+
+  it('moves a committed checkout-bound attestation into the git directory, keeping its baseline (#291)', async () => {
+    const repo = root();
+    put(repo, '.devai/config/authority-policy.json', '{"schemaVersion":"1.0.0"}\n');
+    put(repo, 'law/constitution.md', '# Fixture constitution\n');
+    put(repo, '.git/HEAD', 'a'.repeat(40));
+    const plan = buildHooksInstallPlan({
+      targetRoot: repo,
+      hook: 'post-merge',
+      devaiVersion: '1.0.0',
+    });
+    await withAuthorityHostTestScope(() => executeHooksInstallPlan(plan));
+    const local = join(repo, '.git/devai/post-merge-host-adapter.json');
+    const tracked = join(repo, '.devai/config/post-merge-host-adapter.json');
+    // The layout before #291: the signed attestation committed in tracked configuration.
+    const legacy = readFileSync(local, 'utf8');
+    writeFileSync(tracked, legacy);
+    rmSync(local);
+    put(repo, '.git/HEAD', 'b'.repeat(40));
+    expect(locatePostMergeBinding(repo)).toMatchObject({ scope: 'legacy' });
+
+    await withAuthorityHostTestScope(() => executeHooksInstallPlan(plan));
+    expect(readFileSync(local, 'utf8')).toBe(legacy);
+    expect(readFileSync(tracked, 'utf8')).toBe(postMergeDeclarationBytes());
+    expect(locatePostMergeBinding(repo)).toMatchObject({
+      scope: 'bound',
+      local_state: ['attestation', 'key', 'issuer'],
+    });
+
+    // Idempotent: a second install changes neither file.
+    await withAuthorityHostTestScope(() => executeHooksInstallPlan(plan));
+    expect(readFileSync(local, 'utf8')).toBe(legacy);
+    expect(readFileSync(tracked, 'utf8')).toBe(postMergeDeclarationBytes());
   });
 
   it('installs and verifies the post-merge adapter from a linked Husky worktree', async () => {
@@ -286,7 +329,7 @@ describe('hooks install planning and execution', () => {
       });
       await withAuthorityHostTestScope(() => executeHooksInstallPlan(plan));
       const attestation = JSON.parse(
-        readFileSync(join(repo, '.devai/config/post-merge-host-adapter.json'), 'utf8'),
+        readFileSync(join(repo, '.git/devai/post-merge-host-adapter.json'), 'utf8'),
       ) as Record<string, unknown>;
       expect(attestation['installed_at_head'], kind).toBe(
         kind === 'loose' ? 'b'.repeat(40) : 'c'.repeat(40),
