@@ -92,7 +92,48 @@
           "const": "forbidden"
         },
         "review_reserve": {
-          "const": "not-applicable-until-review-tasks"
+          "description": "Workers kept for review-discipline tasks (ADR-MDL-0009). While a same-generation review task awaits admission, non-review tasks may occupy at most the run's workers minus reserved_workers; review tasks may use every worker. A serial run, or one with no more workers than the reserve, is unreserved.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "disciplines",
+            "reserved_workers",
+            "applies_when",
+            "non_review_ceiling",
+            "review_tasks",
+            "serial_runs",
+            "refusal"
+          ],
+          "properties": {
+            "disciplines": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "enum": ["inspector", "auditor"]
+              }
+            },
+            "reserved_workers": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 15
+            },
+            "applies_when": {
+              "const": "run-workers-exceed-reserved-and-a-same-generation-review-task-awaits-admission"
+            },
+            "non_review_ceiling": {
+              "const": "run-workers-minus-reserved-workers"
+            },
+            "review_tasks": {
+              "const": "may-use-every-run-worker"
+            },
+            "serial_runs": {
+              "const": "unreserved"
+            },
+            "refusal": {
+              "const": "TASK_WORKER_CAP"
+            }
+          }
         }
       }
     },

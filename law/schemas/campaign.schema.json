@@ -625,6 +625,60 @@
           "type": ["string", "null"],
           "pattern": "^[0-9a-f]{40}$"
         },
+        "executor": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "runtime", "model", "effort", "recipe_name"],
+          "description": "Optional agent executor contract (ADR-MDL-0009). Absent, campaign materialize writes a human executor. Present, it writes an agent executor with exact selection of this runtime, after checking the discipline, runtime, effort and model against law/policy/experimental-execution.json, law/policy/model-runtime-registry.json and law/policy/model-tiers.json; round dispatch --experimental still requires an in-force Owner activation that admits the selection.",
+          "properties": {
+            "kind": {
+              "const": "agent"
+            },
+            "runtime": {
+              "enum": ["claude-cli", "codex-cli"]
+            },
+            "model": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9._-]*$",
+              "description": "The host model alias of the runtime as law/policy/model-tiers.json names it, for example sonnet or gpt-6-sol."
+            },
+            "effort": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]*$",
+              "description": "One of the runtime's efforts in law/policy/model-runtime-registry.json."
+            },
+            "recipe_name": {
+              "enum": [
+                "devai-assess",
+                "devai-plan",
+                "devai-fix",
+                "devai-docs",
+                "devai-scaffold",
+                "devai-verify",
+                "devai-round"
+              ]
+            },
+            "recipe_variant": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]*$"
+            },
+            "max_iterations": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 4,
+              "description": "Attempts the Article 19 ladder may spend on the task; default 4."
+            },
+            "capabilities": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "description": "Default []."
+            }
+          }
+        },
         "execution": {
           "type": "object",
           "additionalProperties": false,
