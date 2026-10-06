@@ -49,28 +49,62 @@ function concurrencyDeclaration(file: string): ConcurrencyDeclaration | null {
   };
 }
 
+/** Stands for "any event" when the workflow's triggers cannot be read. */
+const ANY_EVENT = '*';
 /**
- * The subjects a superseding group may be keyed by: the run's ref, its commit, the pull
- * request it serves, the merge-queue entry it serves, or the release tag it builds.
+ * The subjects a superseding group may be keyed by, with the events on which each is set: the
+ * run's ref and commit on every event, the pull request number on pull request events, the
+ * merge-queue head on merge-queue events, and the release tag input on dispatches.
  */
-const SCOPED_SUBJECTS = new Set([
-  'github.ref',
-  'github.sha',
-  'github.event.pull_request.number',
-  'github.event.merge_group.head_sha',
-  'inputs.release_tag',
+const SCOPED_SUBJECTS: ReadonlyMap<string, readonly string[] | 'every'> = new Map<
+  string,
+  readonly string[] | 'every'
+>([
+  ['github.ref', 'every'],
+  ['github.sha', 'every'],
+  ['github.event.pull_request.number', ['pull_request', 'pull_request_target']],
+  ['github.event.merge_group.head_sha', ['merge_group']],
+  ['inputs.release_tag', ['workflow_dispatch', 'workflow_call']],
 ]);
 /** Contexts that may appear beside a scoped subject but never scope a group alone. */
 const UNSCOPED_VALUES = new Set(['github.workflow']);
 
+function subjectCovers(subject: string, event: string): boolean {
+  const events = SCOPED_SUBJECTS.get(subject);
+  return (
+    events === 'every' || (events !== undefined && event !== ANY_EVENT && events.includes(event))
+  );
+}
+
+/** The events a workflow accepts, or undefined when its `on:` cannot be read. */
+export function workflowEvents(text: string): readonly string[] | undefined {
+  const inline = /^on[ \t]*:[ \t]*([^\s#].*?)[ \t]*$/mu.exec(text)?.[1];
+  if (inline !== undefined) {
+    const list = /^\[(.*)\]$/u.exec(inline)?.[1];
+    const names = (list ?? inline)
+      .split(',')
+      .map((name) => name.trim().replace(/^['"]|['"]$/gu, ''));
+    return names.every((name) => /^[a-z_]+$/u.test(name)) ? names : undefined;
+  }
+  const block = /^on[ \t]*:[ \t]*\n((?:[ \t]+.*(?:\n|$)|\s*\n)*)/mu.exec(text)?.[1];
+  if (block === undefined) return undefined;
+  const indent = /^([ \t]+)\S/mu.exec(block)?.[1];
+  if (indent === undefined) return undefined;
+  const names = [...block.matchAll(new RegExp(`^${indent}([a-z_]+)\\s*:`, 'gmu'))].map(
+    (m) => m[1] ?? '',
+  );
+  return names.length > 0 ? names : undefined;
+}
+
 /**
- * Whether one `${{ … }}` expression always evaluates to a value keyed by a scoped subject.
- * Accepted shapes only: a plain scoped context; `format('literal', …)` with at least one
- * scoped argument and every argument a plain allowlisted context; and
- * `<context> == 'literal' && <scoped> || <scoped>`, where both branches are scoped. A
- * comparison as the value, any other operator, or any other context is unproved.
+ * Whether one `${{ … }}` expression is keyed by a scoped subject on every event in `events`.
+ * Accepted shapes only: a plain scoped context; `format('literal', …)` over plain allowlisted
+ * contexts, scoped through a `{n}` placeholder that references a scoped argument; and
+ * `<context> == 'literal' && <value> || <value>`. A `github.event_name == 'X'` condition
+ * needs its first value to cover X and its second to cover every other event; any other
+ * condition needs both values to cover every event. Anything else is unproved.
  */
-function scopedExpression(expression: string): boolean {
+function scopedExpression(expression: string, events: readonly string[]): boolean {
   const token = /\s*(?:('(?:[^']|'')*')|([A-Za-z_][A-Za-z0-9_.-]*)|(==|&&|\|\||[(),]))/uy;
   const tokens: string[] = [];
   let offset = 0;
@@ -85,51 +119,73 @@ function scopedExpression(expression: string): boolean {
     offset = token.lastIndex;
   }
   let cursor = 0;
-  // A scoped value: a plain scoped context, or format() over plain contexts with one scoped.
-  function value(): boolean {
+  // A value and the subjects it is keyed by, or undefined when unproved.
+  function value(): readonly string[] | undefined {
     const head = tokens[cursor++];
-    if (head === undefined) return false;
-    if (SCOPED_SUBJECTS.has(head)) return true;
-    if (head !== 'format' || tokens[cursor++] !== '(') return false;
-    if (!tokens[cursor++]?.startsWith("'")) return false;
-    let scoped = false;
+    if (head === undefined) return undefined;
+    if (SCOPED_SUBJECTS.has(head)) return [head];
+    if (head !== 'format' || tokens[cursor++] !== '(') return undefined;
+    const literal = tokens[cursor++];
+    if (literal?.startsWith("'") !== true) return undefined;
+    const args: string[] = [];
     while (tokens[cursor] === ',') {
       cursor++;
       const argument = tokens[cursor++] ?? '';
-      if (SCOPED_SUBJECTS.has(argument)) scoped = true;
-      else if (!UNSCOPED_VALUES.has(argument)) return false;
+      if (!SCOPED_SUBJECTS.has(argument) && !UNSCOPED_VALUES.has(argument)) return undefined;
+      args.push(argument);
     }
-    return tokens[cursor++] === ')' && scoped;
+    if (tokens[cursor++] !== ')') return undefined;
+    const text = literal.slice(1, -1).replaceAll("''", "'");
+    const placeholders = [
+      ...text
+        .replaceAll('{{', '')
+        .replaceAll('}}', '')
+        .matchAll(/\{(\d+)\}/gu),
+    ].map((match) => Number(match[1]));
+    if (placeholders.some((index) => index >= args.length)) return undefined;
+    return placeholders
+      .map((index) => args[index] ?? '')
+      .filter((argument) => SCOPED_SUBJECTS.has(argument));
   }
-  function condition(): boolean {
-    const left = tokens[cursor++] ?? '';
-    if (!/^github\.[a-z_.]+$/u.test(left) || tokens[cursor++] !== '==') return false;
-    return tokens[cursor++]?.startsWith("'") === true;
-  }
+  const covers = (subjects: readonly string[], event: string): boolean =>
+    subjects.some((subject) => subjectCovers(subject, event));
   const start = cursor;
-  if (value() && cursor === tokens.length) return true;
+  const plain = value();
+  if (plain !== undefined && cursor === tokens.length)
+    return events.every((event) => covers(plain, event));
   cursor = start;
-  return (
-    condition() &&
-    tokens[cursor++] === '&&' &&
-    value() &&
-    tokens[cursor++] === '||' &&
-    value() &&
-    cursor === tokens.length
-  );
+  const left = tokens[cursor++] ?? '';
+  if (!/^github\.[a-z_.]+$/u.test(left) || tokens[cursor++] !== '==') return false;
+  const compared = tokens[cursor++];
+  if (compared?.startsWith("'") !== true || tokens[cursor++] !== '&&') return false;
+  const first = value();
+  if (first === undefined || tokens[cursor++] !== '||') return false;
+  const second = value();
+  if (second === undefined || cursor !== tokens.length) return false;
+  if (left === 'github.event_name') {
+    const chosen = compared.slice(1, -1);
+    return events.every((event) =>
+      event === chosen ? covers(first, event) : covers(second, event),
+    );
+  }
+  return events.every((event) => covers(first, event) && covers(second, event));
 }
 
 /**
  * A superseding group cancels the older runs that share it, so it must be keyed by the run's
- * own subject (#325): every `${{ … }}` part must be a proved shape, and at least one must be
- * scoped. Literal text between parts is free; a literal look-alike of a context never counts.
+ * own subject on every event the workflow accepts (#325): every `${{ … }}` part must be a
+ * proved shape or a plain allowlisted context, and at least one part must cover every event.
+ * Without readable triggers only the ref or commit covers. Literal text between parts is free.
  */
-export function supersedingGroupScoped(group: string): boolean {
+export function supersedingGroupScoped(group: string, events?: readonly string[]): boolean {
   if (concurrencyGroupContexts(group) === undefined) return false;
+  const accepted = events !== undefined && events.length > 0 ? events : [ANY_EVENT];
   const parts = [...group.matchAll(/\$\{\{(.*?)\}\}/gu)].map((match) => (match[1] ?? '').trim());
-  // A plain unscoped context such as github.workflow may sit beside a scoped part.
-  const proved = parts.every((part) => UNSCOPED_VALUES.has(part) || scopedExpression(part));
-  return proved && parts.some((part) => scopedExpression(part));
+  const scoped = parts.map((part) => scopedExpression(part, accepted));
+  return (
+    parts.every((part, index) => UNSCOPED_VALUES.has(part) || scoped[index] === true) &&
+    scoped.some(Boolean)
+  );
 }
 
 function requiresSerialization(relativeFile: string, file: string): boolean {
@@ -231,6 +287,7 @@ export function senseHarnessCoherence(opts: HarnessCoherenceOptions): SensorRead
   let concurrencySemanticIssues = 0;
   for (const workflow of workflows) {
     const declaration = concurrencyDeclaration(workflow.file);
+    const events = workflowEvents(readFileSync(workflow.file, 'utf8'));
     const serialize = requiresSerialization(workflow.relativeFile, workflow.file);
     const jobs = workflow.jobs.map((job) => ({
       ...job,
@@ -251,7 +308,7 @@ export function senseHarnessCoherence(opts: HarnessCoherenceOptions): SensorRead
         return (
           lock.cancelInProgress === !serialize &&
           (serialize ||
-            (supersedingGroupScoped(lock.group) &&
+            (supersedingGroupScoped(lock.group, events) &&
               concurrencyGroupContexts(lock.group)?.includes('github.ref') === true))
         );
       });
@@ -280,7 +337,8 @@ export function senseHarnessCoherence(opts: HarnessCoherenceOptions): SensorRead
         ? jobLocks
         : declaration.group.length > 0 &&
           declaration.cancelInProgress === !(serialize || effectful) &&
-          (declaration.cancelInProgress !== true || supersedingGroupScoped(declaration.group)) &&
+          (declaration.cancelInProgress !== true ||
+            supersedingGroupScoped(declaration.group, events)) &&
           (!effectful || declaration.cancelInProgress === false));
     if (valid) continue;
     concurrencySemanticIssues += 1;
