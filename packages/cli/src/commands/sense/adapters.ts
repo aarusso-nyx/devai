@@ -75,6 +75,7 @@ import {
   governanceReading,
   actionEffectInference,
   observeGateProducers,
+  GATE_SCOPED_PRODUCERS,
 } from './adapter-readers.js';
 export type { SenseAdapterRequest, SenseSensorAdapter } from './adapter-readers.js';
 
@@ -329,6 +330,7 @@ const ADAPTERS: Readonly<Record<SensorKind, SenseSensorAdapter>> = Object.freeze
     senseHarnessInvariantAlignment({
       repoRoot: request.repoRoot,
       observations: await observeGateProducers(request.repoRoot),
+      scopedProducers: GATE_SCOPED_PRODUCERS,
     }),
   harness_idiomaticity: (request) =>
     senseHarnessIdiomaticity({
