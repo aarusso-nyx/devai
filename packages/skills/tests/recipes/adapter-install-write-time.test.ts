@@ -45,9 +45,13 @@ vi.mock('@devai-nyx/authority', async (importOriginal) => {
       seam.events.push(['close', descriptor]);
       actual.closeReadOnlySync(descriptor);
     },
-    unlinkSync: (path: string) => {
-      seam.events.push(['unlink', path]);
-      actual.unlinkSync(path);
+    removeEntryIfIdentitySync: (
+      path: string,
+      identity: Parameters<typeof actual.removeEntryIfIdentitySync>[1],
+    ) => {
+      const outcome = actual.removeEntryIfIdentitySync(path, identity);
+      if (outcome === 'removed') seam.events.push(['unlink', path]);
+      return outcome;
     },
   };
 });
@@ -298,6 +302,27 @@ describe('atomic installation across targets', () => {
       '.agents/skills/devai-assess',
       '.agents/skills/devai-assess/SKILL.md',
     ]);
+  });
+
+  it('never removes a directory that replaced one it created, even an empty one (#317)', () => {
+    const resolved = preflightRecipeAdapterInstall(repo, plan);
+    const created = join(repo, '.claude/skills/devai-assess');
+
+    expect(() =>
+      executeRecipeAdapterPlan(resolved, {
+        beforePublish: (_file, index) => {
+          if (index !== 2) return;
+          // Another writer replaces the directory this call just made with its own empty one.
+          rmSync(created, { recursive: true });
+          mkdirSync(created);
+          throw new Error('INJECTED_PUBLICATION_FAILURE');
+        },
+      }),
+    ).toThrow('INJECTED_PUBLICATION_FAILURE');
+    expect(lstatSync(created).isDirectory()).toBe(true);
+    expect(readdirSync(created)).toEqual([]);
+    // Its parents hold the replacement, so they stay; the codex projection is rolled back.
+    expect(tree(repo)).toEqual(['.claude', '.claude/skills', '.claude/skills/devai-assess']);
   });
 
   it('pins an indeterminate publication through the rollback that removes it', () => {
