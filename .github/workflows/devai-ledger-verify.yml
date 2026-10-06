@@ -1,9 +1,11 @@
 name: DEVAI ledger verification
 on:
   workflow_dispatch: {}
+# The job runs in the devai-ledger-verification environment, so a second dispatch for the
+# same commit queues behind the first instead of cancelling it (F5:T3, #325).
 concurrency:
   group: devai-ledger-verify-${{ github.sha }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 permissions:
   contents: read
 env:
