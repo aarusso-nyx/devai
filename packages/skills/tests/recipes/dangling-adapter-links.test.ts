@@ -35,7 +35,7 @@ describe('recipe installation rejects dangling links during preflight', () => {
 
   it('still permits genuinely absent directories and files for an ordinary install', () => {
     expect(preflightRecipeAdapterInstall(repo, plan)).toEqual([
-      { ...plan.files[0], absolutePath: join(repo, path) },
+      { ...plan.files[0], absolutePath: join(repo, path), repoRoot: repo, observedSha256: null },
     ]);
   });
 });
