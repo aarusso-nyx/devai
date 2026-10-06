@@ -8,6 +8,7 @@ import {
   readFileSync,
   realpathSync,
   rmSync,
+  utimesSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -1025,7 +1026,7 @@ describe('#321 Codex executable resolution and listing integrity', () => {
     writeFileSync(join(real, 'codex'), '#!/bin/sh\nexit 99\n');
     chmodSync(join(real, 'codex'), 0o755);
     process.env.PATH = [shadow, directoryShadow, real, savedPath ?? ''].join(delimiter);
-    expect(resolveCodexExecutable(process.env.PATH)).toBe(join(real, 'codex'));
+    expect(resolveCodexExecutable(process.env.PATH, '/')).toBe(join(real, 'codex'));
     const response = await observe('codex-cli', codexFixture);
     expect(response.finish_reason).toBe('stop');
     expect(new Set(codexProbe.executables)).toEqual(new Set([join(real, 'codex')]));
@@ -1058,6 +1059,8 @@ describe('#321 Codex executable resolution and listing integrity', () => {
     ['a row without a state', rows({ apps: 'apps  stable' }), 'line-2'],
     ['a row with an unknown state', rows({ plugins: 'plugins  stable  maybe' }), 'line-7'],
     ['a stray error line', `Error: something else\n${rows()}`, 'line-1'],
+    ['an extra boolean token', `shell_tool  stable  true false\n${rows()}`, 'line-1'],
+    ['a stage outside the 0.157.1 set', rows({ apps: 'apps  beta  false' }), 'line-2'],
   ])('refuses a listing with %s', async (_name, stdout, detail) => {
     codexProbe.listing = () => ({ status: 0, stdout, stderr: '' });
     await expect(observe('codex-cli', codexFixture)).rejects.toThrow(
@@ -1075,5 +1078,48 @@ describe('#321 Codex executable resolution and listing integrity', () => {
     await expect(observe('codex-cli', codexFixture)).resolves.toMatchObject({
       finish_reason: 'stop',
     });
+  });
+});
+
+describe('#321 Codex resolution against the child working directory and cache freshness', () => {
+  const dirs: string[] = [];
+  let versions = 0;
+  beforeEach(() => {
+    versions += 1;
+    codexProbe.version = `codex-cli freshness-case-${String(versions)}`;
+    codexProbe.listing = undefined;
+    codexProbe.calls.length = 0;
+  });
+  afterEach(() => {
+    codexProbe.version = 'codex-cli offline-stub';
+    for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('resolves relative and empty PATH entries against the child working directory', () => {
+    const root = realpathSync(mkdtempSync(join(tmpdir(), 'devai-codex-relative-')));
+    dirs.push(root);
+    mkdirSync(join(root, 'work'));
+    mkdirSync(join(root, 'bin'));
+    writeFileSync(join(root, 'bin', 'codex'), '#!/bin/sh\nexit 99\n');
+    chmodSync(join(root, 'bin', 'codex'), 0o755);
+    expect(resolveCodexExecutable('../bin', join(root, 'work'))).toBe(join(root, 'bin', 'codex'));
+    expect(resolveCodexExecutable('bin', root)).toBe(join(root, 'bin', 'codex'));
+    // An empty entry is the working directory itself, never the parent process cwd.
+    expect(resolveCodexExecutable(`${delimiter}/nonexistent`, join(root, 'bin'))).toBe(
+      join(root, 'bin', 'codex'),
+    );
+    expect(resolveCodexExecutable('bin', join(root, 'work'))).toBeUndefined();
+  });
+
+  it('checks a binary again after its file changes under the same path and version', async () => {
+    const executable = resolveCodexExecutable(process.env.PATH, '/');
+    if (executable === undefined) throw new Error('placeholder codex missing');
+    await observe('codex-cli', codexFixture);
+    await observe('codex-cli', codexFixture);
+    expect(codexProbe.calls.filter((argv) => argv[0] === 'features')).toHaveLength(1);
+    writeFileSync(executable, '#!/bin/sh\n# rebuilt placeholder\nexit 99\n');
+    utimesSync(executable, new Date(), new Date(Date.now() + 5000));
+    await observe('codex-cli', codexFixture);
+    expect(codexProbe.calls.filter((argv) => argv[0] === 'features')).toHaveLength(2);
   });
 });
