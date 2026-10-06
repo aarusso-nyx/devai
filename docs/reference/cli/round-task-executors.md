@@ -502,8 +502,8 @@ An attempt fails when:
 - the task lost a declared lock before its result could be accepted (`TASK_RESOURCE_LOCK_LOST`).
 
 Its evidence carries `experimental: true`, version-2 usage, and a `sandbox` object naming the
-provider-enforced write confinement and its exact flags. The task's outcome and worktree
-binding are saved before the attempt settles:
+provider-enforced write confinement and its exact flags once the provider started. The task's
+outcome and worktree binding are saved before the attempt settles:
 
 - A contained, completed attempt leaves the task `awaiting_human_review`, with its worktree
   retained for review.
@@ -615,8 +615,10 @@ sandbox_workspace_write.network_access=false`;
 
   The broker admits the provider process only when its argv carries that whole sequence, rooted
   at the spawn cwd. Dispatch refuses a runtime it cannot confine, or a host other than macOS or
-  Linux, with `EXPERIMENTAL_SANDBOX_UNAVAILABLE` before any lock or worktree is touched. Every
-  attempt's evidence records the enforced mode and flags in its `sandbox` object. Limits remain:
+  Linux, with `EXPERIMENTAL_SANDBOX_UNAVAILABLE` before any lock or worktree is touched. The
+  evidence of every attempt whose provider process started records the enforced mode and its
+  complete flags in a `sandbox` object; an attempt refused before any provider ran records
+  none. Limits remain:
   - DEVAI asserts the flags it passes; it does not observe the provider's kernel sandbox, so a
     defect in that sandbox is outside DEVAI's proof.
   - Both providers leave their temporary directories writable, outside the repository.
