@@ -1,5 +1,83 @@
 # Changelog
 
+## 2.1.0 — 2026-10-06
+
+DEVAI 2.1.0 closes the follow-ups filed against 2.0.0 (#285–#299 and the issues found since):
+experimental agent attempts are confined by the provider sandbox, locks, records and the worktree
+registry are published without replacement, and the post-merge host adapter keeps its
+checkout-bound state out of tracked configuration. No commit since v2.0.0 carries the breaking
+marker and the range includes features, so the commit grammar's bump floor is minor. The action
+set stays at 69.
+
+- Adopter migration `MIG-2.1.0-post-merge-local-state` (#266, #291): the post-merge attestation
+  (checkout path, hook path, HMAC over the checkout key) moves to
+  `<git-dir>/devai/post-merge-host-adapter.json`, and the tracked
+  `.devai/config/post-merge-host-adapter.json` becomes a path-free declaration. `init upgrade`
+  converts a committed attestation: the checkout holding the key moves it into its git directory,
+  keeping `installed_at_head` while it still verifies, and every other checkout only rewrites the
+  declaration. `doctor` reports `POST_MERGE_ADAPTER_NOT_BOUND_HERE`,
+  `POST_MERGE_ADAPTER_UNVERIFIABLE_HERE` and `POST_MERGE_ADAPTER_DECLARATION_LEGACY`; the codes
+  `POST_MERGE_ADAPTER_NOT_APPLICABLE_HERE` and `POST_MERGE_ADAPTER_LOCAL_STATE_PRESENT` are retired.
+- Provider sandbox (ADR-MDL-0008, amends ADR-MDL-0005, #290): `codex-cli` attempts run with
+  `--sandbox workspace-write` rooted at the attempt worktree and no network, `claude-cli` attempts
+  with `--restricted` and a fail-closed sandbox setting. The broker rebuilds and asserts the whole
+  confinement argv, dispatch refuses `EXPERIMENTAL_SANDBOX_UNAVAILABLE` before any lock or
+  worktree on a runtime that cannot be confined, and each attempt's evidence records the
+  `sandbox` descriptor.
+- Atomic no-replace publication (ADR-AUT-0005, #286, #287, #293): a governed `link()`-based
+  publication effect backs create-only records, the experimental activation lock, fresh resource
+  locks (#310) and recipe adapter files. Every change to `.devai/state/worktrees.json` runs under
+  a published registry lock (`WORKTREE_REGISTRY_BUSY`, `WORKTREE_REGISTRY_LOCK_STALE`, never taken
+  over). `init apply harness` publishes `.devai/state/state-root.json`, and `round dispatch`
+  refuses `EXPERIMENTAL_STATE_ROOT_UNINITIALIZED` until it exists: an adopter using experimental
+  dispatch runs `init apply harness` once.
+- Lock lifecycle (#285, #288, #296): a task left waiting outside a dispatch holds its locks on a
+  seven-day waiting lease; completion, `task finish` and `round ratify --decision accept` first
+  prove that every declared lock is still the task's own. An unconfirmed process-group
+  termination writes a durable quarantine record under `.devai/state/lock-quarantine/` that holds
+  the task's locks. Release receipts are created exclusively and fsynced, and orphaned receipts
+  are removed at reconciliation.
+- Review reserve and campaign agents (ADR-MDL-0009, #297): with more than one worker, one is
+  reserved for an admissible inspector or auditor task of the same generation. A campaign task may
+  declare an agent `executor`, and `campaign materialize` checks its discipline, runtime, effort
+  and model before writing (`CAMPAIGN_AGENT_*`).
+- `task finish` on an agent task resolves every merge-evidence reference against the verified
+  evidence chain, refuses records bound to another task or round, and a retry from `merging`
+  must match the recorded completion (`TASK_MERGE_EVIDENCE_REQUIRED`, `TASK_COMPLETION_CONFLICT`,
+  #319).
+- `backlog add` (#306, #307): the stored origin role is the admitted invocation role
+  (`BACKLOG_ROLE_MISMATCH`, `BACKLOG_ROLE_REQUIRED`); the round projection write is declared in
+  the registry and a retry with the same `--request-id` completes a missing projection event.
+- Recipe adapter install (#313, #317): targets are rechecked without following links before each
+  write, files are published without replacement under `.devai/state/recipe-adapters.lock`, and a
+  failure rolls back only what the install created, by identity. An escape outside the repository
+  is reported (`RECIPE_INSTALL_ESCAPE_DETECTED`) and never deleted.
+- Review bridge (#249, #321): hosts start in an empty private workspace with the agent
+  environment allowlist; a completed `claude` structured reply is accepted; the strict reply
+  projection is shared. Codex reviews first check the installed binary and its disabled features
+  (`MODEL_BRIDGE_CODEX_INCOMPATIBLE`). The adopter authority policy adds
+  `adopter-remote-sense-run-llm-1`, so the `llm_judge` host CLI invocation under `sense run` is
+  classified; adopters re-bind the authority policy (`init upgrade` does so).
+- Sensors and scorecard: `inventory_regeneration` binds to the git tree at a clean HEAD and
+  refuses `INVENTORY_REGENERATION_SNAPSHOT_CHANGED` (#294); a failed coverage producer names the
+  failing test files (#236); `harness_coherence` proves workflow effects through a closed
+  concurrency grammar and a reviewed-step registry (#325); the pull-request preflight adds
+  fail-closed producers for INV-DEVAI-010 and INV-HARNESS-010 (#235), using the new
+  `sense inventory --packs-root` flag; `stack-adapter.schema.json` joins the runtime schema
+  roster. The third self-scorecard `SC-20261006T141503-001` is recorded (#237).
+- Invariants and dead code (#295): eight new invariant records claim the previously unclaimed
+  inventory surfaces; unreachable CLI `docs` and utils modules are removed, and
+  `evidence render --out` writes only under `.devai/state/render`.
+- Codex token accounting counts cached input once (#289). The check runner's per-task default is
+  30 minutes and `release-prerequisites` passes `--task-timeout-ms 1800000` (#299).
+  Load-sensitive tests run in a serial lane with one deadline per bounded case and process-group
+  kills (#246, #324); durations use a monotonic clock.
+- Release: this release is verified by the trusted local-RC verifier
+  `@aarusso-nyx/devai@1.9.0`, unchanged from 2.0.0.
+- Known limitations: DEVAI asserts the provider sandbox flags but does not observe the provider's
+  kernel sandbox, and provider temporary directories stay writable; Codex review isolation is
+  checked after the fact because `unified_exec` cannot be disabled (#321).
+
 ## 2.0.0 — 2026-10-05
 
 DEVAI 2.0.0 marks the governed orchestrator: the round runner becomes a bounded controller with
