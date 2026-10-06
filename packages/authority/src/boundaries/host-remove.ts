@@ -3,8 +3,11 @@ import { basename, dirname, join } from 'node:path';
 import {
   linkSync as nodeLinkSync,
   lstatSync,
+  mkdirSync as nodeMkdirSync,
+  readlinkSync as nodeReadlinkSync,
   renameSync as nodeRenameSync,
   rmdirSync as nodeRmdirSync,
+  symlinkSync as nodeSymlinkSync,
   unlinkSync as nodeUnlinkSync,
 } from 'node:fs';
 import type { PublishedFileIdentity } from './host-publish.js';
@@ -78,26 +81,40 @@ function sameIdentity(
   );
 }
 
+type EntryKind = 'directory' | 'symlink' | 'other';
+
+function kindOf(stat: { isDirectory(): boolean; isSymbolicLink(): boolean }): EntryKind {
+  return stat.isDirectory() ? 'directory' : stat.isSymbolicLink() ? 'symlink' : 'other';
+}
+
 /**
- * Puts a quarantined entry that must not be removed back at `path`. A regular file is
- * hard-linked back, so link(2) refuses (EEXIST) rather than replace an entry that took the path
- * meanwhile. A directory or symbolic link cannot be hard-linked; it is renamed back only while
- * the path is absent, which leaves a window between that check and the rename.
+ * Puts a quarantined entry that must not be removed back at `path`, never over an entry that
+ * took the path meanwhile: any step that finds the path occupied keeps the quarantine and
+ * refuses with AUTHORITY_REMOVE_RESTORE_INCOMPLETE, naming the quarantine.
+ * - A file (or any non-directory, non-link entry) is hard-linked back; link(2) refuses EEXIST.
+ * - A symbolic link is recreated with its target; symlink(2) refuses EEXIST. The restored link is
+ *   a new inode with the same target.
+ * - A directory first claims the path with an empty placeholder (mkdir(2) refuses EEXIST) and is
+ *   then renamed over it. rename(2) replaces a directory only when it is empty, so a placeholder
+ *   another process filled or replaced with a non-directory refuses; the residual is a process
+ *   that swaps the placeholder for its own empty directory in that instant, which is replaced.
  */
-function restore(path: string, quarantine: string, regular: boolean): void {
-  if (regular) {
-    try {
-      nodeLinkSync(quarantine, path);
-    } catch (error) {
-      throw new RemoveRestoreIncompleteError(path, quarantine, error);
+function restore(path: string, quarantine: string, kind: EntryKind): void {
+  try {
+    if (kind === 'directory') {
+      nodeMkdirSync(path);
+      nodeRenameSync(quarantine, path);
+      return;
     }
-    nodeUnlinkSync(quarantine);
-    return;
+    if (kind === 'symlink') {
+      nodeSymlinkSync(nodeReadlinkSync(quarantine), path);
+    } else {
+      nodeLinkSync(quarantine, path);
+    }
+  } catch (error) {
+    throw new RemoveRestoreIncompleteError(path, quarantine, error);
   }
-  if (lstatSync(path, { throwIfNoEntry: false }) !== undefined) {
-    throw new RemoveRestoreIncompleteError(path, quarantine);
-  }
-  nodeRenameSync(quarantine, path);
+  nodeUnlinkSync(quarantine);
 }
 
 /**
@@ -109,7 +126,9 @@ function restore(path: string, quarantine: string, regular: boolean): void {
  *
  * The residual window is on the private name: a process that finds the random quarantine name
  * and replaces it between the rename and the check could still have its entry checked; and an
- * entry put back is absent from `path` for the duration of the call.
+ * entry put back is absent from `path` for the duration of the call. The rename resolves the
+ * parent by path: containment of that parent is the caller's (the broker re-verifies it around
+ * the effect).
  */
 export function removeEntryIfIdentitySteps(
   path: string,
@@ -129,7 +148,7 @@ export function removeEntryIfIdentitySteps(
   hooks.afterQuarantine?.(quarantine);
   const stat = lstatSync(quarantine, { bigint: true });
   if (!sameIdentity(stat, identity)) {
-    restore(path, quarantine, stat.isFile());
+    restore(path, quarantine, kindOf(stat));
     return 'mismatch';
   }
   try {
@@ -139,7 +158,7 @@ export function removeEntryIfIdentitySteps(
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
     // The entry is still at its private name: put it back before reporting.
-    restore(path, quarantine, stat.isFile());
+    restore(path, quarantine, kindOf(stat));
     if (stat.isDirectory() && (code === 'ENOTEMPTY' || code === 'EEXIST')) return 'not-empty';
     throw error;
   }
