@@ -247,7 +247,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["mode", "enforced_by", "write_root", "flags"],
-      "description": "The write confinement the provider's own sandbox enforced for one experimental agent attempt (ADR-MDL-0008). flags is the exact confinement subsequence the broker asserted in the spawned argv, with the attempt worktree's path written as {attempt-worktree}.",
+      "description": "The write confinement the provider's own sandbox enforced for one experimental agent attempt whose provider process started (ADR-MDL-0008); an attempt refused or failed before any provider process ran records none. flags is the exact confinement subsequence the broker asserted in the spawned argv, with the attempt worktree's path written as {attempt-worktree}.",
       "properties": {
         "mode": {
           "enum": ["codex-workspace-write", "claude-restricted-sandbox"]
