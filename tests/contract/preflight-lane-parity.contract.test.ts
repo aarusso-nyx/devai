@@ -214,6 +214,14 @@ describe('preflight lane parity (ADR-CHK-0001 IA-003)', () => {
     expect(probeCount, 'preflight probes from either source').toBeGreaterThan(0);
   });
 
+  // Each plan is a bootstrap CLI process that fingerprints the live working tree: 3 to 4 s
+  // alone, so a case of two or three plans costs 7 to 11 s alone and 10 s at load average
+  // 200 (#246). The RC coverage lane's 15 s default and the local 30 s default both fell
+  // under that once parallel workers shared the machine, so each case carries its own bound.
+  // The file also runs in the `local-serial` lane: consecutive plans are byte-identical only
+  // while no sibling test writes into the same working tree between them.
+  const PLAN_CASE_TIMEOUT_MS = 120_000;
+
   it.each(['--preflight', '--affected'] as const)(
     'plans a byte-identical node set for the local %s invocation on consecutive runs',
     (target) => {
@@ -226,19 +234,24 @@ describe('preflight lane parity (ADR-CHK-0001 IA-003)', () => {
         expect(planned, `the ${target} plan selects preflight node ${nodeId}`).toContain(nodeId);
       }
     },
+    PLAN_CASE_TIMEOUT_MS,
   );
 
   it.each([
     ['check:preflight', '--preflight'],
     ['check:affected', '--affected'],
-  ] as const)('plans the lane %s invocation exactly as the local invocation', (kind, target) => {
-    const step = laneRunSteps().find((candidate) => candidate.kind === kind);
-    expect(step, `the lane carries a ${kind} step`).toBeDefined();
-    if (step === undefined) return;
-    const laneArgs = laneCheckArguments(step, base);
-    const lane = plannedNodeSet(laneArgs, base);
-    expect(plannedNodeSet(laneArgs, base), `consecutive lane ${kind} plans`).toBe(lane);
-    const local = plannedNodeSet(['check', target, '--task-plan', '--base', base], base);
-    expect(lane, `lane ${kind} and local ${target} planned node sets`).toBe(local);
-  });
+  ] as const)(
+    'plans the lane %s invocation exactly as the local invocation',
+    (kind, target) => {
+      const step = laneRunSteps().find((candidate) => candidate.kind === kind);
+      expect(step, `the lane carries a ${kind} step`).toBeDefined();
+      if (step === undefined) return;
+      const laneArgs = laneCheckArguments(step, base);
+      const lane = plannedNodeSet(laneArgs, base);
+      expect(plannedNodeSet(laneArgs, base), `consecutive lane ${kind} plans`).toBe(lane);
+      const local = plannedNodeSet(['check', target, '--task-plan', '--base', base], base);
+      expect(lane, `lane ${kind} and local ${target} planned node sets`).toBe(local);
+    },
+    PLAN_CASE_TIMEOUT_MS,
+  );
 });
