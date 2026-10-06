@@ -13,9 +13,35 @@ import {
 /** Suffix of the staged name a publication links into place (ADR-AUT-0005). */
 export const PUBLISH_STAGED_SUFFIX = '.publish-staged';
 
-/** Test seam: runs between the link into place and the removal of the staged name. */
+/**
+ * Code of a publication whose target is linked into place but whose cleanup (the staged
+ * unlink or the directory fsync) failed: the target holds the caller's complete bytes,
+ * but the call cannot promise they are durable. The caller owns what it published.
+ */
+export const PUBLISH_INDETERMINATE = 'AUTHORITY_PUBLISH_CLEANUP_INCOMPLETE';
+
+/** Error for an indeterminate publication; `cause` is the failed cleanup step's error. */
+export class PublishIndeterminateError extends Error {
+  readonly code = PUBLISH_INDETERMINATE;
+  readonly path: string;
+  /** Whether the staged name is still present after the recovery attempt. */
+  readonly staged_remaining: boolean;
+
+  constructor(path: string, stagedRemaining: boolean, cause: unknown) {
+    super(PUBLISH_INDETERMINATE, { cause });
+    this.path = path;
+    this.staged_remaining = stagedRemaining;
+  }
+}
+
+/**
+ * Test seams (fault injection). They replace the raw step after the link, or stop the
+ * publication as a process crash would, with no cleanup at all.
+ */
 export interface PublishNoReplaceHooks {
-  readonly afterLink?: (staged: string) => void;
+  readonly crashAfterLink?: boolean;
+  readonly unlinkStaged?: (staged: string) => void;
+  readonly fsyncDirectory?: (directory: string) => void;
 }
 
 function fsyncDirectory(path: string): void {
@@ -27,13 +53,27 @@ function fsyncDirectory(path: string): void {
   }
 }
 
+function removeIfPresent(path: string): boolean {
+  try {
+    nodeUnlinkSync(path);
+    return false;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code !== 'ENOENT';
+  }
+}
+
 /**
  * Atomic no-replace publication (ADR-AUT-0005). The complete bytes go to a fresh staged
  * file beside `path`, which is fsynced, hard-linked to `path` (link(2) fails with EEXIST
  * when `path` exists, so nothing is ever replaced), and then unlinked; the directory is
  * fsynced last, so a returned call is durable. A reader sees either no file or the whole
- * file, never a partial one. A crash after the link leaves the complete file at `path`
- * and a stray staged name, which no reader treats as a record.
+ * file, never a partial one.
+ *
+ * A failure before the link removes the staged file and rethrows: nothing was published.
+ * A failure after the link is an indeterminate publication: the staged name is removed if
+ * it can be, and `PublishIndeterminateError` reports that the target holds the caller's
+ * bytes without a durability promise. A crash after the link leaves the complete target
+ * and a stray hidden staged link, which no reader treats as a record.
  */
 export function publishNoReplaceSteps(
   path: string,
@@ -64,7 +104,11 @@ export function publishNoReplaceSteps(
     nodeUnlinkSync(staged);
     throw error;
   }
-  hooks.afterLink?.(staged);
-  nodeUnlinkSync(staged);
-  fsyncDirectory(directory);
+  if (hooks.crashAfterLink === true) throw new Error('AUTHORITY_PUBLISH_SIMULATED_CRASH');
+  try {
+    (hooks.unlinkStaged ?? nodeUnlinkSync)(staged);
+    (hooks.fsyncDirectory ?? fsyncDirectory)(directory);
+  } catch (error) {
+    throw new PublishIndeterminateError(path, removeIfPresent(staged), error);
+  }
 }

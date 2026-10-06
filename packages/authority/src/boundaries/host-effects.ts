@@ -275,6 +275,27 @@ export const publishFileNoReplaceSync = guarded(
   },
   'mutation',
 );
+export { PUBLISH_INDETERMINATE } from './host-publish.js';
+
+/**
+ * Exact flush exception (ADR-AUT-0005): fsync one directory opened read-only and without
+ * following a final symbolic link, so a `.devai` entry just created in it is durable. It
+ * changes no bytes and names no new entry; the direct-mutator guard restricts its caller
+ * to the state-root initializer, which runs only inside an authorized init step.
+ */
+export function flushDirectoryEntrySync(path: string): void {
+  const fd = nodeOpenSync(
+    path,
+    nodeFileConstants.O_RDONLY |
+      (nodeFileConstants.O_DIRECTORY ?? 0) |
+      (nodeFileConstants.O_NOFOLLOW ?? 0),
+  );
+  try {
+    nodeFsyncSync(fd);
+  } finally {
+    nodeCloseSync(fd);
+  }
+}
 export const execFileSync = guarded('execFileSync', nodeExecFileSync, 'process');
 export const spawnSync = guarded('spawnSync', nodeSpawnSync, 'process');
 
