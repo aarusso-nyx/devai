@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import { decideRoundTaskAdmission, planRoundTaskAdmission } from './round-task-admission.js';
 import {
+  DEFAULT_LOCK_TTL_MS,
   LOCK_RENEWAL_INTERVAL_MS,
   WAITING_LOCK_TTL_MS,
   closeLockFence,
@@ -151,8 +152,8 @@ function locksAccountedFor(
  * lock TTL is never taken over. A dispatch that leaves its task waiting outside any
  * dispatch (`WAITING_STATUSES`) hands it the waiting lease (`WAITING_LOCK_TTL_MS`):
  * nothing renews a waiting task, and a lease lapsing during a human review would let
- * another task take the module before the completion. A lock found missing, held by another task, or
- * replaced by any record other than the one this task last held is a lost lock: the
+ * another task take the module before the completion. A lock found missing, held by
+ * another task, or replaced by any record other than the one this task last held is a lost lock: the
  * dispatch result cannot claim exclusive resources it no longer had. The final check
  * runs whatever status the dispatch left. A transition that released the locks
  * (`round-execution.json` resources.release_on) is accepted only if the task's own
@@ -174,7 +175,14 @@ async function dispatchWithLockRenewal(
     try {
       // Mid-dispatch, only a running task renews; the final check covers the rest.
       if (loadTask(options.repoRoot, task.id).status !== 'in_progress') return;
-      const renewal = renewLocks({ locksDir, taskId: task.id, targets });
+      // A task dispatched again after a wait returns from the waiting lease to the
+      // dispatch TTL, so a runner that stops mid-dispatch strands its locks for an hour.
+      const renewal = renewLocks({
+        locksDir,
+        taskId: task.id,
+        targets,
+        ttlMs: DEFAULT_LOCK_TTL_MS,
+      });
       for (const record of renewal.renewed) {
         held.set(`${record.substrate}:${record.module}`, lockIdentity(record));
       }
