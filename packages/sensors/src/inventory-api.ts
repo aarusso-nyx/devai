@@ -315,7 +315,7 @@ function sortEndpoints(endpoints: readonly ApiMapEndpoint[]): ApiMapEndpoint[] {
 }
 
 function measureInventoryApi(opts: InventoryApiOptions): InventoryApiResult {
-  const t0 = Date.now();
+  const t0 = performance.now();
   const ignoreDirs = opts.ignoreDirs ?? DEFAULT_IGNORE_DIRS;
   const scanDirs = uniqueExistingApiDirs(opts.scanDirs ?? [], opts.repoRoot);
   const generatedAt = opts.now ?? new Date().toISOString();
@@ -438,7 +438,7 @@ function measureInventoryApi(opts: InventoryApiOptions): InventoryApiResult {
     status,
     deterministic: true,
     tier: 'L0',
-    duration_ms: Date.now() - t0,
+    duration_ms: Math.round(performance.now() - t0),
     timestamp: generatedAt,
     ...(findings.length > 0 && { findings }),
     metrics: {

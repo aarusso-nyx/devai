@@ -131,7 +131,7 @@ async function runHttpProbe(
   charter: RuntimeProbeCharter,
   step: RuntimeProbeStep,
 ): Promise<ProbeOutcome> {
-  const t0 = Date.now();
+  const t0 = performance.now();
   const method = (step.method ?? 'GET').toUpperCase();
   const url = new URL(step.path ?? '/', charter.target.base_url).toString();
   const headers: Record<string, string> = {
@@ -168,7 +168,7 @@ async function runHttpProbe(
       failed_expectations: [
         `probe execution error: ${err instanceof Error ? err.message : String(err)}`,
       ],
-      duration_ms: Date.now() - t0,
+      duration_ms: Math.round(performance.now() - t0),
       ...(step.expect.invariant !== undefined && { invariant: step.expect.invariant }),
     };
   }
@@ -180,7 +180,7 @@ async function runHttpProbe(
     ...(observedStatus !== undefined && { observed_status: observedStatus }),
     observed_body_excerpt: bodyExcerpt,
     failed_expectations: failed,
-    duration_ms: Date.now() - t0,
+    duration_ms: Math.round(performance.now() - t0),
     ...(step.expect.invariant !== undefined && { invariant: step.expect.invariant }),
   };
 }

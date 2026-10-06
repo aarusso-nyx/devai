@@ -139,7 +139,7 @@ function endpointIdOf(e: ApiMapEndpoint): string {
 }
 
 function measureInventoryRbac(opts: InventoryRbacOptions): InventoryRbacResult {
-  const t0 = Date.now();
+  const t0 = performance.now();
   const generatedAt = opts.now ?? new Date().toISOString();
   const dataModelPath =
     opts.dataModelPath ??
@@ -388,7 +388,7 @@ function measureInventoryRbac(opts: InventoryRbacOptions): InventoryRbacResult {
     status,
     deterministic: true,
     tier: 'L0',
-    duration_ms: Date.now() - t0,
+    duration_ms: Math.round(performance.now() - t0),
     timestamp: generatedAt,
     ...(findings.length > 0 && { findings }),
     metrics: {
