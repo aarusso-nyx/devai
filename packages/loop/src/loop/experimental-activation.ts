@@ -5,6 +5,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { hostname } from 'node:os';
 import { dirname, join } from 'node:path';
 import {
+  PublicationIndeterminate,
   fsyncDirectorySync,
   mkdirDurableSync,
   publishCreateOnlyDurableSync,
@@ -169,9 +170,24 @@ interface ActivationLockOwner {
   readonly acquired_at: string;
 }
 
-/** The lock appears only with its complete owner record (ADR-AUT-0005), never empty. */
+/**
+ * The lock appears only with its complete owner record (ADR-AUT-0005), never empty. An
+ * indeterminate publication left this owner's lock in place, so it is removed before the
+ * refusal propagates.
+ */
 function createLock(path: string, owner: ActivationLockOwner): boolean {
-  return publishCreateOnlyDurableSync(path, `${JSON.stringify(owner)}\n`);
+  try {
+    return publishCreateOnlyDurableSync(path, `${JSON.stringify(owner)}\n`);
+  } catch (error) {
+    if (error instanceof PublicationIndeterminate) {
+      const held = readLock(path);
+      if (held !== undefined && held !== 'unreadable' && held.token === owner.token) {
+        unlinkSync(path);
+        fsyncDirectorySync(dirname(path));
+      }
+    }
+    throw error;
+  }
 }
 
 function readLock(path: string): ActivationLockOwner | 'unreadable' | undefined {
