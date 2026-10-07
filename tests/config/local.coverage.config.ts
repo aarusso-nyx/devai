@@ -1,5 +1,5 @@
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { globSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, relative, resolve } from 'node:path';
 import { defineConfig } from 'vitest/config';
 import type { Reporter, TestModule, TestRunEndReason, Vitest } from 'vitest/node';
 import {
@@ -71,13 +71,48 @@ export function localCoverageSidecar(counts: {
   };
 }
 
-/** The selector of a run: `full-suite`, or what narrowed it (file filter, name, shard, changed). */
+const BASE_EXCLUDE: readonly string[] = [
+  '**/node_modules/**',
+  '**/dist/**',
+  ...LOCAL_COVERAGE_EXCLUSIONS,
+];
+
+/** The test files of the declared population: `LOCAL_INCLUDE` minus the declared exclusions. */
+export function declaredPopulationFiles(repoRoot: string): readonly string[] {
+  const excluded = new Set<string>(LOCAL_COVERAGE_EXCLUSIONS);
+  return globSync([...LOCAL_INCLUDE], { cwd: repoRoot })
+    .map((file) => file.split('\\').join('/'))
+    .filter(
+      (file) =>
+        !excluded.has(file) &&
+        !file.split('/').includes('node_modules') &&
+        !file.split('/').includes('dist'),
+    )
+    .sort();
+}
+
+function differs(a: readonly string[] | undefined, b: readonly string[]): boolean {
+  if (a === undefined) return false;
+  return a.length !== b.length || [...a].sort().join('\n') !== [...b].sort().join('\n');
+}
+
+/**
+ * The selector of a run: `full-suite` only when nothing narrows the declared population.
+ * Anything else is recorded as what narrowed it: a file filter, a name pattern, a shard, a
+ * changed or related set, a project filter, an include or exclude that differs from the
+ * declared population, or a set of executed files that is not the declared population.
+ */
 export function runSelector(config: {
   readonly filters?: readonly string[];
   readonly testNamePattern?: unknown;
   readonly shard?: unknown;
   readonly changed?: unknown;
   readonly related?: readonly string[];
+  readonly project?: readonly string[];
+  readonly include?: readonly string[];
+  readonly exclude?: readonly string[];
+  readonly executedFiles?: readonly string[];
+  readonly declaredFiles?: readonly string[];
 }): string {
   const parts: string[] = [];
   if ((config.filters ?? []).length > 0) parts.push(`files ${(config.filters ?? []).join(' ')}`);
@@ -85,6 +120,18 @@ export function runSelector(config: {
   if (config.shard !== undefined) parts.push('shard');
   if (config.changed !== undefined && config.changed !== false) parts.push('changed files');
   if ((config.related ?? []).length > 0) parts.push('related files');
+  if ((config.project ?? []).length > 0) parts.push(`project ${(config.project ?? []).join(' ')}`);
+  if (differs(config.include, LOCAL_INCLUDE))
+    parts.push('include differs from the declared population');
+  if (differs(config.exclude, BASE_EXCLUDE))
+    parts.push('exclude differs from the declared exclusions');
+  if (config.executedFiles !== undefined && config.declaredFiles !== undefined) {
+    if (differs(config.executedFiles, config.declaredFiles)) {
+      parts.push(
+        `${String(config.executedFiles.length)} of ${String(config.declaredFiles.length)} declared test files`,
+      );
+    }
+  }
   return parts.length === 0 ? FULL_SUITE_SELECTOR : parts.join('; ');
 }
 
@@ -106,7 +153,7 @@ export class PopulationSidecarReporter implements Reporter {
   private passed = false;
   private version = 'unknown';
   private vitest: Vitest | undefined;
-  private subset: string | undefined;
+  private executedFiles: readonly string[] | undefined;
 
   constructor(
     private readonly sidecarPath: string = resolve(LOCAL_COVERAGE_SIDECAR),
@@ -124,19 +171,19 @@ export class PopulationSidecarReporter implements Reporter {
     this.filesMeasured = measuredFileCount(coverage);
   }
 
-  async onTestRunEnd(
+  onTestRunEnd(
     testModules: ReadonlyArray<TestModule>,
     _unhandledErrors: ReadonlyArray<unknown>,
     reason: TestRunEndReason,
   ): Promise<void> {
     this.passed = reason === 'passed';
     this.testFiles = testModules.length;
-    // The command-line file filters reach vitest after `onInit`, so a run is judged a subset
-    // by what it executed against the whole population as well as by its recorded filters.
-    const population = await this.vitest?.globTestSpecifications();
-    if (population !== undefined && population.length !== testModules.length) {
-      this.subset = `${String(testModules.length)} of ${String(population.length)} test files`;
-    }
+    // Command-line filters reach vitest after `onInit`, so the run is judged by what it
+    // executed against the declared population as well as by its recorded configuration.
+    this.executedFiles = testModules
+      .map((module) => relative(this.repoRoot, module.moduleId).split('\\').join('/'))
+      .sort();
+    return Promise.resolve();
   }
 
   /**
@@ -148,14 +195,14 @@ export class PopulationSidecarReporter implements Reporter {
     const config = this.vitest?.config;
     const filenamePattern = (this.vitest as { filenamePattern?: readonly string[] } | undefined)
       ?.filenamePattern;
-    const narrowed = runSelector({
+    const selector = runSelector({
       ...config,
       filters: filenamePattern ?? config?.filters ?? [],
+      ...(this.executedFiles !== undefined && {
+        executedFiles: this.executedFiles,
+        declaredFiles: declaredPopulationFiles(this.repoRoot),
+      }),
     });
-    const selector =
-      this.subset === undefined
-        ? narrowed
-        : [...(narrowed === FULL_SUITE_SELECTOR ? [] : [narrowed]), this.subset].join('; ');
     const commit = readHeadCommit(this.repoRoot);
     const reportSha256 = sha256OfFile(this.reportPath);
     const sidecar = localCoverageSidecar({
