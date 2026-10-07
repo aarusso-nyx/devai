@@ -129,6 +129,37 @@ describe('reviewed workflow step registry', () => {
     }
   });
 
+  // #338 follow-up: an executed script's local imports are executed too. The release build step
+  // runs the error-code generator, which imports scripts/error-code-sources.mjs; changing only
+  // that module must make the step read unknown until it is re-reviewed.
+  it('binds the local modules an executed script imports', () => {
+    const release = readFileSync(join(WORKFLOWS, 'release.yml'), 'utf8');
+    const build = workflowStepInventory(release, ROOT).find(
+      (step) => step.job === 'build-release' && step.index === 4,
+    );
+    expect(build?.files).toContain('scripts/generate-error-code-reference.mjs');
+    expect(build?.files).toContain('scripts/error-code-sources.mjs');
+    expect(build?.files?.some((path) => path.split('/').includes('dist'))).toBe(false);
+
+    const bound = [
+      ...new Set(workflowStepInventory(release, ROOT).flatMap((step) => step.files ?? [])),
+    ];
+    const tree = mkdtempSync(join(tmpdir(), 'devai-reviewed-imports-'));
+    try {
+      for (const path of bound) {
+        mkdirSync(dirname(join(tree, path)), { recursive: true });
+        cpSync(join(ROOT, path), join(tree, path));
+      }
+      for (const path of ['pnpm-workspace.yaml']) cpSync(join(ROOT, path), join(tree, path));
+      expect(jobEffectFacts(release, tree, 'build-release').effect).not.toBe('unknown');
+      const scanner = join(tree, 'scripts/error-code-sources.mjs');
+      writeFileSync(scanner, `${readFileSync(scanner, 'utf8')}// changed\n`);
+      expect(jobEffectFacts(release, tree, 'build-release').effect).toBe('unknown');
+    } finally {
+      rmSync(tree, { recursive: true, force: true });
+    }
+  });
+
   // #331 final review: package scripts are followed through npm pre/post hooks and nested
   // runs, and an incomplete resolution leaves the step without a file set, so it reads unknown.
   it('follows npm lifecycle scripts and fails closed on an incomplete resolution', () => {
