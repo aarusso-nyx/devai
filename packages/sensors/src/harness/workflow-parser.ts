@@ -1310,7 +1310,53 @@ export function stepExecutedFiles(
     return [...files].sort();
   }
   command(run, '', 0);
+  // An executed script also runs the local modules it imports (#338 follow-up): follow every
+  // relative `./` or `../` import of a .mjs/.js/.cjs file, transitively, so a change to an
+  // imported module reads unknown until its step is re-reviewed. The scan is textual, so a
+  // specifier that resolves to no repository file (an import written inside a string the script
+  // generates or checks) is skipped rather than bound; a genuinely missing import fails the step
+  // itself. Generated state (`.devai/`), build output (`dist/`) and installed packages
+  // (`node_modules/`) are not bound.
+  const pending = [...files].filter((path) => /\.(?:mjs|cjs|js)$/u.test(path));
+  const followed = new Set<string>();
+  while (pending.length > 0) {
+    const file = pending.pop() ?? '';
+    if (followed.has(file)) continue;
+    followed.add(file);
+    const source = reader.read(file);
+    if (source === undefined) continue;
+    for (const match of source.matchAll(LOCAL_IMPORT)) {
+      const target = resolveRelative(file, match[1] ?? '');
+      if (
+        target === undefined ||
+        target.startsWith('.devai/') ||
+        target.split('/').some((part) => part === 'node_modules' || part === 'dist') ||
+        reader.read(target) === undefined
+      ) {
+        continue;
+      }
+      files.add(target);
+      if (/\.(?:mjs|cjs|js)$/u.test(target)) pending.push(target);
+    }
+  }
   return complete ? [...files].sort() : undefined;
+}
+
+/** A static or dynamic import (or require) of a relative module specifier. */
+const LOCAL_IMPORT =
+  /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+|\brequire\s*\(\s*)['"](\.{1,2}\/[^'"\s]+)['"]/gu;
+
+/** `specifier` resolved against the directory of `file`, or undefined when it leaves the tree. */
+function resolveRelative(file: string, specifier: string): string | undefined {
+  const parts = file.split('/').slice(0, -1);
+  for (const part of specifier.split('/')) {
+    if (part === '' || part === '.') continue;
+    if (part === '..') {
+      if (parts.length === 0) return undefined;
+      parts.pop();
+    } else parts.push(part);
+  }
+  return parts.length === 0 ? undefined : parts.join('/');
 }
 
 /** Every step of every job in a workflow source with its canonical digest (#325 review aid). */

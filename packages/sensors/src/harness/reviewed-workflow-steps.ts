@@ -184,6 +184,14 @@ export const REVIEWED_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = Object.f
         sha256: 'f9a0f58f08e1d21616908f842b0b399e9446001e66b5943d84b40945788616be',
       },
       {
+        path: 'scripts/check-commit-range.mjs',
+        sha256: 'f2628ad61dc22236df0006289ec31d38981a5236df302b6d7d4c2a40737f6887',
+      },
+      {
+        path: 'scripts/pr-failure-diagnostics.mjs',
+        sha256: '07eab47fcd5e1c634f622cb764a4edfee044021b2aedd40d870f98477777c587',
+      },
+      {
         path: 'scripts/process/summarize-check-report.mjs',
         sha256: '61d42e1bc0cdaf3a9e68f7950be0ef49f5797e43a348b26415062f0bae37323f',
       },
@@ -440,6 +448,10 @@ export const REVIEWED_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = Object.f
         sha256: '1088a5f6ed6b7e6734f3717f8297743da23daec4e88f18d3cb1fb4cb7f0e7151',
       },
       {
+        path: 'scripts/error-code-sources.mjs',
+        sha256: '4eed494d0d3e2cf423d1872331e588305075ec26fffab307d3fe82b87dc4b79f',
+      },
+      {
         path: 'scripts/generate-action-registry.mjs',
         sha256: '6c6ff06564fa19539adec3c750351b78e4f3383e102dca60799ec87af78a82ea',
       },
@@ -470,8 +482,16 @@ export const REVIEWED_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = Object.f
         sha256: '495787f4705c8f8ddfbb6db148a8fb41f8334e149fa27a3d9910d48606c15cc4',
       },
       {
+        path: 'scripts/npm-pack-output.mjs',
+        sha256: '9b17e820eae545c816c7620a7f219e731f63ebeaa44b5e70e2d39bbddab54341',
+      },
+      {
         path: 'scripts/process/verify-pages-bytes.mjs',
         sha256: 'ffc5f0f64d50c410deb5011c2b532e28305887c60e532e26be4019d4b2a8bec7',
+      },
+      {
+        path: 'scripts/release-channel.mjs',
+        sha256: '944783e880f755afe140e935ba5e11bb37269bce9c3af848fff444d643a94304',
       },
       {
         path: 'scripts/stage-release-package.mjs',
@@ -657,8 +677,28 @@ export const REVIEWED_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = Object.f
       'Publishes or reconciles an external release surface (GitHub Release, GitHub Packages, or Pages) after its candidate and journal checks; runs only in a job with its environment and a non-cancelling lock.',
     files: [
       {
+        path: 'scripts/process/github-pages-journal.mjs',
+        sha256: '6ab7939892293bb43eeb64f9f3af78193654b2833ac4efe25e8b246c157af35b',
+      },
+      {
+        path: 'scripts/process/pages-publication.mjs',
+        sha256: '4a8aea3498e9788445bcf2640762baa3634764a18ee87e9f61b2cf2ab4822e48',
+      },
+      {
+        path: 'scripts/process/pages-runtime.mjs',
+        sha256: '705283bca49745b620444c142622f411c4ee0402d3370e2fbea6d8eaf7fc25cf',
+      },
+      {
         path: 'scripts/process/publish-pages.mjs',
         sha256: 'dba4da9070d2e9742dd507deac35810f67e757532bbaf0b4933e94f86b9abf82',
+      },
+      {
+        path: 'scripts/process/rehearsal.mjs',
+        sha256: 'f639f3484e7260ea57523ff2c4d9a1dddc1b04e843150919e0a3c2962dc8c175',
+      },
+      {
+        path: 'scripts/process/verify-pages-bytes.mjs',
+        sha256: 'ffc5f0f64d50c410deb5011c2b532e28305887c60e532e26be4019d4b2a8bec7',
       },
     ],
   },
@@ -747,6 +787,10 @@ export const REVIEWED_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = Object.f
       'Local verification, build, or binding step: writes only the workspace, runner files, or step outputs, and makes no external write.',
     files: [
       {
+        path: 'scripts/process/verify-pages-bytes.mjs',
+        sha256: 'ffc5f0f64d50c410deb5011c2b532e28305887c60e532e26be4019d4b2a8bec7',
+      },
+      {
         path: 'scripts/process/verify-site-preparation-artifact.mjs',
         sha256: '6e1e2593935a208d5b0eb47ac655ba32be6cc4ef2042be340dfe55c956329853',
       },
@@ -761,8 +805,24 @@ export const REVIEWED_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = Object.f
       'Publishes or reconciles an external release surface (GitHub Release, GitHub Packages, or Pages) after its candidate and journal checks; runs only in a job with its environment and a non-cancelling lock.',
     files: [
       {
+        path: 'scripts/process/github-pages-journal.mjs',
+        sha256: '6ab7939892293bb43eeb64f9f3af78193654b2833ac4efe25e8b246c157af35b',
+      },
+      {
+        path: 'scripts/process/pages-publication.mjs',
+        sha256: '4a8aea3498e9788445bcf2640762baa3634764a18ee87e9f61b2cf2ab4822e48',
+      },
+      {
+        path: 'scripts/process/pages-runtime.mjs',
+        sha256: '705283bca49745b620444c142622f411c4ee0402d3370e2fbea6d8eaf7fc25cf',
+      },
+      {
         path: 'scripts/process/publish-site.mjs',
         sha256: 'e88d9eeb6734adee1783ef7da410b65e36f6ddfaa12d7f9c26478f8c40987a7c',
+      },
+      {
+        path: 'scripts/process/verify-pages-bytes.mjs',
+        sha256: 'ffc5f0f64d50c410deb5011c2b532e28305887c60e532e26be4019d4b2a8bec7',
       },
       {
         path: 'scripts/process/verify-site-preparation-artifact.mjs',
