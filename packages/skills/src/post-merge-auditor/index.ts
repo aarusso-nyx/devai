@@ -1,7 +1,15 @@
 import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { mkdirSync, renameSync, rmSync } from '@devai-nyx/authority';
-import { canonicalSha256, git, gitAdministrationRoot, gitText, sha256 } from './support.js';
+import {
+  canonicalSha256,
+  git,
+  gitAdministrationRoot,
+  gitText,
+  isRecord,
+  sha256,
+} from './support.js';
+import { resolvePreviousObservation } from './previous-observation.js';
 import {
   FULL_SHA,
   verifyPostMergeHostReceipt,
@@ -39,6 +47,34 @@ export interface AuditObservationResult {
 }
 
 /**
+ * The previous commit an existing observation bundle links: its SHA, null when the
+ * bundle links nothing, or undefined when there is no readable bundle to replay.
+ */
+function recordedPrevious(bundleRoot: string): string | null | undefined {
+  const path = join(bundleRoot, 'backlog.json');
+  if (!existsSync(path)) return undefined;
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(path, 'utf8'));
+    const value = isRecord(parsed) ? parsed['previous_merge_sha'] : undefined;
+    if (value === null) return null;
+    return typeof value === 'string' && FULL_SHA.test(value) ? value : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** The previous observation digest an existing bundle's status.json records. */
+function recordedPreviousDigest(bundleRoot: string): string | null {
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(join(bundleRoot, 'status.json'), 'utf8'));
+    const value = isRecord(parsed) ? parsed['previous_observation_digest_sha256'] : undefined;
+    return typeof value === 'string' && /^[0-9a-f]{64}$/u.test(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Run the post-merge observation engine against the repository's exact current
  * HEAD without requiring a host receipt. This is the explicit Auditor facade;
  * it never promotes readiness and refuses an abbreviated or non-current SHA.
@@ -46,6 +82,8 @@ export interface AuditObservationResult {
 export async function runAuditObservation(opts: {
   readonly repoRoot: string;
   readonly at: string;
+  /** #335: a full commit SHA or a recorded scorecard id naming the previous observation. */
+  readonly previous?: string;
 }): Promise<AuditObservationResult> {
   const repoRoot = realpathSync(resolve(opts.repoRoot));
   if (!FULL_SHA.test(opts.at)) throw new Error('AUDIT_OBSERVE_FULL_SHA_REQUIRED');
@@ -60,15 +98,31 @@ export async function runAuditObservation(opts: {
   const targetRoot = join(stateRoot, opts.at);
   const stagingRoot = join(stateRoot, `${opts.at}.tmp-${process.pid.toString()}`);
   rmSync(stagingRoot, { recursive: true, force: true });
+  // #335: link the previous observation. A replay keeps the link its bundle already
+  // records, so a later observation of an intermediate commit cannot drift it.
+  const recorded = opts.previous === undefined ? recordedPrevious(targetRoot) : undefined;
+  const named = recorded === null ? undefined : (opts.previous ?? recorded);
+  const previous =
+    recorded === null
+      ? null
+      : resolvePreviousObservation({
+          repoRoot,
+          stateRoot,
+          at: opts.at,
+          ...(named === undefined ? {} : { previous: named }),
+        });
   await writeBundle(
     repoRoot,
     stateRoot,
     opts.at,
     timestamp,
-    null,
-    null,
+    previous?.mergeSha ?? null,
+    // A replay keeps the digest its bundle recorded, whatever the state holds now.
+    typeof recorded === 'string' ? recordedPreviousDigest(targetRoot) : (previous?.digest ?? null),
     false,
     `${opts.at}.tmp-${process.pid.toString()}`,
+    repoRoot,
+    previous?.observations ?? null,
   );
   const generatedRoot = stagingRoot;
   const generatedDigest = canonicalSha256(
