@@ -8,6 +8,12 @@ import { validators } from '@devai-nyx/schemas';
 import { renderActionFailure } from '../../src/action-output.js';
 import { renderAuthorityResult } from '../../src/authority/authority-results.js';
 import { canonicalRegistry } from '../../src/define-command.js';
+import { ERROR_CODE_PREFIXES } from '../../src/error-code-prefixes.js';
+import {
+  ERROR_CODE_PREFIXES as SCANNED_PREFIXES,
+  EXIT_CLASSES,
+  parseThrowSites,
+} from '../../../../scripts/error-code-sources.mjs';
 
 const ROOT = resolve(import.meta.dirname, '../../../..');
 const PER_ACTION = 'per action: set by the surfacing envelope';
@@ -98,45 +104,28 @@ describe('#338: the error-code reference declares what the CLI emits', () => {
   });
 
   it('agrees with every task, round and tracking throw site and its exit', () => {
-    const symbols: Readonly<Record<string, number>> = {
-      EXIT_USAGE: 2,
-      EXIT_FAIL: 2,
-      EXIT_GATE: 3,
-      EXIT_PRECONDITION: 5,
-    };
-    const classes: Readonly<Record<number, string>> = {
-      2: 'routing-authority',
-      3: 'gate-fail',
-      5: 'precondition',
-    };
+    // The generator and this test share one parser (scripts/error-code-sources.mjs), which reads
+    // multi-line arguments and trailing commas.
     let checked = 0;
     for (const pkg of ['cli', 'loop']) {
       for (const file of sourceFiles(join(ROOT, 'packages', pkg, 'src'))) {
-        const source = readFileSync(file, 'utf8');
-        const patterns = [
-          /new (?:TaskServiceError|TrackingCommandError)\(\s*(?:'([A-Z][A-Z0-9_]+)'|`([A-Z][A-Z0-9_]+):[^`]*`)\s*(?:,\s*([A-Z_]+|[0-9]))?\s*\)/gu,
-        ];
-        if (pkg === 'loop') {
-          patterns.push(/\bfail\(\s*'([A-Z][A-Z0-9_]+)'()\s*(?:,\s*([A-Z_]+|[0-9]))?\s*\)/gu);
-        }
-        for (const pattern of patterns) {
-          for (const match of source.matchAll(pattern)) {
-            const code = match[1] ?? match[2];
-            const symbol = match[3];
-            const exit =
-              symbol === undefined ? 2 : /^[0-9]$/u.test(symbol) ? Number(symbol) : symbols[symbol];
-            if (code === undefined || exit === undefined) continue;
-            const cell = reference.get(code);
-            if (cell === undefined || cell.startsWith('internal')) continue;
-            expect(cell, `${code} thrown with exit ${String(exit)} in ${file}`).toContain(
-              `${classes[exit] ?? '?'} / ${String(exit)}`,
-            );
-            checked += 1;
-          }
+        for (const { code, exit } of parseThrowSites(file, readFileSync(file, 'utf8'))) {
+          const cell = reference.get(code);
+          if (cell === undefined || cell.startsWith('internal')) continue;
+          expect(cell, `${code} thrown with exit ${String(exit)} in ${file}`).toContain(
+            `${EXIT_CLASSES.get(exit) ?? '?'} / ${String(exit)}`,
+          );
+          checked += 1;
         }
       }
     }
     expect(checked).toBeGreaterThan(50);
+    // A multi-line constructor with a trailing comma (tracking reconcile).
+    expect(reference.get('TRACKING_RECONCILE_REPLACEMENT_FORBIDDEN')).toBe('routing-authority / 2');
+  });
+
+  it('scans the same code prefixes the CLI accepts as refusal codes', () => {
+    expect([...ERROR_CODE_PREFIXES].sort()).toEqual([...SCANNED_PREFIXES].sort());
   });
 
   it('agrees with the authority renderer for every AUTHORITY_ code', () => {
