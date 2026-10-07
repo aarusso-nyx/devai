@@ -1,0 +1,628 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "CMP-0007",
+  "title": "Gate throughput: gate speed (F5:T7) and gate pass rate (F5:T9) to PASS",
+  "type": "campaign",
+  "status": "active",
+  "date": "2026-10-07",
+  "authority": "Architect",
+  "mandate": {
+    "kind": "owner-mandate",
+    "ref": "product/campaigns/CMP-0007-gate-throughput/decisions.md"
+  },
+  "goal": "Bring self-scorecard cells F5:T7 and F5:T9 to PASS without relaxing a threshold or a definition and without moving any node out of the pull-request lane. Baseline over the 30 days to main 92526921 (355 counted pull_request runs): harness_performance median 710 s against a target below 600 s (p95 1059 s, already passing), with test:cli 58% of job time because the check runner executes nodes one at a time; harness_green_main 86.8% against a target of at least 95%, with 47 failures of which 33 are real defects, 13 main-moved blocks, and 1 infrastructure (#247). Owner decisions D1 to D5 of 2026-10-07 (decisions.md): in-runner parallel workers first and sharding only if still above 600 s, auto-update branch, a pre-push preflight mandatory for agents and opt-in for humans, keep the F5:T9 definition, and ship 2.3.0 when both cells pass.",
+  "records": ["ADR-CHK-0007", "ADR-CHK-0001", "ADR-CHK-0004", "ADR-GOV-0018", "ADR-SCR-0010"],
+  "constraints": {
+    "self_dogfood": true,
+    "human_invoked_only": true,
+    "one_role_per_session": true,
+    "remote_effects": "forbidden"
+  },
+  "owner_effects": [
+    {
+      "id": "OE-02",
+      "description": "Enable the auto-update branch repository setting with the rebase update method (decision D2), after TASK-0721 records how it fits ADR-CHK-0004 and writes out the exact setting. OE-01 is not used: the campaign policy reserves it for a merge queue, which D2 did not choose, so serialized admission stays in force.",
+      "required_before": "R-0702",
+      "performed_at": null
+    },
+    {
+      "id": "OE-03",
+      "description": "Publish 2.3.0 (decision D5) once harness_performance and harness_green_main both read PASS over their post-change windows, from an exact candidate under a separately authorized release.",
+      "required_before": "R-0702",
+      "performed_at": null
+    }
+  ],
+  "prompts": {
+    "preamble": "prompts/preamble.md"
+  },
+  "review": {
+    "mode": "human"
+  },
+  "rounds": [
+    {
+      "id": "R-0701",
+      "title": "Gate speed (F5:T7)",
+      "goal": "The pull-request gate median falls below 600 s without dropping any planned node: the check runner executes independent plan nodes on a bounded worker pool under ADR-CHK-0007 (T1), test:cli is sharded across two jobs behind the single required check only if the median is still at or above 600 s afterwards (T2, conditional on D1), and the check-result cache persists across CI runs keyed by task input digest with the protected-namespace recapture rule kept (T3). Accepted when harness_performance over the post-change window of decisions.md reads a median below 600 s and every window run executed or accounted for its whole plan. Expected median about 345-430 s against the 710 s baseline.",
+      "status": "open",
+      "records": ["ADR-CHK-0007", "ADR-CHK-0001"],
+      "depends_on": [],
+      "attestation_reissue": true,
+      "owner_effects_required": [],
+      "close_checks": ["adrs", "schemas", "test:schemas", "test:cli", "campaign:check"],
+      "waves": [
+        {
+          "id": "CTG-0711",
+          "title": "Descriptor exclusivity keys and adopter scheduling rules",
+          "type": "single-role",
+          "records": ["ADR-CHK-0007"],
+          "depends_on": [],
+          "lock_scopes": [
+            "law/schemas/test-task-descriptor.schema.json",
+            "docs/adopters/test-tasks.md"
+          ],
+          "gates": ["schemas", "docs-links", "test:schemas"],
+          "tasks": [
+            {
+              "id": "TASK-0711",
+              "title": "Admit exclusivityKeys in the test task descriptor schema and document parallel scheduling for adopters",
+              "discipline": "architect",
+              "coupled_pipeline_position": "architect",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F1", "F5"],
+              "boundary": {
+                "paths": [
+                  "law/schemas/test-task-descriptor.schema.json",
+                  "docs/adopters/test-tasks.md"
+                ],
+                "forbidden": ["packages/", "tests/", "test-tasks.json", ".github/workflows/"]
+              },
+              "deliverables": [
+                "law/schemas/test-task-descriptor.schema.json admits the optional task field exclusivityKeys, an array of unique strings matching ^[a-z][a-z0-9:-]*$, with its description citing ADR-CHK-0007 rule 5; every existing descriptor still validates.",
+                "docs/adopters/test-tasks.md states the scheduling rules of ADR-CHK-0007 for adopter descriptors: the worker count default and its --task-workers and DEVAI_CHECK_TASK_WORKERS overrides, sequential release selections, plan-order reports, unchanged per-task timeouts, no fail-fast, and when to declare an exclusivity key."
+              ],
+              "acceptance_commands": [
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "schemas",
+                  "--format",
+                  "json"
+                ],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "docs-links",
+                  "--format",
+                  "json"
+                ],
+                ["pnpm", "run", "test:schemas"]
+              ],
+              "commit_types": ["law(schemas)", "docs(adopters)"],
+              "prompt": {
+                "path": "prompts/TASK-0711.md"
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "architect",
+                "effort": "high",
+                "time_budget_minutes": 60
+              }
+            }
+          ]
+        },
+        {
+          "id": "CTG-0712",
+          "title": "Bounded parallel check runner",
+          "type": "single-role",
+          "records": ["ADR-CHK-0007", "ADR-CHK-0001"],
+          "depends_on": [],
+          "lock_scopes": [
+            "packages/cli/src/services/check-runner/",
+            "packages/cli/src/commands/check/facade.ts",
+            "packages/cli/tests/unit/",
+            "test-tasks.json",
+            "docs/reference/error-codes.md"
+          ],
+          "gates": ["test:cli"],
+          "tasks": [
+            {
+              "id": "TASK-0712",
+              "title": "Execute independent check plan nodes on a bounded worker pool under ADR-CHK-0007",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": null,
+              "status": "ready",
+              "target_substrates": ["F2", "F5"],
+              "boundary": {
+                "paths": [
+                  "packages/cli/src/services/check-runner/",
+                  "packages/cli/src/commands/check/facade.ts",
+                  "packages/cli/tests/unit/",
+                  "test-tasks.json",
+                  "docs/reference/error-codes.md"
+                ],
+                "forbidden": ["law/", ".github/workflows/"]
+              },
+              "deliverables": [
+                "The check runner schedules plan nodes on a pool of at most W workers by rules 1 to 10 of ADR-CHK-0007: dependency readiness, plan-order admission, conflict serialization by exclusivity key, overlapping output path, or the implicit db key, plan-order report and receipt assembly, unchanged per-task timeouts, and no cancellation on failure.",
+                "check --run accepts --task-workers <n>, reads DEVAI_CHECK_TASK_WORKERS, defaults to min(4, availableParallelism()), refuses values outside 1..16 with CHECK_RUNNER_WORKERS before any node starts, and runs --rc, --release-intent, and protected execution sequentially; docs/reference/error-codes.md is regenerated for the new code.",
+                "test-tasks.json declares an exclusivity key for every shared resource the audit of its nodes finds, and tests cover IA-001 to IA-008 of ADR-CHK-0007 with an injected executor."
+              ],
+              "acceptance_commands": [
+                ["pnpm", "run", "typecheck"],
+                ["pnpm", "run", "test:cli"]
+              ],
+              "commit_types": ["feat(cli)", "test(cli)", "ci(test-tasks)", "docs(reference)"],
+              "prompt": {
+                "path": "prompts/TASK-0712.md"
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 240
+              }
+            }
+          ]
+        },
+        {
+          "id": "CTG-0713",
+          "title": "Shard test:cli behind the single required check (D1 fallback)",
+          "type": "single-role",
+          "records": ["ADR-CHK-0001"],
+          "depends_on": ["CTG-0712"],
+          "lock_scopes": [
+            ".github/workflows/pull-request-checks.yml",
+            "scripts/check-workflows.mjs",
+            "scripts/run-pr-release-gate.mjs",
+            "test-tasks.json"
+          ],
+          "gates": ["test:cli"],
+          "tasks": [
+            {
+              "id": "TASK-0713",
+              "title": "Shard test:cli across two jobs behind the single required check, only if the post-T1 median is still at or above 600 s",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F5"],
+              "boundary": {
+                "paths": [
+                  ".github/workflows/pull-request-checks.yml",
+                  "scripts/check-workflows.mjs",
+                  "scripts/run-pr-release-gate.mjs",
+                  "test-tasks.json"
+                ],
+                "forbidden": ["law/", "packages/"]
+              },
+              "deliverables": [
+                "Started only when harness_performance over the window after TASK-0712 still reads a median at or above 600 s (decision D1); otherwise the task is cancelled with that reading recorded.",
+                "test:cli runs as two shards in two jobs whose union is exactly the test:cli node set, an aggregator job reports the single required check devai-release-gate and fails when either shard fails or is missing, and scripts/check-workflows.mjs pins the shard pair and the aggregator."
+              ],
+              "acceptance_commands": [
+                ["pnpm", "run", "campaign:check"],
+                ["pnpm", "run", "test:cli"]
+              ],
+              "commit_types": ["ci(workflows)", "ci(scripts)", "ci(test-tasks)"],
+              "prompt": {
+                "path": "prompts/TASK-0713.md"
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 180
+              }
+            }
+          ]
+        },
+        {
+          "id": "CTG-0714",
+          "title": "Persist the check-result cache across CI runs",
+          "type": "single-role",
+          "records": ["ADR-CHK-0001"],
+          "depends_on": ["CTG-0712"],
+          "lock_scopes": [
+            ".github/workflows/pull-request-checks.yml",
+            "scripts/check-workflows.mjs",
+            "packages/cli/src/services/check-runner/cache.ts",
+            "packages/cli/tests/unit/"
+          ],
+          "gates": ["test:cli"],
+          "tasks": [
+            {
+              "id": "TASK-0714",
+              "title": "Persist the check-result cache across CI runs keyed by task input digest",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F5"],
+              "boundary": {
+                "paths": [
+                  ".github/workflows/pull-request-checks.yml",
+                  "scripts/check-workflows.mjs",
+                  "packages/cli/src/services/check-runner/cache.ts",
+                  "packages/cli/tests/unit/"
+                ],
+                "forbidden": ["law/", "test-tasks.json"]
+              },
+              "deliverables": [
+                "The pull-request workflow restores and saves the check-result cache keyed by task input digest, so a push that follows a fix reuses every unchanged PASS through the normal cache inspection.",
+                "A BLOCKED attempt is never restored as reusable (ADR-CHK-0001 IA-002), a protected-namespace node is still recaptured, and a restored cache never changes the planned node set; tests cover the three rules and scripts/check-workflows.mjs pins the cache steps."
+              ],
+              "acceptance_commands": [
+                ["pnpm", "run", "typecheck"],
+                ["pnpm", "run", "test:cli"]
+              ],
+              "commit_types": ["ci(workflows)", "ci(scripts)", "fix(cli)", "test(cli)"],
+              "prompt": {
+                "path": "prompts/TASK-0714.md"
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 180
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R-0702",
+      "title": "Remove avoidable gate failures (F5:T9)",
+      "goal": "Fewer runs fail for avoidable reasons, inside the current F5:T9 definition (D4): main-moved base-up-to-date blocks disappear through the auto-update branch setting with the rebase update method (T1, Owner effect OE-02), real defects are caught before push by a pre-push preflight that is mandatory for agents and opt-in for humans (T2, D3), the bootstrap cache is never restored without dist (T3, #247), and the doctor-check-result-identities flake candidate is resolved (T4). Accepted when the post-change window of decisions.md shows no main-moved failures, real-defect failures roughly halved against 33 in 355 baseline runs, and harness_green_main at or above 95%.",
+      "status": "planned",
+      "records": ["ADR-CHK-0004", "ADR-CHK-0001", "ADR-GOV-0018"],
+      "depends_on": [],
+      "attestation_reissue": false,
+      "owner_effects_required": ["OE-02", "OE-03"],
+      "close_checks": ["adrs", "docs-links", "test:cli", "campaign:check"],
+      "waves": [
+        {
+          "id": "CTG-0721",
+          "title": "Admit the rebase update-branch under ADR-CHK-0004",
+          "type": "single-role",
+          "records": ["ADR-CHK-0004"],
+          "depends_on": [],
+          "lock_scopes": [
+            "law/adr/",
+            "law/policy/adr-validation.json",
+            "docs/dev/operations/remote-preflight-contract.md"
+          ],
+          "gates": ["adrs", "docs-links"],
+          "tasks": [
+            {
+              "id": "TASK-0721",
+              "title": "Record how the auto-update branch with the rebase method fits serialized integration",
+              "discipline": "architect",
+              "coupled_pipeline_position": "architect",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F1", "F5"],
+              "boundary": {
+                "paths": [
+                  "law/adr/",
+                  "law/policy/adr-validation.json",
+                  "docs/dev/operations/remote-preflight-contract.md"
+                ],
+                "forbidden": ["packages/", ".github/workflows/"]
+              },
+              "deliverables": [
+                "A forward decision record amending ADR-CHK-0004, which rejected allow_update_branch because a merge commit breaks linear history: it admits the update branch only with the rebase update method, states what triggers an update when main moves so a stale gate run is superseded and cancelled rather than failed, and keeps strict up-to-date protection and the single required check; the catalogue is regenerated and re-pinned.",
+                "docs/dev/operations/remote-preflight-contract.md describes the update path, and the exact setting the Owner enables as OE-02 is written out for the Owner."
+              ],
+              "acceptance_commands": [
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "adrs",
+                  "--format",
+                  "json"
+                ],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "docs-links",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": ["law(adr)", "docs(operations)"],
+              "prompt": {
+                "path": "prompts/TASK-0721.md"
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "architect",
+                "effort": "high",
+                "time_budget_minutes": 90
+              }
+            }
+          ]
+        },
+        {
+          "id": "CTG-0722",
+          "title": "Pre-push preflight in the agent contract",
+          "type": "single-role",
+          "records": ["ADR-CHK-0001", "ADR-GOV-0018"],
+          "depends_on": ["CTG-0721"],
+          "lock_scopes": ["AGENTS.md", "docs/dev/operations/remote-preflight-contract.md"],
+          "gates": ["docs-links"],
+          "tasks": [
+            {
+              "id": "TASK-0722",
+              "title": "Make the pre-push preflight mandatory for agents in the contract and opt-in for humans",
+              "discipline": "architect",
+              "coupled_pipeline_position": "architect",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F1", "F5"],
+              "boundary": {
+                "paths": ["AGENTS.md", "docs/dev/operations/remote-preflight-contract.md"],
+                "forbidden": ["packages/", "scripts/", ".githooks/"]
+              },
+              "deliverables": [
+                "AGENTS.md requires every agent session to install and keep the pre-push preflight hook (decision D3), and docs/dev/operations/remote-preflight-contract.md states what the hook runs (the commit-grammar range check and the affected check against the fetched base), how a human opts in, and that the hook never replaces the CI gate."
+              ],
+              "acceptance_commands": [
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "docs-links",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": ["docs(agents)", "docs(operations)"],
+              "prompt": {
+                "path": "prompts/TASK-0722.md"
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "architect",
+                "effort": "medium",
+                "time_budget_minutes": 45
+              }
+            }
+          ]
+        },
+        {
+          "id": "CTG-0723",
+          "title": "Opt-in pre-push preflight hook",
+          "type": "single-role",
+          "records": ["ADR-CHK-0001", "ADR-GOV-0018"],
+          "depends_on": ["CTG-0722"],
+          "lock_scopes": [
+            ".githooks/pre-push",
+            "scripts/install-repository-hooks.mjs",
+            "scripts/pre-push-preflight.mjs",
+            "tests/integration/"
+          ],
+          "gates": ["test:root"],
+          "tasks": [
+            {
+              "id": "TASK-0723",
+              "title": "Ship an opt-in pre-push hook that runs the commit-grammar range check and the affected check",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F5"],
+              "boundary": {
+                "paths": [
+                  ".githooks/pre-push",
+                  "scripts/install-repository-hooks.mjs",
+                  "scripts/pre-push-preflight.mjs",
+                  "tests/integration/"
+                ],
+                "forbidden": ["law/", ".github/workflows/"]
+              },
+              "deliverables": [
+                ".githooks/pre-push runs scripts/pre-push-preflight.mjs, which fetches the base, runs scripts/check-commit-range.mjs over the pushed range, and runs check --affected --run against the fetched base; it refuses the push on a failure, names the failing node, and a BLOCKED probe names the environment fix.",
+                "pnpm run hooks:install installs the hook alongside the commit-msg and pre-commit hooks without enabling it for a human who has not opted in, and an integration test covers a refused range and a clean push."
+              ],
+              "acceptance_commands": [["pnpm", "run", "test:root"]],
+              "commit_types": ["ci(hooks)", "ci(scripts)", "test(hooks)"],
+              "prompt": {
+                "path": "prompts/TASK-0723.md"
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker",
+                "effort": "medium",
+                "time_budget_minutes": 120
+              }
+            }
+          ]
+        },
+        {
+          "id": "CTG-0724",
+          "title": "Bootstrap cache restored without dist (#247)",
+          "type": "single-role",
+          "records": ["ADR-CHK-0001"],
+          "depends_on": [],
+          "lock_scopes": [
+            ".github/workflows/pull-request-checks.yml",
+            "scripts/check-workflows.mjs"
+          ],
+          "gates": ["test:cli"],
+          "tasks": [
+            {
+              "id": "TASK-0724",
+              "title": "Never restore the pr-bootstrap cache without its compiled dist (#247)",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F5"],
+              "boundary": {
+                "paths": [
+                  ".github/workflows/pull-request-checks.yml",
+                  "scripts/check-workflows.mjs"
+                ],
+                "forbidden": ["law/", "packages/"]
+              },
+              "deliverables": [
+                "A pr-bootstrap cache hit whose restored tree lacks the compiled dist of any workspace package is treated as a miss and rebuilt, so the gate never dies at bootstrap with ERR_MODULE_NOT_FOUND; scripts/check-workflows.mjs pins the guard; issue #247 is closed by the merging pull request."
+              ],
+              "acceptance_commands": [["node", "scripts/check-workflows.mjs"]],
+              "commit_types": ["ci(workflows)", "ci(scripts)"],
+              "prompt": {
+                "path": "prompts/TASK-0724.md"
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker",
+                "effort": "medium",
+                "time_budget_minutes": 60
+              }
+            }
+          ]
+        },
+        {
+          "id": "CTG-0725",
+          "title": "Flake candidate doctor-check-result-identities",
+          "type": "single-role",
+          "records": ["ADR-CHK-0001"],
+          "depends_on": [],
+          "lock_scopes": ["packages/cli/tests/unit/doctor-check-result-identities.test.ts"],
+          "gates": ["test:cli"],
+          "tasks": [
+            {
+              "id": "TASK-0725",
+              "title": "Resolve the doctor-check-result-identities flake candidate",
+              "discipline": "inspector",
+              "coupled_pipeline_position": "inspector",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F5"],
+              "boundary": {
+                "paths": ["packages/cli/tests/unit/doctor-check-result-identities.test.ts"],
+                "forbidden": ["packages/cli/src/", "law/"]
+              },
+              "deliverables": [
+                "The candidate is reproduced under load or shown deterministic with the evidence recorded in the pull request; a real timing dependency is removed from the test without weakening any assertion, or a product defect is recorded to the backlog under ADR-GOV-0019 for an Engineer task. No retry is added."
+              ],
+              "acceptance_commands": [
+                [
+                  "pnpm",
+                  "exec",
+                  "vitest",
+                  "run",
+                  "--config",
+                  "tests/config/local.config.ts",
+                  "packages/cli/tests/unit/doctor-check-result-identities.test.ts"
+                ]
+              ],
+              "commit_types": ["test(cli)"],
+              "prompt": {
+                "path": "prompts/TASK-0725.md"
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker",
+                "effort": "medium",
+                "time_budget_minutes": 60
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R-0703",
+      "title": "F5:T9 measurement (deferred under D4)",
+      "goal": "Only if the Owner later chooses it: redefine F5:T9 so it measures the outcome of the gate rather than developer iteration, either the final commit of each branch or merge_group runs, through a forward record on ADR-SCR-0010 and law/policy/sensor-notes/harness_green_main.md. Changes what the cell means, never what the gate checks.",
+      "status": "planned",
+      "records": ["ADR-SCR-0010"],
+      "depends_on": ["R-0702"],
+      "attestation_reissue": false,
+      "owner_effects_required": [],
+      "close_checks": ["adrs", "campaign:check"],
+      "disposition": "Deferred by Owner decision D4 of 2026-10-07: keep the current F5:T9 definition and revisit after the R-0702 window. The round is never opened without a new Owner decision.",
+      "waves": [
+        {
+          "id": "CTG-0731",
+          "title": "Redefine the F5:T9 measurement",
+          "type": "single-role",
+          "records": ["ADR-SCR-0010"],
+          "depends_on": [],
+          "lock_scopes": [
+            "law/adr/",
+            "law/policy/adr-validation.json",
+            "law/policy/sensor-notes/harness_green_main.md"
+          ],
+          "gates": ["adrs"],
+          "tasks": [
+            {
+              "id": "TASK-0731",
+              "title": "Record a redefined F5:T9 measurement if the Owner reverses D4",
+              "discipline": "architect",
+              "coupled_pipeline_position": "architect",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F1", "F5"],
+              "boundary": {
+                "paths": [
+                  "law/adr/",
+                  "law/policy/adr-validation.json",
+                  "law/policy/sensor-notes/harness_green_main.md"
+                ],
+                "forbidden": ["packages/", ".github/workflows/"]
+              },
+              "deliverables": [
+                "Only after a new Owner decision: a forward record on ADR-SCR-0010 naming the population harness_green_main reads, the matching sensor note, and the regenerated and re-pinned catalogue."
+              ],
+              "acceptance_commands": [
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "adrs",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": ["law(adr)", "law(policy)"],
+              "prompt": {
+                "path": "prompts/TASK-0731.md"
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "architect",
+                "effort": "high",
+                "time_budget_minutes": 60
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
