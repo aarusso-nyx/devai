@@ -441,6 +441,7 @@ authoritative for that invocation.
 | `COVERAGE_PRODUCER_RECURSION` | coverage producer recursion | Stable diagnostic for coverage producer recursion. | Follow the structured envelope remediation and retry only after its condition is satisfied. | failure / 2 |
 | `COVERAGE_PRODUCER_REFUSED` | coverage producer refused | Stable diagnostic for coverage producer refused. | Follow the structured envelope remediation and retry only after its condition is satisfied. | failure / 2 |
 | `COVERAGE_REPORT_MISSING` | coverage report missing | Stable diagnostic for coverage report missing. | Follow the structured envelope remediation and retry only after its condition is satisfied. | failure / 2 |
+| `COVERAGE_REPORT_UNBOUND` | coverage report unbound | Stable diagnostic for coverage report unbound. | Follow the structured envelope remediation and retry only after its condition is satisfied. | failure / 2 |
 | `COVERAGE_REPORT_UNREADABLE` | coverage report unreadable | Stable diagnostic for coverage report unreadable. | Follow the structured envelope remediation and retry only after its condition is satisfied. | failure / 2 |
 | `COVERAGE_REQUIRES_API_MAP` | coverage requires api map | Stable diagnostic for coverage requires api map. | Follow the structured envelope remediation and retry only after its condition is satisfied. | failure / 2 |
 | `COVERAGE_REQUIRES_ROUTES` | coverage requires routes | Stable diagnostic for coverage requires routes. | Follow the structured envelope remediation and retry only after its condition is satisfied. | failure / 2 |

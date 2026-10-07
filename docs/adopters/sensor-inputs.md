@@ -145,6 +145,11 @@ declaration names the population beside the report
 writes the report also writes a `population.json` sidecar beside it naming the population, the
 include globs, the excluded suites, and the count of files measured; the sensor reads the
 sidecar and refuses a report whose population or exclusion list differs from the declaration.
+The sidecar also binds the report to its producer run: the commit, the producer identity and
+version, the selector (`full-suite`, or what narrowed the run), and the report's SHA-256. The
+sensor reuses an existing report only when that binding names the current commit, the full suite
+and the report's own digest; a stale, partial or unbound report is removed and the producer runs
+again, and a report the producer itself leaves unbound reads FAIL with `COVERAGE_REPORT_UNBOUND`.
 The reading then states the population in `metrics` and in its finding text, so two scorecards
 measured over different populations are read as such and never compared ratio to ratio.
 
