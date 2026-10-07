@@ -154,7 +154,7 @@ export const REVIEWED_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = Object.f
     files: [
       {
         path: 'package.json',
-        sha256: 'e25301e562bbe9938a02f44aab6937c7aa177b30b3bf6b207b5c285ccf9137e3',
+        sha256: 'f9a0f58f08e1d21616908f842b0b399e9446001e66b5943d84b40945788616be',
       },
       {
         path: 'scripts/process/bootstrap-check-runner.mjs',
@@ -181,7 +181,7 @@ export const REVIEWED_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = Object.f
     files: [
       {
         path: 'package.json',
-        sha256: 'e25301e562bbe9938a02f44aab6937c7aa177b30b3bf6b207b5c285ccf9137e3',
+        sha256: 'f9a0f58f08e1d21616908f842b0b399e9446001e66b5943d84b40945788616be',
       },
       {
         path: 'scripts/process/summarize-check-report.mjs',
@@ -323,7 +323,7 @@ export const REVIEWED_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = Object.f
     files: [
       {
         path: 'package.json',
-        sha256: 'e25301e562bbe9938a02f44aab6937c7aa177b30b3bf6b207b5c285ccf9137e3',
+        sha256: 'f9a0f58f08e1d21616908f842b0b399e9446001e66b5943d84b40945788616be',
       },
     ],
   },
@@ -353,7 +353,7 @@ export const REVIEWED_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = Object.f
       },
       {
         path: 'package.json',
-        sha256: 'e25301e562bbe9938a02f44aab6937c7aa177b30b3bf6b207b5c285ccf9137e3',
+        sha256: 'f9a0f58f08e1d21616908f842b0b399e9446001e66b5943d84b40945788616be',
       },
       {
         path: 'packages/authority/package.json',
@@ -361,7 +361,7 @@ export const REVIEWED_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = Object.f
       },
       {
         path: 'packages/cli/package.json',
-        sha256: '0cdc5824b1047d911fd6088dcd34b1438c381fe2fb645c94d354ef4f3114978d',
+        sha256: '07a360dab2830234f21311297ee9e9a58abacd2d45965f19c29f161adbf860aa',
       },
       {
         path: 'packages/cli/scripts/assemble-package.mjs',
@@ -498,7 +498,7 @@ export const REVIEWED_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = Object.f
     files: [
       {
         path: 'package.json',
-        sha256: 'e25301e562bbe9938a02f44aab6937c7aa177b30b3bf6b207b5c285ccf9137e3',
+        sha256: 'f9a0f58f08e1d21616908f842b0b399e9446001e66b5943d84b40945788616be',
       },
     ],
   },
@@ -599,7 +599,7 @@ export const REVIEWED_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = Object.f
     files: [
       {
         path: 'package.json',
-        sha256: 'e25301e562bbe9938a02f44aab6937c7aa177b30b3bf6b207b5c285ccf9137e3',
+        sha256: 'f9a0f58f08e1d21616908f842b0b399e9446001e66b5943d84b40945788616be',
       },
       {
         path: 'scripts/process/publication-state.mjs',
