@@ -160,6 +160,63 @@ describe('reviewed workflow step registry', () => {
     }
   });
 
+  // #344 review: a computed dynamic import can load any module, so an executed script that has
+  // one leaves the step incomplete unless the reviewed entry declares the files that cover it.
+  it('fails closed on a computed import unless declared covers pin what it loads', () => {
+    const tree = mkdtempSync(join(tmpdir(), 'devai-computed-imports-'));
+    const put = (path: string, text: string): void => {
+      mkdirSync(dirname(join(tree, path)), { recursive: true });
+      writeFileSync(join(tree, path), text);
+    };
+    const step = 'jobs:\n  build:\n    steps:\n      - run: node scripts/load.mjs\n';
+    const files = (covers?: readonly string[]) =>
+      workflowStepInventory(step, tree, covers === undefined ? undefined : () => covers)[0]?.files;
+    try {
+      put(
+        'scripts/load.mjs',
+        "const target = process.env.GATE ?? '../src/gate.ts';\nawait import(new URL(target, import.meta.url).href);\n",
+      );
+      put('src/gate.ts', 'export const gate = 1;\n');
+      // No declaration: the file set is incomplete, so no reviewed entry can match it.
+      expect(files()).toBeUndefined();
+      // Declared covers: the loaded module joins the executed set, so its digest is pinned.
+      expect(files(['src/gate.ts'])).toEqual(['scripts/load.mjs', 'src/gate.ts']);
+      // A declared cover that does not exist fails closed too.
+      expect(files(['src/missing.ts'])).toBeUndefined();
+      // A literal dynamic import is followed like a static one and needs no declaration.
+      put('scripts/load.mjs', "await import('../src/gate.ts');\n");
+      expect(files()).toEqual(['scripts/load.mjs', 'src/gate.ts']);
+    } finally {
+      rmSync(tree, { recursive: true, force: true });
+    }
+  });
+
+  it('pins the CI invariant gate the site-preparation step loads through a computed import', () => {
+    const publish = readFileSync(join(WORKFLOWS, 'site-publish.yml'), 'utf8');
+    const prepare = workflowStepInventory(publish, ROOT).find(
+      (step) => step.job === 'prepare-site' && step.index === 4,
+    );
+    expect(prepare?.files).toContain('scripts/process/verify-site-preparation-artifact.mjs');
+    expect(prepare?.files).toContain('packages/sensors/src/ci-invariant-gate.ts');
+
+    const bound = [
+      ...new Set(workflowStepInventory(publish, ROOT).flatMap((step) => step.files ?? [])),
+    ];
+    const tree = mkdtempSync(join(tmpdir(), 'devai-reviewed-computed-'));
+    try {
+      for (const path of bound) {
+        mkdirSync(dirname(join(tree, path)), { recursive: true });
+        cpSync(join(ROOT, path), join(tree, path));
+      }
+      expect(jobEffectFacts(publish, tree, 'prepare-site').effect).not.toBe('unknown');
+      const gate = join(tree, 'packages/sensors/src/ci-invariant-gate.ts');
+      writeFileSync(gate, `${readFileSync(gate, 'utf8')}// changed\n`);
+      expect(jobEffectFacts(publish, tree, 'prepare-site').effect).toBe('unknown');
+    } finally {
+      rmSync(tree, { recursive: true, force: true });
+    }
+  });
+
   // #331 final review: package scripts are followed through npm pre/post hooks and nested
   // runs, and an incomplete resolution leaves the step without a file set, so it reads unknown.
   it('follows npm lifecycle scripts and fails closed on an incomplete resolution', () => {
