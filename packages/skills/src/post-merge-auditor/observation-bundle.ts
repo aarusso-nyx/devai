@@ -140,6 +140,9 @@ export async function writeBundle(
   injectFailure: boolean,
   bundleKey = mergeSha,
   storeRoot = worktreeRoot,
+  // #335: a caller that resolved the previous bundle elsewhere (the chain) passes its
+  // observations; undefined reads the previous bundle from this state directory.
+  previous?: readonly ObservationBacklogObservation[] | null,
 ): Promise<string> {
   const bundleRoot = join(stateRoot, bundleKey);
   mkdirSync(bundleRoot, { recursive: true });
@@ -166,7 +169,8 @@ export async function writeBundle(
       mergeSha,
       previousMergeSha,
       generatedAt: timestamp,
-      previous: previousObservations(stateRoot, previousMergeSha),
+      previous:
+        previous === undefined ? previousObservations(stateRoot, previousMergeSha) : previous,
     });
     if (!validateObservationBacklog(backlog).ok) throw new Error('POST_MERGE_BACKLOG_INVALID');
     if (!validators.inventory(inventory)) throw new Error('POST_MERGE_INVENTORY_INVALID');
