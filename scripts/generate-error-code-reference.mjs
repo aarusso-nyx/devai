@@ -113,7 +113,7 @@ const declaredCodes = new Map([
   ['INIT_INTERACTIVE_EDIT_REFUSED', 'precondition / 5'],
   ['INIT_INTERACTIVE_FAILED', 'infrastructure / 6'],
   ['INIT_INTERACTIVE_INVOCATION_FAILED', 'precondition / 5'],
-  ['INIT_INTERACTIVE_MODE_INVALID', 'invalid-input / 2'],
+  ['INIT_INTERACTIVE_MODE_INVALID', 'invalid-input / 4'],
   ['INIT_TARGET_PRECONDITION_UNSATISFIED', 'precondition / 5'],
   ['INIT_UPGRADE_POSTCHECK_FAILED', 'gate-fail / 3'],
   // packages/cli/src/services/self-dogfood.ts refusal.
