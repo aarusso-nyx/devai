@@ -459,3 +459,45 @@ describe('backlog actions with the network boundary denied', () => {
     }
   });
 });
+
+/** The `Exit class` cell of one row of the generated error-code reference. */
+function referenceExitClass(code: string): string | undefined {
+  const reference = readFileSync(
+    resolve(import.meta.dirname, '../../../../docs/reference/error-codes.md'),
+    'utf8',
+  );
+  const row = reference.split('\n').find((line) => line.startsWith(`| \`${code}\` |`));
+  return row?.split('|').at(-2)?.trim();
+}
+
+describe('the error-code reference states what the backlog commands emit', () => {
+  it('matches the emitted backlog failure payload and exit for each sampled code', async () => {
+    const { backlogCommands } = await facades();
+    const { root } = repository();
+    const uncommitted = realpathSync(mkdtempSync(join(tmpdir(), 'devai-backlog-uncommitted-')));
+    roots.push(uncommitted);
+    git(uncommitted, ['init', '--quiet']);
+    const cases: readonly (readonly [string, string, readonly string[]])[] = [
+      ['BACKLOG_STATUS_INVALID', root, ['backlog-list', '--status', 'bogus']],
+      ['BACKLOG_ITEM_NOT_FOUND', root, ['backlog-show', 'BL-0404']],
+      [
+        'BACKLOG_ORIGIN_COMMIT_UNAVAILABLE',
+        uncommitted,
+        ['backlog-add', '--kind', 'note', '--title', 't', '--body', 'b'],
+      ],
+    ];
+    for (const [code, repo, argv] of cases) {
+      const result = await invoke(backlogCommands, repo, argv);
+      const payload = JSON.parse(result.stderr) as { code: string; exit: number };
+      expect(payload.code, argv.join(' ')).toBe(code);
+      expect(result.exit, code).toBe(payload.exit);
+      expect(referenceExitClass(code), code).toBe(`backlog-payload / ${String(payload.exit)}`);
+    }
+  });
+
+  it('marks the model-bridge codes internal, since no envelope carries them as its code', () => {
+    for (const code of ['MODEL_BRIDGE_CODEX_INCOMPATIBLE', 'MODEL_BRIDGE_MODEL_REQUIRED']) {
+      expect(referenceExitClass(code), code).toBe('internal / none');
+    }
+  });
+});
