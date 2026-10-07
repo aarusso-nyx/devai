@@ -19,6 +19,7 @@ const sourceRoots = readdirSync(join(root, 'packages'), { withFileTypes: true })
 const notCodes = new Set(['ACTION_EFFECTS', 'GITHUB_TOKEN', 'POST_CUTOFF', 'RELEASE_TAG']);
 const prefixes = new Set([
   'ACTION',
+  'ACTIONS',
   'ADOPTER',
   'AGENT',
   'ARTIFACT',
@@ -82,30 +83,57 @@ function filesUnder(path) {
   });
 }
 
-function exitValues() {
-  const source = readFileSync(join(root, 'packages/utils/src/exit.ts'), 'utf8');
-  const value = (name) =>
-    Number(new RegExp(`export const ${name} = (\\d+);`, 'u').exec(source)?.[1]);
-  return {
-    pass: value('EXIT_PASS'),
-    review: value('EXIT_REVIEW'),
-    fail: value('EXIT_FAIL'),
-    usage: value('EXIT_USAGE'),
-    precondition: value('EXIT_PRECONDITION'),
-  };
-}
+// #338: the `Exit class` cell is declared, never guessed from a code's name. Each entry names the
+// class and exit the CLI emits and where that comes from;
+// packages/cli/tests/unit/error-code-reference.test.ts checks the declarations against the emitting
+// code (literal cliError constructors, the authority renderer and the action-output wrapper). A code without a declaration is raised as a
+// message or payload whose class and exit are set by the envelope of the action that surfaces it,
+// and the cell says exactly that.
+const PER_ACTION = 'per action: set by the surfacing envelope';
 
-// BACKLOG_* codes are never an envelope code. The backlog commands write their own failure payload
-// `{code, operation, exit}` (packages/cli/src/commands/backlog/index.ts `failure()`) and exit with
-// its `exit`: 1 for the codes below, EXIT_USAGE for every other one. Under `--format json` the action
-// wrapper carries that payload in `error.context.payload` of ACTION_INVOCATION_REFUSED (payload exit
-// 2) or ACTION_OUTPUT_CONTRACT_VIOLATION (payload exit 1).
-const backlogPayloadExitOne = new Set([
+// Literal envelope constructors (`cliError({ code, class, exit })`) and verified emitters.
+const declaredCodes = new Map([
+  // packages/cli/src/commands/actions constructor.
+  ['ACTIONS_LIST_OUTPUT_INVALID', 'contract-violation / 7'],
+  // packages/cli/src/action-output.ts errorCode()/errorClass(): the wrapper's normalized codes.
+  ['ACTION_GATE_FAILED', 'gate-fail / 3'],
+  ['ACTION_INVOCATION_REFUSED', 'routing-authority / 2 (invalid-input / 4, infrastructure / 6)'],
+  ['ACTION_OUTPUT_CONTRACT_VIOLATION', 'contract-violation / 7'],
+  ['ACTION_PRECONDITION_UNSATISFIED', 'precondition / 5'],
+  // packages/cli/src/commands/check/facade.ts and command-router.ts constructors.
+  ['CHECK_MEMBER_UNKNOWN', 'routing-authority / 2'],
+  ['CHECK_RC_DB_TESTS_REQUIRED', 'precondition / 5'],
+  ['CHECK_RUNNER_DESCRIPTOR', 'precondition / 5'],
+  ['CHECK_SELECTION_INVALID', 'routing-authority / 2'],
+  ['CHECK_TASK_DESCRIPTOR_MISSING', 'precondition / 5'],
+  // ADR-CHK-0005: member result statuses, not refusal envelopes.
+  ['CHECK_MEMBER_NOT_APPLICABLE', 'not-applicable result / 0'],
+  ['CHECK_MEMBER_POPULATION_EMPTY', 'review result / 1'],
+  // packages/cli/src/commands/init constructors.
+  ['INIT_INTERACTIVE_EDIT_REFUSED', 'precondition / 5'],
+  ['INIT_INTERACTIVE_FAILED', 'infrastructure / 6'],
+  ['INIT_INTERACTIVE_INVOCATION_FAILED', 'precondition / 5'],
+  ['INIT_INTERACTIVE_MODE_INVALID', 'invalid-input / 2'],
+  ['INIT_TARGET_PRECONDITION_UNSATISFIED', 'precondition / 5'],
+  ['INIT_UPGRADE_POSTCHECK_FAILED', 'gate-fail / 3'],
+  // packages/cli/src/services/self-dogfood.ts refusal.
+  ['POLICY_DENY', 'routing-authority / 2'],
+  // packages/cli/src/command-router.ts and the sense facade constructors.
+  ['SENSE_SELECTION_INVALID', 'routing-authority / 2'],
+  ['SENSOR_KIND_SCHEMA_UNSUPPORTED', 'routing-authority / 2'],
+  ['SENSOR_KIND_UNKNOWN', 'routing-authority / 2'],
+  ['SENSOR_OPTIONAL_DEPENDENCY_MISSING', 'precondition / 5'],
+  // packages/loop/src/loop/task-queue-services.ts: thrown with EXIT_PRECONDITION in the task payload.
+  ['TASK_ROUND_INACTIVE', 'precondition / 5'],
+]);
+
+// packages/cli/src/commands/backlog/index.ts failure(): a refusal envelope carrying the backlog code.
+const backlogPrecondition = new Set([
   'BACKLOG_ITEM_ALREADY_RESOLVED',
   'BACKLOG_ITEM_NOT_FOUND',
-  'BACKLOG_OPERATION_FAILED',
   'BACKLOG_ORIGIN_COMMIT_UNAVAILABLE',
 ]);
+
 // Codes that no envelope or command payload carries as its code, with where they surface instead.
 const internalCodes = new Map([
   [
@@ -124,33 +152,25 @@ function internalNote(code) {
   return undefined;
 }
 
-function classify(code, exits) {
-  if (internalNote(code) !== undefined) return ['internal', 'none'];
+// packages/cli/src/authority/authority-results.ts renderAuthorityResult(): the CLI's own rule.
+function authorityClass(code) {
+  if (code.includes('CONTRACT') || code.includes('INVALID') || code.includes('DIVERGENCE'))
+    return 'contract-violation / 7';
+  if (code.includes('TIMEOUT') || code.includes('CRASH') || code.includes('SIGNAL'))
+    return 'infrastructure / 6';
+  return 'routing-authority / 2 (precondition / 5 for a dependency error)';
+}
+
+function classify(code) {
+  if (internalNote(code) !== undefined) return 'internal / none';
+  if (declaredCodes.has(code)) return declaredCodes.get(code);
+  if (code === 'BACKLOG_OPERATION_FAILED') return 'infrastructure / 6';
   if (code.startsWith('BACKLOG_'))
-    return ['backlog-payload', backlogPayloadExitOne.has(code) ? 1 : exits.usage];
-  // ADR-CHK-0005: not-applicable is its own result class, never a failure.
-  if (code === 'CHECK_MEMBER_NOT_APPLICABLE') return ['not-applicable', exits.pass];
-  if (code === 'CHECK_MEMBER_POPULATION_EMPTY') return ['review', exits.review];
-  if (code.startsWith('AUTHORITY_') || code === 'POLICY_DENY')
-    return ['routing-authority', exits.usage];
-  if (
-    code === 'CHECK_SELECTION_INVALID' ||
-    code === 'CHECK_MEMBER_UNKNOWN' ||
-    code.startsWith('ROUTE_') ||
-    code.endsWith('_USAGE') ||
-    code.endsWith('_ARGUMENT')
-  )
-    return ['usage', exits.usage];
-  if (
-    code === 'CHECK_RUNNER_DESCRIPTOR' ||
-    code === 'CHECK_TASK_DESCRIPTOR_MISSING' ||
-    code === 'CHECK_RC_DB_TESTS_REQUIRED' ||
-    code === 'TASK_ROUND_INACTIVE' ||
-    code.includes('_PRECONDITION') ||
-    code.endsWith('_UNAVAILABLE')
-  )
-    return ['precondition', exits.precondition];
-  return ['failure', exits.fail];
+    return backlogPrecondition.has(code) ? 'precondition / 5' : 'routing-authority / 2';
+  if (code.startsWith('AUTHORITY_')) return authorityClass(code);
+  // packages/cli/src/command-router.ts usageRefusal() and the route constructors.
+  if (code.startsWith('ROUTE_')) return 'routing-authority / 2';
+  return PER_ACTION;
 }
 
 function words(code) {
@@ -161,7 +181,7 @@ function remediation(code) {
   const internal = internalNote(code);
   if (internal !== undefined) return internal;
   if (code.startsWith('BACKLOG_'))
-    return 'Reported in the backlog failure payload `{code, operation, exit}`; correct the named input or item, then retry.';
+    return 'Follow the backlog refusal envelope remediation; correct the named input or item, then retry.';
   if (code === 'AUTHORITY_POLICY_MISSING')
     return 'Run the ordered bind commands in `context.commands`.';
   if (code === 'CHECK_SELECTION_INVALID') return 'Use `--only <member>` or `--suite <name>`.';
@@ -209,10 +229,8 @@ for (const sourceRoot of sourceRoots) {
   }
 }
 
-const exits = exitValues();
 const rows = [...codes].sort().map((code) => {
-  const [exitClass, exit] = classify(code, exits);
-  return `| \`${code}\` | ${words(code)} | Stable diagnostic for ${words(code)}. | ${remediation(code)} | ${exitClass} / ${String(exit)} |`;
+  return `| \`${code}\` | ${words(code)} | Stable diagnostic for ${words(code)}. | ${remediation(code)} | ${classify(code)} |`;
 });
 const content = `<!-- @generated by scripts/generate-error-code-reference.mjs; do not edit -->
 # Error code reference
@@ -221,6 +239,11 @@ DEVAI refusal and failure envelopes carry stable codes. This page is generated f
 diagnostic codes in every package source and the vendored evidence verifier. A code can appear in
 more than one action; the envelope's concrete message, remediation, references, and context remain
 authoritative for that invocation.
+
+The exit class is declared, never inferred from a code's name, and a contract test checks it against
+the emitting code. \`per action\` marks a code raised as a message or payload: the envelope of the
+action that surfaces it sets its class and exit. \`internal\` marks a code that never reaches an
+envelope as its code.
 
 | Code | Cause | Meaning | Remediation | Exit class |
 | --- | --- | --- | --- | --- |
