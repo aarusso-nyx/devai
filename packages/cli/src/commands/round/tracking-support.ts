@@ -25,6 +25,7 @@ import {
   type TrackingChain,
 } from './tracking-session.js';
 import { resolveCliVersion } from '../../version.js';
+import { commandRefusal } from '../../cli-error.js';
 
 export interface TrackingOptions {
   readonly repoRoot?: string;
@@ -89,16 +90,25 @@ export function emit(value: GovernanceProjectionStatus, human: boolean, text: st
   process.exitCode = 0;
 }
 
+/**
+ * #338: a tracking failure is a schema-valid refusal envelope carrying its code. A tracking or
+ * projector error keeps its exit (2 by default); an Error raised with a code (or `CODE:detail`) as
+ * its message keeps it with the usage exit; anything else is TRACKING_OPERATION_FAILED,
+ * infrastructure (6).
+ */
 export function failure(command: string, error: unknown): void {
-  const code =
-    error instanceof TrackingCommandError || error instanceof ProjectorError
-      ? error.code
-      : error instanceof Error
-        ? error.message
-        : 'TRACKING_OPERATION_FAILED';
+  const known = error instanceof TrackingCommandError || error instanceof ProjectorError;
+  const raw = known ? error.code : error instanceof Error ? error.message : '';
   const exit = error instanceof TrackingCommandError ? error.exitCode : 2;
-  process.stderr.write(`${JSON.stringify({ code, operation: command, exit })}\n`);
-  process.exitCode = exit;
+  const envelope = commandRefusal(
+    raw,
+    exit,
+    { operation: command },
+    `Resolve the condition the code names, then rerun devai round ${command}.`,
+    'TRACKING_OPERATION_FAILED',
+  );
+  process.stderr.write(`${JSON.stringify(envelope)}\n`);
+  process.exitCode = envelope.exit;
 }
 
 export function withTrackingOptions(

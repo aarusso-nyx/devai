@@ -36,6 +36,7 @@ import {
   root,
   type RoundOptions,
 } from './workflow-support.js';
+import { commandRefusal } from '../../cli-error.js';
 
 interface DispatchOptions extends RoundOptions {
   readonly task?: string | string[];
@@ -52,15 +53,15 @@ function population(repoRoot: string): readonly TaskRecord[] {
 
 /** The uncertainty refusal, naming every task and attempt that needs a disposition. */
 function uncertainFailure(error: DispatchUncertainError): void {
-  process.stderr.write(
-    `${JSON.stringify({
-      code: error.code,
-      operation: 'dispatch',
-      exit: error.exitCode,
-      uncertain: error.uncertain,
-    })}\n`,
+  const envelope = commandRefusal(
+    error.code,
+    error.exitCode,
+    { operation: 'dispatch', uncertain: error.uncertain },
+    'Record a disposition for each named task and attempt with round dispatch dispose, then rerun.',
+    'ROUND_OPERATION_FAILED',
   );
-  process.exitCode = error.exitCode;
+  process.stderr.write(`${JSON.stringify(envelope)}\n`);
+  process.exitCode = envelope.exit;
 }
 
 export const roundDispatch = defineCommand({
