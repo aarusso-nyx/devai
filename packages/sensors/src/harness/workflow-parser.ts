@@ -1112,6 +1112,21 @@ const EXECUTED_SCRIPT =
 export interface ExecutedFileReader {
   readonly read: (path: string) => string | undefined;
   readonly list: (path: string) => readonly string[] | undefined;
+  /**
+   * The reviewed files that cover the computed dynamic imports of one executed module, or
+   * undefined when none are declared (#344 review). A computed import without a declaration
+   * leaves the step's file set incomplete, so it reads unknown.
+   */
+  readonly computedImports?: (file: string) => readonly string[] | undefined;
+}
+
+/** The computed-import covers a reviewed entry declares, keyed by the importing module. */
+function declaredComputedImports(
+  entry: ReviewedWorkflowStep | undefined,
+): ((file: string) => readonly string[] | undefined) | undefined {
+  const declarations = entry?.computed_imports;
+  if (declarations === undefined) return undefined;
+  return (file) => declarations.find((declaration) => declaration.from === file)?.files;
 }
 
 const PNPM_BUILTINS = new Set([
@@ -1325,6 +1340,23 @@ export function stepExecutedFiles(
     followed.add(file);
     const source = reader.read(file);
     if (source === undefined) continue;
+    // A dynamic import or require whose specifier is not a string literal can load any module,
+    // so the step is complete only when its reviewed entry declares the files that cover it.
+    if (hasComputedImport(source)) {
+      const covers = reader.computedImports?.(file);
+      if (covers === undefined) {
+        complete = false;
+        break;
+      }
+      for (const cover of covers) {
+        if (!safe(cover) || reader.read(cover) === undefined) {
+          complete = false;
+          break;
+        }
+        files.add(cover);
+      }
+      if (!complete) break;
+    }
     for (const match of source.matchAll(LOCAL_IMPORT)) {
       const target = resolveRelative(file, match[1] ?? '');
       if (
@@ -1340,6 +1372,16 @@ export function stepExecutedFiles(
     }
   }
   return complete ? [...files].sort() : undefined;
+}
+
+/** A dynamic import or require whose specifier is not a single string literal. */
+const COMPUTED_IMPORT = /\b(?:import|require)\s*\(\s*(?!['"][^'"\n]*['"]\s*\))/u;
+
+/** True when a source line outside a line comment holds a computed dynamic import. */
+function hasComputedImport(source: string): boolean {
+  return source
+    .split('\n')
+    .some((line) => !/^\s*(?:\/\/|\*)/u.test(line) && COMPUTED_IMPORT.test(line));
 }
 
 /** A static or dynamic import (or require) of a relative module specifier. */
@@ -1363,6 +1405,8 @@ function resolveRelative(file: string, specifier: string): string | undefined {
 export function workflowStepInventory(
   content: string,
   repoRoot?: string,
+  /** Overrides the reviewed computed-import covers (tests); defaults to the registry entry. */
+  computedImports?: (file: string) => readonly string[] | undefined,
 ): readonly {
   job: string;
   index: number;
@@ -1411,6 +1455,7 @@ export function workflowStepInventory(
                     return undefined;
                   }
                 },
+                computedImports: computedImports ?? declaredComputedImports(reviewedStep(step)),
               },
         ),
       });
@@ -2598,6 +2643,7 @@ export function jobEffectFacts(
           return undefined;
         }
       },
+      computedImports: declaredComputedImports(reviewed.entry),
     });
     const bound = reviewed.entry.files;
     if (
