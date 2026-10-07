@@ -70,6 +70,7 @@ const prefixes = new Set([
   'SENSOR',
   'TASK',
   'TRACE',
+  'TRACKING',
   'TRANSLATION',
   'TRIAGE',
   'TRUSTED',
@@ -123,8 +124,13 @@ const declaredCodes = new Map([
   ['SENSOR_KIND_SCHEMA_UNSUPPORTED', 'routing-authority / 2'],
   ['SENSOR_KIND_UNKNOWN', 'routing-authority / 2'],
   ['SENSOR_OPTIONAL_DEPENDENCY_MISSING', 'precondition / 5'],
-  // packages/loop/src/loop/task-queue-services.ts: thrown with EXIT_PRECONDITION in the task payload.
-  ['TASK_ROUND_INACTIVE', 'precondition / 5'],
+  // The task, round and tracking writers' fallback for an unanticipated error (cli-error.ts
+  // commandRefusal with the operation-failed code).
+  ['ROUND_OPERATION_FAILED', 'infrastructure / 6'],
+  ['TASK_OPERATION_FAILED', 'infrastructure / 6'],
+  ['TRACKING_OPERATION_FAILED', 'infrastructure / 6'],
+  // packages/loop/src/loop/dispatch-journal.ts DispatchUncertainError: super('TASK_DISPATCH_UNCERTAIN').
+  ['TASK_DISPATCH_UNCERTAIN', 'routing-authority / 2'],
 ]);
 
 // packages/cli/src/commands/backlog/index.ts failure(): a refusal envelope carrying the backlog code.
@@ -161,6 +167,57 @@ function authorityClass(code) {
   return 'routing-authority / 2 (precondition / 5 for a dependency error)';
 }
 
+// #338: task, round and tracking failures are refusal envelopes whose exit is the one the error
+// carries, so a code thrown as `new TaskServiceError('CODE', EXIT)`, the loop's `fail('CODE', EXIT)`
+// or `new TrackingCommandError('CODE', EXIT)` is declared by its throw sites (default exit 2).
+const THROWN_EXIT_SYMBOLS = new Map([
+  ['EXIT_USAGE', 2],
+  ['EXIT_FAIL', 2],
+  ['EXIT_GATE', 3],
+  ['EXIT_PRECONDITION', 5],
+]);
+const THROWN_CLASSES = new Map([
+  [2, 'routing-authority'],
+  [3, 'gate-fail'],
+  [4, 'invalid-input'],
+  [5, 'precondition'],
+  [6, 'infrastructure'],
+  [7, 'contract-violation'],
+]);
+const thrownExits = new Map();
+
+function recordThrowSites(file, source) {
+  const patterns = [
+    /new (?:TaskServiceError|TrackingCommandError)\(\s*(?:'([A-Z][A-Z0-9_]+)'|`([A-Z][A-Z0-9_]+):[^`]*`)\s*(?:,\s*([A-Z_]+|[0-9]))?\s*\)/gu,
+  ];
+  if (file.includes('/packages/loop/src/')) {
+    patterns.push(/\bfail\(\s*'([A-Z][A-Z0-9_]+)'()\s*(?:,\s*([A-Z_]+|[0-9]))?\s*\)/gu);
+  }
+  for (const pattern of patterns) {
+    for (const match of source.matchAll(pattern)) {
+      const code = match[1] ?? match[2];
+      const symbol = match[3];
+      const exit =
+        symbol === undefined
+          ? 2
+          : /^[0-9]$/u.test(symbol)
+            ? Number(symbol)
+            : THROWN_EXIT_SYMBOLS.get(symbol);
+      if (code === undefined || exit === undefined || !THROWN_CLASSES.has(exit)) continue;
+      const exits = thrownExits.get(code) ?? new Set();
+      exits.add(exit);
+      thrownExits.set(code, exits);
+    }
+  }
+}
+
+function thrownClass(code) {
+  const exits = [...(thrownExits.get(code) ?? [])].sort((a, b) => a - b);
+  if (exits.length === 0) return undefined;
+  const pairs = exits.map((exit) => `${THROWN_CLASSES.get(exit)} / ${String(exit)}`);
+  return pairs.length === 1 ? pairs[0] : `${pairs[0]} (${pairs.slice(1).join(', ')})`;
+}
+
 function classify(code) {
   if (internalNote(code) !== undefined) return 'internal / none';
   if (declaredCodes.has(code)) return declaredCodes.get(code);
@@ -170,7 +227,7 @@ function classify(code) {
   if (code.startsWith('AUTHORITY_')) return authorityClass(code);
   // packages/cli/src/command-router.ts usageRefusal() and the route constructors.
   if (code.startsWith('ROUTE_')) return 'routing-authority / 2';
-  return PER_ACTION;
+  return thrownClass(code) ?? PER_ACTION;
 }
 
 function words(code) {
@@ -214,6 +271,7 @@ const codes = new Set();
 for (const sourceRoot of sourceRoots) {
   for (const file of filesUnder(join(root, sourceRoot))) {
     const source = readFileSync(file, 'utf8');
+    recordThrowSites(file, source);
     // A quoted code, or a code that opens a template message (`PROOF_EPOCH_TRUNCATED ${path}`).
     for (const match of source.matchAll(
       /(?:['"]([A-Z][A-Z0-9]+(?:_[A-Z0-9]+)+)['"]|`([A-Z][A-Z0-9]+(?:_[A-Z0-9]+)+)[\s:`])/gu,
