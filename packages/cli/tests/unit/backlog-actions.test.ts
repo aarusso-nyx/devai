@@ -5,7 +5,7 @@
 // the shared counters file. Read actions record no write at all.
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -493,6 +493,22 @@ describe('the error-code reference states what the backlog commands emit', () =>
       expect(result.exit, code).toBe(envelope.exit);
       expect(referenceExitClass(code), code).toBe(`${envelope.class} / ${String(envelope.exit)}`);
     }
+  });
+
+  it('reports an unexpected error, such as a malformed item, as infrastructure and never as usage', async () => {
+    const { backlogCommands } = await facades();
+    const { root } = repository();
+    mkdirSync(join(root, '.devai/state/backlog'), { recursive: true });
+    writeFileSync(join(root, '.devai/state/backlog/BL-0404.json'), '{ not json');
+    const result = await invoke(backlogCommands, root, ['backlog-show', 'BL-0404']);
+    const envelope = JSON.parse(result.stderr) as { code: string; class: string; exit: number };
+    expect(envelope).toMatchObject({
+      code: 'BACKLOG_OPERATION_FAILED',
+      class: 'infrastructure',
+      exit: 6,
+    });
+    expect(result.exit).toBe(6);
+    expect(referenceExitClass('BACKLOG_OPERATION_FAILED')).toBe('infrastructure / 6');
   });
 
   it('marks the model-bridge codes internal, since no envelope carries them as its code', () => {
