@@ -3,20 +3,31 @@
 // the authority renderer and the action-output wrapper. A cell is never inferred from a name.
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { validators } from '@devai-nyx/schemas';
 import { renderActionFailure } from '../../src/action-output.js';
 import { renderAuthorityResult } from '../../src/authority/authority-results.js';
 import { canonicalRegistry } from '../../src/define-command.js';
 import { ERROR_CODE_PREFIXES } from '../../src/error-code-prefixes.js';
-import {
-  ERROR_CODE_PREFIXES as SCANNED_PREFIXES,
-  EXIT_CLASSES,
-  parseThrowSites,
-} from '../../../../scripts/error-code-sources.mjs';
 
 const ROOT = resolve(import.meta.dirname, '../../../..');
 const PER_ACTION = 'per action: set by the surfacing envelope';
+
+// The parser and prefixes the generator uses (scripts/error-code-sources.mjs), loaded as the other
+// script-backed tests load theirs.
+const {
+  ERROR_CODE_PREFIXES: SCANNED_PREFIXES,
+  EXIT_CLASSES,
+  parseThrowSites,
+} = (await import(pathToFileURL(join(ROOT, 'scripts/error-code-sources.mjs')).href)) as {
+  readonly ERROR_CODE_PREFIXES: ReadonlySet<string>;
+  readonly EXIT_CLASSES: ReadonlyMap<number, string>;
+  readonly parseThrowSites: (
+    file: string,
+    source: string,
+  ) => readonly { readonly code: string; readonly exit: number }[];
+};
 
 const reference = new Map(
   readFileSync(join(ROOT, 'docs/reference/error-codes.md'), 'utf8')
