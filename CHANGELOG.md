@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.1.0 — 2026-10-06
+## 2.1.0 — 2026-10-07
 
 DEVAI 2.1.0 closes the follow-ups filed against 2.0.0 (#285–#299 and the issues found since):
 experimental agent attempts are confined by the provider sandbox, locks, records and the worktree
@@ -55,7 +55,9 @@ set stays at 69.
 - Review bridge (#249, #321): hosts start in an empty private workspace with the agent
   environment allowlist; a completed `claude` structured reply is accepted; the strict reply
   projection is shared. Codex reviews first check the installed binary and its disabled features
-  (`MODEL_BRIDGE_CODEX_INCOMPATIBLE`). The adopter authority policy adds
+  (`MODEL_BRIDGE_CODEX_INCOMPATIBLE`) and run with `agents.enabled=false`, so no sub-agent tools
+  are offered (#332); the offline `scripts/codex-review-probe/` captures the tools a review is
+  offered without a provider call, and is rerun after a codex upgrade. The adopter authority policy adds
   `adopter-remote-sense-run-llm-1`, so the `llm_judge` host CLI invocation under `sense run` is
   classified; adopters re-bind the authority policy (`init upgrade` does so).
 - Sensors and scorecard: `inventory_regeneration` binds to the git tree at a clean HEAD and
@@ -64,19 +66,22 @@ set stays at 69.
   concurrency grammar and a reviewed-step registry (#325); the pull-request preflight adds
   fail-closed producers for INV-DEVAI-010 and INV-HARNESS-010 (#235), using the new
   `sense inventory --packs-root` flag; `stack-adapter.schema.json` joins the runtime schema
-  roster. The third self-scorecard `SC-20261006T141503-001` is recorded (#237).
+  roster. The third and fourth self-scorecards, `SC-20261006T141503-001` (#237, #320) and
+  `SC-20261006T215814-001` (#333, PASS 36, REVIEW 4, FAIL 1, UNKNOWN 1, N/A 3), are recorded.
 - Invariants and dead code (#295): eight new invariant records claim the previously unclaimed
   inventory surfaces; unreachable CLI `docs` and utils modules are removed, and
   `evidence render --out` writes only under `.devai/state/render`.
 - Codex token accounting counts cached input once (#289). The check runner's per-task default is
   30 minutes and `release-prerequisites` passes `--task-timeout-ms 1800000` (#299).
   Load-sensitive tests run in a serial lane with one deadline per bounded case and process-group
-  kills (#246, #324); durations use a monotonic clock.
+  kills (#246, #324), with a 64 MiB capture cap per bounded child (#337); durations use a
+  monotonic clock. The error-code reference now covers the `BACKLOG_*` and `MODEL_BRIDGE_*`
+  codes.
 - Release: this release is verified by the trusted local-RC verifier
   `@aarusso-nyx/devai@1.9.0`, unchanged from 2.0.0.
 - Known limitations: DEVAI asserts the provider sandbox flags but does not observe the provider's
-  kernel sandbox, and provider temporary directories stay writable; Codex review isolation is
-  checked after the fact because `unified_exec` cannot be disabled (#321).
+  kernel sandbox, and provider temporary directories stay writable. The Codex review tool surface
+  is verified offline for codex-cli 0.157.1; a codex upgrade needs a probe rerun (#332).
 
 ## 2.0.0 — 2026-10-05
 
