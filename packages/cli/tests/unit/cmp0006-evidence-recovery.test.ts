@@ -239,7 +239,11 @@ async function duplicateAnchor(root: string, digest?: string) {
   });
 }
 
-describe('ADR-EVI-0005 public newest-line recovery', () => {
+// Every case runs the built CLI as a subprocess, most several times (record, verify, recover):
+// 4.5-6.7 s each alone without coverage at load 5, and three of them exceeded 30 s at load 55-65
+// (#342's affected check). The RC coverage lane's 15 s default leaves no margin under its own
+// instrumentation, so each case gets a 60 s hang guard sized for that measured cost (#246).
+describe('ADR-EVI-0005 public newest-line recovery', { timeout: 60_000 }, () => {
   it('keeps the existing record and real chain verification positive paths', () => {
     const root = boundRoot();
     expect(normalRecord(root, 'existing behavior')).toMatchObject({ exit: 0, stderr: '' });
