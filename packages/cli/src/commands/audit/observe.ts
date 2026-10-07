@@ -34,6 +34,7 @@ interface AuditObserveOptions {
   readonly repoRoot?: string;
   readonly at?: string;
   readonly round?: string;
+  readonly previous?: string;
   readonly human?: boolean;
 }
 
@@ -50,6 +51,10 @@ export const auditObserve = defineCommand({
       .option(
         '--round <round_id>',
         'Optional governed round to attribute this observation to for tracking',
+      )
+      .option(
+        '--previous <sha-or-scorecard-id>',
+        'Previous observation to link: a full commit SHA or a recorded SC- id (default: the nearest observed ancestor in the chain)',
       )
       .option('--human', 'Human-readable output')
       .action(async (options: AuditObserveOptions) => {
@@ -73,7 +78,11 @@ export const auditObserve = defineCommand({
           return;
         }
         try {
-          const observation = await runAuditObservation({ repoRoot, at: options.at });
+          const observation = await runAuditObservation({
+            repoRoot,
+            at: options.at,
+            ...(options.previous === undefined ? {} : { previous: options.previous }),
+          });
           const observationArtifacts = observation.artifacts.map((artifact) => ({
             ...artifact,
             kind: 'audit',
