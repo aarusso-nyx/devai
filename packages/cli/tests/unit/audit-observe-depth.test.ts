@@ -114,8 +114,22 @@ describe('audit observe command depth', () => {
         '--round <round_id>',
         'Optional governed round to attribute this observation to for tracking',
       ],
+      [
+        '--previous <sha-or-scorecard-id>',
+        'Previous observation to link: a full commit SHA or a recorded SC- id (default: the nearest observed ancestor in the chain)',
+      ],
       ['--human', 'Human-readable output'],
     ]);
+  });
+
+  it('passes an explicit previous observation through to the observation engine', async () => {
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    await actionFor()({ at: SHA, repoRoot: '/repo', previous: 'SC-20261006T141503-001' });
+    expect(mocks.runAuditObservation).toHaveBeenCalledWith({
+      repoRoot: '/repo',
+      at: SHA,
+      previous: 'SC-20261006T141503-001',
+    });
   });
 
   it.each([
