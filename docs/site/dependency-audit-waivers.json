@@ -2,7 +2,7 @@
   "schemaVersion": "1.0.0",
   "baseline_release": "v1.4.5",
   "lockfile": "docs/site/package-lock.json",
-  "lockfile_sha256": "1626c4cd55c4865e3bf3b270978c253f1b1c395699269b7b317bcf2a900110ac",
+  "lockfile_sha256": "b8f1e54f49827a905bda97382cf2ed31eeea2212cae8d804a1cca1c28750e172",
   "waivers": [
     {
       "advisory_id": "GHSA-2883-xcg3-v3hh",
@@ -15,13 +15,6 @@
       "advisory_id": "GHSA-5jgf-p345-68v8",
       "package": "fast-uri",
       "reason": "Owner-authorized non-regression exception: transitively present in v1.4.5; no compatible npm audit fix.",
-      "approved_by": "OWNER",
-      "expires_at": "2026-10-15T23:59:59Z"
-    },
-    {
-      "advisory_id": "GHSA-6h2x-m376-mqjq",
-      "package": "joi",
-      "reason": "Owner-authorized non-regression exception recorded 2026-09-30 for release v1.7.0: advisory published after v1.6.0 in a build-time transitive dependency of the documentation site; no compatible npm audit fix; not part of the published package.",
       "approved_by": "OWNER",
       "expires_at": "2026-10-15T23:59:59Z"
     },
