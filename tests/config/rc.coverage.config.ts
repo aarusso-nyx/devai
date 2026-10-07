@@ -42,7 +42,13 @@ export default defineConfig({
   test: {
     name: 'RC coverage',
     environment: 'node',
-    testTimeout: 15_000,
+    // Coverage instruments every case and its child processes, multiplying a case's cost 2-3x.
+    // Cases measured at 5-7 s alone (the bundled export-store lifecycle, newest-line evidence
+    // recovery, release-intent receipt export) timed out at the former 15 s across three 2.2.0
+    // certification attempts. 60 s matches the per-case hang guards of #330 and #346 (#246), and
+    // a genuine hang still surfaces far inside the 30-minute certification task limit. Only this
+    // lane changes; the local and other RC lanes keep their defaults.
+    testTimeout: 60_000,
     include: [...LOCAL_INCLUDE, 'tests/e2e/**/*.test.ts', 'tests/regression/**/*.test.ts'],
     exclude: [
       '**/node_modules/**',
