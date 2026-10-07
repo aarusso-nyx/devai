@@ -25,6 +25,18 @@ export interface ReviewedWorkflowStep {
    * difference, so a changed composite action or script re-opens the review.
    */
   readonly files: readonly { readonly path: string; readonly sha256: string }[];
+  /**
+   * Reviewed covers for computed dynamic imports (#344 review). An executed module whose
+   * `import(...)` or `require(...)` specifier is not a string literal can load any file, so the
+   * step reads unknown unless its entry names, for that module, every repository file the import
+   * can reach (each one is then in `files`, pinned by digest). An empty list is a reviewed
+   * statement that the import reaches nothing in the repository; the reason says why.
+   */
+  readonly computed_imports?: readonly {
+    readonly from: string;
+    readonly reason: string;
+    readonly files: readonly string[];
+  }[];
 }
 
 export const REVIEWED_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = Object.freeze([
@@ -416,6 +428,26 @@ export const REVIEWED_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = Object.f
         sha256: 'e9bf0e8593584e7b87ee31f30c4435a9bd644c699bc6cde779a2327829b15a17',
       },
       {
+        path: 'packages/skills/src/operations/catalog.ts',
+        sha256: '0e8e7a4cdb518d579d7af13d0461f3210d179c202e331627f8d2aed8be858aa1',
+      },
+      {
+        path: 'packages/skills/src/operations/types.ts',
+        sha256: 'acf1ea43bef8370acf5e770bf30769a02eabf152d6e7a276e4569ef842038a25',
+      },
+      {
+        path: 'packages/skills/src/recipes/loader.ts',
+        sha256: '142e645da29e5113afa97e1bf4bd770b8d0ed2bf6a73703bc4674b3e9ad352ac',
+      },
+      {
+        path: 'packages/skills/src/recipes/types.ts',
+        sha256: 'a9dcd5bc77feb8441474dadd5086a8d19b15ce316b2d79a05b73719b69e5b040',
+      },
+      {
+        path: 'packages/skills/src/recipes/validate.ts',
+        sha256: '60d443b35e24d81fe59ff4fff6ea7ca267e8157e78effd42bba56a24db9a555a',
+      },
+      {
         path: 'packages/spec/package.json',
         sha256: '31f8d7bffc6dc8dd4184ec7133fcfeeffc7eabc099f7af02831bb01c04729282',
       },
@@ -464,6 +496,20 @@ export const REVIEWED_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = Object.f
         sha256: 'd558520cc9a8883d069205a3069777c075d93c1a2a8602de10267913ed243e40',
       },
     ],
+    computed_imports: [
+      {
+        from: 'scripts/check-publishable-closure.mjs',
+        reason:
+          'Loads packages/skills/dist/operations/catalog.js, compiled from the operation catalog source and the modules it imports statically.',
+        files: [
+          'packages/skills/src/operations/catalog.ts',
+          'packages/skills/src/operations/types.ts',
+          'packages/skills/src/recipes/loader.ts',
+          'packages/skills/src/recipes/types.ts',
+          'packages/skills/src/recipes/validate.ts',
+        ],
+      },
+    ],
   },
   {
     sha256: 'a64db5042d93fc6db8f3d5c308e5d9c20bbe83459637e93176fb262b0b52dc35',
@@ -496,6 +542,14 @@ export const REVIEWED_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = Object.f
       {
         path: 'scripts/stage-release-package.mjs',
         sha256: '42743ce917956fd0d4020d76cde8b20807af44478b361c70e05078c9f324cd69',
+      },
+    ],
+    computed_imports: [
+      {
+        from: 'packages/cli/scripts/installed-tarball-smoke.mjs',
+        reason:
+          'Every computed import loads the installed package under test from its temporary install directory (or sits in a script the smoke test writes there); none reaches a repository file.',
+        files: [],
       },
     ],
   },
@@ -787,12 +841,24 @@ export const REVIEWED_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = Object.f
       'Local verification, build, or binding step: writes only the workspace, runner files, or step outputs, and makes no external write.',
     files: [
       {
+        path: 'packages/sensors/src/ci-invariant-gate.ts',
+        sha256: '76b1b54ccd3b1cc9b892662eba942abcd21aeadc84f99ac611542fec1cb975ed',
+      },
+      {
         path: 'scripts/process/verify-pages-bytes.mjs',
         sha256: 'ffc5f0f64d50c410deb5011c2b532e28305887c60e532e26be4019d4b2a8bec7',
       },
       {
         path: 'scripts/process/verify-site-preparation-artifact.mjs',
         sha256: '6e1e2593935a208d5b0eb47ac655ba32be6cc4ef2042be340dfe55c956329853',
+      },
+    ],
+    computed_imports: [
+      {
+        from: 'scripts/process/verify-site-preparation-artifact.mjs',
+        reason:
+          'Loads the CI invariant gate from packages/sensors/dist when built, else from its source; the built module is compiled from this source, which has no local imports.',
+        files: ['packages/sensors/src/ci-invariant-gate.ts'],
       },
     ],
   },
@@ -804,6 +870,10 @@ export const REVIEWED_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = Object.f
     review:
       'Publishes or reconciles an external release surface (GitHub Release, GitHub Packages, or Pages) after its candidate and journal checks; runs only in a job with its environment and a non-cancelling lock.',
     files: [
+      {
+        path: 'packages/sensors/src/ci-invariant-gate.ts',
+        sha256: '76b1b54ccd3b1cc9b892662eba942abcd21aeadc84f99ac611542fec1cb975ed',
+      },
       {
         path: 'scripts/process/github-pages-journal.mjs',
         sha256: '6ab7939892293bb43eeb64f9f3af78193654b2833ac4efe25e8b246c157af35b',
@@ -827,6 +897,14 @@ export const REVIEWED_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = Object.f
       {
         path: 'scripts/process/verify-site-preparation-artifact.mjs',
         sha256: '6e1e2593935a208d5b0eb47ac655ba32be6cc4ef2042be340dfe55c956329853',
+      },
+    ],
+    computed_imports: [
+      {
+        from: 'scripts/process/verify-site-preparation-artifact.mjs',
+        reason:
+          'Loads the CI invariant gate from packages/sensors/dist when built, else from its source; the built module is compiled from this source, which has no local imports.',
+        files: ['packages/sensors/src/ci-invariant-gate.ts'],
       },
     ],
   },
