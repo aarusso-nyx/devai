@@ -147,7 +147,7 @@ async function runInteractiveInitPlanAction(options: InitPlanOptions): Promise<v
       {
         code: 'INIT_INTERACTIVE_MODE_INVALID',
         class: 'invalid-input',
-        exit: 2,
+        exit: 4,
         message: `--mode must be one of bind | edit (got '${mode}')`,
         remediation: 'Choose --mode bind or --mode edit and retry.',
         context: { mode },
