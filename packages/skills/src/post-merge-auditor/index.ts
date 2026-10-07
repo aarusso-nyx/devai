@@ -46,31 +46,40 @@ export interface AuditObservationResult {
   readonly artifacts: readonly Readonly<{ path: string; sha256: string }>[];
 }
 
+/** The link an existing observation bundle records, read so a replay can keep it. */
+type RecordedLink =
+  | { readonly kind: 'none' }
+  | {
+      readonly kind: 'linked';
+      readonly mergeSha: string;
+      readonly recordId: string | undefined;
+      readonly digest: string | null;
+    };
+
 /**
- * The previous commit an existing observation bundle links: its SHA, null when the
- * bundle links nothing, or undefined when there is no readable bundle to replay.
+ * The previous link an existing bundle records: none when its backlog links nothing,
+ * the linked commit with the chain record id and digest its status.json names, or
+ * undefined when there is no readable bundle to replay.
  */
-function recordedPrevious(bundleRoot: string): string | null | undefined {
-  const path = join(bundleRoot, 'backlog.json');
-  if (!existsSync(path)) return undefined;
+function recordedLink(bundleRoot: string): RecordedLink | undefined {
+  const backlogPath = join(bundleRoot, 'backlog.json');
+  if (!existsSync(backlogPath)) return undefined;
   try {
-    const parsed: unknown = JSON.parse(readFileSync(path, 'utf8'));
-    const value = isRecord(parsed) ? parsed['previous_merge_sha'] : undefined;
-    if (value === null) return null;
-    return typeof value === 'string' && FULL_SHA.test(value) ? value : undefined;
+    const backlog: unknown = JSON.parse(readFileSync(backlogPath, 'utf8'));
+    const mergeSha = isRecord(backlog) ? backlog['previous_merge_sha'] : undefined;
+    if (mergeSha === null) return { kind: 'none' };
+    if (typeof mergeSha !== 'string' || !FULL_SHA.test(mergeSha)) return undefined;
+    const status: unknown = JSON.parse(readFileSync(join(bundleRoot, 'status.json'), 'utf8'));
+    const recordId = isRecord(status) ? status['previous_observation_record'] : undefined;
+    const digest = isRecord(status) ? status['previous_observation_digest_sha256'] : undefined;
+    return {
+      kind: 'linked',
+      mergeSha,
+      recordId: typeof recordId === 'string' && recordId.length > 0 ? recordId : undefined,
+      digest: typeof digest === 'string' && /^[0-9a-f]{64}$/u.test(digest) ? digest : null,
+    };
   } catch {
     return undefined;
-  }
-}
-
-/** The previous observation digest an existing bundle's status.json records. */
-function recordedPreviousDigest(bundleRoot: string): string | null {
-  try {
-    const parsed: unknown = JSON.parse(readFileSync(join(bundleRoot, 'status.json'), 'utf8'));
-    const value = isRecord(parsed) ? parsed['previous_observation_digest_sha256'] : undefined;
-    return typeof value === 'string' && /^[0-9a-f]{64}$/u.test(value) ? value : null;
-  } catch {
-    return null;
   }
 }
 
@@ -98,31 +107,40 @@ export async function runAuditObservation(opts: {
   const targetRoot = join(stateRoot, opts.at);
   const stagingRoot = join(stateRoot, `${opts.at}.tmp-${process.pid.toString()}`);
   rmSync(stagingRoot, { recursive: true, force: true });
-  // #335: link the previous observation. A replay keeps the link its bundle already
-  // records, so a later observation of an intermediate commit cannot drift it.
-  const recorded = opts.previous === undefined ? recordedPrevious(targetRoot) : undefined;
-  const named = recorded === null ? undefined : (opts.previous ?? recorded);
-  const previous =
-    recorded === null
-      ? null
-      : resolvePreviousObservation({
-          repoRoot,
-          stateRoot,
-          at: opts.at,
-          ...(named === undefined ? {} : { previous: named }),
-        });
+  // #335: link the previous observation, bound to one completed chain record. A replay
+  // keeps the record and digest its bundle already names, so a later chain record cannot
+  // drift it; an explicit --previous is resolved afresh.
+  const recorded = opts.previous === undefined ? recordedLink(targetRoot) : undefined;
+  let previous: ReturnType<typeof resolvePreviousObservation> = null;
+  if (recorded === undefined) {
+    previous = resolvePreviousObservation({
+      repoRoot,
+      stateRoot,
+      at: opts.at,
+      ...(opts.previous === undefined ? {} : { previous: opts.previous }),
+    });
+  } else if (recorded.kind === 'linked') {
+    previous = resolvePreviousObservation({
+      repoRoot,
+      stateRoot,
+      at: opts.at,
+      ...(recorded.recordId === undefined
+        ? { previous: recorded.mergeSha }
+        : { recordId: recorded.recordId }),
+    });
+  }
   await writeBundle(
     repoRoot,
     stateRoot,
     opts.at,
     timestamp,
     previous?.mergeSha ?? null,
-    // A replay keeps the digest its bundle recorded, whatever the state holds now.
-    typeof recorded === 'string' ? recordedPreviousDigest(targetRoot) : (previous?.digest ?? null),
+    recorded?.kind === 'linked' ? recorded.digest : (previous?.digest ?? null),
     false,
     `${opts.at}.tmp-${process.pid.toString()}`,
     repoRoot,
     previous?.observations ?? null,
+    previous?.recordId,
   );
   const generatedRoot = stagingRoot;
   const generatedDigest = canonicalSha256(

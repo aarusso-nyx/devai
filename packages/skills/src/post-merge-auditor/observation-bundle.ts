@@ -143,8 +143,13 @@ export async function writeBundle(
   // #335: a caller that resolved the previous bundle elsewhere (the chain) passes its
   // observations; undefined reads the previous bundle from this state directory.
   previous?: readonly ObservationBacklogObservation[] | null,
+  // #335: the id of the chain record the previous link is bound to; recorded in
+  // status.json only when set, so bundles without a chain-bound link keep their bytes.
+  previousRecordId?: string,
 ): Promise<string> {
   const bundleRoot = join(stateRoot, bundleKey);
+  const previousRecord =
+    previousRecordId === undefined ? {} : { previous_observation_record: previousRecordId };
   mkdirSync(bundleRoot, { recursive: true });
   try {
     if (injectFailure) throw new Error('POST_MERGE_OBSERVATION_INJECTED_FAILURE');
@@ -192,6 +197,7 @@ export async function writeBundle(
       generated_at: timestamp,
       readiness_promoting: false,
       previous_observation_digest_sha256: previousDigest,
+      ...previousRecord,
       artifact_digest_sha256: artifactDigest,
     };
     const observationDigest = canonicalSha256(completed);
@@ -209,6 +215,7 @@ export async function writeBundle(
       generated_at: timestamp,
       readiness_promoting: false,
       previous_observation_digest_sha256: previousDigest,
+      ...previousRecord,
       code: observationErrorCode(error),
     };
     const observationDigest = canonicalSha256(failed);
