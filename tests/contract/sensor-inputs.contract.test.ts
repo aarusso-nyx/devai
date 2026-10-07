@@ -41,18 +41,35 @@ import rcE2eConfig from '../config/rc.e2e.config.js';
 
 const FAKE_COMMIT = 'c'.repeat(40);
 
+const FAKE_TEST_FILES = ['packages/a/tests/a.test.ts', 'packages/b/tests/b.test.ts'] as const;
+
+/** A repository whose declared population is exactly `FAKE_TEST_FILES`. */
 function fakeRepository(directory: string): string {
   const root = join(directory, 'repository');
   mkdirSync(join(root, '.git'), { recursive: true });
   writeFileSync(join(root, '.git', 'HEAD'), `${FAKE_COMMIT}\n`, 'utf8');
+  for (const file of FAKE_TEST_FILES) {
+    mkdirSync(dirname(join(root, file)), { recursive: true });
+    writeFileSync(join(root, file), '', 'utf8');
+  }
   return root;
 }
 
-function fakeVitest(config: Readonly<Record<string, unknown>>, population = 2): never {
+function fakeModules(root: string, files: readonly string[]): never {
+  return files.map((file) => ({ moduleId: join(root, file) })) as never;
+}
+
+/** A vitest whose resolved configuration is the producer's own, with `config` overriding it. */
+function fakeVitest(config: Readonly<Record<string, unknown>> = {}): never {
   return {
-    config: { filters: [], ...config },
+    config: {
+      filters: [],
+      include: [...LOCAL_INCLUDE],
+      exclude: [...(localCoverageConfig.test?.exclude ?? [])],
+      project: [],
+      ...config,
+    },
     version: '9.9.9',
-    globTestSpecifications: () => Promise.resolve(Array.from({ length: population }, () => ({}))),
   } as never;
 }
 
@@ -310,7 +327,7 @@ describe('local coverage producer configuration (ADR-SCR-0007)', () => {
       const reporter = new PopulationSidecarReporter(sidecarPath, reportPath, repoRoot);
       reporter.onInit(fakeVitest({}));
       reporter.onCoverage({ files: () => ['a.ts', 'b.ts', 'c.ts'] });
-      await reporter.onTestRunEnd([{}, {}] as never, [], 'passed');
+      await reporter.onTestRunEnd(fakeModules(repoRoot, FAKE_TEST_FILES), [], 'passed');
       // Vitest writes the report after the run ends; the sidecar waits for it.
       expect(existsSync(sidecarPath)).toBe(false);
       mkdirSync(dirname(reportPath), { recursive: true });
@@ -352,6 +369,13 @@ describe('local coverage producer configuration (ADR-SCR-0007)', () => {
     expect(runSelector({ filters: [], shard: { index: 1, count: 2 } })).toBe('shard');
     expect(runSelector({ filters: [], changed: true })).toBe('changed files');
     expect(runSelector({ filters: [], changed: false })).toBe('full-suite');
+    expect(runSelector({ filters: [], project: ['unit'] })).toBe('project unit');
+    expect(runSelector({ filters: [], exclude: ['**/node_modules/**'] })).toBe(
+      'exclude differs from the declared exclusions',
+    );
+    expect(runSelector({ filters: [], include: ['tests/unit/**'] })).toBe(
+      'include differs from the declared population',
+    );
   });
 
   it('records a run that executed fewer files than the population as a subset (#336)', async () => {
@@ -360,19 +384,32 @@ describe('local coverage producer configuration (ADR-SCR-0007)', () => {
       const sidecarPath = join(directory, 'population.json');
       const reportPath = join(directory, 'coverage-final.json');
       writeFileSync(reportPath, '{}\n', 'utf8');
-      const reporter = new PopulationSidecarReporter(
-        sidecarPath,
-        reportPath,
-        fakeRepository(directory),
-      );
-      reporter.onInit(fakeVitest({}, 3));
-      reporter.onCoverage({ 'a.ts': {} });
-      await reporter.onTestRunEnd([{}, {}] as never, [], 'passed');
-      reporter.onFinishedReportCoverage();
-      const written = JSON.parse(readFileSync(sidecarPath, 'utf8')) as {
-        binding: { selector: string };
+      const repoRoot = fakeRepository(directory);
+      const selectorOf = async (
+        files: readonly string[],
+        config: Readonly<Record<string, unknown>> = {},
+      ): Promise<string> => {
+        const reporter = new PopulationSidecarReporter(sidecarPath, reportPath, repoRoot);
+        reporter.onInit(fakeVitest(config));
+        reporter.onCoverage({ 'a.ts': {} });
+        await reporter.onTestRunEnd(fakeModules(repoRoot, files), [], 'passed');
+        reporter.onFinishedReportCoverage();
+        return (JSON.parse(readFileSync(sidecarPath, 'utf8')) as { binding: { selector: string } })
+          .binding.selector;
       };
-      expect(written.binding.selector).toBe('2 of 3 test files');
+      expect(await selectorOf(FAKE_TEST_FILES)).toBe('full-suite');
+      // A file left out, whatever left it out (`--exclude`, `--project`, a shard, a filter).
+      expect(await selectorOf(FAKE_TEST_FILES.slice(0, 1))).toBe('1 of 2 declared test files');
+      // A run narrowed with `--exclude` records the extra exclusion even before files differ.
+      expect(
+        await selectorOf(FAKE_TEST_FILES, {
+          exclude: [...(localCoverageConfig.test?.exclude ?? []), 'packages/b/**'],
+        }),
+      ).toBe('exclude differs from the declared exclusions');
+      expect(await selectorOf(FAKE_TEST_FILES, { project: ['unit'] })).toBe('project unit');
+      expect(await selectorOf(FAKE_TEST_FILES, { testNamePattern: /x/u })).toBe(
+        'test name pattern',
+      );
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }
@@ -388,7 +425,7 @@ describe('local coverage producer configuration (ADR-SCR-0007)', () => {
         join(directory, 'coverage-final.json'),
         fakeRepository(directory),
       );
-      reporter.onInit(fakeVitest({}));
+      reporter.onInit(fakeVitest());
       expect(existsSync(sidecarPath)).toBe(false);
       reporter.onCoverage({ 'a.ts': {} });
       await reporter.onTestRunEnd([], [], 'failed');
