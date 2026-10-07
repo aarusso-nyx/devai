@@ -1,5 +1,49 @@
 # Changelog
 
+## 2.2.0 — 2026-10-07
+
+DEVAI 2.2.0 turns every backlog, task, round and tracking failure into a schema-valid refusal envelope
+that carries its own code, and declares each error code's class and exit instead of guessing them.
+`audit observe` gains `--previous`. The commit grammar's bump floor since v2.1.0 is minor because of
+that new option (ADR-REL-0027); no commit carries the breaking marker. The action set stays at 69, and
+no adopter configuration changed, so this release has no adopter migration entry and `init upgrade`
+from 2.1.0 only restamps the bound version.
+
+- Adopter-visible exit changes. Under `--format json` the action wrapper used to replace these codes
+  with `ACTION_INVOCATION_REFUSED`, `ACTION_PRECONDITION_UNSATISFIED` or `ACTION_OUTPUT_CONTRACT_VIOLATION`
+  (exit 7); the envelope now carries the command's own code, and the process exit equals the envelope
+  exit (#338, #342, #343):
+  - backlog: `BACKLOG_ITEM_NOT_FOUND`, `BACKLOG_ITEM_ALREADY_RESOLVED` and
+    `BACKLOG_ORIGIN_COMMIT_UNAVAILABLE` exit 5 (precondition) instead of 1; every other backlog code
+    keeps exit 2;
+  - backlog, task, round and tracking: an unanticipated error (a malformed item, a host error such as
+    `ENOENT`, an opaque throw) is `BACKLOG_OPERATION_FAILED`, `TASK_OPERATION_FAILED`,
+    `ROUND_OPERATION_FAILED` or `TRACKING_OPERATION_FAILED` with exit 6 (infrastructure) instead of 2,
+    with the original text in `context.message`;
+  - `operation`, `detail`, `removal` and `uncertain` move into the envelope `context`, and a composite
+    `CODE:detail` keeps `CODE` with the detail in `context.code_detail`;
+  - `init plan --mode <invalid>` refuses `INIT_INTERACTIVE_MODE_INVALID` with exit 4 (invalid-input);
+    it used to throw instead of refusing.
+- `devai backlog show <id>` and `devai backlog resolve <id>` route through the installed binary; the
+  router refused the documented positional id with `ROUTE_UNEXPECTED_ARGUMENT` (#338).
+- Error-code reference: each code's class and exit is declared from its emitter (literal envelope
+  constructors, the action-output wrapper, the authority renderer, the router and the task, round
+  and tracking throw sites) and checked by a contract test against the emitting code and
+  `error.schema.json`; a code raised only inside a message reads `per action`. The reference now lists
+  the backlog, model-bridge, tracking, git and host-receipt codes (1120 codes).
+- Audit observation (#335, #341): `audit observe` links each bundle to the nearest observed ancestor
+  in the evidence chain and computes its additions and completions against it; `--previous <sha or
+SC- id>` names the previous observation (`AUDIT_OBSERVE_PREVIOUS_*` refusals). A replay keeps the
+  recorded link, so it stays byte-identical.
+- Coverage (#336, #340): a reused coverage report is bound to the candidate commit, the full-suite
+  producer run and its digest; a stale or partial report is discarded and the producer reruns
+  (`COVERAGE_REPORT_UNBOUND`). With the 2.1.0 coverage-guard fix, F3:T2 reads PASS.
+- The documentation site's build-time dependencies override the patched `proxy-addr`, `shell-quote`,
+  `tinypool`, `compression`, `source-map-js`, `joi` and `postcss-selector-parser` releases (#339,
+  shipped in 2.1.0 after its notes were written).
+- Release: this release is verified by the trusted local-RC verifier `@aarusso-nyx/devai@1.9.0`,
+  unchanged.
+
 ## 2.1.0 — 2026-10-07
 
 DEVAI 2.1.0 closes the follow-ups filed against 2.0.0 (#285–#299 and the issues found since):
