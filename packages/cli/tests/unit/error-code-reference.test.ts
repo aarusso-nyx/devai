@@ -4,6 +4,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { validators } from '@devai-nyx/schemas';
 import { renderActionFailure } from '../../src/action-output.js';
 import { renderAuthorityResult } from '../../src/authority/authority-results.js';
 import { canonicalRegistry } from '../../src/define-command.js';
@@ -64,6 +65,28 @@ describe('#338: the error-code reference declares what the CLI emits', () => {
         /^[a-z-]+(?: result)? \/ [0-7](?: \(.+\))?$/u.test(cell);
       expect(valid, `${code}: ${cell}`).toBe(true);
     }
+  });
+
+  it('declares only class/exit pairs that error.schema.json admits', () => {
+    // Every pair in every declared cell, the primary and each parenthesized alternative. The
+    // `result` rows (ADR-CHK-0005 member statuses) are not refusal envelopes and are exempt.
+    let checked = 0;
+    for (const [code, cell] of reference) {
+      if (cell === PER_ACTION || cell === 'internal / none' || cell.includes(' result /')) continue;
+      for (const match of cell.matchAll(/([a-z-]+) \/ ([0-9])/gu)) {
+        const [, cls, exit] = match;
+        const envelope = {
+          schemaVersion: '1.0.0',
+          code,
+          class: cls,
+          exit: Number(exit),
+          message: 'reference pair check',
+        };
+        expect(validators.error(envelope), `${code}: ${String(cls)} / ${String(exit)}`).toBe(true);
+        checked += 1;
+      }
+    }
+    expect(checked).toBeGreaterThan(200);
   });
 
   it('agrees with every literal envelope constructor in package sources', () => {
