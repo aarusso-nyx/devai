@@ -150,6 +150,9 @@ version, the selector (`full-suite`, or what narrowed the run), and the report's
 sensor reuses an existing report only when that binding names the current commit, the full suite
 and the report's own digest; a stale, partial or unbound report is removed and the producer runs
 again, and a report the producer itself leaves unbound reads FAIL with `COVERAGE_REPORT_UNBOUND`.
+The producer is single-instance by design: it writes one report and one sidecar at fixed paths,
+so one sweep runs at a time with its sensors in sequence. Two producers sharing those paths can
+bind one run's sidecar to the other run's report; that is outside the contract and is not detected.
 The reading then states the population in `metrics` and in its finding text, so two scorecards
 measured over different populations are read as such and never compared ratio to ratio.
 
