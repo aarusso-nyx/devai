@@ -23,10 +23,14 @@ export interface CoverageBinding {
 
 export function sha256OfFile(path: string): string | undefined {
   try {
-    return createHash('sha256').update(readFileSync(path)).digest('hex');
+    return sha256OfBytes(readFileSync(path));
   } catch {
     return undefined;
   }
+}
+
+export function sha256OfBytes(bytes: Uint8Array): string {
+  return createHash('sha256').update(bytes).digest('hex');
 }
 
 function readText(path: string): string | undefined {
@@ -90,7 +94,7 @@ export function parseCoverageBinding(sidecar: unknown): CoverageBinding | undefi
 export function bindingMismatches(
   binding: CoverageBinding | undefined,
   candidateCommit: string,
-  reportPath: string,
+  reportBytes: Uint8Array | undefined,
 ): readonly string[] {
   if (binding === undefined) {
     return ['the population sidecar carries no producer binding'];
@@ -107,7 +111,7 @@ export function bindingMismatches(
   if (binding.selector !== FULL_SUITE_SELECTOR) {
     reasons.push(`it is a partial run (${binding.selector})`);
   }
-  if (sha256OfFile(reportPath) !== binding.reportSha256) {
+  if (reportBytes === undefined || sha256OfBytes(reportBytes) !== binding.reportSha256) {
     reasons.push('the report does not match the digest the producer recorded');
   }
   return reasons;

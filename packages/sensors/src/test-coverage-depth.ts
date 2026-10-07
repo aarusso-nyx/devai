@@ -216,10 +216,12 @@ export function measureTestCoverageDepth(opts: MeasureTestCoverageDepthOptions):
 
   // #336: an existing report is reused only when its sidecar binds it to this candidate's full
   // run. A stale, partial or unbound report is never read; the producer reruns instead.
+  // The report is read once: the digest is verified and the ratio scored from the same bytes.
+  let reportBytes = readReportBytes(reportPath);
   const reusable =
-    isFile(reportPath) &&
+    reportBytes !== undefined &&
     candidate !== undefined &&
-    bindingMismatches(parseCoverageBinding(readSidecarJson(sidecarPath)), candidate, reportPath)
+    bindingMismatches(parseCoverageBinding(readSidecarJson(sidecarPath)), candidate, reportBytes)
       .length === 0;
 
   let producer: ProducerRun | undefined;
@@ -256,6 +258,7 @@ export function measureTestCoverageDepth(opts: MeasureTestCoverageDepthOptions):
     // The previous report belongs to another run: remove it so a failed producer leaves none.
     rmSync(reportPath, { force: true });
     rmSync(sidecarPath, { force: true });
+    reportBytes = undefined;
     let result: ReturnType<typeof runCommand>;
     try {
       result = runCommand(LOCAL_COVERAGE_PRODUCER_ARGV, {
@@ -304,7 +307,8 @@ export function measureTestCoverageDepth(opts: MeasureTestCoverageDepthOptions):
         producer,
       );
     }
-    if (!isFile(reportPath)) {
+    reportBytes = readReportBytes(reportPath);
+    if (reportBytes === undefined) {
       return reading(
         'fail',
         [
@@ -369,7 +373,7 @@ export function measureTestCoverageDepth(opts: MeasureTestCoverageDepthOptions):
   const unbound = bindingMismatches(
     parseCoverageBinding(readSidecarJson(sidecarPath)),
     candidate ?? '',
-    reportPath,
+    reportBytes,
   );
   if (unbound.length > 0) {
     return reading(
@@ -386,7 +390,7 @@ export function measureTestCoverageDepth(opts: MeasureTestCoverageDepthOptions):
     );
   }
 
-  const summary = summarizeLines(reportPath);
+  const summary = summarizeLines(reportBytes);
   if (summary === undefined) {
     return reading(
       'fail',
@@ -426,6 +430,15 @@ export function measureTestCoverageDepth(opts: MeasureTestCoverageDepthOptions):
   return reading(status, findings, summary, producer);
 }
 
+function readReportBytes(path: string): Uint8Array | undefined {
+  if (!isFile(path)) return undefined;
+  try {
+    return readFileSync(path);
+  } catch {
+    return undefined;
+  }
+}
+
 function isFile(path: string): boolean {
   return existsSync(path) && statSync(path).isFile();
 }
@@ -452,11 +465,12 @@ function readSidecar(
 
 /** Line totals from an Istanbul per-file report (`l`, else `s` as the approximation). */
 function summarizeLines(
-  path: string,
+  bytes: Uint8Array | undefined,
 ): { readonly lines_total: number; readonly lines_covered: number } | undefined {
+  if (bytes === undefined) return undefined;
   let parsed: unknown;
   try {
-    parsed = JSON.parse(readFileSync(path, 'utf8'));
+    parsed = JSON.parse(Buffer.from(bytes).toString('utf8'));
   } catch {
     return undefined;
   }
