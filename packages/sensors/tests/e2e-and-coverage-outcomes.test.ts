@@ -164,6 +164,20 @@ afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
+// This file runs inside the coverage producer during the coverage lane, which exports the
+// #242 recursion guard to its children. Inherited, the guard makes the sensor refuse every
+// mocked producer run here. Each case starts with the guard cleared; the one case that tests
+// the guard sets it explicitly. The inherited value is restored after each case.
+let inheritedProducerGuard: string | undefined;
+beforeEach(() => {
+  inheritedProducerGuard = process.env['DEVAI_COVERAGE_PRODUCER_ACTIVE'];
+  delete process.env['DEVAI_COVERAGE_PRODUCER_ACTIVE'];
+});
+afterEach(() => {
+  if (inheritedProducerGuard === undefined) delete process.env['DEVAI_COVERAGE_PRODUCER_ACTIVE'];
+  else process.env['DEVAI_COVERAGE_PRODUCER_ACTIVE'] = inheritedProducerGuard;
+});
+
 function fixtureRoot(): string {
   const root = mkdtempSync(join(tmpdir(), 'devai-local-coverage-'));
   roots.push(root);
