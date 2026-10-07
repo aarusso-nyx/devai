@@ -12,19 +12,21 @@ const SCORECARD_ID = /^SC-[0-9A-Z-]+$/u;
 const CHAIN_PATH = 'record/proofs/chain.json';
 const SCORECARD_RECORD_DIRECTORY = 'record/proofs/compliance/scorecards';
 
-/** One completed `audit.observe` record of the evidence chain. */
+/** One completed `audit.observe` record of the evidence chain, in chain order. */
 interface ChainObservation {
+  readonly recordId: string;
   readonly mergeSha: string;
   readonly artifacts: ReadonlyMap<string, string>;
 }
 
 /**
- * The previous observation an `audit observe` bundle links (#335): the commit it
- * observed, the observation digest of its bundle when that bundle is present and
- * valid in the state directory, and the observations of its backlog when a copy whose
- * bytes match the chain's digest is found.
+ * The previous observation an `audit observe` bundle links (#335): the one completed
+ * chain record it is bound to, the commit that record observed, the observation digest
+ * of its bundle when that bundle is present in the state directory and matches the
+ * record, and the observations of its backlog, whose bytes must match the record.
  */
 export interface PreviousObservation {
+  readonly recordId: string;
   readonly mergeSha: string;
   readonly digest: string | null;
   readonly observations: readonly ObservationBacklogObservation[] | null;
@@ -44,7 +46,35 @@ function exactSha(record: Record<string, unknown>): string | undefined {
   return undefined;
 }
 
-/** Every completed `audit.observe` record of the chain, in chain order. */
+/** One completed `audit.observe` record, or a refusal when it cannot be bound. */
+function chainObservation(record: Record<string, unknown>): ChainObservation {
+  const recordId = record['id'];
+  const mergeSha = exactSha(record);
+  if (typeof recordId !== 'string' || recordId.length === 0 || mergeSha === undefined) {
+    throw new Error('AUDIT_OBSERVE_PREVIOUS_RECORD_INVALID');
+  }
+  if (!Array.isArray(record['artifacts'])) throw new Error('AUDIT_OBSERVE_PREVIOUS_RECORD_INVALID');
+  const artifacts = new Map<string, string>();
+  for (const artifact of record['artifacts']) {
+    if (!isRecord(artifact) || typeof artifact['path'] !== 'string') {
+      throw new Error('AUDIT_OBSERVE_PREVIOUS_RECORD_INVALID');
+    }
+    const name = artifactName(artifact['path']);
+    const digest = artifact['sha256'];
+    if (name === undefined || typeof digest !== 'string' || !/^[0-9a-f]{64}$/u.test(digest)) {
+      throw new Error('AUDIT_OBSERVE_PREVIOUS_RECORD_INVALID');
+    }
+    artifacts.set(name, digest);
+  }
+  if (!artifacts.has('backlog')) throw new Error('AUDIT_OBSERVE_PREVIOUS_RECORD_INVALID');
+  return { recordId, mergeSha, artifacts };
+}
+
+/**
+ * Every completed `audit.observe` record of the chain, in chain order. An absent chain
+ * holds none; a present chain that is not an object with a `records` array of objects,
+ * or a completed observation record that cannot be bound, is refused.
+ */
 function chainObservations(repoRoot: string): readonly ChainObservation[] {
   const path = join(repoRoot, CHAIN_PATH);
   if (!existsSync(path)) return [];
@@ -52,31 +82,31 @@ function chainObservations(repoRoot: string): readonly ChainObservation[] {
   try {
     parsed = JSON.parse(readFileSync(path, 'utf8'));
   } catch {
-    throw new Error('AUDIT_OBSERVE_CHAIN_UNREADABLE');
+    throw new Error('AUDIT_OBSERVE_CHAIN_INVALID');
   }
-  const records = isRecord(parsed) && Array.isArray(parsed['records']) ? parsed['records'] : [];
+  if (!isRecord(parsed) || !Array.isArray(parsed['records'])) {
+    throw new Error('AUDIT_OBSERVE_CHAIN_INVALID');
+  }
   const observations: ChainObservation[] = [];
-  for (const record of records) {
-    if (!isRecord(record) || record['action'] !== 'audit.observe') continue;
-    if (record['status'] !== 'completed') continue;
-    const mergeSha = exactSha(record);
-    if (mergeSha === undefined || !Array.isArray(record['artifacts'])) continue;
-    const artifacts = new Map<string, string>();
-    for (const artifact of record['artifacts']) {
-      if (!isRecord(artifact)) continue;
-      const name =
-        typeof artifact['path'] === 'string' ? artifactName(artifact['path']) : undefined;
-      const digest = artifact['sha256'];
-      if (name !== undefined && typeof digest === 'string') artifacts.set(name, digest);
-    }
-    observations.push({ mergeSha, artifacts });
+  for (const record of parsed['records']) {
+    if (!isRecord(record)) throw new Error('AUDIT_OBSERVE_CHAIN_INVALID');
+    if (record['action'] !== 'audit.observe' || record['status'] !== 'completed') continue;
+    observations.push(chainObservation(record));
   }
   return observations;
 }
 
+/**
+ * Whether `candidate` is a strict ancestor of `at`. `git merge-base --is-ancestor` exits
+ * 0 for an ancestor and 1 for a commit that is not one; any other outcome (a missing
+ * object, a shallow history, a failed spawn) is refused rather than read as "no".
+ */
 function isStrictAncestor(repoRoot: string, candidate: string, at: string): boolean {
   if (candidate === at) return false;
-  return git(repoRoot, ['merge-base', '--is-ancestor', candidate, at]).status === 0;
+  const result = git(repoRoot, ['merge-base', '--is-ancestor', candidate, at]);
+  if (result.status === 0) return true;
+  if (result.status === 1 && result.error === undefined) return false;
+  throw new Error('AUDIT_OBSERVE_PREVIOUS_HISTORY_UNAVAILABLE');
 }
 
 function depth(repoRoot: string, sha: string): number {
@@ -88,38 +118,49 @@ function depth(repoRoot: string, sha: string): number {
   return count;
 }
 
-/**
- * The chain observation a `--previous` value names: a full commit SHA, or the id of
- * a recorded scorecard whose bytes match the scorecard digest of a chain observation.
- */
-function namedObservation(
-  repoRoot: string,
-  candidates: readonly ChainObservation[],
-  previous: string,
-): ChainObservation {
-  if (FULL_SHA.test(previous)) {
-    const match = candidates.find((observation) => observation.mergeSha === previous);
-    if (match === undefined) throw new Error('AUDIT_OBSERVE_PREVIOUS_UNKNOWN');
-    return match;
-  }
-  if (SCORECARD_ID.test(previous)) {
-    const path = join(repoRoot, SCORECARD_RECORD_DIRECTORY, `${previous}.json`);
-    if (!existsSync(path)) throw new Error('AUDIT_OBSERVE_PREVIOUS_UNKNOWN');
-    const digest = sha256(readFileSync(path));
-    const match = candidates.find(
-      (observation) => observation.artifacts.get('scorecard') === digest,
-    );
-    if (match === undefined) throw new Error('AUDIT_OBSERVE_PREVIOUS_UNKNOWN');
-    return match;
-  }
-  throw new Error('AUDIT_OBSERVE_PREVIOUS_INVALID');
+/** The latest record, by chain order, among those that match. */
+function latest(
+  observations: readonly ChainObservation[],
+  matches: (observation: ChainObservation) => boolean,
+): ChainObservation | undefined {
+  return observations.filter(matches).at(-1);
 }
 
 /**
- * The backlog observations of a chain observation, read from the state directory or
- * from a recorded copy under the scorecards directory, accepted only when the file's
- * bytes match the backlog digest the chain records. Null when no matching copy exists
- * or the copy predates the observation backlog contract.
+ * The chain record a `--previous` value names: a full commit SHA (its latest completed
+ * record), a recorded scorecard id whose bytes match a record's scorecard digest, or,
+ * on replay, the record id the bundle already names.
+ */
+function namedObservation(
+  repoRoot: string,
+  observations: readonly ChainObservation[],
+  previous: string,
+): ChainObservation {
+  let match: ChainObservation | undefined;
+  if (FULL_SHA.test(previous)) {
+    match = latest(observations, (observation) => observation.mergeSha === previous);
+  } else if (SCORECARD_ID.test(previous)) {
+    const path = join(repoRoot, SCORECARD_RECORD_DIRECTORY, `${previous}.json`);
+    if (existsSync(path)) {
+      const digest = sha256(readFileSync(path));
+      match = latest(
+        observations,
+        (observation) => observation.artifacts.get('scorecard') === digest,
+      );
+    }
+  } else {
+    throw new Error('AUDIT_OBSERVE_PREVIOUS_INVALID');
+  }
+  if (match === undefined) throw new Error('AUDIT_OBSERVE_PREVIOUS_UNKNOWN');
+  return match;
+}
+
+/**
+ * The backlog observations of the bound record, read from the state directory or from
+ * a recorded copy under the scorecards directory, accepted only when the file's bytes
+ * match the backlog digest the record carries. A record whose backlog bytes are found
+ * nowhere is refused. A matching copy that predates the observation backlog contract
+ * yields null, as in the post-merge hook.
  */
 function backlogObservations(
   repoRoot: string,
@@ -127,7 +168,6 @@ function backlogObservations(
   observation: ChainObservation,
 ): readonly ObservationBacklogObservation[] | null {
   const expected = observation.artifacts.get('backlog');
-  if (expected === undefined) return null;
   const candidates = [join(stateRoot, observation.mergeSha, 'backlog.json')];
   const recordDirectory = join(repoRoot, SCORECARD_RECORD_DIRECTORY);
   if (existsSync(recordDirectory)) {
@@ -144,62 +184,14 @@ function backlogObservations(
       ? (parsed as { readonly observations: readonly ObservationBacklogObservation[] }).observations
       : null;
   }
-  return null;
+  throw new Error('AUDIT_OBSERVE_PREVIOUS_BACKLOG_MISSING');
 }
 
 /**
- * Resolve the observation an `audit observe` bundle at `at` links (#335).
- *
- * Without `previous`, the candidate set is every completed `audit.observe` record of
- * `record/proofs/chain.json` whose commit is a strict ancestor of `at`, and the
- * nearest one (greatest commit depth, then the smaller SHA) is chosen. The choice
- * depends on commit ancestry, not on chain order or file times. With `previous`, the
- * named chain observation is used and must be a strict ancestor of `at`. Null when no
- * candidate exists: the first observation links nothing.
- */
-export function resolvePreviousObservation(opts: {
-  readonly repoRoot: string;
-  readonly stateRoot: string;
-  readonly at: string;
-  readonly previous?: string;
-}): PreviousObservation | null {
-  const observations = chainObservations(opts.repoRoot);
-  let chosen: ChainObservation | undefined;
-  if (opts.previous !== undefined) {
-    chosen = namedObservation(opts.repoRoot, observations, opts.previous);
-    if (!isStrictAncestor(opts.repoRoot, chosen.mergeSha, opts.at)) {
-      throw new Error('AUDIT_OBSERVE_PREVIOUS_NOT_ANCESTOR');
-    }
-  } else {
-    const ancestors = new Map<string, ChainObservation>();
-    for (const observation of observations) {
-      if (ancestors.has(observation.mergeSha)) continue;
-      if (isStrictAncestor(opts.repoRoot, observation.mergeSha, opts.at)) {
-        ancestors.set(observation.mergeSha, observation);
-      }
-    }
-    const ranked = [...ancestors.values()]
-      .map((observation) => ({ observation, depth: depth(opts.repoRoot, observation.mergeSha) }))
-      .sort(
-        (left, right) =>
-          right.depth - left.depth ||
-          left.observation.mergeSha.localeCompare(right.observation.mergeSha),
-      );
-    chosen = ranked[0]?.observation;
-  }
-  if (chosen === undefined) return null;
-  return {
-    mergeSha: chosen.mergeSha,
-    digest: bundleDigest(opts.stateRoot, chosen),
-    observations: backlogObservations(opts.repoRoot, opts.stateRoot, chosen),
-  };
-}
-
-/**
- * The observation digest of a chain observation's bundle, when the bundle is present
- * in the state directory, validates as completed, and its status.json bytes match the
- * status digest the chain records. Recorded copies carry no status.json, so a bundle
- * known only from the scorecards directory links its commit without a digest.
+ * The observation digest of the bound record's bundle, when the bundle is present in
+ * the state directory, validates as completed, and its status.json bytes match the
+ * status digest the record carries. Recorded copies carry no status.json, so a bundle
+ * known only from the scorecards directory links its record without a digest.
  */
 function bundleDigest(stateRoot: string, observation: ChainObservation): string | null {
   const statusPath = join(stateRoot, observation.mergeSha, 'status.json');
@@ -207,4 +199,56 @@ function bundleDigest(stateRoot: string, observation: ChainObservation): string 
   if (expected === undefined || !existsSync(statusPath)) return null;
   if (sha256(readFileSync(statusPath)) !== expected) return null;
   return completedObservationDigest(stateRoot, observation.mergeSha);
+}
+
+/**
+ * Resolve the chain record an `audit observe` bundle at `at` links (#335).
+ *
+ * With `recordId` (a replay), the bundle stays bound to the record it already names.
+ * With `previous`, the named record is used. Otherwise the candidates are the completed
+ * `audit.observe` records whose commit is a strict ancestor of `at`; the nearest commit
+ * (greatest depth, then the smaller SHA) is chosen, and within it the latest record by
+ * chain order. The bound record must observe a strict ancestor of `at`. Null when no
+ * candidate exists: the first observation links nothing.
+ */
+export function resolvePreviousObservation(opts: {
+  readonly repoRoot: string;
+  readonly stateRoot: string;
+  readonly at: string;
+  readonly previous?: string;
+  readonly recordId?: string;
+}): PreviousObservation | null {
+  const observations = chainObservations(opts.repoRoot);
+  let chosen: ChainObservation | undefined;
+  if (opts.recordId !== undefined) {
+    chosen = latest(observations, (observation) => observation.recordId === opts.recordId);
+    if (chosen === undefined) throw new Error('AUDIT_OBSERVE_PREVIOUS_RECORD_UNKNOWN');
+  } else if (opts.previous !== undefined) {
+    chosen = namedObservation(opts.repoRoot, observations, opts.previous);
+  } else {
+    const ancestors = [
+      ...new Set(
+        observations
+          .map((observation) => observation.mergeSha)
+          .filter((sha) => isStrictAncestor(opts.repoRoot, sha, opts.at)),
+      ),
+    ]
+      .map((sha) => ({ sha, depth: depth(opts.repoRoot, sha) }))
+      .sort((left, right) => right.depth - left.depth || left.sha.localeCompare(right.sha));
+    const nearest = ancestors[0]?.sha;
+    chosen =
+      nearest === undefined
+        ? undefined
+        : latest(observations, (observation) => observation.mergeSha === nearest);
+  }
+  if (chosen === undefined) return null;
+  if (!isStrictAncestor(opts.repoRoot, chosen.mergeSha, opts.at)) {
+    throw new Error('AUDIT_OBSERVE_PREVIOUS_NOT_ANCESTOR');
+  }
+  return {
+    recordId: chosen.recordId,
+    mergeSha: chosen.mergeSha,
+    digest: bundleDigest(opts.stateRoot, chosen),
+    observations: backlogObservations(opts.repoRoot, opts.stateRoot, chosen),
+  };
 }
