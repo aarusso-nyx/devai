@@ -172,6 +172,25 @@ validating suite rejects a delta that names a cell absent from the current obser
 post-merge hook resolves readings from the bound checkout's `.devai/state/sensor-readings`, never
 from the detached worktree root.
 
+`audit observe` links each bundle to its predecessor (#335). It reads the completed
+`audit.observe` records of `record/proofs/chain.json`, keeps those whose observed commit is a
+strict ancestor of `--at`, and links the nearest one (greatest commit depth, then the smaller SHA),
+so the choice follows commit ancestry and never chain order or file time. `--previous` names the
+predecessor instead, as a full commit SHA or a recorded `SC-` id whose scorecard bytes match a chain
+record. The predecessor's backlog is read from its state bundle or from a recorded copy under
+`record/proofs/compliance/scorecards/`, accepted only when its bytes match the chain's backlog
+digest, and `deltas.additions` and `deltas.completions` are computed by the same compiler the
+post-merge hook uses. `previous_observation_digest_sha256` is set only when the predecessor's state
+bundle is present with a `status.json` matching the chain; recorded copies carry no `status.json`.
+A replay keeps the link and digest its bundle already records, so it stays byte-identical. The
+first observation links nothing.
+
+`generated_at` in every bundle artifact is the committer time of the observed commit, not the time
+the observation ran, so the bundle is a deterministic function of the commit and the readings. The
+time an observation was taken is the timestamp of its `audit.observe` chain record. No separate
+`observed_at` field is added: a wall-clock field inside the bundle would break byte-identical
+replay.
+
 ## Hard gate (Article 17)
 
 The hard gate is the deterministic component of error _Error(0)_. It comprises:
