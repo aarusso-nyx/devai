@@ -172,18 +172,28 @@ validating suite rejects a delta that names a cell absent from the current obser
 post-merge hook resolves readings from the bound checkout's `.devai/state/sensor-readings`, never
 from the detached worktree root.
 
-`audit observe` links each bundle to its predecessor (#335). It reads the completed
+`audit observe` links each bundle to one predecessor record (#335). It reads the completed
 `audit.observe` records of `record/proofs/chain.json`, keeps those whose observed commit is a
-strict ancestor of `--at`, and links the nearest one (greatest commit depth, then the smaller SHA),
-so the choice follows commit ancestry and never chain order or file time. `--previous` names the
-predecessor instead, as a full commit SHA or a recorded `SC-` id whose scorecard bytes match a chain
-record. The predecessor's backlog is read from its state bundle or from a recorded copy under
-`record/proofs/compliance/scorecards/`, accepted only when its bytes match the chain's backlog
-digest, and `deltas.additions` and `deltas.completions` are computed by the same compiler the
-post-merge hook uses. `previous_observation_digest_sha256` is set only when the predecessor's state
-bundle is present with a `status.json` matching the chain; recorded copies carry no `status.json`.
-A replay keeps the link and digest its bundle already records, so it stays byte-identical. The
-first observation links nothing.
+strict ancestor of `--at`, takes the nearest commit (greatest commit depth, then the smaller SHA),
+and binds the latest completed record of that commit in chain order. `--previous` names the
+predecessor instead, as a full commit SHA (its latest record) or a recorded `SC-` id whose scorecard
+bytes match a chain record. The bound record's id is written to the bundle's `status.json` as
+`previous_observation_record`, and a replay stays bound to that record and its recorded digest, so
+it stays byte-identical whatever is chained later. The predecessor's backlog is read from its state
+bundle or from a recorded copy under `record/proofs/compliance/scorecards/`, accepted only when its
+bytes match the record's backlog digest, and `deltas.additions` and `deltas.completions` are
+computed by the same compiler the post-merge hook uses. `previous_observation_digest_sha256` is set
+only when the predecessor's state bundle is present with a `status.json` matching the record;
+recorded copies carry no `status.json`. The first observation links nothing.
+
+The lookup fails closed. A chain that is present but is not an object with a `records` array of
+objects is refused (`AUDIT_OBSERVE_CHAIN_INVALID`), as is a completed observation record without an
+id, an `exact_sha` note, or digest-bearing artifacts including a backlog
+(`AUDIT_OBSERVE_PREVIOUS_RECORD_INVALID`). An ancestry check that fails for any reason other than
+"not an ancestor", such as a missing commit or a shallow history, is refused
+(`AUDIT_OBSERVE_PREVIOUS_HISTORY_UNAVAILABLE`). A bound record whose backlog bytes are found neither
+in the state bundle nor among the recorded copies is refused (`AUDIT_OBSERVE_PREVIOUS_BACKLOG_MISSING`)
+rather than read as having no prior observations.
 
 `generated_at` in every bundle artifact is the committer time of the observed commit, not the time
 the observation ran, so the bundle is a deterministic function of the commit and the readings. The
