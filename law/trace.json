@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "invariants": [
     {
       "id": "INV-AUTH-001",
@@ -117,6 +117,7 @@
       ],
       "code_areas": [
         "packages/cli/src/cli-error.ts",
+        "packages/cli/src/error-code-prefixes.ts",
         "packages/cli/src/action-output.ts",
         "packages/cli/src/validate-emit.ts",
         "packages/cli/src/command-router*.ts",
