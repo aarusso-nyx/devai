@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "AS-20261007T203104-001",
+  "generated_at": "2026-10-07T17:31:04-03:00",
+  "scorecard_id": "SC-20261007T203104-001",
+  "previous_assessment_id": null,
+  "narrative": "Overall: YELLOW. 36/45 cells passing. 5 cell(s) in review. 1 cell(s) unknown (sensor coverage gap). Per-cell signals:\n  - F2×T2 REVIEW: PLANT_DEPTH_FILES_GROWING\n  - F2×T6 REVIEW: SECURITY_SCAN_HIGH_PRESENT\n  - F4×T4 REVIEW: INVENTORY_ADHERENCE_ORPHAN, INVENTORY_ADHERENCE_PARTIAL\n  - F5×T7 REVIEW: HARNESS_PERFORMANCE_SLOW, HARNESS_POPULATION_UNVERIFIED\n  - F5×T9 REVIEW: HARNESS_GREEN_MAIN_PARTIAL, HARNESS_POPULATION_UNVERIFIED",
+  "deltas": [],
+  "backlog_actions": {
+    "additions": [],
+    "completions": [],
+    "deprioritizations": []
+  },
+  "recommended_priorities": []
+}
