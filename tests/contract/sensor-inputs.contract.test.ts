@@ -10,8 +10,10 @@
 // generated from. ADR-SCR-0007 adds the governed e2e argv, the local coverage population and
 // exclusions, the LOCAL_INCLUDE population contract, and the local coverage producer, whose
 // exports tests/config/local.coverage.config.ts defines.
+import { createHash } from 'node:crypto';
 import {
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   readdirSync,
@@ -33,8 +35,26 @@ import localCoverageConfig, {
   PopulationSidecarReporter,
   localCoverageSidecar,
   measuredFileCount,
+  runSelector,
 } from '../config/local.coverage.config.js';
 import rcE2eConfig from '../config/rc.e2e.config.js';
+
+const FAKE_COMMIT = 'c'.repeat(40);
+
+function fakeRepository(directory: string): string {
+  const root = join(directory, 'repository');
+  mkdirSync(join(root, '.git'), { recursive: true });
+  writeFileSync(join(root, '.git', 'HEAD'), `${FAKE_COMMIT}\n`, 'utf8');
+  return root;
+}
+
+function fakeVitest(config: Readonly<Record<string, unknown>>, population = 2): never {
+  return {
+    config: { filters: [], ...config },
+    version: '9.9.9',
+    globTestSpecifications: () => Promise.resolve(Array.from({ length: population }, () => ({}))),
+  } as never;
+}
 
 const ROOT = resolve(import.meta.dirname, '../..');
 const SCHEMA_PATH = resolve(ROOT, 'law/schemas/sensor-inputs.schema.json');
@@ -281,15 +301,28 @@ describe('local coverage producer configuration (ADR-SCR-0007)', () => {
     expect(populationDefects(test.include ?? [])).toEqual([]);
   });
 
-  it('writes the population sidecar beside the report after a passing run', () => {
+  it('writes the population sidecar beside the report after a passing run', async () => {
     const directory = mkdtempSync(join(tmpdir(), 'devai-local-coverage-sidecar-'));
     try {
+      const repoRoot = fakeRepository(directory);
       const sidecarPath = join(directory, 'local', 'population.json');
-      const reporter = new PopulationSidecarReporter(sidecarPath);
-      reporter.onInit();
+      const reportPath = join(directory, 'local', 'coverage-final.json');
+      const reporter = new PopulationSidecarReporter(sidecarPath, reportPath, repoRoot);
+      reporter.onInit(fakeVitest({}));
       reporter.onCoverage({ files: () => ['a.ts', 'b.ts', 'c.ts'] });
-      reporter.onTestRunEnd([{}, {}] as never, [], 'passed');
+      await reporter.onTestRunEnd([{}, {}] as never, [], 'passed');
+      // Vitest writes the report after the run ends; the sidecar waits for it.
+      expect(existsSync(sidecarPath)).toBe(false);
+      mkdirSync(dirname(reportPath), { recursive: true });
+      writeFileSync(reportPath, '{}\n', 'utf8');
+      reporter.onFinishedReportCoverage();
       const written = readFileSync(sidecarPath, 'utf8');
+      const binding = {
+        commit: FAKE_COMMIT,
+        producer: { name: 'devai-local-coverage-producer', version: '9.9.9' },
+        selector: 'full-suite',
+        reportSha256: createHash('sha256').update('{}\n').digest('hex'),
+      };
       expect(JSON.parse(written)).toEqual({
         schemaVersion: '1.0.0',
         population: 'local',
@@ -297,9 +330,10 @@ describe('local coverage producer configuration (ADR-SCR-0007)', () => {
         exclusions: input['exclusions'],
         filesMeasured: 3,
         testFiles: 2,
+        binding,
       });
       expect(written).toBe(
-        `${JSON.stringify(localCoverageSidecar({ filesMeasured: 3, testFiles: 2 }), null, 2)}\n`,
+        `${JSON.stringify(localCoverageSidecar({ filesMeasured: 3, testFiles: 2, binding }), null, 2)}\n`,
       );
       expect(LOCAL_COVERAGE_SIDECAR).toBe(
         `${dirname(input['coveragePath'] as string)}/population.json`,
@@ -309,16 +343,56 @@ describe('local coverage producer configuration (ADR-SCR-0007)', () => {
     }
   });
 
-  it('removes a stale sidecar and writes none after a failed run', () => {
+  it('records a narrowed run by what narrowed it, never as the full suite (#336)', () => {
+    expect(runSelector({ filters: [] })).toBe('full-suite');
+    expect(runSelector({ filters: ['packages/cli/tests/unit/a.test.ts'] })).toBe(
+      'files packages/cli/tests/unit/a.test.ts',
+    );
+    expect(runSelector({ filters: [], testNamePattern: /x/u })).toBe('test name pattern');
+    expect(runSelector({ filters: [], shard: { index: 1, count: 2 } })).toBe('shard');
+    expect(runSelector({ filters: [], changed: true })).toBe('changed files');
+    expect(runSelector({ filters: [], changed: false })).toBe('full-suite');
+  });
+
+  it('records a run that executed fewer files than the population as a subset (#336)', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'devai-local-coverage-sidecar-'));
+    try {
+      const sidecarPath = join(directory, 'population.json');
+      const reportPath = join(directory, 'coverage-final.json');
+      writeFileSync(reportPath, '{}\n', 'utf8');
+      const reporter = new PopulationSidecarReporter(
+        sidecarPath,
+        reportPath,
+        fakeRepository(directory),
+      );
+      reporter.onInit(fakeVitest({}, 3));
+      reporter.onCoverage({ 'a.ts': {} });
+      await reporter.onTestRunEnd([{}, {}] as never, [], 'passed');
+      reporter.onFinishedReportCoverage();
+      const written = JSON.parse(readFileSync(sidecarPath, 'utf8')) as {
+        binding: { selector: string };
+      };
+      expect(written.binding.selector).toBe('2 of 3 test files');
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('removes a stale sidecar and writes none after a failed run', async () => {
     const directory = mkdtempSync(join(tmpdir(), 'devai-local-coverage-sidecar-'));
     try {
       const sidecarPath = join(directory, 'population.json');
       writeFileSync(sidecarPath, '{"population":"rc"}\n', 'utf8');
-      const reporter = new PopulationSidecarReporter(sidecarPath);
-      reporter.onInit();
+      const reporter = new PopulationSidecarReporter(
+        sidecarPath,
+        join(directory, 'coverage-final.json'),
+        fakeRepository(directory),
+      );
+      reporter.onInit(fakeVitest({}));
       expect(existsSync(sidecarPath)).toBe(false);
       reporter.onCoverage({ 'a.ts': {} });
-      reporter.onTestRunEnd([], [], 'failed');
+      await reporter.onTestRunEnd([], [], 'failed');
+      reporter.onFinishedReportCoverage();
       expect(existsSync(sidecarPath)).toBe(false);
     } finally {
       rmSync(directory, { recursive: true, force: true });
