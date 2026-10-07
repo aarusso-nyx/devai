@@ -445,7 +445,7 @@ export const REVIEWED_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = Object.f
       },
       {
         path: 'scripts/generate-error-code-reference.mjs',
-        sha256: 'b00bcb9b9b607d69153930fb92fd34441ec1e441800765f96f66bb302ec7eba2',
+        sha256: 'cf08ec50e062205966ac86477bfcd83e66941f1e31ea12c5ca9e0c1cd2d06063',
       },
       {
         path: 'scripts/generate-scorecard-page.mjs',
