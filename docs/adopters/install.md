@@ -20,7 +20,7 @@ printf '%s\n' '@aarusso-nyx:registry=https://npm.pkg.github.com' \
 Do not commit the token or replace `${NODE_AUTH_TOKEN}` with its value.
 
 ```bash
-pnpm add --save-dev --save-exact @aarusso-nyx/devai@2.1.0
+pnpm add --save-dev --save-exact @aarusso-nyx/devai@2.2.0
 pnpm exec devai catalog actions --format json
 ```
 
