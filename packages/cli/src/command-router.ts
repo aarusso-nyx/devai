@@ -32,7 +32,11 @@ export type RouteResult =
 
 export const ROUTER_INTERNAL_NAMES = ['check', 'round-close', 'init-bind'] as const;
 
+// Actions whose handlers take a positional operand. The fast path routes from the canonical
+// registry, which carries no runtime_args, so a positional action must be named here (#338).
 const POSITIONAL_ACTION_NAMES = new Set([
+  'backlog resolve',
+  'backlog show',
   'evidence redact',
   'round gap resolve',
   'round gap show',
