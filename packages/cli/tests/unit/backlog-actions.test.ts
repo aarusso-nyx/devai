@@ -471,7 +471,7 @@ function referenceExitClass(code: string): string | undefined {
 }
 
 describe('the error-code reference states what the backlog commands emit', () => {
-  it('matches the emitted backlog failure payload and exit for each sampled code', async () => {
+  it('matches the emitted backlog refusal envelope class and exit for each sampled code', async () => {
     const { backlogCommands } = await facades();
     const { root } = repository();
     const uncommitted = realpathSync(mkdtempSync(join(tmpdir(), 'devai-backlog-uncommitted-')));
@@ -488,10 +488,10 @@ describe('the error-code reference states what the backlog commands emit', () =>
     ];
     for (const [code, repo, argv] of cases) {
       const result = await invoke(backlogCommands, repo, argv);
-      const payload = JSON.parse(result.stderr) as { code: string; exit: number };
-      expect(payload.code, argv.join(' ')).toBe(code);
-      expect(result.exit, code).toBe(payload.exit);
-      expect(referenceExitClass(code), code).toBe(`backlog-payload / ${String(payload.exit)}`);
+      const envelope = JSON.parse(result.stderr) as { code: string; class: string; exit: number };
+      expect(envelope.code, argv.join(' ')).toBe(code);
+      expect(result.exit, code).toBe(envelope.exit);
+      expect(referenceExitClass(code), code).toBe(`${envelope.class} / ${String(envelope.exit)}`);
     }
   });
 
