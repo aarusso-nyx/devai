@@ -213,7 +213,7 @@
     {
       "version": "2.1.0",
       "status": "released",
-      "date": "2026-10-06",
+      "date": "2026-10-07",
       "changes": [
         {
           "id": "MIG-2.1.0-post-merge-local-state",
