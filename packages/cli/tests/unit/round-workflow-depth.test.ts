@@ -225,12 +225,23 @@ describe('round workflow command boundaries', () => {
     });
 
     runtime.closeGovernedRound.mockImplementationOnce(() => {
-      throw new Error('SEAL_FAILED');
+      throw new Error('ROUND_NOT_ACTIVE');
     });
     expect(refusal((await invoke('seal', { round: 'R-0042' })).stderr)).toEqual({
-      code: 'SEAL_FAILED',
+      code: 'ROUND_NOT_ACTIVE',
       operation: 'seal',
       exit: 2,
+    });
+
+    // A host error is never relabelled as a DEVAI refusal (#338): ENOENT is not a DEVAI code.
+    runtime.closeGovernedRound.mockImplementationOnce(() => {
+      throw new Error("ENOENT: no such file or directory, open 'missing.json'");
+    });
+    expect(refusal((await invoke('seal', { round: 'R-0042' })).stderr)).toEqual({
+      code: 'ROUND_OPERATION_FAILED',
+      operation: 'seal',
+      exit: 6,
+      message: "ENOENT: no such file or directory, open 'missing.json'",
     });
 
     runtime.closeGovernedRound.mockImplementationOnce(() => {
@@ -267,7 +278,7 @@ describe('round workflow command boundaries', () => {
       devaiVersion: '1.5.0-test',
     });
 
-    seams.runPostMergeAuditor.mockRejectedValueOnce(new Error('AUDITOR_REFUSED'));
+    seams.runPostMergeAuditor.mockRejectedValueOnce(new Error('HOST_RECEIPT_UNVERIFIED'));
     expect(
       refusal(
         (
@@ -277,7 +288,7 @@ describe('round workflow command boundaries', () => {
           })
         ).stderr,
       ),
-    ).toEqual({ code: 'AUDITOR_REFUSED', operation: 'close-post-merge', exit: 2 });
+    ).toEqual({ code: 'HOST_RECEIPT_UNVERIFIED', operation: 'close-post-merge', exit: 2 });
   });
 
   it('validates and closes a phase while preserving optional tracking output', async () => {
@@ -310,6 +321,22 @@ describe('round workflow command boundaries', () => {
     expect(
       refusal((await invoke('close', { repoRoot: root, round: 'R-0042' })).stderr),
     ).toMatchObject({ code: 'ROUND_CLOSE_INPUT_REQUIRED', exit: EXIT_USAGE });
+    // #338: a missing --input file is a host ENOENT, not a DEVAI refusal code.
+    const missing = refusal(
+      (
+        await invoke('close', {
+          repoRoot: root,
+          round: 'R-0042',
+          input: join(root, 'missing.json'),
+        })
+      ).stderr,
+    );
+    expect(missing).toMatchObject({
+      code: 'ROUND_OPERATION_FAILED',
+      operation: 'close',
+      exit: 6,
+    });
+    expect(String(missing['message'])).toContain('ENOENT');
   });
 
   it('creates gaps with scalar and repeated evidence and records their governance event', async () => {
@@ -530,9 +557,9 @@ describe('round workflow command boundaries', () => {
       expect.not.objectContaining({ taskIds: expect.anything() }),
     );
 
-    runtime.runRoundTasks.mockRejectedValueOnce(new Error('DISPATCH_FAILED'));
+    runtime.runRoundTasks.mockRejectedValueOnce(new Error('TASK_RESOURCE_LOCK_LOST'));
     expect(refusal((await invoke('run', { round: 'R-0042' })).stderr)).toEqual({
-      code: 'DISPATCH_FAILED',
+      code: 'TASK_RESOURCE_LOCK_LOST',
       operation: 'run',
       exit: 2,
     });
