@@ -25,6 +25,7 @@
 //   - The sidecar is `population.json` beside the report with `population` and `exclusions`.
 //   - `metrics.population` carries the declared population of every measured reading.
 // The pure `senseTestCoverageDepth({ summary })` keeps its contract.
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -70,6 +71,7 @@ interface MeasureOptions {
   readonly exclusions: readonly string[];
   readonly thresholds?: { readonly pass: number; readonly review: number };
   readonly now?: string;
+  readonly candidateCommit?: string;
 }
 
 function measure(options: MeasureOptions): SensorReading {
@@ -218,7 +220,13 @@ function istanbulReport(root: string, covered: number, total: number): string {
   )}\n`;
 }
 
-function sidecar(population: string, exclusions: readonly string[]): string {
+const CANDIDATE = 'a'.repeat(40);
+
+function sidecar(
+  population: string,
+  exclusions: readonly string[],
+  binding?: Readonly<Record<string, unknown>>,
+): string {
   return `${JSON.stringify(
     {
       schemaVersion: '1.0.0',
@@ -232,6 +240,7 @@ function sidecar(population: string, exclusions: readonly string[]): string {
       exclusions: [...exclusions],
       filesMeasured: 1,
       testFiles: 1,
+      ...(binding !== undefined && { binding }),
     },
     null,
     2,
@@ -246,15 +255,35 @@ function writeAt(root: string, relative: string, content: string): void {
 
 const SIDECAR_PATH = join(dirname(COVERAGE_INPUT.coveragePath), 'population.json');
 
+interface ProducedOverrides {
+  readonly commit?: string;
+  readonly selector?: string;
+  readonly withBinding?: boolean;
+  readonly withSidecar?: boolean;
+  readonly reportDigest?: string;
+}
+
 function writeProduced(
   root: string,
   covered: number,
   total: number,
   population = COVERAGE_INPUT.population,
   exclusions: readonly string[] = COVERAGE_INPUT.exclusions,
+  overrides: ProducedOverrides = {},
 ): void {
-  writeAt(root, COVERAGE_INPUT.coveragePath, istanbulReport(root, covered, total));
-  writeAt(root, SIDECAR_PATH, sidecar(population, exclusions));
+  const report = istanbulReport(root, covered, total);
+  writeAt(root, COVERAGE_INPUT.coveragePath, report);
+  if (overrides.withSidecar === false) return;
+  const binding =
+    overrides.withBinding === false
+      ? undefined
+      : {
+          commit: overrides.commit ?? CANDIDATE,
+          producer: { name: 'devai-local-coverage-producer', version: '4.1.11' },
+          selector: overrides.selector ?? 'full-suite',
+          reportSha256: overrides.reportDigest ?? createHash('sha256').update(report).digest('hex'),
+        };
+  writeAt(root, SIDECAR_PATH, sidecar(population, exclusions, binding));
 }
 
 function declared(root: string): MeasureOptions {
@@ -264,6 +293,7 @@ function declared(root: string): MeasureOptions {
     population: COVERAGE_INPUT.population,
     exclusions: COVERAGE_INPUT.exclusions,
     now: NOW,
+    candidateCommit: CANDIDATE,
   };
 }
 
@@ -383,6 +413,103 @@ describe('test_coverage_depth runs the local producer and reads the measured rat
       'Failing test files: packages/cli/tests/unit/slow.test.ts, packages/sensors/tests/other.test.ts.',
     );
     expect(codes(reading)).toEqual(['COVERAGE_PRODUCER_FAILED']);
+  });
+
+  describe('binds a reused report to the candidate commit and the full producer run (#336)', () => {
+    const producerRuns = (root: string, covered = 9, total = 10): void => {
+      runCommandMock.mockImplementation((_argv, options) => {
+        writeProduced(options?.cwd ?? root, covered, total);
+        return ran(' Test Files  1 passed (1)\n', 0);
+      });
+    };
+
+    it('reuses a report whose sidecar matches the candidate full run', () => {
+      const root = fixtureRoot();
+      writeProduced(root, 9, 10);
+      const reading = measure(declared(root));
+      expect(runCommandMock).not.toHaveBeenCalled();
+      expect(reading.status).toBe('pass');
+      expect(reading.metrics?.['lines_pct']).toBe(90);
+    });
+
+    it('reruns the producer instead of reading a stale report from another commit', () => {
+      const root = fixtureRoot();
+      writeProduced(root, 1, 11, 'local', COVERAGE_INPUT.exclusions, { commit: 'b'.repeat(40) });
+      producerRuns(root, 9, 10);
+      const reading = measure(declared(root));
+      expect(runCommandMock).toHaveBeenCalledTimes(1);
+      expect(reading.metrics?.['lines_pct']).toBe(90);
+    });
+
+    it('reruns the producer instead of reading a partial run', () => {
+      const root = fixtureRoot();
+      writeProduced(root, 1, 11, 'local', COVERAGE_INPUT.exclusions, {
+        selector: 'files packages/cli/tests/unit/a.test.ts',
+      });
+      producerRuns(root, 9, 10);
+      const reading = measure(declared(root));
+      expect(runCommandMock).toHaveBeenCalledTimes(1);
+      expect(reading.metrics?.['lines_total']).toBe(10);
+    });
+
+    it('reruns the producer when the sidecar carries no binding or is missing', () => {
+      for (const overrides of [{ withBinding: false }, { withSidecar: false }] as const) {
+        runCommandMock.mockReset();
+        const root = fixtureRoot();
+        writeProduced(root, 1, 11, 'local', COVERAGE_INPUT.exclusions, overrides);
+        producerRuns(root, 9, 10);
+        const reading = measure(declared(root));
+        expect(runCommandMock).toHaveBeenCalledTimes(1);
+        expect(reading.metrics?.['lines_total']).toBe(10);
+      }
+    });
+
+    it('reruns the producer when the report no longer matches its recorded digest', () => {
+      const root = fixtureRoot();
+      writeProduced(root, 1, 11, 'local', COVERAGE_INPUT.exclusions, {
+        reportDigest: '0'.repeat(64),
+      });
+      producerRuns(root, 9, 10);
+      measure(declared(root));
+      expect(runCommandMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('never reads the stale report when the producer may not run', () => {
+      const root = fixtureRoot();
+      writeProduced(root, 1, 11, 'local', COVERAGE_INPUT.exclusions, { commit: 'b'.repeat(40) });
+      runCommandMock.mockImplementation(() => {
+        throw new Error('authority scope does not admit the producer');
+      });
+      const reading = measure(declared(root));
+      // The suite's `beforeEach` returns the mock, which vitest then calls as a cleanup hook.
+      runCommandMock.mockReset();
+      expect(reading.status).toBe('unknown');
+      expect(codes(reading)).toEqual(['COVERAGE_PRODUCER_REFUSED']);
+      expect(existsSync(join(root, COVERAGE_INPUT.coveragePath))).toBe(false);
+    });
+
+    it('fails when the producer writes a report that is not bound to the candidate', () => {
+      const root = fixtureRoot();
+      runCommandMock.mockImplementation((_argv, options) => {
+        writeProduced(options?.cwd ?? root, 9, 10, 'local', COVERAGE_INPUT.exclusions, {
+          selector: 'shard',
+        });
+        return ran(' Test Files  1 passed (1)\n', 0);
+      });
+      const reading = measure(declared(root));
+      expect(reading.status).toBe('fail');
+      expect(codes(reading)).toEqual(['COVERAGE_REPORT_UNBOUND']);
+      expect(messages(reading)).toContain('partial run (shard)');
+    });
+
+    it('reads unknown without running a producer when the candidate commit is unresolved', () => {
+      const root = fixtureRoot();
+      const { candidateCommit: _omitted, ...unresolved } = declared(root);
+      const reading = measure(unresolved);
+      expect(runCommandMock).not.toHaveBeenCalled();
+      expect(reading.status).toBe('unknown');
+      expect(codes(reading)).toEqual(['COVERAGE_REPORT_UNBOUND']);
+    });
   });
 
   it('reads FAIL with COVERAGE_REPORT_MISSING when the report is missing after a zero exit', () => {
