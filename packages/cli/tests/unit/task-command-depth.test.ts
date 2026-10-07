@@ -2,6 +2,22 @@ import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import type { CAC } from '../../node_modules/cac/dist/index.d.ts';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { validators } from '@devai-nyx/schemas';
+
+/**
+ * #338: a task, round or tracking refusal is a schema-valid error envelope. Check it, then flatten
+ * it to the command-layer view the assertions read: the code, the exit and the envelope context.
+ */
+function refusal(text: string): Record<string, unknown> {
+  const envelope = JSON.parse(text.trim()) as {
+    code: string;
+    exit: number;
+    context?: Record<string, unknown>;
+  };
+  expect(validators.error(envelope), text).toBe(true);
+  const { operation, ...context } = envelope.context ?? {};
+  return { code: envelope.code, operation, exit: envelope.exit, ...context };
+}
 
 const runtime = vi.hoisted(() => {
   class TaskServiceError extends Error {
@@ -508,7 +524,7 @@ describe('task command validation and refusal', () => {
       [commands.taskStatus, 'task-status', 'status'],
     ] as const) {
       const result = await invoke(definition, [executable]);
-      expect(json(result.stderr)).toEqual({ code: 'TASK_ROUND_REQUIRED', operation, exit: 2 });
+      expect(refusal(result.stderr)).toEqual({ code: 'TASK_ROUND_REQUIRED', operation, exit: 2 });
       expect(result).toMatchObject({ exit: 2, stdout: '' });
     }
     expect(
@@ -538,10 +554,10 @@ describe('task command validation and refusal', () => {
       '--title',
       'conflict',
     ]);
-    expect(json(conflict.stderr)).toMatchObject({ code: 'TASK_QUEUE_INPUT_CONFLICT', exit: 2 });
+    expect(refusal(conflict.stderr)).toMatchObject({ code: 'TASK_QUEUE_INPUT_CONFLICT', exit: 2 });
 
     const missing = await invoke(commands.taskQueueAdd, ['task-queue-add', '--round', 'R-1']);
-    expect(json(missing.stderr)).toMatchObject({ code: 'TASK_QUEUE_TITLE_REQUIRED', exit: 2 });
+    expect(refusal(missing.stderr)).toMatchObject({ code: 'TASK_QUEUE_TITLE_REQUIRED', exit: 2 });
 
     const escape = await invoke(commands.taskQueueAdd, [
       'task-queue-add',
@@ -552,7 +568,7 @@ describe('task command validation and refusal', () => {
       '--input',
       '../outside.json',
     ]);
-    expect(json(escape.stderr)).toMatchObject({ code: 'TASK_QUEUE_INPUT_ESCAPE', exit: 2 });
+    expect(refusal(escape.stderr)).toMatchObject({ code: 'TASK_QUEUE_INPUT_ESCAPE', exit: 2 });
     expect(runtime.read).not.toHaveBeenCalled();
 
     runtime.read.mockImplementationOnce(() => {
@@ -565,7 +581,7 @@ describe('task command validation and refusal', () => {
       '--input',
       'task.json',
     ]);
-    expect(json(unreadable.stderr)).toMatchObject({ code: 'TASK_RECORD_INVALID', exit: 2 });
+    expect(refusal(unreadable.stderr)).toMatchObject({ code: 'TASK_RECORD_INVALID', exit: 2 });
     runtime.read.mockReturnValueOnce('{invalid');
     const malformed = await invoke(commands.taskQueueAdd, [
       'task-queue-add',
@@ -574,7 +590,7 @@ describe('task command validation and refusal', () => {
       '--input',
       'task.json',
     ]);
-    expect(json(malformed.stderr)).toMatchObject({ code: 'TASK_RECORD_INVALID', exit: 2 });
+    expect(refusal(malformed.stderr)).toMatchObject({ code: 'TASK_RECORD_INVALID', exit: 2 });
   });
 
   it('requires task and gap identities at their exact command boundaries', async () => {
@@ -585,21 +601,21 @@ describe('task command validation and refusal', () => {
       [commands.taskEscalate, 'task-escalate'],
     ] as const) {
       const result = await invoke(definition, [executable, '--round', 'R-1']);
-      expect(json(result.stderr)).toMatchObject({ code: 'TASK_ID_REQUIRED', exit: 2 });
+      expect(refusal(result.stderr)).toMatchObject({ code: 'TASK_ID_REQUIRED', exit: 2 });
     }
     for (const [definition, executable] of [
       [commands.taskPause, 'task-pause'],
       [commands.taskResume, 'task-resume'],
     ] as const) {
       const result = await invoke(definition, [executable, '--round', 'R-1', '--gap', 'GAP-1']);
-      expect(json(result.stderr)).toMatchObject({ code: 'TASK_ID_REQUIRED', exit: 2 });
+      expect(refusal(result.stderr)).toMatchObject({ code: 'TASK_ID_REQUIRED', exit: 2 });
     }
     for (const [definition, executable] of [
       [commands.taskPause, 'task-pause'],
       [commands.taskResume, 'task-resume'],
     ] as const) {
       const result = await invoke(definition, [executable, '--round', 'R-1', '--task', 'TASK-1']);
-      expect(json(result.stderr)).toMatchObject({ code: 'TASK_GAP_REQUIRED', exit: 2 });
+      expect(refusal(result.stderr)).toMatchObject({ code: 'TASK_GAP_REQUIRED', exit: 2 });
     }
   });
 
@@ -612,7 +628,7 @@ describe('task command validation and refusal', () => {
       'TASK-1',
       '--drop-db',
     ]);
-    expect(json(noUrl.stderr)).toMatchObject({ code: 'TASK_DATABASE_URL_REQUIRED', exit: 2 });
+    expect(refusal(noUrl.stderr)).toMatchObject({ code: 'TASK_DATABASE_URL_REQUIRED', exit: 2 });
     const noConsent = await invoke(commands.taskFinish, [
       'task-finish',
       '--round',
@@ -622,7 +638,7 @@ describe('task command validation and refusal', () => {
       '--database-url',
       'postgres://fixture',
     ]);
-    expect(json(noConsent.stderr)).toMatchObject({
+    expect(refusal(noConsent.stderr)).toMatchObject({
       code: 'TASK_DROP_DB_CONSENT_REQUIRED',
       exit: 2,
     });
@@ -633,7 +649,7 @@ describe('task command validation and refusal', () => {
       '--resources',
       'network',
     ]);
-    expect(json(resource.stderr)).toMatchObject({ code: 'TASK_RESOURCE_KIND_INVALID', exit: 2 });
+    expect(refusal(resource.stderr)).toMatchObject({ code: 'TASK_RESOURCE_KIND_INVALID', exit: 2 });
     expect(runtime.finish).not.toHaveBeenCalled();
     expect(runtime.resourceStatus).not.toHaveBeenCalled();
   });
@@ -643,10 +659,10 @@ describe('task command validation and refusal', () => {
       throw new Error('sensitive internal detail');
     });
     const result = await invoke(commands.taskStatus, ['task-status', '--round', 'R-1']);
-    expect(json(result.stderr)).toEqual({
+    expect(refusal(result.stderr)).toEqual({
       code: 'TASK_OPERATION_FAILED',
       operation: 'status',
-      exit: 2,
+      exit: 6,
     });
     expect(result.stdout).toBe('');
   });

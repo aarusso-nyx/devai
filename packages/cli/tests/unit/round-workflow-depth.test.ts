@@ -68,6 +68,22 @@ import {
   roundSeal,
   roundStatus,
 } from '../../src/commands/round/workflow.js';
+import { validators } from '@devai-nyx/schemas';
+
+/**
+ * #338: a task, round or tracking refusal is a schema-valid error envelope. Check it, then flatten
+ * it to the command-layer view the assertions read: the code, the exit and the envelope context.
+ */
+function refusal(text: string): Record<string, unknown> {
+  const envelope = JSON.parse(text.trim()) as {
+    code: string;
+    exit: number;
+    context?: Record<string, unknown>;
+  };
+  expect(validators.error(envelope), text).toBe(true);
+  const { operation, ...context } = envelope.context ?? {};
+  return { code: envelope.code, operation, exit: envelope.exit, ...context };
+}
 
 type Callback = (...args: never[]) => unknown;
 
@@ -202,7 +218,7 @@ describe('round workflow command boundaries', () => {
 
   it('maps missing round, Error, and opaque failures to stable diagnostics', async () => {
     const missing = await invoke('assess', { repoRoot: '/repo' });
-    expect(JSON.parse(missing.stderr)).toEqual({
+    expect(refusal(missing.stderr)).toEqual({
       code: 'TASK_ROUND_REQUIRED',
       operation: 'assess',
       exit: EXIT_USAGE,
@@ -211,7 +227,7 @@ describe('round workflow command boundaries', () => {
     runtime.closeGovernedRound.mockImplementationOnce(() => {
       throw new Error('SEAL_FAILED');
     });
-    expect(JSON.parse((await invoke('seal', { round: 'R-0042' })).stderr)).toEqual({
+    expect(refusal((await invoke('seal', { round: 'R-0042' })).stderr)).toEqual({
       code: 'SEAL_FAILED',
       operation: 'seal',
       exit: 2,
@@ -220,10 +236,10 @@ describe('round workflow command boundaries', () => {
     runtime.closeGovernedRound.mockImplementationOnce(() => {
       throw 'opaque';
     });
-    expect(JSON.parse((await invoke('seal', { round: 'R-0042' })).stderr)).toEqual({
+    expect(refusal((await invoke('seal', { round: 'R-0042' })).stderr)).toEqual({
       code: 'ROUND_OPERATION_FAILED',
       operation: 'seal',
-      exit: 2,
+      exit: 6,
     });
   });
 
@@ -253,7 +269,7 @@ describe('round workflow command boundaries', () => {
 
     seams.runPostMergeAuditor.mockRejectedValueOnce(new Error('AUDITOR_REFUSED'));
     expect(
-      JSON.parse(
+      refusal(
         (
           await invoke('close', {
             postMergeReceipt: true,
@@ -289,12 +305,10 @@ describe('round workflow command boundaries', () => {
 
     const mismatch = put(root, 'mismatch.json', { round_id: 'R-0099' });
     expect(
-      JSON.parse(
-        (await invoke('close', { repoRoot: root, round: 'R-0042', input: mismatch })).stderr,
-      ),
+      refusal((await invoke('close', { repoRoot: root, round: 'R-0042', input: mismatch })).stderr),
     ).toMatchObject({ code: 'TASK_ROUND_MISMATCH', operation: 'close' });
     expect(
-      JSON.parse((await invoke('close', { repoRoot: root, round: 'R-0042' })).stderr),
+      refusal((await invoke('close', { repoRoot: root, round: 'R-0042' })).stderr),
     ).toMatchObject({ code: 'ROUND_CLOSE_INPUT_REQUIRED', exit: EXIT_USAGE });
   });
 
@@ -336,7 +350,7 @@ describe('round workflow command boundaries', () => {
     expect(runtime.emitRgr).toHaveBeenLastCalledWith(expect.objectContaining({ evidenceRefs: [] }));
 
     const missing = await invoke('create', { round: 'R-0042', task: 'T-1' });
-    expect(JSON.parse(missing.stderr)).toMatchObject({
+    expect(refusal(missing.stderr)).toMatchObject({
       code: 'ROUND_GAP_INPUT_REQUIRED',
       exit: EXIT_USAGE,
     });
@@ -355,16 +369,16 @@ describe('round workflow command boundaries', () => {
       JSON.parse((await invoke('show', 'G-1', { round: 'R-0042', human: false })).stdout),
     ).toEqual(own);
     runtime.readRgr.mockReturnValue({ id: 'G-X', emitting_task_id: 'OTHER', status: 'open' });
-    expect(JSON.parse((await invoke('show', 'G-X', { round: 'R-0042' })).stderr)).toMatchObject({
+    expect(refusal((await invoke('show', 'G-X', { round: 'R-0042' })).stderr)).toMatchObject({
       code: 'ROUND_GAP_NOT_FOUND',
       operation: 'gap show',
     });
     runtime.readRgr.mockReturnValue(null);
-    expect(JSON.parse((await invoke('show', 'G-404', { round: 'R-0042' })).stderr)).toMatchObject({
+    expect(refusal((await invoke('show', 'G-404', { round: 'R-0042' })).stderr)).toMatchObject({
       code: 'ROUND_GAP_NOT_FOUND',
     });
 
-    expect(JSON.parse((await invoke('list', {})).stderr)).toMatchObject({
+    expect(refusal((await invoke('list', {})).stderr)).toMatchObject({
       code: 'TASK_ROUND_REQUIRED',
       operation: 'gap list',
     });
@@ -404,29 +418,27 @@ describe('round workflow command boundaries', () => {
     );
 
     expect(
-      JSON.parse((await invoke('resolve', 'G-X', { round: 'R-0042', resolver: 'owner' })).stderr),
+      refusal((await invoke('resolve', 'G-X', { round: 'R-0042', resolver: 'owner' })).stderr),
     ).toMatchObject({ code: 'ROUND_GAP_NOT_FOUND' });
-    expect(JSON.parse((await invoke('resolve', 'G-1', { round: 'R-0042' })).stderr)).toMatchObject({
+    expect(refusal((await invoke('resolve', 'G-1', { round: 'R-0042' })).stderr)).toMatchObject({
       code: 'ROUND_GAP_RESOLVER_REQUIRED',
       exit: EXIT_USAGE,
     });
   });
 
   it('rejects invalid blueprint selections and invalid loaded blueprints', async () => {
-    expect(JSON.parse((await invoke('plan', { blueprint: 'render' })).stderr)).toMatchObject({
+    expect(refusal((await invoke('plan', { blueprint: 'render' })).stderr)).toMatchObject({
       code: 'ROUND_BLUEPRINT_OPERATION_INVALID',
     });
-    expect(JSON.parse((await invoke('plan', { blueprint: 'plan' })).stderr)).toMatchObject({
+    expect(refusal((await invoke('plan', { blueprint: 'plan' })).stderr)).toMatchObject({
       code: 'ROUND_BLUEPRINT_FILE_REQUIRED',
     });
     expect(
-      JSON.parse(
-        (await invoke('plan', { blueprint: 'plan', file: 'b.json', scaffold: true })).stderr,
-      ),
+      refusal((await invoke('plan', { blueprint: 'plan', file: 'b.json', scaffold: true })).stderr),
     ).toMatchObject({ code: 'ROUND_PLAN_SELECTION_CONFLICT' });
     runtime.loadBlueprint.mockReturnValue({ ok: false });
     expect(
-      JSON.parse((await invoke('plan', { blueprint: 'plan', file: 'b.json' })).stderr),
+      refusal((await invoke('plan', { blueprint: 'plan', file: 'b.json' })).stderr),
     ).toMatchObject({ code: 'ROUND_BLUEPRINT_SCHEMA_INVALID' });
   });
 
@@ -519,7 +531,7 @@ describe('round workflow command boundaries', () => {
     );
 
     runtime.runRoundTasks.mockRejectedValueOnce(new Error('DISPATCH_FAILED'));
-    expect(JSON.parse((await invoke('run', { round: 'R-0042' })).stderr)).toEqual({
+    expect(refusal((await invoke('run', { round: 'R-0042' })).stderr)).toEqual({
       code: 'DISPATCH_FAILED',
       operation: 'run',
       exit: 2,
@@ -555,7 +567,7 @@ describe('round workflow command boundaries', () => {
     runtime.requireActiveTaskRound.mockImplementationOnce(() => {
       throw new Error('ROUND_NOT_ACTIVE');
     });
-    expect(JSON.parse((await invoke('status', { round: 'R-0042' })).stderr)).toEqual({
+    expect(refusal((await invoke('status', { round: 'R-0042' })).stderr)).toEqual({
       code: 'ROUND_NOT_ACTIVE',
       operation: 'status',
       exit: 2,
@@ -637,7 +649,7 @@ describe('round status on a sealed round (ADR-EVI-0003)', () => {
     });
     const result = await invoke('status', { repoRoot: '/repo', round: 'R-0099' });
     expect(result.exit).toBe(2);
-    expect(JSON.parse(result.stderr)).toEqual({
+    expect(refusal(result.stderr)).toEqual({
       code: 'ROUND_RECORD_NOT_FOUND',
       operation: 'status',
       exit: 2,
@@ -650,7 +662,7 @@ describe('round status on a sealed round (ADR-EVI-0003)', () => {
     runtime.runRoundTasks.mockRejectedValue(inactive());
     const result = await invoke('run', { repoRoot: '/repo', round: 'R-0042' });
     expect(result.exit).toBe(EXIT_PRECONDITION);
-    expect(JSON.parse(result.stderr)).toEqual({
+    expect(refusal(result.stderr)).toEqual({
       code: 'TASK_ROUND_INACTIVE',
       operation: 'run',
       exit: EXIT_PRECONDITION,
