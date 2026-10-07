@@ -26,6 +26,19 @@ const decisionRecords = new Set(
     .filter((id): id is string => id !== undefined),
 );
 
+/**
+ * Releases that changed no adopter-facing configuration, so the manifest holds no entry for them
+ * (adopter-migrations.schema.json: an entry exists for every release that changed adopter-facing
+ * configuration, and an entry needs at least one change). Each one is named with its reason;
+ * init upgrade across one only restamps the bound version.
+ */
+const CONFIGURATION_NEUTRAL_RELEASES: ReadonlyMap<string, string> = new Map([
+  [
+    '2.2.0',
+    'Behavior and diagnostics only (refusal envelopes, audit observe --previous, coverage report binding); no law, policy, schema or materialized adopter file changed since 2.1.0.',
+  ],
+]);
+
 describe('#264: the adopter migration manifest', () => {
   it('validates against its schema with ascending releases and version-scoped change ids', () => {
     expect(manifest.baseline).toBe('1.6.0');
@@ -52,7 +65,7 @@ describe('#264: the adopter migration manifest', () => {
     });
   });
 
-  it('has exactly one entry for every changelog release above the baseline', () => {
+  it('has exactly one entry for every changelog release above the baseline that changed configuration', () => {
     const changelog = readFileSync(join(ROOT, 'CHANGELOG.md'), 'utf8');
     const released = [...changelog.matchAll(/^## (\d+\.\d+\.\d+) — (\d{4}-\d{2}-\d{2})$/gmu)]
       .map((match) => ({ version: match[1] ?? '', date: match[2] ?? '' }))
@@ -60,7 +73,15 @@ describe('#264: the adopter migration manifest', () => {
     expect(released.length).toBeGreaterThan(0);
     for (const release of released) {
       const entry = manifest.releases.find((candidate) => candidate.version === release.version);
+      if (CONFIGURATION_NEUTRAL_RELEASES.has(release.version)) {
+        expect(entry, `${release.version} is declared configuration-neutral`).toBeUndefined();
+        continue;
+      }
       expect(entry, release.version).toMatchObject({ status: 'released', date: release.date });
+    }
+    // A neutral declaration names a release the changelog records, never a future one.
+    for (const version of CONFIGURATION_NEUTRAL_RELEASES.keys()) {
+      expect(released.map((release) => release.version)).toContain(version);
     }
     for (const entry of manifest.releases.filter((candidate) => candidate.status === 'released')) {
       expect(released.map((release) => release.version)).toContain(entry.version);
@@ -69,8 +90,15 @@ describe('#264: the adopter migration manifest', () => {
 
   it('covers the installed package version', () => {
     const installed = resolveCliVersion();
-    if (compareVersions(installed, manifest.baseline) > 0) {
+    if (
+      compareVersions(installed, manifest.baseline) > 0 &&
+      !CONFIGURATION_NEUTRAL_RELEASES.has(installed)
+    ) {
       expect(manifest.releases.map((release) => release.version)).toContain(installed);
+    }
+    // Across a neutral release the plan is empty and init upgrade only restamps the version.
+    for (const version of CONFIGURATION_NEUTRAL_RELEASES.keys()) {
+      expect(plannedReleases(manifest, '2.1.0', version)).toEqual([]);
     }
     expect(releasesInRange(manifest, '1.6.0', '1.9.0').map((release) => release.version)).toEqual([
       '1.7.0',
