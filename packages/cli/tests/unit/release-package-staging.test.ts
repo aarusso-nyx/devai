@@ -88,8 +88,12 @@ interface ChildResult {
   readonly stderr: string;
 }
 
-/** Captured bytes per stream before the group is killed. */
-const OUTPUT_CAP_BYTES = 1024 * 1024;
+/**
+ * Captured bytes per stream before the group is killed. A runaway guard, not a size limit
+ * on legitimate output: `check --affected --task-plan --format json` printed more than 1 MiB
+ * for a large diff, so the cap matches the 64 MiB `maxBuffer` the synchronous calls used.
+ */
+const OUTPUT_CAP_BYTES = 64 * 1024 * 1024;
 /** How long `close` may take after the group kill before the pipes are destroyed. */
 const CLOSE_GRACE_MS = 2_000;
 
@@ -253,6 +257,21 @@ describe('normalized release package staging', () => {
     },
     STAGE_CASE_TIMEOUT_MS,
   );
+
+  it('accepts a valid child output larger than 1 MiB in full', async () => {
+    // Regression for the former 1 MiB cap: a large affected plan was killed as runaway output.
+    const script =
+      'process.stdout.write(JSON.stringify({ tasks: Array.from({ length: 40000 }, (_, i) => ({ nodeId: "n" + i, pad: "x".repeat(40) })) }))';
+    const result = await runBounded(
+      process.execPath,
+      ['-e', script],
+      { cwd: root },
+      deadline(60_000),
+    );
+    expect(result.status).toBe(0);
+    expect(Buffer.byteLength(result.stdout)).toBeGreaterThan(2 * 1024 * 1024);
+    expect((JSON.parse(result.stdout) as { tasks: unknown[] }).tasks).toHaveLength(40000);
+  });
 
   it('keeps the published landing page bound to the package version', () => {
     const packageVersion = (
