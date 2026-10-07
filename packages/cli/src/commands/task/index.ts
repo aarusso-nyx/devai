@@ -18,6 +18,7 @@ import {
   TaskServiceError,
   type TaskRecord,
 } from '#runtime-core';
+import { commandRefusal } from '../../cli-error.js';
 import { defineCommand } from '../../define-command.js';
 
 interface CommonOptions {
@@ -54,11 +55,24 @@ function repoRoot(options: CommonOptions): string {
   return options.repoRoot ?? process.cwd();
 }
 
+/**
+ * #338: a task failure is a schema-valid refusal envelope carrying the task code, so the action
+ * wrapper passes it through under --format json. A TaskServiceError keeps its exit; any other
+ * error is unanticipated: TASK_OPERATION_FAILED, infrastructure (6).
+ */
 function taskFailure(command: string, error: unknown): void {
-  const code = error instanceof TaskServiceError ? error.code : 'TASK_OPERATION_FAILED';
-  const exit = error instanceof TaskServiceError ? error.exitCode : 2;
-  process.stderr.write(`${JSON.stringify({ code, operation: command, exit })}\n`);
-  process.exitCode = exit;
+  const known = error instanceof TaskServiceError;
+  const envelope = commandRefusal(
+    known ? error.code : 'TASK_OPERATION_FAILED',
+    known ? error.exitCode : 6,
+    { operation: command },
+    known
+      ? `Resolve the condition the code names, then rerun devai task ${command}.`
+      : 'Retry; if it persists, report the failure with the operation and code.',
+    'TASK_OPERATION_FAILED',
+  );
+  process.stderr.write(`${JSON.stringify(envelope)}\n`);
+  process.exitCode = envelope.exit;
 }
 
 function requiredTask(options: TaskOptions): string {
