@@ -1,5 +1,11 @@
-import { existsSync, readFileSync, statSync } from 'node:fs';
-import { dirname, isAbsolute, join, resolve } from 'node:path';
+import { existsSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { isAbsolute, resolve } from 'node:path';
+import {
+  bindingMismatches,
+  parseCoverageBinding,
+  readHeadCommit,
+  sidecarPathFor,
+} from './coverage-binding.js';
 import { runCommand } from './run-command.js';
 import {
   buildSensorReading,
@@ -125,6 +131,8 @@ export interface MeasureTestCoverageDepthOptions {
   readonly exclusions: readonly string[];
   readonly thresholds?: { readonly pass: number; readonly review: number };
   readonly now?: string;
+  /** The candidate commit the report must be bound to; defaults to `HEAD` of `repoRoot`. */
+  readonly candidateCommit?: string;
 }
 
 const STDERR_HEAD_LIMIT = 512;
@@ -168,7 +176,8 @@ export function measureTestCoverageDepth(opts: MeasureTestCoverageDepthOptions):
   const reportPath = isAbsolute(opts.coveragePath)
     ? opts.coveragePath
     : resolve(opts.repoRoot, opts.coveragePath);
-  const sidecarPath = join(dirname(reportPath), 'population.json');
+  const sidecarPath = sidecarPathFor(reportPath);
+  const candidate = opts.candidateCommit ?? readHeadCommit(opts.repoRoot);
   const population = opts.population;
 
   const reading = (
@@ -205,8 +214,16 @@ export function measureTestCoverageDepth(opts: MeasureTestCoverageDepthOptions):
     });
   };
 
+  // #336: an existing report is reused only when its sidecar binds it to this candidate's full
+  // run. A stale, partial or unbound report is never read; the producer reruns instead.
+  const reusable =
+    isFile(reportPath) &&
+    candidate !== undefined &&
+    bindingMismatches(parseCoverageBinding(readSidecarJson(sidecarPath)), candidate, reportPath)
+      .length === 0;
+
   let producer: ProducerRun | undefined;
-  if (!isFile(reportPath)) {
+  if (!reusable) {
     // #242: the producer runs the local suite, which may itself run this sensor. The producer
     // carries a marker, and a sensor inside it never starts a nested producer, whatever the
     // authority scope admits.
@@ -223,6 +240,22 @@ export function measureTestCoverageDepth(opts: MeasureTestCoverageDepthOptions):
         null,
       );
     }
+    if (candidate === undefined) {
+      return reading(
+        'unknown',
+        [
+          {
+            severity: 'warning',
+            code: 'COVERAGE_REPORT_UNBOUND',
+            message: `The ${population} coverage report cannot be bound to a candidate: the commit of ${opts.repoRoot} could not be resolved, so no producer was run.`,
+          },
+        ],
+        null,
+      );
+    }
+    // The previous report belongs to another run: remove it so a failed producer leaves none.
+    rmSync(reportPath, { force: true });
+    rmSync(sidecarPath, { force: true });
     let result: ReturnType<typeof runCommand>;
     try {
       result = runCommand(LOCAL_COVERAGE_PRODUCER_ARGV, {
@@ -333,6 +366,26 @@ export function measureTestCoverageDepth(opts: MeasureTestCoverageDepthOptions):
     );
   }
 
+  const unbound = bindingMismatches(
+    parseCoverageBinding(readSidecarJson(sidecarPath)),
+    candidate ?? '',
+    reportPath,
+  );
+  if (unbound.length > 0) {
+    return reading(
+      'fail',
+      [
+        {
+          severity: 'error',
+          code: 'COVERAGE_REPORT_UNBOUND',
+          message: `The ${population} coverage report at ${opts.coveragePath} is not bound to this candidate's full producer run: ${unbound.join('; ')}.`,
+        },
+      ],
+      null,
+      producer,
+    );
+  }
+
   const summary = summarizeLines(reportPath);
   if (summary === undefined) {
     return reading(
@@ -377,16 +430,19 @@ function isFile(path: string): boolean {
   return existsSync(path) && statSync(path).isFile();
 }
 
-function readSidecar(
-  path: string,
-): { readonly population: string; readonly exclusions: readonly string[] } | undefined {
+function readSidecarJson(path: string): unknown {
   if (!isFile(path)) return undefined;
-  let parsed: unknown;
   try {
-    parsed = JSON.parse(readFileSync(path, 'utf8'));
+    return JSON.parse(readFileSync(path, 'utf8'));
   } catch {
     return undefined;
   }
+}
+
+function readSidecar(
+  path: string,
+): { readonly population: string; readonly exclusions: readonly string[] } | undefined {
+  const parsed = readSidecarJson(path);
   if (parsed === null || typeof parsed !== 'object') return undefined;
   const { population, exclusions } = parsed as { population?: unknown; exclusions?: unknown };
   if (typeof population !== 'string' || !Array.isArray(exclusions)) return undefined;
