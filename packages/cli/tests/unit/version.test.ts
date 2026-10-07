@@ -9,7 +9,7 @@ import { resolveCliProvenance, resolveCliVersion } from '../../src/version.js';
 
 const ROOT = resolve(import.meta.dirname, '../../../..');
 const CANDIDATE_RELEASE_VERSION = '2.2.0';
-const PUBLISHED_RELEASE_VERSION = '2.0.0';
+const PUBLISHED_RELEASE_VERSION = '2.1.0';
 const TRUSTED_VERIFIER_PACKAGE_VERSION = '1.9.0';
 const VENDORED_PROVENANCE = 'packages/cli/vendor/evidence-verification/provenance.json';
 // The verifier inside the published 1.9.0 package that the law policy trusts (step 4 pin).
