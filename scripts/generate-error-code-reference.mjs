@@ -2,6 +2,12 @@
 
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
+import {
+  ERROR_CODE_PREFIXES,
+  EXIT_CLASSES,
+  NOT_CODES,
+  parseThrowSites,
+} from './error-code-sources.mjs';
 
 const rootArgument = process.argv.slice(2).find((argument) => !argument.startsWith('--'));
 const root = resolve(rootArgument ?? '.');
@@ -13,69 +19,6 @@ const sourceRoots = readdirSync(join(root, 'packages'), { withFileTypes: true })
   .map((entry) => `packages/${entry.name}/src`)
   .concat(['packages/cli/vendor/evidence-verification/src'])
   .sort();
-// Quoted identifiers that share a code prefix but name a constant or credential, not a code.
-// Quoted names that match a code prefix but are not codes; RELEASE_TAG is a workflow data
-// variable the harness effect analysis admits (#325).
-const notCodes = new Set(['ACTION_EFFECTS', 'GITHUB_TOKEN', 'POST_CUTOFF', 'RELEASE_TAG']);
-const prefixes = new Set([
-  'ACTION',
-  'ACTIONS',
-  'ADOPTER',
-  'AGENT',
-  'ARTIFACT',
-  'AUDIT',
-  'AUTHORITY',
-  'BACKLOG',
-  'BLUEPRINT',
-  'BUILD',
-  'CAMPAIGN',
-  'CATALOG',
-  'CHECK',
-  'CI',
-  'CLI',
-  'CONSTITUTION',
-  'COVERAGE',
-  'DATABASE',
-  'DISPOSITION',
-  'DOCS',
-  'DURABLE',
-  'EVIDENCE',
-  'EXPERIMENTAL',
-  'FORBIDDEN',
-  'GITHUB',
-  'GLOB',
-  'HOOK',
-  'INIT',
-  'INTENT',
-  'INVENTORY',
-  'JOURNEY',
-  'LEDGER',
-  'LOOP',
-  'MODEL',
-  'MUTATION',
-  'POLICY',
-  'POST',
-  'PROCESS',
-  'PROMPT',
-  'PROOF',
-  'RATIFICATION',
-  'RECEIPT',
-  'RECIPE',
-  'RELEASE',
-  'ROUND',
-  'ROUTE',
-  'SCHEMA',
-  'SCORECARD',
-  'SENSE',
-  'SENSOR',
-  'TASK',
-  'TRACE',
-  'TRACKING',
-  'TRANSLATION',
-  'TRIAGE',
-  'TRUSTED',
-  'WORKTREE',
-]);
 
 function filesUnder(path) {
   return readdirSync(path, { withFileTypes: true }).flatMap((entry) => {
@@ -170,51 +113,20 @@ function authorityClass(code) {
 // #338: task, round and tracking failures are refusal envelopes whose exit is the one the error
 // carries, so a code thrown as `new TaskServiceError('CODE', EXIT)`, the loop's `fail('CODE', EXIT)`
 // or `new TrackingCommandError('CODE', EXIT)` is declared by its throw sites (default exit 2).
-const THROWN_EXIT_SYMBOLS = new Map([
-  ['EXIT_USAGE', 2],
-  ['EXIT_FAIL', 2],
-  ['EXIT_GATE', 3],
-  ['EXIT_PRECONDITION', 5],
-]);
-const THROWN_CLASSES = new Map([
-  [2, 'routing-authority'],
-  [3, 'gate-fail'],
-  [4, 'invalid-input'],
-  [5, 'precondition'],
-  [6, 'infrastructure'],
-  [7, 'contract-violation'],
-]);
 const thrownExits = new Map();
 
 function recordThrowSites(file, source) {
-  const patterns = [
-    /new (?:TaskServiceError|TrackingCommandError)\(\s*(?:'([A-Z][A-Z0-9_]+)'|`([A-Z][A-Z0-9_]+):[^`]*`)\s*(?:,\s*([A-Z_]+|[0-9]))?\s*\)/gu,
-  ];
-  if (file.includes('/packages/loop/src/')) {
-    patterns.push(/\bfail\(\s*'([A-Z][A-Z0-9_]+)'()\s*(?:,\s*([A-Z_]+|[0-9]))?\s*\)/gu);
-  }
-  for (const pattern of patterns) {
-    for (const match of source.matchAll(pattern)) {
-      const code = match[1] ?? match[2];
-      const symbol = match[3];
-      const exit =
-        symbol === undefined
-          ? 2
-          : /^[0-9]$/u.test(symbol)
-            ? Number(symbol)
-            : THROWN_EXIT_SYMBOLS.get(symbol);
-      if (code === undefined || exit === undefined || !THROWN_CLASSES.has(exit)) continue;
-      const exits = thrownExits.get(code) ?? new Set();
-      exits.add(exit);
-      thrownExits.set(code, exits);
-    }
+  for (const { code, exit } of parseThrowSites(file, source)) {
+    const exits = thrownExits.get(code) ?? new Set();
+    exits.add(exit);
+    thrownExits.set(code, exits);
   }
 }
 
 function thrownClass(code) {
   const exits = [...(thrownExits.get(code) ?? [])].sort((a, b) => a - b);
   if (exits.length === 0) return undefined;
-  const pairs = exits.map((exit) => `${THROWN_CLASSES.get(exit)} / ${String(exit)}`);
+  const pairs = exits.map((exit) => `${EXIT_CLASSES.get(exit)} / ${String(exit)}`);
   return pairs.length === 1 ? pairs[0] : `${pairs[0]} (${pairs.slice(1).join(', ')})`;
 }
 
@@ -277,7 +189,7 @@ for (const sourceRoot of sourceRoots) {
       /(?:['"]([A-Z][A-Z0-9]+(?:_[A-Z0-9]+)+)['"]|`([A-Z][A-Z0-9]+(?:_[A-Z0-9]+)+)[\s:`])/gu,
     )) {
       const code = match[1] ?? match[2];
-      if (code !== undefined && prefixes.has(code.split('_')[0]) && !notCodes.has(code))
+      if (code !== undefined && ERROR_CODE_PREFIXES.has(code.split('_')[0]) && !NOT_CODES.has(code))
         codes.add(code);
     }
     for (const match of source.matchAll(/['"](DEVAI_VERIFIER_[A-Z0-9_]+)(?=[:'"])/gu)) {
