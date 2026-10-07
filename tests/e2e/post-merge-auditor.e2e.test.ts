@@ -357,10 +357,11 @@ describe('Article 34 post-merge Auditor composite', () => {
           }
         })
         .find((entry) => entry?.['code'] === 'POST_MERGE_OBSERVATION_INJECTED_FAILURE');
+      // #343: round failures are refusal envelopes; the operation sits in the envelope context.
       expect(injectedFailure).toMatchObject({
         code: 'POST_MERGE_OBSERVATION_INJECTED_FAILURE',
-        operation: 'close-post-merge',
         exit: 2,
+        context: { operation: 'close-post-merge' },
       });
       const failed = join(repo, '.git/devai/post-merge-observations', after, 'status.json');
       expect(JSON.parse(readFileSync(failed, 'utf8'))).toMatchObject({ status: 'error' });
