@@ -95,7 +95,39 @@ function exitValues() {
   };
 }
 
+// BACKLOG_* codes are never an envelope code. The backlog commands write their own failure payload
+// `{code, operation, exit}` (packages/cli/src/commands/backlog/index.ts `failure()`) and exit with
+// its `exit`: 1 for the codes below, EXIT_USAGE for every other one. Under `--format json` the action
+// wrapper carries that payload in `error.context.payload` of ACTION_INVOCATION_REFUSED (payload exit
+// 2) or ACTION_OUTPUT_CONTRACT_VIOLATION (payload exit 1).
+const backlogPayloadExitOne = new Set([
+  'BACKLOG_ITEM_ALREADY_RESOLVED',
+  'BACKLOG_ITEM_NOT_FOUND',
+  'BACKLOG_OPERATION_FAILED',
+  'BACKLOG_ORIGIN_COMMIT_UNAVAILABLE',
+]);
+// Codes that no envelope or command payload carries as its code, with where they surface instead.
+const internalCodes = new Map([
+  [
+    'BACKLOG_SCORECARD_INVALID',
+    'Raised by the post-merge auditor observation-backlog compiler, not by the backlog commands; it never reaches an envelope as its code.',
+  ],
+]);
+// MODEL_BRIDGE_* codes are raised inside the model bridge, which only `sense run llm_judge` calls; the
+// run records the thrown message as that member's `stderr` in its result, never as an envelope code.
+const MODEL_BRIDGE_INTERNAL =
+  'Raised by the model bridge inside `sense run llm_judge`; the run records it as the failing member `stderr`, never as an envelope code. Fix the named provider, model or host condition and rerun the sensor.';
+
+function internalNote(code) {
+  if (internalCodes.has(code)) return internalCodes.get(code);
+  if (code.startsWith('MODEL_')) return MODEL_BRIDGE_INTERNAL;
+  return undefined;
+}
+
 function classify(code, exits) {
+  if (internalNote(code) !== undefined) return ['internal', 'none'];
+  if (code.startsWith('BACKLOG_'))
+    return ['backlog-payload', backlogPayloadExitOne.has(code) ? 1 : exits.usage];
   // ADR-CHK-0005: not-applicable is its own result class, never a failure.
   if (code === 'CHECK_MEMBER_NOT_APPLICABLE') return ['not-applicable', exits.pass];
   if (code === 'CHECK_MEMBER_POPULATION_EMPTY') return ['review', exits.review];
@@ -126,6 +158,10 @@ function words(code) {
 }
 
 function remediation(code) {
+  const internal = internalNote(code);
+  if (internal !== undefined) return internal;
+  if (code.startsWith('BACKLOG_'))
+    return 'Reported in the backlog failure payload `{code, operation, exit}`; correct the named input or item, then retry.';
   if (code === 'AUTHORITY_POLICY_MISSING')
     return 'Run the ordered bind commands in `context.commands`.';
   if (code === 'CHECK_SELECTION_INVALID') return 'Use `--only <member>` or `--suite <name>`.';
