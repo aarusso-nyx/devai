@@ -72,6 +72,10 @@ describe('release export artifact-store provider boundary', () => {
     expect(verify).not.toHaveBeenCalled();
   });
 
+  // The one case that bundles the release lifecycle with rolldown and then runs the bundle in a
+  // child process (itself capped at 30 s): about 10 s alone without coverage at load 7-14, past the
+  // RC coverage lane's 15 s default during 2.2.0 certification (#246). The bound is a hang guard
+  // sized for that measured cost and the child's own cap, not a performance claim.
   it('runs the v3 none carrier through the bundled protected host lifecycle', async () => {
     const root = resolve(import.meta.dirname, '../../../..');
     const temporary = mkdtempSync(join(tmpdir(), 'devai export bundle ç-'));
@@ -224,5 +228,5 @@ export class ProtectedCertificationContainer extends OriginalProtectedCertificat
     } finally {
       rmSync(temporary, { recursive: true, force: true });
     }
-  });
+  }, 60_000);
 });
