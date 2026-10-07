@@ -1,6 +1,7 @@
 import type { CAC } from 'cac';
 import { spawnSync } from '@devai-nyx/authority';
-import { EXIT_USAGE } from '@devai-nyx/utils';
+import { EXIT_PRECONDITION, EXIT_USAGE } from '@devai-nyx/utils';
+import { cliError } from '../../cli-error.js';
 import {
   addBacklogItem,
   listBacklogItems,
@@ -53,7 +54,7 @@ interface BacklogOptions {
 class BacklogUsageError extends Error {
   constructor(
     readonly code: string,
-    readonly exit: number = EXIT_USAGE,
+    readonly exit: 2 | 5 = EXIT_USAGE,
   ) {
     super(code);
     this.name = 'BacklogUsageError';
@@ -81,20 +82,47 @@ function emit(value: unknown, human: boolean, text: string): void {
   process.exitCode = 0;
 }
 
+/** The envelope exit for a failure DEVAI did not anticipate (class infrastructure). */
+const EXIT_INFRASTRUCTURE = 6;
+
 const NOT_FOUND_CODES = new Set(['BACKLOG_ITEM_NOT_FOUND', 'BACKLOG_ITEM_ALREADY_RESOLVED']);
 
+/**
+ * #338: a backlog failure is a schema-valid refusal envelope carrying the backlog code, so the
+ * action wrapper passes it through under `--format json` instead of normalizing it to a contract
+ * violation. A missing or resolved item and an unavailable origin commit are preconditions (5);
+ * an unexpected non-error throw is infrastructure (6); every other code keeps the usage exit (2).
+ */
 function failure(operation: string, error: unknown): void {
   let code = 'BACKLOG_OPERATION_FAILED';
-  let exit = 1;
+  let exit: 2 | 5 | 6 = EXIT_INFRASTRUCTURE;
   if (error instanceof BacklogUsageError) {
     code = error.code;
     exit = error.exit;
   } else if (error instanceof Error) {
     const declared = (error as { code?: unknown }).code;
     code = typeof declared === 'string' ? declared : error.message;
-    exit = NOT_FOUND_CODES.has(code) ? 1 : EXIT_USAGE;
+    exit = NOT_FOUND_CODES.has(code) ? EXIT_PRECONDITION : EXIT_USAGE;
   }
-  process.stderr.write(`${JSON.stringify({ code, operation: `backlog ${operation}`, exit })}\n`);
+  const envelope = cliError({
+    code: /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*$/u.test(code) ? code : 'BACKLOG_OPERATION_FAILED',
+    class:
+      exit === EXIT_PRECONDITION
+        ? 'precondition'
+        : exit === 2
+          ? 'routing-authority'
+          : 'infrastructure',
+    exit,
+    message: code.toLowerCase().replaceAll('_', ' '),
+    remediation:
+      exit === EXIT_PRECONDITION
+        ? 'Name an existing open item, or commit once so the origin commit exists, then retry.'
+        : exit === 2
+          ? `Correct the named input; see devai backlog ${operation} --help.`
+          : 'Retry; if it persists, report the failure with the operation and code.',
+    context: { operation: `backlog ${operation}` },
+  });
+  process.stderr.write(`${JSON.stringify(envelope)}\n`);
   process.exitCode = exit;
 }
 
@@ -110,7 +138,7 @@ function headCommit(repoRoot: string): string {
   const result = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: repoRoot, encoding: 'utf8' });
   const head = typeof result.stdout === 'string' ? result.stdout.trim() : '';
   if (result.status !== 0 || !/^[0-9a-f]{40}$/u.test(head)) {
-    throw new BacklogUsageError('BACKLOG_ORIGIN_COMMIT_UNAVAILABLE', 1);
+    throw new BacklogUsageError('BACKLOG_ORIGIN_COMMIT_UNAVAILABLE', EXIT_PRECONDITION);
   }
   return head;
 }
