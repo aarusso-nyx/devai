@@ -1,4 +1,5 @@
 import { validators } from '@devai-nyx/schemas';
+import { ERROR_CODE_PREFIXES } from './error-code-prefixes.js';
 
 export type CliErrorClass =
   | 'routing-authority'
@@ -36,13 +37,20 @@ const REFUSAL_CLASSES: Readonly<Record<CliError['exit'], CliErrorClass>> = {
   7: 'contract-violation',
 };
 
-const ENVELOPE_CODE = /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*$/u;
+const DEVAI_CODE = /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+$/u;
+
+/** A DEVAI diagnostic code: code-shaped, with a prefix the error-code reference scans. */
+function isDevaiCode(token: string): boolean {
+  return DEVAI_CODE.test(token) && ERROR_CODE_PREFIXES.has(token.split('_')[0] ?? '');
+}
 
 /**
  * A command-layer refusal as a schema-valid envelope (#338): the class is the one error.schema.json
  * pairs with the exit, and an exit outside 2-7 is an unanticipated failure, so infrastructure (6).
  * A composite `CODE:detail` keeps CODE as the envelope code and the detail as
- * `context.code_detail`; anything else that is not code-shaped becomes `fallback` with exit 6.
+ * `context.code_detail`. A leading token that is not a DEVAI code (a host error such as
+ * `ENOENT: no such file`) becomes `fallback` with infrastructure (6) and the original text in
+ * `context.message`.
  */
 export function commandRefusal(
   raw: string,
@@ -53,21 +61,26 @@ export function commandRefusal(
 ): CliError {
   const separator = raw.indexOf(':');
   const head = separator < 0 ? raw : raw.slice(0, separator);
-  const shaped = ENVELOPE_CODE.test(head);
-  const code = shaped ? head : fallback;
-  const detail = shaped && separator >= 0 ? raw.slice(separator + 1) : undefined;
-  const refusalExit: CliError['exit'] = !shaped
+  const known = isDevaiCode(head);
+  const code = known ? head : fallback;
+  const detail = known && separator >= 0 ? raw.slice(separator + 1).trim() : undefined;
+  const refusalExit: CliError['exit'] = !known
     ? 6
     : Number.isInteger(exit) && exit >= 2 && exit <= 7
       ? (exit as CliError['exit'])
       : 6;
+  const extra: Record<string, unknown> = {};
+  if (detail !== undefined) extra['code_detail'] = detail;
+  if (!known && raw.length > 0) extra['message'] = raw;
   return cliError({
     code,
     class: REFUSAL_CLASSES[refusalExit],
     exit: refusalExit,
     message: code.toLowerCase().replaceAll('_', ' '),
-    remediation,
-    context: detail === undefined ? context : { ...context, code_detail: detail },
+    remediation: known
+      ? remediation
+      : 'Check the operation input named in context.message, then retry; report it if it persists.',
+    context: { ...context, ...extra },
   });
 }
 
