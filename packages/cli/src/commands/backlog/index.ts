@@ -88,10 +88,22 @@ const EXIT_INFRASTRUCTURE = 6;
 const NOT_FOUND_CODES = new Set(['BACKLOG_ITEM_NOT_FOUND', 'BACKLOG_ITEM_ALREADY_RESOLVED']);
 
 /**
+ * A refusal the backlog store or the tracking projection raised on purpose, with its own code.
+ * Anything else (a SyntaxError from a malformed item, an fs error) is unexpected: infrastructure.
+ */
+function isKnownBacklogError(error: unknown): error is Error & { readonly code: string } {
+  if (!(error instanceof Error)) return false;
+  if (error.name !== 'BacklogStoreError' && error.name !== 'GovernanceTrackingError') return false;
+  const code = (error as { code?: unknown }).code;
+  return typeof code === 'string' && /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+$/u.test(code);
+}
+
+/**
  * #338: a backlog failure is a schema-valid refusal envelope carrying the backlog code, so the
  * action wrapper passes it through under `--format json` instead of normalizing it to a contract
  * violation. A missing or resolved item and an unavailable origin commit are preconditions (5);
- * an unexpected non-error throw is infrastructure (6); every other code keeps the usage exit (2).
+ * any error the store or projection did not raise on purpose is infrastructure (6); every other
+ * backlog code keeps the usage exit (2).
  */
 function failure(operation: string, error: unknown): void {
   let code = 'BACKLOG_OPERATION_FAILED';
@@ -99,13 +111,12 @@ function failure(operation: string, error: unknown): void {
   if (error instanceof BacklogUsageError) {
     code = error.code;
     exit = error.exit;
-  } else if (error instanceof Error) {
-    const declared = (error as { code?: unknown }).code;
-    code = typeof declared === 'string' ? declared : error.message;
+  } else if (isKnownBacklogError(error)) {
+    code = error.code;
     exit = NOT_FOUND_CODES.has(code) ? EXIT_PRECONDITION : EXIT_USAGE;
   }
   const envelope = cliError({
-    code: /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*$/u.test(code) ? code : 'BACKLOG_OPERATION_FAILED',
+    code,
     class:
       exit === EXIT_PRECONDITION
         ? 'precondition'
