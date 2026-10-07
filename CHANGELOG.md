@@ -16,10 +16,12 @@ from 2.1.0 only restamps the bound version.
   - backlog: `BACKLOG_ITEM_NOT_FOUND`, `BACKLOG_ITEM_ALREADY_RESOLVED` and
     `BACKLOG_ORIGIN_COMMIT_UNAVAILABLE` exit 5 (precondition) instead of 1; every other backlog code
     keeps exit 2;
-  - backlog, task, round and tracking: an unanticipated error (a malformed item, a host error such as
-    `ENOENT`, an opaque throw) is `BACKLOG_OPERATION_FAILED`, `TASK_OPERATION_FAILED`,
-    `ROUND_OPERATION_FAILED` or `TRACKING_OPERATION_FAILED` with exit 6 (infrastructure) instead of 2,
-    with the original text in `context.message`;
+  - backlog, task, round and tracking: a failure keeps its own code only when it is a DEVAI code
+    (a prefix the error-code reference scans); an unanticipated error (a malformed item, an opaque
+    throw, or a host error such as `ENOENT: no such file` from `round close --input`) is
+    `BACKLOG_OPERATION_FAILED`, `TASK_OPERATION_FAILED`, `ROUND_OPERATION_FAILED` or
+    `TRACKING_OPERATION_FAILED` with exit 6 (infrastructure) instead of 2, with the original text in
+    `context.message` (#343);
   - `operation`, `detail`, `removal` and `uncertain` move into the envelope `context`, and a composite
     `CODE:detail` keeps `CODE` with the detail in `context.code_detail`;
   - `init plan --mode <invalid>` refuses `INIT_INTERACTIVE_MODE_INVALID` with exit 4 (invalid-input);
@@ -29,8 +31,10 @@ from 2.1.0 only restamps the bound version.
 - Error-code reference: each code's class and exit is declared from its emitter (literal envelope
   constructors, the action-output wrapper, the authority renderer, the router and the task, round
   and tracking throw sites) and checked by a contract test against the emitting code and
-  `error.schema.json`; a code raised only inside a message reads `per action`. The reference now lists
-  the backlog, model-bridge, tracking, git and host-receipt codes (1120 codes).
+  `error.schema.json`; a code raised only inside a message reads `per action`. The reference now scans
+  the `BACKLOG`, `MODEL`, `TRACKING`, `GIT` and `HOST` prefixes (1120 codes), so the `GIT_*` and
+  `HOST_RECEIPT_*` codes raised by round and task operations stay their own codes in the refusal
+  envelope (#343).
 - Audit observation (#335, #341): `audit observe` links each bundle to the nearest observed ancestor
   in the evidence chain and computes its additions and completions against it; `--previous <sha or
 SC- id>` names the previous observation (`AUDIT_OBSERVE_PREVIOUS_*` refusals). A replay keeps the
