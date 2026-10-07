@@ -26,12 +26,12 @@
     "previous_merge_sha": {
       "type": ["string", "null"],
       "pattern": "^[a-f0-9]{40}$",
-      "description": "The integration commit of the previous completed bundle the deltas are computed against, or null for the first bundle."
+      "description": "The integration commit of the previous completed bundle the deltas are computed against, or null for the first bundle. `audit observe` links the nearest observed ancestor of merge_sha recorded in the evidence chain, or the observation `--previous` names; a replay keeps the link its bundle records."
     },
     "generated_at": {
       "type": "string",
       "format": "date-time",
-      "description": "The observation timestamp shared by the bundle's artifacts."
+      "description": "The committer time of merge_sha (the candidate commit), shared by the bundle's artifacts. It is not the wall-clock time the observation ran: the bundle is a deterministic function of the commit and the readings, so a replay at the same commit reproduces it byte for byte. The time an observation was taken is the timestamp of its audit.observe record in the evidence chain."
     },
     "observations": {
       "type": "array",
