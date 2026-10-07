@@ -102,6 +102,22 @@ import {
   recordRoundCloseTracking,
   trackingWorkflowArtifact,
 } from '../../src/commands/round/tracking.js';
+import { validators } from '@devai-nyx/schemas';
+
+/**
+ * #338: a task, round or tracking refusal is a schema-valid error envelope. Check it, then flatten
+ * it to the command-layer view the assertions read: the code, the exit and the envelope context.
+ */
+function refusal(text: string): Record<string, unknown> {
+  const envelope = JSON.parse(text.trim()) as {
+    code: string;
+    exit: number;
+    context?: Record<string, unknown>;
+  };
+  expect(validators.error(envelope), text).toBe(true);
+  const { operation, ...context } = envelope.context ?? {};
+  return { code: envelope.code, operation, exit: envelope.exit, ...context };
+}
 
 const { cac } = createRequire(import.meta.url)('../../node_modules/cac/index-compat.js') as {
   cac: (name?: string) => CAC;
@@ -314,7 +330,7 @@ describe.sequential('round tracking command depth', () => {
       '--repo-root',
       root,
     ]);
-    expect(json(missing.stderr)).toMatchObject({ code: 'TRACKING_ROUND_REQUIRED', exit: 2 });
+    expect(refusal(missing.stderr)).toMatchObject({ code: 'TRACKING_ROUND_REQUIRED', exit: 2 });
     const malformed = await invoke(roundTrackingStatus, [
       'round-tracking-status',
       '--repo-root',
@@ -322,7 +338,7 @@ describe.sequential('round tracking command depth', () => {
       '--round',
       'round-4242',
     ]);
-    expect(json(malformed.stderr)).toMatchObject({ code: 'TRACKING_ROUND_INVALID', exit: 2 });
+    expect(refusal(malformed.stderr)).toMatchObject({ code: 'TRACKING_ROUND_INVALID', exit: 2 });
     for (const value of [`prefix-${ROUND}`, `${ROUND}-suffix`]) {
       const bounded = await invoke(roundTrackingStatus, [
         'round-tracking-status',
@@ -331,7 +347,7 @@ describe.sequential('round tracking command depth', () => {
         '--round',
         value,
       ]);
-      expect(json(bounded.stderr)).toMatchObject({ code: 'TRACKING_ROUND_INVALID', exit: 2 });
+      expect(refusal(bounded.stderr)).toMatchObject({ code: 'TRACKING_ROUND_INVALID', exit: 2 });
     }
 
     const boundInactive = await invoke(roundTrackingStatus, [
@@ -386,7 +402,7 @@ describe.sequential('round tracking command depth', () => {
       '--round',
       ROUND,
     ]);
-    expect(json(noConsent.stderr)).toMatchObject({
+    expect(refusal(noConsent.stderr)).toMatchObject({
       code: 'TRACKING_PUBLISH_CONSENT_REQUIRED',
       operation: 'tracking enable',
       exit: 2,
@@ -400,7 +416,7 @@ describe.sequential('round tracking command depth', () => {
       ROUND,
       '--publish',
     ]);
-    expect(json(noBinding.stderr)).toMatchObject({ code: 'TRACKING_BINDING_ABSENT', exit: 5 });
+    expect(refusal(noBinding.stderr)).toMatchObject({ code: 'TRACKING_BINDING_ABSENT', exit: 5 });
 
     bind(root);
     writeFileSync(join(root, '.github/workflows/devai-issue-tracking.yml'), 'drifted\n');
@@ -412,8 +428,9 @@ describe.sequential('round tracking command depth', () => {
       ROUND,
       '--publish',
     ]);
-    expect(json(stale.stderr)).toMatchObject({
-      code: 'TRACKING_BINDING_STALE:TRACKING_WORKFLOW_DRIFT',
+    expect(refusal(stale.stderr)).toMatchObject({
+      code: 'TRACKING_BINDING_STALE',
+      code_detail: 'TRACKING_WORKFLOW_DRIFT',
       exit: 5,
     });
     expect(remote.calls).toEqual([]);
@@ -454,7 +471,7 @@ describe.sequential('round tracking command depth', () => {
       '--authority-session',
       'AUTH-SESSION-missing',
     ]);
-    expect(json(result.stderr)).toMatchObject({
+    expect(refusal(result.stderr)).toMatchObject({
       code: 'AUTHORITY_SESSION_NOT_FOUND',
       operation: 'tracking enable',
       exit: 5,
@@ -476,7 +493,7 @@ describe.sequential('round tracking command depth', () => {
       '--publish',
       '--write',
     ]);
-    expect(json(result.stderr)).toEqual({
+    expect(refusal(result.stderr)).toEqual({
       code: 'TRACKING_SESSION_BACKEND_FAILED',
       operation: 'tracking enable',
       exit: 2,
@@ -768,7 +785,7 @@ describe.sequential('round tracking command depth', () => {
       ROUND,
       '--write',
     ]);
-    expect(json(result.stderr)).toMatchObject({ code: 'TRACKING_ISSUE_MISSING', exit: 5 });
+    expect(refusal(result.stderr)).toMatchObject({ code: 'TRACKING_ISSUE_MISSING', exit: 5 });
     expect(readDeliveryState({ repoRoot: root, round: ROUND })).toMatchObject({
       divergence: true,
       divergence_detail: expect.stringContaining('--replace-missing-issue'),
@@ -810,7 +827,7 @@ describe.sequential('round tracking command depth', () => {
       '--reconcile',
       '--replace-missing-issue',
     ]);
-    expect(json(replacement.stderr)).toMatchObject({
+    expect(refusal(replacement.stderr)).toMatchObject({
       code: 'TRACKING_RECONCILE_REPLACEMENT_FORBIDDEN',
       exit: 2,
     });
@@ -827,7 +844,7 @@ describe.sequential('round tracking command depth', () => {
       ROUND,
       '--write',
     ]);
-    expect(json(stale.stderr)).toMatchObject({
+    expect(refusal(stale.stderr)).toMatchObject({
       code: 'TRACKING_ACTIVATION_BINDING_STALE',
       exit: 5,
     });
@@ -844,7 +861,7 @@ describe.sequential('round tracking command depth', () => {
       ROUND,
       '--write',
     ]);
-    expect(json(foreign.stderr)).toMatchObject({
+    expect(refusal(foreign.stderr)).toMatchObject({
       code: 'TRACKING_ACTIVATION_REPOSITORY_MISMATCH',
       exit: 5,
     });
@@ -866,7 +883,7 @@ describe.sequential('round tracking command depth', () => {
       ROUND,
       '--write',
     ]);
-    expect(json(disabled.stderr)).toMatchObject({ code: 'TRACKING_ROUND_DISABLED', exit: 5 });
+    expect(refusal(disabled.stderr)).toMatchObject({ code: 'TRACKING_ROUND_DISABLED', exit: 5 });
     expect(remote.calls).toEqual([]);
   });
 
@@ -921,7 +938,7 @@ describe.sequential('round tracking command depth', () => {
       '--pending',
       'discard',
     ]);
-    expect(json(invalid.stderr)).toMatchObject({
+    expect(refusal(invalid.stderr)).toMatchObject({
       code: 'TRACKING_PENDING_POLICY_INVALID',
       exit: 2,
     });
@@ -935,7 +952,7 @@ describe.sequential('round tracking command depth', () => {
       '--pending',
       'drain',
     ]);
-    expect(json(noConsent.stderr)).toMatchObject({
+    expect(refusal(noConsent.stderr)).toMatchObject({
       code: 'TRACKING_DRAIN_CONSENT_REQUIRED',
       exit: 2,
     });
@@ -953,7 +970,7 @@ describe.sequential('round tracking command depth', () => {
       ROUND,
       '--write',
     ]);
-    expect(json(absent.stderr)).toMatchObject({ code: 'TRACKING_ROUND_NOT_ACTIVATED', exit: 5 });
+    expect(refusal(absent.stderr)).toMatchObject({ code: 'TRACKING_ROUND_NOT_ACTIVATED', exit: 5 });
 
     const active = activate(root);
     remote.overrideActivation = true;
@@ -969,7 +986,7 @@ describe.sequential('round tracking command depth', () => {
       ROUND,
       '--write',
     ]);
-    expect(json(unpublished.stderr)).toMatchObject({
+    expect(refusal(unpublished.stderr)).toMatchObject({
       code: 'TRACKING_PUBLICATION_UNAUTHORIZED',
       exit: 5,
     });

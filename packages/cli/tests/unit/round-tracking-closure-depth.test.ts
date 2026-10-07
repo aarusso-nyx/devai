@@ -24,6 +24,22 @@ import {
 import { withAuthorityHostTestScope as withSkillsHostTestScope } from '../../../skills/tests/unit/authority-host-test-scope.js';
 import { roundRun, roundStatus } from '../../src/commands/round/workflow.js';
 import { taskStart } from '../../src/commands/task/index.js';
+import { validators } from '@devai-nyx/schemas';
+
+/**
+ * #338: a task, round or tracking refusal is a schema-valid error envelope. Check it, then flatten
+ * it to the command-layer view the assertions read: the code, the exit and the envelope context.
+ */
+function refusal(text: string): Record<string, unknown> {
+  const envelope = JSON.parse(text.trim()) as {
+    code: string;
+    exit: number;
+    context?: Record<string, unknown>;
+  };
+  expect(validators.error(envelope), text).toBe(true);
+  const { operation, ...context } = envelope.context ?? {};
+  return { code: envelope.code, operation, exit: envelope.exit, ...context };
+}
 
 const { cac } = createRequire(import.meta.url)('../../node_modules/cac/index-compat.js') as {
   cac: (name?: string) => CAC;
@@ -234,7 +250,7 @@ describe.sequential('round tracking status and closure seam', () => {
 
     const missing = await invokeStatus(['round-tracking-status', '--repo-root', root]);
     expect(missing.exit).toBe(2);
-    expect(JSON.parse(missing.stderr)).toEqual({
+    expect(refusal(missing.stderr)).toEqual({
       code: 'TRACKING_ROUND_REQUIRED',
       operation: 'tracking status',
       exit: 2,
@@ -248,7 +264,7 @@ describe.sequential('round tracking status and closure seam', () => {
       'round-42',
     ]);
     expect(malformed.exit).toBe(2);
-    expect(JSON.parse(malformed.stderr)).toEqual({
+    expect(refusal(malformed.stderr)).toEqual({
       code: 'TRACKING_ROUND_INVALID',
       operation: 'tracking status',
       exit: 2,
@@ -394,7 +410,7 @@ describe.sequential('round status and dispatch on a sealed round (ADR-EVI-0003)'
 
     const run = await invokeCommand(roundRun, argvFor('round-run', root, SEALED_ROUND));
     expect(run.exit).toBe(5);
-    expect(JSON.parse(run.stderr)).toEqual({
+    expect(refusal(run.stderr)).toEqual({
       code: 'TASK_ROUND_INACTIVE',
       operation: 'run',
       exit: 5,
@@ -404,7 +420,7 @@ describe.sequential('round status and dispatch on a sealed round (ADR-EVI-0003)'
       argvFor('task-start', root, SEALED_ROUND, ['--task', 'TASK-0001']),
     );
     expect(start.exit).toBe(5);
-    expect(JSON.parse(start.stderr)).toMatchObject({ code: 'TASK_ROUND_INACTIVE', exit: 5 });
+    expect(refusal(start.stderr)).toMatchObject({ code: 'TASK_ROUND_INACTIVE', exit: 5 });
     expect(sha(root, CLOSE_STATE)).toBe(before);
   });
 
@@ -413,7 +429,7 @@ describe.sequential('round status and dispatch on a sealed round (ADR-EVI-0003)'
     const result = await invokeCommand(roundStatus, argvFor('round-status', root, 'R-0099'));
     expect(result.exit).not.toBe(0);
     expect(result.stdout).not.toMatch(/closed/u);
-    expect(JSON.parse(result.stderr)).toEqual({
+    expect(refusal(result.stderr)).toEqual({
       code: 'ROUND_RECORD_NOT_FOUND',
       operation: 'status',
       exit: 2,

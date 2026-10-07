@@ -43,6 +43,22 @@ import { roundDispatch } from '../../src/commands/round/dispatch-agents.js';
 import { roundDispatchDeactivate } from '../../src/commands/round/dispatch-deactivate.js';
 import { roundDispatchDispose } from '../../src/commands/round/dispatch-dispose.js';
 import type { CommandDefinition } from '../../src/define-command.js';
+import { validators } from '@devai-nyx/schemas';
+
+/**
+ * #338: a task, round or tracking refusal is a schema-valid error envelope. Check it, then flatten
+ * it to the command-layer view the assertions read: the code, the exit and the envelope context.
+ */
+function refusal(text: string): Record<string, unknown> {
+  const envelope = JSON.parse(text.trim()) as {
+    code: string;
+    exit: number;
+    context?: Record<string, unknown>;
+  };
+  expect(validators.error(envelope), text).toBe(true);
+  const { operation, ...context } = envelope.context ?? {};
+  return { code: envelope.code, operation, exit: envelope.exit, ...context };
+}
 
 const ROUND = 'R-0012';
 const roots: string[] = [];
@@ -213,7 +229,7 @@ describe('round dispatch deactivate', () => {
       root,
     ]);
     expect(again.exit).not.toBe(0);
-    expect(JSON.parse(again.stderr)).toMatchObject({ code: 'EXPERIMENTAL_ACTIVATION_MISSING' });
+    expect(refusal(again.stderr)).toMatchObject({ code: 'EXPERIMENTAL_ACTIVATION_MISSING' });
   });
 
   it('names a stale activation lock and its manual removal step instead of taking it over', async () => {
@@ -229,12 +245,12 @@ describe('round dispatch deactivate', () => {
       root,
     ]);
     expect(result.exit).not.toBe(0);
-    const refusal = JSON.parse(result.stderr) as Record<string, string>;
-    expect(refusal).toMatchObject({
+    const stale = refusal(result.stderr) as Record<string, string>;
+    expect(stale).toMatchObject({
       code: 'EXPERIMENTAL_ACTIVATION_LOCK_STALE',
       removal: `rm "${lock}"`,
     });
-    expect(refusal['detail']).toContain(EXPERIMENTAL_ACTIVATION_LOCK);
+    expect(stale['detail']).toContain(EXPERIMENTAL_ACTIVATION_LOCK);
     expect(existsSync(lock)).toBe(true);
     expect(readExperimentalActivation(root, new Date())).toMatchObject({ ok: true });
   });
@@ -281,7 +297,7 @@ describe('round dispatch dispose arguments', () => {
       ...args,
     ]);
     expect(result.exit).not.toBe(0);
-    expect(JSON.parse(result.stderr)).toMatchObject({ code: expected });
+    expect(refusal(result.stderr)).toMatchObject({ code: expected });
   });
 });
 
@@ -299,7 +315,7 @@ describe('round dispatch preflight', () => {
       ROUND,
     ]);
     expect(refused.exit).not.toBe(0);
-    expect(JSON.parse(refused.stderr)).toMatchObject({
+    expect(refusal(refused.stderr)).toMatchObject({
       code: 'EXPERIMENTAL_STATE_ROOT_UNINITIALIZED',
     });
     expect(existsSync(join(root, STATE_ROOT_MARKER))).toBe(false);
@@ -321,7 +337,7 @@ describe('round dispatch preflight', () => {
       ROUND,
     ]);
     expect(refused.exit).not.toBe(0);
-    expect(JSON.parse(refused.stderr)).toMatchObject({
+    expect(refusal(refused.stderr)).toMatchObject({
       code: 'EXPERIMENTAL_STATE_ROOT_MARKER_INVALID',
     });
     expect(existsSync(join(root, '.devai/state/locks'))).toBe(false);
@@ -356,7 +372,7 @@ describe('round dispatch preflight', () => {
       'TASK-0311',
     ]);
     expect(result.exit).not.toBe(0);
-    expect(JSON.parse(result.stderr)).toMatchObject({ code: 'EXPERIMENTAL_TASK_NOT_AGENT' });
+    expect(refusal(result.stderr)).toMatchObject({ code: 'EXPERIMENTAL_TASK_NOT_AGENT' });
     expect(loadTask(root, 'TASK-0310').status).toBe('ready');
     expect(loadTask(root, 'TASK-0311').status).toBe('ready');
     expect(existsSync(join(root, '.devai/state/locks'))).toBe(false);
@@ -377,7 +393,7 @@ describe('round dispatch preflight', () => {
       ROUND,
     ]);
     expect(result.exit).not.toBe(0);
-    expect(JSON.parse(result.stderr)).toEqual({
+    expect(refusal(result.stderr)).toEqual({
       code: 'TASK_DISPATCH_UNCERTAIN',
       operation: 'dispatch',
       exit: 2,

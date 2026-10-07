@@ -97,6 +97,48 @@ describe('#338: the error-code reference declares what the CLI emits', () => {
     }
   });
 
+  it('agrees with every task, round and tracking throw site and its exit', () => {
+    const symbols: Readonly<Record<string, number>> = {
+      EXIT_USAGE: 2,
+      EXIT_FAIL: 2,
+      EXIT_GATE: 3,
+      EXIT_PRECONDITION: 5,
+    };
+    const classes: Readonly<Record<number, string>> = {
+      2: 'routing-authority',
+      3: 'gate-fail',
+      5: 'precondition',
+    };
+    let checked = 0;
+    for (const pkg of ['cli', 'loop']) {
+      for (const file of sourceFiles(join(ROOT, 'packages', pkg, 'src'))) {
+        const source = readFileSync(file, 'utf8');
+        const patterns = [
+          /new (?:TaskServiceError|TrackingCommandError)\(\s*(?:'([A-Z][A-Z0-9_]+)'|`([A-Z][A-Z0-9_]+):[^`]*`)\s*(?:,\s*([A-Z_]+|[0-9]))?\s*\)/gu,
+        ];
+        if (pkg === 'loop') {
+          patterns.push(/\bfail\(\s*'([A-Z][A-Z0-9_]+)'()\s*(?:,\s*([A-Z_]+|[0-9]))?\s*\)/gu);
+        }
+        for (const pattern of patterns) {
+          for (const match of source.matchAll(pattern)) {
+            const code = match[1] ?? match[2];
+            const symbol = match[3];
+            const exit =
+              symbol === undefined ? 2 : /^[0-9]$/u.test(symbol) ? Number(symbol) : symbols[symbol];
+            if (code === undefined || exit === undefined) continue;
+            const cell = reference.get(code);
+            if (cell === undefined || cell.startsWith('internal')) continue;
+            expect(cell, `${code} thrown with exit ${String(exit)} in ${file}`).toContain(
+              `${classes[exit] ?? '?'} / ${String(exit)}`,
+            );
+            checked += 1;
+          }
+        }
+      }
+    }
+    expect(checked).toBeGreaterThan(50);
+  });
+
   it('agrees with the authority renderer for every AUTHORITY_ code', () => {
     const codes = [...reference.keys()].filter((code) => code.startsWith('AUTHORITY_'));
     expect(codes.length).toBeGreaterThan(100);
@@ -133,6 +175,7 @@ describe('#338: the error-code reference declares what the CLI emits', () => {
   it('marks the model-bridge codes internal and gives undeclared codes no guessed class', () => {
     expect(reference.get('MODEL_BRIDGE_CODEX_INCOMPATIBLE')).toBe('internal / none');
     expect(reference.get('ACTION_OUTPUT_CONTRACT_VIOLATION')).toBe('contract-violation / 7');
-    expect(reference.get('TASK_RECORD_CLAIM_STALE')).toBe(PER_ACTION);
+    expect(reference.get('COVERAGE_REPORT_UNBOUND')).toBe(PER_ACTION);
+    expect(reference.get('TASK_RECORD_CLAIM_STALE')).toBe('routing-authority / 2');
   });
 });
