@@ -48,7 +48,7 @@ describe('#264: the adopter migration manifest', () => {
     expect(manifest.releases.at(-1)).toMatchObject({
       version: '2.1.0',
       status: 'released',
-      date: '2026-10-06',
+      date: '2026-10-07',
     });
   });
 
