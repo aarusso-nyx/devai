@@ -28,10 +28,12 @@ elevates its role. Before changing governed repository state, read `README.md`,
 - Read command output and `git diff --check` before committing. Keep commits coherent.
 - Before opening a pull request, fetch the base branch and run the local preflight against
   that fetched base; a `BLOCKED` probe names the environment fix, not a candidate defect.
-- Agent sessions install and keep the pre-push preflight in their worktree with
-  `pnpm run hooks:install -- --pre-push` and never bypass it with `--no-verify`. It runs the
-  commit-grammar range check and `check --affected` against the fetched base before every
-  push. For humans it is opt-in; see `docs/dev/operations/remote-preflight-contract.md`.
+- Once the pre-push hook ships (CMP-0007 TASK-0723), every agent session installs and
+  keeps it in its worktree with `pnpm run hooks:install -- --pre-push` and never bypasses
+  it with `--no-verify`. It runs the commit-grammar range check and `check --affected`
+  against the fetched base before every push. Until then, run the local preflight above
+  before pushing. For humans it is opt-in; see
+  `docs/dev/operations/remote-preflight-contract.md`.
 - Write commit subjects as `type(scope)!: subject` from the closed type set in
   `law/policy/commit-grammar.json`, and keep every commit inside one change family from
   `law/policy/change-taxonomy.json`; only the pairings that policy lists may cross families.
