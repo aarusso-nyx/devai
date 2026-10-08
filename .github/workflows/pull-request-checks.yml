@@ -66,7 +66,32 @@ jobs:
         id: install
         run: |
           pnpm install --frozen-lockfile
-          if [ "${{ steps.bootstrap-cache.outputs.cache-hit }}" != 'true' ]; then
+          # A hit counts only when the runner and every package entry under packages/*/dist
+          # were restored with it; any missing file makes it a miss and rebuilds (#247).
+          missing=1
+          if [ "${{ steps.bootstrap-cache.outputs.cache-hit }}" = 'true' ]; then
+            node -e '
+              const { existsSync, readdirSync, readFileSync } = require("node:fs");
+              const absent = [".devai/state/pr-bootstrap/cli/bin.js"].filter((file) => !existsSync(file));
+              for (const name of readdirSync("packages")) {
+                const manifest = "packages/" + name + "/package.json";
+                if (!existsSync(manifest)) continue;
+                const pkg = JSON.parse(readFileSync(manifest, "utf8"));
+                const entries = [pkg.main, ...Object.values(pkg.exports ?? {}).map((entry) => (typeof entry === "string" ? entry : entry?.default))];
+                for (const entry of new Set(entries)) {
+                  // A subpath pattern ("./dist/*") names no single file.
+                  if (typeof entry !== "string" || !entry.startsWith("./dist/") || entry.includes("*")) continue;
+                  const file = "packages/" + name + "/" + entry.slice(2);
+                  if (!existsSync(file)) absent.push(file);
+                }
+              }
+              if (absent.length > 0) {
+                console.log("pr-bootstrap cache hit is incomplete, rebuilding: " + absent.join(", "));
+                process.exit(1);
+              }
+            ' && missing=0
+          fi
+          if [ "$missing" -ne 0 ]; then
             pnpm run release:bootstrap
           fi
 
@@ -203,7 +228,32 @@ jobs:
         id: install
         run: |
           pnpm install --frozen-lockfile
-          if [ "${{ steps.bootstrap-cache.outputs.cache-hit }}" != 'true' ]; then
+          # A hit counts only when the runner and every package entry under packages/*/dist
+          # were restored with it; any missing file makes it a miss and rebuilds (#247).
+          missing=1
+          if [ "${{ steps.bootstrap-cache.outputs.cache-hit }}" = 'true' ]; then
+            node -e '
+              const { existsSync, readdirSync, readFileSync } = require("node:fs");
+              const absent = [".devai/state/pr-bootstrap/cli/bin.js"].filter((file) => !existsSync(file));
+              for (const name of readdirSync("packages")) {
+                const manifest = "packages/" + name + "/package.json";
+                if (!existsSync(manifest)) continue;
+                const pkg = JSON.parse(readFileSync(manifest, "utf8"));
+                const entries = [pkg.main, ...Object.values(pkg.exports ?? {}).map((entry) => (typeof entry === "string" ? entry : entry?.default))];
+                for (const entry of new Set(entries)) {
+                  // A subpath pattern ("./dist/*") names no single file.
+                  if (typeof entry !== "string" || !entry.startsWith("./dist/") || entry.includes("*")) continue;
+                  const file = "packages/" + name + "/" + entry.slice(2);
+                  if (!existsSync(file)) absent.push(file);
+                }
+              }
+              if (absent.length > 0) {
+                console.log("pr-bootstrap cache hit is incomplete, rebuilding: " + absent.join(", "));
+                process.exit(1);
+              }
+            ' && missing=0
+          fi
+          if [ "$missing" -ne 0 ]; then
             pnpm run release:bootstrap
           fi
 
