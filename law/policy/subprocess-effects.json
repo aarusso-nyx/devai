@@ -118,6 +118,24 @@
       "owner": "architect"
     },
     {
+      "template_id": "gh-pr-list-all",
+      "executable": "gh",
+      "argv_shape": [
+        "pr",
+        "list",
+        "--state",
+        "all",
+        "--limit",
+        "1000",
+        "--json",
+        "closedAt,headRefName,headRefOid,mergedAt,number,state"
+      ],
+      "capabilities": ["proc:gh-read"],
+      "effect": "read",
+      "reason": "The harness_green_main sensor under outcomeUnit pull-request-final-head reads every pull request's state and final head to match it with the gate runs by head branch and sha (ADR-SCR-0014, ADR-SCR-0005 IA-004); the broker admits exactly this argv without a host adapter under sense run and check, every token literal and in this order. Any other gh pr argv is refused.",
+      "owner": "architect"
+    },
+    {
       "template_id": "gh-api-pages-deployments",
       "executable": "gh",
       "argv_shape": [

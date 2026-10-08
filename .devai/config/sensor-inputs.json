@@ -81,6 +81,7 @@
       "includeCancelled": false,
       "lookbackDays": 30,
       "minimumSample": 20,
+      "outcomeUnit": "pull-request-final-head",
       "excludedJobs": [
         { "workflow": "release.yml", "job": "verify-ledger" },
         { "workflow": "release.yml", "job": "build-release" },
