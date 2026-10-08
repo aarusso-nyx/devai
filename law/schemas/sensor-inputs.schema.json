@@ -365,16 +365,12 @@
           "$ref": "#/$defs/harness_population_inputs"
         },
         "harness_performance": {
-          "allOf": [
-            { "$ref": "#/$defs/harness_population_inputs" },
-            { "not": { "required": ["outcomeUnit"] } }
-          ]
+          "$ref": "#/$defs/harness_population_inputs",
+          "not": { "required": ["outcomeUnit"] }
         },
         "harness_robustness": {
-          "allOf": [
-            { "$ref": "#/$defs/harness_population_inputs" },
-            { "not": { "required": ["outcomeUnit"] } }
-          ]
+          "$ref": "#/$defs/harness_population_inputs",
+          "not": { "required": ["outcomeUnit"] }
         }
       }
     },
