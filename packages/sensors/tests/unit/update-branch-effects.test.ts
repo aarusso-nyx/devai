@@ -106,6 +106,12 @@ describe('the update-branch workflow effects (ADR-CHK-0008 IA-009)', () => {
     ['a group without github.workflow', 'update-branches-${{ github.ref }}', true],
     ['a group without github.ref', '${{ github.workflow }}-updates', true],
     ['a fixed group', 'update-pull-request-branches', true],
+    // Both contexts appear, but format() never uses the workflow argument (#363 review).
+    [
+      'a format() group that ignores its workflow argument',
+      "${{ format('updates-{0}', github.ref, github.workflow) }}",
+      true,
+    ],
   ] as const)('flags %s on the repository-write job', (_label, group, cancelInProgress) => {
     // The scratch tree is compared with its own unmutated reading, so an issue another
     // workflow raises there for lack of a repository file cannot mask or fake this one.
