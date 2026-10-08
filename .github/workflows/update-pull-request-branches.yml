@@ -70,7 +70,12 @@ jobs:
             > "$RUNNER_TEMP/pull-requests.tsv"
           skipped=0
           while IFS=$'\t' read -r number head; do
-            behind=$(gh api "repos/$REPOSITORY/compare/$MAIN_SHA...$head" --jq '.behind_by')
+            if ! behind=$(gh api "repos/$REPOSITORY/compare/$MAIN_SHA...$head" --jq '.behind_by' 2> "$RUNNER_TEMP/update.err"); then
+              skipped=$((skipped + 1))
+              echo "::warning::#$number could not be compared with main: $(tr '\n' ' ' < "$RUNNER_TEMP/update.err")"
+              echo "- #$number could not be compared with main: $(tr '\n' ' ' < "$RUNNER_TEMP/update.err")" >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
             if [ "$behind" = '0' ]; then
               echo "#$number is up to date with main"
               continue
