@@ -1,0 +1,87 @@
+name: Update pull request branches
+
+# When main moves, rebase every open, non-draft pull request against main that is behind it
+# (ADR-CHK-0004, ADR-CHK-0008). The update runs with a GitHub App installation token, because
+# a push made with GITHUB_TOKEN starts no workflow run and the rebased head would never be
+# gated; this workflow never reads GITHUB_TOKEN. Each rebased head arrives as a synchronize
+# event, and the gate's concurrency group (keyed by workflow and pull request number,
+# cancel-in-progress) cancels the superseded run.
+on:
+  push:
+    branches: [main]
+
+# A newer main supersedes an update still in flight (a repository-write job supersedes);
+# expected_head_sha keeps every update exact.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  update-branches:
+    name: Rebase pull requests behind main
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # The App credentials degrade on absence (ADR-CHK-0008): without both, the update is
+      # skipped with a notice and the run passes. Presence flags only, never a value.
+      - name: Probe the update-branch App credentials
+        id: credentials
+        shell: bash
+        env:
+          APP_ID_PRESENT: ${{ secrets.DEVAI_UPDATE_BRANCH_APP_ID != '' }}
+          PRIVATE_KEY_PRESENT: ${{ secrets.DEVAI_UPDATE_BRANCH_APP_PRIVATE_KEY != '' }}
+        run: |
+          set -euo pipefail
+          if [ "$APP_ID_PRESENT" = 'true' ] && [ "$PRIVATE_KEY_PRESENT" = 'true' ]; then
+            echo 'present=true' >> "$GITHUB_OUTPUT"
+          else
+            echo '::notice::The update-branch App credentials are not configured; no pull request was rebased.'
+            echo '- The update-branch App credentials are not configured; no pull request was rebased.' >> "$GITHUB_STEP_SUMMARY"
+            echo 'present=false' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Mint the update-branch App token
+        id: app-token
+        if: steps.credentials.outputs.present == 'true'
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.DEVAI_UPDATE_BRANCH_APP_ID }}
+          private-key: ${{ secrets.DEVAI_UPDATE_BRANCH_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Rebase each open pull request behind main
+        id: rebase
+        if: steps.credentials.outputs.present == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPOSITORY: ${{ github.repository }}
+          MAIN_SHA: ${{ github.sha }}
+        # Fork pull requests are never updated; a pull request whose rebase is refused (a
+        # conflict, or a head that moved) is reported and skipped without failing the others.
+        run: |
+          set -euo pipefail
+          gh api --paginate "repos/$REPOSITORY/pulls?state=open&base=main&per_page=100" \
+            --jq '.[] | select(.draft == false) | select(.head.repo.full_name == $ENV.REPOSITORY) | [.number, .head.sha] | @tsv' \
+            > "$RUNNER_TEMP/pull-requests.tsv"
+          skipped=0
+          while IFS=$'\t' read -r number head; do
+            behind=$(gh api "repos/$REPOSITORY/compare/$MAIN_SHA...$head" --jq '.behind_by')
+            if [ "$behind" = '0' ]; then
+              echo "#$number is up to date with main"
+              continue
+            fi
+            if gh api --method PUT "repos/$REPOSITORY/pulls/$number/update-branch" \
+              -f update_method=rebase -f expected_head_sha="$head" > /dev/null 2> "$RUNNER_TEMP/update.err"; then
+              echo "#$number rebased onto main ($behind commits behind)"
+            else
+              skipped=$((skipped + 1))
+              echo "::warning::#$number was not rebased: $(tr '\n' ' ' < "$RUNNER_TEMP/update.err")"
+              echo "- #$number was not rebased: $(tr '\n' ' ' < "$RUNNER_TEMP/update.err")" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done < "$RUNNER_TEMP/pull-requests.tsv"
+          echo "skipped pull requests: $skipped"
