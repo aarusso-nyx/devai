@@ -956,7 +956,12 @@ describe('remote preflight workflow', () => {
     expect(CHECKED_IN_PREFLIGHT).not.toContain('secrets.');
     expect(CHECKED_IN_PREFLIGHT).not.toContain('environment:');
     expect(CHECKED_IN_PREFLIGHT).not.toContain(LEDGER_ENVIRONMENT);
-    expect(CHECKED_IN_PREFLIGHT).not.toContain('upload-artifact');
+    // ADR-CHK-0007 rule 11: the only uploads are the two partition reports the aggregator
+    // reads, artifacts of the same run; the lane uploads no evidence.
+    expect(CHECKED_IN_PREFLIGHT.match(/uses: actions\/upload-artifact@/gu)).toHaveLength(2);
+    expect(CHECKED_IN_PREFLIGHT.match(/^\s+name: devai-gate-report-(?:cli|rest)$/gmu)).toHaveLength(
+      2,
+    );
     expect(gate).toContain("['diff', '--name-status', '-z', '-M', '--find-renames'");
     expect(gate).not.toContain("['diff', '--name-only'");
 
@@ -1022,15 +1027,26 @@ describe('remote preflight workflow', () => {
         ),
       diagnostic: 'CI_PREFLIGHT_SECRET_ACCESS_FORBIDDEN',
     })),
-    ...['if: false', 'continue-on-error: true'].map((setting) => ({
-      name: `optional required job ${setting}`,
+    // The aggregator already carries `if: always()` (ADR-CHK-0007 rule 11), so `if: false`
+    // replaces it rather than adding a duplicate key.
+    {
+      name: 'optional required job if: false',
+      mutate: (source: string) =>
+        source.replace(
+          '    name: devai-release-gate\n    needs: [gate-cli, gate-rest]\n    if: always()\n',
+          '    name: devai-release-gate\n    needs: [gate-cli, gate-rest]\n    if: false\n',
+        ),
+      diagnostic: 'CI_PREFLIGHT_GATE_INVALID',
+    },
+    {
+      name: 'optional required job continue-on-error: true',
       mutate: (source: string) =>
         source.replace(
           '    name: devai-release-gate',
-          '    ' + setting + '\n    name: devai-release-gate',
+          '    continue-on-error: true\n    name: devai-release-gate',
         ),
       diagnostic: 'CI_PREFLIGHT_GATE_INVALID',
-    })),
+    },
     {
       name: 'remote execution of the attested RC closure',
       mutate: (source: string) =>
