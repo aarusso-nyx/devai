@@ -89,6 +89,7 @@ not hold.
 | `harness_green_main`, `harness_performance`, `harness_robustness`                                      | `includeCancelled`             | `false`                                                                                                                              | Whether cancelled runs count. `false` leaves them out of the sample and the denominator; `true` counts a cancelled run as one that did not succeed.                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `harness_green_main`, `harness_performance`, `harness_robustness`                                      | `lookbackDays`                 | `30`                                                                                                                                 | How many days back a run may have been created and still be sampled. The `since` input of `harness_green_main` is kept and applied after this filter.                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `harness_green_main`, `harness_performance`, `harness_robustness`                                      | `minimumSample`                | none (required)                                                                                                                      | How many runs the population must hold before the sensor states a verdict: sampled runs for `harness_green_main` and `harness_robustness`, successful runs for `harness_performance`. Below it the reading is `UNKNOWN` with `sample_size` and `minimum_sample` in the finding, never FAIL and never PASS; at or above it the verdict is the measured one under the unchanged thresholds.                                                                                                                                                                                           |
+| `harness_green_main`                                                                                   | `outcomeUnit`                  | `run`                                                                                                                                | What one outcome is ([ADR-SCR-0014](../../law/adr/ADR-SCR-0014-green-main-counts-final-heads.md)). `run` counts every sampled run. `pull-request-final-head` counts one outcome per pull request with a sampled run in the window, merged, closed, or open: the latest completed, non-cancelled, non-skipped run on its final head, matched by head branch and sha. `harness_performance` and `harness_robustness` refuse the key.                                                                                                                                                  |
 | `harness_green_main`, `harness_performance`, `harness_robustness`                                      | `excludedJobs`                 | none                                                                                                                                 | Workflow-and-job pairs (`{ "workflow", "job" }`, the job key under `jobs:`) left out of the sample by identity, never by duration: jobs that wait on a protected environment, whose wall-clock time would otherwise enter the performance median. A slow run of the sampled workflow stays in and can drive FAIL.                                                                                                                                                                                                                                                                   |
 
 A kind that appears under `inputs` must declare at least one key. Kinds not listed above take
@@ -105,7 +106,22 @@ measure (#154). Each sensor therefore declares its population: `workflow` and `e
 required and name the runs; `headBranch`, `baseBranch`, `attempts`, `includeCancelled`, and
 `lookbackDays` narrow them; `minimumSample` is required and says how many runs make a verdict;
 `excludedJobs` leaves out workflow-and-job pairs by identity. The declaration is part of the
-reading's `metrics`, so a scorecard reader sees what was sampled. Below the minimum each sensor
+reading's `metrics`, so a scorecard reader sees what was sampled.
+
+For `harness_green_main`, `outcomeUnit` decides what one outcome is
+([ADR-SCR-0014](../../law/adr/ADR-SCR-0014-green-main-counts-final-heads.md)):
+
+- **`run`, the default,** counts every sampled run, so each push to a pull request is one
+  outcome.
+- **`pull-request-final-head`** counts each pull request once: merged, closed without merge,
+  or open, if it has a sampled run in the window. The outcome is the latest completed,
+  non-cancelled, non-skipped run on its final head: the head at merge, or the current head.
+  The final head is matched by head branch and sha between `gh pr list --state all` and the
+  window's runs. An open pull request without such a run is left out, and `minimumSample`
+  counts pull requests.
+
+The second unit measures the gate's outcome per candidate rather than how often authors push
+unfinished work, such as test-first commits that are red by design. Below the minimum each sensor
 reads `UNKNOWN` with the sample size, the minimum, and the population in the finding, never
 FAIL and never PASS; at or above it the verdict is the measured one, including FAIL when the
 gate is red or slow. No threshold changes.
@@ -221,7 +237,10 @@ Harness sensors reach GitHub only through the GitHub CLI shapes
 the authority broker admits without a host adapter. Beyond `gh auth`, `gh auth status`, and
 the four `gh run list` shapes of the [harness sensor population](#the-harness-sensor-population)
 (`gh run list --workflow <file> --event <event> [--branch <ref>] --json <fields> --limit <n>
-[--created >=<date>]`, one template per combination of the optional pairs), the `site_drift` sensor reads the Pages
+[--created >=<date>]`, one template per combination of the optional pairs) and the
+`gh-pr-list-all` shape that `outcomeUnit` `pull-request-final-head` needs (`gh pr list
+--state all --limit 1000 --json closedAt,headRefName,headRefOid,mergedAt,number,state`,
+every token literal), the `site_drift` sensor reads the Pages
 publication journal through two exact read-only `gh api` GET shapes
 ([ADR-AUT-0002](../../law/adr/ADR-AUT-0002-sensing-process-admission.md)):
 
@@ -336,7 +355,8 @@ performance configuration over the regression suite) as `perf_test`'s `argv`, `5
 `packages/cli/src/generated/**` for `plant_depth`'s `excludeGlobs`, and for the three harness
 sensors the population of the gate: `pull-request-checks.yml` on `pull_request`, any head
 branch (`*`), base `main`, last attempt only, cancelled runs excluded, thirty days, a minimum
-of twenty runs for `harness_green_main` and `harness_robustness` and ten successful runs for
+of twenty for `harness_green_main` (counted in pull requests, since it declares
+`outcomeUnit` `pull-request-final-head`) and `harness_robustness` and ten successful runs for
 `harness_performance`, and the four environment-gated jobs of `release.yml` (`verify-ledger`,
 `build-release`, `finalize-release`, `deploy-pages`) excluded by identity, so a release
 rehearsal's approval waits never enter the performance median. It declares no
