@@ -24,8 +24,146 @@ permissions:
   contents: read
 
 jobs:
-  preflight:
-    name: devai-release-gate
+  gate-cli:
+    # One side of the partitioned plan: test:cli and its planned descendants, with their
+    # planned prerequisites (ADR-CHK-0007 rule 11).
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DEVAI_PREFLIGHT_BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || github.event.pull_request.base.sha }}
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event_name == 'merge_group' && github.event.merge_group.head_sha || github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up pnpm and Node
+        uses: ./.github/actions/setup-node-toolchain
+        with:
+          setup-pnpm: 'true'
+          cache: pnpm
+
+      # The bootstrap output is keyed by the digest of the TypeScript inputs it
+      # compiles, so a candidate that changes no source restores the runner
+      # instead of compiling it; a stale key only causes a recompile
+      # (ADR-CHK-0003). The runner resolves the workspace packages through
+      # node_modules links into packages/*/dist, so the cache carries those
+      # outputs with it; a hit without them fails with ERR_MODULE_NOT_FOUND (#247).
+      - name: Restore the check runner bootstrap
+        id: bootstrap-cache
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: |
+            .devai/state/pr-bootstrap
+            packages/*/dist
+          key: pr-bootstrap-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'tsconfig*.json', 'packages/*/tsconfig*.json', 'packages/*/src/**/*.ts', 'packages/*/package.json', 'scripts/process/bootstrap-check-runner.mjs') }}
+
+      # Three steps, each failing the job on its own; the runner report replaces
+      # the former step-level aggregator (ADR-CHK-0001).
+      - name: Compile the check runner bootstrap
+        id: install
+        run: |
+          pnpm install --frozen-lockfile
+          if [ "${{ steps.bootstrap-cache.outputs.cache-hit }}" != 'true' ]; then
+            pnpm run release:bootstrap
+          fi
+
+      - name: Preflight probes
+        id: preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          control="$RUNNER_TEMP/devai-verifier-package"
+          package_root="packages/cli"
+          source_root="$package_root/vendor/evidence-verification"
+          provenance="$source_root/provenance.json"
+          actual_provenance_sha256="$(sha256sum "$provenance" | cut -d' ' -f1)"
+          verifier_root="$control/evidence-verification"
+          mkdir -p "$verifier_root"
+          cp "$source_root/provenance.json" "$verifier_root/provenance.json"
+          cp -R "$source_root/schemas" "$source_root/src" "$verifier_root/"
+          node - "$package_root" "$verifier_root" <<'NODE'
+          const { createHash } = require('node:crypto');
+          const { readFileSync, readdirSync } = require('node:fs');
+          const { join, relative } = require('node:path');
+          const [packageRoot, verifierRoot] = process.argv.slice(2);
+          const expectedBins = {
+            'devai-evidence-policy': './dist/runtime/evidence-verification/src/build-policy-cli.js',
+            'devai-evidence-verify': './dist/runtime/evidence-verification/src/cli.js',
+            'devai-evidence-bundle-verify': './dist/runtime/evidence-verification/src/bundle-cli.js',
+            'devai-evidence-export': './dist/runtime/evidence-verification/src/export-cli.js',
+            'devai-evidence-publish': './dist/runtime/evidence-verification/src/publish-cli.js',
+          };
+          const manifest = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8'));
+          if (manifest.name !== '@aarusso-nyx/devai') throw new Error('DEVAI_VERIFIER_PACKAGE_IDENTITY_INVALID');
+          for (const [name, path] of Object.entries(expectedBins)) {
+            if (manifest.bin?.[name] !== path) throw new Error('DEVAI_VERIFIER_PACKAGE_BIN_INVALID:' + name);
+          }
+          const provenancePath = join(verifierRoot, 'provenance.json');
+          const provenance = JSON.parse(readFileSync(provenancePath, 'utf8'));
+          if (provenance.schemaVersion !== '1.0.0' || provenance.sourceCommit !== '8b215d706a828af7361f9c6799b9cb0a30c9d00b') {
+            throw new Error('DEVAI_VERIFIER_PACKAGE_PROVENANCE_INVALID');
+          }
+          const listed = new Map(provenance.files.map((entry) => [entry.path, entry.sha256]));
+          const walk = (root, directory = root) => readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+            const path = join(directory, entry.name);
+            if (entry.isSymbolicLink() || (!entry.isDirectory() && !entry.isFile())) {
+              throw new Error('DEVAI_VERIFIER_PACKAGE_SPECIAL_FILE_INVALID:' + relative(root, path));
+            }
+            return entry.isDirectory() ? walk(root, path) : [relative(root, path)];
+          });
+          const actual = walk(verifierRoot).filter((path) => path !== 'provenance.json').sort();
+          if (JSON.stringify(actual) !== JSON.stringify([...listed.keys()].sort())) {
+            throw new Error('DEVAI_VERIFIER_PACKAGE_POPULATION_INVALID');
+          }
+          for (const [path, expected] of listed) {
+            const file = join(verifierRoot, path);
+            const actualDigest = createHash('sha256').update(readFileSync(file)).digest('hex');
+            if (actualDigest !== expected) throw new Error('DEVAI_VERIFIER_PACKAGE_FILE_DIGEST_INVALID:' + path);
+          }
+          NODE
+          {
+            echo "DEVAI_EVIDENCE_POLICY=$verifier_root/src/build-policy-cli.js"
+            echo "DEVAI_EVIDENCE_VERIFY=$verifier_root/src/cli.js"
+            echo "DEVAI_EVIDENCE_BUNDLE_VERIFY=$verifier_root/src/bundle-cli.js"
+          } >> "$GITHUB_ENV"
+          echo "version=1.5.1" >> "$GITHUB_OUTPUT"
+          echo "provenance_sha256=$actual_provenance_sha256" >> "$GITHUB_OUTPUT"
+          node .devai/state/pr-bootstrap/cli/bin.js init bind --target . --as-role architect --write --format json
+          node .devai/state/pr-bootstrap/cli/bin.js check --preflight --run --base "$DEVAI_PREFLIGHT_BASE" --as-role inspector --write --format json
+
+      - name: Affected checks owned by test:cli
+        id: affected
+        shell: bash
+        # The gate invocation is the local one (ADR-CHK-0001 IA-003) on one side of the
+        # partitioned plan (ADR-CHK-0007 rule 11); on failure its one-line report is
+        # summarized per failing node so the log names it (#248).
+        run: |
+          set -euo pipefail
+          report="$RUNNER_TEMP/devai-gate-report-cli/report.json"
+          mkdir -p "$RUNNER_TEMP/devai-gate-report-cli"
+          status=0
+          node .devai/state/pr-bootstrap/cli/bin.js check --affected --run --base "$DEVAI_PREFLIGHT_BASE" --partition-include test:cli --as-role inspector --write --format json | tee "$report" || status=$?
+          if [ "$status" -ne 0 ]; then
+            node scripts/process/summarize-check-report.mjs "$report" || true
+          fi
+          exit "$status"
+
+      # The aggregator reads this report; a missing one fails the gate (ADR-CHK-0007 rule 11).
+      - name: Upload the partition report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: devai-gate-report-cli
+          path: ${{ runner.temp }}/devai-gate-report-cli/report.json
+          if-no-files-found: ignore
+          retention-days: 7
+
+  gate-rest:
+    # The other side: every planned node outside test:cli and its descendants, the gate
+    # invariant producers (ADR-SCR-0013), and the release profile gate.
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -144,15 +282,62 @@ jobs:
       - name: Affected checks and profile-selected candidate preflight
         id: affected
         shell: bash
-        # The gate invocation is the local one (ADR-CHK-0001 IA-003); on failure its one-line
-        # report is summarized per failing node so the log names it (#248).
+        # The gate invocation is the local one (ADR-CHK-0001 IA-003) on one side of the
+        # partitioned plan (ADR-CHK-0007 rule 11); on failure its one-line report is
+        # summarized per failing node so the log names it (#248).
         run: |
           set -euo pipefail
           pnpm run release:pr-gate -- "$DEVAI_PREFLIGHT_BASE"
-          report="$RUNNER_TEMP/devai-affected.json"
+          report="$RUNNER_TEMP/devai-gate-report-rest/report.json"
+          mkdir -p "$RUNNER_TEMP/devai-gate-report-rest"
           status=0
-          node .devai/state/pr-bootstrap/cli/bin.js check --affected --run --base "$DEVAI_PREFLIGHT_BASE" --as-role inspector --write --format json | tee "$report" || status=$?
+          node .devai/state/pr-bootstrap/cli/bin.js check --affected --run --base "$DEVAI_PREFLIGHT_BASE" --partition-exclude test:cli --as-role inspector --write --format json | tee "$report" || status=$?
           if [ "$status" -ne 0 ]; then
             node scripts/process/summarize-check-report.mjs "$report" || true
           fi
           exit "$status"
+
+      # The aggregator reads this report; a missing one fails the gate (ADR-CHK-0007 rule 11).
+      - name: Upload the partition report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: devai-gate-report-rest
+          path: ${{ runner.temp }}/devai-gate-report-rest/report.json
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # The required check (ADR-CHK-0007 rule 11): it runs no check node and passes only when both
+  # partition jobs succeeded and their reports own every planned node exactly once, as PASS.
+  gate:
+    name: devai-release-gate
+    needs: [gate-cli, gate-rest]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event_name == 'merge_group' && github.event.merge_group.head_sha || github.event.pull_request.head.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: ./.github/actions/setup-node-toolchain
+
+      - name: Download the partition reports
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: devai-gate-report-*
+          path: ${{ runner.temp }}/gate-reports
+
+      - name: Aggregate the partition reports
+        id: aggregate
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/aggregate-gate-partitions.mjs --include-report "$RUNNER_TEMP/gate-reports/devai-gate-report-cli" --exclude-report "$RUNNER_TEMP/gate-reports/devai-gate-report-rest" --include-result "${{ needs.gate-cli.result }}" --exclude-result "${{ needs.gate-rest.result }}"
