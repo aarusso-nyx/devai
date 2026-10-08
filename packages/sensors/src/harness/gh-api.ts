@@ -63,6 +63,11 @@ export interface HarnessPopulation {
   readonly lookbackDays?: number;
   readonly minimumSample?: number;
   readonly excludedJobs?: readonly { readonly workflow: string; readonly job: string }[];
+  /**
+   * What one sampled outcome is (ADR-SCR-0014): each run (the default), or each pull request
+   * judged by the latest completed run on its final head.
+   */
+  readonly outcomeUnit?: 'run' | 'pull-request-final-head';
 }
 
 export interface HarnessPopulationOptions extends HarnessPopulation {
@@ -80,11 +85,38 @@ export interface HarnessRun {
   readonly databaseId?: number;
   readonly event?: string;
   readonly headBranch?: string;
+  readonly headSha?: string;
+  readonly status?: string;
 }
 
 /** The real gh run list fields the harness sensors request. */
 export const HARNESS_RUN_FIELDS =
   'attempt,conclusion,createdAt,databaseId,event,headBranch,updatedAt';
+/** The run fields of the final-head population, which also needs each run's sha and status. */
+export const HARNESS_GREEN_MAIN_RUN_FIELDS =
+  'attempt,conclusion,createdAt,databaseId,event,headBranch,headSha,status,updatedAt';
+
+/** A pull request row as `gh pr list --json` returns it; only real gh pr list fields. */
+export interface HarnessPullRequest {
+  readonly closedAt?: string | null;
+  readonly headRefName?: string;
+  readonly headRefOid?: string;
+  readonly mergedAt?: string | null;
+  readonly number?: number;
+  readonly state?: string;
+}
+
+/** The exact gh pr list argv of the final-head population (ADR-SCR-0014). */
+export const HARNESS_PULL_REQUEST_LIST_ARGS = [
+  'pr',
+  'list',
+  '--state',
+  'all',
+  '--limit',
+  '1000',
+  '--json',
+  'closedAt,headRefName,headRefOid,mergedAt,number,state',
+] as const;
 
 const DAY_MS = 86_400_000;
 const DEFAULT_RUN_LIMIT = 300;
@@ -119,7 +151,10 @@ export type PopulationSample =
  * attempt. Base branch and a same-workflow excluded job pair cannot be verified from gh run
  * list rows and are reported as unverified, never filtered on.
  */
-export function samplePopulation(opts: HarnessPopulationOptions): PopulationSample {
+export function samplePopulation(
+  opts: HarnessPopulationOptions,
+  fields: string = HARNESS_RUN_FIELDS,
+): PopulationSample {
   const { workflow, event, minimumSample } = opts;
   if (workflow === undefined || event === undefined || minimumSample === undefined) {
     return {
@@ -142,7 +177,7 @@ export function samplePopulation(opts: HarnessPopulationOptions): PopulationSamp
   if (headBranch !== '*') args.push('--branch', headBranch);
   args.push(
     '--json',
-    HARNESS_RUN_FIELDS,
+    fields,
     '--limit',
     String(opts.limit ?? DEFAULT_RUN_LIMIT),
     '--created',
@@ -224,5 +259,99 @@ export function insufficientSampleFinding(
     severity: 'info',
     code,
     message: `Sample size ${String(sampleSize)} ${unit} is below the minimum sample ${String(minimum)} for ${describe}. Verdict suppressed.`,
+  };
+}
+
+/** One pull request's final head and the run that judges it, if any. */
+export interface PullRequestFinal {
+  readonly number: number;
+  readonly state: string;
+  readonly headSha: string;
+  /** The latest completed, non-cancelled run on the final head; undefined when there is none. */
+  readonly run: HarnessRun | undefined;
+}
+
+export type FinalHeadSample =
+  | {
+      readonly ok: false;
+      /** Which read failed: the run list or the pull request list. */
+      readonly source: 'run-list' | 'pr-list';
+      readonly reason: string;
+      readonly args: readonly string[];
+    }
+  | {
+      readonly ok: true;
+      readonly args: readonly string[];
+      /** Counted pull requests: every closed or merged one, and open ones with a final run. */
+      readonly finals: readonly PullRequestFinal[];
+      /** Open pull requests whose final head has no completed run yet; never counted. */
+      readonly pendingOpen: readonly number[];
+      readonly minimum: number;
+      readonly metrics: PopulationMetrics;
+      readonly unverifiedFinding: PopulationFinding;
+      readonly describe: string;
+    };
+
+/**
+ * The final-head population (R-0703, ADR-SCR-0014): the declared gate runs of the window grouped
+ * by pull request, each judged by the latest completed, non-cancelled run on the pull request's
+ * final head (its current head when open, its head at merge when merged). Two gh calls: the
+ * window's runs, and every pull request with its final head. A pull request is matched to its
+ * runs by head branch and head sha. An open pull request whose final head has no completed run
+ * is pending and never counted; a closed or merged one without such a run is counted and is not
+ * green. A failed or unparseable pull request list is a failed sample, never a per-run fallback.
+ */
+export function sampleFinalHeads(opts: HarnessPopulationOptions): FinalHeadSample {
+  const sample = samplePopulation(opts, HARNESS_GREEN_MAIN_RUN_FIELDS);
+  if (!sample.ok) return { ...sample, source: 'run-list' };
+  const prArgs = [...HARNESS_PULL_REQUEST_LIST_ARGS];
+  const pulls = invokeGhJson<HarnessPullRequest[]>({ cwd: opts.repoRoot, args: prArgs });
+  const args = [...sample.args, '&&', 'gh', ...prArgs];
+  if (!pulls.ok) return { ok: false, source: 'pr-list', reason: pulls.reason, args };
+  if (!Array.isArray(pulls.data)) {
+    return { ok: false, source: 'pr-list', reason: 'gh-cli-parse-error: not an array', args };
+  }
+
+  // Completed runs that reached a verdict: never cancelled or skipped (ADR-SCR-0014).
+  const completed = sample.runs.filter(
+    (run) =>
+      run.status === 'completed' &&
+      run.conclusion !== undefined &&
+      run.conclusion !== '' &&
+      run.conclusion !== 'cancelled' &&
+      run.conclusion !== 'skipped',
+  );
+  const branches = new Set(sample.runs.map((run) => run.headBranch));
+  const finals: PullRequestFinal[] = [];
+  const pendingOpen: number[] = [];
+  for (const pull of pulls.data) {
+    const { number, headRefName, headRefOid, state } = pull;
+    if (number === undefined || headRefName === undefined || headRefOid === undefined) continue;
+    if (!branches.has(headRefName)) continue;
+    const run = completed
+      .filter(
+        (candidate) => candidate.headBranch === headRefName && candidate.headSha === headRefOid,
+      )
+      .sort((a, b) => Date.parse(b.createdAt ?? '') - Date.parse(a.createdAt ?? ''))[0];
+    if (run === undefined && state === 'OPEN') {
+      pendingOpen.push(number);
+      continue;
+    }
+    finals.push({ number, state: state ?? 'UNKNOWN', headSha: headRefOid, run });
+  }
+  return {
+    ok: true,
+    args,
+    finals,
+    pendingOpen,
+    minimum: sample.minimum,
+    describe: `${sample.describe}, final head per pull request`,
+    metrics: {
+      ...sample.metrics,
+      population_outcome_unit: 'pull-request-final-head',
+      population_window_runs: sample.runs.length,
+      population_pending_open: pendingOpen.length,
+    },
+    unverifiedFinding: sample.unverifiedFinding,
   };
 }

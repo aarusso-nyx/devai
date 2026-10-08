@@ -96,6 +96,16 @@ export function harnessPopulationInput(
   if (includeCancelled !== undefined && typeof includeCancelled !== 'boolean') {
     throw new Error('SENSE_INPUT_INVALID:includeCancelled');
   }
+  // ADR-SCR-0014: the outcome one sample counts; absent means each run.
+  const outcomeUnitInput = stringInput(request, 'outcomeUnit');
+  if (
+    outcomeUnitInput !== undefined &&
+    outcomeUnitInput !== 'run' &&
+    outcomeUnitInput !== 'pull-request-final-head'
+  ) {
+    throw new Error('SENSE_INPUT_INVALID:outcomeUnit');
+  }
+  const outcomeUnit: 'run' | 'pull-request-final-head' | undefined = outcomeUnitInput;
   const minimumSample = integerInput(request, 'minimumSample');
   if (minimumSample === undefined) throw new Error('SENSE_INPUT_REQUIRED:minimumSample');
   const excluded = request.inputs?.['excludedJobs'];
@@ -120,6 +130,7 @@ export function harnessPopulationInput(
     ...optional('attempts', attempts),
     ...optional('includeCancelled', includeCancelled),
     ...optional('lookbackDays', integerInput(request, 'lookbackDays')),
+    ...optional('outcomeUnit', outcomeUnit),
   };
 }
 

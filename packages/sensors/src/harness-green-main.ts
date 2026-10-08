@@ -6,9 +6,97 @@ import {
 } from './sensor-reading.js';
 import {
   insufficientSampleFinding,
+  sampleFinalHeads,
   samplePopulation,
   type HarnessPopulationOptions,
+  type PopulationFinding,
+  type PopulationMetrics,
 } from './harness/gh-api.js';
+
+/** One sampled outcome: a run, or a pull request judged by its final-head run. */
+interface Outcome {
+  readonly conclusion?: string;
+  readonly createdAt?: string;
+}
+
+type Population =
+  | {
+      readonly ok: false;
+      readonly code: string;
+      readonly reason: string;
+      readonly args: readonly string[];
+    }
+  | {
+      readonly ok: true;
+      readonly args: readonly string[];
+      readonly runs: readonly Outcome[];
+      readonly minimum: number;
+      readonly metrics: PopulationMetrics;
+      readonly unverifiedFinding: PopulationFinding;
+      readonly describe: string;
+      /** The noun one outcome is counted as in messages. */
+      readonly unit: 'run' | 'pull request';
+      readonly extraFindings: readonly SensorFinding[];
+      readonly extraMetrics: PopulationMetrics;
+    };
+
+/**
+ * The declared population (ADR-SCR-0014). `run`, the default, counts every run exactly as
+ * before. `pull-request-final-head` counts each pull request once, by the latest completed,
+ * non-cancelled run on its final head: an open pull request without one is pending and not
+ * counted, and a closed or merged one without one counts as not green. Its pull request list
+ * failing is UNKNOWN, never a fallback to the per-run reading.
+ */
+function population(opts: HarnessGreenMainOptions): Population {
+  if (opts.outcomeUnit !== 'pull-request-final-head') {
+    const sample = samplePopulation(opts);
+    if (!sample.ok)
+      return {
+        ok: false,
+        code: 'HARNESS_GREEN_MAIN_GH_UNAVAILABLE',
+        reason: sample.reason,
+        args: sample.args,
+      };
+    return { ...sample, unit: 'run', extraFindings: [], extraMetrics: {} };
+  }
+  const sample = sampleFinalHeads(opts);
+  if (!sample.ok) {
+    return {
+      ok: false,
+      code:
+        sample.source === 'pr-list'
+          ? 'HARNESS_GREEN_MAIN_PR_LIST_UNAVAILABLE'
+          : 'HARNESS_GREEN_MAIN_GH_UNAVAILABLE',
+      reason: sample.reason,
+      args: sample.args,
+    };
+  }
+  const ungated = sample.finals.filter((final) => final.run === undefined);
+  return {
+    ok: true,
+    args: sample.args,
+    runs: sample.finals.map((final) => ({
+      conclusion: final.run?.conclusion ?? 'no-final-head-run',
+      createdAt: final.run?.createdAt,
+    })),
+    minimum: sample.minimum,
+    metrics: sample.metrics,
+    unverifiedFinding: sample.unverifiedFinding,
+    describe: sample.describe,
+    unit: 'pull request',
+    extraFindings:
+      ungated.length === 0
+        ? []
+        : [
+            {
+              severity: 'warning',
+              code: 'HARNESS_GREEN_MAIN_FINAL_HEAD_UNGATED',
+              message: `${String(ungated.length)} closed or merged pull request(s) have no completed gate run on their final head in the window and count as not green: ${ungated.map((final) => `#${String(final.number)}`).join(', ')}.`,
+            },
+          ],
+    extraMetrics: { final_head_ungated: ungated.length },
+  };
+}
 
 /**
  * Inventory sensor: harness green-main (F5 × T9). Phase 26.K (closes
@@ -60,7 +148,7 @@ export function senseHarnessGreenMain(opts: HarnessGreenMainOptions): SensorRead
     ...(opts.now !== undefined && { timestamp: opts.now }),
   } as const;
 
-  const sample = samplePopulation(opts);
+  const sample = population(opts);
   if (!sample.ok) {
     return buildSensorReading({
       ...common,
@@ -69,7 +157,7 @@ export function senseHarnessGreenMain(opts: HarnessGreenMainOptions): SensorRead
       findings: [
         {
           severity: 'info',
-          code: 'HARNESS_GREEN_MAIN_GH_UNAVAILABLE',
+          code: sample.code,
           message: `Skipped: ${sample.reason}`,
         },
       ],
@@ -91,7 +179,7 @@ export function senseHarnessGreenMain(opts: HarnessGreenMainOptions): SensorRead
           populationSize,
           sample.minimum,
           sample.describe,
-          'run(s)',
+          `${sample.unit}(s)`,
         ),
         sample.unverifiedFinding,
       ],
@@ -167,17 +255,17 @@ export function senseHarnessGreenMain(opts: HarnessGreenMainOptions): SensorRead
     findings.push({
       severity: 'warning',
       code: 'HARNESS_GREEN_MAIN_PARTIAL',
-      message: `Success rate ${successPct.toFixed(1)}% (over ${String(total)} runs, ${sample.describe}) is below pass threshold ${String(thresholds.pass)}%.`,
+      message: `Success rate ${successPct.toFixed(1)}% (over ${String(total)} ${sample.unit}s, ${sample.describe}) is below pass threshold ${String(thresholds.pass)}%.`,
     });
   } else {
     status = 'fail';
     findings.push({
       severity: 'error',
       code: 'HARNESS_GREEN_MAIN_BELOW_THRESHOLD',
-      message: `Success rate ${successPct.toFixed(1)}% (over ${String(total)} runs, ${sample.describe}) is below review threshold ${String(thresholds.review)}%.`,
+      message: `Success rate ${successPct.toFixed(1)}% (over ${String(total)} ${sample.unit}s, ${sample.describe}) is below review threshold ${String(thresholds.review)}%.`,
     });
   }
-  findings.push(sample.unverifiedFinding);
+  findings.push(...sample.extraFindings, sample.unverifiedFinding);
 
   return buildSensorReading({
     ...common,
@@ -196,6 +284,7 @@ export function senseHarnessGreenMain(opts: HarnessGreenMainOptions): SensorRead
         min_sample_size: minSampleSize,
       }),
       ...sample.metrics,
+      ...sample.extraMetrics,
     },
   });
 }
