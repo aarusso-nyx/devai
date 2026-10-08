@@ -5,7 +5,11 @@ import { EXIT_FAIL, EXIT_PRECONDITION, EXIT_USAGE } from '@devai-nyx/utils';
 import { cliError, renderCliError } from '../../cli-error.js';
 import { defineCommand } from '../../define-command.js';
 import {
+  resolveCheckWorkers,
+  sequentialOnlyTarget,
   runCheckTasks,
+  runCheckTasksAsync,
+  type CheckRunnerOptions,
   type CheckRunnerReport,
   type TaskOperation,
   type TaskTarget,
@@ -32,6 +36,7 @@ interface CheckCliOptions extends Omit<CheckExecutionOptions, 'repoRoot'> {
   readonly explain?: boolean;
   readonly base?: string;
   readonly taskTimeoutMs?: string;
+  readonly taskWorkers?: string | number;
 }
 
 function exactlyOne<T extends string>(
@@ -167,6 +172,10 @@ export const checkCmd = defineCommand({
       .option('--explain', 'Task operation (choose one): explain selection and reuse')
       .option('--base <commit>', 'Exact ancestor commit required with --affected')
       .option('--task-timeout-ms <n>', 'Per-task timeout in milliseconds for --run')
+      .option(
+        '--task-workers <n>',
+        'Concurrent task processes for --run, 1-16 (default: DEVAI_CHECK_TASK_WORKERS, else min(4, CPUs)); release runs use 1',
+      )
       .option('--human', 'Human-readable aggregate')
       .action(async (options: CheckCliOptions) => {
         const repoRoot = resolve(options.repoRoot ?? '.');
@@ -185,7 +194,7 @@ export const checkCmd = defineCommand({
             ) {
               throw new Error('CHECK_RELEASE_STAGE: expected preflight or certify');
             }
-            const report = runCheckTasks({
+            const runnerOptions: CheckRunnerOptions = {
               repoRoot,
               ...taskSelection,
               ...(options.base !== undefined && { baseCommit: options.base }),
@@ -210,7 +219,22 @@ export const checkCmd = defineCommand({
                 }),
               }),
               ...(timeout !== undefined && { timeoutMs: timeout }),
-            });
+            };
+            // One worker is the sequential runner itself; more run independent nodes at once.
+            // Release targets always run one node at a time (ADR-CHK-0007).
+            const workers =
+              runnerOptions.operation === 'run'
+                ? resolveCheckWorkers(
+                    options.taskWorkers === undefined ? undefined : String(options.taskWorkers),
+                    process.env,
+                    undefined,
+                    sequentialOnlyTarget(runnerOptions.target),
+                  )
+                : 1;
+            const report =
+              workers === 1
+                ? runCheckTasks(runnerOptions)
+                : await runCheckTasksAsync({ ...runnerOptions, workers });
             process.stdout.write(
               options.human === true ? renderRunnerHuman(report) : `${JSON.stringify(report)}\n`,
             );
@@ -319,7 +343,8 @@ export const checkCmd = defineCommand({
             message.startsWith('CHECK_RUNNER_SELECTION') ||
             message.startsWith('CHECK_RUNNER_BASE_REQUIRED') ||
             message.startsWith('CHECK_RUNNER_BASE:') ||
-            message.startsWith('CHECK_RUNNER_TIMEOUT')
+            message.startsWith('CHECK_RUNNER_TIMEOUT') ||
+            message.startsWith('CHECK_RUNNER_WORKERS')
               ? EXIT_USAGE
               : EXIT_FAIL;
         }

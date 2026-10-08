@@ -65,6 +65,17 @@ export interface TaskDescriptorNode {
   readonly outputContract: Readonly<Record<string, unknown>>;
 }
 
+/**
+ * One node's shared-state declaration for parallel execution (ADR-CHK-0007), kept out of
+ * the task descriptor in its own runner-only file.
+ */
+export interface TaskExclusivity {
+  /** Keys whose state this node mutates. */
+  readonly exclusive?: readonly string[];
+  /** Keys whose state this node only reads. */
+  readonly shared?: readonly string[];
+}
+
 export interface TaskDescriptor {
   readonly schemaVersion: '1.0.0';
   readonly descriptorVersion: string;

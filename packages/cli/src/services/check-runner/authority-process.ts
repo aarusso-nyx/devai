@@ -97,11 +97,20 @@ function matchesDeclaredExecutable(root: string, declared: string, requested: st
   }
 }
 
+/**
+ * A declared task is admitted as the blocking process effect or, for the parallel runner,
+ * as the governed asynchronous one (ADR-MDL-0005 D-10). Both carry the same executable,
+ * argv, cwd, and shell, so the same exact match decides both. Probes stay blocking.
+ */
+function checkTaskProcessSymbol(symbol: string): boolean {
+  return symbol === 'spawnSync' || symbol === 'spawn';
+}
+
 function exactDeclaredTask(
   repoRoot: string,
   request: AuthorityHostEffectRequest,
 ): DeclaredCheckTaskProcess | undefined {
-  if (request.kind !== 'process' || request.symbol !== 'spawnSync') return undefined;
+  if (request.kind !== 'process' || !checkTaskProcessSymbol(request.symbol)) return undefined;
   const executable = request.arguments[0];
   const argv = request.arguments[1];
   const rawOptions = request.arguments[2];
@@ -285,7 +294,7 @@ export function matchDeclaredCheckTaskProcess(
   invocationArgv: readonly string[],
   request: AuthorityHostEffectRequest,
 ): DeclaredCheckTaskProcess | undefined {
-  if (request.kind !== 'process' || request.symbol !== 'spawnSync') return undefined;
+  if (request.kind !== 'process' || !checkTaskProcessSymbol(request.symbol)) return undefined;
   const targets = ['--affected', '--preflight', '--local', '--rc', '--release-intent'].filter(
     (flag) => invocationArgv.includes(flag),
   );

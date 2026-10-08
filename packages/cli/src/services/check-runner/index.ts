@@ -1,4 +1,12 @@
-export { runCheckTasks, resolveRunnerToolchain } from './runner.js';
+export {
+  CHECK_WORKERS_ENV,
+  defaultCheckWorkers,
+  resolveCheckWorkers,
+  resolveRunnerToolchain,
+  runCheckTasks,
+  runCheckTasksAsync,
+  sequentialOnlyTarget,
+} from './runner.js';
 export { resolveReleaseTaskNodes, resolveReleaseVerification } from '../release-profile.js';
 export type { ReleaseVerificationDecision, ReleaseVerificationInput } from '../release-profile.js';
 export { selectMutationEvidence } from '../mutation-reuse.js';

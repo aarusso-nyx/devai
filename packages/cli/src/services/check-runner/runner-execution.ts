@@ -1,9 +1,22 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { spawnSync } from '@devai-nyx/authority';
+import { spawn, spawnSync } from '@devai-nyx/authority';
 import { sha256Hex } from './canonical.js';
 import { bindReleaseTaskProcessOptions } from './authority-process.js';
 import type { PlannedTask, TaskExecutionResult, TaskOutcome } from './types.js';
+
+const MAX_TASK_OUTPUT_BYTES = 64 * 1024 * 1024;
+
+function executionEnvironment(environment: Readonly<Record<string, string>>): NodeJS.ProcessEnv {
+  return {
+    ...(process.env.PATH !== undefined && { PATH: process.env.PATH }),
+    ...(process.env.HOME !== undefined && { HOME: process.env.HOME }),
+    ...(process.env.TMPDIR !== undefined && { TMPDIR: process.env.TMPDIR }),
+    CI: '1',
+    NO_COLOR: '1',
+    ...environment,
+  };
+}
 
 export function defaultExecute(
   argv: readonly string[],
@@ -12,20 +25,12 @@ export function defaultExecute(
   environment: Readonly<Record<string, string>>,
   releaseBinding?: Parameters<typeof bindReleaseTaskProcessOptions>[1],
 ): TaskExecutionResult {
-  const executionEnvironment: NodeJS.ProcessEnv = {
-    ...(process.env.PATH !== undefined && { PATH: process.env.PATH }),
-    ...(process.env.HOME !== undefined && { HOME: process.env.HOME }),
-    ...(process.env.TMPDIR !== undefined && { TMPDIR: process.env.TMPDIR }),
-    CI: '1',
-    NO_COLOR: '1',
-    ...environment,
-  };
   const spawnOptions = {
     cwd,
     encoding: 'utf8',
     timeout: timeoutMs,
-    maxBuffer: 64 * 1024 * 1024,
-    env: executionEnvironment,
+    maxBuffer: MAX_TASK_OUTPUT_BYTES,
+    env: executionEnvironment(environment),
     shell: false,
   } as const;
   const result = spawnSync(
@@ -46,6 +51,49 @@ export function defaultExecute(
           ? result.error.code
           : result.error.name,
     }),
+  };
+}
+
+/**
+ * The parallel runner's executor: the same process, cwd, environment, timeout, and output
+ * bound as `defaultExecute`, started without blocking so sibling nodes can run. Its output
+ * is buffered per task, never streamed. A timeout still reports ETIMEDOUT and output past
+ * the bound still fails with ENOBUFS, so every outcome classifies as it does sequentially.
+ */
+export async function defaultExecuteAsync(
+  argv: readonly string[],
+  cwd: string,
+  timeoutMs: number,
+  environment: Readonly<Record<string, string>>,
+  releaseBinding?: Parameters<typeof bindReleaseTaskProcessOptions>[1],
+): Promise<TaskExecutionResult> {
+  const spawnOptions = {
+    cwd,
+    timeout: timeoutMs,
+    maxOutputBytes: MAX_TASK_OUTPUT_BYTES,
+    env: executionEnvironment(environment),
+    shell: false,
+  } as const;
+  const result = await spawn(
+    argv[0] ?? '',
+    argv.slice(1),
+    releaseBinding === undefined
+      ? spawnOptions
+      : bindReleaseTaskProcessOptions({ ...spawnOptions }, releaseBinding),
+  ).result;
+  const errorCode =
+    result.spawn_error ??
+    (result.timed_out
+      ? 'ETIMEDOUT'
+      : result.stdout_truncated || result.stderr_truncated
+        ? 'ENOBUFS'
+        : undefined);
+  return {
+    status: result.exit_code,
+    signal: result.signal,
+    stdout: result.stdout,
+    stderr: result.stderr,
+    ...(errorCode !== undefined && { errorCode }),
   };
 }
 
