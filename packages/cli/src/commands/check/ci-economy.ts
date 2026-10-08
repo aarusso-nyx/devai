@@ -82,6 +82,8 @@ interface WorkflowFacts {
   readonly hasCancelInProgress: boolean;
   readonly hasPathFilters: boolean;
   readonly pushNamesOnlyTags: boolean;
+  /** Declares a top-level `jobs:` block and no step in it uses actions/checkout. */
+  readonly jobsSkipCheckout: boolean;
   readonly referencesMacos: boolean;
   readonly hasPostgresService: boolean;
   readonly hasEvidenceMarker: boolean;
@@ -231,6 +233,15 @@ export function pushNamesOnlyTags(text: string): boolean {
 }
 
 /**
+ * A step that uses `actions/checkout` at any ref (sha, tag, or branch), in the
+ * list-item or mapping form. A commented-out step does not match because the
+ * line must begin with whitespace and an optional list dash. A workflow with
+ * no top-level `jobs:` block establishes nothing about its jobs, so only a
+ * declared `jobs:` block without such a step counts as checkout-free.
+ */
+const CHECKOUT_STEP = /^\s*(?:-\s+)?uses:\s*['"]?actions\/checkout@/mu;
+
+/**
  * True when the repository's `test-tasks.json` is a readable descriptor whose
  * task input selectors include a `kind: class` selector, or that declares the
  * fixed planning profile the check runner plans from the commit-range
@@ -295,6 +306,7 @@ function collectFacts(dir: string, file: string): WorkflowFacts {
     hasCancelInProgress: CANCEL_IN_PROGRESS_SATISFIED.test(text),
     hasPathFilters: /^\s+paths(-ignore)?:/m.test(text),
     pushNamesOnlyTags: pushNamesOnlyTags(text),
+    jobsSkipCheckout: /^jobs:/m.test(text) && !CHECKOUT_STEP.test(text),
     referencesMacos: /\bmacos-/i.test(text) || /runs-on:.*macos/i.test(text),
     hasPostgresService: /image:\s*['"]?postgres/.test(text),
     hasEvidenceMarker:
@@ -458,12 +470,17 @@ export function checkCiEconomy(opts: CheckCiEconomyOptions): CiEconomyReport {
 
   // ── Advisory — ci-economy.path-filters ───────────────────────────────
   // Not raised for a pull-request trigger whose lane is selected by class in
-  // test-tasks.json, nor for a push that names only tags; an unfiltered branch
-  // push, or a pull-request lane without class selectors, keeps the advisory.
+  // test-tasks.json, nor for a push that names only tags, nor for a branch push
+  // that declares jobs none of which uses actions/checkout: such a workflow
+  // consumes no repository content, so a path filter saves nothing and could
+  // only skip it. An unfiltered branch push that checks out source (or declares
+  // no jobs), or a pull-request lane without class selectors (with or without a
+  // checkout), keeps the advisory.
   const classSelected = laneSelectedByClass(opts.repoRoot);
   const unfiltered = facts.filter(
     (f) =>
-      ((hasPrTrigger(f) && !classSelected) || (f.triggers.has('push') && !f.pushNamesOnlyTags)) &&
+      ((hasPrTrigger(f) && !classSelected) ||
+        (f.triggers.has('push') && !f.pushNamesOnlyTags && !f.jobsSkipCheckout)) &&
       !f.hasPathFilters &&
       !f.triggers.has('workflow_call'),
   );
