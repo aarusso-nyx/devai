@@ -57,11 +57,12 @@ describe('#264: the adopter migration manifest', () => {
       '1.9.0',
       '2.0.0',
       '2.1.0',
+      '2.3.0',
     ]);
     expect(manifest.releases.at(-1)).toMatchObject({
-      version: '2.1.0',
+      version: '2.3.0',
       status: 'released',
-      date: '2026-10-07',
+      date: '2026-10-08',
     });
   });
 

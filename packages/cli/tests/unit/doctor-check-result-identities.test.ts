@@ -848,7 +848,7 @@ describe('Doctor whole CheckResult identities', () => {
         "malformedProject": {
           "errors": [
             "materialized target is invalid: .devai/config/project.json",
-            "bound DEVAI version missing differs from installed DEVAI version 2.2.0",
+            "bound DEVAI version missing differs from installed DEVAI version 2.3.0",
             "adopter-policy source cannot be materialized: law/policy/devai-adoption.json",
           ],
           "info": {
@@ -869,7 +869,7 @@ describe('Doctor whole CheckResult identities', () => {
         "missingCollision": {
           "errors": [
             "materialized target is missing: .devai/config/project.json",
-            "bound DEVAI version missing differs from installed DEVAI version 2.2.0",
+            "bound DEVAI version missing differs from installed DEVAI version 2.3.0",
           ],
           "info": {
             "binding": ".devai/config/adopter-policy-binding.json",
@@ -894,7 +894,7 @@ describe('Doctor whole CheckResult identities', () => {
         "missingProject": {
           "errors": [
             "materialized target is missing: .devai/config/project.json",
-            "bound DEVAI version missing differs from installed DEVAI version 2.2.0",
+            "bound DEVAI version missing differs from installed DEVAI version 2.3.0",
           ],
           "info": {
             "binding": ".devai/config/adopter-policy-binding.json",
