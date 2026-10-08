@@ -60,6 +60,9 @@ const GIT_READ_OWNERS: Readonly<Record<string, ReadonlySet<string>>> = {
   readExactGitTreeSync: new Set([
     'packages/cli/src/services/check-runner/authority-process.ts',
     'packages/cli/src/services/release-certification-provider-requests.ts',
+    // ADR-CHK-0007 rule 5: the check runner reads test-task-exclusivity.json only as the
+    // committed bytes at the planned commit, never from the working tree.
+    'packages/cli/src/services/check-runner/runner-schedule.ts',
   ]),
 };
 const DIRECTORY_FLUSH_EXCEPTION = 'flushDirectoryEntrySync';
