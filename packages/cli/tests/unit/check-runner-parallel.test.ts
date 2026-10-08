@@ -726,6 +726,46 @@ describe('rule 5: only declarations tracked at the planned commit count', () => 
       expect(recorder.events).toEqual([]);
     }
   });
+
+  it('refuses a tracked directory at the declaration path before any node starts', async () => {
+    // A directory has no entry at the exact path, only entries beneath it; it must still be
+    // refused, never read as an absent file that silently serializes the plan.
+    const root = repository(FAN, { exclusivity: null });
+    put(
+      root,
+      `${TASK_EXCLUSIVITY_PATH}/declarations.json`,
+      `${JSON.stringify(FAN_EXCLUSIVITY, null, 2)}\n`,
+    );
+    git(root, ['add', '.']);
+    git(root, ['commit', '-qm', 'a directory where the declarations belong']);
+    for (const workers of [1, 4]) {
+      const recorder = new Recorder(root);
+      await expect(runAsync(root, recorder, workers)).rejects.toThrow(
+        /^CHECK_RUNNER_EXCLUSIVITY: test-task-exclusivity\.json must be a regular file/u,
+      );
+      expect(recorder.events).toEqual([]);
+    }
+  });
+
+  it('refuses a submodule entry at the declaration path before any node starts', async () => {
+    const root = repository(FAN, { exclusivity: null });
+    // A gitlink (mode 160000) names a commit, not file bytes.
+    const target = git(root, ['rev-parse', 'HEAD']);
+    git(root, [
+      'update-index',
+      '--add',
+      '--cacheinfo',
+      `160000,${target},${TASK_EXCLUSIVITY_PATH}`,
+    ]);
+    git(root, ['commit', '-qm', 'a submodule where the declarations belong']);
+    for (const workers of [1, 4]) {
+      const recorder = new Recorder(root);
+      await expect(runAsync(root, recorder, workers)).rejects.toThrow(
+        /^CHECK_RUNNER_EXCLUSIVITY: test-task-exclusivity\.json must be a regular file/u,
+      );
+      expect(recorder.events).toEqual([]);
+    }
+  });
 });
 
 describe('IA-005 and rule 8: no fail-fast', () => {
