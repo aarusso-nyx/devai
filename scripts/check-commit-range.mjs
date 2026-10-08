@@ -237,12 +237,10 @@ export function identityRole(name, email) {
   return undefined;
 }
 
+const UPDATE_BRANCH_EMAIL = /^\d+\+devai-update-branch\[bot\]@users\.noreply\.github\.com$/u;
+
 function updateBranchApp(name, email) {
-  return (
-    name === DEVAI_UPDATE_BRANCH_COMMITTER.name &&
-    /^[0-9]+\+/u.test(email) &&
-    email.endsWith(DEVAI_UPDATE_BRANCH_COMMITTER.emailSuffix)
-  );
+  return name === DEVAI_UPDATE_BRANCH_COMMITTER.name && UPDATE_BRANCH_EMAIL.test(email);
 }
 
 const ROOT_PROSE = new Set([
@@ -278,11 +276,54 @@ const POLICY_COPIES = new Set([
   'subprocess-effects.json',
   'thresholds.json',
 ]);
-const PINNED = new Set([
-  '.devai/constitution.md',
+/** Pinned outputs of init apply / init bind whose source is fixed by the pin itself. */
+const PINNED_SOURCES = new Map([
+  ['.devai/pin/constitution.md', ['law/constitution.md']],
+  ['.devai/constitution.md', ['law/constitution.md']],
+]);
+/** Pinned outputs whose source is the adopter binding's own source policy. */
+const BINDING_PINNED = new Set([
   '.devai/config/project.json',
   '.devai/config/adopter-policy-binding.json',
 ]);
+const ADOPTER_BINDING = '.devai/config/adopter-policy-binding.json';
+
+/**
+ * The checked-in adopter binding at a commit: its source policy and the outputs it
+ * materializes. An absent or unreadable binding names no source.
+ */
+export function readAdopterBinding(root, commit) {
+  try {
+    const binding = JSON.parse(gitIn(root, ['show', `${commit}:${ADOPTER_BINDING}`]));
+    return {
+      source: typeof binding.source_path === 'string' ? binding.source_path : undefined,
+      outputs: new Set(Object.keys(binding.materialized ?? {})),
+    };
+  } catch {
+    return { source: undefined, outputs: new Set() };
+  }
+}
+
+/**
+ * The law sources whose change in the same commit admits the Architect for a materialized or
+ * pinned output (the law-with-generated pairing of ADR-CHK-0008), or undefined when the path
+ * is not such an output.
+ */
+export function canonicalSources(path, binding = { source: undefined, outputs: new Set() }) {
+  const sources = new Set(PINNED_SOURCES.get(path) ?? []);
+  const name = path.startsWith('.devai/config/') ? path.slice('.devai/config/'.length) : '';
+  // The byte copies scripts/check-policy-materialization.mjs pins to their law/policy source.
+  if (POLICY_COPIES.has(name)) sources.add(`law/policy/${name}`);
+  if (binding.source !== undefined && (binding.outputs.has(path) || BINDING_PINNED.has(path))) {
+    sources.add(binding.source);
+  }
+  const output =
+    POLICY_COPIES.has(name) ||
+    PINNED_SOURCES.has(path) ||
+    BINDING_PINNED.has(path) ||
+    path.startsWith('.devai/pin/');
+  return output ? sources : undefined;
+}
 const ARCHITECT_BINDINGS = new Set([
   '.devai/config/change-taxonomy-binding.json',
   '.devai/config/credential-requirements-binding.json',
@@ -300,17 +341,15 @@ const NEVER_COMMITTED = ['scratch/', '.devai/state/', '.devai/worktrees/', '.dev
  * same commit (the law-with-generated pairing); an empty set refuses the path. The most
  * specific row decides, and a path no row names is refused.
  */
-export function admittedAuthors(path, commitPaths) {
+export function admittedAuthors(path, commitPaths, binding) {
   const only = (...roles) => new Set(roles);
   if (path === 'scratch/README.md') return only('Architect');
   if (PLACEHOLDERS.has(path)) return only('Engineer');
   if (NEVER_COMMITTED.some((prefix) => path.startsWith(prefix))) return only();
-  if (path.startsWith('.devai/config/') && POLICY_COPIES.has(path.slice('.devai/config/'.length))) {
-    const source = `law/policy/${path.slice('.devai/config/'.length)}`;
-    return commitPaths.includes(source) ? only(MACHINE, 'Architect') : only(MACHINE);
-  }
-  if (path.startsWith('.devai/pin/') || PINNED.has(path)) {
-    return commitPaths.some((other) => other.startsWith('law/'))
+  const sources = canonicalSources(path, binding);
+  if (sources !== undefined) {
+    // Machine always; the Architect only in the commit that changes this output's own source.
+    return [...sources].some((source) => commitPaths.includes(source))
       ? only(MACHINE, 'Architect')
       : only(MACHINE);
   }
@@ -329,12 +368,14 @@ export function admittedAuthors(path, commitPaths) {
     return only('Engineer');
   }
   if (path.startsWith('.claude/')) return only('Architect');
+  if (path.startsWith('record/derived/')) return only(MACHINE);
+  if (path.startsWith('record/proofs/')) return only(MACHINE, ...ROLES);
   if (path.startsWith('record/')) return only(MACHINE, ...ROLES);
   return only();
 }
 
 /** Provenance findings for one commit of a pull-request range; empty when it is admitted. */
-export function provenanceFindings({ parents, author, committer, paths }) {
+export function provenanceFindings({ parents, author, committer, paths, binding }) {
   const findings = [];
   if (parents > 1) {
     findings.push(
@@ -354,7 +395,7 @@ export function provenanceFindings({ parents, author, committer, paths }) {
       );
     }
     for (const path of paths) {
-      const admitted = admittedAuthors(path, paths);
+      const admitted = admittedAuthors(path, paths, binding);
       if (admitted.size === 0) {
         findings.push(`path ${path} is not admitted for any author by the ADR-CHK-0008 table`);
       } else if (!admitted.has(role)) {
@@ -374,6 +415,7 @@ function checkRange(root, base, head) {
     return 0;
   }
   const taxonomy = loadTaxonomy(root);
+  const binding = readAdopterBinding(root, head);
   const exclusions = [`^${base}`];
   if (grammar.historical_cutoff !== null) {
     if (commitPresent(root, grammar.historical_cutoff)) {
@@ -401,6 +443,7 @@ function checkRange(root, base, head) {
       .replace(/\n$/u, '')
       .split('\0');
     const provenance = provenanceFindings({
+      binding,
       parents: parentCount,
       author: { name: authorName, email: authorEmail },
       committer: { name: committerName, email: committerEmail },
