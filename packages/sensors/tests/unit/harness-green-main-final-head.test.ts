@@ -1,0 +1,393 @@
+// CMP-0007 R-0703, ADR-SCR-0014: with outcomeUnit pull-request-final-head, harness_green_main
+// (F5:T9) counts one outcome per pull request. The default outcomeUnit run keeps the per-run
+// reading and its command line unchanged. A pull
+// request's final head is its (headRefName, headRefOid); its outcome is the latest completed
+// gate run on that branch and sha that was neither cancelled nor skipped. Merged,
+// closed-unmerged, and open pull requests with such a run are counted; an open pull request
+// without one is excluded. The thresholds are unchanged: PASS at 95 % and above, REVIEW from
+// 80 % up to 95 %, FAIL below 80 %.
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const mocks = vi.hoisted(() => ({ spawnSync: vi.fn() }));
+
+vi.mock('@devai-nyx/authority', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@devai-nyx/authority')>()),
+  spawnSync: mocks.spawnSync,
+}));
+
+import { senseHarnessGreenMain } from '../../src/harness-green-main.js';
+import type { SensorReading } from '../../src/sensor-reading.js';
+
+const NOW = '2026-10-08T12:00:00.000Z';
+const POPULATION = {
+  workflow: 'pull-request-checks.yml',
+  event: 'pull_request',
+  minimumSample: 1,
+} as const;
+const FINAL_HEAD = { outcomeUnit: 'pull-request-final-head' } as const;
+/** The run fields every harness sensor requests under the default outcome unit. */
+const RUN_FIELDS = 'attempt,conclusion,createdAt,databaseId,event,headBranch,updatedAt';
+/** The run fields harness_green_main requests under pull-request-final-head. */
+const GREEN_MAIN_RUN_FIELDS =
+  'attempt,conclusion,createdAt,databaseId,event,headBranch,headSha,status,updatedAt';
+const RUN_LIST_ARGV = (fields: string) => [
+  'run',
+  'list',
+  '--workflow',
+  'pull-request-checks.yml',
+  '--event',
+  'pull_request',
+  '--json',
+  fields,
+  '--limit',
+  '300',
+  '--created',
+  '>=2026-09-08',
+];
+const PR_LIST_ARGV = [
+  'pr',
+  'list',
+  '--state',
+  'all',
+  '--limit',
+  '1000',
+  '--json',
+  'closedAt,headRefName,headRefOid,mergedAt,number,state',
+];
+
+type Conclusion = 'success' | 'failure' | 'cancelled' | 'skipped' | 'timed_out' | null;
+type State = 'MERGED' | 'CLOSED' | 'OPEN';
+
+interface Run {
+  readonly databaseId: number;
+  readonly headBranch: string;
+  readonly headSha: string;
+  readonly event: string;
+  readonly status: string;
+  readonly conclusion: Conclusion;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly attempt: number;
+}
+
+interface PullRequest {
+  readonly number: number;
+  readonly headRefName: string;
+  readonly headRefOid: string;
+  readonly state: State;
+  readonly mergedAt: string | null;
+  readonly closedAt: string | null;
+}
+
+let nextId = 1;
+let clock = Date.parse('2026-10-01T00:00:00Z');
+const tick = (): string => new Date((clock += 60_000)).toISOString();
+
+function run(branch: string, sha: string, conclusion: Conclusion, extra: Partial<Run> = {}): Run {
+  const createdAt = tick();
+  return {
+    databaseId: nextId++,
+    headBranch: branch,
+    headSha: sha,
+    event: 'pull_request',
+    status: conclusion === null ? 'in_progress' : 'completed',
+    conclusion,
+    createdAt,
+    updatedAt: tick(),
+    attempt: 1,
+    ...extra,
+  };
+}
+
+function pr(number: number, branch: string, sha: string, state: State): PullRequest {
+  const closed = state === 'OPEN' ? null : NOW;
+  return {
+    number,
+    headRefName: branch,
+    headRefOid: sha,
+    state,
+    mergedAt: state === 'MERGED' ? NOW : null,
+    closedAt: closed,
+  };
+}
+
+interface SpawnResult {
+  readonly status: number | null;
+  readonly signal: null;
+  readonly stdout: string;
+  readonly stderr: string;
+  readonly error: undefined;
+}
+const ok = (value: unknown): SpawnResult => ({
+  status: 0,
+  signal: null,
+  stdout: JSON.stringify(value),
+  stderr: '',
+  error: undefined,
+});
+
+/** Serves the run list to `gh run list` and the pull requests to `gh pr list`. */
+function stub(
+  runs: readonly Run[],
+  pullRequests: readonly PullRequest[],
+  prList: SpawnResult = ok(pullRequests),
+): void {
+  mocks.spawnSync.mockImplementation((command: string, args: readonly string[]) => {
+    if (command !== 'gh') throw new Error(`unexpected spawnSync call: ${command}`);
+    if (args[0] === 'run' && args[1] === 'list') return ok(runs);
+    if (args[0] === 'pr' && args[1] === 'list') return prList;
+    throw new Error(`unexpected gh call: ${args.join(' ')}`);
+  });
+}
+
+function sense(): SensorReading {
+  return senseHarnessGreenMain({ ...POPULATION, ...FINAL_HEAD, repoRoot: '/repo', now: NOW });
+}
+
+function argv(call: number): readonly string[] {
+  return (mocks.spawnSync.mock.calls[call]?.[1] ?? []) as readonly string[];
+}
+
+/** The sensor's counted outcomes, read back from its metrics. */
+function counted(reading: SensorReading) {
+  return {
+    total: reading.metrics?.['run_count'],
+    green: reading.metrics?.['success_count'],
+    pct: reading.metrics?.['success_pct'],
+  };
+}
+
+/** `count` merged pull requests whose final heads passed, numbered from `first`. */
+function greenPullRequests(count: number, first = 100) {
+  const runs: Run[] = [];
+  const pullRequests: PullRequest[] = [];
+  for (let index = 0; index < count; index += 1) {
+    const number = first + index;
+    const branch = `feature/green-${String(number)}`;
+    const sha = `g${String(number).padStart(39, '0')}`;
+    runs.push(run(branch, sha, 'success'));
+    pullRequests.push(pr(number, branch, sha, 'MERGED'));
+  }
+  return { runs, pullRequests };
+}
+
+/** `count` closed-unmerged pull requests whose final heads failed, numbered from `first`. */
+function redPullRequests(count: number, first = 500) {
+  const runs: Run[] = [];
+  const pullRequests: PullRequest[] = [];
+  for (let index = 0; index < count; index += 1) {
+    const number = first + index;
+    const branch = `feature/red-${String(number)}`;
+    const sha = `r${String(number).padStart(39, '0')}`;
+    runs.push(run(branch, sha, 'failure'));
+    pullRequests.push(pr(number, branch, sha, 'CLOSED'));
+  }
+  return { runs, pullRequests };
+}
+
+beforeEach(() => {
+  mocks.spawnSync.mockReset();
+  nextId = 1;
+  clock = Date.parse('2026-10-01T00:00:00Z');
+});
+
+describe('harness_green_main: one outcome per pull request final head (R-0703)', () => {
+  it('counts a pull request green when its last push passes after earlier red pushes', () => {
+    const branch = 'feature/fixed';
+    stub(
+      [
+        run(branch, 'a'.repeat(40), 'failure'),
+        run(branch, 'b'.repeat(40), 'failure'),
+        run(branch, 'c'.repeat(40), 'success'),
+      ],
+      [pr(1, branch, 'c'.repeat(40), 'MERGED')],
+    );
+
+    expect(counted(sense())).toEqual({ total: 1, green: 1, pct: 100 });
+  });
+
+  it('counts a pull request red when its final head failed, whatever passed before', () => {
+    const branch = 'feature/broke';
+    stub(
+      [run(branch, 'a'.repeat(40), 'success'), run(branch, 'b'.repeat(40), 'failure')],
+      [pr(2, branch, 'b'.repeat(40), 'OPEN')],
+    );
+
+    expect(counted(sense())).toEqual({ total: 1, green: 0, pct: 0 });
+  });
+
+  it('counts a closed-unmerged pull request with a red final head as red', () => {
+    const branch = 'feature/abandoned';
+    stub([run(branch, 'd'.repeat(40), 'failure')], [pr(3, branch, 'd'.repeat(40), 'CLOSED')]);
+
+    expect(counted(sense())).toEqual({ total: 1, green: 0, pct: 0 });
+  });
+
+  it('counts a timed-out final head as red', () => {
+    const branch = 'feature/slow';
+    stub([run(branch, 'e'.repeat(40), 'timed_out')], [pr(4, branch, 'e'.repeat(40), 'MERGED')]);
+
+    expect(counted(sense())).toEqual({ total: 1, green: 0, pct: 0 });
+  });
+
+  it('excludes a pull request whose final head has only cancelled or skipped runs', () => {
+    const counts = greenPullRequests(1);
+    const branch = 'feature/superseded';
+    const sha = 'f'.repeat(40);
+    stub(
+      [
+        ...counts.runs,
+        // An earlier head's red run does not stand in for the final head.
+        run(branch, '0'.repeat(40), 'failure'),
+        run(branch, sha, 'cancelled'),
+        run(branch, sha, 'skipped'),
+      ],
+      [...counts.pullRequests, pr(5, branch, sha, 'MERGED')],
+    );
+
+    expect(counted(sense())).toEqual({ total: 1, green: 1, pct: 100 });
+  });
+
+  it('excludes an open pull request with no completed run on its final head', () => {
+    const counts = greenPullRequests(1);
+    const running = 'feature/running';
+    const unrun = 'feature/unrun';
+    stub(
+      [
+        ...counts.runs,
+        run(running, '1'.repeat(40), 'failure'),
+        run(running, '2'.repeat(40), null),
+        run(unrun, '3'.repeat(40), 'failure'),
+      ],
+      [
+        ...counts.pullRequests,
+        pr(6, running, '2'.repeat(40), 'OPEN'),
+        pr(7, unrun, '4'.repeat(40), 'OPEN'),
+      ],
+    );
+
+    expect(counted(sense())).toEqual({ total: 1, green: 1, pct: 100 });
+  });
+
+  it('counts the last attempt of a re-run final head', () => {
+    const branch = 'feature/rerun';
+    const sha = '5'.repeat(40);
+    const first = run(branch, sha, 'failure');
+    stub(
+      [first, run(branch, sha, 'success', { databaseId: first.databaseId, attempt: 2 })],
+      [pr(8, branch, sha, 'MERGED')],
+    );
+
+    expect(counted(sense())).toEqual({ total: 1, green: 1, pct: 100 });
+  });
+
+  it('counts the latest completed run when a later run on the final head is still in progress', () => {
+    const branch = 'feature/rerunning';
+    const sha = '6'.repeat(40);
+    stub([run(branch, sha, 'success'), run(branch, sha, null)], [pr(9, branch, sha, 'MERGED')]);
+
+    expect(counted(sense())).toEqual({ total: 1, green: 1, pct: 100 });
+  });
+
+  it('matches the final head by branch and sha, not by sha alone', () => {
+    const sha = '7'.repeat(40);
+    stub(
+      // A green run of the same commit on another branch is not this pull request's outcome.
+      [run('feature/elsewhere', sha, 'success'), run('feature/mine', sha, 'failure')],
+      [pr(10, 'feature/mine', sha, 'CLOSED')],
+    );
+
+    expect(counted(sense())).toEqual({ total: 1, green: 0, pct: 0 });
+  });
+});
+
+describe('harness_green_main outcome units and command lines (ADR-SCR-0014)', () => {
+  it('keeps the per-run reading and run-list argv under the default outcome unit', () => {
+    const branch = 'feature/default';
+    // Two red pushes and a green final head: three runs per run, one green pull request per PR.
+    stub(
+      [
+        run(branch, 'a'.repeat(40), 'failure'),
+        run(branch, 'b'.repeat(40), 'failure'),
+        run(branch, 'c'.repeat(40), 'success'),
+      ],
+      [pr(1, branch, 'c'.repeat(40), 'MERGED')],
+    );
+
+    const reading = senseHarnessGreenMain({ ...POPULATION, repoRoot: '/repo', now: NOW });
+
+    expect(counted(reading)).toEqual({ total: 3, green: 1, pct: 33.33 });
+    expect(mocks.spawnSync).toHaveBeenCalledTimes(1);
+    expect(argv(0)).toEqual(RUN_LIST_ARGV(RUN_FIELDS));
+  });
+
+  it('reads the same as the default when the run unit is declared explicitly', () => {
+    stub([run('feature/x', 'a'.repeat(40), 'failure')], []);
+
+    const reading = senseHarnessGreenMain({
+      ...POPULATION,
+      outcomeUnit: 'run',
+      repoRoot: '/repo',
+      now: NOW,
+    });
+
+    expect(counted(reading)).toEqual({ total: 1, green: 0, pct: 0 });
+    expect(argv(0)).toEqual(RUN_LIST_ARGV(RUN_FIELDS));
+  });
+
+  it('requests the green-main run fields, then every pull request, under the final-head unit', () => {
+    stub(
+      [run('feature/y', 'a'.repeat(40), 'success')],
+      [pr(1, 'feature/y', 'a'.repeat(40), 'OPEN')],
+    );
+
+    sense();
+
+    expect(argv(0)).toEqual(RUN_LIST_ARGV(GREEN_MAIN_RUN_FIELDS));
+    expect(argv(1)).toEqual(PR_LIST_ARGV);
+    expect(mocks.spawnSync).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    ['fails', { status: 1, signal: null, stdout: '', stderr: 'HTTP 502', error: undefined }],
+    [
+      'returns unparseable JSON',
+      { status: 0, signal: null, stdout: '{not json', stderr: '', error: undefined },
+    ],
+  ] as const)(
+    'reads unknown, never the run-only verdict, when gh pr list %s',
+    (_label, failure) => {
+      // Every run passed, so a fall back to the run-only reading would read PASS.
+      const greens = greenPullRequests(20);
+      stub(greens.runs, greens.pullRequests, failure);
+
+      const reading = sense();
+
+      expect(reading.status).toBe('unknown');
+      expect((reading.findings ?? []).some((finding) => /PR_LIST/u.test(finding.code))).toBe(true);
+      expect(reading.metrics?.['success_pct'] ?? 0).toBe(0);
+    },
+  );
+});
+
+describe('harness_green_main thresholds over pull-request outcomes (R-0703)', () => {
+  function mix(green: number, red: number): void {
+    const greens = greenPullRequests(green);
+    const reds = redPullRequests(red);
+    stub([...greens.runs, ...reds.runs], [...greens.pullRequests, ...reds.pullRequests]);
+  }
+
+  it.each([
+    [19, 1, 'pass', 95],
+    [20, 0, 'pass', 100],
+    [18, 1, 'review', 94.74],
+    [4, 1, 'review', 80],
+    [79, 21, 'fail', 79],
+    [3, 2, 'fail', 60],
+  ] as const)('reads %i green and %i red as %s', (green, red, status, pct) => {
+    mix(green, red);
+    const reading = sense();
+    expect(reading.status).toBe(status);
+    expect(counted(reading)).toEqual({ total: green + red, green, pct });
+  });
+});
