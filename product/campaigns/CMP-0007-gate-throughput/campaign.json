@@ -49,7 +49,7 @@
     {
       "id": "R-0701",
       "title": "Gate speed (F5:T7)",
-      "goal": "The pull-request gate median falls below 600 s without dropping any planned node. The check runner executes independent plan nodes on a bounded worker pool under ADR-CHK-0007, with scheduling declarations in test-task-exclusivity.json and never in test-tasks.json so the package-owned verifier and release export are unaffected (T1). The job split of ADR-CHK-0007 rule 11 is planned and conditional (T2, CTG-0713): it proceeds only if the harness_performance median over the window after the parallel runner merges is still at or above 600 s, as decision D1 requires; then test:cli runs in its own partition job, every other affected node in a second, and an aggregator keeps the single required check devai-release-gate. The parallel runner's best case of about 617 s on the 4-vCPU runner (test:cli is CPU-bound) is the evidence that motivates preparing the split, not its trigger. The check-result cache persists across CI runs keyed by task input digest with the protected-namespace recapture rule kept (T3). Every task is single-role: Architect writes law and docs, Inspector tests, Engineer code. Accepted when harness_performance over the post-change window of decisions.md reads a median below 600 s and every window run accounted for its whole plan, with partitioned-out entries counted and ownership assessed across the report pair when the gate is partitioned (decisions.md).",
+      "goal": "The pull-request gate median falls below 600 s without dropping any planned node. The check runner executes independent plan nodes on a bounded worker pool under ADR-CHK-0007, with scheduling declarations in test-task-exclusivity.json and never in test-tasks.json so the package-owned verifier and release export are unaffected (T1). The job split of ADR-CHK-0007 rule 11 (T2, CTG-0713) is ready: on 2026-10-07 the Owner amended D1 to start it now, without waiting for the post-merge median, because the parallel gate runs of #352 took 549 s and 798 s, too variable to rely on parallelism alone (decisions.md). test:cli runs in its own partition job, every other affected node in a second, and an aggregator keeps the single required check devai-release-gate. The check-result cache persists across CI runs keyed by task input digest with the protected-namespace recapture rule kept (T3). Every task is single-role: Architect writes law and docs, Inspector tests, Engineer code. Accepted when harness_performance over the post-change window of decisions.md reads a median below 600 s and every window run accounted for its whole plan, with partitioned-out entries counted and ownership assessed across the report pair when the gate is partitioned (decisions.md).",
       "status": "open",
       "records": ["ADR-CHK-0007", "ADR-CHK-0006", "ADR-CHK-0004", "ADR-CHK-0001"],
       "depends_on": [],
@@ -213,7 +213,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "merged",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": ["docs/adopters/test-tasks.md", "docs/reference/error-codes.md"],
@@ -238,8 +238,8 @@
               "prompt": {
                 "path": "prompts/TASK-0714.md"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/352",
+              "merged_as": "d2834aa5cc08c5ba49a5ce25664204b6ae89f8fd",
               "execution": {
                 "tier": "architect",
                 "effort": "medium",
@@ -252,7 +252,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0714",
-              "status": "planned",
+              "status": "merged",
               "target_substrates": ["F5"],
               "boundary": {
                 "paths": ["packages/cli/tests/unit/"],
@@ -267,8 +267,8 @@
               "prompt": {
                 "path": "prompts/TASK-0715.md"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/352",
+              "merged_as": "d2834aa5cc08c5ba49a5ce25664204b6ae89f8fd",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -281,7 +281,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0715",
-              "status": "planned",
+              "status": "merged",
               "target_substrates": ["F2", "F5"],
               "boundary": {
                 "paths": [
@@ -310,8 +310,8 @@
               "prompt": {
                 "path": "prompts/TASK-0716.md"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/352",
+              "merged_as": "d2834aa5cc08c5ba49a5ce25664204b6ae89f8fd",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -322,7 +322,7 @@
         },
         {
           "id": "CTG-0713",
-          "title": "Partition the gate across a test:cli job and a rest job (conditional on D1's median test)",
+          "title": "Partition the gate across a test:cli job and a rest job (Owner override of 2026-10-07)",
           "type": "coupled-triplet",
           "records": ["ADR-CHK-0007", "ADR-CHK-0004"],
           "depends_on": ["CTG-0712"],
@@ -347,7 +347,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "ready",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -397,7 +397,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0717",
-              "status": "planned",
+              "status": "ready",
               "target_substrates": ["F5"],
               "boundary": {
                 "paths": ["packages/cli/tests/unit/", "packages/sensors/tests/", "tests/contract/"],
@@ -431,7 +431,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0718",
-              "status": "planned",
+              "status": "ready",
               "target_substrates": ["F2", "F5"],
               "boundary": {
                 "paths": [
@@ -482,7 +482,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "ready",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": ["docs/reference/error-codes.md"],
