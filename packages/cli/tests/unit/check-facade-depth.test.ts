@@ -10,11 +10,19 @@ const boundary = vi.hoisted(() => ({
   resolveCheckPlan: vi.fn(),
   runCheckPlan: vi.fn(),
   runCheckTasks: vi.fn(),
+  runCheckTasksAsync: vi.fn(),
 }));
 
-vi.mock('../../src/services/check-runner/index.js', () => ({
-  runCheckTasks: boundary.runCheckTasks,
-}));
+// The worker-count rules are the real ones (ADR-CHK-0007); only the runner hosts are mocked.
+vi.mock('../../src/services/check-runner/index.js', async () => {
+  const schedule = await import('../../src/services/check-runner/runner-schedule.js');
+  return {
+    runCheckTasks: boundary.runCheckTasks,
+    runCheckTasksAsync: boundary.runCheckTasksAsync,
+    resolveCheckWorkers: schedule.resolveCheckWorkers,
+    sequentialOnlyTarget: schedule.sequentialOnlyTarget,
+  };
+});
 
 vi.mock('../../src/commands/check/adapters.js', () => ({
   executeCheckMember: boundary.executeCheckMember,
@@ -32,6 +40,7 @@ const originalArgv = process.argv;
 const originalExitCode = process.exitCode;
 const originalStdout = process.stdout.write;
 const originalStderr = process.stderr.write;
+const originalTaskWorkers = process.env.DEVAI_CHECK_TASK_WORKERS;
 
 function temporaryRoot(): string {
   const root = mkdtempSync(join(tmpdir(), 'devai-check-facade-depth-'));
@@ -107,6 +116,9 @@ beforeEach(() => {
   boundary.resolveCheckPlan.mockReset();
   boundary.runCheckPlan.mockReset();
   boundary.runCheckTasks.mockReset();
+  boundary.runCheckTasksAsync.mockReset();
+  // The default is min(4, CPUs); the sequential-host cases pin one worker explicitly.
+  process.env.DEVAI_CHECK_TASK_WORKERS = '1';
 });
 
 afterEach(() => {
@@ -114,6 +126,8 @@ afterEach(() => {
   process.exitCode = originalExitCode;
   process.stdout.write = originalStdout;
   process.stderr.write = originalStderr;
+  if (originalTaskWorkers === undefined) delete process.env.DEVAI_CHECK_TASK_WORKERS;
+  else process.env.DEVAI_CHECK_TASK_WORKERS = originalTaskWorkers;
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
@@ -187,6 +201,10 @@ describe('check facade task-runner boundary', () => {
       ['--explain', 'Task operation (choose one): explain selection and reuse'],
       ['--base <commit>', 'Exact ancestor commit required with --affected'],
       ['--task-timeout-ms <n>', 'Per-task timeout in milliseconds for --run'],
+      [
+        '--task-workers <n>',
+        'Concurrent task processes for --run, 1-16 (default: DEVAI_CHECK_TASK_WORKERS, else min(4, CPUs)); release runs use 1',
+      ],
       ['--human', 'Human-readable aggregate'],
     ]);
     expect(action).toEqual(expect.any(Function));
@@ -249,6 +267,138 @@ describe('check facade task-runner boundary', () => {
       releaseStage: 'certify',
       preflightReceipt: { digest: 'a'.repeat(64) },
     });
+  });
+
+  it.each(['--affected', '--preflight', '--local'])(
+    'routes %s --run with more than one worker to the asynchronous host',
+    async (target) => {
+      const root = temporaryRoot();
+      boundary.runCheckTasksAsync.mockResolvedValueOnce(taskReport({ operation: 'run' }));
+      const args = [target, '--run', '--task-workers', '3', '--repo-root', root];
+      if (target === '--affected') args.push('--base', 'abc123');
+
+      const result = await invoke(args);
+
+      expect(result).toMatchObject({ stderr: '', exit: 0 });
+      expect(boundary.runCheckTasks).not.toHaveBeenCalled();
+      expect(boundary.runCheckTasksAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ repoRoot: root, operation: 'run', workers: 3 }),
+      );
+    },
+  );
+
+  it('lets --task-workers win over DEVAI_CHECK_TASK_WORKERS and keeps planning sequential', async () => {
+    const root = temporaryRoot();
+    process.env.DEVAI_CHECK_TASK_WORKERS = '5';
+    boundary.runCheckTasksAsync.mockResolvedValue(taskReport({ operation: 'run' }));
+    boundary.runCheckTasks.mockReturnValue(taskReport());
+
+    await invoke(['--local', '--run', '--repo-root', root]);
+    await invoke(['--local', '--run', '--task-workers', '2', '--repo-root', root]);
+    const plan = await invoke([
+      '--local',
+      '--task-plan',
+      '--task-workers',
+      '2',
+      '--repo-root',
+      root,
+    ]);
+
+    expect(boundary.runCheckTasksAsync.mock.calls.map(([options]) => options.workers)).toEqual([
+      5, 2,
+    ]);
+    // Only --run executes nodes; a plan never takes a worker count.
+    expect(boundary.runCheckTasks).toHaveBeenCalledWith({
+      repoRoot: root,
+      target: 'local',
+      operation: 'plan',
+    });
+    expect(plan).toMatchObject({ stderr: '', exit: 0 });
+  });
+
+  it('runs release targets on the sequential host, ignoring DEVAI_CHECK_TASK_WORKERS', async () => {
+    const root = temporaryRoot();
+    put(root, 'intent.json', { candidate: 'cafe' });
+    put(root, '.devai/config/release-verification.json', { profile: 'default' });
+    process.env.DEVAI_CHECK_TASK_WORKERS = '8';
+    boundary.runCheckTasks.mockReturnValue(taskReport({ operation: 'run' }));
+
+    const rc = await invoke(['--rc', '--run', '--repo-root', root]);
+    const preflight = await invoke([
+      '--release-intent',
+      'intent.json',
+      '--run',
+      '--repo-root',
+      root,
+    ]);
+    const certify = await invoke([
+      '--release-intent',
+      'intent.json',
+      '--release-stage',
+      'certify',
+      '--run',
+      '--task-workers',
+      '1',
+      '--repo-root',
+      root,
+    ]);
+
+    for (const result of [rc, preflight, certify]) expect(result).toMatchObject({ exit: 0 });
+    expect(boundary.runCheckTasks).toHaveBeenCalledTimes(3);
+    expect(boundary.runCheckTasksAsync).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['--rc', ['--rc']],
+    ['--release-intent preflight', ['--release-intent', 'intent.json']],
+    ['--release-intent certify', ['--release-intent', 'intent.json', '--release-stage', 'certify']],
+  ])('refuses --task-workers above one under %s as usage', async (_label, selection) => {
+    const root = temporaryRoot();
+    put(root, 'intent.json', { candidate: 'cafe' });
+    put(root, '.devai/config/release-verification.json', { profile: 'default' });
+
+    const result = await invoke([
+      ...selection,
+      '--run',
+      '--task-workers',
+      '2',
+      '--repo-root',
+      root,
+    ]);
+
+    expect(result).toMatchObject({
+      stdout: '',
+      stderr: expect.stringContaining('CHECK_RUNNER_WORKERS'),
+      exit: EXIT_USAGE,
+    });
+    expect(boundary.runCheckTasks).not.toHaveBeenCalled();
+    expect(boundary.runCheckTasksAsync).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['--task-workers', '0'],
+    ['--task-workers', '17'],
+    ['--task-workers', '1.5'],
+    ['--task-workers', 'two'],
+    ['DEVAI_CHECK_TASK_WORKERS', '0'],
+    ['DEVAI_CHECK_TASK_WORKERS', '17'],
+    ['DEVAI_CHECK_TASK_WORKERS', 'many'],
+    // Set but empty is not unset (ADR-CHK-0007 rule 2): it is refused, not defaulted.
+    ['DEVAI_CHECK_TASK_WORKERS', ''],
+  ])('refuses %s %s as usage before any runner is called', async (source, value) => {
+    const args = ['--local', '--run'];
+    if (source === '--task-workers') args.push('--task-workers', value);
+    else process.env.DEVAI_CHECK_TASK_WORKERS = value;
+
+    const result = await invoke(args);
+
+    expect(result).toMatchObject({
+      stdout: '',
+      stderr: expect.stringContaining('CHECK_RUNNER_WORKERS'),
+      exit: EXIT_USAGE,
+    });
+    expect(boundary.runCheckTasks).not.toHaveBeenCalled();
+    expect(boundary.runCheckTasksAsync).not.toHaveBeenCalled();
   });
 
   it('uses the default release profile and preflight stage', async () => {
