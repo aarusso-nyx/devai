@@ -148,6 +148,9 @@ export function readTaskExclusivity(
 ): ReadonlyMap<string, TaskExclusivity> {
   // Only the tracked bytes at the planned commit are authority: an untracked, ignored, or
   // locally edited working-tree file is never read, and an untracked one counts as absent.
+  const notRegular = (): never => {
+    throw new Error(`CHECK_RUNNER_EXCLUSIVITY: ${TASK_EXCLUSIVITY_PATH} must be a regular file`);
+  };
   let projected: readonly ReadOnlyGitTreeEntry[];
   try {
     projected = readExactGitTreeSync(
@@ -159,13 +162,20 @@ export function readTaskExclusivity(
   } catch (error) {
     // The path is not tracked at the planned commit: the file is absent.
     if (error instanceof Error && error.message === 'GIT_TREE_PROJECTION_EMPTY') return new Map();
+    // A submodule (gitlink) entry at the path is not a regular file.
+    if (error instanceof Error && error.message === 'GIT_TREE_ENTRY_UNSUPPORTED') notRegular();
     throw error;
   }
-  const entries = projected.filter((entry) => entry.path === TASK_EXCLUSIVITY_PATH);
-  const entry = entries[0];
-  if (entry === undefined) return new Map();
-  if (entries.length !== 1 || entry.mode === '120000') {
-    throw new Error(`CHECK_RUNNER_EXCLUSIVITY: ${TASK_EXCLUSIVITY_PATH} must be a regular file`);
+  // Anything tracked at the path must be exactly one regular file: a directory projects
+  // the entries beneath it, and a symbolic link projects mode 120000.
+  const entry = projected[0];
+  if (
+    entry === undefined ||
+    projected.length !== 1 ||
+    entry.path !== TASK_EXCLUSIVITY_PATH ||
+    entry.mode === '120000'
+  ) {
+    return notRegular();
   }
   let document: unknown;
   try {

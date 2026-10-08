@@ -37,6 +37,32 @@ interface CheckCliOptions extends Omit<CheckExecutionOptions, 'repoRoot'> {
   readonly base?: string;
   readonly taskTimeoutMs?: string;
   readonly taskWorkers?: string | number;
+  readonly partitionInclude?: string | number | boolean;
+  readonly partitionExclude?: string | number | boolean;
+}
+
+/**
+ * The partition flags (ADR-CHK-0007 rule 11): at most one of them, its value a comma list
+ * of node ids, trimmed, empties dropped, and never empty.
+ */
+function partitionSelection(
+  options: CheckCliOptions,
+): Readonly<{ mode: 'include' | 'exclude'; nodeIds: readonly string[] }> | undefined {
+  const include = options.partitionInclude;
+  const exclude = options.partitionExclude;
+  if (include !== undefined && exclude !== undefined) {
+    throw new Error(
+      'CHECK_RUNNER_PARTITION: --partition-include and --partition-exclude are exclusive',
+    );
+  }
+  const raw = include ?? exclude;
+  if (raw === undefined) return undefined;
+  const nodeIds = (typeof raw === 'string' || typeof raw === 'number' ? String(raw) : '')
+    .split(',')
+    .map((nodeId) => nodeId.trim())
+    .filter((nodeId) => nodeId !== '');
+  if (nodeIds.length === 0) throw new Error('CHECK_RUNNER_PARTITION: the partition lists no node');
+  return { mode: include !== undefined ? 'include' : 'exclude', nodeIds };
 }
 
 function exactlyOne<T extends string>(
@@ -176,6 +202,14 @@ export const checkCmd = defineCommand({
         '--task-workers <n>',
         'Concurrent task processes for --run, 1-16 (default: DEVAI_CHECK_TASK_WORKERS, else min(4, CPUs)); release runs use 1',
       )
+      .option(
+        '--partition-include <ids>',
+        'Own only these comma-separated nodes and their planned descendants (--run with --affected or --local)',
+      )
+      .option(
+        '--partition-exclude <ids>',
+        'Own every planned node outside the --partition-include side for these ids (--run with --affected or --local)',
+      )
       .option('--human', 'Human-readable aggregate')
       .action(async (options: CheckCliOptions) => {
         const repoRoot = resolve(options.repoRoot ?? '.');
@@ -194,6 +228,7 @@ export const checkCmd = defineCommand({
             ) {
               throw new Error('CHECK_RELEASE_STAGE: expected preflight or certify');
             }
+            const partition = partitionSelection(options);
             const runnerOptions: CheckRunnerOptions = {
               repoRoot,
               ...taskSelection,
@@ -219,6 +254,7 @@ export const checkCmd = defineCommand({
                 }),
               }),
               ...(timeout !== undefined && { timeoutMs: timeout }),
+              ...(partition !== undefined && { partition }),
             };
             // One worker is the sequential runner itself; more run independent nodes at once.
             // Release targets always run one node at a time (ADR-CHK-0007).
@@ -344,7 +380,8 @@ export const checkCmd = defineCommand({
             message.startsWith('CHECK_RUNNER_BASE_REQUIRED') ||
             message.startsWith('CHECK_RUNNER_BASE:') ||
             message.startsWith('CHECK_RUNNER_TIMEOUT') ||
-            message.startsWith('CHECK_RUNNER_WORKERS')
+            message.startsWith('CHECK_RUNNER_WORKERS') ||
+            message.startsWith('CHECK_RUNNER_PARTITION')
               ? EXIT_USAGE
               : EXIT_FAIL;
         }

@@ -17,6 +17,8 @@ import type {
   PlannedTask,
   TaskDescriptorNode,
   TaskExclusivity,
+  TaskPartition,
+  TaskPartitionRole,
   TaskExecutionResult,
   TaskPlan,
   TaskResult,
@@ -31,7 +33,12 @@ import {
   executionOutcome,
   outputDigests,
 } from './runner-execution.js';
-import { attestCheckRun, releaseVerificationEntries } from './runner-attestation.js';
+import {
+  attestCheckRun,
+  blockedEntries,
+  releaseVerificationEntries,
+} from './runner-attestation.js';
+import { assertPartitionAdmissible, partitionRoles } from './runner-partition.js';
 import { prepareCheckRunInputs, verifyCertifyPreflightReceipt } from './runner-inputs.js';
 import { retainProtectedCompletedTaskResults, snapshotTaskResult } from './runner-results.js';
 import {
@@ -166,12 +173,24 @@ export async function runCheckTasksAsync(
   if (workers === 1) {
     for (let position = 0; position < run.plan.tasks.length; position += 1) await drive(position);
   } else {
+    // A partitioned-out node is recorded at once and never scheduled, so it holds no worker
+    // and delays no conflicting node (ADR-CHK-0007 rule 11).
+    const scheduled: number[] = [];
+    for (const [position, task] of run.plan.tasks.entries()) {
+      if (run.partition?.roles.get(task.nodeId) === 'partitioned-out') await drive(position);
+      else scheduled.push(position);
+    }
     await runScheduled(
-      run.plan.tasks.map((task) =>
-        scheduledNode(task, run.descriptorById.get(task.nodeId), run.exclusivity.get(task.nodeId)),
-      ),
+      scheduled.map((position) => {
+        const task = run.plan.tasks[position] as PlannedTask;
+        return scheduledNode(
+          task,
+          run.descriptorById.get(task.nodeId),
+          run.exclusivity.get(task.nodeId),
+        );
+      }),
       () => (serialized ? 1 : workers),
-      drive,
+      (index) => drive(scheduled[index] as number),
     );
   }
   return finishCheckRun(run);
@@ -199,6 +218,11 @@ interface CheckRun {
   readonly protectedOutputCapture: boolean;
   readonly asyncExecutor: AsyncTaskExecutor | undefined;
   readonly executeDefault: DefaultExecutor;
+  /** ADR-CHK-0007 rule 11: the listed partition and each planned node's role in it. */
+  readonly partition?: Readonly<{
+    request: TaskPartition;
+    roles: ReadonlyMap<string, TaskPartitionRole>;
+  }>;
 }
 
 function prepareCheckRun(
@@ -217,6 +241,13 @@ function prepareCheckRun(
       : inputOptions,
   );
   const options = request.options;
+  if (options.partition !== undefined) {
+    assertPartitionAdmissible(
+      options,
+      options.partition,
+      () => new Set(descriptorFor(options).tasks.map((task) => task.nodeId)),
+    );
+  }
   const protectedOutputCapture =
     options.protectedExecutionIdentity !== undefined &&
     options.readTaskOutput !== undefined &&
@@ -293,6 +324,12 @@ function prepareCheckRun(
     protectedOutputCapture,
     asyncExecutor,
     executeDefault,
+    ...(options.partition !== undefined && {
+      partition: {
+        request: options.partition,
+        roles: partitionRoles(plan.tasks, options.partition).roles,
+      },
+    }),
   };
 }
 
@@ -317,9 +354,21 @@ function* runPlannedTask(run: CheckRun, task: PlannedTask, position: number): Ta
     executeDefault,
   } = run;
   const { cache, environment } = run.inputs;
+  const role = run.partition?.roles.get(task.nodeId);
   const record = (entry: ExecutedTask): void => {
-    run.execution[position] = entry;
+    run.execution[position] = role === undefined ? entry : { ...entry, partition: role };
   };
+  if (role === 'partitioned-out') {
+    record({
+      nodeId: task.nodeId,
+      taskKey: task.taskKey,
+      disposition: 'partitioned-out',
+      outcome: 'SKIPPED',
+      reason: 'partitioned-out',
+      durationMs: 0,
+    });
+    return;
+  }
   const blockedBy = task.dependencies.find((dependency) => blockedNodes.has(dependency));
   if (blockedBy !== undefined) {
     // blocked-environment: never executed and never cached as a result.
@@ -570,6 +619,20 @@ function finishCheckRun(run: CheckRun): CheckRunnerReport {
   const execution = run.execution;
   if (execution.length !== plan.tasks.length || plan.tasks.some((_, at) => !(at in execution))) {
     throw new Error('CHECK_RUNNER_INTERNAL: planned task result missing');
+  }
+  if (run.partition !== undefined) {
+    const owned = execution.filter((entry) => entry.partition === 'owned');
+    const blocked = blockedEntries(owned);
+    return {
+      schemaVersion: '1.0.0',
+      operation: options.operation,
+      plan,
+      execution,
+      receiptRefusal: 'partitioned-run',
+      ...(blocked.length > 0 && { blocked }),
+      partition: { mode: run.partition.request.mode, nodes: [...run.partition.request.nodeIds] },
+      exitCode: owned.every((entry) => entry.outcome === 'PASS') ? 0 : 1,
+    };
   }
   const { receipt, preflightReceipt, receiptRefusal, blocked, allPass } = attestCheckRun({
     execution,

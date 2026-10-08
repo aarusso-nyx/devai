@@ -169,9 +169,15 @@ export interface CandidateReceipt {
 export interface ExecutedTask {
   readonly nodeId: string;
   readonly taskKey: string;
-  /** blocked-environment: a dependency was BLOCKED, so this node was never executed. */
-  readonly disposition: 'executed' | 'reused' | 'aborted' | 'blocked-environment';
-  readonly outcome: TaskOutcome;
+  /**
+   * blocked-environment: a dependency was BLOCKED, so this node was never executed.
+   * partitioned-out: outside this partitioned run's ownership and closure (ADR-CHK-0007
+   * rule 11), so it was never started, inspected, or cached.
+   */
+  readonly disposition:
+    'executed' | 'reused' | 'aborted' | 'blocked-environment' | 'partitioned-out';
+  /** SKIPPED only for a partitioned-out entry. */
+  readonly outcome: TaskOutcome | 'SKIPPED';
   readonly reason: string;
   readonly durationMs: number;
   readonly resultDigest?: string;
@@ -182,7 +188,17 @@ export interface ExecutedTask {
   readonly probes?: readonly PreflightProbeObservation[];
   /** Remediation of every probe that did not pass. */
   readonly remediation?: readonly string[];
+  /** Present on partitioned runs only: whose verdict this entry belongs to. */
+  readonly partition?: TaskPartitionRole;
 }
+
+/** ADR-CHK-0007 rule 11: the nodes a partitioned run lists, and how it uses them. */
+export interface TaskPartition {
+  readonly mode: 'include' | 'exclude';
+  readonly nodeIds: readonly string[];
+}
+
+export type TaskPartitionRole = 'owned' | 'prerequisite' | 'partitioned-out';
 
 export interface CheckRunnerReport {
   readonly schemaVersion: '1.0.0';
@@ -210,6 +226,8 @@ export interface CheckRunnerReport {
     reason: string;
     remediation: readonly string[];
   }>[];
+  /** Present on partitioned runs only; the verdict and `blocked` cover owned entries. */
+  readonly partition?: Readonly<{ mode: TaskPartition['mode']; nodes: readonly string[] }>;
   readonly exitCode: number;
 }
 
@@ -263,4 +281,6 @@ export interface CheckRunnerOptions {
    */
   readonly resolveProtectedMutationProducer?: () => string;
   readonly now?: () => string;
+  /** ADR-CHK-0007 rule 11: run only one side of a partitioned plan (`run`, affected/local). */
+  readonly partition?: TaskPartition;
 }
