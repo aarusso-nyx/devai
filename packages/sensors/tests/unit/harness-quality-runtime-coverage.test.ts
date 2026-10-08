@@ -971,20 +971,38 @@ describe('harness performance sensor', () => {
       sample_size: 4,
       median_ms: 200_000,
       p95_ms: 400_000,
-      pass_median_ms: 600_000,
+      // Owner decision 2026-10-08: the F5:T7 PASS median is below 900 s.
+      pass_median_ms: 900_000,
       pass_p95_ms: 1_800_000,
     });
   });
 
+  it('passes a median one millisecond under the 900 s pass bound', () => {
+    stubCommands({ gh: ghJson([successRun(899_999)]) });
+
+    const reading = sense();
+
+    expect(reading.status).toBe('pass');
+    expect(codes(reading)).not.toContain('HARNESS_PERFORMANCE_SLOW');
+    expect(reading.metrics).toMatchObject({ median_ms: 899_999, pass_median_ms: 900_000 });
+  });
+
+  it('passes a median between the former 600 s bound and 900 s', () => {
+    stubCommands({ gh: ghJson([successRun(700_000)]) });
+
+    expect(sense().status).toBe('pass');
+  });
+
   it('does not pass when the median sits exactly on the pass bound', () => {
-    stubCommands({ gh: ghJson([successRun(600_000)]) });
+    stubCommands({ gh: ghJson([successRun(900_000)]) });
 
     const reading = sense();
 
     expect(reading.status).toBe('review');
     expect(message(reading, 'HARNESS_PERFORMANCE_SLOW')).toBe(
-      'median 600s, p95 600s — above pass thresholds.',
+      'median 900s, p95 900s — above pass thresholds.',
     );
+    expect(reading.metrics).toMatchObject({ pass_median_ms: 900_000 });
   });
 
   it('does not pass when p95 sits exactly on the pass bound', () => {
@@ -1024,10 +1042,10 @@ describe('harness performance sensor', () => {
   });
 
   it('rounds the reported seconds to the nearest second', () => {
-    stubCommands({ gh: ghJson([successRun(600_500)]) });
+    stubCommands({ gh: ghJson([successRun(900_500)]) });
 
     expect(message(sense(), 'HARNESS_PERFORMANCE_SLOW')).toBe(
-      'median 601s, p95 601s — above pass thresholds.',
+      'median 901s, p95 901s — above pass thresholds.',
     );
   });
 
