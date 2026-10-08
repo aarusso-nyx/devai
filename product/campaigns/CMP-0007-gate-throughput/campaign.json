@@ -337,7 +337,8 @@
             ".github/workflows/pull-request-checks.yml",
             "scripts/aggregate-gate-partitions.mjs",
             "scripts/check-workflows.mjs",
-            "packages/sensors/src/harness-invariant-alignment-workflow.ts"
+            "packages/sensors/src/harness-invariant-alignment-workflow.ts",
+            "packages/sensors/src/harness/reviewed-workflow-steps.ts"
           ],
           "gates": ["test:cli"],
           "tasks": [
@@ -440,13 +441,15 @@
                   ".github/workflows/pull-request-checks.yml",
                   "scripts/aggregate-gate-partitions.mjs",
                   "scripts/check-workflows.mjs",
-                  "packages/sensors/src/harness-invariant-alignment-workflow.ts"
+                  "packages/sensors/src/harness-invariant-alignment-workflow.ts",
+                  "packages/sensors/src/harness/reviewed-workflow-steps.ts"
                 ],
                 "forbidden": ["law/", "docs/", "tests/", "packages/cli/tests/", "test-tasks.json"]
               },
               "deliverables": [
                 "check --run accepts --partition-include and --partition-exclude under ADR-CHK-0007 rule 11, with ownership, separability, one entry per planned node marked owned, prerequisite, or partitioned-out (outcome SKIPPED, never started), a verdict over owned entries only, no receipt, and CHECK_RUNNER_PARTITION refusals.",
-                ".github/workflows/pull-request-checks.yml runs gate-cli and gate-rest and an aggregator job named devai-release-gate that needs both under always(); scripts/aggregate-gate-partitions.mjs verifies the two reports as rule 11 states; scripts/check-workflows.mjs pins the shape; the alignment sensor reads the steps across the partition jobs; if CTG-0715 has already added check-result cache steps to the gate job, each partition job keeps them."
+                ".github/workflows/pull-request-checks.yml runs gate-cli and gate-rest and an aggregator job named devai-release-gate that needs both under always(); scripts/aggregate-gate-partitions.mjs verifies the two reports as rule 11 states; scripts/check-workflows.mjs pins the shape; the alignment sensor reads the steps across the partition jobs; if CTG-0715 has already added check-result cache steps to the gate job, each partition job keeps them.",
+                "packages/sensors/src/harness/reviewed-workflow-steps.ts re-reviews the steps of the three gate jobs, gate-cli, gate-rest and the devai-release-gate aggregator (coordinator ruling of 2026-10-08)."
               ],
               "acceptance_commands": [
                 ["pnpm", "run", "typecheck"],
@@ -473,7 +476,10 @@
           "type": "single-role",
           "records": ["ADR-CHK-0007"],
           "depends_on": ["CTG-0713"],
-          "lock_scopes": ["docs/reference/error-codes.md"],
+          "lock_scopes": [
+            "docs/reference/error-codes.md",
+            "docs/dev/operations/workflows/pull-request-checks.md"
+          ],
           "gates": ["docs-links"],
           "tasks": [
             {
@@ -485,11 +491,15 @@
               "status": "ready",
               "target_substrates": ["F1", "F5"],
               "boundary": {
-                "paths": ["docs/reference/error-codes.md"],
+                "paths": [
+                  "docs/reference/error-codes.md",
+                  "docs/dev/operations/workflows/pull-request-checks.md"
+                ],
                 "forbidden": ["packages/", "tests/", "scripts/", "law/"]
               },
               "deliverables": [
-                "docs/reference/error-codes.md is regenerated with node scripts/generate-error-code-reference.mjs after TASK-0719 adds CHECK_RUNNER_PARTITION, on the same branch as the partition wave, so the devai:prepare drift check passes. A coupled triplet holds one Architect task, so this regeneration, which must follow the Engineer code, is its own wave."
+                "docs/reference/error-codes.md is regenerated with node scripts/generate-error-code-reference.mjs after TASK-0719 adds CHECK_RUNNER_PARTITION, on the same branch as the partition wave, so the devai:prepare drift check passes. A coupled triplet holds one Architect task, so this regeneration, which must follow the Engineer code, is its own wave.",
+                "docs/dev/operations/workflows/pull-request-checks.md lists the three gate jobs: gate-cli, gate-rest and the devai-release-gate aggregator."
               ],
               "acceptance_commands": [
                 ["node", "scripts/generate-error-code-reference.mjs"],
