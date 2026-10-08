@@ -1172,7 +1172,12 @@
             "packages/sensors/src/harness/",
             "packages/sensors/src/harness-coherence.ts",
             "docs/dev/operations/workflows/README.md",
-            "law/policy/documentation-information-architecture.json"
+            "law/policy/documentation-information-architecture.json",
+            "docs/adopters/ci-economy.md",
+            "packages/cli/tests/unit/live-ledger-workflow.test.ts",
+            "packages/cli/tests/unit/check-ci-economy-depth.test.ts",
+            "packages/cli/tests/unit/ci-economy-class-lane.test.ts",
+            "packages/cli/src/commands/check/ci-economy.ts"
           ],
           "gates": ["test:cli", "test:sensors"],
           "tasks": [
@@ -1193,7 +1198,8 @@
                   ".devai/config/credential-requirements-binding.json",
                   "docs/dev/operations/workflows/update-pull-request-branches.md",
                   "docs/dev/operations/workflows/README.md",
-                  "law/policy/documentation-information-architecture.json"
+                  "law/policy/documentation-information-architecture.json",
+                  "docs/adopters/ci-economy.md"
                 ],
                 "forbidden": ["packages/", "tests/", "scripts/", ".github/"]
               },
@@ -1201,7 +1207,8 @@
                 "ADR-CHK-0008 defines the harness effect class repository-write: a step that writes repository refs or branches through the API and is not a release publication. It classifies the rebase-update step as repository-write (coordinator ruling of 2026-10-08: the rebase-update step is repository-write, not publication), and states that the update workflow uses a superseding concurrency group, so a newer push to main cancels an update run in progress. The ADR index is regenerated and law/policy/adr-validation.json is re-pinned.",
                 "law/policy/credential-requirements.json declares the update-branch GitHub App credential the update workflow consumes. .devai/config/credential-requirements-binding.json binds it for this repository, as an Architect-owned adopter binding under the ADR-CHK-0008 path table. No credential value is committed.",
                 "docs/dev/operations/workflows/update-pull-request-branches.md describes the update workflow: its trigger, the rebase update method, the expected-head guard, the App credential, the least permissions, the repository-write effect class, and the superseding concurrency.",
-                "The workflows index docs/dev/operations/workflows/README.md lists the new page, and law/policy/documentation-information-architecture.json registers it."
+                "The workflows index docs/dev/operations/workflows/README.md lists the new page, and law/policy/documentation-information-architecture.json registers it.",
+                "If the ci-economy path-filters exemption changes adopter-visible behaviour, docs/adopters/ci-economy.md states that a workflow none of whose jobs uses actions/checkout is exempt from ci-economy.path-filters."
               ],
               "acceptance_commands": [
                 [
@@ -1223,7 +1230,13 @@
                   "json"
                 ]
               ],
-              "commit_types": ["law(adr)", "law(policy)", "law(credentials)", "docs(operations)"],
+              "commit_types": [
+                "law(adr)",
+                "law(policy)",
+                "law(credentials)",
+                "docs(operations)",
+                "docs(adopters)"
+              ],
               "prompt": {
                 "path": "prompts/TASK-07210.md"
               },
@@ -1247,20 +1260,32 @@
                 "paths": [
                   "tests/contract/",
                   "packages/sensors/tests/",
-                  "packages/schemas/tests/contract/"
+                  "packages/schemas/tests/contract/",
+                  "packages/cli/tests/unit/live-ledger-workflow.test.ts",
+                  "packages/cli/tests/unit/check-ci-economy-depth.test.ts",
+                  "packages/cli/tests/unit/ci-economy-class-lane.test.ts"
                 ],
-                "forbidden": ["packages/sensors/src/", "scripts/", "law/", "docs/", ".github/"]
+                "forbidden": [
+                  "packages/sensors/src/",
+                  "scripts/",
+                  "law/",
+                  "docs/",
+                  ".github/",
+                  "packages/cli/src/"
+                ]
               },
               "deliverables": [
                 "Contract tests mutate .github/workflows/update-pull-request-branches.yml and prove that scripts/check-workflows.mjs fails when the push-to-main trigger, the rebase update method, the expected-head-sha guard, the App credential, the least permissions, or the superseding concurrency is removed (ADR-CHK-0008 IA-005).",
                 "Tests under packages/sensors/tests/ prove that the reviewed-step registry records the rebase-update step as repository-write, and that repository-write is a harness effect class distinct from publication and read-only. A changed update step reads unknown until reviewed anew. A publication-only rule does not apply to repository-write.",
-                "Any ADR census or credential manifest counts that the TASK-07210 changes move are re-pinned. The tests fail until TASK-0726 lands on the same branch."
+                "Any ADR census or credential manifest counts that the TASK-07210 changes move are re-pinned. The tests fail until TASK-0726 lands on the same branch.",
+                "The live-ledger workflow fixtures include update-pull-request-branches.yml and its workflows_scanned count is re-pinned to 5. Rule cases in check-ci-economy-depth.test.ts and ci-economy-class-lane.test.ts prove that a branch-push workflow with no actions/checkout step is exempt from ci-economy.path-filters, while one that checks out the repository is still flagged."
               ],
               "acceptance_commands": [
                 ["pnpm", "run", "test:root"],
-                ["pnpm", "run", "test:sensors"]
+                ["pnpm", "run", "test:sensors"],
+                ["pnpm", "run", "test:cli"]
               ],
-              "commit_types": ["test(contract)", "test(sensors)", "test(schemas)"],
+              "commit_types": ["test(contract)", "test(sensors)", "test(schemas)", "test(cli)"],
               "prompt": {
                 "path": "prompts/TASK-07211.md"
               },
@@ -1287,18 +1312,32 @@
                   "scripts/check-workflows.mjs",
                   ".devai/config/toolchain.json",
                   "packages/sensors/src/harness/",
-                  "packages/sensors/src/harness-coherence.ts"
+                  "packages/sensors/src/harness-coherence.ts",
+                  "packages/cli/src/commands/check/ci-economy.ts"
                 ],
-                "forbidden": ["law/", "docs/", "tests/", "packages/cli/", "packages/sensors/tests/"]
+                "forbidden": [
+                  "law/",
+                  "docs/",
+                  "tests/",
+                  "packages/cli/tests/",
+                  "packages/sensors/tests/"
+                ]
               },
               "deliverables": [
                 ".github/workflows/update-pull-request-branches.yml runs on push to main and, for every open non-draft pull request against main that is behind it, calls PUT /repos/{owner}/{repo}/pulls/{number}/update-branch with update_method rebase and the expected head sha. It skips a pull request whose rebase conflicts and reports it without failing the others. It uses a GitHub App or other non-GITHUB_TOKEN credential, because a push made with GITHUB_TOKEN starts no workflow run and the rebased head would never be gated. The workflow holds the least permissions it needs.",
                 "The superseded gate run is cancelled rather than failed. The existing concurrency group of pull-request-checks.yml, keyed by workflow and pull request number with cancel-in-progress, already cancels an in-progress run when the rebased head arrives as a synchronize event; the task verifies this on a live pull request, records the run ids in its pull request, and changes the gate workflow only if the verification fails.",
                 "scripts/check-workflows.mjs pins the trigger, the rebase update method, the credential source, and the concurrency group, so removing any of them fails the workflow check.",
-                "packages/sensors/src/harness/reviewed-workflow-steps.ts admits the effect class repository-write and records the reviewed rebase-update step with it, not publication (coordinator ruling of 2026-10-08: the rebase-update step is repository-write, not publication). The harness effect analysis treats repository-write as its own class, with its coherence exception in packages/sensors/src/harness-coherence.ts. .devai/config/toolchain.json declares what the update workflow needs from the toolchain."
+                "packages/sensors/src/harness/reviewed-workflow-steps.ts admits the effect class repository-write and records the reviewed rebase-update step with it, not publication (coordinator ruling of 2026-10-08: the rebase-update step is repository-write, not publication). The harness effect analysis treats repository-write as its own class, with its coherence exception in packages/sensors/src/harness-coherence.ts. .devai/config/toolchain.json declares what the update workflow needs from the toolchain.",
+                "packages/cli/src/commands/check/ci-economy.ts exempts from ci-economy.path-filters a workflow none of whose jobs uses actions/checkout. Such a workflow consumes no repository content, so path filters would save nothing, and docs:ci-economy reads PASS for update-pull-request-branches.yml."
               ],
               "acceptance_commands": [["node", "scripts/check-workflows.mjs"]],
-              "commit_types": ["ci(workflows)", "ci(scripts)", "fix(sensors)", "chore(toolchain)"],
+              "commit_types": [
+                "ci(workflows)",
+                "ci(scripts)",
+                "fix(sensors)",
+                "chore(toolchain)",
+                "fix(cli)"
+              ],
               "prompt": {
                 "path": "prompts/TASK-0726.md"
               },
