@@ -12,6 +12,8 @@ export const RELEASE_WORKFLOW_FILE = 'release.yml';
 export const PREFLIGHT_WORKFLOW_FILE = 'pull-request-checks.yml';
 // ADR-REL-0029: the site-only Pages publication lane, dispatched from main.
 export const SITE_WORKFLOW_FILE = 'site-publish.yml';
+// ADR-CHK-0004, ADR-CHK-0008: rebase every open pull request when main moves, with an App token.
+export const UPDATE_WORKFLOW_FILE = 'update-pull-request-branches.yml';
 // Toolchain identity is owned by the adopter manifest (ADR-CHK-0002). The
 // exported pin constants below are derived from this repository's manifest at
 // load time; checkWorkflowTree(root) compares each workflow against the
@@ -559,6 +561,7 @@ export function checkWorkflowTree(root = process.cwd()) {
     RELEASE_WORKFLOW_FILE,
     PREFLIGHT_WORKFLOW_FILE,
     SITE_WORKFLOW_FILE,
+    UPDATE_WORKFLOW_FILE,
   ].sort();
   const permitted = required;
   const missing = required.filter((name) => !files.includes(name));
@@ -710,6 +713,107 @@ function checkOrdinaryLedgerWorkflow(file, workflow, findings) {
   }
 }
 
+const UPDATE_JOB = 'update-branches';
+const UPDATE_APP_TOKEN_STEP = 'app-token';
+const UPDATE_APP_TOKEN_INPUTS = {
+  'app-id': '${{ secrets.DEVAI_UPDATE_BRANCH_APP_ID }}',
+  'private-key': '${{ secrets.DEVAI_UPDATE_BRANCH_APP_PRIVATE_KEY }}',
+};
+const UPDATE_RUN_TOKEN = '${{ steps.app-token.outputs.token }}';
+const UPDATE_PROBE_STEP = 'credentials';
+const UPDATE_PROBE_ENV = {
+  APP_ID_PRESENT: "${{ secrets.DEVAI_UPDATE_BRANCH_APP_ID != '' }}",
+  PRIVATE_KEY_PRESENT: "${{ secrets.DEVAI_UPDATE_BRANCH_APP_PRIVATE_KEY != '' }}",
+};
+const UPDATE_PROBE_MARKERS = [
+  'set -euo pipefail',
+  'echo \'present=true\' >> "$GITHUB_OUTPUT"',
+  'echo \'present=false\' >> "$GITHUB_OUTPUT"',
+  '::notice::',
+  '$GITHUB_STEP_SUMMARY',
+];
+const UPDATE_PRESENT_CONDITION = "steps.credentials.outputs.present == 'true'";
+const UPDATE_RUN_MARKERS = [
+  'set -euo pipefail',
+  'select(.draft == false)',
+  'select(.head.repo.full_name == $ENV.REPOSITORY)',
+  '/update-branch',
+  '-f update_method=rebase',
+  '-f expected_head_sha="$head"',
+];
+
+/**
+ * The update-branch workflow (ADR-CHK-0004, ADR-CHK-0008): it runs on push to main only,
+ * holds contents: read, mints an App installation token (a GITHUB_TOKEN push starts no gate
+ * run), and rebases each open non-draft same-repository pull request behind main with the
+ * expected head sha. No job or step may soften its failure.
+ */
+function checkUpdateBranchWorkflow(file, workflow, source, findings) {
+  const invalid = (detail) =>
+    findings.push(finding('CI_UPDATE_BRANCH_WORKFLOW_INVALID', file, detail));
+  const triggers = object(workflow.on);
+  if (
+    JSON.stringify(Object.keys(triggers)) !== JSON.stringify(['push']) ||
+    JSON.stringify(object(triggers.push)) !== JSON.stringify({ branches: ['main'] })
+  )
+    invalid('must trigger on push to main only');
+  if (JSON.stringify(object(workflow.permissions)) !== JSON.stringify({ contents: 'read' }))
+    invalid('must hold workflow permissions contents: read only');
+  const jobs = object(workflow.jobs);
+  if (JSON.stringify(Object.keys(jobs)) !== JSON.stringify([UPDATE_JOB]))
+    invalid(`must have exactly one job, ${UPDATE_JOB}`);
+  const job = object(jobs[UPDATE_JOB]);
+  if (job.permissions !== undefined || job.if !== undefined || job.environment !== undefined)
+    invalid(`jobs.${UPDATE_JOB} must add no permissions, condition, or environment`);
+  if (typeof job['timeout-minutes'] !== 'number')
+    invalid(`jobs.${UPDATE_JOB} must declare timeout-minutes`);
+  const steps = (Array.isArray(job.steps) ? job.steps : []).map(object);
+  if (
+    job['continue-on-error'] !== undefined ||
+    steps.some((step) => step['continue-on-error'] !== undefined)
+  )
+    invalid('no job or step may declare continue-on-error');
+  // GITHUB_TOKEN pushes start no workflow run, so it must never carry the update.
+  if (/\bgithub\s*\.\s*token\b|secrets\s*\.\s*GITHUB_TOKEN\b/u.test(source))
+    invalid('must not use GITHUB_TOKEN; the update needs the App installation token');
+  const mint = steps.find((step) => step.id === UPDATE_APP_TOKEN_STEP);
+  if (
+    typeof mint?.uses !== 'string' ||
+    !/^actions\/create-github-app-token@[0-9a-f]{40}$/u.test(mint.uses) ||
+    Object.entries(UPDATE_APP_TOKEN_INPUTS).some(([key, value]) => object(mint.with)[key] !== value)
+  )
+    invalid(
+      `step ${UPDATE_APP_TOKEN_STEP} must mint the token with a SHA-pinned actions/create-github-app-token from DEVAI_UPDATE_BRANCH_APP_ID and DEVAI_UPDATE_BRANCH_APP_PRIVATE_KEY`,
+    );
+  // Absence degrades (ADR-CHK-0008): a probe reads presence flags only, and the token and
+  // rebase steps run only when both credentials are present.
+  const probe = steps.find((step) => step.id === UPDATE_PROBE_STEP);
+  if (
+    probe === undefined ||
+    probe.shell !== 'bash' ||
+    probe.if !== undefined ||
+    JSON.stringify(object(probe.env)) !== JSON.stringify(UPDATE_PROBE_ENV) ||
+    UPDATE_PROBE_MARKERS.some((marker) => !String(probe.run ?? '').includes(marker))
+  )
+    invalid(
+      `step ${UPDATE_PROBE_STEP} must probe the presence of both App credentials and skip the update with a notice when either is absent`,
+    );
+  const runs = steps.filter((step) => typeof step.run === 'string');
+  const update = runs.find((step) => String(step.run).includes('/update-branch'));
+  if (
+    runs.length !== 2 ||
+    update === undefined ||
+    update.shell !== 'bash' ||
+    update.if !== UPDATE_PRESENT_CONDITION ||
+    mint?.if !== UPDATE_PRESENT_CONDITION ||
+    object(update.env).GH_TOKEN !== UPDATE_RUN_TOKEN ||
+    UPDATE_RUN_MARKERS.some((marker) => !String(update.run).includes(marker))
+  )
+    invalid(
+      'one bash step, run only when both credentials are present, must rebase each open non-draft same-repository pull request with update_method=rebase and the expected head sha, authenticated by the App token',
+    );
+}
+
 function checkWorkflow(file, source, findings, pins) {
   for (const marker of OLD_WORKFLOW_MARKERS) {
     if (file.includes(marker) || source.includes(marker)) {
@@ -739,6 +843,10 @@ function checkWorkflow(file, source, findings, pins) {
   }
   if (file === SITE_WORKFLOW_FILE) {
     checkSiteWorkflow(file, workflow, source, findings);
+    return;
+  }
+  if (file === UPDATE_WORKFLOW_FILE) {
+    checkUpdateBranchWorkflow(file, workflow, source, findings);
     return;
   }
   if (file !== LEDGER_WORKFLOW_FILE) {
