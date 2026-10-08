@@ -4,5 +4,5 @@ set -eu
 # the affected check against the freshly fetched base. Inactive, silently, unless this
 # worktree opted in with `pnpm run hooks:install -- --pre-push`; $1 is the remote and stdin
 # carries the pushed refs.
-[ "$(git config --get devai.prePushPreflight 2>/dev/null || true)" = 'true' ] || exit 0
+[ "$(git config --worktree --get devai.prePushPreflight 2>/dev/null || true)" = 'true' ] || exit 0
 exec node "$(dirname "$0")/../scripts/pre-push-preflight.mjs" "$@"
