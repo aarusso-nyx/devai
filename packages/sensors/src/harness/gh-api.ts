@@ -349,7 +349,10 @@ function validatePullRequests(data: unknown): PullRequestValidation {
       typeof headRefOid !== 'string' ||
       typeof state !== 'string' ||
       !isTime(createdAt) ||
-      (closedAt !== undefined && closedAt !== null && !isTime(closedAt))
+      // A closed or merged pull request must say when it closed: its lifetime ends there.
+      (state === 'OPEN'
+        ? closedAt !== undefined && closedAt !== null && !isTime(closedAt)
+        : !isTime(closedAt))
     ) {
       return {
         ok: false,
