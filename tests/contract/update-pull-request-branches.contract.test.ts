@@ -192,6 +192,56 @@ describe('workflow checker pins the update-pull-request-branches workflow (ADR-C
       (d) =>
         editRun(d, (run) => run.replace(' | select(.head.repo.full_name == $ENV.REPOSITORY)', '')),
     ],
+    // A security marker kept only in a shell comment proves nothing: the executed command
+    // decides (#363 review).
+    [
+      'a merge update runs while update_method=rebase survives in a comment',
+      (d) =>
+        editRun(
+          d,
+          (run) =>
+            `# update_method=rebase\n${run.replace('update_method=rebase', 'update_method=merge')}`,
+        ),
+    ],
+    [
+      'the expected head sha is dropped while it survives in a comment',
+      (d) =>
+        editRun(
+          d,
+          (run) =>
+            `# -f expected_head_sha="$head"\n${run.replace(' -f expected_head_sha="$head"', '')}`,
+        ),
+    ],
+    [
+      'the draft filter is dropped while it survives in a comment',
+      (d) =>
+        editRun(
+          d,
+          (run) => `# select(.draft == false)\n${run.replace(' | select(.draft == false)', '')}`,
+        ),
+    ],
+    [
+      'the fork filter is dropped while it survives in a comment',
+      (d) =>
+        editRun(
+          d,
+          (run) =>
+            `# select(.head.repo.full_name == $ENV.REPOSITORY)\n${run.replace(
+              ' | select(.head.repo.full_name == $ENV.REPOSITORY)',
+              '',
+            )}`,
+        ),
+    ],
+    // The superseding lock keyed by workflow and ref.
+    [
+      'the lock stops cancelling superseded runs',
+      (d) => d.setIn(['concurrency', 'cancel-in-progress'], false),
+    ],
+    [
+      'the lock group is a constant',
+      (d) => d.setIn(['concurrency', 'group'], 'update-pull-request-branches'),
+    ],
+    ['the workflow concurrency is removed', (d) => d.deleteIn(['concurrency'])],
   ];
 
   it.each(mutations)('fails when %s', (_label, edit) => {
