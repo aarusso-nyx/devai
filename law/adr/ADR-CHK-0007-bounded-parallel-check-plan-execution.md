@@ -35,9 +35,9 @@ inspector_acceptance:
   - IA-006 -- A node that waits in the ready queue longer than the per-task timeout still runs and is timed out only by its own timeout measured from its own start; the timeout default and the --task-timeout-ms flag are unchanged.
   - IA-007 -- --task-workers wins over DEVAI_CHECK_TASK_WORKERS; 0, 17, a fraction, or a non-numeric value from either source is refused with CHECK_RUNNER_WORKERS before any node starts; under --rc, --release-intent, or a protected execution identity the effective count is one, the environment value is ignored, and an explicit --task-workers above one is refused with CHECK_RUNNER_WORKERS.
   - IA-008 -- The plan, task keys, input digests, descriptor and task-policy digests, and receipt are byte-identical whatever the worker count; runner and bundled verifier derive the same task keys and task-policy digest for a candidate carrying test-task-exclusivity.json, which a ** selector hashes like any file; an exclusivity file that fails its schema or names an undeclared node is refused before any node starts.
-  - IA-009 -- For an affected plan that holds test:cli, --partition-include test:cli and --partition-exclude test:cli plan byte-identical plans with the same task-policy digest; their owned sets are disjoint and their union is the planned node set; test:cli executes only in the including run; and only the dependency closure of test:cli executes in both runs.
-  - IA-010 -- A plan where a node depends on test:cli and on a node outside its dependency closure (the test:local-full fallback) is not separable: the including run owns every node and the excluding run none. A partition flag under --rc, --release-intent or a protected identity, both flags together, or an unknown node id is refused with CHECK_RUNNER_PARTITION before any node starts, and a partitioned run writes no receipt.
-  - IA-011 -- The devai-release-gate aggregator fails when a partition job failed, was cancelled, or uploaded no report; when the reports differ in candidate, base, descriptor or task-policy digest, or node set; when owned sets overlap or miss a node; or when an owned node lacks a PASS or reused entry. scripts/check-workflows.mjs fails when the aggregator, its needs, its always() condition, or the check name is removed.
+  - IA-009 -- For an affected plan holding test:cli, --partition-include test:cli and --partition-exclude test:cli plan byte-identical plans with one task-policy digest; each report has one entry per planned node in plan order; each node is owned in exactly one report and partitioned-out or prerequisite in the other; test:cli executes only in the including run, and only its dependency closure executes in both.
+  - IA-010 -- A plan where a node depends on test:cli and on a node outside its dependency closure (the test:local-full fallback) is not separable, so the including run owns every node and every entry of the excluding run is partitioned-out. A partition flag under --rc, --release-intent or a protected identity, both flags together, or an unknown node id is refused with CHECK_RUNNER_PARTITION before any node starts, and a partitioned run writes no receipt.
+  - IA-011 -- The devai-release-gate aggregator fails when a partition job failed, was cancelled, or uploaded no report; when the reports differ in candidate, base, digests, or node set; when a node has zero or two owned entries; or when an owned entry is not PASS. scripts/check-workflows.mjs fails when the aggregator, its needs, its always() condition, or the check name is removed.
 ---
 
 # Bounded parallel execution of check plan nodes
@@ -112,7 +112,9 @@ the implementation and its tests.
    flag of `check --run` overrides the environment variable
    `DEVAI_CHECK_TASK_WORKERS`, which overrides the default. `n` is an integer
    from 1 to 16; any other value from either source is refused with
-   `CHECK_RUNNER_WORKERS` before any node starts. `W = 1` is the sequential
+   `CHECK_RUNNER_WORKERS` before any node starts. A set but empty
+   `DEVAI_CHECK_TASK_WORKERS=""` is such a value and is refused; only an
+   unset variable falls through to the default. `W = 1` is the sequential
    behavior of ADR-CHK-0001, byte for byte in the comparable projection of
    rule 9. The runner reads the variable itself; it is never passed to a
    task unless the task allowlists it.
@@ -230,8 +232,21 @@ the implementation and its tests.
       fallback plan, the including run owns every planned node and the
       excluding run owns none.
     - A run executes its owned nodes and their planned ancestors by rules 1
-      to 9. Its report marks each execution entry as owned or as a
-      prerequisite, and its verdict is computed over owned nodes only.
+      to 9. Its report still carries exactly one execution entry for every
+      planned node, in plan order, so rule 1 holds for each run:
+      - an owned node gets its ordinary entry (`executed`, `reused`,
+        `aborted`, or `blocked-environment`) with `partition: "owned"`;
+      - a node the run executes only as a dependency of an owned node gets
+        its ordinary entry with `partition: "prerequisite"`;
+      - every other planned node gets the entry disposition
+        `partitioned-out`, outcome `SKIPPED`, and reason
+        `partitioned-out`. The run never starts, inspects, or caches such a
+        node.
+
+      The run's verdict and exit code are computed over owned entries only.
+      In a plan that is not separable, the excluding run owns nothing and
+      every one of its entries is `partitioned-out`.
+
     - So every planned node is owned exactly once across the pair, and a node
       of `I ∪ D` never executes in the excluding run. Only `A`, the
       dependency closure of the listed nodes, may execute in both runs: today
@@ -257,8 +272,16 @@ the implementation and its tests.
       - both jobs passed;
       - both reports name the same candidate, base, descriptor digest,
         task-policy digest, and planned node set;
-      - the owned sets are disjoint and their union is the planned node set;
-      - every owned node has a PASS or reused entry.
+      - each report holds exactly one entry per planned node, in plan order;
+      - across the two reports, every planned node has exactly one owned
+        entry, whose disposition is `executed`, `reused`, `aborted`, or
+        `blocked-environment`. Its entry in the other report is
+        `partitioned-out` or `prerequisite`. Prerequisite entries never
+        count toward a node's verdict.
+      - every owned entry is a PASS, either executed or reused.
+
+      Taken in plan order, the owned entries form the comparable projection
+      that rule 9 requires of an unpartitioned run on the same inputs.
 
       A missing, cancelled, or extra report fails it.
 
@@ -347,6 +370,6 @@ inside the runner is left to a later record if the job split is not enough.
 - IA-006 -- A node that waits in the ready queue longer than the per-task timeout still runs and is timed out only by its own timeout measured from its own start; the timeout default and the --task-timeout-ms flag are unchanged.
 - IA-007 -- --task-workers wins over DEVAI_CHECK_TASK_WORKERS; 0, 17, a fraction, or a non-numeric value from either source is refused with CHECK_RUNNER_WORKERS before any node starts; under --rc, --release-intent, or a protected execution identity the effective count is one, the environment value is ignored, and an explicit --task-workers above one is refused with CHECK_RUNNER_WORKERS.
 - IA-008 -- The plan, task keys, input digests, descriptor and task-policy digests, and receipt are byte-identical whatever the worker count; runner and bundled verifier derive the same task keys and task-policy digest for a candidate carrying test-task-exclusivity.json, which a ** selector hashes like any file; an exclusivity file that fails its schema or names an undeclared node is refused before any node starts.
-- IA-009 -- For an affected plan that holds test:cli, --partition-include test:cli and --partition-exclude test:cli plan byte-identical plans with the same task-policy digest; their owned sets are disjoint and their union is the planned node set; test:cli executes only in the including run; and only the dependency closure of test:cli executes in both runs.
-- IA-010 -- A plan where a node depends on test:cli and on a node outside its dependency closure (the test:local-full fallback) is not separable: the including run owns every node and the excluding run none. A partition flag under --rc, --release-intent or a protected identity, both flags together, or an unknown node id is refused with CHECK_RUNNER_PARTITION before any node starts, and a partitioned run writes no receipt.
-- IA-011 -- The devai-release-gate aggregator fails when a partition job failed, was cancelled, or uploaded no report; when the reports differ in candidate, base, descriptor or task-policy digest, or node set; when owned sets overlap or miss a node; or when an owned node lacks a PASS or reused entry. scripts/check-workflows.mjs fails when the aggregator, its needs, its always() condition, or the check name is removed.
+- IA-009 -- For an affected plan holding test:cli, --partition-include test:cli and --partition-exclude test:cli plan byte-identical plans with one task-policy digest; each report has one entry per planned node in plan order; each node is owned in exactly one report and partitioned-out or prerequisite in the other; test:cli executes only in the including run, and only its dependency closure executes in both.
+- IA-010 -- A plan where a node depends on test:cli and on a node outside its dependency closure (the test:local-full fallback) is not separable, so the including run owns every node and every entry of the excluding run is partitioned-out. A partition flag under --rc, --release-intent or a protected identity, both flags together, or an unknown node id is refused with CHECK_RUNNER_PARTITION before any node starts, and a partitioned run writes no receipt.
+- IA-011 -- The devai-release-gate aggregator fails when a partition job failed, was cancelled, or uploaded no report; when the reports differ in candidate, base, digests, or node set; when a node has zero or two owned entries; or when an owned entry is not PASS. scripts/check-workflows.mjs fails when the aggregator, its needs, its always() condition, or the check name is removed.
