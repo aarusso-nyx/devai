@@ -62,8 +62,32 @@ function sha256(value: string | Buffer): string {
   return createHash('sha256').update(value).digest('hex');
 }
 
+type MaterializedPolicyFile = (typeof MATERIALIZED_POLICY_FILES)[number];
+
+/** The exact bytes `canonicalRepo` writes for one materialized policy file. */
+function canonicalBytes(file: MaterializedPolicyFile): string {
+  const content = resolveCanonicalPolicyContent(file);
+  return typeof content === 'string' ? content : `${JSON.stringify(content, null, 2)}\n`;
+}
+
+/**
+ * CMP-0007 TASK-0725: the digest of each canonical policy file, keyed to a stable token. The
+ * frozen identities used to carry these digests literally, so any branch that amended one of
+ * those law files failed this test until it was re-pinned, which read as a flake across
+ * branches. Only a digest equal to the exact canonical bytes becomes its token; any other
+ * digest stays raw hex and still fails the snapshot, and the relation itself is asserted
+ * directly by the installed-digest case below.
+ */
+const CANONICAL_DIGESTS: ReadonlyMap<string, string> = new Map(
+  MATERIALIZED_POLICY_FILES.map((file) => [sha256(canonicalBytes(file)), file]),
+);
+
 function normalized<T>(value: T, repo: string): T {
-  return JSON.parse(JSON.stringify(value).split(repo).join('<repo>')) as T;
+  let text = JSON.stringify(value).split(repo).join('<repo>');
+  for (const [digest, file] of CANONICAL_DIGESTS) {
+    text = text.split(digest).join(`<canonical-sha256:${file}>`);
+  }
+  return JSON.parse(text) as T;
 }
 
 async function invoke(definition: { register(cli: CAC): void }, argv: readonly string[]) {
@@ -314,6 +338,40 @@ describe('Doctor whole CheckResult identities', () => {
     `);
   });
 
+  it('reports the installed digest of exactly the canonical policy bytes', async () => {
+    // The raw report, before any token: every installed digest the doctor names for a policy
+    // file is the sha256 of that file's canonical bytes, and a mismatched copy's actual digest
+    // is the sha256 of the bytes on disk.
+    const missing = root();
+    const mismatch = await canonicalRepo();
+    put(mismatch, `${CONFIG}/domains.json`, '{}\n');
+    type Entry = { file?: unknown; installed_sha256?: unknown; actual_sha256?: unknown };
+    const entries = (value: unknown): Entry[] =>
+      value === null || typeof value !== 'object'
+        ? []
+        : [
+            ...('installed_sha256' in value ? [value as Entry] : []),
+            ...Object.values(value).flatMap(entries),
+          ];
+
+    const reported = [
+      ...entries(await doctorCheck(missing, 'policy-materialization-current')),
+      ...entries(await doctorCheck(mismatch, 'policy-materialization-current')),
+    ];
+    const files = new Set(reported.map((entry) => entry.file));
+    expect(files.size).toBeGreaterThan(1);
+    for (const file of files) expect(MATERIALIZED_POLICY_FILES).toContain(file);
+    for (const entry of reported) {
+      const file = MATERIALIZED_POLICY_FILES.find((candidate) => candidate === entry.file);
+      if (file === undefined)
+        throw new Error(`not a materialized policy file: ${String(entry.file)}`);
+      expect(entry.installed_sha256, file).toBe(sha256(canonicalBytes(file)));
+    }
+    const actual = reported.find((entry) => entry.actual_sha256 !== 'missing');
+    expect(actual?.file).toBe('domains.json');
+    expect(actual?.actual_sha256).toBe(sha256('{}\n'));
+  });
+
   it('freezes complete, missing, and mismatched canonical materialization identities', async () => {
     const complete = await canonicalRepo();
     const missing = root();
@@ -348,7 +406,7 @@ describe('Doctor whole CheckResult identities', () => {
               {
                 "actual_sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
                 "file": "domains.json",
-                "installed_sha256": "9539eb0e6679d423fa83b98726136eb369202edb042fce68eae92b19f543f6fd",
+                "installed_sha256": "<canonical-sha256:domains.json>",
                 "target": "<repo>/.devai/config/domains.json",
               },
             ],
@@ -376,37 +434,37 @@ describe('Doctor whole CheckResult identities', () => {
               {
                 "actual_sha256": "missing",
                 "file": "domains.json",
-                "installed_sha256": "9539eb0e6679d423fa83b98726136eb369202edb042fce68eae92b19f543f6fd",
+                "installed_sha256": "<canonical-sha256:domains.json>",
                 "target": "<repo>/.devai/config/domains.json",
               },
               {
                 "actual_sha256": "missing",
                 "file": "forbidden-actions.json",
-                "installed_sha256": "1b7dbdda65108802ebfb86344ded1f34c73ee737c00544b3e7b1a2c2922f07db",
+                "installed_sha256": "<canonical-sha256:forbidden-actions.json>",
                 "target": "<repo>/.devai/config/forbidden-actions.json",
               },
               {
                 "actual_sha256": "missing",
                 "file": "glob-guards.json",
-                "installed_sha256": "759bf9dd020fff02a75cdc184780c04e4883bde6a82e16290ce7f0b8ab70d4bd",
+                "installed_sha256": "<canonical-sha256:glob-guards.json>",
                 "target": "<repo>/.devai/config/glob-guards.json",
               },
               {
                 "actual_sha256": "missing",
                 "file": "scorecard-na.json",
-                "installed_sha256": "55956d3426a42ecad07ad04ad18eb6c6758852aa03c39f0e3b58c440a6ec8c62",
+                "installed_sha256": "<canonical-sha256:scorecard-na.json>",
                 "target": "<repo>/.devai/config/scorecard-na.json",
               },
               {
                 "actual_sha256": "missing",
                 "file": "thresholds.json",
-                "installed_sha256": "4662c41fbbce00db9e887be3f44f7f799e9bee587cb74dccb86e68eca3e4e9f4",
+                "installed_sha256": "<canonical-sha256:thresholds.json>",
                 "target": "<repo>/.devai/config/thresholds.json",
               },
               {
                 "actual_sha256": "missing",
                 "file": "subprocess-effects.json",
-                "installed_sha256": "2a052d320f5f86dc4a0b062b44322e5c561301794746b7544a1317aedbb7ffe2",
+                "installed_sha256": "<canonical-sha256:subprocess-effects.json>",
                 "target": "<repo>/.devai/config/subprocess-effects.json",
               },
             ],
@@ -1025,7 +1083,7 @@ describe('Doctor whole CheckResult identities', () => {
             "mismatches": [
               {
                 "actual_sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
-                "expected_sha256": "2a052d320f5f86dc4a0b062b44322e5c561301794746b7544a1317aedbb7ffe2",
+                "expected_sha256": "<canonical-sha256:subprocess-effects.json>",
                 "file": ".devai/config/subprocess-effects.json",
               },
             ],
