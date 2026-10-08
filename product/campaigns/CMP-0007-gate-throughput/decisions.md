@@ -67,13 +67,13 @@ The window holds 47 failed runs.
 
 The Owner approved every recommendation of the CMP-0007 scope draft on 2026-10-07. The approval was given in the orchestrating session and relayed to the Architect in the W21 brief of the same day.
 
-| #   | Question           | Decision                                                                                                                                                  |
-| --- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| D1  | How to parallelize | In-runner parallel workers first (R-0701 TASK-0712 under ADR-CHK-0007). Shard `test:cli` (TASK-0713) only if the post-change median is still above 600 s. |
-| D2  | Main-moved blocks  | Enable the auto-update branch (OE-02). No merge queue, so no `merge_group` sensor change.                                                                 |
-| D3  | Local preflight    | A pre-push preflight hook. It is mandatory in the agent contract and opt-in for humans.                                                                   |
-| D4  | F5:T9 definition   | Keep the current definition. R-0703 is recorded as deferred, to be revisited after the R-0702 window.                                                     |
-| D5  | Release coupling   | Ship 2.3.0 when both cells read PASS (OE-03).                                                                                                             |
+| #   | Question           | Decision                                                                                                                                                                                                                                                                                                                                                                     |
+| --- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D1  | How to parallelize | In-runner parallel workers first (R-0701 TASK-0712 under ADR-CHK-0007). Shard `test:cli` (TASK-0713) only if the post-change median is still above 600 s.                                                                                                                                                                                                                    |
+| D2  | Main-moved blocks  | Enable the auto-update branch (OE-02). The setting alone updates no pull request, so R-0702 adds TASK-0726: a workflow on push to main that rebases each open pull request through the update-branch API with `update_method: rebase`, so the superseded gate run is cancelled by the per-pull-request concurrency group. No merge queue, so no `merge_group` sensor change. |
+| D3  | Local preflight    | A pre-push preflight hook. It is mandatory in the agent contract and opt-in for humans.                                                                                                                                                                                                                                                                                      |
+| D4  | F5:T9 definition   | Keep the current definition. R-0703 is recorded as deferred, to be revisited after the R-0702 window.                                                                                                                                                                                                                                                                        |
+| D5  | Release coupling   | Ship 2.3.0 when both cells read PASS (OE-03).                                                                                                                                                                                                                                                                                                                                |
 
 ## Acceptance windows
 
@@ -83,16 +83,16 @@ A round's post-change window starts at the merge of its last implementing task.
 - **Length:** the window closes after at least 30 counted runs, and no earlier than 7 days after it opens.
 - **Readings:** the readings are those of `harness_performance` and `harness_green_main` recorded over the window.
 
-| Round  | Accepted when                                                                                                                                             |
-| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| R-0701 | `harness_performance` median < 600 s, and no planned node is dropped from any plan. Each window run's executed and aborted node set equals its plan.      |
-| R-0702 | Over the window: no main-moved failures, real-defect failures roughly halved against the baseline rate of 33 in 355 runs, and `harness_green_main` ≥ 95%. |
-| R-0703 | Deferred under D4. It is never opened without a new Owner decision.                                                                                       |
+| Round  | Accepted when                                                                                                                                                                                                                                                                                                                      |
+| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| R-0701 | `harness_performance` median < 600 s, and no planned node is dropped from any plan: in every window run, the node set of the report's `execution` array equals the plan's node set exactly, each node once, counting every disposition (`executed`, `reused`, `aborted`, and `blocked-environment`).                               |
+| R-0702 | The window opens only after TASK-0726 merges and OE-02 is performed. Over the window: no main-moved failures, real-defect failures roughly halved against the baseline rate of 33 in 355 runs, and `harness_green_main` ≥ 95%. The no-main-moved claim holds only with TASK-0726 in force; without it the setting changes nothing. |
+| R-0703 | Deferred under D4. It is never opened without a new Owner decision.                                                                                                                                                                                                                                                                |
 
 ## Owner effects
 
 The plan only names these effects. No task performs them.
 
 - **OE-01 is not used.** The campaign policy reserves that id for a merge queue, which D2 did not choose. Serialized admission therefore stays in force: at most one task pull request is in `pre_merge` at a time.
-- **OE-02, before R-0702 closes:** the Owner enables the auto-update branch repository setting with the rebase update method. This happens after TASK-0721 records how that fits ADR-CHK-0004.
+- **OE-02, before R-0702 closes:** the Owner enables the auto-update branch repository setting with the rebase update method, and provides the non-`GITHUB_TOKEN` credential the TASK-0726 workflow uses (a push made with `GITHUB_TOKEN` starts no gate run). This happens after TASK-0721 records how that fits ADR-CHK-0004.
 - **OE-03, before R-0702 closes:** publication of 2.3.0. It requires both cells to read PASS on their windows and a separately authorized release.
