@@ -17,6 +17,9 @@ affected_rules:
   - .github/workflows/update-pull-request-branches.yml
   - scripts/check-workflows.mjs
   - docs/dev/operations/remote-preflight-contract.md
+  - packages/sensors/src/harness-coherence.ts
+  - packages/sensors/src/harness/reviewed-workflow-steps.ts
+  - law/policy/credential-requirements.json
 inspector_acceptance:
   - IA-001 -- A push to main rebases every open, non-draft pull request against main that is behind it through the update-branch API with update_method rebase and the expected head sha, and no update ever creates a merge commit on a pull-request branch.
   - IA-002 -- A pull request whose rebase conflicts is skipped and reported without failing the update of the others, and its gate run is neither started nor cancelled by the update workflow.
@@ -26,6 +29,7 @@ inspector_acceptance:
   - IA-006 -- With TASK-0728 merged, the commit-range check fails a pull-request commit whose committer is neither its author role nor the recorded update-branch App, or whose author role lacks Article 6 authority over a path it touches; a rebase update by the App never fails it.
   - IA-007 -- With TASK-0728 merged, the commit-range check fails any pull-request range that contains a commit with more than one parent, so a merge update pressed in the GitHub interface reddens the gate; the grammar exemption for merge commits is unchanged.
   - IA-008 -- The commit-range check admits each path only for the authors its table row names, so an Architect commit under packages/, an Engineer commit under law/ or docs/, a commit mixing two roles, and a committed file under scratch/ other than its README each fail, while a Machine commit under record/ and an Architect commit pairing law/policy with its .devai/config copy pass.
+  - IA-009 -- harness_coherence reads a job as repository-write only when a reviewed step carries that effect and its other steps are read-only, accepts it only with cancel-in-progress true and a group keyed by github.workflow and github.ref, and reports a serializing, unkeyed, or shared-group lock, while a publication job still requires the noncancellable devai-pages-publication lock.
 ---
 
 # Admit the update branch with the rebase method only
@@ -187,6 +191,40 @@ Two rules close the table:
 TASK-0728 carries this table in the checker. A change to the table is a
 change to this record.
 
+### The repository-write harness effect class
+
+The harness effect analysis of `harness_coherence` (ADR-REL-0034) classifies
+every workflow job as `read-only`, `publication`, or `unknown`. The update
+workflow fits none of them, so this record adds a fourth class, by the
+coordinator's ruling of 2026-10-08:
+
+- **Definition.** A `repository-write` job writes repository refs or
+  branches through the GitHub API, under a scoped GitHub App installation
+  token, and does nothing else that is effectful. It never creates or moves
+  a tag, release, package, Pages deployment, or protected branch. So it is
+  not a release publication, and it never takes the `devai-pages-publication`
+  lock.
+- **How a job gets it.** A step reaches the class only through a reviewed
+  entry in `packages/sensors/src/harness/reviewed-workflow-steps.ts` whose
+  effect is `repository-write`. A job is `repository-write` when at least
+  one of its steps is, and every other step is `read-only`. An unreviewed or
+  edited step still reads `unknown`.
+- **Credentials.** The job's `GITHUB_TOKEN` stays `contents: read`, and
+  the only write credential it holds is the App installation token. The App
+  identifiers are declared in `law/policy/credential-requirements.json` with
+  the job as their consumer.
+- **Concurrency.** The concurrency is superseding: `cancel-in-progress: true`,
+  with a group keyed by `github.workflow` and `github.ref`. It may be set at
+  the job or at the workflow level. A newer push to main makes an update in
+  progress stale, and the next run re-evaluates every pull request. The
+  expected-head-sha guard of each update-branch call keeps a cancelled run
+  from racing the next one.
+
+  The coherence rule that serializes effectful jobs does not apply to this
+  class. A `repository-write` lock that serializes, that is not keyed by
+  workflow and ref, or that shares its group with a job of another class is
+  a finding.
+
 ## Alternatives Considered
 
 The merge update method stays rejected for the reason ADR-CHK-0004 gives.
@@ -217,3 +255,4 @@ button for every open pull request on every merge.
 - IA-006 -- With TASK-0728 merged, the commit-range check fails a pull-request commit whose committer is neither its author role nor the recorded update-branch App, or whose author role lacks Article 6 authority over a path it touches; a rebase update by the App never fails it.
 - IA-007 -- With TASK-0728 merged, the commit-range check fails any pull-request range that contains a commit with more than one parent, so a merge update pressed in the GitHub interface reddens the gate; the grammar exemption for merge commits is unchanged.
 - IA-008 -- The commit-range check admits each path only for the authors its table row names, so an Architect commit under packages/, an Engineer commit under law/ or docs/, a commit mixing two roles, and a committed file under scratch/ other than its README each fail, while a Machine commit under record/ and an Architect commit pairing law/policy with its .devai/config copy pass.
+- IA-009 -- harness_coherence reads a job as repository-write only when a reviewed step carries that effect and its other steps are read-only, accepts it only with cancel-in-progress true and a group keyed by github.workflow and github.ref, and reports a serializing, unkeyed, or shared-group lock, while a publication job still requires the noncancellable devai-pages-publication lock.
