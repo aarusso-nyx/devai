@@ -92,6 +92,33 @@ required check `devai-release-gate`, and the same three jobs run under `merge_gr
 `scripts/check-workflows.mjs` pins the jobs, both partition commands, the aggregator's
 needs, its `always()` condition, and the check name.
 
+## Pre-push preflight
+
+Most failed gate runs are real defects that a local run would have caught: test, lint,
+type, format, and commit-grammar failures. The pre-push preflight runs the same checks
+before a push leaves the machine (CMP-0007 decision D3).
+
+- **What it runs.** `.githooks/pre-push` runs `scripts/pre-push-preflight.mjs`, which:
+  1. fetches the base branch;
+  2. runs `scripts/check-commit-range.mjs` over the commits being pushed, from the fetched
+     base to the pushed head;
+  3. runs `check --affected --run` against the fetched base.
+
+  It refuses the push on a failure and names the failing commit or node. A `BLOCKED`
+  probe names the environment fix, as in the local preflight.
+
+- **Agents: mandatory.** Every agent session installs it in its worktree with
+  `pnpm run hooks:install -- --pre-push`, keeps it installed, and never bypasses it with
+  `--no-verify` (AGENTS.md).
+- **Humans: opt-in.** `pnpm run hooks:install` installs the hook alongside `commit-msg`
+  and `pre-commit` but leaves it inactive. `pnpm run hooks:install -- --pre-push`
+  activates it for the current worktree by setting the worktree-scoped git config
+  `devai.prePushPreflight` to `true`. Without that value the hook exits at once and the
+  push proceeds.
+- **Never a gate.** The hook is a convenience that catches defects earlier. It never
+  replaces, skips, or satisfies the CI gate: `devai-release-gate` runs on every head
+  whether or not the hook ran, and a green hook proves nothing to the gate.
+
 ## Two validation boundaries
 
 Integration is validated twice, at two boundaries that answer different questions
