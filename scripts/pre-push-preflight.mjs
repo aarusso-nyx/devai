@@ -54,6 +54,17 @@ function main(argv, readStdin) {
     .filter(([, localSha]) => !ZERO.test(localSha ?? ''));
   if (pushed.length === 0) return 0;
 
+  // The affected check runs on the working tree, so it can vouch only for the checked-out
+  // commit: a push of any other commit is refused before anything else runs.
+  const head = git(['rev-parse', 'HEAD']).stdout.trim();
+  const elsewhere = pushed.find(([, localSha]) => localSha !== head);
+  if (elsewhere !== undefined) {
+    say(
+      `pre-push preflight checks the working tree; check out ${elsewhere[0]} (or push HEAD) and retry`,
+    );
+    return 1;
+  }
+
   const fetched = git(['fetch', '--quiet', remote, BASE_BRANCH]);
   if (fetched.status !== 0) {
     relay(fetched);
