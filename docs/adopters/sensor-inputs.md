@@ -106,7 +106,9 @@ measure (#154). Each sensor therefore declares its population: `workflow` and `e
 required and name the runs; `headBranch`, `baseBranch`, `attempts`, `includeCancelled`, and
 `lookbackDays` narrow them; `minimumSample` is required and says how many runs make a verdict;
 `excludedJobs` leaves out workflow-and-job pairs by identity. The declaration is part of the
-reading's `metrics`, so a scorecard reader sees what was sampled.
+reading's `metrics`, so a scorecard reader sees what was sampled. Every run list is read with
+the literal `--limit 1000`; a list that comes back full may have been cut before the lookback
+window ends, so the sensor reads `UNKNOWN` as truncated (#364).
 
 For `harness_green_main`, `outcomeUnit` decides what one outcome is
 ([ADR-SCR-0014](../../law/adr/ADR-SCR-0014-green-main-counts-final-heads.md)):
@@ -117,7 +119,9 @@ For `harness_green_main`, `outcomeUnit` decides what one outcome is
   or open, if it has a sampled run in the window. The outcome is the latest completed,
   non-cancelled, non-skipped run on its final head: the head at merge, or the current head.
   The final head is matched by head branch and sha between `gh pr list --state all` and the
-  window's runs. An open pull request without such a run is left out, and `minimumSample`
+  window's runs, and a run counts for a pull request only if it was created while that pull
+  request was open; a pull request whose base branch is not the declared one is never sampled.
+  An open pull request without such a run is left out, and `minimumSample`
   counts pull requests.
 
 The second unit measures the gate's outcome per candidate rather than how often authors push
@@ -236,10 +240,10 @@ Harness sensors reach GitHub only through the GitHub CLI shapes
 [`law/policy/subprocess-effects.json`](../../law/policy/subprocess-effects.json) declares and
 the authority broker admits without a host adapter. Beyond `gh auth`, `gh auth status`, and
 the four `gh run list` shapes of the [harness sensor population](#the-harness-sensor-population)
-(`gh run list --workflow <file> --event <event> [--branch <ref>] --json <fields> --limit <n>
+(`gh run list --workflow <file> --event <event> [--branch <ref>] --json <fields> --limit 1000
 [--created >=<date>]`, one template per combination of the optional pairs) and the
 `gh-pr-list-all` shape that `outcomeUnit` `pull-request-final-head` needs (`gh pr list
---state all --limit 1000 --json closedAt,headRefName,headRefOid,mergedAt,number,state`,
+--state all --limit 1000 --json baseRefName,closedAt,createdAt,headRefName,headRefOid,mergedAt,number,state`,
 every token literal), the `site_drift` sensor reads the Pages
 publication journal through two exact read-only `gh api` GET shapes
 ([ADR-AUT-0002](../../law/adr/ADR-AUT-0002-sensing-process-admission.md)):
