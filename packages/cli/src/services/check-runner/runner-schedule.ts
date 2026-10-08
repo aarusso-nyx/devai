@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { availableParallelism } from 'node:os';
 import { join } from 'node:path';
+import { getValidator } from '@devai-nyx/schemas';
 import type { PlannedTask, TaskDescriptorNode, TaskExclusivity, TaskTarget } from './types.js';
 
 /** The ceiling on concurrent task processes, whatever the host or override asks for. */
@@ -9,14 +10,14 @@ export const MAX_CHECK_WORKERS = 16;
 const DEFAULT_WORKER_CEILING = 4;
 export const CHECK_WORKERS_ENV = 'DEVAI_CHECK_TASK_WORKERS';
 /**
- * The runner-only exclusivity declarations, kept out of `test-tasks.json` (whose task
- * keys the bundled release verifier checks exactly). Provisional name: ADR-CHK-0007's
- * Architect task fixes the final path and schema.
+ * The runner-only exclusivity declarations (ADR-CHK-0007 rule 5), kept out of
+ * `test-tasks.json`, whose task keys the bundled release verifier checks exactly.
  */
 export const TASK_EXCLUSIVITY_PATH = 'test-task-exclusivity.json';
 /** Nodes that both allowlist this variable share one database. */
 const DATABASE_ENV = 'DEVAI_DB_URL';
 const EXCLUSIVITY_KEY = /^[a-z0-9][a-z0-9._-]*$/u;
+const EXCLUSIVITY_SCHEMA = 'test-task-exclusivity.schema.json';
 const SEQUENTIAL_ONLY =
   'CHECK_RUNNER_WORKERS: release and protected runs execute one task at a time';
 
@@ -31,9 +32,15 @@ function workersRefusal(): Error {
   );
 }
 
-/** Release runs (`rc`, `release`) and protected runs always execute one node at a time. */
+/** The only selections that admit more than one worker (ADR-CHK-0007 rule 3). */
+const PARALLEL_TARGETS: ReadonlySet<TaskTarget> = new Set(['affected', 'preflight', 'local']);
+
+/**
+ * Release runs (`rc`, `release`), protected runs, and any selection outside `affected`,
+ * `preflight`, and `local` always execute one node at a time.
+ */
 export function sequentialOnlyTarget(target: TaskTarget, protectedRun = false): boolean {
-  return target === 'rc' || target === 'release' || protectedRun;
+  return protectedRun || !PARALLEL_TARGETS.has(target);
 }
 
 /**
@@ -58,8 +65,9 @@ export function resolveCheckWorkers(
     if (flag !== undefined && parse(flag) !== 1) throw new Error(SEQUENTIAL_ONLY);
     return 1;
   }
+  // Only an unset variable falls through to the default; a set but empty one is refused.
   const raw = flag ?? environment[CHECK_WORKERS_ENV];
-  return raw === undefined || raw === '' ? defaultCheckWorkers(cpus) : parse(raw);
+  return raw === undefined ? defaultCheckWorkers(cpus) : parse(raw);
 }
 
 /** Validates a worker count handed to the runner directly. */
@@ -91,6 +99,16 @@ export function parseTaskExclusivity(
   const fail = (detail: string): never => {
     throw new Error(`CHECK_RUNNER_EXCLUSIVITY: ${detail}`);
   };
+  const validate = getValidator(EXCLUSIVITY_SCHEMA);
+  if (!validate(value)) {
+    const first = validate.errors?.[0];
+    fail(
+      `${TASK_EXCLUSIVITY_PATH} fails ${EXCLUSIVITY_SCHEMA}${
+        first === undefined ? '' : `: ${first.instancePath || '/'} ${String(first.message)}`
+      }`,
+    );
+  }
+  // The schema decides the shape; the checks below keep the runner closed on its own too.
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
     return fail('the document must be an object');
   }
