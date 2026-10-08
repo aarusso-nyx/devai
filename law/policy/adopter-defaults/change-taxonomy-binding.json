@@ -31,6 +31,7 @@
     { "selector": { "kind": "prefix", "pattern": ".githooks/" }, "class": "ci" },
     { "selector": { "kind": "prefix", "pattern": "scripts/" }, "class": "ci" },
     { "selector": { "kind": "exact", "pattern": "test-tasks.json" }, "class": "ci" },
+    { "selector": { "kind": "exact", "pattern": "test-task-exclusivity.json" }, "class": "ci" },
     { "selector": { "kind": "exact", "pattern": "package.json" }, "class": "toolchain" },
     { "selector": { "kind": "exact", "pattern": "package-lock.json" }, "class": "toolchain" },
     { "selector": { "kind": "exact", "pattern": "pnpm-lock.yaml" }, "class": "toolchain" },
