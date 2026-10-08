@@ -302,7 +302,8 @@ const GH_RUN_LIST_WORKFLOW = /^[A-Za-z0-9_.-]+\.ya?ml$/u;
 const GH_RUN_LIST_EVENT = /^(?:push|pull_request|merge_group|workflow_dispatch|schedule)$/u;
 const GH_RUN_LIST_BRANCH = /^(?!-)(?!.*\.\.)[A-Za-z0-9._/-]{1,255}$/u;
 const GH_RUN_LIST_JSON_FIELDS = /^[A-Za-z]+(?:,[A-Za-z]+){0,15}$/u;
-const GH_RUN_LIST_LIMIT = /^[1-9][0-9]{0,3}$/u;
+/** The one run-list limit the templates admit (#364): the literal 1000, no other value. */
+const GH_RUN_LIST_LIMIT = '1000';
 const GH_RUN_LIST_CREATED =
   /^>=[0-9]{4}-[0-9]{2}-[0-9]{2}(?:T[0-9:.]+(?:Z|[+-][0-9]{2}:?[0-9]{2})?)?$/u;
 
@@ -331,7 +332,7 @@ function pagesJournalGhApi(argv: readonly string[]): boolean {
  * The declared read-only GitHub CLI shapes (ADR-SCR-0005 IA-004, ADR-SCR-0010): `gh auth`
  * (usage), `gh auth status`, and the argv the harness sensors emit:
  * `gh run list --workflow <file> --event <event> [--branch <ref>] --json <fields>
- * --limit <n> [--created >=<date>]`. Declared by templates gh-auth-status, gh-run-list,
+ * --limit 1000 [--created >=<date>]`, the limit always the literal 1000. Declared by templates gh-auth-status, gh-run-list,
  * gh-run-list-created, gh-run-list-branch, and gh-run-list-branch-created in
  * law/policy/subprocess-effects.json, plus the two Pages journal GET shapes of
  * templates gh-api-pages-deployments and gh-api-pages-deployment-statuses
@@ -355,7 +356,7 @@ function readOnlyGhProcess(args: readonly unknown[]): boolean {
  * The one read-only pull request listing the harness green-main sensor emits for its
  * final-head population (ADR-SCR-0014), declared in law/policy/subprocess-effects.json:
  * exactly `gh pr list --state all --limit 1000 --json
- * closedAt,headRefName,headRefOid,mergedAt,number,state`.
+ * baseRefName,closedAt,createdAt,headRefName,headRefOid,mergedAt,number,state`.
  */
 const GH_PR_LIST_ARGV = [
   'pr',
@@ -365,7 +366,7 @@ const GH_PR_LIST_ARGV = [
   '--limit',
   '1000',
   '--json',
-  'closedAt,headRefName,headRefOid,mergedAt,number,state',
+  'baseRefName,closedAt,createdAt,headRefName,headRefOid,mergedAt,number,state',
 ] as const;
 
 function prListGhProcess(argv: readonly string[]): boolean {
@@ -386,7 +387,7 @@ function runListGhProcess(argv: readonly string[]): boolean {
     at += 2;
   }
   if (argv[at] !== '--json' || !GH_RUN_LIST_JSON_FIELDS.test(argv[at + 1] ?? '')) return false;
-  if (argv[at + 2] !== '--limit' || !GH_RUN_LIST_LIMIT.test(argv[at + 3] ?? '')) return false;
+  if (argv[at + 2] !== '--limit' || argv[at + 3] !== GH_RUN_LIST_LIMIT) return false;
   at += 4;
   if (at === argv.length) return true;
   return (
