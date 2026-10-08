@@ -246,7 +246,20 @@ const PREFLIGHT_AGGREGATOR_COMMANDS = [
   '--include-result "${{ needs.gate-cli.result }}"',
   '--exclude-result "${{ needs.gate-rest.result }}"',
 ];
+// The aggregator step's whole script, line by line. Matched exactly after continuation
+// lines are joined and each line is trimmed, so no `||`, `;`, `&`, `set +e`, or added
+// command can soften the aggregator's exit status.
+const PREFLIGHT_AGGREGATOR_SCRIPT = ['set -euo pipefail', PREFLIGHT_AGGREGATOR_COMMANDS.join(' ')];
 const PREFLIGHT_REPORT_PATTERN = 'devai-gate-report-*';
+
+/** A run block as logical lines: continuations joined, lines trimmed, blank lines dropped. */
+function logicalScriptLines(run) {
+  return String(run)
+    .replace(/\\\r?\n/gu, ' ')
+    .split(/\r?\n/u)
+    .map((line) => line.trim().replace(/\s+/gu, ' '))
+    .filter((line) => line !== '');
+}
 function preflightLaneCommands(jobName) {
   const job = PREFLIGHT_PARTITION_JOBS[jobName];
   return {
@@ -1202,17 +1215,34 @@ function checkPreflightWorkflow(file, workflow, source, findings, pins) {
     gateRuns[0]?.id !== PREFLIGHT_AGGREGATOR_STEP_ID ||
     gateRuns[0]?.if !== undefined ||
     gateRuns[0]?.['continue-on-error'] !== undefined ||
-    PREFLIGHT_AGGREGATOR_COMMANDS.some((text) => !gateRuns[0]?.run?.includes(text)) ||
-    // No check node runs here: no package script, no DEVAI CLI, no check invocation.
-    /\bpnpm\b|\bnpx\b|bin\.js|\bcheck\s+--/u.test(String(gateRuns[0]?.run ?? ''))
+    gateRuns[0]?.shell !== 'bash' ||
+    // The exact canonical script: it runs no check node and nothing can soften its exit.
+    JSON.stringify(logicalScriptLines(gateRuns[0]?.run ?? '')) !==
+      JSON.stringify(PREFLIGHT_AGGREGATOR_SCRIPT)
   )
     findings.push(
       finding(
         'CI_PREFLIGHT_GATE_INVALID',
         file,
-        `jobs.${PREFLIGHT_AGGREGATOR_JOB} must run only ${PREFLIGHT_AGGREGATOR_COMMANDS.join(' ')}`,
+        `jobs.${PREFLIGHT_AGGREGATOR_JOB}.steps.${PREFLIGHT_AGGREGATOR_STEP_ID} must be a bash step whose script is exactly: ${PREFLIGHT_AGGREGATOR_SCRIPT.join('; then ')}`,
       ),
     );
+  // A gate job or step that may fail without failing the gate is refused outright.
+  for (const jobName of [...Object.keys(PREFLIGHT_PARTITION_JOBS), PREFLIGHT_AGGREGATOR_JOB]) {
+    const job = object(jobs[jobName]);
+    const steps = (Array.isArray(job.steps) ? job.steps : []).map(object);
+    if (
+      job['continue-on-error'] !== undefined ||
+      steps.some((step) => step['continue-on-error'] !== undefined)
+    )
+      findings.push(
+        finding(
+          'CI_PREFLIGHT_GATE_INVALID',
+          file,
+          `jobs.${jobName} and its steps must not declare continue-on-error`,
+        ),
+      );
+  }
   const downloads = gateSteps.filter(
     (step) => typeof step.uses === 'string' && step.uses.startsWith('actions/download-artifact@'),
   );
