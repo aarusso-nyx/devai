@@ -446,7 +446,7 @@
               },
               "deliverables": [
                 "check --run accepts --partition-include and --partition-exclude under ADR-CHK-0007 rule 11, with ownership, separability, one entry per planned node marked owned, prerequisite, or partitioned-out (outcome SKIPPED, never started), a verdict over owned entries only, no receipt, and CHECK_RUNNER_PARTITION refusals.",
-                ".github/workflows/pull-request-checks.yml runs gate-cli and gate-rest and an aggregator job named devai-release-gate that needs both under always(); scripts/aggregate-gate-partitions.mjs verifies the two reports as rule 11 states; scripts/check-workflows.mjs pins the shape; the alignment sensor reads the steps across the partition jobs."
+                ".github/workflows/pull-request-checks.yml runs gate-cli and gate-rest and an aggregator job named devai-release-gate that needs both under always(); scripts/aggregate-gate-partitions.mjs verifies the two reports as rule 11 states; scripts/check-workflows.mjs pins the shape; the alignment sensor reads the steps across the partition jobs; if CTG-0715 has already added check-result cache steps to the gate job, each partition job keeps them."
               ],
               "acceptance_commands": [
                 ["pnpm", "run", "typecheck"],
@@ -522,7 +522,7 @@
           "title": "Check-result cache persistence tests",
           "type": "single-role",
           "records": ["ADR-CHK-0001"],
-          "depends_on": ["CTG-0713"],
+          "depends_on": ["CTG-0712"],
           "lock_scopes": ["packages/cli/tests/unit/"],
           "gates": ["test:cli"],
           "tasks": [
@@ -561,7 +561,7 @@
           "title": "Persist the check-result cache across CI runs",
           "type": "single-role",
           "records": ["ADR-CHK-0001"],
-          "depends_on": ["CTG-0713", "CTG-0714"],
+          "depends_on": ["CTG-0714"],
           "lock_scopes": [
             ".github/workflows/pull-request-checks.yml",
             "scripts/check-workflows.mjs",
@@ -586,7 +586,7 @@
                 "forbidden": ["law/", "docs/", "tests/", "packages/cli/tests/", "test-tasks.json"]
               },
               "deliverables": [
-                "Each partition job restores and saves the check-result cache keyed by task input digest, so a push that follows a fix reuses every unchanged PASS through the normal inspection; BLOCKED is never restored as reusable and protected-namespace recapture is kept; scripts/check-workflows.mjs pins the cache steps."
+                "Every gate job restores and saves the check-result cache keyed by task input digest: the single gate job while the gate is unpartitioned, and each partition job if CTG-0713 splits the gate, whichever lands first, so a push that follows a fix reuses every unchanged PASS through the normal inspection; BLOCKED is never restored as reusable and protected-namespace recapture is kept; scripts/check-workflows.mjs pins the cache steps."
               ],
               "acceptance_commands": [
                 ["pnpm", "run", "typecheck"],
