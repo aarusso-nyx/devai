@@ -14,7 +14,11 @@ import {
 } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { createHash } from 'node:crypto';
-import { REVIEWED_WORKFLOW_STEPS, type ReviewedWorkflowStep } from './reviewed-workflow-steps.js';
+import {
+  REVIEWED_WORKFLOW_STEPS,
+  type HarnessEffect,
+  type ReviewedWorkflowStep,
+} from './reviewed-workflow-steps.js';
 
 /**
  * Shared workflow YAML parser for Phase 28 harness sensors. Walks
@@ -64,7 +68,7 @@ export interface WorkflowJob {
   readonly matrixDimensions: number;
   /** Total matrix combinations: product of all listed dimensions. */
   readonly matrixCombinations: number;
-  readonly effect?: 'read-only' | 'publication' | 'unknown';
+  readonly effect?: HarnessEffect | 'unknown';
   readonly concurrency?: { readonly group: string; readonly cancelInProgress: boolean | null };
   readonly condition?: string;
   readonly needs?: readonly string[];
@@ -875,7 +879,7 @@ export function loadWorkflows(repoRoot: string, dir?: string): WorkflowAst[] {
  */
 type ActionInputClass = 'inert' | 'reducing' | 'credential' | 'selector' | 'executable';
 interface RegisteredAction {
-  readonly effect: 'read-only' | 'publication';
+  readonly effect: HarnessEffect;
   /** Restores or downloads bytes into the workspace (WHOLE19-REV-012). */
   readonly bytesSelector: boolean;
   readonly inputs: Readonly<Record<string, ActionInputClass>>;
@@ -1520,18 +1524,19 @@ export function jobEffectFacts(
   WorkflowJob,
   'effect' | 'concurrency' | 'condition' | 'needs' | 'environment' | 'permissions' | 'runScripts'
 > {
-  let effect: 'read-only' | 'publication' | 'unknown' = 'read-only';
-  const mark = (next: typeof effect) => {
-    if (next === 'unknown' || effect === 'unknown') effect = 'unknown';
-    else if (next === 'publication') effect = 'publication';
+  type Effect = HarnessEffect | 'unknown';
+  // The strongest effect wins: unknown, then publication, then repository-write, then read-only.
+  const rank: Readonly<Record<Effect, number>> = {
+    'read-only': 0,
+    'repository-write': 1,
+    publication: 2,
+    unknown: 3,
   };
-  type Effect = 'read-only' | 'publication' | 'unknown';
-  const combine = (a: Effect, b: Effect): Effect =>
-    a === 'unknown' || b === 'unknown'
-      ? 'unknown'
-      : a === 'publication' || b === 'publication'
-        ? 'publication'
-        : 'read-only';
+  const combine = (a: Effect, b: Effect): Effect => (rank[a] >= rank[b] ? a : b);
+  let effect: Effect = 'read-only';
+  const mark = (next: Effect) => {
+    effect = combine(effect, next);
+  };
   // Registered application data only; unproved loader/runtime/output/config selectors refuse.
   // #325: the job- and workflow-level data names the four DEVAI workflows declare. Each
   // carries a commit, a tag, a ref, a package name or a count; none selects code, a loader,

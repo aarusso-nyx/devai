@@ -188,6 +188,15 @@ export function supersedingGroupScoped(group: string, events?: readonly string[]
   );
 }
 
+/**
+ * A repository-write lock (ADR-CHK-0008) is keyed by the workflow and the ref, so a newer run of
+ * the same workflow on the same ref supersedes the older one and no other workflow shares it.
+ */
+function keyedByWorkflowAndRef(group: string): boolean {
+  const contexts = concurrencyGroupContexts(group);
+  return contexts?.includes('github.workflow') === true && contexts.includes('github.ref');
+}
+
 function requiresSerialization(relativeFile: string, file: string): boolean {
   if (/release/iu.test(relativeFile)) return true;
   try {
@@ -293,13 +302,21 @@ export function senseHarnessCoherence(opts: HarnessCoherenceOptions): SensorRead
       ...job,
       ...jobEffectFacts(readFileSync(workflow.file, 'utf8'), opts.repoRoot, job.name),
     }));
-    const effectful = jobs.some((job) => job.effect !== 'read-only');
+    // Only a publication (or an unproved effect) must serialize. A repository-write job, such as
+    // the update-branch rebase, is superseded by a newer run like a read-only one: its every
+    // update is guarded by the expected head sha (ADR-CHK-0008).
+    const effectful = jobs.some(
+      (job) => job.effect !== 'read-only' && job.effect !== 'repository-write',
+    );
+    const repositoryWrite = jobs.some((job) => job.effect === 'repository-write');
     const jobLocks =
       jobs.length > 0 &&
       jobs.every((job) => {
         const lock = job.concurrency;
         if (job.effect === 'unknown' || !lock || !lock.group || lock.cancelInProgress === null)
           return false;
+        if (job.effect === 'repository-write')
+          return lock.cancelInProgress === true && keyedByWorkflowAndRef(lock.group);
         if (job.effect === 'publication')
           return (
             lock.cancelInProgress === false &&
@@ -339,7 +356,10 @@ export function senseHarnessCoherence(opts: HarnessCoherenceOptions): SensorRead
           declaration.cancelInProgress === !(serialize || effectful) &&
           (declaration.cancelInProgress !== true ||
             supersedingGroupScoped(declaration.group, events)) &&
-          (!effectful || declaration.cancelInProgress === false));
+          (!effectful || declaration.cancelInProgress === false) &&
+          // A repository-write job supersedes under a lock keyed by workflow and ref.
+          (!repositoryWrite ||
+            (declaration.cancelInProgress === true && keyedByWorkflowAndRef(declaration.group))));
     if (valid) continue;
     concurrencySemanticIssues += 1;
     findings.push({

@@ -6,15 +6,23 @@
  * assigned it. Any edit to the step changes its digest, so an edited step is analysed again
  * and reads unknown until it is reviewed anew; ADR-REL-0034 keeps unknown effects findings.
  *
- * `publication` marks a step that writes an external release surface; every other entry
- * writes only the workspace, runner files or step outputs. The registry test
+ * `publication` marks a step that writes an external release surface; `repository-write` marks a
+ * step that changes this repository's own branches through the API; every other entry writes only
+ * the workspace, runner files or step outputs. The registry test
  * (packages/sensors/tests/unit/reviewed-workflow-steps.test.ts) fails on an entry whose
  * occurrences differ from the current workflows and names every job left unproved; the
  * digests of a job's steps come from `workflowStepInventory` in workflow-parser.ts.
  */
+/**
+ * A proved step or job effect (ADR-CHK-0008): read-only writes only the workspace, runner files
+ * or step outputs; repository-write changes this repository's own branches through the API (the
+ * update-branch rebase), with no release surface; publication writes an external release surface.
+ */
+export type HarnessEffect = 'read-only' | 'repository-write' | 'publication';
+
 export interface ReviewedWorkflowStep {
   readonly sha256: string;
-  readonly effect: 'read-only' | 'publication';
+  readonly effect: HarnessEffect;
   /** Every occurrence, as `<workflow file>#<job>[<step index>]`. */
   readonly workflow: string;
   readonly step: string;
@@ -995,5 +1003,32 @@ export const REVIEWED_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = Object.f
         sha256: 'ffc5f0f64d50c410deb5011c2b532e28305887c60e532e26be4019d4b2a8bec7',
       },
     ],
+  },
+  {
+    sha256: '1e00be750d7d9f4d8b478d0f80c1d29f0fa9ebdbdaa3391ab414bb814d03634f',
+    effect: 'read-only',
+    workflow: 'update-pull-request-branches.yml#update-branches[0]',
+    step: 'Probe the update-branch App credentials',
+    review:
+      'Reads presence flags for the two update-branch App secrets, never their values, and sets a present output; on absence it writes a notice and a step-summary line so the run skips the update (absence: degrade). It changes nothing outside step outputs and the summary.',
+    files: [],
+  },
+  {
+    sha256: '61d6607ba9aaac3fd8a8fb06801836775c17735eeeb98ced3e89579172c443b7',
+    effect: 'read-only',
+    workflow: 'update-pull-request-branches.yml#update-branches[1]',
+    step: 'Mint the update-branch App token',
+    review:
+      'Runs only when both credentials are present; mints a short-lived installation token for the update-branch GitHub App, scoped to this repository with contents and pull-requests write. It changes nothing itself and only sets a step output.',
+    files: [],
+  },
+  {
+    sha256: '538636cc83ae16d89ba2444bd1aa808a236a241debbe1c4ff94c7e1719901715',
+    effect: 'repository-write',
+    workflow: 'update-pull-request-branches.yml#update-branches[2]',
+    step: 'Rebase each open pull request behind main',
+    review:
+      "Runs only when both credentials are present; rebases each open, non-draft, same-repository pull request behind main through PUT pulls/{n}/update-branch with update_method rebase and the expected head sha, authenticated by the App token. It changes only this repository's pull-request branches, never a fork and never a release surface, and reports a refused update without failing the others.",
+    files: [],
   },
 ]);
