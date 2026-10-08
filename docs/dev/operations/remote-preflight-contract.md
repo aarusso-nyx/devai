@@ -107,9 +107,11 @@ before a push leaves the machine (CMP-0007 decision D3).
   It refuses the push on a failure and names the failing commit or node. A `BLOCKED`
   probe names the environment fix, as in the local preflight.
 
-- **Agents: mandatory.** Every agent session installs it in its worktree with
-  `pnpm run hooks:install -- --pre-push`, keeps it installed, and never bypasses it with
-  `--no-verify` (AGENTS.md).
+- **Agents: mandatory once it ships.** The hook and the `--pre-push` install flag arrive
+  with CMP-0007 TASK-0723. From that merge on, every agent session installs it in its
+  worktree with `pnpm run hooks:install -- --pre-push`, keeps it installed, and never
+  bypasses it with `--no-verify` (AGENTS.md). Until then, agents run the local preflight
+  before pushing.
 - **Humans: opt-in.** `pnpm run hooks:install` installs the hook alongside `commit-msg`
   and `pre-commit` but leaves it inactive. `pnpm run hooks:install -- --pre-push`
   activates it for the current worktree by setting the worktree-scoped git config
@@ -196,7 +198,9 @@ on the `base-up-to-date` probe. ADR-CHK-0008 keeps pull requests current instead
 
 - **Rebase only.** `allow_update_branch` is admitted with the rebase update method alone.
   A merge update would put a merge commit on the branch and is refused, as ADR-CHK-0004
-  refuses it.
+  refuses it. The setting still shows GitHub's merge-update button, so the gate enforces the
+  refusal: `scripts/check-commit-range.mjs` fails a pull-request range that contains any
+  commit with more than one parent (TASK-0728, tested by TASK-0729).
 - **The workflow is the mechanism.** `.github/workflows/update-pull-request-branches.yml`
   (CMP-0007 TASK-0726) runs on every push to `main`. For each open, non-draft pull
   request against `main` that is behind it, the workflow calls
@@ -217,9 +221,12 @@ on the `base-up-to-date` probe. ADR-CHK-0008 keeps pull requests current instead
   committer becomes the update App while authorship is unchanged. The author carries the
   role. The committer must be the same role, the human merger of a rebase merge, or the
   update App of a rebase update; any other committer inside a role-scoped pull request is
-  a provenance defect. Nobody replays commits after an update (ADR-CHK-0008).
+  a provenance defect. Nobody replays commits after an update (ADR-CHK-0008). TASK-0728
+  enforces the author-path and committer checks in the commit-range check; until it and
+  TASK-0729 merge, review applies the rule by hand.
 
-**Owner effect OE-02 (CMP-0007).** No task performs it. The Owner:
+**Owner effect OE-02 (CMP-0007).** No task performs it, and it is not performed before
+TASK-0728 merges, so a merge update can never pass the gate. The Owner:
 
 1. Enables the update branch on the repository: Settings, General, Pull Requests,
    "Always suggest updating pull request branches", which is
@@ -229,6 +236,7 @@ on the `base-up-to-date` probe. ADR-CHK-0008 keeps pull requests current instead
    Contents read and write and Pull requests read and write, and nothing else.
 3. Stores the App's id and private key as the repository secrets TASK-0726's workflow
    names, readable only by that workflow.
+4. Records the App's committer identity, which TASK-0728's committer check admits.
 
 Branch protection, the required check, and the merge method are not changed by OE-02.
 
