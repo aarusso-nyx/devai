@@ -56,6 +56,11 @@ process.exit(scripted.exit);
 `;
 
 const roots: string[] = [];
+/**
+ * The global git config every command of the current fixture sees, so a developer's own
+ * ~/.gitconfig never reaches the hook; a case may write an opt-in into it.
+ */
+let globalConfig = '';
 afterEach(() => {
   while (roots.length > 0) rmSync(roots.pop() ?? '', { recursive: true, force: true });
 });
@@ -73,6 +78,7 @@ function run(cwd: string, command: string, args: readonly string[]): Result {
     env: {
       ...process.env,
       GIT_TERMINAL_PROMPT: '0',
+      ...(globalConfig !== '' && { GIT_CONFIG_GLOBAL: globalConfig, GIT_CONFIG_NOSYSTEM: '1' }),
       GIT_AUTHOR_NAME: IDENTITY.name,
       GIT_AUTHOR_EMAIL: IDENTITY.email,
       GIT_COMMITTER_NAME: IDENTITY.name,
@@ -107,6 +113,8 @@ interface Fixture {
 function fixture(optIn = true): Fixture {
   const dir = mkdtempSync(join(tmpdir(), 'devai-pre-push-'));
   roots.push(dir);
+  globalConfig = join(dir, 'global.gitconfig');
+  writeFileSync(globalConfig, '');
   const remote = join(dir, 'origin.git');
   const work = join(dir, 'work');
   git(dir, 'init', '--quiet', '--bare', '--initial-branch=main', remote);
@@ -130,7 +138,9 @@ function fixture(optIn = true): Fixture {
 
   put(work, STUB_CLI, STUB_SOURCE);
   git(work, 'config', 'core.hooksPath', '.githooks');
-  if (optIn) git(work, 'config', 'devai.prePushPreflight', 'true');
+  // The opt-in is per worktree, as `pnpm run hooks:install -- --pre-push` writes it.
+  git(work, 'config', 'extensions.worktreeConfig', 'true');
+  if (optIn) git(work, 'config', '--worktree', 'devai.prePushPreflight', 'true');
   git(work, 'checkout', '-qb', 'feature');
   return { work, base };
 }
@@ -305,7 +315,7 @@ describe('pre-push preflight (TASK-0727)', () => {
     'treats a value other than true as not opted in',
     () => {
       const { work } = fixture(false);
-      git(work, 'config', 'devai.prePushPreflight', 'false');
+      git(work, 'config', '--worktree', 'devai.prePushPreflight', 'false');
       cleanCommit(work, 'opted-out');
       script(work, 1, { schemaVersion: '1.0.0', operation: 'run', execution: [], exitCode: 1 });
 
@@ -342,6 +352,96 @@ describe('pre-push preflight (TASK-0727)', () => {
       const retried = push(work);
       expect(retried.status, retried.output).toBe(0);
       expect(calls(work)).toHaveLength(1);
+    },
+    PUSH_TIMEOUT_MS,
+  );
+
+  it(
+    'resolves the base from the fetched main, not from a stale FETCH_HEAD',
+    () => {
+      const { work, base } = fixture();
+      // A commit origin never saw, recorded as if a stale fetch had left it in FETCH_HEAD; with
+      // fetch.writeFetchHead off, the hook's own fetch cannot overwrite it.
+      git(work, 'checkout', '-qb', 'stale', base);
+      cleanCommit(work, 'stale');
+      const stale = git(work, 'rev-parse', 'HEAD');
+      git(work, 'checkout', '-q', 'feature');
+      writeFileSync(
+        join(work, '.git', 'FETCH_HEAD'),
+        `${stale}\t\tbranch 'main' of ${join(dirname(work), 'origin.git')}\n`,
+      );
+      git(work, 'config', 'fetch.writeFetchHead', 'false');
+      cleanCommit(work, 'fresh-base');
+      script(work, 0, PASSING);
+
+      const result = push(work);
+
+      expect(result.status, result.output).toBe(0);
+      const [args = []] = calls(work);
+      expect(args[args.indexOf('--base') + 1]).toBe(base);
+      expect(args[args.indexOf('--base') + 1]).not.toBe(stale);
+    },
+    PUSH_TIMEOUT_MS,
+  );
+
+  it(
+    'never prints the credentials of a credential-bearing remote URL',
+    () => {
+      const { work } = fixture();
+      const secret = 'supersecret-token-0727';
+      const credentialUrl = `https://ci-user:${secret}@example.invalid/origin.git`;
+      // The configured URL carries credentials; insteadOf routes the transport to the local
+      // bare repository, so the push and the hook's fetch still reach origin.
+      git(work, 'config', `url.${join(dirname(work), 'origin.git')}.insteadOf`, credentialUrl);
+      git(work, 'remote', 'set-url', 'origin', credentialUrl);
+      // A refused push prints the most: a grammar failure, then a failing affected check.
+      put(work, 'tests/contract/secret.contract.test.ts', 'export {};\n');
+      git(work, 'add', '-A');
+      git(work, 'commit', '-qm', 'add a fixture without a type');
+      script(work, 0, PASSING);
+
+      const refused = push(work);
+
+      expect(refused.status, refused.output).not.toBe(0);
+      expect(refused.output).not.toContain(secret);
+      git(work, 'reset', '-q', '--hard', 'HEAD~1');
+      cleanCommit(work, 'secret-clean');
+      script(work, 1, {
+        schemaVersion: '1.0.0',
+        operation: 'run',
+        execution: [
+          {
+            nodeId: 'lint',
+            disposition: 'executed',
+            outcome: 'FAIL',
+            reason: 'process-exit-1',
+            exitCode: 1,
+          },
+        ],
+        exitCode: 1,
+      });
+      const failing = push(work);
+      expect(failing.status, failing.output).not.toBe(0);
+      expect(failing.output).not.toContain(secret);
+    },
+    PUSH_TIMEOUT_MS,
+  );
+
+  it(
+    'stays inactive under a global opt-in without the worktree opt-in',
+    () => {
+      const { work } = fixture(false);
+      writeFileSync(globalConfig, '[devai]\n\tprePushPreflight = true\n');
+      expect(git(work, 'config', '--global', '--get', 'devai.prePushPreflight')).toBe('true');
+      put(work, 'tests/contract/global.contract.test.ts', 'export {};\n');
+      git(work, 'add', '-A');
+      git(work, 'commit', '-qm', 'add a fixture without a type');
+      script(work, 1, { schemaVersion: '1.0.0', operation: 'run', execution: [], exitCode: 1 });
+
+      const result = push(work);
+
+      expect(result.status, result.output).toBe(0);
+      expect(calls(work)).toEqual([]);
     },
     PUSH_TIMEOUT_MS,
   );
