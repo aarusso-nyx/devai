@@ -2,10 +2,12 @@
 // run locally and the one run in the pull-request lane produce byte-identical
 // planned node sets for the same base and candidate.
 //
-// The lane (.github/workflows/pull-request-checks.yml) must reduce to exactly
-// three run steps: install, a bootstrap CLI `check` with the preflight target,
-// and a bootstrap CLI `check` with the affected target. The lane's two check
-// invocations are then replayed here with --task-plan against the repository's
+// The lane (.github/workflows/pull-request-checks.yml) runs in two partition
+// jobs (ADR-CHK-0007 rule 11), and each must reduce to exactly three run steps:
+// install, a bootstrap CLI `check` with the preflight target, and a bootstrap CLI
+// `check` with the affected target and its partition flag; the aggregator runs no
+// check. Each lane check invocation is then replayed here with --task-plan, without
+// its partition flag (a partition never changes the plan), against the repository's
 // own base (HEAD~1) and candidate (HEAD), and compared with the documented local
 // invocations `check --preflight|--affected --task-plan --base <base>`.
 //
@@ -29,6 +31,12 @@ const EXPRESSION = /\$\{\{([\s\S]*?)\}\}/gu;
 const BASE_REFERENCE = 'github.event.pull_request.base.sha';
 const EVENT_TEST = /^github\.event_name\s*==\s*'([a-z_]+)'$/u;
 const CHECK_INVOCATION = /(?:pr-bootstrap\/cli\/bin\.js|\bdevai)\s+check\s+([^\n;&|]*)/u;
+/** The partition jobs and the flag each passes with test:cli (ADR-CHK-0007 rule 11). */
+const PARTITION_JOBS = {
+  'gate-cli': '--partition-include',
+  'gate-rest': '--partition-exclude',
+} as const;
+const PARTITION_FLAGS = new Set<string>(Object.values(PARTITION_JOBS));
 
 type Environment = Readonly<Record<string, unknown>>;
 type WorkflowStep = Readonly<{
@@ -180,9 +188,12 @@ async function git(args: readonly string[], limit: Deadline): Promise<string> {
   return result.stdout.trim();
 }
 
-function laneRunSteps(): readonly LaneStep[] {
+function laneRunSteps(jobKey?: string): readonly LaneStep[] {
   const workflow = parse(readFileSync(WORKFLOW, 'utf8')) as Workflow;
-  const steps = Object.values(workflow.jobs ?? {}).flatMap((job) =>
+  const jobs = Object.entries(workflow.jobs ?? {})
+    .filter(([key]) => jobKey === undefined || key === jobKey)
+    .map(([, job]) => job);
+  const steps = jobs.flatMap((job) =>
     (job.steps ?? []).map((step) => ({
       step,
       env: { ...workflow.env, ...job.env, ...step.env },
@@ -260,7 +271,16 @@ function laneCheckArguments(step: LaneStep, base: string): readonly string[] {
   if (unresolved !== undefined)
     throw new Error(`unresolved lane expression ${unresolved} in: ${run}`);
   const operations = new Set(['--run', '--task-plan', '--status', '--explain']);
-  const planned = args.filter((arg) => !operations.has(arg));
+  // A partition selects which planned nodes a run owns, never the plan, and is refused with
+  // --task-plan, so the replayed plan drops it with its id list.
+  const unpartitioned = args.flatMap((arg, index) =>
+    PARTITION_FLAGS.has(arg) ||
+    PARTITION_FLAGS.has(args[index - 1] ?? '') ||
+    [...PARTITION_FLAGS].some((flag) => arg.startsWith(`${flag}=`))
+      ? []
+      : [arg],
+  );
+  const planned = unpartitioned.filter((arg) => !operations.has(arg));
   const withoutFormat = planned.flatMap((arg, index) =>
     arg === '--format' || planned[index - 1] === '--format' ? [] : [arg],
   );
@@ -344,12 +364,31 @@ describe('preflight lane parity (ADR-CHK-0001 IA-003)', () => {
     expect((JSON.parse(result.stdout) as { tasks: unknown[] }).tasks).toHaveLength(40000);
   });
 
-  it('reduces the pull-request lane to install, preflight check, affected check', () => {
-    expect(
-      laneRunSteps().map((step) => step.kind),
-      'the run steps of pull-request-checks.yml',
-    ).toEqual(['install', 'check:preflight', 'check:affected']);
+  it.each(Object.keys(PARTITION_JOBS))(
+    'reduces the %s lane to install, preflight check, affected check',
+    (job) => {
+      expect(
+        laneRunSteps(job).map((step) => step.kind),
+        `the run steps of pull-request-checks.yml#${job}`,
+      ).toEqual(['install', 'check:preflight', 'check:affected']);
+    },
+  );
+
+  it('runs only the two partition lanes and an aggregator that runs no check', () => {
+    const workflow = parse(readFileSync(WORKFLOW, 'utf8')) as Workflow;
+    const others = Object.keys(workflow.jobs ?? {}).filter((key) => !(key in PARTITION_JOBS));
+    expect(others).toHaveLength(1);
+    expect(laneRunSteps(others[0]).map((step) => step.kind)).toEqual(['other']);
   });
+
+  it.each(Object.entries(PARTITION_JOBS))(
+    'passes %s its partition flag %s test:cli on the affected check',
+    (job, flag) => {
+      const affected = laneRunSteps(job).find((step) => step.kind === 'check:affected');
+      const check = CHECK_INVOCATION.exec(affected?.run ?? '')?.[1] ?? '';
+      expect(check).toMatch(new RegExp(`(?:^|\\s)${flag}(?:\\s+|=)test:cli(?:\\s|$)`, 'u'));
+    },
+  );
 
   it('declares preflight probes in test-tasks.json or .devai/config/preflight-probes.json', () => {
     // DEVAI keeps its own probes in the adopter-owned probe file, which the
@@ -390,13 +429,15 @@ describe('preflight lane parity (ADR-CHK-0001 IA-003)', () => {
   );
 
   it.each([
-    ['check:preflight', '--preflight'],
-    ['check:affected', '--affected'],
+    ['gate-cli', 'check:preflight', '--preflight'],
+    ['gate-cli', 'check:affected', '--affected'],
+    ['gate-rest', 'check:preflight', '--preflight'],
+    ['gate-rest', 'check:affected', '--affected'],
   ] as const)(
-    'plans the lane %s invocation exactly as the local invocation',
-    async (kind, target) => {
+    'plans the %s lane %s invocation exactly as the local invocation',
+    async (job, kind, target) => {
       const limit = deadline(PLAN_CASE_DEADLINE_MS);
-      const step = laneRunSteps().find((candidate) => candidate.kind === kind);
+      const step = laneRunSteps(job).find((candidate) => candidate.kind === kind);
       expect(step, `the lane carries a ${kind} step`).toBeDefined();
       if (step === undefined) return;
       const laneArgs = laneCheckArguments(step, base);
