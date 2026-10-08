@@ -234,3 +234,78 @@ Make every other node depend on `preflight`, directly or through its dependency
 chain, so a blocked environment stops the plan before the first suite starts.
 Run `devai check --affected --base <fetched-base-commit>` locally before opening a
 pull request; the lane runs the same descriptor against the same base.
+
+## Parallel execution
+
+`devai check --run` can run independent nodes of one plan at the same time
+(ADR-CHK-0007). Whatever the worker count, the plan, its node set, its task
+keys, and its verdict stay the same; only the wall time changes.
+
+### Worker count
+
+- `--task-workers <n>` sets how many task processes may run at once, from 1 to 16.
+- Without the flag, `DEVAI_CHECK_TASK_WORKERS` sets it. A set but empty
+  variable is refused; only an unset variable falls through to the default.
+- Without either, the count is `min(4, CPUs)`: the logical CPUs, at most 4.
+- Any other value is refused with `CHECK_RUNNER_WORKERS` before a node starts.
+- `--task-workers 1` is the sequential runner, with identical output.
+
+Only `--affected`, `--preflight`, and `--local` run with more than one worker.
+These always run one node at a time:
+
+- `--rc`;
+- `--release-intent`, in both stages;
+- protected runs.
+
+They ignore `DEVAI_CHECK_TASK_WORKERS` and refuse an explicit `--task-workers`
+above 1.
+
+### Declaring shared state
+
+Declare which nodes may overlap in `test-task-exclusivity.json`, next to
+`test-tasks.json`. The file is validated against
+`test-task-exclusivity.schema.json`, which ships in `@devai-nyx/schemas`.
+
+Never put scheduling fields in `test-tasks.json`. The descriptor schema is
+closed, and the release evidence verifier rebuilds the release policy from the
+descriptor and refuses unknown task properties (ADR-CHK-0006).
+
+```json
+{
+  "schemaVersion": "1.0.0",
+  "nodes": {
+    "generate": { "exclusive": ["sources"] },
+    "build": { "exclusive": ["dist"], "shared": ["sources"] },
+    "test:unit": { "shared": ["sources", "dist"] },
+    "lint": { "shared": ["sources"] }
+  }
+}
+```
+
+- `exclusive` names state the node changes; `shared` names state it only
+  reads. Keys match `^[a-z0-9][a-z0-9._-]*$`, and every level of the file is
+  closed.
+- Two nodes conflict when one holds exclusively a key that the other holds in
+  either list. Nodes that only share a key may overlap.
+- A node with no entry conflicts with every node. Without the file, every plan
+  runs one node at a time whatever the worker count, so parallelism is opt-in
+  per node.
+- Two nodes also conflict when their declared output paths are equal or one is
+  a prefix of the other, and when both allowlist `DEVAI_DB_URL`.
+- Conflicting nodes never overlap, and the one earlier in plan order runs
+  first.
+- A file that fails its schema, or names a node the descriptor does not
+  declare, is refused with `CHECK_RUNNER_EXCLUSIVITY` before a node starts.
+
+The file is ordinary repository content. A node whose input selectors match
+it, such as a `**` selector, hashes it like any other input.
+
+### What stays the same
+
+- Dependencies still finish before their dependents start.
+- The report, its blocked list, and any receipt list nodes in plan order, not
+  completion order.
+- Each node keeps its own `--task-timeout-ms` timeout, counted from its own
+  start.
+- A failure cancels nothing. Its dependents are recorded `ABORTED`, and every
+  other node still runs.
