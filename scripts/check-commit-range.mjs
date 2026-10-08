@@ -4,8 +4,13 @@
 // `check-commit-range.mjs <base> <head>`, it walks the first-parent commits in
 // base..head after `historical_cutoff` and exits 1 naming every commit whose
 // subject breaks the grammar, whose paths span more than one class family, or
-// whose type does not allow the classes of its paths. Merge commits are exempt;
-// a revert inherits the type of the commit it reverts.
+// whose type does not allow the classes of its paths. A revert inherits the type of the
+// commit it reverts.
+//
+// It also judges provenance (ADR-CHK-0008): a commit with more than one parent is refused,
+// the author must be an exact DEVAI role identity admitted by the author-path table for every
+// path the commit changes, and the committer must be the author's role or the update-branch
+// App. Each refusal names the commit.
 //
 // The module also exports the helpers the commit hooks share. Classification
 // reads law/policy/change-taxonomy.json and the materialized binding directly,
@@ -213,6 +218,155 @@ function commitPresent(root, sha) {
   }
 }
 
+// Commit provenance (ADR-CHK-0008): every commit of a pull-request range carries an exact
+// DEVAI role author, that author is admitted by the author-path table for every path the
+// commit changes, and its committer is the same role or the update-branch App.
+const ROLES = ['Owner', 'Architect', 'Inspector', 'Engineer'];
+const MACHINE = 'Machine';
+/** The update-branch GitHub App the Owner names at OE-02: its rebase updates keep the author. */
+export const DEVAI_UPDATE_BRANCH_COMMITTER = Object.freeze({
+  name: 'devai-update-branch[bot]',
+  emailSuffix: '+devai-update-branch[bot]@users.noreply.github.com',
+});
+
+/** The DEVAI role an identity names exactly, or undefined. */
+export function identityRole(name, email) {
+  for (const role of [...ROLES, MACHINE]) {
+    if (name === `DEVAI ${role}` && email === `${role.toLowerCase()}@devai.local`) return role;
+  }
+  return undefined;
+}
+
+function updateBranchApp(name, email) {
+  return (
+    name === DEVAI_UPDATE_BRANCH_COMMITTER.name &&
+    /^[0-9]+\+/u.test(email) &&
+    email.endsWith(DEVAI_UPDATE_BRANCH_COMMITTER.emailSuffix)
+  );
+}
+
+const ROOT_PROSE = new Set([
+  'README.md',
+  'CLAUDE.md',
+  'AGENTS.md',
+  'CHANGELOG.md',
+  'LICENSE',
+  'NOTICE',
+]);
+const ROOT_WORKSPACE = new Set([
+  'package.json',
+  'pnpm-lock.yaml',
+  'pnpm-workspace.yaml',
+  'vitest.config.ts',
+  'eslint.config.mjs',
+  '.prettierrc.json',
+  '.prettierignore',
+  '.editorconfig',
+  '.npmrc',
+  '.node-version',
+  '.gitignore',
+  'test-tasks.json',
+  'test-task-exclusivity.json',
+]);
+const POLICY_COPIES = new Set([
+  'change-taxonomy.json',
+  'domains.json',
+  'forbidden-actions.json',
+  'glob-guards.json',
+  'release-verification.json',
+  'scorecard-na.json',
+  'subprocess-effects.json',
+  'thresholds.json',
+]);
+const PINNED = new Set([
+  '.devai/constitution.md',
+  '.devai/config/project.json',
+  '.devai/config/adopter-policy-binding.json',
+]);
+const ARCHITECT_BINDINGS = new Set([
+  '.devai/config/change-taxonomy-binding.json',
+  '.devai/config/credential-requirements-binding.json',
+  '.devai/config/sensor-inputs.json',
+]);
+const ENGINEER_BINDINGS = new Set([
+  '.devai/config/toolchain.json',
+  '.devai/config/preflight-probes.json',
+]);
+const PLACEHOLDERS = new Set(['.devai/state/.gitkeep', '.devai/worktrees/.gitkeep']);
+const NEVER_COMMITTED = ['scratch/', '.devai/state/', '.devai/worktrees/', '.devai/local/'];
+
+/**
+ * The authors the ADR-CHK-0008 table admits for one path, judged with the other paths of the
+ * same commit (the law-with-generated pairing); an empty set refuses the path. The most
+ * specific row decides, and a path no row names is refused.
+ */
+export function admittedAuthors(path, commitPaths) {
+  const only = (...roles) => new Set(roles);
+  if (path === 'scratch/README.md') return only('Architect');
+  if (PLACEHOLDERS.has(path)) return only('Engineer');
+  if (NEVER_COMMITTED.some((prefix) => path.startsWith(prefix))) return only();
+  if (path.startsWith('.devai/config/') && POLICY_COPIES.has(path.slice('.devai/config/'.length))) {
+    const source = `law/policy/${path.slice('.devai/config/'.length)}`;
+    return commitPaths.includes(source) ? only(MACHINE, 'Architect') : only(MACHINE);
+  }
+  if (path.startsWith('.devai/pin/') || PINNED.has(path)) {
+    return commitPaths.some((other) => other.startsWith('law/'))
+      ? only(MACHINE, 'Architect')
+      : only(MACHINE);
+  }
+  if (ARCHITECT_BINDINGS.has(path)) return only('Architect');
+  if (ENGINEER_BINDINGS.has(path)) return only('Engineer');
+  if (path.startsWith('law/glossary/')) return only('Architect', 'Owner');
+  if (path.startsWith('law/')) return only('Architect');
+  if (path.startsWith('product/')) return only('Owner');
+  if (path.startsWith('docs/')) return only('Architect');
+  if (ROOT_PROSE.has(path)) return only('Architect');
+  if (path.startsWith('tests/') || /^packages\/[^/]+\/tests\//u.test(path))
+    return only('Inspector');
+  if (path.startsWith('packages/')) return only('Engineer');
+  if (ROOT_WORKSPACE.has(path) || /^tsconfig[^/]*\.json$/u.test(path)) return only('Engineer');
+  if (path.startsWith('scripts/') || path.startsWith('.githooks/') || path.startsWith('.github/')) {
+    return only('Engineer');
+  }
+  if (path.startsWith('.claude/')) return only('Architect');
+  if (path.startsWith('record/')) return only(MACHINE, ...ROLES);
+  return only();
+}
+
+/** Provenance findings for one commit of a pull-request range; empty when it is admitted. */
+export function provenanceFindings({ parents, author, committer, paths }) {
+  const findings = [];
+  if (parents > 1) {
+    findings.push(
+      `merge commit with ${String(parents)} parents: a pull-request range admits no merge commit (ADR-CHK-0008)`,
+    );
+  }
+  const role = identityRole(author.name, author.email);
+  if (role === undefined) {
+    findings.push(
+      `author "${author.name} <${author.email}>" is not an exact DEVAI role identity (DEVAI <Role> <role@devai.local>)`,
+    );
+  } else {
+    const committerRole = identityRole(committer.name, committer.email);
+    if (committerRole !== role && !updateBranchApp(committer.name, committer.email)) {
+      findings.push(
+        `committer "${committer.name} <${committer.email}>" is neither the author's role (${role}) nor the update-branch App`,
+      );
+    }
+    for (const path of paths) {
+      const admitted = admittedAuthors(path, paths);
+      if (admitted.size === 0) {
+        findings.push(`path ${path} is not admitted for any author by the ADR-CHK-0008 table`);
+      } else if (!admitted.has(role)) {
+        findings.push(
+          `path ${path} admits ${[...admitted].join(' or ')}, not the author role ${role}`,
+        );
+      }
+    }
+  }
+  return findings;
+}
+
 function checkRange(root, base, head) {
   const grammar = loadGrammar(root);
   if (grammar === null) {
@@ -238,8 +392,28 @@ function checkRange(root, base, head) {
   const revertPrefix = grammar.exemptions?.reverts?.subject_prefix ?? 'Revert ';
   const offenders = [];
   for (const sha of shas) {
-    const parents = gitIn(root, ['rev-list', '--parents', '-n', '1', sha]).trim().split(' ');
-    if (parents.length > 2) continue;
+    const parentCount =
+      gitIn(root, ['rev-list', '--parents', '-n', '1', sha]).trim().split(' ').length - 1;
+    const [authorName = '', authorEmail = '', committerName = '', committerEmail = ''] = gitIn(
+      root,
+      ['log', '-1', '--format=%an%x00%ae%x00%cn%x00%ce', sha],
+    )
+      .replace(/\n$/u, '')
+      .split('\0');
+    const provenance = provenanceFindings({
+      parents: parentCount,
+      author: { name: authorName, email: authorEmail },
+      committer: { name: committerName, email: committerEmail },
+      paths: parentCount > 1 ? [] : commitPaths(root, sha),
+    });
+    if (parentCount > 1) {
+      offenders.push({
+        sha,
+        subject: subjectOf(gitIn(root, ['log', '-1', '--format=%B', sha])),
+        findings: provenance,
+      });
+      continue;
+    }
     const message = gitIn(root, ['log', '-1', '--format=%B', sha]);
     const subject = subjectOf(message);
     let typeSubject = subject;
@@ -263,6 +437,7 @@ function checkRange(root, base, head) {
             ]
           : []
         : judgeCommit({ grammar, classification, subject, typeSubject });
+    findings.push(...provenance);
     if (findings.length > 0) offenders.push({ sha, subject, findings });
   }
   for (const { sha, subject, findings } of offenders) {
