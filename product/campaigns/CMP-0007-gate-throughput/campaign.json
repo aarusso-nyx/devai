@@ -1354,7 +1354,7 @@
           ]
         }
       ],
-      "disposition": "Delivered: pre-push preflight (#361), bootstrap cache hardening (#357), doctor identities (#359), ADR-CHK-0008 and commit provenance (#358, #362), rebase-update workflow and the repository-write effect class (#363). OE-02 performed 2026-10-08; LIVE UPDATE-BRANCH CHECK PENDING: update workflow run <run id>, rebased pull request <#n>, superseded gate run <run id> cancelled. F5:T9 reads PASS on main e43e8db9. OE-03: v2.3.0 published."
+      "disposition": "Delivered: pre-push preflight (#361), bootstrap cache hardening (#357), doctor identities (#359), ADR-CHK-0008 and commit provenance (#358, #362), rebase-update workflow and the repository-write effect class (#363). OE-02 performed 2026-10-08; live update-branch check waived by coordinator ruling under the Owner's 2026-10-08 instruction \"Do what need to close CMP-0007 yourself\": the update-branch App credentials, which remain Owner-only, were not provided before close. Partial evidence: the update workflow fired on the push of #371 to main (run 37850122108, success) and degraded to its credentials-absent notice as designed, rebasing no pull request. The App setup and a live rebase remain an Owner follow-up outside this campaign. F5:T9 reads PASS on main e43e8db9. OE-03: v2.3.0 published."
     },
     {
       "id": "R-0703",
@@ -1366,7 +1366,7 @@
       "attestation_reissue": false,
       "owner_effects_required": [],
       "close_checks": ["adrs", "test:sensors", "campaign:check", "test:cli"],
-      "disposition": "Opened by the amended D4 of 2026-10-08. Delivered: final-head population (ADR-SCR-0014, #366). F5:T9 reads PASS, 121 of 121 final heads (SR-30aa1c53e9b96427).",
+      "disposition": "Opened by the amended D4 of 2026-10-08. Delivered: final-head population (ADR-SCR-0014, #366) and the sensor-window follow-up for #364 and #365 (#371). F5:T9 reads PASS, 121 of 121 final heads (SR-30aa1c53e9b96427).",
       "waves": [
         {
           "id": "CTG-0731",
@@ -1563,7 +1563,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "ready",
+              "status": "merged",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -1603,8 +1603,8 @@
               "prompt": {
                 "path": "prompts/TASK-0734.md"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/371",
+              "merged_as": "046c777159281d9a98db17592fb13a35d4aa73e1",
               "execution": {
                 "tier": "architect",
                 "effort": "medium",
@@ -1617,7 +1617,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0734",
-              "status": "ready",
+              "status": "merged",
               "target_substrates": ["F5"],
               "boundary": {
                 "paths": [
@@ -1640,8 +1640,8 @@
               "prompt": {
                 "path": "prompts/TASK-0735.md"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/371",
+              "merged_as": "046c777159281d9a98db17592fb13a35d4aa73e1",
               "execution": {
                 "tier": "worker",
                 "effort": "medium",
@@ -1654,7 +1654,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0735",
-              "status": "ready",
+              "status": "merged",
               "target_substrates": ["F2", "F5"],
               "boundary": {
                 "paths": [
@@ -1682,8 +1682,8 @@
               "prompt": {
                 "path": "prompts/TASK-0736.md"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/371",
+              "merged_as": "046c777159281d9a98db17592fb13a35d4aa73e1",
               "execution": {
                 "tier": "worker",
                 "effort": "medium",

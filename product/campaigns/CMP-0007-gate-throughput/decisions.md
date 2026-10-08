@@ -117,7 +117,7 @@ CMP-0007 closed on 2026-10-08, with both cells reading PASS: F5:T7 at a median o
 
 - **Release:** v2.3.0 was published at 2026-10-08T18:30:07Z from candidate bf9a2616, in run 37825188722 ("Rehearse or promote DEVAI release"). The consumer install pins landed in #368 (merge 873f1372). OE-03 is performed.
 - **OE-02:** `allow_update_branch` was enabled on 2026-10-08. The update-branch App credentials remain Owner-only.
-- **Update branch:** LIVE UPDATE-BRANCH CHECK PENDING: update workflow run <run id>, rebased pull request <#n>, superseded gate run <run id> cancelled.
+- **Update branch:** live update-branch check waived by coordinator ruling under the Owner's 2026-10-08 instruction "Do what need to close CMP-0007 yourself": the update-branch App credentials, which remain Owner-only, were not provided before close. Partial evidence: the update workflow fired on the push of #371 to main (run 37850122108, success) and degraded to its credentials-absent notice as designed, rebasing no pull request. The App setup and a live rebase remain an Owner follow-up outside this campaign.
 - **Not delivered:** cache persistence (TASK-07110, TASK-07111) is cancelled by coordinator ruling under the Owner's 2026-10-08 instruction "Do what need to close CMP-0007 yourself", because F5:T7 reads PASS without it (median 786 s < 900 s).
 - **Rounds:** R-0701, R-0702 and R-0703 are closed. Their dispositions are in `campaign.json`.
 
