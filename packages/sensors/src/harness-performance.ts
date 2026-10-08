@@ -25,7 +25,7 @@ export interface HarnessPerformanceOptions extends HarnessPopulationOptions {
 }
 
 const DEFAULT_THRESHOLDS = {
-  passMedianMs: 600_000,
+  passMedianMs: 900_000,
   passP95Ms: 1_800_000,
   reviewMedianMs: 1_200_000,
   reviewP95Ms: 3_600_000,
