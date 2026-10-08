@@ -110,9 +110,10 @@ the implementation and its tests.
    no entry is `partitioned-out`, and no node is dropped or started twice
    because of scheduling. In a partitioned run (rule 11), nodes outside the
    run's partition carry the fifth disposition, `partitioned-out`, with
-   outcome `SKIPPED`. They are never started, and across the two partition
-   runs each node still has exactly one entry with one of the other four
-   dispositions.
+   outcome `SKIPPED`. They are never started. Across the two partition
+   runs, every node has exactly one _owned_ entry (`executed`, `reused`,
+   `aborted`, or `blocked-environment`); a node may additionally appear as
+   a `prerequisite` entry in the other run's report.
 2. **Bounded worker count.** At most `W` node processes run at once. The
    default is `min(4, os.availableParallelism())`. The `--task-workers <n>`
    flag of `check --run` overrides the environment variable
