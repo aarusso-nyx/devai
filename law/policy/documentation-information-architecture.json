@@ -295,6 +295,11 @@
           "path": ".github/workflows/devai-ledger-verify.yml",
           "pointer": "#",
           "projection": "keys of on: and jobs: in file order, compared with the metadata block of docs/dev/operations/workflows/devai-ledger-verify.md"
+        },
+        {
+          "path": ".github/workflows/update-pull-request-branches.yml",
+          "pointer": "#",
+          "projection": "keys of on: and jobs: in file order, compared with the metadata block of docs/dev/operations/workflows/update-pull-request-branches.md"
         }
       ]
     }
