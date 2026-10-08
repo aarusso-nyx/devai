@@ -1,6 +1,6 @@
 ---
 id: ADR-CHK-0007
-title: The check runner executes independent plan nodes on a bounded worker pool and reports in plan order
+title: Check plan nodes run on bounded parallel workers in plan order, and the gate may partition a plan
 type: adr
 status: accepted
 date: 2026-10-07
@@ -9,8 +9,10 @@ supersedes: []
 provenance:
   - ADR-CHK-0001
   - ADR-CHK-0003
+  - ADR-CHK-0004
   - ADR-CHK-0006
   - ADR-SCR-0010
+  - ADR-SCR-0013
   - packages/cli/src/services/check-runner/runner.ts
   - .github/workflows/pull-request-checks.yml
 affected_rules:
@@ -21,6 +23,9 @@ affected_rules:
   - law/schemas/test-task-descriptor.schema.json
   - law/schemas/test-task-exclusivity.schema.json
   - docs/adopters/test-tasks.md
+  - .github/workflows/pull-request-checks.yml
+  - scripts/check-workflows.mjs
+  - packages/sensors/src/harness-invariant-alignment-workflow.ts
 inspector_acceptance:
   - IA-001 -- The same plan run with one worker and with four workers yields the same planned node set and, for every node in plan order, the same nodeId, taskKey, disposition, outcome, reason, exit code and signal, the same blocked list, the same receipt-or-refusal presence, and the same report exit code; the fixture includes a FAIL node, an extrinsic BLOCKED probe with a blocked-environment dependent, an ABORTED dependent of a FAIL, and a reused node.
   - IA-002 -- With an executor that records start and finish instants and finishes nodes in reverse plan order, no node starts before every one of its dependencies has a terminal outcome, and the execution array of the report is in plan order, not completion order.
@@ -29,7 +34,10 @@ inspector_acceptance:
   - IA-005 -- A FAIL in one node does not cancel or shorten any running node, every independent node still starts, and only its dependents are recorded ABORTED with reason dependency-not-pass without being started.
   - IA-006 -- A node that waits in the ready queue longer than the per-task timeout still runs and is timed out only by its own timeout measured from its own start; the timeout default and the --task-timeout-ms flag are unchanged.
   - IA-007 -- --task-workers wins over DEVAI_CHECK_TASK_WORKERS; 0, 17, a fraction, or a non-numeric value from either source is refused with CHECK_RUNNER_WORKERS before any node starts; under --rc, --release-intent, or a protected execution identity the effective count is one, the environment value is ignored, and an explicit --task-workers above one is refused with CHECK_RUNNER_WORKERS.
-  - IA-008 -- The plan document, every task key and input digest, the descriptor and task-policy digests, and the receipt are byte-identical for the same inputs whatever the worker count and whatever test-task-exclusivity.json declares, so neither is an input of reuse or attestation; an exclusivity file that fails test-task-exclusivity.schema.json or names a node the descriptor does not declare is refused before any node starts.
+  - IA-008 -- The plan, task keys, input digests, descriptor and task-policy digests, and receipt are byte-identical whatever the worker count; runner and bundled verifier derive the same task keys and task-policy digest for a candidate carrying test-task-exclusivity.json, which a ** selector hashes like any file; an exclusivity file that fails its schema or names an undeclared node is refused before any node starts.
+  - IA-009 -- For an affected plan that holds test:cli, --partition-include test:cli and --partition-exclude test:cli plan byte-identical plans with the same task-policy digest; their owned sets are disjoint and their union is the planned node set; test:cli executes only in the including run; and only the dependency closure of test:cli executes in both runs.
+  - IA-010 -- A plan where a node depends on test:cli and on a node outside its dependency closure (the test:local-full fallback) is not separable: the including run owns every node and the excluding run none. A partition flag under --rc, --release-intent or a protected identity, both flags together, or an unknown node id is refused with CHECK_RUNNER_PARTITION before any node starts, and a partitioned run writes no receipt.
+  - IA-011 -- The devai-release-gate aggregator fails when a partition job failed, was cancelled, or uploaded no report; when the reports differ in candidate, base, descriptor or task-policy digest, or node set; when owned sets overlap or miss a node; or when an owned node lacks a PASS or reused entry. scripts/check-workflows.mjs fails when the aggregator, its needs, its always() condition, or the check name is removed.
 ---
 
 # Bounded parallel execution of check plan nodes
@@ -59,6 +67,13 @@ coordinator's ruling on the review of CMP-0007. The first text put an
 would refuse. The conflict model is now the `exclusive` and `shared`
 declaration of the separate file, and an undeclared node conflicts with every
 node.
+
+Amended again on 2026-10-07 after review. Rule 10 no longer claims that the
+exclusivity file stays out of every digest: a `**` input selector hashes it
+like any other file. Rule 11 adds the partitioned gate. Decision D1's
+fallback is now triggered, because the parallel runner alone measured a best
+of about 617 s on the 4-vCPU runner: `test:cli` is CPU-bound and
+saturates the machine.
 
 ## Context
 
@@ -141,11 +156,12 @@ the implementation and its tests.
    lock file) must be declared with a key; a wrong declaration is a defect
    of the file, not a scheduling choice. A file that fails its schema, or
    that names a node the descriptor does not declare, is refused before any
-   node starts. The file is read by the runner only. It is never part of the
-   descriptor, never read by the package-owned evidence verifier, and never
-   an input of a task key, a digest, or a receipt (rule 10), which keeps
-   release export and certification byte-identical to a run without it
-   (ADR-CHK-0006).
+   node starts. Only the runner reads the file as scheduling metadata. It is
+   never part of the descriptor, and the package-owned evidence verifier
+   never reads it as a declaration, so the verifier's descriptor validation
+   and RC policy reconstruction are unchanged (ADR-CHK-0006). Where a node's
+   input selectors match it, the file is an ordinary tracked input under
+   rule 10.
 
 6. **Deterministic report and evidence order.** The `execution` array of the
    report, the `blocked` list, the release verification entries, the receipt
@@ -177,11 +193,80 @@ the implementation and its tests.
    with another node through an undeclared resource, is a defect of that
    node, recorded to the backlog under ADR-GOV-0019, and never a reason to
    weaken this guarantee.
-10. **Scheduling is not an input.** The worker count and the contents of
-    `test-task-exclusivity.json` are absent from the plan, every task key and
+10. **The worker count is not an input; the exclusivity file is an ordinary
+    file.** The worker count is absent from the plan, every task key and
     input digest, the descriptor digest, the task-policy digest, and the
-    receipt. A cached result is reusable or not regardless of the worker count
-    or declarations that produced it.
+    receipt. A cached result is reusable or not regardless of the worker
+    count that produced it.
+
+    `test-task-exclusivity.json` is a tracked file, and its role as
+    scheduling metadata gives it no special standing. A node whose input
+    selectors match it hashes it as one of its inputs: today the `**`
+    selectors of `format` and `test:local-full`. Adding or editing the
+    file therefore changes those nodes' task keys and the task-policy digest
+    of that candidate, exactly as any other new file would. The runner and
+    the bundled verifier derive the inputs of a `**` selector from the same
+    committed tree, and `rc-policy-verifier-parity.test.ts` keeps the two
+    derivations equal, so both compute the same digests. No RC attestation
+    re-issue is needed beyond the per-candidate attestation every release
+    candidate already receives. The descriptor, the descriptor digest, and the
+    task-policy schema are unchanged, and an RC attestation is bound to its
+    own candidate's task-policy digest.
+
+11. **The gate may partition one plan across jobs.** `check --run` with
+    `--affected` or `--local` accepts exactly one of
+    `--partition-include <ids>` and `--partition-exclude <ids>`. `<ids>`
+    is a comma-separated list of descriptor node ids. Both runs plan exactly
+    as an unpartitioned run would: the same selection, node set, task keys
+    and task-policy digest. A partition changes only which planned nodes this
+    run owns and executes.
+    - Let `I` be the listed nodes that are planned, `D` the planned
+      descendants of `I`, and `A` the planned ancestors of `I`. The plan
+      is separable when every planned ancestor of `D` lies in
+      `I ∪ D ∪ A`.
+    - In a separable plan, the including run owns `I ∪ D`, and the
+      excluding run with the same list owns every other planned node.
+    - In a plan that is not separable, for example the `test:local-full`
+      fallback plan, the including run owns every planned node and the
+      excluding run owns none.
+    - A run executes its owned nodes and their planned ancestors by rules 1
+      to 9. Its report marks each execution entry as owned or as a
+      prerequisite, and its verdict is computed over owned nodes only.
+    - So every planned node is owned exactly once across the pair, and a node
+      of `I ∪ D` never executes in the excluding run. Only `A`, the
+      dependency closure of the listed nodes, may execute in both runs: today
+      `generate`, `build`, and `test:package-staging`, about 30 s.
+    - A partitioned run writes no receipt. Its report records
+      `receiptRefusal: partitioned-run`. A consumer that needs a whole-plan
+      receipt uses an unpartitioned run.
+    - The partition flags are refused with `CHECK_RUNNER_PARTITION` before
+      any node starts in these cases: under `--rc`, `--release-intent`, or
+      a protected identity; with both flags together; or with a node id the
+      descriptor does not declare.
+
+    The pull-request workflow runs two partition jobs and one aggregator job:
+    - `gate-cli` runs the preflight probes and
+      `check --affected --run --partition-include test:cli`.
+    - `gate-rest` runs the preflight probes, the gate invariant producers of
+      ADR-SCR-0013, `release:pr-gate` (commit range, bump floor, release
+      preflight), and `check --affected --run --partition-exclude test:cli`.
+    - Each partition job uploads its report as an artifact.
+    - The aggregator job carries the required check name
+      `devai-release-gate`. It needs both jobs, runs under `always()`, and
+      passes only when all of the following hold:
+      - both jobs passed;
+      - both reports name the same candidate, base, descriptor digest,
+        task-policy digest, and planned node set;
+      - the owned sets are disjoint and their union is the planned node set;
+      - every owned node has a PASS or reused entry.
+
+      A missing, cancelled, or extra report fails it.
+
+    - Under `merge_group` the same three jobs run (ADR-CHK-0004).
+    - The workflow checker pins the three jobs, both partition commands, the
+      aggregator's needs, its `always()` condition, and the check name.
+    - The alignment sensor of ADR-SCR-0013 reads the producer and affected
+      steps across the partition jobs.
 
 ## Consequences
 
@@ -195,8 +280,11 @@ or flakes. Each one is fixed by a declaration in `test-task-exclusivity.json`
 or by isolating the test, and a retry never hides it. An adopter gains
 parallelism only by declaring its nodes; until then its plans run one node at
 a time whatever the worker count. If the gate median is still above 600 s after
-this lands, R-0701 shards `test:cli` under decision D1. Release runs keep
-their current timing until a later record widens rule 3.
+this lands, R-0701 splits the gate under rule 11. Decision D1 has
+triggered that split. The gate's wall time then approaches the longer of the
+`test:cli` job (prerequisites plus `test:cli`) and the rest of the plan.
+The required check stays the single name `devai-release-gate`. Release runs
+keep their current timing until a later record widens rule 3.
 
 ## Alternatives Considered
 
@@ -215,7 +303,15 @@ evidence verifier refuses unknown task properties when it rebuilds the RC
 policy from the committed descriptor (ADR-CHK-0006), so it would break release
 export until the verifier is re-vendored. Treating an undeclared node as free
 to overlap is rejected because one missing declaration would let two writers
-race silently.
+race silently. Handing the prerequisites from one partition job to the other
+as an artifact, so that no node executes twice, is rejected: `gate-cli`
+would wait for `gate-rest` to build and upload before it could start
+`test:cli`, which serializes the critical path to save about 30 s of
+duplicated, deterministic work. Running `test:cli` in both jobs, or letting
+the aggregator synthesize the outcome of a join node such as
+`test:local-full`, is rejected because it would double the dominant node or
+report a node no job executed. Sharding `test:cli` across vitest shards
+inside the runner is left to a later record if the job split is not enough.
 
 ## Affected Rules
 
@@ -225,14 +321,21 @@ race silently.
   execution of node processes under the per-task timeout.
 - `packages/cli/src/services/check-runner/types.ts`: the worker count option
   and the exclusivity declaration type.
-- `packages/cli/src/commands/check/facade.ts`: the `--task-workers` flag and
-  the `CHECK_RUNNER_WORKERS` refusal.
+- `packages/cli/src/commands/check/facade.ts`: the `--task-workers` flag, the
+  `--partition-include` and `--partition-exclude` flags, and the
+  `CHECK_RUNNER_WORKERS` and `CHECK_RUNNER_PARTITION` refusals.
 - `law/schemas/test-task-descriptor.schema.json`: closed objects, so a
   scheduling field or a misspelled property in the descriptor is refused.
 - `law/schemas/test-task-exclusivity.schema.json`: the closed schema of
   `test-task-exclusivity.json`.
 - `docs/adopters/test-tasks.md`: the declaration file and the scheduling
   rules for adopters.
+- `.github/workflows/pull-request-checks.yml`: the `gate-cli` and
+  `gate-rest` partition jobs and the `devai-release-gate` aggregator.
+- `scripts/check-workflows.mjs`: pins for the three jobs, the partition
+  commands, and the aggregator contract.
+- `packages/sensors/src/harness-invariant-alignment-workflow.ts`: reads the
+  producer and affected steps across the partition jobs.
 
 ## Inspector Adversarial Acceptance
 
@@ -243,4 +346,7 @@ race silently.
 - IA-005 -- A FAIL in one node does not cancel or shorten any running node, every independent node still starts, and only its dependents are recorded ABORTED with reason dependency-not-pass without being started.
 - IA-006 -- A node that waits in the ready queue longer than the per-task timeout still runs and is timed out only by its own timeout measured from its own start; the timeout default and the --task-timeout-ms flag are unchanged.
 - IA-007 -- --task-workers wins over DEVAI_CHECK_TASK_WORKERS; 0, 17, a fraction, or a non-numeric value from either source is refused with CHECK_RUNNER_WORKERS before any node starts; under --rc, --release-intent, or a protected execution identity the effective count is one, the environment value is ignored, and an explicit --task-workers above one is refused with CHECK_RUNNER_WORKERS.
-- IA-008 -- The plan document, every task key and input digest, the descriptor and task-policy digests, and the receipt are byte-identical for the same inputs whatever the worker count and whatever test-task-exclusivity.json declares, so neither is an input of reuse or attestation; an exclusivity file that fails test-task-exclusivity.schema.json or names a node the descriptor does not declare is refused before any node starts.
+- IA-008 -- The plan, task keys, input digests, descriptor and task-policy digests, and receipt are byte-identical whatever the worker count; runner and bundled verifier derive the same task keys and task-policy digest for a candidate carrying test-task-exclusivity.json, which a ** selector hashes like any file; an exclusivity file that fails its schema or names an undeclared node is refused before any node starts.
+- IA-009 -- For an affected plan that holds test:cli, --partition-include test:cli and --partition-exclude test:cli plan byte-identical plans with the same task-policy digest; their owned sets are disjoint and their union is the planned node set; test:cli executes only in the including run; and only the dependency closure of test:cli executes in both runs.
+- IA-010 -- A plan where a node depends on test:cli and on a node outside its dependency closure (the test:local-full fallback) is not separable: the including run owns every node and the excluding run none. A partition flag under --rc, --release-intent or a protected identity, both flags together, or an unknown node id is refused with CHECK_RUNNER_PARTITION before any node starts, and a partitioned run writes no receipt.
+- IA-011 -- The devai-release-gate aggregator fails when a partition job failed, was cancelled, or uploaded no report; when the reports differ in candidate, base, descriptor or task-policy digest, or node set; when owned sets overlap or miss a node; or when an owned node lacks a PASS or reused entry. scripts/check-workflows.mjs fails when the aggregator, its needs, its always() condition, or the check name is removed.
