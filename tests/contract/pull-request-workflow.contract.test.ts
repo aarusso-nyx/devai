@@ -1078,3 +1078,101 @@ describe('workflow checker refuses a softened gate (ADR-CHK-0007 IA-011)', () =>
     expect(preflightFindings(root)).not.toEqual([]);
   });
 });
+
+// CMP-0007 TASK-0724 (#247): the bootstrap cache restores the runner with packages/*/dist,
+// and a hit counts only when the runner bin and every compiled package entry are present;
+// anything missing rebuilds. Each partition job keeps that guard on its own.
+describe('workflow checker pins the bootstrap cache completeness guard (#247)', () => {
+  type Document = ReturnType<typeof parseDocument>;
+
+  const stepAt = (job: string, id: string): number => {
+    const index = (RAW_JOBS[job]?.steps ?? []).findIndex((step) => step.id === id);
+    if (index < 0) throw new Error(`fixture: no step ${id} in ${job}`);
+    return index;
+  };
+
+  /** Rewrites one step field through the document, keeping all other bytes. */
+  function editStep(
+    document: Document,
+    job: string,
+    id: string,
+    field: 'run' | 'path',
+    edit: (text: string) => string,
+  ): void {
+    const path =
+      field === 'run'
+        ? ['jobs', job, 'steps', stepAt(job, id), 'run']
+        : ['jobs', job, 'steps', stepAt(job, id), 'with', 'path'];
+    const before = String(document.getIn(path));
+    const after = edit(before);
+    expect(after, `the mutation changed ${job}.${id}.${field}`).not.toBe(before);
+    document.setIn(path, after);
+  }
+
+  const mutations: readonly (readonly [string, (document: Document, job: string) => void])[] = [
+    [
+      'the former skip-on-hit shortcut replaces the guard',
+      (document, job) => {
+        editStep(document, job, 'install', 'run', () =>
+          [
+            'pnpm install --frozen-lockfile',
+            `if [ "\${{ steps.bootstrap-cache.outputs.cache-hit }}" != 'true' ]; then`,
+            '  pnpm run release:bootstrap',
+            'fi',
+            '',
+          ].join('\n'),
+        );
+      },
+    ],
+    [
+      'packages/*/dist leaves the restore paths',
+      (document, job) => {
+        editStep(document, job, 'bootstrap-cache', 'path', (paths) =>
+          paths
+            .split('\n')
+            .filter((line) => line.trim() !== 'packages/*/dist')
+            .join('\n'),
+        );
+      },
+    ],
+    [
+      'the guard no longer exits on a missing file',
+      (document, job) => {
+        editStep(document, job, 'install', 'run', (run) =>
+          run.replace(/^\s*process\.exit\(1\);\n/mu, ''),
+        );
+      },
+    ],
+    [
+      'the rebuild no longer depends on the guard',
+      (document, job) => {
+        editStep(document, job, 'install', 'run', (run) =>
+          run
+            .replace(/^if \[ "\$missing" -ne 0 \]; then\n/mu, '')
+            .replace(/^\s+pnpm run release:bootstrap\nfi\n/mu, 'pnpm run release:bootstrap\n'),
+        );
+      },
+    ],
+    [
+      'the guard no longer checks the runner bin',
+      (document, job) => {
+        editStep(document, job, 'install', 'run', (run) =>
+          run.replace('[".devai/state/pr-bootstrap/cli/bin.js"]', '[]'),
+        );
+      },
+    ],
+  ];
+
+  it.each(
+    PARTITION_JOBS.flatMap((job) =>
+      mutations.map(([label, mutate]) => [job, label, mutate] as const),
+    ),
+  )('fails when in %s %s', (job, _label, mutate) => {
+    const root = workflowTree();
+    mutateWorkflow(root, (document) => {
+      mutate(document, job);
+    });
+    expect(checkWorkflowTree(root).ok).toBe(false);
+    expect(preflightFindings(root)).not.toEqual([]);
+  });
+});
