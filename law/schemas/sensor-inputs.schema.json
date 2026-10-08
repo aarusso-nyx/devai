@@ -251,7 +251,12 @@
         "minimumSample": {
           "type": "integer",
           "minimum": 1,
-          "description": "How many runs the population must hold, after every filter above, before the sensor states a verdict. For harness_green_main and harness_robustness it counts the sampled runs; for harness_performance it counts the successful runs whose durations are measured. Below it the sensor reads unknown with sample_size and minimum_sample in the finding. Required: a declaration without it is rejected."
+          "description": "How many outcomes the population must hold, after every filter above, before the sensor states a verdict. For harness_green_main it counts the sampled runs, or the sampled pull requests under outcomeUnit pull-request-final-head; for harness_robustness it counts the sampled runs; for harness_performance it counts the successful runs whose durations are measured. Below it the sensor reads unknown with sample_size and minimum_sample in the finding. Required: a declaration without it is rejected."
+        },
+        "outcomeUnit": {
+          "enum": ["run", "pull-request-final-head"],
+          "default": "run",
+          "description": "harness_green_main only (ADR-SCR-0014): what one outcome is. run counts every sampled run, the population of ADR-SCR-0010. pull-request-final-head counts one outcome per pull request against the base with a sampled run in the lookback window, merged, closed without merge, or open: the latest completed run whose conclusion is neither cancelled nor skipped on the pull request's final head (the head at merge, or the current head), matched by head branch and sha; an open pull request without such a run is excluded. Default run when omitted. harness_performance and harness_robustness refuse the property."
         },
         "excludedJobs": {
           "type": "array",
@@ -360,10 +365,16 @@
           "$ref": "#/$defs/harness_population_inputs"
         },
         "harness_performance": {
-          "$ref": "#/$defs/harness_population_inputs"
+          "allOf": [
+            { "$ref": "#/$defs/harness_population_inputs" },
+            { "not": { "required": ["outcomeUnit"] } }
+          ]
         },
         "harness_robustness": {
-          "$ref": "#/$defs/harness_population_inputs"
+          "allOf": [
+            { "$ref": "#/$defs/harness_population_inputs" },
+            { "not": { "required": ["outcomeUnit"] } }
+          ]
         }
       }
     },
@@ -428,6 +439,7 @@
           "includeCancelled": false,
           "lookbackDays": 30,
           "minimumSample": 20,
+          "outcomeUnit": "pull-request-final-head",
           "excludedJobs": [{ "workflow": "release.yml", "job": "build-release" }]
         },
         "harness_performance": {
