@@ -237,7 +237,7 @@ export const REVIEWED_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = Object.f
       },
       {
         path: 'scripts/check-commit-range.mjs',
-        sha256: 'f2628ad61dc22236df0006289ec31d38981a5236df302b6d7d4c2a40737f6887',
+        sha256: '24b9264694666133329ff30a0c87399c6c3118592b3a49541cb491c4392fce30',
       },
       {
         path: 'scripts/pr-failure-diagnostics.mjs',
