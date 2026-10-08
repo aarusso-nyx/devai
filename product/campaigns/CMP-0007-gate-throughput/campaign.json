@@ -786,7 +786,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "ready",
+              "status": "merged",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -824,8 +824,8 @@
               "prompt": {
                 "path": "prompts/TASK-0721.md"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/358",
+              "merged_as": "85e79c1a654a8e325b9d87e4623aa412ede231bb",
               "execution": {
                 "tier": "architect",
                 "effort": "high",
@@ -849,7 +849,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "ready",
+              "status": "merged",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": ["AGENTS.md", "docs/dev/operations/remote-preflight-contract.md"],
@@ -873,8 +873,8 @@
               "prompt": {
                 "path": "prompts/TASK-0722.md"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/358",
+              "merged_as": "85e79c1a654a8e325b9d87e4623aa412ede231bb",
               "execution": {
                 "tier": "architect",
                 "effort": "medium",
@@ -902,7 +902,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "ready",
               "target_substrates": ["F5"],
               "boundary": {
                 "paths": [
@@ -946,7 +946,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "ready",
               "target_substrates": ["F5"],
               "boundary": {
                 "paths": ["tests/integration/"],
@@ -989,7 +989,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": null,
-              "status": "ready",
+              "status": "merged",
               "target_substrates": ["F5"],
               "boundary": {
                 "paths": [
@@ -1004,12 +1004,12 @@
                 "packages/sensors/src/harness/reviewed-workflow-steps.ts re-reviews the digest of the changed compile step (coordinator ruling of 2026-10-08)."
               ],
               "acceptance_commands": [["node", "scripts/check-workflows.mjs"]],
-              "commit_types": ["ci(workflows)", "ci(scripts)"],
+              "commit_types": ["ci(workflows)", "ci(scripts)", "fix(sensors)"],
               "prompt": {
                 "path": "prompts/TASK-0724.md"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/357",
+              "merged_as": "37d8cce88bfd6f2f44371c98d1e24e7a4bcdc9c1",
               "execution": {
                 "tier": "worker",
                 "effort": "medium",
@@ -1033,7 +1033,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": null,
-              "status": "ready",
+              "status": "merged",
               "target_substrates": ["F5"],
               "boundary": {
                 "paths": ["packages/cli/tests/unit/doctor-check-result-identities.test.ts"],
@@ -1057,8 +1057,8 @@
               "prompt": {
                 "path": "prompts/TASK-0725.md"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/359",
+              "merged_as": "e8427a77e079093b0e660217db6a86e0436a7b23",
               "execution": {
                 "tier": "worker",
                 "effort": "medium",
@@ -1082,7 +1082,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "ready",
               "target_substrates": ["F5"],
               "boundary": {
                 "paths": ["tests/contract/"],
@@ -1122,7 +1122,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "ready",
               "target_substrates": ["F2", "F5"],
               "boundary": {
                 "paths": ["scripts/check-commit-range.mjs"],
