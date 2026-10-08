@@ -81,7 +81,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "merged",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -112,8 +112,8 @@
               "prompt": {
                 "path": "prompts/TASK-0711.md"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/353",
+              "merged_as": "8514f91a5ef40e703d07ae715c5a2d404d6a081c",
               "execution": {
                 "tier": "architect",
                 "effort": "high",
@@ -126,7 +126,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0711",
-              "status": "planned",
+              "status": "merged",
               "target_substrates": ["F5"],
               "boundary": {
                 "paths": [
@@ -144,8 +144,8 @@
               "prompt": {
                 "path": "prompts/TASK-0712.md"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/353",
+              "merged_as": "8514f91a5ef40e703d07ae715c5a2d404d6a081c",
               "execution": {
                 "tier": "worker",
                 "effort": "medium",
@@ -158,7 +158,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0712",
-              "status": "planned",
+              "status": "merged",
               "target_substrates": ["F2", "F5"],
               "boundary": {
                 "paths": ["packages/schemas/src/roster.ts"],
@@ -175,8 +175,8 @@
               "prompt": {
                 "path": "prompts/TASK-0713.md"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/353",
+              "merged_as": "8514f91a5ef40e703d07ae715c5a2d404d6a081c",
               "execution": {
                 "tier": "worker",
                 "effort": "low",
@@ -254,7 +254,7 @@
               },
               "deliverables": [
                 "Tests under packages/cli/tests/unit/ cover IA-001 to IA-008 of ADR-CHK-0007 with an injected executor and real processes, including the undeclared-node default, a refused exclusivity file, a set but empty DEVAI_CHECK_TASK_WORKERS refused with CHECK_RUNNER_WORKERS, and the release selections that stay sequential.",
-                "IA-008 (runner and bundled-verifier task-key and task-policy parity for a candidate carrying test-task-exclusivity.json) is untested until this task lands with the runner pull request; the test proves it through the rc-policy verifier parity harness."
+                "IA-008 (runner and bundled-verifier task-key and task-policy parity for a candidate carrying test-task-exclusivity.json) is untested until this task lands with the runner pull request (#352); the test proves it through the rc-policy verifier parity harness."
               ],
               "acceptance_commands": [["pnpm", "run", "test:cli"]],
               "commit_types": ["test(cli)"],
