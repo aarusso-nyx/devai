@@ -3,7 +3,7 @@
 // the sequential failure semantics, reports in plan order, and keeps the worker count and
 // test-task-exclusivity.json out of every key, digest, and receipt.
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -115,31 +115,42 @@ interface RepositoryOptions {
   readonly exclusivityBytes?: string;
   /** Extra committed files, for example real node scripts. */
   readonly files?: Readonly<Record<string, string>>;
+  /**
+   * How test-task-exclusivity.json sits in the checkout: committed at the planned commit
+   * (the default, and the only state the runner honours), git-ignored, or left untracked.
+   */
+  readonly exclusivityState?: 'tracked' | 'ignored' | 'untracked';
 }
 
 /**
- * A committed fixture repository. test-task-exclusivity.json is git-ignored, so its
- * presence and content never change the commit, the tree, or the cleanliness of the
- * checkout: only the runner's own reading of it can make two runs differ.
+ * A committed fixture repository. test-task-exclusivity.json is committed like any adopter
+ * file unless `exclusivityState` says otherwise; no fixture selector matches it, so it is
+ * never an input of a fixture node's task key.
  */
 function repository(specs: readonly NodeSpec[], options: RepositoryOptions = {}): string {
   const root = mkdtempSync(join(tmpdir(), 'devai-check-runner-parallel-ia-'));
   roots.push(root);
+  const state = options.exclusivityState ?? 'tracked';
   git(root, ['init', '-q']);
   git(root, ['config', 'user.name', 'Parallel Inspector']);
   git(root, ['config', 'user.email', 'parallel-inspector@example.invalid']);
-  put(root, '.gitignore', `.devai/state/*\nout/\ngen/\n${TASK_EXCLUSIVITY_PATH}\n`);
+  const ignored = state === 'ignored' ? `${TASK_EXCLUSIVITY_PATH}\n` : '';
+  put(root, '.gitignore', `.devai/state/*\nout/\ngen/\n${ignored}`);
   put(root, 'src/main.ts', 'export const value = 1;\n');
   put(root, 'cached/stable.txt', 'stable\n');
   put(root, 'test-tasks.json', `${JSON.stringify(descriptor(specs), null, 2)}\n`);
   for (const [path, bytes] of Object.entries(options.files ?? {})) put(root, path, bytes);
-  if (options.exclusivityBytes !== undefined) {
-    put(root, TASK_EXCLUSIVITY_PATH, options.exclusivityBytes);
-  } else if (options.exclusivity !== null && options.exclusivity !== undefined) {
-    put(root, TASK_EXCLUSIVITY_PATH, `${JSON.stringify(options.exclusivity, null, 2)}\n`);
-  }
+  const writeExclusivity = (): void => {
+    if (options.exclusivityBytes !== undefined) {
+      put(root, TASK_EXCLUSIVITY_PATH, options.exclusivityBytes);
+    } else if (options.exclusivity !== null && options.exclusivity !== undefined) {
+      put(root, TASK_EXCLUSIVITY_PATH, `${JSON.stringify(options.exclusivity, null, 2)}\n`);
+    }
+  };
+  if (state !== 'untracked') writeExclusivity();
   git(root, ['add', '.']);
   git(root, ['commit', '-qm', 'base']);
+  if (state === 'untracked') writeExclusivity();
   return root;
 }
 
@@ -660,6 +671,63 @@ describe('IA-004 and rule 5: conflicting nodes never overlap and keep plan order
   });
 });
 
+describe('rule 5: only declarations tracked at the planned commit count', () => {
+  const PLAN = [...FAN.map((spec) => spec.nodeId), FALLBACK];
+
+  async function observe(root: string): Promise<Recorder> {
+    const recorder = new Recorder(root, {}, 20);
+    const report = await runAsync(root, recorder, 4);
+    expect(report.exitCode, JSON.stringify(comparable(report))).toBe(0);
+    return recorder;
+  }
+
+  it('lets a tracked declaration file permit overlap', async () => {
+    const recorder = await observe(repository(FAN, { exclusivity: FAN_EXCLUSIVITY }));
+    expect(recorder.peak).toBe(4);
+  });
+
+  it.each(['ignored', 'untracked'] as const)(
+    'treats an %s declaration file as absent and runs one node at a time',
+    async (exclusivityState) => {
+      const root = repository(FAN, { exclusivity: FAN_EXCLUSIVITY, exclusivityState });
+      const recorder = await observe(root);
+      expect(recorder.peak).toBe(1);
+      expect(recorder.started()).toEqual(PLAN);
+    },
+  );
+
+  it('ignores a local edit that would permit overlap the committed file does not', async () => {
+    // Committed: no node declared, so everything conflicts. Edited: every node only shares.
+    const root = repository(FAN, { exclusivity: { schemaVersion: '1.0.0', nodes: {} } });
+    put(root, TASK_EXCLUSIVITY_PATH, `${JSON.stringify(FAN_EXCLUSIVITY, null, 2)}\n`);
+    const recorder = await observe(root);
+    expect(recorder.peak).toBe(1);
+    expect(recorder.started()).toEqual(PLAN);
+  });
+
+  it('ignores a local edit that breaks the committed file', async () => {
+    const root = repository(FAN, { exclusivity: FAN_EXCLUSIVITY });
+    put(root, TASK_EXCLUSIVITY_PATH, '{ "schemaVersion": "9", "nodes": [');
+    const recorder = await observe(root);
+    expect(recorder.peak).toBe(4);
+  });
+
+  it('refuses a tracked symlink at the declaration path before any node starts', async () => {
+    const root = repository(FAN, { exclusivity: null });
+    put(root, 'declarations.json', `${JSON.stringify(FAN_EXCLUSIVITY, null, 2)}\n`);
+    symlinkSync('declarations.json', join(root, TASK_EXCLUSIVITY_PATH));
+    git(root, ['add', '.']);
+    git(root, ['commit', '-qm', 'link the declarations']);
+    for (const workers of [1, 4]) {
+      const recorder = new Recorder(root);
+      await expect(runAsync(root, recorder, workers)).rejects.toThrow(
+        /^CHECK_RUNNER_EXCLUSIVITY: test-task-exclusivity\.json must be a regular file/u,
+      );
+      expect(recorder.events).toEqual([]);
+    }
+  });
+});
+
 describe('IA-005 and rule 8: no fail-fast', () => {
   it('lets running siblings finish, starts every independent node, and aborts only dependents', async () => {
     const ordered: NodeSpec[] = [
@@ -913,27 +981,41 @@ describe('IA-008 and rule 10: scheduling is not an input', () => {
     return JSON.stringify(report).replaceAll(root, '<root>');
   }
 
-  it('yields byte-identical plans, task keys, digests and receipts whatever the workers and declarations', async () => {
+  it('yields byte-identical plans, task keys, digests and receipts whatever the worker count', async () => {
     vi.spyOn(performance, 'now').mockReturnValue(0);
     const behavior: Readonly<Record<string, Behavior>> = { 'unit-c': { result: 'fail' } };
-    const sequential = await affectedReport('sync', null);
-    const parsed = JSON.parse(sequential) as CheckRunnerReport;
-    // The fixture is receipt-bearing and planned the whole fan, so the comparison is not vacuous.
-    expect(parsed.plan.tasks.map((task) => task.nodeId)).toEqual([
-      ...SPECS.map((spec) => spec.nodeId),
-      FALLBACK,
-    ]);
-    expect(parsed.receipt ?? parsed.receiptRefusal).toBeDefined();
-    expect(parsed.receipt?.digest ?? parsed.receiptRefusal).toEqual(expect.any(String));
-
-    for (const workers of [1, 2, 4, 16]) {
-      for (const declaration of DECLARATIONS) {
+    for (const declaration of DECLARATIONS) {
+      const sequential = await affectedReport('sync', declaration);
+      const parsed = JSON.parse(sequential) as CheckRunnerReport;
+      // The fixture planned the whole fan, so the comparison is not vacuous.
+      expect(parsed.plan.tasks.map((task) => task.nodeId)).toEqual([
+        ...SPECS.map((spec) => spec.nodeId),
+        FALLBACK,
+      ]);
+      expect(parsed.receipt?.digest ?? parsed.receiptRefusal).toEqual(expect.any(String));
+      for (const workers of [1, 2, 4, 16]) {
         expect(
           await affectedReport(workers, declaration, behavior),
           `workers ${String(workers)}, ${JSON.stringify(declaration)}`,
         ).toBe(sequential);
       }
     }
+  }, 90_000);
+
+  it('keeps task keys and descriptor and task-policy digests apart from the declarations', async () => {
+    // A committed declaration file changes the commit a receipt binds, but no fixture selector
+    // matches it, so it feeds no task key or digest: declarations are not a reuse input.
+    vi.spyOn(performance, 'now').mockReturnValue(0);
+    const digests: unknown[] = [];
+    for (const declaration of DECLARATIONS) {
+      const report = JSON.parse(await affectedReport(4, declaration)) as CheckRunnerReport;
+      digests.push({
+        keys: report.plan.tasks.map((task) => [task.nodeId, task.taskKey]),
+        descriptor: report.plan.descriptorDigest,
+        policy: report.plan.taskPolicyDigest,
+      });
+    }
+    for (const entry of digests) expect(entry).toEqual(digests[0]);
   }, 60_000);
 
   /**
