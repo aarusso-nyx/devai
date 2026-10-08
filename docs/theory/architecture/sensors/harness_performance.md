@@ -12,7 +12,7 @@ Graceful degradation: when `gh` is not on PATH or authentication is missing, emi
 
 ## PASS / REVIEW / FAIL boundaries
 
-- **PASS:** median_ms < 600_000 (10 min) AND p95_ms < 1_800_000 (30 min).
+- **PASS:** median_ms < 900_000 (15 min) AND p95_ms < 1_800_000 (30 min). The median bound was 600_000 until Owner decision D6 of CMP-0007 (2026-10-08).
 - **REVIEW:** median_ms < 1_200_000 (20 min) AND p95_ms < 3_600_000 (60 min).
 - **FAIL:** otherwise.
 - **UNKNOWN:** gh unavailable / no runs found.
