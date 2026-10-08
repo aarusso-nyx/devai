@@ -3,8 +3,10 @@
 // `pre-push-preflight.mjs <remote> [<url>]` with the pushed refs on stdin, one per line:
 // `<local ref> <local sha> <remote ref> <remote sha>`.
 //
-// Unless `git config --get devai.prePushPreflight` is exactly `true` it exits 0 with no output.
-// Otherwise it fetches `<remote> main` as the base, then for every pushed ref that is not a
+// Unless the worktree-scoped `git config --worktree --get devai.prePushPreflight` is exactly
+// `true` it exits 0 with no output. Otherwise it fetches `<remote> main` into a temporary ref
+// (deleted afterwards) as the base, never printing the remote unless it is a configured name.
+// It refuses a push of any commit other than HEAD, then for every pushed ref that is not a
 // deletion runs scripts/check-commit-range.mjs over base..<local sha>; any failure refuses the
 // push before the affected check starts. It then runs the gate's affected check against the
 // fetched base, with the CI gate's own flags, and on failure prints the per-node summary of
@@ -12,6 +14,7 @@
 // the environment fix) is named. Exit: 0 clean, 1 refused.
 
 import { spawnSync } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -26,12 +29,20 @@ function git(args, options = {}) {
 }
 
 function enabled() {
-  const result = git(['config', '--get', 'devai.prePushPreflight']);
+  const result = git(['config', '--worktree', '--get', 'devai.prePushPreflight']);
   return result.status === 0 && result.stdout.trim() === 'true';
 }
 
 function say(text) {
   process.stderr.write(`pre-push: ${text}\n`);
+}
+
+/** The configured remote name, or a fixed label: a push URL is never printed. */
+function remoteLabel(remote) {
+  const names = git(['remote'])
+    .stdout.split('\n')
+    .map((name) => name.trim());
+  return names.includes(remote) ? remote : 'the push remote';
 }
 
 /** Relays a child's captured output to this process's streams. */
@@ -65,14 +76,24 @@ function main(argv, readStdin) {
     return 1;
   }
 
-  const fetched = git(['fetch', '--quiet', remote, BASE_BRANCH]);
+  const label = remoteLabel(remote);
+  const baseRef = `refs/devai/pre-push/${String(process.pid)}-${randomBytes(6).toString('hex')}`;
+  try {
+    return preflight(remote, label, baseRef, pushed);
+  } finally {
+    git(['update-ref', '-d', baseRef]);
+  }
+}
+
+function preflight(remote, label, baseRef, pushed) {
+  // git's own fetch output can carry the URL, so only the fixed message is printed.
+  const fetched = git(['fetch', '--quiet', remote, `+refs/heads/${BASE_BRANCH}:${baseRef}`]);
   if (fetched.status !== 0) {
-    relay(fetched);
-    say(`could not fetch ${remote} ${BASE_BRANCH}; fetch it and push again`);
+    say(`could not fetch ${BASE_BRANCH} from ${label}; fetch it and push again`);
     return 1;
   }
-  const base = git(['rev-parse', '--verify', 'FETCH_HEAD']).stdout.trim();
-  say(`base ${remote}/${BASE_BRANCH} ${base}`);
+  const base = git(['rev-parse', '--verify', `${baseRef}^{commit}`]).stdout.trim();
+  say(`base ${BASE_BRANCH} from ${label} ${base}`);
 
   for (const [localRef, localSha] of pushed) {
     const range = spawnSync(
