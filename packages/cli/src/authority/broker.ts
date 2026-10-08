@@ -348,7 +348,31 @@ function readOnlyGhProcess(args: readonly unknown[]): boolean {
   if (argv[0] === 'auth' && (argv.length === 1 || (argv.length === 2 && argv[1] === 'status'))) {
     return true;
   }
-  return runListGhProcess(argv);
+  return runListGhProcess(argv) || prListGhProcess(argv);
+}
+
+/**
+ * The one read-only pull request listing the harness green-main sensor emits for its
+ * final-head population (ADR-SCR-0014), declared in law/policy/subprocess-effects.json:
+ * exactly `gh pr list --state all --limit 1000 --json
+ * closedAt,headRefName,headRefOid,mergedAt,number,state`.
+ */
+const GH_PR_LIST_ARGV = [
+  'pr',
+  'list',
+  '--state',
+  'all',
+  '--limit',
+  '1000',
+  '--json',
+  'closedAt,headRefName,headRefOid,mergedAt,number,state',
+] as const;
+
+function prListGhProcess(argv: readonly string[]): boolean {
+  return (
+    argv.length === GH_PR_LIST_ARGV.length &&
+    GH_PR_LIST_ARGV.every((word, index) => argv[index] === word)
+  );
 }
 
 function runListGhProcess(argv: readonly string[]): boolean {
