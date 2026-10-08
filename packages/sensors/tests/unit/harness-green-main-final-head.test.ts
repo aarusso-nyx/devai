@@ -467,6 +467,20 @@ describe('harness_green_main final-head review rulings (R-0703)', () => {
     unavailable(sense());
   });
 
+  it('accepts an open pull request row with a null closedAt', () => {
+    const greens = greenPullRequests(2);
+    const branch = 'feature/open-null-closed';
+    const sha = '8'.repeat(40);
+    stub(
+      [...greens.runs, run(branch, sha, 'failure')],
+      [...greens.pullRequests, pr(30, branch, sha, 'OPEN', { closedAt: null, mergedAt: null })],
+    );
+
+    const reading = sense();
+    expect(reading.status).not.toBe('unknown');
+    expect(counted(reading)).toEqual({ total: 3, green: 2, pct: 66.67 });
+  });
+
   it('reads a verdict when gh pr list returns one row fewer than its limit', () => {
     const { runs, pullRequests } = listing(999);
     stub(runs, pullRequests);
@@ -486,6 +500,13 @@ describe('harness_green_main final-head review rulings (R-0703)', () => {
     ['a numeric baseRefName', (row) => ({ ...row, baseRefName: 7 })],
     ['a non-date createdAt', (row) => ({ ...row, createdAt: 'yesterday' })],
     ['a null createdAt', (row) => ({ ...row, createdAt: null })],
+    // A merged or closed pull request has a closing time; without it its lifetime is unknown.
+    ['a merged state with a null closedAt', (row) => ({ ...row, closedAt: null })],
+    ['a merged state without closedAt', ({ closedAt: _drop, ...row }) => row],
+    [
+      'a closed state with a null closedAt',
+      (row) => ({ ...row, state: 'CLOSED', mergedAt: null, closedAt: null }),
+    ],
     ['a numeric headRefName', (row) => ({ ...row, headRefName: 42 })],
     ['a null headRefOid', (row) => ({ ...row, headRefOid: null })],
     ['a string number', (row) => ({ ...row, number: '7' })],
