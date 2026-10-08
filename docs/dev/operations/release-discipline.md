@@ -804,7 +804,7 @@ once under its exact Owner-initiated invocation envelope from a separately revie
 immutable control checkpoint, retains actual completed no-tool/MCP/config/inventory
 observations and signs only through independent custody. Signature alone is insufficient.
 
-The PR lane reads only `vars.DEVAI_SOFT_GATE_TRUST_JSON` at the declared provider-free
+Deferred: no step of the PR lane runs the soft gate today (the Owner deferred it on 2026-10-03, `0ccab59c`), and the lane reads no variable. When the step is re-introduced, the PR lane reads only `vars.DEVAI_SOFT_GATE_TRUST_JSON` at the declared provider-free
 `soft-gate` env seam, using fixed public GitHub commit/tree/blob reads without a token or
 secret fallback. It admits only selected immutable externally authenticated candidate/
 base/control/input/reply/host identities with <=24h freshness and no future times. A new

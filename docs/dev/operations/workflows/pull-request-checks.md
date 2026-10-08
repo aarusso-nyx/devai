@@ -223,10 +223,13 @@ blocked-environment (ADR-CHK-0001).
 
 ## Public trust input boundary
 
-No step of the workflow as it stands reads `DEVAI_SOFT_GATE_TRUST_JSON`. The boundary
-below governs the declared provider-free `soft-gate` step whenever it is present.
+No step of the workflow as it stands reads `DEVAI_SOFT_GATE_TRUST_JSON`: the Owner
+deferred the scored soft gate on 2026-10-03 and its step was removed (`0ccab59c`), and
+the workflow checker refuses every secret and `vars` read in this file. The boundary
+below is the contract a re-introduced `soft-gate` step must meet
+([remote preflight contract](../remote-preflight-contract.md#independent-scored-admission)).
 
-The sole additional variable read is the exact public trust expression above, once at
+When re-introduced, the step's sole variable read is `${{ vars.DEVAI_SOFT_GATE_TRUST_JSON }}`, once at
 the declared provider-free step. All secrets, other vars, whole contexts, bracket reads,
 duplicate or relocated reads and unknown fields remain refused. The independently
 controlled tuple binds immutable evidence commit/payload digest, Ed25519 SPKI/key identity,

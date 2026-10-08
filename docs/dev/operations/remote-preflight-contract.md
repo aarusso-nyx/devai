@@ -191,13 +191,15 @@ triggers, jobs, environments, credentials, effects, and recovery paths.
 | `release.yml`             | Tag validation, candidate rehearsal, authorized artifact promotion        |
 | `site-publish.yml`        | Owner-dispatched documentation site publication from main                 |
 
-The PR lane has `contents: read`, no environment, secrets or protected variables.
-Its only additional variable is independently controlled public
-`vars.DEVAI_SOFT_GATE_TRUST_JSON`, read once in the declared provider-free `soft-gate`
-step env under ADR-MDL-0004; every other vars/secret/whole-context/bracket/duplicate/
-relocated read remains refused. It uses
+The PR lane has `contents: read` (the aggregator job adds `actions: read` for the run's
+own report artifacts), no environment, and reads no secret and no variable. The workflow
+checker refuses every secret and `vars` read in it. The provider-free scored soft gate of
+ADR-MDL-0004, with its single public variable `vars.DEVAI_SOFT_GATE_TRUST_JSON`, is not
+part of the lane: the Owner deferred it on 2026-10-03 and its step was removed
+(`0ccab59c`), while its scripts stay in the repository for a later release. The lane uses
 pinned actions, exact candidate checkout without persisted credentials, Linux runners
-and a bounded timeout. It never uploads evidence or executes the local-only RC closure.
+and a bounded timeout. It never uploads evidence or executes the local-only RC closure;
+its only artifacts are the two non-attesting partition reports the aggregator reads.
 Verifier materialization validates bytes; it never invokes signing or receipt verification.
 
 Cancellation is keyed per event as the table above states: by workflow identity and
@@ -233,6 +235,12 @@ The generic adopter contract remains controlled by its constitution and material
 policy. No own-repository exception weakens adopter roles, gates or trust anchors.
 
 ## Independent scored admission
+
+Deferred. No step of `pull-request-checks.yml` runs the scored soft gate today, so
+nothing below gates a pull request. This section states the contract a re-introduced
+`soft-gate` step must meet under ADR-MDL-0004; adding the step, and with it the read of
+`vars.DEVAI_SOFT_GATE_TRUST_JSON`, needs the Owner's decision and a workflow-checker
+change.
 
 The signed payload and external tuple must bind the exact event candidate/tree/base,
 reviewed immutable producer control and all source/lock/toolchain/roster/context/rubric/
