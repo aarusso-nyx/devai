@@ -11,7 +11,14 @@
     "ref": "product/campaigns/CMP-0007-gate-throughput/decisions.md"
   },
   "goal": "Bring self-scorecard cells F5:T7 and F5:T9 to PASS without relaxing a threshold or a definition and without moving any node out of the pull-request lane. Baseline over the 30 days to main 92526921 (355 counted pull_request runs): harness_performance median 710 s against a target below 600 s (p95 1059 s, already passing), with test:cli 58% of job time because the check runner executes nodes one at a time; harness_green_main 86.8% against a target of at least 95%, with 47 failures of which 33 are real defects, 13 main-moved blocks, and 1 infrastructure (#247). Owner decisions D1 to D5 of 2026-10-07 (decisions.md): in-runner parallel workers first and sharding only if still above 600 s, auto-update branch, a pre-push preflight mandatory for agents and opt-in for humans, keep the F5:T9 definition, and ship 2.3.0 when both cells pass.",
-  "records": ["ADR-CHK-0007", "ADR-CHK-0001", "ADR-CHK-0004", "ADR-GOV-0018", "ADR-SCR-0010"],
+  "records": [
+    "ADR-CHK-0007",
+    "ADR-CHK-0006",
+    "ADR-CHK-0001",
+    "ADR-CHK-0004",
+    "ADR-GOV-0018",
+    "ADR-SCR-0010"
+  ],
   "constraints": {
     "self_dogfood": true,
     "human_invoked_only": true,
@@ -42,29 +49,32 @@
     {
       "id": "R-0701",
       "title": "Gate speed (F5:T7)",
-      "goal": "The pull-request gate median falls below 600 s without dropping any planned node: the check runner executes independent plan nodes on a bounded worker pool under ADR-CHK-0007 (T1), test:cli is sharded across two jobs behind the single required check only if the median is still at or above 600 s afterwards (T2, conditional on D1), and the check-result cache persists across CI runs keyed by task input digest with the protected-namespace recapture rule kept (T3). Accepted when harness_performance over the post-change window of decisions.md reads a median below 600 s and every window run executed or accounted for its whole plan. Expected median about 345-430 s against the 710 s baseline.",
+      "goal": "The pull-request gate median falls below 600 s without dropping any planned node: the check runner executes independent plan nodes on a bounded worker pool under ADR-CHK-0007, with scheduling declarations in test-task-exclusivity.json and never in test-tasks.json so the package-owned verifier and release export are unaffected (T1), test:cli is sharded across two jobs behind the single required check only if the median is still at or above 600 s afterwards (T2, conditional on D1), and the check-result cache persists across CI runs keyed by task input digest with the protected-namespace recapture rule kept (T3). Accepted when harness_performance over the post-change window of decisions.md reads a median below 600 s and every window run executed or accounted for its whole plan. Expected median about 345-430 s against the 710 s baseline.",
       "status": "open",
-      "records": ["ADR-CHK-0007", "ADR-CHK-0001"],
+      "records": ["ADR-CHK-0007", "ADR-CHK-0006", "ADR-CHK-0001"],
       "depends_on": [],
-      "attestation_reissue": true,
+      "attestation_reissue": false,
       "owner_effects_required": [],
       "close_checks": ["adrs", "schemas", "test:schemas", "test:cli", "campaign:check"],
       "waves": [
         {
           "id": "CTG-0711",
-          "title": "Descriptor exclusivity keys and adopter scheduling rules",
+          "title": "Exclusivity declaration schema and a closed descriptor schema",
           "type": "single-role",
-          "records": ["ADR-CHK-0007"],
+          "records": ["ADR-CHK-0007", "ADR-CHK-0006"],
           "depends_on": [],
           "lock_scopes": [
+            "law/schemas/test-task-exclusivity.schema.json",
             "law/schemas/test-task-descriptor.schema.json",
-            "docs/adopters/test-tasks.md"
+            "packages/schemas/src/roster.ts",
+            "packages/schemas/tests/contract/",
+            "packages/cli/tests/unit/check-schemas-adopter-boundaries.test.ts"
           ],
-          "gates": ["schemas", "docs-links", "test:schemas"],
+          "gates": ["schemas", "test:schemas"],
           "tasks": [
             {
               "id": "TASK-0711",
-              "title": "Admit exclusivityKeys in the test task descriptor schema and document parallel scheduling for adopters",
+              "title": "Define the test-task-exclusivity schema and close the test task descriptor schema",
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
@@ -72,14 +82,22 @@
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
+                  "law/schemas/test-task-exclusivity.schema.json",
                   "law/schemas/test-task-descriptor.schema.json",
-                  "docs/adopters/test-tasks.md"
+                  "packages/schemas/src/roster.ts",
+                  "packages/schemas/tests/contract/",
+                  "packages/cli/tests/unit/check-schemas-adopter-boundaries.test.ts"
                 ],
-                "forbidden": ["packages/", "tests/", "test-tasks.json", ".github/workflows/"]
+                "forbidden": [
+                  "test-tasks.json",
+                  "packages/cli/src/",
+                  "packages/cli/vendor/",
+                  ".github/workflows/"
+                ]
               },
               "deliverables": [
-                "law/schemas/test-task-descriptor.schema.json admits the optional task field exclusivityKeys, an array of unique strings matching ^[a-z][a-z0-9:-]*$, with its description citing ADR-CHK-0007 rule 5; every existing descriptor still validates.",
-                "docs/adopters/test-tasks.md states the scheduling rules of ADR-CHK-0007 for adopter descriptors: the worker count default and its --task-workers and DEVAI_CHECK_TASK_WORKERS overrides, sequential release selections, plan-order reports, unchanged per-task timeouts, no fail-fast, and when to declare an exclusivity key."
+                "law/schemas/test-task-exclusivity.schema.json is the closed schema of test-task-exclusivity.json under ADR-CHK-0007 rule 5: schemaVersion 1.0.0 and a nodes map from descriptor nodeId to a declaration with optional exclusive and shared arrays of distinct keys matching ^[a-z0-9][a-z0-9._-]*$, additionalProperties false at every level, admitted to the runtime roster with its counts re-pinned.",
+                "law/schemas/test-task-descriptor.schema.json is closed at the top level and on each task (additionalProperties false), every committed descriptor still validates, and a misspelled task property or a scheduling field placed in the descriptor is refused; contract tests cover both schemas."
               ],
               "acceptance_commands": [
                 [
@@ -91,18 +109,9 @@
                   "--format",
                   "json"
                 ],
-                [
-                  "node",
-                  ".devai/state/pr-bootstrap/cli/bin.js",
-                  "check",
-                  "--only",
-                  "docs-links",
-                  "--format",
-                  "json"
-                ],
                 ["pnpm", "run", "test:schemas"]
               ],
-              "commit_types": ["law(schemas)", "docs(adopters)"],
+              "commit_types": ["spec(schemas)", "feat(schemas)", "test(schemas)", "test(cli)"],
               "prompt": {
                 "path": "prompts/TASK-0711.md"
               },
@@ -126,7 +135,8 @@
             "packages/cli/src/services/check-runner/",
             "packages/cli/src/commands/check/facade.ts",
             "packages/cli/tests/unit/",
-            "test-tasks.json",
+            "test-task-exclusivity.json",
+            "docs/adopters/test-tasks.md",
             "docs/reference/error-codes.md"
           ],
           "gates": ["test:cli"],
@@ -144,21 +154,33 @@
                   "packages/cli/src/services/check-runner/",
                   "packages/cli/src/commands/check/facade.ts",
                   "packages/cli/tests/unit/",
-                  "test-tasks.json",
+                  "test-task-exclusivity.json",
+                  "docs/adopters/test-tasks.md",
                   "docs/reference/error-codes.md"
                 ],
-                "forbidden": ["law/", ".github/workflows/"]
+                "forbidden": [
+                  "law/",
+                  "test-tasks.json",
+                  "packages/cli/vendor/",
+                  ".github/workflows/"
+                ]
               },
               "deliverables": [
-                "The check runner schedules plan nodes on a pool of at most W workers by rules 1 to 10 of ADR-CHK-0007: dependency readiness, plan-order admission, conflict serialization by exclusivity key, overlapping output path, or the implicit db key, plan-order report and receipt assembly, unchanged per-task timeouts, and no cancellation on failure.",
+                "The check runner schedules plan nodes on a pool of at most W workers by rules 1 to 10 of ADR-CHK-0007: dependency readiness, plan-order admission, conflict serialization from test-task-exclusivity.json (exclusive against either list, undeclared against every node) and from overlapping output paths and a shared DEVAI_DB_URL, plan-order report and receipt assembly, unchanged per-task timeouts, and no cancellation on failure.",
                 "check --run accepts --task-workers <n>, reads DEVAI_CHECK_TASK_WORKERS, defaults to min(4, availableParallelism()), refuses values outside 1..16 with CHECK_RUNNER_WORKERS before any node starts, and runs --rc, --release-intent, and protected execution sequentially; docs/reference/error-codes.md is regenerated for the new code.",
-                "test-tasks.json declares an exclusivity key for every shared resource the audit of its nodes finds, and tests cover IA-001 to IA-008 of ADR-CHK-0007 with an injected executor."
+                "test-task-exclusivity.json declares the framework nodes and validates against law/schemas/test-task-exclusivity.schema.json; the runner refuses a file that fails the schema or names an undeclared node; test-tasks.json is unchanged; docs/adopters/test-tasks.md documents the file and the rules; tests cover IA-001 to IA-008 of ADR-CHK-0007 with an injected executor."
               ],
               "acceptance_commands": [
                 ["pnpm", "run", "typecheck"],
                 ["pnpm", "run", "test:cli"]
               ],
-              "commit_types": ["feat(cli)", "test(cli)", "ci(test-tasks)", "docs(reference)"],
+              "commit_types": [
+                "feat(cli)",
+                "test(cli)",
+                "ci(test-tasks)",
+                "docs(adopters)",
+                "docs(reference)"
+              ],
               "prompt": {
                 "path": "prompts/TASK-0712.md"
               },
@@ -181,8 +203,7 @@
           "lock_scopes": [
             ".github/workflows/pull-request-checks.yml",
             "scripts/check-workflows.mjs",
-            "scripts/run-pr-release-gate.mjs",
-            "test-tasks.json"
+            "scripts/run-pr-release-gate.mjs"
           ],
           "gates": ["test:cli"],
           "tasks": [
@@ -198,20 +219,19 @@
                 "paths": [
                   ".github/workflows/pull-request-checks.yml",
                   "scripts/check-workflows.mjs",
-                  "scripts/run-pr-release-gate.mjs",
-                  "test-tasks.json"
+                  "scripts/run-pr-release-gate.mjs"
                 ],
-                "forbidden": ["law/", "packages/"]
+                "forbidden": ["law/", "packages/", "test-tasks.json"]
               },
               "deliverables": [
                 "Started only when harness_performance over the window after TASK-0712 still reads a median at or above 600 s (decision D1); otherwise the task is cancelled with that reading recorded.",
-                "test:cli runs as two shards in two jobs whose union is exactly the test:cli node set, an aggregator job reports the single required check devai-release-gate and fails when either shard fails or is missing, and scripts/check-workflows.mjs pins the shard pair and the aggregator."
+                "test:cli runs as two shards in two jobs, selected through vitest shard arguments in the workflow without editing test-tasks.json, whose union is exactly the test:cli node set, an aggregator job reports the single required check devai-release-gate and fails when either shard fails or is missing, and scripts/check-workflows.mjs pins the shard pair and the aggregator."
               ],
               "acceptance_commands": [
                 ["pnpm", "run", "campaign:check"],
                 ["pnpm", "run", "test:cli"]
               ],
-              "commit_types": ["ci(workflows)", "ci(scripts)", "ci(test-tasks)"],
+              "commit_types": ["ci(workflows)", "ci(scripts)"],
               "prompt": {
                 "path": "prompts/TASK-0713.md"
               },
