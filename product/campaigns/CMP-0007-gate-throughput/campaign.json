@@ -21,7 +21,7 @@
   "owner_effects": [
     {
       "id": "OE-02",
-      "description": "Enable the auto-update branch repository setting with the rebase update method (decision D2), after TASK-0721 records how it fits ADR-CHK-0004 and writes out the exact setting. OE-01 is not used: the campaign policy reserves it for a merge queue, which D2 did not choose, so serialized admission stays in force.",
+      "description": "Enable the auto-update branch repository setting with the rebase update method (decision D2), after TASK-0721 records how it fits ADR-CHK-0004 and writes out the exact setting, and provide the non-GITHUB_TOKEN credential the TASK-0726 rebase-update workflow uses. The setting alone updates no pull request; TASK-0726 is the update mechanism. OE-01 is not used: the campaign policy reserves it for a merge queue, which D2 did not choose, so serialized admission stays in force.",
       "required_before": "R-0702",
       "performed_at": null
     },
@@ -121,7 +121,7 @@
           "title": "Bounded parallel check runner",
           "type": "single-role",
           "records": ["ADR-CHK-0007", "ADR-CHK-0001"],
-          "depends_on": [],
+          "depends_on": ["CTG-0711"],
           "lock_scopes": [
             "packages/cli/src/services/check-runner/",
             "packages/cli/src/commands/check/facade.ts",
@@ -137,7 +137,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": null,
-              "status": "ready",
+              "status": "planned",
               "target_substrates": ["F2", "F5"],
               "boundary": {
                 "paths": [
@@ -283,7 +283,7 @@
     {
       "id": "R-0702",
       "title": "Remove avoidable gate failures (F5:T9)",
-      "goal": "Fewer runs fail for avoidable reasons, inside the current F5:T9 definition (D4): main-moved base-up-to-date blocks disappear through the auto-update branch setting with the rebase update method (T1, Owner effect OE-02), real defects are caught before push by a pre-push preflight that is mandatory for agents and opt-in for humans (T2, D3), the bootstrap cache is never restored without dist (T3, #247), and the doctor-check-result-identities flake candidate is resolved (T4). Accepted when the post-change window of decisions.md shows no main-moved failures, real-defect failures roughly halved against 33 in 355 baseline runs, and harness_green_main at or above 95%.",
+      "goal": "Fewer runs fail for avoidable reasons, inside the current F5:T9 definition (D4): main-moved base-up-to-date blocks are removed only if both of these land: the auto-update branch setting with the rebase update method (T1, Owner effect OE-02), and a rebase-update trigger that rebases every open pull request when main moves, so the superseded gate run is cancelled rather than failed (T1b, TASK-0726). Real defects are caught before push by a pre-push preflight that is mandatory for agents and opt-in for humans (T2, D3), the bootstrap cache is never restored without dist (T3, #247), and the doctor-check-result-identities flake candidate is resolved (T4). Accepted when the post-change window of decisions.md, which opens only after TASK-0726 merges and OE-02 is performed, shows no main-moved failures, real-defect failures roughly halved against 33 in 355 baseline runs, and harness_green_main at or above 95%.",
       "status": "planned",
       "records": ["ADR-CHK-0004", "ADR-CHK-0001", "ADR-GOV-0018"],
       "depends_on": [],
@@ -321,7 +321,7 @@
                 "forbidden": ["packages/", ".github/workflows/"]
               },
               "deliverables": [
-                "A forward decision record amending ADR-CHK-0004, which rejected allow_update_branch because a merge commit breaks linear history: it admits the update branch only with the rebase update method, states what triggers an update when main moves so a stale gate run is superseded and cancelled rather than failed, and keeps strict up-to-date protection and the single required check; the catalogue is regenerated and re-pinned.",
+                "A forward decision record amending ADR-CHK-0004, which rejected allow_update_branch because a merge commit breaks linear history: it admits the update branch only with the rebase update method, names the rebase-update trigger that TASK-0726 implements as the mechanism that updates open pull requests when main moves (the setting alone updates nothing), states that the superseded gate run is cancelled through the per-pull-request concurrency group rather than failed, and keeps strict up-to-date protection and the single required check; the catalogue is regenerated and re-pinned.",
                 "docs/dev/operations/remote-preflight-contract.md describes the update path, and the exact setting the Owner enables as OE-02 is written out for the Owner."
               ],
               "acceptance_commands": [
@@ -547,6 +547,55 @@
                 "tier": "worker",
                 "effort": "medium",
                 "time_budget_minutes": 60
+              }
+            }
+          ]
+        },
+        {
+          "id": "CTG-0726",
+          "title": "Rebase-update trigger for open pull requests when main moves",
+          "type": "single-role",
+          "records": ["ADR-CHK-0004"],
+          "depends_on": ["CTG-0721", "CTG-0724"],
+          "lock_scopes": [
+            ".github/workflows/update-pull-request-branches.yml",
+            ".github/workflows/pull-request-checks.yml",
+            "scripts/check-workflows.mjs"
+          ],
+          "gates": ["test:cli"],
+          "tasks": [
+            {
+              "id": "TASK-0726",
+              "title": "Rebase every open pull request onto main when main moves, and cancel the superseded gate run",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F5"],
+              "boundary": {
+                "paths": [
+                  ".github/workflows/update-pull-request-branches.yml",
+                  ".github/workflows/pull-request-checks.yml",
+                  "scripts/check-workflows.mjs"
+                ],
+                "forbidden": ["law/", "packages/"]
+              },
+              "deliverables": [
+                ".github/workflows/update-pull-request-branches.yml runs on push to main and, for every open non-draft pull request against main that is behind it, calls PUT /repos/{owner}/{repo}/pulls/{number}/update-branch with update_method rebase and the expected head sha. It skips a pull request whose rebase conflicts and reports it without failing the others. It uses a GitHub App or other non-GITHUB_TOKEN credential, because a push made with GITHUB_TOKEN starts no workflow run and the rebased head would never be gated. The workflow holds the least permissions it needs.",
+                "The superseded gate run is cancelled rather than failed. The existing concurrency group of pull-request-checks.yml, keyed by workflow and pull request number with cancel-in-progress, already cancels an in-progress run when the rebased head arrives as a synchronize event; the task verifies this on a live pull request, records the run ids in its pull request, and changes the gate workflow only if the verification fails.",
+                "scripts/check-workflows.mjs pins the trigger, the rebase update method, the credential source, and the concurrency group, so removing any of them fails the workflow check."
+              ],
+              "acceptance_commands": [["node", "scripts/check-workflows.mjs"]],
+              "commit_types": ["ci(workflows)", "ci(scripts)"],
+              "prompt": {
+                "path": "prompts/TASK-0726.md"
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker-high",
+                "effort": "high",
+                "time_budget_minutes": 120
               }
             }
           ]
