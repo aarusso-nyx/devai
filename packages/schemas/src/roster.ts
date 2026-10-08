@@ -103,6 +103,7 @@ export const ROSTER = [
   'subprocess-effects.schema.json',
   'task-execution-evidence.schema.json',
   'task.schema.json',
+  'test-task-exclusivity.schema.json',
   'test-weakening-config.schema.json',
   'trace.schema.json',
   'triage.schema.json',
