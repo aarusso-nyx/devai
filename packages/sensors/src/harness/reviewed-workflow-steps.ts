@@ -127,7 +127,7 @@ export const REVIEWED_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = Object.f
   {
     sha256: 'a5a7ea3605608cc3fd140e071d6fb7270542636ea3a80ca33a6c04484976a6c0',
     effect: 'read-only',
-    workflow: 'pull-request-checks.yml#preflight[0]',
+    workflow: 'pull-request-checks.yml#gate-cli[0], pull-request-checks.yml#gate-rest[0]',
     step: 'Check out exact candidate',
     review:
       "Checks out ${{ github.event_name == 'merge_group' && github.event.merge_group.head_sha || github.event.pull_request.head.sha }} into the workspace without persisted credentials; selects source, publishes nothing.",
@@ -136,7 +136,7 @@ export const REVIEWED_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = Object.f
   {
     sha256: 'b7ed7ae3efcf18f796d7496b73aa9531724d8c844932e1d114d38937fa9b7018',
     effect: 'read-only',
-    workflow: 'pull-request-checks.yml#preflight[1]',
+    workflow: 'pull-request-checks.yml#gate-cli[1], pull-request-checks.yml#gate-rest[1]',
     step: 'Set up pnpm and Node',
     review:
       'Repository toolchain action with declared inputs: installs Node and optionally pnpm and a registry scope; publishes nothing.',
@@ -150,7 +150,7 @@ export const REVIEWED_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = Object.f
   {
     sha256: 'c486121aada4d6e6e22633528e550ffaaac884812fb8a92183a0742343bd117c',
     effect: 'read-only',
-    workflow: 'pull-request-checks.yml#preflight[2]',
+    workflow: 'pull-request-checks.yml#gate-cli[2], pull-request-checks.yml#gate-rest[2]',
     step: 'Restore the check runner bootstrap',
     review:
       'Restores the bootstrap runner keyed by the hash of every input it compiles (ADR-CHK-0003); a stale key only recompiles. The following run steps are reviewed with this restore in view.',
@@ -159,7 +159,7 @@ export const REVIEWED_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = Object.f
   {
     sha256: 'cc1e66490d45c8a0c7e27631e02d7ae958794240fc4ba39f1827940befb20643',
     effect: 'read-only',
-    workflow: 'pull-request-checks.yml#preflight[3]',
+    workflow: 'pull-request-checks.yml#gate-cli[3], pull-request-checks.yml#gate-rest[3]',
     step: 'Compile the check runner bootstrap',
     review:
       'Local verification, build, or binding step: writes only the workspace, runner files, or step outputs, and makes no external write.',
@@ -175,21 +175,53 @@ export const REVIEWED_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = Object.f
     ],
   },
   {
-    sha256: '8b7b48e343a0f1e593f5ee0c40d28158841a79e234c03f1deb517340f540bc2b',
+    sha256: '1b05da42801c51f8948844996aadfb149574e96c51db8129e3fdecc9f784e832',
     effect: 'read-only',
-    workflow: 'pull-request-checks.yml#preflight[4]',
+    workflow: 'pull-request-checks.yml#gate-cli[4]',
     step: 'Preflight probes',
     review:
       'Local verification, build, or binding step: writes only the workspace, runner files, or step outputs, and makes no external write.',
     files: [],
   },
   {
-    sha256: '2a80e1d207149e628fa84709334191b84bce4640415da8576adb4c6f10d51da2',
+    sha256: 'd6118e1f7242659d27bbcb028a58b5f41f7d7193066240c9bb0477483a925ce2',
     effect: 'read-only',
-    workflow: 'pull-request-checks.yml#preflight[5]',
-    step: 'Affected checks and profile-selected candidate preflight',
+    workflow: 'pull-request-checks.yml#gate-cli[5]',
+    step: 'Affected checks owned by test:cli',
+    review:
+      'Runs the test:cli side of the partitioned affected plan (ADR-CHK-0007 rule 11) and writes its report under the runner temp directory; makes no external write.',
+    files: [
+      {
+        path: 'scripts/process/summarize-check-report.mjs',
+        sha256: '61d42e1bc0cdaf3a9e68f7950be0ef49f5797e43a348b26415062f0bae37323f',
+      },
+    ],
+  },
+  {
+    sha256: 'b0084ee23bfa8266d898e03d7e81c91972524541000067be939e5d8020e31534',
+    effect: 'read-only',
+    workflow: 'pull-request-checks.yml#gate-cli[6]',
+    step: 'Upload the partition report',
+    review:
+      "Uploads this partition's report from the runner temp directory as an artifact of the same workflow run (devai-gate-report-cli), which only the aggregator job reads; writes no release surface.",
+    files: [],
+  },
+  {
+    sha256: '8b7b48e343a0f1e593f5ee0c40d28158841a79e234c03f1deb517340f540bc2b',
+    effect: 'read-only',
+    workflow: 'pull-request-checks.yml#gate-rest[4]',
+    step: 'Preflight probes',
     review:
       'Local verification, build, or binding step: writes only the workspace, runner files, or step outputs, and makes no external write.',
+    files: [],
+  },
+  {
+    sha256: 'b05cd92ce9f6a2cf9fda90e42433e0380c2c59f68272a3c3cf624cdc2433c320',
+    effect: 'read-only',
+    workflow: 'pull-request-checks.yml#gate-rest[5]',
+    step: 'Affected checks and profile-selected candidate preflight',
+    review:
+      'Runs the release profile gate and the side of the partitioned affected plan outside test:cli (ADR-CHK-0007 rule 11), writing its report under the runner temp directory; makes no external write.',
     files: [
       {
         path: 'package.json',
@@ -210,6 +242,47 @@ export const REVIEWED_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = Object.f
       {
         path: 'scripts/run-pr-release-gate.mjs',
         sha256: '9986877ced443848d2e1e72cdfb40c13c667469eb0d4e91846e465c4cbda6da1',
+      },
+    ],
+  },
+  {
+    sha256: '2b445cc112826576ef05d97afa1b7e462232c347423486d331f7ceaa1cfcedbc',
+    effect: 'read-only',
+    workflow: 'pull-request-checks.yml#gate-rest[6]',
+    step: 'Upload the partition report',
+    review:
+      "Uploads this partition's report from the runner temp directory as an artifact of the same workflow run (devai-gate-report-rest), which only the aggregator job reads; writes no release surface.",
+    files: [],
+  },
+  {
+    sha256: '8eed4a18e94d2b0ad0360e876bb574e8dcb8c2ee735536381a437fb00667d16d',
+    effect: 'read-only',
+    workflow: 'pull-request-checks.yml#gate[0]',
+    step: 'Check out exact candidate',
+    review:
+      "Checks out ${{ github.event_name == 'merge_group' && github.event.merge_group.head_sha || github.event.pull_request.head.sha }} at depth 1 into the workspace without persisted credentials, only to read the aggregator script; selects source, publishes nothing.",
+    files: [],
+  },
+  {
+    sha256: '18525e42de63e157903e8af3c42d8f99f426ca640332f85001babf6d902bd4c7',
+    effect: 'read-only',
+    workflow: 'pull-request-checks.yml#gate[2]',
+    step: 'Download the partition reports',
+    review:
+      "Downloads the run's own devai-gate-report-* artifacts into the runner temp directory; reads artifacts of this workflow run and writes only runner files.",
+    files: [],
+  },
+  {
+    sha256: '5e9f0dd12c5ae611711a2a29c8667fea0ef3802731af48e7a75353d19559278d',
+    effect: 'read-only',
+    workflow: 'pull-request-checks.yml#gate[3]',
+    step: 'Aggregate the partition reports',
+    review:
+      'Runs scripts/aggregate-gate-partitions.mjs over the two downloaded partition reports; reads them, runs no check node, and prints one JSON line; makes no external write.',
+    files: [
+      {
+        path: 'scripts/aggregate-gate-partitions.mjs',
+        sha256: '3db39086d9afc41612514a8b6eee066e3315fc8f3cc750108558b32000836cb2',
       },
     ],
   },
@@ -782,7 +855,8 @@ export const REVIEWED_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = Object.f
   {
     sha256: 'ee55209cb6bca367dafa104dc204ea18901bc44861c17e377f6db04c311dc99a',
     effect: 'read-only',
-    workflow: 'site-publish.yml#prepare-site[1], site-publish.yml#publish-site[1]',
+    workflow:
+      'pull-request-checks.yml#gate[1], site-publish.yml#prepare-site[1], site-publish.yml#publish-site[1]',
     step: 'Set up Node',
     review:
       'Repository toolchain action with declared inputs: installs Node and optionally pnpm and a registry scope; publishes nothing.',
