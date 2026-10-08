@@ -5,12 +5,13 @@ file and kept to it by a drift check on the metadata block below (ADR-GOV-0021).
 operator reads the page before dispatching or recovering a workflow; the
 information-architecture gate refuses a workflow file without a page.
 
-| Workflow file             | Page                                            | Purpose                                                                     |
-| ------------------------- | ----------------------------------------------- | --------------------------------------------------------------------------- |
-| `pull-request-checks.yml` | [pull-request-checks](./pull-request-checks.md) | Non-attesting merge preflight on pull-request heads and merge-queue entries |
-| `release.yml`             | [release](./release.md)                         | Tag validation, candidate rehearsal, and authorized promotion               |
-| `site-publish.yml`        | [site-publish](./site-publish.md)               | Owner-dispatched site-only Pages publication from `main`                    |
-| `devai-ledger-verify.yml` | [devai-ledger-verify](./devai-ledger-verify.md) | Explicit dispatch of the protected ledger verification against one commit   |
+| Workflow file                      | Page                                                              | Purpose                                                                           |
+| ---------------------------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `pull-request-checks.yml`          | [pull-request-checks](./pull-request-checks.md)                   | Non-attesting merge preflight on pull-request heads and merge-queue entries       |
+| `release.yml`                      | [release](./release.md)                                           | Tag validation, candidate rehearsal, and authorized promotion                     |
+| `site-publish.yml`                 | [site-publish](./site-publish.md)                                 | Owner-dispatched site-only Pages publication from `main`                          |
+| `devai-ledger-verify.yml`          | [devai-ledger-verify](./devai-ledger-verify.md)                   | Explicit dispatch of the protected ledger verification against one commit         |
+| `update-pull-request-branches.yml` | [update-pull-request-branches](./update-pull-request-branches.md) | Rebase open pull requests behind `main` with the update-branch App (ADR-CHK-0008) |
 
 ## Page shape
 
@@ -49,7 +50,7 @@ block is current is a docs review, not a gate failure.
 
 ## Adding a workflow
 
-A fifth file under `.github/workflows/` needs, in the same pull request, a page
+A new file under `.github/workflows/` needs, in the same pull request, a page
 `docs/dev/operations/workflows/<file stem>.md` in the shape above, a row in the table
 on this page, its consumers in `law/policy/credential-requirements.json`, and its pins
 in `scripts/check-workflows.mjs`.
