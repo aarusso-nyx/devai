@@ -857,3 +857,54 @@ describe('harness_green_main outcomeUnit (ADR-SCR-0014)', () => {
     expect(declaration.inputs['harness_robustness']).not.toHaveProperty('outcomeUnit');
   });
 });
+
+// #364 and #365: the harness populations are read through gh argv the subprocess-effects
+// policy admits exactly, and DEVAI's materialized copy declares the same templates.
+describe('harness gh argv templates (ADR-SCR-0014 IA-006, IA-007)', () => {
+  interface Template {
+    readonly template_id: string;
+    readonly argv_shape: readonly string[];
+  }
+  const templates = (path: string): Map<string, readonly string[]> =>
+    new Map(
+      readJson<{ templates: readonly Template[] }>(resolve(path))
+        .templates.filter((template) => template.template_id.startsWith('gh-'))
+        .map((template) => [template.template_id, template.argv_shape]),
+    );
+  const law = templates('law/policy/subprocess-effects.json');
+  const materialized = templates('.devai/config/subprocess-effects.json');
+
+  it('fixes every run-list shape to the literal limit 1000', () => {
+    const runLists = [...law.keys()].filter((id) => id.startsWith('gh-run-list')).sort();
+    expect(runLists).toEqual([
+      'gh-run-list',
+      'gh-run-list-branch',
+      'gh-run-list-branch-created',
+      'gh-run-list-created',
+    ]);
+    for (const id of runLists) {
+      const argv = law.get(id) ?? [];
+      expect(argv.slice(argv.indexOf('--limit'), argv.indexOf('--limit') + 2), id).toEqual([
+        '--limit',
+        '1000',
+      ]);
+    }
+  });
+
+  it('admits gh pr list only with the base, lifetime and final-head fields', () => {
+    expect(law.get('gh-pr-list-all')).toEqual([
+      'pr',
+      'list',
+      '--state',
+      'all',
+      '--limit',
+      '1000',
+      '--json',
+      'baseRefName,closedAt,createdAt,headRefName,headRefOid,mergedAt,number,state',
+    ]);
+  });
+
+  it('materializes the same gh templates DEVAI law declares', () => {
+    expect(materialized).toEqual(law);
+  });
+});

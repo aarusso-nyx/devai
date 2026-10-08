@@ -89,7 +89,19 @@ afterEach(() => {
 
 /** The admitted gh run list shape: workflow and event, then json and limit (ADR-SCR-0010). */
 const BASE = ['run', 'list', '--workflow', 'pull-request-checks.yml', '--event', 'pull_request'];
-const TAIL = ['--json', 'conclusion', '--limit', '50'];
+/** The limit is the literal 1000 on every run-list shape (#364, ADR-SCR-0014 IA-007). */
+const TAIL = ['--json', 'conclusion', '--limit', '1000'];
+/** The exact gh pr list argv of the final-head unit (gh-pr-list-all, #365). */
+const PR_LIST = [
+  'pr',
+  'list',
+  '--state',
+  'all',
+  '--limit',
+  '1000',
+  '--json',
+  'baseRefName,closedAt,createdAt,headRefName,headRefOid,mergedAt,number,state',
+];
 
 describe('gh run list is a declared read-only host process (ADR-SCR-0005 IA-004)', () => {
   it.each([
@@ -106,7 +118,6 @@ describe('gh run list is a declared read-only host process (ADR-SCR-0005 IA-004)
           minimumSample: 20,
           headBranch: 'release/v1.2',
           since: '2026-09-01',
-          limit: 20,
         }),
     ],
     [
@@ -150,10 +161,11 @@ describe('gh run list is a declared read-only host process (ADR-SCR-0005 IA-004)
         '--json',
         'conclusion,createdAt,updatedAt',
         '--limit',
-        '50',
+        '1000',
       ],
     ],
-    ['harness_robustness', [...BASE, '--json', 'conclusion,attempt', '--limit', '100']],
+    ['harness_robustness', [...BASE, '--json', 'conclusion,attempt', '--limit', '1000']],
+    ['harness_green_main', PR_LIST],
     ['runtime_probe_auth', ['auth', 'status']],
     ['runtime_probe_api', ['--version']],
   ] as const)('admits %s: gh %j', (kind, args) => {
@@ -215,8 +227,26 @@ describe('gh run list is a declared read-only host process (ADR-SCR-0005 IA-004)
     // A bad branch, fields, limit, or created filter.
     [...BASE, '--branch', '--web', ...TAIL],
     [...BASE, '--branch', '../main', ...TAIL],
-    [...BASE, '--json', 'a;b', '--limit', '50'],
-    [...BASE, '--json', '', '--limit', '50'],
+    [...BASE, '--json', 'a;b', '--limit', '1000'],
+    [...BASE, '--json', '', '--limit', '1000'],
+    // Only the literal limit 1000 is admitted: the former 300 and every other value are refused.
+    [...BASE, '--json', 'conclusion', '--limit', '300'],
+    [...BASE, '--json', 'conclusion', '--limit', '50'],
+    [...BASE, '--json', 'conclusion', '--limit', '999'],
+    [...BASE, '--json', 'conclusion', '--limit', '1001'],
+    [...BASE, '--json', 'conclusion', '--limit', '9999'],
+    [...BASE, '--json', 'conclusion', '--limit', '300', '--created', '>=2026-09-01'],
+    [...BASE, '--branch', 'main', '--json', 'conclusion', '--limit', '300'],
+    // gh pr list only in its exact final-head shape: the former field set, another limit, a
+    // reordered field list, or an extra option is refused.
+    [...PR_LIST.slice(0, -1), 'closedAt,headRefName,headRefOid,mergedAt,number,state'],
+    [...PR_LIST.slice(0, 5), '300', ...PR_LIST.slice(6)],
+    [
+      ...PR_LIST.slice(0, -1),
+      'number,state,baseRefName,closedAt,createdAt,headRefName,headRefOid,mergedAt',
+    ],
+    [...PR_LIST, '--search', 'is:merged'],
+    ['pr', 'list', '--state', 'open', ...PR_LIST.slice(4)],
     [...BASE, '--json', 'conclusion', '--limit', '0'],
     [...BASE, '--json', 'conclusion', '--limit', '-1'],
     [...BASE, '--json', 'conclusion', '--limit', '99999'],
@@ -261,7 +291,6 @@ describe('gh run list is a declared read-only host process (ADR-SCR-0005 IA-004)
       '<event>': 'pull_request',
       '<ref>': 'main',
       '<fields>': 'conclusion,createdAt',
-      '<n>': '50',
       '>=<date>': '>=2026-09-01',
     };
     for (const path of [
@@ -290,11 +319,23 @@ describe('gh run list is a declared read-only host process (ADR-SCR-0005 IA-004)
       for (const template of declared) {
         const argv = template.argv_shape.map((token) => samples[token] ?? token);
         expect(template.executable).toBe('gh');
+        if (template.template_id !== 'gh-auth-status') {
+          // Every run-list shape fixes the limit to the literal 1000; no placeholder remains.
+          expect(argv.slice(argv.indexOf('--limit'), argv.indexOf('--limit') + 2)).toEqual([
+            '--limit',
+            '1000',
+          ]);
+          expect(argv.some((token) => /^<.*>$/u.test(token))).toBe(false);
+        }
         expect(invoke('harness_green_main', 'gh', argv)()).toBe('allowed');
         expect(invoke('harness_green_main', 'gh', [...argv, '--web'])).toThrow(
           /^AUTHORITY_[A-Z_]+$/u,
         );
       }
+      const prList = registry.templates.find(
+        (template) => template.template_id === 'gh-pr-list-all',
+      );
+      expect(prList?.argv_shape).toEqual(PR_LIST);
     }
   });
 });
