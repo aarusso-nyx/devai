@@ -9,6 +9,7 @@ supersedes: []
 provenance:
   - ADR-CHK-0001
   - ADR-CHK-0003
+  - ADR-CHK-0006
   - ADR-SCR-0010
   - packages/cli/src/services/check-runner/runner.ts
   - .github/workflows/pull-request-checks.yml
@@ -18,17 +19,17 @@ affected_rules:
   - packages/cli/src/services/check-runner/types.ts
   - packages/cli/src/commands/check/facade.ts
   - law/schemas/test-task-descriptor.schema.json
-  - test-tasks.json
+  - law/schemas/test-task-exclusivity.schema.json
   - docs/adopters/test-tasks.md
 inspector_acceptance:
   - IA-001 -- The same plan run with one worker and with four workers yields the same planned node set and, for every node in plan order, the same nodeId, taskKey, disposition, outcome, reason, exit code and signal, the same blocked list, the same receipt-or-refusal presence, and the same report exit code; the fixture includes a FAIL node, an extrinsic BLOCKED probe with a blocked-environment dependent, an ABORTED dependent of a FAIL, and a reused node.
   - IA-002 -- With an executor that records start and finish instants and finishes nodes in reverse plan order, no node starts before every one of its dependencies has a terminal outcome, and the execution array of the report is in plan order, not completion order.
   - IA-003 -- The number of node processes running at once never exceeds the effective worker count, and with one worker the start order equals plan order and no two nodes overlap.
-  - IA-004 -- Two nodes that share an exclusivity key, two nodes whose declared output paths are equal or one a path prefix of the other, and two nodes that both allowlist DEVAI_DB_URL never overlap in time, and the earlier one in plan order always starts first.
+  - IA-004 -- Two nodes where one holds exclusively a key the other holds in either list, a declared node and a node with no declaration, two nodes whose declared output paths are equal or one a path prefix of the other, and two nodes that both allowlist DEVAI_DB_URL never overlap in time, and the earlier one in plan order always starts first; two nodes that only share a key overlap, and with no test-task-exclusivity.json every plan runs one node at a time.
   - IA-005 -- A FAIL in one node does not cancel or shorten any running node, every independent node still starts, and only its dependents are recorded ABORTED with reason dependency-not-pass without being started.
   - IA-006 -- A node that waits in the ready queue longer than the per-task timeout still runs and is timed out only by its own timeout measured from its own start; the timeout default and the --task-timeout-ms flag are unchanged.
   - IA-007 -- --task-workers wins over DEVAI_CHECK_TASK_WORKERS; 0, 17, a fraction, or a non-numeric value from either source is refused with CHECK_RUNNER_WORKERS before any node starts; under --rc, --release-intent, or a protected execution identity the effective count is one, the environment value is ignored, and an explicit --task-workers above one is refused with CHECK_RUNNER_WORKERS.
-  - IA-008 -- The plan document, every task key and input digest, the descriptor and task-policy digests, and the receipt are byte-identical for the same inputs whatever the worker count, so the worker count is never an input of reuse or attestation.
+  - IA-008 -- The plan document, every task key and input digest, the descriptor and task-policy digests, and the receipt are byte-identical for the same inputs whatever the worker count and whatever test-task-exclusivity.json declares, so neither is an input of reuse or attestation; an exclusivity file that fails test-task-exclusivity.schema.json or names a node the descriptor does not declare is refused before any node starts.
 ---
 
 # Bounded parallel execution of check plan nodes
@@ -45,9 +46,19 @@ for a pull request" condition. It changes how the runner schedules the nodes
 of a plan, never which nodes a plan holds or what verdict it reaches. No
 invariant changes: INV-CORE-003 already requires a deterministic gate and
 INV-CORE-004 the blocked-environment rule, and both hold under the rules
-below. The optional `exclusivityKeys` descriptor field changes the
-descriptor schema, and declaring it in `test-tasks.json` changes the
-task-policy digest, so the round that lands it re-issues the RC attestation.
+below. Scheduling declarations live in their own file,
+`test-task-exclusivity.json`, and never in `test-tasks.json`. The
+package-owned evidence verifier (1.9.0) reconstructs the RC policy from the
+committed descriptor and refuses any task property it does not know
+(ADR-CHK-0006), so the descriptor bytes, its digest, the task-policy digest,
+release export, and certification are unchanged by this record.
+
+Amended on 2026-10-07, before any release carried it, under the
+coordinator's ruling on the review of CMP-0007. The first text put an
+`exclusivityKeys` field into the descriptor, which the bundled verifier
+would refuse. The conflict model is now the `exclusive` and `shared`
+declaration of the separate file, and an undeclared node conflicts with every
+node.
 
 ## Context
 
@@ -107,18 +118,35 @@ the implementation and its tests.
    result digests, then execution. A ready node is admitted in plan order:
    among ready nodes that may start, the one earliest in plan order starts
    first.
-5. **Shared-resource safety.** Two nodes conflict when (a) they share a value
-   in the optional descriptor field `exclusivityKeys` (an array of strings
-   matching `^[a-z][a-z0-9:-]*$`), (b) one declares an `outputContract.paths`
-   entry or a `generated_namespaces` prefix that equals, or is a path prefix
-   of, an entry or prefix the other declares, or (c) both allowlist
-   `DEVAI_DB_URL`, which is the implicit key `db`. Conflicting nodes never
-   run at the same time, and the one later in plan order does not start until
-   the earlier one has a terminal outcome, so a shared output ends with the
-   bytes the sequential order would leave. Any other shared resource a node
-   uses (a fixed scratch directory, a port, a lock file) must be declared
-   with an exclusivity key in `test-tasks.json`; an undeclared shared
-   resource is a descriptor defect, not a scheduling choice.
+5. **Shared-resource safety.** Scheduling declarations live in
+   `test-task-exclusivity.json` beside `test-tasks.json`, validated by
+   `law/schemas/test-task-exclusivity.schema.json`. The file maps a
+   descriptor `nodeId` to `{ "exclusive": [...], "shared": [...] }`, each an
+   array of distinct keys matching `^[a-z0-9][a-z0-9._-]*$`. `exclusive`
+   names state the node mutates; `shared` names state it only reads. Two
+   nodes conflict when any of these holds:
+   - one holds exclusively a key that the other holds in either list;
+   - either node has no declaration in the file, which is the safe default:
+     an undeclared node conflicts with every node, so a repository without
+     the file runs every plan one node at a time;
+   - one declares an `outputContract.paths` entry or a
+     `generated_namespaces` prefix that equals, or is a path prefix of, an
+     entry or prefix the other declares;
+   - both allowlist `DEVAI_DB_URL`.
+
+   Conflicting nodes never run at the same time, and the one later in plan
+   order does not start until the earlier one has a terminal outcome, so a
+   shared output ends with the bytes the sequential order would leave. Any
+   other shared resource a node uses (a fixed scratch directory, a port, a
+   lock file) must be declared with a key; a wrong declaration is a defect
+   of the file, not a scheduling choice. A file that fails its schema, or
+   that names a node the descriptor does not declare, is refused before any
+   node starts. The file is read by the runner only. It is never part of the
+   descriptor, never read by the package-owned evidence verifier, and never
+   an input of a task key, a digest, or a receipt (rule 10), which keeps
+   release export and certification byte-identical to a run without it
+   (ADR-CHK-0006).
+
 6. **Deterministic report and evidence order.** The `execution` array of the
    report, the `blocked` list, the release verification entries, the receipt
    and the preflight receipt are assembled in plan order, never in completion
@@ -135,7 +163,9 @@ the implementation and its tests.
    starting every node whose dependencies allow it. Only the dependents of
    the failed node are recorded under rule 4 without being started. The
    runner waits for every started node to reach a terminal outcome before it
-   attests and returns.
+   attests and returns. A host error of the runner itself, which is not a
+   node outcome, stops new starts, lets running nodes settle, and is then
+   raised as it would be in the sequential runner.
 9. **Gate guarantee.** For the same base, candidate, descriptor, toolchain,
    and cache state, a run with any admitted worker count yields the same
    planned node set and, node by node in plan order, the same comparable
@@ -147,10 +177,11 @@ the implementation and its tests.
    with another node through an undeclared resource, is a defect of that
    node, recorded to the backlog under ADR-GOV-0019, and never a reason to
    weaken this guarantee.
-10. **The worker count is not an input.** It is absent from the plan, every
-    task key and input digest, the descriptor digest, the task-policy digest,
-    and the receipt. A cached result is reusable or not regardless of the
-    worker count that produced it.
+10. **Scheduling is not an input.** The worker count and the contents of
+    `test-task-exclusivity.json` are absent from the plan, every task key and
+    input digest, the descriptor digest, the task-policy digest, and the
+    receipt. A cached result is reusable or not regardless of the worker count
+    or declarations that produced it.
 
 ## Consequences
 
@@ -160,8 +191,10 @@ and one report. Its duration approaches the longest dependency chain, which
 rise with the worker count. A runner with tight resources sets
 `DEVAI_CHECK_TASK_WORKERS=1` and gets the sequential behavior unchanged.
 Tests that silently shared state while sequential become visible as conflicts
-or flakes. Each one is fixed by an exclusivity key or by isolating the test,
-and a retry never hides it. If the gate median is still above 600 s after
+or flakes. Each one is fixed by a declaration in `test-task-exclusivity.json`
+or by isolating the test, and a retry never hides it. An adopter gains
+parallelism only by declaring its nodes; until then its plans run one node at
+a time whatever the worker count. If the gate median is still above 600 s after
 this lands, R-0701 shards `test:cli` under decision D1. Release runs keep
 their current timing until a later record widens rule 3.
 
@@ -176,7 +209,13 @@ set that reaches a terminal outcome and hide independent failures that the
 sequential runner reports. An unbounded pool is rejected because the large
 vitest nodes already fan out internally and would oversubscribe the runner.
 Inferring conflicts from file-system tracing is rejected because it is
-platform-specific and not reproducible from the descriptor.
+platform-specific and not reproducible from the descriptor. A scheduling
+field inside `test-tasks.json` is rejected because the package-owned
+evidence verifier refuses unknown task properties when it rebuilds the RC
+policy from the committed descriptor (ADR-CHK-0006), so it would break release
+export until the verifier is re-vendored. Treating an undeclared node as free
+to overlap is rejected because one missing declaration would let two writers
+race silently.
 
 ## Affected Rules
 
@@ -185,23 +224,23 @@ platform-specific and not reproducible from the descriptor.
 - `packages/cli/src/services/check-runner/runner-execution.ts`: concurrent
   execution of node processes under the per-task timeout.
 - `packages/cli/src/services/check-runner/types.ts`: the worker count option
-  and the `exclusivityKeys` descriptor field.
+  and the exclusivity declaration type.
 - `packages/cli/src/commands/check/facade.ts`: the `--task-workers` flag and
   the `CHECK_RUNNER_WORKERS` refusal.
-- `law/schemas/test-task-descriptor.schema.json`: the optional
-  `exclusivityKeys` field.
-- `test-tasks.json`: exclusivity keys for every shared resource the
-  implementation audit finds.
-- `docs/adopters/test-tasks.md`: the field and the scheduling rules for
-  adopter descriptors.
+- `law/schemas/test-task-descriptor.schema.json`: closed objects, so a
+  scheduling field or a misspelled property in the descriptor is refused.
+- `law/schemas/test-task-exclusivity.schema.json`: the closed schema of
+  `test-task-exclusivity.json`.
+- `docs/adopters/test-tasks.md`: the declaration file and the scheduling
+  rules for adopters.
 
 ## Inspector Adversarial Acceptance
 
 - IA-001 -- The same plan run with one worker and with four workers yields the same planned node set and, for every node in plan order, the same nodeId, taskKey, disposition, outcome, reason, exit code and signal, the same blocked list, the same receipt-or-refusal presence, and the same report exit code; the fixture includes a FAIL node, an extrinsic BLOCKED probe with a blocked-environment dependent, an ABORTED dependent of a FAIL, and a reused node.
 - IA-002 -- With an executor that records start and finish instants and finishes nodes in reverse plan order, no node starts before every one of its dependencies has a terminal outcome, and the execution array of the report is in plan order, not completion order.
 - IA-003 -- The number of node processes running at once never exceeds the effective worker count, and with one worker the start order equals plan order and no two nodes overlap.
-- IA-004 -- Two nodes that share an exclusivity key, two nodes whose declared output paths are equal or one a path prefix of the other, and two nodes that both allowlist DEVAI_DB_URL never overlap in time, and the earlier one in plan order always starts first.
+- IA-004 -- Two nodes where one holds exclusively a key the other holds in either list, a declared node and a node with no declaration, two nodes whose declared output paths are equal or one a path prefix of the other, and two nodes that both allowlist DEVAI_DB_URL never overlap in time, and the earlier one in plan order always starts first; two nodes that only share a key overlap, and with no test-task-exclusivity.json every plan runs one node at a time.
 - IA-005 -- A FAIL in one node does not cancel or shorten any running node, every independent node still starts, and only its dependents are recorded ABORTED with reason dependency-not-pass without being started.
 - IA-006 -- A node that waits in the ready queue longer than the per-task timeout still runs and is timed out only by its own timeout measured from its own start; the timeout default and the --task-timeout-ms flag are unchanged.
 - IA-007 -- --task-workers wins over DEVAI_CHECK_TASK_WORKERS; 0, 17, a fraction, or a non-numeric value from either source is refused with CHECK_RUNNER_WORKERS before any node starts; under --rc, --release-intent, or a protected execution identity the effective count is one, the environment value is ignored, and an explicit --task-workers above one is refused with CHECK_RUNNER_WORKERS.
-- IA-008 -- The plan document, every task key and input digest, the descriptor and task-policy digests, and the receipt are byte-identical for the same inputs whatever the worker count, so the worker count is never an input of reuse or attestation.
+- IA-008 -- The plan document, every task key and input digest, the descriptor and task-policy digests, and the receipt are byte-identical for the same inputs whatever the worker count and whatever test-task-exclusivity.json declares, so neither is an input of reuse or attestation; an exclusivity file that fails test-task-exclusivity.schema.json or names a node the descriptor does not declare is refused before any node starts.
