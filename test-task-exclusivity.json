@@ -1,0 +1,90 @@
+{
+  "schemaVersion": "1.0.0",
+  "nodes": {
+    "generate": {
+      "exclusive": ["sources"]
+    },
+    "test:authority": {
+      "shared": ["sources", "dist"]
+    },
+    "test:cli": {
+      "shared": ["sources", "dist"]
+    },
+    "test:package-staging": {
+      "shared": ["sources", "dist"]
+    },
+    "test:effects": {
+      "shared": ["sources", "dist"]
+    },
+    "test:evidence": {
+      "shared": ["sources", "dist"]
+    },
+    "test:loop": {
+      "shared": ["sources", "dist"]
+    },
+    "test:sensors": {
+      "shared": ["sources", "dist"]
+    },
+    "test:schemas": {
+      "shared": ["sources", "dist"]
+    },
+    "test:skills": {
+      "shared": ["sources", "dist"]
+    },
+    "test:spec": {
+      "shared": ["sources", "dist"]
+    },
+    "test:utils": {
+      "shared": ["sources", "dist"]
+    },
+    "test:root": {
+      "shared": ["sources", "dist"]
+    },
+    "format": {
+      "shared": ["sources"]
+    },
+    "release:static-integrity": {
+      "shared": ["sources", "dist"]
+    },
+    "release:closure": {
+      "shared": ["sources", "dist"]
+    },
+    "release:affected-anchor": {},
+    "plan:campaign": {
+      "shared": ["sources"]
+    },
+    "plan:scorecard-page": {
+      "shared": ["sources"]
+    },
+    "plan:validate": {
+      "shared": ["sources", "dist"]
+    },
+    "law:validate": {
+      "shared": ["sources", "dist"]
+    },
+    "docs:links": {
+      "shared": ["sources", "dist"]
+    },
+    "docs:governance": {
+      "shared": ["sources", "dist"]
+    },
+    "docs:ci-economy": {
+      "shared": ["sources", "dist"]
+    },
+    "docs:validate": {
+      "shared": ["sources", "dist"]
+    },
+    "test:local-full": {},
+    "build": {
+      "exclusive": ["dist"],
+      "shared": ["sources"]
+    },
+    "lint": {
+      "shared": ["sources", "dist"]
+    },
+    "typecheck": {
+      "exclusive": ["dist"],
+      "shared": ["sources"]
+    }
+  }
+}
