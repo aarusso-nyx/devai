@@ -1170,7 +1170,9 @@
             "packages/schemas/tests/contract/",
             ".devai/config/toolchain.json",
             "packages/sensors/src/harness/",
-            "packages/sensors/src/harness-coherence.ts"
+            "packages/sensors/src/harness-coherence.ts",
+            "docs/dev/operations/workflows/README.md",
+            "law/policy/documentation-information-architecture.json"
           ],
           "gates": ["test:cli", "test:sensors"],
           "tasks": [
@@ -1189,14 +1191,17 @@
                   "law/policy/adr-validation.json",
                   "law/policy/credential-requirements.json",
                   ".devai/config/credential-requirements-binding.json",
-                  "docs/dev/operations/workflows/update-pull-request-branches.md"
+                  "docs/dev/operations/workflows/update-pull-request-branches.md",
+                  "docs/dev/operations/workflows/README.md",
+                  "law/policy/documentation-information-architecture.json"
                 ],
                 "forbidden": ["packages/", "tests/", "scripts/", ".github/"]
               },
               "deliverables": [
                 "ADR-CHK-0008 defines the harness effect class repository-write: a step that writes repository refs or branches through the API and is not a release publication. It classifies the rebase-update step as repository-write (coordinator ruling of 2026-10-08: the rebase-update step is repository-write, not publication), and states that the update workflow uses a superseding concurrency group, so a newer push to main cancels an update run in progress. The ADR index is regenerated and law/policy/adr-validation.json is re-pinned.",
                 "law/policy/credential-requirements.json declares the update-branch GitHub App credential the update workflow consumes. .devai/config/credential-requirements-binding.json binds it for this repository, as an Architect-owned adopter binding under the ADR-CHK-0008 path table. No credential value is committed.",
-                "docs/dev/operations/workflows/update-pull-request-branches.md describes the update workflow: its trigger, the rebase update method, the expected-head guard, the App credential, the least permissions, the repository-write effect class, and the superseding concurrency."
+                "docs/dev/operations/workflows/update-pull-request-branches.md describes the update workflow: its trigger, the rebase update method, the expected-head guard, the App credential, the least permissions, the repository-write effect class, and the superseding concurrency.",
+                "The workflows index docs/dev/operations/workflows/README.md lists the new page, and law/policy/documentation-information-architecture.json registers it."
               ],
               "acceptance_commands": [
                 [
