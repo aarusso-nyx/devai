@@ -17,10 +17,12 @@ const ROOT = resolve(import.meta.dirname, '../../../..');
 // promotes campaign.schema.json for the campaign projection and materializer. The pack resolver
 // validates every stack-adapter.json through the roster, so stack-adapter.schema.json leaves the
 // source-only catalogue (#235); a source-only name throws in the packed runtime and no pack would
-// ever resolve. The count is 111.
+// ever resolve. ADR-CHK-0007 adds test-task-exclusivity.schema.json, which the check runner
+// validates its scheduling declarations against. The count is 112.
 describe('schema roster', () => {
   it('holds the previous roster plus model-tiers, path-authority-classes, observation-backlog and the proof anchor schemas', () => {
-    expect(ROSTER).toHaveLength(111);
+    expect(ROSTER).toHaveLength(112);
+    expect(ROSTER).toContain('test-task-exclusivity.schema.json');
     expect(ROSTER).toContain('stack-adapter.schema.json');
     expect(ROSTER).toContain('model-tiers.schema.json');
     expect(ROSTER).toContain('path-authority-classes.schema.json');
