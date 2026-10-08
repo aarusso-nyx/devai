@@ -17,6 +17,8 @@ const POLICY = [
   'law/policy/commit-grammar.json',
   'law/policy/change-taxonomy.json',
   '.devai/config/change-taxonomy-binding.json',
+  // The checker reads the adopter-policy source and its materialized copies from this binding.
+  '.devai/config/adopter-policy-binding.json',
 ] as const;
 
 interface Identity {
@@ -338,6 +340,69 @@ describe('commit-range provenance admitted cases (ADR-CHK-0008)', () => {
       author: OWNER,
       message: 'law(glossary): define a fixture term',
       files: { 'law/glossary/fixture.md': '# Fixture term\n' },
+    });
+  });
+});
+
+// #362 review: the derived record, the constitution pin, adopter-policy materialization, and
+// the update App's exact email.
+describe('commit-range provenance edge rows (ADR-CHK-0008, #362)', () => {
+  it('refuses an Owner commit under record/derived/', () => {
+    expectRefused({
+      author: OWNER,
+      message: 'plan(record): write a derived record by hand',
+      files: { 'record/derived/fixture.json': '{"derived":true}\n' },
+    });
+  });
+
+  it('admits a Machine commit under record/derived/', () => {
+    expectAdmitted({
+      author: MACHINE,
+      message: 'plan(record): derive a fixture record',
+      files: { 'record/derived/fixture.json': '{"derived":true}\n' },
+    });
+  });
+
+  it('refuses an Architect commit that re-pins the constitution without changing it', () => {
+    // The pin follows law/constitution.md; an ADR change alone does not license re-pinning it.
+    expectRefused({
+      author: ARCHITECT,
+      message: 'law(adr): amend a record and touch the constitution pin',
+      files: {
+        'law/adr/ADR-FIX-0001-fixture.md': '# Fixture record\n',
+        '.devai/pin/constitution.md': '# Pinned constitution\n',
+      },
+    });
+  });
+
+  it('admits an Architect commit materializing the adopter policy into its .devai/config copy', () => {
+    expectAdmitted({
+      author: ARCHITECT,
+      message: 'law(policy): amend the adoption policy and its materialized scorecard copy',
+      files: {
+        'law/policy/devai-adoption.json': '{"schemaVersion":"1.0.0"}\n',
+        '.devai/config/scorecard-na.json': '{"schemaVersion":"1.0.0","cells":[]}\n',
+      },
+    });
+  });
+
+  it('refuses an Architect commit changing a materialized copy without its adopter source', () => {
+    expectRefused({
+      author: ARCHITECT,
+      message: 'law(policy): edit the materialized scorecard copy alone',
+      files: { '.devai/config/scorecard-na.json': '{"schemaVersion":"1.0.0","cells":[]}\n' },
+    });
+  });
+
+  it('refuses a lookalike of the update App email', () => {
+    expectRefused({
+      author: INSPECTOR,
+      committer: {
+        name: 'devai-update-branch[bot]',
+        email: '123+other+devai-update-branch[bot]@users.noreply.github.com',
+      },
+      message: 'test(commit-grammar): add a fixture under a lookalike App email',
+      files: { 'tests/contract/lookalike-app.contract.test.ts': 'export {};\n' },
     });
   });
 });
