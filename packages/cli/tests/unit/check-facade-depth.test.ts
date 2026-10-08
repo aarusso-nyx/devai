@@ -163,7 +163,15 @@ describe('check facade task-runner boundary', () => {
         'Run a canonical check suite or one named check with fail-closed aggregate output.',
       authority: 'policy_firewall',
     });
-    expect(options).toEqual([
+    // ADR-CHK-0007 rule 11 adds the two partition flags; their wording and position are the
+    // implementation's, their names and the <ids> argument are the contract.
+    const partitionFlags = options.filter(([flags]) => flags.startsWith('--partition-'));
+    expect(partitionFlags.map(([flags]) => flags).sort()).toEqual([
+      '--partition-exclude <ids>',
+      '--partition-include <ids>',
+    ]);
+    for (const [, description] of partitionFlags) expect(description).toMatch(/\S/u);
+    expect(options.filter(([flags]) => !flags.startsWith('--partition-'))).toEqual([
       ['--suite <name>', 'quick | standard | full | release (default: standard)'],
       ['--only <member>', 'Run one named canonical check member'],
       ['--repo-root <path>', 'Repository root (default: .)'],
@@ -399,6 +407,141 @@ describe('check facade task-runner boundary', () => {
     });
     expect(boundary.runCheckTasks).not.toHaveBeenCalled();
     expect(boundary.runCheckTasksAsync).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['--partition-include', 'test:cli', 'include', ['test:cli']],
+    ['--partition-exclude', 'test:cli', 'exclude', ['test:cli']],
+    [
+      '--partition-include',
+      'test:cli, docs:links ,lint',
+      'include',
+      ['test:cli', 'docs:links', 'lint'],
+    ],
+  ])('passes %s %j to the runner as an %s partition', async (flag, value, mode, nodeIds) => {
+    const root = temporaryRoot();
+    boundary.runCheckTasks.mockReturnValueOnce(taskReport({ operation: 'run' }));
+
+    const result = await invoke([
+      '--affected',
+      '--run',
+      '--base',
+      'abc123',
+      flag,
+      value,
+      '--repo-root',
+      root,
+    ]);
+
+    expect(result).toMatchObject({ stderr: '', exit: 0 });
+    expect(boundary.runCheckTasks).toHaveBeenCalledWith(
+      expect.objectContaining({
+        target: 'affected',
+        operation: 'run',
+        partition: { mode, nodeIds },
+      }),
+    );
+  });
+
+  it('passes a partition for a local run as well', async () => {
+    const root = temporaryRoot();
+    boundary.runCheckTasks.mockReturnValueOnce(taskReport({ operation: 'run' }));
+    await invoke(['--local', '--run', '--partition-exclude', 'test:cli', '--repo-root', root]);
+    expect(boundary.runCheckTasks).toHaveBeenCalledWith(
+      expect.objectContaining({
+        target: 'local',
+        partition: { mode: 'exclude', nodeIds: ['test:cli'] },
+      }),
+    );
+  });
+
+  it('sends no partition when neither flag is given', async () => {
+    const root = temporaryRoot();
+    boundary.runCheckTasks.mockReturnValueOnce(taskReport({ operation: 'run' }));
+    await invoke(['--local', '--run', '--repo-root', root]);
+    expect(boundary.runCheckTasks.mock.calls[0]?.[0]).not.toHaveProperty('partition');
+  });
+
+  it.each([
+    [
+      'both flags together',
+      [
+        '--affected',
+        '--run',
+        '--base',
+        'abc123',
+        '--partition-include',
+        'test:cli',
+        '--partition-exclude',
+        'test:cli',
+      ],
+    ],
+    ['an empty list', ['--affected', '--run', '--base', 'abc123', '--partition-include', '']],
+    [
+      'a list of separators only',
+      ['--affected', '--run', '--base', 'abc123', '--partition-exclude', ' , ,'],
+    ],
+    ['an rc selection', ['--rc', '--run', '--partition-include', 'test:cli']],
+    [
+      'a preflight selection',
+      ['--preflight', '--run', '--base', 'abc123', '--partition-include', 'test:cli'],
+    ],
+    [
+      'a release intent',
+      ['--release-intent', 'intent.json', '--run', '--partition-exclude', 'test:cli'],
+    ],
+    [
+      'a certify stage',
+      [
+        '--release-intent',
+        'intent.json',
+        '--release-stage',
+        'certify',
+        '--run',
+        '--partition-include',
+        'test:cli',
+      ],
+    ],
+    [
+      'a task plan',
+      ['--affected', '--task-plan', '--base', 'abc123', '--partition-include', 'test:cli'],
+    ],
+  ])('refuses a partition with %s as usage before the runner is called', async (_label, args) => {
+    const root = temporaryRoot();
+    put(root, 'intent.json', { candidate: 'cafe' });
+    put(root, '.devai/config/release-verification.json', { profile: 'default' });
+
+    const result = await invoke([...args, '--repo-root', root]);
+
+    expect(result).toMatchObject({
+      stdout: '',
+      stderr: expect.stringContaining('CHECK_RUNNER_PARTITION'),
+      exit: EXIT_USAGE,
+    });
+    expect(boundary.runCheckTasks).not.toHaveBeenCalled();
+    expect(boundary.runCheckTasksAsync).not.toHaveBeenCalled();
+  });
+
+  it('maps a runner CHECK_RUNNER_PARTITION refusal to usage', async () => {
+    const root = temporaryRoot();
+    boundary.runCheckTasks.mockImplementationOnce(() => {
+      throw new Error('CHECK_RUNNER_PARTITION: test:clii is not a node of the task descriptor');
+    });
+    const result = await invoke([
+      '--affected',
+      '--run',
+      '--base',
+      'abc123',
+      '--partition-include',
+      'test:clii',
+      '--repo-root',
+      root,
+    ]);
+    expect(result).toMatchObject({
+      stdout: '',
+      stderr: expect.stringContaining('CHECK_RUNNER_PARTITION'),
+      exit: EXIT_USAGE,
+    });
   });
 
   it('uses the default release profile and preflight stage', async () => {
