@@ -721,25 +721,51 @@ const UPDATE_APP_TOKEN_INPUTS = {
 };
 const UPDATE_RUN_TOKEN = '${{ steps.app-token.outputs.token }}';
 const UPDATE_PROBE_STEP = 'credentials';
+const UPDATE_CONCURRENCY = {
+  group: '${{ github.workflow }}-${{ github.ref }}',
+  'cancel-in-progress': true,
+};
 const UPDATE_PROBE_ENV = {
   APP_ID_PRESENT: "${{ secrets.DEVAI_UPDATE_BRANCH_APP_ID != '' }}",
   PRIVATE_KEY_PRESENT: "${{ secrets.DEVAI_UPDATE_BRANCH_APP_PRIVATE_KEY != '' }}",
 };
-const UPDATE_PROBE_MARKERS = [
+// The probe and rebase scripts, as normalized logical lines (continuations joined, lines
+// trimmed, blank lines dropped). Matched exactly, so text in a comment never satisfies a pin.
+const UPDATE_PROBE_SCRIPT = [
   'set -euo pipefail',
+  'if [ "$APP_ID_PRESENT" = \'true\' ] && [ "$PRIVATE_KEY_PRESENT" = \'true\' ]; then',
   'echo \'present=true\' >> "$GITHUB_OUTPUT"',
+  'else',
+  "echo '::notice::The update-branch App credentials are not configured; no pull request was rebased.'",
+  'echo \'- The update-branch App credentials are not configured; no pull request was rebased.\' >> "$GITHUB_STEP_SUMMARY"',
   'echo \'present=false\' >> "$GITHUB_OUTPUT"',
-  '::notice::',
-  '$GITHUB_STEP_SUMMARY',
+  'fi',
 ];
 const UPDATE_PRESENT_CONDITION = "steps.credentials.outputs.present == 'true'";
-const UPDATE_RUN_MARKERS = [
+const UPDATE_RUN_SCRIPT = [
   'set -euo pipefail',
-  'select(.draft == false)',
-  'select(.head.repo.full_name == $ENV.REPOSITORY)',
-  '/update-branch',
-  '-f update_method=rebase',
-  '-f expected_head_sha="$head"',
+  'gh api --paginate "repos/$REPOSITORY/pulls?state=open&base=main&per_page=100" --jq \'.[] | select(.draft == false) | select(.head.repo.full_name == $ENV.REPOSITORY) | [.number, .head.sha] | @tsv\' > "$RUNNER_TEMP/pull-requests.tsv"',
+  'skipped=0',
+  "while IFS=$'\\t' read -r number head; do",
+  'if ! behind=$(gh api "repos/$REPOSITORY/compare/$MAIN_SHA...$head" --jq \'.behind_by\' 2> "$RUNNER_TEMP/update.err"); then',
+  'skipped=$((skipped + 1))',
+  'echo "::warning::#$number could not be compared with main: $(tr \'\\n\' \' \' < "$RUNNER_TEMP/update.err")"',
+  'echo "- #$number could not be compared with main: $(tr \'\\n\' \' \' < "$RUNNER_TEMP/update.err")" >> "$GITHUB_STEP_SUMMARY"',
+  'continue',
+  'fi',
+  'if [ "$behind" = \'0\' ]; then',
+  'echo "#$number is up to date with main"',
+  'continue',
+  'fi',
+  'if gh api --method PUT "repos/$REPOSITORY/pulls/$number/update-branch" -f update_method=rebase -f expected_head_sha="$head" > /dev/null 2> "$RUNNER_TEMP/update.err"; then',
+  'echo "#$number rebased onto main ($behind commits behind)"',
+  'else',
+  'skipped=$((skipped + 1))',
+  'echo "::warning::#$number was not rebased: $(tr \'\\n\' \' \' < "$RUNNER_TEMP/update.err")"',
+  'echo "- #$number was not rebased: $(tr \'\\n\' \' \' < "$RUNNER_TEMP/update.err")" >> "$GITHUB_STEP_SUMMARY"',
+  'fi',
+  'done < "$RUNNER_TEMP/pull-requests.tsv"',
+  'echo "skipped pull requests: $skipped"',
 ];
 
 /**
@@ -759,6 +785,10 @@ function checkUpdateBranchWorkflow(file, workflow, source, findings) {
     invalid('must trigger on push to main only');
   if (JSON.stringify(object(workflow.permissions)) !== JSON.stringify({ contents: 'read' }))
     invalid('must hold workflow permissions contents: read only');
+  if (JSON.stringify(object(workflow.concurrency)) !== JSON.stringify(UPDATE_CONCURRENCY))
+    invalid(
+      `must declare concurrency group ${UPDATE_CONCURRENCY.group} with cancel-in-progress: true`,
+    );
   const jobs = object(workflow.jobs);
   if (JSON.stringify(Object.keys(jobs)) !== JSON.stringify([UPDATE_JOB]))
     invalid(`must have exactly one job, ${UPDATE_JOB}`);
@@ -793,7 +823,7 @@ function checkUpdateBranchWorkflow(file, workflow, source, findings) {
     probe.shell !== 'bash' ||
     probe.if !== undefined ||
     JSON.stringify(object(probe.env)) !== JSON.stringify(UPDATE_PROBE_ENV) ||
-    UPDATE_PROBE_MARKERS.some((marker) => !String(probe.run ?? '').includes(marker))
+    JSON.stringify(logicalScriptLines(probe.run ?? '')) !== JSON.stringify(UPDATE_PROBE_SCRIPT)
   )
     invalid(
       `step ${UPDATE_PROBE_STEP} must probe the presence of both App credentials and skip the update with a notice when either is absent`,
@@ -807,7 +837,7 @@ function checkUpdateBranchWorkflow(file, workflow, source, findings) {
     update.if !== UPDATE_PRESENT_CONDITION ||
     mint?.if !== UPDATE_PRESENT_CONDITION ||
     object(update.env).GH_TOKEN !== UPDATE_RUN_TOKEN ||
-    UPDATE_RUN_MARKERS.some((marker) => !String(update.run).includes(marker))
+    JSON.stringify(logicalScriptLines(update.run)) !== JSON.stringify(UPDATE_RUN_SCRIPT)
   )
     invalid(
       'one bash step, run only when both credentials are present, must rebase each open non-draft same-repository pull request with update_method=rebase and the expected head sha, authenticated by the App token',
