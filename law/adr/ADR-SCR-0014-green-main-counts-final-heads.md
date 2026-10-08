@@ -27,6 +27,8 @@ inspector_acceptance:
   - IA-003 -- An open pull request whose current head has no completed gate run is excluded from the sample and the denominator, and a pull request whose only gate runs fall outside the thirty-day window is not sampled.
   - IA-004 -- A re-run counts only as its last attempt, merge_group runs and runs on other workflows or events never enter the sample, and the minimum sample counts pull requests, reading UNKNOWN below it.
   - IA-005 -- With twenty sampled pull requests and one red final outcome the reading is PASS at 95 percent, with two it is REVIEW, and a declaration that omits outcomeUnit keeps the run population of ADR-SCR-0010 unchanged.
+  - IA-006 -- A pull request whose baseRefName is not the declared base is never sampled, and a run on a matching head branch and sha that was created before the pull request opened or after it closed is not its outcome, so a reused branch name never lends a run to another pull request.
+  - IA-007 -- A run list or pull request list that returns as many entries as its literal limit of 1000 reads UNKNOWN as truncated with the limit in the finding, never PASS, REVIEW, or FAIL.
 ---
 
 # harness_green_main counts one gate outcome per pull request
@@ -68,24 +70,31 @@ gains `outcomeUnit`, validated by `law/schemas/sensor-inputs.schema.json`.
 
 Under `pull-request-final-head`:
 
-1. **Which pull requests.** Every pull request against the declared base
-   with at least one gate run of the declared workflow and event created in
-   the lookback window: merged, closed without merge, and open.
+1. **Which pull requests.** Every pull request whose `baseRefName` equals
+   the declared base branch, with at least one gate run of the declared
+   workflow and event created in the lookback window: merged, closed without
+   merge, and open.
 2. **Final head.** For a merged pull request, the head commit at merge. For
    an open or closed pull request, its current head.
 3. **Counted run.** The latest completed gate run on the final head: a run
    whose conclusion is neither `cancelled` nor `skipped`. A re-run counts as
-   its last attempt. The final head is matched by head branch and sha. The
-   pull requests come from `gh pr list --state all` (`headRefName`,
-   `headRefOid`), and the window's runs from the gate's run list
-   (`headBranch`, `headSha`).
+   its last attempt. A run belongs to a pull request only when its head
+   branch and sha match the final head and it was created while the pull
+   request was open: at or after `createdAt`, and at or before `closedAt`,
+   or now for an open pull request. The pull requests come from
+   `gh pr list --state all` (`baseRefName`, `closedAt`, `createdAt`,
+   `headRefName`, `headRefOid`, `mergedAt`, `number`, `state`), and the
+   window's runs from the gate's run list (`headBranch`, `headSha`,
+   `createdAt`).
 4. **Green.** The counted run concluded `success`. Any other completed
    conclusion is not green.
 5. **Exclusions.** An open pull request whose final head has no completed
    run yet is excluded from the sample and the denominator. `merge_group`
    runs stay out of scope, as do runs of other workflows or events.
 6. **Minimum and verdict.** The minimum sample counts pull requests. Below it
-   the reading is `UNKNOWN`, as ADR-SCR-0010 states. At or above it, 95
+   the reading is `UNKNOWN`, as ADR-SCR-0010 states. A run list or pull
+   request list that returns as many entries as its literal limit of 1000
+   may have been cut, so it also reads `UNKNOWN`, as truncated. At or above it, 95
    percent or more green reads PASS, 80 to below 95 percent reads REVIEW,
    and below 80 percent reads FAIL.
 
@@ -111,7 +120,14 @@ held 220 sampled pull requests, of which 216 were green on their final head,
 
 The number is not comparable with readings made under the run population.
 The scorecard names the unit in its metrics, and the next scorecard notes
-the change of definition beside its delta. The population of
+the change of definition beside its delta.
+
+Clarified on 2026-10-08 after 2.3.0 carried this record, for #364 and #365,
+without changing its decision. Membership requires the pull request's base
+branch, a run belongs to a pull request only within its open interval, and
+a list that reaches its literal limit reads `UNKNOWN` as truncated. The
+`gh pr list` fields gain `baseRefName` and `createdAt`. IA-006 and IA-007
+cover the clarifications. The population of
 `harness_performance` (F5:T7) and of `harness_robustness` (F5:T8) is
 unchanged, because a duration or a retry is a property of each run.
 
@@ -146,3 +162,5 @@ threshold nor the gate is relaxed, only what the cell counts.
 - IA-003 -- An open pull request whose current head has no completed gate run is excluded from the sample and the denominator, and a pull request whose only gate runs fall outside the thirty-day window is not sampled.
 - IA-004 -- A re-run counts only as its last attempt, merge_group runs and runs on other workflows or events never enter the sample, and the minimum sample counts pull requests, reading UNKNOWN below it.
 - IA-005 -- With twenty sampled pull requests and one red final outcome the reading is PASS at 95 percent, with two it is REVIEW, and a declaration that omits outcomeUnit keeps the run population of ADR-SCR-0010 unchanged.
+- IA-006 -- A pull request whose baseRefName is not the declared base is never sampled, and a run on a matching head branch and sha that was created before the pull request opened or after it closed is not its outcome, so a reused branch name never lends a run to another pull request.
+- IA-007 -- A run list or pull request list that returns as many entries as its literal limit of 1000 reads UNKNOWN as truncated with the limit in the finding, never PASS, REVIEW, or FAIL.
