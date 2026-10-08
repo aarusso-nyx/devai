@@ -15,6 +15,21 @@ import type {
 import { bindReleaseRequest } from './runner-release-binding.js';
 import { descriptorFor } from './runner-plan.js';
 
+/** The BLOCKED entries, in plan order, aggregated apart from failures with their remediation. */
+export function blockedEntries(execution: readonly ExecutedTask[]) {
+  return execution
+    .filter((task) => task.outcome === 'BLOCKED')
+    .map((task) => ({
+      nodeId: task.nodeId,
+      disposition:
+        task.disposition === 'blocked-environment'
+          ? ('blocked-environment' as const)
+          : ('executed' as const),
+      reason: task.reason,
+      remediation: task.remediation ?? [],
+    }));
+}
+
 /** Decide whether the finished run is attestable and, when it is, write its receipt (and its preflight receipt); otherwise name the refusal. */
 export function attestCheckRun(input: {
   readonly execution: ExecutedTask[];
@@ -48,17 +63,7 @@ export function attestCheckRun(input: {
   let preflightReceipt: CheckRunnerReport['preflightReceipt'];
   let receiptRefusal: string | undefined;
   const allPass = execution.every((task) => task.outcome === 'PASS');
-  const blocked = execution
-    .filter((task) => task.outcome === 'BLOCKED')
-    .map((task) => ({
-      nodeId: task.nodeId,
-      disposition:
-        task.disposition === 'blocked-environment'
-          ? ('blocked-environment' as const)
-          : ('executed' as const),
-      reason: task.reason,
-      remediation: task.remediation ?? [],
-    }));
+  const blocked = blockedEntries(execution);
   const finalState = repositoryState();
   if (
     requiresProtectedOutputCapture &&
