@@ -158,8 +158,50 @@ recombines single-family commits (ADR-GOV-0018), and a merge commit breaks linea
 history, so rebase is the only method under which the commits the queue tests are the
 commits that reach `main`. Enabling the queue with that method is an Owner effect on the
 repository settings (OE-01 of CMP-0003), verified and performed before the round that
-delivers the `merge_group` lane closes. `allow_update_branch` is a convenience for the
-human and is not a prerequisite of either delivery.
+delivers the `merge_group` lane closes. `allow_update_branch` is not a prerequisite of
+either delivery; with no queue enabled it is admitted, rebase only, as the update path
+below (ADR-CHK-0008).
+
+## Update path
+
+Without a merge queue, a pull request whose base fell behind `main` used to fail its gate
+on the `base-up-to-date` probe. ADR-CHK-0008 keeps pull requests current instead.
+
+- **Rebase only.** `allow_update_branch` is admitted with the rebase update method alone.
+  A merge update would put a merge commit on the branch and is refused, as ADR-CHK-0004
+  refuses it.
+- **The workflow is the mechanism.** `.github/workflows/update-pull-request-branches.yml`
+  (CMP-0007 TASK-0726) runs on every push to `main`. For each open, non-draft pull
+  request against `main` that is behind it, the workflow calls
+  `PUT /repos/{owner}/{repo}/pulls/{number}/update-branch` with `update_method: rebase`
+  and the pull request's current head sha as the expected head. The setting alone updates
+  nothing.
+- **App token.** The workflow acts with a GitHub App installation token. A push made with
+  `GITHUB_TOKEN` starts no workflow run, so the rebased head would never be gated.
+- **Conflicts.** A pull request whose rebase conflicts is skipped and reported. Its author
+  resolves it; the other pull requests are still updated.
+- **Cancellation, not failure.** The rebased head arrives as `synchronize`. The gate's
+  concurrency group (workflow name, `pr`, pull-request number, `cancel-in-progress: true`)
+  cancels the superseded head's run, which ends cancelled and is excluded from
+  `harness_green_main`.
+- **Unchanged.** Strict up-to-date protection, the three gate jobs, and the single
+  required check `devai-release-gate` stay as they are.
+- **Committer identity.** A rebase update replays the pull request's commits, so their
+  committer becomes the update identity; authorship is unchanged. A role session that
+  needs committer equal to author replays its own commits after an update.
+
+**Owner effect OE-02 (CMP-0007).** No task performs it. The Owner:
+
+1. Enables the update branch on the repository: Settings, General, Pull Requests,
+   "Always suggest updating pull request branches", which is
+   `gh api -X PATCH repos/aarusso-nyx/devai -F allow_update_branch=true`. The update
+   method is chosen per call, and the workflow always passes `rebase`.
+2. Creates or installs a GitHub App on `aarusso-nyx/devai` with repository permissions
+   Contents read and write and Pull requests read and write, and nothing else.
+3. Stores the App's id and private key as the repository secrets TASK-0726's workflow
+   names, readable only by that workflow.
+
+Branch protection, the required check, and the merge method are not changed by OE-02.
 
 ## Serialized admission
 
