@@ -111,6 +111,16 @@ A round's post-change window starts at the merge of its last implementing task.
 - **Follow-up wave CTG-0732 in R-0703** (TASK-0734 to TASK-0736) addresses both issues below.
 - **Follow-ups:** #364 (`harness_green_main`: run list `--limit 300` truncates the 30-day window) and #365 (final-head unit: verify the pull request's base branch and identity).
 
+## Campaign close
+
+CMP-0007 closed on 2026-10-08, with both cells reading PASS: F5:T7 at a median of 786 s (SR-116466b6a1b2df0b) and F5:T9 at 121 of 121 final heads (SR-30aa1c53e9b96427).
+
+- **Release:** v2.3.0 was published at 2026-10-08T18:30:07Z from candidate bf9a2616, in run 37825188722 ("Rehearse or promote DEVAI release"). The consumer install pins landed in #368 (merge 873f1372). OE-03 is performed.
+- **OE-02:** `allow_update_branch` was enabled on 2026-10-08. The update-branch App credentials remain Owner-only.
+- **Update branch:** LIVE UPDATE-BRANCH CHECK PENDING: update workflow run <run id>, rebased pull request <#n>, superseded gate run <run id> cancelled.
+- **Not delivered:** cache persistence (TASK-07110, TASK-07111) is cancelled by coordinator ruling under the Owner's 2026-10-08 instruction "Do what need to close CMP-0007 yourself", because F5:T7 reads PASS without it (median 786 s < 900 s).
+- **Rounds:** R-0701, R-0702 and R-0703 are closed. Their dispositions are in `campaign.json`.
+
 ## Owner effects
 
 The plan only names these effects. No task performs them.
