@@ -32,9 +32,9 @@
   "owner_effects": [
     {
       "id": "OE-02",
-      "description": "Enable the auto-update branch repository setting with the rebase update method (decision D2), after TASK-0721 records how it fits ADR-CHK-0004 and writes out the exact setting, and after TASK-0728 makes the commit-range check refuse merge commits and judge author path authority and admitted committers (ADR-CHK-0008), and provide the non-GITHUB_TOKEN credential the TASK-0726 rebase-update workflow uses. The setting alone updates no pull request; TASK-0726 is the update mechanism. OE-01 is not used: the campaign policy reserves it for a merge queue, which D2 did not choose, so serialized admission stays in force. Still Owner-pending at the 2.3.0 release decision of 2026-10-08, together with the live update-branch check on a real pull request.",
+      "description": "Enable the auto-update branch repository setting with the rebase update method (decision D2), after TASK-0721 records how it fits ADR-CHK-0004 and writes out the exact setting, and after TASK-0728 makes the commit-range check refuse merge commits and judge author path authority and admitted committers (ADR-CHK-0008), and provide the non-GITHUB_TOKEN credential the TASK-0726 rebase-update workflow uses. The setting alone updates no pull request; TASK-0726 is the update mechanism. OE-01 is not used: the campaign policy reserves it for a merge queue, which D2 did not choose, so serialized admission stays in force. Still Owner-pending at the 2.3.0 release decision of 2026-10-08, together with the live update-branch check on a real pull request. Performed on 2026-10-08 (date only): the coordinator enabled allow_update_branch on the Owner's instruction (\"Do what need to close CMP-0007 yourself\"). The update-branch App credentials remain Owner-only.",
       "required_before": "R-0702",
-      "performed_at": null
+      "performed_at": "2026-10-08T00:00:00Z"
     },
     {
       "id": "OE-03",
@@ -1363,7 +1363,7 @@
       "depends_on": [],
       "attestation_reissue": false,
       "owner_effects_required": [],
-      "close_checks": ["adrs", "test:sensors", "campaign:check"],
+      "close_checks": ["adrs", "test:sensors", "campaign:check", "test:cli"],
       "disposition": "Opened by the Owner on 2026-10-08 (\"Redefine F5:T9 now (R-0703)\"), amending D4 and lifting the wait on the R-0702 window.",
       "waves": [
         {
@@ -1526,6 +1526,162 @@
               },
               "pull_request": "https://github.com/aarusso-nyx/devai/pull/366",
               "merged_as": "e43e8db9d8dc64159396373760e20d4e5488fb12",
+              "execution": {
+                "tier": "worker",
+                "effort": "medium",
+                "time_budget_minutes": 60
+              }
+            }
+          ]
+        },
+        {
+          "id": "CTG-0732",
+          "title": "Read the whole sensor window and verify final-head membership (#364, #365)",
+          "type": "coupled-triplet",
+          "records": ["ADR-SCR-0014", "ADR-SCR-0010"],
+          "depends_on": ["CTG-0731"],
+          "lock_scopes": [
+            "law/policy/subprocess-effects.json",
+            ".devai/config/subprocess-effects.json",
+            "law/policy/sensor-notes/harness_*.md",
+            "law/adr/ADR-SCR-0014-green-main-counts-final-heads.md",
+            "docs/adopters/sensor-inputs.md",
+            "packages/sensors/tests/",
+            "tests/contract/sensor-inputs.contract.test.ts",
+            "packages/cli/tests/unit/",
+            "packages/sensors/src/harness/",
+            "packages/sensors/src/harness-*.ts",
+            "packages/cli/src/authority/broker.ts"
+          ],
+          "gates": ["adrs", "test:sensors", "test:cli"],
+          "tasks": [
+            {
+              "id": "TASK-0734",
+              "title": "Raise the run-list limit and widen the pr list fields in the subprocess templates and the record",
+              "discipline": "architect",
+              "coupled_pipeline_position": "architect",
+              "upstream_task_id": null,
+              "status": "ready",
+              "target_substrates": ["F1", "F5"],
+              "boundary": {
+                "paths": [
+                  "law/policy/subprocess-effects.json",
+                  ".devai/config/subprocess-effects.json",
+                  "law/policy/sensor-notes/harness_*.md",
+                  "law/adr/ADR-SCR-0014-green-main-counts-final-heads.md",
+                  "docs/adopters/sensor-inputs.md"
+                ],
+                "forbidden": ["packages/", "tests/", ".github/"]
+              },
+              "deliverables": [
+                "#364: the gh run list templates in law/policy/subprocess-effects.json and its .devai/config/subprocess-effects.json copy (same commit) read --limit 1000 instead of 300. A sample that reaches the limit cannot prove it covers the declared window, so it reads UNKNOWN. The harness sensor notes and ADR-SCR-0014 state this.",
+                "#365: the gh pr list template adds baseRefName and createdAt. ADR-SCR-0014 and docs/adopters/sensor-inputs.md state that final-head membership keeps only pull requests whose base branch is the declared baseBranch, and only runs created within the pull request's lifetime, so a reused branch name never counts another pull request's runs."
+              ],
+              "acceptance_commands": [
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "adrs",
+                  "--format",
+                  "json"
+                ],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "docs-links",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": ["law(policy)", "law(adr)", "docs(adopters)"],
+              "prompt": {
+                "path": "prompts/TASK-0734.md"
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "architect",
+                "effort": "medium",
+                "time_budget_minutes": 45
+              }
+            },
+            {
+              "id": "TASK-0735",
+              "title": "Test the full-window read and the final-head membership filters",
+              "discipline": "inspector",
+              "coupled_pipeline_position": "inspector",
+              "upstream_task_id": "TASK-0734",
+              "status": "ready",
+              "target_substrates": ["F5"],
+              "boundary": {
+                "paths": [
+                  "packages/sensors/tests/",
+                  "tests/contract/sensor-inputs.contract.test.ts",
+                  "packages/cli/tests/unit/"
+                ],
+                "forbidden": ["packages/sensors/src/", "packages/cli/src/", "law/", "docs/"]
+              },
+              "deliverables": [
+                "Sensor tests prove that a run sample at the 1000 limit reads UNKNOWN and that a sample below it reads normally. They prove that a pull request whose base branch is not the declared one is left out, and that a run created outside a pull request's lifetime is not attributed to it, including a reused branch name.",
+                "tests/contract/sensor-inputs.contract.test.ts and the broker read-only tests under packages/cli/tests/unit/ admit the new run-list and pr list argv exactly and refuse the old shapes. The tests fail until TASK-0736 lands on the same branch."
+              ],
+              "acceptance_commands": [
+                ["pnpm", "run", "test:sensors"],
+                ["pnpm", "run", "test:root"],
+                ["pnpm", "run", "test:cli"]
+              ],
+              "commit_types": ["test(sensors)", "test(contract)", "test(cli)"],
+              "prompt": {
+                "path": "prompts/TASK-0735.md"
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker",
+                "effort": "medium",
+                "time_budget_minutes": 60
+              }
+            },
+            {
+              "id": "TASK-0736",
+              "title": "Read 1000 runs, report UNKNOWN at the limit, and filter final-head membership",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": "TASK-0735",
+              "status": "ready",
+              "target_substrates": ["F2", "F5"],
+              "boundary": {
+                "paths": [
+                  "packages/sensors/src/harness/",
+                  "packages/sensors/src/harness-*.ts",
+                  "packages/cli/src/authority/broker.ts"
+                ],
+                "forbidden": [
+                  "law/",
+                  "docs/",
+                  "tests/",
+                  "packages/sensors/tests/",
+                  "packages/cli/tests/"
+                ]
+              },
+              "deliverables": [
+                "The harness sensors call gh run list with --limit 1000 and read UNKNOWN when the sample reaches the limit. The gh pr list reader requests baseRefName and createdAt, keeps only pull requests on the declared base branch, and attributes a run to a pull request only when the run was created within that pull request's lifetime.",
+                "packages/cli/src/authority/broker.ts admits the new argv with exact literals, mirroring the TASK-0734 templates."
+              ],
+              "acceptance_commands": [
+                ["pnpm", "run", "typecheck"],
+                ["pnpm", "run", "test:sensors"]
+              ],
+              "commit_types": ["fix(sensors)", "fix(cli)"],
+              "prompt": {
+                "path": "prompts/TASK-0736.md"
+              },
+              "pull_request": null,
+              "merged_as": null,
               "execution": {
                 "tier": "worker",
                 "effort": "medium",

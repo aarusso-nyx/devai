@@ -105,8 +105,10 @@ A round's post-change window starts at the merge of its last implementing task.
   - F5:T9, `harness_green_main` (reading SR-30aa1c53e9b96427): PASS. 121 of 121 final heads are green under the final-head unit of the amended D4.
   - F5:T7, `harness_performance` (reading SR-116466b6a1b2df0b): PASS. The median is 786 s, below the 900 s target of D6.
 - **D5 is satisfied.** Both cells read PASS, so 2.3.0 ships under D5. The coordinator directed the release on 2026-10-08. Publication (OE-03) still needs its separately authorized release from an exact candidate.
-- **Still Owner-pending:** OE-02 (the auto-update branch setting and the update credential) and the live update-branch check on a real pull request. The release does not wait for them, and R-0702 does not close until they are done.
+- **OE-02 performed on 2026-10-08:** the coordinator enabled `allow_update_branch` on the Owner's instruction ("Do what need to close CMP-0007 yourself"). The update-branch App credentials remain Owner-only.
+- **Previously Owner-pending:** OE-02 (the auto-update branch setting and the update credential) and the live update-branch check on a real pull request. The release does not wait for them, and R-0702 does not close until they are done.
 - **Round acceptance stays separate.** These readings are the D5 measurement. Each round's post-change window under Acceptance windows is still assessed on its own before that round closes.
+- **Follow-up wave CTG-0732 in R-0703** (TASK-0734 to TASK-0736) addresses both issues below.
 - **Follow-ups:** #364 (`harness_green_main`: run list `--limit 300` truncates the 30-day window) and #365 (final-head unit: verify the pull request's base branch and identity).
 
 ## Owner effects
