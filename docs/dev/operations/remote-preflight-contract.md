@@ -10,9 +10,11 @@ ledger. A transient preflight receipt coordinates the current run; it is not upl
 An unsigned local cache record from an untrusted run is not signing authority.
 
 One required `devai-release-gate` runs on every pull-request head and on every
-merge-queue entry (ADR-CHK-0004). Its lane, step by step on the
+merge-queue entry (ADR-CHK-0004). It is the aggregator of two partition jobs that
+split one affected plan (ADR-CHK-0007 rule 11; see [Three gate jobs](#three-gate-jobs)).
+Each partition job, step by step on the
 [workflow page](workflows/pull-request-checks.md), restores or compiles the check runner
-bootstrap, runs the preflight probes, then runs the affected checks. The preflight step
+bootstrap, runs the preflight probes, then runs its share of the affected checks. The preflight step
 runs `check --preflight --run` against the event base, which is the pull-request base
 under `pull_request` and the queue base under `merge_group`, executing the preflight
 probes of `test-tasks.json` (verifier-package materialization, toolchain identity, base
@@ -23,8 +25,9 @@ execution outcomes and consistency on that runner. It does not prove the local R
 closure executed, and a signed local claim does not prove Linux execution. These
 observations answer different questions.
 
-The affected plan runs once per head. `release:pr-gate` precedes the affected check in
-the same step and keeps commit-range hygiene, the bump floor and, for a
+The affected plan is planned identically in both partition jobs, and each planned node
+is owned, executed and counted by exactly one of them. `release:pr-gate` runs once,
+in `gate-rest`, before its affected check, and keeps commit-range hygiene, the bump floor and, for a
 version-changing pull request, the release profile preflight; it no longer plans the
 affected target a second time (ADR-CHK-0003).
 
@@ -36,6 +39,58 @@ plans the planning lane instead of the affected floor: the preflight nodes,
 of any other class, or a candidate that rebinds the taxonomy falls back to the
 affected profile. The lane is selected from the taxonomy, never from a workflow path
 filter, so neither trigger carries one.
+
+## Three gate jobs
+
+The pull-request workflow splits the affected plan of one head across two partition jobs.
+`test:cli` is CPU-bound and alone saturates the 4-vCPU runner, so the runner's parallel
+workers could not bring the median below 600 s (ADR-CHK-0007, decision D1 of CMP-0007).
+
+| Job                  | Runs                                                                                                                                                             | Uploads                  |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
+| `gate-cli`           | bootstrap, `check --preflight --run`, then `check --affected --run --partition-include test:cli`                                                                 | `devai-gate-report-cli`  |
+| `gate-rest`          | bootstrap, `check --preflight --run`, the gate invariant producers (ADR-SCR-0013), `release:pr-gate`, then `check --affected --run --partition-exclude test:cli` | `devai-gate-report-rest` |
+| `devai-release-gate` | needs both jobs and runs under `always()`; reads the two reports and the two job results; executes no check node                                                 | nothing                  |
+
+Both partition jobs check out the same candidate and pass the same `--base`. They plan
+the same plan with the same task keys and task-policy digest. The partition decides only
+which planned nodes a job owns:
+
+- **Owned.** `gate-cli` owns `test:cli` and every planned node that depends on it.
+  `gate-rest` owns every other planned node.
+- **Prerequisites.** `gate-cli` also executes the dependency closure of `test:cli`
+  (`generate`, `build`, `test:package-staging`, and the preflight nodes, about 30 s).
+  These run as prerequisites. `gate-rest` owns them, so they never count twice.
+- **Not separable.** When a planned node depends on `test:cli` and on a node outside its
+  closure, as in the `test:local-full` fallback plan, `gate-cli` owns the whole plan and
+  `gate-rest` owns nothing.
+- **`test:cli` not planned.** When the plan does not select `test:cli`, `gate-cli` owns
+  nothing and passes.
+
+Each report lists every planned node once, in plan order:
+
+- an owned node has its ordinary entry;
+- a prerequisite node has its ordinary entry, marked `prerequisite`;
+- every other node is `partitioned-out`, with outcome `SKIPPED`. It is never started.
+
+A partitioned run writes no receipt. Each partition job fails on its own when one of its
+owned entries is not PASS.
+
+The aggregator carries the required check name and passes only when all of these hold:
+
+- both jobs passed;
+- exactly the two named reports exist, one `include` and one `exclude` over the same
+  node list;
+- they agree on candidate, base, descriptor digest, task-policy digest, and planned node
+  set;
+- each holds one entry per planned node;
+- every planned node has exactly one owned entry across the pair, and that entry is a
+  PASS, executed or reused.
+
+A missing, cancelled, or extra report fails it. Branch protection keeps the single
+required check `devai-release-gate`, and the same three jobs run under `merge_group`.
+`scripts/check-workflows.mjs` pins the jobs, both partition commands, the aggregator's
+needs, its `always()` condition, and the check name.
 
 ## Two validation boundaries
 
