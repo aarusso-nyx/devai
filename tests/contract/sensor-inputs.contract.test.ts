@@ -601,7 +601,8 @@ function devaiPopulation(minimumSample: number): Record<string, unknown> {
 }
 
 const DEVAI_HARNESS_POPULATIONS = {
-  harness_green_main: devaiPopulation(20),
+  // ADR-SCR-0014: DEVAI counts one gate outcome per pull request on its final head.
+  harness_green_main: { ...devaiPopulation(20), outcomeUnit: 'pull-request-final-head' },
   harness_performance: devaiPopulation(10),
   harness_robustness: devaiPopulation(20),
 };
@@ -799,5 +800,60 @@ describe('harness population declaration (ADR-SCR-0010)', () => {
         }),
       ).toBe(true);
     }
+  });
+});
+
+describe('harness_green_main outcomeUnit (ADR-SCR-0014)', () => {
+  const minimal = { workflow: 'ci.yml', event: 'pull_request', minimumSample: 5 };
+
+  it.each(['run', 'pull-request-final-head'])(
+    'accepts outcomeUnit %s on harness_green_main',
+    (unit) => {
+      expect(
+        valid({
+          schemaVersion: '1.0.0',
+          inputs: { harness_green_main: { ...minimal, outcomeUnit: unit } },
+        }),
+      ).toBe(true);
+    },
+  );
+
+  it.each(['pull-request', 'final-head', 'Run', '', 'per-run'])(
+    'refuses outcomeUnit %j on harness_green_main',
+    (unit) => {
+      expect(
+        valid({
+          schemaVersion: '1.0.0',
+          inputs: { harness_green_main: { ...minimal, outcomeUnit: unit } },
+        }),
+      ).toBe(false);
+    },
+  );
+
+  it.each(['harness_performance', 'harness_robustness'])(
+    'refuses outcomeUnit on %s, even run',
+    (kind) => {
+      for (const unit of ['run', 'pull-request-final-head']) {
+        expect(
+          valid({ schemaVersion: '1.0.0', inputs: { [kind]: { ...minimal, outcomeUnit: unit } } }),
+          `${kind} with ${unit}`,
+        ).toBe(false);
+      }
+      expect(valid({ schemaVersion: '1.0.0', inputs: { [kind]: minimal } })).toBe(true);
+    },
+  );
+
+  it('defaults to run when omitted, and DEVAI declares pull-request-final-head', () => {
+    const unit = (
+      schema as unknown as {
+        $defs: { harness_population_inputs: { properties: { outcomeUnit: { default: string } } } };
+      }
+    ).$defs.harness_population_inputs.properties.outcomeUnit.default;
+    expect(unit).toBe('run');
+    expect(declaration.inputs['harness_green_main']?.['outcomeUnit']).toBe(
+      'pull-request-final-head',
+    );
+    expect(declaration.inputs['harness_performance']).not.toHaveProperty('outcomeUnit');
+    expect(declaration.inputs['harness_robustness']).not.toHaveProperty('outcomeUnit');
   });
 });
