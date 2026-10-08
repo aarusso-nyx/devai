@@ -292,28 +292,111 @@ export type FinalHeadSample =
       readonly describe: string;
     };
 
+/** The pull request list's --limit; a list that reaches it may be truncated. */
+const PULL_REQUEST_LIST_LIMIT = Number(
+  HARNESS_PULL_REQUEST_LIST_ARGS[HARNESS_PULL_REQUEST_LIST_ARGS.indexOf('--limit') + 1],
+);
+
+interface ValidPullRequest {
+  readonly number: number;
+  readonly headRefName: string;
+  readonly headRefOid: string;
+  readonly state: string;
+}
+
+type PullRequestValidation =
+  | { readonly ok: true; readonly pulls: readonly ValidPullRequest[] }
+  | { readonly ok: false; readonly reason: string };
+
+/** Validates the whole pull request list: one ill-formed row fails it, no row is ever skipped. */
+function validatePullRequests(data: unknown): PullRequestValidation {
+  if (!Array.isArray(data)) return { ok: false, reason: 'gh-cli-parse-error: not an array' };
+  const rows: readonly unknown[] = data;
+  if (rows.length >= PULL_REQUEST_LIST_LIMIT) {
+    return {
+      ok: false,
+      reason: `gh-pr-list-truncated: ${String(rows.length)} rows reached the limit ${String(PULL_REQUEST_LIST_LIMIT)}`,
+    };
+  }
+  const pulls: ValidPullRequest[] = [];
+  for (const [index, row] of rows.entries()) {
+    if (typeof row !== 'object' || row === null || Array.isArray(row)) {
+      return {
+        ok: false,
+        reason: `gh-cli-parse-error: pull request row ${String(index)} is not an object`,
+      };
+    }
+    const { number, headRefName, headRefOid, state } = row as HarnessPullRequest;
+    if (
+      typeof number !== 'number' ||
+      !Number.isInteger(number) ||
+      typeof headRefName !== 'string' ||
+      typeof headRefOid !== 'string' ||
+      typeof state !== 'string'
+    ) {
+      return {
+        ok: false,
+        reason: `gh-cli-parse-error: pull request row ${String(index)} lacks a valid number, headRefName, headRefOid, or state`,
+      };
+    }
+    pulls.push({ number, headRefName, headRefOid, state });
+  }
+  return { ok: true, pulls };
+}
+
+/** Keeps the highest attempt of each run id, whatever the input order; id-less rows stay as they are. */
+function highestAttempts(runs: readonly HarnessRun[]): HarnessRun[] {
+  const best = new Map<number, HarnessRun>();
+  const unkeyed: HarnessRun[] = [];
+  for (const run of runs) {
+    if (run.databaseId === undefined) {
+      unkeyed.push(run);
+      continue;
+    }
+    const held = best.get(run.databaseId);
+    if (held === undefined || (run.attempt ?? 1) > (held.attempt ?? 1)) {
+      best.set(run.databaseId, run);
+    }
+  }
+  return [...best.values(), ...unkeyed];
+}
+
+/** Latest first: by created time, then by run id, so the choice never rests on input order. */
+function latestFirst(a: HarnessRun, b: HarnessRun): number {
+  const byCreated = Date.parse(b.createdAt ?? '') - Date.parse(a.createdAt ?? '');
+  if (Number.isFinite(byCreated) && byCreated !== 0) return byCreated;
+  return (b.databaseId ?? 0) - (a.databaseId ?? 0);
+}
+
 /**
  * The final-head population (R-0703, ADR-SCR-0014): the declared gate runs of the window grouped
  * by pull request, each judged by the latest completed, non-cancelled run on the pull request's
  * final head (its current head when open, its head at merge when merged). Two gh calls: the
- * window's runs, and every pull request with its final head. A pull request is matched to its
- * runs by head branch and head sha. An open pull request whose final head has no completed run
- * is pending and never counted; a closed or merged one without such a run is counted and is not
- * green. A failed or unparseable pull request list is a failed sample, never a per-run fallback.
+ * window's runs, and every pull request with its final head. Membership comes first: a pull
+ * request belongs to the population when any window run, cancelled or skipped included, ran on
+ * its head branch. Its outcome is then the latest verdict on its final head among the highest
+ * attempt of each run. An open pull request whose final head has no completed run is pending and
+ * never counted; a closed or merged one without such a run is counted and is not green. A failed,
+ * possibly truncated, or ill-formed pull request list is a failed sample, never a per-run fallback.
  */
 export function sampleFinalHeads(opts: HarnessPopulationOptions): FinalHeadSample {
-  const sample = samplePopulation(opts, HARNESS_GREEN_MAIN_RUN_FIELDS);
+  // Read every attempt, cancelled runs included: membership precedes every outcome filter.
+  const sample = samplePopulation(
+    { ...opts, attempts: 'all', includeCancelled: true },
+    HARNESS_GREEN_MAIN_RUN_FIELDS,
+  );
   if (!sample.ok) return { ...sample, source: 'run-list' };
   const prArgs = [...HARNESS_PULL_REQUEST_LIST_ARGS];
-  const pulls = invokeGhJson<HarnessPullRequest[]>({ cwd: opts.repoRoot, args: prArgs });
+  const listed = invokeGhJson<unknown>({ cwd: opts.repoRoot, args: prArgs });
   const args = [...sample.args, '&&', 'gh', ...prArgs];
-  if (!pulls.ok) return { ok: false, source: 'pr-list', reason: pulls.reason, args };
-  if (!Array.isArray(pulls.data)) {
-    return { ok: false, source: 'pr-list', reason: 'gh-cli-parse-error: not an array', args };
-  }
+  if (!listed.ok) return { ok: false, source: 'pr-list', reason: listed.reason, args };
+  const validated = validatePullRequests(listed.data);
+  if (!validated.ok) return { ok: false, source: 'pr-list', reason: validated.reason, args };
 
+  const windowRuns = highestAttempts(sample.runs);
+  const branches = new Set(windowRuns.map((run) => run.headBranch));
   // Completed runs that reached a verdict: never cancelled or skipped (ADR-SCR-0014).
-  const completed = sample.runs.filter(
+  const completed = windowRuns.filter(
     (run) =>
       run.status === 'completed' &&
       run.conclusion !== undefined &&
@@ -321,23 +404,20 @@ export function sampleFinalHeads(opts: HarnessPopulationOptions): FinalHeadSampl
       run.conclusion !== 'cancelled' &&
       run.conclusion !== 'skipped',
   );
-  const branches = new Set(sample.runs.map((run) => run.headBranch));
   const finals: PullRequestFinal[] = [];
   const pendingOpen: number[] = [];
-  for (const pull of pulls.data) {
-    const { number, headRefName, headRefOid, state } = pull;
-    if (number === undefined || headRefName === undefined || headRefOid === undefined) continue;
+  for (const { number, headRefName, headRefOid, state } of validated.pulls) {
     if (!branches.has(headRefName)) continue;
     const run = completed
       .filter(
         (candidate) => candidate.headBranch === headRefName && candidate.headSha === headRefOid,
       )
-      .sort((a, b) => Date.parse(b.createdAt ?? '') - Date.parse(a.createdAt ?? ''))[0];
+      .sort(latestFirst)[0];
     if (run === undefined && state === 'OPEN') {
       pendingOpen.push(number);
       continue;
     }
-    finals.push({ number, state: state ?? 'UNKNOWN', headSha: headRefOid, run });
+    finals.push({ number, state, headSha: headRefOid, run });
   }
   return {
     ok: true,
@@ -348,8 +428,10 @@ export function sampleFinalHeads(opts: HarnessPopulationOptions): FinalHeadSampl
     describe: `${sample.describe}, final head per pull request`,
     metrics: {
       ...sample.metrics,
+      population_attempts: opts.attempts ?? 'last',
+      population_include_cancelled: opts.includeCancelled ?? false,
       population_outcome_unit: 'pull-request-final-head',
-      population_window_runs: sample.runs.length,
+      population_window_runs: windowRuns.length,
       population_pending_open: pendingOpen.length,
     },
     unverifiedFinding: sample.unverifiedFinding,
