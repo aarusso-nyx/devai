@@ -5,7 +5,7 @@ PASS. F5:T7 is gate speed, read by `harness_performance`, with a median below
 900 s (decision D6; it was 600 s). F5:T9 is gate pass rate, read by `harness_green_main`, with at least
 95% green. No definition is relaxed and no threshold other than D6's, and no node
 leaves the pull-request lane. The mandate, the baseline, and the Owner
-decisions D1 to D5 of 2026-10-07 and D6 of 2026-10-08 are in
+decisions D1 to D5 of 2026-10-07 and D6 and the amended D4 of 2026-10-08 are in
 [decisions.md](../decisions.md). Read it before you change anything.
 
 Work in a dedicated worktree on a branch from a freshly fetched `origin/main`.

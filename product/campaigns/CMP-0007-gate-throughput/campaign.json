@@ -10,7 +10,7 @@
     "kind": "owner-mandate",
     "ref": "product/campaigns/CMP-0007-gate-throughput/decisions.md"
   },
-  "goal": "Bring self-scorecard cells F5:T7 and F5:T9 to PASS without relaxing a definition and without moving any node out of the pull-request lane. Baseline over the 30 days to main 92526921 (355 counted pull_request runs): harness_performance median 710 s against a target then below 600 s, below 900 s since decision D6 (p95 1059 s, already passing), with test:cli 58% of job time because the check runner executes nodes one at a time; harness_green_main 86.8% against a target of at least 95%, with 47 failures of which 33 are real defects, 13 main-moved blocks, and 1 infrastructure (#247). Owner decisions D1 to D5 of 2026-10-07 (decisions.md): in-runner parallel workers first and sharding only if still above 600 s, auto-update branch, a pre-push preflight mandatory for agents and opt-in for humans, keep the F5:T9 definition, and ship 2.3.0 when both cells pass. Owner decision D6 of 2026-10-08 sets the F5:T7 PASS threshold to a median below 900 s, with p95 below 1800 s and the REVIEW bounds unchanged.",
+  "goal": "Bring self-scorecard cells F5:T7 and F5:T9 to PASS without relaxing a definition and without moving any node out of the pull-request lane. Baseline over the 30 days to main 92526921 (355 counted pull_request runs): harness_performance median 710 s against a target then below 600 s, below 900 s since decision D6 (p95 1059 s, already passing), with test:cli 58% of job time because the check runner executes nodes one at a time; harness_green_main 86.8% against a target of at least 95%, with 47 failures of which 33 are real defects, 13 main-moved blocks, and 1 infrastructure (#247). Owner decisions D1 to D5 of 2026-10-07 (decisions.md): in-runner parallel workers first and sharding only if still above 600 s, auto-update branch, a pre-push preflight mandatory for agents and opt-in for humans, keep the F5:T9 definition (amended on 2026-10-08: F5:T9 measures the final-head gate outcome of each pull request), and ship 2.3.0 when both cells pass. Owner decision D6 of 2026-10-08 sets the F5:T7 PASS threshold to a median below 900 s, with p95 below 1800 s and the REVIEW bounds unchanged.",
   "records": [
     "ADR-CHK-0007",
     "ADR-CHK-0006",
@@ -1355,47 +1355,57 @@
     },
     {
       "id": "R-0703",
-      "title": "F5:T9 measurement (deferred under D4)",
-      "goal": "Only if the Owner later chooses it: redefine F5:T9 so it measures the outcome of the gate rather than developer iteration, either the final commit of each branch or merge_group runs, through a forward record on ADR-SCR-0010 and law/policy/sensor-notes/harness_green_main.md. Changes what the cell means, never what the gate checks.",
-      "status": "planned",
+      "title": "F5:T9 measurement: the final-head gate outcome of each pull request (D4 amended)",
+      "goal": "Redefine F5:T9 under D4 as amended on 2026-10-08: harness_green_main reads the final-head gate run of each pull request in the window, not every push, so it measures the outcome of the gate rather than developer iteration. A forward record on ADR-SCR-0010, law/policy/sensor-notes/harness_green_main.md, a sensor page under docs/theory, the sensor, and its tests carry the change. It changes what the cell means, never what the gate checks; the at-least-95% threshold is unchanged.",
+      "status": "open",
       "records": ["ADR-SCR-0010"],
-      "depends_on": ["R-0702"],
+      "depends_on": [],
       "attestation_reissue": false,
       "owner_effects_required": [],
-      "close_checks": ["adrs", "campaign:check"],
-      "disposition": "Deferred by Owner decision D4 of 2026-10-07: keep the current F5:T9 definition and revisit after the R-0702 window. The round is never opened without a new Owner decision.",
+      "close_checks": ["adrs", "test:sensors", "campaign:check"],
+      "disposition": "Opened by the Owner on 2026-10-08 (\"Redefine F5:T9 now (R-0703)\"), amending D4 and lifting the wait on the R-0702 window.",
       "waves": [
         {
           "id": "CTG-0731",
-          "title": "Redefine the F5:T9 measurement",
-          "type": "single-role",
+          "title": "Redefine the F5:T9 population as the final-head gate run of each pull request",
+          "type": "coupled-triplet",
           "records": ["ADR-SCR-0010"],
           "depends_on": [],
           "lock_scopes": [
             "law/adr/",
             "law/policy/adr-validation.json",
-            "law/policy/sensor-notes/harness_green_main.md"
+            "law/policy/sensor-notes/harness_green_main.md",
+            "docs/theory/architecture/sensors/harness_green_main.md",
+            "docs/theory/architecture/sensors/README.md",
+            "law/policy/documentation-information-architecture.json",
+            "packages/sensors/tests/",
+            "packages/sensors/src/harness-green-main.ts",
+            "packages/sensors/src/harness/"
           ],
-          "gates": ["adrs"],
+          "gates": ["adrs", "test:sensors"],
           "tasks": [
             {
               "id": "TASK-0731",
-              "title": "Record a redefined F5:T9 measurement if the Owner reverses D4",
+              "title": "Record the final-head F5:T9 population on ADR-SCR-0010, its sensor note and its sensor page",
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "ready",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
                   "law/adr/",
                   "law/policy/adr-validation.json",
-                  "law/policy/sensor-notes/harness_green_main.md"
+                  "law/policy/sensor-notes/harness_green_main.md",
+                  "docs/theory/architecture/sensors/harness_green_main.md",
+                  "docs/theory/architecture/sensors/README.md",
+                  "law/policy/documentation-information-architecture.json"
                 ],
-                "forbidden": ["packages/", ".github/workflows/"]
+                "forbidden": ["packages/", "tests/", ".github/workflows/"]
               },
               "deliverables": [
-                "Only after a new Owner decision: a forward record on ADR-SCR-0010 naming the population harness_green_main reads, the matching sensor note, and the regenerated and re-pinned catalogue."
+                "A forward record on ADR-SCR-0010 (D4 as amended on 2026-10-08) defines the harness_green_main population as the final-head gate run of each pull request in the window: for each pull request with a gate run in the window, only the run on its final head counts. Cancelled and superseded runs stay excluded, the at-least-95% threshold is unchanged, and what the gate checks is unchanged. The catalogue is regenerated and re-pinned.",
+                "law/policy/sensor-notes/harness_green_main.md states the new population. A new sensor page docs/theory/architecture/sensors/harness_green_main.md, listed in docs/theory/architecture/sensors/README.md and registered in law/policy/documentation-information-architecture.json, describes how the final head of each pull request is chosen and read."
               ],
               "acceptance_commands": [
                 [
@@ -1408,7 +1418,7 @@
                   "json"
                 ]
               ],
-              "commit_types": ["law(adr)", "law(policy)"],
+              "commit_types": ["law(adr)", "law(policy)", "docs(sensors)"],
               "prompt": {
                 "path": "prompts/TASK-0731.md"
               },
@@ -1417,6 +1427,70 @@
               "execution": {
                 "tier": "architect",
                 "effort": "high",
+                "time_budget_minutes": 60
+              }
+            },
+            {
+              "id": "TASK-0732",
+              "title": "Test the final-head population of harness_green_main",
+              "discipline": "inspector",
+              "coupled_pipeline_position": "inspector",
+              "upstream_task_id": "TASK-0731",
+              "status": "ready",
+              "target_substrates": ["F5"],
+              "boundary": {
+                "paths": ["packages/sensors/tests/"],
+                "forbidden": ["packages/sensors/src/", "law/", "docs/"]
+              },
+              "deliverables": [
+                "Tests under packages/sensors/tests/ prove that harness_green_main counts one gate run per pull request, the run on its final head. A pull request whose earlier pushes failed but whose final head passed counts green. One whose final head failed counts red. Cancelled and superseded runs are excluded. A pull request with no gate run on its final head is not counted.",
+                "The percentage, the 95% PASS and 80% REVIEW thresholds, and the reading metrics follow the per-pull-request population. The tests fail until TASK-0733 lands on the same branch."
+              ],
+              "acceptance_commands": [["pnpm", "run", "test:sensors"]],
+              "commit_types": ["test(sensors)"],
+              "prompt": {
+                "path": "prompts/TASK-0732.md"
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker",
+                "effort": "medium",
+                "time_budget_minutes": 60
+              }
+            },
+            {
+              "id": "TASK-0733",
+              "title": "Read the final-head gate run of each pull request in harness_green_main",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": "TASK-0732",
+              "status": "ready",
+              "target_substrates": ["F2", "F5"],
+              "boundary": {
+                "paths": [
+                  "packages/sensors/src/harness-green-main.ts",
+                  "packages/sensors/src/harness/"
+                ],
+                "forbidden": ["law/", "docs/", "tests/", "packages/sensors/tests/", "packages/cli/"]
+              },
+              "deliverables": [
+                "packages/sensors/src/harness-green-main.ts computes its percentage over the final-head gate run of each pull request in the window. The gh-api population reader under packages/sensors/src/harness/ groups the pull_request gate runs by pull request and keeps the latest attempt of the run on each final head, through the admitted gh run list shapes.",
+                "The thresholds and the reading shape are unchanged."
+              ],
+              "acceptance_commands": [
+                ["pnpm", "run", "typecheck"],
+                ["pnpm", "run", "test:sensors"]
+              ],
+              "commit_types": ["fix(sensors)", "feat(sensors)"],
+              "prompt": {
+                "path": "prompts/TASK-0733.md"
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker",
+                "effort": "medium",
                 "time_budget_minutes": 60
               }
             }
