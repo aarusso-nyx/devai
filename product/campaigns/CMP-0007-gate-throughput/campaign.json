@@ -253,7 +253,8 @@
                 "forbidden": ["packages/cli/src/", "law/", "test-tasks.json"]
               },
               "deliverables": [
-                "Tests under packages/cli/tests/unit/ cover IA-001 to IA-008 of ADR-CHK-0007 with an injected executor and real processes, including the undeclared-node default, a refused exclusivity file, and the release selections that stay sequential."
+                "Tests under packages/cli/tests/unit/ cover IA-001 to IA-008 of ADR-CHK-0007 with an injected executor and real processes, including the undeclared-node default, a refused exclusivity file, a set but empty DEVAI_CHECK_TASK_WORKERS refused with CHECK_RUNNER_WORKERS, and the release selections that stay sequential.",
+                "IA-008 (runner and bundled-verifier task-key and task-policy parity for a candidate carrying test-task-exclusivity.json) is untested until this task lands with the runner pull request; the test proves it through the rc-policy verifier parity harness."
               ],
               "acceptance_commands": [["pnpm", "run", "test:cli"]],
               "commit_types": ["test(cli)"],
@@ -292,8 +293,8 @@
                 ]
               },
               "deliverables": [
-                "The runner schedules plan nodes by rules 1 to 10 of ADR-CHK-0007, reading conflicts from test-task-exclusivity.json (validated through the roster, refused when invalid or naming an undeclared node), output-path overlap, and a shared DEVAI_DB_URL; --task-workers and DEVAI_CHECK_TASK_WORKERS select 1 to 16 workers with CHECK_RUNNER_WORKERS refusals and sequential release runs.",
-                "test-task-exclusivity.json declares the framework nodes; test-tasks.json and the vendored verifier are unchanged."
+                "The runner schedules plan nodes by rules 1 to 10 of ADR-CHK-0007, reading conflicts from test-task-exclusivity.json (validated through the roster, refused when invalid or naming an undeclared node), output-path overlap, and a shared DEVAI_DB_URL; --task-workers and DEVAI_CHECK_TASK_WORKERS select 1 to 16 workers with CHECK_RUNNER_WORKERS refusals, including a set but empty variable, and sequential release runs.",
+                "test-task-exclusivity.json declares the framework nodes. It is root workspace configuration under Article 6, so the Engineer authors its content, and it is bound to the ci change class like test-tasks.json; test-tasks.json and the vendored verifier are unchanged."
               ],
               "acceptance_commands": [
                 ["pnpm", "run", "typecheck"],
@@ -403,7 +404,7 @@
                 ]
               },
               "deliverables": [
-                "Tests cover IA-009 to IA-011 of ADR-CHK-0007: identical plans and task-policy digests across the two partitions, disjoint owned sets whose union is the plan, test:cli executed only in the including run, the non-separable test:local-full plan, the CHECK_RUNNER_PARTITION refusals, the absent receipt, every aggregator failure mode, the workflow-checker pins, and the alignment sensor reading the producer and affected steps across the partition jobs."
+                "IA-009 to IA-011 of ADR-CHK-0007 are untested until this task. Tests cover them: identical plans and task-policy digests across the two partitions, one entry per planned node in each report with exactly one owned entry per node across the pair and partitioned-out entries that are never started, test:cli executed only in the including run, the non-separable test:local-full plan whose excluding report is all partitioned-out, the CHECK_RUNNER_PARTITION refusals, the absent receipt, every aggregator failure mode, the workflow-checker pins, and the alignment sensor reading the producer and affected steps across the partition jobs."
               ],
               "acceptance_commands": [["pnpm", "run", "test:cli"]],
               "commit_types": ["test(cli)", "test(sensors)", "test(contract)"],
@@ -438,7 +439,7 @@
                 "forbidden": ["law/", "docs/", "tests/", "packages/cli/tests/", "test-tasks.json"]
               },
               "deliverables": [
-                "check --run accepts --partition-include and --partition-exclude under ADR-CHK-0007 rule 11, with ownership, separability, prerequisite marking, no receipt, and CHECK_RUNNER_PARTITION refusals.",
+                "check --run accepts --partition-include and --partition-exclude under ADR-CHK-0007 rule 11, with ownership, separability, one entry per planned node marked owned, prerequisite, or partitioned-out (outcome SKIPPED, never started), a verdict over owned entries only, no receipt, and CHECK_RUNNER_PARTITION refusals.",
                 ".github/workflows/pull-request-checks.yml runs gate-cli and gate-rest and an aggregator job named devai-release-gate that needs both under always(); scripts/aggregate-gate-partitions.mjs verifies the two reports as rule 11 states; scripts/check-workflows.mjs pins the shape; the alignment sensor reads the steps across the partition jobs."
               ],
               "acceptance_commands": [
@@ -456,6 +457,56 @@
                 "tier": "worker-high",
                 "effort": "high",
                 "time_budget_minutes": 240
+              }
+            }
+          ]
+        },
+        {
+          "id": "CTG-0716",
+          "title": "Error-code reference for the partitioned gate",
+          "type": "single-role",
+          "records": ["ADR-CHK-0007"],
+          "depends_on": ["CTG-0713"],
+          "lock_scopes": ["docs/reference/error-codes.md"],
+          "gates": ["docs-links"],
+          "tasks": [
+            {
+              "id": "TASK-07112",
+              "title": "Regenerate the error-code reference for CHECK_RUNNER_PARTITION",
+              "discipline": "architect",
+              "coupled_pipeline_position": "architect",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F1", "F5"],
+              "boundary": {
+                "paths": ["docs/reference/error-codes.md"],
+                "forbidden": ["packages/", "tests/", "scripts/", "law/"]
+              },
+              "deliverables": [
+                "docs/reference/error-codes.md is regenerated with node scripts/generate-error-code-reference.mjs after TASK-0719 adds CHECK_RUNNER_PARTITION, on the same branch as the partition wave, so the devai:prepare drift check passes. A coupled triplet holds one Architect task, so this regeneration, which must follow the Engineer code, is its own wave."
+              ],
+              "acceptance_commands": [
+                ["node", "scripts/generate-error-code-reference.mjs"],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "docs-links",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": ["docs(reference)"],
+              "prompt": {
+                "path": "prompts/TASK-07112.md"
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "clerk",
+                "effort": "low",
+                "time_budget_minutes": 15
               }
             }
           ]
