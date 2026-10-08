@@ -225,6 +225,37 @@
           "files": [".devai/config/post-merge-host-adapter.json"]
         }
       ]
+    },
+    {
+      "version": "2.3.0",
+      "status": "released",
+      "date": "2026-10-08",
+      "changes": [
+        {
+          "id": "MIG-2.3.0-subprocess-effects-pr-list",
+          "kind": "rebind",
+          "summary": "The subprocess effects registry declares the read-only gh-pr-list-all template, gh pr list --state all --limit 1000 --json closedAt,headRefName,headRefOid,mergedAt,number,state with every token literal, which harness_green_main reads under outcomeUnit pull-request-final-head. Rebinding subprocess effects materializes it byte for byte.",
+          "decision_records": ["ADR-SCR-0014", "ADR-SCR-0005"],
+          "segments": ["subprocess-effects"],
+          "files": [".devai/config/subprocess-effects.json"]
+        },
+        {
+          "id": "MIG-2.3.0-parallel-check-scheduling",
+          "kind": "opt-in-capability",
+          "summary": "check --run may execute independent plan nodes in parallel. A node runs beside another only when the committed test-task-exclusivity.json, validated by test-task-exclusivity.schema.json, declares both and their exclusive and shared keys do not conflict, so a repository without the file keeps running one node at a time whatever --task-workers or DEVAI_CHECK_TASK_WORKERS says. An adopter that adds the file binds it to the ci class in its own .devai/config/change-taxonomy-binding.json, as the package default now does, or the unclassified-path probe refuses it. test-tasks.json is unchanged and its schema is now closed, so an unknown task property is refused.",
+          "decision_records": ["ADR-CHK-0007", "ADR-CHK-0006"],
+          "segments": ["harness-ci"],
+          "files": ["test-task-exclusivity.json", ".devai/config/change-taxonomy-binding.json"]
+        },
+        {
+          "id": "MIG-2.3.0-green-main-final-head",
+          "kind": "opt-in-capability",
+          "summary": "The harness_green_main declaration in .devai/config/sensor-inputs.json accepts outcomeUnit. The default run keeps one outcome per sampled run; pull-request-final-head counts each merged, closed, or open pull request once, on the latest completed, non-cancelled run of its final head, and needs the gh-pr-list-all template rebound. A declaration without the key reads as before.",
+          "decision_records": ["ADR-SCR-0014"],
+          "segments": ["harness-ci"],
+          "files": [".devai/config/sensor-inputs.json"]
+        }
+      ]
     }
   ]
 }
