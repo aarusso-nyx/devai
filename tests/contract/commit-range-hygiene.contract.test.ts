@@ -2,7 +2,9 @@
 // pull-request range check re-applies the commit grammar and single-family
 // rule over the first-parent range from base to candidate, so a mixed commit
 // that bypassed the local pre-commit hook (`--no-verify`) is still caught. A
-// merge commit and a revert of a single-family commit are exempt and pass.
+// revert of a single-family commit is exempt and passes. ADR-CHK-0008 IA-007 refuses any
+// merge commit inside a pull-request range, so a merge now fails the range check, and the
+// fixture commits as a DEVAI role identity whose authority covers the paths it changes.
 //
 // scripts/check-commit-range.mjs does not exist yet, so every case here is red:
 // node reports a MODULE_NOT_FOUND error instead of classifying anything, which
@@ -25,8 +27,8 @@ function repo() {
   roots.push(cwd);
   const git = (...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
   git('init', '--quiet');
-  git('config', 'user.name', 'Range test');
-  git('config', 'user.email', 'range@example.invalid');
+  git('config', 'user.name', 'DEVAI Inspector');
+  git('config', 'user.email', 'inspector@devai.local');
 
   mkdirSync(join(cwd, 'law/policy'), { recursive: true });
   mkdirSync(join(cwd, '.devai/config'), { recursive: true });
@@ -87,7 +89,7 @@ describe('commit range hygiene (ADR-GOV-0018)', () => {
     expect(result.output).toMatch(new RegExp(`${shortMixed}|${mixed}`, 'u'));
   });
 
-  it('passes a merge commit without treating it as mixed', () => {
+  it('refuses a merge commit inside the range (ADR-CHK-0008 IA-007), naming it', () => {
     const r = repo();
     r.git('checkout', '-qb', 'branch-a');
     r.put('tests/contract/fixture-a.contract.test.ts', 'export {};\n');
@@ -100,10 +102,12 @@ describe('commit range hygiene (ADR-GOV-0018)', () => {
     r.git('checkout', '-q', 'branch-a');
     r.git('merge', '--no-ff', '-qm', 'Merge branch-b into branch-a', 'branch-b');
     const head = r.git('rev-parse', 'HEAD');
+    const shortHead = r.git('rev-parse', '--short', head);
 
     const result = runChecked(() => r.checkRange(r.base, head));
 
-    expect(result.status, result.output).toBe(0);
+    expect(result.status, result.output).not.toBe(0);
+    expect(result.output).toMatch(new RegExp(`${shortHead}|${head}`, 'u'));
   });
 
   it('passes a revert of a single-family commit', () => {
