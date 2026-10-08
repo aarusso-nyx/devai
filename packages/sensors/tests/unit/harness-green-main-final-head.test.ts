@@ -40,7 +40,7 @@ const RUN_LIST_ARGV = (fields: string) => [
   '--json',
   fields,
   '--limit',
-  '300',
+  '1000',
   '--created',
   '>=2026-09-08',
 ];
@@ -52,7 +52,7 @@ const PR_LIST_ARGV = [
   '--limit',
   '1000',
   '--json',
-  'closedAt,headRefName,headRefOid,mergedAt,number,state',
+  'baseRefName,closedAt,createdAt,headRefName,headRefOid,mergedAt,number,state',
 ];
 
 type Conclusion = 'success' | 'failure' | 'cancelled' | 'skipped' | 'timed_out' | null;
@@ -72,12 +72,17 @@ interface Run {
 
 interface PullRequest {
   readonly number: number;
+  readonly baseRefName: string;
   readonly headRefName: string;
   readonly headRefOid: string;
   readonly state: State;
+  readonly createdAt: string;
   readonly mergedAt: string | null;
   readonly closedAt: string | null;
 }
+
+/** Before every run the fixture's clock creates, so each fixture run lies in the open interval. */
+const OPENED = '2026-09-30T00:00:00.000Z';
 
 let nextId = 1;
 let clock = Date.parse('2026-10-01T00:00:00Z');
@@ -99,15 +104,24 @@ function run(branch: string, sha: string, conclusion: Conclusion, extra: Partial
   };
 }
 
-function pr(number: number, branch: string, sha: string, state: State): PullRequest {
+function pr(
+  number: number,
+  branch: string,
+  sha: string,
+  state: State,
+  extra: Partial<PullRequest> = {},
+): PullRequest {
   const closed = state === 'OPEN' ? null : NOW;
   return {
     number,
+    baseRefName: 'main',
     headRefName: branch,
     headRefOid: sha,
     state,
+    createdAt: OPENED,
     mergedAt: state === 'MERGED' ? NOW : null,
     closedAt: closed,
+    ...extra,
   };
 }
 
@@ -467,6 +481,11 @@ describe('harness_green_main final-head review rulings (R-0703)', () => {
     ['a missing headRefOid', ({ headRefOid: _drop, ...row }) => row],
     ['a missing number', ({ number: _drop, ...row }) => row],
     ['a missing state', ({ state: _drop, ...row }) => row],
+    ['a missing baseRefName', ({ baseRefName: _drop, ...row }) => row],
+    ['a missing createdAt', ({ createdAt: _drop, ...row }) => row],
+    ['a numeric baseRefName', (row) => ({ ...row, baseRefName: 7 })],
+    ['a non-date createdAt', (row) => ({ ...row, createdAt: 'yesterday' })],
+    ['a null createdAt', (row) => ({ ...row, createdAt: null })],
     ['a numeric headRefName', (row) => ({ ...row, headRefName: 42 })],
     ['a null headRefOid', (row) => ({ ...row, headRefOid: null })],
     ['a string number', (row) => ({ ...row, number: '7' })],
@@ -515,6 +534,107 @@ describe('harness_green_main final-head review rulings (R-0703)', () => {
     });
 
     expect(counted(reading)).toEqual({ total: 1, green: 0, pct: 0 });
+  });
+});
+
+// ADR-SCR-0014 IA-006 (#365): only pull requests against the declared base are sampled, and a
+// run belongs to a pull request only when it was created while the pull request was open.
+describe('harness_green_main final-head base branch and lifetime (ADR-SCR-0014 IA-006)', () => {
+  const at = (iso: string): Partial<Run> => ({ createdAt: iso, updatedAt: iso });
+
+  it('leaves out a pull request whose base is not the declared base branch', () => {
+    const counts = greenPullRequests(1);
+    const branch = 'feature/backport';
+    const sha = '1'.repeat(40);
+    stub(
+      [...counts.runs, run(branch, sha, 'failure')],
+      [...counts.pullRequests, pr(20, branch, sha, 'MERGED', { baseRefName: 'release/2.2' })],
+    );
+
+    expect(counted(sense())).toEqual({ total: 1, green: 1, pct: 100 });
+  });
+
+  it('does not attribute a run created before the pull request opened', () => {
+    const counts = greenPullRequests(1);
+    const branch = 'feature/early';
+    const sha = '2'.repeat(40);
+    stub(
+      [...counts.runs, run(branch, sha, 'failure', at('2026-10-02T00:00:00.000Z'))],
+      [
+        ...counts.pullRequests,
+        pr(21, branch, sha, 'MERGED', { createdAt: '2026-10-03T00:00:00.000Z' }),
+      ],
+    );
+
+    // Its only run predates it, so it has no run in its lifetime and is not sampled.
+    expect(counted(sense())).toEqual({ total: 1, green: 1, pct: 100 });
+  });
+
+  it('does not attribute a run created after the pull request closed', () => {
+    const counts = greenPullRequests(1);
+    const branch = 'feature/late';
+    const sha = '3'.repeat(40);
+    stub(
+      [...counts.runs, run(branch, sha, 'failure', at('2026-10-06T00:00:00.000Z'))],
+      [
+        ...counts.pullRequests,
+        pr(22, branch, sha, 'CLOSED', { closedAt: '2026-10-05T00:00:00.000Z' }),
+      ],
+    );
+
+    expect(counted(sense())).toEqual({ total: 1, green: 1, pct: 100 });
+  });
+
+  it('decides a final head only from the runs inside its lifetime', () => {
+    const branch = 'feature/inside';
+    const sha = '4'.repeat(40);
+    stub(
+      [
+        run(branch, sha, 'success', at('2026-10-02T00:00:00.000Z')),
+        run(branch, sha, 'failure', at('2026-10-04T00:00:00.000Z')),
+        run(branch, sha, 'success', at('2026-10-07T00:00:00.000Z')),
+      ],
+      [
+        pr(23, branch, sha, 'MERGED', {
+          createdAt: '2026-10-03T00:00:00.000Z',
+          closedAt: '2026-10-05T00:00:00.000Z',
+          mergedAt: '2026-10-05T00:00:00.000Z',
+        }),
+      ],
+    );
+
+    // The green runs fall before it opened and after it merged; inside, its head failed.
+    expect(counted(sense())).toEqual({ total: 1, green: 0, pct: 0 });
+  });
+
+  it('keeps an open pull request open until now', () => {
+    const branch = 'feature/still-open';
+    const sha = '5'.repeat(40);
+    stub(
+      [run(branch, sha, 'failure', at('2026-10-08T11:00:00.000Z'))],
+      [pr(24, branch, sha, 'OPEN', { createdAt: '2026-10-02T00:00:00.000Z' })],
+    );
+
+    expect(counted(sense())).toEqual({ total: 1, green: 0, pct: 0 });
+  });
+
+  it('never lends a reused branch name the run of a later pull request (#365)', () => {
+    const branch = 'feature/reused';
+    const sha = '6'.repeat(40);
+    stub(
+      // One green run, created while only the newer pull request was open.
+      [run(branch, sha, 'success', at('2026-10-04T00:00:00.000Z'))],
+      [
+        pr(25, branch, sha, 'CLOSED', {
+          createdAt: '2026-09-20T00:00:00.000Z',
+          closedAt: '2026-09-21T00:00:00.000Z',
+        }),
+        pr(26, branch, sha, 'MERGED', { createdAt: '2026-10-03T00:00:00.000Z' }),
+      ],
+    );
+
+    // The older pull request had no run in its own lifetime: it is not sampled and not red.
+    expect(counted(sense())).toEqual({ total: 1, green: 1, pct: 100 });
   });
 });
 

@@ -21,7 +21,7 @@ interface GhRun {
 const NOW = '2026-09-09T12:00:00.000Z';
 const GH_ARGV =
   `gh run list --workflow pull-request-checks.yml --event pull_request --json ${HARNESS_RUN_FIELDS} ` +
-  '--limit 300 --created >=2026-08-10';
+  '--limit 1000 --created >=2026-08-10';
 let root = '';
 let nextId = 1;
 

@@ -176,7 +176,7 @@ describe('harness green-main sensor', () => {
       deterministic: false,
       tier: 'L2',
       timestamp: NOW,
-      command: `gh run list --workflow pull-request-checks.yml --event pull_request --json ${FIELDS} --limit 300 --created >=2026-08-09`,
+      command: `gh run list --workflow pull-request-checks.yml --event pull_request --json ${FIELDS} --limit 1000 --created >=2026-08-09`,
       findings: [
         {
           severity: 'info',
@@ -198,7 +198,7 @@ describe('harness green-main sensor', () => {
         '--json',
         FIELDS,
         '--limit',
-        '300',
+        '1000',
         '--created',
         '>=2026-08-09',
       ],
@@ -422,7 +422,7 @@ describe('harness green-main sensor', () => {
       '--json',
       FIELDS,
       '--limit',
-      '300',
+      '1000',
       '--created',
       '>=2026-08-09',
     ]);
@@ -830,7 +830,7 @@ describe('harness performance sensor', () => {
       deterministic: false,
       tier: 'L2',
       timestamp: NOW,
-      command: `gh run list --workflow pull-request-checks.yml --event pull_request --json ${FIELDS} --limit 300 --created >=2026-08-09`,
+      command: `gh run list --workflow pull-request-checks.yml --event pull_request --json ${FIELDS} --limit 1000 --created >=2026-08-09`,
       findings: [
         {
           severity: 'info',
@@ -850,7 +850,7 @@ describe('harness performance sensor', () => {
       '--json',
       FIELDS,
       '--limit',
-      '300',
+      '1000',
       '--created',
       '>=2026-08-09',
     ]);
