@@ -241,13 +241,15 @@ export function schedulePredecessors(nodes: readonly ScheduledNode[]): readonly 
  * predecessors have settled; among ready nodes the earliest in plan order starts first.
  * Task failures are results, not errors, and never stop the schedule. A host error stops
  * new starts, lets running siblings settle, and then rethrows the error of the earliest
- * node that raised one.
+ * node that raised one. `workers` is re-read before every start: when it drops to 1, no
+ * node starts until every running node has settled, and the rest run one at a time.
  */
 export async function runScheduled(
   nodes: readonly ScheduledNode[],
-  workers: number,
+  workers: number | (() => number),
   run: (position: number) => Promise<void>,
 ): Promise<void> {
+  const limit = typeof workers === 'number' ? () => workers : workers;
   const predecessors = schedulePredecessors(nodes);
   const started = new Array<boolean>(nodes.length).fill(false);
   const settled = new Array<boolean>(nodes.length).fill(false);
@@ -256,7 +258,7 @@ export async function runScheduled(
   await new Promise<void>((resolveAll) => {
     const pump = (): void => {
       if (errors.size === 0) {
-        for (let position = 0; position < nodes.length && running < workers; position += 1) {
+        for (let position = 0; position < nodes.length && running < limit(); position += 1) {
           if (started[position] === true) continue;
           if (!(predecessors[position] ?? []).every((at) => settled[at] === true)) continue;
           started[position] = true;

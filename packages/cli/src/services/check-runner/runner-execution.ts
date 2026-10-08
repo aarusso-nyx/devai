@@ -66,6 +66,7 @@ export async function defaultExecuteAsync(
   timeoutMs: number,
   environment: Readonly<Record<string, string>>,
   releaseBinding?: Parameters<typeof bindReleaseTaskProcessOptions>[1],
+  onUnconfirmedTermination?: () => void,
 ): Promise<TaskExecutionResult> {
   const spawnOptions = {
     cwd,
@@ -81,6 +82,10 @@ export async function defaultExecuteAsync(
       ? spawnOptions
       : bindReleaseTaskProcessOptions({ ...spawnOptions }, releaseBinding),
   ).result;
+  // A process group that outlived its termination may still write shared output. The
+  // node's own outcome stays what the blocking executor reports (TIMEOUT for a timeout);
+  // the caller stops admitting concurrent nodes so nothing conflicting overlaps it.
+  if (result.termination_error !== undefined) onUnconfirmedTermination?.();
   const errorCode =
     result.spawn_error ??
     (result.timed_out

@@ -16,6 +16,7 @@ import type {
   ExecutedTask,
   PlannedTask,
   TaskDescriptorNode,
+  TaskExclusivity,
   TaskExecutionResult,
   TaskPlan,
   TaskResult,
@@ -128,13 +129,22 @@ export async function runCheckTasksAsync(
     ...(resolveProtectedMutationProducer === undefined ? {} : { resolveProtectedMutationProducer }),
     ...(now === undefined ? {} : { now }),
   };
+  // Once a timed-out process group cannot be confirmed gone, a descendant may still write
+  // shared output: no further node starts until every running node has settled, and the
+  // remaining nodes run one at a time. Outcomes are unchanged (the node is TIMEOUT).
+  let serialized = false;
   const run = prepareCheckRun(
     captured,
     executeTask === undefined
       ? undefined
       : (argv, cwd, timeout, environment, taskIdentity) =>
           executeTask([...argv], cwd, timeout, { ...environment }, { ...taskIdentity }),
-    workers === 1 ? defaultExecute : defaultExecuteAsync,
+    workers === 1
+      ? defaultExecute
+      : (argv, cwd, timeout, environment, releaseBinding) =>
+          defaultExecuteAsync(argv, cwd, timeout, environment, releaseBinding, () => {
+            serialized = true;
+          }),
   );
   if (!('descriptorById' in run)) return run;
   const drive = async (position: number): Promise<void> => {
@@ -156,16 +166,11 @@ export async function runCheckTasksAsync(
   if (workers === 1) {
     for (let position = 0; position < run.plan.tasks.length; position += 1) await drive(position);
   } else {
-    // Read before any node starts, so a malformed declaration refuses the whole run.
-    const exclusivity = readTaskExclusivity(
-      run.options.repoRoot,
-      new Set(run.descriptorById.keys()),
-    );
     await runScheduled(
       run.plan.tasks.map((task) =>
-        scheduledNode(task, run.descriptorById.get(task.nodeId), exclusivity.get(task.nodeId)),
+        scheduledNode(task, run.descriptorById.get(task.nodeId), run.exclusivity.get(task.nodeId)),
       ),
-      workers,
+      () => (serialized ? 1 : workers),
       drive,
     );
   }
@@ -179,6 +184,8 @@ interface CheckRun {
   readonly inputs: ReturnType<typeof prepareCheckRunInputs>;
   readonly releaseBinding: ReturnType<typeof bindReleaseRequest>['binding'];
   readonly descriptorById: ReadonlyMap<string, TaskDescriptorNode>;
+  /** Validated before any node runs, at every worker count, so refusals do not depend on W. */
+  readonly exclusivity: ReadonlyMap<string, TaskExclusivity>;
   readonly timeoutMs: number;
   readonly now: () => string;
   readonly repositoryState: () => Readonly<{ commit: string; tree: string; clean: boolean }>;
@@ -268,6 +275,10 @@ function prepareCheckRun(
     inputs,
     releaseBinding,
     descriptorById: new Map(descriptor.tasks.map((task) => [task.nodeId, task])),
+    exclusivity: readTaskExclusivity(
+      options.repoRoot,
+      new Set(descriptor.tasks.map((task) => task.nodeId)),
+    ),
     timeoutMs,
     now: options.now ?? (() => new Date().toISOString()),
     repositoryState,
