@@ -32,13 +32,13 @@
   "owner_effects": [
     {
       "id": "OE-02",
-      "description": "Enable the auto-update branch repository setting with the rebase update method (decision D2), after TASK-0721 records how it fits ADR-CHK-0004 and writes out the exact setting, and after TASK-0728 makes the commit-range check refuse merge commits and judge author path authority and admitted committers (ADR-CHK-0008), and provide the non-GITHUB_TOKEN credential the TASK-0726 rebase-update workflow uses. The setting alone updates no pull request; TASK-0726 is the update mechanism. OE-01 is not used: the campaign policy reserves it for a merge queue, which D2 did not choose, so serialized admission stays in force.",
+      "description": "Enable the auto-update branch repository setting with the rebase update method (decision D2), after TASK-0721 records how it fits ADR-CHK-0004 and writes out the exact setting, and after TASK-0728 makes the commit-range check refuse merge commits and judge author path authority and admitted committers (ADR-CHK-0008), and provide the non-GITHUB_TOKEN credential the TASK-0726 rebase-update workflow uses. The setting alone updates no pull request; TASK-0726 is the update mechanism. OE-01 is not used: the campaign policy reserves it for a merge queue, which D2 did not choose, so serialized admission stays in force. Still Owner-pending at the 2.3.0 release decision of 2026-10-08, together with the live update-branch check on a real pull request.",
       "required_before": "R-0702",
       "performed_at": null
     },
     {
       "id": "OE-03",
-      "description": "Publish 2.3.0 (decision D5) once harness_performance and harness_green_main both read PASS over their post-change windows, from an exact candidate under a separately authorized release.",
+      "description": "Publish 2.3.0 (decision D5) once harness_performance and harness_green_main both read PASS over their post-change windows, from an exact candidate under a separately authorized release. D5 measured as satisfied on main e43e8db9 at 2026-10-08T17:39Z (decisions.md, D5 measurement); the release proceeds, and publication still needs its separate authorization.",
       "required_before": "R-0702",
       "performed_at": null
     }
@@ -1188,7 +1188,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "ready",
+              "status": "merged",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -1241,8 +1241,8 @@
               "prompt": {
                 "path": "prompts/TASK-07210.md"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/363",
+              "merged_as": "e96b261ef7af2b7240d2b17100a6d1472ddea422",
               "execution": {
                 "tier": "architect",
                 "effort": "high",
@@ -1255,7 +1255,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-07210",
-              "status": "ready",
+              "status": "merged",
               "target_substrates": ["F5"],
               "boundary": {
                 "paths": [
@@ -1290,8 +1290,8 @@
               "prompt": {
                 "path": "prompts/TASK-07211.md"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/363",
+              "merged_as": "e96b261ef7af2b7240d2b17100a6d1472ddea422",
               "execution": {
                 "tier": "worker",
                 "effort": "medium",
@@ -1304,7 +1304,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-07211",
-              "status": "ready",
+              "status": "merged",
               "target_substrates": ["F5"],
               "boundary": {
                 "paths": [
@@ -1342,8 +1342,8 @@
               "prompt": {
                 "path": "prompts/TASK-0726.md"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/363",
+              "merged_as": "e96b261ef7af2b7240d2b17100a6d1472ddea422",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -1397,7 +1397,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "ready",
+              "status": "merged",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -1440,8 +1440,8 @@
               "prompt": {
                 "path": "prompts/TASK-0731.md"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/366",
+              "merged_as": "e43e8db9d8dc64159396373760e20d4e5488fb12",
               "execution": {
                 "tier": "architect",
                 "effort": "high",
@@ -1454,7 +1454,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0731",
-              "status": "ready",
+              "status": "merged",
               "target_substrates": ["F5"],
               "boundary": {
                 "paths": ["packages/sensors/tests/", "packages/schemas/tests/"],
@@ -1479,8 +1479,8 @@
               "prompt": {
                 "path": "prompts/TASK-0732.md"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/366",
+              "merged_as": "e43e8db9d8dc64159396373760e20d4e5488fb12",
               "execution": {
                 "tier": "worker",
                 "effort": "medium",
@@ -1493,7 +1493,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0732",
-              "status": "ready",
+              "status": "merged",
               "target_substrates": ["F2", "F5"],
               "boundary": {
                 "paths": [
@@ -1524,8 +1524,8 @@
               "prompt": {
                 "path": "prompts/TASK-0733.md"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/366",
+              "merged_as": "e43e8db9d8dc64159396373760e20d4e5488fb12",
               "execution": {
                 "tier": "worker",
                 "effort": "medium",
