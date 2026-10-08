@@ -23,6 +23,7 @@ inspector_acceptance:
   - IA-003 -- A rebased head started by the update workflow starts a gate run, because the push is made with a GitHub App installation token; an update made with GITHUB_TOKEN would start none and is refused by the workflow checker.
   - IA-004 -- When the rebased head arrives while the previous head's gate is running, the per-pull-request concurrency group cancels the superseded run, which ends cancelled rather than failed and is excluded from harness_green_main.
   - IA-005 -- scripts/check-workflows.mjs fails when the update workflow loses its push-to-main trigger, its rebase update method, its expected-head-sha guard, its App-token credential, or its least-privilege permissions, and strict up-to-date protection and the single required check devai-release-gate are unchanged.
+  - IA-006 -- A commit inside a role-scoped pull request whose committer is neither its author role, the human merger of a rebase merge, nor the update-branch GitHub App of a rebase update is reported as a provenance defect, and path authority is judged from the author identity alone, so a rebase update never turns a role commit into a defect.
 ---
 
 # Admit the update branch with the rebase method only
@@ -93,10 +94,26 @@ and re-gated instead. The only remaining main-moved failure is a run that
 completed against a base that moved before the update workflow reacted.
 
 A rebase update replays the pull request's commits, so their committer
-becomes the update identity while their authorship is unchanged. A
-provenance rule that requires committer to equal author therefore applies
-to commits as their authors pushed them. After an update, a role session
-re-establishes it by replaying its own commits, as the CMP-0007 replays did.
+becomes the update identity while their authorship is unchanged. Commit
+provenance therefore works as follows:
+
+- **The author carries the role.** A commit's role is its author identity,
+  for example `DEVAI Architect <architect@devai.local>`.
+- **Admitted committers.** The committer must be one of:
+  - the same role as the author;
+  - the human merger, when a rebase merge onto main re-commits the commit
+    (main already reads `DEVAI <Role>` as author and the merger as
+    committer);
+  - the update-branch GitHub App, when it performs a rebase update under
+    this record.
+- **Defect.** Any other committer on a commit inside a role-scoped pull
+  request is a provenance defect.
+- **No replay.** Role sessions are not required to replay their commits
+  after a rebase update; requiring it would defeat the update.
+- **Review tooling** checks author-to-path authority (Constitution Article 6)
+  from the author identity, and checks the committer only against the
+  admitted list above.
+
 The commit grammar, the single-family rule, and the version-bump derivation
 of ADR-REL-0027 are evaluated on the rebased commits and are unaffected.
 
@@ -127,3 +144,4 @@ button for every open pull request on every merge.
 - IA-003 -- A rebased head started by the update workflow starts a gate run, because the push is made with a GitHub App installation token; an update made with GITHUB_TOKEN would start none and is refused by the workflow checker.
 - IA-004 -- When the rebased head arrives while the previous head's gate is running, the per-pull-request concurrency group cancels the superseded run, which ends cancelled rather than failed and is excluded from harness_green_main.
 - IA-005 -- scripts/check-workflows.mjs fails when the update workflow loses its push-to-main trigger, its rebase update method, its expected-head-sha guard, its App-token credential, or its least-privilege permissions, and strict up-to-date protection and the single required check devai-release-gate are unchanged.
+- IA-006 -- A commit inside a role-scoped pull request whose committer is neither its author role, the human merger of a rebase merge, nor the update-branch GitHub App of a rebase update is reported as a provenance defect, and path authority is judged from the author identity alone, so a rebase update never turns a role commit into a defect.
