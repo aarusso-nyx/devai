@@ -18,7 +18,8 @@
     "ADR-CHK-0004",
     "ADR-GOV-0018",
     "ADR-SCR-0010",
-    "ADR-SCR-0004"
+    "ADR-SCR-0004",
+    "ADR-CHK-0008"
   ],
   "constraints": {
     "self_dogfood": true,
@@ -29,7 +30,7 @@
   "owner_effects": [
     {
       "id": "OE-02",
-      "description": "Enable the auto-update branch repository setting with the rebase update method (decision D2), after TASK-0721 records how it fits ADR-CHK-0004 and writes out the exact setting, and provide the non-GITHUB_TOKEN credential the TASK-0726 rebase-update workflow uses. The setting alone updates no pull request; TASK-0726 is the update mechanism. OE-01 is not used: the campaign policy reserves it for a merge queue, which D2 did not choose, so serialized admission stays in force.",
+      "description": "Enable the auto-update branch repository setting with the rebase update method (decision D2), after TASK-0721 records how it fits ADR-CHK-0004 and writes out the exact setting, and after TASK-0728 makes the commit-range check refuse merge commits and judge author path authority and admitted committers (ADR-CHK-0008), and provide the non-GITHUB_TOKEN credential the TASK-0726 rebase-update workflow uses. The setting alone updates no pull request; TASK-0726 is the update mechanism. OE-01 is not used: the campaign policy reserves it for a merge queue, which D2 did not choose, so serialized admission stays in force.",
       "required_before": "R-0702",
       "performed_at": null
     },
@@ -760,7 +761,7 @@
       "title": "Remove avoidable gate failures (F5:T9)",
       "goal": "Fewer runs fail for avoidable reasons, inside the current F5:T9 definition (D4): main-moved base-up-to-date blocks are removed only if both of these land: the auto-update branch setting with the rebase update method (T1, Owner effect OE-02), and a rebase-update trigger that rebases every open pull request when main moves, so the superseded gate run is cancelled rather than failed (T1b, TASK-0726). Real defects are caught before push by a pre-push preflight that is mandatory for agents and opt-in for humans (T2, D3), the bootstrap cache counts a hit only when every compiled file is present and otherwise rebuilds (T3, hardening after #247, already closed), and the doctor-check-result-identities flake candidate is resolved (T4). Accepted when the post-change window of decisions.md, which opens only after TASK-0726 merges and OE-02 is performed, shows no main-moved failures, real-defect failures roughly halved against 33 in 355 baseline runs, and harness_green_main at or above 95%.",
       "status": "open",
-      "records": ["ADR-CHK-0004", "ADR-CHK-0001", "ADR-GOV-0018"],
+      "records": ["ADR-CHK-0004", "ADR-CHK-0001", "ADR-GOV-0018", "ADR-CHK-0008"],
       "depends_on": [],
       "attestation_reissue": false,
       "owner_effects_required": ["OE-02", "OE-03"],
@@ -1067,11 +1068,92 @@
           ]
         },
         {
+          "id": "CTG-0729",
+          "title": "Commit-range provenance tests (ADR-CHK-0008)",
+          "type": "single-role",
+          "records": ["ADR-CHK-0008"],
+          "depends_on": ["CTG-0721"],
+          "lock_scopes": ["tests/contract/"],
+          "gates": ["test:root"],
+          "tasks": [
+            {
+              "id": "TASK-0729",
+              "title": "Prove the commit-range refusals and admitted cases for merge commits, author path authority, and committers",
+              "discipline": "inspector",
+              "coupled_pipeline_position": "inspector",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F5"],
+              "boundary": {
+                "paths": ["tests/contract/"],
+                "forbidden": ["scripts/", "law/", "packages/"]
+              },
+              "deliverables": [
+                "Contract tests under tests/contract/ build real git ranges and prove each refusal of scripts/check-commit-range.mjs: a merge commit inside a pull-request range; an author that is not a DEVAI <Role> identity; an author role changing a path outside its Constitution Article 6 write authority; and a committer outside the admitted list (the same role as the author, the human merger of a rebase merge onto main, or the update-branch GitHub App of a rebase update).",
+                "They prove the admitted cases: a role commit committed by the same role, a rebase-merged commit committed by the human merger, and a rebase-updated commit committed by the update-branch App, each changing only paths its author role may write (ADR-CHK-0008 IA-006). The tests fail until TASK-0728 lands on the same branch."
+              ],
+              "acceptance_commands": [["pnpm", "run", "test:root"]],
+              "commit_types": ["test(commit-grammar)"],
+              "prompt": {
+                "path": "prompts/TASK-0729.md"
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker",
+                "effort": "medium",
+                "time_budget_minutes": 60
+              }
+            }
+          ]
+        },
+        {
+          "id": "CTG-0728",
+          "title": "Commit-range provenance checks (ADR-CHK-0008)",
+          "type": "single-role",
+          "records": ["ADR-CHK-0008"],
+          "depends_on": ["CTG-0729"],
+          "lock_scopes": ["scripts/check-commit-range.mjs"],
+          "gates": ["test:root"],
+          "tasks": [
+            {
+              "id": "TASK-0728",
+              "title": "Refuse merge commits and check author path authority and admitted committers in the commit range",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": null,
+              "status": "planned",
+              "target_substrates": ["F2", "F5"],
+              "boundary": {
+                "paths": ["scripts/check-commit-range.mjs"],
+                "forbidden": ["law/", "tests/", "packages/", ".github/"]
+              },
+              "deliverables": [
+                "scripts/check-commit-range.mjs refuses any merge commit in a pull-request range.",
+                "For each commit it reads the author identity as DEVAI <Role> and refuses a commit that changes a path outside that role's Constitution Article 6 write authority, judged from the author alone (ADR-CHK-0008). It refuses a committer outside the admitted list: the same role as the author, the human merger of a rebase merge onto main, or the update-branch GitHub App of a rebase update.",
+                "Each refusal names the commit and the reason; the existing grammar and single-family checks are unchanged. TASK-0726 and Owner effect OE-02 wait for this task."
+              ],
+              "acceptance_commands": [["pnpm", "run", "test:root"]],
+              "commit_types": ["ci(hooks)"],
+              "prompt": {
+                "path": "prompts/TASK-0728.md"
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker",
+                "effort": "medium",
+                "time_budget_minutes": 60
+              }
+            }
+          ]
+        },
+        {
           "id": "CTG-0726",
           "title": "Rebase-update trigger for open pull requests when main moves",
           "type": "single-role",
-          "records": ["ADR-CHK-0004"],
-          "depends_on": ["CTG-0721", "CTG-0724"],
+          "records": ["ADR-CHK-0004", "ADR-CHK-0008"],
+          "depends_on": ["CTG-0721", "CTG-0724", "CTG-0728"],
           "lock_scopes": [
             ".github/workflows/update-pull-request-branches.yml",
             ".github/workflows/pull-request-checks.yml",
