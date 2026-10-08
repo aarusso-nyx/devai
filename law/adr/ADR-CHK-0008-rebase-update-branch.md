@@ -23,7 +23,8 @@ inspector_acceptance:
   - IA-003 -- A rebased head started by the update workflow starts a gate run, because the push is made with a GitHub App installation token; an update made with GITHUB_TOKEN would start none and is refused by the workflow checker.
   - IA-004 -- When the rebased head arrives while the previous head's gate is running, the per-pull-request concurrency group cancels the superseded run, which ends cancelled rather than failed and is excluded from harness_green_main.
   - IA-005 -- scripts/check-workflows.mjs fails when the update workflow loses its push-to-main trigger, its rebase update method, its expected-head-sha guard, its App-token credential, or its least-privilege permissions, and strict up-to-date protection and the single required check devai-release-gate are unchanged.
-  - IA-006 -- A commit inside a role-scoped pull request whose committer is neither its author role, the human merger of a rebase merge, nor the update-branch GitHub App of a rebase update is reported as a provenance defect, and path authority is judged from the author identity alone, so a rebase update never turns a role commit into a defect.
+  - IA-006 -- With TASK-0728 merged, the commit-range check fails a pull-request commit whose committer is neither its author role nor the recorded update-branch App, or whose author role lacks Article 6 authority over a path it touches; a rebase update by the App never fails it.
+  - IA-007 -- With TASK-0728 merged, the commit-range check fails any pull-request range that contains a commit with more than one parent, so a merge update pressed in the GitHub interface reddens the gate; the grammar exemption for merge commits is unchanged.
 ---
 
 # Admit the update branch with the rebase method only
@@ -58,6 +59,15 @@ update performed with it would leave the rebased head ungated.
 `allow_update_branch` is admitted with one update method, rebase. A merge
 update of a pull-request branch is refused by this record as ADR-CHK-0004
 refused it.
+
+The setting also exposes GitHub's merge-update button, so the refusal is
+enforced by the gate, not by convention. `scripts/check-commit-range.mjs`,
+which `release:pr-gate` runs over the pull request's range, fails a range
+that contains any commit with more than one parent (CMP-0007 TASK-0728,
+Engineer; tests in TASK-0729, Inspector). This is a linear-history rule
+beside the commit grammar. The grammar's `merge_commits` exemption still
+means a merge commit is not judged for its subject, but a pull-request
+range may not contain one. OE-02 is not performed before TASK-0728 merges.
 
 The mechanism that keeps pull requests current is the rebase-update
 workflow `.github/workflows/update-pull-request-branches.yml` (CMP-0007
@@ -110,9 +120,17 @@ provenance therefore works as follows:
   request is a provenance defect.
 - **No replay.** Role sessions are not required to replay their commits
   after a rebase update; requiring it would defeat the update.
-- **Review tooling** checks author-to-path authority (Constitution Article 6)
-  from the author identity, and checks the committer only against the
-  admitted list above.
+- **Enforcement.** TASK-0728 (Engineer) extends
+  `scripts/check-commit-range.mjs` to check every commit of a pull request's
+  range on two counts:
+  - its author is a role identity whose Article 6 path authority covers every
+    path the commit touches;
+  - its committer is either that role or the update-branch App identity the
+    Owner records with OE-02.
+
+  The human-merger committer appears only on main, after a merge, so it is
+  never inside a pull-request range. TASK-0729 (Inspector) tests the check.
+  Until both merge, this rule is binding and checked in review by hand.
 
 The commit grammar, the single-family rule, and the version-bump derivation
 of ADR-REL-0027 are evaluated on the rebased commits and are unaffected.
@@ -144,4 +162,5 @@ button for every open pull request on every merge.
 - IA-003 -- A rebased head started by the update workflow starts a gate run, because the push is made with a GitHub App installation token; an update made with GITHUB_TOKEN would start none and is refused by the workflow checker.
 - IA-004 -- When the rebased head arrives while the previous head's gate is running, the per-pull-request concurrency group cancels the superseded run, which ends cancelled rather than failed and is excluded from harness_green_main.
 - IA-005 -- scripts/check-workflows.mjs fails when the update workflow loses its push-to-main trigger, its rebase update method, its expected-head-sha guard, its App-token credential, or its least-privilege permissions, and strict up-to-date protection and the single required check devai-release-gate are unchanged.
-- IA-006 -- A commit inside a role-scoped pull request whose committer is neither its author role, the human merger of a rebase merge, nor the update-branch GitHub App of a rebase update is reported as a provenance defect, and path authority is judged from the author identity alone, so a rebase update never turns a role commit into a defect.
+- IA-006 -- With TASK-0728 merged, the commit-range check fails a pull-request commit whose committer is neither its author role nor the recorded update-branch App, or whose author role lacks Article 6 authority over a path it touches; a rebase update by the App never fails it.
+- IA-007 -- With TASK-0728 merged, the commit-range check fails any pull-request range that contains a commit with more than one parent, so a merge update pressed in the GitHub interface reddens the gate; the grammar exemption for merge commits is unchanged.
