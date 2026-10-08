@@ -14,7 +14,10 @@ import type {
   CheckRunnerOptions,
   CheckRunnerReport,
   ExecutedTask,
+  PlannedTask,
+  TaskDescriptorNode,
   TaskExecutionResult,
+  TaskPlan,
   TaskResult,
 } from './types.js';
 import { descriptorFor, planWithCache, unattestedNodeIds, taskEnvironment } from './runner-plan.js';
@@ -22,6 +25,7 @@ import { bindReleaseRequest } from './runner-release-binding.js';
 import {
   type TaskExecutionEffect,
   defaultExecute,
+  defaultExecuteAsync,
   probeEffect,
   executionOutcome,
   outputDigests,
@@ -29,10 +33,23 @@ import {
 import { attestCheckRun, releaseVerificationEntries } from './runner-attestation.js';
 import { prepareCheckRunInputs, verifyCertifyPreflightReceipt } from './runner-inputs.js';
 import { retainProtectedCompletedTaskResults, snapshotTaskResult } from './runner-results.js';
+import {
+  assertCheckWorkers,
+  readTaskExclusivity,
+  runScheduled,
+  scheduledNode,
+  sequentialOnlyTarget,
+} from './runner-schedule.js';
 export { readProtectedCompletedTaskResults } from './runner-results.js';
 
 export { PROTECTED_MUTATION_PRODUCER } from './runner-release-binding.js';
 export { resolveRunnerToolchain } from './runner-plan.js';
+export {
+  CHECK_WORKERS_ENV,
+  defaultCheckWorkers,
+  resolveCheckWorkers,
+  sequentialOnlyTarget,
+} from './runner-schedule.js';
 
 const DEFAULT_TIMEOUT_MS = 30 * 60_000;
 
@@ -40,33 +57,50 @@ type AsyncTaskExecutor = (
   ...args: Parameters<NonNullable<CheckRunnerOptions['executeTask']>>
 ) => TaskExecutionResult | Promise<TaskExecutionResult>;
 
+type DefaultExecutor = (
+  ...args: Parameters<typeof defaultExecute>
+) => TaskExecutionResult | Promise<TaskExecutionResult>;
+
+type TaskSteps = Generator<TaskExecutionEffect, void, TaskExecutionResult>;
+
 /** The synchronous API and protected asynchronous host share every planning/result rule. */
 export function runCheckTasks(inputOptions: CheckRunnerOptions): CheckRunnerReport {
-  const steps = runCheckTaskSteps(inputOptions);
-  let step = steps.next();
-  while (!step.done) {
-    let result: TaskExecutionResult | Promise<TaskExecutionResult>;
-    try {
-      result = step.value();
-      if (result !== null && typeof result === 'object' && 'then' in result)
-        throw new Error('CHECK_RUNNER_ASYNC_EXECUTOR_REQUIRES_ASYNC_HOST');
-    } catch (error) {
-      steps.throw(error);
-      throw error;
+  const run = prepareCheckRun(inputOptions, undefined, defaultExecute);
+  if (!('descriptorById' in run)) return run;
+  run.plan.tasks.forEach((task, position) => {
+    const steps = runPlannedTask(run, task, position);
+    let step = steps.next();
+    while (!step.done) {
+      let result: TaskExecutionResult | Promise<TaskExecutionResult>;
+      try {
+        result = step.value();
+        if (result !== null && typeof result === 'object' && 'then' in result)
+          throw new Error('CHECK_RUNNER_ASYNC_EXECUTOR_REQUIRES_ASYNC_HOST');
+      } catch (error) {
+        steps.throw(error);
+        throw error;
+      }
+      step = steps.next(result);
     }
-    step = steps.next(result);
-  }
-  return step.value;
+  });
+  return finishCheckRun(run);
 }
 
 /**
  * Internal host orchestration only: await a task's complete execution/retention
  * before processing its result or advancing to a dependent task. This adds no
  * release action, receipt authority, or exception to the mutation producer guard.
+ *
+ * `workers` above 1 runs independent planned nodes concurrently (ADR-CHK-0007): a node
+ * starts only after its dependencies and every earlier conflicting node have settled,
+ * results are recorded in plan order, and without a host executor each process is
+ * started without blocking. `workers` 1, the default, is the sequential runner; release
+ * (`rc`, `release`) and protected runs refuse any other count.
  */
 export async function runCheckTasksAsync(
   inputOptions: Omit<CheckRunnerOptions, 'executeTask'> & {
     readonly executeTask?: AsyncTaskExecutor;
+    readonly workers?: number;
   },
 ): Promise<CheckRunnerReport> {
   const {
@@ -76,8 +110,14 @@ export async function runCheckTasksAsync(
     capturedTaskOutputPaths,
     resolveProtectedMutationProducer,
     now,
+    workers = 1,
     ...data
   } = inputOptions;
+  // Refused before planning, so no node starts under an invalid or forbidden count.
+  assertCheckWorkers(
+    workers,
+    sequentialOnlyTarget(data.target, data.protectedExecutionIdentity !== undefined),
+  );
   // Host functions are captured once; caller-owned documents cannot drift while
   // a task is awaited. None of these callbacks is resolved from candidate data.
   const captured: CheckRunnerOptions = {
@@ -88,31 +128,77 @@ export async function runCheckTasksAsync(
     ...(resolveProtectedMutationProducer === undefined ? {} : { resolveProtectedMutationProducer }),
     ...(now === undefined ? {} : { now }),
   };
-  const steps = runCheckTaskSteps(
+  const run = prepareCheckRun(
     captured,
     executeTask === undefined
       ? undefined
       : (argv, cwd, timeout, environment, taskIdentity) =>
           executeTask([...argv], cwd, timeout, { ...environment }, { ...taskIdentity }),
+    workers === 1 ? defaultExecute : defaultExecuteAsync,
   );
-  let step = steps.next();
-  while (!step.done) {
-    let result: TaskExecutionResult;
-    try {
-      result = await step.value();
-    } catch (error) {
-      steps.throw(error);
-      throw error;
+  if (!('descriptorById' in run)) return run;
+  const drive = async (position: number): Promise<void> => {
+    const task = run.plan.tasks[position];
+    if (task === undefined) throw new Error('CHECK_RUNNER_INTERNAL: scheduled task missing');
+    const steps: TaskSteps = runPlannedTask(run, task, position);
+    let step = steps.next();
+    while (!step.done) {
+      let result: TaskExecutionResult;
+      try {
+        result = await step.value();
+      } catch (error) {
+        steps.throw(error);
+        throw error;
+      }
+      step = steps.next(result);
     }
-    step = steps.next(result);
+  };
+  if (workers === 1) {
+    for (let position = 0; position < run.plan.tasks.length; position += 1) await drive(position);
+  } else {
+    // Read before any node starts, so a malformed declaration refuses the whole run.
+    const exclusivity = readTaskExclusivity(
+      run.options.repoRoot,
+      new Set(run.descriptorById.keys()),
+    );
+    await runScheduled(
+      run.plan.tasks.map((task) =>
+        scheduledNode(task, run.descriptorById.get(task.nodeId), exclusivity.get(task.nodeId)),
+      ),
+      workers,
+      drive,
+    );
   }
-  return step.value;
+  return finishCheckRun(run);
 }
 
-function* runCheckTaskSteps(
+/** Everything one run's tasks share; task results land in `execution` by plan position. */
+interface CheckRun {
+  readonly options: CheckRunnerOptions;
+  readonly plan: TaskPlan;
+  readonly inputs: ReturnType<typeof prepareCheckRunInputs>;
+  readonly releaseBinding: ReturnType<typeof bindReleaseRequest>['binding'];
+  readonly descriptorById: ReadonlyMap<string, TaskDescriptorNode>;
+  readonly timeoutMs: number;
+  readonly now: () => string;
+  readonly repositoryState: () => Readonly<{ commit: string; tree: string; clean: boolean }>;
+  readonly initialState: Readonly<{ commit: string; tree: string; clean: boolean }>;
+  readonly resultDigests: Map<string, string>;
+  readonly taskResults: Map<string, TaskResult>;
+  readonly execution: ExecutedTask[];
+  readonly blockedNodes: Set<string>;
+  readonly unattested: readonly string[];
+  readonly requiresProtectedOutputCapture: boolean;
+  readonly protectedOutputCapture: boolean;
+  readonly asyncExecutor: AsyncTaskExecutor | undefined;
+  readonly executeDefault: DefaultExecutor;
+}
+
+function prepareCheckRun(
   inputOptions: CheckRunnerOptions,
-  asyncExecutor?: AsyncTaskExecutor,
-): Generator<TaskExecutionEffect, CheckRunnerReport, TaskExecutionResult> {
+  asyncExecutor: AsyncTaskExecutor | undefined,
+  executeDefault: DefaultExecutor,
+): CheckRunnerReport | CheckRun {
   // The preflight target accepts a named base (the freshly fetched origin/main)
   // and binds the exact commit it resolves to before planning.
   const request = bindReleaseRequest(
@@ -133,7 +219,8 @@ function* runCheckTaskSteps(
   // an ordinary receipt never grants access to protected completed results.
   const requiresProtectedOutputCapture =
     options.target === 'release' || options.protectedExecutionIdentity !== undefined;
-  const { cache, toolchain, environment, toolchainDigest } = prepareCheckRunInputs({ options });
+  const inputs = prepareCheckRunInputs({ options });
+  const { cache, toolchain, environment, toolchainDigest } = inputs;
   const rawPlan = planWithCache(options, cache, toolchain, environment);
   const releaseBinding = request.binding;
   if (releaseBinding !== undefined) {
@@ -167,282 +254,319 @@ function* runCheckTaskSteps(
   }
 
   const descriptor = descriptorFor(options);
-  const descriptorById = new Map(descriptor.tasks.map((task) => [task.nodeId, task]));
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) {
     throw new Error('CHECK_RUNNER_TIMEOUT: timeout must be a positive integer');
   }
-  const now = options.now ?? (() => new Date().toISOString());
   const repositoryState = (): Readonly<{ commit: string; tree: string; clean: boolean }> =>
     options.target === 'release' && options.releaseCandidate !== undefined
       ? exactCandidateRepositoryState(options.repoRoot, options.releaseCandidate)
       : currentRepositoryState(options.repoRoot);
-  const initialState = repositoryState();
-  const resultDigests = new Map<string, string>();
-  const taskResults = new Map<string, TaskResult>();
-  const execution: ExecutedTask[] = [];
-  const blockedNodes = new Set<string>();
-  const unattested = unattestedNodeIds(options);
+  return {
+    options,
+    plan,
+    inputs,
+    releaseBinding,
+    descriptorById: new Map(descriptor.tasks.map((task) => [task.nodeId, task])),
+    timeoutMs,
+    now: options.now ?? (() => new Date().toISOString()),
+    repositoryState,
+    initialState: repositoryState(),
+    resultDigests: new Map<string, string>(),
+    taskResults: new Map<string, TaskResult>(),
+    execution: [],
+    blockedNodes: new Set<string>(),
+    unattested: unattestedNodeIds(options),
+    requiresProtectedOutputCapture,
+    protectedOutputCapture,
+    asyncExecutor,
+    executeDefault,
+  };
+}
 
-  for (const task of plan.tasks) {
-    const blockedBy = task.dependencies.find((dependency) => blockedNodes.has(dependency));
-    if (blockedBy !== undefined) {
-      // blocked-environment: never executed and never cached as a result.
-      blockedNodes.add(task.nodeId);
-      cache.writeAttempt(task.nodeId, task.taskKey, 'BLOCKED', now());
-      execution.push({
-        nodeId: task.nodeId,
-        taskKey: task.taskKey,
-        disposition: 'blocked-environment',
-        outcome: 'BLOCKED',
-        reason: `blocked-environment:${blockedBy}`,
-        durationMs: 0,
-      });
-      continue;
-    }
-    const dependencyResultDigests: Record<string, string> = {};
-    let dependencyMissing = false;
-    for (const dependency of task.dependencies) {
-      const digest = resultDigests.get(dependency);
-      if (digest === undefined) dependencyMissing = true;
-      else dependencyResultDigests[dependency] = digest;
-    }
-    if (dependencyMissing) {
-      const at = now();
-      cache.writeAttempt(task.nodeId, task.taskKey, 'ABORTED', at);
-      execution.push({
-        nodeId: task.nodeId,
-        taskKey: task.taskKey,
-        disposition: 'aborted',
-        outcome: 'ABORTED',
-        reason: 'dependency-not-pass',
-        durationMs: 0,
-      });
-      continue;
-    }
-    const cached = unattested.includes(task.nodeId)
-      ? { cacheState: 'execute' as const, reason: 'preflight-always-executes' }
-      : cache.inspect(task, dependencyResultDigests);
-    if (
-      cached.cacheState === 'reusable' &&
-      cached.cachedResultDigest !== undefined &&
-      'result' in cached
-    ) {
-      if (cached.result === undefined)
-        throw new Error('CHECK_RUNNER_INTERNAL: reusable task result missing');
-      resultDigests.set(task.nodeId, cached.cachedResultDigest);
-      taskResults.set(task.nodeId, snapshotTaskResult(cached.result));
-      execution.push({
-        nodeId: task.nodeId,
-        taskKey: task.taskKey,
-        disposition: 'reused',
-        outcome: 'PASS',
-        reason: cached.reason,
-        durationMs: 0,
-        resultDigest: cached.cachedResultDigest,
-      });
-      continue;
-    }
+/**
+ * One planned node: blocked, aborted, reused, or executed. It reads only the results of
+ * nodes that settled before it started and records its entry at its plan position.
+ */
+function* runPlannedTask(run: CheckRun, task: PlannedTask, position: number): TaskSteps {
+  const {
+    options,
+    plan,
+    descriptorById,
+    timeoutMs,
+    now,
+    resultDigests,
+    taskResults,
+    blockedNodes,
+    unattested,
+    requiresProtectedOutputCapture,
+    protectedOutputCapture,
+    asyncExecutor,
+    executeDefault,
+  } = run;
+  const { cache, environment } = run.inputs;
+  const record = (entry: ExecutedTask): void => {
+    run.execution[position] = entry;
+  };
+  const blockedBy = task.dependencies.find((dependency) => blockedNodes.has(dependency));
+  if (blockedBy !== undefined) {
+    // blocked-environment: never executed and never cached as a result.
+    blockedNodes.add(task.nodeId);
+    cache.writeAttempt(task.nodeId, task.taskKey, 'BLOCKED', now());
+    record({
+      nodeId: task.nodeId,
+      taskKey: task.taskKey,
+      disposition: 'blocked-environment',
+      outcome: 'BLOCKED',
+      reason: `blocked-environment:${blockedBy}`,
+      durationMs: 0,
+    });
+    return;
+  }
+  const dependencyResultDigests: Record<string, string> = {};
+  let dependencyMissing = false;
+  for (const dependency of task.dependencies) {
+    const digest = resultDigests.get(dependency);
+    if (digest === undefined) dependencyMissing = true;
+    else dependencyResultDigests[dependency] = digest;
+  }
+  if (dependencyMissing) {
+    const at = now();
+    cache.writeAttempt(task.nodeId, task.taskKey, 'ABORTED', at);
+    record({
+      nodeId: task.nodeId,
+      taskKey: task.taskKey,
+      disposition: 'aborted',
+      outcome: 'ABORTED',
+      reason: 'dependency-not-pass',
+      durationMs: 0,
+    });
+    return;
+  }
+  const cached = unattested.includes(task.nodeId)
+    ? { cacheState: 'execute' as const, reason: 'preflight-always-executes' }
+    : cache.inspect(task, dependencyResultDigests);
+  if (
+    cached.cacheState === 'reusable' &&
+    cached.cachedResultDigest !== undefined &&
+    'result' in cached
+  ) {
+    if (cached.result === undefined)
+      throw new Error('CHECK_RUNNER_INTERNAL: reusable task result missing');
+    resultDigests.set(task.nodeId, cached.cachedResultDigest);
+    taskResults.set(task.nodeId, snapshotTaskResult(cached.result));
+    record({
+      nodeId: task.nodeId,
+      taskKey: task.taskKey,
+      disposition: 'reused',
+      outcome: 'PASS',
+      reason: cached.reason,
+      durationMs: 0,
+      resultDigest: cached.cachedResultDigest,
+    });
+    return;
+  }
 
-    const startedAt = now();
-    const started = performance.now();
-    const descriptorTask = descriptorById.get(task.nodeId);
-    if (descriptorTask === undefined) {
-      throw new Error(`CHECK_RUNNER_INTERNAL: planned task ${task.nodeId} is not declared`);
-    }
-    const taskCwd = realpathSync(resolve(options.repoRoot, task.cwd));
-    const taskEnv = taskEnvironment(descriptorTask, environment);
-    const executeArgv =
-      (argv: readonly string[]): TaskExecutionEffect =>
-      () =>
-        asyncExecutor !== undefined
-          ? asyncExecutor(argv, taskCwd, timeoutMs, taskEnv, {
+  const startedAt = now();
+  const started = performance.now();
+  const descriptorTask = descriptorById.get(task.nodeId);
+  if (descriptorTask === undefined) {
+    throw new Error(`CHECK_RUNNER_INTERNAL: planned task ${task.nodeId} is not declared`);
+  }
+  const taskCwd = realpathSync(resolve(options.repoRoot, task.cwd));
+  const taskEnv = taskEnvironment(descriptorTask, environment);
+  const executeArgv =
+    (argv: readonly string[]): TaskExecutionEffect =>
+    () =>
+      asyncExecutor !== undefined
+        ? asyncExecutor(argv, taskCwd, timeoutMs, taskEnv, {
+            nodeId: task.nodeId,
+            taskKey: task.taskKey,
+          })
+        : options.executeTask === undefined
+          ? defaultExecute(argv, taskCwd, timeoutMs, taskEnv)
+          : options.executeTask(argv, taskCwd, timeoutMs, taskEnv, {
               nodeId: task.nodeId,
               taskKey: task.taskKey,
-            })
-          : options.executeTask === undefined
-            ? defaultExecute(argv, taskCwd, timeoutMs, taskEnv)
-            : options.executeTask(argv, taskCwd, timeoutMs, taskEnv, {
-                nodeId: task.nodeId,
-                taskKey: task.taskKey,
-              });
-    let preflight: PreflightEvaluation | undefined;
-    if (isPreflightNode(descriptorTask)) {
-      const probeSteps = evaluatePreflightProbes(descriptorTask.probes ?? [], {
-        repoRoot: taskCwd,
-        ...(plan.baseCommit !== undefined && { baseCommit: plan.baseCommit }),
-        environment: taskEnv,
-      });
-      let probeStep = probeSteps.next();
-      while (!probeStep.done) {
-        const probeResult: TaskExecutionResult = yield probeEffect(executeArgv(probeStep.value));
-        probeStep = probeSteps.next(probeResult);
-      }
-      preflight = probeStep.value;
+            });
+  let preflight: PreflightEvaluation | undefined;
+  if (isPreflightNode(descriptorTask)) {
+    const probeSteps = evaluatePreflightProbes(descriptorTask.probes ?? [], {
+      repoRoot: taskCwd,
+      ...(plan.baseCommit !== undefined && { baseCommit: plan.baseCommit }),
+      environment: taskEnv,
+    });
+    let probeStep = probeSteps.next();
+    while (!probeStep.done) {
+      const probeResult: TaskExecutionResult = yield probeEffect(executeArgv(probeStep.value));
+      probeStep = probeSteps.next(probeResult);
     }
-    if (preflight !== undefined && preflight.outcome !== 'PASS') {
-      const durationMs = Math.max(0, Math.round(performance.now() - started));
-      const finishedAt = now();
-      const probeResult: TaskExecutionResult = {
-        status: preflight.outcome === 'FAIL' ? 1 : null,
-        signal: null,
-        stdout: preflight.stdout,
-        stderr: preflight.stderr,
-      };
-      const diagnosticPath = cache.writeFailureDiagnostic(
-        task,
-        preflight.outcome,
-        finishedAt,
-        preflight.reason,
-        probeResult,
-        preflight.remediation,
-      );
-      // An extrinsic BLOCKED is recorded only as an attempt, never as a result.
-      cache.writeAttempt(task.nodeId, task.taskKey, preflight.outcome, finishedAt);
-      if (preflight.outcome === 'BLOCKED') blockedNodes.add(task.nodeId);
-      execution.push({
-        nodeId: task.nodeId,
-        taskKey: task.taskKey,
-        disposition: 'executed',
-        outcome: preflight.outcome,
-        reason: preflight.reason,
-        durationMs,
-        diagnosticPath,
-        probes: preflight.observations,
-        remediation: preflight.remediation,
-      });
-      continue;
-    }
-    const result: TaskExecutionResult =
-      preflight !== undefined
-        ? { status: 0, signal: null, stdout: preflight.stdout, stderr: preflight.stderr }
-        : yield () =>
-            asyncExecutor !== undefined
-              ? asyncExecutor(task.argv, taskCwd, timeoutMs, taskEnv, {
-                  nodeId: task.nodeId,
-                  taskKey: task.taskKey,
-                })
-              : options.executeTask === undefined
-                ? defaultExecute(
-                    [task.executable.path, ...task.argv.slice(1)],
-                    taskCwd,
-                    timeoutMs,
-                    taskEnv,
-                    options.target === 'release'
-                      ? {
-                          candidate: {
-                            commit: plan.repository.commit,
-                            tree: plan.repository.tree,
-                          },
-                          descriptor_digest: plan.descriptorDigest,
-                          task_policy_digest: plan.taskPolicyDigest,
-                          node_id: task.nodeId,
-                          executable: task.executable,
-                          argv: task.argv,
-                          cwd: task.cwd,
-                        }
-                      : undefined,
-                  )
-                : options.executeTask(task.argv, taskCwd, timeoutMs, taskEnv, {
-                    nodeId: task.nodeId,
-                    taskKey: task.taskKey,
-                  });
+    preflight = probeStep.value;
+  }
+  if (preflight !== undefined && preflight.outcome !== 'PASS') {
     const durationMs = Math.max(0, Math.round(performance.now() - started));
     const finishedAt = now();
-    const outcome = executionOutcome(result);
-    if (outcome !== 'PASS') {
-      const reason =
-        result.errorCode !== undefined
-          ? `process-${result.errorCode}`
-          : result.signal !== null
-            ? `process-signal-${result.signal}`
-            : `process-exit-${String(result.status)}`;
-      const diagnosticPath = cache.writeFailureDiagnostic(
-        task,
-        outcome,
-        finishedAt,
-        reason,
-        result,
-      );
-      cache.writeAttempt(task.nodeId, task.taskKey, outcome, finishedAt);
-      execution.push({
-        nodeId: task.nodeId,
-        taskKey: task.taskKey,
-        disposition: 'executed',
-        outcome,
-        reason,
-        durationMs,
-        ...(result.status !== null && { exitCode: result.status }),
-        ...(result.signal !== null && { signal: result.signal }),
-        diagnosticPath,
-      });
-      continue;
-    }
-
-    let taskResult: TaskResult;
-    try {
-      taskResult = {
-        schemaVersion: '1.0.0',
-        nodeId: task.nodeId,
-        taskKey: task.taskKey,
-        status: 'PASS',
-        inputDigest: task.inputDigest,
-        dependencyResultDigests,
-        outputDigests: outputDigests(
-          options.repoRoot,
-          task,
-          result,
-          options.readTaskOutput,
-          options.capturedTaskOutputPaths,
-        ),
-        startedAt,
-        finishedAt,
-      };
-    } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
-      const diagnosticPath = cache.writeFailureDiagnostic(task, 'FAIL', finishedAt, reason, result);
-      cache.writeAttempt(task.nodeId, task.taskKey, 'FAIL', finishedAt);
-      execution.push({
-        nodeId: task.nodeId,
-        taskKey: task.taskKey,
-        disposition: 'executed',
-        outcome: 'FAIL',
-        reason,
-        durationMs,
-        diagnosticPath,
-      });
-      continue;
-    }
-    const resultDigest = cache.writeResult(taskResult);
-    cache.writeAttempt(task.nodeId, task.taskKey, 'PASS', finishedAt, resultDigest);
-    resultDigests.set(task.nodeId, resultDigest);
-    taskResults.set(task.nodeId, snapshotTaskResult(taskResult));
-    execution.push({
+    const probeResult: TaskExecutionResult = {
+      status: preflight.outcome === 'FAIL' ? 1 : null,
+      signal: null,
+      stdout: preflight.stdout,
+      stderr: preflight.stderr,
+    };
+    const diagnosticPath = cache.writeFailureDiagnostic(
+      task,
+      preflight.outcome,
+      finishedAt,
+      preflight.reason,
+      probeResult,
+      preflight.remediation,
+    );
+    // An extrinsic BLOCKED is recorded only as an attempt, never as a result.
+    cache.writeAttempt(task.nodeId, task.taskKey, preflight.outcome, finishedAt);
+    if (preflight.outcome === 'BLOCKED') blockedNodes.add(task.nodeId);
+    record({
       nodeId: task.nodeId,
       taskKey: task.taskKey,
       disposition: 'executed',
-      outcome: 'PASS',
-      reason:
-        requiresProtectedOutputCapture &&
-        task.outputContract.generated_namespaces !== undefined &&
-        !protectedOutputCapture
-          ? 'executed;protected-namespace-closure-unproven'
-          : cached.reason,
+      outcome: preflight.outcome,
+      reason: preflight.reason,
       durationMs,
-      resultDigest,
-      exitCode: 0,
-      ...(preflight !== undefined && { probes: preflight.observations }),
+      diagnosticPath,
+      probes: preflight.observations,
+      remediation: preflight.remediation,
     });
+    return;
+  }
+  const result: TaskExecutionResult =
+    preflight !== undefined
+      ? { status: 0, signal: null, stdout: preflight.stdout, stderr: preflight.stderr }
+      : yield () =>
+          asyncExecutor !== undefined
+            ? asyncExecutor(task.argv, taskCwd, timeoutMs, taskEnv, {
+                nodeId: task.nodeId,
+                taskKey: task.taskKey,
+              })
+            : options.executeTask === undefined
+              ? executeDefault(
+                  [task.executable.path, ...task.argv.slice(1)],
+                  taskCwd,
+                  timeoutMs,
+                  taskEnv,
+                  options.target === 'release'
+                    ? {
+                        candidate: {
+                          commit: plan.repository.commit,
+                          tree: plan.repository.tree,
+                        },
+                        descriptor_digest: plan.descriptorDigest,
+                        task_policy_digest: plan.taskPolicyDigest,
+                        node_id: task.nodeId,
+                        executable: task.executable,
+                        argv: task.argv,
+                        cwd: task.cwd,
+                      }
+                    : undefined,
+                )
+              : options.executeTask(task.argv, taskCwd, timeoutMs, taskEnv, {
+                  nodeId: task.nodeId,
+                  taskKey: task.taskKey,
+                });
+  const durationMs = Math.max(0, Math.round(performance.now() - started));
+  const finishedAt = now();
+  const outcome = executionOutcome(result);
+  if (outcome !== 'PASS') {
+    const reason =
+      result.errorCode !== undefined
+        ? `process-${result.errorCode}`
+        : result.signal !== null
+          ? `process-signal-${result.signal}`
+          : `process-exit-${String(result.status)}`;
+    const diagnosticPath = cache.writeFailureDiagnostic(task, outcome, finishedAt, reason, result);
+    cache.writeAttempt(task.nodeId, task.taskKey, outcome, finishedAt);
+    record({
+      nodeId: task.nodeId,
+      taskKey: task.taskKey,
+      disposition: 'executed',
+      outcome,
+      reason,
+      durationMs,
+      ...(result.status !== null && { exitCode: result.status }),
+      ...(result.signal !== null && { signal: result.signal }),
+      diagnosticPath,
+    });
+    return;
   }
 
+  let taskResult: TaskResult;
+  try {
+    taskResult = {
+      schemaVersion: '1.0.0',
+      nodeId: task.nodeId,
+      taskKey: task.taskKey,
+      status: 'PASS',
+      inputDigest: task.inputDigest,
+      dependencyResultDigests,
+      outputDigests: outputDigests(
+        options.repoRoot,
+        task,
+        result,
+        options.readTaskOutput,
+        options.capturedTaskOutputPaths,
+      ),
+      startedAt,
+      finishedAt,
+    };
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    const diagnosticPath = cache.writeFailureDiagnostic(task, 'FAIL', finishedAt, reason, result);
+    cache.writeAttempt(task.nodeId, task.taskKey, 'FAIL', finishedAt);
+    record({
+      nodeId: task.nodeId,
+      taskKey: task.taskKey,
+      disposition: 'executed',
+      outcome: 'FAIL',
+      reason,
+      durationMs,
+      diagnosticPath,
+    });
+    return;
+  }
+  const resultDigest = cache.writeResult(taskResult);
+  cache.writeAttempt(task.nodeId, task.taskKey, 'PASS', finishedAt, resultDigest);
+  resultDigests.set(task.nodeId, resultDigest);
+  taskResults.set(task.nodeId, snapshotTaskResult(taskResult));
+  record({
+    nodeId: task.nodeId,
+    taskKey: task.taskKey,
+    disposition: 'executed',
+    outcome: 'PASS',
+    reason:
+      requiresProtectedOutputCapture &&
+      task.outputContract.generated_namespaces !== undefined &&
+      !protectedOutputCapture
+        ? 'executed;protected-namespace-closure-unproven'
+        : cached.reason,
+    durationMs,
+    resultDigest,
+    exitCode: 0,
+    ...(preflight !== undefined && { probes: preflight.observations }),
+  });
+}
+
+function finishCheckRun(run: CheckRun): CheckRunnerReport {
+  const { options, plan, releaseBinding, now, resultDigests, taskResults } = run;
+  const { cache, toolchainDigest } = run.inputs;
+  const execution = run.execution;
+  if (execution.length !== plan.tasks.length || plan.tasks.some((_, at) => !(at in execution))) {
+    throw new Error('CHECK_RUNNER_INTERNAL: planned task result missing');
+  }
   const { receipt, preflightReceipt, receiptRefusal, blocked, allPass } = attestCheckRun({
     execution,
-    repositoryState,
-    requiresProtectedOutputCapture,
-    protectedOutputCapture,
+    repositoryState: run.repositoryState,
+    requiresProtectedOutputCapture: run.requiresProtectedOutputCapture,
+    protectedOutputCapture: run.protectedOutputCapture,
     plan,
     options,
-    initialState,
+    initialState: run.initialState,
     releaseBinding,
     resultDigests,
     toolchainDigest,
@@ -464,7 +588,7 @@ function* runCheckTaskSteps(
     exitCode: allPass ? 0 : 1,
   };
   if (
-    protectedOutputCapture &&
+    run.protectedOutputCapture &&
     receipt !== undefined &&
     taskResults.size === plan.tasks.length &&
     plan.tasks.every((task) => taskResults.get(task.nodeId)?.taskKey === task.taskKey)
