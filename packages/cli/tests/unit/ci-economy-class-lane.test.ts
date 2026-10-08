@@ -92,8 +92,41 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - run: pnpm test
 `;
+
+/**
+ * A branch-push workflow that checks out no source and only calls the GitHub API, like the
+ * update-branch rebase (ADR-CHK-0008): a path filter could only make it skip updates.
+ */
+const API_ONLY_PUSH_WORKFLOW = `name: update pull request branches
+on:
+  push:
+    branches: [main]
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo present=true >> "$GITHUB_OUTPUT"
+  update-branches:
+    runs-on: ubuntu-latest
+    needs: probe
+    steps:
+      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1
+        with:
+          app-id: \${{ secrets.APP_ID }}
+          private-key: \${{ secrets.APP_PRIVATE_KEY }}
+      - run: gh api repos/example/devai/pulls
+`;
+
+/** The API-only push workflow with a checkout added to one of its jobs. */
+function withCheckout(uses: string): string {
+  return API_ONLY_PUSH_WORKFLOW.replace(
+    '      - run: gh api repos/example/devai/pulls\n',
+    `      - uses: ${uses}\n      - run: gh api repos/example/devai/pulls\n`,
+  );
+}
 
 const CLASS_SELECTORS = [
   { kind: 'class', pattern: 'docs' },
@@ -157,6 +190,53 @@ describe('ci-economy.path-filters on a class-selected pull-request lane (ADR-CHK
     expect(pathFilters(root)).toMatchObject({
       severity: 'warn',
       locations: ['main-verification.yml'],
+    });
+  });
+});
+
+describe('ci-economy.path-filters on a branch push that checks out no source (ADR-CHK-0008)', () => {
+  it('is not raised for a branch-push workflow with no actions/checkout step in any job', () => {
+    const root = temporary();
+    workflow(root, 'update-pull-request-branches.yml', API_ONLY_PUSH_WORKFLOW);
+    expect(pathFilters(root)).toBe(undefined);
+  });
+
+  it.each([
+    ['a sha-pinned checkout', 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1'],
+    ['a tag checkout', 'actions/checkout@v4'],
+    ['a branch checkout', 'actions/checkout@main'],
+  ])('still warns when any job uses %s', (_label, uses) => {
+    const root = temporary();
+    workflow(root, 'update-pull-request-branches.yml', withCheckout(uses));
+    expect(pathFilters(root)).toMatchObject({
+      severity: 'warn',
+      locations: ['update-pull-request-branches.yml'],
+    });
+  });
+
+  it('names only the push workflow that checks out source beside an exempt one', () => {
+    const root = temporary();
+    workflow(root, 'update-pull-request-branches.yml', API_ONLY_PUSH_WORKFLOW);
+    workflow(root, 'main-verification.yml', BRANCH_PUSH_WORKFLOW);
+    expect(pathFilters(root)).toMatchObject({
+      severity: 'warn',
+      locations: ['main-verification.yml'],
+    });
+  });
+
+  it('leaves pull-request lanes unchanged: an unfiltered lane without class selectors warns even without a checkout', () => {
+    const root = temporary();
+    workflow(
+      root,
+      'pull-request-checks.yml',
+      API_ONLY_PUSH_WORKFLOW.replace(
+        'on:\n  push:\n    branches: [main]\n',
+        'on:\n  pull_request:\n    types: [opened, synchronize]\n',
+      ),
+    );
+    expect(pathFilters(root)).toMatchObject({
+      severity: 'warn',
+      locations: ['pull-request-checks.yml'],
     });
   });
 });
