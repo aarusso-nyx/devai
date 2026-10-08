@@ -31,7 +31,7 @@ inspector_acceptance:
   - IA-002 -- With an executor that records start and finish instants and finishes nodes in reverse plan order, no node starts before every one of its dependencies has a terminal outcome, and the execution array of the report is in plan order, not completion order.
   - IA-003 -- The number of node processes running at once never exceeds the effective worker count, and with one worker the start order equals plan order and no two nodes overlap.
   - IA-004 -- Two nodes where one holds exclusively a key the other holds in either list, a declared node and a node with no declaration, two nodes whose declared output paths are equal or one a path prefix of the other, and two nodes that both allowlist DEVAI_DB_URL never overlap in time, and the earlier one in plan order always starts first; two nodes that only share a key overlap, and with no test-task-exclusivity.json every plan runs one node at a time.
-  - IA-005 -- A FAIL in one node does not cancel or shorten any running node, every independent node still starts, and only its dependents are recorded ABORTED with reason dependency-not-pass without being started.
+  - IA-005 -- A FAIL in one node does not cancel or shorten any running node, every independent node still starts, and only its dependents are recorded ABORTED with reason dependency-not-pass without being started; an unpartitioned run never records a partitioned-out entry or a SKIPPED outcome.
   - IA-006 -- A node that waits in the ready queue longer than the per-task timeout still runs and is timed out only by its own timeout measured from its own start; the timeout default and the --task-timeout-ms flag are unchanged.
   - IA-007 -- --task-workers wins over DEVAI_CHECK_TASK_WORKERS; 0, 17, a fraction, or a non-numeric value from either source is refused with CHECK_RUNNER_WORKERS before any node starts; under --rc, --release-intent, or a protected execution identity the effective count is one, the environment value is ignored, and an explicit --task-workers above one is refused with CHECK_RUNNER_WORKERS.
   - IA-008 -- The plan, task keys, input digests, descriptor and task-policy digests, and receipt are byte-identical whatever the worker count; runner and bundled verifier derive the same task keys and task-policy digest for a candidate carrying test-task-exclusivity.json, which a ** selector hashes like any file; an exclusivity file that fails its schema or names an undeclared node is refused before any node starts.
@@ -103,10 +103,16 @@ the implementation and its tests.
 
 1. **Every planned node is accounted for.** The plan, its node set, and the
    selection that produced it are computed exactly as before. Every planned
-   node receives exactly one execution entry. A node is started, reused,
-   recorded `ABORTED`, or recorded `blocked-environment` by the same
-   per-node rules as the sequential runner; no node is skipped, dropped, or
-   started twice because of scheduling.
+   node receives exactly one execution entry, with one of five dispositions:
+   `executed` or `reused` (by the same per-node rules as the sequential
+   runner), `aborted` (outcome `ABORTED`), `blocked-environment`, or
+   `partitioned-out`. In an unpartitioned run no planned node is skipped,
+   no entry is `partitioned-out`, and no node is dropped or started twice
+   because of scheduling. In a partitioned run (rule 11), nodes outside the
+   run's partition carry the fifth disposition, `partitioned-out`, with
+   outcome `SKIPPED`. They are never started, and across the two partition
+   runs each node still has exactly one entry with one of the other four
+   dispositions.
 2. **Bounded worker count.** At most `W` node processes run at once. The
    default is `min(4, os.availableParallelism())`. The `--task-workers <n>`
    flag of `check --run` overrides the environment variable
@@ -366,7 +372,7 @@ inside the runner is left to a later record if the job split is not enough.
 - IA-002 -- With an executor that records start and finish instants and finishes nodes in reverse plan order, no node starts before every one of its dependencies has a terminal outcome, and the execution array of the report is in plan order, not completion order.
 - IA-003 -- The number of node processes running at once never exceeds the effective worker count, and with one worker the start order equals plan order and no two nodes overlap.
 - IA-004 -- Two nodes where one holds exclusively a key the other holds in either list, a declared node and a node with no declaration, two nodes whose declared output paths are equal or one a path prefix of the other, and two nodes that both allowlist DEVAI_DB_URL never overlap in time, and the earlier one in plan order always starts first; two nodes that only share a key overlap, and with no test-task-exclusivity.json every plan runs one node at a time.
-- IA-005 -- A FAIL in one node does not cancel or shorten any running node, every independent node still starts, and only its dependents are recorded ABORTED with reason dependency-not-pass without being started.
+- IA-005 -- A FAIL in one node does not cancel or shorten any running node, every independent node still starts, and only its dependents are recorded ABORTED with reason dependency-not-pass without being started; an unpartitioned run never records a partitioned-out entry or a SKIPPED outcome.
 - IA-006 -- A node that waits in the ready queue longer than the per-task timeout still runs and is timed out only by its own timeout measured from its own start; the timeout default and the --task-timeout-ms flag are unchanged.
 - IA-007 -- --task-workers wins over DEVAI_CHECK_TASK_WORKERS; 0, 17, a fraction, or a non-numeric value from either source is refused with CHECK_RUNNER_WORKERS before any node starts; under --rc, --release-intent, or a protected execution identity the effective count is one, the environment value is ignored, and an explicit --task-workers above one is refused with CHECK_RUNNER_WORKERS.
 - IA-008 -- The plan, task keys, input digests, descriptor and task-policy digests, and receipt are byte-identical whatever the worker count; runner and bundled verifier derive the same task keys and task-policy digest for a candidate carrying test-task-exclusivity.json, which a ** selector hashes like any file; an exclusivity file that fails its schema or names an undeclared node is refused before any node starts.
