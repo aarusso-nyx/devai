@@ -96,6 +96,19 @@ A round's post-change window starts at the merge of its last implementing task.
 - **TASK-0711 boundary.** PR #353 also bound `test-task-exclusivity.json` to the ci change class in `law/policy/adopter-defaults/change-taxonomy-binding.json` and `.devai/config/change-taxonomy-binding.json`. Both paths are now in the TASK-0711 boundary.
 - **Known gap, not resolved here:** `.devai/config/change-taxonomy-binding.json` is an adopter-owned binding (`packages/cli/src/services/interactive-config.ts` lists it). It is seeded at bind time, and no init action writes it afterwards, so it was edited by hand. That conflicts with Article 6 write authority. It is recorded for a later decision.
 
+## D5 measurement and release decision
+
+- **Delivered:**
+  - #363 (merge e96b261e) delivered CTG-0726: TASK-07210, TASK-07211 and TASK-0726.
+  - #366 (merge e43e8db9) delivered R-0703's CTG-0731: TASK-0731, TASK-0732 and TASK-0733.
+- **Readings on main e43e8db9, 2026-10-08T17:39Z:**
+  - F5:T9, `harness_green_main` (reading SR-30aa1c53e9b96427): PASS. 121 of 121 final heads are green under the final-head unit of the amended D4.
+  - F5:T7, `harness_performance` (reading SR-116466b6a1b2df0b): PASS. The median is 786 s, below the 900 s target of D6.
+- **D5 is satisfied.** Both cells read PASS, so 2.3.0 ships under D5. The coordinator directed the release on 2026-10-08. Publication (OE-03) still needs its separately authorized release from an exact candidate.
+- **Still Owner-pending:** OE-02 (the auto-update branch setting and the update credential) and the live update-branch check on a real pull request. The release does not wait for them, and R-0702 does not close until they are done.
+- **Round acceptance stays separate.** These readings are the D5 measurement. Each round's post-change window under Acceptance windows is still assessed on its own before that round closes.
+- **Follow-ups:** #364 (`harness_green_main`: run list `--limit 300` truncates the 30-day window) and #365 (final-head unit: verify the pull request's base branch and identity).
+
 ## Owner effects
 
 The plan only names these effects. No task performs them.
