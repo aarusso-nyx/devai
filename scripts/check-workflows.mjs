@@ -251,6 +251,20 @@ const PREFLIGHT_AGGREGATOR_COMMANDS = [
 // command can soften the aggregator's exit status.
 const PREFLIGHT_AGGREGATOR_SCRIPT = ['set -euo pipefail', PREFLIGHT_AGGREGATOR_COMMANDS.join(' ')];
 const PREFLIGHT_REPORT_PATTERN = 'devai-gate-report-*';
+// #247: the bootstrap cache restores the runner together with packages/*/dist, and a hit
+// counts only when every restored entry is present; any missing file rebuilds.
+const PREFLIGHT_BOOTSTRAP_CACHE_PATHS = ['.devai/state/pr-bootstrap', 'packages/*/dist'];
+const PREFLIGHT_BOOTSTRAP_GUARD = [
+  'missing=1',
+  `if [ "\${{ steps.bootstrap-cache.outputs.cache-hit }}" = 'true' ]; then`,
+  '".devai/state/pr-bootstrap/cli/bin.js"',
+  'entry.startsWith("./dist/")',
+  'process.exit(1);',
+  "' && missing=0",
+  'if [ "$missing" -ne 0 ]; then',
+];
+// The former shortcut trusted any hit, so a hit without the dist skipped the build.
+const PREFLIGHT_BOOTSTRAP_SHORTCUT = /cache-hit\s*\}\}"?\s*!=\s*'true'/u;
 
 /** A run block as logical lines: continuations joined, lines trimmed, blank lines dropped. */
 function logicalScriptLines(run) {
@@ -263,7 +277,11 @@ function logicalScriptLines(run) {
 function preflightLaneCommands(jobName) {
   const job = PREFLIGHT_PARTITION_JOBS[jobName];
   return {
-    install: ['pnpm install --frozen-lockfile', 'pnpm run release:bootstrap'],
+    install: [
+      'pnpm install --frozen-lockfile',
+      'pnpm run release:bootstrap',
+      ...PREFLIGHT_BOOTSTRAP_GUARD,
+    ],
     [PREFLIGHT_STEP_ID]: [`check --preflight --run ${PREFLIGHT_BASE}`],
     affected: [
       `check --affected --run ${PREFLIGHT_BASE} ${job.partition}`,
@@ -1178,6 +1196,25 @@ function checkPreflightWorkflow(file, workflow, source, findings, pins) {
           'CI_PREFLIGHT_GATE_INVALID',
           file,
           `jobs.${jobName} must not run the release profile gate; gate-rest owns it`,
+        ),
+      );
+    const restore = steps.find((step) => step.id === 'bootstrap-cache');
+    const restorePaths = String(object(restore?.with).path ?? '')
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line !== '');
+    const install = laneSteps.find((step) => step.id === 'install');
+    if (
+      typeof restore?.uses !== 'string' ||
+      !restore.uses.startsWith('actions/cache@') ||
+      PREFLIGHT_BOOTSTRAP_CACHE_PATHS.some((entry) => !restorePaths.includes(entry)) ||
+      PREFLIGHT_BOOTSTRAP_SHORTCUT.test(String(install?.run ?? ''))
+    )
+      findings.push(
+        finding(
+          'CI_PREFLIGHT_GATE_INVALID',
+          file,
+          `jobs.${jobName} must restore ${PREFLIGHT_BOOTSTRAP_CACHE_PATHS.join(' and ')} in step bootstrap-cache and rebuild on a hit missing any compiled entry (#247)`,
         ),
       );
     const uploads = steps.filter(
