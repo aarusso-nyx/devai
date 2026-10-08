@@ -188,13 +188,45 @@ export function supersedingGroupScoped(group: string, events?: readonly string[]
   );
 }
 
+const REPOSITORY_WRITE_KEYS = new Set(['github.workflow', 'github.ref']);
+
+/**
+ * The contexts one `${{ … }}` group part renders, or undefined when unproved. Accepted: a plain
+ * `github.workflow` or `github.ref`, or `format('literal', …)` over those two only, where every
+ * argument is rendered by a `{n}` placeholder (the #331 placeholder proof) and an unused
+ * argument is refused, so a mention that never reaches the rendered group is not a key.
+ */
+function renderedKeys(expression: string): readonly string[] | undefined {
+  const plain = expression.trim();
+  if (REPOSITORY_WRITE_KEYS.has(plain)) return [plain];
+  const call = /^format\(\s*'((?:[^']|'')*)'\s*((?:,\s*[A-Za-z_][A-Za-z0-9_.]*\s*)*)\)$/u.exec(
+    plain,
+  );
+  if (!call) return undefined;
+  const args = (call[2] ?? '')
+    .split(',')
+    .map((argument) => argument.trim())
+    .filter((argument) => argument !== '');
+  if (args.some((argument) => !REPOSITORY_WRITE_KEYS.has(argument))) return undefined;
+  const text = (call[1] ?? '').replaceAll("''", "'").replaceAll('{{', '').replaceAll('}}', '');
+  const used = [...text.matchAll(/\{(\d+)\}/gu)].map((match) => Number(match[1]));
+  if (used.some((index) => index >= args.length)) return undefined;
+  if (args.some((_, index) => !used.includes(index))) return undefined;
+  return [...new Set(used.map((index) => args[index] ?? ''))];
+}
+
 /**
  * A repository-write lock (ADR-CHK-0008) is keyed by the workflow and the ref, so a newer run of
  * the same workflow on the same ref supersedes the older one and no other workflow shares it.
+ * Both values must be rendered into the group by a proved part; every part must be proved.
  */
 function keyedByWorkflowAndRef(group: string): boolean {
-  const contexts = concurrencyGroupContexts(group);
-  return contexts?.includes('github.workflow') === true && contexts.includes('github.ref');
+  if (concurrencyGroupContexts(group) === undefined) return false;
+  const parts = [...group.matchAll(/\$\{\{(.*?)\}\}/gu)].map((match) => match[1] ?? '');
+  const rendered = parts.map(renderedKeys);
+  if (parts.length === 0 || rendered.some((keys) => keys === undefined)) return false;
+  const keys = new Set(rendered.flatMap((part) => part ?? []));
+  return [...REPOSITORY_WRITE_KEYS].every((key) => keys.has(key));
 }
 
 function requiresSerialization(relativeFile: string, file: string): boolean {

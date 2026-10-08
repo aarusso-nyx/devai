@@ -1023,12 +1023,12 @@ export const REVIEWED_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = Object.f
     files: [],
   },
   {
-    sha256: '538636cc83ae16d89ba2444bd1aa808a236a241debbe1c4ff94c7e1719901715',
+    sha256: '279a877e0ddf43fd1f2952d46a76fa85f1b91125b6d22f828e041608a1a809b8',
     effect: 'repository-write',
     workflow: 'update-pull-request-branches.yml#update-branches[2]',
     step: 'Rebase each open pull request behind main',
     review:
-      "Runs only when both credentials are present; rebases each open, non-draft, same-repository pull request behind main through PUT pulls/{n}/update-branch with update_method rebase and the expected head sha, authenticated by the App token. It changes only this repository's pull-request branches, never a fork and never a release surface, and reports a refused update without failing the others.",
+      "Runs only when both credentials are present; rebases each open, non-draft, same-repository pull request behind main through PUT pulls/{n}/update-branch with update_method rebase and the expected head sha, authenticated by the App token. It changes only this repository's pull-request branches, never a fork and never a release surface, and reports a pull request it cannot compare or update without failing the others.",
     files: [],
   },
 ]);
