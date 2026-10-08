@@ -316,4 +316,33 @@ describe('pre-push preflight (TASK-0727)', () => {
     },
     PUSH_TIMEOUT_MS,
   );
+
+  it(
+    'refuses a push of a commit other than HEAD before the affected check, naming the ref',
+    () => {
+      // The affected check runs on the working tree, so it can only vouch for HEAD: pushing
+      // another branch's commit from here must be refused rather than checked against HEAD.
+      const { work } = fixture();
+      cleanCommit(work, 'elsewhere');
+      const pushed = git(work, 'rev-parse', 'HEAD');
+      git(work, 'checkout', '-q', 'main');
+      script(work, 0, PASSING);
+
+      const result = push(work);
+
+      expect(result.status, result.output).not.toBe(0);
+      expect(result.output).toMatch(/check out/u);
+      expect(result.output).toMatch(/feature/u);
+      expect(result.output).toMatch(/push HEAD/u);
+      expect(calls(work), 'the affected check never starts').toEqual([]);
+      expect(git(work, 'ls-remote', 'origin', 'refs/heads/feature')).toBe('');
+      // The same commit pushes once it is checked out.
+      git(work, 'checkout', '-q', 'feature');
+      expect(git(work, 'rev-parse', 'HEAD')).toBe(pushed);
+      const retried = push(work);
+      expect(retried.status, retried.output).toBe(0);
+      expect(calls(work)).toHaveLength(1);
+    },
+    PUSH_TIMEOUT_MS,
+  );
 });
