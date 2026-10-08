@@ -57,7 +57,11 @@ function partitionSelection(
   }
   const raw = include ?? exclude;
   if (raw === undefined) return undefined;
-  const nodeIds = (typeof raw === 'string' || typeof raw === 'number' ? String(raw) : '')
+  // The argument parser reads an empty value (`--partition-include ''`) as the number 0 and
+  // a bare flag as true; both list no node. A node id `0` cannot be told apart from it.
+  const listed =
+    typeof raw === 'string' ? raw : typeof raw === 'number' && raw !== 0 ? String(raw) : '';
+  const nodeIds = listed
     .split(',')
     .map((nodeId) => nodeId.trim())
     .filter((nodeId) => nodeId !== '');
@@ -229,6 +233,17 @@ export const checkCmd = defineCommand({
               throw new Error('CHECK_RELEASE_STAGE: expected preflight or certify');
             }
             const partition = partitionSelection(options);
+            // Refused here, before any runner call or input read (ADR-CHK-0007 rule 11): a
+            // partition exists only for `--run` with `--affected` or `--local`.
+            if (
+              partition !== undefined &&
+              (taskSelection.operation !== 'run' ||
+                (taskSelection.target !== 'affected' && taskSelection.target !== 'local'))
+            ) {
+              throw new Error(
+                `CHECK_RUNNER_PARTITION: a partition applies only to --run with --affected or --local, not ${taskSelection.operation} ${taskSelection.target}`,
+              );
+            }
             const runnerOptions: CheckRunnerOptions = {
               repoRoot,
               ...taskSelection,
