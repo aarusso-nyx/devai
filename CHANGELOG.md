@@ -1,5 +1,92 @@
 # Changelog
 
+## 2.3.0 — 2026-10-08
+
+DEVAI 2.3.0 lets the check runner run independent plan nodes in parallel, and splits the pull-request
+gate into two partition jobs behind the single required check `devai-release-gate` (CMP-0007). Both
+gate cells read PASS on main e43e8db9:
+
+- F5:T7 at a 786 s median, against the new 900 s target;
+- F5:T9 at 121 of 121 final heads green, under its new per-pull-request definition.
+
+No commit since v2.2.0 carries the breaking marker, and the range includes features, so the commit
+grammar's bump floor is minor. The action set stays at 69. Three adopter migration entries cover the
+adopter files this release changes.
+
+- Adopter migrations (`init upgrade` from 2.2.0):
+  - `MIG-2.3.0-subprocess-effects-pr-list` (rebind). The subprocess effects registry declares the
+    read-only `gh-pr-list-all` template, every token literal:
+    `gh pr list --state all --limit 1000 --json closedAt,headRefName,headRefOid,mergedAt,number,state`.
+    Rebinding subprocess effects materializes it.
+  - `MIG-2.3.0-parallel-check-scheduling` (opt-in). Nothing changes until the repository commits a
+    `test-task-exclusivity.json`.
+  - `MIG-2.3.0-green-main-final-head` (opt-in). Nothing changes until the `harness_green_main`
+    declaration sets `outcomeUnit`.
+- Parallel check execution (ADR-CHK-0007, #352, #353, #360):
+  - **Workers.** `check --run` accepts `--task-workers <n>` (1 to 16). Without it,
+    `DEVAI_CHECK_TASK_WORKERS` sets the count. A set but empty variable is refused with
+    `CHECK_RUNNER_WORKERS`, and so is any other invalid value, before a node starts. The default is
+    `min(4, CPUs)`.
+  - **Sequential runs.** Only `--affected`, `--preflight` and `--local` run with more than one worker.
+    `--rc`, `--release-intent` and protected runs stay sequential.
+  - **Same results.** Reports and receipts list nodes in plan order. Per-task timeouts are unchanged,
+    and a failure cancels nothing. The node set and verdict equal a sequential run's.
+- Shared state is declared in `test-task-exclusivity.json`, beside `test-tasks.json`, against the new
+  `test-task-exclusivity.schema.json`:
+  - each node lists the `exclusive` and `shared` keys it holds;
+  - a node with no entry conflicts with every node, so a repository without the file runs one node at
+    a time;
+  - output-path overlap and a shared `DEVAI_DB_URL` also serialize;
+  - a malformed file, a non-file entry, or a declaration naming an unknown node is refused with
+    `CHECK_RUNNER_EXCLUSIVITY`;
+  - the runner reads the file as committed at the planned commit, never from the working tree.
+
+  The file stays out of `test-tasks.json`, so release export and certification read the descriptor
+  unchanged (ADR-CHK-0006).
+
+- `test-task-descriptor.schema.json` is now closed at the top level and on each task. A misspelled or
+  unknown task property is refused instead of ignored (#353).
+- Partitioned gate (ADR-CHK-0007 rule 11, #355):
+  - **Flags.** `check --run --affected|--local` accepts `--partition-include <ids>` or
+    `--partition-exclude <ids>`.
+  - **Same plan.** Both partitions plan the same nodes with the same digests.
+  - **Reports.** Each report lists every node as owned, prerequisite or `partitioned-out` (outcome
+    `SKIPPED`). The verdict covers owned entries only, and a partitioned run writes no receipt.
+  - **Refusals.** A partition under `--rc`, `--release-intent` or a protected run, both flags
+    together, or an unknown node id is refused with `CHECK_RUNNER_PARTITION`.
+  - **DEVAI's own gate.** It runs `gate-cli` (`test:cli`) and `gate-rest` (everything else) in
+    parallel. The aggregator job `devai-release-gate` passes only when the two reports own every
+    planned node exactly once, as PASS.
+- `harness_green_main` gains the optional `outcomeUnit` (ADR-SCR-0014, #366):
+  - `run`, the default, keeps the ADR-SCR-0010 population.
+  - `pull-request-final-head` counts each merged, closed or open pull request once. Its outcome is
+    the latest completed, non-cancelled run on its final head, matched by head branch and sha. The
+    minimum sample then counts pull requests.
+
+  DEVAI declares the second unit, so F5:T9 measures the gate per candidate rather than per push.
+
+- `harness_performance` passes F5:T7 at a median below 900 s, up from 600 s; p95 and the REVIEW
+  bounds are unchanged (CMP-0007 decision D6, #356). This is a package default: an adopter keeps it
+  unless its `extractor_params.harness_performance.thresholds` override sets another value.
+- The `ci-economy` path-filters advisory exempts push workflows that check nothing out (#363).
+- Repository process for DEVAI's own source (no adopter effect):
+  - **Rebase-only update branch (ADR-CHK-0008, #358).** `update-pull-request-branches.yml` rebases
+    open pull requests onto main through a GitHub App (#363). It does nothing until the App is
+    provisioned.
+  - **Commit-range check (#362).** It refuses merge commits in a pull-request range. It also checks
+    each commit's author against the author-path table and its committer against the admitted list,
+    which includes the update-branch App.
+  - **Pre-push preflight (#361).** It is opt-in: install it with `pnpm run hooks:install -- --pre-push`.
+  - **Bootstrap cache (#357).** A gate cache hit that lacks its compiled `dist` rebuilds, completing
+    #247.
+- Self-scorecard `SC-20261007T203104-001` (#349) has no FAIL cell. Its F4:T4 REVIEW came from one
+  unclaimed inventory surface, `packages/cli/src/error-code-prefixes.ts`. The trace now claims it
+  under INV-CORE-001 (#350).
+- The consumer install guidance names the published 2.2.0 (#348). It moves to 2.3.0 after
+  publication.
+- Release: this release is verified by the trusted local-RC verifier `@aarusso-nyx/devai@1.9.0`,
+  unchanged.
+
 ## 2.2.0 — 2026-10-07
 
 DEVAI 2.2.0 turns every backlog, task, round and tracking failure into a schema-valid refusal envelope
