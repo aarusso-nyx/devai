@@ -230,7 +230,7 @@ describe('harness_green_main: one outcome per pull request final head (R-0703)',
     expect(counted(sense())).toEqual({ total: 1, green: 0, pct: 0 });
   });
 
-  it('excludes a pull request whose final head has only cancelled or skipped runs', () => {
+  it('excludes an open pull request whose final head has only cancelled or skipped runs', () => {
     const counts = greenPullRequests(1);
     const branch = 'feature/superseded';
     const sha = 'f'.repeat(40);
@@ -242,11 +242,33 @@ describe('harness_green_main: one outcome per pull request final head (R-0703)',
         run(branch, sha, 'cancelled'),
         run(branch, sha, 'skipped'),
       ],
-      [...counts.pullRequests, pr(5, branch, sha, 'MERGED')],
+      [...counts.pullRequests, pr(5, branch, sha, 'OPEN')],
     );
 
     expect(counted(sense())).toEqual({ total: 1, green: 1, pct: 100 });
   });
+
+  it.each(['MERGED', 'CLOSED'] as const)(
+    'counts a %s pull request whose final head has only cancelled or skipped runs as red',
+    (state) => {
+      // ADR-SCR-0014 rule 5: only an open pull request may wait for its gate; one that left
+      // without a completed final-head run is not green, whatever passed on an earlier head.
+      const counts = greenPullRequests(1);
+      const branch = `feature/left-ungated-${state.toLowerCase()}`;
+      const sha = 'e'.repeat(40);
+      stub(
+        [
+          ...counts.runs,
+          run(branch, '0'.repeat(40), 'success'),
+          run(branch, sha, 'cancelled'),
+          run(branch, sha, 'skipped'),
+        ],
+        [...counts.pullRequests, pr(11, branch, sha, state)],
+      );
+
+      expect(counted(sense())).toEqual({ total: 2, green: 1, pct: 50 });
+    },
+  );
 
   it('excludes an open pull request with no completed run on its final head', () => {
     const counts = greenPullRequests(1);
