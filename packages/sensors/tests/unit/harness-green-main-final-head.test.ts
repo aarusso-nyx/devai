@@ -392,6 +392,132 @@ describe('harness_green_main outcome units and command lines (ADR-SCR-0014)', ()
   );
 });
 
+// R-0703 review rulings for the final-head unit.
+describe('harness_green_main final-head review rulings (R-0703)', () => {
+  const UNAVAILABLE = 'HARNESS_GREEN_MAIN_PR_LIST_UNAVAILABLE';
+
+  function unavailable(reading: SensorReading): void {
+    expect(reading.status).toBe('unknown');
+    expect((reading.findings ?? []).map((finding) => finding.code)).toContain(UNAVAILABLE);
+    expect(reading.metrics?.['success_count'] ?? 0).toBe(0);
+  }
+
+  it.each(['MERGED', 'CLOSED'] as const)(
+    'enters a %s pull request whose only window runs are cancelled, and counts it red',
+    (state) => {
+      // Membership is decided before cancelled and skipped runs are dropped as outcomes, so a
+      // pull request seen only through cancelled runs is still in the population.
+      const counts = greenPullRequests(1);
+      const branch = `feature/only-cancelled-${state.toLowerCase()}`;
+      const sha = 'c'.repeat(40);
+      stub(
+        [...counts.runs, run(branch, sha, 'cancelled'), run(branch, sha, 'cancelled')],
+        [...counts.pullRequests, pr(12, branch, sha, state)],
+      );
+
+      expect(counted(sense())).toEqual({ total: 2, green: 1, pct: 50 });
+    },
+  );
+
+  it('keeps an open pull request whose only window runs are cancelled out of the population', () => {
+    const counts = greenPullRequests(1);
+    const branch = 'feature/only-cancelled-open';
+    const sha = 'c'.repeat(40);
+    stub(
+      [...counts.runs, run(branch, sha, 'cancelled')],
+      [...counts.pullRequests, pr(13, branch, sha, 'OPEN')],
+    );
+
+    expect(counted(sense())).toEqual({ total: 1, green: 1, pct: 100 });
+  });
+
+  /** `count` pull requests, the first `gated` of them with a green final-head run. */
+  function listing(count: number, gated = 3) {
+    const greens = greenPullRequests(gated);
+    const others = Array.from({ length: count - gated }, (_, index) =>
+      pr(
+        10_000 + index,
+        `feature/listed-${String(index)}`,
+        String(index).padStart(40, '9'),
+        'OPEN',
+      ),
+    );
+    return { runs: greens.runs, pullRequests: [...greens.pullRequests, ...others] };
+  }
+
+  it('reads unknown when gh pr list returns exactly its 1000-row limit (possible truncation)', () => {
+    const { runs, pullRequests } = listing(1000);
+    expect(pullRequests).toHaveLength(1000);
+    stub(runs, pullRequests);
+
+    unavailable(sense());
+  });
+
+  it('reads a verdict when gh pr list returns one row fewer than its limit', () => {
+    const { runs, pullRequests } = listing(999);
+    stub(runs, pullRequests);
+
+    const reading = sense();
+    expect(reading.status).toBe('pass');
+    expect(counted(reading)).toEqual({ total: 3, green: 3, pct: 100 });
+  });
+
+  const malformed: readonly (readonly [string, (row: Record<string, unknown>) => unknown])[] = [
+    ['a missing headRefName', ({ headRefName: _drop, ...row }) => row],
+    ['a missing headRefOid', ({ headRefOid: _drop, ...row }) => row],
+    ['a missing number', ({ number: _drop, ...row }) => row],
+    ['a missing state', ({ state: _drop, ...row }) => row],
+    ['a numeric headRefName', (row) => ({ ...row, headRefName: 42 })],
+    ['a null headRefOid', (row) => ({ ...row, headRefOid: null })],
+    ['a string number', (row) => ({ ...row, number: '7' })],
+    ['a numeric state', (row) => ({ ...row, state: 1 })],
+    ['a row that is not an object', () => 'feature/not-an-object'],
+  ];
+
+  it.each(malformed)(
+    'reads unknown, with no partial verdict, for a pr row with %s',
+    (_label, edit) => {
+      const greens = greenPullRequests(3);
+      const [first, ...rest] = greens.pullRequests;
+      if (first === undefined) throw new Error('fixture: no pull request');
+      stub(greens.runs, [], ok([edit({ ...first }), ...rest]));
+
+      unavailable(sense());
+    },
+  );
+
+  it.each([
+    ['an object', { pullRequests: [] }],
+    ['a string', 'no pull requests'],
+    ['null', null],
+  ])('reads unknown when gh pr list returns %s instead of an array', (_label, value) => {
+    const greens = greenPullRequests(3);
+    stub(greens.runs, [], ok(value));
+
+    unavailable(sense());
+  });
+
+  it('decides a final head by its highest attempt when every attempt is sampled', () => {
+    const branch = 'feature/reattempted';
+    const sha = 'a'.repeat(40);
+    const first = run(branch, sha, 'success');
+    // Attempt 1 passed and is listed first; attempt 2 of the same run, created at the same
+    // instant, failed and decides.
+    const second = { ...first, attempt: 2, conclusion: 'failure' as const, updatedAt: tick() };
+    stub([first, second], [pr(14, branch, sha, 'MERGED')]);
+
+    const reading = senseHarnessGreenMain({
+      ...POPULATION,
+      ...FINAL_HEAD,
+      attempts: 'all',
+      repoRoot: '/repo',
+      now: NOW,
+    });
+
+    expect(counted(reading)).toEqual({ total: 1, green: 0, pct: 0 });
+  });
+});
+
 describe('harness_green_main thresholds over pull-request outcomes (R-0703)', () => {
   function mix(green: number, red: number): void {
     const greens = greenPullRequests(green);
