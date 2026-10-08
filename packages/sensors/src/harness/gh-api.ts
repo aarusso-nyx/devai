@@ -98,7 +98,9 @@ export const HARNESS_GREEN_MAIN_RUN_FIELDS =
 
 /** A pull request row as `gh pr list --json` returns it; only real gh pr list fields. */
 export interface HarnessPullRequest {
+  readonly baseRefName?: string;
   readonly closedAt?: string | null;
+  readonly createdAt?: string;
   readonly headRefName?: string;
   readonly headRefOid?: string;
   readonly mergedAt?: string | null;
@@ -115,11 +117,12 @@ export const HARNESS_PULL_REQUEST_LIST_ARGS = [
   '--limit',
   '1000',
   '--json',
-  'closedAt,headRefName,headRefOid,mergedAt,number,state',
+  'baseRefName,closedAt,createdAt,headRefName,headRefOid,mergedAt,number,state',
 ] as const;
 
 const DAY_MS = 86_400_000;
-const DEFAULT_RUN_LIMIT = 300;
+/** The literal run-list limit the broker admits (#364); a list this long may be cut. */
+const DEFAULT_RUN_LIMIT = 1000;
 
 export interface PopulationMetrics {
   readonly [key: string]: number | string | boolean;
@@ -175,16 +178,18 @@ export function samplePopulation(
 
   const args = ['run', 'list', '--workflow', workflow, '--event', event];
   if (headBranch !== '*') args.push('--branch', headBranch);
-  args.push(
-    '--json',
-    fields,
-    '--limit',
-    String(opts.limit ?? DEFAULT_RUN_LIMIT),
-    '--created',
-    `>=${created}`,
-  );
+  const limit = opts.limit ?? DEFAULT_RUN_LIMIT;
+  args.push('--json', fields, '--limit', String(limit), '--created', `>=${created}`);
   const result = invokeGhJson<HarnessRun[]>({ cwd: opts.repoRoot, args });
   if (!result.ok) return { ok: false, reason: result.reason, args };
+  // A list that reaches the limit may have been cut before the window ends (ADR-SCR-0014 IA-007).
+  if (Array.isArray(result.data) && result.data.length >= limit) {
+    return {
+      ok: false,
+      reason: `gh-run-list-truncated: ${String(result.data.length)} runs reached the limit ${String(limit)}; the lookback window may be cut, so no verdict is stated`,
+      args,
+    };
+  }
 
   let runs = result.data.filter(
     (run) =>
@@ -299,10 +304,18 @@ const PULL_REQUEST_LIST_LIMIT = Number(
 
 interface ValidPullRequest {
   readonly number: number;
+  readonly baseRefName: string;
   readonly headRefName: string;
   readonly headRefOid: string;
   readonly state: string;
+  /** When the pull request opened, in epoch milliseconds. */
+  readonly openedMs: number;
+  /** When it closed or merged, in epoch milliseconds; undefined while it is open. */
+  readonly closedMs: number | undefined;
 }
+
+const isTime = (value: unknown): value is string =>
+  typeof value === 'string' && Number.isFinite(Date.parse(value));
 
 type PullRequestValidation =
   | { readonly ok: true; readonly pulls: readonly ValidPullRequest[] }
@@ -326,20 +339,32 @@ function validatePullRequests(data: unknown): PullRequestValidation {
         reason: `gh-cli-parse-error: pull request row ${String(index)} is not an object`,
       };
     }
-    const { number, headRefName, headRefOid, state } = row as HarnessPullRequest;
+    const { number, baseRefName, headRefName, headRefOid, state, createdAt, closedAt } =
+      row as HarnessPullRequest;
     if (
       typeof number !== 'number' ||
       !Number.isInteger(number) ||
+      typeof baseRefName !== 'string' ||
       typeof headRefName !== 'string' ||
       typeof headRefOid !== 'string' ||
-      typeof state !== 'string'
+      typeof state !== 'string' ||
+      !isTime(createdAt) ||
+      (closedAt !== undefined && closedAt !== null && !isTime(closedAt))
     ) {
       return {
         ok: false,
-        reason: `gh-cli-parse-error: pull request row ${String(index)} lacks a valid number, headRefName, headRefOid, or state`,
+        reason: `gh-cli-parse-error: pull request row ${String(index)} lacks a valid number, baseRefName, headRefName, headRefOid, state, createdAt, or closedAt`,
       };
     }
-    pulls.push({ number, headRefName, headRefOid, state });
+    pulls.push({
+      number,
+      baseRefName,
+      headRefName,
+      headRefOid,
+      state,
+      openedMs: Date.parse(createdAt),
+      closedMs: isTime(closedAt) ? Date.parse(closedAt) : undefined,
+    });
   }
   return { ok: true, pulls };
 }
@@ -372,10 +397,13 @@ function latestFirst(a: HarnessRun, b: HarnessRun): number {
  * The final-head population (R-0703, ADR-SCR-0014): the declared gate runs of the window grouped
  * by pull request, each judged by the latest completed, non-cancelled run on the pull request's
  * final head (its current head when open, its head at merge when merged). Two gh calls: the
- * window's runs, and every pull request with its final head. Membership comes first: a pull
- * request belongs to the population when any window run, cancelled or skipped included, ran on
- * its head branch. Its outcome is then the latest verdict on its final head among the highest
- * attempt of each run. An open pull request whose final head has no completed run is pending and
+ * window's runs, and every pull request with its final head. Only pull requests whose base is
+ * the declared base branch are sampled, and a run belongs to a pull request only when it was
+ * created while the pull request was open, from its createdAt to its closedAt (now while open),
+ * so a reused branch name never lends a run to another pull request (IA-006). Membership comes
+ * first: a pull request belongs to the population when any such window run, cancelled or skipped
+ * included, ran on its head branch. Its outcome is then the latest verdict on its final head
+ * among the highest attempt of each run. An open pull request whose final head has no completed run is pending and
  * never counted; a closed or merged one without such a run is counted and is not green. A failed,
  * possibly truncated, or ill-formed pull request list is a failed sample, never a per-run fallback.
  */
@@ -394,7 +422,8 @@ export function sampleFinalHeads(opts: HarnessPopulationOptions): FinalHeadSampl
   if (!validated.ok) return { ok: false, source: 'pr-list', reason: validated.reason, args };
 
   const windowRuns = highestAttempts(sample.runs);
-  const branches = new Set(windowRuns.map((run) => run.headBranch));
+  const baseBranch = opts.baseBranch ?? 'main';
+  const nowMs = opts.now === undefined ? Date.now() : Date.parse(opts.now);
   // Completed runs that reached a verdict: never cancelled or skipped (ADR-SCR-0014).
   const completed = windowRuns.filter(
     (run) =>
@@ -406,12 +435,23 @@ export function sampleFinalHeads(opts: HarnessPopulationOptions): FinalHeadSampl
   );
   const finals: PullRequestFinal[] = [];
   const pendingOpen: number[] = [];
-  for (const { number, headRefName, headRefOid, state } of validated.pulls) {
-    if (!branches.has(headRefName)) continue;
+  for (const pull of validated.pulls) {
+    const { number, baseRefName, headRefName, headRefOid, state } = pull;
+    if (baseRefName !== baseBranch) continue;
+    const closesMs = pull.closedMs ?? nowMs;
+    // A run is this pull request's only when created on its branch while it was open.
+    const ownRun = (run: HarnessRun): boolean => {
+      const createdMs = Date.parse(run.createdAt ?? '');
+      return (
+        run.headBranch === headRefName &&
+        Number.isFinite(createdMs) &&
+        createdMs >= pull.openedMs &&
+        createdMs <= closesMs
+      );
+    };
+    if (!windowRuns.some(ownRun)) continue;
     const run = completed
-      .filter(
-        (candidate) => candidate.headBranch === headRefName && candidate.headSha === headRefOid,
-      )
+      .filter((candidate) => ownRun(candidate) && candidate.headSha === headRefOid)
       .sort(latestFirst)[0];
     if (run === undefined && state === 'OPEN') {
       pendingOpen.push(number);
