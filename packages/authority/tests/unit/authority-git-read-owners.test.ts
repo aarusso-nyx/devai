@@ -30,7 +30,7 @@ describe('immutable Git read helper ownership', () => {
     ).toEqual([]);
   });
 
-  it('allows readExactGitTreeSync only in its two named production owners', async () => {
+  it('allows readExactGitTreeSync only in its three named production owners', async () => {
     const result = await inventoryFor({
       'packages/cli/src/services/check-runner/authority-process.ts': [
         "import { readExactGitTreeSync as readTree } from '@devai-nyx/authority';",
@@ -40,9 +40,24 @@ describe('immutable Git read helper ownership', () => {
         "import { readExactGitTreeSync } from '@devai-nyx/authority';",
         'readExactGitTreeSync();',
       ].join('\n'),
+      // ADR-CHK-0007 rule 5: the scheduler reads test-task-exclusivity.json from the planned
+      // commit's tree, never the working tree.
+      'packages/cli/src/services/check-runner/runner-schedule.ts': [
+        "import { readExactGitTreeSync } from '@devai-nyx/authority';",
+        'readExactGitTreeSync();',
+      ].join('\n'),
     });
 
     expect(result).toMatchObject({ ok: true, value: { unauthorized_call_sites: 0 } });
+    // The scheduler's approval names its file, not its directory: a sibling stays refused.
+    expectBoundaryFailure(
+      await inventoryFor({
+        'packages/cli/src/services/check-runner/runner.ts':
+          "import { readExactGitTreeSync } from '@devai-nyx/authority';\nreadExactGitTreeSync();",
+      }),
+      'refused',
+      'AUTHORITY_DIRECT_MUTATOR_INVENTORY_STALE',
+    );
     // TASK-0256 moved the certification tree reads out of release-certification-provider.ts;
     // the old path keeps no approval.
     expectBoundaryFailure(
