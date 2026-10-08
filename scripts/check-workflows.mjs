@@ -220,14 +220,44 @@ const PREFLIGHT_BASE_BINDING =
 const PREFLIGHT_CONCURRENCY_GROUP =
   "${{ github.event_name == 'merge_group' && format('{0}-mq-{1}', github.workflow, github.event.merge_group.head_sha) || format('{0}-pr-{1}', github.workflow, github.event.pull_request.number) }}";
 const PREFLIGHT_BASE = `--base "$${PREFLIGHT_BASE_VARIABLE}"`;
-const PREFLIGHT_LANE_COMMANDS = {
-  install: ['pnpm install --frozen-lockfile', 'pnpm run release:bootstrap'],
-  [PREFLIGHT_STEP_ID]: [`check --preflight --run ${PREFLIGHT_BASE}`],
-  affected: [
-    `check --affected --run ${PREFLIGHT_BASE}`,
-    `pnpm run release:pr-gate -- "$${PREFLIGHT_BASE_VARIABLE}"`,
-  ],
+// ADR-CHK-0007 rule 11: two partition jobs over one plan and one aggregator that carries the
+// required check name. Each partition job runs the lane; only gate-rest runs the release
+// profile gate. The aggregator runs no check node.
+const PREFLIGHT_PARTITION_JOBS = {
+  'gate-cli': {
+    partition: `--partition-include test:cli`,
+    artifact: 'devai-gate-report-cli',
+    releaseGate: false,
+  },
+  'gate-rest': {
+    partition: `--partition-exclude test:cli`,
+    artifact: 'devai-gate-report-rest',
+    releaseGate: true,
+  },
 };
+const PREFLIGHT_AGGREGATOR_JOB = 'gate';
+const PREFLIGHT_GATE_NAME = 'devai-release-gate';
+const PREFLIGHT_AGGREGATOR_STEP_ID = 'aggregate';
+const PREFLIGHT_AGGREGATOR_PERMISSIONS = { contents: 'read', actions: 'read' };
+const PREFLIGHT_AGGREGATOR_COMMANDS = [
+  'node scripts/aggregate-gate-partitions.mjs',
+  '--include-report "$RUNNER_TEMP/gate-reports/devai-gate-report-cli"',
+  '--exclude-report "$RUNNER_TEMP/gate-reports/devai-gate-report-rest"',
+  '--include-result "${{ needs.gate-cli.result }}"',
+  '--exclude-result "${{ needs.gate-rest.result }}"',
+];
+const PREFLIGHT_REPORT_PATTERN = 'devai-gate-report-*';
+function preflightLaneCommands(jobName) {
+  const job = PREFLIGHT_PARTITION_JOBS[jobName];
+  return {
+    install: ['pnpm install --frozen-lockfile', 'pnpm run release:bootstrap'],
+    [PREFLIGHT_STEP_ID]: [`check --preflight --run ${PREFLIGHT_BASE}`],
+    affected: [
+      `check --affected --run ${PREFLIGHT_BASE} ${job.partition}`,
+      ...(job.releaseGate ? [`pnpm run release:pr-gate -- "$${PREFLIGHT_BASE_VARIABLE}"`] : []),
+    ],
+  };
+}
 const PREFLIGHT_EVIDENCE_TOKENS =
   /\b(?:evidence|receipt|attest(?:ation)?|verifier|provenance|ledger|sign(?:ing|ed)?)\b/iu;
 
@@ -1050,68 +1080,159 @@ function checkPreflightWorkflow(file, workflow, source, findings, pins) {
       ),
     );
   }
-  if (
-    JSON.stringify(Object.keys(jobs)) !== JSON.stringify(['preflight']) ||
-    jobs.preflight?.name !== 'devai-release-gate' ||
-    jobs.preflight?.if !== undefined ||
-    (jobs.preflight?.['continue-on-error'] !== undefined &&
-      jobs.preflight['continue-on-error'] !== false)
-  )
-    findings.push(finding('CI_PREFLIGHT_GATE_INVALID', file, 'one required result'));
-  // Three run steps, each failing the job on its own: install, the preflight
-  // target, and the affected target with the profile gate. The runner report is
-  // the aggregate, so no step may be optional or conditional.
-  const laneSteps = (Array.isArray(jobs.preflight?.steps) ? jobs.preflight.steps : [])
-    .map(object)
-    .filter((step) => typeof step.run === 'string');
-  if (JSON.stringify(laneSteps.map((step) => step.id)) !== JSON.stringify(PREFLIGHT_LANE_STEP_IDS))
+  const expectedJobs = [...Object.keys(PREFLIGHT_PARTITION_JOBS), PREFLIGHT_AGGREGATOR_JOB];
+  if (JSON.stringify(Object.keys(jobs)) !== JSON.stringify(expectedJobs))
     findings.push(
       finding(
         'CI_PREFLIGHT_GATE_INVALID',
         file,
-        `run steps must be exactly ${PREFLIGHT_LANE_STEP_IDS.join(', ')}`,
+        `jobs must be exactly ${expectedJobs.join(', ')} (ADR-CHK-0007 rule 11)`,
       ),
     );
-  for (const step of laneSteps) {
-    if (step['continue-on-error'] !== undefined || step.if !== undefined)
+  for (const [jobName, partition] of Object.entries(PREFLIGHT_PARTITION_JOBS)) {
+    const job = object(jobs[jobName]);
+    if (
+      job.name === PREFLIGHT_GATE_NAME ||
+      job.if !== undefined ||
+      job.needs !== undefined ||
+      (job['continue-on-error'] !== undefined && job['continue-on-error'] !== false)
+    )
       findings.push(
-        finding('CI_PREFLIGHT_GATE_INVALID', file, `step ${String(step.id)} must not be optional`),
+        finding(
+          'CI_PREFLIGHT_GATE_INVALID',
+          file,
+          `jobs.${jobName} must run unconditionally, without needs, under its own name`,
+        ),
+      );
+    const steps = (Array.isArray(job.steps) ? job.steps : []).map(object);
+    // Three run steps, each failing the job on its own: install, the preflight target, and
+    // the affected target on this side of the partition. No step may be optional.
+    const laneSteps = steps.filter((step) => typeof step.run === 'string');
+    if (
+      JSON.stringify(laneSteps.map((step) => step.id)) !== JSON.stringify(PREFLIGHT_LANE_STEP_IDS)
+    )
+      findings.push(
+        finding(
+          'CI_PREFLIGHT_GATE_INVALID',
+          file,
+          `jobs.${jobName} run steps must be exactly ${PREFLIGHT_LANE_STEP_IDS.join(', ')}`,
+        ),
+      );
+    for (const step of laneSteps) {
+      if (step['continue-on-error'] !== undefined || step.if !== undefined)
+        findings.push(
+          finding(
+            'CI_PREFLIGHT_GATE_INVALID',
+            file,
+            `jobs.${jobName} step ${String(step.id)} must not be optional`,
+          ),
+        );
+    }
+    if (object(job.env)[PREFLIGHT_BASE_VARIABLE] !== PREFLIGHT_BASE_BINDING)
+      findings.push(
+        finding(
+          'CI_PREFLIGHT_GATE_INVALID',
+          file,
+          `jobs.${jobName}.env.${PREFLIGHT_BASE_VARIABLE} must be ${PREFLIGHT_BASE_BINDING}`,
+        ),
+      );
+    const checkout = steps.find(
+      (step) => typeof step.uses === 'string' && step.uses.startsWith('actions/checkout@'),
+    );
+    if (
+      object(checkout?.with).ref !== PREFLIGHT_CANDIDATE_REF ||
+      String(object(checkout?.with)['fetch-depth']) !== '0'
+    )
+      findings.push(
+        finding(
+          'CI_PREFLIGHT_GATE_INVALID',
+          file,
+          `jobs.${jobName} checkout must take ref ${PREFLIGHT_CANDIDATE_REF} with fetch-depth: 0`,
+        ),
+      );
+    for (const [id, required] of Object.entries(preflightLaneCommands(jobName))) {
+      const step = laneSteps.find((candidate) => candidate.id === id);
+      for (const text of required) {
+        if (!step?.run?.includes(text))
+          findings.push(
+            finding('CI_PREFLIGHT_GATE_INVALID', file, `jobs.${jobName} ${id} must run ${text}`),
+          );
+      }
+    }
+    if (!partition.releaseGate && laneSteps.some((step) => step.run.includes('release:pr-gate')))
+      findings.push(
+        finding(
+          'CI_PREFLIGHT_GATE_INVALID',
+          file,
+          `jobs.${jobName} must not run the release profile gate; gate-rest owns it`,
+        ),
+      );
+    const uploads = steps.filter(
+      (step) => typeof step.uses === 'string' && step.uses.startsWith('actions/upload-artifact@'),
+    );
+    if (uploads.length !== 1 || object(uploads[0]?.with).name !== partition.artifact)
+      findings.push(
+        finding(
+          'CI_PREFLIGHT_GATE_INVALID',
+          file,
+          `jobs.${jobName} must upload exactly one artifact, ${partition.artifact}`,
+        ),
       );
   }
-  if (object(jobs.preflight?.env)[PREFLIGHT_BASE_VARIABLE] !== PREFLIGHT_BASE_BINDING)
-    findings.push(
-      finding(
-        'CI_PREFLIGHT_GATE_INVALID',
-        file,
-        `jobs.preflight.env.${PREFLIGHT_BASE_VARIABLE} must be ${PREFLIGHT_BASE_BINDING}`,
-      ),
-    );
-  const checkout = (Array.isArray(jobs.preflight?.steps) ? jobs.preflight.steps : [])
-    .map(object)
-    .find((step) => typeof step.uses === 'string' && step.uses.startsWith('actions/checkout@'));
+  const gate = object(jobs[PREFLIGHT_AGGREGATOR_JOB]);
+  const gateIf = typeof gate.if === 'string' ? gate.if.replace(/^\$\{\{\s*|\s*\}\}$/gu, '') : '';
   if (
-    object(checkout?.with).ref !== PREFLIGHT_CANDIDATE_REF ||
-    String(object(checkout?.with)['fetch-depth']) !== '0'
+    gate.name !== PREFLIGHT_GATE_NAME ||
+    JSON.stringify(gate.needs) !== JSON.stringify(Object.keys(PREFLIGHT_PARTITION_JOBS)) ||
+    gateIf.trim() !== 'always()' ||
+    (gate['continue-on-error'] !== undefined && gate['continue-on-error'] !== false) ||
+    JSON.stringify(gate.permissions) !== JSON.stringify(PREFLIGHT_AGGREGATOR_PERMISSIONS)
   )
     findings.push(
       finding(
         'CI_PREFLIGHT_GATE_INVALID',
         file,
-        `the checkout must take ref ${PREFLIGHT_CANDIDATE_REF} with fetch-depth: 0`,
+        `jobs.${PREFLIGHT_AGGREGATOR_JOB} must be named ${PREFLIGHT_GATE_NAME}, need ${Object.keys(PREFLIGHT_PARTITION_JOBS).join(', ')} under always(), and hold only contents: read and actions: read`,
       ),
     );
-  for (const [id, required] of Object.entries(PREFLIGHT_LANE_COMMANDS)) {
-    const step = laneSteps.find((candidate) => candidate.id === id);
-    for (const text of required) {
-      if (!step?.run?.includes(text))
-        findings.push(finding('CI_PREFLIGHT_GATE_INVALID', file, `${id} must run ${text}`));
-    }
-  }
+  const gateSteps = (Array.isArray(gate.steps) ? gate.steps : []).map(object);
+  const gateRuns = gateSteps.filter((step) => typeof step.run === 'string');
+  if (
+    gateRuns.length !== 1 ||
+    gateRuns[0]?.id !== PREFLIGHT_AGGREGATOR_STEP_ID ||
+    gateRuns[0]?.if !== undefined ||
+    gateRuns[0]?.['continue-on-error'] !== undefined ||
+    PREFLIGHT_AGGREGATOR_COMMANDS.some((text) => !gateRuns[0]?.run?.includes(text)) ||
+    // No check node runs here: no package script, no DEVAI CLI, no check invocation.
+    /\bpnpm\b|\bnpx\b|bin\.js|\bcheck\s+--/u.test(String(gateRuns[0]?.run ?? ''))
+  )
+    findings.push(
+      finding(
+        'CI_PREFLIGHT_GATE_INVALID',
+        file,
+        `jobs.${PREFLIGHT_AGGREGATOR_JOB} must run only ${PREFLIGHT_AGGREGATOR_COMMANDS.join(' ')}`,
+      ),
+    );
+  const downloads = gateSteps.filter(
+    (step) => typeof step.uses === 'string' && step.uses.startsWith('actions/download-artifact@'),
+  );
+  if (downloads.length !== 1 || object(downloads[0]?.with).pattern !== PREFLIGHT_REPORT_PATTERN)
+    findings.push(
+      finding(
+        'CI_PREFLIGHT_GATE_INVALID',
+        file,
+        `jobs.${PREFLIGHT_AGGREGATOR_JOB} must download the ${PREFLIGHT_REPORT_PATTERN} reports`,
+      ),
+    );
   for (const [name, rawJob] of Object.entries(jobs)) {
     const job = object(rawJob);
     if (
       job.permissions !== undefined &&
-      JSON.stringify(job.permissions) !== JSON.stringify({ contents: 'read' })
+      JSON.stringify(job.permissions) !== JSON.stringify({ contents: 'read' }) &&
+      !(
+        name === PREFLIGHT_AGGREGATOR_JOB &&
+        JSON.stringify(job.permissions) === JSON.stringify(PREFLIGHT_AGGREGATOR_PERMISSIONS)
+      )
     )
       findings.push(finding('CI_WORKFLOW_PERMISSIONS_INVALID', file, name));
     if (job.environment !== undefined) {
@@ -1158,12 +1279,24 @@ function checkPreflightWorkflow(file, workflow, source, findings, pins) {
       ) {
         findings.push(finding('CI_ACTION_PIN_MISMATCH', file, `${location} uses ${uses}`));
       }
-      if (uses.startsWith('actions/upload-artifact@')) {
+      if (
+        uses.startsWith('actions/upload-artifact@') &&
+        object(step.with).name !== PREFLIGHT_PARTITION_JOBS[name]?.artifact
+      ) {
         findings.push(
           finding(
             'CI_PREFLIGHT_ARTIFACT_FORBIDDEN',
             file,
-            `${location} uploads an artifact; a preflight run leaves nothing behind`,
+            `${location} uploads an artifact; a preflight run leaves only its partition reports behind`,
+          ),
+        );
+      }
+      if (uses.startsWith('actions/download-artifact@') && name !== PREFLIGHT_AGGREGATOR_JOB) {
+        findings.push(
+          finding(
+            'CI_PREFLIGHT_ARTIFACT_FORBIDDEN',
+            file,
+            `${location} downloads an artifact; only the aggregator reads the partition reports`,
           ),
         );
       }
