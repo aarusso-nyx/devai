@@ -893,3 +893,188 @@ describe('workflow checker pins the three gate jobs (ADR-CHK-0007 IA-011)', () =
     expect(preflightFindings(root)).not.toEqual([]);
   });
 });
+
+// ADR-CHK-0007 rule 11 (#355 review): the aggregator decides the required check, so its run
+// block is the exact canonical command and nothing may swallow its exit status, and neither
+// partition job nor the aggregator may continue on error.
+describe('workflow checker refuses a softened gate (ADR-CHK-0007 IA-011)', () => {
+  type Document = ReturnType<typeof parseDocument>;
+
+  const stepIndex = (job: string, id: string): number => {
+    const index = (RAW_JOBS[job]?.steps ?? []).findIndex((step) => step.id === id);
+    if (index < 0) throw new Error(`fixture: no step ${id} in ${job}`);
+    return index;
+  };
+  const affectedIndex = (job: string): number => {
+    const index = (RAW_JOBS[job]?.steps ?? []).findIndex(
+      (step) => [...(step.run ?? '').matchAll(AFFECTED_CHECK)].length > 0,
+    );
+    if (index < 0) throw new Error(`fixture: no affected step in ${job}`);
+    return index;
+  };
+  const aggregatorJob = (): string => {
+    if (AGGREGATOR_KEY === undefined) throw new Error('no aggregator job');
+    return AGGREGATOR_KEY;
+  };
+
+  /** Rewrites the aggregate step's run block through the document, keeping all other bytes. */
+  function editAggregateRun(document: Document, edit: (run: string) => string): void {
+    const path = ['jobs', aggregatorJob(), 'steps', stepIndex(aggregatorJob(), 'aggregate'), 'run'];
+    const run = String(document.getIn(path));
+    const next = edit(run);
+    expect(next, 'the mutation changed the run block').not.toBe(run);
+    document.setIn(path, next);
+  }
+
+  it('accepts the committed tree after a no-op document round trip', () => {
+    const root = workflowTree();
+    mutateWorkflow(root, () => undefined);
+    expect(checkWorkflowTree(root).findings).toEqual([]);
+  });
+
+  it('accepts the same aggregate command split across backslash continuations', () => {
+    const root = workflowTree();
+    mutateWorkflow(root, (document) => {
+      editAggregateRun(document, (run) =>
+        run
+          .replace(/ --exclude-report /u, ' \\\n  --exclude-report ')
+          .replace(/ --include-result /u, ' \\\n  --include-result '),
+      );
+    });
+    expect(checkWorkflowTree(root).findings).toEqual([]);
+  });
+
+  it.each([
+    [
+      'the aggregate command gains || true',
+      (document: Document) => {
+        editAggregateRun(document, (run) => `${run.trimEnd()} || true\n`);
+      },
+    ],
+    [
+      'the aggregate command gains ; true',
+      (document: Document) => {
+        editAggregateRun(document, (run) => `${run.trimEnd()}; true\n`);
+      },
+    ],
+    [
+      'the aggregate command runs in the background with &',
+      (document: Document) => {
+        editAggregateRun(document, (run) => `${run.trimEnd()} &\n`);
+      },
+    ],
+    [
+      'the aggregate run block starts with set +e',
+      (document: Document) => {
+        editAggregateRun(document, (run) => `set +e\n${run}`);
+      },
+    ],
+    [
+      'the aggregate run block replaces errexit with set +e',
+      (document: Document) => {
+        editAggregateRun(document, (run) => run.replace('set -euo pipefail', 'set +e'));
+      },
+    ],
+    [
+      'the aggregate run block drops set -euo pipefail',
+      (document: Document) => {
+        editAggregateRun(document, (run) => run.replace(/^set -euo pipefail\n/mu, ''));
+      },
+    ],
+    [
+      'the aggregate step is not a bash step',
+      (document: Document) => {
+        document.deleteIn([
+          'jobs',
+          aggregatorJob(),
+          'steps',
+          stepIndex(aggregatorJob(), 'aggregate'),
+          'shell',
+        ]);
+      },
+    ],
+    [
+      'the gate-rest job declares continue-on-error: false',
+      (document: Document) => {
+        document.setIn(['jobs', 'gate-rest', 'continue-on-error'], false);
+      },
+    ],
+    [
+      'the aggregate step declares continue-on-error: false',
+      (document: Document) => {
+        document.setIn(
+          [
+            'jobs',
+            aggregatorJob(),
+            'steps',
+            stepIndex(aggregatorJob(), 'aggregate'),
+            'continue-on-error',
+          ],
+          false,
+        );
+      },
+    ],
+    [
+      'the aggregate command is followed by another command',
+      (document: Document) => {
+        editAggregateRun(document, (run) => `${run.trimEnd()}\necho aggregated\n`);
+      },
+    ],
+    [
+      'the aggregate step continues on error',
+      (document: Document) => {
+        document.setIn(
+          [
+            'jobs',
+            aggregatorJob(),
+            'steps',
+            stepIndex(aggregatorJob(), 'aggregate'),
+            'continue-on-error',
+          ],
+          true,
+        );
+      },
+    ],
+    [
+      'the aggregator job continues on error',
+      (document: Document) => {
+        document.setIn(['jobs', aggregatorJob(), 'continue-on-error'], true);
+      },
+    ],
+    [
+      'the gate-cli job continues on error',
+      (document: Document) => {
+        document.setIn(['jobs', 'gate-cli', 'continue-on-error'], true);
+      },
+    ],
+    [
+      'the gate-rest job continues on error',
+      (document: Document) => {
+        document.setIn(['jobs', 'gate-rest', 'continue-on-error'], true);
+      },
+    ],
+    [
+      'the gate-cli affected step continues on error',
+      (document: Document) => {
+        document.setIn(
+          ['jobs', 'gate-cli', 'steps', affectedIndex('gate-cli'), 'continue-on-error'],
+          true,
+        );
+      },
+    ],
+    [
+      'the gate-rest affected step continues on error',
+      (document: Document) => {
+        document.setIn(
+          ['jobs', 'gate-rest', 'steps', affectedIndex('gate-rest'), 'continue-on-error'],
+          true,
+        );
+      },
+    ],
+  ])('fails when %s', (_label, mutate) => {
+    const root = workflowTree();
+    mutateWorkflow(root, mutate);
+    expect(checkWorkflowTree(root).ok).toBe(false);
+    expect(preflightFindings(root)).not.toEqual([]);
+  });
+});
