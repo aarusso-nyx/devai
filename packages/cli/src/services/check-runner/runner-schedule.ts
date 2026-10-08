@@ -1,6 +1,5 @@
-import { existsSync, readFileSync } from 'node:fs';
 import { availableParallelism } from 'node:os';
-import { join } from 'node:path';
+import { readExactGitTreeSync, type ReadOnlyGitTreeEntry } from '@devai-nyx/authority';
 import { getValidator } from '@devai-nyx/schemas';
 import type { PlannedTask, TaskDescriptorNode, TaskExclusivity, TaskTarget } from './types.js';
 
@@ -141,16 +140,36 @@ export function parseTaskExclusivity(
   return declared;
 }
 
-/** Read the committed exclusivity file; without it, every node is undeclared. */
+/** Read the exclusivity file tracked at the planned commit; without one, every node is undeclared. */
 export function readTaskExclusivity(
   repoRoot: string,
+  candidate: Readonly<{ commit: string; tree: string }>,
   nodeIds: ReadonlySet<string>,
 ): ReadonlyMap<string, TaskExclusivity> {
-  const path = join(repoRoot, TASK_EXCLUSIVITY_PATH);
-  if (!existsSync(path)) return new Map();
+  // Only the tracked bytes at the planned commit are authority: an untracked, ignored, or
+  // locally edited working-tree file is never read, and an untracked one counts as absent.
+  let projected: readonly ReadOnlyGitTreeEntry[];
+  try {
+    projected = readExactGitTreeSync(
+      repoRoot,
+      candidate.commit,
+      candidate.tree,
+      TASK_EXCLUSIVITY_PATH,
+    );
+  } catch (error) {
+    // The path is not tracked at the planned commit: the file is absent.
+    if (error instanceof Error && error.message === 'GIT_TREE_PROJECTION_EMPTY') return new Map();
+    throw error;
+  }
+  const entries = projected.filter((entry) => entry.path === TASK_EXCLUSIVITY_PATH);
+  const entry = entries[0];
+  if (entry === undefined) return new Map();
+  if (entries.length !== 1 || entry.mode === '120000') {
+    throw new Error(`CHECK_RUNNER_EXCLUSIVITY: ${TASK_EXCLUSIVITY_PATH} must be a regular file`);
+  }
   let document: unknown;
   try {
-    document = JSON.parse(readFileSync(path, 'utf8')) as unknown;
+    document = JSON.parse(entry.bytes.toString('utf8')) as unknown;
   } catch {
     throw new Error(`CHECK_RUNNER_EXCLUSIVITY: ${TASK_EXCLUSIVITY_PATH} is not valid JSON`);
   }
