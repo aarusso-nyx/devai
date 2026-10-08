@@ -645,7 +645,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "ready",
+              "status": "merged",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -679,12 +679,12 @@
                   "json"
                 ]
               ],
-              "commit_types": ["law(targets)", "docs(theory)"],
+              "commit_types": ["law(targets)", "docs(theory)", "docs(sensors)"],
               "prompt": {
                 "path": "prompts/TASK-07113.md"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/356",
+              "merged_as": "817e9e2b0aa2035c00bc67fd6b1fbac4e18b7f27",
               "execution": {
                 "tier": "architect",
                 "effort": "medium",
@@ -697,7 +697,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-07113",
-              "status": "ready",
+              "status": "merged",
               "target_substrates": ["F5"],
               "boundary": {
                 "paths": ["packages/sensors/tests/"],
@@ -712,8 +712,8 @@
               "prompt": {
                 "path": "prompts/TASK-07114.md"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/356",
+              "merged_as": "817e9e2b0aa2035c00bc67fd6b1fbac4e18b7f27",
               "execution": {
                 "tier": "worker",
                 "effort": "low",
@@ -726,7 +726,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-07114",
-              "status": "ready",
+              "status": "merged",
               "target_substrates": ["F2", "F5"],
               "boundary": {
                 "paths": ["packages/sensors/src/harness-performance.ts"],
@@ -739,12 +739,12 @@
                 ["pnpm", "run", "typecheck"],
                 ["pnpm", "run", "test:sensors"]
               ],
-              "commit_types": ["feat(sensors)"],
+              "commit_types": ["feat(sensors)", "fix(sensors)"],
               "prompt": {
                 "path": "prompts/TASK-07115.md"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/356",
+              "merged_as": "817e9e2b0aa2035c00bc67fd6b1fbac4e18b7f27",
               "execution": {
                 "tier": "worker",
                 "effort": "low",
@@ -759,7 +759,7 @@
       "id": "R-0702",
       "title": "Remove avoidable gate failures (F5:T9)",
       "goal": "Fewer runs fail for avoidable reasons, inside the current F5:T9 definition (D4): main-moved base-up-to-date blocks are removed only if both of these land: the auto-update branch setting with the rebase update method (T1, Owner effect OE-02), and a rebase-update trigger that rebases every open pull request when main moves, so the superseded gate run is cancelled rather than failed (T1b, TASK-0726). Real defects are caught before push by a pre-push preflight that is mandatory for agents and opt-in for humans (T2, D3), the bootstrap cache counts a hit only when every compiled file is present and otherwise rebuilds (T3, hardening after #247, already closed), and the doctor-check-result-identities flake candidate is resolved (T4). Accepted when the post-change window of decisions.md, which opens only after TASK-0726 merges and OE-02 is performed, shows no main-moved failures, real-defect failures roughly halved against 33 in 355 baseline runs, and harness_green_main at or above 95%.",
-      "status": "planned",
+      "status": "open",
       "records": ["ADR-CHK-0004", "ADR-CHK-0001", "ADR-GOV-0018"],
       "depends_on": [],
       "attestation_reissue": false,
@@ -785,7 +785,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "ready",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -848,7 +848,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "ready",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": ["AGENTS.md", "docs/dev/operations/remote-preflight-contract.md"],
@@ -988,7 +988,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "ready",
               "target_substrates": ["F5"],
               "boundary": {
                 "paths": [
@@ -1032,7 +1032,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": null,
-              "status": "planned",
+              "status": "ready",
               "target_substrates": ["F5"],
               "boundary": {
                 "paths": ["packages/cli/tests/unit/doctor-check-result-identities.test.ts"],
