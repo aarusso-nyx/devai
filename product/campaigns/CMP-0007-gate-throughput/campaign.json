@@ -758,7 +758,7 @@
     {
       "id": "R-0702",
       "title": "Remove avoidable gate failures (F5:T9)",
-      "goal": "Fewer runs fail for avoidable reasons, inside the current F5:T9 definition (D4): main-moved base-up-to-date blocks are removed only if both of these land: the auto-update branch setting with the rebase update method (T1, Owner effect OE-02), and a rebase-update trigger that rebases every open pull request when main moves, so the superseded gate run is cancelled rather than failed (T1b, TASK-0726). Real defects are caught before push by a pre-push preflight that is mandatory for agents and opt-in for humans (T2, D3), the bootstrap cache is never restored without dist (T3, #247), and the doctor-check-result-identities flake candidate is resolved (T4). Accepted when the post-change window of decisions.md, which opens only after TASK-0726 merges and OE-02 is performed, shows no main-moved failures, real-defect failures roughly halved against 33 in 355 baseline runs, and harness_green_main at or above 95%.",
+      "goal": "Fewer runs fail for avoidable reasons, inside the current F5:T9 definition (D4): main-moved base-up-to-date blocks are removed only if both of these land: the auto-update branch setting with the rebase update method (T1, Owner effect OE-02), and a rebase-update trigger that rebases every open pull request when main moves, so the superseded gate run is cancelled rather than failed (T1b, TASK-0726). Real defects are caught before push by a pre-push preflight that is mandatory for agents and opt-in for humans (T2, D3), the bootstrap cache counts a hit only when every compiled file is present and otherwise rebuilds (T3, hardening after #247, already closed), and the doctor-check-result-identities flake candidate is resolved (T4). Accepted when the post-change window of decisions.md, which opens only after TASK-0726 merges and OE-02 is performed, shows no main-moved failures, real-defect failures roughly halved against 33 in 355 baseline runs, and harness_green_main at or above 95%.",
       "status": "planned",
       "records": ["ADR-CHK-0004", "ADR-CHK-0001", "ADR-GOV-0018"],
       "depends_on": [],
@@ -971,19 +971,20 @@
         },
         {
           "id": "CTG-0724",
-          "title": "Bootstrap cache restored without dist (#247)",
+          "title": "Bootstrap cache hit only with every compiled file (hardening after #247)",
           "type": "single-role",
           "records": ["ADR-CHK-0001"],
           "depends_on": [],
           "lock_scopes": [
             ".github/workflows/pull-request-checks.yml",
-            "scripts/check-workflows.mjs"
+            "scripts/check-workflows.mjs",
+            "packages/sensors/src/harness/reviewed-workflow-steps.ts"
           ],
           "gates": ["test:cli"],
           "tasks": [
             {
               "id": "TASK-0724",
-              "title": "Never restore the pr-bootstrap cache without its compiled dist (#247)",
+              "title": "Count a pr-bootstrap cache hit only when every compiled file is present (hardening after #247)",
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": null,
@@ -992,12 +993,14 @@
               "boundary": {
                 "paths": [
                   ".github/workflows/pull-request-checks.yml",
-                  "scripts/check-workflows.mjs"
+                  "scripts/check-workflows.mjs",
+                  "packages/sensors/src/harness/reviewed-workflow-steps.ts"
                 ],
-                "forbidden": ["law/", "packages/"]
+                "forbidden": ["law/", "packages/cli/", "packages/sensors/tests/"]
               },
               "deliverables": [
-                "A pr-bootstrap cache hit whose restored tree lacks the compiled dist of any workspace package is treated as a miss and rebuilt, so the gate never dies at bootstrap with ERR_MODULE_NOT_FOUND; scripts/check-workflows.mjs pins the guard; issue #247 is closed by the merging pull request."
+                "Issue #247 was already closed on 2026-10-03, so this is a hardening task. A pr-bootstrap cache hit counts as a hit only when every compiled file is present; otherwise the step rebuilds, so the gate never dies at bootstrap with ERR_MODULE_NOT_FOUND. scripts/check-workflows.mjs pins the guard.",
+                "packages/sensors/src/harness/reviewed-workflow-steps.ts re-reviews the digest of the changed compile step (coordinator ruling of 2026-10-08)."
               ],
               "acceptance_commands": [["node", "scripts/check-workflows.mjs"]],
               "commit_types": ["ci(workflows)", "ci(scripts)"],
