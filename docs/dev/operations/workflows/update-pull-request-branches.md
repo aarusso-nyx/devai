@@ -53,7 +53,10 @@ override. The job's only write credential is the App installation token it mints
 | `update-branches` | `DEVAI_UPDATE_BRANCH_APP_ID`, `DEVAI_UPDATE_BRANCH_APP_PRIVATE_KEY` (presence probe, then the token action only) | none      | the App installation token, with Contents and Pull requests write; `GITHUB_TOKEN` is never read |
 
 Both secrets are declared in `law/policy/credential-requirements.json` with absence
-`degrade`. The Owner provisions them as OE-02 of CMP-0007.
+`degrade`. The Owner provisions them as OE-02 of CMP-0007. They were provisioned on
+2026-10-08: the App `devai-update-branch` (App ID 5243994) is private to
+`aarusso-nyx`, installed on this repository only, with Contents and Pull requests write and
+Metadata read, and no webhook.
 
 ## What each job runs
 
