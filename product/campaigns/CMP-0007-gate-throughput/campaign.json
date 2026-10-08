@@ -49,7 +49,7 @@
     {
       "id": "R-0701",
       "title": "Gate speed (F5:T7)",
-      "goal": "The pull-request gate median falls below 600 s without dropping any planned node. The check runner executes independent plan nodes on a bounded worker pool under ADR-CHK-0007, with scheduling declarations in test-task-exclusivity.json and never in test-tasks.json so the package-owned verifier and release export are unaffected (T1). Because test:cli is CPU-bound and the parallel runner alone measured a best of about 617 s, decision D1 triggers the job split of ADR-CHK-0007 rule 11: test:cli runs in its own partition job, every other affected node in a second, and an aggregator keeps the single required check devai-release-gate (T2). The check-result cache persists across CI runs keyed by task input digest with the protected-namespace recapture rule kept (T3). Every task is single-role: Architect writes law and docs, Inspector tests, Engineer code. Accepted when harness_performance over the post-change window of decisions.md reads a median below 600 s and every window run accounted for its whole plan.",
+      "goal": "The pull-request gate median falls below 600 s without dropping any planned node. The check runner executes independent plan nodes on a bounded worker pool under ADR-CHK-0007, with scheduling declarations in test-task-exclusivity.json and never in test-tasks.json so the package-owned verifier and release export are unaffected (T1). The job split of ADR-CHK-0007 rule 11 is planned and conditional (T2, CTG-0713): it proceeds only if the harness_performance median over the window after the parallel runner merges is still at or above 600 s, as decision D1 requires; then test:cli runs in its own partition job, every other affected node in a second, and an aggregator keeps the single required check devai-release-gate. The parallel runner's best case of about 617 s on the 4-vCPU runner (test:cli is CPU-bound) is the evidence that motivates preparing the split, not its trigger. The check-result cache persists across CI runs keyed by task input digest with the protected-namespace recapture rule kept (T3). Every task is single-role: Architect writes law and docs, Inspector tests, Engineer code. Accepted when harness_performance over the post-change window of decisions.md reads a median below 600 s and every window run accounted for its whole plan, with partitioned-out entries counted and ownership assessed across the report pair when the gate is partitioned (decisions.md).",
       "status": "open",
       "records": ["ADR-CHK-0007", "ADR-CHK-0006", "ADR-CHK-0004", "ADR-CHK-0001"],
       "depends_on": [],
@@ -69,6 +69,8 @@
             "law/policy/adr-validation.json",
             "law/schemas/test-task-exclusivity.schema.json",
             "law/schemas/test-task-descriptor.schema.json",
+            "law/policy/adopter-defaults/change-taxonomy-binding.json",
+            ".devai/config/change-taxonomy-binding.json",
             "packages/schemas/tests/contract/",
             "packages/cli/tests/unit/check-schemas-adopter-boundaries.test.ts",
             "packages/schemas/src/roster.ts"
@@ -89,13 +91,16 @@
                   "law/adr/README.md",
                   "law/policy/adr-validation.json",
                   "law/schemas/test-task-exclusivity.schema.json",
-                  "law/schemas/test-task-descriptor.schema.json"
+                  "law/schemas/test-task-descriptor.schema.json",
+                  "law/policy/adopter-defaults/change-taxonomy-binding.json",
+                  ".devai/config/change-taxonomy-binding.json"
                 ],
                 "forbidden": ["packages/", "tests/", "test-tasks.json"]
               },
               "deliverables": [
                 "ADR-CHK-0007 states the separate exclusivity file (rule 5), the worker count as a non-input and the file as an ordinary tracked input (rule 10), and the partitioned gate (rule 11); the catalogue is regenerated and re-pinned.",
-                "law/schemas/test-task-exclusivity.schema.json is closed at every level with keys matching ^[a-z0-9][a-z0-9._-]*$, and law/schemas/test-task-descriptor.schema.json is closed at the top level and on each task; every committed descriptor still validates."
+                "law/schemas/test-task-exclusivity.schema.json is closed at every level with keys matching ^[a-z0-9][a-z0-9._-]*$, and law/schemas/test-task-descriptor.schema.json is closed at the top level and on each task; every committed descriptor still validates.",
+                "test-task-exclusivity.json is bound to the ci change class in law/policy/adopter-defaults/change-taxonomy-binding.json and .devai/config/change-taxonomy-binding.json (delivered in #353 as law(taxonomy)). The second file is adopter-owned under packages/cli/src/services/interactive-config.ts and no init action writes it, so it was edited by hand; that tension with Article 6 write authority is a known gap, recorded in decisions.md and not resolved here."
               ],
               "acceptance_commands": [
                 [
@@ -108,7 +113,7 @@
                   "json"
                 ]
               ],
-              "commit_types": ["law(adr)", "spec(schemas)"],
+              "commit_types": ["law(adr)", "spec(schemas)", "law(taxonomy)"],
               "prompt": {
                 "path": "prompts/TASK-0711.md"
               },
@@ -165,7 +170,8 @@
                 "forbidden": ["law/", "tests/", "packages/schemas/tests/"]
               },
               "deliverables": [
-                "packages/schemas/src/roster.ts lists test-task-exclusivity.schema.json so the check runner validates the file through getValidator."
+                "packages/schemas/src/roster.ts lists test-task-exclusivity.schema.json so the check runner validates the file through getValidator.",
+                "Delivery record: #353 delivered this triplet in one pull request with commit order Architect, Engineer, Inspector, so this roster commit landed before the TASK-0712 tests. upstream_task_id keeps the Article 24 plan order Architect, Inspector, Engineer, which every later triplet follows (decisions.md, Delivery record)."
               ],
               "acceptance_commands": [
                 ["pnpm", "run", "typecheck"],
@@ -316,7 +322,7 @@
         },
         {
           "id": "CTG-0713",
-          "title": "Partition the gate across a test:cli job and a rest job (D1 triggered)",
+          "title": "Partition the gate across a test:cli job and a rest job (conditional on D1's median test)",
           "type": "coupled-triplet",
           "records": ["ADR-CHK-0007", "ADR-CHK-0004"],
           "depends_on": ["CTG-0712"],
@@ -555,7 +561,7 @@
           "title": "Persist the check-result cache across CI runs",
           "type": "single-role",
           "records": ["ADR-CHK-0001"],
-          "depends_on": ["CTG-0713"],
+          "depends_on": ["CTG-0713", "CTG-0714"],
           "lock_scopes": [
             ".github/workflows/pull-request-checks.yml",
             "scripts/check-workflows.mjs",
