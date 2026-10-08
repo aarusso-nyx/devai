@@ -214,8 +214,10 @@ on the `base-up-to-date` probe. ADR-CHK-0008 keeps pull requests current instead
 - **Unchanged.** Strict up-to-date protection, the three gate jobs, and the single
   required check `devai-release-gate` stay as they are.
 - **Committer identity.** A rebase update replays the pull request's commits, so their
-  committer becomes the update identity; authorship is unchanged. A role session that
-  needs committer equal to author replays its own commits after an update.
+  committer becomes the update App while authorship is unchanged. The author carries the
+  role. The committer must be the same role, the human merger of a rebase merge, or the
+  update App of a rebase update; any other committer inside a role-scoped pull request is
+  a provenance defect. Nobody replays commits after an update (ADR-CHK-0008).
 
 **Owner effect OE-02 (CMP-0007).** No task performs it. The Owner:
 
