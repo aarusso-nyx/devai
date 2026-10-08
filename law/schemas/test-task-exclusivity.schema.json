@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/test-task-exclusivity.schema.json",
+  "title": "Test task exclusivity declarations",
+  "description": "Shared-state declarations the check runner reads to schedule plan nodes in parallel (ADR-CHK-0007). The file is `test-task-exclusivity.json` beside `test-tasks.json`, separate from the descriptor so that the descriptor bytes, the descriptor digest, the task-policy digest, and the package-owned evidence verifier stay unchanged (ADR-CHK-0006). `exclusive` names state a node mutates; `shared` names state it only reads. Two declared nodes conflict when either holds exclusively a key the other holds in either list. A descriptor node with no entry here conflicts with every node; an absent file declares no node, so every plan runs one node at a time. An entry naming a node the descriptor does not declare is refused. The file is never an input of a task key, a digest, or a receipt.",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "nodes"],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "nodes": {
+      "type": "object",
+      "description": "Declarations keyed by descriptor nodeId. An empty declaration `{}` holds no key and conflicts only through the implicit rules of ADR-CHK-0007.",
+      "propertyNames": {
+        "type": "string",
+        "minLength": 1
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/declaration"
+      }
+    }
+  },
+  "$defs": {
+    "key": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]*$",
+      "description": "A shared-state key, for example sources, dist, or db."
+    },
+    "declaration": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "exclusive": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/key"
+          },
+          "description": "State this node mutates. No node that holds any of these keys, in either list, runs at the same time."
+        },
+        "shared": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/key"
+          },
+          "description": "State this node only reads. It may overlap another node that shares the same key, never one that holds it exclusively."
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "nodes": {
+        "generate": { "exclusive": ["sources"] },
+        "build": { "exclusive": ["dist"], "shared": ["sources"] },
+        "test:cli": { "shared": ["sources", "dist"] },
+        "release:affected-anchor": {}
+      }
+    }
+  ]
+}

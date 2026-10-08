@@ -2,8 +2,9 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://devai.dev/schemas/test-task-descriptor.schema.json",
   "title": "Adopter test task descriptor",
-  "description": "Adopter-owned test task DAG. Every node names a runner; a node under any runner except `preflight-v1` declares an `argv` contract, while a `preflight-v1` node declares a `probes` array of preflight probe objects (preflight-probe.schema.json, ADR-CHK-0001) and carries no argv. A task outcome is one of five values: PASS, FAIL, SKIPPED, CACHED, and BLOCKED. BLOCKED is the outcome of a preflight node whose extrinsic probe did not pass; its dependents are marked blocked-environment and not executed, and no BLOCKED result is ever written as a reusable cache entry. An intrinsic probe mismatch is FAIL, as for any other node.",
+  "description": "Adopter-owned test task DAG. Every node names a runner; a node under any runner except `preflight-v1` declares an `argv` contract, while a `preflight-v1` node declares a `probes` array of preflight probe objects (preflight-probe.schema.json, ADR-CHK-0001) and carries no argv. A task outcome is one of five values: PASS, FAIL, SKIPPED, CACHED, and BLOCKED. BLOCKED is the outcome of a preflight node whose extrinsic probe did not pass; its dependents are marked blocked-environment and not executed, and no BLOCKED result is ever written as a reusable cache entry. An intrinsic probe mismatch is FAIL, as for any other node. The descriptor and each task are closed objects: an unknown or misspelled property is refused. Scheduling declarations for parallel execution live in the separate test-task-exclusivity.json (test-task-exclusivity.schema.json, ADR-CHK-0007), never here, so the package-owned evidence verifier keeps reading the descriptor unchanged (ADR-CHK-0006).",
   "type": "object",
+  "additionalProperties": false,
   "required": [
     "schemaVersion",
     "descriptorVersion",
@@ -44,6 +45,7 @@
       "minItems": 1,
       "items": {
         "type": "object",
+        "additionalProperties": false,
         "required": [
           "nodeId",
           "dependencies",
