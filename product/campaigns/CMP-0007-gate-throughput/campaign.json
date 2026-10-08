@@ -19,7 +19,8 @@
     "ADR-GOV-0018",
     "ADR-SCR-0010",
     "ADR-SCR-0004",
-    "ADR-CHK-0008"
+    "ADR-CHK-0008",
+    "ADR-SEC-0001"
   ],
   "constraints": {
     "self_dogfood": true,
@@ -761,7 +762,7 @@
       "title": "Remove avoidable gate failures (F5:T9)",
       "goal": "Fewer runs fail for avoidable reasons, inside the current F5:T9 definition (D4): main-moved base-up-to-date blocks are removed only if both of these land: the auto-update branch setting with the rebase update method (T1, Owner effect OE-02), and a rebase-update trigger that rebases every open pull request when main moves, so the superseded gate run is cancelled rather than failed (T1b, TASK-0726). Real defects are caught before push by a pre-push preflight that is mandatory for agents and opt-in for humans (T2, D3), the bootstrap cache counts a hit only when every compiled file is present and otherwise rebuilds (T3, hardening after #247, already closed), and the doctor-check-result-identities flake candidate is resolved (T4). Accepted when the post-change window of decisions.md, which opens only after TASK-0726 merges and OE-02 is performed, shows no main-moved failures, real-defect failures roughly halved against 33 in 355 baseline runs, and harness_green_main at or above 95%.",
       "status": "open",
-      "records": ["ADR-CHK-0004", "ADR-CHK-0001", "ADR-GOV-0018", "ADR-CHK-0008"],
+      "records": ["ADR-CHK-0004", "ADR-CHK-0001", "ADR-GOV-0018", "ADR-CHK-0008", "ADR-SEC-0001"],
       "depends_on": [],
       "attestation_reissue": false,
       "owner_effects_required": ["OE-02", "OE-03"],
@@ -902,7 +903,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": null,
-              "status": "ready",
+              "status": "merged",
               "target_substrates": ["F5"],
               "boundary": {
                 "paths": [
@@ -921,8 +922,8 @@
               "prompt": {
                 "path": "prompts/TASK-0723.md"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/361",
+              "merged_as": "3ac66e1b776c53a187924239dc784c1c7b57d523",
               "execution": {
                 "tier": "worker",
                 "effort": "medium",
@@ -946,7 +947,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": null,
-              "status": "ready",
+              "status": "merged",
               "target_substrates": ["F5"],
               "boundary": {
                 "paths": ["tests/integration/"],
@@ -960,8 +961,8 @@
               "prompt": {
                 "path": "prompts/TASK-0727.md"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/361",
+              "merged_as": "3ac66e1b776c53a187924239dc784c1c7b57d523",
               "execution": {
                 "tier": "worker",
                 "effort": "medium",
@@ -1082,7 +1083,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": null,
-              "status": "ready",
+              "status": "merged",
               "target_substrates": ["F5"],
               "boundary": {
                 "paths": ["tests/contract/"],
@@ -1097,8 +1098,8 @@
               "prompt": {
                 "path": "prompts/TASK-0729.md"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/362",
+              "merged_as": "595c050ede1c448c45e18a4f37d3633e45721d3e",
               "execution": {
                 "tier": "worker",
                 "effort": "medium",
@@ -1122,7 +1123,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": null,
-              "status": "ready",
+              "status": "merged",
               "target_substrates": ["F2", "F5"],
               "boundary": {
                 "paths": ["scripts/check-commit-range.mjs"],
@@ -1138,8 +1139,8 @@
               "prompt": {
                 "path": "prompts/TASK-0728.md"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/362",
+              "merged_as": "595c050ede1c448c45e18a4f37d3633e45721d3e",
               "execution": {
                 "tier": "worker",
                 "effort": "medium",
@@ -1150,40 +1151,147 @@
         },
         {
           "id": "CTG-0726",
-          "title": "Rebase-update trigger for open pull requests when main moves",
-          "type": "single-role",
-          "records": ["ADR-CHK-0004", "ADR-CHK-0008"],
+          "title": "Rebase-update trigger for open pull requests when main moves, with the repository-write effect class",
+          "type": "coupled-triplet",
+          "records": ["ADR-CHK-0004", "ADR-CHK-0008", "ADR-SEC-0001"],
           "depends_on": ["CTG-0721", "CTG-0724", "CTG-0728"],
           "lock_scopes": [
             ".github/workflows/update-pull-request-branches.yml",
             ".github/workflows/pull-request-checks.yml",
-            "scripts/check-workflows.mjs"
+            "scripts/check-workflows.mjs",
+            "law/adr/ADR-CHK-0008-rebase-update-branch.md",
+            "law/adr/README.md",
+            "law/policy/adr-validation.json",
+            "law/policy/credential-requirements.json",
+            ".devai/config/credential-requirements-binding.json",
+            "docs/dev/operations/workflows/update-pull-request-branches.md",
+            "tests/contract/",
+            "packages/sensors/tests/",
+            "packages/schemas/tests/contract/",
+            ".devai/config/toolchain.json",
+            "packages/sensors/src/harness/"
           ],
-          "gates": ["test:cli"],
+          "gates": ["test:cli", "test:sensors"],
           "tasks": [
+            {
+              "id": "TASK-07210",
+              "title": "Define the repository-write effect class, the update credential, and the update workflow page",
+              "discipline": "architect",
+              "coupled_pipeline_position": "architect",
+              "upstream_task_id": null,
+              "status": "ready",
+              "target_substrates": ["F1", "F5"],
+              "boundary": {
+                "paths": [
+                  "law/adr/ADR-CHK-0008-rebase-update-branch.md",
+                  "law/adr/README.md",
+                  "law/policy/adr-validation.json",
+                  "law/policy/credential-requirements.json",
+                  ".devai/config/credential-requirements-binding.json",
+                  "docs/dev/operations/workflows/update-pull-request-branches.md"
+                ],
+                "forbidden": ["packages/", "tests/", "scripts/", ".github/"]
+              },
+              "deliverables": [
+                "ADR-CHK-0008 defines the harness effect class repository-write: a step that writes repository refs or branches through the API and is not a release publication. It classifies the rebase-update step as repository-write (coordinator ruling of 2026-10-08: the rebase-update step is repository-write, not publication), and states that the update workflow uses a superseding concurrency group, so a newer push to main cancels an update run in progress. The ADR index is regenerated and law/policy/adr-validation.json is re-pinned.",
+                "law/policy/credential-requirements.json declares the update-branch GitHub App credential the update workflow consumes. .devai/config/credential-requirements-binding.json binds it for this repository, as an Architect-owned adopter binding under the ADR-CHK-0008 path table. No credential value is committed.",
+                "docs/dev/operations/workflows/update-pull-request-branches.md describes the update workflow: its trigger, the rebase update method, the expected-head guard, the App credential, the least permissions, the repository-write effect class, and the superseding concurrency."
+              ],
+              "acceptance_commands": [
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "adrs",
+                  "--format",
+                  "json"
+                ],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "docs-links",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": ["law(adr)", "law(policy)", "law(credentials)", "docs(operations)"],
+              "prompt": {
+                "path": "prompts/TASK-07210.md"
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "architect",
+                "effort": "high",
+                "time_budget_minutes": 60
+              }
+            },
+            {
+              "id": "TASK-07211",
+              "title": "Test the update workflow checker, the reviewed-step registry, and the repository-write effect class",
+              "discipline": "inspector",
+              "coupled_pipeline_position": "inspector",
+              "upstream_task_id": "TASK-07210",
+              "status": "ready",
+              "target_substrates": ["F5"],
+              "boundary": {
+                "paths": [
+                  "tests/contract/",
+                  "packages/sensors/tests/",
+                  "packages/schemas/tests/contract/"
+                ],
+                "forbidden": ["packages/sensors/src/", "scripts/", "law/", "docs/", ".github/"]
+              },
+              "deliverables": [
+                "Contract tests mutate .github/workflows/update-pull-request-branches.yml and prove that scripts/check-workflows.mjs fails when the push-to-main trigger, the rebase update method, the expected-head-sha guard, the App credential, the least permissions, or the superseding concurrency is removed (ADR-CHK-0008 IA-005).",
+                "Tests under packages/sensors/tests/ prove that the reviewed-step registry records the rebase-update step as repository-write, and that repository-write is a harness effect class distinct from publication and read-only. A changed update step reads unknown until reviewed anew. A publication-only rule does not apply to repository-write.",
+                "Any ADR census or credential manifest counts that the TASK-07210 changes move are re-pinned. The tests fail until TASK-0726 lands on the same branch."
+              ],
+              "acceptance_commands": [
+                ["pnpm", "run", "test:root"],
+                ["pnpm", "run", "test:sensors"]
+              ],
+              "commit_types": ["test(contract)", "test(sensors)", "test(schemas)"],
+              "prompt": {
+                "path": "prompts/TASK-07211.md"
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker",
+                "effort": "medium",
+                "time_budget_minutes": 60
+              }
+            },
             {
               "id": "TASK-0726",
               "title": "Rebase every open pull request onto main when main moves, and cancel the superseded gate run",
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
-              "upstream_task_id": null,
-              "status": "planned",
+              "upstream_task_id": "TASK-07211",
+              "status": "ready",
               "target_substrates": ["F5"],
               "boundary": {
                 "paths": [
                   ".github/workflows/update-pull-request-branches.yml",
                   ".github/workflows/pull-request-checks.yml",
-                  "scripts/check-workflows.mjs"
+                  "scripts/check-workflows.mjs",
+                  ".devai/config/toolchain.json",
+                  "packages/sensors/src/harness/"
                 ],
-                "forbidden": ["law/", "packages/"]
+                "forbidden": ["law/", "docs/", "tests/", "packages/cli/", "packages/sensors/tests/"]
               },
               "deliverables": [
                 ".github/workflows/update-pull-request-branches.yml runs on push to main and, for every open non-draft pull request against main that is behind it, calls PUT /repos/{owner}/{repo}/pulls/{number}/update-branch with update_method rebase and the expected head sha. It skips a pull request whose rebase conflicts and reports it without failing the others. It uses a GitHub App or other non-GITHUB_TOKEN credential, because a push made with GITHUB_TOKEN starts no workflow run and the rebased head would never be gated. The workflow holds the least permissions it needs.",
                 "The superseded gate run is cancelled rather than failed. The existing concurrency group of pull-request-checks.yml, keyed by workflow and pull request number with cancel-in-progress, already cancels an in-progress run when the rebased head arrives as a synchronize event; the task verifies this on a live pull request, records the run ids in its pull request, and changes the gate workflow only if the verification fails.",
-                "scripts/check-workflows.mjs pins the trigger, the rebase update method, the credential source, and the concurrency group, so removing any of them fails the workflow check."
+                "scripts/check-workflows.mjs pins the trigger, the rebase update method, the credential source, and the concurrency group, so removing any of them fails the workflow check.",
+                "packages/sensors/src/harness/reviewed-workflow-steps.ts admits the effect class repository-write and records the reviewed rebase-update step with it, not publication (coordinator ruling of 2026-10-08: the rebase-update step is repository-write, not publication). The harness effect analysis treats repository-write as its own class. .devai/config/toolchain.json declares what the update workflow needs from the toolchain."
               ],
               "acceptance_commands": [["node", "scripts/check-workflows.mjs"]],
-              "commit_types": ["ci(workflows)", "ci(scripts)"],
+              "commit_types": ["ci(workflows)", "ci(scripts)", "fix(sensors)", "chore(toolchain)"],
               "prompt": {
                 "path": "prompts/TASK-0726.md"
               },
