@@ -157,7 +157,7 @@ export const REVIEWED_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = Object.f
     files: [],
   },
   {
-    sha256: 'cc1e66490d45c8a0c7e27631e02d7ae958794240fc4ba39f1827940befb20643',
+    sha256: '869b6b0cd83816e1ff7cc3ae93ee096bb1b9e38f02aeba1eea72506e77130fd7',
     effect: 'read-only',
     workflow: 'pull-request-checks.yml#gate-cli[3], pull-request-checks.yml#gate-rest[3]',
     step: 'Compile the check runner bootstrap',
