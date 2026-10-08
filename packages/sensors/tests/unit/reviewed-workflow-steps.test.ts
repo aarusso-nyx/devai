@@ -97,9 +97,11 @@ describe('reviewed workflow step registry', () => {
         expect(digest, `${entry.workflow} ${file.path}`).toBe(file.sha256);
       }
     }
+    // ADR-CHK-0007 rule 11: the toolchain step is shared by both partition jobs.
     const toolchain = REVIEWED_WORKFLOW_STEPS.find((entry) =>
-      entry.workflow.startsWith('pull-request-checks.yml#preflight[1]'),
+      entry.workflow.startsWith('pull-request-checks.yml#gate-cli[1]'),
     );
+    expect(toolchain?.workflow).toContain('pull-request-checks.yml#gate-rest[1]');
     expect(toolchain?.files.map((file) => file.path)).toEqual([
       '.github/actions/setup-node-toolchain/action.yml',
     ]);
@@ -116,14 +118,41 @@ describe('reviewed workflow step registry', () => {
         mkdirSync(dirname(join(tree, path)), { recursive: true });
         cpSync(join(ROOT, path), join(tree, path));
       }
-      expect(jobEffectFacts(gate, tree, 'preflight').effect).toBe('read-only');
+      // ADR-CHK-0007 rule 11: the two partition jobs and the aggregator each prove read-only.
+      const jobs = ['gate-cli', 'gate-rest', 'gate'] as const;
+      const effects = () =>
+        Object.fromEntries(jobs.map((job) => [job, jobEffectFacts(gate, tree, job).effect]));
+      expect(effects()).toEqual({
+        'gate-cli': 'read-only',
+        'gate-rest': 'read-only',
+        gate: 'read-only',
+      });
+      // Every job sets up its toolchain through the composite action.
       const action = join(tree, '.github/actions/setup-node-toolchain/action.yml');
       writeFileSync(action, `${readFileSync(action, 'utf8')}# changed\n`);
-      expect(jobEffectFacts(gate, tree, 'preflight').effect).toBe('unknown');
+      expect(effects()).toEqual({ 'gate-cli': 'unknown', 'gate-rest': 'unknown', gate: 'unknown' });
       cpSync(join(ROOT, '.github/actions/setup-node-toolchain/action.yml'), action);
-      expect(jobEffectFacts(gate, tree, 'preflight').effect).toBe('read-only');
-      rmSync(join(tree, 'scripts/process/summarize-check-report.mjs'));
-      expect(jobEffectFacts(gate, tree, 'preflight').effect).toBe('unknown');
+      expect(effects()).toEqual({
+        'gate-cli': 'read-only',
+        'gate-rest': 'read-only',
+        gate: 'read-only',
+      });
+      // Only the partition jobs summarize a failing report.
+      const summarize = join(tree, 'scripts/process/summarize-check-report.mjs');
+      rmSync(summarize);
+      expect(effects()).toEqual({
+        'gate-cli': 'unknown',
+        'gate-rest': 'unknown',
+        gate: 'read-only',
+      });
+      cpSync(join(ROOT, 'scripts/process/summarize-check-report.mjs'), summarize);
+      // Only the aggregator runs the aggregator script.
+      rmSync(join(tree, 'scripts/aggregate-gate-partitions.mjs'));
+      expect(effects()).toEqual({
+        'gate-cli': 'read-only',
+        'gate-rest': 'read-only',
+        gate: 'unknown',
+      });
     } finally {
       rmSync(tree, { recursive: true, force: true });
     }
