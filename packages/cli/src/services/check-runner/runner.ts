@@ -277,6 +277,7 @@ function prepareCheckRun(
     descriptorById: new Map(descriptor.tasks.map((task) => [task.nodeId, task])),
     exclusivity: readTaskExclusivity(
       options.repoRoot,
+      plan.repository,
       new Set(descriptor.tasks.map((task) => task.nodeId)),
     ),
     timeoutMs,
