@@ -42,11 +42,11 @@
         "--json",
         "<fields>",
         "--limit",
-        "<n>"
+        "1000"
       ],
       "capabilities": ["proc:gh-read"],
       "effect": "read",
-      "reason": "Harness sensors read the GitHub Actions run history of the population their declaration in .devai/config/sensor-inputs.json names (ADR-SCR-0005 IA-004, ADR-SCR-0010); the broker admits exactly this shape without a host adapter under sense run and check: <file> is one workflow file name of letters, digits, dot, underscore, or hyphen ending in .yml or .yaml, without a directory; <event> is one of push, pull_request, merge_group, workflow_dispatch, or schedule, nothing else; <fields> is one to sixteen comma-separated alphabetic names; <n> is 1 to 9999. This shape carries no --branch option and is emitted when the declared headBranch is * (any head branch); gh-run-list-branch adds the single --branch <ref> option for a literal head branch, and the -created variants add the --created filter. Each option appears once and in this order; a second --branch, a value outside its grammar, and every other gh argv except auth, auth status, --version, and --help are refused.",
+      "reason": "Harness sensors read the GitHub Actions run history of the population their declaration in .devai/config/sensor-inputs.json names (ADR-SCR-0005 IA-004, ADR-SCR-0010); the broker admits exactly this shape without a host adapter under sense run and check: <file> is one workflow file name of letters, digits, dot, underscore, or hyphen ending in .yml or .yaml, without a directory; <event> is one of push, pull_request, merge_group, workflow_dispatch, or schedule, nothing else; <fields> is one to sixteen comma-separated alphabetic names; the limit is the literal 1000, so a thirty-day window at the current volume of about 450 runs is never cut, and a list that returns 1000 runs reads unknown as truncated (#364). This shape carries no --branch option and is emitted when the declared headBranch is * (any head branch); gh-run-list-branch adds the single --branch <ref> option for a literal head branch, and the -created variants add the --created filter. Each option appears once and in this order; a second --branch, a value outside its grammar, and every other gh argv except auth, auth status, --version, and --help are refused.",
       "owner": "architect"
     },
     {
@@ -62,7 +62,7 @@
         "--json",
         "<fields>",
         "--limit",
-        "<n>",
+        "1000",
         "--created",
         ">=<date>"
       ],
@@ -86,7 +86,7 @@
         "--json",
         "<fields>",
         "--limit",
-        "<n>"
+        "1000"
       ],
       "capabilities": ["proc:gh-read"],
       "effect": "read",
@@ -108,7 +108,7 @@
         "--json",
         "<fields>",
         "--limit",
-        "<n>",
+        "1000",
         "--created",
         ">=<date>"
       ],
@@ -128,11 +128,11 @@
         "--limit",
         "1000",
         "--json",
-        "closedAt,headRefName,headRefOid,mergedAt,number,state"
+        "baseRefName,closedAt,createdAt,headRefName,headRefOid,mergedAt,number,state"
       ],
       "capabilities": ["proc:gh-read"],
       "effect": "read",
-      "reason": "The harness_green_main sensor under outcomeUnit pull-request-final-head reads every pull request's state and final head to match it with the gate runs by head branch and sha (ADR-SCR-0014, ADR-SCR-0005 IA-004); the broker admits exactly this argv without a host adapter under sense run and check, every token literal and in this order. Any other gh pr argv is refused.",
+      "reason": "The harness_green_main sensor under outcomeUnit pull-request-final-head reads every pull request's base, state, creation and closing times and final head to admit only pull requests against the declared base and to match each with the gate runs created while it was open, by head branch and sha (ADR-SCR-0014, #365, ADR-SCR-0005 IA-004); a list that returns 1000 pull requests reads unknown as truncated; the broker admits exactly this argv without a host adapter under sense run and check, every token literal and in this order. Any other gh pr argv is refused.",
       "owner": "architect"
     },
     {

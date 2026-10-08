@@ -27,7 +27,7 @@ single `--branch` option, or `*` for any head branch with no `--branch` option),
 applied after the call, whether every attempt or only the last attempt of a run counts, whether
 cancelled runs count, the lookback in days, the minimum sample (required), and the
 workflow-and-job pairs excluded by identity. The declaration drives the `gh run list` shape the
-broker admits (`--workflow <file> --event <event> [--branch <ref>] --json <fields> --limit <n>`,
+broker admits (`--workflow <file> --event <event> [--branch <ref>] --json <fields> --limit 1000`,
 templates `gh-run-list` and `gh-run-list-branch` in `law/policy/subprocess-effects.json`), and
 the population is part of the reading's `metrics`.
 
@@ -40,6 +40,10 @@ excludes the environment-gated jobs of `release.yml`: `verify-ledger`, `build-re
 `finalize-release`, and `deploy-pages`.
 
 ## Verdict below and above the minimum
+
+The run list is read with the literal limit `--limit 1000` (#364). A list that returns as many
+runs as the limit may have been cut before the lookback window ends, so the sensor reads
+`unknown` as truncated, with the limit in its finding, and never states a verdict on it.
 
 The minimum counts successful runs, the runs whose durations the sensor measures. Below it the
 sensor reads `unknown` with `sample_size`, `minimum_sample`, and the population in the finding,

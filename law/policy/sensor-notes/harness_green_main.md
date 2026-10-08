@@ -27,7 +27,7 @@ single `--branch` option, or `*` for any head branch with no `--branch` option),
 applied after the call, whether every attempt or only the last attempt of a run counts, whether
 cancelled runs count, the lookback in days, the minimum sample (required), and the
 workflow-and-job pairs excluded by identity. The declaration drives the `gh run list` shape the
-broker admits (`--workflow <file> --event <event> [--branch <ref>] --json <fields> --limit <n>
+broker admits (`--workflow <file> --event <event> [--branch <ref>] --json <fields> --limit 1000
 [--created >=<date>]`, templates `gh-run-list*` in `law/policy/subprocess-effects.json`), and
 the population is part of the reading's `metrics`.
 
@@ -45,17 +45,21 @@ The declaration's `outcomeUnit` decides what one outcome is:
 
 Under `pull-request-final-head`:
 
-- **Sampled pull requests.** Every pull request against the base with a gate run of the
-  declared workflow and event created in the lookback window: merged, closed without merge,
-  and open. Closed pull requests stay in, because leaving them out would hide gate failures
+- **Sampled pull requests.** Every pull request whose `baseRefName` is the declared base
+  branch and that has a gate run of the declared workflow and event created in the lookback
+  window: merged, closed without merge, and open. Closed pull requests stay in, because leaving them out would hide gate failures
   on abandoned candidates.
 - **Final head.** The head at merge for a merged pull request, and the current head for an
   open or closed one.
 - **Counted run.** The latest completed gate run on that head. Cancelled and skipped runs
   never count, and a re-run counts as its last attempt. The pull request is green when that
-  run concluded `success`. The final head is matched by head branch and sha: the pull
-  requests come from `gh pr list --state all` (`headRefName`, `headRefOid`), and the
-  window's runs from the gate's run list (`headBranch`, `headSha`).
+  run concluded `success`. A run belongs to a pull request only when its head branch and
+  sha match the pull request's final head and it was created while the pull request was open:
+  at or after its `createdAt` and at or before its `closedAt`, or now for an open one. The
+  pull requests come from `gh pr list --state all` (`baseRefName`, `createdAt`,
+  `closedAt`, `headRefName`, `headRefOid`), and the window's runs from the gate's run list
+  (`headBranch`, `headSha`, `createdAt`). A pull request list that returns 1000 entries reads
+  `unknown` as truncated (#365).
 - **Exclusions.** An open pull request whose final head has no completed run is left out of
   the sample and the denominator. `merge_group` runs stay out of scope.
 - **Minimum.** The minimum sample counts pull requests. The reading's `metrics` name the
@@ -66,6 +70,10 @@ test-first commits that are red by design, superseded heads, and the runs that r
 start (ADR-CHK-0008) no longer count against the cell.
 
 ## Verdict below and above the minimum
+
+The run list is read with the literal limit `--limit 1000` (#364). A list that returns as many
+runs as the limit may have been cut before the lookback window ends, so the sensor reads
+`unknown` as truncated, with the limit in its finding, and never states a verdict on it.
 
 Below the declared minimum the sensor reads `unknown` with `sample_size`, `minimum_sample`,
 and the population in the finding, never FAIL and never PASS: the absence of runs is not a
