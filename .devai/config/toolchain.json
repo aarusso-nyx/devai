@@ -19,6 +19,10 @@
       "digest": "7088e561eb65bb68695d245aa206f005ef30921d",
       "peeled_commit": "a7487c7e89a18df4991f7f222e4898a00d66ddda"
     },
+    "actions/create-github-app-token": {
+      "ref": "v3.2.0",
+      "digest": "bcd2ba49218906704ab6c1aa796996da409d3eb1"
+    },
     "actions/upload-artifact": {
       "ref": "v4.6.2",
       "digest": "ea165f8d65b6e75b540449e92b4886f43607fa02"
