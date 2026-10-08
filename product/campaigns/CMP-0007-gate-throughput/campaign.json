@@ -10,14 +10,15 @@
     "kind": "owner-mandate",
     "ref": "product/campaigns/CMP-0007-gate-throughput/decisions.md"
   },
-  "goal": "Bring self-scorecard cells F5:T7 and F5:T9 to PASS without relaxing a threshold or a definition and without moving any node out of the pull-request lane. Baseline over the 30 days to main 92526921 (355 counted pull_request runs): harness_performance median 710 s against a target below 600 s (p95 1059 s, already passing), with test:cli 58% of job time because the check runner executes nodes one at a time; harness_green_main 86.8% against a target of at least 95%, with 47 failures of which 33 are real defects, 13 main-moved blocks, and 1 infrastructure (#247). Owner decisions D1 to D5 of 2026-10-07 (decisions.md): in-runner parallel workers first and sharding only if still above 600 s, auto-update branch, a pre-push preflight mandatory for agents and opt-in for humans, keep the F5:T9 definition, and ship 2.3.0 when both cells pass.",
+  "goal": "Bring self-scorecard cells F5:T7 and F5:T9 to PASS without relaxing a definition and without moving any node out of the pull-request lane. Baseline over the 30 days to main 92526921 (355 counted pull_request runs): harness_performance median 710 s against a target then below 600 s, below 900 s since decision D6 (p95 1059 s, already passing), with test:cli 58% of job time because the check runner executes nodes one at a time; harness_green_main 86.8% against a target of at least 95%, with 47 failures of which 33 are real defects, 13 main-moved blocks, and 1 infrastructure (#247). Owner decisions D1 to D5 of 2026-10-07 (decisions.md): in-runner parallel workers first and sharding only if still above 600 s, auto-update branch, a pre-push preflight mandatory for agents and opt-in for humans, keep the F5:T9 definition, and ship 2.3.0 when both cells pass. Owner decision D6 of 2026-10-08 sets the F5:T7 PASS threshold to a median below 900 s, with p95 below 1800 s and the REVIEW bounds unchanged.",
   "records": [
     "ADR-CHK-0007",
     "ADR-CHK-0006",
     "ADR-CHK-0001",
     "ADR-CHK-0004",
     "ADR-GOV-0018",
-    "ADR-SCR-0010"
+    "ADR-SCR-0010",
+    "ADR-SCR-0004"
   ],
   "constraints": {
     "self_dogfood": true,
@@ -49,9 +50,16 @@
     {
       "id": "R-0701",
       "title": "Gate speed (F5:T7)",
-      "goal": "The pull-request gate median falls below 600 s without dropping any planned node. The check runner executes independent plan nodes on a bounded worker pool under ADR-CHK-0007, with scheduling declarations in test-task-exclusivity.json and never in test-tasks.json so the package-owned verifier and release export are unaffected (T1). The job split of ADR-CHK-0007 rule 11 (T2, CTG-0713) is ready: on 2026-10-07 the Owner amended D1 to start it now, without waiting for the post-merge median, because the parallel gate runs of #352 took 549 s and 798 s, too variable to rely on parallelism alone (decisions.md). test:cli runs in its own partition job, every other affected node in a second, and an aggregator keeps the single required check devai-release-gate. The check-result cache persists across CI runs keyed by task input digest with the protected-namespace recapture rule kept (T3). Every task is single-role: Architect writes law and docs, Inspector tests, Engineer code. Accepted when harness_performance over the post-change window of decisions.md reads a median below 600 s and every window run accounted for its whole plan, with partitioned-out entries counted and ownership assessed across the report pair when the gate is partitioned (decisions.md).",
+      "goal": "The pull-request gate median falls below 900 s (decision D6 of 2026-10-08; it was 600 s) without dropping any planned node. The check runner executes independent plan nodes on a bounded worker pool under ADR-CHK-0007, with scheduling declarations in test-task-exclusivity.json and never in test-tasks.json so the package-owned verifier and release export are unaffected (T1). The job split of ADR-CHK-0007 rule 11 (T2, CTG-0713) merged in #355: on 2026-10-07 the Owner amended D1 to start it at once, without waiting for the post-merge median, because the parallel gate runs of #352 took 549 s and 798 s, too variable to rely on parallelism alone (decisions.md). test:cli runs in its own partition job, every other affected node in a second, and an aggregator keeps the single required check devai-release-gate. The check-result cache persists across CI runs keyed by task input digest with the protected-namespace recapture rule kept (T3). CTG-0717 moves the F5:T7 PASS threshold to a median below 900 s in the target record, the sensor default and its tests (T4, D6). Every task is single-role: Architect writes law and docs, Inspector tests, Engineer code. Accepted when harness_performance over the post-change window of decisions.md reads a median below 900 s and every window run accounted for its whole plan, with partitioned-out entries counted and ownership assessed across the report pair when the gate is partitioned (decisions.md).",
       "status": "open",
-      "records": ["ADR-CHK-0007", "ADR-CHK-0006", "ADR-CHK-0004", "ADR-CHK-0001"],
+      "records": [
+        "ADR-CHK-0007",
+        "ADR-CHK-0006",
+        "ADR-CHK-0004",
+        "ADR-CHK-0001",
+        "ADR-SCR-0004",
+        "ADR-SCR-0010"
+      ],
       "depends_on": [],
       "attestation_reissue": false,
       "owner_effects_required": [],
@@ -348,7 +356,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "ready",
+              "status": "merged",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -384,8 +392,8 @@
               "prompt": {
                 "path": "prompts/TASK-0717.md"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/355",
+              "merged_as": "682d185b3ef08d05eb580b4eb8e56c85146dbac0",
               "execution": {
                 "tier": "architect",
                 "effort": "high",
@@ -398,7 +406,7 @@
               "discipline": "inspector",
               "coupled_pipeline_position": "inspector",
               "upstream_task_id": "TASK-0717",
-              "status": "ready",
+              "status": "merged",
               "target_substrates": ["F5"],
               "boundary": {
                 "paths": ["packages/cli/tests/unit/", "packages/sensors/tests/", "tests/contract/"],
@@ -418,8 +426,8 @@
               "prompt": {
                 "path": "prompts/TASK-0718.md"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/355",
+              "merged_as": "682d185b3ef08d05eb580b4eb8e56c85146dbac0",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -432,7 +440,7 @@
               "discipline": "engineer",
               "coupled_pipeline_position": "engineer",
               "upstream_task_id": "TASK-0718",
-              "status": "ready",
+              "status": "merged",
               "target_substrates": ["F2", "F5"],
               "boundary": {
                 "paths": [
@@ -460,8 +468,8 @@
               "prompt": {
                 "path": "prompts/TASK-0719.md"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/355",
+              "merged_as": "682d185b3ef08d05eb580b4eb8e56c85146dbac0",
               "execution": {
                 "tier": "worker-high",
                 "effort": "high",
@@ -488,7 +496,7 @@
               "discipline": "architect",
               "coupled_pipeline_position": "architect",
               "upstream_task_id": null,
-              "status": "ready",
+              "status": "merged",
               "target_substrates": ["F1", "F5"],
               "boundary": {
                 "paths": [
@@ -517,8 +525,8 @@
               "prompt": {
                 "path": "prompts/TASK-07112.md"
               },
-              "pull_request": null,
-              "merged_as": null,
+              "pull_request": "https://github.com/aarusso-nyx/devai/pull/355",
+              "merged_as": "682d185b3ef08d05eb580b4eb8e56c85146dbac0",
               "execution": {
                 "tier": "clerk",
                 "effort": "low",
@@ -612,6 +620,135 @@
                 "tier": "worker-high",
                 "effort": "high",
                 "time_budget_minutes": 180
+              }
+            }
+          ]
+        },
+        {
+          "id": "CTG-0717",
+          "title": "Move the F5:T7 PASS threshold to a median below 900 s (D6)",
+          "type": "coupled-triplet",
+          "records": ["ADR-SCR-0004", "ADR-SCR-0010"],
+          "depends_on": ["CTG-0713"],
+          "lock_scopes": [
+            "law/targets/performance.json",
+            "docs/theory/architecture/sensors/harness_performance.md",
+            "law/policy/sensor-notes/harness_performance.md",
+            "packages/sensors/tests/",
+            "packages/sensors/src/harness-performance.ts"
+          ],
+          "gates": ["test:sensors"],
+          "tasks": [
+            {
+              "id": "TASK-07113",
+              "title": "Record the 900 s median target in the performance targets and the sensor design note",
+              "discipline": "architect",
+              "coupled_pipeline_position": "architect",
+              "upstream_task_id": null,
+              "status": "ready",
+              "target_substrates": ["F1", "F5"],
+              "boundary": {
+                "paths": [
+                  "law/targets/performance.json",
+                  "docs/theory/architecture/sensors/harness_performance.md",
+                  "law/policy/sensor-notes/harness_performance.md"
+                ],
+                "forbidden": ["packages/", "tests/", "test-tasks.json"]
+              },
+              "deliverables": [
+                "TGT-PERF-001 in law/targets/performance.json states a median of at most 900000 ms with threshold 900000, citing decision D6 of 2026-10-08; TGT-PERF-002 (p95 at most 1800000 ms) is unchanged.",
+                "docs/theory/architecture/sensors/harness_performance.md states PASS as median_ms < 900_000 (15 min) AND p95_ms < 1_800_000 (30 min); the REVIEW bounds (median < 1_200_000, p95 < 3_600_000) are unchanged. The sensor note changes only if it states the PASS median."
+              ],
+              "acceptance_commands": [
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "schemas",
+                  "--format",
+                  "json"
+                ],
+                [
+                  "node",
+                  ".devai/state/pr-bootstrap/cli/bin.js",
+                  "check",
+                  "--only",
+                  "docs-links",
+                  "--format",
+                  "json"
+                ]
+              ],
+              "commit_types": ["law(targets)", "docs(theory)"],
+              "prompt": {
+                "path": "prompts/TASK-07113.md"
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "architect",
+                "effort": "medium",
+                "time_budget_minutes": 30
+              }
+            },
+            {
+              "id": "TASK-07114",
+              "title": "Test the 900 s PASS median of harness_performance",
+              "discipline": "inspector",
+              "coupled_pipeline_position": "inspector",
+              "upstream_task_id": "TASK-07113",
+              "status": "ready",
+              "target_substrates": ["F5"],
+              "boundary": {
+                "paths": ["packages/sensors/tests/"],
+                "forbidden": ["packages/sensors/src/", "law/", "docs/"]
+              },
+              "deliverables": [
+                "Tests under packages/sensors/tests/ prove the default thresholds: a median below 900 s with p95 below 1800 s reads PASS, a median of exactly 900 s or more reads REVIEW while below 1200 s with p95 below 3600 s, and p95 at or above 1800 s still prevents PASS; a median between 600 s and 900 s, REVIEW before D6, now reads PASS.",
+                "The default pass_median_ms reported in the reading metrics is 900000; tests that pinned 600000 as the default are re-pinned, and explicit threshold overrides keep their own values."
+              ],
+              "acceptance_commands": [["pnpm", "run", "test:sensors"]],
+              "commit_types": ["test(sensors)"],
+              "prompt": {
+                "path": "prompts/TASK-07114.md"
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker",
+                "effort": "low",
+                "time_budget_minutes": 30
+              }
+            },
+            {
+              "id": "TASK-07115",
+              "title": "Set the harness_performance default PASS median to 900 s",
+              "discipline": "engineer",
+              "coupled_pipeline_position": "engineer",
+              "upstream_task_id": "TASK-07114",
+              "status": "ready",
+              "target_substrates": ["F2", "F5"],
+              "boundary": {
+                "paths": ["packages/sensors/src/harness-performance.ts"],
+                "forbidden": ["law/", "docs/", "tests/", "packages/sensors/tests/"]
+              },
+              "deliverables": [
+                "The default thresholds in packages/sensors/src/harness-performance.ts set passMedianMs to 900_000; passP95Ms (1_800_000), reviewMedianMs (1_200_000) and reviewP95Ms (3_600_000) are unchanged, and the extractor_params threshold override still applies."
+              ],
+              "acceptance_commands": [
+                ["pnpm", "run", "typecheck"],
+                ["pnpm", "run", "test:sensors"]
+              ],
+              "commit_types": ["feat(sensors)"],
+              "prompt": {
+                "path": "prompts/TASK-07115.md"
+              },
+              "pull_request": null,
+              "merged_as": null,
+              "execution": {
+                "tier": "worker",
+                "effort": "low",
+                "time_budget_minutes": 15
               }
             }
           ]
