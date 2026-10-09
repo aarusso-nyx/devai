@@ -127,9 +127,11 @@ consulted only when a directory holds none.
 
 The consumers are `inventory_rbac` (data model, api map), `inventory_data_handling`
 (data model), `inventory_coverage` (api map, routes) and `plant_coverage` (api map,
-routes). An input absent from every location keeps the consumer's existing finding code;
-its message names the locations read and `sense run inventory_regeneration` as the
-producer.
+routes). An input absent from every location keeps the consumer's existing finding code and,
+in 2.3.1, its existing message. The message should name every location read and
+`sense run inventory_regeneration` as the producer; that wording is deferred to a
+follow-up. Two or more routes candidates in `plant_coverage` read
+`PLANT_COVERAGE_ROUTES_AMBIGUOUS` (warning, REVIEW).
 
 ## Status and accounting
 
@@ -145,6 +147,15 @@ production failure: the run reads FAIL and publishes nothing. Partial production
 explicitly incomplete. Zero kinds retains `INVENTORY_REGENERATION_NO_KINDS_TOUCHED` /
 REVIEW. Schema, extraction, head-binding or persistence errors remain explicit errors
 with retained evidence.
+
+Every body is validated against its schema before it is staged. A PASS body must validate
+exactly. A producer that inventories nothing reads REVIEW and returns its primary
+collection empty, which a schema requiring at least one item rejects (today the api-map
+and rbac-inventory `minItems` collections). A REVIEW body whose only schema failures are
+such empty required top-level collections is still staged and published as REVIEW: an
+empty inventory is a true, reviewable result, not a production error. Every other schema
+failure of a REVIEW body, and any schema failure of a PASS body, fails the run and
+publishes nothing.
 
 Aggregate metrics retain `kinds_touched`, `kinds_rebuilt`, `kinds_up_to_date` and
 `error_count`, and expose which required kind is missing. A skipped-existing file
