@@ -63,6 +63,7 @@ function measureInventoryDataModel(opts: InventoryDataModelOptions): InventoryDa
       extensions: ['sql'],
       skipDeclarations: false,
     })) {
+      if (opts.admitFile !== undefined && !opts.admitFile(file)) continue;
       discovered.add(file);
     }
   }

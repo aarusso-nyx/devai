@@ -125,8 +125,18 @@ export function sensePlantCoverage(opts: PlantCoverageOptions): SensorReading {
   let routeCount = 0;
   let missing = 0;
   const routesAmbiguous = httpPresent && routesResolution.kind === 'ambiguous';
+  const routesUnreadable = httpPresent && routesResolution.kind === 'unreadable';
   // With http declared absent the HTTP inventory is not demanded.
-  const noInventory = httpPresent && apiMap === null && routes === null && !routesAmbiguous;
+  const noInventory =
+    httpPresent && apiMap === null && routes === null && !routesAmbiguous && !routesUnreadable;
+
+  if (routesUnreadable && routesResolution.kind === 'unreadable') {
+    findings.push({
+      severity: 'error',
+      code: 'PLANT_COVERAGE_ROUTES_UNREADABLE',
+      message: `The routes-inventory directory ${routesResolution.directory} is present but cannot be read (${routesResolution.reason}); no lower-priority body is consulted.`,
+    });
+  }
 
   if (noInventory) {
     findings.push({
@@ -180,11 +190,13 @@ export function sensePlantCoverage(opts: PlantCoverageOptions): SensorReading {
     findings.push(...unlinkedActionFindings(linkage, 'PLANT_COVERAGE_UNLINKED_ACTION'));
   }
 
-  const status: SensorStatus = noInventory
-    ? 'fail'
-    : !routesAmbiguous && missing === 0 && (linkage?.unlinkedIds.length ?? 0) === 0
-      ? 'pass'
-      : 'review';
+  const status: SensorStatus = routesUnreadable
+    ? 'error'
+    : noInventory
+      ? 'fail'
+      : !routesAmbiguous && missing === 0 && (linkage?.unlinkedIds.length ?? 0) === 0
+        ? 'pass'
+        : 'review';
   const reading = buildSensorReading({
     sensorName: 'plant-coverage',
     sensorKind: 'plant_coverage',

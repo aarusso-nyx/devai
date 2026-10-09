@@ -41,7 +41,7 @@ function measureInventoryCoverage(opts: InventoryCoverageOptions): InventoryCove
   const generatedAt = opts.now ?? new Date().toISOString();
   const admit = opts.admitFile ?? (() => true);
   // #382: an explicit input, then the regenerated state body, then the direct default.
-  const apiMapPath = resolveBodyInput(opts.repoRoot, opts.apiMapPath, API_MAP_FILE, admit);
+  const apiMapPath = resolveBodyInput(opts.repoRoot, opts.apiMapPath, API_MAP_FILE);
   const routesResolution = resolveRoutesPath(opts.repoRoot, opts.routesPath, opts.framework, admit);
 
   const findings: Array<{
@@ -85,6 +85,13 @@ function measureInventoryCoverage(opts: InventoryCoverageOptions): InventoryCove
       severity: 'warning',
       code: 'COVERAGE_ROUTES_AMBIGUOUS',
       message: `Multiple routes-inventory bodies found under ${routesResolution.directory}: ${routesResolution.candidates.join(', ')}. Select one with routesPath or framework after running 'devai sense run inventory_routes'.`,
+    });
+  } else if (routesResolution.kind === 'unreadable') {
+    status = 'error';
+    findings.push({
+      severity: 'critical',
+      code: 'COVERAGE_ROUTES_INVALID',
+      message: `The routes-inventory directory ${routesResolution.directory} is present but cannot be read (${routesResolution.reason}); no lower-priority body is consulted.`,
     });
   } else if (routesResolution.kind === 'missing') {
     if (status === 'pass') status = 'review';
@@ -309,7 +316,7 @@ const BOUND_SURFACES: readonly PlantSurface[] = ['http', 'actions'];
 function httpEvidence(opts: InventoryCoverageOptions): SurfaceEvidence {
   const items: string[] = [];
   const admit = opts.admitFile ?? (() => true);
-  const apiMapPath = resolveBodyInput(opts.repoRoot, opts.apiMapPath, API_MAP_FILE, admit);
+  const apiMapPath = resolveBodyInput(opts.repoRoot, opts.apiMapPath, API_MAP_FILE);
   try {
     if (apiMapPath === null || !admit(apiMapPath)) throw new Error('input not admitted');
     const apiMap = JSON.parse(readFileSync(apiMapPath, 'utf8')) as Partial<ApiMapShape>;

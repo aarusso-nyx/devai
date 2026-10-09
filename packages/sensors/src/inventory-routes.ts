@@ -87,7 +87,8 @@ function measureInventoryRoutes(opts: InventoryRoutesOptions): InventoryRoutesRe
   try {
     const collected: RawRoute[] = [];
     for (const scanDir of scanDirs) {
-      const files = walkTsxJsx(scanDir, ignoreDirs);
+      const admit = opts.admitFile;
+      const files = walkTsxJsx(scanDir, ignoreDirs).filter((f) => admit === undefined || admit(f));
       for (const file of files) {
         const sf = parseSource(file);
         if (sf === null) continue;

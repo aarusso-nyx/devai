@@ -25,18 +25,19 @@ export const DIRECT_BODY_DIRECTORY = 'record/proofs/sensors';
 
 /**
  * Resolve one body input, `kindFile` naming it inside each directory (for example
- * `inventory_api/api-map.json`). Without an explicit input, the first default location
- * that exists and is admitted is read; when none is, the direct default is returned, so
- * the consumer reports the input missing exactly as it always has. `null` stays `null`.
+ * `inventory_api/api-map.json`). Without an explicit input, the regenerated state body is
+ * the input whenever it is present, even unreadable or not admitted: the consumer then
+ * refuses or reports it, and a lower-priority default never stands in for it. Only when
+ * it is absent is the direct default returned, so the consumer reports a missing input
+ * exactly as it always has. `null` stays `null`.
  */
 export function resolveBodyInput(
   repoRoot: string,
   explicit: string | null | undefined,
   kindFile: string,
-  admit: (absolutePath: string) => boolean = () => true,
 ): string | null {
   if (explicit !== undefined) return explicit;
   const regenerated = join(repoRoot, REGENERATED_BODY_DIRECTORY, kindFile);
-  if (existsSync(regenerated) && admit(regenerated)) return regenerated;
+  if (existsSync(regenerated)) return regenerated;
   return join(repoRoot, DIRECT_BODY_DIRECTORY, kindFile);
 }
