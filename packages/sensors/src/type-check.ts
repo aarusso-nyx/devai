@@ -46,6 +46,12 @@ export interface TypeCheckResult {
 }
 
 const TSC_ERROR_PATTERN = /^(.+?)\((\d+),(\d+)\): error (TS\d+): (.+)$/;
+/**
+ * The prefix `pnpm -r <script>` writes before each line of a package's output, `<package dir>
+ * <script>: ` (ADR-AUT-0006). It never matches a bare tsc diagnostic, whose first space follows
+ * `(<line>,<column>):` and is followed by `error`, not by a colon.
+ */
+const PNPM_RECURSIVE_PREFIX = /^\S+ [^\s:]+: /u;
 const DEFAULT_SCAN_DIRS: readonly string[] = ['packages', 'apps', 'reference', 'domain', 'tools'];
 
 /**
@@ -85,7 +91,7 @@ function runSingle(opts: TypeCheckOptions, projectOverride?: string): SensorRead
 
   const findings: SensorFinding[] = [];
   for (const line of result.stdout.split('\n')) {
-    const m = TSC_ERROR_PATTERN.exec(line);
+    const m = TSC_ERROR_PATTERN.exec(line.replace(PNPM_RECURSIVE_PREFIX, ''));
     if (m) {
       findings.push({
         severity: 'error',
