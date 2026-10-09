@@ -1165,11 +1165,33 @@ export interface ExecutedFileReader {
   readonly read: (path: string) => string | undefined;
   readonly list: (path: string) => readonly string[] | undefined;
   /**
+   * Whether anything occupies a repository-relative path, decided without reading or
+   * following it (#390 review): a regular file, a directory, an unreadable entry, or a
+   * symlink, dangling or escaping, all count. A path that cannot be examined counts too.
+   */
+  readonly present: (path: string) => boolean;
+  /**
    * The reviewed files that cover the computed dynamic imports of one executed module, or
    * undefined when none are declared (#344 review). A computed import without a declaration
    * leaves the step's file set incomplete, so it reads unknown.
    */
   readonly computedImports?: (file: string) => readonly string[] | undefined;
+}
+
+/**
+ * Whether anything occupies `path` under `root`, by lstat, never following the entry itself.
+ * Only a definite "no such entry" reads absent; an escaping relative path, a non-directory
+ * parent, or any other failure to examine the path reads present, so a check built on it
+ * fails closed.
+ */
+function entryPresent(root: string, path: string): boolean {
+  if (path === '' || isAbsolute(path) || path.split('/').includes('..')) return true;
+  try {
+    lstatSync(join(root, path));
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException | undefined)?.code !== 'ENOENT';
+  }
 }
 
 /** The computed-import covers a reviewed entry declares, keyed by the importing module. */
@@ -1337,12 +1359,12 @@ export function stepExecutedFiles(
           // #390: an install with --ignore-scripts runs no lifecycle script, so it binds no
           // script and no manifest. A pnpmfile still runs its hooks during resolution, so its
           // presence (or a tree that cannot be read to rule it out) leaves the step unproved.
+          // Presence is decided by the entry alone, never by whether its bytes can be read: an
+          // unreadable, directory or symlinked hook (dangling or escaping) still counts.
           if (reader === undefined) complete = false;
           else if (
             PNPM_HOOK_FILES.some(
-              (hook) =>
-                reader.read(hook) !== undefined ||
-                reader.read(joinRelative(dir, hook)) !== undefined,
+              (hook) => reader.present(hook) || reader.present(joinRelative(dir, hook)),
             )
           )
             complete = false;
@@ -1528,6 +1550,7 @@ export function workflowStepInventory(
                     return undefined;
                   }
                 },
+                present: (path) => entryPresent(repoRoot, path),
                 computedImports: computedImports ?? declaredComputedImports(reviewedStep(step)),
               },
         ),
@@ -2722,6 +2745,8 @@ export function jobEffectFacts(
           return undefined;
         }
       },
+      // Without a candidate root nothing can be ruled absent.
+      present: (path) => !root || entryPresent(root, path),
       computedImports: declaredComputedImports(reviewed.entry),
     });
     const bound = reviewed.entry.files;
