@@ -37,7 +37,18 @@ function readActionPins(): ActionPins | undefined {
   ];
   const path = candidates.find((candidate) => existsSync(candidate));
   if (path === undefined) return undefined;
-  const manifest = JSON.parse(readFileSync(path, 'utf8')) as {
+  // A truncated or non-JSON file, or a top level that is not an object, is refused with the
+  // declared code rather than a raw SyntaxError or TypeError (#391).
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(path, 'utf8'));
+  } catch {
+    throw new Error('CI_SCAFFOLD_ACTION_PINS_INVALID');
+  }
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('CI_SCAFFOLD_ACTION_PINS_INVALID');
+  }
+  const manifest = parsed as {
     readonly actions?: Readonly<
       Record<string, { readonly ref?: unknown; readonly digest?: unknown }>
     >;
