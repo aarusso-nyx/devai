@@ -69,6 +69,44 @@ The unit measures the gate's outcome per candidate, not author iteration. Articl
 test-first commits that are red by design, superseded heads, and the runs that rebase updates
 start (ADR-CHK-0008) no longer count against the cell.
 
+## Unverified population filters (#370)
+
+`gh run list` rows carry no base branch and no jobs, so some declared filters cannot be
+applied to a run sample. The reading names them instead of claiming them:
+
+- **Under `run`**, and for `harness_performance` and `harness_robustness`, which always count
+  runs:
+  - `metrics.population_base_branch_verified` is `false`;
+  - `metrics.population_unverified` lists `baseBranch`, then `excludedJobs` when a declared
+    excluded pair names the sampled workflow, comma-separated in that order;
+  - the reading carries the info finding `HARNESS_POPULATION_UNVERIFIED`, whose message names
+    each of those filters.
+- **Under `pull-request-final-head`**, the base branch is verified: only pull requests whose
+  `baseRefName` equals the declared base are sampled.
+  - `metrics.population_base_branch_verified` is `true`.
+  - `metrics.population_unverified` omits `baseBranch`. It holds `excludedJobs` when a
+    declared excluded pair names the sampled workflow, and is the empty string otherwise.
+  - `HARNESS_POPULATION_UNVERIFIED` names only the remaining unverified filters, and the reading
+    carries no such finding when none remains.
+
+The verdict never depends on these metrics or on the finding. They describe what the sample
+could and could not filter.
+
+## Known limitation: a reopened pull request (#365)
+
+A pull request that was closed and later reopened is treated as open over its whole span:
+from its `createdAt` to its `closedAt`, or now. A gate run created while it was closed, on a
+branch reused with the same head sha, can therefore be attributed to it.
+
+This is left unfixed because the exact open intervals are not available cheaply:
+
+- `gh run list` exposes no pull-request link;
+- the REST run's `pull_requests` field is cleared once a pull request closes;
+- exact intervals would need each pull request's timeline through GraphQL.
+
+The case needs a reopened pull request, a reused branch and a matching sha, so it is rare, and
+the cost is out of scope for this sensor.
+
 ## Verdict below and above the minimum
 
 The run list is read with the literal limit `--limit 1000` (#364). A list that returns as many
