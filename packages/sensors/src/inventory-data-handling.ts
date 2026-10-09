@@ -11,7 +11,11 @@ import {
 } from './declared-surfaces.js';
 import { buildSensorReading, type SensorReading, type SensorStatus } from './sensor-reading.js';
 import type { DataModelBody, DataModelColumn, DataModelTable } from './inventory-data-model.js';
-import { resolveBodyInput } from './inventory-body-inputs.js';
+import {
+  bodyInputLocations,
+  INVENTORY_REGENERATION_HINT,
+  resolveBodyInput,
+} from './inventory-body-inputs.js';
 
 const DATA_MODEL_FILE = 'inventory_data_model/data-model.json';
 
@@ -191,7 +195,7 @@ function measureInventoryDataHandling(
     findings.push({
       severity: 'warning',
       code: 'DATA_HANDLING_REQUIRES_DATA_MODEL',
-      message: `Data-model body not found at ${dataModelPath}. Run 'devai sense run inventory_data_model' first.`,
+      message: `Data-model body not found at ${bodyInputLocations(opts.repoRoot, opts.dataModelPath, DATA_MODEL_FILE).join(' or ')}. ${INVENTORY_REGENERATION_HINT}.`,
     });
   } else {
     try {
