@@ -413,15 +413,21 @@ function refusedProcessContext(request: AuthorityHostEffectRequest): {
  * #241: a refused `sense run` process names the sensor and the declaration that admits its
  * process, rather than the task descriptor wording used for `check`.
  */
+/** The sensor kind a `sense run <sensor>` invocation names, or undefined when it names none. */
+function senseRunSensor(argv: readonly string[] | undefined): string | undefined {
+  if (argv === undefined) return undefined;
+  const run = argv.findIndex((word, index) => word === 'run' && argv[index - 1] === 'sense');
+  const candidate = run < 0 ? undefined : argv[run + 1];
+  return candidate === undefined || candidate.startsWith('-') ? undefined : candidate;
+}
+
 function refusedSensorProcessContext(
   request: AuthorityHostEffectRequest,
   action: string,
   argv: readonly string[],
 ): object | undefined {
   if (action !== 'sense run') return undefined;
-  const run = argv.findIndex((word, index) => word === 'run' && argv[index - 1] === 'sense');
-  const candidate = run < 0 ? undefined : argv[run + 1];
-  const sensor = candidate === undefined || candidate.startsWith('-') ? undefined : candidate;
+  const sensor = senseRunSensor(argv);
   return {
     ...refusedProcessContext(request),
     action,
@@ -463,6 +469,8 @@ function readOnlyProcess(
   request: AuthorityHostEffectRequest,
   parentAction?: string,
   declaredCapabilities: readonly string[] = [],
+  /** The sensor kind `sense run` names, which scopes the pnpm script shapes (ADR-AUT-0006). */
+  sensor?: string,
 ): boolean {
   // The asynchronous process effect is never a read-only shortcut; it needs a declared target.
   if (request.symbol === 'spawn') return false;
@@ -485,7 +493,10 @@ function readOnlyProcess(
     args.length === 3 &&
     args[0] === 'eslint' &&
     args[1] === '--format=json' &&
-    typeof args[2] === 'string'
+    typeof args[2] === 'string' &&
+    // A path, never an option: a leading '-' could add a config, plugin, or output flag.
+    args[2].length > 0 &&
+    !args[2].startsWith('-')
   ) {
     return true;
   }
@@ -516,12 +527,16 @@ function readOnlyProcess(
   if (
     parentAction === 'sense run' &&
     pnpmExecutable(executable) &&
-    ((args.length === 2 && args[0] === '-r' && args[1] === 'typecheck') ||
-      (args.length === 1 && args[0] === 'test:perf'))
+    ((sensor === 'type_check' &&
+      args.length === 2 &&
+      args[0] === '-r' &&
+      args[1] === 'typecheck') ||
+      (sensor === 'perf_test' && args.length === 1 && args[0] === 'test:perf'))
   ) {
     // Mirror templates pnpm-recursive-typecheck and pnpm-test-perf (ADR-AUT-0006): exactly
-    // `pnpm -r typecheck` and `pnpm test:perf`, token for token. Each runs an adopter script and
-    // is local-write like the build; no added argument, no `run` or `exec`, no other script.
+    // `pnpm -r typecheck` for type_check and `pnpm test:perf` for perf_test, token for token. Each
+    // runs an adopter script and is local-write like the build; no added argument, no `run` or
+    // `exec`, no other script, and no other sensor.
     return true;
   }
   if (parentAction === 'sense run' && basename(executable) === 'pnpm') {
@@ -1175,7 +1190,14 @@ export function createAuthorityHostBroker(input: BrokerInput): {
       );
     }
     if (request.kind === 'process') {
-      if (readOnlyProcess(request, input.entry.name, input.entry.authority_contract.capabilities))
+      if (
+        readOnlyProcess(
+          request,
+          input.entry.name,
+          input.entry.authority_contract.capabilities,
+          senseRunSensor(input.argv),
+        )
+      )
         return apply();
       if (input.entry.effects === 'read') {
         // Name the refused argv so the reader sees which command was not admitted
