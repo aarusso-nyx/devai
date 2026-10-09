@@ -466,7 +466,7 @@ export const REVIEWED_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = Object.f
       },
       {
         path: 'packages/cli/scripts/assemble-package.mjs',
-        sha256: 'b7ccff5df58df6f47fa38c2d903870e2202464c3512439b3b1218272abe5dcc1',
+        sha256: '7cf85b70dc58a4f5163c064184710728ccbd2dcdf6315306fd56a001e73db016',
       },
       {
         path: 'packages/effects-check/package.json',
