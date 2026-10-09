@@ -259,7 +259,8 @@
     },
     {
       "version": "2.3.1",
-      "status": "unreleased",
+      "status": "released",
+      "date": "2026-10-09",
       "changes": [
         {
           "id": "MIG-2.3.1-observation-workflow-pins",
