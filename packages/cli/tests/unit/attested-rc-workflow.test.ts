@@ -464,3 +464,32 @@ describe('attested RC workflow scaffold', () => {
     );
   });
 });
+
+// #383: the attested-RC verifier workflow keeps its bytes and the default toolchain manifest's
+// pin set, which the observation workflow now shares.
+describe('#383: the attested RC workflow pin set', () => {
+  const ROOT = resolve(import.meta.dirname, '../../../..');
+  const DEFAULTS = JSON.parse(
+    readFileSync(join(ROOT, 'law/policy/adopter-defaults/toolchain.json'), 'utf8'),
+  ) as { actions: Record<string, { digest: string }> };
+  /** sha256 of the generated workflow at 2.3.0; the 2.3.1 rebind leaves these bytes alone. */
+  const GOLDEN_SHA256 = '96fb92acd062b840575cc51ab3673fcabf52607be7e7f1cdf3eab4b2f80ba5fb';
+
+  it('pins every adopter-defaults action, upload-artifact included, to its digest', () => {
+    const workflow = attestedRcVerificationWorkflow();
+    for (const [action, { digest }] of Object.entries(DEFAULTS.actions)) {
+      const refs = [...workflow.matchAll(new RegExp(`uses: ${action}@(\\S+)`, 'gu'))].map(
+        (match) => match[1],
+      );
+      expect(refs.length, `${action} is used`).toBeGreaterThan(0);
+      expect(new Set(refs), action).toEqual(new Set([digest]));
+    }
+    expect(Object.keys(DEFAULTS.actions)).toContain('actions/upload-artifact');
+  });
+
+  it('generates unchanged bytes', () => {
+    expect(createHash('sha256').update(attestedRcVerificationWorkflow()).digest('hex')).toBe(
+      GOLDEN_SHA256,
+    );
+  });
+});

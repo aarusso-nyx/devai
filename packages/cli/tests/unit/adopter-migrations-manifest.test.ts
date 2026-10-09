@@ -58,12 +58,20 @@ describe('#264: the adopter migration manifest', () => {
       '2.0.0',
       '2.1.0',
       '2.3.0',
+      '2.3.1',
     ]);
-    expect(manifest.releases.at(-1)).toMatchObject({
+    expect(manifest.releases.find((release) => release.version === '2.3.0')).toMatchObject({
       version: '2.3.0',
       status: 'released',
       date: '2026-10-08',
     });
+    // #383: the observation-workflow rebind ships unreleased with the code that performs it.
+    const next = manifest.releases.at(-1);
+    expect(next).toMatchObject({ version: '2.3.1', status: 'unreleased' });
+    expect(next).not.toHaveProperty('date');
+    expect(next?.changes.map((change) => change.id)).toEqual([
+      'MIG-2.3.1-observation-workflow-pins',
+    ]);
   });
 
   it('has exactly one entry for every changelog release above the baseline that changed configuration', () => {
@@ -97,10 +105,19 @@ describe('#264: the adopter migration manifest', () => {
     ) {
       expect(manifest.releases.map((release) => release.version)).toContain(installed);
     }
-    // Across a neutral release the plan is empty and init upgrade only restamps the version.
+    // Across a neutral release no released entry is planned and init upgrade only restamps the
+    // version; an unreleased entry is planned with the code that ships it.
+    const released = (from: string, installedVersion: string) =>
+      plannedReleases(manifest, from, installedVersion).filter(
+        (release) => release.status === 'released',
+      );
     for (const version of CONFIGURATION_NEUTRAL_RELEASES.keys()) {
-      expect(plannedReleases(manifest, '2.1.0', version)).toEqual([]);
+      expect(released('2.1.0', version)).toEqual([]);
     }
+    // #383: from installed 2.3.0, the unreleased 2.3.1 rebind is planned above it.
+    expect(plannedReleases(manifest, '2.3.0', '2.3.0').map((release) => release.version)).toEqual([
+      '2.3.1',
+    ]);
     expect(releasesInRange(manifest, '1.6.0', '1.9.0').map((release) => release.version)).toEqual([
       '1.7.0',
       '1.8.0',
@@ -122,8 +139,9 @@ describe('#264: the adopter migration manifest', () => {
         return { ...rest, status: 'unreleased' };
       }),
     });
-    expect(versions('2.0.0', '2.0.0', unreleased)).toEqual(['2.1.0']);
-    expect(versions('1.9.0', '2.0.0', unreleased)).toEqual(['2.0.0', '2.1.0']);
+    // The unreleased 2.3.1 entry (#383) rides along in every plan below it.
+    expect(versions('2.0.0', '2.0.0', unreleased)).toEqual(['2.1.0', '2.3.1']);
+    expect(versions('1.9.0', '2.0.0', unreleased)).toEqual(['2.0.0', '2.1.0', '2.3.1']);
     expect(versions('1.6.0', '2.0.0', unreleased).slice(0, 4)).toEqual([
       '1.7.0',
       '1.8.0',
@@ -131,9 +149,9 @@ describe('#264: the adopter migration manifest', () => {
       '2.0.0',
     ]);
     // Once released and installed, it is an ordinary entry, planned only from below it.
-    expect(versions('2.1.0', '2.1.0')).toEqual([]);
-    expect(versions('2.0.0', '2.1.0')).toEqual(['2.1.0']);
-    expect(versions('2.0.0', '2.0.0')).toEqual([]);
+    expect(versions('2.1.0', '2.1.0')).toEqual(['2.3.1']);
+    expect(versions('2.0.0', '2.1.0')).toEqual(['2.1.0', '2.3.1']);
+    expect(versions('2.0.0', '2.0.0')).toEqual(['2.3.1']);
   });
 
   it('cites only decision records that exist and names a canonical segment for each change', () => {

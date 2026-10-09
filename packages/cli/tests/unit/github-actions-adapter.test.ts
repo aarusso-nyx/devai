@@ -1,9 +1,9 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { afterEach, describe, expect, it } from 'vitest';
-import { parseDocument } from 'yaml';
+import { parse, parseDocument } from 'yaml';
 import { withAuthorityHostTestScope } from '../../../skills/tests/unit/authority-host-test-scope.js';
 import {
   buildGithubActionsAdapterPlan,
@@ -321,5 +321,46 @@ describe('GitHub Actions main-observation adapter', () => {
     expect(JSON.parse(readFileSync(plan.configPath, 'utf8'))).toMatchObject({
       repository: 'example/linked-adopter',
     });
+  });
+});
+
+// #383: the observation workflow shares the default toolchain manifest's pin set with the
+// attested-RC verifier workflow, and never cancels an observation in progress.
+describe('#383: the observation workflow pins and concurrency', () => {
+  const ROOT = resolve(import.meta.dirname, '../../../..');
+  const DEFAULTS = JSON.parse(
+    readFileSync(join(ROOT, 'law/policy/adopter-defaults/toolchain.json'), 'utf8'),
+  ) as { actions: Record<string, { digest: string }> };
+  const SHARED = ['actions/checkout', 'actions/setup-node', 'actions/upload-artifact'] as const;
+
+  it('pins checkout, setup-node and upload-artifact to the adopter-defaults digests', () => {
+    const { workflowBytes } = buildGithubActionsAdapterPlan(repository(), '2.3.1');
+    for (const action of SHARED) {
+      const refs = [...workflowBytes.matchAll(new RegExp(`uses: ${action}@(\\S+)`, 'gu'))].map(
+        (match) => match[1],
+      );
+      expect(refs.length, `${action} is used`).toBeGreaterThan(0);
+      expect(new Set(refs), action).toEqual(new Set([DEFAULTS.actions[action]?.digest]));
+    }
+  });
+
+  it('declares a commit-keyed concurrency group that never cancels a run in progress', () => {
+    const { workflowBytes } = buildGithubActionsAdapterPlan(repository(), '2.3.1');
+    const document = parse(workflowBytes) as {
+      concurrency?: unknown;
+      jobs: Record<string, { concurrency?: unknown }>;
+    };
+    expect(document.concurrency).toEqual({
+      group: 'devai-main-observation-${{ github.sha }}',
+      'cancel-in-progress': false,
+    });
+    for (const job of Object.values(document.jobs)) expect(job.concurrency).toBeUndefined();
+  });
+
+  it('verifies a fresh plan', async () => {
+    const root = repository();
+    const plan = buildGithubActionsAdapterPlan(root, '2.3.1');
+    await withAuthorityHostTestScope(() => executeGithubActionsAdapterPlan(plan));
+    expect(verifyGithubActionsAdapter(root, '2.3.1')).toMatchObject({ ok: true, errors: [] });
   });
 });
