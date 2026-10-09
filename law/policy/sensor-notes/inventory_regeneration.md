@@ -96,6 +96,12 @@ reads a published state body or a `record/proofs/sensors/` default. An input who
 not required is passed as no path, and the dependent measures as its producer does
 without that input.
 
+During regeneration every producer reads source files only as they are tracked at the
+candidate HEAD; the staged inventory inputs above are the only untracked files admitted.
+Bodies are portable bytes: a regenerated body that names the repository it read carries
+`sourceRepo: "."`, never the absolute checkout path, so the same HEAD yields the same bytes
+in any checkout.
+
 These join `.devai/state/inventory/inventory.json` as machine outputs of the
 registered observation/rebuild path. `sense run inventory_regeneration` regenerates every
 required body for a clean HEAD commit and validates each against its schema. The changed
@@ -124,6 +130,13 @@ The routes input applies, in each directory in turn, the rule of `resolveRoutesP
 framework is given, otherwise the single `routes-*.json` the directory holds. Two or more
 candidates read as ambiguous and are never guessed between; the next directory is
 consulted only when a directory holds none.
+
+A present state body is always the input. If it is present but not admissible it is
+refused, and the consumer never falls through to the `record/proofs/sensors/` default in
+its place; only an absent state body falls through. A regenerated routes directory that is
+present but cannot be listed reads error, naming the directory, without reading the proof
+routes body: `PLANT_COVERAGE_ROUTES_UNREADABLE` in `plant_coverage` and
+`COVERAGE_ROUTES_INVALID` in `inventory_coverage`.
 
 The consumers are `inventory_rbac` (data model, api map), `inventory_data_handling`
 (data model), `inventory_coverage` (api map, routes) and `plant_coverage` (api map,

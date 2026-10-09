@@ -38,6 +38,13 @@ framework is given, otherwise the single `routes-*.json` present. Two or more ca
 are ambiguous and never guessed between, and the next directory is consulted only when a
 directory holds none.
 
+The sensor reads only files tracked at the candidate HEAD, apart from the inventory bodies
+it is given. A present state body is always the input: one that is not admissible is
+refused and never replaced by the `record/proofs/sensors/` default. A regenerated routes
+directory that is present but cannot be listed reads error with
+`PLANT_COVERAGE_ROUTES_UNREADABLE`, naming the directory, and the proof routes body is not
+read.
+
 Neither body present in any location keeps `PLANT_COVERAGE_NO_INVENTORY`. Two or more
 routes candidates in the directory consulted read `PLANT_COVERAGE_ROUTES_AMBIGUOUS`, a
 warning that makes the reading REVIEW; none of the candidates is chosen.
