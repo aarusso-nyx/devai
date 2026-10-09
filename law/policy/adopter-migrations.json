@@ -284,6 +284,24 @@
           "files": [".devai/config/subprocess-effects.json"]
         }
       ]
+    },
+    {
+      "version": "2.3.2",
+      "status": "unreleased",
+      "changes": [
+        {
+          "id": "MIG-2.3.2-observation-install-ignore-scripts",
+          "kind": "rebind",
+          "summary": "The GitHub Actions host adapter regenerates devai-main-observation.yml so its dependency install runs pnpm install --frozen-lockfile --ignore-scripts: the adopter's lifecycle scripts no longer run in the observation job, and harness_coherence proves the generated steps through the reviewed-step registry by step digest. Rebinding the adapter (init upgrade) rewrites the workflow and its receipt. A dependency that needs its install scripts to build must not be required by DEVAI's observation.",
+          "decision_records": [],
+          "issues": [390],
+          "segments": ["host-adapters"],
+          "files": [
+            ".github/workflows/devai-main-observation.yml",
+            ".devai/config/github-actions-host-adapter.json"
+          ]
+        }
+      ]
     }
   ]
 }
