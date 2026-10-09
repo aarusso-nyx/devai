@@ -61,6 +61,9 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
+      # A checkout consumes repository content, so the path-filters advisory applies
+      # (the checkout-free exemption of the ADR-CHK-0008 amendment does not).
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - run: |
           actual_provenance_sha256=value
           VERIFIER_PROVENANCE_SHA256=\${{ vars.DEVAI_LEDGER_VERIFIER_PROVENANCE_SHA256 }}
@@ -190,6 +193,8 @@ jobs:
     services:
       db:
         image: postgres:16
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 schedule:
   - cron: '0 0 * * *'
 `,
