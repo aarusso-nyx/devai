@@ -6,14 +6,24 @@ name: Update pull request branches
 # gated; this workflow never reads GITHUB_TOKEN. Each rebased head arrives as a synchronize
 # event, and the gate's concurrency group (keyed by workflow and pull request number,
 # cancel-in-progress) cancels the superseded run.
+#
+# A pull request opened, reopened, or marked ready behind main is rebased at once through
+# pull_request_target (ADR-CHK-0008, 2026-10-09 amendment): the workflow runs as it stands on
+# the base branch, never checks out or runs pull-request content, reads the pull request only
+# through the API and its event values only through env, and the job guard skips fork and
+# draft pull requests before any credential is read.
 on:
   push:
     branches: [main]
+  pull_request_target:
+    types: [opened, reopened, ready_for_review]
+    branches: [main]
 
-# A newer main supersedes an update still in flight (a repository-write job supersedes);
-# expected_head_sha keeps every update exact.
+# A newer run on the same subject supersedes an update still in flight (a repository-write job
+# supersedes): main's ref on push, the pull request on pull_request_target, where github.ref
+# names the base branch and never scopes the group. expected_head_sha keeps every update exact.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request_target' && format('pr-{0}', github.event.pull_request.number) || github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -22,6 +32,7 @@ permissions:
 jobs:
   update-branches:
     name: Rebase pull requests behind main
+    if: github.event_name == 'push' || (github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.draft == false)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -61,13 +72,22 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           REPOSITORY: ${{ github.repository }}
           MAIN_SHA: ${{ github.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          PULL_NUMBER: ${{ github.event.pull_request.number }}
+          PULL_HEAD: ${{ github.event.pull_request.head.sha }}
         # Fork pull requests are never updated; a pull request whose rebase is refused (a
         # conflict, or a head that moved) is reported and skipped without failing the others.
+        # On pull_request_target only the event pull request is considered: the job guard has
+        # already required it to be a same-repository, non-draft pull request.
         run: |
           set -euo pipefail
-          gh api --paginate "repos/$REPOSITORY/pulls?state=open&base=main&per_page=100" \
-            --jq '.[] | select(.draft == false) | select(.head.repo.full_name == $ENV.REPOSITORY) | [.number, .head.sha] | @tsv' \
-            > "$RUNNER_TEMP/pull-requests.tsv"
+          if [ "$EVENT_NAME" = 'pull_request_target' ]; then
+            printf '%s\t%s\n' "$PULL_NUMBER" "$PULL_HEAD" > "$RUNNER_TEMP/pull-requests.tsv"
+          else
+            gh api --paginate "repos/$REPOSITORY/pulls?state=open&base=main&per_page=100" \
+              --jq '.[] | select(.draft == false) | select(.head.repo.full_name == $ENV.REPOSITORY) | [.number, .head.sha] | @tsv' \
+              > "$RUNNER_TEMP/pull-requests.tsv"
+          fi
           skipped=0
           while IFS=$'\t' read -r number head; do
             if ! behind=$(gh api "repos/$REPOSITORY/compare/$MAIN_SHA...$head" --jq '.behind_by' 2> "$RUNNER_TEMP/update.err"); then
