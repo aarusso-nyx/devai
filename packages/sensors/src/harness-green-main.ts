@@ -32,7 +32,8 @@ type Population =
       readonly runs: readonly Outcome[];
       readonly minimum: number;
       readonly metrics: PopulationMetrics;
-      readonly unverifiedFinding: PopulationFinding;
+      /** HARNESS_POPULATION_UNVERIFIED when a declared filter could not be applied (#370). */
+      readonly unverifiedFindings: readonly PopulationFinding[];
       readonly describe: string;
       /** The noun one outcome is counted as in messages. */
       readonly unit: 'run' | 'pull request';
@@ -57,7 +58,13 @@ function population(opts: HarnessGreenMainOptions): Population {
         reason: sample.reason,
         args: sample.args,
       };
-    return { ...sample, unit: 'run', extraFindings: [], extraMetrics: {} };
+    return {
+      ...sample,
+      unverifiedFindings: [sample.unverifiedFinding],
+      unit: 'run',
+      extraFindings: [],
+      extraMetrics: {},
+    };
   }
   const sample = sampleFinalHeads(opts);
   if (!sample.ok) {
@@ -81,7 +88,7 @@ function population(opts: HarnessGreenMainOptions): Population {
     })),
     minimum: sample.minimum,
     metrics: sample.metrics,
-    unverifiedFinding: sample.unverifiedFinding,
+    unverifiedFindings: sample.unverifiedFinding === undefined ? [] : [sample.unverifiedFinding],
     describe: sample.describe,
     unit: 'pull request',
     extraFindings:
@@ -181,7 +188,7 @@ export function senseHarnessGreenMain(opts: HarnessGreenMainOptions): SensorRead
           sample.describe,
           `${sample.unit}(s)`,
         ),
-        sample.unverifiedFinding,
+        ...sample.unverifiedFindings,
       ],
       metrics: { run_count: populationSize, sample_size: populationSize, ...sample.metrics },
     });
@@ -207,7 +214,7 @@ export function senseHarnessGreenMain(opts: HarnessGreenMainOptions): SensorRead
           code: 'HARNESS_GREEN_MAIN_NO_RUNS',
           message: `No CI runs of the population since ${since ?? ''} (${sample.describe}).`,
         },
-        sample.unverifiedFinding,
+        ...sample.unverifiedFindings,
       ],
       metrics: {
         run_count: 0,
@@ -231,7 +238,7 @@ export function senseHarnessGreenMain(opts: HarnessGreenMainOptions): SensorRead
           code: 'HARNESS_GREEN_MAIN_INSUFFICIENT_SAMPLE_POST_FILTER',
           message: `Only ${String(total)} run(s) since ${since}; below min_sample_size ${String(minSampleSize)}. Verdict suppressed.`,
         },
-        sample.unverifiedFinding,
+        ...sample.unverifiedFindings,
       ],
       metrics: {
         run_count: total,
@@ -265,7 +272,7 @@ export function senseHarnessGreenMain(opts: HarnessGreenMainOptions): SensorRead
       message: `Success rate ${successPct.toFixed(1)}% (over ${String(total)} ${sample.unit}s, ${sample.describe}) is below review threshold ${String(thresholds.review)}%.`,
     });
   }
-  findings.push(...sample.extraFindings, sample.unverifiedFinding);
+  findings.push(...sample.extraFindings, ...sample.unverifiedFindings);
 
   return buildSensorReading({
     ...common,
