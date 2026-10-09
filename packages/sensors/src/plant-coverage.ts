@@ -17,7 +17,11 @@ import {
   type SurfaceEvidence,
 } from './declared-surfaces.js';
 import { resolveRoutesPath } from './inventory-coverage-inputs.js';
-import { resolveBodyInput } from './inventory-body-inputs.js';
+import {
+  bodyInputLocations,
+  INVENTORY_REGENERATION_HINT,
+  resolveBodyInput,
+} from './inventory-body-inputs.js';
 
 /**
  * Inventory sensor: plant coverage (F2 × T1). Phase 26.E (closes
@@ -142,7 +146,17 @@ export function sensePlantCoverage(opts: PlantCoverageOptions): SensorReading {
     findings.push({
       severity: 'error',
       code: 'PLANT_COVERAGE_NO_INVENTORY',
-      message: `Neither api-map nor routes-inventory found. Run sense-api + sense-routes first.`,
+      message: `Neither api-map (read at ${bodyInputLocations(
+        opts.repoRoot,
+        opts.apiMapPath === undefined ? undefined : abs(opts.repoRoot, opts.apiMapPath),
+        'inventory_api/api-map.json',
+      ).join(' or ')}) nor routes-inventory (read at ${bodyInputLocations(
+        opts.repoRoot,
+        opts.routesInventoryPath === undefined
+          ? undefined
+          : abs(opts.repoRoot, opts.routesInventoryPath),
+        'inventory_routes/routes-*.json',
+      ).join(' or ')}) found. ${INVENTORY_REGENERATION_HINT}.`,
     });
   }
   if (routesAmbiguous && routesResolution.kind === 'ambiguous') {

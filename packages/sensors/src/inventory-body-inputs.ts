@@ -41,3 +41,24 @@ export function resolveBodyInput(
   if (existsSync(regenerated)) return regenerated;
   return join(repoRoot, DIRECT_BODY_DIRECTORY, kindFile);
 }
+
+/**
+ * The locations a consumer read for one absent body input, in the order it read them, for a
+ * missing-input message (#391): the explicit input alone when one was passed, otherwise the
+ * regenerated state body and then the direct sensor default.
+ */
+export function bodyInputLocations(
+  repoRoot: string,
+  explicit: string | null | undefined,
+  kindFile: string,
+): readonly string[] {
+  if (explicit !== undefined && explicit !== null) return [explicit];
+  return [
+    join(repoRoot, REGENERATED_BODY_DIRECTORY, kindFile),
+    join(repoRoot, DIRECT_BODY_DIRECTORY, kindFile),
+  ];
+}
+
+/** The producer every missing inventory body points at (#382, #391). */
+export const INVENTORY_REGENERATION_HINT =
+  "Run 'devai sense run inventory_regeneration' to regenerate the inventory bodies";
