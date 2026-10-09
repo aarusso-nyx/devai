@@ -36,6 +36,12 @@ framework is given, otherwise the single `routes-*.json` present. Two or more ca
 are ambiguous and never guessed between, and the next directory is consulted only when a
 directory holds none.
 
+The sensor reads only files tracked at the candidate HEAD, apart from the inventory bodies
+it is given. A present state body is always the input: one that is not admissible is
+refused and never replaced by the `record/proofs/sensors/` default. A regenerated routes
+directory that is present but cannot be listed reads error with `COVERAGE_ROUTES_INVALID`,
+naming the directory, and the proof routes body is not read.
+
 The sensor emits evidence only through its registered cells or diagnostic surface. Any
 future change to identity, standing, tier, or emitter requires an Architect disposition
 before implementation. This note grants no mutation or release authority.
