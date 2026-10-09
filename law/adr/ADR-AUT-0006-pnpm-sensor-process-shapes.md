@@ -27,6 +27,7 @@ inspector_acceptance:
   - IA-004 -- The corepack shim that a corepack-managed pnpm resolves to is admitted as the executable for both shapes, as for pnpm -r build, and an executable whose basename is neither pnpm nor that shim is refused.
   - IA-005 -- Removing any of the templates pnpm-recursive-typecheck, pnpm-test-perf, npx-tsc-noemit, npx-tsc-noemit-project, or npx-eslint-json from subprocess-effects.json while the broker still admits the shape, or the converse, fails the mirror test in the broker suite.
   - IA-006 -- Both pnpm templates declare effect local-write with the fs workspace capability, and recording either reading stays an inspector harness-write under the self-dogfood matrix.
+  - IA-007 -- pnpm -r typecheck requested by any sensor kind but type_check, pnpm test:perf requested by any kind but perf_test, and npx eslint --format=json with a path argument that begins with a hyphen are each refused before a process starts.
 ---
 
 # Exact admission of the pnpm type-check and performance sensor processes
@@ -66,6 +67,10 @@ with no further argument:
 - **`pnpm test:perf`** for `perf_test`, as a declared argv or as the legacy
   `scriptName` default `test:perf`.
 
+Each shape is bound to its sensor kind. `pnpm -r typecheck` is admitted
+only for `type_check`, and `pnpm test:perf` only for `perf_test`; neither is
+admitted for another kind, nor for `build` or a test suite.
+
 Both are matched token for token. The broker refuses:
 
 - either shape with any added argument, such as `--filter`, `--`, or a flag;
@@ -92,8 +97,10 @@ them.
 templates the broker already admits but the registry never listed:
 `npx-tsc-noemit` (`npx tsc --noEmit`), `npx-tsc-noemit-project`
 (`npx tsc --noEmit -p <relative path>`), and `npx-eslint-json`
-(`npx eslint --format=json <path>`). The sentence that refused every bare
-package script now names `pnpm test:perf` as its one exception.
+(`npx eslint --format=json <path>`). In that template `<path>` is a
+repository path, never an option: a value that begins with `-` is refused.
+The sentence that refused every bare package script now names
+`pnpm test:perf` as its one exception.
 
 ## Consequences
 
@@ -104,6 +111,14 @@ workspace root's own script, so a root that also needs checking keeps a
 package or adds an `npx tsc --noEmit -p <project>` declaration of its own.
 An adopter whose performance suite is the `test:perf` script gets a measured
 F2:T7 from its existing default.
+
+The broker does not verify the identity of the executable. An executable
+whose basename is `pnpm`, or a path shaped like the corepack shim, is
+trusted as pnpm. This is the same trust model as `pnpm -r build` under
+ADR-AUT-0002: the broker binds the argv, not the binary. The argv itself
+comes from the adopter's committed `.devai/config/sensor-inputs.json`
+declaration, or from the sensor's own default, never from the command line
+of `sense run`.
 
 The broker literal list changes, so the task-policy digest changes, and the
 next release candidate needs its own attestation. Adopters rebind subprocess
@@ -145,3 +160,4 @@ would make every package script a sensor process.
 - IA-004 -- The corepack shim that a corepack-managed pnpm resolves to is admitted as the executable for both shapes, as for pnpm -r build, and an executable whose basename is neither pnpm nor that shim is refused.
 - IA-005 -- Removing any of the templates pnpm-recursive-typecheck, pnpm-test-perf, npx-tsc-noemit, npx-tsc-noemit-project, or npx-eslint-json from subprocess-effects.json while the broker still admits the shape, or the converse, fails the mirror test in the broker suite.
 - IA-006 -- Both pnpm templates declare effect local-write with the fs workspace capability, and recording either reading stays an inspector harness-write under the self-dogfood matrix.
+- IA-007 -- pnpm -r typecheck requested by any sensor kind but type_check, pnpm test:perf requested by any kind but perf_test, and npx eslint --format=json with a path argument that begins with a hyphen are each refused before a process starts.
