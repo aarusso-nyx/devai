@@ -7,9 +7,9 @@
     {
       "advisory_id": "GHSA-vfj7-8cjw-p6xm",
       "package": "braces",
-      "reason": "Owner-authorized exception (2026-10-03, v1.9.0): advisory published after the v1.4.5 baseline with no patched version in any release; present only in the Docusaurus 3.10.2 documentation build tooling, never in the npm package.",
+      "reason": "Owner-authorized exception (2026-10-03, v1.9.0): advisory published after the v1.4.5 baseline with no patched version in any release; present only in the Docusaurus 3.10.2 documentation build tooling, never in the npm package. Extended by the Owner on 2026-10-09 to 2026-11-17: still no patched release (braces <=3.0.3, latest 3.0.3).",
       "approved_by": "OWNER",
-      "expires_at": "2026-10-15T23:59:59Z"
+      "expires_at": "2026-11-17T23:59:59Z"
     }
   ]
 }
