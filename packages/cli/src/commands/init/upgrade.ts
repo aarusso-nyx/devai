@@ -499,8 +499,14 @@ export function prepareAdopterUpgrade(
         refreshed: true,
       });
     }
-    if (!verification.ok) {
-      githubActions = buildGithubActionsAdapterPlan(targetRoot, installed);
+    // A verified workflow whose bytes are not the installed generator's (an older pin set or no
+    // concurrency block, #383) is rebound too, so an upgrade carries generator changes.
+    const regenerated = buildGithubActionsAdapterPlan(targetRoot, installed);
+    if (
+      !verification.ok ||
+      readTextIfPresent(regenerated.workflowPath) !== regenerated.workflowBytes
+    ) {
+      githubActions = regenerated;
       for (const [path, bytes] of [
         [githubActions.workflowPath, githubActions.workflowBytes],
         [githubActions.configPath, githubActions.configBytes],
