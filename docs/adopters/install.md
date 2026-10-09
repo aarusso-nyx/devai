@@ -379,6 +379,21 @@ This order holds in every checkout, for three reasons:
   `devai-main-observation.yml`, verifies it from the tracked workflow and configuration and the
   `origin` remote.
 
+Both workflows DEVAI generates, `devai-local-rc-verify.yml` and `devai-main-observation.yml`,
+pin `actions/checkout`, `actions/setup-node`, and `actions/upload-artifact` to one pin set.
+That set is DEVAI's default toolchain manifest, which `init` seeds as
+`.devai/config/toolchain.json`. The observation workflow also declares a concurrency group
+keyed by the commit that never cancels a run in progress (#383).
+
+- **Align your own workflows.** Use the action pins in `.devai/config/toolchain.json` in
+  workflows you own, so `harness_coherence` sees one pin per action.
+- **Generated workflows stay as generated.** They are byte-bound, and `doctor` refuses a hand
+  edit. They change only when DEVAI ships a new pin set, through a migration.
+- **Remaining findings are yours.** `HARNESS_COHERENCE_ACTION_VERSION_DRIFT` for an action only
+  your workflows use, or `HARNESS_COHERENCE_PERMISSIONS_MIXED` and
+  `HARNESS_COHERENCE_CONCURRENCY_MIXED` from workflows without `permissions` or
+  `concurrency` blocks, come from workflows you own. You fix them there.
+
 `doctor` reads the post-merge state from the checkout's own git directory:
 
 - Where an attestation, key, or receipt issuer exists there, the checkout is bound, and doctor
