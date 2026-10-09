@@ -438,7 +438,7 @@ export const REVIEWED_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = Object.f
     files: [
       {
         path: 'docs/site/package.json',
-        sha256: '5a75e4f36f8d603efe7e1449bfa60ab4d0413d790360df119f4f716aa9a08168',
+        sha256: 'd6f40c119dc4957119d82e67b8d1ada2ca99561d7ca0302bd73f60e09c665735',
       },
       {
         path: 'docs/site/scripts/check-dependency-audit.mjs',
@@ -894,7 +894,7 @@ export const REVIEWED_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = Object.f
     files: [
       {
         path: 'docs/site/package.json',
-        sha256: '5a75e4f36f8d603efe7e1449bfa60ab4d0413d790360df119f4f716aa9a08168',
+        sha256: 'd6f40c119dc4957119d82e67b8d1ada2ca99561d7ca0302bd73f60e09c665735',
       },
       {
         path: 'docs/site/scripts/check-dependency-audit.mjs',
