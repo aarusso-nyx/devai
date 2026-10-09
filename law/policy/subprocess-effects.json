@@ -337,6 +337,33 @@
       "owner": "architect"
     },
     {
+      "template_id": "npx-tsc-noemit",
+      "executable": "npx",
+      "argv_shape": ["tsc", "--noEmit"],
+      "capabilities": ["proc:npx-local"],
+      "effect": "read",
+      "reason": "The type_check sensor's default checks the root tsconfig without emitting; the broker admits exactly this argv without a host adapter under sense run (ADR-AUT-0006 mirror of an existing literal).",
+      "owner": "architect"
+    },
+    {
+      "template_id": "npx-tsc-noemit-project",
+      "executable": "npx",
+      "argv_shape": ["tsc", "--noEmit", "-p", "<relative-path>"],
+      "capabilities": ["proc:npx-local"],
+      "effect": "read",
+      "reason": "A type_check declaration may name one project; the broker admits exactly this argv without a host adapter under sense run, with <relative-path> a repository-relative path without a '..' segment and never absolute (ADR-AUT-0006 mirror of an existing literal).",
+      "owner": "architect"
+    },
+    {
+      "template_id": "npx-eslint-json",
+      "executable": "npx",
+      "argv_shape": ["eslint", "--format=json", "<path>"],
+      "capabilities": ["proc:npx-local"],
+      "effect": "read",
+      "reason": "Lint sensors read ESLint's JSON report for one path; the broker admits exactly this argv without a host adapter under sense run (ADR-AUT-0006 mirror of an existing literal).",
+      "owner": "architect"
+    },
+    {
       "template_id": "npx-eslint-fix",
       "executable": "npx",
       "argv_shape": ["eslint", "--fix", "."],
@@ -386,12 +413,30 @@
       "conflict_code": "BUILD_ARGV_CONFLICT"
     },
     {
+      "template_id": "pnpm-recursive-typecheck",
+      "executable": "pnpm",
+      "argv_shape": ["-r", "typecheck"],
+      "capabilities": ["proc:pnpm-build", "fs:workspace"],
+      "effect": "local-write",
+      "reason": "The type_check sensor in a pnpm workspace runs every package's typecheck script (ADR-AUT-0006). The script is adopter code and may write, so the process is a write and never read-only, and recording its reading is an inspector harness-write under the self-dogfood matrix. Under sense run the broker admits exactly this argv without a host adapter, with pnpm or the corepack shim it resolves to as the executable; an added argument, --filter, --, run, exec, or another script name is refused before a process starts.",
+      "owner": "architect"
+    },
+    {
+      "template_id": "pnpm-test-perf",
+      "executable": "pnpm",
+      "argv_shape": ["test:perf"],
+      "capabilities": ["proc:pnpm-build", "fs:workspace"],
+      "effect": "local-write",
+      "reason": "The perf_test sensor runs the root test:perf script, as a declared argv or as the default scriptName (ADR-AUT-0006). The script is adopter code and may write, so the process is a write and never read-only, and recording its reading is an inspector harness-write under the self-dogfood matrix. Under sense run the broker admits exactly this argv without a host adapter, with pnpm or the corepack shim it resolves to as the executable; an added argument, run, exec, or another script name is refused before a process starts.",
+      "owner": "architect"
+    },
+    {
       "template_id": "pnpm-vitest-run-governed-config",
       "executable": "pnpm",
       "argv_shape": ["vitest", "run", "--config", "<governed-config>", "<test-path>"],
       "capabilities": ["proc:pnpm-read"],
       "effect": "read",
-      "reason": "Test sensors run vitest under a governed configuration (ADR-SCR-0005); under sense run the broker admits exactly this shape without a host adapter: <governed-config> is one of tests/config/local.config.ts, tests/config/rc.performance.config.ts, tests/config/rc.e2e.config.ts (the governed e2e configuration the e2e_test declaration names, ADR-SCR-0007), tests/config/local.coverage.config.ts (the database-free coverage producer test_coverage_depth runs for the local population, ADR-SCR-0007), or the suite configurations the test sensor emits (tests/config/t1.unit.config.ts, t3.integration.config.ts, t4.regression.config.ts, t5.e2e.config.ts), and the optional <test-path> is one repository-relative path under tests/ without an empty, '.', or '..' segment (the perf_test declaration passes tests/regression). A bare package script such as pnpm test:perf or pnpm run test:perf is refused.",
+      "reason": "Test sensors run vitest under a governed configuration (ADR-SCR-0005); under sense run the broker admits exactly this shape without a host adapter: <governed-config> is one of tests/config/local.config.ts, tests/config/rc.performance.config.ts, tests/config/rc.e2e.config.ts (the governed e2e configuration the e2e_test declaration names, ADR-SCR-0007), tests/config/local.coverage.config.ts (the database-free coverage producer test_coverage_depth runs for the local population, ADR-SCR-0007), or the suite configurations the test sensor emits (tests/config/t1.unit.config.ts, t3.integration.config.ts, t4.regression.config.ts, t5.e2e.config.ts), and the optional <test-path> is one repository-relative path under tests/ without an empty, '.', or '..' segment (the perf_test declaration passes tests/regression). A bare package script is refused, such as pnpm run test:perf or pnpm lint; the one exception is exactly pnpm test:perf, admitted by template pnpm-test-perf (ADR-AUT-0006).",
       "owner": "architect"
     },
     {
