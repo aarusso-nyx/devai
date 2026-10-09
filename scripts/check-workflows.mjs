@@ -721,9 +721,30 @@ const UPDATE_APP_TOKEN_INPUTS = {
 };
 const UPDATE_RUN_TOKEN = '${{ steps.app-token.outputs.token }}';
 const UPDATE_PROBE_STEP = 'credentials';
+// The lock follows the run's subject on each accepted event (ADR-CHK-0008 IA-009): the pull
+// request on pull_request_target, where github.ref names the base branch, and the ref on push.
 const UPDATE_CONCURRENCY = {
-  group: '${{ github.workflow }}-${{ github.ref }}',
+  group:
+    "${{ github.workflow }}-${{ github.event_name == 'pull_request_target' && format('pr-{0}', github.event.pull_request.number) || github.ref }}",
   'cancel-in-progress': true,
+};
+// Push to main, plus pull_request_target opened, reopened, or ready_for_review against main
+// (ADR-CHK-0008 IA-010).
+const UPDATE_TRIGGERS = {
+  push: { branches: ['main'] },
+  pull_request_target: { types: ['opened', 'reopened', 'ready_for_review'], branches: ['main'] },
+};
+// The job guard skips fork and draft pull requests before any credential step runs.
+const UPDATE_JOB_CONDITION =
+  "github.event_name == 'push' || (github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.draft == false)";
+// Event values reach the rebase script only through env, never expanded into its text.
+const UPDATE_RUN_ENV = {
+  GH_TOKEN: '${{ steps.app-token.outputs.token }}',
+  REPOSITORY: '${{ github.repository }}',
+  MAIN_SHA: '${{ github.sha }}',
+  EVENT_NAME: '${{ github.event_name }}',
+  PULL_NUMBER: '${{ github.event.pull_request.number }}',
+  PULL_HEAD: '${{ github.event.pull_request.head.sha }}',
 };
 const UPDATE_PROBE_ENV = {
   APP_ID_PRESENT: "${{ secrets.DEVAI_UPDATE_BRANCH_APP_ID != '' }}",
@@ -744,7 +765,11 @@ const UPDATE_PROBE_SCRIPT = [
 const UPDATE_PRESENT_CONDITION = "steps.credentials.outputs.present == 'true'";
 const UPDATE_RUN_SCRIPT = [
   'set -euo pipefail',
+  'if [ "$EVENT_NAME" = \'pull_request_target\' ]; then',
+  'printf \'%s\\t%s\\n\' "$PULL_NUMBER" "$PULL_HEAD" > "$RUNNER_TEMP/pull-requests.tsv"',
+  'else',
   'gh api --paginate "repos/$REPOSITORY/pulls?state=open&base=main&per_page=100" --jq \'.[] | select(.draft == false) | select(.head.repo.full_name == $ENV.REPOSITORY) | [.number, .head.sha] | @tsv\' > "$RUNNER_TEMP/pull-requests.tsv"',
+  'fi',
   'skipped=0',
   "while IFS=$'\\t' read -r number head; do",
   'if ! behind=$(gh api "repos/$REPOSITORY/compare/$MAIN_SHA...$head" --jq \'.behind_by\' 2> "$RUNNER_TEMP/update.err"); then',
@@ -769,20 +794,22 @@ const UPDATE_RUN_SCRIPT = [
 ];
 
 /**
- * The update-branch workflow (ADR-CHK-0004, ADR-CHK-0008): it runs on push to main only,
- * holds contents: read, mints an App installation token (a GITHUB_TOKEN push starts no gate
- * run), and rebases each open non-draft same-repository pull request behind main with the
- * expected head sha. No job or step may soften its failure.
+ * The update-branch workflow (ADR-CHK-0004, ADR-CHK-0008): it runs on push to main and on
+ * pull_request_target opened, reopened, or ready_for_review against main, holds contents: read,
+ * mints an App installation token (a GITHUB_TOKEN push starts no gate run), and rebases each
+ * open non-draft same-repository pull request behind main (on a pull request event, only that
+ * pull request) with the expected head sha. Its job guard skips fork and draft pull requests
+ * before any credential is read, and no step checks out a ref or expands an expression into a
+ * script, so pull-request content never runs with the App credential. No job or step may soften
+ * its failure.
  */
 function checkUpdateBranchWorkflow(file, workflow, source, findings) {
   const invalid = (detail) =>
     findings.push(finding('CI_UPDATE_BRANCH_WORKFLOW_INVALID', file, detail));
-  const triggers = object(workflow.on);
-  if (
-    JSON.stringify(Object.keys(triggers)) !== JSON.stringify(['push']) ||
-    JSON.stringify(object(triggers.push)) !== JSON.stringify({ branches: ['main'] })
-  )
-    invalid('must trigger on push to main only');
+  if (JSON.stringify(object(workflow.on)) !== JSON.stringify(UPDATE_TRIGGERS))
+    invalid(
+      'must trigger on push to main and on pull_request_target types [opened, reopened, ready_for_review] against main only',
+    );
   if (JSON.stringify(object(workflow.permissions)) !== JSON.stringify({ contents: 'read' }))
     invalid('must hold workflow permissions contents: read only');
   if (JSON.stringify(object(workflow.concurrency)) !== JSON.stringify(UPDATE_CONCURRENCY))
@@ -793,8 +820,12 @@ function checkUpdateBranchWorkflow(file, workflow, source, findings) {
   if (JSON.stringify(Object.keys(jobs)) !== JSON.stringify([UPDATE_JOB]))
     invalid(`must have exactly one job, ${UPDATE_JOB}`);
   const job = object(jobs[UPDATE_JOB]);
-  if (job.permissions !== undefined || job.if !== undefined || job.environment !== undefined)
-    invalid(`jobs.${UPDATE_JOB} must add no permissions, condition, or environment`);
+  if (job.permissions !== undefined || job.environment !== undefined)
+    invalid(`jobs.${UPDATE_JOB} must add no permissions or environment`);
+  if (job.if !== UPDATE_JOB_CONDITION)
+    invalid(
+      `jobs.${UPDATE_JOB} must run on every push and, on pull_request_target, only for a same-repository non-draft pull request: if: ${UPDATE_JOB_CONDITION}`,
+    );
   if (typeof job['timeout-minutes'] !== 'number')
     invalid(`jobs.${UPDATE_JOB} must declare timeout-minutes`);
   const steps = (Array.isArray(job.steps) ? job.steps : []).map(object);
@@ -806,6 +837,13 @@ function checkUpdateBranchWorkflow(file, workflow, source, findings) {
   // GITHUB_TOKEN pushes start no workflow run, so it must never carry the update.
   if (/\bgithub\s*\.\s*token\b|secrets\s*\.\s*GITHUB_TOKEN\b/u.test(source))
     invalid('must not use GITHUB_TOKEN; the update needs the App installation token');
+  // Pull-request content never runs: the App token action is the only action, and no script
+  // carries an expression, so an event value reaches a script only through env.
+  const actions = steps.filter((step) => step.uses !== undefined);
+  if (actions.length !== 1 || actions[0]?.id !== UPDATE_APP_TOKEN_STEP)
+    invalid('the App token mint must be the only action step; no step may check out a ref');
+  if (steps.some((step) => typeof step.run === 'string' && step.run.includes('${{')))
+    invalid('no run script may expand an expression; event values reach a script through env');
   const mint = steps.find((step) => step.id === UPDATE_APP_TOKEN_STEP);
   if (
     typeof mint?.uses !== 'string' ||
@@ -837,10 +875,11 @@ function checkUpdateBranchWorkflow(file, workflow, source, findings) {
     update.if !== UPDATE_PRESENT_CONDITION ||
     mint?.if !== UPDATE_PRESENT_CONDITION ||
     object(update.env).GH_TOKEN !== UPDATE_RUN_TOKEN ||
+    JSON.stringify(object(update.env)) !== JSON.stringify(UPDATE_RUN_ENV) ||
     JSON.stringify(logicalScriptLines(update.run)) !== JSON.stringify(UPDATE_RUN_SCRIPT)
   )
     invalid(
-      'one bash step, run only when both credentials are present, must rebase each open non-draft same-repository pull request with update_method=rebase and the expected head sha, authenticated by the App token',
+      'one bash step, run only when both credentials are present, must rebase each open non-draft same-repository pull request (on pull_request_target, only the event pull request) with update_method=rebase and the expected head sha, authenticated by the App token',
     );
 }
 
