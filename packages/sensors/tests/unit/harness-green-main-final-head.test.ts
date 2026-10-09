@@ -16,6 +16,7 @@ vi.mock('@devai-nyx/authority', async (importOriginal) => ({
 }));
 
 import { senseHarnessGreenMain } from '../../src/harness-green-main.js';
+import { senseHarnessPerformance } from '../../src/harness-performance.js';
 import type { SensorReading } from '../../src/sensor-reading.js';
 
 const NOW = '2026-10-08T12:00:00.000Z';
@@ -656,6 +657,105 @@ describe('harness_green_main final-head base branch and lifetime (ADR-SCR-0014 I
 
     // The older pull request had no run in its own lifetime: it is not sampled and not red.
     expect(counted(sense())).toEqual({ total: 1, green: 1, pct: 100 });
+  });
+});
+
+// ADR-SCR-0014 IA-008 (#370): membership filters on baseRefName, so the final-head unit has
+// verified the base branch; the run unit, which reads runs without a base, has not.
+describe('harness_green_main unverified population filters (ADR-SCR-0014 IA-008)', () => {
+  const UNVERIFIED = 'HARNESS_POPULATION_UNVERIFIED';
+  /** A declared excluded pair naming the sampled workflow, which run rows cannot apply. */
+  const SAME_WORKFLOW_PAIR = {
+    excludedJobs: [{ workflow: 'pull-request-checks.yml', job: 'gate' }],
+  } as const;
+  const OTHER_WORKFLOW_PAIR = {
+    excludedJobs: [{ workflow: 'release.yml', job: 'verify-ledger' }],
+  } as const;
+
+  function finding(reading: SensorReading) {
+    return (reading.findings ?? []).find((entry) => entry.code === UNVERIFIED);
+  }
+
+  function readFinalHead(extra: Record<string, unknown> = {}): SensorReading {
+    const greens = greenPullRequests(2);
+    stub(greens.runs, greens.pullRequests);
+    return senseHarnessGreenMain({
+      ...POPULATION,
+      ...FINAL_HEAD,
+      ...extra,
+      repoRoot: '/repo',
+      now: NOW,
+    });
+  }
+
+  function readRuns(extra: Record<string, unknown> = {}): SensorReading {
+    const greens = greenPullRequests(2);
+    stub(greens.runs, greens.pullRequests);
+    return senseHarnessGreenMain({ ...POPULATION, ...extra, repoRoot: '/repo', now: NOW });
+  }
+
+  it('verifies the base branch and carries no unverified finding under the final-head unit', () => {
+    const reading = readFinalHead();
+
+    expect(reading.metrics).toMatchObject({
+      population_base_branch_verified: true,
+      population_unverified: '',
+    });
+    expect(finding(reading)).toBeUndefined();
+  });
+
+  it('names only excludedJobs under the final-head unit when a pair names the sampled workflow', () => {
+    const reading = readFinalHead(SAME_WORKFLOW_PAIR);
+
+    expect(reading.metrics).toMatchObject({
+      population_base_branch_verified: true,
+      population_unverified: 'excludedJobs',
+    });
+    expect(finding(reading)?.message).toMatch(/excludedJobs/u);
+    expect(finding(reading)?.message).not.toMatch(/baseBranch/u);
+  });
+
+  it('ignores a pair on another workflow under the final-head unit', () => {
+    const reading = readFinalHead(OTHER_WORKFLOW_PAIR);
+
+    expect(reading.metrics).toMatchObject({ population_unverified: '' });
+    expect(finding(reading)).toBeUndefined();
+  });
+
+  it.each([
+    ['omitted', {}],
+    ['declared run', { outcomeUnit: 'run' }],
+  ])('keeps the base branch unverified when the unit is %s', (_label, unit) => {
+    const reading = readRuns(unit);
+
+    expect(reading.metrics).toMatchObject({
+      population_base_branch_verified: false,
+      population_unverified: 'baseBranch',
+    });
+    expect(finding(reading)?.message).toMatch(/baseBranch/u);
+  });
+
+  it('lists baseBranch then excludedJobs under the run unit', () => {
+    const reading = readRuns(SAME_WORKFLOW_PAIR);
+
+    expect(reading.metrics).toMatchObject({
+      population_base_branch_verified: false,
+      population_unverified: 'baseBranch,excludedJobs',
+    });
+    expect(finding(reading)?.message).toMatch(/baseBranch.*excludedJobs/su);
+  });
+
+  it('leaves harness_performance reporting the unverified base branch', () => {
+    const greens = greenPullRequests(2);
+    stub(greens.runs, greens.pullRequests);
+
+    const reading = senseHarnessPerformance({ ...POPULATION, repoRoot: '/repo', now: NOW });
+
+    expect(reading.metrics).toMatchObject({
+      population_base_branch_verified: false,
+      population_unverified: 'baseBranch',
+    });
+    expect(finding(reading)?.message).toMatch(/baseBranch/u);
   });
 });
 
