@@ -633,6 +633,15 @@ const BROKER_SENSE_RUN_SHAPES: Readonly<
   'pnpm-test-perf': { executable: 'pnpm', argv_shape: ['test:perf'] },
 };
 
+/** The sensor kind whose sense run requests each mirrored shape. */
+const SHAPE_KIND: Readonly<Record<string, string>> = {
+  'npx-tsc-noemit': 'type_check',
+  'npx-tsc-noemit-project': 'type_check',
+  'npx-eslint-json': 'lint',
+  'pnpm-recursive-typecheck': 'type_check',
+  'pnpm-test-perf': 'perf_test',
+};
+
 function instantiateSenseRun(shape: readonly string[]): readonly string[] {
   return shape.map((argument) =>
     argument.replace('<relative-path>', 'packages/cli/tsconfig.json').replace('<path>', 'src'),
@@ -736,16 +745,14 @@ describe('subprocess template mirror for the sense run shapes (ADR-AUT-0006 IA-0
   it('admits every declared template once instantiated', () => {
     expect(declared()).toHaveLength(5);
     for (const template of declared()) {
-      const kind = template.template_id.includes('perf') ? 'perf_test' : 'type_check';
+      const kind = SHAPE_KIND[template.template_id] ?? 'unknown';
       expectAdmitted(kind, template.executable, instantiateSenseRun(template.argv_shape));
     }
   });
 
   it('admits every shape the broker literals mirror, so a removed literal fails', () => {
     for (const [id, { executable, argv_shape }] of Object.entries(BROKER_SENSE_RUN_SHAPES)) {
-      expectAdmitted(id.includes('perf') ? 'perf_test' : 'type_check', executable, [
-        ...instantiateSenseRun(argv_shape),
-      ]);
+      expectAdmitted(SHAPE_KIND[id] ?? 'unknown', executable, [...instantiateSenseRun(argv_shape)]);
     }
   });
 
@@ -899,5 +906,85 @@ describe('sense run perf_test through the broker (ADR-AUT-0006 IA-002, IA-004)',
       value.error instanceof Error ? value.error.message : `${value.value?.err_head ?? ''}`;
     expect(text).toContain('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
     expect(value.value?.status).not.toBe('pass');
+  });
+});
+
+// #386 review: each pnpm shape is bound to the sensor kind that runs it. The broker reads the
+// kind from the sense run argv (the refusal context names it as `sensor`), so pnpm -r
+// typecheck is admitted only for type_check and pnpm test:perf only for perf_test.
+describe('the pnpm shapes are bound to their sensor kind (ADR-AUT-0006, #386)', () => {
+  it.each([
+    ['pnpm test:perf requested by type_check', 'type_check', TEST_PERF],
+    ['pnpm -r typecheck requested by perf_test', 'perf_test', TYPECHECK],
+    ['pnpm -r typecheck requested by build', 'build', TYPECHECK],
+    ['pnpm test:perf requested by unit_test', 'unit_test', TEST_PERF],
+    ['pnpm -r typecheck requested by lint', 'lint', TYPECHECK],
+  ] as const)('refuses %s before a process starts', (_label, kind, args) => {
+    expectRefusedBeforeStart(kind, 'pnpm', [...args]);
+    expectRefusedBeforeStart(kind, COREPACK_SHIM, [...args]);
+  });
+
+  it('names the requesting sensor in the refusal of a cross-kind shape', () => {
+    const { refusal } = decide('type_check', 'pnpm', [...TEST_PERF]);
+    expect((refusal as Error & { context?: Record<string, unknown> }).context).toMatchObject({
+      action: 'sense run',
+      sensor: 'type_check',
+      executable: 'pnpm',
+      argv: ['test:perf'],
+    });
+  });
+
+  it('refuses type_check declaring pnpm test:perf through the real sensor, before spawn', () => {
+    const repo = pnpmWorkspace({ typecheck: 'tsc --noEmit', 'test:perf': 'node perf.mjs' });
+    process.env.PATH = plainPath();
+    const answer = vi.fn(() => ({ status: 0, stdout: '', stderr: '' }));
+    const { value, requests } = underBroker('type_check', 'inspector', answer, () =>
+      outcome(() => senseTypeCheck({ cwd: repo, argv: ['pnpm', ...TEST_PERF] })),
+    );
+    expect(answer).not.toHaveBeenCalled();
+    expect(requests).toHaveLength(1);
+    const text =
+      value.error instanceof Error
+        ? value.error.message
+        : `${value.value?.aggregate.err_head ?? ''}`;
+    expect(text).toContain('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
+    expect(value.value?.aggregate.status).not.toBe('pass');
+  });
+
+  it('refuses perf_test declaring pnpm -r typecheck through the real sensor, before spawn', () => {
+    const repo = pnpmWorkspace({ typecheck: 'tsc --noEmit', 'test:perf': 'node perf.mjs' });
+    process.env.PATH = plainPath();
+    const answer = vi.fn(() => ({ status: 0, stdout: '', stderr: '' }));
+    const { value, requests } = underBroker('perf_test', 'inspector', answer, () =>
+      outcome(() => sensePerfTest({ repoRoot: repo, argv: ['pnpm', ...TYPECHECK] })),
+    );
+    expect(answer).not.toHaveBeenCalled();
+    expect(requests).toHaveLength(1);
+    const text =
+      value.error instanceof Error ? value.error.message : `${value.value?.err_head ?? ''}`;
+    expect(text).toContain('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
+    expect(value.value?.status).not.toBe('pass');
+  });
+});
+
+// #386 review: npx eslint --format=json <path> admits a path, never an option in its place.
+describe('npx eslint --format=json path operand (#386)', () => {
+  it.each([
+    ['the repository root', '.'],
+    ['a relative directory', 'src'],
+    ['a relative file', 'packages/cli/src/bin.ts'],
+  ] as const)('admits %s', (_label, path) => {
+    expectAdmitted('lint', 'npx', ['eslint', '--format=json', path]);
+  });
+
+  it.each([
+    ['--fix', '--fix'],
+    ['-o', '-o'],
+    ['--output-file', '--output-file'],
+    ['--output-file=report.json', '--output-file=report.json'],
+    ['a bare dash', '-'],
+    ['--config', '--config'],
+  ] as const)('refuses the option %s in the path position', (_label, option) => {
+    expectRefusedBeforeStart('lint', 'npx', ['eslint', '--format=json', option]);
   });
 });

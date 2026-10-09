@@ -179,3 +179,60 @@ describe('type-check diagnostics behind the pnpm -r prefix (ADR-AUT-0006 IA-001)
     ]);
   });
 });
+
+// #386 review: stripping the pnpm -r prefix never costs a plain tsc diagnostic whose file name
+// holds a space, and a prefixed diagnostic still parses.
+describe('type-check diagnostics with spaces and prefixes (#386)', () => {
+  const run = (stdout: string, argv: readonly string[]) => {
+    runCommand.mockReturnValue({
+      stdout,
+      stderr: '',
+      exit_code: 2,
+      duration_ms: 5,
+      killed: false,
+    } satisfies RunResult);
+    return senseTypeCheck({ cwd: root, argv }).aggregate.findings ?? [];
+  };
+
+  it('reads a plain tsc diagnostic for a file name with a space', () => {
+    const findings = run(
+      "src/my file.ts(1,2): error TS2322: Type 'string' is not assignable to type 'number'.\n",
+      ['npx', 'tsc', '--noEmit'],
+    );
+    expect(findings).toEqual([
+      expect.objectContaining({
+        severity: 'error',
+        code: 'TS2322',
+        file: 'src/my file.ts',
+        line: 1,
+        message: "Type 'string' is not assignable to type 'number'.",
+      }),
+    ]);
+  });
+
+  it('reads a spaced file name from the default tsc run too', () => {
+    runCommand.mockReturnValue({
+      stdout: 'lib/a b/c d.ts(3,4): error TS7006: Parameter implicitly has an any type.\n',
+      stderr: '',
+      exit_code: 2,
+      duration_ms: 5,
+      killed: false,
+    } satisfies RunResult);
+    const findings = senseTypeCheck({ cwd: root }).aggregate.findings ?? [];
+    expect(findings.map(({ file, line, code }) => ({ file, line, code }))).toEqual([
+      { file: 'lib/a b/c d.ts', line: 3, code: 'TS7006' },
+    ]);
+  });
+
+  it('still parses a pnpm-prefixed diagnostic', () => {
+    const findings = run('packages/x typecheck: src/a.ts(1,2): error TS2322: Type mismatch.\n', [
+      'pnpm',
+      '-r',
+      'typecheck',
+    ]);
+    expect(findings).toHaveLength(1);
+    expect(findings[0]).toMatchObject({ code: 'TS2322', line: 1, message: 'Type mismatch.' });
+    expect(String(findings[0]?.file)).toMatch(/(?:^|\/)src\/a\.ts$/u);
+    expect(String(findings[0]?.file)).not.toContain('typecheck:');
+  });
+});
