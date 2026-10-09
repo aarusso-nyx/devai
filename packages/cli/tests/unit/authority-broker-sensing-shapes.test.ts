@@ -334,6 +334,9 @@ describe('refused sense run process context (#241)', () => {
       action: 'sense run',
       sensor: 'coverage',
       descriptor_path: '.devai/config/sensor-inputs.json',
+      // ADR-AUT-0006: the refusal points at the admitted shapes on the adopter page.
+      admitted_shapes:
+        'docs/adopters/sensor-inputs.md#process-shapes-the-broker-admits-under-sense-run',
     });
   });
 });
