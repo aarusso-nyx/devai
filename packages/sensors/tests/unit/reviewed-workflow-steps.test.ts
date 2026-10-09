@@ -3,12 +3,14 @@
 // reviewed step's entry makes its job unknown again, so an edited step reads unknown until it
 // is reviewed anew.
 import {
+  chmodSync,
   cpSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   readdirSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -178,6 +180,54 @@ describe('reviewed workflow step registry', () => {
       expect(jobEffectFacts(observation, tree, 'observe').effect).toBe('publication');
       writeFileSync(join(tree, hook), 'module.exports = { hooks: {} };\n');
       expect(jobEffectFacts(observation, tree, 'observe').effect).toBe('unknown');
+    },
+  );
+
+  // #395 review: a hook path pnpm may still load fails closed whatever its form; only its
+  // absence lets the --ignore-scripts install bind nothing.
+  describe.each(['.pnpmfile.cjs', 'pnpmfile.cjs', '.pnpmfile.js'])(
+    'the pnpm hook path %s present but unreadable or escaping',
+    (hook) => {
+      const observe = (tree: string) =>
+        jobEffectFacts(generatedWorkflows(tree)[1]?.text ?? '', tree, 'observe').effect;
+
+      it('reads unknown for a symlink to an existing file outside the candidate root', () => {
+        const tree = adopterTree();
+        const outside = mkdtempSync(join(tmpdir(), 'devai-hook-outside-'));
+        adopterTrees.push(outside);
+        writeFileSync(join(outside, 'hook.cjs'), 'module.exports = { hooks: {} };\n');
+        expect(observe(tree)).toBe('publication');
+        symlinkSync(join(outside, 'hook.cjs'), join(tree, hook));
+        expect(observe(tree)).toBe('unknown');
+      });
+
+      it('reads unknown for a dangling symlink', () => {
+        const tree = adopterTree();
+        symlinkSync(join(tree, 'missing-hook.cjs'), join(tree, hook));
+        expect(observe(tree)).toBe('unknown');
+      });
+
+      it.skipIf(process.platform === 'win32' || process.getuid?.() === 0)(
+        'reads unknown for an unreadable file',
+        () => {
+          const tree = adopterTree();
+          const path = join(tree, hook);
+          writeFileSync(path, 'module.exports = { hooks: {} };\n');
+          chmodSync(path, 0o000);
+          try {
+            expect(observe(tree)).toBe('unknown');
+          } finally {
+            chmodSync(path, 0o644);
+          }
+        },
+      );
+
+      it('reads unknown for a directory at the hook path', () => {
+        const tree = adopterTree();
+        mkdirSync(join(tree, hook));
+        writeFileSync(join(tree, hook, 'index.js'), 'module.exports = { hooks: {} };\n');
+        expect(observe(tree)).toBe('unknown');
+      });
     },
   );
 
