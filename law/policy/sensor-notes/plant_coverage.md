@@ -38,7 +38,9 @@ framework is given, otherwise the single `routes-*.json` present. Two or more ca
 are ambiguous and never guessed between, and the next directory is consulted only when a
 directory holds none.
 
-Neither body present in any location keeps `PLANT_COVERAGE_NO_INVENTORY`.
+Neither body present in any location keeps `PLANT_COVERAGE_NO_INVENTORY`. Two or more
+routes candidates in the directory consulted read `PLANT_COVERAGE_ROUTES_AMBIGUOUS`, a
+warning that makes the reading REVIEW; none of the candidates is chosen.
 
 The sensor emits evidence only through its registered cells or diagnostic surface. Any
 future change to identity, standing, tier, or emitter requires an Architect disposition
