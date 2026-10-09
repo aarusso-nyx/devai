@@ -138,10 +138,11 @@ Inventory regeneration comes before the first pass (#237). `inventory_adherence`
 member, reads the combined manifest `.devai/state/inventory/inventory.json`, and only the
 harness-write `inventory_regeneration` sensor produces it. On a clean tree at the candidate head the
 inspector runs `devai sense run inventory_regeneration --repo-root . --as-role inspector --write`.
-It regenerates, for the HEAD commit, the combined manifest and the bodies of the required kinds,
-`.devai/state/sensors/inventory_dep_graph/dep-graph.json` and
-`.devai/state/sensors/inventory_coverage/coverage-matrix.json`, each through its own typed producer
-and schema, binds them to that commit and its commit time, and keeps a producer's REVIEW as REVIEW.
+It regenerates, for the HEAD commit, the combined manifest and the bodies of the kinds the declared
+surfaces require under `.devai/state/sensors/<kind>/` (on the framework
+`inventory_dep_graph/dep-graph.json` and `inventory_coverage/coverage-matrix.json`; in an adopter
+with HTTP, database or RBAC surfaces also the API, routes, data-model, RBAC and data-handling
+bodies, #382), each through its own typed producer and schema, binds them to that commit and its commit time, and keeps a producer's REVIEW as REVIEW.
 On a tree that differs from HEAD it reads UNKNOWN and writes nothing, so it runs before any
 recording touches `record/proofs/chain.json`. The full protocol is regenerate, first pass, record,
 second pass, record, and the first recording includes the regeneration reading the sensor persisted

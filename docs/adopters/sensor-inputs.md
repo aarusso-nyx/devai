@@ -343,6 +343,53 @@ sensor that finds evidence of a surface declared absent (a route, a table, a rol
 sensor that found it. Declare a surface absent because the repository has none of it, never to
 move a cell.
 
+### Producing the inventory bodies
+
+Several sweep members measure from the bodies other inventory sensors produce: `plant_coverage`
+and `inventory_coverage` read the API map and the routes inventory, `inventory_rbac` reads the data
+model and the API map, and `inventory_data_handling` reads the data model. The sweep is read-only,
+so its own inventory members never persist a body. The one governed writer is the harness-write
+sensor `inventory_regeneration`, which for each surface declared present produces the bodies
+through each kind's typed producer, validates them against their schemas, and binds them to the
+HEAD commit (#382):
+
+| Surface declared present | Bodies under `.devai/state/sensors/`                                                                    |
+| ------------------------ | ------------------------------------------------------------------------------------------------------- |
+| `http`                   | `inventory_api/api-map.json`, `inventory_routes/routes-<framework>.json`                                |
+| `database`               | `inventory_data_model/data-model.json`                                                                  |
+| `rbac` (with `database`) | `inventory_rbac/rbac.json`, `inventory_data_handling/data-model-pii.json`                               |
+| `http` or `actions`      | `inventory_coverage/coverage-matrix.json`                                                               |
+| always                   | `inventory_dep_graph/dep-graph.json`, and the combined manifest `.devai/state/inventory/inventory.json` |
+
+A body whose surface is declared absent is removed from `.devai/state/sensors/` when the next
+regeneration publishes. The dependent sweep members read each input from the first location that
+holds it: an explicit input, then the regenerated body above, then the direct sensor default under
+`record/proofs/sensors/<kind>/`, which regeneration neither writes nor removes. The routes body is
+`routes-<framework>.json`; with no framework given a reader takes the single `routes-*.json` in a
+directory and reports two or more as ambiguous rather than choosing one. The full contract is the
+[`inventory_regeneration` design note](../../law/policy/sensor-notes/inventory_regeneration.md).
+
+Produce the bodies, then sweep and record in the ADR-SCR-0012 order, as the Inspector:
+
+1. Commit, so the working tree equals HEAD. Regeneration on a dirty tree, or without a commit,
+   reads UNKNOWN and writes nothing.
+2. Regenerate with write consent:
+   `devai sense run inventory_regeneration --repo-root . --as-role inspector --write --format json`.
+   A required producer that reads FAIL or UNKNOWN fails the run and publishes nothing; a producer's
+   REVIEW is kept as REVIEW.
+3. Record the regeneration reading the run persisted:
+   `devai sense record --repo-root . --input <reading> --as-role inspector --write --format json`.
+4. Run the first sweep pass, `devai sense run --preset sweep --round <round> --repo-root . --format json`,
+   and record each of its readings with `sense record` as in step 3.
+5. Run the second pass, the same command with `--pass second`, and record its readings.
+
+Run the sequence again after any commit that changes the plant: the bodies describe the commit
+they were regenerated at, and a body regenerated at another commit is not a measurement of this
+one. Declared surfaces must be accurate. Regeneration produces exactly the kinds the declaration
+names, so a surface declared present that the repository lacks makes its producer read what it
+finds, and a surface declared absent that the repository has leaves its dependents without input
+and its sensors reporting the evidence they find.
+
 The adopter default declares the conventional service shape, `http`, `database`, and `rbac`
 present and `actions` absent, beside the harness population above (shown here for one of the
 three kinds; `harness_performance` and `harness_robustness` repeat it with their own
