@@ -218,13 +218,7 @@ export function samplePopulation(
   const sameWorkflowPairs = (opts.excludedJobs ?? []).filter(
     (pair) => pair.workflow === workflow,
   ).length;
-  const unverified = ['baseBranch', ...(sameWorkflowPairs > 0 ? ['excludedJobs'] : [])];
-  const unverifiedDetail = [
-    `baseBranch ${baseBranch} (gh run list rows carry no base branch)`,
-    ...(sameWorkflowPairs > 0
-      ? [`excludedJobs ${String(sameWorkflowPairs)} pair(s) of ${workflow} (rows carry no jobs)`]
-      : []),
-  ];
+  const unverified = unverifiedFilters({ workflow, baseBranch, sameWorkflowPairs }, false);
   return {
     ok: true,
     args,
@@ -242,13 +236,50 @@ export function samplePopulation(
       population_lookback_days: lookbackDays,
       population_base_branch_verified: false,
       population_excluded_jobs_unverified: sameWorkflowPairs,
-      population_unverified: unverified.join(','),
+      population_unverified: unverified.names,
     },
-    unverifiedFinding: {
-      severity: 'info',
-      code: 'HARNESS_POPULATION_UNVERIFIED',
-      message: `Population filters unverified, not applied to the sample: ${unverifiedDetail.join('; ')}.`,
-    },
+    // A run sample always leaves the base branch unverified, so the finding is always present.
+    unverifiedFinding: unverified.finding as PopulationFinding,
+  };
+}
+
+/**
+ * The declared filters a sample could not apply and the finding naming them (#370): the base
+ * branch unless it was verified, then the excluded jobs when a declared pair names the sampled
+ * workflow. The finding is undefined when nothing remains unverified.
+ */
+function unverifiedFilters(
+  population: {
+    readonly workflow: string;
+    readonly baseBranch: string;
+    readonly sameWorkflowPairs: number;
+  },
+  baseBranchVerified: boolean,
+): { readonly names: string; readonly finding: PopulationFinding | undefined } {
+  const { workflow, baseBranch, sameWorkflowPairs } = population;
+  const filters: { readonly name: string; readonly detail: string }[] = [];
+  if (!baseBranchVerified) {
+    filters.push({
+      name: 'baseBranch',
+      detail: `baseBranch ${baseBranch} (gh run list rows carry no base branch)`,
+    });
+  }
+  if (sameWorkflowPairs > 0) {
+    filters.push({
+      name: 'excludedJobs',
+      detail: `excludedJobs ${String(sameWorkflowPairs)} pair(s) of ${workflow} (rows carry no jobs)`,
+    });
+  }
+  return {
+    names: filters.map((filter) => filter.name).join(','),
+    finding:
+      filters.length === 0
+        ? undefined
+        : {
+            severity: 'info',
+            code: 'HARNESS_POPULATION_UNVERIFIED',
+            message: `Population filters unverified, not applied to the sample: ${filters.map((filter) => filter.detail).join('; ')}.`,
+          },
   };
 }
 
@@ -293,7 +324,8 @@ export type FinalHeadSample =
       readonly pendingOpen: readonly number[];
       readonly minimum: number;
       readonly metrics: PopulationMetrics;
-      readonly unverifiedFinding: PopulationFinding;
+      /** Absent when every declared filter was applied (#370). */
+      readonly unverifiedFinding: PopulationFinding | undefined;
       readonly describe: string;
     };
 
@@ -436,6 +468,16 @@ export function sampleFinalHeads(opts: HarnessPopulationOptions): FinalHeadSampl
       run.conclusion !== 'cancelled' &&
       run.conclusion !== 'skipped',
   );
+  // The baseRefName filter verifies the base branch; only same-workflow excluded jobs remain.
+  const unverified = unverifiedFilters(
+    {
+      workflow: opts.workflow ?? '',
+      baseBranch,
+      sameWorkflowPairs: (opts.excludedJobs ?? []).filter((pair) => pair.workflow === opts.workflow)
+        .length,
+    },
+    true,
+  );
   const finals: PullRequestFinal[] = [];
   const pendingOpen: number[] = [];
   for (const pull of validated.pulls) {
@@ -476,7 +518,9 @@ export function sampleFinalHeads(opts: HarnessPopulationOptions): FinalHeadSampl
       population_outcome_unit: 'pull-request-final-head',
       population_window_runs: windowRuns.length,
       population_pending_open: pendingOpen.length,
+      population_base_branch_verified: true,
+      population_unverified: unverified.names,
     },
-    unverifiedFinding: sample.unverifiedFinding,
+    unverifiedFinding: unverified.finding,
   };
 }
