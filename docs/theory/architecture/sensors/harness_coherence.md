@@ -42,6 +42,20 @@ registry (`packages/sensors/src/harness/reviewed-workflow-steps.ts`):
 - The analysis recomputes those hashes from the candidate tree. A changed, missing, or
   unresolvable file reads unknown.
 
+Every input of the registry is an input of `test:sensors` in `test-tasks.json` (#376), so
+`check --affected` selects the registry test whenever a change could break it:
+
+- each repository file that any entry pins by digest, declared one `exact` selector per
+  path;
+- every workflow file and local action, through one `prefix` selector on `.github/`,
+  because a step's canonical YAML is pinned too.
+
+A guard test fails when the registry pins a path that no `test:sensors` selector matches, so
+a new pin cannot outrun the declaration. A version roll changes pinned `package.json`
+files, which therefore selects `test:sensors` and asks for the re-pinned digests in the same
+pull request. A change that touches only a pinned file, such as a documentation-site
+dependency bump, no longer passes the gate without the registry test.
+
 A superseding concurrency group must be keyed by the run's own subject on every event the
 workflow accepts: its ref, its commit, the pull request number on pull request events, or
 the merge-queue head on merge-queue events.
