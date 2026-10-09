@@ -470,16 +470,17 @@ export function checkCiEconomy(opts: CheckCiEconomyOptions): CiEconomyReport {
 
   // ── Advisory — ci-economy.path-filters ───────────────────────────────
   // Not raised for a pull-request trigger whose lane is selected by class in
-  // test-tasks.json, nor for a push that names only tags, nor for a branch push
-  // that declares jobs none of which uses actions/checkout: such a workflow
-  // consumes no repository content, so a path filter saves nothing and could
-  // only skip it. An unfiltered branch push that checks out source (or declares
-  // no jobs), or a pull-request lane without class selectors (with or without a
-  // checkout), keeps the advisory.
+  // test-tasks.json, nor for a push that names only tags, nor for a workflow
+  // that declares jobs none of which uses actions/checkout, on a branch push or
+  // on either pull-request trigger (ADR-CHK-0008, 2026-10-09 amendment): such a
+  // workflow consumes no repository content, so a path filter saves nothing and
+  // could only skip it. An unfiltered branch push or pull-request lane that
+  // checks out source (or declares no jobs), the latter without class
+  // selectors, keeps the advisory.
   const classSelected = laneSelectedByClass(opts.repoRoot);
   const unfiltered = facts.filter(
     (f) =>
-      ((hasPrTrigger(f) && !classSelected) ||
+      ((hasPrTrigger(f) && !classSelected && !f.jobsSkipCheckout) ||
         (f.triggers.has('push') && !f.pushNamesOnlyTags && !f.jobsSkipCheckout)) &&
       !f.hasPathFilters &&
       !f.triggers.has('workflow_call'),
