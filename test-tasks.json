@@ -436,6 +436,214 @@
         {
           "kind": "exact",
           "pattern": "tests/config/local.config.ts"
+        },
+        {
+          "kind": "prefix",
+          "pattern": ".github/"
+        },
+        {
+          "kind": "exact",
+          "pattern": "docs/site/package.json"
+        },
+        {
+          "kind": "exact",
+          "pattern": "docs/site/scripts/check-dependency-audit.mjs"
+        },
+        {
+          "kind": "exact",
+          "pattern": "docs/site/scripts/check-image-size-patch.mjs"
+        },
+        {
+          "kind": "exact",
+          "pattern": "docs/site/scripts/sync-docs.mjs"
+        },
+        {
+          "kind": "exact",
+          "pattern": "package.json"
+        },
+        {
+          "kind": "exact",
+          "pattern": "packages/cli/package.json"
+        },
+        {
+          "kind": "exact",
+          "pattern": "packages/cli/scripts/assemble-package.mjs"
+        },
+        {
+          "kind": "exact",
+          "pattern": "packages/cli/scripts/installed-tarball-smoke.mjs"
+        },
+        {
+          "kind": "exact",
+          "pattern": "packages/evidence/package.json"
+        },
+        {
+          "kind": "exact",
+          "pattern": "packages/loop/package.json"
+        },
+        {
+          "kind": "exact",
+          "pattern": "packages/skills/package.json"
+        },
+        {
+          "kind": "exact",
+          "pattern": "packages/skills/scripts/copy-constitution.mjs"
+        },
+        {
+          "kind": "exact",
+          "pattern": "packages/skills/scripts/copy-policy.mjs"
+        },
+        {
+          "kind": "exact",
+          "pattern": "packages/skills/src/operations/catalog.ts"
+        },
+        {
+          "kind": "exact",
+          "pattern": "packages/skills/src/operations/types.ts"
+        },
+        {
+          "kind": "exact",
+          "pattern": "packages/skills/src/recipes/loader.ts"
+        },
+        {
+          "kind": "exact",
+          "pattern": "packages/skills/src/recipes/types.ts"
+        },
+        {
+          "kind": "exact",
+          "pattern": "packages/skills/src/recipes/validate.ts"
+        },
+        {
+          "kind": "exact",
+          "pattern": "packages/spec/package.json"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/aggregate-gate-partitions.mjs"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/check-commit-range.mjs"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/check-formatting.mjs"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/check-mutation-free-delivery.mjs"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/check-policy-materialization.mjs"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/check-publishable-closure.mjs"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/check-release-static-integrity.mjs"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/check-test-task-workspace-selectors.mjs"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/create-release-manifest.mjs"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/error-code-sources.mjs"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/generate-action-registry.mjs"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/generate-error-code-reference.mjs"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/generate-scorecard-page.mjs"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/npm-pack-output.mjs"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/pr-failure-diagnostics.mjs"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/process/bootstrap-check-runner.mjs"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/process/evidence_transport.py"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/process/github-pages-journal.mjs"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/process/pages-publication.mjs"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/process/pages-runtime.mjs"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/process/publication-state.mjs"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/process/publish-pages.mjs"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/process/publish-site.mjs"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/process/rehearsal.mjs"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/process/release-prerequisites.mjs"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/process/release-recovery.mjs"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/process/summarize-check-report.mjs"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/process/verify-pages-bytes.mjs"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/process/verify-site-preparation-artifact.mjs"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/release-channel.mjs"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/run-pr-release-gate.mjs"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/stage-release-package.mjs"
         }
       ],
       "toolchainKeys": ["node", "pnpm", "vitest"],
