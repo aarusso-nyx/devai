@@ -257,7 +257,9 @@ describe('audit observe links the previous observation (#335)', () => {
     await expect(observe(root, third)).rejects.toThrow('AUDIT_OBSERVE_PREVIOUS_BACKLOG_MISSING');
   });
 
-  it('refuses an ancestry check that fails for any reason other than "not an ancestor"', async () => {
+  // #389: a commit absent from a complete, non-shallow history is provably not an ancestor,
+  // so automatic selection skips its record and links the nearest real ancestor.
+  it('skips a record whose commit is absent from a full checkout and links the real ancestor', async () => {
     const root = fixture();
     const { first } = await observedPredecessor(root);
     const third = commitChain(root, [
@@ -265,9 +267,10 @@ describe('audit observe links the previous observation (#335)', () => {
       chainRecord('EV-missing-1', 'f'.repeat(40), bundleDigests(root, first)),
     ]);
 
-    await expect(observe(root, third)).rejects.toThrow(
-      'AUDIT_OBSERVE_PREVIOUS_HISTORY_UNAVAILABLE',
-    );
+    await observe(root, third);
+
+    expect(readBundle(root, third, 'status')['previous_observation_record']).toBe('EV-first-1');
+    expect(readBundle(root, third, 'backlog')['previous_merge_sha']).toBe(first);
   });
 
   it.each([
@@ -292,4 +295,144 @@ describe('audit observe links the previous observation (#335)', () => {
         : 'AUDIT_OBSERVE_CHAIN_INVALID',
     );
   });
+});
+
+/**
+ * #389: main observed at its first commit, then a pull-request branch commit observed and
+ * recorded, rebase-merged onto main (a new commit with the same change), and its branch deleted.
+ * With `gc`, the reflogs are expired and the branch commit pruned, as on a host after the branch
+ * is gone; without it, the branch commit stays present but unreachable from main.
+ */
+async function rebaseMerged(gc: boolean): Promise<{
+  root: string;
+  first: string;
+  branch: string;
+  merged: string;
+}> {
+  const root = fixture();
+  const first = git(root, ['rev-parse', 'HEAD']);
+  await observe(root, first);
+  const mainRecord = chainRecord('EV-main-1', first, bundleDigests(root, first));
+  commitChain(root, [mainRecord]);
+
+  git(root, ['checkout', '-b', 'feature']);
+  writeFileSync(join(root, 'feature.txt'), 'feature\n');
+  git(root, ['add', 'feature.txt']);
+  git(root, ['commit', '-m', 'feat(fixture): add the feature']);
+  const branch = git(root, ['rev-parse', 'HEAD']);
+  await observe(root, branch);
+  const branchRecord = chainRecord('EV-branch-1', branch, bundleDigests(root, branch));
+
+  // Main moves on first, so the rebase-merged commit has a new parent and a new SHA.
+  git(root, ['checkout', 'main']);
+  writeFileSync(join(root, 'main.txt'), 'main\n');
+  git(root, ['add', 'main.txt']);
+  git(root, ['commit', '-m', 'feat(fixture): move main']);
+  git(root, ['cherry-pick', branch]);
+  expect(git(root, ['rev-parse', 'HEAD']), 'the rebase-merge made a new commit').not.toBe(branch);
+  git(root, ['branch', '-D', 'feature']);
+  if (gc) {
+    git(root, ['reflog', 'expire', '--expire=now', '--all']);
+    git(root, ['gc', '--prune=now', '--quiet']);
+  }
+  const merged = commitChain(root, [mainRecord, branchRecord]);
+  return { root, first, branch, merged };
+}
+
+function present(root: string, sha: string): boolean {
+  return spawnSync('git', ['cat-file', '-e', `${sha}^{commit}`], { cwd: root }).status === 0;
+}
+
+describe('audit observe skips provably unreachable observations (#389)', () => {
+  it('links the real ancestor after a rebase-merged, deleted, and pruned branch', async () => {
+    const { root, first, branch, merged } = await rebaseMerged(true);
+    expect(present(root, branch), 'the branch commit was pruned').toBe(false);
+
+    const result = await observe(root, merged);
+
+    expect(result.status).not.toBe('replayed');
+    expect(readBundle(root, merged, 'status')['previous_observation_record']).toBe('EV-main-1');
+    expect(readBundle(root, merged, 'backlog')['previous_merge_sha']).toBe(first);
+  });
+
+  it('replays the linked bundle byte for byte', async () => {
+    const { root, merged } = await rebaseMerged(true);
+    await observe(root, merged);
+    const before = Object.fromEntries(
+      NAMES.map((name) => [name, readFileSync(bundlePath(root, merged, name), 'utf8')]),
+    );
+
+    const replayed = await observe(root, merged);
+
+    expect(replayed.status).toBe('replayed');
+    for (const name of NAMES) {
+      expect(readFileSync(bundlePath(root, merged, name), 'utf8')).toBe(before[name]);
+    }
+  });
+
+  it('skips a branch commit that is still present but unreachable from main', async () => {
+    const { root, first, branch, merged } = await rebaseMerged(false);
+    expect(present(root, branch), 'the branch commit is still present').toBe(true);
+
+    await observe(root, merged);
+
+    expect(readBundle(root, merged, 'status')['previous_observation_record']).toBe('EV-main-1');
+    expect(readBundle(root, merged, 'backlog')['previous_merge_sha']).toBe(first);
+  });
+
+  it('observes as a first observation when every candidate is unreachable', async () => {
+    const root = fixture();
+    git(root, ['checkout', '-b', 'side']);
+    writeFileSync(join(root, 'side.txt'), 'side\n');
+    git(root, ['add', 'side.txt']);
+    git(root, ['commit', '-m', 'feat(fixture): an unmerged side commit']);
+    const side = git(root, ['rev-parse', 'HEAD']);
+    await observe(root, side);
+    const digests = bundleDigests(root, side);
+    git(root, ['checkout', 'main']);
+    const at = commitChain(root, [
+      chainRecord('EV-missing-1', 'f'.repeat(40), digests),
+      chainRecord('EV-side-1', side, digests),
+    ]);
+
+    const result = await observe(root, at);
+
+    expect(result.status).not.toBe('replayed');
+    const backlog = readBundle(root, at, 'backlog');
+    expect(backlog['previous_merge_sha']).toBeNull();
+    expect(backlog['deltas']).toEqual({ additions: [], completions: [] });
+    const status = readBundle(root, at, 'status');
+    expect(status['previous_observation_digest_sha256']).toBeNull();
+    expect(status['previous_observation_record'] ?? null).toBeNull();
+  });
+
+  it('still refuses a shallow clone that lacks a real ancestor as undecidable', async () => {
+    const source = fixture();
+    const { first, second } = await observedPredecessor(source);
+    const clone = mkdtempSync(join(tmpdir(), 'devai-audit-previous-shallow-'));
+    roots.push(clone);
+    rmSync(clone, { recursive: true, force: true });
+    git(tmpdir(), ['clone', '--quiet', '--depth', '1', `file://${source}`, clone]);
+    disableGitAutoMaintenance(clone);
+    expect(git(clone, ['rev-parse', '--is-shallow-repository'])).toBe('true');
+    expect(present(clone, first), 'the real ancestor is outside the shallow history').toBe(false);
+
+    await expect(observe(clone, second)).rejects.toThrow(
+      'AUDIT_OBSERVE_PREVIOUS_HISTORY_UNAVAILABLE',
+    );
+  });
+
+  it.each([
+    ['pruned', true],
+    ['present but unreachable', false],
+  ] as const)(
+    'refuses an explicit --previous naming a %s branch commit as not an ancestor',
+    async (_label, gc) => {
+      const { root, branch, merged } = await rebaseMerged(gc);
+
+      await expect(observe(root, merged, branch)).rejects.toThrow(
+        'AUDIT_OBSERVE_PREVIOUS_NOT_ANCESTOR',
+      );
+    },
+  );
 });
