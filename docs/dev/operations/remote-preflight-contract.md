@@ -202,8 +202,11 @@ on the `base-up-to-date` probe. ADR-CHK-0008 keeps pull requests current instead
   refusal: `scripts/check-commit-range.mjs` fails a pull-request range that contains any
   commit with more than one parent (TASK-0728, tested by TASK-0729).
 - **The workflow is the mechanism.** `.github/workflows/update-pull-request-branches.yml`
-  (CMP-0007 TASK-0726) runs on every push to `main`. For each open, non-draft pull
-  request against `main` that is behind it, the workflow calls
+  (CMP-0007 TASK-0726) runs on every push to `main`, and on `pull_request_target` when
+  a pull request against `main` is opened, reopened, or marked ready for review. On a push
+  it updates every open, non-draft, same-repository pull request behind `main`; on a pull
+  request event it updates only that pull request, never a fork's, and never checks out or
+  runs its code. For each pull request it updates, the workflow calls
   `PUT /repos/{owner}/{repo}/pulls/{number}/update-branch` with `update_method: rebase`
   and the pull request's current head sha as the expected head. The setting alone updates
   nothing.
