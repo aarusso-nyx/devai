@@ -29,7 +29,8 @@ inspector_acceptance:
   - IA-006 -- With TASK-0728 merged, the commit-range check fails a pull-request commit whose committer is neither its author role nor the recorded update-branch App, or whose author role lacks Article 6 authority over a path it touches; a rebase update by the App never fails it.
   - IA-007 -- With TASK-0728 merged, the commit-range check fails any pull-request range that contains a commit with more than one parent, so a merge update pressed in the GitHub interface reddens the gate; the grammar exemption for merge commits is unchanged.
   - IA-008 -- The commit-range check admits each path only for the authors its table row names, so an Architect commit under packages/, an Engineer commit under law/ or docs/, a commit mixing two roles, and a committed file under scratch/ other than its README each fail, while a Machine commit under record/ and an Architect commit pairing law/policy with its .devai/config copy pass.
-  - IA-009 -- harness_coherence reads a job as repository-write only when a reviewed step carries that effect and its other steps are read-only, accepts it only with cancel-in-progress true and a group keyed by github.workflow and github.ref, and reports a serializing, unkeyed, or shared-group lock, while a publication job still requires the noncancellable devai-pages-publication lock.
+  - IA-009 -- harness_coherence reads a job as repository-write only when a reviewed step carries that effect and its other steps are read-only, and accepts it only with cancel-in-progress true and a group keyed by github.workflow plus the subject of each accepted event, github.ref on push and github.event.pull_request.number on pull_request_target; a serializing, unkeyed, or shared-group lock is reported.
+  - IA-010 -- On pull_request_target opened, reopened, or ready_for_review, the workflow from the base branch rebases only that pull request when it is from this repository, not a draft, and behind main; a fork or draft pull request is skipped without reading a credential, and no step checks out or runs pull-request content.
 ---
 
 # Admit the update branch with the rebase method only
@@ -43,6 +44,15 @@ rejected and leaves every other part of that record in force: strict
 up-to-date branch protection, the single required check, the
 `merge_group` lane, serialized admission while no queue is enabled, and the
 rebase merge method.
+
+Amended on 2026-10-09 after 2.3.0 carried this record. The update workflow
+also runs on `pull_request_target` when a pull request against main is
+opened, reopened, or marked ready for review. Without it, a pull request
+opened from a branch already behind main could not merge until main moved
+again: "Update branch" in the GitHub interface makes the user the committer,
+which the commit-range check refuses. The `repository-write` concurrency
+key follows the run's subject on each event. IA-009 is restated, and IA-010
+covers the pull request event.
 
 ## Context
 
@@ -78,16 +88,26 @@ The mechanism that keeps pull requests current is the rebase-update
 workflow `.github/workflows/update-pull-request-branches.yml` (CMP-0007
 TASK-0726):
 
-1. **Trigger.** It runs on every push to main.
-2. **Update.** For every open, non-draft pull request against main that is
-   behind it, it calls
+1. **Trigger.** It runs on every push to main, and on `pull_request_target`
+   with types `opened`, `reopened`, and `ready_for_review` for pull
+   requests against main.
+2. **Update.** On a push to main, it updates every open, non-draft pull
+   request against main that is behind it. On a pull request event, it
+   updates only that pull request, and only when the pull request comes from
+   this repository, is not a draft, and is behind main. Each update calls
    `PUT /repos/{owner}/{repo}/pulls/{number}/update-branch` with
    `update_method: rebase` and the pull request's current head sha as the
    expected head.
-3. **Credential.** It acts with a GitHub App installation token, never with
+3. **Untrusted code never runs.** `pull_request_target` runs the workflow as
+   it stands on the base branch, so a pull request cannot change the steps
+   that hold the App credential. The workflow never checks out or executes
+   pull-request content: it has no `actions/checkout` step and reads the
+   pull request only through the GitHub API. Pull requests from forks are
+   skipped.
+4. **Credential.** It acts with a GitHub App installation token, never with
    `GITHUB_TOKEN`, so the rebased head starts a gate run. The workflow holds
    the least permissions it needs.
-4. **Conflicts.** A pull request whose rebase conflicts is skipped and
+5. **Conflicts.** A pull request whose rebase conflicts is skipped and
    reported; the others are still updated, and a conflict is resolved by its
    author.
 
@@ -214,16 +234,24 @@ coordinator's ruling of 2026-10-08:
   identifiers are declared in `law/policy/credential-requirements.json` with
   the job as their consumer.
 - **Concurrency.** The concurrency is superseding: `cancel-in-progress: true`,
-  with a group keyed by `github.workflow` and `github.ref`. It may be set at
-  the job or at the workflow level. A newer push to main makes an update in
-  progress stale, and the next run re-evaluates every pull request. The
-  expected-head-sha guard of each update-branch call keeps a cancelled run
-  from racing the next one.
+  with a group keyed by `github.workflow` and by the run's own subject on
+  every event the workflow accepts. It may be set at the job or at the
+  workflow level.
+  - On `push` the subject is `github.ref`. A newer push to main makes an
+    update in progress stale, and the next run re-evaluates every pull
+    request.
+  - On `pull_request_target` the subject is
+    `github.event.pull_request.number`. `github.ref` names the base branch
+    on that event, so it never scopes a `repository-write` group there: it
+    would put every pull request's run in one group with the push run.
+
+  The expected-head-sha guard of each update-branch call keeps a cancelled
+  or overlapping run from racing another.
 
   The coherence rule that serializes effectful jobs does not apply to this
-  class. A `repository-write` lock that serializes, that is not keyed by
-  workflow and ref, or that shares its group with a job of another class is
-  a finding.
+  class. A `repository-write` lock is a finding when it serializes, when on
+  any accepted event it is not keyed by that event's subject, or when it
+  shares its group with a job of another class.
 
 ## Alternatives Considered
 
@@ -255,4 +283,5 @@ button for every open pull request on every merge.
 - IA-006 -- With TASK-0728 merged, the commit-range check fails a pull-request commit whose committer is neither its author role nor the recorded update-branch App, or whose author role lacks Article 6 authority over a path it touches; a rebase update by the App never fails it.
 - IA-007 -- With TASK-0728 merged, the commit-range check fails any pull-request range that contains a commit with more than one parent, so a merge update pressed in the GitHub interface reddens the gate; the grammar exemption for merge commits is unchanged.
 - IA-008 -- The commit-range check admits each path only for the authors its table row names, so an Architect commit under packages/, an Engineer commit under law/ or docs/, a commit mixing two roles, and a committed file under scratch/ other than its README each fail, while a Machine commit under record/ and an Architect commit pairing law/policy with its .devai/config copy pass.
-- IA-009 -- harness_coherence reads a job as repository-write only when a reviewed step carries that effect and its other steps are read-only, accepts it only with cancel-in-progress true and a group keyed by github.workflow and github.ref, and reports a serializing, unkeyed, or shared-group lock, while a publication job still requires the noncancellable devai-pages-publication lock.
+- IA-009 -- harness_coherence reads a job as repository-write only when a reviewed step carries that effect and its other steps are read-only, and accepts it only with cancel-in-progress true and a group keyed by github.workflow plus the subject of each accepted event, github.ref on push and github.event.pull_request.number on pull_request_target; a serializing, unkeyed, or shared-group lock is reported.
+- IA-010 -- On pull_request_target opened, reopened, or ready_for_review, the workflow from the base branch rebases only that pull request when it is from this repository, not a draft, and behind main; a fork or draft pull request is skipped without reading a credential, and no step checks out or runs pull-request content.
