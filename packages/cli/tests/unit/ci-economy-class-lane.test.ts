@@ -82,6 +82,9 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
+      # The lane checks out the candidate, so it consumes repository content and the
+      # checkout-free exemption (ADR-CHK-0008 amendment) never applies to it.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - run: node .devai/state/pr-bootstrap/cli/bin.js check --affected --run
 `;
 }
