@@ -274,6 +274,8 @@ jobs:
       db:
         image: postgres
     steps:
+      # A checkout consumes repository content, so the path-filters advisory applies.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - run: |
           actual_provenance_sha256=x
           VERIFIER_PROVENANCE_SHA256=\${{ vars.DEVAI_LEDGER_VERIFIER_PROVENANCE_SHA256 }}
@@ -470,7 +472,12 @@ jobs:
 
   it('renders every human finding field and honors a custom workflows directory', () => {
     const root = temporary('devai-s06c-residual-human-');
-    put(root, 'custom/risk.yml', 'on: pull_request\njobs:\n  x:\n    runs-on: ubuntu-latest\n');
+    // The checkout keeps the path-filters advisory: a checkout-free workflow is exempt.
+    put(
+      root,
+      'custom/risk.yml',
+      'on: pull_request\njobs:\n  x:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1\n',
+    );
     const registration = captureRegistration(checkCiEconomyCmd);
     if (registration.action === undefined) throw new Error('CI action missing');
     const output = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);

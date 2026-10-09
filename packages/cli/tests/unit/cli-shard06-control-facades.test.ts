@@ -207,7 +207,7 @@ describe('S06-C CI economy public result seam', () => {
     workflow(
       root,
       'risk.yml',
-      `on: [pull_request, push, schedule]\njobs:\n  test:\n    runs-on: macos-14\n    services:\n      db:\n        image: postgres:16\nschedule:\n  - cron: '0 0 * * *'\n`,
+      `on: [pull_request, push, schedule]\njobs:\n  test:\n    runs-on: macos-14\n    services:\n      db:\n        image: postgres:16\n    steps:\n      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1\nschedule:\n  - cron: '0 0 * * *'\n`,
     );
     workflow(root, 'cost.yaml', 'on: workflow_dispatch\njobs:\n  test:\n    runs-on: macos-13\n');
     const report = checkCiEconomy({ repoRoot: root });
