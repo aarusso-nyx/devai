@@ -47,11 +47,21 @@ export interface TypeCheckResult {
 
 const TSC_ERROR_PATTERN = /^(.+?)\((\d+),(\d+)\): error (TS\d+): (.+)$/;
 /**
- * The prefix `pnpm -r <script>` writes before each line of a package's output, `<package dir>
- * <script>: ` (ADR-AUT-0006). It never matches a bare tsc diagnostic, whose first space follows
- * `(<line>,<column>):` and is followed by `error`, not by a colon.
+ * The prefix `pnpm -r typecheck` writes before each line of a package's output, `<package dir>
+ * typecheck: ` (ADR-AUT-0006). Only this exact script name is stripped, so a bare diagnostic
+ * whose file name holds a space still parses as written.
  */
-const PNPM_RECURSIVE_PREFIX = /^\S+ [^\s:]+: /u;
+const PNPM_TYPECHECK_PREFIX = /^\S+ typecheck: /u;
+
+/**
+ * One tsc diagnostic line, read as written first; a line that `pnpm -r typecheck` prefixed is
+ * read again without its verified prefix, so the finding names the file rather than the prefix.
+ */
+function diagnostic(line: string): RegExpExecArray | null {
+  const written = TSC_ERROR_PATTERN.exec(line);
+  if (written === null || !PNPM_TYPECHECK_PREFIX.test(written[1] ?? '')) return written;
+  return TSC_ERROR_PATTERN.exec(line.replace(PNPM_TYPECHECK_PREFIX, ''));
+}
 const DEFAULT_SCAN_DIRS: readonly string[] = ['packages', 'apps', 'reference', 'domain', 'tools'];
 
 /**
@@ -91,7 +101,7 @@ function runSingle(opts: TypeCheckOptions, projectOverride?: string): SensorRead
 
   const findings: SensorFinding[] = [];
   for (const line of result.stdout.split('\n')) {
-    const m = TSC_ERROR_PATTERN.exec(line.replace(PNPM_RECURSIVE_PREFIX, ''));
+    const m = diagnostic(line);
     if (m) {
       findings.push({
         severity: 'error',
