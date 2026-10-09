@@ -19,6 +19,7 @@ import {
   type InventoryDataHandlingOptions,
 } from '../../src/inventory-data-handling.js';
 import type { SensorReading } from '../../src/sensor-reading.js';
+import { expectMissingInputMessage } from './inventory-missing-input-message.js';
 
 const NOW = '2026-09-08T12:00:00.000Z';
 const MODEL_BODY_REL = 'record/proofs/sensors/inventory_data_model/data-model.json';
@@ -739,9 +740,11 @@ describe('senseInventoryDataHandling prerequisite handling', () => {
       {
         severity: 'warning',
         code: 'DATA_HANDLING_REQUIRES_DATA_MODEL',
-        message: `Data-model body not found at ${join(root, MODEL_BODY_REL)}. Run 'devai sense run inventory_data_model' first.`,
+        message: expect.any(String),
       },
     ]);
+    // #391: the message names both locations read and the regeneration producer.
+    expectMissingInputMessage(result.reading.findings?.[0]?.message, ['inventory_data_model']);
     expect(result.body).toBeNull();
     expect(result.bodyPath).toBeNull();
     expect(result.reading.evidence_path).toBeUndefined();
