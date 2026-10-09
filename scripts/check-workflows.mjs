@@ -718,7 +718,27 @@ const UPDATE_APP_TOKEN_STEP = 'app-token';
 const UPDATE_APP_TOKEN_INPUTS = {
   'app-id': '${{ secrets.DEVAI_UPDATE_BRANCH_APP_ID }}',
   'private-key': '${{ secrets.DEVAI_UPDATE_BRANCH_APP_PRIVATE_KEY }}',
+  'permission-contents': 'write',
+  'permission-pull-requests': 'write',
 };
+// The exact keys of the workflow, its one job, and each of its steps (#380 review). Anything
+// else, such as a job container, services, a self-hosted or matrix runner, job defaults or env,
+// a reusable workflow call, outputs, or step env on the token mint, could change where or how
+// the App-credential steps run, so it is refused rather than reviewed case by case.
+const UPDATE_WORKFLOW_KEYS = ['name', 'on', 'concurrency', 'permissions', 'jobs'];
+const UPDATE_JOB_KEYS = ['name', 'if', 'runs-on', 'timeout-minutes', 'steps'];
+const UPDATE_RUNNER = 'ubuntu-latest';
+const UPDATE_STEP_KEYS = {
+  credentials: ['name', 'id', 'shell', 'env', 'run'],
+  'app-token': ['name', 'id', 'if', 'uses', 'with'],
+  rebase: ['name', 'id', 'if', 'shell', 'env', 'run'],
+};
+
+/** Whether a mapping has exactly the given keys, in any order. */
+function exactKeys(value, keys) {
+  const actual = Object.keys(object(value)).sort();
+  return JSON.stringify(actual) === JSON.stringify([...keys].sort());
+}
 const UPDATE_RUN_TOKEN = '${{ steps.app-token.outputs.token }}';
 const UPDATE_PROBE_STEP = 'credentials';
 // The lock follows the run's subject on each accepted event (ADR-CHK-0008 IA-009): the pull
@@ -806,6 +826,8 @@ const UPDATE_RUN_SCRIPT = [
 function checkUpdateBranchWorkflow(file, workflow, source, findings) {
   const invalid = (detail) =>
     findings.push(finding('CI_UPDATE_BRANCH_WORKFLOW_INVALID', file, detail));
+  if (!exactKeys(workflow, UPDATE_WORKFLOW_KEYS))
+    invalid(`must declare exactly the top-level keys ${UPDATE_WORKFLOW_KEYS.join(', ')}`);
   if (JSON.stringify(object(workflow.on)) !== JSON.stringify(UPDATE_TRIGGERS))
     invalid(
       'must trigger on push to main and on pull_request_target types [opened, reopened, ready_for_review] against main only',
@@ -828,7 +850,22 @@ function checkUpdateBranchWorkflow(file, workflow, source, findings) {
     );
   if (typeof job['timeout-minutes'] !== 'number')
     invalid(`jobs.${UPDATE_JOB} must declare timeout-minutes`);
+  if (!exactKeys(job, UPDATE_JOB_KEYS))
+    invalid(
+      `jobs.${UPDATE_JOB} must declare exactly ${UPDATE_JOB_KEYS.join(', ')}; no container, services, defaults, env, strategy, outputs, or reusable workflow`,
+    );
+  if (job['runs-on'] !== UPDATE_RUNNER)
+    invalid(`jobs.${UPDATE_JOB} must run on the GitHub-hosted ${UPDATE_RUNNER} runner`);
   const steps = (Array.isArray(job.steps) ? job.steps : []).map(object);
+  if (
+    steps.length !== Object.keys(UPDATE_STEP_KEYS).length ||
+    Object.entries(UPDATE_STEP_KEYS).some(
+      ([id, keys], index) => steps[index]?.id !== id || !exactKeys(steps[index], keys),
+    )
+  )
+    invalid(
+      `jobs.${UPDATE_JOB} must run exactly the steps ${Object.keys(UPDATE_STEP_KEYS).join(', ')}, in that order, each with only its reviewed keys`,
+    );
   if (
     job['continue-on-error'] !== undefined ||
     steps.some((step) => step['continue-on-error'] !== undefined)
@@ -848,7 +885,7 @@ function checkUpdateBranchWorkflow(file, workflow, source, findings) {
   if (
     typeof mint?.uses !== 'string' ||
     !/^actions\/create-github-app-token@[0-9a-f]{40}$/u.test(mint.uses) ||
-    Object.entries(UPDATE_APP_TOKEN_INPUTS).some(([key, value]) => object(mint.with)[key] !== value)
+    JSON.stringify(object(mint.with)) !== JSON.stringify(UPDATE_APP_TOKEN_INPUTS)
   )
     invalid(
       `step ${UPDATE_APP_TOKEN_STEP} must mint the token with a SHA-pinned actions/create-github-app-token from DEVAI_UPDATE_BRANCH_APP_ID and DEVAI_UPDATE_BRANCH_APP_PRIVATE_KEY`,
