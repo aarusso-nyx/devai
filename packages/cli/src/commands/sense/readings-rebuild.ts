@@ -565,6 +565,26 @@ function validateBody(kind: RegeneratedBody['kind'], status: SensorStatus, body:
 }
 
 /**
+ * A body the same commit regenerates byte for byte in any checkout. Producers name the
+ * repository they read as `sourceRepo`, its absolute location; a bound body names it `.`,
+ * the repository root it is published in. Any other trace of the checkout location refuses
+ * the body, since it would describe one checkout rather than the commit.
+ */
+function portableBody(repoRoot: string, body: unknown): unknown {
+  const portable =
+    typeof body === 'object' &&
+    body !== null &&
+    !Array.isArray(body) &&
+    typeof (body as Record<string, unknown>)['sourceRepo'] === 'string'
+      ? { ...(body as Record<string, unknown>), sourceRepo: '.' }
+      : body;
+  if (JSON.stringify(portable).includes(repoRoot)) {
+    throw new Error('body embeds the absolute checkout location, so it describes no commit');
+  }
+  return portable;
+}
+
+/**
  * A validated body, the exact bytes publication will write, and the durable temporary file
  * that holds them beside their target. A dependent producer reads its input from that
  * staged file, so nothing is published before the whole set is valid.
@@ -772,19 +792,22 @@ function produceKind(
   const requiredInput = (from: RegeneratedKind): string => {
     const path = inputs.get(from);
     if (path === undefined) throw new Error(`its input ${from} was not produced`);
+    if (!admitFile(path)) throw new Error(`its input ${from} could not be admitted`);
     return path;
   };
   const common = { repoRoot, persistBody: false, now, ...declared } as const;
   let produced: { readonly reading: SensorReading; readonly body: unknown };
   switch (kind) {
+    // The source walks describe only regular files tracked at the candidate HEAD, so an
+    // ignored source file on a clean tree never enters a HEAD-bound body.
     case 'inventory_api':
-      produced = senseInventoryApi(common);
+      produced = senseInventoryApi({ ...common, admitFile });
       break;
     case 'inventory_routes':
-      produced = senseInventoryRoutes(common);
+      produced = senseInventoryRoutes({ ...common, admitFile });
       break;
     case 'inventory_data_model':
-      produced = senseInventoryDataModel(common);
+      produced = senseInventoryDataModel({ ...common, admitFile });
       break;
     case 'inventory_rbac':
       produced = senseInventoryRbac({
@@ -1001,15 +1024,16 @@ async function regenerateForCandidate(
         );
         continue;
       }
+      const portable = portableBody(repoRoot, produced.body);
       // The schema is checked before the body names its own path (routes-<framework>.json).
-      validateBody(kind, produced.status, produced.body);
-      bodyPath = regeneratedBodyPath(kind, produced.body);
-      const body = stageBody(repoRoot, kind, bodyPath, produced.status, produced.body, {
+      validateBody(kind, produced.status, portable);
+      bodyPath = regeneratedBodyPath(kind, portable);
+      const staging = stageBody(repoRoot, kind, bodyPath, produced.status, portable, {
         reading: produced.reading,
         candidate,
       });
-      staged.push(body);
-      inputs.set(kind, body.temporary);
+      staged.push(staging);
+      inputs.set(kind, staging.temporary);
     } catch (error) {
       errors.push(`regenerate ${bodyPath} failed: ${messageOf(error)}`);
     }
