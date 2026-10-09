@@ -427,6 +427,8 @@ function refusedSensorProcessContext(
     action,
     ...(sensor === undefined ? {} : { sensor }),
     descriptor_path: '.devai/config/sensor-inputs.json',
+    admitted_shapes:
+      'docs/adopters/sensor-inputs.md#process-shapes-the-broker-admits-under-sense-run',
   };
 }
 
@@ -509,6 +511,17 @@ function readOnlyProcess(
     args[1] === 'build'
   ) {
     // Mirrors template pnpm-recursive-build (ADR-AUT-0002): exactly `pnpm -r build`.
+    return true;
+  }
+  if (
+    parentAction === 'sense run' &&
+    pnpmExecutable(executable) &&
+    ((args.length === 2 && args[0] === '-r' && args[1] === 'typecheck') ||
+      (args.length === 1 && args[0] === 'test:perf'))
+  ) {
+    // Mirror templates pnpm-recursive-typecheck and pnpm-test-perf (ADR-AUT-0006): exactly
+    // `pnpm -r typecheck` and `pnpm test:perf`, token for token. Each runs an adopter script and
+    // is local-write like the build; no added argument, no `run` or `exec`, no other script.
     return true;
   }
   if (parentAction === 'sense run' && basename(executable) === 'pnpm') {
