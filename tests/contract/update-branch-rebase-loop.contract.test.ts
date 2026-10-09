@@ -2,24 +2,54 @@
 // it cannot judge or update and carries on with the others. The committed rebase script runs
 // under bash with a stub `gh` on PATH that serves three same-repository pull requests and fails
 // the compare call for the second; the first and third are still rebased, the second is
-// reported, and the step ends successfully.
+// reported, and the step ends successfully. The script reads the env its step declares,
+// resolved under a push-to-main context, so the push path is pinned on every event shape the
+// workflow accepts (IA-010 amendment).
 import { spawnSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
+import { type ExpressionValue, interpolate } from '../helpers/workflow-expression.js';
 
 const ROOT = resolve(import.meta.dirname, '../..');
 const WORKFLOW = join(ROOT, '.github/workflows/update-pull-request-branches.yml');
 
-type Step = Readonly<{ id?: string; run?: string }>;
+type Step = Readonly<{ id?: string; run?: string; env?: Record<string, unknown> }>;
 const workflow = parse(readFileSync(WORKFLOW, 'utf8')) as {
+  name: string;
   jobs: Record<string, { steps: Step[] }>;
 };
-const REBASE = Object.values(workflow.jobs)
+const STEP = Object.values(workflow.jobs)
   .flatMap((job) => job.steps)
-  .find((step) => step.id === 'rebase')?.run;
+  .find((step) => step.id === 'rebase');
+const REBASE = STEP?.run;
+
+/** A push to main: the step's declared env, resolved as the runner would. */
+function pushEnv(runnerTemp: string): Record<string, string> {
+  const context: Record<string, ExpressionValue> = {
+    github: {
+      workflow: workflow.name,
+      event_name: 'push',
+      ref: 'refs/heads/main',
+      repository: 'example/devai',
+      sha: 'f'.repeat(40),
+      event: { ref: 'refs/heads/main', after: 'f'.repeat(40) },
+    },
+    steps: { 'app-token': { outputs: { token: 'stub-token' } } },
+    secrets: {},
+    env: {},
+    vars: {},
+    runner: { temp: runnerTemp },
+  };
+  return Object.fromEntries(
+    Object.entries(STEP?.env ?? {}).map(([key, value]) => [
+      key,
+      interpolate(String(value), context),
+    ]),
+  );
+}
 
 /**
  * The stand-in `gh`: it logs each call, lists the pull requests the jq filter would keep,
@@ -77,9 +107,10 @@ describe('update-branch rebase loop (ADR-CHK-0008 IA-002)', () => {
         RUNNER_TEMP: runnerTemp,
         GITHUB_STEP_SUMMARY: summary,
         GITHUB_OUTPUT: join(dir, 'output'),
-        REPOSITORY: 'example/devai',
-        MAIN_SHA: 'f'.repeat(40),
-        GH_TOKEN: 'stub-token',
+        GITHUB_EVENT_NAME: 'push',
+        GITHUB_REPOSITORY: 'example/devai',
+        GITHUB_SHA: 'f'.repeat(40),
+        ...pushEnv(runnerTemp),
         STUB_LOG: log,
       },
     });

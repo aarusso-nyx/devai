@@ -5,9 +5,9 @@
 // selection and let a candidate edit the filter to suppress checks (IA-002),
 // so the advisory would only make every pull request that runs ci-economy
 // exit on a warning. Without class selectors the advisory stands.
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../src/commands/check/ci-local-only.js', () => ({
@@ -22,6 +22,8 @@ vi.mock('../../src/commands/check/ci-local-only.js', () => ({
 import { checkCiEconomy } from '../../src/commands/check/ci-economy.js';
 
 const PATH_FILTERS = 'ci-economy.path-filters';
+const CONCURRENCY_CANCEL = 'ci-economy.concurrency-cancel';
+const ROOT = resolve(import.meta.dirname, '../../../..');
 const roots: string[] = [];
 
 afterEach(() => {
@@ -224,19 +226,96 @@ describe('ci-economy.path-filters on a branch push that checks out no source (AD
     });
   });
 
-  it('leaves pull-request lanes unchanged: an unfiltered lane without class selectors warns even without a checkout', () => {
+  // Re-pinned by the 2026-10-09 ADR-CHK-0008 amendment: a workflow whose jobs never check out
+  // the repository consumes no repository content, so the advisory skips it on a branch push
+  // and on either pull-request trigger (docs/adopters/ci-economy.md).
+  it.each(['pull_request', 'pull_request_target'] as const)(
+    'is not raised for an unfiltered checkout-free %s workflow without class selectors',
+    (trigger) => {
+      const root = temporary();
+      workflow(
+        root,
+        'pull-request-checks.yml',
+        API_ONLY_PUSH_WORKFLOW.replace(
+          'on:\n  push:\n    branches: [main]\n',
+          `on:\n  ${trigger}:\n    types: [opened, synchronize]\nconcurrency:\n  group: \${{ github.workflow }}-\${{ github.ref }}\n  cancel-in-progress: true\n`,
+        ),
+      );
+      expect(pathFilters(root)).toBe(undefined);
+    },
+  );
+
+  it.each(['pull_request', 'pull_request_target'] as const)(
+    'still warns for an unfiltered %s lane without class selectors once a job checks out',
+    (trigger) => {
+      const root = temporary();
+      workflow(
+        root,
+        'pull-request-checks.yml',
+        withCheckout('actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1').replace(
+          'on:\n  push:\n    branches: [main]\n',
+          `on:\n  ${trigger}:\n    types: [opened, synchronize]\n`,
+        ),
+      );
+      expect(pathFilters(root)).toMatchObject({
+        severity: 'warn',
+        locations: ['pull-request-checks.yml'],
+      });
+    },
+  );
+});
+
+/** The update workflow's shape after the amendment: push to main plus pull_request_target. */
+const API_ONLY_PUSH_AND_TARGET_WORKFLOW = API_ONLY_PUSH_WORKFLOW.replace(
+  'on:\n  push:\n    branches: [main]\n',
+  [
+    'on:',
+    '  push:',
+    '    branches: [main]',
+    '  pull_request_target:',
+    '    types: [opened, reopened, ready_for_review]',
+    '    branches: [main]',
+    'concurrency:',
+    "  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request_target' && format('pr-{0}', github.event.pull_request.number) || github.ref }}",
+    '  cancel-in-progress: true',
+    '',
+  ].join('\n'),
+);
+
+function rule(root: string, ruleId: string) {
+  return checkCiEconomy({ repoRoot: root }).findings.find((entry) => entry.ruleId === ruleId);
+}
+
+describe('ci-economy on the update workflow with pull_request_target (ADR-CHK-0008 IA-010)', () => {
+  it('raises no path-filters advisory and passes rule 1 for the checkout-free push and target shape', () => {
+    const root = temporary();
+    workflow(root, 'update-pull-request-branches.yml', API_ONLY_PUSH_AND_TARGET_WORKFLOW);
+    expect(pathFilters(root)).toBe(undefined);
+    expect(rule(root, CONCURRENCY_CANCEL)).toMatchObject({ severity: 'pass' });
+  });
+
+  it('fails rule 1 when that workflow stops cancelling superseded pull_request_target runs', () => {
     const root = temporary();
     workflow(
       root,
-      'pull-request-checks.yml',
-      API_ONLY_PUSH_WORKFLOW.replace(
-        'on:\n  push:\n    branches: [main]\n',
-        'on:\n  pull_request:\n    types: [opened, synchronize]\n',
-      ),
+      'update-pull-request-branches.yml',
+      API_ONLY_PUSH_AND_TARGET_WORKFLOW.replace('  cancel-in-progress: true\n', ''),
     );
-    expect(pathFilters(root)).toMatchObject({
-      severity: 'warn',
-      locations: ['pull-request-checks.yml'],
+    expect(rule(root, CONCURRENCY_CANCEL)).toMatchObject({
+      severity: 'fail',
+      locations: ['update-pull-request-branches.yml'],
     });
+  });
+
+  it('raises no path-filters advisory and passes rule 1 for the committed update workflow', () => {
+    const root = temporary();
+    const committed = readFileSync(
+      join(ROOT, '.github/workflows/update-pull-request-branches.yml'),
+      'utf8',
+    );
+    expect(committed).toMatch(/^\s*pull_request_target\s*:/mu);
+    workflow(root, 'update-pull-request-branches.yml', committed);
+    expect(pathFilters(root)).toBe(undefined);
+    expect(rule(root, CONCURRENCY_CANCEL)).toMatchObject({ severity: 'pass' });
   });
 });
