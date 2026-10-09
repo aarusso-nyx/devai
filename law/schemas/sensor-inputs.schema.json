@@ -114,7 +114,7 @@
       "properties": {
         "argv": {
           "$ref": "#/$defs/argv",
-          "description": "Type check command the sensor executes instead of its default of npx tsc --noEmit against the root tsconfig; its diagnostics are parsed the same way."
+          "description": "Type check command the sensor executes, without a shell, instead of its default of npx tsc --noEmit against the root tsconfig; its diagnostics are parsed the same way. Under sense run the authority broker admits only npx tsc --noEmit, npx tsc --noEmit -p <relative path>, and exactly pnpm -r typecheck for a pnpm workspace (templates npx-tsc-noemit, npx-tsc-noemit-project, and pnpm-recursive-typecheck, ADR-AUT-0006); any other argv, including pnpm typecheck, pnpm run typecheck, or an added argument, is refused before a process starts."
         }
       }
     },
@@ -151,11 +151,11 @@
       "properties": {
         "argv": {
           "$ref": "#/$defs/argv",
-          "description": "Performance suite command the sensor executes, without a shell, and grades by exit code, duration, and an optional JSON metrics line. When declared it takes precedence over scriptName."
+          "description": "Performance suite command the sensor executes, without a shell, and grades by exit code, duration, and an optional JSON metrics line. When declared it takes precedence over scriptName. Under sense run the authority broker admits only the governed pnpm vitest run --config <governed-config> [<test-path>] shape and exactly pnpm test:perf (templates pnpm-vitest-run-governed-config and pnpm-test-perf, ADR-AUT-0006); any other argv, including node <script> or pnpm run test:perf, is refused before a process starts."
         },
         "scriptName": {
           "$ref": "#/$defs/script_name",
-          "description": "Legacy key: the root package script the sensor runs as pnpm <scriptName> when no argv is declared, instead of the sensor default of test:perf."
+          "description": "Legacy key: the root package script the sensor runs as pnpm <scriptName> when no argv is declared, instead of the sensor default of test:perf. Under sense run the broker admits only the default, pnpm test:perf (ADR-AUT-0006); any other script name is refused before a process starts."
         }
       }
     },
