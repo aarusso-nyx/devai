@@ -503,6 +503,20 @@ const yamlBoolean = (value: ExecutionYaml | undefined): boolean | undefined => {
 };
 
 /**
+ * The top-level concurrency declaration as the execution YAML reads it (#390), or undefined
+ * when the source has none or its group is not a proven string scalar. `cancelInProgress` is
+ * null when the key is absent or not a plain boolean.
+ */
+export function workflowConcurrency(
+  content: string,
+): { readonly group: string; readonly cancelInProgress: boolean | null } | undefined {
+  const block = yamlMap(yamlMap(executionYaml(content))?.get('concurrency'));
+  const group = yamlString(block?.get('group'));
+  if (block === undefined || group === undefined) return undefined;
+  return { group, cancelInProgress: yamlBoolean(block.get('cancel-in-progress')) ?? null };
+}
+
+/**
  * Contexts a concurrency group may read (#325). Each names the run's own scope: its ref, its
  * workflow, its commit, its event, the pull request or merge-queue entry it serves, or a
  * dispatch input. None selects code, a credential or a runtime.
@@ -1180,6 +1194,8 @@ const PNPM_BUILTINS = new Set([
   'publish',
   'view',
 ]);
+/** pnpm hook files, which run during resolution even with --ignore-scripts (#390). */
+const PNPM_HOOK_FILES = ['.pnpmfile.cjs', 'pnpmfile.cjs', '.pnpmfile.js'];
 /** Lifecycle scripts a package manager runs for an install in that package. */
 const INSTALL_LIFECYCLE = ['preinstall', 'install', 'postinstall', 'prepare'];
 
@@ -1298,9 +1314,11 @@ export function stepExecutedFiles(
       const words = (match[1] ?? '').trim().split(/\s+/u);
       let index = 0;
       let recursive = false;
+      let ignoreScripts = false;
       while (words[index]?.startsWith('-') === true) {
         const flag = words[index] ?? '';
         if (flag === '-r' || flag === '--recursive') recursive = true;
+        else if (flag === '--ignore-scripts') ignoreScripts = true;
         else if (!['--frozen-lockfile', '--silent', '-s'].includes(flag)) {
           complete = false;
           return;
@@ -1308,10 +1326,27 @@ export function stepExecutedFiles(
         index++;
       }
       let name = words[index] ?? '';
+      if (ignoreScripts && name !== 'install' && name !== 'i') {
+        complete = false;
+        return;
+      }
       if (name === 'run') name = words[index + 1] ?? '';
       else if (name === 'install' || name === 'i') {
         if (recursive) complete = false;
-        else install(dir, depth);
+        else if (ignoreScripts || words.slice(index + 1).includes('--ignore-scripts')) {
+          // #390: an install with --ignore-scripts runs no lifecycle script, so it binds no
+          // script and no manifest. A pnpmfile still runs its hooks during resolution, so its
+          // presence (or a tree that cannot be read to rule it out) leaves the step unproved.
+          if (reader === undefined) complete = false;
+          else if (
+            PNPM_HOOK_FILES.some(
+              (hook) =>
+                reader.read(hook) !== undefined ||
+                reader.read(joinRelative(dir, hook)) !== undefined,
+            )
+          )
+            complete = false;
+        } else install(dir, depth);
         continue;
       } else if (PNPM_BUILTINS.has(name)) continue;
       if (!/^[a-z][\w:.-]*$/u.test(name)) {
