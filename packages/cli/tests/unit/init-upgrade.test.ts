@@ -754,3 +754,74 @@ describe('#291: init upgrade converts a committed checkout-bound post-merge bind
     expect(snapshot(repo)).toEqual(settled);
   }, 180_000);
 });
+
+describe('#383: init upgrade rebinds a 2.3.0 observation workflow to the shared pin set', () => {
+  const WORKFLOW = '.github/workflows/devai-main-observation.yml';
+  const CONFIG = '.devai/config/github-actions-host-adapter.json';
+  const RC_WORKFLOW = '.github/workflows/devai-local-rc-verify.yml';
+  /** The pins the 2.3.0 observation generator emitted; it declared no concurrency block. */
+  const PINS_230: readonly (readonly [string, string])[] = [
+    ['actions/checkout', '11d5960a326750d5838078e36cf38b85af677262'],
+    ['actions/setup-node', '49933ea5288caeca8642d1e84afbd3f7d6820020'],
+  ];
+
+  /** The observation workflow as 2.3.0 generated it, rebuilt from the current bytes. */
+  function as230(current: string): string {
+    let bytes = current.replace(/^concurrency:\n(?: {2}.*\n)+\n?/mu, '');
+    for (const [action, digest] of PINS_230) {
+      bytes = bytes.replace(new RegExp(`(uses: ${action})@[0-9a-f]{40}`, 'gu'), `$1@${digest}`);
+    }
+    return bytes;
+  }
+
+  /** An adopter upgraded to the installed version, then put back to its 2.3.0 adapter. */
+  async function boundAt230(): Promise<{ readonly repo: string; readonly current: string }> {
+    const repo = await stynxAt160(true);
+    expect((await runCli(WRITE(repo))).exit).toBe(0);
+    const current = readFileSync(join(repo, WORKFLOW), 'utf8');
+    const legacy = as230(current);
+    expect(legacy, 'the current generator moved off the 2.3.0 pins').not.toBe(current);
+    put(repo, WORKFLOW, legacy);
+    const config = json(repo, CONFIG);
+    put(repo, CONFIG, {
+      ...config,
+      adapter_version: '2.3.0',
+      workflow_digest_sha256: createHash('sha256').update(legacy).digest('hex'),
+      package_binding: { name: '@aarusso-nyx/devai', version: '2.3.0' },
+    });
+    const project = json(repo, '.devai/config/project.json');
+    put(repo, '.devai/config/project.json', { ...project, devai_version: '2.3.0' });
+    return { repo, current };
+  }
+
+  it('plans the workflow and its config under host-adapters and leaves the RC workflow alone', async () => {
+    const { repo, current } = await boundAt230();
+    const rcBefore = readFileSync(join(repo, RC_WORKFLOW), 'utf8');
+    const planned = await runCli(PLAN(repo));
+    expect(planned.exit, planned.stderr).toBe(0);
+    const plan = value(planned)['plan'] as JsonObject;
+    expect(plan['status']).toBe('ready');
+    expect((plan['releases'] as JsonObject[]).map((release) => release['version'])).toContain(
+      '2.3.1',
+    );
+    const changed = plan['changed_files'] as JsonObject[];
+    expect(changed).toEqual(
+      expect.arrayContaining([
+        { path: WORKFLOW, operation: 'update', segment: 'host-adapters' },
+        { path: CONFIG, operation: 'update', segment: 'host-adapters' },
+      ]),
+    );
+    // The verifier workflow bytes are unchanged, so no harness-ci change is planned for it.
+    expect(changed.filter((entry) => entry['path'] === RC_WORKFLOW)).toEqual([]);
+    expect(changed.filter((entry) => entry['segment'] === 'harness-ci')).toEqual([]);
+
+    const applied = await runCli(WRITE(repo));
+    expect(applied.exit, applied.stderr).toBe(0);
+    expect(readFileSync(join(repo, WORKFLOW), 'utf8')).toBe(current);
+    expect(json(repo, CONFIG)['workflow_digest_sha256']).toBe(
+      createHash('sha256').update(current).digest('hex'),
+    );
+    expect(readFileSync(join(repo, RC_WORKFLOW), 'utf8')).toBe(rcBefore);
+    expect(json(repo, RECEIPT)['migrations']).toContain('MIG-2.3.1-observation-workflow-pins');
+  }, 180_000);
+});
