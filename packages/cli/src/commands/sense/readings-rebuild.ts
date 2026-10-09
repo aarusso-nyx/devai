@@ -15,12 +15,21 @@ import {
   writeFileSync,
   writeSync,
 } from '@devai-nyx/authority';
-import { basename, dirname, join, relative } from 'node:path';
-import { validators } from '@devai-nyx/schemas';
+import { basename, dirname, join, relative, sep } from 'node:path';
+import Ajv2020, { type ErrorObject, type ValidateFunction } from 'ajv/dist/2020.js';
+import addFormats from 'ajv-formats';
+import { loadSchema, validators, type SchemaName } from '@devai-nyx/schemas';
 import {
   buildSensorReading,
+  DIRECT_BODY_DIRECTORY,
+  REGENERATED_BODY_DIRECTORY,
+  senseInventoryApi,
   senseInventoryCoverage,
+  senseInventoryDataHandling,
+  senseInventoryDataModel,
   senseInventoryDepGraph,
+  senseInventoryRbac,
+  senseInventoryRoutes,
   type SensorFinding,
   type SensorReading,
   type SensorStatus,
@@ -260,15 +269,54 @@ export function rebuildSensorReadings(repoRoot: string): RebuildSensorReadingsRe
 /** The combined F4 manifest `inventory_adherence` reads (ADR-SCR-0012). */
 export const INVENTORY_BODY_PATH = '.devai/state/inventory/inventory.json';
 
-/** The kinds regeneration produces from source, each through its own typed producer. */
-const REGENERATED_BODY_PATHS = {
-  inventory_dep_graph: '.devai/state/sensors/inventory_dep_graph/dep-graph.json',
-  inventory_coverage: '.devai/state/sensors/inventory_coverage/coverage-matrix.json',
+/**
+ * The kinds regeneration produces from source, each through its own typed producer, in
+ * dependency order: a kind's inputs are always produced before it. The routes body is
+ * named for its framework (`routes-<framework>.json`), as `resolveRoutesPath` reads it.
+ */
+const REGENERATED_BODY_FILES = {
+  inventory_api: 'inventory_api/api-map.json',
+  inventory_routes: 'inventory_routes/routes-<framework>.json',
+  inventory_data_model: 'inventory_data_model/data-model.json',
+  inventory_rbac: 'inventory_rbac/rbac.json',
+  inventory_data_handling: 'inventory_data_handling/data-model-pii.json',
+  inventory_dep_graph: 'inventory_dep_graph/dep-graph.json',
+  inventory_coverage: 'inventory_coverage/coverage-matrix.json',
 } as const;
 
-export type RegeneratedKind = keyof typeof REGENERATED_BODY_PATHS;
+export type RegeneratedKind = keyof typeof REGENERATED_BODY_FILES;
 
-const REGENERATED_KINDS = Object.keys(REGENERATED_BODY_PATHS) as readonly RegeneratedKind[];
+const REGENERATED_KINDS = Object.keys(REGENERATED_BODY_FILES) as readonly RegeneratedKind[];
+
+const ROUTES_BODY_NAME = /^routes-[^.]+\.json$/u;
+
+/** The repository-relative state path of a kind's body; routes take the body's framework. */
+function regeneratedBodyPath(kind: RegeneratedKind, body?: unknown): string {
+  if (kind !== 'inventory_routes')
+    return join(REGENERATED_BODY_DIRECTORY, REGENERATED_BODY_FILES[kind]);
+  const framework =
+    typeof body === 'object' && body !== null && 'framework' in body
+      ? String((body as { readonly framework: unknown }).framework)
+      : '';
+  if (!/^[a-z0-9-]+$/u.test(framework)) {
+    throw new Error(`routes body names no usable framework (${JSON.stringify(framework)})`);
+  }
+  return join(REGENERATED_BODY_DIRECTORY, 'inventory_routes', `routes-${framework}.json`);
+}
+
+/** The existing state bodies of a kind, as repository-relative paths. */
+function existingBodyPaths(repoRoot: string, kind: RegeneratedKind): readonly string[] {
+  if (kind !== 'inventory_routes') {
+    const path = regeneratedBodyPath(kind);
+    return existsSync(join(repoRoot, path)) ? [path] : [];
+  }
+  const directory = join(REGENERATED_BODY_DIRECTORY, 'inventory_routes');
+  if (!existsSync(join(repoRoot, directory))) return [];
+  return readdirSync(join(repoRoot, directory))
+    .filter((name) => ROUTES_BODY_NAME.test(name))
+    .sort()
+    .map((name) => join(directory, name));
+}
 
 /** Declared plant surfaces (ADR-SCR-0003), as `.devai/config/sensor-inputs.json` states them. */
 export interface RegenerationSurfaces {
@@ -451,17 +499,79 @@ function bodySchema(kind: RegeneratedBody['kind']): {
   readonly schema: string;
   readonly validate: BodyValidator;
 } {
-  if (kind === 'inventory')
-    return { schema: 'inventory.schema.json', validate: validators.inventory };
-  if (kind === 'inventory_dep_graph') {
-    return { schema: 'dep-graph.schema.json', validate: validators.depGraph };
+  switch (kind) {
+    case 'inventory':
+      return { schema: 'inventory.schema.json', validate: validators.inventory };
+    case 'inventory_api':
+      return { schema: 'api-map.schema.json', validate: validators.apiMap };
+    case 'inventory_routes':
+      return { schema: 'routes-inventory.schema.json', validate: validators.routesInventory };
+    case 'inventory_data_model':
+    case 'inventory_data_handling':
+      return {
+        schema: 'data-model-inventory.schema.json',
+        validate: validators.dataModelInventory,
+      };
+    case 'inventory_rbac':
+      return { schema: 'rbac-inventory.schema.json', validate: validators.rbacInventory };
+    case 'inventory_dep_graph':
+      return { schema: 'dep-graph.schema.json', validate: validators.depGraph };
+    case 'inventory_coverage':
+      return { schema: 'coverage-matrix.schema.json', validate: validators.coverageMatrix };
   }
-  return { schema: 'coverage-matrix.schema.json', validate: validators.coverageMatrix };
 }
 
-/** A validated body and the exact bytes publication will write. */
+const exhaustiveValidators = new Map<string, ValidateFunction>();
+
+/** The body schema compiled to report every error, for a REVIEW body that fails it. */
+function exhaustiveValidator(schema: string): ValidateFunction {
+  let validate = exhaustiveValidators.get(schema);
+  if (validate === undefined) {
+    const ajv = new Ajv2020({ strict: false, allErrors: true });
+    addFormats(ajv);
+    validate = ajv.compile(loadSchema(schema as SchemaName));
+    exhaustiveValidators.set(schema, validate);
+  }
+  return validate;
+}
+
+/** A top-level collection the body holds empty, which the schema requires to hold one. */
+function isEmptyCollection(body: unknown, error: ErrorObject): boolean {
+  if (error.keyword !== 'minItems' || !/^\/[^/]+$/u.test(error.instancePath)) return false;
+  if (typeof body !== 'object' || body === null) return false;
+  const value = (body as Record<string, unknown>)[error.instancePath.slice(1)];
+  return Array.isArray(value) && value.length === 0;
+}
+
+/**
+ * Validate a produced body against its own schema before anything is staged. A producer
+ * that inventories nothing reads REVIEW and returns its collection empty, which a schema
+ * requiring at least one item rejects; that empty collection is the REVIEW the producer
+ * already reports, so it alone does not refuse the body. Every other departure does, and
+ * a PASS body must validate exactly.
+ */
+function validateBody(kind: RegeneratedBody['kind'], status: SensorStatus, body: unknown): void {
+  const { schema, validate } = bodySchema(kind);
+  if (validate(body)) return;
+  let errors: unknown = validate.errors;
+  if (status === 'review') {
+    const exhaustive = exhaustiveValidator(schema);
+    if (exhaustive(body)) return;
+    const remaining = (exhaustive.errors ?? []).filter((error) => !isEmptyCollection(body, error));
+    if (remaining.length === 0) return;
+    errors = remaining;
+  }
+  throw new Error(`body fails ${schema}: ${JSON.stringify(errors)}`);
+}
+
+/**
+ * A validated body, the exact bytes publication will write, and the durable temporary file
+ * that holds them beside their target. A dependent producer reads its input from that
+ * staged file, so nothing is published before the whole set is valid.
+ */
 interface StagedBody extends RegeneratedBody {
   readonly bytes: string;
+  readonly temporary: string;
 }
 
 function stageBody(
@@ -472,8 +582,7 @@ function stageBody(
   body: unknown,
   producer?: { readonly reading: SensorReading; readonly candidate: RegenerationCandidate },
 ): StagedBody {
-  const { schema, validate } = bodySchema(kind);
-  if (!validate(body)) throw new Error(`body fails ${schema}: ${JSON.stringify(validate.errors)}`);
+  validateBody(kind, producerStatus, body);
   const bytes = `${JSON.stringify(body, null, 2)}\n`;
   const target = join(repoRoot, bodyPath);
   const unchanged = existsSync(target) && readFileSync(target, 'utf8') === bytes;
@@ -490,6 +599,7 @@ function stageBody(
           producer_reading: preserveProducerReading(producer.reading, producer.candidate, sha256),
         }),
     bytes,
+    temporary: writeTemporary(target, bytes),
   };
 }
 
@@ -528,41 +638,41 @@ function discardTemporary(temporary: string): void {
 }
 
 /**
- * Publish a complete set of validated bodies together. Every changed body is first written
- * to a durable temporary file; only when all of them exist is each renamed over its target
- * and its directory synced. A failure before the renames publishes nothing.
+ * Publish a complete set of validated bodies together. Every body was staged as a durable
+ * temporary file when it was produced; only once the whole set is staged is each changed
+ * body renamed over its target and its directory synced. An up-to-date body's temporary is
+ * discarded. A failure before the renames publishes nothing.
  */
 function publishBodies(repoRoot: string, staged: readonly StagedBody[]): void {
-  const pending: { readonly temporary: string; readonly target: string }[] = [];
-  try {
-    for (const body of staged) {
-      if (body.action !== 'regenerated') continue;
-      const target = join(repoRoot, body.body_path);
-      pending.push({ temporary: writeTemporary(target, body.bytes), target });
+  for (const body of staged) {
+    if (body.action !== 'regenerated') {
+      discardTemporary(body.temporary);
+      continue;
     }
-    for (const { temporary, target } of pending) {
-      renameSync(temporary, target);
-      fsyncDirectory(dirname(target));
-    }
-  } catch (error) {
-    for (const { temporary } of pending) discardTemporary(temporary);
-    throw error;
+    const target = join(repoRoot, body.body_path);
+    renameSync(body.temporary, target);
+    fsyncDirectory(dirname(target));
   }
 }
 
-/** Remove the bodies of regenerated kinds the declaration no longer requires. */
+/**
+ * Remove every state body that no published body stands for: the bodies of kinds the
+ * declaration no longer requires, and a routes body for a framework other than the one
+ * just published, so no stale body is ever read as current.
+ */
 function removeObsoleteBodies(
   repoRoot: string,
-  required: readonly RegeneratedKind[],
+  published: ReadonlySet<string>,
 ): readonly ObsoleteBody[] {
   const removed: ObsoleteBody[] = [];
   for (const kind of REGENERATED_KINDS) {
-    if (required.includes(kind)) continue;
-    const target = join(repoRoot, REGENERATED_BODY_PATHS[kind]);
-    if (!existsSync(target)) continue;
-    unlinkSync(target);
-    fsyncDirectory(dirname(target));
-    removed.push({ kind, body_path: REGENERATED_BODY_PATHS[kind], action: 'removed' });
+    for (const bodyPath of existingBodyPaths(repoRoot, kind)) {
+      if (published.has(bodyPath)) continue;
+      const target = join(repoRoot, bodyPath);
+      unlinkSync(target);
+      fsyncDirectory(dirname(target));
+      removed.push({ kind, body_path: bodyPath, action: 'removed' });
+    }
   }
   return removed;
 }
@@ -606,11 +716,35 @@ function regenerationReading(
   });
 }
 
-/** The required kinds: coverage is bound to http and actions, so both absent drops it. */
+/**
+ * The required kinds, in dependency order: each kind is required while a surface it is
+ * bound to is declared present (ADR-SCR-0003). The dependency graph is always required;
+ * coverage is bound to http and actions, so both absent drops it. RBAC and data handling
+ * measure from the data model, so they are required only with `database` present too.
+ */
 function requiredKinds(surfaces: RegenerationSurfaces | undefined): readonly RegeneratedKind[] {
-  return surfaces !== undefined && !surfaces.http && !surfaces.actions
-    ? ['inventory_dep_graph']
-    : ['inventory_dep_graph', 'inventory_coverage'];
+  const present = (surface: keyof RegenerationSurfaces): boolean =>
+    surfaces === undefined || surfaces[surface];
+  const bound: Readonly<Record<RegeneratedKind, boolean>> = {
+    inventory_api: present('http'),
+    inventory_routes: present('http'),
+    inventory_data_model: present('database'),
+    inventory_rbac: present('rbac') && present('database'),
+    inventory_data_handling: present('rbac') && present('database'),
+    inventory_dep_graph: true,
+    inventory_coverage: present('http') || present('actions'),
+  };
+  return REGENERATED_KINDS.filter((kind) => bound[kind]);
+}
+
+/** The staged temporary file of a kind already produced in this run, if any. */
+type StagedInputs = ReadonlyMap<RegeneratedKind, string>;
+
+interface ProducedKind {
+  readonly status: SensorStatus;
+  readonly codes: string;
+  readonly body: unknown;
+  readonly reading: SensorReading;
 }
 
 function produceKind(
@@ -618,28 +752,67 @@ function produceKind(
   kind: RegeneratedKind,
   candidate: RegenerationCandidate,
   surfaces: RegenerationSurfaces | undefined,
-): {
-  readonly status: SensorStatus;
-  readonly codes: string;
-  readonly body: unknown;
-  readonly reading: SensorReading;
-} {
-  const admitFile = candidate.admit;
-  const produced =
-    kind === 'inventory_dep_graph'
-      ? senseInventoryDepGraph({
-          repoRoot,
-          persistBody: false,
-          now: candidate.timestamp,
-          admitFile,
-        })
-      : senseInventoryCoverage({
-          repoRoot,
-          persistBody: false,
-          now: candidate.timestamp,
-          admitFile,
-          ...(surfaces === undefined ? {} : { surfaces }),
-        });
+  inputs: StagedInputs,
+): ProducedKind {
+  const now = candidate.timestamp;
+  const declared = surfaces === undefined ? {} : { surfaces };
+  // A dependent reads exactly the bodies this run staged, passed explicitly; an input whose
+  // kind is not required is passed as no path. Neither a published state body nor a
+  // record/proofs default is ever read: each staged file is admitted beside the files git
+  // tracks at the candidate, and no other file under an inventory body directory is.
+  const staged = new Set(inputs.values());
+  const bodyDirectories = [REGENERATED_BODY_DIRECTORY, DIRECT_BODY_DIRECTORY].map(
+    (directory) => `${join(repoRoot, directory)}${sep}`,
+  );
+  const admitFile = (path: string): boolean =>
+    staged.has(path) ||
+    (candidate.admit(path) && !bodyDirectories.some((directory) => path.startsWith(directory)));
+  const input = <K extends string>(name: K, from: RegeneratedKind): { [P in K]?: string } =>
+    (inputs.has(from) ? { [name]: inputs.get(from) } : {}) as { [P in K]?: string };
+  const requiredInput = (from: RegeneratedKind): string => {
+    const path = inputs.get(from);
+    if (path === undefined) throw new Error(`its input ${from} was not produced`);
+    return path;
+  };
+  const common = { repoRoot, persistBody: false, now, ...declared } as const;
+  let produced: { readonly reading: SensorReading; readonly body: unknown };
+  switch (kind) {
+    case 'inventory_api':
+      produced = senseInventoryApi(common);
+      break;
+    case 'inventory_routes':
+      produced = senseInventoryRoutes(common);
+      break;
+    case 'inventory_data_model':
+      produced = senseInventoryDataModel(common);
+      break;
+    case 'inventory_rbac':
+      produced = senseInventoryRbac({
+        ...common,
+        dataModelPath: requiredInput('inventory_data_model'),
+        // The rbac producer admits any file it is pointed at, so an api map this run did
+        // not stage is named explicitly as no input rather than left to its defaults.
+        apiMapPath: inputs.get('inventory_api') ?? null,
+      });
+      break;
+    case 'inventory_data_handling':
+      produced = senseInventoryDataHandling({
+        ...common,
+        dataModelPath: requiredInput('inventory_data_model'),
+      });
+      break;
+    case 'inventory_dep_graph':
+      produced = senseInventoryDepGraph({ repoRoot, persistBody: false, now, admitFile });
+      break;
+    case 'inventory_coverage':
+      produced = senseInventoryCoverage({
+        ...common,
+        admitFile,
+        ...input('apiMapPath', 'inventory_api'),
+        ...input('routesPath', 'inventory_routes'),
+      });
+      break;
+  }
   return {
     status: produced.reading.status,
     codes: (produced.reading.findings ?? []).map((finding) => finding.code).join(','),
@@ -765,10 +938,12 @@ function unwrittenResult(repoRoot: string, finding: SensorFinding): RegenerateIn
 /**
  * `sense run inventory_regeneration` (#237, ADR-SCR-0012). Regenerates, for the clean
  * HEAD commit, the combined F4 manifest `inventory_adherence` reads and the bodies of the
- * required kinds through their own typed producers, validates every body against its
- * schema, and publishes the set only when all of it is valid, by atomic replacement. It
- * removes the body of a regenerated kind the declaration no longer requires, then rebuilds
- * the kinds it does not regenerate from their bodies as `sense record --rebuild` does.
+ * kinds the declared surfaces require (#382) through their own typed producers, in
+ * dependency order, each dependent reading its inputs from the files staged in the same
+ * run. It validates every body against its schema and publishes the set only when all of
+ * it is valid, by atomic replacement. It removes every state body no published body stands
+ * for, then rebuilds any kind it does not regenerate from its body as `sense record
+ * --rebuild` does; every inventory kind is now regenerated, so that walk finds none.
  * A producer's REVIEW stays REVIEW; an error, a missing required kind, or an aggregate
  * reading the store did not receive is a FAIL. Without a clean candidate commit it reads
  * UNKNOWN and writes nothing.
@@ -779,10 +954,23 @@ export async function regenerateInventoryReadings(
 ): Promise<RegenerateInventoryResult> {
   const candidate = resolveCandidate(repoRoot);
   if ('code' in candidate) return unwrittenResult(repoRoot, candidate);
+  const staged: StagedBody[] = [];
+  try {
+    return await regenerateForCandidate(repoRoot, options, candidate, staged);
+  } finally {
+    // A published body's temporary was renamed away; every other staged file is discarded.
+    for (const body of staged) discardTemporary(body.temporary);
+  }
+}
 
+async function regenerateForCandidate(
+  repoRoot: string,
+  options: RegenerationOptions,
+  candidate: RegenerationCandidate,
+  staged: StagedBody[],
+): Promise<RegenerateInventoryResult> {
   const errors: string[] = [];
   const findings: SensorFinding[] = [];
-  const staged: StagedBody[] = [];
   let surfaceCount = 0;
   try {
     const inventory = await regenerateInventory({
@@ -802,22 +990,26 @@ export async function regenerateInventoryReadings(
   }
 
   const required = requiredKinds(options.surfaces);
+  const inputs = new Map<RegeneratedKind, string>();
   for (const kind of required) {
-    const bodyPath = REGENERATED_BODY_PATHS[kind];
+    let bodyPath = join(REGENERATED_BODY_DIRECTORY, REGENERATED_BODY_FILES[kind]);
     try {
-      const produced = produceKind(repoRoot, kind, candidate, options.surfaces);
+      const produced = produceKind(repoRoot, kind, candidate, options.surfaces, inputs);
       if (produced.status !== 'pass' && produced.status !== 'review') {
         errors.push(
           `regenerate ${bodyPath} failed: ${kind} read ${produced.status} (${produced.codes})`,
         );
         continue;
       }
-      staged.push(
-        stageBody(repoRoot, kind, bodyPath, produced.status, produced.body, {
-          reading: produced.reading,
-          candidate,
-        }),
-      );
+      // The schema is checked before the body names its own path (routes-<framework>.json).
+      validateBody(kind, produced.status, produced.body);
+      bodyPath = regeneratedBodyPath(kind, produced.body);
+      const body = stageBody(repoRoot, kind, bodyPath, produced.status, produced.body, {
+        reading: produced.reading,
+        candidate,
+      });
+      staged.push(body);
+      inputs.set(kind, body.temporary);
     } catch (error) {
       errors.push(`regenerate ${bodyPath} failed: ${messageOf(error)}`);
     }
@@ -851,7 +1043,7 @@ export async function regenerateInventoryReadings(
         sha256: body.sha256,
         ...(body.producer_reading === undefined ? {} : { producer_reading: body.producer_reading }),
       }));
-      obsolete = removeObsoleteBodies(repoRoot, required);
+      obsolete = removeObsoleteBodies(repoRoot, new Set(staged.map((body) => body.body_path)));
       // Publication is not atomic with the check above: a commit or edit can land between
       // them. Check again afterwards; a stale set is retracted, so no body outlives its HEAD.
       const late = snapshotChange(repoRoot, candidate);
