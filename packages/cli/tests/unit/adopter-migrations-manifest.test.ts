@@ -65,7 +65,7 @@ describe('#264: the adopter migration manifest', () => {
       status: 'released',
       date: '2026-10-08',
     });
-    // #381, #383: the observation-workflow rebinds ship unreleased with the code that performs it.
+    // #381, #383: the 2.3.1 rebinds ship unreleased with the code that performs them.
     const next = manifest.releases.at(-1);
     expect(next).toMatchObject({ version: '2.3.1', status: 'unreleased' });
     expect(next).not.toHaveProperty('date');
