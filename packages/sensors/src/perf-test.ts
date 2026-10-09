@@ -47,6 +47,9 @@ export interface PerfTestOptions {
   readonly now?: string;
 }
 
+/** The one package script the broker admits for perf_test (ADR-AUT-0006). */
+const DEFAULT_SCRIPT_NAME = 'test:perf';
+
 interface ParsedMetrics {
   readonly p50_ms?: number;
   readonly p95_ms?: number;
@@ -145,11 +148,14 @@ function legacyScriptReading(
 
 export function sensePerfTest(opts: PerfTestOptions): SensorReading {
   const declaredArgv = opts.argv !== undefined && opts.argv.length > 0 ? [...opts.argv] : undefined;
-  const scriptName = declaredArgv === undefined ? (opts.scriptName ?? 'test:perf') : undefined;
-  const command = declaredArgv ?? ['pnpm', scriptName ?? 'test:perf'];
+  const scriptName =
+    declaredArgv === undefined ? (opts.scriptName ?? DEFAULT_SCRIPT_NAME) : undefined;
+  const command = declaredArgv ?? ['pnpm', scriptName ?? DEFAULT_SCRIPT_NAME];
   const label = scriptName ?? command.join(' ');
   const identity: Record<string, string> =
     scriptName === undefined ? { argv: label } : { script_name: scriptName };
+  // Under sense run the broker admits only `pnpm test:perf` (ADR-AUT-0006): another legacy
+  // scriptName is requested as `pnpm <scriptName>` and refused by the broker before it starts.
   if (scriptName !== undefined) {
     const legacy = legacyScriptReading(opts, scriptName, command);
     if (legacy !== undefined) return legacy;
