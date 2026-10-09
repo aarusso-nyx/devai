@@ -383,7 +383,10 @@ Both workflows DEVAI generates, `devai-local-rc-verify.yml` and `devai-main-obse
 pin `actions/checkout`, `actions/setup-node`, and `actions/upload-artifact` to one pin set.
 That set is DEVAI's default toolchain manifest, which `init` seeds as
 `.devai/config/toolchain.json`. The observation workflow also declares a concurrency group
-keyed by the commit that never cancels a run in progress (#383).
+keyed by the commit that never cancels a run in progress (#383). Its dependency install runs
+`pnpm install --frozen-lockfile --ignore-scripts`, so your lifecycle scripts do not run in the
+observation job, and DEVAI's observation must not require a dependency that needs its install
+scripts to build (#390).
 
 - **Align your own workflows.** Use the action pins in `.devai/config/toolchain.json` in
   workflows you own, so `harness_coherence` sees one pin per action.
