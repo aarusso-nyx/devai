@@ -11,6 +11,7 @@ import {
   listWorkflowFiles,
   loadWorkflows,
   jobEffectFacts,
+  workflowConcurrency,
 } from './harness/workflow-parser.js';
 
 /**
@@ -363,75 +364,101 @@ export function senseHarnessCoherence(opts: HarnessCoherenceOptions): SensorRead
     const declaration = concurrencyDeclaration(workflow.file);
     const events = workflowEvents(readFileSync(workflow.file, 'utf8'));
     const serialize = requiresSerialization(workflow.relativeFile, workflow.file);
-    const jobs = workflow.jobs.map((job) => ({
+    const effects = workflow.jobs.map((job) => ({
       ...job,
       ...jobEffectFacts(readFileSync(workflow.file, 'utf8'), opts.repoRoot, job.name),
     }));
-    // Only a publication (or an unproved effect) must serialize. A repository-write job, such as
-    // the update-branch rebase, is superseded by a newer run like a read-only one: its every
-    // update is guarded by the expected head sha (ADR-CHK-0008).
-    const effectful = jobs.some(
-      (job) => job.effect !== 'read-only' && job.effect !== 'repository-write',
-    );
-    const repositoryWrite = jobs.some((job) => job.effect === 'repository-write');
-    const jobLocks =
-      jobs.length > 0 &&
-      jobs.every((job) => {
-        const lock = job.concurrency;
-        if (job.effect === 'unknown' || !lock || !lock.group || lock.cancelInProgress === null)
-          return false;
-        if (job.effect === 'repository-write')
-          return lock.cancelInProgress === true && keyedByWorkflowAndSubject(lock.group, events);
-        if (job.effect === 'publication')
+    // The concurrency policy over one reading of the jobs' effects.
+    const holds = (jobs: readonly (typeof effects)[number][]): boolean => {
+      // Only a publication (or an unproved effect) must serialize. A repository-write job, such as
+      // the update-branch rebase, is superseded by a newer run like a read-only one: its every
+      // update is guarded by the expected head sha (ADR-CHK-0008).
+      const effectful = jobs.some(
+        (job) => job.effect !== 'read-only' && job.effect !== 'repository-write',
+      );
+      const repositoryWrite = jobs.some((job) => job.effect === 'repository-write');
+      const jobLocks =
+        jobs.length > 0 &&
+        jobs.every((job) => {
+          const lock = job.concurrency;
+          if (job.effect === 'unknown' || !lock || !lock.group || lock.cancelInProgress === null)
+            return false;
+          if (job.effect === 'repository-write')
+            return lock.cancelInProgress === true && keyedByWorkflowAndSubject(lock.group, events);
+          if (job.effect === 'publication')
+            return (
+              lock.cancelInProgress === false &&
+              lock.group.toLowerCase() === 'devai-pages-publication'
+            );
           return (
-            lock.cancelInProgress === false &&
-            lock.group.toLowerCase() === 'devai-pages-publication'
+            lock.cancelInProgress === !serialize &&
+            (serialize ||
+              (supersedingGroupScoped(lock.group, events) &&
+                concurrencyGroupContexts(lock.group)?.includes('github.ref') === true))
           );
-        return (
-          lock.cancelInProgress === !serialize &&
-          (serialize ||
-            (supersedingGroupScoped(lock.group, events) &&
-              concurrencyGroupContexts(lock.group)?.includes('github.ref') === true))
-        );
-      });
-    const aliases = jobs.some((a) =>
-      jobs.some(
-        (b) =>
-          a !== b &&
-          a.effect !== b.effect &&
-          // Two jobs without a job-level group share no lock (#325).
-          a.concurrency !== undefined &&
-          b.concurrency !== undefined &&
-          a.concurrency.group.toLowerCase() === b.concurrency.group.toLowerCase(),
-      ),
-    );
-    const bypass = jobs.some(
-      (job) =>
-        job.effect === 'publication' &&
-        job.needs?.length &&
-        /\b(?:always|failure|cancelled)\s*\(/u.test(job.condition ?? ''),
-    );
-    const valid =
-      !aliases &&
-      !bypass &&
-      jobs.every((j) => j.effect !== 'unknown') &&
-      (declaration === null
-        ? jobLocks
-        : declaration.group.length > 0 &&
-          declaration.cancelInProgress === !(serialize || effectful) &&
-          (declaration.cancelInProgress !== true ||
-            supersedingGroupScoped(declaration.group, events)) &&
-          (!effectful || declaration.cancelInProgress === false) &&
-          // A repository-write job supersedes under a lock keyed by workflow and subject.
-          (!repositoryWrite ||
-            (declaration.cancelInProgress === true &&
-              keyedByWorkflowAndSubject(declaration.group, events))));
+        });
+      const aliases = jobs.some((a) =>
+        jobs.some(
+          (b) =>
+            a !== b &&
+            a.effect !== b.effect &&
+            // Two jobs without a job-level group share no lock (#325).
+            a.concurrency !== undefined &&
+            b.concurrency !== undefined &&
+            a.concurrency.group.toLowerCase() === b.concurrency.group.toLowerCase(),
+        ),
+      );
+      const bypass = jobs.some(
+        (job) =>
+          job.effect === 'publication' &&
+          job.needs?.length &&
+          /\b(?:always|failure|cancelled)\s*\(/u.test(job.condition ?? ''),
+      );
+      return (
+        !aliases &&
+        !bypass &&
+        jobs.every((j) => j.effect !== 'unknown') &&
+        (declaration === null
+          ? jobLocks
+          : declaration.group.length > 0 &&
+            declaration.cancelInProgress === !(serialize || effectful) &&
+            (declaration.cancelInProgress !== true ||
+              supersedingGroupScoped(declaration.group, events)) &&
+            (!effectful || declaration.cancelInProgress === false) &&
+            // A repository-write job supersedes under a lock keyed by workflow and subject.
+            (!repositoryWrite ||
+              (declaration.cancelInProgress === true &&
+                keyedByWorkflowAndSubject(declaration.group, events))))
+      );
+    };
+    const valid = holds(effects);
     if (valid) continue;
     concurrencySemanticIssues += 1;
+    // #390: when the workflow-level concurrency declaration would hold for the unproved jobs
+    // read at their most demanding effect, a publication, the unproved effect alone fails the
+    // policy, so the finding names those jobs instead of stating a superseding or serializing
+    // requirement. Job-level locks keep the existing message. The verdict is unchanged.
+    const unknownJobs = effects.filter((job) => job.effect === 'unknown').map((job) => job.name);
+    // The declaration must read the same through the structural YAML parse, so a group whose
+    // text merely contains a cancel-in-progress line never earns the unknown-job wording.
+    const structural = workflowConcurrency(readFileSync(workflow.file, 'utf8'));
+    const unknownAlone =
+      unknownJobs.length > 0 &&
+      declaration !== null &&
+      structural !== undefined &&
+      structural.group.trim() === declaration.group.trim() &&
+      structural.cancelInProgress === declaration.cancelInProgress &&
+      holds(
+        effects.map((job) =>
+          job.effect === 'unknown' ? { ...job, effect: 'publication' as const } : job,
+        ),
+      );
     findings.push({
       severity: 'warning',
       code: 'HARNESS_COHERENCE_CONCURRENCY_POLICY',
-      message: `${workflow.relativeFile} must declare a non-empty concurrency group with cancel-in-progress: ${serialize ? 'false (serialized)' : 'true (superseding)'}.`,
+      message: unknownAlone
+        ? `${workflow.relativeFile} has jobs whose effect is unknown (${unknownJobs.join(', ')}); review their steps in the reviewed workflow step registry, since an unproved effect cannot satisfy the concurrency policy.`
+        : `${workflow.relativeFile} must declare a non-empty concurrency group with cancel-in-progress: ${serialize ? 'false (serialized)' : 'true (superseding)'}.`,
     });
   }
 

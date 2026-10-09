@@ -47,7 +47,8 @@ export interface ReviewedWorkflowStep {
   }[];
 }
 
-export const REVIEWED_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = Object.freeze([
+/** The steps of DEVAI's own workflows under .github/workflows. */
+const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
   {
     sha256: 'b789ab88315626e7303bea66f4a3c615df7ef22bc152ac28b7c4768210563368',
     effect: 'read-only',
@@ -602,7 +603,7 @@ export const REVIEWED_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = Object.f
     files: [
       {
         path: 'packages/cli/scripts/installed-tarball-smoke.mjs',
-        sha256: '55015927c7a23b5a1ab21d2c60a59df9394340905ef3ee6eb90e4edc2493abd2',
+        sha256: 'f4fe741fcd36eb0d399215b6477716691927df6e5683bafb0e879c9943866798',
       },
       {
         path: 'scripts/create-release-manifest.mjs',
@@ -1031,4 +1032,268 @@ export const REVIEWED_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = Object.f
       "Runs only when both credentials are present; on push it rebases each open, non-draft, same-repository pull request behind main, and on pull_request_target only the event pull request (the job guard has required it same-repository and non-draft), through PUT pulls/{n}/update-branch with update_method rebase and the expected head sha, authenticated by the App token. Event values arrive only through env and the script checks out and runs no pull-request content. It changes only this repository's pull-request branches, never a fork and never a release surface, and reports a pull request it cannot compare or update without failing the others.",
     files: [],
   },
-]);
+];
+
+const READ_ONLY_CHECKOUT =
+  'Checks out a fixed ref into its own path without persisted credentials; selects source, publishes nothing.';
+const READ_ONLY_LOCAL =
+  'Local verification, build, or binding step: writes only the workspace, runner files, or step outputs, and makes no external write.';
+const READ_ONLY_ARTIFACT =
+  'Uploads a workflow run artifact of this run; the artifact belongs to the run, not to a release surface or this repository, so it makes no external write.';
+
+/**
+ * The steps of the workflows DEVAI generates into an adopter repository (#390): the
+ * attested-RC verifier (`devai-local-rc-verify.yml`, from ci-scaffold) and the main
+ * observation (`devai-main-observation.yml`, from the GitHub Actions host adapter). Their
+ * occurrences read `generated:<workflow file>#<job>[<step index>]`, since they live in no
+ * workflow of this repository; the registry test regenerates both workflows and checks every
+ * occurrence against them. They execute no adopter repository file, so `files` is empty.
+ */
+const GENERATED_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
+  {
+    sha256: '2564088d4cdb19c64d8b3ab1845af8f178c80eb9ba68a0adb23a8d9e76599714',
+    effect: 'read-only',
+    workflow: 'generated:devai-local-rc-verify.yml#verify-attested-rc[0]',
+    step: 'Check out candidate as inert data',
+    review: READ_ONLY_CHECKOUT,
+    files: [],
+  },
+  {
+    sha256: '62b0e5adec89b9ec6bbd0a5efd3eed70b2f95b6f523dd8015b6f192a76d1dae6',
+    effect: 'read-only',
+    workflow: 'generated:devai-local-rc-verify.yml#verify-attested-rc[1]',
+    step: 'Check out default-branch controls',
+    review: READ_ONLY_CHECKOUT,
+    files: [],
+  },
+  {
+    sha256: 'd50453121afe926a4974e35bd9ce4ecc58b2adb539b98a1eba1f4f2214b459fc',
+    effect: 'read-only',
+    // Byte-identical to the verifier runtime step of DEVAI's own ledger verification, which
+    // the registry had not listed, so this one entry names all three occurrences.
+    workflow:
+      'devai-ledger-verify.yml#verify-ledger[1], release.yml#verify-ledger[1], generated:devai-local-rc-verify.yml#verify-attested-rc[2]',
+    step: 'Set up verifier runtime',
+    review: 'Installs the pinned Node.js runtime on the runner; writes only runner files.',
+    files: [],
+  },
+  {
+    sha256: 'ffb556b0e44a212cd031505dbb756ec4a6730a0ffe7464b26d84a234ba33ea83',
+    effect: 'read-only',
+    workflow: 'generated:devai-local-rc-verify.yml#verify-attested-rc[3]',
+    step: 'Materialize protected DEVAI verifier package',
+    review: READ_ONLY_LOCAL,
+    files: [],
+  },
+  {
+    sha256: '021c2f0c64db13239986fbe2d017c9445d5bf7ded6c041647d81a152e2702105',
+    effect: 'read-only',
+    workflow: 'generated:devai-local-rc-verify.yml#verify-attested-rc[4]',
+    step: 'Bind candidate and protected evidence tag',
+    review:
+      'Reads the candidate checkout and the protected evidence tag through GET API calls and writes only step outputs; makes no external write.',
+    files: [],
+  },
+  {
+    sha256: '1b8a008c09ce4ada400dd7f30b0eb80acd1c115374f649a7c26f9f349bcc949e',
+    effect: 'read-only',
+    workflow: 'generated:devai-local-rc-verify.yml#verify-attested-rc[5]',
+    step: 'Check out immutable proof commit',
+    review: READ_ONLY_CHECKOUT,
+    files: [],
+  },
+  {
+    sha256: 'afb8b1c21feebcf5eb3a4f28d3202158f56367795505acbcdba1e726f2c09e8c',
+    effect: 'read-only',
+    workflow: 'generated:devai-local-rc-verify.yml#verify-attested-rc[6]',
+    step: 'Materialize inert versioned proof payload',
+    review: READ_ONLY_LOCAL,
+    files: [],
+  },
+  {
+    sha256: 'a96feb923517b0075749ddc83c3cb689bbafaaa20e9ccb6aae907a52c43d2d0a',
+    effect: 'read-only',
+    workflow: 'generated:devai-local-rc-verify.yml#verify-attested-rc[7]',
+    step: 'Reconstruct exact RC task policy',
+    review: READ_ONLY_LOCAL,
+    files: [],
+  },
+  {
+    sha256: 'c7ea134693c69c74f570ab50d13cef4e5ce20cdeb5d7391a69fee1f9fd977a45',
+    effect: 'read-only',
+    workflow: 'generated:devai-local-rc-verify.yml#verify-attested-rc[8]',
+    step: 'Verify complete trusted local RC bundle',
+    review: READ_ONLY_LOCAL,
+    files: [],
+  },
+  {
+    sha256: 'f95fb88abfd9c1dc7eaa2942d64048312eb130ca5a9bac4437cf4e30cedf34f7',
+    effect: 'read-only',
+    workflow: 'generated:devai-local-rc-verify.yml#verify-attested-rc[9]',
+    step: 'Build concise verification artifact',
+    review: READ_ONLY_LOCAL,
+    files: [],
+  },
+  {
+    sha256: '48b68067200275b43233f105a4b05c52dcc5bee81834addf6b1c6abd0f8871dc',
+    effect: 'read-only',
+    workflow: 'generated:devai-local-rc-verify.yml#verify-attested-rc[10]',
+    step: 'Upload verification summary',
+    review: READ_ONLY_ARTIFACT,
+    files: [],
+  },
+  {
+    sha256: '6a5c7cd4c075f80827e21a334c173b2fb3c60e402f4c532e786359602bc559e9',
+    effect: 'publication',
+    workflow: 'generated:devai-local-rc-verify.yml#verify-attested-rc[11]',
+    step: 'Publish candidate check',
+    review:
+      'POSTs the verified-local-rc check run for the candidate commit to the repository check-runs API: an externally visible verification surface, so it runs only under the commit-keyed, non-cancelling lock.',
+    files: [],
+  },
+  {
+    sha256: 'd2c31f82fcea6edb2bd3d5892aebe74c3c303c2abbe547bdef2a23fcd0f2f3c1',
+    effect: 'read-only',
+    workflow: 'generated:devai-local-rc-verify.yml#verify-attested-rc[12]',
+    step: 'Enforce verification result',
+    review: 'Fails the job unless verification succeeded; writes nothing.',
+    files: [],
+  },
+  {
+    sha256: 'f38a912061e93f32b99bdff0ffcc346114049b38295a4b6a445c46c55d9f42d6',
+    effect: 'read-only',
+    workflow: 'generated:devai-main-observation.yml#observe[0]',
+    step: 'actions/checkout',
+    review:
+      'Checks out the exact pushed commit with full history; selects source, publishes nothing.',
+    files: [],
+  },
+  {
+    sha256: 'fb7d213d16a53d2bfce50d488f1e18273dc28fbd9ae3e294479030b6bb834884',
+    effect: 'read-only',
+    workflow: 'generated:devai-main-observation.yml#observe[1]',
+    step: 'actions/setup-node',
+    review:
+      'Installs the pinned Node.js runtime and writes the GitHub Packages registry configuration on the runner; writes only runner files.',
+    files: [],
+  },
+  {
+    sha256: '8443c17d577cbd5dc4941b15f4d78f3eb8bc114d1752f9749802d3d1d4a35e0f',
+    effect: 'read-only',
+    workflow: 'generated:devai-main-observation.yml#observe[2]',
+    step: 'Install exact workspace',
+    review:
+      'Fails closed without the packages read token, then installs the frozen lockfile with --ignore-scripts, so no dependency or repository lifecycle script runs; writes only the workspace.',
+    files: [],
+  },
+  {
+    sha256: '0b342bf01479e1fcf8839544d62a12175f34d591f119279f47e1a5170df07268',
+    effect: 'read-only',
+    workflow: 'generated:devai-main-observation.yml#observe[3]',
+    step: 'Verify bound posture',
+    review: 'Runs devai doctor, which reads the repository and reports; writes nothing.',
+    files: [],
+  },
+  {
+    sha256: 'b27386d977b5db8c76c40d85ce8ade5552c00789e288108f1447c69f72e49285',
+    effect: 'read-only',
+    workflow: 'generated:devai-main-observation.yml#observe[4]',
+    step: 'Observe exact main SHA',
+    review:
+      'Runs the auditor observation of the exact pushed commit, writing only its observation under .devai/state in the workspace.',
+    files: [],
+  },
+  {
+    sha256: '9b7866fc3bbb7b43699e79a0842e6f6beccd279e4613d0c937dd94f344159526',
+    effect: 'read-only',
+    workflow: 'generated:devai-main-observation.yml#observe[5]',
+    step: 'Select supported provenance mode',
+    review:
+      'Selects the provenance mode from the event repository facts; writes only step outputs.',
+    files: [],
+  },
+  {
+    sha256: '34fd4a179792a4e8f80a4dd3cdbbaabd31064c8cf3ae1d7b9ff2ec0381291162',
+    effect: 'read-only',
+    workflow: 'generated:devai-main-observation.yml#observe[6]',
+    step: 'Prepare exact observation provenance',
+    review: READ_ONLY_LOCAL,
+    files: [],
+  },
+  {
+    sha256: '24a8403364f22010b858bc0716ddbe5b1f823cf957f52807012dbc01478d919d',
+    effect: 'read-only',
+    workflow: 'generated:devai-main-observation.yml#observe[7]',
+    step: 'actions/upload-artifact',
+    review: READ_ONLY_ARTIFACT,
+    files: [],
+  },
+  {
+    sha256: '3fdc0c4bb7f0fd0098353ad370da327cd505d938d5ce8e1651f1297004d1721b',
+    effect: 'read-only',
+    workflow: 'generated:devai-main-observation.yml#observe[8]',
+    step: 'Verify immutable observation artifact binding',
+    review: READ_ONLY_LOCAL,
+    files: [],
+  },
+  {
+    sha256: '9f74063bf6492a716b153e88f17ea823ec06c60765fcfd6540fabb28e705ad1b',
+    effect: 'publication',
+    workflow: 'generated:devai-main-observation.yml#observe[9]',
+    step: 'actions/attest-build-provenance',
+    review:
+      'Creates a signed build-provenance attestation for the observation files through the OIDC token: an external attestation surface, so it runs only under the commit-keyed, non-cancelling lock.',
+    files: [],
+  },
+  {
+    sha256: 'c539bd1949ab2306502d020edd30eda874578730dc1870f224fec712c5b2d230',
+    effect: 'read-only',
+    workflow: 'generated:devai-main-observation.yml#observe[10]',
+    step: 'Record explicit provenance result',
+    review: READ_ONLY_LOCAL,
+    files: [],
+  },
+  {
+    sha256: 'cfc884ad7843cc71fa73936e87958faadfb13820d8838c52774cc4582e23ea6d',
+    effect: 'read-only',
+    workflow: 'generated:devai-main-observation.yml#observe[11]',
+    step: 'actions/upload-artifact',
+    review: READ_ONLY_ARTIFACT,
+    files: [],
+  },
+  {
+    sha256: '926ee0c07d725daed025486a481f5438345d0de9db603c990e644e983424ba59',
+    effect: 'publication',
+    workflow: 'generated:devai-main-observation.yml#observe[12]',
+    step: 'Publish dedicated audit ref with explicit consent',
+    review:
+      'Runs only on a dispatch with publish_observation and the repository consent variable; pushes the observation commit to refs/devai/post-merge/<sha>, never a branch: an external audit surface, so it runs only under the commit-keyed, non-cancelling lock.',
+    files: [],
+  },
+];
+
+/**
+ * Both sections keyed by digest. A generated step byte-identical to a repository step shares
+ * its entry: the occurrence is added to that entry rather than registering the digest twice.
+ */
+function mergeByDigest(
+  sections: readonly (readonly ReviewedWorkflowStep[])[],
+): readonly ReviewedWorkflowStep[] {
+  const merged = new Map<string, ReviewedWorkflowStep>();
+  for (const entry of sections.flat()) {
+    const existing = merged.get(entry.sha256);
+    if (existing === undefined) merged.set(entry.sha256, entry);
+    else if (existing.effect !== entry.effect) {
+      throw new Error(`reviewed workflow step ${entry.sha256} is reviewed with two effects`);
+    } else
+      merged.set(entry.sha256, {
+        ...existing,
+        workflow: `${existing.workflow}, ${entry.workflow}`,
+      });
+  }
+  return [...merged.values()];
+}
+
+export const REVIEWED_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = Object.freeze(
+  mergeByDigest([REPOSITORY_WORKFLOW_STEPS, GENERATED_WORKFLOW_STEPS]),
+);
