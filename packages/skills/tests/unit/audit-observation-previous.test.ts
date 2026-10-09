@@ -3,16 +3,37 @@ import { createHash } from 'node:crypto';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { runAuditObservation } from '../../src/post-merge-auditor/index.js';
+import type { git as auditorGit } from '../../src/post-merge-auditor/support.js';
 import { withAuthorityHostTestScope } from './authority-host-test-scope.js';
 import { disableGitAutoMaintenance } from './git-fixture-maintenance.js';
+
+/**
+ * The auditor's git seam passes through to real git unless a test installs an override for one
+ * invocation (#393): the override may answer a call in place of git, or return undefined to
+ * let it run.
+ */
+type GitResult = ReturnType<typeof auditorGit>;
+const seam = vi.hoisted(() => ({
+  override: undefined as
+    ((args: readonly string[]) => Record<string, unknown> | undefined) | undefined,
+}));
+vi.mock('../../src/post-merge-auditor/support.js', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../../src/post-merge-auditor/support.js')>();
+  return {
+    ...original,
+    git: (repoRoot: string, args: readonly string[]) =>
+      (seam.override?.(args) as GitResult | undefined) ?? original.git(repoRoot, args),
+  };
+});
 
 const roots: string[] = [];
 const NAMES = ['inventory', 'scorecard', 'backlog', 'assessment', 'status'] as const;
 const RECORD_DIRECTORY = 'record/proofs/compliance/scorecards';
 
 afterEach(() => {
+  seam.override = undefined;
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
@@ -435,4 +456,95 @@ describe('audit observe skips provably unreachable observations (#389)', () => {
       );
     },
   );
+});
+
+// #393 review: a skip needs proof that the recorded commit is not an ancestor. A shallow
+// boundary that hides the path, or a presence probe that fails for any reason other than a
+// verified missing object, leaves ancestry unknown, and automatic selection refuses.
+describe('audit observe refuses undecidable ancestry instead of skipping (#393)', () => {
+  it('refuses when a shallow boundary hides the path between --at and a present ancestor', async () => {
+    const source = fixture();
+    const { first } = await observedPredecessor(source);
+    writeFileSync(join(source, 'later.txt'), 'later\n');
+    git(source, ['add', 'later.txt']);
+    git(source, ['commit', '-m', 'feat(fixture): a later commit']);
+    const at = git(source, ['rev-parse', 'HEAD']);
+    git(source, ['tag', 'observed-first', first]);
+
+    const clone = mkdtempSync(join(tmpdir(), 'devai-audit-previous-boundary-'));
+    roots.push(clone);
+    rmSync(clone, { recursive: true, force: true });
+    git(tmpdir(), ['clone', '--quiet', '--depth', '1', `file://${source}`, clone]);
+    disableGitAutoMaintenance(clone);
+    git(clone, ['fetch', '--quiet', '--depth', '1', 'origin', 'tag', 'observed-first']);
+
+    expect(git(clone, ['rev-parse', '--is-shallow-repository'])).toBe('true');
+    expect(present(clone, at), '--at is present').toBe(true);
+    expect(present(clone, first), 'the recorded ancestor is present').toBe(true);
+    // The boundary hides the path, so git answers "not an ancestor" (exit 1) for a real one.
+    expect(
+      spawnSync('git', ['merge-base', '--is-ancestor', first, at], { cwd: clone }).status,
+    ).toBe(1);
+
+    await expect(observe(clone, at)).rejects.toThrow('AUDIT_OBSERVE_PREVIOUS_HISTORY_UNAVAILABLE');
+  });
+
+  it.each([
+    ['ends by a signal', { status: null, signal: 'SIGKILL', stdout: '', stderr: '' }],
+    [
+      'fails with an error other than a missing object',
+      {
+        status: 128,
+        signal: null,
+        stdout: '',
+        stderr: 'error: unable to read object: Input/output error\n',
+      },
+    ],
+  ] as const)(
+    'refuses when the presence probe for a recorded commit %s',
+    async (_label, answer) => {
+      const root = fixture();
+      const { first } = await observedPredecessor(root);
+      const missing = 'f'.repeat(40);
+      const third = commitChain(root, [
+        ...chainRecords(root),
+        chainRecord('EV-missing-1', missing, bundleDigests(root, first)),
+      ]);
+      const probes: string[][] = [];
+      seam.override = (args) => {
+        if (args[0] === 'cat-file' && args.some((arg) => arg.startsWith(missing))) {
+          probes.push([...args]);
+          return { pid: 0, output: [null, answer.stdout, answer.stderr], ...answer };
+        }
+        return undefined;
+      };
+
+      await expect(observe(root, third)).rejects.toThrow(
+        'AUDIT_OBSERVE_PREVIOUS_HISTORY_UNAVAILABLE',
+      );
+      expect(probes.length, 'the presence of the recorded commit was probed').toBeGreaterThan(0);
+    },
+  );
+
+  it('still skips the commit when the presence probe verifies it missing', async () => {
+    const root = fixture();
+    const { first } = await observedPredecessor(root);
+    const missing = 'f'.repeat(40);
+    const third = commitChain(root, [
+      ...chainRecords(root),
+      chainRecord('EV-missing-1', missing, bundleDigests(root, first)),
+    ]);
+    const probes: string[][] = [];
+    seam.override = (args) => {
+      if (args[0] === 'cat-file' && args.some((arg) => arg.startsWith(missing))) {
+        probes.push([...args]);
+      }
+      return undefined;
+    };
+
+    await observe(root, third);
+
+    expect(probes.length).toBeGreaterThan(0);
+    expect(readBundle(root, third, 'status')['previous_observation_record']).toBe('EV-first-1');
+  });
 });
