@@ -8,7 +8,7 @@ import {
 import { createHash } from 'node:crypto';
 import { dirname, join, resolve } from 'node:path';
 import { parseDocument } from 'yaml';
-import { ACTION_PINS } from '../ci-scaffold/action-pins.js';
+import { getActionPins } from '../ci-scaffold/action-pins.js';
 
 const WORKFLOW_PATH = '.github/workflows/devai-main-observation.yml';
 const CONFIG_PATH = '.devai/config/github-actions-host-adapter.json';
@@ -45,6 +45,7 @@ function repositorySlug(root: string): string {
 }
 
 function workflow(): string {
+  const pins = getActionPins();
   return `name: DEVAI main observation
 
 on:
@@ -73,11 +74,11 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@${ACTION_PINS.checkout.digest}
+      - uses: actions/checkout@${pins.checkout.digest}
         with:
           ref: \${{ github.sha }}
           fetch-depth: 0
-      - uses: actions/setup-node@${ACTION_PINS.setupNode.digest}
+      - uses: actions/setup-node@${pins.setupNode.digest}
         with:
           node-version: 24
           registry-url: https://npm.pkg.github.com
@@ -140,7 +141,7 @@ jobs:
           writeFileSync(join(root, 'github-provenance.json'), JSON.stringify(document, null, 2) + '\\n');
           NODE
       - id: observation-artifact
-        uses: actions/upload-artifact@${ACTION_PINS.uploadArtifact.digest}
+        uses: actions/upload-artifact@${pins.uploadArtifact.digest}
         with:
           name: devai-main-observation-\${{ github.sha }}
           path: .devai/state/audit-observations/\${{ github.sha }}/
@@ -206,7 +207,7 @@ jobs:
           };
           writeFileSync(join('.devai/state/audit-receipts', process.env.GITHUB_SHA, 'github-provenance-receipt.json'), JSON.stringify(document, null, 2) + '\\n');
           NODE
-      - uses: actions/upload-artifact@${ACTION_PINS.uploadArtifact.digest}
+      - uses: actions/upload-artifact@${pins.uploadArtifact.digest}
         with:
           name: devai-main-observation-receipt-\${{ github.sha }}
           path: .devai/state/audit-receipts/\${{ github.sha }}/github-provenance-receipt.json

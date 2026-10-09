@@ -1,15 +1,15 @@
-import { ACTION_PINS } from './action-pins.js';
+import { actionPinDigestIfPresent, getActionPins } from './action-pins.js';
 import { verifierPackagePolicy, protectedVerifierPackageStep } from './verifier-package.js';
 
 export const LEDGER_ENVIRONMENT = 'devai-ledger-verification';
-// The generated workflows share one action pin set, read from the adopter toolchain defaults (#383).
-export const CHECKOUT_COMMIT = ACTION_PINS.checkout.digest;
-export const SETUP_NODE_COMMIT = ACTION_PINS.setupNode.digest;
-const CHECKOUT_REF = ACTION_PINS.checkout.ref;
-const SETUP_NODE_REF = ACTION_PINS.setupNode.ref;
-const UPLOAD_ARTIFACT = ACTION_PINS.uploadArtifact;
+// The generated workflows share one action pin set, read from the adopter toolchain defaults
+// (#383) when a workflow is generated, never at import. These two informational exports are the
+// empty string where the packaged defaults are absent; the generators below fail closed.
+export const CHECKOUT_COMMIT = actionPinDigestIfPresent('checkout');
+export const SETUP_NODE_COMMIT = actionPinDigestIfPresent('setupNode');
 
 export function attestedRcVerificationWorkflow(): string {
+  const { checkout, setupNode, uploadArtifact } = getActionPins();
   const backslash = '\\';
   return `name: DEVAI trusted local RC verification
 
@@ -42,7 +42,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Check out candidate as inert data
-        uses: actions/checkout@${CHECKOUT_COMMIT} # ${CHECKOUT_REF}
+        uses: actions/checkout@${checkout.digest} # ${checkout.ref}
         with:
           ref: \${{ env.CANDIDATE_SHA }}
           path: candidate
@@ -50,7 +50,7 @@ jobs:
           persist-credentials: false
 
       - name: Check out default-branch controls
-        uses: actions/checkout@${CHECKOUT_COMMIT} # ${CHECKOUT_REF}
+        uses: actions/checkout@${checkout.digest} # ${checkout.ref}
         with:
           ref: main
           path: control
@@ -58,7 +58,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up verifier runtime
-        uses: actions/setup-node@${SETUP_NODE_COMMIT} # ${SETUP_NODE_REF}
+        uses: actions/setup-node@${setupNode.digest} # ${setupNode.ref}
         with:
           node-version: 24
 
@@ -92,7 +92,7 @@ ${protectedVerifierPackageStep('Materialize protected DEVAI verifier package')}
           } >> "$GITHUB_OUTPUT"
 
       - name: Check out immutable proof commit
-        uses: actions/checkout@${CHECKOUT_COMMIT} # ${CHECKOUT_REF}
+        uses: actions/checkout@${checkout.digest} # ${checkout.ref}
         with:
           ref: \${{ steps.identity.outputs.proof_commit }}
           path: evidence
@@ -197,7 +197,7 @@ ${protectedVerifierPackageStep('Materialize protected DEVAI verifier package')}
 
       - name: Upload verification summary
         if: always()
-        uses: actions/upload-artifact@${UPLOAD_ARTIFACT.digest} # ${UPLOAD_ARTIFACT.ref}
+        uses: actions/upload-artifact@${uploadArtifact.digest} # ${uploadArtifact.ref}
         with:
           name: verified-local-rc-\${{ env.CANDIDATE_SHA }}
           path: \${{ runner.temp }}/devai-local-rc/verification-summary.json
@@ -233,6 +233,7 @@ ${protectedVerifierPackageStep('Materialize protected DEVAI verifier package')}
 }
 
 export function ledgerVerificationWorkflow(): string {
+  const { checkout, setupNode } = getActionPins();
   const backslash = '\\';
   return `name: DEVAI ledger verification
 
@@ -261,7 +262,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Check out exact candidate
-        uses: actions/checkout@${CHECKOUT_COMMIT} # ${CHECKOUT_REF}
+        uses: actions/checkout@${checkout.digest} # ${checkout.ref}
         with:
           ref: \${{ env.CANDIDATE_SHA }}
           path: candidate
@@ -269,7 +270,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up verifier runtime
-        uses: actions/setup-node@${SETUP_NODE_COMMIT} # ${SETUP_NODE_REF}
+        uses: actions/setup-node@${setupNode.digest} # ${setupNode.ref}
         with:
           node-version: 24
 
@@ -283,7 +284,7 @@ ${protectedVerifierPackageStep('Materialize protected DEVAI verifier package')}
     timeout-minutes: 5
     steps:
       - name: Check out exact candidate
-        uses: actions/checkout@${CHECKOUT_COMMIT} # ${CHECKOUT_REF}
+        uses: actions/checkout@${checkout.digest} # ${checkout.ref}
         with:
           ref: \${{ env.CANDIDATE_SHA }}
           path: candidate
@@ -291,7 +292,7 @@ ${protectedVerifierPackageStep('Materialize protected DEVAI verifier package')}
           persist-credentials: false
 
       - name: Set up verifier runtime
-        uses: actions/setup-node@${SETUP_NODE_COMMIT} # ${SETUP_NODE_REF}
+        uses: actions/setup-node@${setupNode.digest} # ${setupNode.ref}
         with:
           node-version: 24
 
