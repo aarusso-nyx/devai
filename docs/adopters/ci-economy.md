@@ -140,7 +140,10 @@ also runs on push to a protected branch conditions the cancellation on the event
 pull-request runs stop while a branch-gating run on main is never cancelled. They do not
 combine pull-request, push, and scheduled product-validation triggers. Path filters
 are appropriate only for content the gate does not consume; tested documentation and
-policy inputs remain unfiltered. Concurrent suites that use PostgreSQL need isolated
+policy inputs remain unfiltered. A workflow whose jobs never check out the repository
+consumes no repository content, so the path-filters advisory skips it on a branch push and
+on either pull-request trigger. `pull_request_target` counts as a pull-request trigger
+for the cancellation rule, so such a workflow still cancels superseded runs. Concurrent suites that use PostgreSQL need isolated
 ephemeral databases or serialized database-heavy work rather than inflated timeouts.
 
 A preflight lane, where a repository runs one, is untrusted and non-attesting by
