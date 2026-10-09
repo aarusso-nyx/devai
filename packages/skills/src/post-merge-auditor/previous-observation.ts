@@ -125,16 +125,31 @@ function historyCompleteProbe(repoRoot: string, at: string): () => boolean {
   };
 }
 
-/** Whether `sha` names a commit present in the local object store. */
-function commitPresent(repoRoot: string, sha: string): boolean {
-  return gitRun(repoRoot, ['cat-file', '-e', `${sha}^{commit}`]).status === 0;
+/**
+ * Whether `sha` names a commit in the local object store: `present` when
+ * `git cat-file -e <sha>^{commit}` exits 0, `absent` only for git's missing-object outcome, and
+ * `unknown` for anything else (a spawn error, a signal, another failure, or an object that
+ * exists but is not a commit). For an object that is not in the store, git exits 128 and prints
+ * exactly `fatal: Not a valid object name <sha>^{commit}` (verified with git 2.54); older gits
+ * may exit 1 with no output, which reads the same.
+ */
+function commitPresence(repoRoot: string, sha: string): 'present' | 'absent' | 'unknown' {
+  const spec = `${sha}^{commit}`;
+  const result = git(repoRoot, ['cat-file', '-e', spec]);
+  if (result.error !== undefined || result.signal !== null) return 'unknown';
+  if (result.status === 0) return 'present';
+  const stderr = String(result.stderr ?? '').trim();
+  if (result.status === 1 && stderr === '') return 'absent';
+  if (result.status === 128 && stderr === `fatal: Not a valid object name ${spec}`) return 'absent';
+  return 'unknown';
 }
 
 /**
- * How `candidate` relates to `at`. `git merge-base --is-ancestor` exits 0 for an ancestor and
- * 1 for a commit that is not one. Any other exit is read as not an ancestor only when the
- * recorded commit is absent from a complete local history, as for a commit rewritten away or
- * recorded in another clone (#389); otherwise, a shallow or partial history, it is unknown.
+ * How `candidate` relates to `at`. `git merge-base --is-ancestor` exits 0 for an ancestor. Its
+ * exit 1 is "not an ancestor" only in a complete history; in a shallow or partial one the walk
+ * may have stopped short, so it is unknown. Any other exit is read as not an ancestor only when
+ * the recorded commit is verifiably absent from a complete local history, as for a commit
+ * rewritten away or recorded in another clone (#389); otherwise it is unknown.
  */
 function ancestry(
   repoRoot: string,
@@ -145,8 +160,12 @@ function ancestry(
   if (candidate === at) return 'not-ancestor';
   const result = gitRun(repoRoot, ['merge-base', '--is-ancestor', candidate, at]);
   if (result.status === 0) return 'ancestor';
-  if (result.status === 1) return 'not-ancestor';
-  return !commitPresent(repoRoot, candidate) && historyComplete() ? 'not-ancestor' : 'unknown';
+  if (result.status === 1 && result.signal === null) {
+    return historyComplete() ? 'not-ancestor' : 'unknown';
+  }
+  return commitPresence(repoRoot, candidate) === 'absent' && historyComplete()
+    ? 'not-ancestor'
+    : 'unknown';
 }
 
 function depth(repoRoot: string, sha: string): number {
