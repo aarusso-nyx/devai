@@ -443,11 +443,12 @@ const __dirname = __devaiDirname(__filename);`,
   cpSync(join(repositoryRoot, 'law/constitution.md'), join(runtimeRoot, 'law/constitution.md'));
   copyFiles(join(repositoryRoot, 'law/policy'), join(distRoot, 'law/policy'), policyFiles);
   // ADR-AUT-0003: the package default test selectors are a law source the installed bin
-  // resolves from dist/law, never from the adopter repository.
+  // resolves from dist/law, never from the adopter repository. The adopter toolchain defaults
+  // carry the action pins every generated workflow uses (#383).
   copyFiles(
     join(repositoryRoot, 'law/policy/adopter-defaults'),
     join(distRoot, 'law/policy/adopter-defaults'),
-    ['path-authority-classes.json'],
+    ['path-authority-classes.json', 'toolchain.json'],
   );
   cpSync(join(repositoryRoot, 'packages/skills/resources'), join(distRoot, 'resources'), {
     recursive: true,
@@ -478,6 +479,7 @@ const __dirname = __devaiDirname(__filename);`,
     join(distRoot, 'law/policy/mutation-evidence-v2.json'),
     join(distRoot, 'law/policy/release-lifecycle.json'),
     join(distRoot, 'law/policy/adopter-defaults/path-authority-classes.json'),
+    join(distRoot, 'law/policy/adopter-defaults/toolchain.json'),
     join(distRoot, 'law/constitution.md'),
     join(distRoot, 'resources/recipes/devai-round/SKILL.md'),
     join(distRoot, 'resources/operations/scaffold/templates/db/migration.sql.tpl'),
