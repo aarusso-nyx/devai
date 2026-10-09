@@ -44,6 +44,9 @@ describe('sense read-only process shape boundaries', () => {
     ['type_check', 'npx', ['tsc', '--noEmit']],
     ['type_check', 'npx', ['tsc', '--noEmit', '-p', 'packages/cli/tsconfig.json']],
     ['build', 'pnpm', ['-r', 'build']],
+    // ADR-AUT-0006: exactly pnpm -r typecheck and pnpm test:perf under sense run.
+    ['type_check', 'pnpm', ['-r', 'typecheck']],
+    ['perf_test', 'pnpm', ['test:perf']],
     ['unit_test', 'pnpm', ['vitest', 'run']],
     [
       'integration_test',
@@ -116,8 +119,10 @@ describe('sense read-only process shape boundaries', () => {
       'pnpm',
       ['vitest', 'run', '--other', 'tests/config/t4.regression.config.ts'],
     ],
-    ['perf_test', 'pnpm', ['test:perf']],
+    ['type_check', 'pnpm', ['typecheck']],
+    ['type_check', 'pnpm', ['-r', 'typecheck', 'extra']],
     ['perf_test', 'pnpm', ['run', 'test:perf']],
+    ['perf_test', 'pnpm', ['test:perf', 'extra']],
     ['perf_test', 'pnpm', ['vitest', 'run', '--config', 'tests/config/rc.containment.config.ts']],
     [
       'perf_test',
@@ -172,5 +177,32 @@ describe('sense read-only process shape boundaries', () => {
     ['runtime_probe_api', 'sh', ['-lc', 'echo unsafe']],
   ] as const)('refuses %s: %s %j', (kind, executable, args) => {
     expect(invoke(kind, executable, args)).toThrow('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
+  });
+});
+
+describe('the ADR-AUT-0006 pnpm shapes outside sense run', () => {
+  it.each([
+    ['pnpm -r typecheck', ['-r', 'typecheck']],
+    ['pnpm test:perf', ['test:perf']],
+  ] as const)('refuses %s under check', (_label, args) => {
+    const check = entries.find((entry) => entry.name === 'check');
+    if (check === undefined) throw new Error('missing action check');
+    const host = createAuthorityHostBroker({
+      entry: check,
+      entries,
+      argv: [process.execPath, 'devai', 'check'],
+      role: 'auditor',
+      declaration: { as_role: 'auditor' },
+      repository_root: ROOT,
+      package_version: resolveCliVersion(),
+      bootstrap_policy: true,
+    });
+    try {
+      expect(() => host.scope.apply_effect(effect('pnpm', [...args]), () => 'allowed')).toThrow(
+        'AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED',
+      );
+    } finally {
+      host.dispose();
+    }
   });
 });
