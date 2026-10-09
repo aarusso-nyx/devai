@@ -79,6 +79,10 @@ async function regenerate(root: string, options?: RegenerationOptions) {
   return withAuthorityHostTestScope(() => regenerateInventoryReadings(root, options));
 }
 
+function codes(reading: { readonly findings?: readonly { readonly code: string }[] }): string[] {
+  return (reading.findings ?? []).map((finding) => finding.code);
+}
+
 function json(root: string, path: string): Record<string, unknown> {
   return JSON.parse(readFileSync(join(root, path), 'utf8')) as Record<string, unknown>;
 }
@@ -206,15 +210,20 @@ describe('inventory regeneration from source (#237)', () => {
 
   it('keeps a producer REVIEW as REVIEW and drops coverage when its surfaces are absent', async () => {
     const presumed = repository();
-    // No declaration presumes the http surface, whose api-map body is absent.
+    // #382: no declaration presumes every surface, so all seven kinds are required; the
+    // api producer finds no controller in this source and reads REVIEW.
     const review = await regenerate(presumed.root);
     expect(review.reading).toMatchObject({
       status: 'review',
-      metrics: { inventory_coverage_status: 'review', required_kinds: 2 },
+      metrics: {
+        inventory_api_status: 'review',
+        required_kinds: 7,
+        missing_required_kinds: 0,
+      },
       findings: expect.arrayContaining([
         expect.objectContaining({
           code: 'INVENTORY_REGENERATION_KIND_REVIEW',
-          message: expect.stringContaining('inventory_coverage'),
+          message: expect.stringContaining('inventory_api'),
         }),
       ]),
     });
@@ -235,37 +244,45 @@ describe('inventory regeneration from source (#237)', () => {
     expect(existsSync(join(absent.root, COVERAGE_BODY))).toBe(false);
   });
 
-  it('never synthesizes a regenerated kind from a body file and still rebuilds the others', async () => {
+  it('never synthesizes any inventory kind from a body file (#382)', async () => {
     const { root } = repository();
     put(root, '.devai/state/sensors/inventory_dep_graph/stale.json', '{"graph":{}}\n');
     put(root, '.devai/state/sensors/inventory_rbac/rbac.json', '{"roles":[]}\n');
 
     const result = await regenerate(root, { surfaces: ACTIONS_ONLY });
 
-    expect(result.report.entries.map(({ kind, action }) => [kind, action])).toEqual([
-      ['inventory_rbac', 'created'],
+    // Every kind is now a regenerated kind: rbac is not required here, so its body is
+    // removed rather than rebuilt into a reading.
+    expect(result.report.entries).toEqual([]);
+    expect(result.report.obsolete).toEqual([
+      {
+        kind: 'inventory_rbac',
+        body_path: '.devai/state/sensors/inventory_rbac/rbac.json',
+        action: 'removed',
+      },
     ]);
+    expect(existsSync(join(root, '.devai/state/sensors/inventory_rbac/rbac.json'))).toBe(false);
     expect(existsSync(join(root, '.devai/state/sensor-readings/inventory_dep_graph'))).toBe(false);
+    expect(existsSync(join(root, '.devai/state/sensor-readings/inventory_rbac'))).toBe(false);
     expect(result.reading).toMatchObject({
       status: 'pass',
-      metrics: { kinds_touched: 3, kinds_rebuilt: 3, kinds_up_to_date: 0 },
+      metrics: { kinds_touched: 2, kinds_rebuilt: 2, kinds_up_to_date: 0 },
     });
   });
 
-  it('fails on a malformed body of a rebuilt kind and reviews an empty inventory', async () => {
+  it('never reads a stray state file of an inventory kind and reviews an empty inventory', async () => {
     const malformed = repository();
     put(malformed.root, '.devai/state/sensors/inventory_api/broken.json', '{broken');
-    const fail = await regenerate(malformed.root, { surfaces: ACTIONS_ONLY });
-    expect(fail.reading).toMatchObject({
-      status: 'fail',
-      metrics: { error_count: 1, missing_required_kinds: 0 },
-      findings: [
-        expect.objectContaining({
-          code: 'READINGS_REBUILD_ERROR',
-          message: expect.stringContaining('inventory_api/broken.json'),
-        }),
-      ],
+    // #382: inventory_api is a regenerated kind, so no state file of it is parsed or rebuilt.
+    const stray = await regenerate(malformed.root, { surfaces: ACTIONS_ONLY });
+    expect(stray.reading).toMatchObject({
+      status: 'pass',
+      metrics: { error_count: 0, missing_required_kinds: 0 },
     });
+    expect(stray.report.entries).toEqual([]);
+    expect(existsSync(join(malformed.root, '.devai/state/sensor-readings/inventory_api'))).toBe(
+      false,
+    );
 
     const empty = repository({ 'README.md': '# No TypeScript source\n' });
     const review = await regenerate(empty.root, { surfaces: ACTIONS_ONLY });
@@ -275,58 +292,31 @@ describe('inventory regeneration from source (#237)', () => {
     });
   });
 
-  it('publishes nothing when a required kind fails and keeps earlier bodies byte for byte', async () => {
-    // With http presumed present, an unreadable api-map makes the coverage producer error.
+  it('never feeds a record/proofs default to a producer during regeneration (#382)', async () => {
+    // Malformed proof defaults: an unreadable api-map and a schema-invalid routes body.
+    // Coverage reads the api-map and routes staged in the same run, so neither is an input.
+    // A producer failure that publishes nothing is covered in inventory-regeneration-producers.
     const { root } = repository({
       'src/a.ts': 'export const a = 1;\n',
       'record/proofs/sensors/inventory_api/api-map.json': '{broken',
-    });
-    const earlier = seedPublishedBodies(root);
-
-    const result = await regenerate(root);
-
-    expect(result.reading).toMatchObject({
-      status: 'fail',
-      // The dep-graph body was valid, but nothing is published, so both kinds are missing.
-      metrics: { missing_required_kinds: 2, kinds_touched: 0 },
-      findings: [
-        expect.objectContaining({
-          code: 'READINGS_REBUILD_ERROR',
-          message: expect.stringContaining('inventory_coverage read error'),
-        }),
-      ],
-    });
-    expect(result.report).toMatchObject({ ok: false, regenerated: [], obsolete: [] });
-    for (const [path, body] of Object.entries(earlier)) {
-      expect(readFileSync(join(root, path), 'utf8')).toBe(body);
-    }
-    expect(existsSync(join(root, COVERAGE_BODY))).toBe(false);
-    expect(temporaries(root)).toEqual([]);
-  });
-
-  it('validates a REVIEW body against its schema before publishing anything', async () => {
-    // No api-map reads REVIEW; a numeric route id makes that REVIEW body schema-invalid.
-    const { root } = repository({
-      'src/a.ts': 'export const a = 1;\n',
       'record/proofs/sensors/inventory_routes/routes-test.json': `${JSON.stringify({
         routes: [{ id: 42, method: 'GET', path: '/a' }],
       })}\n`,
     });
-    const earlier = seedPublishedBodies(root);
+    seedPublishedBodies(root);
 
     const result = await regenerate(root);
 
-    expect(result.reading.status).toBe('fail');
-    expect(result.report.errors).toEqual([
-      expect.stringMatching(
-        /^regenerate \.devai\/state\/sensors\/inventory_coverage\/coverage-matrix\.json failed: body fails coverage-matrix\.schema\.json/u,
-      ),
-    ]);
-    expect(result.report.regenerated).toEqual([]);
-    for (const [path, body] of Object.entries(earlier)) {
-      expect(readFileSync(join(root, path), 'utf8')).toBe(body);
-    }
-    expect(existsSync(join(root, COVERAGE_BODY))).toBe(false);
+    expect(result.report).toMatchObject({ ok: true, errors: [] });
+    expect(result.reading.status).not.toBe('fail');
+    expect(codes(result.reading)).not.toContain('READINGS_REBUILD_ERROR');
+    expect(json(root, COVERAGE_BODY)).toMatchObject({ routes: [], endpoints: [] });
+    // The proof defaults stay exactly as committed.
+    expect(
+      readFileSync(join(root, 'record/proofs/sensors/inventory_api/api-map.json'), 'utf8'),
+    ).toBe('{broken');
+    expect(git(root, 'status', '--porcelain')).toBe('');
+    expect(temporaries(root)).toEqual([]);
   });
 
   it('removes the body of a kind no longer required so it can never stand in for a PASS', async () => {
