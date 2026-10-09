@@ -14,6 +14,7 @@ import {
   type SurfaceEvidence,
 } from './declared-surfaces.js';
 import { buildSensorReading, type SensorStatus } from './sensor-reading.js';
+import { resolveBodyInput } from './inventory-body-inputs.js';
 import {
   type InventoryCoverageOptions,
   type InventoryCoverageResult,
@@ -28,14 +29,19 @@ import {
 export type {
   InventoryCoverageOptions,
   InventoryCoverageResult,
+  RoutesPathResolution,
 } from './inventory-coverage-inputs.js';
+export { ROUTES_BODY_DIRECTORIES, resolveRoutesPath } from './inventory-coverage-inputs.js';
+
+/** The api-map body, relative to each inventory body directory. */
+const API_MAP_FILE = 'inventory_api/api-map.json';
 
 function measureInventoryCoverage(opts: InventoryCoverageOptions): InventoryCoverageResult {
   const t0 = performance.now();
   const generatedAt = opts.now ?? new Date().toISOString();
   const admit = opts.admitFile ?? (() => true);
-  const apiMapPath =
-    opts.apiMapPath ?? join(opts.repoRoot, 'record/proofs/sensors/inventory_api/api-map.json');
+  // #382: an explicit input, then the regenerated state body, then the direct default.
+  const apiMapPath = resolveBodyInput(opts.repoRoot, opts.apiMapPath, API_MAP_FILE, admit);
   const routesResolution = resolveRoutesPath(opts.repoRoot, opts.routesPath, opts.framework, admit);
 
   const findings: Array<{
@@ -51,12 +57,12 @@ function measureInventoryCoverage(opts: InventoryCoverageOptions): InventoryCove
 
   if (!httpPresent) {
     // ADR-SCR-0003: http declared absent; no HTTP inventory is demanded.
-  } else if (!existsSync(apiMapPath) || !admit(apiMapPath)) {
+  } else if (apiMapPath === null || !existsSync(apiMapPath) || !admit(apiMapPath)) {
     status = 'review';
     findings.push({
       severity: 'warning',
       code: 'COVERAGE_REQUIRES_API_MAP',
-      message: `api-map body not found at ${apiMapPath}. Run 'devai sense run inventory_api' first.`,
+      message: `api-map body not found at ${apiMapPath ?? 'no api-map input'}. Run 'devai sense run inventory_api' first.`,
     });
   } else {
     try {
@@ -303,10 +309,9 @@ const BOUND_SURFACES: readonly PlantSurface[] = ['http', 'actions'];
 function httpEvidence(opts: InventoryCoverageOptions): SurfaceEvidence {
   const items: string[] = [];
   const admit = opts.admitFile ?? (() => true);
-  const apiMapPath =
-    opts.apiMapPath ?? join(opts.repoRoot, 'record/proofs/sensors/inventory_api/api-map.json');
+  const apiMapPath = resolveBodyInput(opts.repoRoot, opts.apiMapPath, API_MAP_FILE, admit);
   try {
-    if (!admit(apiMapPath)) throw new Error('input not admitted');
+    if (apiMapPath === null || !admit(apiMapPath)) throw new Error('input not admitted');
     const apiMap = JSON.parse(readFileSync(apiMapPath, 'utf8')) as Partial<ApiMapShape>;
     for (const endpoint of apiMap.endpoints ?? []) items.push(endpointId(endpoint));
   } catch {

@@ -2,6 +2,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { validators } from '@devai-nyx/schemas';
 import type { DeclaredSurfaces } from './declared-surfaces.js';
+import { DIRECT_BODY_DIRECTORY, REGENERATED_BODY_DIRECTORY } from './inventory-body-inputs.js';
 import type { SensorReading } from './sensor-reading.js';
 
 /**
@@ -58,8 +59,13 @@ export interface InventoryCoverageOptions {
    * present the action registry is measured against its use-case links.
    */
   readonly surfaces?: DeclaredSurfaces;
-  readonly apiMapPath?: string;
-  readonly routesPath?: string;
+  /**
+   * The api-map body. Omitted: the regenerated state body, then the direct default
+   * (`resolveBodyInput`, #382). `null`: no api-map input at all.
+   */
+  readonly apiMapPath?: string | null;
+  /** The routes body. Omitted: resolved by `resolveRoutesPath`. `null`: no routes input. */
+  readonly routesPath?: string | null;
   readonly bodyPath?: string;
   /** False for pure observation callers that must not materialize canonical state. */
   readonly persistBody?: boolean;
@@ -326,41 +332,69 @@ export function countInferredMatches(
   return n;
 }
 
-type RoutesPathResolution =
+export type RoutesPathResolution =
   | { readonly kind: 'resolved'; readonly path: string }
-  | { readonly kind: 'missing'; readonly directory: string }
+  | {
+      readonly kind: 'missing';
+      /** The direct-default directory; empty when the caller named no input. */
+      readonly directory: string;
+    }
   | {
       readonly kind: 'ambiguous';
       readonly directory: string;
       readonly candidates: readonly string[];
     };
 
-/** Resolve exactly one current routes-inventory body without guessing a framework. */
+/** The repository-relative directories a routes body is looked up in, in order (#382). */
+export const ROUTES_BODY_DIRECTORIES: readonly string[] = [
+  join(REGENERATED_BODY_DIRECTORY, 'inventory_routes'),
+  join(DIRECT_BODY_DIRECTORY, 'inventory_routes'),
+];
+
+const ROUTES_BODY_NAME = /^routes-[^.]+\.json$/;
+
+/**
+ * Resolve exactly one current routes-inventory body without guessing a framework. An
+ * explicit path wins and `null` names no input. Otherwise each directory is consulted in
+ * turn (the regenerated state body, then the direct sensor default): with a framework,
+ * `routes-<framework>.json`; without one, the single `routes-*.json` the directory holds.
+ * Two or more candidates are ambiguous and never guessed between; the next directory is
+ * consulted only when a directory holds none. With a framework and no body anywhere, the
+ * last directory's path is resolved, so the consumer reports it missing there.
+ */
 export function resolveRoutesPath(
   repoRoot: string,
-  explicit: string | undefined,
+  explicit: string | null | undefined,
   framework: string | undefined,
   admit: (absolutePath: string) => boolean = () => true,
+  directories: readonly string[] = ROUTES_BODY_DIRECTORIES,
 ): RoutesPathResolution {
+  if (explicit === null) return { kind: 'missing', directory: '' };
   if (explicit !== undefined) return { kind: 'resolved', path: explicit };
-  const dir = join(repoRoot, 'record/proofs/sensors/inventory_routes');
-  if (framework !== undefined) {
-    return { kind: 'resolved', path: join(dir, `routes-${framework}.json`) };
-  }
-  if (existsSync(dir)) {
-    try {
-      const candidates = readdirSync(dir)
-        .filter((name) => /^routes-[^.]+\.json$/.test(name) && admit(join(dir, name)))
-        .sort();
-      if (candidates.length === 1) {
-        return { kind: 'resolved', path: join(dir, candidates[0] as string) };
-      }
-      if (candidates.length > 1) {
-        return { kind: 'ambiguous', directory: dir, candidates };
-      }
-    } catch {
-      return { kind: 'missing', directory: dir };
+  const searched = directories.map((directory) => join(repoRoot, directory));
+  for (const dir of searched) {
+    if (framework !== undefined) {
+      const path = join(dir, `routes-${framework}.json`);
+      if (existsSync(path) && admit(path)) return { kind: 'resolved', path };
+      continue;
     }
+    if (!existsSync(dir)) continue;
+    let candidates: string[];
+    try {
+      candidates = readdirSync(dir)
+        .filter((name) => ROUTES_BODY_NAME.test(name) && admit(join(dir, name)))
+        .sort();
+    } catch {
+      continue;
+    }
+    if (candidates.length === 1) {
+      return { kind: 'resolved', path: join(dir, candidates[0] as string) };
+    }
+    if (candidates.length > 1) return { kind: 'ambiguous', directory: dir, candidates };
   }
-  return { kind: 'missing', directory: dir };
+  const last = searched[searched.length - 1] ?? repoRoot;
+  if (framework !== undefined) {
+    return { kind: 'resolved', path: join(last, `routes-${framework}.json`) };
+  }
+  return { kind: 'missing', directory: last };
 }
