@@ -137,9 +137,13 @@ export function git(root: string, ...args: string[]): string {
 }
 
 /** A committed adopter with ignored state; `extra` files are committed beside the sources. */
-export function adopter(extra: Readonly<Record<string, string>> = {}): AdopterFixture {
+export function adopter(
+  extra: Readonly<Record<string, string>> = {},
+  /** Further .gitignore lines, committed with the fixture. */
+  ignore: readonly string[] = [],
+): AdopterFixture {
   const root = mkdtempSync(join(tmpdir(), 'devai-inventory-adopter-'));
-  put(root, '.gitignore', '.devai/state/\n');
+  put(root, '.gitignore', ['.devai/state/', ...ignore, ''].join('\n'));
   for (const [path, body] of Object.entries({ ...ADOPTER_SOURCES, ...extra })) {
     put(root, path, body);
   }
