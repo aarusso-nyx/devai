@@ -241,26 +241,24 @@ describe('inventory regeneration preserves each producer reading (#294)', () => 
   it('records the findings, metrics, command hash and input binding of every producer', async () => {
     const { root, head, tree } = repository();
 
-    // No declaration presumes the http surface, whose api-map body is absent: coverage reads REVIEW.
+    // #382: no declaration presumes every surface; the api producer finds no controller and
+    // reads REVIEW, which regeneration keeps with the producer's own findings.
     const result = await regenerate(root);
 
     const bodies = result.report.regenerated;
-    const coverage = bodies.find(({ kind }) => kind === 'inventory_coverage');
+    const api = bodies.find(({ kind }) => kind === 'inventory_api');
     const depGraph = bodies.find(({ kind }) => kind === 'inventory_dep_graph');
     expect(bodies.find(({ kind }) => kind === 'inventory')?.producer_reading).toBeUndefined();
 
-    const reading = coverage?.producer_reading;
+    const reading = api?.producer_reading;
     expect(reading).toMatchObject({
-      sensor: { kind: 'inventory_coverage' },
+      sensor: { kind: 'inventory_api' },
       status: 'review',
-      findings: expect.arrayContaining([
-        expect.objectContaining({ code: 'COVERAGE_REQUIRES_API_MAP' }),
-        expect.objectContaining({ code: 'COVERAGE_REQUIRES_ROUTES' }),
-      ]),
+      findings: expect.arrayContaining([expect.objectContaining({ code: 'API_INVENTORY_EMPTY' })]),
       input_binding: {
         integration_head: head,
         integration_tree: tree,
-        body_sha256: coverage?.sha256,
+        body_sha256: api?.sha256,
       },
     });
     expect(reading?.metrics).toEqual(expect.any(Object));
@@ -279,14 +277,14 @@ describe('inventory regeneration preserves each producer reading (#294)', () => 
     // The aggregate keeps the same reading beside its own status.
     expect(result.reading.metrics).toMatchObject({
       integration_tree: tree,
-      inventory_coverage_command_hash: reading?.command_hash,
-      inventory_coverage_input_sha256: coverage?.sha256,
-      inventory_coverage_finding_count: reading?.findings.length,
+      inventory_api_command_hash: reading?.command_hash,
+      inventory_api_input_sha256: api?.sha256,
+      inventory_api_finding_count: reading?.findings.length,
       inventory_dep_graph_command_hash: depGraph?.producer_reading?.command_hash,
       inventory_dep_graph_finding_count: 0,
     });
     for (const [name, value] of Object.entries(reading?.metrics ?? {})) {
-      expect(result.reading.metrics?.[`inventory_coverage_metric_${name}`]).toBe(
+      expect(result.reading.metrics?.[`inventory_api_metric_${name}`]).toBe(
         typeof value === 'boolean' ? String(value) : value,
       );
     }
@@ -294,10 +292,7 @@ describe('inventory regeneration preserves each producer reading (#294)', () => 
       ({ code }) => code === 'INVENTORY_REGENERATION_PRODUCER_FINDING',
     );
     expect(preserved.map(({ message }) => message.split(']')[0])).toEqual(
-      expect.arrayContaining([
-        'inventory_coverage [COVERAGE_REQUIRES_API_MAP',
-        'inventory_coverage [COVERAGE_REQUIRES_ROUTES',
-      ]),
+      expect.arrayContaining(['inventory_api [API_INVENTORY_EMPTY']),
     );
     // The aggregate the store keeps names no checkout location.
     expect(JSON.stringify(result.reading)).not.toContain(root);
@@ -319,15 +314,20 @@ describe('inventory regeneration admits no ignored or linked input (#294)', () =
       'product/use-cases/\nrecord/proofs/\n',
     );
     put(root, 'product/use-cases/linked.json', `${JSON.stringify(USE_CASE)}\n`);
-    put(root, 'record/proofs/sensors/inventory_api/api-map.json', '{"endpoints":[]}\n');
+    put(
+      root,
+      'record/proofs/sensors/inventory_api/api-map.json',
+      `${JSON.stringify({ endpoints: [{ method: 'GET', path: '/ignored' }] })}\n`,
+    );
     expect(git(root, 'status', '--porcelain')).toBe('');
 
     const result = await regenerate(root);
 
     const coverage = result.report.regenerated.find(({ kind }) => kind === 'inventory_coverage');
     const codes = (coverage?.producer_reading?.findings ?? []).map(({ code }) => code);
-    // Neither the ignored api-map nor the ignored use case reached the tree-bound matrix.
-    expect(codes).toContain('COVERAGE_REQUIRES_API_MAP');
+    // Neither the ignored api-map nor the ignored use case reached the tree-bound matrix:
+    // #382 coverage reads only the api-map staged in the same run.
+    expect(JSON.stringify(json(root, COVERAGE_BODY))).not.toContain('/ignored');
     expect(codes).toContain('COVERAGE_UNLINKED_ACTION');
     expect(coverage?.producer_reading?.metrics['linked_action_count']).toBe(0);
     expect(JSON.stringify(json(root, COVERAGE_BODY))).not.toContain('UC-1');

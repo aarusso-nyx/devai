@@ -91,3 +91,69 @@ describe('plant-coverage endpoint and route file population', () => {
     ]);
   });
 });
+
+// #382: the routes producer writes routes-<framework>.json, so plant coverage resolves the
+// routes body as inventory_coverage does instead of a fixed routes-inventory.json name.
+describe('plant-coverage routes body resolution', () => {
+  const ROUTES_DIR = 'record/proofs/sensors/inventory_routes';
+  const api = {
+    endpoints: [{ method: 'GET', path: '/users', controller: { file: 'apps/api/users.ts' } }],
+  };
+  const routes = (path: string) => ({
+    framework: 'react',
+    routes: [{ path, component: { file: 'apps/web/routes.tsx' } }],
+  });
+
+  beforeEach(() => {
+    write('record/proofs/sensors/inventory_api/api-map.json', JSON.stringify(api));
+  });
+
+  it('reads the single framework-named routes body the producer writes', () => {
+    write(`${ROUTES_DIR}/routes-react.json`, JSON.stringify(routes('/users')));
+
+    const result = reading();
+
+    expect(result.status).toBe('pass');
+    expect(result.metrics).toMatchObject({ endpoint_count: 1, route_count: 1, missing_files: 0 });
+  });
+
+  it('still reads a lone legacy routes-inventory.json body', () => {
+    write(`${ROUTES_DIR}/routes-inventory.json`, JSON.stringify(routes('/legacy')));
+
+    expect(reading().metrics).toMatchObject({ route_count: 1 });
+  });
+
+  it('never guesses between two routes bodies', () => {
+    write(`${ROUTES_DIR}/routes-react.json`, JSON.stringify(routes('/react')));
+    write(`${ROUTES_DIR}/routes-angular.json`, JSON.stringify(routes('/angular')));
+
+    expect(reading().metrics).toMatchObject({ route_count: 0 });
+  });
+
+  it('keeps an explicit routes path over any candidate in the directory', () => {
+    write(`${ROUTES_DIR}/routes-react.json`, JSON.stringify(routes('/react')));
+    write(
+      'elsewhere/routes.json',
+      JSON.stringify({ routes: [...routes('/a').routes, ...routes('/b').routes] }),
+    );
+
+    const result = sensePlantCoverage({
+      repoRoot: root,
+      now,
+      routesInventoryPath: 'elsewhere/routes.json',
+    });
+
+    expect(result.metrics).toMatchObject({ route_count: 2 });
+  });
+
+  it('keeps PLANT_COVERAGE_NO_INVENTORY when neither body exists anywhere', () => {
+    rmSync(join(root, 'record'), { recursive: true, force: true });
+
+    const result = reading();
+
+    expect(result.status).toBe('fail');
+    expect(result.findings?.map((finding) => finding.code)).toContain(
+      'PLANT_COVERAGE_NO_INVENTORY',
+    );
+  });
+});

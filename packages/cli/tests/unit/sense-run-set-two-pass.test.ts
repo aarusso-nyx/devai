@@ -173,6 +173,34 @@ describe('ADR-SCR-0008 the declared second pass', () => {
     }
   });
 
+  it('keeps the inventory body producers and consumers read-only and the body writer outside the sweep (#382)', () => {
+    const registry = workspaceJson<Registry>('law/policy/sensor-registry.json');
+    const effectOf = (kind: string) =>
+      registry.entries.find((entry) => entry.kind === kind)?.effect;
+    const { first } = resolveSensePasses(
+      resolveSenseSelection({ preset: 'sweep' }, { roundId: ROUND }),
+    );
+    for (const kind of [
+      'inventory_api',
+      'inventory_routes',
+      'inventory_data_model',
+      'inventory_rbac',
+      'inventory_data_handling',
+      'inventory_coverage',
+      'plant_coverage',
+      'inventory_adherence',
+    ]) {
+      expect(sweepMembers(), kind).toContain(kind);
+      expect(effectOf(kind), kind).toBe('read');
+      expect(first.executed, kind).toContain(kind);
+    }
+    // The one governed writer of the bodies runs before the sweep, never inside it.
+    expect(effectOf('inventory_regeneration')).toBe('harness-write');
+    expect(sweepMembers()).not.toContain('inventory_regeneration');
+    expect(first.aggregate_effect).toBe('read');
+    expect(first.implicit_persistence).toBe(false);
+  });
+
   it('splits the sweep into a first pass without the store readers and an ordered second pass', () => {
     const resolved = resolveSenseSelection({ preset: 'sweep' }, { roundId: ROUND });
     const { first, second } = resolveSensePasses(resolved);

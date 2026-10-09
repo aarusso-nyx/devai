@@ -292,11 +292,17 @@ describe('sense adapter deterministic boundaries', () => {
         { repoRoot: '/repo', persistBody: false },
         true,
       ],
-      ['inventory_rbac', 'senseInventoryRbac', { repoRoot: '/repo', persistBody: false }, true],
+      // #382: the body consumers may also receive resolved input paths; persistence stays off.
+      [
+        'inventory_rbac',
+        'senseInventoryRbac',
+        expect.objectContaining({ repoRoot: '/repo', persistBody: false }),
+        true,
+      ],
       [
         'inventory_data_handling',
         'senseInventoryDataHandling',
-        { repoRoot: '/repo', persistBody: false },
+        expect.objectContaining({ repoRoot: '/repo', persistBody: false }),
         true,
       ],
       [
@@ -308,12 +314,17 @@ describe('sense adapter deterministic boundaries', () => {
       [
         'inventory_coverage',
         'senseInventoryCoverage',
-        { repoRoot: '/repo', persistBody: false },
+        expect.objectContaining({ repoRoot: '/repo', persistBody: false }),
         true,
       ],
       ['spec_depth', 'senseSpecDepth', { repoRoot: '/repo' }, true],
       ['spec_freshness', 'senseSpecFreshness', { repoRoot: '/repo' }, true],
-      ['plant_coverage', 'sensePlantCoverage', { repoRoot: '/repo' }, false],
+      [
+        'plant_coverage',
+        'sensePlantCoverage',
+        expect.objectContaining({ repoRoot: '/repo' }),
+        false,
+      ],
       ['test_invariant_alignment', 'senseTestInvariantAlignment', { repoRoot: '/repo' }, false],
       ['harness_security', 'senseHarnessSecurity', { repoRoot: '/repo' }, true],
       [
@@ -384,6 +395,50 @@ describe('sense adapter deterministic boundaries', () => {
           : { marker: delegateName, input: expectedInput, reading: { marker: delegateName } },
       );
     }
+  });
+
+  it('keeps every inventory sweep member read-only whatever bodies are present (#382)', async () => {
+    const root = repository();
+    // Regenerated state bodies and proof defaults present: the sweep may read, never write.
+    for (const path of [
+      '.devai/state/sensors/inventory_api/api-map.json',
+      '.devai/state/sensors/inventory_routes/routes-react.json',
+      '.devai/state/sensors/inventory_data_model/data-model.json',
+      'record/proofs/sensors/inventory_routes/routes-react.json',
+    ]) {
+      put(root, path, {});
+    }
+    const surfaces = { http: true, database: true, rbac: true, actions: true };
+    const members = [
+      ['inventory_api', 'senseInventoryApi'],
+      ['inventory_routes', 'senseInventoryRoutes'],
+      ['inventory_data_model', 'senseInventoryDataModel'],
+      ['inventory_rbac', 'senseInventoryRbac'],
+      ['inventory_data_handling', 'senseInventoryDataHandling'],
+      ['inventory_dep_graph', 'senseInventoryDepGraph'],
+      ['inventory_coverage', 'senseInventoryCoverage'],
+    ] as const;
+    for (const [kind, delegateName] of members) {
+      const delegate = simpleSensors[delegateName];
+      if (delegate === undefined) throw new Error(`missing test delegate: ${delegateName}`);
+      delegate.mockClear();
+      await sensorAdapter(kind)({ repoRoot: root, inputs: { surfaces } });
+      expect(delegate, kind).toHaveBeenCalledTimes(1);
+      const options = delegate.mock.calls[0]?.[0] as Record<string, unknown>;
+      expect(options, kind).toMatchObject({ repoRoot: root, persistBody: false });
+      // No sweep member is told where to write a body.
+      expect(options['bodyPath'], kind).toBeUndefined();
+    }
+    const plant = simpleSensors['sensePlantCoverage'];
+    if (plant === undefined) throw new Error('missing test delegate: sensePlantCoverage');
+    plant.mockClear();
+    await sensorAdapter('plant_coverage')({ repoRoot: root, inputs: { surfaces } });
+    const plantOptions = plant.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(plantOptions).toMatchObject({ repoRoot: root });
+    expect(plantOptions['persistBody']).not.toBe(true);
+    expect(plantOptions['bodyPath']).toBeUndefined();
+    // The regeneration writer is not reached by any sweep member.
+    expect(local.regenerateInventoryReadings).not.toHaveBeenCalled();
   });
 
   it('reports the precise missing inventory input and computes adherence when complete', async () => {
