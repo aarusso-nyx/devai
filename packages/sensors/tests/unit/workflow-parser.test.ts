@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve, sep } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { afterEach, describe, expect, it } from 'vitest';
-import { parseWorkflow } from '../../src/harness/workflow-parser.js';
+import { parseWorkflow, workflowStepInventory } from '../../src/harness/workflow-parser.js';
 import { senseHarnessCoherence } from '../../src/harness-coherence.js';
 
 // Complete supplied-checkout fixtures; scripts below are parsed, never executed.
@@ -1918,4 +1918,59 @@ describe('actual scheduler and selected workflow source binding (offline analysi
       }
     }
   });
+});
+
+// #390: an install with --ignore-scripts runs no package lifecycle script, so it binds neither the
+// manifest nor any script; a pnpm hook file runs regardless of the flag, so it fails closed.
+describe('pnpm install --ignore-scripts binds no lifecycle script', () => {
+  function tree(): string {
+    const root = mkdtempSync(join(tmpdir(), 'devai-ignore-scripts-'));
+    candidateRoots.push(root);
+    const put = (path: string, text: string): void => {
+      mkdirSync(dirname(join(root, path)), { recursive: true });
+      writeFileSync(join(root, path), text);
+    };
+    put(
+      'package.json',
+      JSON.stringify({
+        scripts: {
+          preinstall: 'node scripts/preinstall.mjs',
+          postinstall: 'node scripts/postinstall.mjs',
+          prepare: 'node scripts/prepare.mjs',
+        },
+      }),
+    );
+    for (const name of ['preinstall', 'postinstall', 'prepare']) {
+      put(`scripts/${name}.mjs`, `export const ${name} = 1;\n`);
+    }
+    return root;
+  }
+  const files = (root: string, run: string) =>
+    workflowStepInventory(`jobs:\n  build:\n    steps:\n      - run: ${run}\n`, root)[0]?.files;
+
+  it('binds no manifest or script for the generated install line', () => {
+    const root = tree();
+    expect(files(root, 'pnpm install --frozen-lockfile --ignore-scripts')).toEqual([]);
+    expect(files(root, 'corepack pnpm install --frozen-lockfile --ignore-scripts')).toEqual([]);
+  });
+
+  it('keeps following the lifecycle scripts of an install without --ignore-scripts', () => {
+    const root = tree();
+    const bound = files(root, 'corepack pnpm install --frozen-lockfile');
+    expect(bound).toContain('package.json');
+    expect(bound).toContain('scripts/postinstall.mjs');
+    expect(bound).toContain('scripts/prepare.mjs');
+  });
+
+  it.each(['.pnpmfile.cjs', 'pnpmfile.cjs', '.pnpmfile.js'])(
+    'fails closed with the pnpm hook file %s present',
+    (hook) => {
+      const root = tree();
+      writeFileSync(join(root, hook), 'module.exports = { hooks: {} };\n');
+      expect(files(root, 'pnpm install --frozen-lockfile --ignore-scripts')).toBeUndefined();
+      expect(
+        files(root, 'corepack pnpm install --frozen-lockfile --ignore-scripts'),
+      ).toBeUndefined();
+    },
+  );
 });

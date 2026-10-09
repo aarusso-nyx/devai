@@ -364,3 +364,14 @@ describe('#383: the observation workflow pins and concurrency', () => {
     expect(verifyGithubActionsAdapter(root, '2.3.1')).toMatchObject({ ok: true, errors: [] });
   });
 });
+
+describe('#390: the observation install runs no lifecycle script', () => {
+  it('installs with corepack pnpm install --frozen-lockfile --ignore-scripts and nothing else', () => {
+    const { workflowBytes } = buildGithubActionsAdapterPlan(repository(), '2.3.2');
+    const installs = workflowBytes
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => /\bpnpm\s+(?:install|i)\b/u.test(line));
+    expect(installs).toEqual(['corepack pnpm install --frozen-lockfile --ignore-scripts']);
+  });
+});

@@ -14,7 +14,9 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
+import { attestedRcVerificationWorkflow } from '../../../cli/src/services/ci-scaffold/index.js';
+import { buildGithubActionsAdapterPlan } from '../../../cli/src/services/github-actions-adapter/index.js';
 import { senseHarnessCoherence } from '../../src/harness-coherence.js';
 import { jobEffectFacts, workflowStepInventory } from '../../src/harness/workflow-parser.js';
 import { REVIEWED_WORKFLOW_STEPS } from '../../src/harness/reviewed-workflow-steps.js';
@@ -22,11 +24,60 @@ import { REVIEWED_WORKFLOW_STEPS } from '../../src/harness/reviewed-workflow-ste
 const ROOT = resolve(import.meta.dirname, '../../../..');
 const WORKFLOWS = join(ROOT, '.github/workflows');
 const PUBLICATION_STEPS = [
+  // #390: the RC verifier's check-run POST, the observation's build-provenance attestation and
+  // its dedicated audit-ref push write external surfaces of the adopter repository.
+  'generated:devai-local-rc-verify.yml#verify-attested-rc[11]',
+  'generated:devai-main-observation.yml#observe[12]',
+  'generated:devai-main-observation.yml#observe[9]',
   'release.yml#deploy-pages[6]',
   'release.yml#finalize-release[7]',
   'release.yml#finalize-release[8]',
   'site-publish.yml#publish-site[2]',
 ];
+
+/** The two jobs DEVAI generates into an adopter, by workflow file (#390). */
+const GENERATED_JOBS = {
+  'devai-local-rc-verify.yml': 'verify-attested-rc',
+  'devai-main-observation.yml': 'observe',
+} as const;
+const adopterTrees: string[] = [];
+afterAll(() => {
+  for (const tree of adopterTrees.splice(0)) rmSync(tree, { recursive: true, force: true });
+});
+
+/**
+ * An adopter tree as the generated workflows see it: a GitHub origin, and a package manifest
+ * whose lifecycle scripts the observation install must not run.
+ */
+function adopterTree(): string {
+  const tree = mkdtempSync(join(tmpdir(), 'devai-generated-adopter-'));
+  adopterTrees.push(tree);
+  mkdirSync(join(tree, '.git'));
+  writeFileSync(
+    join(tree, '.git/config'),
+    '[remote "origin"]\n\turl = https://github.com/example/adopter.git\n',
+  );
+  mkdirSync(join(tree, 'scripts'));
+  writeFileSync(
+    join(tree, 'package.json'),
+    JSON.stringify({ scripts: { postinstall: 'node scripts/postinstall.mjs' } }),
+  );
+  writeFileSync(join(tree, 'scripts/postinstall.mjs'), 'export const postinstall = 1;\n');
+  return tree;
+}
+
+/** The generated workflows, rebuilt from their generators. */
+function generatedWorkflows(
+  tree: string,
+): readonly { file: keyof typeof GENERATED_JOBS; text: string }[] {
+  return [
+    { file: 'devai-local-rc-verify.yml', text: attestedRcVerificationWorkflow() },
+    {
+      file: 'devai-main-observation.yml',
+      text: buildGithubActionsAdapterPlan(tree, '2.3.2').workflowBytes,
+    },
+  ];
+}
 
 function workflows(): readonly { file: string; text: string }[] {
   return readdirSync(WORKFLOWS)
@@ -46,8 +97,20 @@ describe('reviewed workflow step registry', () => {
         occurrences.set(step.sha256, list);
       }
     }
+    // #390: the generated adopter workflows' steps are occurrences too.
+    const tree = adopterTree();
+    for (const { file, text } of generatedWorkflows(tree)) {
+      for (const step of workflowStepInventory(text, tree)) {
+        if (step.sha256 === undefined) continue;
+        const list = occurrences.get(step.sha256) ?? [];
+        list.push(`generated:${file}#${step.job}[${String(step.index)}]`);
+        occurrences.set(step.sha256, list);
+      }
+    }
     for (const entry of REVIEWED_WORKFLOW_STEPS) {
-      expect(occurrences.get(entry.sha256), entry.workflow).toEqual(entry.workflow.split(', '));
+      expect([...(occurrences.get(entry.sha256) ?? [])].sort(), entry.workflow).toEqual(
+        entry.workflow.split(', ').sort(),
+      );
     }
     const digests = REVIEWED_WORKFLOW_STEPS.map((entry) => entry.sha256);
     expect(new Set(digests).size).toBe(digests.length);
@@ -61,6 +124,62 @@ describe('reviewed workflow step registry', () => {
     );
     expect(unknown).toEqual([]);
   });
+
+  // #390: the generated adopter workflows are proved by step digest, never by file name.
+  it('proves both generated jobs publication in an adopter tree', () => {
+    const tree = adopterTree();
+    for (const { file, text } of generatedWorkflows(tree)) {
+      expect(jobEffectFacts(text, tree, GENERATED_JOBS[file]).effect, file).toBe('publication');
+    }
+    // Every generated step has its own entry, with no adopter file pinned.
+    for (const { file, text } of generatedWorkflows(tree)) {
+      for (const step of workflowStepInventory(text, tree)) {
+        const entry = REVIEWED_WORKFLOW_STEPS.find((candidate) => candidate.sha256 === step.sha256);
+        const occurrence = `generated:${file}#${step.job}[${String(step.index)}]`;
+        expect(entry?.workflow.split(', '), occurrence).toContain(occurrence);
+        expect(step.files, occurrence).toEqual([]);
+      }
+    }
+  });
+
+  it('reads a generated job unknown again when one of its steps is edited', () => {
+    const tree = adopterTree();
+    const [rc, observation] = generatedWorkflows(tree);
+    const editedRc = (rc?.text ?? '').replace(
+      'Bind candidate and protected evidence tag',
+      'Bind the candidate and protected evidence tag',
+    );
+    expect(editedRc).not.toBe(rc?.text);
+    expect(jobEffectFacts(editedRc, tree, 'verify-attested-rc').effect).toBe('unknown');
+    const editedObservation = (observation?.text ?? '').replace(
+      'Verify bound posture',
+      'Verify the bound posture',
+    );
+    expect(editedObservation).not.toBe(observation?.text);
+    expect(jobEffectFacts(editedObservation, tree, 'observe').effect).toBe('unknown');
+  });
+
+  it('reads the observation job unknown when its install runs lifecycle scripts again', () => {
+    const tree = adopterTree();
+    const observation = generatedWorkflows(tree)[1]?.text ?? '';
+    expect(observation).toContain('pnpm install --frozen-lockfile --ignore-scripts');
+    const scripted = observation.replace(
+      'pnpm install --frozen-lockfile --ignore-scripts',
+      'pnpm install --frozen-lockfile',
+    );
+    expect(jobEffectFacts(scripted, tree, 'observe').effect).toBe('unknown');
+  });
+
+  it.each(['.pnpmfile.cjs', 'pnpmfile.cjs', '.pnpmfile.js'])(
+    'reads the observation job unknown with the pnpm hook file %s in the adopter tree',
+    (hook) => {
+      const tree = adopterTree();
+      const observation = generatedWorkflows(tree)[1]?.text ?? '';
+      expect(jobEffectFacts(observation, tree, 'observe').effect).toBe('publication');
+      writeFileSync(join(tree, hook), 'module.exports = { hooks: {} };\n');
+      expect(jobEffectFacts(observation, tree, 'observe').effect).toBe('unknown');
+    },
+  );
 
   it('marks exactly the external release writes as publication', () => {
     const publication = REVIEWED_WORKFLOW_STEPS.filter((entry) => entry.effect === 'publication')
@@ -80,6 +199,13 @@ describe('reviewed workflow step registry', () => {
   // #331 review: a reviewed step is bound to the bytes of every repository file it executes.
   it('binds each entry to the current bytes of exactly the files its step executes', () => {
     const filesBySha = new Map<string, readonly string[] | undefined>();
+    // A generated step executes no adopter repository file, so its entry pins none (#390).
+    const tree = adopterTree();
+    for (const { text } of generatedWorkflows(tree)) {
+      for (const step of workflowStepInventory(text, tree)) {
+        if (step.sha256 !== undefined) filesBySha.set(step.sha256, step.files);
+      }
+    }
     for (const { text } of workflows()) {
       for (const step of workflowStepInventory(text, ROOT)) {
         if (step.sha256 !== undefined) filesBySha.set(step.sha256, step.files);
