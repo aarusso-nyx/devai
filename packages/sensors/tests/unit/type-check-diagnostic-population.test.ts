@@ -128,3 +128,54 @@ describe('type-check diagnostic population', () => {
     );
   });
 });
+
+// ADR-AUT-0006 (#381): `pnpm -r typecheck` prefixes each package's output with
+// `<package dir> typecheck: `, so the parser reads the diagnostic behind that prefix and never
+// takes the prefix for part of the file path.
+describe('type-check diagnostics behind the pnpm -r prefix (ADR-AUT-0006 IA-001)', () => {
+  it('runs the declared argv exactly and parses every prefixed diagnostic', () => {
+    runCommand.mockReturnValue({
+      stdout:
+        'Scope: 2 of 3 workspace projects\n' +
+        "packages/x typecheck: a.ts(1,2): error TS2322: Type 'string' is not assignable to type 'number'.\n" +
+        'packages/y typecheck: src/b.ts(10,20): error TS7006: Parameter implicitly has an any type.\n' +
+        'packages/x typecheck: Failed\n',
+      stderr: ' ELIFECYCLE  Command failed with exit code 2.\n',
+      exit_code: 2,
+      duration_ms: 40,
+      killed: false,
+    } satisfies RunResult);
+
+    const result = senseTypeCheck({ cwd: root, argv: ['pnpm', '-r', 'typecheck'] });
+
+    expect(runCommand).toHaveBeenCalledTimes(1);
+    expect(runCommand.mock.calls[0]?.[0]).toEqual(['pnpm', '-r', 'typecheck']);
+    expect(result.perProject).toEqual([]);
+    expect(result.aggregate).toMatchObject({
+      status: 'fail',
+      exit_code: 2,
+      metrics: { error_count: 2 },
+    });
+    const findings = result.aggregate.findings ?? [];
+    expect(findings.map(({ code, line, message }) => ({ code, line, message }))).toEqual([
+      { code: 'TS2322', line: 1, message: "Type 'string' is not assignable to type 'number'." },
+      { code: 'TS7006', line: 10, message: 'Parameter implicitly has an any type.' },
+    ]);
+    const files = findings.map((finding) => String(finding.file));
+    expect(files[0]).toMatch(/(?:^|\/)a\.ts$/u);
+    expect(files[1]).toMatch(/(?:^|\/)src\/b\.ts$/u);
+    for (const file of files) {
+      expect(file).not.toContain('typecheck:');
+      expect(file).not.toContain(' ');
+    }
+  });
+
+  it('keeps reading unprefixed tsc diagnostics the same way', () => {
+    runCommand.mockReturnValue(failedTsc);
+    const result = senseTypeCheck({ cwd: root, argv: ['npx', 'tsc', '--noEmit'] });
+    expect(result.aggregate.findings?.map((finding) => finding.file)).toEqual([
+      'src/example.ts',
+      'src/example.ts',
+    ]);
+  });
+});

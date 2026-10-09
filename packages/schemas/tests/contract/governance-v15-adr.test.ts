@@ -608,6 +608,7 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-AUT-0003',
       'ADR-AUT-0004',
       'ADR-AUT-0005',
+      'ADR-AUT-0006',
       'ADR-CFG-0001',
       'ADR-CFG-0002',
       'ADR-CHK-0001',
@@ -719,13 +720,13 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-SCR-0014',
       'ADR-SEC-0001',
     ]);
-    expect(records).toHaveLength(116);
+    expect(records).toHaveLength(117);
     expect(
       records.filter((record) => record.format === 'legacy-catalog').map((record) => record.adr_id),
     ).toEqual(['ADR-014', 'ADR-MUT-0005', 'ADR-REL-0017']);
     expect(records.filter((record) => record.adr_id === 'ADR-014')).toHaveLength(1);
-    expect(result.files_scanned).toBe(117);
-    expect(result.subject_authorities).toHaveLength(542);
+    expect(result.files_scanned).toBe(118);
+    expect(result.subject_authorities).toHaveLength(550);
     expect(result.effective_authorities).toEqual([
       'ADR-014',
       'ADR-AUT-0001',
@@ -733,6 +734,7 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-AUT-0003',
       'ADR-AUT-0004',
       'ADR-AUT-0005',
+      'ADR-AUT-0006',
       'ADR-CFG-0001',
       'ADR-CFG-0002',
       'ADR-CHK-0001',
@@ -822,6 +824,20 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-SCR-0014',
       'ADR-SEC-0001',
     ]);
+    // ADR-AUT-0006 (#381): the accepted record is effective and adds one subject authority
+    // for each of its eight affected rules.
+    const pnpmShapes = records.find((record) => record.adr_id === 'ADR-AUT-0006');
+    expect(pnpmShapes?.affected_rules).toHaveLength(8);
+    expect(result.adrs.find((row) => row.adr_id === 'ADR-AUT-0006')).toMatchObject({
+      effective: true,
+      effective_affected_rules: [...(pnpmShapes?.affected_rules ?? [])].sort(),
+    });
+    expect(
+      result.subject_authorities
+        .filter((authority) => authority.lineage_members.includes('ADR-AUT-0006'))
+        .map((authority) => authority.subject)
+        .sort(),
+    ).toEqual([...(pnpmShapes?.affected_rules ?? [])].sort());
     // ADR-CHK-0006 IA-005: the record is the effective head of every subject it declares.
     const descriptorKinds = records.find((record) => record.adr_id === 'ADR-CHK-0006');
     expect(descriptorKinds?.affected_rules.length).toBeGreaterThan(0);

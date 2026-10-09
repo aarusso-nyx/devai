@@ -65,12 +65,13 @@ describe('#264: the adopter migration manifest', () => {
       status: 'released',
       date: '2026-10-08',
     });
-    // #383: the observation-workflow rebind ships unreleased with the code that performs it.
+    // #381, #383: the observation-workflow rebinds ship unreleased with the code that performs it.
     const next = manifest.releases.at(-1);
     expect(next).toMatchObject({ version: '2.3.1', status: 'unreleased' });
     expect(next).not.toHaveProperty('date');
     expect(next?.changes.map((change) => change.id)).toEqual([
       'MIG-2.3.1-observation-workflow-pins',
+      'MIG-2.3.1-subprocess-effects-pnpm-shapes',
     ]);
   });
 
@@ -114,7 +115,7 @@ describe('#264: the adopter migration manifest', () => {
     for (const version of CONFIGURATION_NEUTRAL_RELEASES.keys()) {
       expect(released('2.1.0', version)).toEqual([]);
     }
-    // #383: from installed 2.3.0, the unreleased 2.3.1 rebind is planned above it.
+    // #381, #383: from installed 2.3.0, the unreleased 2.3.1 rebinds are planned above it.
     expect(plannedReleases(manifest, '2.3.0', '2.3.0').map((release) => release.version)).toEqual([
       '2.3.1',
     ]);
@@ -139,7 +140,7 @@ describe('#264: the adopter migration manifest', () => {
         return { ...rest, status: 'unreleased' };
       }),
     });
-    // The unreleased 2.3.1 entry (#383) rides along in every plan below it.
+    // The unreleased 2.3.1 entry (#381, #383) rides along in every plan below it.
     expect(versions('2.0.0', '2.0.0', unreleased)).toEqual(['2.1.0', '2.3.1']);
     expect(versions('1.9.0', '2.0.0', unreleased)).toEqual(['2.0.0', '2.1.0', '2.3.1']);
     expect(versions('1.6.0', '2.0.0', unreleased).slice(0, 4)).toEqual([
