@@ -29,6 +29,7 @@ inspector_acceptance:
   - IA-005 -- With twenty sampled pull requests and one red final outcome the reading is PASS at 95 percent, with two it is REVIEW, and a declaration that omits outcomeUnit keeps the run population of ADR-SCR-0010 unchanged.
   - IA-006 -- A pull request whose baseRefName is not the declared base is never sampled, and a run on a matching head branch and sha that was created before the pull request opened or after it closed is not its outcome, so a reused branch name never lends a run to another pull request.
   - IA-007 -- A run list or pull request list that returns as many entries as its literal limit of 1000 reads UNKNOWN as truncated with the limit in the finding, never PASS, REVIEW, or FAIL.
+  - IA-008 -- Under pull-request-final-head the reading reports population_base_branch_verified true and a population_unverified without baseBranch, and carries no HARNESS_POPULATION_UNVERIFIED finding when no other filter is unverified, while under run it still reports false and names baseBranch in that finding.
 ---
 
 # harness_green_main counts one gate outcome per pull request
@@ -127,9 +128,25 @@ without changing its decision. Membership requires the pull request's base
 branch, a run belongs to a pull request only within its open interval, and
 a list that reaches its literal limit reads `UNKNOWN` as truncated. The
 `gh pr list` fields gain `baseRefName` and `createdAt`. IA-006 and IA-007
-cover the clarifications. The population of
-`harness_performance` (F5:T7) and of `harness_robustness` (F5:T8) is
-unchanged, because a duration or a retry is a property of each run.
+cover the clarifications.
+
+Clarified again on 2026-10-09, for #370 and the rest of #365, without
+changing the decision.
+
+- **#370.** Because membership filters on `baseRefName`, the base branch
+  is verified under `pull-request-final-head`. The reading reports
+  `population_base_branch_verified: true`, and `HARNESS_POPULATION_UNVERIFIED`
+  no longer names `baseBranch` for that unit. It still does under `run`.
+  IA-008 covers it.
+- **#365.** A pull request that was closed and reopened is treated as open
+  over its whole span, so a run created during the closed gap on a reused
+  branch can be attributed to it. This is a known limitation: no available
+  read exposes the exact open intervals without a per-pull-request GraphQL
+  timeline.
+
+The population of `harness_performance` (F5:T7) and of
+`harness_robustness` (F5:T8) is unchanged, because a duration or a retry is
+a property of each run.
 
 ## Alternatives Considered
 
@@ -164,3 +181,4 @@ threshold nor the gate is relaxed, only what the cell counts.
 - IA-005 -- With twenty sampled pull requests and one red final outcome the reading is PASS at 95 percent, with two it is REVIEW, and a declaration that omits outcomeUnit keeps the run population of ADR-SCR-0010 unchanged.
 - IA-006 -- A pull request whose baseRefName is not the declared base is never sampled, and a run on a matching head branch and sha that was created before the pull request opened or after it closed is not its outcome, so a reused branch name never lends a run to another pull request.
 - IA-007 -- A run list or pull request list that returns as many entries as its literal limit of 1000 reads UNKNOWN as truncated with the limit in the finding, never PASS, REVIEW, or FAIL.
+- IA-008 -- Under pull-request-final-head the reading reports population_base_branch_verified true and a population_unverified without baseBranch, and carries no HARNESS_POPULATION_UNVERIFIED finding when no other filter is unverified, while under run it still reports false and names baseBranch in that finding.
