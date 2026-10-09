@@ -342,6 +342,29 @@ try {
   run('git', ['config', 'user.email', 'smoke@example.invalid'], projectRoot);
   run('git', ['add', 'package.json', 'pnpm-lock.yaml', '.gitignore'], projectRoot);
   run('git', ['commit', '-qm', 'installed package fixture'], projectRoot);
+  // #390: the generated main-observation workflow installs with --ignore-scripts, so the
+  // installed CLI must run from a frozen install that ran no lifecycle script.
+  rmSync(join(projectRoot, 'node_modules'), { recursive: true, force: true });
+  run(
+    'pnpm',
+    ['install', '--frozen-lockfile', '--ignore-scripts', '--prefer-offline'],
+    projectRoot,
+  );
+  const ignoredScriptsDoctor = runResult(
+    'pnpm',
+    ['exec', 'devai', 'doctor', '--repo-root', projectRoot, '--format', 'json'],
+    projectRoot,
+  );
+  let ignoredScriptsEnvelope;
+  try {
+    ignoredScriptsEnvelope = JSON.parse(String(ignoredScriptsDoctor.stdout));
+  } catch {
+    throw new Error('INSTALLED_IGNORE_SCRIPTS_DOCTOR_OUTPUT_INVALID');
+  }
+  if (![0, 1].includes(ignoredScriptsDoctor.status) || ignoredScriptsEnvelope?.result === undefined)
+    throw new Error(
+      `INSTALLED_IGNORE_SCRIPTS_DOCTOR_FAILED:${String(ignoredScriptsDoctor.status)}`,
+    );
   const binary = join(projectRoot, 'node_modules/.bin/devai');
   const installedPackage = join(projectRoot, 'node_modules/@aarusso-nyx/devai');
   for (const name of secondaryBins) {
