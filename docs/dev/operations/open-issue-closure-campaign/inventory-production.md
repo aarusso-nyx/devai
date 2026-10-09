@@ -38,6 +38,13 @@ All line spans below refer to the preparation base; re-resolve them on refresh.
 
 The observation bundle's `inventory.json` is not the canonical adherence path.
 Sensor defaults under `record/proofs/sensors/` are not the rebuild input directory.
+(Clarified 2026-10-09, #382: this design predates adopter production. Regeneration
+now writes every surface-required kind's body under `.devai/state/sensors/<kind>/`, and
+the sweep consumers read that body before the unchanged `record/proofs/sensors/<kind>/`
+default; the current contract is the
+[`inventory_regeneration` design note](../../../../law/policy/sensor-notes/inventory_regeneration.md)
+and the adopter recipe is in
+[Producing the inventory bodies](../../../adopters/sensor-inputs.md#producing-the-inventory-bodies).)
 There is no verified production body in this design session. Preserve reported
 `INVENTORY_ADHERENCE_INPUT_MISSING` UNKNOWN and
 `INVENTORY_REGENERATION_NO_KINDS_TOUCHED` REVIEW as existing findings until actual
