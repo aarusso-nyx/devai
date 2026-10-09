@@ -395,8 +395,22 @@ function executionYaml(source: string): ExecutionYaml | undefined {
       if (!/^'(?:[^']|'')*'$/u.test(text)) return { kind: 'opaque' };
       return { kind: 'scalar', value: text.slice(1, -1).replace(/''/gu, "'"), syntax: 'quoted' };
     }
-    if (/:\s/u.test(text)) return { kind: 'opaque' };
-    return { kind: 'scalar', value: text, syntax: 'plain' };
+    // A long plain scalar may continue on following rows indented deeper than its parent; YAML
+    // folds each line break into one space (a YAML emitter writes long expressions this way).
+    // A blank row or a comment ends it, keeping the folding exact.
+    let folded = text;
+    while (cursor < rows.length) {
+      const row = rows[cursor] ?? '';
+      if (!row.trim() || indentOf(row) <= parent || /^ *\t/u.test(row)) break;
+      const continuation = row.trim();
+      if (continuation.startsWith('#') || trimComment(row).trim() !== continuation) break;
+      folded = `${folded} ${continuation}`;
+      cursor++;
+    }
+    if (/:\s/u.test(folded)) return { kind: 'opaque' };
+    return folded === text
+      ? { kind: 'scalar', value: text, syntax: 'plain' }
+      : { kind: 'scalar', value: folded, syntax: 'plain', display: folded };
   }
   function value(text: string, parent: number, displayIndent = parent): ExecutionYaml {
     const line = cursor;
@@ -582,6 +596,26 @@ export function concurrencyGroupContexts(group: string): readonly string[] | und
   }
 }
 
+/**
+ * The plain value of `key` in a mapping block body, with the continuation rows a YAML emitter
+ * folds a long plain scalar onto (each indented deeper than the key) joined by single spaces,
+ * as YAML reads them. Empty when the key is absent.
+ */
+export function foldedBlockValue(body: string, key: string): string {
+  const rows = body.split('\n');
+  const keyRow = new RegExp(`^(\\s+)${key}\\s*:\\s*(.*?)\\s*$`, 'u');
+  const at = rows.findIndex((row) => keyRow.test(row));
+  if (at < 0) return '';
+  const match = keyRow.exec(rows[at] ?? '');
+  const indent = match?.[1]?.length ?? 0;
+  const parts = [match?.[2] ?? ''];
+  for (const row of rows.slice(at + 1)) {
+    if (!row.trim() || indentOf(row) <= indent || row.trim().startsWith('#')) break;
+    parts.push(row.trim());
+  }
+  return parts.filter((part) => part !== '').join(' ');
+}
+
 /** undefined is absent; null refuses; values have typed actual scoped authority. */
 function controlConcurrency(value: ExecutionYaml | undefined): WorkflowJob['concurrency'] | null {
   if (value === undefined) return undefined;
@@ -603,7 +637,7 @@ function rootConcurrencyExposed(content: string, fields: Map<string, ExecutionYa
   if (actual === undefined) return block === null;
   if (!block) return false;
   const body = block[1] ?? '';
-  const group = body.match(/^\s+group\s*:\s*(.+?)\s*$/mu)?.[1] ?? '';
+  const group = foldedBlockValue(body, 'group');
   const cancel = body.match(/^\s+cancel-in-progress\s*:\s*(true|false)\s*$/mu)?.[1];
   return (
     group === actual.group &&
@@ -1709,6 +1743,11 @@ export function jobEffectFacts(
       'github.workflow',
       'github.sha',
       'github.actor',
+      // ADR-CHK-0008 IA-010: the update workflow's job guard reads whether the event pull
+      // request comes from this repository and is a draft. Both are event data that only
+      // decide whether the job runs; neither selects code, a ref, or a runtime.
+      'github.event.pull_request.head.repo.full_name',
+      'github.event.pull_request.draft',
     ]);
     const statuses = new Set(['success', 'always', 'failure', 'cancelled']);
     function primary(): boolean {

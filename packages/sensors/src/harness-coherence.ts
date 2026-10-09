@@ -7,6 +7,7 @@ import {
 } from './sensor-reading.js';
 import {
   concurrencyGroupContexts,
+  foldedBlockValue,
   listWorkflowFiles,
   loadWorkflows,
   jobEffectFacts,
@@ -41,7 +42,7 @@ function concurrencyDeclaration(file: string): ConcurrencyDeclaration | null {
   const block = text.match(/^concurrency\s*:\s*\n((?:[ \t]+.*(?:\n|$))*)/mu);
   if (block === null) return null;
   const body = block[1] ?? '';
-  const group = body.match(/^\s+group\s*:\s*(.+?)\s*$/mu)?.[1] ?? '';
+  const group = foldedBlockValue(body, 'group');
   const cancel = body.match(/^\s+cancel-in-progress\s*:\s*(true|false)\s*$/mu)?.[1];
   return {
     group,
@@ -188,15 +189,26 @@ export function supersedingGroupScoped(group: string, events?: readonly string[]
   );
 }
 
-const REPOSITORY_WRITE_KEYS = new Set(['github.workflow', 'github.ref']);
+const PULL_REQUEST_NUMBER = 'github.event.pull_request.number';
+const REPOSITORY_WRITE_KEYS = new Set(['github.workflow', 'github.ref', PULL_REQUEST_NUMBER]);
 
 /**
- * The contexts one `${{ … }}` group part renders, or undefined when unproved. Accepted: a plain
- * `github.workflow` or `github.ref`, or `format('literal', …)` over those two only, where every
- * argument is rendered by a `{n}` placeholder (the #331 placeholder proof) and an unused
- * argument is refused, so a mention that never reaches the rendered group is not a key.
+ * The subject that scopes a repository-write lock on one accepted event (ADR-CHK-0008 IA-009):
+ * the pull request on pull_request_target, where github.ref names the base branch and would put
+ * every pull request's run in one group, and the ref on every other event.
  */
-function renderedKeys(expression: string): readonly string[] | undefined {
+function repositoryWriteSubject(event: string): string {
+  return event === 'pull_request_target' ? PULL_REQUEST_NUMBER : 'github.ref';
+}
+
+/**
+ * The contexts one plain or `format()` value renders, or undefined when unproved. Accepted: a
+ * plain `github.workflow`, `github.ref`, or pull request number, or `format('literal', …)` over
+ * those only, where every argument is rendered by a `{n}` placeholder (the #331 placeholder
+ * proof) and an unused argument is refused, so a mention that never reaches the group is not a
+ * key.
+ */
+function renderedValue(expression: string): readonly string[] | undefined {
   const plain = expression.trim();
   if (REPOSITORY_WRITE_KEYS.has(plain)) return [plain];
   const call = /^format\(\s*'((?:[^']|'')*)'\s*((?:,\s*[A-Za-z_][A-Za-z0-9_.]*\s*)*)\)$/u.exec(
@@ -216,17 +228,38 @@ function renderedKeys(expression: string): readonly string[] | undefined {
 }
 
 /**
- * A repository-write lock (ADR-CHK-0008) is keyed by the workflow and the ref, so a newer run of
- * the same workflow on the same ref supersedes the older one and no other workflow shares it.
- * Both values must be rendered into the group by a proved part; every part must be proved.
+ * The contexts one `${{ … }}` group part renders on `event`, or undefined when unproved: a
+ * value accepted by renderedValue, or `github.event_name == 'X' && <value> || <value>`, which
+ * renders its first value on X and its second on every other event.
  */
-function keyedByWorkflowAndRef(group: string): boolean {
+function renderedKeys(expression: string, event: string): readonly string[] | undefined {
+  const conditional = /^github\.event_name\s*==\s*'([a-z_]+)'\s*&&\s*(.+?)\s*\|\|\s*(.+)$/u.exec(
+    expression.trim(),
+  );
+  if (!conditional) return renderedValue(expression);
+  const chosen = renderedValue(conditional[2] ?? '');
+  const otherwise = renderedValue(conditional[3] ?? '');
+  if (chosen === undefined || otherwise === undefined) return undefined;
+  return event === conditional[1] ? chosen : otherwise;
+}
+
+/**
+ * A repository-write lock (ADR-CHK-0008 IA-009) is keyed by the workflow and by the run's own
+ * subject on every event the workflow accepts, so a newer run on the same subject supersedes the
+ * older one and no other workflow or subject shares it. On each event the workflow and that
+ * event's subject must be rendered into the group by a proved part; every part must be proved.
+ */
+function keyedByWorkflowAndSubject(group: string, events: readonly string[] | undefined): boolean {
+  if (events === undefined || events.length === 0) return false;
   if (concurrencyGroupContexts(group) === undefined) return false;
   const parts = [...group.matchAll(/\$\{\{(.*?)\}\}/gu)].map((match) => match[1] ?? '');
-  const rendered = parts.map(renderedKeys);
-  if (parts.length === 0 || rendered.some((keys) => keys === undefined)) return false;
-  const keys = new Set(rendered.flatMap((part) => part ?? []));
-  return [...REPOSITORY_WRITE_KEYS].every((key) => keys.has(key));
+  if (parts.length === 0) return false;
+  return events.every((event) => {
+    const rendered = parts.map((part) => renderedKeys(part, event));
+    if (rendered.some((keys) => keys === undefined)) return false;
+    const keys = new Set(rendered.flatMap((part) => part ?? []));
+    return keys.has('github.workflow') && keys.has(repositoryWriteSubject(event));
+  });
 }
 
 function requiresSerialization(relativeFile: string, file: string): boolean {
@@ -348,7 +381,7 @@ export function senseHarnessCoherence(opts: HarnessCoherenceOptions): SensorRead
         if (job.effect === 'unknown' || !lock || !lock.group || lock.cancelInProgress === null)
           return false;
         if (job.effect === 'repository-write')
-          return lock.cancelInProgress === true && keyedByWorkflowAndRef(lock.group);
+          return lock.cancelInProgress === true && keyedByWorkflowAndSubject(lock.group, events);
         if (job.effect === 'publication')
           return (
             lock.cancelInProgress === false &&
@@ -389,9 +422,10 @@ export function senseHarnessCoherence(opts: HarnessCoherenceOptions): SensorRead
           (declaration.cancelInProgress !== true ||
             supersedingGroupScoped(declaration.group, events)) &&
           (!effectful || declaration.cancelInProgress === false) &&
-          // A repository-write job supersedes under a lock keyed by workflow and ref.
+          // A repository-write job supersedes under a lock keyed by workflow and subject.
           (!repositoryWrite ||
-            (declaration.cancelInProgress === true && keyedByWorkflowAndRef(declaration.group))));
+            (declaration.cancelInProgress === true &&
+              keyedByWorkflowAndSubject(declaration.group, events))));
     if (valid) continue;
     concurrencySemanticIssues += 1;
     findings.push({
