@@ -825,3 +825,69 @@ describe('#383: init upgrade rebinds a 2.3.0 observation workflow to the shared 
     expect(json(repo, RECEIPT)['migrations']).toContain('MIG-2.3.1-observation-workflow-pins');
   }, 180_000);
 });
+
+describe('#390: init upgrade rebinds a 2.3.1 observation workflow to the script-free install', () => {
+  const WORKFLOW = '.github/workflows/devai-main-observation.yml';
+  const CONFIG = '.devai/config/github-actions-host-adapter.json';
+  const RC_WORKFLOW = '.github/workflows/devai-local-rc-verify.yml';
+  const INSTALL_232 = 'corepack pnpm install --frozen-lockfile --ignore-scripts';
+  const INSTALL_231 = 'corepack pnpm install --frozen-lockfile';
+
+  /** The observation workflow as 2.3.1 generated it: the same bytes, installing with scripts. */
+  function as231(current: string): string {
+    return current.replace(`${INSTALL_232}\n`, `${INSTALL_231}\n`);
+  }
+
+  async function boundAt231(): Promise<{ readonly repo: string; readonly current: string }> {
+    const repo = await stynxAt160(true);
+    expect((await runCli(WRITE(repo))).exit).toBe(0);
+    const current = readFileSync(join(repo, WORKFLOW), 'utf8');
+    expect(current).toContain(`${INSTALL_232}\n`);
+    const legacy = as231(current);
+    expect(legacy, 'the current generator still installs with scripts').not.toBe(current);
+    put(repo, WORKFLOW, legacy);
+    const config = json(repo, CONFIG);
+    put(repo, CONFIG, {
+      ...config,
+      adapter_version: '2.3.1',
+      workflow_digest_sha256: createHash('sha256').update(legacy).digest('hex'),
+      package_binding: { name: '@aarusso-nyx/devai', version: '2.3.1' },
+    });
+    const project = json(repo, '.devai/config/project.json');
+    put(repo, '.devai/config/project.json', { ...project, devai_version: '2.3.1' });
+    return { repo, current };
+  }
+
+  it('plans the 2.3.2 rebind under host-adapters and rewrites the workflow and its receipt', async () => {
+    const { repo, current } = await boundAt231();
+    const rcBefore = readFileSync(join(repo, RC_WORKFLOW), 'utf8');
+    const planned = await runCli(PLAN(repo));
+    expect(planned.exit, planned.stderr).toBe(0);
+    const plan = value(planned)['plan'] as JsonObject;
+    expect(plan['status']).toBe('ready');
+    expect((plan['releases'] as JsonObject[]).map((release) => release['version'])).toContain(
+      '2.3.2',
+    );
+    const changed = plan['changed_files'] as JsonObject[];
+    expect(changed).toEqual(
+      expect.arrayContaining([
+        { path: WORKFLOW, operation: 'update', segment: 'host-adapters' },
+        { path: CONFIG, operation: 'update', segment: 'host-adapters' },
+      ]),
+    );
+    expect(changed.filter((entry) => entry['path'] === RC_WORKFLOW)).toEqual([]);
+
+    const applied = await runCli(WRITE(repo));
+    expect(applied.exit, applied.stderr).toBe(0);
+    const rebound = readFileSync(join(repo, WORKFLOW), 'utf8');
+    expect(rebound).toBe(current);
+    expect(rebound).toContain(INSTALL_232);
+    expect(json(repo, CONFIG)['workflow_digest_sha256']).toBe(
+      createHash('sha256').update(current).digest('hex'),
+    );
+    expect(readFileSync(join(repo, RC_WORKFLOW), 'utf8')).toBe(rcBefore);
+    expect(json(repo, RECEIPT)['migrations']).toContain(
+      'MIG-2.3.2-observation-install-ignore-scripts',
+    );
+  }, 180_000);
+});
