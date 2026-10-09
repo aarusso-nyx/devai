@@ -256,6 +256,24 @@
           "files": [".devai/config/sensor-inputs.json"]
         }
       ]
+    },
+    {
+      "version": "2.3.1",
+      "status": "unreleased",
+      "changes": [
+        {
+          "id": "MIG-2.3.1-observation-workflow-pins",
+          "kind": "rebind",
+          "summary": "The GitHub Actions host adapter regenerates devai-main-observation.yml with the actions/checkout, actions/setup-node, and actions/upload-artifact pins of the default toolchain manifest, the same pins the attested-RC verifier workflow uses, and with a concurrency group keyed by the commit that never cancels a run in progress. Rebinding the adapter rewrites the workflow and its receipt; the verifier workflow bytes are unchanged. harness_coherence then sees one pin per action across the two generated workflows.",
+          "decision_records": [],
+          "issues": [383],
+          "segments": ["host-adapters"],
+          "files": [
+            ".github/workflows/devai-main-observation.yml",
+            ".devai/config/github-actions-host-adapter.json"
+          ]
+        }
+      ]
     }
   ]
 }
