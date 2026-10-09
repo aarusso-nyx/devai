@@ -91,7 +91,7 @@ jobs:
             exit 1
           fi
           corepack enable
-          corepack pnpm install --frozen-lockfile
+          corepack pnpm install --frozen-lockfile --ignore-scripts
       - name: Verify bound posture
         run: corepack pnpm exec devai doctor --repo-root . --format json
       - name: Observe exact main SHA
