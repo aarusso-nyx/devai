@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { sensePlantCoverage } from '../../src/plant-coverage.js';
+import { expectMissingInputMessage } from './inventory-missing-input-message.js';
 
 const NOW = '2026-09-08T12:00:00.000Z';
 let root: string;
@@ -35,11 +36,16 @@ describe('plant coverage partial inventory boundaries', () => {
         {
           severity: 'error',
           code: 'PLANT_COVERAGE_NO_INVENTORY',
-          message:
-            'Neither api-map nor routes-inventory found. Run sense-api + sense-routes first.',
+          message: expect.any(String),
         },
       ],
     });
+    // #391: the message names every location read for both bodies and the regeneration
+    // producer, never the removed sense-api and sense-routes verbs.
+    expectMissingInputMessage(reading.findings?.[0]?.message, [
+      'inventory_api',
+      'inventory_routes',
+    ]);
   });
 
   it('reviews an API-only inventory when its controller file is missing', () => {

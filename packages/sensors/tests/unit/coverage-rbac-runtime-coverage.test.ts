@@ -13,6 +13,7 @@ import { senseInventoryCoverage } from '../../src/inventory-coverage.js';
 import { senseInventoryRbac } from '../../src/inventory-rbac.js';
 import type { SensorReading } from '../../src/sensor-reading.js';
 import type { DataModelBody, DataModelTable } from '../../src/inventory-data-model.js';
+import { expectMissingInputMessage } from './inventory-missing-input-message.js';
 
 const NOW = '2026-09-08T12:00:00.000Z';
 
@@ -716,11 +717,15 @@ describe('senseInventoryRbac binding inference, evidence, and persistence', () =
     expect(findingFor(result.reading, 'RBAC_REQUIRES_DATA_MODEL')).toEqual({
       severity: 'info',
       code: 'RBAC_REQUIRES_DATA_MODEL',
-      message:
-        `Data-model body not found at ` +
-        `${join(root, 'record/proofs/sensors/inventory_data_model/data-model.json')}. ` +
-        `Run 'devai sense run inventory_data_model' first; nothing measured.`,
+      message: expect.any(String),
     });
+    // #391: the message names both locations read and the regeneration producer.
+    expectMissingInputMessage(findingFor(result.reading, 'RBAC_REQUIRES_DATA_MODEL')?.message, [
+      'inventory_data_model',
+    ]);
+    expect(findingFor(result.reading, 'RBAC_REQUIRES_DATA_MODEL')?.message).toContain(
+      'nothing measured',
+    );
     // 'unknown' is neither pass nor review: nothing is materialized.
     expect(result.bodyPath).toBeNull();
     expect(result.reading.evidence_path).toBeUndefined();

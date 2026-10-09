@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { sensePlantCoverage } from '../../src/plant-coverage.js';
+import { expectMissingInputMessage } from './inventory-missing-input-message.js';
 
 const now = '2026-09-09T12:00:00.000Z';
 let root: string;
@@ -154,6 +155,10 @@ describe('plant-coverage routes body resolution', () => {
     expect(result.status).toBe('fail');
     expect(result.findings?.map((finding) => finding.code)).toContain(
       'PLANT_COVERAGE_NO_INVENTORY',
+    );
+    expectMissingInputMessage(
+      result.findings?.find((finding) => finding.code === 'PLANT_COVERAGE_NO_INVENTORY')?.message,
+      ['inventory_api', 'inventory_routes'],
     );
   });
 });
