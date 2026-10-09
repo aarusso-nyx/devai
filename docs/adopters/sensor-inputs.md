@@ -123,6 +123,15 @@ For `harness_green_main`, `outcomeUnit` decides what one outcome is
   request was open; a pull request whose base branch is not the declared one is never sampled.
   An open pull request without such a run is left out, and `minimumSample`
   counts pull requests.
+  - **Base branch verified.** Under this unit the base branch is verified, so the reading
+    reports `population_base_branch_verified: true`. The `HARNESS_POPULATION_UNVERIFIED`
+    finding no longer names `baseBranch`, and it is absent when no other filter stays
+    unverified. Under `run`, and for the other two sensors, it still names `baseBranch`,
+    because run rows carry no base branch (#370).
+  - **Known limitation: reopened pull requests.** A pull request that was closed and reopened
+    is treated as open from its creation to its last close. A run on a reused branch during
+    the closed gap can be attributed to it (#365); the sensor note explains why this is not
+    fixed.
 
 The second unit measures the gate's outcome per candidate rather than how often authors push
 unfinished work, such as test-first commits that are red by design. Below the minimum each sensor
