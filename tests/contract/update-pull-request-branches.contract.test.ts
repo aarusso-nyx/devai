@@ -341,6 +341,101 @@ describe('workflow checker pins the update-pull-request-branches workflow (ADR-C
           'github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.draft == false',
         ),
     ],
+    // #380 review: the job runs the credential steps, so its execution settings are exactly the
+    // approved keys (name, if, runs-on, timeout-minutes, steps) and the workflow adds none. An
+    // untrusted image, a service, another runner, a shell default, or injected env could run
+    // or observe the credential steps.
+    [
+      'the job runs in a container image',
+      (d) => d.setIn(['jobs', JOB, 'container'], 'ghcr.io/attacker/image:latest'),
+    ],
+    [
+      'the job runs in a container declared as an object',
+      (d) =>
+        d.setIn(['jobs', JOB, 'container'], {
+          image: 'ghcr.io/attacker/image:latest',
+          options: '--privileged',
+        }),
+    ],
+    [
+      'the job starts a service container',
+      (d) =>
+        d.setIn(['jobs', JOB, 'services'], { sidecar: { image: 'ghcr.io/attacker/image:latest' } }),
+    ],
+    [
+      'the job runs on a self-hosted runner',
+      (d) => d.setIn(['jobs', JOB, 'runs-on'], 'self-hosted'),
+    ],
+    [
+      'the job runs on a labelled self-hosted runner',
+      (d) => d.setIn(['jobs', JOB, 'runs-on'], ['self-hosted', 'linux']),
+    ],
+    [
+      'the job sets a default shell',
+      (d) => d.setIn(['jobs', JOB, 'defaults'], { run: { shell: 'sh -c {0}' } }),
+    ],
+    [
+      'the job sets a default working directory',
+      (d) => d.setIn(['jobs', JOB, 'defaults'], { run: { 'working-directory': '/tmp/attacker' } }),
+    ],
+    [
+      'the workflow sets a default shell',
+      (d) => d.setIn(['defaults'], { run: { shell: 'sh -c {0}' } }),
+    ],
+    [
+      'the job declares env',
+      (d) => d.setIn(['jobs', JOB, 'env'], { BASH_ENV: '/tmp/attacker.sh' }),
+    ],
+    ['the workflow declares env', (d) => d.setIn(['env'], { BASH_ENV: '/tmp/attacker.sh' })],
+    [
+      'the job calls a reusable workflow',
+      (d) => {
+        d.deleteIn(['jobs', JOB, 'steps']);
+        d.setIn(['jobs', JOB, 'uses'], 'attacker/workflows/.github/workflows/update.yml@main');
+        d.setIn(['jobs', JOB, 'secrets'], 'inherit');
+      },
+    ],
+    [
+      'the job adds a reusable-workflow uses beside its steps',
+      (d) => d.setIn(['jobs', JOB, 'uses'], './.github/workflows/pull-request-checks.yml'),
+    ],
+    [
+      'the job gains a matrix strategy',
+      (d) => d.setIn(['jobs', JOB, 'strategy'], { matrix: { image: ['ubuntu-latest'] } }),
+    ],
+    [
+      'the job exports outputs',
+      (d) => d.setIn(['jobs', JOB, 'outputs'], { token: '${{ steps.app-token.outputs.token }}' }),
+    ],
+    [
+      'the rebase step runs under another shell',
+      (d) => d.setIn(['jobs', JOB, 'steps', stepIndex(d, 'rebase'), 'shell'], 'sh'),
+    ],
+    [
+      'the probe step runs under another shell',
+      (d) => d.setIn(['jobs', JOB, 'steps', stepIndex(d, 'credentials'), 'shell'], 'pwsh'),
+    ],
+    [
+      'the rebase step changes its working directory',
+      (d) =>
+        d.setIn(
+          ['jobs', JOB, 'steps', stepIndex(d, 'rebase'), 'working-directory'],
+          '/tmp/attacker',
+        ),
+    ],
+    [
+      'the rebase step gains BASH_ENV',
+      (d) =>
+        d.setIn(
+          ['jobs', JOB, 'steps', stepIndex(d, 'rebase'), 'env', 'BASH_ENV'],
+          '/tmp/attacker.sh',
+        ),
+    ],
+    [
+      'the probe step continues on error',
+      (d) =>
+        d.setIn(['jobs', JOB, 'steps', stepIndex(d, 'credentials'), 'continue-on-error'], true),
+    ],
     // IA-009: the lock follows the run's subject on each accepted event.
     [
       'the lock group is keyed by the ref alone while pull_request_target is accepted',
