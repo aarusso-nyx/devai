@@ -7,7 +7,7 @@ import {
   type AuthorityHostEffectRequest,
   type AuthorityHostEffectScope,
 } from '@devai-nyx/authority';
-import { senseBuild, senseSiteDrift } from '@devai-nyx/sensors';
+import { senseBuild, sensePerfTest, senseSiteDrift, senseTypeCheck } from '@devai-nyx/sensors';
 import { execFileSync } from 'node:child_process';
 import {
   chmodSync,
@@ -601,5 +601,300 @@ describe('sense run site_drift through the broker (ADR-AUT-0002 IA-002, IA-004)'
     );
     expect(reading.status).toBe('review');
     expect(JSON.stringify(reading.findings)).toContain('journal-not-verified');
+  });
+});
+
+// ADR-AUT-0006 (#381): under sense run the broker admits exactly `pnpm -r typecheck` for
+// type_check and `pnpm test:perf` for perf_test, through pnpm or the corepack shim it resolves
+// to, refuses every other shape before a process starts, and its literals mirror the two pnpm
+// templates and the three npx templates in law/policy/subprocess-effects.json.
+const COREPACK_SHIM = '/opt/node/lib/node_modules/corepack/dist/pnpm.js';
+const TYPECHECK = ['-r', 'typecheck'] as const;
+const TEST_PERF = ['test:perf'] as const;
+
+/**
+ * The broker's sense run process literals ADR-AUT-0006 names, as template argv_shape strings.
+ * The mirror compares this list with the declared templates in both directions and proves the
+ * broker admits each instantiated shape.
+ */
+const BROKER_SENSE_RUN_SHAPES: Readonly<
+  Record<string, { readonly executable: string; readonly argv_shape: readonly string[] }>
+> = {
+  'npx-tsc-noemit': { executable: 'npx', argv_shape: ['tsc', '--noEmit'] },
+  'npx-tsc-noemit-project': {
+    executable: 'npx',
+    argv_shape: ['tsc', '--noEmit', '-p', '<relative-path>'],
+  },
+  'npx-eslint-json': { executable: 'npx', argv_shape: ['eslint', '--format=json', '<path>'] },
+  'pnpm-recursive-typecheck': { executable: 'pnpm', argv_shape: ['-r', 'typecheck'] },
+  'pnpm-test-perf': { executable: 'pnpm', argv_shape: ['test:perf'] },
+};
+
+function instantiateSenseRun(shape: readonly string[]): readonly string[] {
+  return shape.map((argument) =>
+    argument.replace('<relative-path>', 'packages/cli/tsconfig.json').replace('<path>', 'src'),
+  );
+}
+
+function checkBroker() {
+  const check = entries.find((candidate) => candidate.name === 'check');
+  if (check === undefined) throw new Error('missing action check');
+  return createAuthorityHostBroker({
+    entry: check,
+    entries,
+    argv: [process.execPath, 'devai', 'check', '--as-role', 'auditor'],
+    role: 'auditor',
+    declaration: { as_role: 'auditor' },
+    repository_root: ROOT,
+    package_version: resolveCliVersion(),
+    bootstrap_policy: true,
+  });
+}
+
+describe('type_check and perf_test shapes under sense run (ADR-AUT-0006 IA-003, IA-004)', () => {
+  it.each([
+    ['a bare pnpm', 'pnpm'],
+    ['an absolute pnpm', '/usr/local/bin/pnpm'],
+    ['the corepack shim', COREPACK_SHIM],
+  ] as const)('admits pnpm -r typecheck and pnpm test:perf through %s', (_label, executable) => {
+    expectAdmitted('type_check', executable, [...TYPECHECK]);
+    expectAdmitted('perf_test', executable, [...TEST_PERF]);
+  });
+
+  it.each([
+    ['pnpm typecheck without -r', 'pnpm', ['typecheck']],
+    ['pnpm run typecheck', 'pnpm', ['run', 'typecheck']],
+    ['pnpm -r run typecheck', 'pnpm', ['-r', 'run', 'typecheck']],
+    ['a --filter', 'pnpm', ['-r', 'typecheck', '--filter', 'x']],
+    ['a filter before the script', 'pnpm', ['-r', '--filter', 'x', 'typecheck']],
+    ['a trailing script argument', 'pnpm', ['-r', 'typecheck', '--', '--watch']],
+    ['an added flag', 'pnpm', ['-r', 'typecheck', '--if-present']],
+    ['pnpm exec tsc', 'pnpm', ['exec', 'tsc']],
+    ['another recursive script', 'pnpm', ['-r', 'lint']],
+    ['the shape through npx', 'npx', ['pnpm', '-r', 'typecheck']],
+  ] as const)('refuses %s for type_check', (_label, executable, args) => {
+    expectRefusedBeforeStart('type_check', executable, args);
+  });
+
+  it.each([
+    ['pnpm run test:perf', 'pnpm', ['run', 'test:perf']],
+    ['an extra argument', 'pnpm', ['test:perf', 'extra']],
+    ['a trailing script argument', 'pnpm', ['test:perf', '--', '--bail']],
+    ['another script name', 'pnpm', ['bench']],
+    ['a recursive test:perf', 'pnpm', ['-r', 'test:perf']],
+    ['pnpm exec of the script', 'pnpm', ['exec', 'test:perf']],
+    ['a node script', 'node', ['scripts/perf-smoke.mjs']],
+  ] as const)('refuses %s for perf_test', (_label, executable, args) => {
+    expectRefusedBeforeStart('perf_test', executable, args);
+  });
+
+  it.each([
+    ['a pnpm look-alike', 'pnpmx'],
+    ['a pnpm.js outside corepack', '/opt/node/lib/node_modules/other/dist/pnpm.js'],
+    ['corepack npm shim', '/opt/node/lib/node_modules/corepack/dist/npm.js'],
+    ['a pnpm.js outside dist', '/opt/node/lib/node_modules/corepack/pnpm.js'],
+  ] as const)('refuses %s as the executable for both shapes', (_label, executable) => {
+    expectRefusedBeforeStart('type_check', executable, [...TYPECHECK]);
+    expectRefusedBeforeStart('perf_test', executable, [...TEST_PERF]);
+  });
+
+  it.each([
+    ['pnpm -r typecheck', TYPECHECK],
+    ['pnpm test:perf', TEST_PERF],
+  ] as const)('refuses %s under check, outside sense run', (_label, args) => {
+    const host = checkBroker();
+    const apply = vi.fn(() => 'started');
+    try {
+      expect(() => host.scope.apply_effect(effect('pnpm', [...args]), apply)).toThrow(Error);
+      expect(apply).not.toHaveBeenCalled();
+    } finally {
+      host.dispose();
+    }
+  });
+});
+
+describe('subprocess template mirror for the sense run shapes (ADR-AUT-0006 IA-005, IA-006)', () => {
+  const ids = Object.keys(BROKER_SENSE_RUN_SHAPES);
+  const declared = (): readonly SubprocessTemplate[] =>
+    templates().filter((template) => ids.includes(template.template_id));
+
+  it('declares exactly the five templates with the shapes the broker literals admit', () => {
+    expect(
+      Object.fromEntries(
+        declared().map((template) => [
+          template.template_id,
+          { executable: template.executable, argv_shape: template.argv_shape },
+        ]),
+      ),
+    ).toEqual(BROKER_SENSE_RUN_SHAPES);
+    expect(declared().map((template) => template.template_id)).toHaveLength(ids.length);
+  });
+
+  it('admits every declared template once instantiated', () => {
+    expect(declared()).toHaveLength(5);
+    for (const template of declared()) {
+      const kind = template.template_id.includes('perf') ? 'perf_test' : 'type_check';
+      expectAdmitted(kind, template.executable, instantiateSenseRun(template.argv_shape));
+    }
+  });
+
+  it('admits every shape the broker literals mirror, so a removed literal fails', () => {
+    for (const [id, { executable, argv_shape }] of Object.entries(BROKER_SENSE_RUN_SHAPES)) {
+      expectAdmitted(id.includes('perf') ? 'perf_test' : 'type_check', executable, [
+        ...instantiateSenseRun(argv_shape),
+      ]);
+    }
+  });
+
+  it('declares both pnpm shapes local-write on the workspace and the npx mirrors read', () => {
+    for (const id of ['pnpm-recursive-typecheck', 'pnpm-test-perf']) {
+      expect(templates().find((template) => template.template_id === id)).toMatchObject({
+        effect: 'local-write',
+        capabilities: ['proc:pnpm-build', 'fs:workspace'],
+      });
+    }
+    for (const id of ['npx-tsc-noemit', 'npx-tsc-noemit-project', 'npx-eslint-json']) {
+      expect(templates().find((template) => template.template_id === id)).toMatchObject({
+        effect: 'read',
+        capabilities: ['proc:npx-local'],
+      });
+    }
+  });
+});
+
+/** A pnpm workspace root whose package.json declares the scripts it is given. */
+function pnpmWorkspace(scripts: Readonly<Record<string, string>>): string {
+  const repo = temporaryRoot('devai-broker-pnpm-workspace-');
+  writeFileSync(
+    join(repo, 'package.json'),
+    `${JSON.stringify({ name: 'workspace', private: true, scripts }, null, 2)}\n`,
+  );
+  writeFileSync(join(repo, 'pnpm-workspace.yaml'), "packages:\n  - 'packages/*'\n");
+  return repo;
+}
+
+const shapeAnswer =
+  (shape: readonly string[], fixture: ProcessFixture) =>
+  (executable: string, args: readonly string[]): ProcessFixture | undefined =>
+    executable.includes('pnpm') && args.join(' ') === shape.join(' ') ? fixture : undefined;
+
+/** Runs a sensor, returning its value or the refusal it raised. */
+function outcome<T>(callback: () => T): { readonly value?: T; readonly error?: unknown } {
+  try {
+    return { value: callback() };
+  } catch (error) {
+    return { error };
+  }
+}
+
+describe('sense run type_check through the broker (ADR-AUT-0006 IA-001, IA-004)', () => {
+  const PNPM_OUTPUT =
+    'Scope: 2 of 3 workspace projects\n' +
+    "packages/x typecheck: a.ts(1,2): error TS2322: Type 'string' is not assignable to type 'number'.\n" +
+    'packages/x typecheck: Failed\n';
+
+  it.each([
+    ['a plain pnpm', plainPath],
+    ['the corepack shim', corepackPath],
+  ] as const)(
+    'reads FAIL with the exit code and the prefixed diagnostic through %s',
+    (_label, path) => {
+      const repo = pnpmWorkspace({ typecheck: 'tsc --noEmit' });
+      process.env.PATH = path();
+      const { value, requests } = underBroker(
+        'type_check',
+        'inspector',
+        shapeAnswer(TYPECHECK, { status: 2, stdout: PNPM_OUTPUT, stderr: 'ELIFECYCLE' }),
+        () => senseTypeCheck({ cwd: repo, argv: ['pnpm', ...TYPECHECK] }),
+      );
+      const reading = value.aggregate;
+      expect(requests).toHaveLength(1);
+      expect((requests[0]?.[1] as readonly string[]).join(' ')).toBe('-r typecheck');
+      expect(reading.status).toBe('fail');
+      expect(reading.exit_code).toBe(2);
+      expect(`${reading.err_head ?? ''}${reading.out_head ?? ''}`).not.toContain('AUTHORITY_');
+      expect(reading.findings).toEqual([
+        expect.objectContaining({
+          severity: 'error',
+          code: 'TS2322',
+          line: 1,
+          message: "Type 'string' is not assignable to type 'number'.",
+        }),
+      ]);
+      const file = String(reading.findings?.[0]?.file);
+      expect(file).toMatch(/(?:^|\/)a\.ts$/u);
+      expect(file).not.toContain('typecheck:');
+      expect(file).not.toContain(' ');
+    },
+  );
+
+  it('refuses pnpm run typecheck before a process starts, as a refusal and not a type error', () => {
+    const repo = pnpmWorkspace({ typecheck: 'tsc --noEmit' });
+    process.env.PATH = plainPath();
+    const answer = vi.fn(() => ({ status: 0, stdout: '', stderr: '' }));
+    const { value } = underBroker('type_check', 'inspector', answer, () =>
+      outcome(() => senseTypeCheck({ cwd: repo, argv: ['pnpm', 'run', 'typecheck'] })),
+    );
+    expect(answer).not.toHaveBeenCalled();
+    const text =
+      value.error instanceof Error
+        ? value.error.message
+        : `${value.value?.aggregate.err_head ?? ''}`;
+    expect(text).toContain('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
+    expect(value.value?.aggregate.status).not.toBe('pass');
+  });
+});
+
+describe('sense run perf_test through the broker (ADR-AUT-0006 IA-002, IA-004)', () => {
+  const METRICS = 'perf done\n{"p50_ms": 4, "p95_ms": 9}\n';
+
+  it.each([
+    ['a declared argv', { argv: ['pnpm', 'test:perf'] }],
+    ['the default scriptName', {}],
+  ] as const)('runs pnpm test:perf from %s and reads a measured verdict', (_label, inputs) => {
+    const repo = pnpmWorkspace({ 'test:perf': 'node perf.mjs' });
+    process.env.PATH = corepackPath();
+    const { value: reading, requests } = underBroker(
+      'perf_test',
+      'inspector',
+      shapeAnswer(TEST_PERF, { status: 0, stdout: METRICS, stderr: '' }),
+      () => sensePerfTest({ repoRoot: repo, ...inputs }),
+    );
+    expect(requests).toHaveLength(1);
+    expect((requests[0]?.[1] as readonly string[]).join(' ')).toBe('test:perf');
+    expect(reading.err_head ?? '').not.toContain('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
+    expect(reading.status).toBe('pass');
+    expect(reading.exit_code).toBe(0);
+  });
+
+  it('reads FAIL with the exit code when the admitted perf script fails', () => {
+    const repo = pnpmWorkspace({ 'test:perf': 'node perf.mjs' });
+    process.env.PATH = plainPath();
+    const { value: reading } = underBroker(
+      'perf_test',
+      'inspector',
+      shapeAnswer(TEST_PERF, { status: 3, stdout: '', stderr: 'perf budget blown' }),
+      () => sensePerfTest({ repoRoot: repo }),
+    );
+    expect(reading.status).toBe('fail');
+    expect(reading.exit_code).toBe(3);
+    expect(reading.err_head ?? '').not.toContain('AUTHORITY_');
+  });
+
+  it('refuses a non-default scriptName before a process starts instead of running it', () => {
+    const repo = pnpmWorkspace({ 'test:perf': 'node perf.mjs', bench: 'node bench.mjs' });
+    process.env.PATH = plainPath();
+    const answer = vi.fn(() => ({ status: 0, stdout: METRICS, stderr: '' }));
+    const { value, requests } = underBroker('perf_test', 'inspector', answer, () =>
+      outcome(() => sensePerfTest({ repoRoot: repo, scriptName: 'bench' })),
+    );
+    expect(answer).not.toHaveBeenCalled();
+    expect(requests.map((request) => (request[1] as readonly string[]).join(' '))).toEqual([
+      'bench',
+    ]);
+    const text =
+      value.error instanceof Error ? value.error.message : `${value.value?.err_head ?? ''}`;
+    expect(text).toContain('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
+    expect(value.value?.status).not.toBe('pass');
   });
 });
