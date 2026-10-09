@@ -88,6 +88,11 @@ export interface InventoryRoutesOptions {
    * through `extractor_params.inventory_routes.framework`.
    */
   readonly framework?: RoutesFramework;
+  /**
+   * The absolute source files the inventory may describe. A walked file outside it, such
+   * as one git ignores, never enters the body. Omitted: every walked file is described.
+   */
+  readonly admitFile?: (absolutePath: string) => boolean;
 }
 
 export interface InventoryRoutesResult {

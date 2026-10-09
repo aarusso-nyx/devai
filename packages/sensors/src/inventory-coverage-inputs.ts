@@ -343,6 +343,12 @@ export type RoutesPathResolution =
       readonly kind: 'ambiguous';
       readonly directory: string;
       readonly candidates: readonly string[];
+    }
+  | {
+      /** A present directory that could not be listed; no other directory is consulted. */
+      readonly kind: 'unreadable';
+      readonly directory: string;
+      readonly reason: string;
     };
 
 /** The repository-relative directories a routes body is looked up in, in order (#382). */
@@ -359,7 +365,8 @@ const ROUTES_BODY_NAME = /^routes-[^.]+\.json$/;
  * turn (the regenerated state body, then the direct sensor default): with a framework,
  * `routes-<framework>.json`; without one, the single `routes-*.json` the directory holds.
  * Two or more candidates are ambiguous and never guessed between; the next directory is
- * consulted only when a directory holds none. With a framework and no body anywhere, the
+ * consulted only when a directory holds none, and a present directory that cannot be
+ * listed is reported `unreadable` rather than skipped. With a framework and no body anywhere, the
  * last directory's path is resolved, so the consumer reports it missing there.
  */
 export function resolveRoutesPath(
@@ -374,8 +381,9 @@ export function resolveRoutesPath(
   const searched = directories.map((directory) => join(repoRoot, directory));
   for (const dir of searched) {
     if (framework !== undefined) {
+      // A present body is the input, admitted or not: the consumer refuses it, never skips it.
       const path = join(dir, `routes-${framework}.json`);
-      if (existsSync(path) && admit(path)) return { kind: 'resolved', path };
+      if (existsSync(path)) return { kind: 'resolved', path };
       continue;
     }
     if (!existsSync(dir)) continue;
@@ -384,8 +392,16 @@ export function resolveRoutesPath(
       candidates = readdirSync(dir)
         .filter((name) => ROUTES_BODY_NAME.test(name) && admit(join(dir, name)))
         .sort();
-    } catch {
-      continue;
+    } catch (error) {
+      // A present higher-priority directory that cannot be listed is an input error, never
+      // a fall-through to a lower-priority directory. The last directory keeps reading as
+      // missing, as it always has.
+      if (dir === searched[searched.length - 1]) return { kind: 'missing', directory: dir };
+      return {
+        kind: 'unreadable',
+        directory: dir,
+        reason: error instanceof Error ? error.message : String(error),
+      };
     }
     if (candidates.length === 1) {
       return { kind: 'resolved', path: join(dir, candidates[0] as string) };

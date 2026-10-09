@@ -90,6 +90,11 @@ export interface InventoryDataModelOptions {
   readonly bodyPath?: string;
   /** False for pure observation callers that must not materialize canonical state. */
   readonly persistBody?: boolean;
+  /**
+   * The absolute migration files the inventory may describe. A walked file outside it,
+   * such as one git ignores, never enters the body. Omitted: every walked file is described.
+   */
+  readonly admitFile?: (absolutePath: string) => boolean;
   readonly dialect?: DataModelBody['dialect'];
   readonly now?: string;
   /**

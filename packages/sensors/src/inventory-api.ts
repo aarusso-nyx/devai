@@ -90,6 +90,11 @@ export interface InventoryApiOptions {
    * on the matched stack-adapter pack.
    */
   readonly publicMarkerDecorators?: readonly string[];
+  /**
+   * The absolute source files the inventory may describe. A walked file outside it, such
+   * as one git ignores, never enters the body. Omitted: every walked file is described.
+   */
+  readonly admitFile?: (absolutePath: string) => boolean;
 }
 
 /** Resolve configured scan directories to unique existing absolute paths. */
@@ -335,7 +340,8 @@ function measureInventoryApi(opts: InventoryApiOptions): InventoryApiResult {
 
   try {
     for (const scanDir of scanDirs) {
-      const files = walkTs(scanDir, ignoreDirs);
+      const admit = opts.admitFile;
+      const files = walkTs(scanDir, ignoreDirs).filter((f) => admit === undefined || admit(f));
       const controllerFiles = files.filter((f) => f.endsWith('.controller.ts'));
       for (const file of controllerFiles) {
         const sf = parseSource(file);
