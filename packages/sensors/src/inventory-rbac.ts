@@ -11,6 +11,10 @@ import {
 } from './declared-surfaces.js';
 import { buildSensorReading, type SensorReading, type SensorStatus } from './sensor-reading.js';
 import type { DataModelBody, DataModelTable } from './inventory-data-model.js';
+import { resolveBodyInput } from './inventory-body-inputs.js';
+
+const DATA_MODEL_FILE = 'inventory_data_model/data-model.json';
+const API_MAP_FILE = 'inventory_api/api-map.json';
 
 /**
  * Inventory sensor: RBAC bindings (REDOX-RBAC, Phase 17.C3).
@@ -74,8 +78,12 @@ export interface InventoryRbacOptions {
    * form `guard:<Name>` or `role:<Name>`; each endpoint with any
    * guards/roles gets an EndpointBinding entry. Closes the
    * "endpointBindings always empty" gap from Phase 17.C3.
+   *
+   * The data model and api map each resolve as `resolveBodyInput` does (#382): an
+   * explicit path, then the regenerated state body, then the direct default. A `null`
+   * api map names no api-map input.
    */
-  readonly apiMapPath?: string;
+  readonly apiMapPath?: string | null;
   readonly bodyPath?: string;
   /** False for pure observation callers that must not materialize canonical state. */
   readonly persistBody?: boolean;
@@ -141,11 +149,13 @@ function endpointIdOf(e: ApiMapEndpoint): string {
 function measureInventoryRbac(opts: InventoryRbacOptions): InventoryRbacResult {
   const t0 = performance.now();
   const generatedAt = opts.now ?? new Date().toISOString();
-  const dataModelPath =
-    opts.dataModelPath ??
-    join(opts.repoRoot, 'record/proofs/sensors/inventory_data_model/data-model.json');
-  const apiMapPath =
-    opts.apiMapPath ?? join(opts.repoRoot, 'record/proofs/sensors/inventory_api/api-map.json');
+  // #382: an explicit input, then the regenerated state body, then the direct default.
+  const dataModelPath = resolveBodyInput(
+    opts.repoRoot,
+    opts.dataModelPath,
+    DATA_MODEL_FILE,
+  ) as string;
+  const apiMapPath = resolveBodyInput(opts.repoRoot, opts.apiMapPath, API_MAP_FILE);
 
   const findings: Array<{
     readonly severity: 'info' | 'warning' | 'error' | 'critical';
@@ -185,7 +195,7 @@ function measureInventoryRbac(opts: InventoryRbacOptions): InventoryRbacResult {
   // Load api-map body opportunistically. Absence is informational
   // (status stays at whatever data-model state implied) — adopters
   // may run sense rbac before sense api.
-  if (existsSync(apiMapPath)) {
+  if (apiMapPath !== null && existsSync(apiMapPath)) {
     try {
       apiMap = JSON.parse(readFileSync(apiMapPath, 'utf8')) as ApiMapBodyShape;
     } catch (err) {

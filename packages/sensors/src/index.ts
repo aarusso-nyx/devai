@@ -1,6 +1,7 @@
 export * from './build.js';
 export * from './action-effect-inference.js';
 export * from './inventory-api.js';
+export * from './inventory-body-inputs.js';
 export * from './inventory-coverage.js';
 export * from './inventory-data-handling.js';
 export * from './inventory-data-model.js';

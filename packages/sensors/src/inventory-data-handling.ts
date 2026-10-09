@@ -11,6 +11,9 @@ import {
 } from './declared-surfaces.js';
 import { buildSensorReading, type SensorReading, type SensorStatus } from './sensor-reading.js';
 import type { DataModelBody, DataModelColumn, DataModelTable } from './inventory-data-model.js';
+import { resolveBodyInput } from './inventory-body-inputs.js';
+
+const DATA_MODEL_FILE = 'inventory_data_model/data-model.json';
 
 /**
  * Inventory sensor: data-handling / PII column classification
@@ -167,9 +170,12 @@ function measureInventoryDataHandling(
 ): InventoryDataHandlingResult {
   const t0 = performance.now();
   const generatedAt = opts.now ?? new Date().toISOString();
-  const dataModelPath =
-    opts.dataModelPath ??
-    join(opts.repoRoot, 'record/proofs/sensors/inventory_data_model/data-model.json');
+  // #382: an explicit input, then the regenerated state body, then the direct default.
+  const dataModelPath = resolveBodyInput(
+    opts.repoRoot,
+    opts.dataModelPath,
+    DATA_MODEL_FILE,
+  ) as string;
 
   const findings: Array<{
     readonly severity: 'info' | 'warning' | 'error' | 'critical';

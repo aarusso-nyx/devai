@@ -16,6 +16,8 @@ import {
   type PlantSurface,
   type SurfaceEvidence,
 } from './declared-surfaces.js';
+import { resolveRoutesPath } from './inventory-coverage-inputs.js';
+import { resolveBodyInput } from './inventory-body-inputs.js';
 
 /**
  * Inventory sensor: plant coverage (F2 × T1). Phase 26.E (closes
@@ -47,9 +49,16 @@ import {
 
 export interface PlantCoverageOptions {
   readonly repoRoot: string;
-  /** Default: `record/proofs/sensors/inventory_api/api-map.json`. */
+  /**
+   * Default: `.devai/state/sensors/inventory_api/api-map.json` when regeneration published
+   * it, else `record/proofs/sensors/inventory_api/api-map.json` (#382).
+   */
   readonly apiMapPath?: string;
-  /** Default: `record/proofs/sensors/inventory_routes/routes-inventory.json`. */
+  /**
+   * Default: the single `routes-<framework>.json` in the regenerated state routes
+   * directory, else in `record/proofs/sensors/inventory_routes/`, resolved as
+   * `resolveRoutesPath` does; two candidates in one directory are never guessed between.
+   */
   readonly routesInventoryPath?: string;
   readonly now?: string;
   /**
@@ -88,16 +97,26 @@ interface RoutesInventory {
 const BOUND_SURFACES: readonly PlantSurface[] = ['http', 'actions'];
 
 export function sensePlantCoverage(opts: PlantCoverageOptions): SensorReading {
-  const apiPath = abs(
+  // #382: each input is an explicit path, then the regenerated state body, then the
+  // direct default. The routes body is named for its framework, so it resolves as
+  // inventory_coverage resolves it: the single routes-*.json, never a guess between two.
+  const apiPath = resolveBodyInput(
     opts.repoRoot,
-    opts.apiMapPath ?? 'record/proofs/sensors/inventory_api/api-map.json',
+    opts.apiMapPath === undefined ? undefined : abs(opts.repoRoot, opts.apiMapPath),
+    'inventory_api/api-map.json',
   );
-  const routesPath = abs(
+  const routesResolution = resolveRoutesPath(
     opts.repoRoot,
-    opts.routesInventoryPath ?? 'record/proofs/sensors/inventory_routes/routes-inventory.json',
+    opts.routesInventoryPath === undefined
+      ? undefined
+      : abs(opts.repoRoot, opts.routesInventoryPath),
+    undefined,
   );
-  const apiMap = loadJsonSafe<ApiMap>(apiPath);
-  const routes = loadJsonSafe<RoutesInventory>(routesPath);
+  const apiMap = apiPath === null ? null : loadJsonSafe<ApiMap>(apiPath);
+  const routes =
+    routesResolution.kind === 'resolved'
+      ? loadJsonSafe<RoutesInventory>(routesResolution.path)
+      : null;
   const httpPresent = surfacePresent(opts.surfaces, 'http');
   const actionsPresent = surfacePresent(opts.surfaces, 'actions');
 
@@ -105,14 +124,22 @@ export function sensePlantCoverage(opts: PlantCoverageOptions): SensorReading {
   let endpointCount = 0;
   let routeCount = 0;
   let missing = 0;
+  const routesAmbiguous = httpPresent && routesResolution.kind === 'ambiguous';
   // With http declared absent the HTTP inventory is not demanded.
-  const noInventory = httpPresent && apiMap === null && routes === null;
+  const noInventory = httpPresent && apiMap === null && routes === null && !routesAmbiguous;
 
   if (noInventory) {
     findings.push({
       severity: 'error',
       code: 'PLANT_COVERAGE_NO_INVENTORY',
       message: `Neither api-map nor routes-inventory found. Run sense-api + sense-routes first.`,
+    });
+  }
+  if (routesAmbiguous && routesResolution.kind === 'ambiguous') {
+    findings.push({
+      severity: 'warning',
+      code: 'PLANT_COVERAGE_ROUTES_AMBIGUOUS',
+      message: `Multiple routes-inventory bodies found under ${routesResolution.directory}: ${routesResolution.candidates.join(', ')}. None is chosen; pass routesInventoryPath or regenerate the inventory.`,
     });
   }
 
@@ -155,7 +182,7 @@ export function sensePlantCoverage(opts: PlantCoverageOptions): SensorReading {
 
   const status: SensorStatus = noInventory
     ? 'fail'
-    : missing === 0 && (linkage?.unlinkedIds.length ?? 0) === 0
+    : !routesAmbiguous && missing === 0 && (linkage?.unlinkedIds.length ?? 0) === 0
       ? 'pass'
       : 'review';
   const reading = buildSensorReading({
