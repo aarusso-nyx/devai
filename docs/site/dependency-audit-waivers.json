@@ -2,88 +2,11 @@
   "schemaVersion": "1.0.0",
   "baseline_release": "v1.4.5",
   "lockfile": "docs/site/package-lock.json",
-  "lockfile_sha256": "b8f1e54f49827a905bda97382cf2ed31eeea2212cae8d804a1cca1c28750e172",
+  "lockfile_sha256": "87326e2c607bb9e1193f3fc3f671ede99f480cbd5897cc1eb533795a65d7fbc9",
   "waivers": [
-    {
-      "advisory_id": "GHSA-2883-xcg3-v3hh",
-      "package": "js-yaml",
-      "reason": "Owner-authorized non-regression exception: transitively present in v1.4.5; no compatible npm audit fix.",
-      "approved_by": "OWNER",
-      "expires_at": "2026-10-15T23:59:59Z"
-    },
-    {
-      "advisory_id": "GHSA-5jgf-p345-68v8",
-      "package": "fast-uri",
-      "reason": "Owner-authorized non-regression exception: transitively present in v1.4.5; no compatible npm audit fix.",
-      "approved_by": "OWNER",
-      "expires_at": "2026-10-15T23:59:59Z"
-    },
-    {
-      "advisory_id": "GHSA-6j4f-fj2g-mc7p",
-      "package": "brace-expansion",
-      "reason": "Owner-authorized non-regression exception recorded 2026-09-30 for release v1.7.0: advisory published after v1.6.0 in a build-time transitive dependency of the documentation site; no compatible npm audit fix; not part of the published package.",
-      "approved_by": "OWNER",
-      "expires_at": "2026-10-15T23:59:59Z"
-    },
-    {
-      "advisory_id": "GHSA-f65p-4m7j-42xc",
-      "package": "fast-uri",
-      "reason": "Owner-authorized non-regression exception: transitively present in v1.4.5; no compatible npm audit fix.",
-      "approved_by": "OWNER",
-      "expires_at": "2026-10-15T23:59:59Z"
-    },
-    {
-      "advisory_id": "GHSA-fph4-wmhf-6fwf",
-      "package": "fast-uri",
-      "reason": "Owner-authorized non-regression exception: transitively present in v1.4.5; no compatible npm audit fix.",
-      "approved_by": "OWNER",
-      "expires_at": "2026-10-15T23:59:59Z"
-    },
-    {
-      "advisory_id": "GHSA-hrr3-gc8f-f4qj",
-      "package": "fast-uri",
-      "reason": "Owner-authorized non-regression exception recorded 2026-09-30 for release v1.7.0: advisory published after v1.6.0 in a build-time transitive dependency of the documentation site; no compatible npm audit fix; not part of the published package.",
-      "approved_by": "OWNER",
-      "expires_at": "2026-10-15T23:59:59Z"
-    },
-    {
-      "advisory_id": "GHSA-jqff-g426-hqxp",
-      "package": "fast-uri",
-      "reason": "Owner-authorized non-regression exception: transitively present in v1.4.5; no compatible npm audit fix.",
-      "approved_by": "OWNER",
-      "expires_at": "2026-10-15T23:59:59Z"
-    },
-    {
-      "advisory_id": "GHSA-q2hr-2g5m-vwhr",
-      "package": "brace-expansion",
-      "reason": "Owner-authorized non-regression exception recorded 2026-09-30 for release v1.7.0: advisory published after v1.6.0 in a build-time transitive dependency of the documentation site; no compatible npm audit fix; not part of the published package.",
-      "approved_by": "OWNER",
-      "expires_at": "2026-10-15T23:59:59Z"
-    },
-    {
-      "advisory_id": "GHSA-qhr7-859c-m2p7",
-      "package": "brace-expansion",
-      "reason": "Owner-authorized non-regression exception recorded 2026-09-30 for release v1.7.0: advisory published after v1.6.0 in a build-time transitive dependency of the documentation site; no compatible npm audit fix; not part of the published package.",
-      "approved_by": "OWNER",
-      "expires_at": "2026-10-15T23:59:59Z"
-    },
-    {
-      "advisory_id": "GHSA-qw65-cvwx-89v3",
-      "package": "fast-uri",
-      "reason": "Owner-authorized non-regression exception recorded 2026-09-30 for release v1.7.0: advisory published after v1.6.0 in a build-time transitive dependency of the documentation site; no compatible npm audit fix; not part of the published package.",
-      "approved_by": "OWNER",
-      "expires_at": "2026-10-15T23:59:59Z"
-    },
     {
       "advisory_id": "GHSA-vfj7-8cjw-p6xm",
       "package": "braces",
-      "reason": "Owner-authorized exception (2026-10-03, v1.9.0): advisory published after the v1.4.5 baseline with no patched version in any release; present only in the Docusaurus 3.10.2 documentation build tooling, never in the npm package.",
-      "approved_by": "OWNER",
-      "expires_at": "2026-10-15T23:59:59Z"
-    },
-    {
-      "advisory_id": "GHSA-ch52-4w7c-c8xp",
-      "package": "http-cache-semantics",
       "reason": "Owner-authorized exception (2026-10-03, v1.9.0): advisory published after the v1.4.5 baseline with no patched version in any release; present only in the Docusaurus 3.10.2 documentation build tooling, never in the npm package.",
       "approved_by": "OWNER",
       "expires_at": "2026-10-15T23:59:59Z"
