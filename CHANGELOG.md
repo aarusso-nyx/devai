@@ -1,5 +1,78 @@
 # Changelog
 
+## 2.3.1 — 2026-10-09
+
+DEVAI 2.3.1 is a patch release. It fixes four sensor and generator defects that STYNX reported
+as an attested-RC adopter, and lets a pull request opened behind main update without the
+interface. No commit since v2.3.0 carries a feature type or the breaking marker, so the
+commit grammar's bump floor is patch. The action set stays at 69. Two adopter migration entries
+cover the adopter files this release changes.
+
+- Adopter migrations (`init upgrade` from 2.3.0):
+  - `MIG-2.3.1-observation-workflow-pins` (rebind, host adapters). `devai-main-observation.yml`
+    is regenerated with the pins DEVAI's default toolchain manifest declares for
+    `actions/checkout`, `actions/setup-node` and `actions/upload-artifact`. These are the same
+    pins `devai-local-rc-verify.yml` uses. The workflow also gains a concurrency group keyed by
+    the commit that never cancels a run in progress. `init upgrade` rebinds an observation
+    workflow whose verified bytes predate this generator (#383, #385).
+  - `MIG-2.3.1-subprocess-effects-pnpm-shapes` (rebind, subprocess effects). The registry
+    gains `pnpm-recursive-typecheck` and `pnpm-test-perf`, plus mirror templates for the
+    `npx tsc --noEmit` and `npx eslint --format=json` shapes the broker already admitted (#381,
+    #386).
+- `harness_coherence` no longer fails for an attested-RC adopter because DEVAI's two generated
+  workflows pinned different action versions (#383, #385):
+  - **Same pins.** Both workflows now use one pin set.
+  - **Adopter workflows.** Align them to the pins in `.devai/config/toolchain.json`. Findings
+    that remain come from workflows the adopter owns.
+  - **New refusals.** The generators refuse a missing or invalid pin set with
+    `CI_SCAFFOLD_ACTION_PINS_MISSING` or `CI_SCAFFOLD_ACTION_PINS_INVALID`.
+- `type_check` and `perf_test` measure in a pnpm workspace (ADR-AUT-0006, #381, #386):
+  - **New shapes.** Under `sense run` only, the broker admits exactly `pnpm -r typecheck` for
+    `type_check` and `pnpm test:perf` for `perf_test`, with no extra argument. `pnpm` may also be
+    the corepack shim it resolves to.
+  - **Not read-only.** Both run scripts the adopter writes, so they are local-write, like
+    `pnpm -r build`.
+  - **Refused.** Every other `pnpm <script>` argv stays refused, as do `pnpm run`, `pnpm exec`
+    and added arguments. The ESLint path argument may not be an option.
+  - **Workspace guidance.** The adopter page lists the admitted shapes per sensor kind, with
+    guidance for pnpm and turbo workspaces. Admitting any declared argv is planned for 2.4.0.
+- For an adopter with `http`, `database` or `rbac` surfaces, `inventory_regeneration` now
+  produces every inventory body those surfaces require (#382, #387):
+  - **Bodies.** It writes the api, routes, data-model, rbac and data-handling bodies, in
+    dependency order, under `.devai/state/sensors/<kind>/`. It publishes them all or none.
+  - **Consumers measure.** `plant_coverage`, `inventory_rbac`, `inventory_data_handling` and
+    `inventory_coverage` used to wait for bodies no command wrote; they now measure.
+  - **Input order.** Each consumer resolves its input in a fixed order: an explicit path, then
+    the state body, then the `record/proofs` default.
+  - **New finding.** `plant_coverage` reports `PLANT_COVERAGE_ROUTES_AMBIGUOUS` (REVIEW) when
+    more than one routes body matches.
+  - **Sweep stays read-only.** It adds no new effect, action or flag.
+- `harness_green_main` and the other harness sensors (ADR-SCR-0014 clarifications, #364, #365,
+  #370; #371, #375):
+  - **Literal limit.** Each harness run list is read with the literal `--limit 1000`, and a
+    list that comes back full reads UNKNOWN as truncated.
+  - **Final-head membership.** Under `outcomeUnit` `pull-request-final-head`, a pull request
+    counts only when its `baseRefName` is the declared base. A run counts for it only when
+    created while it was open.
+  - **Base verified.** The reading reports `population_base_branch_verified: true`, and
+    `HARNESS_POPULATION_UNVERIFIED` no longer names the base branch.
+  - **Known limitation.** A reopened pull request is treated as open across its closed gap.
+- Repository process for DEVAI's own source (no adopter effect):
+  - **Update branch (ADR-CHK-0008, #380, #384).** `update-pull-request-branches.yml` also runs
+    on `pull_request_target` when a pull request against main is opened, reopened or marked
+    ready for review. It rebases only that pull request, never a fork's, and never checks out
+    or runs its code. The `devai-update-branch` App is provisioned (#373).
+  - **Selection (#376, #379).** Every file the reviewed-step registry pins, and every workflow
+    file, now selects `test:sensors`. The stale `docs/site/package.json` pin that slipped
+    through is re-pinned (#377).
+  - **Docs site (#374, #378).** Its build tooling takes the patched releases for eleven waived
+    advisories. The last waiver, braces GHSA-vfj7-8cjw-p6xm, which has no patched release, is
+    extended to 2026-11-17 by Owner decision.
+- The consumer install guidance names the published 2.3.0 (#368). It moves to 2.3.1 after
+  publication.
+- Release: this release is verified by the trusted local-RC verifier `@aarusso-nyx/devai@1.9.0`,
+  unchanged.
+
 ## 2.3.0 — 2026-10-08
 
 DEVAI 2.3.0 lets the check runner run independent plan nodes in parallel, and splits the pull-request
