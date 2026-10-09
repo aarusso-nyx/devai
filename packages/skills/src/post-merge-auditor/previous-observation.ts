@@ -96,17 +96,57 @@ function chainObservations(repoRoot: string): readonly ChainObservation[] {
   return observations;
 }
 
+/** How a recorded commit relates to the observed commit `at` (#389). */
+type Ancestry = 'ancestor' | 'not-ancestor' | 'unknown';
+
+/** A git run whose process could not start is refused, never read as an answer. */
+function gitRun(repoRoot: string, args: readonly string[]) {
+  const result = git(repoRoot, args);
+  if (result.error !== undefined) throw new Error('AUDIT_OBSERVE_PREVIOUS_HISTORY_UNAVAILABLE');
+  return result;
+}
+
 /**
- * Whether `candidate` is a strict ancestor of `at`. `git merge-base --is-ancestor` exits
- * 0 for an ancestor and 1 for a commit that is not one; any other outcome (a missing
- * object, a shallow history, a failed spawn) is refused rather than read as "no".
+ * Whether the local history behind `at` is complete, asked at most once per resolution: the
+ * repository is not shallow (`git rev-parse --is-shallow-repository` prints `false`) and the
+ * whole history of `at` can be walked (`git rev-list --count <at>` succeeds).
  */
-function isStrictAncestor(repoRoot: string, candidate: string, at: string): boolean {
-  if (candidate === at) return false;
-  const result = git(repoRoot, ['merge-base', '--is-ancestor', candidate, at]);
-  if (result.status === 0) return true;
-  if (result.status === 1 && result.error === undefined) return false;
-  throw new Error('AUDIT_OBSERVE_PREVIOUS_HISTORY_UNAVAILABLE');
+function historyCompleteProbe(repoRoot: string, at: string): () => boolean {
+  let complete: boolean | undefined;
+  return () => {
+    if (complete === undefined) {
+      const shallow = gitRun(repoRoot, ['rev-parse', '--is-shallow-repository']);
+      complete =
+        shallow.status === 0 &&
+        shallow.stdout.trim() === 'false' &&
+        gitRun(repoRoot, ['rev-list', '--count', at]).status === 0;
+    }
+    return complete;
+  };
+}
+
+/** Whether `sha` names a commit present in the local object store. */
+function commitPresent(repoRoot: string, sha: string): boolean {
+  return gitRun(repoRoot, ['cat-file', '-e', `${sha}^{commit}`]).status === 0;
+}
+
+/**
+ * How `candidate` relates to `at`. `git merge-base --is-ancestor` exits 0 for an ancestor and
+ * 1 for a commit that is not one. Any other exit is read as not an ancestor only when the
+ * recorded commit is absent from a complete local history, as for a commit rewritten away or
+ * recorded in another clone (#389); otherwise, a shallow or partial history, it is unknown.
+ */
+function ancestry(
+  repoRoot: string,
+  candidate: string,
+  at: string,
+  historyComplete: () => boolean,
+): Ancestry {
+  if (candidate === at) return 'not-ancestor';
+  const result = gitRun(repoRoot, ['merge-base', '--is-ancestor', candidate, at]);
+  if (result.status === 0) return 'ancestor';
+  if (result.status === 1) return 'not-ancestor';
+  return !commitPresent(repoRoot, candidate) && historyComplete() ? 'not-ancestor' : 'unknown';
 }
 
 function depth(repoRoot: string, sha: string): number {
@@ -219,6 +259,7 @@ export function resolvePreviousObservation(opts: {
   readonly recordId?: string;
 }): PreviousObservation | null {
   const observations = chainObservations(opts.repoRoot);
+  const historyComplete = historyCompleteProbe(opts.repoRoot, opts.at);
   let chosen: ChainObservation | undefined;
   if (opts.recordId !== undefined) {
     chosen = latest(observations, (observation) => observation.recordId === opts.recordId);
@@ -230,7 +271,14 @@ export function resolvePreviousObservation(opts: {
       ...new Set(
         observations
           .map((observation) => observation.mergeSha)
-          .filter((sha) => isStrictAncestor(opts.repoRoot, sha, opts.at)),
+          .filter((sha) => {
+            // A record that is not an ancestor is skipped; one the history cannot judge refuses.
+            const relation = ancestry(opts.repoRoot, sha, opts.at, historyComplete);
+            if (relation === 'unknown') {
+              throw new Error('AUDIT_OBSERVE_PREVIOUS_HISTORY_UNAVAILABLE');
+            }
+            return relation === 'ancestor';
+          }),
       ),
     ]
       .map((sha) => ({ sha, depth: depth(opts.repoRoot, sha) }))
@@ -242,9 +290,9 @@ export function resolvePreviousObservation(opts: {
         : latest(observations, (observation) => observation.mergeSha === nearest);
   }
   if (chosen === undefined) return null;
-  if (!isStrictAncestor(opts.repoRoot, chosen.mergeSha, opts.at)) {
-    throw new Error('AUDIT_OBSERVE_PREVIOUS_NOT_ANCESTOR');
-  }
+  const relation = ancestry(opts.repoRoot, chosen.mergeSha, opts.at, historyComplete);
+  if (relation === 'not-ancestor') throw new Error('AUDIT_OBSERVE_PREVIOUS_NOT_ANCESTOR');
+  if (relation === 'unknown') throw new Error('AUDIT_OBSERVE_PREVIOUS_HISTORY_UNAVAILABLE');
   return {
     recordId: chosen.recordId,
     mergeSha: chosen.mergeSha,
