@@ -82,7 +82,7 @@ function signed(value: JsonRecord, key: Buffer): JsonRecord {
 }
 
 /** A failing lint reading (cell F2:T5) in the shape `sense record` persists. */
-function failingLint(): JsonRecord {
+function failingLint(): SensorReading {
   return {
     schemaVersion: '1.0.0',
     id: `SR-${sha256('store-resolution:lint:fail').slice(0, 16)}`,
@@ -107,7 +107,7 @@ interface BoundCheckout {
  * and an ignored readings store holding one recorded reading. Nothing under
  * `.devai/state/` is committed, exactly as on an adopter checkout.
  */
-function boundCheckout(reading: JsonRecord): BoundCheckout {
+function boundCheckout(reading: SensorReading): BoundCheckout {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'devai-post-merge-store-')));
   roots.push(root);
   git(root, ['init', '-q', '-b', 'main']);
@@ -128,7 +128,7 @@ function boundCheckout(reading: JsonRecord): BoundCheckout {
   const mergeSha = git(root, ['rev-parse', 'HEAD']);
 
   // The recorded reading lives only in the bound checkout's ignored store.
-  recordBoundScorecardReading(root, reading as SensorReading, mergeSha);
+  recordBoundScorecardReading(root, reading, mergeSha);
   expect(git(root, ['status', '--porcelain', '--', STORE])).toBe('');
 
   const hookPath = put(root, '.git/hooks/post-merge', '#!/bin/sh\nexit 0\n');
