@@ -156,14 +156,14 @@ the reviewed `image-size` JXL/HEIF and ICNS loop fixes because upstream has no p
 the provenance is recorded beside the vendored package. Replace the vendor with the first upstream
 release containing both fixes, after the docs audit and build remain green.
 
-The docs dependency audit has a single Owner-authorized non-regression baseline in
-`docs/site/dependency-audit-waivers.json`. It is bound to the unchanged `v1.4.5` site lockfile,
-lists every currently observed moderate or high advisory by exact advisory and package, expires on
-2026-10-15, rejects critical advisories, and rejects any changed or additional advisory. A dependency
-or lockfile change must remove the applicable waiver or obtain a new explicitly recorded decision.
-On 2026-10-03 the Owner added two such decisions for v1.9.0: `braces` (GHSA-vfj7-8cjw-p6xm) and
-`http-cache-semantics` (GHSA-ch52-4w7c-c8xp) have no patched release and reach only the Docusaurus
-build tooling, so they carry the same expiry; the npm package itself carries no audit waiver (#233).
+The docs dependency audit records its Owner-authorized non-regression baseline in
+`docs/site/dependency-audit-waivers.json`, bound to the exact site lockfile SHA-256 recorded there.
+The current lockfile includes the patched dependencies adopted for 2.3.1 (#374, #378); only
+`braces` (GHSA-vfj7-8cjw-p6xm) remains waived. The Owner extended that exception on 2026-10-09
+through 2026-11-17T23:59:59Z because it still had no patched release. It reaches only Docusaurus
+build tooling; the npm package itself carries no audit waiver (#233). The audit rejects critical
+advisories and any changed or additional advisory. A dependency or lockfile change must remove
+the applicable waiver or obtain a new explicitly recorded decision.
 
 Repository settings are separate Owner-authorized effects: enable immutable Releases,
 prohibit update/deletion of `v*` tags, require signed annotated release tags, configure the

@@ -16,8 +16,8 @@ migration entry covers the observation workflow change.
     to build (#390, #395).
 - `audit observe` skips a predecessor whose commit is provably absent from a complete repository
   history (#389, #393). An absent commit in a shallow history, or an undecidable ancestry read,
-  still refuses observation. An explicitly supplied previous commit that is not an ancestor
-  remains a refusal.
+  still refuses observation. An explicitly supplied previous observation whose commit is not an
+  ancestor remains a refusal.
 - `harness_coherence` proves generated adopter workflow steps by their reviewed digests (#390,
   #395). The observation install cannot execute lifecycle scripts. Any present pnpm hook entry,
   including an unreadable or escaping path, remains unproved and fails closed.
