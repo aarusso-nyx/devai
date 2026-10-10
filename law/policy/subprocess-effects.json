@@ -391,6 +391,15 @@
       "owner": "architect"
     },
     {
+      "template_id": "declared-sensor-task",
+      "executable": "declared-sensor-task",
+      "argv_shape": ["<exact-verified-task-argv>"],
+      "capabilities": ["proc:declared-sensor-task", "fs:workspace"],
+      "effect": "local-write",
+      "reason": "ADR-SCR-0015: only sense run's internally trusted member/task binding admits this process. The executable marker is descriptive, never a runnable command or generic argv shape. Admission binds the exact sensorKinds annotation, population, candidate commit/tree, descriptor and task-policy digests, executable path and byte digest, complete argv, contained cwd, input selectors, dependency completion and toolchain/allowlisted environment identities. A caller cannot manufacture the internal binding; wrong kind, added arguments, changed policy, absent prerequisite custody and unmatched executable bytes refuse before execution. Every bound task requires explicit --write and fs:workspace; migration_check additionally retains db:write. Read presets refuse these members and no remote effect is inferred.",
+      "owner": "architect"
+    },
+    {
       "template_id": "pnpm-recursive-build",
       "executable": "pnpm",
       "argv_shape": ["-r", "build"],
