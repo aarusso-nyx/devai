@@ -36,6 +36,8 @@ import { runWithAuthorityHostEffects } from '@devai-nyx/authority';
 import { resolveScorecardInputs } from '@devai-nyx/loop';
 import { withAuthorityHostTestScope } from './authority-host-test-scope.js';
 import { disableGitAutoMaintenance } from './git-fixture-maintenance.js';
+import type { SensorReading } from '@devai-nyx/sensors';
+import { recordBoundScorecardReading } from '../../../loop/tests/helpers/scorecard-custody-fixture.js';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -120,7 +122,7 @@ interface FixtureOptions {
   readonly constitution?: string | null;
   /** Extra files committed with the baseline, visible in every observed worktree. */
   readonly files?: Readonly<Record<string, string>>;
-  /** Readings committed to the canonical store with each merge, one entry per round. */
+  /** Readings recorded with exact custody after each merge, one entry per round. */
   readonly readings?: readonly (readonly unknown[])[];
   /** Binds the adapter to the merge itself rather than to the pre-merge baseline. */
   readonly installedAtHead?: boolean;
@@ -144,20 +146,12 @@ function reading(kind: string, status: string): JsonRecord {
   };
 }
 
-/**
- * The canonical readings store (ADR-SCR-0002). Each round replaces the store
- * with its readings at `<kind>/<id>.json`, the layout `sense record` writes.
- */
 const READINGS_STORE = '.devai/state/sensor-readings';
 
-function writeReadingsRound(root: string, round: readonly unknown[]): void {
-  rmSync(join(root, READINGS_STORE), { recursive: true, force: true });
+/** Append exact-candidate custody while preserving earlier immutable observations. */
+function writeReadingsRound(root: string, round: readonly unknown[], head: string): void {
   for (const entry of round) {
-    const { id, sensor } = entry as {
-      readonly id: string;
-      readonly sensor: { readonly kind: string };
-    };
-    put(root, `${READINGS_STORE}/${sensor.kind}/${id}.json`, `${JSON.stringify(entry, null, 2)}\n`);
+    recordBoundScorecardReading(root, entry as SensorReading, head);
   }
 }
 
@@ -184,6 +178,7 @@ function fixture(options: FixtureOptions = {}): HostFixture {
     constitutionRelative === null ? null : put(root, constitutionRelative, '# Constitution\n');
   const policyPath = put(root, '.devai/config/authority-policy.json', '{}\n');
   put(root, 'README.md', 'baseline\n');
+  put(root, '.gitignore', '.devai/state/\nrecord/proofs/\n');
   for (const [path, contents] of Object.entries(options.files ?? {})) put(root, path, contents);
   git(root, ['add', '.']);
   git(root, ['commit', '-qm', 'baseline']);
@@ -192,11 +187,11 @@ function fixture(options: FixtureOptions = {}): HostFixture {
     git(root, ['checkout', '-qb', `feature-${String(index)}`]);
     put(root, `feature-${String(index)}.txt`, `feature ${String(index)}\n`);
     const round = options.readings?.[index - 1];
-    if (round !== undefined) writeReadingsRound(root, round);
     git(root, ['add', '-A']);
     git(root, ['commit', '-qm', `feature ${String(index)}`]);
     git(root, ['checkout', '-q', 'main']);
     git(root, ['merge', '--no-ff', `feature-${String(index)}`, '-qm', `merge ${String(index)}`]);
+    if (round !== undefined) writeReadingsRound(root, round, git(root, ['rev-parse', 'HEAD']));
   }
   const mergeSha = git(root, ['rev-parse', 'HEAD']);
   const merges = git(root, [
@@ -645,16 +640,17 @@ describe('post-merge backlog deltas', () => {
 
     git(fx.root, ['checkout', '-qb', 'feature-2']);
     put(fx.root, 'feature-2.txt', 'feature 2\n');
-    writeReadingsRound(fx.root, [
-      reading('type_check', 'pass'),
-      reading('lint', 'fail'),
-      reading('security_scan', 'fail'),
-    ]);
-    git(fx.root, ['add', '-A', '--', 'feature-2.txt', READINGS_STORE]);
+    git(fx.root, ['add', '--', 'feature-2.txt']);
     git(fx.root, ['commit', '-qm', 'feature 2']);
     git(fx.root, ['checkout', '-q', 'main']);
     git(fx.root, ['merge', '--no-ff', 'feature-2', '-qm', 'merge 2']);
     const secondSha = git(fx.root, ['rev-parse', 'HEAD']);
+    writeReadingsRound(
+      fx.root,
+      [reading('type_check', 'pass'), reading('lint', 'fail'), reading('security_scan', 'fail')],
+      secondSha,
+    );
+
     const { signature_hmac_sha256: _signature, ...receipt } = JSON.parse(
       readFileSync(fx.receiptPath, 'utf8'),
     ) as JsonRecord;
@@ -727,7 +723,7 @@ describe('post-merge audit observation facade', () => {
 
   it('computes its scorecard from the canonical store exactly as audit scorecard does', async () => {
     const { root, at } = observationFixture();
-    writeReadingsRound(root, [reading('type_check', 'fail'), reading('lint', 'pass')]);
+    writeReadingsRound(root, [reading('type_check', 'fail'), reading('lint', 'pass')], at);
     put(
       root,
       'record/proofs/freshness/readings/sensors.json',

@@ -32,6 +32,8 @@ import { POST_MERGE_DECLARATION } from '../../src/post-merge-auditor/host-receip
 import { runWithAuthorityHostEffects, type AuthorityHostEffectRequest } from '@devai-nyx/authority';
 import { withAuthorityHostTestScope } from './authority-host-test-scope.js';
 import { disableGitAutoMaintenance } from './git-fixture-maintenance.js';
+import type { SensorReading } from '@devai-nyx/sensors';
+import { recordBoundScorecardReading } from '../../../loop/tests/helpers/scorecard-custody-fixture.js';
 
 const roots: string[] = [];
 const NOW = '2026-07-24T12:00:00.000Z';
@@ -126,20 +128,10 @@ function reading(kind: string, status: string): Record<string, unknown> {
   };
 }
 
-/**
- * The canonical readings store (ADR-SCR-0002). Each round replaces the store
- * with its readings at `<kind>/<id>.json`, the layout `sense record` writes.
- */
-const READINGS_STORE = '.devai/state/sensor-readings';
-
-function writeReadingsRound(root: string, round: readonly unknown[]): void {
-  rmSync(join(root, READINGS_STORE), { recursive: true, force: true });
+/** Append exact-candidate custody while preserving earlier immutable observations. */
+function writeReadingsRound(root: string, round: readonly unknown[], head: string): void {
   for (const entry of round) {
-    const { id, sensor } = entry as {
-      readonly id: string;
-      readonly sensor: { readonly kind: string };
-    };
-    put(root, `${READINGS_STORE}/${sensor.kind}/${id}.json`, `${JSON.stringify(entry, null, 2)}\n`);
+    recordBoundScorecardReading(root, entry as SensorReading, head);
   }
 }
 
@@ -151,6 +143,7 @@ function fixture(mergeCount = 1, readings: readonly (readonly unknown[])[] = [])
   const constitutionPath = put(root, 'law/constitution.md', '# Constitution\n');
   const policyPath = put(root, '.devai/config/authority-policy.json', '{}\n');
   put(root, 'README.md', 'baseline\n');
+  put(root, '.gitignore', '.devai/state/\nrecord/proofs/\n');
   git(root, ['add', '.']);
   git(root, ['commit', '-qm', 'baseline']);
   const baselineSha = git(root, ['rev-parse', 'HEAD']);
@@ -158,11 +151,11 @@ function fixture(mergeCount = 1, readings: readonly (readonly unknown[])[] = [])
     git(root, ['checkout', '-qb', `feature-${String(index)}`]);
     put(root, `feature-${String(index)}.txt`, `feature ${String(index)}\n`);
     const round = readings[index - 1];
-    if (round !== undefined) writeReadingsRound(root, round);
     git(root, ['add', '-A']);
     git(root, ['commit', '-qm', `feature ${String(index)}`]);
     git(root, ['checkout', '-q', 'main']);
     git(root, ['merge', '--no-ff', `feature-${String(index)}`, '-qm', `merge ${String(index)}`]);
+    if (round !== undefined) writeReadingsRound(root, round, git(root, ['rev-parse', 'HEAD']));
   }
   const mergeSha = git(root, ['rev-parse', 'HEAD']);
   const merges = git(root, [
@@ -444,16 +437,17 @@ describe('post-merge completed round identity', () => {
 
     git(fx.root, ['checkout', '-qb', 'feature-2']);
     put(fx.root, 'feature-2.txt', 'feature 2\n');
-    writeReadingsRound(fx.root, [
-      reading('type_check', 'pass'),
-      reading('lint', 'fail'),
-      reading('security_scan', 'fail'),
-    ]);
-    git(fx.root, ['add', '-A', '--', 'feature-2.txt', READINGS_STORE]);
+    git(fx.root, ['add', '--', 'feature-2.txt']);
     git(fx.root, ['commit', '-qm', 'feature 2']);
     git(fx.root, ['checkout', '-q', 'main']);
     git(fx.root, ['merge', '--no-ff', 'feature-2', '-qm', 'merge 2']);
     const secondSha = git(fx.root, ['rev-parse', 'HEAD']);
+    writeReadingsRound(
+      fx.root,
+      [reading('type_check', 'pass'), reading('lint', 'fail'), reading('security_scan', 'fail')],
+      secondSha,
+    );
+
     const { signature_hmac_sha256: _signature, ...receipt } = fx.receipt;
     writeFileSync(
       fx.receiptPath,

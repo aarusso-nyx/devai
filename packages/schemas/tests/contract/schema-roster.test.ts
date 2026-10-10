@@ -18,10 +18,13 @@ const ROOT = resolve(import.meta.dirname, '../../../..');
 // validates every stack-adapter.json through the roster, so stack-adapter.schema.json leaves the
 // source-only catalogue (#235); a source-only name throws in the packed runtime and no pack would
 // ever resolve. ADR-CHK-0007 adds test-task-exclusivity.schema.json, which the check runner
-// validates its scheduling declarations against. The count is 112.
+// validates its scheduling declarations against. ADR-SCR-0015 promotes the reviewed task
+// descriptor and its preflight-probe reference closure. The count is 114.
 describe('schema roster', () => {
-  it('holds the previous roster plus model-tiers, path-authority-classes, observation-backlog and the proof anchor schemas', () => {
-    expect(ROSTER).toHaveLength(112);
+  it('holds the previous roster and the reviewed sensor task descriptor reference closure', () => {
+    expect(ROSTER).toHaveLength(114);
+    expect(ROSTER).toContain('test-task-descriptor.schema.json');
+    expect(ROSTER).toContain('preflight-probe.schema.json');
     expect(ROSTER).toContain('test-task-exclusivity.schema.json');
     expect(ROSTER).toContain('stack-adapter.schema.json');
     expect(ROSTER).toContain('model-tiers.schema.json');

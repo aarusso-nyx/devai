@@ -338,13 +338,22 @@ describe('ADR-REL-0033: the scorecard route from the packed artifact', () => {
     } finally {
       renameSync(aside, controller);
     }
+    recordReading(earlier);
+    const earlierBytes = readFileSync(
+      join(fixture, STORE, 'inventory_api', `${String(earlier['id'])}.json`),
+      'utf8',
+    );
     const later = senseRunReading('inventory_api');
+    expect(later['supersedes']).toBe(earlier['id']);
     expect(earlier['status']).toBe('review');
     expect(later['status']).toBe('pass');
     expect(later['id']).not.toBe(earlier['id']);
     expect(String(later['timestamp']) > String(earlier['timestamp'])).toBe(true);
     recordReading(later);
     recordReading(earlier);
+    expect(
+      readFileSync(join(fixture, STORE, 'inventory_api', `${String(earlier['id'])}.json`), 'utf8'),
+    ).toBe(earlierBytes);
 
     const first = scorecard();
     const second = scorecard();
@@ -364,7 +373,7 @@ describe('ADR-REL-0033: the scorecard route from the packed artifact', () => {
     resetStore();
     const stale = readFileSync(join(FIXTURES, 'inventory-api-fail-stale.json'), 'utf8');
     expect(packedSchemaValidator()(JSON.parse(stale))).toBe(true);
-    placeInStore('inventory_api', 'SR-00000000000000a1.json', stale);
+    recordReading(JSON.parse(stale) as Record<string, unknown>);
 
     const cell = presenceCell(scorecard());
     expect(cell.verdict).toBe('REVIEW');

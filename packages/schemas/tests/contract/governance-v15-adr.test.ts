@@ -671,6 +671,7 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-MUT-0011',
       'ADR-MUT-0012',
       'ADR-MUT-0013',
+      'ADR-MUT-0014',
       'ADR-REL-0001',
       'ADR-REL-0002',
       'ADR-REL-0003',
@@ -718,15 +719,16 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-SCR-0012',
       'ADR-SCR-0013',
       'ADR-SCR-0014',
+      'ADR-SCR-0015',
       'ADR-SEC-0001',
     ]);
-    expect(records).toHaveLength(117);
+    expect(records).toHaveLength(119);
     expect(
       records.filter((record) => record.format === 'legacy-catalog').map((record) => record.adr_id),
     ).toEqual(['ADR-014', 'ADR-MUT-0005', 'ADR-REL-0017']);
     expect(records.filter((record) => record.adr_id === 'ADR-014')).toHaveLength(1);
-    expect(result.files_scanned).toBe(118);
-    expect(result.subject_authorities).toHaveLength(550);
+    expect(result.files_scanned).toBe(120);
+    expect(result.subject_authorities).toHaveLength(563);
     expect(result.effective_authorities).toEqual([
       'ADR-014',
       'ADR-AUT-0001',
@@ -781,7 +783,7 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-MUT-0010',
       'ADR-MUT-0011',
       'ADR-MUT-0012',
-      'ADR-MUT-0013',
+      'ADR-MUT-0014',
       'ADR-REL-0002',
       'ADR-REL-0004',
       'ADR-REL-0005',
@@ -822,8 +824,28 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-SCR-0012',
       'ADR-SCR-0013',
       'ADR-SCR-0014',
+      'ADR-SCR-0015',
       'ADR-SEC-0001',
     ]);
+    // ADR-MUT-0014 advances both active provenance subjects through a real supersession.
+    expect(result.adrs.find((row) => row.adr_id === 'ADR-MUT-0013')).toMatchObject({
+      effective: false,
+      effective_affected_rules: [],
+    });
+    for (const adrId of ['ADR-MUT-0014', 'ADR-SCR-0015']) {
+      const declared = records.find((record) => record.adr_id === adrId);
+      expect(declared?.affected_rules).toHaveLength(adrId === 'ADR-MUT-0014' ? 2 : 13);
+      expect(result.adrs.find((row) => row.adr_id === adrId)).toMatchObject({
+        effective: true,
+        effective_affected_rules: [...(declared?.affected_rules ?? [])].sort(),
+      });
+      expect(
+        result.subject_authorities
+          .filter((authority) => authority.effective_head === adrId)
+          .map((authority) => authority.subject)
+          .sort(),
+      ).toEqual([...(declared?.affected_rules ?? [])].sort());
+    }
     // ADR-AUT-0006 (#381): the accepted record is effective and adds one subject authority
     // for each of its eight affected rules.
     const pnpmShapes = records.find((record) => record.adr_id === 'ADR-AUT-0006');

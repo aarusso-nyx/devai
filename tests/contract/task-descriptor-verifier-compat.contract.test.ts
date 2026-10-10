@@ -232,20 +232,20 @@ function expectRefused(
 
 describe('committed descriptor selector kinds (ADR-CHK-0006 IA-001)', () => {
   it('declares the vendored verifier schema kind enum as the admitted set', () => {
-    const schema = readJson<unknown>(VENDORED_SCHEMA_PATH);
-    const enums: string[][] = [];
-    const visit = (value: unknown): void => {
-      if (Array.isArray(value)) value.forEach(visit);
-      else if (value !== null && typeof value === 'object') {
-        const record = value as Record<string, unknown>;
-        const kind = record['kind'] as { enum?: unknown } | undefined;
-        if (Array.isArray(kind?.enum)) enums.push(kind.enum as string[]);
-        Object.values(record).forEach(visit);
-      }
-    };
-    visit(schema);
-    expect(enums, 'the vendored schema declares one selector kind enum').toHaveLength(1);
-    expect([...admittedKinds()].sort()).toEqual([...(enums[0] ?? [])].sort());
+    const schema = readJson<{
+      $defs: { selector: { properties: { kind: { enum: string[] } } } };
+      properties: {
+        dynamicFallbackSelectors: { items: { $ref: string } };
+        tasks: { items: { properties: { inputSelectors: { items: { $ref: string } } } } };
+      };
+    }>(VENDORED_SCHEMA_PATH);
+    expect(schema.properties.dynamicFallbackSelectors.items.$ref).toBe('#/$defs/selector');
+    expect(schema.properties.tasks.items.properties.inputSelectors.items.$ref).toBe(
+      '#/$defs/selector',
+    );
+    expect([...admittedKinds()].sort()).toEqual(
+      [...schema.$defs.selector.properties.kind.enum].sort(),
+    );
   });
 
   it('uses only admitted kinds in every task and fallback selector', () => {

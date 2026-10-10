@@ -498,6 +498,7 @@ export function createLifecyclePolicyFixture(
     readonly current_version?: string;
     readonly target_version?: string;
     readonly adopter_dependency?: boolean;
+    readonly sensor_inputs?: Readonly<Record<string, unknown>>;
   } = {},
 ): LifecyclePolicyFixture {
   const checked = packageSnapshot(
@@ -518,6 +519,9 @@ export function createLifecyclePolicyFixture(
     schemaVersion: '1.0.0',
     policy_id: 'fixture.adopter-policy',
     policy_version: '1.0.0',
+    ...(candidateOptions.sensor_inputs === undefined
+      ? {}
+      : { sensor_inputs: candidateOptions.sensor_inputs }),
     release_verification: {
       schemaVersion: '1.0.0',
       policy_id: 'fixture.release-profile',

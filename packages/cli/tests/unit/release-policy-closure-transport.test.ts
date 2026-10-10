@@ -10,6 +10,7 @@ import {
   verifyReleasePolicyClosure,
   type ReleasePolicyClosure,
 } from '../../src/services/release-policy-closure.js';
+import { verifyReleaseCandidateSnapshot } from '../../src/services/release-candidate-snapshot.js';
 import { createLifecyclePolicyFixture } from '../helpers/release-policy-resolution-fixture.js';
 
 const LIMITS: ReleasePolicyClosureTransportLimits = {
@@ -65,6 +66,54 @@ function flipFirstByte(bytes: Uint8Array, message: string): void {
 }
 
 describe('release policy closure transport', () => {
+  it.each(['absent', 'managed-present', 'unmanaged-present'] as const)(
+    'replays exact optional sensor-input projection custody when %s',
+    (state) => {
+      const path = '.devai/config/sensor-inputs.json';
+      const sensorInputs = { schemaVersion: '1.0.0', inputs: {} };
+      const unmanagedBytes = Buffer.from(`${JSON.stringify(sensorInputs, null, 2)}\n`);
+      const fixture = createLifecyclePolicyFixture(
+        [],
+        {},
+        {
+          ...(state === 'managed-present' ? { sensor_inputs: sensorInputs } : {}),
+          ...(state === 'unmanaged-present' ? { files: new Map([[path, unmanagedBytes]]) } : {}),
+        },
+      );
+      const closure = createReleasePolicyClosure({
+        plan: fixture.receipt,
+        resolution: fixture.resolution,
+      });
+      const decoded = decodeReleasePolicyClosure(
+        encodeReleasePolicyClosure(closure, LIMITS),
+        LIMITS,
+      );
+      const replay = verify(fixture, decoded);
+      expect(replay.repository).toEqual(fixture.candidate.repository);
+      expect(replay.resolution).toEqual(fixture.resolution.resolution);
+      expect(decoded.plan).toEqual(fixture.receipt);
+      const candidate = verifyReleaseCandidateSnapshot({
+        repository: fixture.expected.repository,
+        objects: decoded.evidence.candidate_objects,
+        maximum_bytes: 4 * 1024 * 1024,
+        maximum_entries: 2000,
+      });
+      const binding = JSON.parse(
+        candidate.read('.devai/config/adopter-policy-binding.json').toString(),
+      ) as {
+        materialized: Record<string, string>;
+      };
+      expect(Object.hasOwn(binding.materialized, path)).toBe(state === 'managed-present');
+      expect(candidate.paths.includes(path)).toBe(state !== 'absent');
+      if (state !== 'absent') {
+        expect(candidate.read(path)).toEqual(fixture.candidate.read(path));
+      } else {
+        expect(() => candidate.read(path)).toThrow();
+      }
+      if (state === 'unmanaged-present') expect(candidate.read(path)).toEqual(unmanagedBytes);
+    },
+  );
+
   it('round-trips the producer closure and reconstructs the original semantic proof', () => {
     const { fixture, closure } = fixtureClosure();
     const decoded = decodeReleasePolicyClosure(encodeReleasePolicyClosure(closure, LIMITS), LIMITS);
