@@ -29,6 +29,8 @@ import {
 } from '../../src/post-merge-auditor/index.js';
 import { POST_MERGE_DECLARATION } from '../../src/post-merge-auditor/host-receipt.js';
 import { disableGitAutoMaintenance } from './git-fixture-maintenance.js';
+import type { SensorReading } from '@devai-nyx/sensors';
+import { recordBoundScorecardReading } from '../../../loop/tests/helpers/scorecard-custody-fixture.js';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -110,7 +112,7 @@ function boundCheckout(reading: JsonRecord): BoundCheckout {
   roots.push(root);
   git(root, ['init', '-q', '-b', 'main']);
   disableGitAutoMaintenance(root);
-  put(root, '.gitignore', '.devai/state/\n.devai/worktrees/\n');
+  put(root, '.gitignore', '.devai/state/\n.devai/worktrees/\nrecord/proofs/\n');
   const constitutionPath = put(root, 'law/constitution.md', '# Constitution\n');
   const policyPath = put(root, '.devai/config/authority-policy.json', '{}\n');
   put(root, 'README.md', 'baseline\n');
@@ -126,8 +128,7 @@ function boundCheckout(reading: JsonRecord): BoundCheckout {
   const mergeSha = git(root, ['rev-parse', 'HEAD']);
 
   // The recorded reading lives only in the bound checkout's ignored store.
-  const { id, sensor } = reading as { readonly id: string; readonly sensor: { kind: string } };
-  put(root, `${STORE}/${sensor.kind}/${id}.json`, `${JSON.stringify(reading, null, 2)}\n`);
+  recordBoundScorecardReading(root, reading as SensorReading, mergeSha);
   expect(git(root, ['status', '--porcelain', '--', STORE])).toBe('');
 
   const hookPath = put(root, '.git/hooks/post-merge', '#!/bin/sh\nexit 0\n');

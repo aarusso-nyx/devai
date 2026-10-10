@@ -1,3 +1,6 @@
+import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { CAC } from 'cac';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EXIT_GATE, EXIT_PASS, EXIT_REVIEW, EXIT_USAGE } from '@devai-nyx/utils';
@@ -27,6 +30,13 @@ interface Capture {
 }
 
 let invoke: (kind: string | undefined, options: Options) => Promise<void>;
+const roots: string[] = [];
+function fixtureRoot(): string {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'devai-sense-command-root-')));
+  roots.push(root);
+  return root;
+}
+
 const originalExitCode = process.exitCode;
 const originalStdout = process.stdout.write;
 const originalStderr = process.stderr.write;
@@ -58,6 +68,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
   declareSelfDogfoodInvocation(undefined);
   process.exitCode = originalExitCode;
   process.stdout.write = originalStdout;
@@ -101,7 +112,7 @@ describe('sense run command boundaries', () => {
   });
 
   it('resolves an exact kind and preset without executing adapters in dry-run mode', async () => {
-    const kind = await run('type_check', { dryRun: true, repoRoot: '/unused' });
+    const kind = await run('type_check', { dryRun: true, repoRoot: fixtureRoot() });
     expect(kind.stderr).toBe('');
     expect(kind.exit).toBe(EXIT_PASS);
     expect(JSON.parse(kind.stdout)).toMatchObject({
@@ -130,15 +141,16 @@ describe('sense run command boundaries', () => {
     }));
     mocks.sensorAdapter.mockReturnValue(adapter);
 
+    const repoRoot = fixtureRoot();
     const result = await run('type_check', {
-      repoRoot: '/owned/repository',
+      repoRoot,
       input: '{"project":"cli"}',
     });
     expect(result.stderr).toBe('');
     expect(result.exit).toBe(EXIT_PASS);
     expect(mocks.sensorAdapter).toHaveBeenCalledWith('type_check');
     expect(adapter).toHaveBeenCalledWith({
-      repoRoot: '/owned/repository',
+      repoRoot,
       inputs: { project: 'cli' },
     });
     expect(JSON.parse(result.stdout)).toMatchObject({
