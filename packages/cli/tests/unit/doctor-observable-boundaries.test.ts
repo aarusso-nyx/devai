@@ -268,7 +268,7 @@ describe('Doctor observable filesystem boundaries', () => {
     const version = check((await report(mismatch)).report, 'devai-version-match');
     expect(version).toMatchObject({
       ok: false,
-      info: { pinned: '0.0.0', running: '2.3.2' },
+      info: { pinned: '0.0.0', running: '2.4.0' },
     });
     expect(version.errors?.join('\n')).toContain('does not match');
   });

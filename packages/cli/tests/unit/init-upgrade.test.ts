@@ -891,3 +891,86 @@ describe('#390: init upgrade rebinds a 2.3.1 observation workflow to the script-
     );
   }, 180_000);
 });
+
+describe('ADR-SCR-0015: init upgrade from 2.3.2 to 2.4.0', () => {
+  it('projects opted-in sensor inputs, rebinds the task template, and repeats without a byte change', async () => {
+    const repo = await stynxAt160(true);
+    expect((await runCli(WRITE(repo))).exit).toBe(0);
+    const project = json(repo, '.devai/config/project.json');
+    put(repo, '.devai/config/project.json', { ...project, devai_version: '2.3.2' });
+    const adapter = json(repo, '.devai/config/github-actions-host-adapter.json');
+    put(repo, '.devai/config/github-actions-host-adapter.json', {
+      ...adapter,
+      adapter_version: '2.3.2',
+      package_binding: { name: '@aarusso-nyx/devai', version: '2.3.2' },
+    });
+    const effectsPath = '.devai/config/subprocess-effects.json';
+    const effects = json(repo, effectsPath);
+    put(repo, effectsPath, {
+      ...effects,
+      templates: (effects['templates'] as JsonObject[]).filter(
+        (template) => template['template_id'] !== 'declared-sensor-task',
+      ),
+    });
+    const sensorInputs = {
+      schemaVersion: '1.0.0',
+      inputs: { inventory_routes: { framework: 'angular', scanDirs: ['apps/angular'] } },
+    };
+    mkdirSync(join(repo, 'apps/angular'), { recursive: true });
+    put(repo, SOURCE, {
+      ...json(repo, SOURCE),
+      policy_version: '1.1.0',
+      sensor_inputs: sensorInputs,
+    });
+    rmSync(join(repo, RECEIPT));
+    const before = snapshot(repo);
+    const planned = await runCli(PLAN(repo));
+    expect(planned.exit, planned.stderr).toBe(0);
+    expect(snapshot(repo)).toEqual(before);
+    const plan = value(planned)['plan'] as JsonObject;
+    expect(plan).toMatchObject({ from: '2.3.2', to: '2.4.0', status: 'ready' });
+    expect((plan['releases'] as JsonObject[]).map((release) => release['version'])).toEqual([
+      '2.4.0',
+    ]);
+    expect(plan['changed_files']).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: '.devai/config/sensor-inputs.json',
+          segment: 'adopter-policy',
+        }),
+        expect.objectContaining({ path: effectsPath, segment: 'subprocess-effects' }),
+      ]),
+    );
+    const applied = await runCli(WRITE(repo));
+    expect(applied.exit, applied.stderr).toBe(0);
+    expect(json(repo, '.devai/config/sensor-inputs.json')).toEqual(sensorInputs);
+    const binding = json(repo, '.devai/config/adopter-policy-binding.json');
+    expect(
+      (binding['materialized'] as Record<string, string>)['.devai/config/sensor-inputs.json'],
+    ).toBe(
+      createHash('sha256')
+        .update(readFileSync(join(repo, '.devai/config/sensor-inputs.json')))
+        .digest('hex'),
+    );
+    expect(
+      (json(repo, effectsPath)['templates'] as JsonObject[]).filter(
+        (template) => template['template_id'] === 'declared-sensor-task',
+      ),
+    ).toHaveLength(1);
+    expect(json(repo, RECEIPT)).toMatchObject({
+      from: '2.3.2',
+      to: '2.4.0',
+      migrations: ['MIG-2.4.0-sensor-inputs-projection', 'MIG-2.4.0-declared-sensor-task-template'],
+      postchecks: [
+        { name: 'policy-materialization-current', ok: true },
+        { name: 'authority-enforcement', ok: true },
+        { name: 'constitution-binding', ok: true },
+      ],
+    });
+    const settled = snapshot(repo);
+    const again = await runCli(WRITE(repo));
+    expect(again.exit, again.stderr).toBe(0);
+    expect((value(again)['plan'] as JsonObject)['status']).toBe('no-op');
+    expect(snapshot(repo)).toEqual(settled);
+  }, 180_000);
+});

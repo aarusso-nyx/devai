@@ -1,4 +1,6 @@
 import type { CAC } from 'cac';
+import { realpathSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EXIT_PASS, EXIT_USAGE } from '@devai-nyx/utils';
 import type { SensorKind } from '@devai-nyx/sensors';
@@ -245,13 +247,14 @@ describe('CLI shard 09 sense run set execution', () => {
     expect(defaulted).toMatchObject({ stderr: '', exit: EXIT_PASS });
     // ADR-SCR-0005: the repository root declares a type_check argv, which reaches the adapter.
     expect(adapter).toHaveBeenLastCalledWith({
-      repoRoot: '.',
+      repoRoot: realpathSync('.'),
       inputs: { argv: ['npx', 'tsc', '--noEmit', '-p', 'tsconfig.typecheck.json'] },
     });
 
-    const explicit = await run('type_check', { repoRoot: '/repo', input: '{"value":false}' });
+    const explicitRoot = realpathSync(tmpdir());
+    const explicit = await run('type_check', { repoRoot: explicitRoot, input: '{"value":false}' });
     expect(explicit).toMatchObject({ stderr: '', exit: EXIT_PASS });
-    expect(adapter).toHaveBeenLastCalledWith({ repoRoot: '/repo', inputs: { value: false } });
+    expect(adapter).toHaveBeenLastCalledWith({ repoRoot: explicitRoot, inputs: { value: false } });
 
     for (const [kind, options] of [
       [undefined, {}],

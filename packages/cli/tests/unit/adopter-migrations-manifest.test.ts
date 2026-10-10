@@ -60,6 +60,7 @@ describe('#264: the adopter migration manifest', () => {
       '2.3.0',
       '2.3.1',
       '2.3.2',
+      '2.4.0',
     ]);
     expect(manifest.releases.find((release) => release.version === '2.3.0')).toMatchObject({
       version: '2.3.0',
@@ -74,10 +75,10 @@ describe('#264: the adopter migration manifest', () => {
       'MIG-2.3.1-subprocess-effects-pnpm-shapes',
     ]);
     // #390: the 2.3.2 observation install rebind is released.
-    const latest = manifest.releases.at(-1);
-    expect(latest).toMatchObject({ version: '2.3.2', status: 'released' });
-    expect(latest).toHaveProperty('date', '2026-10-10');
-    expect(latest?.changes).toEqual([
+    const previous = manifest.releases.find((release) => release.version === '2.3.2');
+    expect(previous).toMatchObject({ version: '2.3.2', status: 'released' });
+    expect(previous).toHaveProperty('date', '2026-10-10');
+    expect(previous?.changes).toEqual([
       expect.objectContaining({
         id: 'MIG-2.3.2-observation-install-ignore-scripts',
         kind: 'rebind',
@@ -87,6 +88,28 @@ describe('#264: the adopter migration manifest', () => {
           '.github/workflows/devai-main-observation.yml',
           '.devai/config/github-actions-host-adapter.json',
         ],
+      }),
+    ]);
+    const latest = manifest.releases.at(-1);
+    expect(latest).toMatchObject({ version: '2.4.0', status: 'released', date: '2026-10-10' });
+    expect(latest?.changes).toEqual([
+      expect.objectContaining({
+        id: 'MIG-2.4.0-sensor-inputs-projection',
+        kind: 'opt-in-capability',
+        decision_records: ['ADR-SCR-0015', 'ADR-CFG-0002', 'ADR-AUT-0002'],
+        segments: ['adopter-policy'],
+        files: [
+          '.devai/config/sensor-inputs.json',
+          '.devai/config/adopter-policy-binding.json',
+          'test-tasks.json',
+        ],
+      }),
+      expect.objectContaining({
+        id: 'MIG-2.4.0-declared-sensor-task-template',
+        kind: 'rebind',
+        decision_records: ['ADR-SCR-0015'],
+        segments: ['subprocess-effects'],
+        files: ['.devai/config/subprocess-effects.json'],
       }),
     ]);
   });
@@ -140,6 +163,9 @@ describe('#264: the adopter migration manifest', () => {
     expect(planned('2.3.0', '2.3.2')).toEqual(['2.3.1', '2.3.2']);
     expect(planned('2.3.1', '2.3.2')).toEqual(['2.3.2']);
     expect(planned('2.3.2', '2.3.2')).toEqual([]);
+    expect(planned('2.3.2', '2.4.0')).toEqual(['2.4.0']);
+    expect(planned('2.3.1', '2.4.0')).toEqual(['2.3.2', '2.4.0']);
+    expect(planned('2.4.0', '2.4.0')).toEqual([]);
     expect(releasesInRange(manifest, '1.6.0', '1.9.0').map((release) => release.version)).toEqual([
       '1.7.0',
       '1.8.0',

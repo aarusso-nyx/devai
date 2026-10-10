@@ -26,6 +26,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createAuthorityHostBroker } from '../../src/authority/broker.js';
 import { canonicalRegistry } from '../../src/define-command.js';
 import { resolveCliVersion } from '../../src/version.js';
+import { runWithResolvedSensorMember } from '../../src/authority/sensor-member.js';
 
 const ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 const entries = canonicalRegistry();
@@ -986,5 +987,62 @@ describe('npx eslint --format=json path operand (#386)', () => {
     ['--config', '--config'],
   ] as const)('refuses the option %s in the path position', (_label, option) => {
     expectRefusedBeforeStart('lint', 'npx', ['eslint', '--format=json', option]);
+  });
+});
+
+// ADR-SCR-0015: a preset's trusted resolved member controls literal process admission.
+describe('trusted preset member process identity', () => {
+  function presetDecision(member: string, args: readonly string[]) {
+    const host = createAuthorityHostBroker({
+      entry: senseRun,
+      entries,
+      argv: [process.execPath, 'devai', 'sense', 'run', '--preset', 'sweep'],
+      role: 'auditor',
+      declaration: { as_role: 'auditor' },
+      repository_root: ROOT,
+      package_version: resolveCliVersion(),
+      bootstrap_policy: true,
+    });
+    const start = vi.fn(() => 'started');
+    try {
+      let result: unknown;
+      let error: unknown;
+      try {
+        result = runWithResolvedSensorMember(member, () =>
+          host.scope.apply_effect(effect('pnpm', args), start),
+        );
+      } catch (caught) {
+        error = caught;
+      }
+      return { result, error, starts: start.mock.calls.length };
+    } finally {
+      host.dispose();
+    }
+  }
+  it.each([
+    ['type_check', TYPECHECK],
+    ['perf_test', TEST_PERF],
+  ] as const)('admits the exact literal for resolved %s inside a preset', (member, args) => {
+    expect(presetDecision(member, args)).toEqual({
+      result: 'started',
+      error: undefined,
+      starts: 1,
+    });
+  });
+  it.each([
+    ['inventory_api', TYPECHECK],
+    ['perf_test', TYPECHECK],
+    ['type_check', TEST_PERF],
+    ['type_check', [...TYPECHECK, '--filter', 'client']],
+    ['perf_test', [...TEST_PERF, '--', '--bail']],
+  ] as const)('refuses wrong-member or extra argv %s %j before start', (member, args) => {
+    const decision = presetDecision(member, args);
+    expect(decision.starts).toBe(0);
+    expect(decision.result).toBeUndefined();
+    expect(decision.error).toBeDefined();
+  });
+  it('does not leak a prior member into the next ordinary broker call', () => {
+    expect(presetDecision('type_check', TYPECHECK).starts).toBe(1);
+    expectRefusedBeforeStart('inventory_api', 'pnpm', [...TYPECHECK]);
   });
 });

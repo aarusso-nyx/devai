@@ -523,6 +523,53 @@ describe('IA-004: idempotent binding', () => {
 // ---------------------------------------------------------------------------
 
 describe('IA-003: atomic projection and receipt', () => {
+  it('recovers an interrupted sensor-input target replacement with its matching receipt digest', async () => {
+    const target = '.devai/config/sensor-inputs.json';
+    const original = {
+      schemaVersion: '1.0.0',
+      inputs: { inventory_routes: { framework: 'react' } },
+    };
+    const next = {
+      schemaVersion: '1.0.0',
+      inputs: { inventory_routes: { framework: 'angular', scanDirs: ['apps/web/src'] } },
+    };
+    async function changing() {
+      const repo = adopterRepo(baseProject());
+      await expectBound(repo, policy({ sensor_inputs: original }));
+      const previous = bytesOf(repo, [...PAIR, target]);
+      put(repo, SOURCE, policy({ policy_version: '1.1.0', sensor_inputs: next }));
+      return { repo, previous };
+    }
+    const probe = await changing();
+    seam.recording = true;
+    await expectBound(probe.repo);
+    const index = seam.log.findIndex(
+      (mutation) => mutation.op === 'renameSync' && mutation.paths[1] === join(probe.repo, target),
+    );
+    disarm();
+    expect(index).toBeGreaterThanOrEqual(0);
+
+    const { repo, previous } = await changing();
+    arm(index + 1);
+    try {
+      await bind(repo);
+    } catch {
+      /* Frozen process cannot roll back. */
+    }
+    disarm();
+    expect(bytesOf(repo, [...PAIR, target])).toEqual(previous);
+    const blocked = await bind(repo);
+    expect(blocked.stderr).toContain('INIT_UPGRADE_LOCKED');
+    fs.rmSync(join(repo, LOCK));
+    await expectBound(repo);
+    expect(readJson(repo, target)).toEqual(next);
+    expect(pairIsComplete(repo)).toBe(true);
+    expect((readJson(repo, BINDING)['materialized'] as JsonObject)[target]).toBe(
+      sha256(fs.readFileSync(join(repo, target))),
+    );
+    expect(await doctorCheck(repo, 'policy-materialization-current')).toMatchObject({ ok: true });
+  });
+
   it('stages every target and the receipt, then renames them into place', async () => {
     const { repo } = await retiringFixture();
 
