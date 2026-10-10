@@ -287,7 +287,8 @@
     },
     {
       "version": "2.3.2",
-      "status": "unreleased",
+      "status": "released",
+      "date": "2026-10-10",
       "changes": [
         {
           "id": "MIG-2.3.2-observation-install-ignore-scripts",
