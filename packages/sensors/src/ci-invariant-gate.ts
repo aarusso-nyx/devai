@@ -1117,6 +1117,22 @@ function tarFiles(b: Buffer): TarFile[] {
   return files;
 }
 const sites = new WeakMap<object, readonly TarFile[]>();
+function orderedSiteMembers(files: readonly TarFile[]): SiteMember[] {
+  return files
+    .map((f) => ({ path: f.path, size: f.bytes.length, sha256: evidenceSha256(f.bytes) }))
+    .sort((a, b) => {
+      // Match siteMembers' depth-first traversal of default-sorted sibling names.
+      const left = a.path.split('/'),
+        right = b.path.split('/');
+      for (const [index, segment] of left.entries()) {
+        const other = right[index];
+        if (other === undefined) return 1;
+        if (segment < other) return -1;
+        if (segment > other) return 1;
+      }
+      return left.length - right.length;
+    });
+}
 /**
  * The bounded member population carried by a Pages archive itself. It is not authority on its
  * own: validateSitePreparationArtifact still binds it to the read-only preparation siteSha256.
@@ -1127,9 +1143,7 @@ export function siteArchiveMembers(raw: Uint8Array): readonly SiteMember[] {
   demand(
     files.length <= 20000 && files.reduce((sum, file) => sum + file.bytes.length, 0) <= 512 * MiB,
   );
-  return files
-    .map((f) => ({ path: f.path, size: f.bytes.length, sha256: evidenceSha256(f.bytes) }))
-    .sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+  return orderedSiteMembers(files);
 }
 export function validateSitePreparationArtifact(
   input: unknown,
@@ -1160,9 +1174,7 @@ export function validateSitePreparationArtifact(
     demand(
       files.length <= 20000 && files.reduce((sum, file) => sum + file.bytes.length, 0) <= 512 * MiB,
     );
-    const members = files
-      .map((f) => ({ path: f.path, size: f.bytes.length, sha256: evidenceSha256(f.bytes) }))
-      .sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+    const members = orderedSiteMembers(files);
     demand(
       same(members, a.members) &&
         evidenceSha256(Buffer.from(JSON.stringify(members))) === a.siteSha256,
