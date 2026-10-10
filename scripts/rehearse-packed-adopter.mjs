@@ -365,18 +365,51 @@ function checkSelection(template) {
   } finally {
     renameSync(aside, controller);
   }
+  const unlinkedLater = senseRunReading(RECORDED_KIND);
+  const readingPath = (reading) => join(STORE, RECORDED_KIND, `${String(reading.id)}.json`);
+  let ambiguous = false;
+  if (earlier !== undefined && unlinkedLater !== undefined && earlier.id !== unlinkedLater.id) {
+    const earlierRecorded = recordReading(earlier);
+    const laterRecorded = recordReading(unlinkedLater);
+    const refused = scorecard();
+    ambiguous =
+      earlierRecorded.endsWith(readingPath(earlier)) &&
+      laterRecorded.endsWith(readingPath(unlinkedLater)) &&
+      earlier.supersedes === undefined &&
+      unlinkedLater.supersedes === undefined &&
+      refused.status !== 0 &&
+      refused.stdout === '' &&
+      refused.stderr.includes(`SCORECARD_READING_AMBIGUOUS:${RECORDED_KIND}`);
+  }
+  record('route:ambiguous', 'RELEASE_PACKED_ADOPTER_AMBIGUOUS_READING_ACCEPTED', ambiguous);
+
+  // Current-head observations supersede through an explicit link, never merely
+  // through their timestamps. Record the predecessor before measuring its successor.
+  resetStore();
+  const earlierRecorded = earlier === undefined ? '' : recordReading(earlier);
+  const earlierPath = earlier === undefined ? '' : join(fixture, readingPath(earlier));
+  const earlierBytes =
+    earlierPath !== '' && existsSync(earlierPath) ? readFileSync(earlierPath) : undefined;
   const later = senseRunReading(RECORDED_KIND);
   let ok =
     earlier !== undefined &&
     later !== undefined &&
+    earlierRecorded.endsWith(readingPath(earlier)) &&
+    earlierBytes !== undefined &&
     earlier.id !== later.id &&
+    later.supersedes === earlier.id &&
     String(later.timestamp) > String(earlier.timestamp);
   if (ok) {
-    recordReading(later);
-    recordReading(earlier);
+    const laterRecorded = recordReading(later);
+    const earlierRecordedAgain = recordReading(earlier);
     const first = scorecard();
     const second = scorecard();
     ok =
+      laterRecorded.endsWith(readingPath(later)) &&
+      earlierRecordedAgain.endsWith(readingPath(earlier)) &&
+      earlierBytes.equals(readFileSync(earlierPath)) &&
+      first.status === 0 &&
+      second.status === 0 &&
       first.stdout === second.stdout &&
       JSON.stringify(cellOf(first)?.sensor_readings ?? []) === JSON.stringify([later.id]) &&
       JSON.stringify(cellOf(second)?.sensor_readings ?? []) === JSON.stringify([later.id]);
@@ -391,10 +424,13 @@ function checkSelection(template) {
       timestamp: '2000-01-01T00:00:00.000Z',
     };
     delete stale.findings;
-    placeInStore(RECORDED_KIND, `${stale.id}.json`, `${JSON.stringify(stale)}\n`);
+    const staleRecorded = recordReading(stale);
+    const staleCustody = staleRecorded.endsWith(readingPath(stale));
+    record('route:stale-custody', 'RELEASE_PACKED_ADOPTER_STALE_CUSTODY_MISSING', staleCustody);
     const cell = cellOf(scorecard());
     ok =
       ok &&
+      staleCustody &&
       packedValidator()(stale) &&
       cell !== undefined &&
       cell.verdict !== 'PASS' &&
