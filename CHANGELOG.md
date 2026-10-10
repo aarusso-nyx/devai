@@ -1,5 +1,34 @@
 # Changelog
 
+## 2.3.2 — 2026-10-10
+
+DEVAI 2.3.2 is a patch release. It fixes predecessor observation selection, proves the generated
+adopter workflows through reviewed step digests, and makes malformed toolchain and missing inventory
+inputs report their declared diagnostics. No commit since v2.3.1 carries a feature type or the
+breaking marker, so the commit grammar's bump floor is patch. The action set stays at 69. One adopter
+migration entry covers the observation workflow change.
+
+- Adopter migration (`init upgrade` from 2.3.1):
+  - `MIG-2.3.2-observation-install-ignore-scripts` (rebind, host adapters). The regenerated
+    `devai-main-observation.yml` installs dependencies with
+    `pnpm install --frozen-lockfile --ignore-scripts`. Rebinding the adapter updates the workflow
+    and its receipt. DEVAI's observation must not require dependencies that need install scripts
+    to build (#390, #395).
+- `audit observe` skips a predecessor whose commit is provably absent from a complete repository
+  history (#389, #393). An absent commit in a shallow history, or an undecidable ancestry read,
+  still refuses observation. An explicitly supplied previous commit that is not an ancestor
+  remains a refusal.
+- `harness_coherence` proves generated adopter workflow steps by their reviewed digests (#390,
+  #395). The observation install cannot execute lifecycle scripts. Any present pnpm hook entry,
+  including an unreadable or escaping path, remains unproved and fails closed.
+- The CI scaffold reports `CI_SCAFFOLD_ACTION_PINS_INVALID` when the toolchain defaults cannot
+  be parsed (#391, #394). Missing inventory input messages name every location read and the
+  `inventory_regeneration` producer, so adopters can identify the required regeneration step.
+- Consumer install guidance is pinned to the published 2.3.1 (#392). It moves to 2.3.2 after
+  publication.
+- Release: this release is verified by the trusted local-RC verifier `@aarusso-nyx/devai@1.9.0`,
+  unchanged.
+
 ## 2.3.1 — 2026-10-09
 
 DEVAI 2.3.1 is a patch release. It fixes four sensor and generator defects that STYNX reported
