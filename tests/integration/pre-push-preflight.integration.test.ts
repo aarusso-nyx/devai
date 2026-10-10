@@ -198,6 +198,106 @@ describe('pre-push preflight (TASK-0727)', () => {
   );
 
   it(
+    'passes a signed annotated tag at HEAD after checking its commit range and affected tree',
+    () => {
+      const { work, base } = fixture();
+      cleanCommit(work, 'signed-tag');
+      script(work, 0, PASSING);
+      const key = join(work, '.devai/state/tag-signing-key');
+      const generated = run(work, 'ssh-keygen', ['-q', '-t', 'ed25519', '-N', '', '-f', key]);
+      expect(generated.status, generated.output).toBe(0);
+      git(work, 'config', 'gpg.format', 'ssh');
+      git(work, 'config', 'user.signingkey', key);
+      git(work, 'tag', '-s', 'v-signed', '-m', 'Disposable signed release tag');
+      const head = git(work, 'rev-parse', 'HEAD');
+      const tag = git(work, 'rev-parse', 'refs/tags/v-signed');
+      expect(tag).not.toBe(head);
+      expect(git(work, 'rev-parse', 'refs/tags/v-signed^{commit}')).toBe(head);
+      expect(git(work, 'cat-file', '-p', tag)).toContain('-----BEGIN SSH SIGNATURE-----');
+
+      const result = run(work, 'git', ['push', 'origin', 'refs/tags/v-signed']);
+
+      expect(result.status, result.output).toBe(0);
+      expect(result.output).toContain('commit range and affected check passed');
+      const invoked = calls(work);
+      expect(invoked).toHaveLength(1);
+      const [args = []] = invoked;
+      expect(args[args.indexOf('--base') + 1]).toBe(base);
+      expect(git(work, 'ls-remote', 'origin', 'refs/tags/v-signed')).toContain(tag);
+      expect(git(work, 'ls-remote', 'origin', 'refs/tags/v-signed^{}')).toContain(head);
+    },
+    PUSH_TIMEOUT_MS,
+  );
+
+  it(
+    'passes a lightweight tag at HEAD after checking its commit range and affected tree',
+    () => {
+      const { work, base } = fixture();
+      cleanCommit(work, 'lightweight-tag');
+      script(work, 0, PASSING);
+      git(work, 'tag', 'v-lightweight');
+      const head = git(work, 'rev-parse', 'HEAD');
+
+      const result = run(work, 'git', ['push', 'origin', 'refs/tags/v-lightweight']);
+
+      expect(result.status, result.output).toBe(0);
+      expect(result.output).toContain('commit range and affected check passed');
+      const invoked = calls(work);
+      expect(invoked).toHaveLength(1);
+      const [args = []] = invoked;
+      expect(args[args.indexOf('--base') + 1]).toBe(base);
+      expect(git(work, 'ls-remote', 'origin', 'refs/tags/v-lightweight')).toContain(head);
+    },
+    PUSH_TIMEOUT_MS,
+  );
+
+  it(
+    'refuses an annotated tag targeting another commit before fetching or checking',
+    () => {
+      const { work, base } = fixture();
+      cleanCommit(work, 'tag-elsewhere');
+      script(work, 0, PASSING);
+      git(work, 'tag', '-a', 'v-elsewhere', base, '-m', 'Tag the previous commit');
+      expect(existsSync(join(work, '.git/FETCH_HEAD'))).toBe(false);
+
+      const result = run(work, 'git', ['push', 'origin', 'refs/tags/v-elsewhere']);
+
+      expect(result.status, result.output).not.toBe(0);
+      expect(result.output).toContain('refs/tags/v-elsewhere');
+      expect(result.output).toMatch(/check out/u);
+      expect(calls(work), 'the affected check never starts').toEqual([]);
+      expect(existsSync(join(work, '.git/FETCH_HEAD')), 'the hook never fetches').toBe(false);
+      expect(git(work, 'ls-remote', 'origin', 'refs/tags/v-elsewhere')).toBe('');
+    },
+    PUSH_TIMEOUT_MS,
+  );
+
+  it.each(['blob', 'tree', 'annotated-blob'] as const)(
+    'refuses a tag targeting a %s object before fetching or checking',
+    (kind) => {
+      const { work } = fixture();
+      cleanCommit(work, `noncommit-${kind}`);
+      script(work, 0, PASSING);
+      const object = git(work, 'rev-parse', kind === 'tree' ? 'HEAD^{tree}' : 'HEAD:README.md');
+      if (kind === 'annotated-blob') {
+        git(work, 'tag', '-a', 'v-noncommit', object, '-m', 'Tag a non-commit object');
+      } else {
+        git(work, 'update-ref', 'refs/tags/v-noncommit', object);
+      }
+      expect(existsSync(join(work, '.git/FETCH_HEAD'))).toBe(false);
+
+      const result = run(work, 'git', ['push', 'origin', 'refs/tags/v-noncommit']);
+
+      expect(result.status, result.output).not.toBe(0);
+      expect(result.output).toContain('refs/tags/v-noncommit');
+      expect(calls(work), 'the affected check never starts').toEqual([]);
+      expect(existsSync(join(work, '.git/FETCH_HEAD')), 'the hook never fetches').toBe(false);
+      expect(git(work, 'ls-remote', 'origin', 'refs/tags/v-noncommit')).toBe('');
+    },
+    PUSH_TIMEOUT_MS,
+  );
+
+  it(
     'refuses a range that fails the commit grammar before any check runs, naming the commit',
     () => {
       const { work } = fixture();
