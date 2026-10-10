@@ -184,7 +184,9 @@ describe('complete schema canon filesystem checks', () => {
     // moves it from the source-only catalogue into the runtime roster.
     // #235 moves stack-adapter.schema.json into the runtime roster for the pack resolver.
     // ADR-CHK-0007 adds test-task-exclusivity.schema.json for the parallel check runner.
-    expect(ROSTER).toHaveLength(112);
+    expect(ROSTER).toHaveLength(114);
+    expect(ROSTER).toContain('test-task-descriptor.schema.json');
+    expect(ROSTER).toContain('preflight-probe.schema.json');
     expect(report).toMatchObject({ ok: true, canonical_total: 126, findings: [] });
   });
   it.each(['missing-source-only', 'missing-runtime', 'unexpected'] as const)(
