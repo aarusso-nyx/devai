@@ -358,7 +358,7 @@ export function resolveReleasePolicySnapshot(input: {
       ...new Set([
         BINDING,
         parsedBinding.binding.source_path,
-        ...ADOPTER_POLICY_TARGETS,
+        ...ADOPTER_POLICY_TARGETS.filter((path) => candidate.paths.includes(path)),
         PIN,
         locks.package_manifest.path,
         ...locks.lockfiles.map((lock) => lock.path),
