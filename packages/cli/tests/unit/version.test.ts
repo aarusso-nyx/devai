@@ -8,7 +8,7 @@ import { canonicalRegistry } from '../../src/define-command.js';
 import { resolveCliProvenance, resolveCliVersion } from '../../src/version.js';
 
 const ROOT = resolve(import.meta.dirname, '../../../..');
-const CANDIDATE_RELEASE_VERSION = '2.3.2';
+const CANDIDATE_RELEASE_VERSION = '2.4.0';
 const PUBLISHED_RELEASE_VERSION = '2.3.2';
 const TRUSTED_VERIFIER_PACKAGE_VERSION = '1.9.0';
 const VENDORED_PROVENANCE = 'packages/cli/vendor/evidence-verification/provenance.json';
@@ -17,10 +17,10 @@ const TRUSTED_VERIFIER = {
   sourceCommit: '8b215d706a828af7361f9c6799b9cb0a30c9d00b',
   provenanceSha256: '302161f378e54d0a2b14b743a68577f4bfc43a147a1f17568941e08e14e767a0',
 } as const;
-// The in-repository vendored copy, re-vendored at step 2 for ADR-REL-0031.
+// The in-repository vendored copy, re-vendored at step 2 for ADR-SCR-0015.
 const VENDORED_VERIFIER = {
-  sourceCommit: '8b215d706a828af7361f9c6799b9cb0a30c9d00b',
-  provenanceSha256: '302161f378e54d0a2b14b743a68577f4bfc43a147a1f17568941e08e14e767a0',
+  sourceCommit: 'ad790aea6f200412da79a3a1bfbaa03cbdb47a2d',
+  provenanceSha256: 'fc79da07d4d4dfa466548337a4944ae1b7e0bfdcf2f1c334b341bb1ad477cd4d',
   payloadFileCount: 26,
 } as const;
 
@@ -181,12 +181,12 @@ describe('resolveCliVersion', () => {
     }
   });
 
-  it('binds the trusted pin to the vendored copy once the step-4 repin lands', () => {
+  it('keeps the trusted published verifier pin during the next vendoring step', () => {
     // Repin order (ADR-REL-0031, release-discipline.md): the vendored copy is rewritten at
     // step 2, a release ships it under the still-pinned verifier at step 3, and only a
     // law(release) change at step 4 moves the trusted pin. Between steps 2 and 4 the two
-    // identities differ by design; step 4 (the 1.9.0 repin, #243) makes them equal again
-    // until the next re-vendor opens step 2.
+    // identities differ by design. This candidate starts the next step 2 while the
+    // trusted published 1.9.0 identity remains unchanged.
     const policy = JSON.parse(
       readFileSync(join(ROOT, 'law/policy/trusted-local-rc-verifier-package.json'), 'utf8'),
     ) as {
@@ -207,8 +207,8 @@ describe('resolveCliVersion', () => {
     expect(policy.verifier.source_commit).toBe(TRUSTED_VERIFIER.sourceCommit);
     const vendoredBytes = readFileSync(join(ROOT, VENDORED_PROVENANCE));
     expect(sha256(vendoredBytes)).toBe(VENDORED_VERIFIER.provenanceSha256);
-    expect(VENDORED_VERIFIER.provenanceSha256).toBe(TRUSTED_VERIFIER.provenanceSha256);
-    expect(VENDORED_VERIFIER.sourceCommit).toBe(TRUSTED_VERIFIER.sourceCommit);
+    expect(VENDORED_VERIFIER.provenanceSha256).not.toBe(TRUSTED_VERIFIER.provenanceSha256);
+    expect(VENDORED_VERIFIER.sourceCommit).not.toBe(TRUSTED_VERIFIER.sourceCommit);
   });
 });
 

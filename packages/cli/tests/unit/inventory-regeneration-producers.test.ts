@@ -262,3 +262,33 @@ describe('a producer that does not measure is never published as PASS (#382)', (
     },
   );
 });
+
+// INV-DEVAI-020: portability normalization must not erase a genuine producer path leak.
+describe('checkout leak refusal preserves previously published inventory', () => {
+  it('rejects an absolute controller/evidence path and rolls back the whole body population', async () => {
+    const { root } = fixture();
+    const earlier = seedEarlierBodies(root);
+    const source = join(root, 'apps/api/users.controller.ts');
+    control.body['inventory_api'] = {
+      schemaVersion: '1.0.0',
+      generatedAt: '2026-10-10T09:00:00.000Z',
+      sourceRepo: root,
+      endpoints: [
+        {
+          method: 'GET',
+          path: '/users',
+          controller: { file: source },
+          evidence: [{ path: source, startLine: 1, endLine: 1 }],
+        },
+      ],
+    };
+    const result = await regenerate(root);
+    expect(result.reading.status).toBe('fail');
+    expect(result.report.ok).toBe(false);
+    expect(result.report.errors.join('\n')).toContain('absolute checkout location');
+    expect(result.report.regenerated).toEqual([]);
+    for (const [path, body] of Object.entries(earlier)) {
+      expect(readFileSync(join(root, path), 'utf8'), path).toBe(body);
+    }
+  });
+});

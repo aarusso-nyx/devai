@@ -5,6 +5,7 @@ import { getValidator } from '@devai-nyx/schemas';
 import type { SensorReading } from '@devai-nyx/sensors';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { computeScorecard } from '../../src/loop/scorecard.js';
+import { recordBoundScorecardReading } from '../helpers/scorecard-custody-fixture.js';
 import {
   filterLatestPerKind,
   loadReadingsFromDir,
@@ -148,7 +149,7 @@ describe('scorecard input precedence and disk population', () => {
   );
   it('falls back to disk when the caller supplies an empty readings list', () => {
     const stored = reading('review');
-    write('.devai/state/sensor-readings/api/one.json', stored);
+    recordBoundScorecardReading(root, stored, head);
     expect(
       resolveScorecardInputs({
         repoRoot: root,
@@ -196,7 +197,7 @@ describe('scorecard input precedence and disk population', () => {
   it('applies the repository stale-failure policy equally to supplied and disk readings', () => {
     const failure = reading('fail');
     write('law/policy/thresholds.json', { freshness: { scorecard_failure_max_age_hours: 1 } });
-    write('.devai/state/sensor-readings/reading.json', failure);
+    recordBoundScorecardReading(root, failure, head);
     const expected = computeScorecard({
       timestamp,
       integrationHead: head,

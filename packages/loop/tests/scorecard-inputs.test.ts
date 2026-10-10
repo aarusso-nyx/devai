@@ -7,11 +7,8 @@ import type { SensorReading } from '@devai-nyx/sensors';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { computeScorecard, summarizeCells, type Scorecard } from '../src/loop/scorecard.js';
 import { loadScorecardNaConfig, scorecardNaCellSet } from '../src/loop/scorecard-na.js';
-import {
-  resolveScorecardInputs,
-  resolveScorecardNaCells,
-  SENSOR_READINGS_DIR,
-} from '../src/scorecard/inputs.js';
+import { recordBoundScorecardReading } from './helpers/scorecard-custody-fixture.js';
+import { resolveScorecardInputs, resolveScorecardNaCells } from '../src/scorecard/inputs.js';
 
 const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const LAW_LEDGER = join(REPO_ROOT, 'law/policy/scorecard-na.json');
@@ -57,10 +54,7 @@ function write(relative: string, body: string): string {
 
 /** Persist exactly as `sense record` does: `<kind>/<id>.json`, pretty-printed, newline-terminated. */
 function record(value: SensorReading): string {
-  return write(
-    join(SENSOR_READINGS_DIR, value.sensor.kind, `${value.id}.json`),
-    `${JSON.stringify(value, null, 2)}\n`,
-  );
+  return recordBoundScorecardReading(root, value, head);
 }
 
 function ledger(cells: readonly { cell: string; reason: string }[]): void {

@@ -28,7 +28,7 @@ const roots: string[] = [];
 const SOURCE = 'law/policy/devai-adoption.json';
 const BINDING = '.devai/config/adopter-policy-binding.json';
 const CONFIG = '.devai/config';
-const SELECTED_RELEASE_VERSION = '2.3.2';
+const SELECTED_RELEASE_VERSION = '2.4.0';
 const TARGETS = [
   '.devai/config/project.json',
   '.devai/config/domains.json',
@@ -533,5 +533,120 @@ describe('Doctor adopter-policy binding regression', () => {
     check = await policyCheck(missingRepo);
     expect(check.ok).toBe(false);
     expectReason(check, 'TARGET_MISSING');
+  });
+});
+
+// ADR-SCR-0015: policy-owned sensor inputs are covered by the same binding and Doctor.
+describe('Doctor policy-owned sensor inputs', () => {
+  const target = '.devai/config/sensor-inputs.json';
+  const inputs = {
+    schemaVersion: '1.0.0',
+    inputs: {
+      inventory_routes: { framework: 'angular', scanDirs: ['apps/web/src'] },
+      type_check: { taskId: 'typecheck', population: 'workspace' },
+    },
+    surfaces: { http: true, database: true, rbac: true, actions: true },
+  };
+  it('binds the complete declaration and verifies it without rewriting any target', async () => {
+    const repo = await boundRepo({ ...defaultPolicy(), sensor_inputs: inputs });
+    expect(readJson(repo, target)).toEqual(inputs);
+    const receipt = readJson(repo, BINDING);
+    expect((receipt['materialized'] as JsonObject)[target]).toBe(
+      sha256(readFileSync(join(repo, target))),
+    );
+    const before = new Map(
+      [...TARGETS, target, BINDING].map((path) => [path, readFileSync(join(repo, path))] as const),
+    );
+    expect(await policyCheck(repo)).toMatchObject({ ok: true });
+    expect(
+      new Map(
+        [...TARGETS, target, BINDING].map(
+          (path) => [path, readFileSync(join(repo, path))] as const,
+        ),
+      ),
+    ).toEqual(before);
+  });
+  it('detects materialized route/task drift without repairing the file', async () => {
+    const repo = await boundRepo({ ...defaultPolicy(), sensor_inputs: inputs });
+    put(repo, target, {
+      ...inputs,
+      inputs: { inventory_routes: { framework: 'react', scanDirs: ['apps/web/src'] } },
+    });
+    const changed = readFileSync(join(repo, target));
+    const check = await policyCheck(repo);
+    expect(check.ok).toBe(false);
+    expectReason(check, 'TARGET_BYTES_MISMATCH');
+    expect(readFileSync(join(repo, target)).equals(changed)).toBe(true);
+  });
+  it('detects an altered sensor source even when materialized targets remain unchanged', async () => {
+    const repo = await boundRepo({ ...defaultPolicy(), sensor_inputs: inputs });
+    const original = readFileSync(join(repo, target));
+    put(repo, SOURCE, {
+      ...defaultPolicy(),
+      sensor_inputs: {
+        ...inputs,
+        inputs: { type_check: { taskId: 'different', population: 'workspace' } },
+      },
+    });
+    const check = await policyCheck(repo);
+    expect(check.ok).toBe(false);
+    expectReason(check, 'SOURCE_DIGEST_MISMATCH');
+    expect(readFileSync(join(repo, target)).equals(original)).toBe(true);
+  });
+  it('rebinds identical owned inputs without changing target or receipt bytes', async () => {
+    const repo = await boundRepo({ ...defaultPolicy(), sensor_inputs: inputs });
+    const before = new Map(
+      [target, BINDING].map((path) => [path, readFileSync(join(repo, path))] as const),
+    );
+    const result = await invoke(initBind, [
+      'init-bind',
+      '--target',
+      repo,
+      '--adopter-policy',
+      SOURCE,
+      '--write',
+    ]);
+    expect(result.exit, result.stderr).toBe(0);
+    for (const [path, bytes] of before)
+      expect(readFileSync(join(repo, path)).equals(bytes)).toBe(true);
+    expect(await policyCheck(repo)).toMatchObject({ ok: true });
+  });
+  it('preserves a never-owned input target when the policy omits sensor_inputs', async () => {
+    const repo = await canonicalRepo();
+    put(repo, target, inputs);
+    const before = readFileSync(join(repo, target));
+    put(repo, SOURCE, defaultPolicy());
+    const result = await invoke(initBind, [
+      'init-bind',
+      '--target',
+      repo,
+      '--adopter-policy',
+      SOURCE,
+      '--write',
+    ]);
+    expect(result.exit, result.stderr).toBe(0);
+    expect(readFileSync(join(repo, target)).equals(before)).toBe(true);
+    expect((readJson(repo, BINDING)['materialized'] as JsonObject)[target]).toBeUndefined();
+    expect(await policyCheck(repo)).toMatchObject({ ok: true });
+  });
+  it('retires verified prior ownership to installed defaults with a new authoritative digest', async () => {
+    const repo = await boundRepo({ ...defaultPolicy(), sensor_inputs: inputs });
+    put(repo, SOURCE, { ...defaultPolicy(), policy_version: '1.1.0' });
+    const result = await invoke(initBind, [
+      'init-bind',
+      '--target',
+      repo,
+      '--adopter-policy',
+      SOURCE,
+      '--write',
+    ]);
+    expect(result.exit, result.stderr).toBe(0);
+    expect(readJson(repo, target)).toEqual(
+      JSON.parse(resolveCanonicalPolicyContent('sensor-inputs.json')),
+    );
+    expect((readJson(repo, BINDING)['materialized'] as JsonObject)[target]).toBe(
+      sha256(readFileSync(join(repo, target))),
+    );
+    expect(await policyCheck(repo)).toMatchObject({ ok: true });
   });
 });

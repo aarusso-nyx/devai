@@ -1,7 +1,7 @@
 // #382: a disposable adopter whose http, database and rbac surfaces are all present, so
 // every inventory kind has real source for its typed producer to measure.
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -142,7 +142,7 @@ export function adopter(
   /** Further .gitignore lines, committed with the fixture. */
   ignore: readonly string[] = [],
 ): AdopterFixture {
-  const root = mkdtempSync(join(tmpdir(), 'devai-inventory-adopter-'));
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'devai-inventory-adopter-')));
   put(root, '.gitignore', ['.devai/state/', ...ignore, ''].join('\n'));
   for (const [path, body] of Object.entries({ ...ADOPTER_SOURCES, ...extra })) {
     put(root, path, body);
