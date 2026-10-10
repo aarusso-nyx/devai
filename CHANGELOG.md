@@ -26,6 +26,10 @@ migration entry covers the observation workflow change.
   `inventory_regeneration` producer, so adopters can identify the required regeneration step.
 - Consumer install guidance is pinned to the published 2.3.1 (#392). It moves to 2.3.2 after
   publication.
+- Repository process for DEVAI's own source: the pre-push hook checks an annotated tag's
+  peeled commit against `HEAD`, so a signed release tag can pass the same fetched-base
+  commit-range and affected checks. A failed peel, a blob or tree, or any other commit still
+  refuses the push. Release tag-signature verification remains mandatory.
 - Release: this release is verified by the trusted local-RC verifier `@aarusso-nyx/devai@1.9.0`,
   unchanged.
 

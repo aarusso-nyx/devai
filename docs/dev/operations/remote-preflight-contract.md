@@ -107,6 +107,12 @@ before a push leaves the machine (CMP-0007 decision D3).
   It refuses the push on a failure and names the failing commit or node. A `BLOCKED`
   probe names the environment fix, as in the local preflight.
 
+- **Checked-out commit.** Every pushed object other than a deletion must resolve to
+  the checked-out `HEAD` commit. An annotated tag, including a signed release tag,
+  is checked through its peeled commit rather than its tag-object identity. A failed
+  peel, a blob or tree, or any other commit refuses the push. Tags still run the
+  commit-range check and affected check against the freshly fetched base; release
+  tag-signature verification remains a separate release requirement.
 - **Agents: mandatory once it ships.** The hook and the `--pre-push` install flag arrive
   with CMP-0007 TASK-0723. From that merge on, every agent session installs it in its
   worktree with `pnpm run hooks:install -- --pre-push`, keeps it installed, and never
