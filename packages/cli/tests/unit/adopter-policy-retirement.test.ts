@@ -18,6 +18,7 @@ import { runWithAuthorityPolicyMaterialization } from '../../src/authority/comma
 import { doctor } from '../../src/commands/doctor.js';
 import { initBind } from '../../src/commands/init/index.js';
 import { resolveAdopterPolicyMaterialization } from '../../src/services/adopter-policy.js';
+import { resolveCliVersion } from '../../src/version.js';
 
 const { cac } = createRequire(import.meta.url)('../../node_modules/cac/index-compat.js') as {
   cac: (name?: string) => CAC;
@@ -549,6 +550,7 @@ describe('IA-002: adopter declarations outside the matrix survive every bind', (
 
     expect(readJson(repo, PROJECT)).toEqual({
       ...project({ ...DECLARATIONS }),
+      devai_version: resolveCliVersion(),
       project_type: 'runtime-host',
       docs: { builder: 'docusaurus' },
       ci_economy: { profile: 'gate-staged' },
@@ -572,7 +574,11 @@ describe('/project_type is schema-required: a source without it keeps the curren
     });
 
     expect(readJson(repo, PROJECT)).toEqual(
-      project({ project_type: 'runtime-host', repo: { kind: 'library' } }),
+      project({
+        project_type: 'runtime-host',
+        repo: { kind: 'library' },
+        devai_version: resolveCliVersion(),
+      }),
     );
     expect(retiredKeys(repo)).toEqual([]);
     expect(kept.output?.['receipt']).toMatchObject({ retired_keys: [] });

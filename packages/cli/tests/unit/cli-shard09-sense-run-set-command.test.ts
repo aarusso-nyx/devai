@@ -1,3 +1,4 @@
+import { realpathSync } from 'node:fs';
 import type { CAC } from 'cac';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { resolveSenseSelection } from '../../src/commands/sense/facade.js';
@@ -205,7 +206,7 @@ describe('CLI shard 09 sense run set command', () => {
     });
     expect(mocks.sensorAdapter).toHaveBeenCalledExactlyOnceWith('type_check');
     expect(adapter).toHaveBeenCalledExactlyOnceWith({
-      repoRoot: '.',
+      repoRoot: realpathSync(process.cwd()),
       inputs: DECLARED_TYPE_CHECK_INPUTS,
     });
   });

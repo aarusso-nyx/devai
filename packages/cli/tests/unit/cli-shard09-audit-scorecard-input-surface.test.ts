@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import type { Scorecard } from '@devai-nyx/loop';
@@ -7,15 +7,17 @@ import type { CAC } from 'cac';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { withAuthorityHostTestScope } from '../../../authority/tests/unit/authority-host-test-scope.js';
 import { EXIT_PASS, EXIT_USAGE } from '../../../utils/src/exit.js';
+import { verifyChain } from '@devai-nyx/evidence';
+import { recordBoundScorecardReading } from '../../../loop/tests/helpers/scorecard-custody-fixture.js';
 
-const mocks = vi.hoisted(() => ({ spawnSync: vi.fn() }));
+const mocks = vi.hoisted(() => ({ spawnSync: vi.fn(), execFileSync: vi.fn() }));
 
 // Git is the only host process the facade spawns (exact-head guard and commit
 // timestamp); everything else — the loop resolver, the readings store, the N/A
 // ledger, the schema validator, and `sense record` persistence — runs for real.
 vi.mock('@devai-nyx/authority', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@devai-nyx/authority')>();
-  return { ...actual, spawnSync: mocks.spawnSync };
+  return { ...actual, spawnSync: mocks.spawnSync, execFileSync: mocks.execFileSync };
 });
 
 import { auditScorecard } from '../../src/commands/audit/scorecard.js';
@@ -53,6 +55,11 @@ const RECORDED_ID = 'SR-0123456789abcdef';
 const RETIRED_STORE_ID = 'SR-fedcba9876543210';
 
 function answerGit(head: string = AT): void {
+  mocks.execFileSync.mockImplementation((command: string, args: readonly string[]) => {
+    if (command === 'git' && args[0] === 'rev-parse') return `${head}\n`;
+    if (command === 'git' && args[0] === 'status') return '';
+    throw new Error(`unexpected Git context command ${command} ${String(args[0])}`);
+  });
   mocks.spawnSync.mockImplementation((_command: string, args: readonly string[]) => {
     if (args[0] === 'rev-parse') return { status: 0, stdout: `${head}\n`, stderr: '' };
     if (args[0] === 'show') return { status: 0, stdout: `${TIMESTAMP}\n`, stderr: '' };
@@ -180,11 +187,20 @@ describe('CLI shard 09 audit scorecard reads the one readings store (ADR-SCR-000
     const root = makeRoot();
     const recorded = reading('inventory_api', 'pass', RECORDED_ID);
     put(root, 'reading.json', JSON.stringify(recorded));
+    answerGit();
 
     const persisted = await withAuthorityHostTestScope(() =>
       recordSensorReading(root, 'reading.json'),
     );
     expect(persisted.action).toBe('created');
+    expect(verifyChain(join(root, 'record/proofs/chain.json'))).toEqual({
+      valid: true,
+      errors: [],
+    });
+    const chain = JSON.parse(readFileSync(join(root, 'record/proofs/chain.json'), 'utf8')) as {
+      records: readonly { context: { git: { head_sha: string } } }[];
+    };
+    expect(chain.records.at(-1)?.context.git.head_sha).toBe(AT);
     expect(persisted.path).toBe(
       join(root, '.devai/state/sensor-readings/inventory_api', `${RECORDED_ID}.json`),
     );
@@ -263,9 +279,7 @@ function stored(
 }
 
 function putReading(root: string, value: SensorReading | Record<string, unknown>): void {
-  const kind = (value as SensorReading).sensor.kind;
-  const id = (value as SensorReading).id;
-  put(root, `${STORE}/${kind}/${id}.json`, `${JSON.stringify(value)}\n`);
+  recordBoundScorecardReading(root, value as SensorReading, AT);
 }
 
 function runRaw(root: string, at: string = AT): void {
@@ -302,8 +316,11 @@ describe('CLI shard 09 audit scorecard resolver seam (ADR-REL-0033)', () => {
 
   it('selects the later of two readings of one kind, identically on two runs', () => {
     const root = makeRoot();
-    putReading(root, stored('inventory_api', 'pass', NEWER_ID, '2026-09-26T11:30:00.000Z'));
     putReading(root, stored('inventory_api', 'fail', OLDER_ID, '2026-09-26T10:00:00.000Z'));
+    putReading(root, {
+      ...stored('inventory_api', 'pass', NEWER_ID, '2026-09-26T11:30:00.000Z'),
+      supersedes: OLDER_ID,
+    });
 
     const first = runScorecard(root);
     const firstBytes = stdout;
@@ -337,7 +354,9 @@ describe('CLI shard 09 audit scorecard resolver seam (ADR-REL-0033)', () => {
   it('moves no cell verdict when the four admitted diagnostic kinds are in the store', () => {
     const root = makeRoot();
     putReading(root, stored('inventory_api', 'pass', NEWER_ID, '2026-09-26T11:30:00.000Z'));
-    const baseline = runScorecard(root).cells.map((c) => [c.substrate, c.property, c.verdict]);
+    const baselineScorecard = runScorecard(root);
+    expect(cell(baselineScorecard, 'F4', 'T1').verdict).toBe('PASS');
+    const baseline = baselineScorecard.cells.map((c) => [c.substrate, c.property, c.verdict]);
 
     DIAGNOSTIC_KINDS.forEach((kind, index) => {
       putReading(root, stored(kind, 'fail', `SR-${String(index).padStart(16, 'c')}`, TIMESTAMP));
