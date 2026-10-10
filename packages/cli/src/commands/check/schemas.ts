@@ -49,10 +49,8 @@ const SOURCE_ONLY_SCHEMAS = [
   'data-handling.schema.json',
   'documentation-information-architecture.schema.json',
   'inv-override.schema.json',
-  'preflight-probe.schema.json',
   'targets.schema.json',
   'task-freshness.schema.json',
-  'test-task-descriptor.schema.json',
   'threat-model.schema.json',
   'toolchain-manifest.schema.json',
 ] as const;
