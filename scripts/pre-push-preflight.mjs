@@ -7,7 +7,7 @@
 // `true` it exits 0 with no output. Otherwise it fetches `<remote> main` into a temporary ref
 // (deleted afterwards) as the base, never printing the remote unless it is a configured name.
 // It refuses a push of any commit other than HEAD, then for every pushed ref that is not a
-// deletion runs scripts/check-commit-range.mjs over base..<local sha>; any failure refuses the
+// deletion runs scripts/check-commit-range.mjs over base..<peeled commit>; any failure refuses the
 // push before the affected check starts. It then runs the gate's affected check against the
 // fetched base, with the CI gate's own flags, and on failure prints the per-node summary of
 // scripts/process/summarize-check-report.mjs, so the failing node (and, for a BLOCKED probe,
@@ -66,20 +66,35 @@ function main(argv, readStdin) {
   if (pushed.length === 0) return 0;
 
   // The affected check runs on the working tree, so it can vouch only for the checked-out
-  // commit: a push of any other commit is refused before anything else runs.
-  const head = git(['rev-parse', 'HEAD']).stdout.trim();
-  const elsewhere = pushed.find(([, localSha]) => localSha !== head);
-  if (elsewhere !== undefined) {
-    say(
-      `pre-push preflight checks the working tree; check out ${elsewhere[0]} (or push HEAD) and retry`,
-    );
+  // commit. Annotated tags name tag objects, so peel every pushed object to a commit
+  // before comparing it to HEAD; non-commit objects fail closed before fetching.
+  const resolvedHead = git(['rev-parse', '--verify', 'HEAD^{commit}']);
+  const head = resolvedHead.stdout.trim();
+  if (resolvedHead.status !== 0 || head === '') {
+    say('could not resolve HEAD to a commit; the push is refused');
     return 1;
+  }
+  const commits = [];
+  for (const [localRef, localSha] of pushed) {
+    const resolved = git(['rev-parse', '--verify', '--end-of-options', `${localSha}^{commit}`]);
+    const commit = resolved.stdout.trim();
+    if (resolved.status !== 0 || commit === '') {
+      say(`could not resolve ${localRef} to a commit; the push is refused`);
+      return 1;
+    }
+    if (commit !== head) {
+      say(
+        `pre-push preflight checks the working tree; check out ${localRef} (or push HEAD) and retry`,
+      );
+      return 1;
+    }
+    commits.push([localRef, commit]);
   }
 
   const label = remoteLabel(remote);
   const baseRef = `refs/devai/pre-push/${String(process.pid)}-${randomBytes(6).toString('hex')}`;
   try {
-    return preflight(remote, label, baseRef, pushed);
+    return preflight(remote, label, baseRef, commits);
   } finally {
     git(['update-ref', '-d', baseRef]);
   }
