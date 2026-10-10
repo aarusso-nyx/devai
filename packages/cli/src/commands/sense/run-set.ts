@@ -1,4 +1,5 @@
 import type { CAC } from 'cac';
+import { realpathSync } from 'node:fs';
 import { routeArgv } from '../../command-router.js';
 import { defineCommand, type RegistryEntry } from '../../define-command.js';
 import { EXIT_FAIL, EXIT_GATE, EXIT_PASS, EXIT_REVIEW, EXIT_USAGE } from '@devai-nyx/utils';
@@ -10,17 +11,19 @@ import {
 } from '../../services/self-dogfood.js';
 import { SENSE_PRESET_POLICY } from '@devai-nyx/sensors';
 import { sensorAdapter } from './adapters.js';
+import { resolveSensorReadingInstance } from './reading-instance.js';
+import { runWithResolvedSensorMember } from '../../authority/sensor-member.js';
 import {
   resolveSenseSelection,
   type ResolvedSenseSelection,
   type SenseSelection,
 } from './facade.js';
-import {
-  declaredInputKeys,
-  resolveDeclaredSensorInputs,
-  SenseInputsError,
-  type SensorInputs,
-} from './shared.js';
+import { type SensorInputs } from './shared.js';
+
+import { resolveMemberInputs } from './member-inputs.js';
+export { resolveMemberInputs } from './member-inputs.js';
+import { resolveTaskBoundSenseSelection } from './task-selection.js';
+import { resolveSensorTaskBinding, executeSensorTask } from './task-binding.js';
 
 type ReadinessStatus = 'pass' | 'review' | 'fail' | 'unknown' | 'na';
 type StructuredStatus = Exclude<ReadinessStatus, 'na'> | 'skipped' | 'error' | 'killed';
@@ -179,49 +182,6 @@ function parseInputs(value?: string): Readonly<Record<string, unknown>> | undefi
   return parsed as Readonly<Record<string, unknown>>;
 }
 
-/**
- * Effective inputs per member (ADR-SCR-0005), resolved completely before any adapter
- * runs so a refused declaration executes nothing. A single kind receives every
- * explicit key; a preset member receives only the explicit keys its schema entry
- * lists, and a key no member lists is refused.
- */
-export function resolveMemberInputs(
-  resolved: ResolvedSenseSelection,
-  options: { readonly repoRoot: string; readonly explicit?: SensorInputs },
-): ReadonlyMap<string, SensorInputs> {
-  const preset = resolved.selection.type === 'preset';
-  const explicit = options.explicit;
-  if (preset && explicit !== undefined) {
-    for (const key of Object.keys(explicit)) {
-      if (!resolved.members.some((member) => declaredInputKeys(member.kind).includes(key))) {
-        throw new SenseInputsError(
-          'SENSE_INPUTS_UNDECLARED_KEY',
-          `explicit input '${key}' is not a declared input of any member of preset '${resolved.selection.value}'`,
-        );
-      }
-    }
-  }
-  const byKind = new Map<string, SensorInputs>();
-  for (const member of resolved.members) {
-    const accepted = preset ? declaredInputKeys(member.kind) : undefined;
-    const memberExplicit =
-      explicit === undefined
-        ? undefined
-        : accepted === undefined
-          ? explicit
-          : Object.fromEntries(Object.entries(explicit).filter(([key]) => accepted.includes(key)));
-    byKind.set(
-      member.kind,
-      resolveDeclaredSensorInputs({
-        repoRoot: options.repoRoot,
-        sensorKind: member.kind,
-        ...(memberExplicit === undefined ? {} : { explicit: memberExplicit }),
-      }),
-    );
-  }
-  return byKind;
-}
-
 export async function executeResolvedSenseSelection(
   resolved: ResolvedSenseSelection,
   options: {
@@ -236,13 +196,19 @@ export async function executeResolvedSenseSelection(
     try {
       const inputs =
         options.memberInputs === undefined ? options.inputs : options.memberInputs.get(member.kind);
-      const reading = await sensorAdapter(member.kind)({
-        repoRoot: options.repoRoot,
-        ...(inputs === undefined ||
-        (options.memberInputs !== undefined && Object.keys(inputs).length === 0)
-          ? {}
-          : { inputs }),
-      });
+      const binding = resolveSensorTaskBinding(options.repoRoot, member.kind, inputs);
+      const measured = await runWithResolvedSensorMember(member.kind, () =>
+        binding !== undefined
+          ? executeSensorTask(binding)
+          : sensorAdapter(member.kind)({
+              repoRoot: options.repoRoot,
+              ...(inputs === undefined ||
+              (options.memberInputs !== undefined && Object.keys(inputs).length === 0)
+                ? {}
+                : { inputs }),
+            }),
+      );
+      const reading = resolveSensorReadingInstance(options.repoRoot, measured);
       if (reading.sensor.kind !== member.kind) {
         throw new Error(`SENSE_ADAPTER_KIND_MISMATCH:${member.kind}:${reading.sensor.kind}`);
       }
@@ -398,18 +364,19 @@ export const senseRunSetCmd = defineCommand({
         try {
           // Resolution is intentionally complete before any adapter can execute.
           // ADR-SCR-0008: the sweep runs in two ordered passes; the first is the default.
-          const resolved = selectedPass(
+          let resolved = selectedPass(
             resolveSenseSelection(selectionFor(kind, options.preset), {
               ...(options.round === undefined ? {} : { roundId: options.round }),
             }),
             options.pass,
           );
-          const repoRoot = options.repoRoot ?? '.';
+          const repoRoot = realpathSync(options.repoRoot ?? '.');
           const explicit = parseInputs(options.input);
           const memberInputs = resolveMemberInputs(resolved, {
             repoRoot,
             ...(explicit === undefined ? {} : { explicit }),
           });
+          resolved = resolveTaskBoundSenseSelection(resolved, repoRoot, memberInputs);
           // ADR-SCR-0001: on the framework repository the self-dogfood matrix
           // decides the run from the declared role, the consent and the whole
           // resolved population, after the invocation is validated and before

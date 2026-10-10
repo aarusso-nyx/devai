@@ -164,6 +164,12 @@ function ensureCommon(): void {
 }
 
 function ensureSchemaReferences(name: SchemaName): void {
+  if (
+    name === 'test-task-descriptor.schema.json' &&
+    ajv.getSchema('preflight-probe.schema.json') === undefined
+  ) {
+    ajv.addSchema(schemaDocument('preflight-probe.schema.json'), 'preflight-probe.schema.json');
+  }
   if (name === 'action-result.schema.json' && ajv.getSchema('error.schema.json') === undefined) {
     ajv.addSchema(schemaDocument('error.schema.json'), 'error.schema.json');
   }
@@ -173,6 +179,7 @@ function ensureSchemaReferences(name: SchemaName): void {
       'project-config.schema.json',
       'scorecard-na-config.schema.json',
       'release-verification-profile.schema.json',
+      'sensor-inputs.schema.json',
     ] as const) {
       if (ajv.getSchema(dependency) === undefined) {
         ajv.addSchema(schemaDocument(dependency), dependency);

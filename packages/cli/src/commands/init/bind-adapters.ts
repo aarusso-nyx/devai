@@ -53,6 +53,7 @@ import { fsyncPath } from './durable-fs.js';
 import { acquireUpgradeLock, assertUpgradeLockFree } from './upgrade-lock.js';
 import { classWriteVerbs } from '../../authority/policy-support.js';
 import { canonicalRegistry } from '../../define-command.js';
+import { parseAdopterPolicyBinding } from '../../services/adopter-policy-binding.js';
 
 function sha256Bytes(value: string | Buffer): string {
   return createHash('sha256').update(value).digest('hex');
@@ -420,11 +421,29 @@ export function planAdopterPolicyBind(
   const currentProject =
     options.currentProject ??
     (existsSync(projectPath) ? (JSON.parse(readFileSync(projectPath, 'utf8')) as JsonObject) : {});
+  const ownedTargets: string[] = [];
+  const priorReceipt = readTextIfPresent(join(targetRoot, ADOPTER_POLICY_RECEIPT));
+  if (priorReceipt !== null) {
+    const parsed = parseAdopterPolicyBinding(priorReceipt);
+    const sensorTarget = '.devai/config/sensor-inputs.json';
+    if ('binding' in parsed && parsed.binding.materialized[sensorTarget] !== undefined) {
+      const priorBytes = readTextIfPresent(join(targetRoot, sensorTarget));
+      if (
+        parsed.binding.policy_id !== document['policy_id'] ||
+        priorBytes === null ||
+        sha256Bytes(priorBytes) !== parsed.binding.materialized[sensorTarget]
+      ) {
+        throw new Error('ADOPTER_POLICY_SENSOR_INPUTS_OWNERSHIP_MISMATCH');
+      }
+      ownedTargets.push(sensorTarget);
+    }
+  }
   const projectionInput = {
     policy,
     currentProject,
     frameworkVersion: options.frameworkVersion ?? resolveCliVersion(),
     targetRoot,
+    ownedTargets,
     ...(options.constitutionVersion !== undefined && {
       constitutionVersion: options.constitutionVersion,
     }),

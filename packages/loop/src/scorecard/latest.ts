@@ -1,5 +1,46 @@
 import type { SensorReading } from '@devai-nyx/sensors';
 
+/** Validate the complete population already bound to one exact candidate. */
+export function assertCandidateSupersessionGraph(
+  readings: readonly SensorReading[],
+  prefix = 'SCORECARD_READING',
+): void {
+  const byId = new Map<string, SensorReading>();
+  for (const reading of readings) {
+    if (byId.has(reading.id)) throw new Error(`${prefix}_DUPLICATE_ID:${reading.id}`);
+    byId.set(reading.id, reading);
+  }
+  const retired = new Set<string>();
+  for (const reading of readings) {
+    if (reading.supersedes === undefined) continue;
+    const previous = byId.get(reading.supersedes);
+    if (previous === undefined || previous.sensor.kind !== reading.sensor.kind) {
+      throw new Error(`${prefix}_INVALID_SUPERSEDES:${reading.id}`);
+    }
+    retired.add(previous.id);
+  }
+  // Visit every component: a disconnected cycle must not hide behind a valid head.
+  const visited = new Set<string>();
+  for (const reading of readings) {
+    const active = new Set<string>();
+    let cursor: SensorReading | undefined = reading;
+    while (cursor !== undefined && !visited.has(cursor.id)) {
+      if (active.has(cursor.id)) throw new Error(`${prefix}_SUPERSEDES_CYCLE:${cursor.id}`);
+      active.add(cursor.id);
+      cursor = cursor.supersedes === undefined ? undefined : byId.get(cursor.supersedes);
+    }
+    for (const id of active) visited.add(id);
+  }
+  const heads = new Set<string>();
+  for (const reading of readings) {
+    if (retired.has(reading.id)) continue;
+    if (heads.has(reading.sensor.kind)) {
+      throw new Error(`${prefix}_AMBIGUOUS:${reading.sensor.kind}`);
+    }
+    heads.add(reading.sensor.kind);
+  }
+}
+
 function isUnknown(reading: SensorReading): boolean {
   return reading.status === 'unknown' || reading.status === 'skipped';
 }

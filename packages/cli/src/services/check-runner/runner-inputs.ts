@@ -96,20 +96,33 @@ export function prepareCheckRunInputs(input: { readonly options: CheckRunnerOpti
   const cache = new CheckCache(options.repoRoot, cacheRoot);
   const toolchain = options.toolchain ?? resolvedRunnerToolchain(options);
   const toolchainDigest = runnerToolchainDigest(options.repoRoot, toolchain);
-  const environment: Record<string, string> = { ...(options.environment ?? {}) };
+  const environment = resolveTaskEnvironment(
+    options.repoRoot,
+    requiredEnvironment,
+    options.environment,
+    options.protectedExecutionIdentity !== undefined,
+  );
+  return { cache, toolchain, environment, toolchainDigest };
+}
+
+/** Resolve the same derived policy identity for checks and task-bound sensors. */
+export function resolveTaskEnvironment(
+  repoRoot: string,
+  requiredEnvironment: readonly string[],
+  supplied?: Readonly<Record<string, string>>,
+  protectedExecution = false,
+): Record<string, string> {
+  const environment: Record<string, string> = { ...(supplied ?? {}) };
   const authorityDigestKey = 'DEVAI_AUTHORITY_POLICY_SHA256';
   if (requiredEnvironment.includes(authorityDigestKey)) {
-    const authorityPolicyPath = join(options.repoRoot, '.devai/config/authority-policy.json');
+    const authorityPolicyPath = join(repoRoot, '.devai/config/authority-policy.json');
     if (!existsSync(authorityPolicyPath)) {
       throw new Error(
         'CHECK_AUTHORITY_POLICY_REQUIRED: materialize .devai/config/authority-policy.json before planning release evidence',
       );
     }
     const authorityDigest = sha256Hex(readFileSync(authorityPolicyPath));
-    if (
-      options.protectedExecutionIdentity !== undefined &&
-      environment[authorityDigestKey] !== authorityDigest
-    )
+    if (protectedExecution && environment[authorityDigestKey] !== authorityDigest)
       throw new Error('release-certification-environment-unbound');
     environment[authorityDigestKey] = authorityDigest;
   }
@@ -119,5 +132,5 @@ export function prepareCheckRunInputs(input: { readonly options: CheckRunnerOpti
       environment[key] = inheritedValue;
     }
   }
-  return { cache, toolchain, environment, toolchainDigest };
+  return environment;
 }

@@ -48,6 +48,8 @@ import {
   sha256Bytes,
 } from './policy.js';
 import { expectSuccess, flagValue, isRecord, type JsonRecord } from './broker-values.js';
+import { resolvedSensorMember } from './sensor-member.js';
+import { isBoundSensorTaskProcess } from '../commands/sense/task-binding.js';
 import {
   canonicalRelativePath,
   existingRealpath,
@@ -415,6 +417,8 @@ function refusedProcessContext(request: AuthorityHostEffectRequest): {
  */
 /** The sensor kind a `sense run <sensor>` invocation names, or undefined when it names none. */
 function senseRunSensor(argv: readonly string[] | undefined): string | undefined {
+  const resolved = resolvedSensorMember();
+  if (resolved !== undefined) return resolved;
   if (argv === undefined) return undefined;
   const run = argv.findIndex((word, index) => word === 'run' && argv[index - 1] === 'sense');
   const candidate = run < 0 ? undefined : argv[run + 1];
@@ -1191,6 +1195,17 @@ export function createAuthorityHostBroker(input: BrokerInput): {
     }
     if (request.kind === 'process') {
       if (
+        isBoundSensorTaskProcess(request) &&
+        (input.entry.name !== 'sense run' ||
+          input.entry.effects !== 'local-write' ||
+          !input.argv.includes('--write') ||
+          !input.entry.authority_contract.capabilities.includes('fs:workspace') ||
+          !input.entry.authority_contract.capabilities.includes('proc:declared-sensor-task'))
+      ) {
+        throw new Error('AUTHORITY_SENSOR_TASK_CONSENT_REQUIRED');
+      }
+      if (
+        !isBoundSensorTaskProcess(request) &&
         readOnlyProcess(
           request,
           input.entry.name,

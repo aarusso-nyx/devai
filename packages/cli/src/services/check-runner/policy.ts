@@ -96,6 +96,8 @@ interface PolicyBuildOptions {
   readonly baseCommit?: string;
   readonly releaseCandidate?: Readonly<{ commit: string; tree: string }>;
   readonly releaseRequiredNodes?: readonly string[];
+  /** Internal exact-node consumers; closes dependencies without selecting downstream nodes. */
+  readonly selectedTaskNodes?: readonly string[];
   readonly releaseAffectedSelection?: boolean;
   readonly releaseTaskBindings?: Readonly<Record<string, unknown>>;
   readonly toolchain: Readonly<Record<string, string>>;
@@ -424,18 +426,35 @@ export function buildTaskPlan(options: PolicyBuildOptions): TaskPlan {
       () => classifyPath ?? taxonomyClassifier(repoRoot),
       () => baseCommitClassifier(repoRoot, baseCommit),
     );
-  const selected = selectedNodeIds(
-    descriptor,
-    planningLane ? PLANNING_LANE_PROFILE : target,
-    changes,
-    options.releaseRequiredNodes?.filter(
-      (node) =>
-        !options.descriptor.tasks.some((task) => task.nodeId === node) ||
-        descriptor.tasks.some((task) => task.nodeId === node),
-    ),
-    options.releaseAffectedSelection,
-    classifyPath,
-  );
+  const selected =
+    options.selectedTaskNodes === undefined
+      ? selectedNodeIds(
+          descriptor,
+          planningLane ? PLANNING_LANE_PROFILE : target,
+          changes,
+          options.releaseRequiredNodes?.filter(
+            (node) =>
+              !options.descriptor.tasks.some((task) => task.nodeId === node) ||
+              descriptor.tasks.some((task) => task.nodeId === node),
+          ),
+          options.releaseAffectedSelection,
+          classifyPath,
+        )
+      : new Set(options.selectedTaskNodes);
+  if (options.selectedTaskNodes !== undefined) {
+    const byId = new Map(descriptor.tasks.map((task) => [task.nodeId, task]));
+    const pending = [...selected];
+    for (let index = 0; index < pending.length; index += 1) {
+      const task = byId.get(pending[index] ?? '');
+      if (task === undefined) throw new Error('CHECK_RUNNER_DESCRIPTOR: selected task missing');
+      for (const dependency of task.dependencies) {
+        if (!selected.has(dependency)) {
+          selected.add(dependency);
+          pending.push(dependency);
+        }
+      }
+    }
+  }
   const descriptorDigest = taskDescriptorDigest(options.descriptor);
   const ordered = topologicalTasks(descriptor);
   const outputContracts = new Map(

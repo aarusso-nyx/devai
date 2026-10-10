@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs';
+import { matchDeclaredSensorTaskProcess } from '../commands/sense/task-binding.js';
 import { basename, resolve } from 'node:path';
 import {
   type AuthorityHostEffectRequest,
@@ -33,6 +34,19 @@ export function processTarget(
   const executable = basename(executableValue);
   const args = argumentValue.map(String);
   const verb = args[0];
+
+  if (actionName === 'sense run') {
+    const binding = matchDeclaredSensorTaskProcess(root, request);
+    if (binding !== undefined) {
+      return {
+        kind: 'fs',
+        id: `fs:.devai/state/check-cache/v1:sensor:${safeLogical(binding.task.nodeId, 'task')}`,
+        repository_id: repositoryId,
+        canonical_relative_path: '.devai/state/check-cache/v1',
+        operation: 'update',
+      };
+    }
+  }
 
   if (actionName === 'check') {
     const task = matchDeclaredCheckTaskProcess(root, invocationArgv, request);

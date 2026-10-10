@@ -365,6 +365,8 @@ function checkAdopterPolicyMaterialization(repoRoot: string, bindingPath: string
       policy,
       currentProject,
       frameworkVersion: installedVersion,
+      ownedTargets: Object.keys(binding.materialized),
+      targetRoot: repoRoot,
     });
   } catch {
     if (!projectExists) return result(sourceLexical);

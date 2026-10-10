@@ -1,5 +1,6 @@
-import { existsSync, readFileSync, readdirSync, realpathSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { isAbsolute, join, relative, sep } from 'node:path';
 import { parseConstitutionVersion } from '@devai-nyx/utils';
 import { buildSensorReading, type SensorFinding, type SensorReading } from './sensor-reading.js';
 
@@ -53,6 +54,35 @@ function readIfPresent(repoRoot: string, rel: string): string | null {
   const path = join(repoRoot, rel);
   if (!existsSync(path)) return null;
   return readFileSync(path, 'utf8');
+}
+
+const CONSTITUTION_ENTRYPOINT_BODY =
+  '\n\nThe DEVAI Constitution bound to this repository is the immutable vendored copy\n' +
+  'at [`.devai/pin/constitution.md`](../.devai/pin/constitution.md). Its version\n' +
+  'and SHA-256 digest are pinned in `.devai/config/project.json` by\n' +
+  '`devai init bind --constitution --write`.\n\n' +
+  'This file is the Architect-owned reading-order entrypoint. It does not restate\n' +
+  'or override the pinned Constitution.';
+
+function registeredConstitutionEntrypoint(body: string): boolean {
+  const normalized = body.replaceAll('\r\n', '\n').replace(/\n$/u, '');
+  const heading = /^# ([\p{L}\p{N}._ -]{1,80}) constitution binding/u.exec(normalized);
+  return (
+    heading !== null &&
+    heading[1] === heading[1]?.trim() &&
+    normalized === `${heading[0]}${CONSTITUTION_ENTRYPOINT_BODY}`
+  );
+}
+
+function boundRegularFile(repoRoot: string, path: string): Buffer {
+  const root = realpathSync(repoRoot);
+  const target = join(root, path);
+  if (!lstatSync(target).isFile()) throw new Error('constitution binding is not a regular file');
+  const inside = relative(root, realpathSync(target));
+  if (inside === '..' || inside.startsWith(`..${sep}`) || isAbsolute(inside)) {
+    throw new Error('constitution binding escapes repository');
+  }
+  return readFileSync(target);
 }
 
 export function senseDocsDrift(opts: DocsDriftOptions): SensorReading {
@@ -139,7 +169,43 @@ export function senseDocsDrift(opts: DocsDriftOptions): SensorReading {
   }
 
   // Check 3 — Article 27 cap prose vs the WORKTREE_CAP constant.
-  const constitutionBody = readIfPresent(opts.repoRoot, 'law/constitution.md');
+  let constitutionBody = readIfPresent(opts.repoRoot, 'law/constitution.md');
+  const bindingEntrypoint =
+    constitutionBody !== null && parseConstitutionVersion(constitutionBody) === null;
+  if (bindingEntrypoint) {
+    claimsChecked += 1;
+    let pin: string | null = null;
+    let valid = false;
+    try {
+      const pinBytes = boundRegularFile(opts.repoRoot, '.devai/pin/constitution.md');
+      pin = pinBytes.toString('utf8');
+      const project = JSON.parse(
+        boundRegularFile(opts.repoRoot, '.devai/config/project.json').toString('utf8'),
+      ) as {
+        constitution?: { version?: unknown; sha256?: unknown };
+      } | null;
+      const version = pin === null ? null : parseConstitutionVersion(pin);
+      valid =
+        constitutionBody !== null &&
+        registeredConstitutionEntrypoint(constitutionBody) &&
+        version !== null &&
+        project?.constitution?.version === version &&
+        project.constitution.sha256 === createHash('sha256').update(pinBytes).digest('hex');
+    } catch {
+      valid = false;
+    }
+    if (!valid) {
+      findings.push({
+        severity: 'error',
+        code: 'DOCS_DRIFT_CONSTITUTION_BINDING',
+        message:
+          'The constitution entrypoint requires an existing pin with its exact project version and SHA-256 binding.',
+        file: '.devai/config/project.json',
+      });
+    }
+    // Check the actual bound constitution, including cap and narrative version claims.
+    constitutionBody = pin;
+  }
   if (constitutionBody === null) {
     findings.push({
       severity: 'critical',

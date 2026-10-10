@@ -59,6 +59,7 @@ import {
 } from '#runtime-core';
 
 import { regenerateInventoryReadings } from './readings-rebuild.js';
+import { resolveInventoryRouteInputs } from './inventory-inputs.js';
 import {
   type SenseAdapterRequest,
   type SenseSensorAdapter,
@@ -223,6 +224,7 @@ const ADAPTERS: Readonly<Record<SensorKind, SenseSensorAdapter>> = Object.freeze
     senseInventoryRoutes({
       repoRoot: request.repoRoot,
       persistBody: false,
+      ...resolveInventoryRouteInputs(request.repoRoot, request.inputs),
       ...optional('surfaces', surfacesInput(request)),
     }).reading,
   inventory_data_model: (request) =>

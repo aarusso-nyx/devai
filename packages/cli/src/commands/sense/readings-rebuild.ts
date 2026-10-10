@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
+import { realpathSync } from 'node:fs';
 import {
   closeSync,
   execFileSync,
@@ -36,6 +37,7 @@ import {
 } from '@devai-nyx/sensors';
 import { regenerateInventory } from '#runtime-core';
 import { persistSensorReading } from './shared.js';
+import { resolveInventoryRouteInputs } from './inventory-inputs.js';
 
 /**
  * Rebuild inventory readings from previously recorded sensor bodies. Walks
@@ -804,7 +806,11 @@ function produceKind(
       produced = senseInventoryApi({ ...common, admitFile });
       break;
     case 'inventory_routes':
-      produced = senseInventoryRoutes({ ...common, admitFile });
+      produced = senseInventoryRoutes({
+        ...common,
+        ...resolveInventoryRouteInputs(repoRoot),
+        admitFile,
+      });
       break;
     case 'inventory_data_model':
       produced = senseInventoryDataModel({ ...common, admitFile });
@@ -975,6 +981,7 @@ export async function regenerateInventoryReadings(
   repoRoot: string,
   options: RegenerationOptions = {},
 ): Promise<RegenerateInventoryResult> {
+  repoRoot = realpathSync(repoRoot);
   const candidate = resolveCandidate(repoRoot);
   if ('code' in candidate) return unwrittenResult(repoRoot, candidate);
   const staged: StagedBody[] = [];

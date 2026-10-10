@@ -14,6 +14,7 @@ const files = [
   'mutation-strength.json',
   'release-verification.json',
   'scorecard-na.json',
+  'sensor-inputs.json',
   'thresholds.json',
 ];
 
