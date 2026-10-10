@@ -66,13 +66,20 @@ function schemaClosure(roots) {
   const sourceRoot = join(repositoryRoot, 'law/schemas');
   const pending = [...roots];
   const selected = new Set();
+  const canonicalNames = new Map();
+  for (const name of readdirSync(sourceRoot).filter((entry) => entry.endsWith('.schema.json'))) {
+    const id = JSON.parse(readFileSync(join(sourceRoot, name), 'utf8')).$id;
+    if (typeof id !== 'string') continue;
+    if (canonicalNames.has(id)) throw new Error(`PACKAGE_SCHEMA_ID_DUPLICATE:${id}`);
+    canonicalNames.set(id, name);
+  }
   const referencedSchemas = (value) => {
     if (Array.isArray(value)) return value.flatMap(referencedSchemas);
     if (value === null || typeof value !== 'object') return [];
     return Object.entries(value).flatMap(([key, child]) => {
       if (key === '$ref' && typeof child === 'string') {
         const match = /^([^#]+\.schema\.json)(?:#.*)?$/u.exec(child);
-        return match?.[1] === undefined ? [] : [match[1]];
+        return match?.[1] === undefined ? [] : [canonicalNames.get(match[1]) ?? match[1]];
       }
       return referencedSchemas(child);
     });
@@ -113,7 +120,7 @@ function validateVerifierAssets() {
   const provenance = JSON.parse(readFileSync(provenancePath, 'utf8'));
   if (
     provenance.schemaVersion !== '1.0.0' ||
-    provenance.sourceCommit !== '8b215d706a828af7361f9c6799b9cb0a30c9d00b' ||
+    provenance.sourceCommit !== 'ad790aea6f200412da79a3a1bfbaa03cbdb47a2d' ||
     !Array.isArray(provenance.files)
   ) {
     throw new Error('PACKAGE_VERIFIER_PROVENANCE_INVALID');

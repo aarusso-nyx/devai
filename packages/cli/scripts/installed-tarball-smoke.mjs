@@ -1555,9 +1555,9 @@ try {
     .sort();
   const declaredVerifierFiles = verifierProvenance.files?.map((entry) => entry.path).sort();
   if (
-    verifierProvenance.sourceCommit !== '8b215d706a828af7361f9c6799b9cb0a30c9d00b' ||
+    verifierProvenance.sourceCommit !== 'ad790aea6f200412da79a3a1bfbaa03cbdb47a2d' ||
     digest(join(verifierRoot, 'provenance.json')) !==
-      '302161f378e54d0a2b14b743a68577f4bfc43a147a1f17568941e08e14e767a0' ||
+      'fc79da07d4d4dfa466548337a4944ae1b7e0bfdcf2f1c334b341bb1ad477cd4d' ||
     verifierProvenance.files?.length !== 26 ||
     verifierFiles.length !== 26 ||
     JSON.stringify(verifierFiles) !== JSON.stringify(declaredVerifierFiles) ||

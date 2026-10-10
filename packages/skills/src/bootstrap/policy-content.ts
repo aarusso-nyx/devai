@@ -18,6 +18,8 @@ const _CANONICAL_POLICY_FILES = [
   'check-suites.json',
   ...ADOPTER_LAW_POLICY_FILES,
   'subprocess-effects.json',
+  'sensor-inputs.json',
+  'release-verification.json',
 ] as const;
 
 type BootstrapPolicyFile = (typeof POLICY_FILES)[number];

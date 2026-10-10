@@ -53,6 +53,7 @@ export interface InputSelector {
 
 export interface TaskDescriptorNode {
   readonly nodeId: string;
+  readonly sensorKinds?: readonly string[];
   readonly dependencies: readonly string[];
   /** Empty for a `preflight-v1` node, which declares `probes` instead. */
   readonly argv: readonly string[];

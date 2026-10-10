@@ -2,6 +2,8 @@ import { resolve } from 'node:path';
 import { deriveActionEffectFromCapabilities, type ActionCapability } from '../command-manifest.js';
 import type { RegistryEntry } from '../define-command.js';
 import { resolveCheckPlan } from '../commands/check/contracts.js';
+import { resolveMemberInputs } from '../commands/sense/member-inputs.js';
+import { resolveTaskBoundSenseSelection } from '../commands/sense/task-selection.js';
 import {
   resolveSenseSelection,
   type ResolvedSenseSelection,
@@ -201,9 +203,23 @@ export function resolveSenseInvocation(
   else if (kind === undefined && preset !== undefined) requested = { preset };
   else throw new Error('SENSE_SELECTION_EXACTLY_ONE_REQUIRED');
 
-  const selection = resolveSenseSelection(requested, {
+  let selection = resolveSenseSelection(requested, {
     ...(roundId === undefined ? {} : { roundId }),
   });
+  const root = resolve(flagValue(args, '--repo-root') ?? '.');
+  const rawInput = flagValue(args, '--input');
+  let explicit: Readonly<Record<string, unknown>> | undefined;
+  if (rawInput !== undefined) {
+    const parsed: unknown = JSON.parse(rawInput);
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed))
+      throw new Error('SENSE_INPUT_MUST_BE_JSON_OBJECT');
+    explicit = parsed as Readonly<Record<string, unknown>>;
+  }
+  const inputs = resolveMemberInputs(selection, {
+    repoRoot: root,
+    ...(explicit === undefined ? {} : { explicit }),
+  });
+  selection = resolveTaskBoundSenseSelection(selection, root, inputs);
   return Object.freeze({ entry: resolvedEntry(entry, selection), selection });
 }
 

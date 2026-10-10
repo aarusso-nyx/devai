@@ -201,7 +201,7 @@ const DECLARED_PATH_KEYS: ReadonlySet<string> = new Set([
  * segment each, and plant_depth's file exclusions, whose fixed prefix and first
  * wildcard expansion must stay inside the root the same way.
  */
-const DECLARED_GLOB_KEYS: ReadonlySet<string> = new Set(['testGlobs', 'excludeGlobs']);
+const DECLARED_GLOB_KEYS: ReadonlySet<string> = new Set(['testGlobs', 'excludeGlobs', 'scanDirs']);
 
 export type SenseInputsErrorCode =
   | 'SENSE_INPUTS_UNDECLARED_KEY'
@@ -422,6 +422,15 @@ function validateDeclaration(
     );
   }
   return (declaration as { readonly inputs: Readonly<Record<string, SensorInputs>> }).inputs;
+}
+
+/** Validate a sensor's scoped effective inputs before an adapter consumes overrides. */
+export function validateEffectiveSensorInputs(
+  repoRoot: string,
+  kind: string,
+  inputs: SensorInputs,
+): void {
+  validateDeclaration(repoRoot, { schemaVersion: '1.0.0', inputs: { [kind]: inputs } });
 }
 
 /**

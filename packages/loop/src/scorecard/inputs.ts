@@ -1,5 +1,7 @@
+import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, relative, resolve } from 'node:path';
+import { loadChain, verifyLoadedChain, type EvidenceRecord } from '@devai-nyx/evidence';
 import { validators } from '@devai-nyx/schemas';
 import type { SensorReading } from '@devai-nyx/sensors';
 import { computeScorecard, type Scorecard } from '../loop/scorecard.js';
@@ -9,7 +11,7 @@ import {
   scorecardNaCellSet,
 } from '../loop/scorecard-na.js';
 import { loadScorecardFailureMaxAgeMs } from './freshness-policy.js';
-import { filterLatestPerKind } from './latest.js';
+import { assertCandidateSupersessionGraph, filterLatestPerKind } from './latest.js';
 
 export { filterLatestPerKind } from './latest.js';
 
@@ -127,7 +129,10 @@ export function resolveScorecardInputs(opts: ScorecardInputs): ResolvedScorecard
   // (3) Disk fallback.
   const readingsDir =
     (inputs['readings_dir'] as string | undefined) ?? join(opts.repoRoot, SENSOR_READINGS_DIR);
-  const readings = loadReadingsFromDir(readingsDir, { rejectInvalid: true });
+  const readings = loadReadingsFromDir(readingsDir, {
+    rejectInvalid: true,
+    ...(opts.integrationHead === undefined ? {} : { integrationHead: opts.integrationHead }),
+  });
   const naCells = resolveScorecardNaCells(opts.repoRoot);
   assertNaCellsUnmeasured(naCells, readings);
   const scorecard = computeScorecard({
@@ -147,6 +152,8 @@ export const SCORECARD_READING_INVALID = 'SCORECARD_READING_INVALID';
 
 /** Options of the readings-directory walker. */
 export interface LoadReadingsOptions {
+  /** Exact candidate custody, applied before latest-instance selection. Omission is diagnostic. */
+  readonly integrationHead?: string;
   /**
    * Reject instead of skipping: a file of invalid JSON throws
    * `SCORECARD_READING_UNPARSEABLE:<path>` and a value that is not a valid SensorReading
@@ -162,19 +169,58 @@ export interface LoadReadingsOptions {
  * code and its path, so an unreadable or invalid reading is never counted, least of all as
  * PASS; otherwise an unparseable file is skipped.
  */
-function readStoreFile(path: string, rejectInvalid: boolean): SensorReading[] {
+function readStoreFile(
+  path: string,
+  rejectInvalid: boolean,
+  custody?: {
+    readonly root: string;
+    readonly head: string;
+    readonly records: readonly EvidenceRecord[];
+  },
+): SensorReading[] {
   let parsed: unknown;
+  let bytes: Buffer;
   try {
-    parsed = JSON.parse(readFileSync(path, 'utf8')) as unknown;
+    bytes = readFileSync(path);
+    parsed = JSON.parse(bytes.toString('utf8')) as unknown;
   } catch {
-    if (rejectInvalid) throw new Error(`${SCORECARD_READING_UNPARSEABLE}:${path}`);
+    if (rejectInvalid || custody !== undefined) {
+      throw new Error(`${SCORECARD_READING_UNPARSEABLE}:${path}`);
+    }
     return [];
   }
   const values = Array.isArray(parsed) ? (parsed as unknown[]) : [parsed];
-  if (rejectInvalid && values.some((value) => !validators.sensorReading(value))) {
+  if (
+    (rejectInvalid || custody !== undefined) &&
+    values.some((value) => !validators.sensorReading(value))
+  ) {
     throw new Error(`${SCORECARD_READING_INVALID}:${path}`);
   }
-  return values as SensorReading[];
+  const readings = values as SensorReading[];
+  if (custody === undefined) return readings;
+  const reading = readings[0];
+  const storedPath = relative(custody.root, path).split('\\').join('/');
+  if (
+    readings.length !== 1 ||
+    reading === undefined ||
+    storedPath !== `${SENSOR_READINGS_DIR}/${reading.sensor.kind}/${reading.id}.json`
+  ) {
+    throw new Error(`SCORECARD_READING_STORE_IDENTITY_MISMATCH:${path}`);
+  }
+  const digest = createHash('sha256').update(bytes).digest('hex');
+  const bindings = custody.records.flatMap((record) =>
+    record.action !== 'sense.readings.record'
+      ? []
+      : record.artifacts
+          .filter((artifact) => artifact.path === storedPath)
+          .map((artifact) => ({ digest: artifact.sha256, head: record.context.git.head_sha })),
+  );
+  if (bindings.length > 0 && !bindings.some((binding) => binding.digest === digest)) {
+    throw new Error(`SCORECARD_READING_CHAIN_DIGEST_MISMATCH:${reading.id}`);
+  }
+  return bindings.some((binding) => binding.digest === digest && binding.head === custody.head)
+    ? readings
+    : [];
 }
 
 /**
@@ -191,10 +237,23 @@ export function loadReadingsFromDir(
   const rejectInvalid = options.rejectInvalid === true;
   const out: SensorReading[] = [];
   if (!existsSync(dir)) return out;
+  let custody: Parameters<typeof readStoreFile>[2];
+  if (options.integrationHead !== undefined) {
+    // The post-merge observer reads a bound checkout's store from a detached worktree.
+    // Custody belongs to the source store's chain, not the observer's working directory.
+    const root = resolve(dir, '../../..');
+    if (resolve(dir) !== join(root, SENSOR_READINGS_DIR)) {
+      throw new Error(`SCORECARD_READING_CUSTODY_STORE_REQUIRED:${dir}`);
+    }
+    const chainPath = join(root, 'record/proofs/chain.json');
+    const chain = existsSync(chainPath) ? loadChain(chainPath) : { head: null, records: [] };
+    if (!verifyLoadedChain(chain).valid) throw new Error('SCORECARD_READING_CHAIN_INVALID');
+    custody = { root, head: options.integrationHead, records: chain.records };
+  }
   for (const entry of readdirSync(dir).sort()) {
     const full = join(dir, entry);
     if (entry.endsWith('.json')) {
-      out.push(...readStoreFile(full, rejectInvalid));
+      out.push(...readStoreFile(full, rejectInvalid, custody));
       continue;
     }
     let isDir = false;
@@ -206,8 +265,9 @@ export function loadReadingsFromDir(
     if (!isDir) continue;
     for (const childName of readdirSync(full).sort()) {
       if (!childName.endsWith('.json')) continue;
-      out.push(...readStoreFile(join(full, childName), rejectInvalid));
+      out.push(...readStoreFile(join(full, childName), rejectInvalid, custody));
     }
   }
+  if (custody !== undefined) assertCandidateSupersessionGraph(out);
   return filterLatestPerKind(out);
 }

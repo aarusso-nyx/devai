@@ -33,6 +33,7 @@ export interface AdopterPolicyMaterializationSources {
       | 'thresholds.json'
       | 'scorecard-na.json'
       | 'glob-guards.json'
+      | 'sensor-inputs.json'
       | 'release-verification.json',
   ) => string;
 }
@@ -44,6 +45,7 @@ export const ADOPTER_POLICY_TARGETS = [
   '.devai/config/scorecard-na.json',
   '.devai/config/glob-guards.json',
   '.devai/config/release-verification.json',
+  '.devai/config/sensor-inputs.json',
 ] as const;
 
 export function isJsonObject(value: unknown): value is JsonObject {
@@ -76,6 +78,8 @@ export interface AdopterPolicyProjectionInput {
   readonly constitutionVersion?: string;
   /** Repository root whose bound constitution pin gates an `authority` block. */
   readonly targetRoot?: string;
+  /** Targets whose prior binding receipt establishes ownership. */
+  readonly ownedTargets?: readonly string[];
 }
 
 const CONSTITUTION_PIN = '.devai/pin/constitution.md';
@@ -242,6 +246,19 @@ export function resolveAdopterPolicyProjection(
       '.devai/config/release-verification.json',
       unchanged('release-verification.json', releaseVerification),
     );
+  }
+  const sensorInputs = document['sensor_inputs'];
+  if (
+    sensorInputs !== undefined ||
+    input.ownedTargets?.includes('.devai/config/sensor-inputs.json') === true
+  ) {
+    const bytes =
+      sensorInputs === undefined ? readPolicy('sensor-inputs.json') : jsonBytes(sensorInputs);
+    const validate = validator('sensor-inputs.schema.json');
+    if (!validate(JSON.parse(bytes))) {
+      throw new Error(`ADOPTER_POLICY_SENSOR_INPUTS_INVALID:${JSON.stringify(validate.errors)}`);
+    }
+    resolved.set('.devai/config/sensor-inputs.json', bytes);
   }
   return { files: resolved, retired_keys: retiredKeys };
 }

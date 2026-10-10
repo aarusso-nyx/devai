@@ -138,6 +138,7 @@ export function verifyAdopterPolicyBindingSnapshot(input: {
     readonly policy: unknown;
     readonly currentProject: unknown;
     readonly frameworkVersion: string;
+    readonly ownedTargets?: readonly string[];
   }) => ReadonlyMap<string, string>;
 }): AdopterPolicyBindingSnapshot {
   const fail = (): never => {
@@ -183,6 +184,7 @@ export function verifyAdopterPolicyBindingSnapshot(input: {
       policy,
       currentProject: project,
       frameworkVersion: input.frameworkVersion,
+      ownedTargets: Object.keys(binding.materialized),
     });
     const paths = [...expected.keys()].sort();
     if (
