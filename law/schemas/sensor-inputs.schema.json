@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://devai.nyxk.com.br/schemas/sensor-inputs.schema.json",
   "title": "Sensor inputs declaration",
-  "description": "One adopter-owned declaration of the inputs its sensors read and the plant surfaces it has, materialized at .devai/config/sensor-inputs.json from the law default under law/policy/adopter-defaults/sensor-inputs.json (ADR-SCR-0005, ADR-SCR-0003). Every entry under inputs is keyed by a registered sensor kind from law/policy/sensor-registry.json and carries only the inputs that kind reads: test roots, the decision record directory, the invariants directory, the coverage report path with its measured population and exclusion list (ADR-SCR-0007), the effects tsconfig path, the type check argv, the unit, integration, and end-to-end suite argv, the performance suite argv or legacy script name, the build argv and optional working directory, the reusable-workflow threshold, the plant depth exclusion globs, and the CI population of the three harness sensors (workflow, event, head and base branch, attempts, cancelled runs, lookback, minimum sample, excluded workflow-and-job pairs; ADR-SCR-0010). A kind that declares nothing keeps the sensor's own default; the build input is admitted only when test-tasks.json has no build node, and a build declaration whose argv differs from that node reads error with BUILD_ARGV_CONFLICT (ADR-AUT-0002); sense run refuses a key this schema does not list, a kind the registry does not hold, and a path that leaves the repository root, and merges an explicit --input for the same key over the declaration for one run only. The surfaces object names which of the four plant surfaces the repository has (http, database, rbac, actions), each true or false; a sensor bound only to surfaces declared absent emits a skipped reading carrying the declaration as its reason, the scorecard composer records a cell whose readings are all skipped as N/A with that reason, and a sensor that finds a surface declared absent reports review. Declaring an input never changes a threshold or a verdict rule.",
+  "description": "One adopter-owned declaration of the inputs its sensors read and the plant surfaces it has, materialized at .devai/config/sensor-inputs.json from the law default under law/policy/adopter-defaults/sensor-inputs.json (ADR-SCR-0005, ADR-SCR-0003). Every entry under inputs is keyed by a registered sensor kind from law/policy/sensor-registry.json and carries only the inputs that kind reads: test roots, the decision record directory, the invariants directory, the coverage report path with its measured population and exclusion list (ADR-SCR-0007), the effects tsconfig path, the type check argv, the unit, integration, and end-to-end suite argv, the performance suite argv or legacy script name, the build argv and optional working directory, the reusable-workflow threshold, the plant depth exclusion globs, and the CI population of the three harness sensors (workflow, event, head and base branch, attempts, cancelled runs, lookback, minimum sample, excluded workflow-and-job pairs; ADR-SCR-0010). A kind that declares nothing keeps the sensor's own default; the build input is admitted only when test-tasks.json has no build node, and a build declaration whose argv differs from that node reads error with BUILD_ARGV_CONFLICT (ADR-AUT-0002); sense run refuses a key this schema does not list, a kind the registry does not hold, and a path that leaves the repository root, and merges an explicit --input for the same key over the declaration for one run only. The surfaces object names which of the four plant surfaces the repository has (http, database, rbac, actions), each true or false; a sensor bound only to surfaces declared absent emits a skipped reading carrying the declaration as its reason, the scorecard composer records a cell whose readings are all skipped as N/A with that reason, and a sensor that finds a surface declared absent reports review. Declaring an input never changes a threshold or a verdict rule. ADR-SCR-0015 adds policy-owned projection, explicit Angular/React route inputs, and exact descriptor task references. Task references are not arbitrary command admission.",
   "schema_version": "1.0.0",
   "type": "object",
   "additionalProperties": false,
@@ -115,8 +115,43 @@
         "argv": {
           "$ref": "#/$defs/argv",
           "description": "Type check command the sensor executes, without a shell, instead of its default of npx tsc --noEmit against the root tsconfig; its diagnostics are parsed the same way. Under sense run the authority broker admits only npx tsc --noEmit, npx tsc --noEmit -p <relative path>, and exactly pnpm -r typecheck for a pnpm workspace (templates npx-tsc-noemit, npx-tsc-noemit-project, and pnpm-recursive-typecheck, ADR-AUT-0006); any other argv, including pnpm typecheck, pnpm run typecheck, or an added argument, is refused before a process starts."
+        },
+        "taskId": {
+          "$ref": "#/$defs/task_id"
+        },
+        "population": {
+          "$ref": "#/$defs/population"
         }
-      }
+      },
+      "oneOf": [
+        {
+          "required": ["taskId", "population"],
+          "not": {
+            "anyOf": [
+              {
+                "required": ["argv"]
+              }
+            ]
+          }
+        },
+        {
+          "not": {
+            "anyOf": [
+              {
+                "required": ["taskId"]
+              },
+              {
+                "required": ["population"]
+              }
+            ]
+          },
+          "anyOf": [
+            {
+              "required": ["argv"]
+            }
+          ]
+        }
+      ]
     },
     "test_suite_inputs": {
       "type": "object",
@@ -126,13 +161,47 @@
         "argv": {
           "$ref": "#/$defs/argv",
           "description": "Test suite command the sensor executes, without a shell, and grades by exit code and the vitest summary line, instead of the sensor default of pnpm vitest run --config tests/config/t1.unit.config.ts, t3.integration.config.ts, or t5.e2e.config.ts for the unit, integration, or end-to-end suite. Under sense run the broker admits only the governed shape of template pnpm-vitest-run-governed-config in law/policy/subprocess-effects.json; the framework's e2e_test declares tests/config/rc.e2e.config.ts, whose own include selects tests/e2e, with no test path appended (ADR-SCR-0007)."
+        },
+        "taskId": {
+          "$ref": "#/$defs/task_id"
+        },
+        "population": {
+          "$ref": "#/$defs/population"
         }
-      }
+      },
+      "oneOf": [
+        {
+          "required": ["taskId", "population"],
+          "not": {
+            "anyOf": [
+              {
+                "required": ["argv"]
+              }
+            ]
+          }
+        },
+        {
+          "not": {
+            "anyOf": [
+              {
+                "required": ["taskId"]
+              },
+              {
+                "required": ["population"]
+              }
+            ]
+          },
+          "anyOf": [
+            {
+              "required": ["argv"]
+            }
+          ]
+        }
+      ]
     },
     "build_inputs": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["argv"],
       "properties": {
         "argv": {
           "$ref": "#/$defs/argv",
@@ -141,8 +210,46 @@
         "cwd": {
           "$ref": "#/$defs/repository_path",
           "description": "Directory the build command runs from, repository-relative under the same path grammar as the other inputs; the repository root when omitted."
+        },
+        "taskId": {
+          "$ref": "#/$defs/task_id"
+        },
+        "population": {
+          "$ref": "#/$defs/population"
         }
-      }
+      },
+      "oneOf": [
+        {
+          "required": ["taskId", "population"],
+          "not": {
+            "anyOf": [
+              {
+                "required": ["argv"]
+              },
+              {
+                "required": ["cwd"]
+              }
+            ]
+          }
+        },
+        {
+          "not": {
+            "anyOf": [
+              {
+                "required": ["taskId"]
+              },
+              {
+                "required": ["population"]
+              }
+            ]
+          },
+          "anyOf": [
+            {
+              "required": ["argv"]
+            }
+          ]
+        }
+      ]
     },
     "perf_test_inputs": {
       "type": "object",
@@ -156,8 +263,49 @@
         "scriptName": {
           "$ref": "#/$defs/script_name",
           "description": "Legacy key: the root package script the sensor runs as pnpm <scriptName> when no argv is declared, instead of the sensor default of test:perf. Under sense run the broker admits only the default, pnpm test:perf (ADR-AUT-0006); any other script name is refused before a process starts."
+        },
+        "taskId": {
+          "$ref": "#/$defs/task_id"
+        },
+        "population": {
+          "$ref": "#/$defs/population"
         }
-      }
+      },
+      "oneOf": [
+        {
+          "required": ["taskId", "population"],
+          "not": {
+            "anyOf": [
+              {
+                "required": ["argv"]
+              },
+              {
+                "required": ["scriptName"]
+              }
+            ]
+          }
+        },
+        {
+          "not": {
+            "anyOf": [
+              {
+                "required": ["taskId"]
+              },
+              {
+                "required": ["population"]
+              }
+            ]
+          },
+          "anyOf": [
+            {
+              "required": ["argv"]
+            },
+            {
+              "required": ["scriptName"]
+            }
+          ]
+        }
+      ]
     },
     "harness_idiomaticity_inputs": {
       "type": "object",
@@ -305,6 +453,50 @@
           "description": "True when the repository has a registered action surface (law/policy/action-registry.json); false declares the surface absent. Absent: the action registry is not measured. Present: plant_coverage and inventory_coverage measure registered actions against their specification links the way they measure routes."
         }
       }
+    },
+    "task_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Exact nodeId in the validated repository test-tasks.json. The node must explicitly include this sensor kind in sensorKinds and pass existing digest-bound task/toolchain/environment/effect admission. This key is mutually exclusive with command overrides."
+    },
+    "migration_check_inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["taskId", "population"],
+      "properties": {
+        "taskId": {
+          "$ref": "#/$defs/task_id"
+        },
+        "population": {
+          "$ref": "#/$defs/population"
+        }
+      },
+      "description": "Optional reviewed task mode for migration checks. Without this declaration the existing sensor default remains unchanged."
+    },
+    "inventory_routes_inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "framework": {
+          "enum": ["react", "angular"],
+          "description": "Route parser used by direct sensing and inventory regeneration. Defaults to react when omitted; an Angular application must declare angular rather than fabricate a React route population."
+        },
+        "scanDirs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/repository_path"
+          },
+          "description": "Repository-relative route source directories, resolved within the same canonical root for direct sensing and regeneration."
+        }
+      }
+    },
+    "population": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Reviewed execution population label, matched exactly against the referenced node outputContract.population. The task/descriptor, selectors and actual result bind its meaning; the label alone proves no coverage or successful execution."
     }
   },
   "properties": {
@@ -366,11 +558,21 @@
         },
         "harness_performance": {
           "$ref": "#/$defs/harness_population_inputs",
-          "not": { "required": ["outcomeUnit"] }
+          "not": {
+            "required": ["outcomeUnit"]
+          }
         },
         "harness_robustness": {
           "$ref": "#/$defs/harness_population_inputs",
-          "not": { "required": ["outcomeUnit"] }
+          "not": {
+            "required": ["outcomeUnit"]
+          }
+        },
+        "inventory_routes": {
+          "$ref": "#/$defs/inventory_routes_inputs"
+        },
+        "migration_check": {
+          "$ref": "#/$defs/migration_check_inputs"
         }
       }
     },
@@ -411,7 +613,7 @@
           "tsconfigPath": "tests/config/tsconfig.effects.json"
         },
         "type_check": {
-          "argv": ["pnpm", "run", "typecheck"]
+          "argv": ["pnpm", "-r", "typecheck"]
         },
         "e2e_test": {
           "argv": ["pnpm", "vitest", "run", "--config", "tests/config/rc.e2e.config.ts"]
@@ -436,7 +638,12 @@
           "lookbackDays": 30,
           "minimumSample": 20,
           "outcomeUnit": "pull-request-final-head",
-          "excludedJobs": [{ "workflow": "release.yml", "job": "build-release" }]
+          "excludedJobs": [
+            {
+              "workflow": "release.yml",
+              "job": "build-release"
+            }
+          ]
         },
         "harness_performance": {
           "workflow": "ci.yml",
@@ -450,6 +657,19 @@
         "database": false,
         "rbac": false,
         "actions": true
+      }
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "inputs": {
+        "type_check": {
+          "taskId": "typecheck",
+          "population": "workspace-typecheck"
+        },
+        "inventory_routes": {
+          "framework": "angular",
+          "scanDirs": ["apps/web/src"]
+        }
       }
     }
   ]
