@@ -212,7 +212,29 @@ function guarded<T extends object>(
 ): T {
   const wrapper = (...args: unknown[]) => {
     const scope = requireScope(mode);
-    const apply = () => Reflect.apply(implementation as CallableFunction, undefined, args);
+    const apply = () => {
+      let executionArgs = args;
+      if (symbol === 'spawnSync') {
+        const optionsIndex =
+          args[1] !== null && typeof args[1] === 'object' && !Array.isArray(args[1]) ? 1 : 2;
+        const options = args[optionsIndex];
+        if (options !== null && typeof options === 'object' && !Array.isArray(options)) {
+          const executionOptions = { ...options } as SpawnSyncOptions;
+          const env = executionOptions.env;
+          if (env !== null && typeof env === 'object') {
+            // Node propagates coverage variables by mutating env. Keep the authorized request
+            // immutable and give the native call its own copy only after broker approval.
+            executionOptions.env = Object.create(
+              Object.getPrototypeOf(env) as object | null,
+              Object.getOwnPropertyDescriptors({ ...env }),
+            ) as NodeJS.ProcessEnv;
+          }
+          executionArgs = [...args];
+          executionArgs[optionsIndex] = executionOptions;
+        }
+      }
+      return Reflect.apply(implementation as CallableFunction, undefined, executionArgs);
+    };
     return scope.apply_effect(
       { kind: mode === 'mutation' ? 'filesystem' : 'process', symbol, arguments: args },
       apply,
