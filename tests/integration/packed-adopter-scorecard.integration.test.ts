@@ -305,6 +305,56 @@ describe('ADR-SCR-0011 IA-004: the packed artifact admits every sweep read kind'
 });
 
 describe('ADR-REL-0033: the scorecard route from the packed artifact', () => {
+  it('passes the publication harness against the same packed artifact with all custody checks', () => {
+    const destination = join(workspace, 'pack');
+    const archives = readdirSync(destination).filter((name) => name.endsWith('.tgz'));
+    expect(archives).toHaveLength(1);
+    const tarball = join(destination, archives[0] ?? 'missing-tarball');
+    const result = spawnSync(
+      process.execPath,
+      [join(ROOT, 'scripts/rehearse-packed-adopter.mjs'), '--tarball', tarball, '--format', 'json'],
+      {
+        cwd: ROOT,
+        encoding: 'utf8',
+        timeout: 180_000,
+        maxBuffer: 16 * 1024 * 1024,
+      },
+    );
+    expect(result.error).toBeUndefined();
+    expect(result.status, result.stderr || result.stdout).toBe(0);
+    const report = JSON.parse(result.stdout) as {
+      ok: boolean;
+      codes: string[];
+      tarball: string;
+      checks: { id: string; ok: boolean }[];
+    };
+    expect(report.ok).toBe(true);
+    expect(report.codes).toEqual([]);
+    expect(report.tarball).toBe(tarball);
+    expect(report.checks).toHaveLength(18);
+    const ids = report.checks.map((check) => check.id);
+    expect(new Set(ids).size).toBe(18);
+    expect(ids).toEqual(
+      expect.arrayContaining([
+        ...PACKED_LAW.map(([packed]) => `artifact:${packed}`),
+        'sweep:effect',
+        'sweep:admitted',
+        'sweep:readings',
+        'route:identical',
+        'route:consumed',
+        'route:ambiguous',
+        'route:stale-custody',
+        'route:selection',
+        'store:empty',
+        'route:exact-head',
+        'store:unparseable',
+        'store:schema-invalid',
+        'store:legacy-absent',
+      ]),
+    );
+    expect(report.checks.every((check) => check.ok)).toBe(true);
+  }, 180_000);
+
   it('consumes a recorded reading from the readings store identically on two runs', () => {
     resetStore();
     const reading = senseRunReading('inventory_api');
@@ -367,6 +417,62 @@ describe('ADR-REL-0033: the scorecard route from the packed artifact', () => {
     const cell = presenceCell(scorecard());
     expect(cell.verdict).toBe('UNKNOWN');
     expect(cell.sensor_readings ?? []).toEqual([]);
+  }, 30_000);
+
+  it('refuses two recorded heads without an explicit supersession even when timestamps differ', () => {
+    resetStore();
+    const controller = join(fixture, 'src/tickets.controller.ts');
+    const aside = join(workspace, 'tickets.controller.ts');
+    renameSync(controller, aside);
+    let earlier: Record<string, unknown>;
+    try {
+      earlier = senseRunReading('inventory_api');
+    } finally {
+      renameSync(aside, controller);
+    }
+    const later = senseRunReading('inventory_api');
+    expect(earlier['status']).toBe('review');
+    expect(later['status']).toBe('pass');
+    expect(later['id']).not.toBe(earlier['id']);
+    expect(String(later['timestamp']) > String(earlier['timestamp'])).toBe(true);
+    expect(earlier['supersedes']).toBeUndefined();
+    expect(later['supersedes']).toBeUndefined();
+    recordReading(later);
+    recordReading(earlier);
+    const earlierPath = join(fixture, STORE, 'inventory_api', `${String(earlier['id'])}.json`);
+    const laterPath = join(fixture, STORE, 'inventory_api', `${String(later['id'])}.json`);
+    const earlierBytes = readFileSync(earlierPath, 'utf8');
+    const laterBytes = readFileSync(laterPath, 'utf8');
+
+    for (const result of [scorecard(), scorecard()]) {
+      expect(result.status).not.toBe(0);
+      expect(result.stdout).toBe('');
+      expect(envelope(result).error?.message).toBe('SCORECARD_READING_AMBIGUOUS:inventory_api');
+      expect(presenceCellIfEmitted(result)?.verdict).not.toBe('PASS');
+    }
+    expect(readFileSync(earlierPath, 'utf8')).toBe(earlierBytes);
+    expect(readFileSync(laterPath, 'utf8')).toBe(laterBytes);
+  }, 60_000);
+
+  it('requires exact recorded custody before an otherwise valid stale reading is consumed', () => {
+    resetStore();
+    const stale = JSON.parse(
+      readFileSync(join(FIXTURES, 'inventory-api-fail-stale.json'), 'utf8'),
+    ) as Record<string, unknown>;
+    stale['id'] = 'SR-00000000000000d4';
+    expect(packedSchemaValidator()(stale)).toBe(true);
+    const bytes = `${JSON.stringify(stale)}\n`;
+    const path = placeInStore('inventory_api', `${String(stale['id'])}.json`, bytes);
+    const unrecorded = presenceCell(scorecard());
+    expect(unrecorded.verdict).toBe('UNKNOWN');
+    expect(unrecorded.sensor_readings ?? []).toEqual([]);
+    expect(readFileSync(path, 'utf8')).toBe(bytes);
+
+    recordReading(stale);
+    expect(readFileSync(path, 'utf8')).toBe(bytes);
+    const recorded = presenceCell(scorecard());
+    expect(recorded.verdict).toBe('REVIEW');
+    expect(recorded.notes).toContain('REVIEW-stale');
   }, 30_000);
 
   it('reads a failure older than the stale window as stale and not PASS', () => {
