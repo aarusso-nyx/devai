@@ -25,7 +25,7 @@ const { cac } = createRequire(import.meta.url)('../../node_modules/cac/index-com
 
 type JsonObject = Record<string, unknown>;
 
-const FRAMEWORK_VERSION = '2.3.1';
+const FRAMEWORK_VERSION = '2.3.2';
 const SOURCE = 'law/policy/devai-adoption.json';
 const BINDING = '.devai/config/adopter-policy-binding.json';
 const PROJECT = '.devai/config/project.json';

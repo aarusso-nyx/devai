@@ -8,7 +8,7 @@ import { canonicalRegistry } from '../../src/define-command.js';
 import { resolveCliProvenance, resolveCliVersion } from '../../src/version.js';
 
 const ROOT = resolve(import.meta.dirname, '../../../..');
-const CANDIDATE_RELEASE_VERSION = '2.3.1';
+const CANDIDATE_RELEASE_VERSION = '2.3.2';
 const PUBLISHED_RELEASE_VERSION = '2.3.1';
 const TRUSTED_VERIFIER_PACKAGE_VERSION = '1.9.0';
 const VENDORED_PROVENANCE = 'packages/cli/vendor/evidence-verification/provenance.json';
