@@ -925,7 +925,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
     files: [
       {
         path: 'packages/sensors/src/ci-invariant-gate.ts',
-        sha256: '76b1b54ccd3b1cc9b892662eba942abcd21aeadc84f99ac611542fec1cb975ed',
+        sha256: '947eb7e5250b446d2ddb8578cfcfb171e8fe99a3af34d264e9adba6c896e44e2',
       },
       {
         path: 'scripts/process/verify-pages-bytes.mjs',
@@ -955,7 +955,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
     files: [
       {
         path: 'packages/sensors/src/ci-invariant-gate.ts',
-        sha256: '76b1b54ccd3b1cc9b892662eba942abcd21aeadc84f99ac611542fec1cb975ed',
+        sha256: '947eb7e5250b446d2ddb8578cfcfb171e8fe99a3af34d264e9adba6c896e44e2',
       },
       {
         path: 'scripts/process/github-pages-journal.mjs',
