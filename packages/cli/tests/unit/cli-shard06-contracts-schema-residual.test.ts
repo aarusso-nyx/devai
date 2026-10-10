@@ -5,7 +5,12 @@ import type { CAC } from 'cac';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const schemaBoundary = vi.hoisted(() => ({
-  roster: ['alpha.schema.json', 'beta.schema.json'] as readonly string[],
+  roster: [
+    'alpha.schema.json',
+    'beta.schema.json',
+    'preflight-probe.schema.json',
+    'test-task-descriptor.schema.json',
+  ] as readonly string[],
   checkSchemas: vi.fn(),
   getValidator: vi.fn(),
   metaGate: vi.fn(),
@@ -400,10 +405,8 @@ const SOURCE_ONLY_SCHEMAS = [
   'data-handling.schema.json',
   'documentation-information-architecture.schema.json',
   'inv-override.schema.json',
-  'preflight-probe.schema.json',
   'targets.schema.json',
   'task-freshness.schema.json',
-  'test-task-descriptor.schema.json',
   'threat-model.schema.json',
   'toolchain-manifest.schema.json',
 ] as const;
@@ -431,8 +434,7 @@ describe('S06-A schema canon and dispatch residuals', () => {
     fsBoundary.readdirSync.mockReturnValue([
       'toolchain-manifest.schema.json',
       'README.txt',
-      'beta.schema.json',
-      'alpha.schema.json',
+      ...[...schemaBoundary.roster].reverse(),
       ...SOURCE_ONLY_SCHEMAS.slice(0, -1).reverse(),
     ]);
 
