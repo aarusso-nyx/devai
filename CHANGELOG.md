@@ -1,5 +1,47 @@
 # Changelog
 
+## 2.4.0 — 2026-10-10
+
+DEVAI 2.4.0 is a minor candidate. It adds opt-in reviewed task bindings and
+policy-owned sensor inputs, and repairs candidate custody, portable inventory
+roots, Angular route forwarding and bound-constitution measurement. The public
+action set remains 69. Publication and independent artifact verification are
+pending.
+
+- `init bind --adopter-policy` projects the complete optional `sensor_inputs`
+  document with its source and target digests. A never-owned target survives an
+  absent block; removing a previously owned block retires its overrides to
+  installed defaults. Binding, upgrade journals, rollback and Doctor use the
+  same ownership contract (ADR-SCR-0015).
+- `type_check`, test, performance, build and migration sensors can reference an
+  exact reviewed `test-tasks.json` node and population. Explicit `sensorKinds`
+  annotation, actual execution, exact executable/policy/environment identity
+  and verified prerequisites are required. Task bindings require `--write` and
+  are refused in read presets. Unsupported contracts and remote effects gain
+  no admission; real parsed output supplies counts and metrics.
+- Fresh measurements receive deterministic candidate-bound instances and
+  supersede only a verified predecessor of the same kind and candidate.
+  Exact repeated recording stays idempotent. Historical reading bytes and
+  chain prefixes are preserved; tampering, collisions and ambiguous heads
+  remain refusals.
+- Direct and regenerated inventories resolve the same physical checkout root,
+  including paths containing spaces or non-ASCII characters. Angular route
+  declarations and scan directories are forwarded consistently. Inventory
+  dependency order and atomic publication remain mandatory; actual path leaks
+  still fail.
+- Docs drift recognizes the registered constitution reading-order entrypoint
+  only with matching pinned bytes, version and SHA-256 binding. Arbitrary prose,
+  absent pins, competing links and tampered bindings fail closed.
+- The canonical verifier compatibility change admits the same closed task
+  annotations without stripping them from descriptor or task identity. Upstream
+  pull request 13 was reviewed and merged as `ad790aea`, then vendored with
+  exact source provenance (ADR-MUT-0014). This release
+  continues to use the published trusted verifier `@aarusso-nyx/devai@1.9.0`;
+  a repin follows verified publication as a separate step.
+- Adopter migrations cover the optional sensor-input projection and the
+  descriptive declared-task subprocess template. See
+  [sensor input guidance](docs/adopters/sensor-inputs.md) before opting in.
+
 ## 2.3.2 — 2026-10-10
 
 DEVAI 2.3.2 is a patch release. It fixes predecessor observation selection, proves the generated

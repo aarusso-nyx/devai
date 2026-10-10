@@ -1,14 +1,19 @@
 # Sensor inputs
 
-Sensor inputs are adopter declarations. Each sensor carries a default for a conventional
-service layout; a repository with another layout declares where its inputs live once, in
-`.devai/config/sensor-inputs.json`, under `law/schemas/sensor-inputs.schema.json`. The file is
-materialized by `init bind` from the adopter default under
-`law/policy/adopter-defaults/sensor-inputs.json`, which declares only the
-[CI population](#the-harness-sensor-population) of the three harness sensors, so every adopter
-starts on the sensor defaults and declares only what differs (ADR-SCR-0005,
-[ADR-SCR-0010](../../law/adr/ADR-SCR-0010-ci-sampling-contract.md)). The same file
-declares which plant [surfaces](#surfaces) the repository has (ADR-SCR-0003).
+Sensor inputs are adopter declarations validated by
+`law/schemas/sensor-inputs.schema.json`. Starting with DEVAI 2.4.0, author the
+complete document under `sensor_inputs` in `law/policy/devai-adoption.json`, then
+run the pinned CLI's `init bind --adopter-policy --write`. The registered producer
+materializes `.devai/config/sensor-inputs.json` together with its digest-bound
+receipt; do not hand-edit that generated projection.
+
+An explicit block owns the entire file. Without the block, a never-owned existing
+file is preserved. Removing a previously bound block retires its overrides to the
+installed canonical defaults; a verified prior receipt establishes ownership.
+The defaults under `law/policy/adopter-defaults/sensor-inputs.json` declare the
+[CI population](#the-harness-sensor-population) of the three harness sensors.
+The document also declares the plant [surfaces](#surfaces).
+See [ADR-SCR-0015](../../law/adr/ADR-SCR-0015-candidate-bound-sensor-inputs-and-instances.md).
 
 A declaration changes what a sensor reads, never what it concludes. Thresholds, verdict rules,
 and N/A cells are untouched; the only way a declared input moves a cell is by giving its
@@ -94,6 +99,84 @@ not hold.
 
 A kind that appears under `inputs` must declare at least one key. Kinds not listed above take
 no declared input, and naming one is refused as an undeclared key.
+
+## Exact reviewed task inputs
+
+The `type_check`, `unit_test`, `integration_test`, `e2e_test`, `perf_test`, `build`
+and `migration_check` sensors may reference a reviewed task instead of overriding
+a command:
+
+```json
+{
+  "schemaVersion": "1.0.0",
+  "inputs": {
+    "type_check": { "taskId": "typecheck", "population": "workspace-typecheck" },
+    "inventory_routes": { "framework": "angular", "scanDirs": ["apps/web/src"] }
+  }
+}
+```
+
+The exact `test-tasks.json` node must list the consumer in `sensorKinds` and declare
+`outputContract.population` equal to the sensor's population. The descriptor and
+task policy bind the actual command, working directory, inputs, dependency
+requirements, toolchain and allowlisted environment. Missing annotation, wrong
+kind, mismatched population or changed policy is refused. `taskId` and `population`
+are required together and cannot accompany `argv`, `cwd` or `scriptName`.
+Existing argv modes keep their broker restrictions; declaring a task is no grant
+of write or external-effect authority. Results name their bound population and
+actual metrics; a population label and zero exit code do not prove coverage.
+
+Every task binding requires explicit `--write` and resolves to at least
+`local-write` with `fs:workspace` and `proc:declared-sensor-task`;
+`migration_check` also requires `db:write`. A read preset refuses a bound task
+member. Invoke write-capable members separately under their declared role and
+consent. This grants no remote effects.
+
+The task must carry executable argv rather than `preflight-v1` probes, and the
+sensor must support its actual output contract. Missing or unsupported output
+contracts are refused. Supported `outputContract.kind` values are
+`command-result`, `vitest` and `workspace-build`; omission uses the sensor's
+ordinary parser. Protected `generated_namespaces` output-census contracts and
+mutation-testing tasks are refused through this sensing path. Declaring a kind
+does not replace validated output from the selected sensor's actual parser.
+Prerequisites are verified from existing completion for
+the exact candidate, policy and environment; sensing does not run them
+implicitly. Only the selected task executes, and a cached result cannot replace
+a new measurement. Changed executable bytes, argv, cwd, policy or environment
+between admission and execution fail closed.
+
+## Route framework and roots
+
+`inventory_routes.framework` selects `angular` or `react`; omission retains the
+React default. `scanDirs` supplies repository-relative route-source directories.
+Direct sensing and inventory regeneration use the same declaration, including
+surfaces. An Angular application measures its actual Angular route declarations.
+An empty or unsupported route population remains review rather than a fabricated
+React measurement. Omitted, dot and absolute checkout roots identify the same
+repository; portable inventory bodies contain relative paths.
+
+## Constitution reading-order entrypoint
+
+An adopter may keep the registered reading-order document at
+`law/constitution.md` instead of duplicating its pinned Constitution. Use the
+exact [ADR-SCR-0015 form](../../law/adr/ADR-SCR-0015-candidate-bound-sensor-inputs-and-instances.md#root-routes-and-documentation-binding),
+with the repository label in its heading. The body and links are fixed; a
+document that merely mentions the pin and project configuration is not accepted.
+Docs drift verifies the regular, contained pinned file's raw-byte SHA-256 and
+parsed version against `.devai/config/project.json`, then measures the bound
+Constitution. Extra prose, a missing or tampered pin, or a mismatched version
+fails the binding check. Refresh the pin through
+`devai init bind --constitution --write`.
+
+## Immutable measurement instances
+
+Exactly repeated recording reuses immutable bytes. A new execution, including a
+new timestamp or duration, is a new measurement. Producer-selected digest-bound
+instances supersede only a verified current instance for the same sensor kind
+and candidate. Cross-candidate reuse requires its own verified chain binding and
+never creates a cross-candidate supersession edge. Ambiguity and tampering are
+refused; existing IDs, historical readings, chain prefixes and recorder
+same-ID/different-body rejection remain intact.
 
 ## The harness sensor population
 
@@ -266,10 +349,13 @@ The local-write shapes run package scripts you write, so DEVAI treats them as wr
 as read-only. `pnpm` may also be the corepack shim a corepack-managed `pnpm` resolves to
 (ADR-AUT-0006, ADR-AUT-0002).
 
-Each shape is matched token for token. `pnpm typecheck`, `pnpm run typecheck`,
-`pnpm exec tsc`, `pnpm run test:perf`, `node <script>`, another script name, or an added
-argument such as `--filter` or `--` are all refused. Admitting any declared argv is
-planned for 2.4.0.
+Each shape is matched token for token. As direct argv declarations, `pnpm typecheck`,
+`pnpm run typecheck`, `pnpm exec tsc`, `pnpm run test:perf`, `node <script>`, another
+script name, or an added argument such as `--filter` or `--` are refused. DEVAI 2.4.0
+provides the [exact reviewed task input](#exact-reviewed-task-inputs) path for an
+annotated task with its bound executable, policy, population and explicit write
+consent. The descriptive `declared-sensor-task` template admits only that verified
+binding; it grants no generic argv fallback.
 
 **A pnpm or turbo workspace** has no single root project that type-checks every package, and
 a root `tsconfig` over all package sources reports errors the real gates do not:

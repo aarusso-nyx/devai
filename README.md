@@ -12,6 +12,12 @@ into eleven workflow domains: `audit`, `init`, `doctor`, `check`, `sense`, `roun
 `evidence`, `release`, `triage`, `backlog`, and `campaign`. `task` and `catalog` are internal plumbing exposed by
 `--all` for maintainers and automation.
 
+The **2.4.0 minor candidate** adds policy-owned sensor inputs, exact reviewed
+task bindings, candidate-bound measurement instances, and Angular inventory
+inputs. See the [candidate release notes](CHANGELOG.md#240--2026-10-10) and
+[sensor input guide](docs/adopters/sensor-inputs.md). The installation below
+continues to name the published package until 2.4.0 publication is verified.
+
 ```bash
 export NODE_AUTH_TOKEN=<github-token-with-read-packages>
 printf '%s\n' '@aarusso-nyx:registry=https://npm.pkg.github.com' \
