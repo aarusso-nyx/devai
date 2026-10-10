@@ -303,6 +303,33 @@
           ]
         }
       ]
+    },
+    {
+      "version": "2.4.0",
+      "status": "released",
+      "date": "2026-10-10",
+      "changes": [
+        {
+          "id": "MIG-2.4.0-sensor-inputs-projection",
+          "kind": "opt-in-capability",
+          "summary": "Declare complete sensor_inputs in the adopter policy and rematerialize through the registered adopter-policy binding. The target and receipt are atomic and digest-bound; absent unmanaged targets are preserved, while removing a previously owned block retires its overrides to installed canonical defaults. Exact taskId sensor inputs additionally require an explicit sensorKinds annotation on the reviewed test-task node. Angular route inputs are forwarded to direct sensing and inventory regeneration. Existing argv admission, thresholds and reading history remain unchanged.",
+          "decision_records": ["ADR-SCR-0015", "ADR-CFG-0002", "ADR-AUT-0002"],
+          "segments": ["adopter-policy"],
+          "files": [
+            ".devai/config/sensor-inputs.json",
+            ".devai/config/adopter-policy-binding.json",
+            "test-tasks.json"
+          ]
+        },
+        {
+          "id": "MIG-2.4.0-declared-sensor-task-template",
+          "kind": "rebind",
+          "summary": "Rebind subprocess effects to materialize the declared-sensor-task descriptive template. It grants only an internally verified exact member/task binding, requires explicit local-write consent, retains migration db:write and grants no generic argv or remote effects.",
+          "decision_records": ["ADR-SCR-0015"],
+          "segments": ["subprocess-effects"],
+          "files": [".devai/config/subprocess-effects.json"]
+        }
+      ]
     }
   ]
 }
