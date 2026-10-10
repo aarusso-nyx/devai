@@ -161,6 +161,34 @@ function fixture() {
     },
   };
 }
+function prefixSiblingFixture() {
+  const fixtureValue = fixture();
+  const { root, input } = fixtureValue;
+  for (const directory of ['foo', 'foo-extra']) {
+    mkdirSync(join(root, directory));
+    writeFileSync(join(root, directory, 'file'), CSS);
+  }
+  writeFileSync(join(root, 'foo.ext'), INDEX);
+  // Deliberately use an archive entry order different from both sibling traversal and
+  // complete-path sorting. Archive order cannot redefine the preparation population.
+  const entries: Entry[] = [
+    { path: './', type: '5' },
+    { path: './index.html', bytes: INDEX },
+    { path: './foo.ext', bytes: INDEX },
+    { path: './foo-extra/', type: '5' },
+    { path: './foo-extra/file', bytes: CSS },
+    { path: './foo/', type: '5' },
+    { path: './foo/file', bytes: CSS },
+    { path: './assets/', type: '5' },
+    { path: './assets/style.css', bytes: CSS },
+  ];
+  input.artifact.members = siteMembers(root);
+  input.artifact.siteSha256 = hash(Buffer.from(JSON.stringify(input.artifact.members)));
+  input.expected.siteSha256 = input.artifact.siteSha256;
+  input.archiveBytes = zip(tar(entries));
+  input.artifact.archiveSha256 = hash(input.archiveBytes);
+  return { ...fixtureValue, entries };
+}
 async function validate(input: unknown) {
   const module = (await import('../../packages/sensors/src/ci-invariant-gate.js')) as {
     validateSitePreparationArtifact: (input: unknown) => {
@@ -180,6 +208,79 @@ describe('retained site member population compatibility (offline)', () => {
     ]);
     expect(hash(Buffer.from(JSON.stringify(siteMembers(root))))).toBe(input.artifact.siteSha256);
   });
+  it('retains sibling traversal ordering for shared-prefix directories and file siblings', () => {
+    const { root, input } = prefixSiblingFixture();
+    expect(siteMembers(root).map((member: { path: string }) => member.path)).toEqual([
+      'assets/style.css',
+      'foo/file',
+      'foo-extra/file',
+      'foo.ext',
+      'index.html',
+    ]);
+    expect(siteMembers(root)).toEqual(input.artifact.members);
+    expect(hash(Buffer.from(JSON.stringify(siteMembers(root))))).toBe(input.artifact.siteSha256);
+  });
+  it('binds both typed archive operations to the original sibling traversal population', async () => {
+    const { input } = prefixSiblingFixture();
+    const module = await import('../../packages/sensors/src/ci-invariant-gate.js');
+    const members = module.siteArchiveMembers(input.archiveBytes);
+    expect.soft(members).toEqual(input.artifact.members);
+    expect.soft(hash(Buffer.from(JSON.stringify(members)))).toBe(input.artifact.siteSha256);
+    expect(await validate(input)).toMatchObject({
+      status: 'pass',
+      members: input.artifact.members,
+    });
+  });
+  it('extracts the exact shared-prefix file population only after wrapper validation', async () => {
+    const { input } = prefixSiblingFixture();
+    const extract = vi.fn();
+    const module = (await import(
+      new URL('../../scripts/process/verify-site-preparation-artifact.mjs', import.meta.url).href
+    )) as {
+      verifySitePreparationArtifact: (input: unknown) => Promise<unknown>;
+    };
+    await expect(
+      module.verifySitePreparationArtifact({ ...input, extract }),
+    ).resolves.toMatchObject({
+      status: 'pass',
+      members: input.artifact.members,
+    });
+    expect(extract).toHaveBeenCalledTimes(1);
+    const [files] = required(extract.mock.calls[0]) as [{ path: string; bytes: Buffer }[]];
+    expect(files.map((file) => file.path).sort()).toEqual(
+      input.artifact.members.map((member: { path: string }) => member.path).sort(),
+    );
+    for (const member of input.artifact.members) {
+      const file = required(files.find((file) => file.path === member.path));
+      expect(file.bytes.length).toBe(member.size);
+      expect(hash(file.bytes)).toBe(member.sha256);
+    }
+  });
+  it.each(['./foo/file', './foo-extra/file', './foo.ext'])(
+    'refuses substituted shared-prefix member bytes at %s before extraction',
+    async (path) => {
+      const { input, entries } = prefixSiblingFixture();
+      input.archiveBytes = zip(
+        tar(
+          entries.map((entry) =>
+            entry.path === path ? { ...entry, bytes: Buffer.from('tampered') } : entry,
+          ),
+        ),
+      );
+      input.artifact.archiveSha256 = hash(input.archiveBytes);
+      const extract = vi.fn();
+      const module = (await import(
+        new URL('../../scripts/process/verify-site-preparation-artifact.mjs', import.meta.url).href
+      )) as {
+        verifySitePreparationArtifact: (input: unknown) => Promise<unknown>;
+      };
+      expect((await validate(input)).status).not.toBe('pass');
+      await expect(module.verifySitePreparationArtifact({ ...input, extract })).rejects.toThrow(
+        'SITE_PREPARATION_ARTIFACT_REFUSED',
+      );
+      expect(extract).not.toHaveBeenCalled();
+    },
+  );
   it('rejects other dot members and symbolic links through the actual current helper', () => {
     const { root } = fixture();
     writeFileSync(join(root, '.hidden'), 'unsafe');
