@@ -30,7 +30,17 @@
       "default": "./dist/runtime/index/release-host.js"
     },
     "./package.json": "./package.json",
-    "./dist/*": "./dist/*"
+    "./dist/*": "./dist/*",
+    "./native-coverage-adapter": {
+      "types": "./dist/runtime/types/cli/native-coverage-adapter.d.ts",
+      "import": "./dist/runtime/index/native-coverage-adapter.js",
+      "default": "./dist/runtime/index/native-coverage-adapter.js"
+    },
+    "./native-service-fixtures": {
+      "types": "./dist/runtime/types/cli/native-service-fixtures.d.ts",
+      "import": "./dist/runtime/index/native-service-fixtures.js",
+      "default": "./dist/runtime/index/native-service-fixtures.js"
+    }
   },
   "files": [
     "dist"

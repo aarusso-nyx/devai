@@ -78,6 +78,7 @@
     "@vitest/coverage-v8": "4.1.11",
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1",
+    "devai-native-coverage-compiler-fixture": "file:./tests/fixtures/native-coverage-compiler",
     "eslint": "^9.0.0",
     "globals": "^17.4.0",
     "lint-staged": "17.6.0",
