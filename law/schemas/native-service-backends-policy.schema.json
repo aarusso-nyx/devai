@@ -1,0 +1,493 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/native-service-backends-policy.schema.json",
+  "title": "Approved finite native service backend catalogue",
+  "schema_version": "1.0.0",
+  "description": "Package-owned reviewed backend records. Empty candidate catalogue admits no service. A selector or self-declared digest cannot approve an image, runtime or containment policy. Actual immutable positive/hostile/replay/cleanup proofs are required before Architect activation; schema validity alone supplies no standing.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "policyVersion",
+    "id",
+    "status",
+    "authority",
+    "introducedIn",
+    "records",
+    "invariants"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "../schemas/native-service-backends-policy.schema.json"
+    },
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "policyVersion": {
+      "const": "1.0.0"
+    },
+    "id": {
+      "const": "native-service-backends"
+    },
+    "authority": {
+      "const": "Architect"
+    },
+    "introducedIn": {
+      "const": "2.6.0"
+    },
+    "invariants": {
+      "const": [
+        "package-owned-record-only-no-adopter-image-or-policy-self-approval",
+        "active-record-and-profile-implementation-required-before-effect",
+        "code-free-reviewed-base-image-prepared-outside-measurement",
+        "exact-linux-runtime-recipe-platform-and-containment-identity",
+        "candidate-dependencies-devai-helpers-and-replay-separately-hashed-readonly-mounts",
+        "network-none-owned-anchor-actual-topology-and-membership-verified",
+        "same-linux-runtime-paths-independent-replay-no-host-identity-relabel",
+        "real-positive-hostile-and-terminal-cleanup-proofs-before-activation"
+      ]
+    },
+    "status": {
+      "enum": ["candidate", "active"]
+    },
+    "records": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/backend"
+      }
+    }
+  },
+  "$defs": {
+    "backend": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "status",
+        "platform",
+        "supportedProfiles",
+        "baseImage",
+        "recipe",
+        "containment",
+        "node",
+        "git",
+        "limits"
+      ],
+      "properties": {
+        "id": {
+          "enum": ["owned-linux-native-v1-linux-amd64", "owned-linux-native-v1-linux-arm64"]
+        },
+        "kind": {
+          "const": "owned-linux-native-v1"
+        },
+        "status": {
+          "enum": ["candidate", "active"]
+        },
+        "platform": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["os", "architecture"],
+          "properties": {
+            "os": {
+              "const": "linux"
+            },
+            "architecture": {
+              "enum": ["amd64", "arm64"]
+            }
+          }
+        },
+        "supportedProfiles": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "postgres-http-v1",
+              "postgres-http-s3-v1",
+              "postgres-redis-http-s3-kms-v1",
+              "playwright-chromium-web-v1"
+            ]
+          }
+        },
+        "baseImage": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["imageId", "runtimeManifestSha256", "archive"],
+          "properties": {
+            "reference": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9._:/-]*@sha256:(?!0{64}$)[0-9a-f]{64}$",
+              "description": "Optional genuine registry RepoDigest; absent for an unpublished local prepared image. Never fabricate a RepoDigest or pull during measurement."
+            },
+            "imageId": {
+              "type": "string",
+              "pattern": "^sha256:(?!0{64}$)[0-9a-f]{64}$"
+            },
+            "runtimeManifestSha256": {
+              "type": "string",
+              "pattern": "^(?!0{64}$)[0-9a-f]{64}$"
+            },
+            "archive": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "sha256"],
+              "properties": {
+                "kind": {
+                  "const": "docker-image-archive-v1"
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^(?!0{64}$)[0-9a-f]{64}$"
+                }
+              }
+            }
+          }
+        },
+        "recipe": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "sha256"],
+          "properties": {
+            "id": {
+              "const": "owned-linux-native-v1"
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^(?!0{64}$)[0-9a-f]{64}$"
+            }
+          }
+        },
+        "containment": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "policySha256"],
+          "properties": {
+            "kind": {
+              "const": "docker-none-anchor-v1"
+            },
+            "policySha256": {
+              "type": "string",
+              "pattern": "^(?!0{64}$)[0-9a-f]{64}$"
+            }
+          }
+        },
+        "node": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["version", "path", "sha256"],
+          "properties": {
+            "version": {
+              "const": "24.20.0"
+            },
+            "path": {
+              "type": "string",
+              "pattern": "^/(?!.*(?:^|/)\\.\\.(?:/|$))[^\\u0000\\r\\n]+$"
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^(?!0{64}$)[0-9a-f]{64}$"
+            }
+          }
+        },
+        "git": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["version", "path", "sha256"],
+          "properties": {
+            "version": {
+              "type": "string",
+              "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+            },
+            "path": {
+              "type": "string",
+              "pattern": "^/(?!.*(?:^|/)\\.\\.(?:/|$))[^\\u0000\\r\\n]+$"
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^(?!0{64}$)[0-9a-f]{64}$"
+            }
+          }
+        },
+        "browser": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["playwrightVersion", "chromiumRevision", "path", "distributionSha256"],
+          "properties": {
+            "playwrightVersion": {
+              "const": "1.60.0"
+            },
+            "chromiumRevision": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            },
+            "path": {
+              "type": "string",
+              "pattern": "^/(?!.*(?:^|/)\\.\\.(?:/|$))[^\\u0000\\r\\n]+$"
+            },
+            "distributionSha256": {
+              "type": "string",
+              "pattern": "^(?!0{64}$)[0-9a-f]{64}$"
+            }
+          }
+        },
+        "limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "maxInstancesPerKind",
+            "startupTimeoutMs",
+            "executionTimeoutMs",
+            "cleanupTimeoutMs",
+            "maxBufferBytes",
+            "memoryBytes",
+            "pids"
+          ],
+          "properties": {
+            "maxInstancesPerKind": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["postgres", "redis", "localstackS3", "localstackS3Kms"],
+              "properties": {
+                "postgres": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 64
+                },
+                "redis": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 64
+                },
+                "localstackS3": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 64
+                },
+                "localstackS3Kms": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 64
+                }
+              }
+            },
+            "startupTimeoutMs": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 300000
+            },
+            "executionTimeoutMs": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 3600000
+            },
+            "cleanupTimeoutMs": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 60000
+            },
+            "maxBufferBytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 67108864
+            },
+            "memoryBytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 17179869184
+            },
+            "pids": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 4096
+            }
+          }
+        },
+        "acceptance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "reviewedBy",
+            "nativeProofSha256",
+            "replayProofSha256",
+            "containmentProofSha256",
+            "cleanupProofSha256"
+          ],
+          "properties": {
+            "reviewedBy": {
+              "const": "Architect"
+            },
+            "nativeProofSha256": {
+              "type": "string",
+              "pattern": "^(?!0{64}$)[0-9a-f]{64}$"
+            },
+            "replayProofSha256": {
+              "type": "string",
+              "pattern": "^(?!0{64}$)[0-9a-f]{64}$"
+            },
+            "containmentProofSha256": {
+              "type": "string",
+              "pattern": "^(?!0{64}$)[0-9a-f]{64}$"
+            },
+            "cleanupProofSha256": {
+              "type": "string",
+              "pattern": "^(?!0{64}$)[0-9a-f]{64}$"
+            }
+          }
+        },
+        "redisProcessControl": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "maxTransitionsPerInstance", "maxPausedMs"],
+          "properties": {
+            "kind": {
+              "const": "pause-resume-v1"
+            },
+            "maxTransitionsPerInstance": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 64
+            },
+            "maxPausedMs": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 60000
+            }
+          },
+          "description": "Package-reviewed optional Redis process-control support. Limits are backend-owned, never request supplied. No control is admitted unless both this record and the selected request explicitly match; an absent declaration mints a null private control context."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "active"
+              }
+            }
+          },
+          "then": {
+            "required": ["acceptance"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "supportedProfiles": {
+                "contains": {
+                  "const": "playwright-chromium-web-v1"
+                }
+              }
+            }
+          },
+          "then": {
+            "required": ["browser"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "id": {
+                "const": "owned-linux-native-v1-linux-amd64"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "platform": {
+                "properties": {
+                  "architecture": {
+                    "const": "amd64"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "id": {
+                "const": "owned-linux-native-v1-linux-arm64"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "platform": {
+                "properties": {
+                  "architecture": {
+                    "const": "arm64"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": ["redisProcessControl"]
+          },
+          "then": {
+            "properties": {
+              "supportedProfiles": {
+                "contains": {
+                  "enum": ["postgres-redis-http-s3-kms-v1", "playwright-chromium-web-v1"]
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "examples": [
+    {
+      "$schema": "../schemas/native-service-backends-policy.schema.json",
+      "schemaVersion": "1.0.0",
+      "policyVersion": "1.0.0",
+      "id": "native-service-backends",
+      "status": "candidate",
+      "authority": "Architect",
+      "introducedIn": "2.6.0",
+      "records": [],
+      "invariants": [
+        "package-owned-record-only-no-adopter-image-or-policy-self-approval",
+        "active-record-and-profile-implementation-required-before-effect",
+        "code-free-reviewed-base-image-prepared-outside-measurement",
+        "exact-linux-runtime-recipe-platform-and-containment-identity",
+        "candidate-dependencies-devai-helpers-and-replay-separately-hashed-readonly-mounts",
+        "network-none-owned-anchor-actual-topology-and-membership-verified",
+        "same-linux-runtime-paths-independent-replay-no-host-identity-relabel",
+        "real-positive-hostile-and-terminal-cleanup-proofs-before-activation"
+      ]
+    }
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "active"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "records": {
+            "minItems": 1,
+            "contains": {
+              "properties": {
+                "status": {
+                  "const": "active"
+                }
+              },
+              "required": ["status"]
+            }
+          }
+        }
+      }
+    }
+  ]
+}

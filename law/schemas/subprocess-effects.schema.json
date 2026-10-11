@@ -98,7 +98,15 @@
                     "db:read",
                     "db:write",
                     "db:unclassified",
-                    "host-cache:write"
+                    "host-cache:write",
+                    "fixture:postgresql",
+                    "fixture:loopback-http",
+                    "fixture:localstack-s3",
+                    "fixture:redis",
+                    "fixture:redis-process-control",
+                    "fixture:localstack-kms",
+                    "fixture:chromium",
+                    "fixture:reference-web"
                   ]
                 },
                 {

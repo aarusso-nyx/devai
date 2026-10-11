@@ -91,6 +91,10 @@
         "pattern": "^test:v1:.+"
       },
       "description": "Exact complete expected native leaf-test ID set, not a count or sample. ID is test:v1: plus encodeURIComponent(canonical JSON [projectId,portable sourceFile,ancestorTitles,testTitle]); no ordinal or line fallback. Semantic canonical decoding and exact equality to native final IDs are mandatory."
+    },
+    "serviceProfile": {
+      "$ref": "native-service-profile.schema.json",
+      "description": "Optional finite owned service request (ADR-SCR-0020). Missing/candidate backend records or an unimplemented backend/profile refuse before provisioning. Declaration alone grants no effect, endpoint, execution origin or standing."
     }
   },
   "allOf": [

@@ -1,0 +1,428 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/native-service-profile.schema.json",
+  "title": "Finite owned native service profile",
+  "schema_version": "1.0.0",
+  "description": "Forward opt-in native fixture request under resultPopulation.serviceProfile. This declaration grants no authority or readiness. A package-owned planner must bind exact toolchain/artifact identities and independently prove provisioning, contained transports and terminal cleanup before execution origin or standing (ADR-SCR-0020). No caller endpoints, sockets, secrets, command strings, roots or origin tokens are accepted.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "profile", "provisioner", "postgres", "backendId"],
+  "$defs": {
+    "toolchainKey": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "postgres": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["image"],
+      "properties": {
+        "image": {
+          "type": "string",
+          "pattern": "^postgres:16-alpine@sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "localstack": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["image", "services"],
+      "properties": {
+        "image": {
+          "type": "string",
+          "pattern": "^localstack\\/localstack:3.8.1@sha256:[0-9a-f]{64}$"
+        },
+        "services": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "enum": ["s3", "kms"]
+          },
+          "description": "Declared profile service forms. The combined S3/KMS profile permits separately fresh localstackS3 and localstackS3Kms operations; each actual instance has its exact selected service list in private lifecycle evidence. A S3-only profile never admits KMS."
+        }
+      }
+    },
+    "browser": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "playwrightVersion",
+        "executableToolchainKey",
+        "distributionSha256",
+        "containmentToolchainKey",
+        "containmentPolicySha256"
+      ],
+      "properties": {
+        "kind": {
+          "const": "contained-chromium-v1"
+        },
+        "playwrightVersion": {
+          "const": "1.60.0"
+        },
+        "executableToolchainKey": {
+          "$ref": "#/$defs/toolchainKey"
+        },
+        "distributionSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "containmentToolchainKey": {
+          "$ref": "#/$defs/toolchainKey"
+        },
+        "containmentPolicySha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "server": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "taskId", "population", "port", "readyPath"],
+      "properties": {
+        "id": {
+          "enum": ["api", "web", "oidc"]
+        },
+        "taskId": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "population": {
+          "type": "string",
+          "minLength": 1
+        },
+        "port": {
+          "enum": [3000, 3100, 3200]
+        },
+        "readyPath": {
+          "enum": ["/readyz", "/"]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "id": {
+                "const": "api"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "port": {
+                "const": 3000
+              },
+              "readyPath": {
+                "const": "/readyz"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "id": {
+                "const": "web"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "port": {
+                "const": 3100
+              },
+              "readyPath": {
+                "const": "/"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "id": {
+                "const": "oidc"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "port": {
+                "const": 3200
+              },
+              "readyPath": {
+                "const": "/readyz"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "redis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["image"],
+      "properties": {
+        "image": {
+          "type": "string",
+          "pattern": "^redis:7-alpine@sha256:[0-9a-f]{64}$"
+        },
+        "processControl": {
+          "const": "pause-resume-v1",
+          "description": "Explicit opt-in to exact-owned Redis process suspension/recovery only. Requires the separate fixture:redis-process-control capability and active backend support with host-owned finite limits; absence grants no process control. No caller signals, commands, container IDs or limits are accepted."
+        }
+      }
+    }
+  },
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "profile": {
+      "enum": [
+        "postgres-http-v1",
+        "postgres-http-s3-v1",
+        "postgres-redis-http-s3-kms-v1",
+        "playwright-chromium-web-v1"
+      ]
+    },
+    "provisioner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "toolchainKey"],
+      "properties": {
+        "kind": {
+          "const": "owned-docker-v1"
+        },
+        "toolchainKey": {
+          "const": "docker"
+        }
+      }
+    },
+    "postgres": {
+      "$ref": "#/$defs/postgres"
+    },
+    "localstack": {
+      "$ref": "#/$defs/localstack"
+    },
+    "browser": {
+      "$ref": "#/$defs/browser"
+    },
+    "servers": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 3,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/server"
+      },
+      "allOf": [
+        {
+          "contains": {
+            "properties": {
+              "id": {
+                "const": "api"
+              }
+            },
+            "required": ["id"]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "properties": {
+              "id": {
+                "const": "web"
+              }
+            },
+            "required": ["id"]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "properties": {
+              "id": {
+                "const": "oidc"
+              }
+            },
+            "required": ["id"]
+          },
+          "minContains": 0,
+          "maxContains": 1
+        }
+      ]
+    },
+    "redis": {
+      "$ref": "#/$defs/redis"
+    },
+    "prerequisites": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["taskId", "population"],
+        "properties": {
+          "taskId": {
+            "$ref": "#/$defs/toolchainKey"
+          },
+          "population": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "backendId": {
+      "enum": ["owned-linux-native-v1-linux-amd64", "owned-linux-native-v1-linux-arm64"],
+      "description": "Selects an active package-owned approved backend record; this selector cannot approve image/runtime/policy bytes. Missing, candidate, absent or unsupported record refuses before provisioning."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "profile": {
+            "const": "postgres-http-v1"
+          }
+        }
+      },
+      "then": {
+        "not": {
+          "anyOf": [
+            {
+              "required": ["localstack"]
+            },
+            {
+              "required": ["browser"]
+            },
+            {
+              "required": ["servers"]
+            },
+            {
+              "required": ["redis"]
+            },
+            {
+              "required": ["prerequisites"]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "profile": {
+            "const": "postgres-http-s3-v1"
+          }
+        }
+      },
+      "then": {
+        "required": ["localstack"],
+        "not": {
+          "anyOf": [
+            {
+              "required": ["browser"]
+            },
+            {
+              "required": ["servers"]
+            },
+            {
+              "required": ["redis"]
+            },
+            {
+              "required": ["prerequisites"]
+            }
+          ]
+        },
+        "properties": {
+          "localstack": {
+            "properties": {
+              "services": {
+                "const": ["s3"]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "profile": {
+            "const": "postgres-redis-http-s3-kms-v1"
+          }
+        }
+      },
+      "then": {
+        "required": ["redis", "localstack"],
+        "not": {
+          "anyOf": [
+            {
+              "required": ["browser"]
+            },
+            {
+              "required": ["servers"]
+            },
+            {
+              "required": ["prerequisites"]
+            }
+          ]
+        },
+        "properties": {
+          "localstack": {
+            "properties": {
+              "services": {
+                "const": ["s3", "kms"]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "profile": {
+            "const": "playwright-chromium-web-v1"
+          }
+        }
+      },
+      "then": {
+        "required": ["browser", "servers", "redis", "localstack", "prerequisites"],
+        "properties": {
+          "localstack": {
+            "properties": {
+              "services": {
+                "const": ["s3", "kms"]
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "profile": "postgres-http-v1",
+      "provisioner": {
+        "kind": "owned-docker-v1",
+        "toolchainKey": "docker"
+      },
+      "postgres": {
+        "image": "postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685"
+      },
+      "backendId": "owned-linux-native-v1-linux-arm64"
+    }
+  ]
+}
