@@ -10,7 +10,7 @@ import {
   snapshot,
   workflow,
 } from '../../../../tests/helpers/workflow-inventory-fixture.js';
-import { workflowReviewInventory } from '../../src/harness/workflow-parser.js';
+import { parseWorkflow, workflowReviewInventory } from '../../src/harness/workflow-parser.js';
 
 const roots: string[] = [];
 function fixture(): string {
@@ -24,6 +24,82 @@ afterEach(() => {
 });
 
 describe('read-only workflow review inventory', () => {
+  it.each(['5432:5432', '127.0.0.1:5432:5432', 'http://localhost:5432', 'urn:service'])(
+    'retains physical steps after the valid unquoted service scalar %s without approving effects',
+    (scalar) => {
+      const root = fixture();
+      const source = `name: STYNX service-shaped observation
+jobs:
+  verify:
+    services:
+      postgres:
+        image: postgres:16-alpine
+        ports:
+          - ${scalar}
+    env:
+      STYNX_TEST_PG_PORT: '5432'
+    steps:
+      - name: Inspect
+        run: node scripts/main.mjs
+      - name: Unsupported shell
+        run: bash scripts/main.mjs
+`;
+      put(root, '.github/workflows/check.yml', source);
+      const before = snapshot(root);
+      const result = workflowReviewInventory(root);
+      expect(result.status).toBe('unknown');
+      expect(result.workflows[0]?.sha256).toBe(hash(source));
+      expect(result.workflows[0]?.steps).toEqual(
+        [
+          { name: 'Inspect', run: 'node scripts/main.mjs' },
+          { name: 'Unsupported shell', run: 'bash scripts/main.mjs' },
+        ].map((step, index) => ({
+          job: 'verify',
+          index,
+          occurrence: `.github/workflows/check.yml#verify[${String(index)}]`,
+          name: step.name,
+          sha256: hash(JSON.stringify(step)),
+          closure: {
+            status: 'unknown',
+            files: null,
+            reason: 'WORKFLOW_INVENTORY_CLOSURE_UNPROVED',
+          },
+        })),
+      );
+      expect(
+        parseWorkflow(join(root, '.github/workflows/check.yml'), source, root).jobs[0]?.effect,
+      ).toBe('unknown');
+      expect(snapshot(root)).toEqual(before);
+      expect(existsSync(join(root, 'EXECUTED'))).toBe(false);
+    },
+  );
+
+  it.each([
+    '          - host: 5432\n            host: 5433',
+    '          - host: 5432\n           escaped: 5433',
+  ])('keeps ambiguous service YAML fail-closed: %s', (ports) => {
+    const root = fixture();
+    put(
+      root,
+      '.github/workflows/check.yml',
+      `jobs:
+  verify:
+    services:
+      postgres:
+        ports:
+${ports}
+    steps:
+      - name: Inspect
+        run: node scripts/main.mjs
+`,
+    );
+    const before = snapshot(root);
+    const result = workflowReviewInventory(root);
+    expect(result).toMatchObject({ status: 'unknown', reason: 'WORKFLOW_INVENTORY_INCOMPLETE' });
+    expect(result.workflows[0]).toMatchObject({ status: 'unknown', steps: [] });
+    expect(snapshot(root)).toEqual(before);
+  });
+
   it('returns complete raw workflow and executable/import digests without executing or writing', () => {
     const root = fixture();
     const before = snapshot(root);
