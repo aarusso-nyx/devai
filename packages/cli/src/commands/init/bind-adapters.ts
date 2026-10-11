@@ -426,9 +426,15 @@ export function planAdopterPolicyBind(
   if (priorReceipt !== null) {
     const parsed = parseAdopterPolicyBinding(priorReceipt);
     for (const [target, code] of [
-      ['.devai/config/sensor-inputs.json', 'SENSOR_INPUTS'],
-      ['.devai/config/invariant-producers.json', 'INVARIANT_PRODUCERS'],
-      ['.devai/config/reviewed-workflow-steps.json', 'REVIEWED_WORKFLOW_STEPS'],
+      ['.devai/config/sensor-inputs.json', 'ADOPTER_POLICY_SENSOR_INPUTS_OWNERSHIP_MISMATCH'],
+      [
+        '.devai/config/invariant-producers.json',
+        'ADOPTER_POLICY_INVARIANT_PRODUCERS_OWNERSHIP_MISMATCH',
+      ],
+      [
+        '.devai/config/reviewed-workflow-steps.json',
+        'ADOPTER_POLICY_REVIEWED_WORKFLOW_STEPS_OWNERSHIP_MISMATCH',
+      ],
     ] as const) {
       if ('binding' in parsed && parsed.binding.materialized[target] !== undefined) {
         const priorBytes = readTextIfPresent(join(targetRoot, target));
@@ -437,7 +443,7 @@ export function planAdopterPolicyBind(
           priorBytes === null ||
           sha256Bytes(priorBytes) !== parsed.binding.materialized[target]
         ) {
-          throw new Error(`ADOPTER_POLICY_${code}_OWNERSHIP_MISMATCH`);
+          throw new Error(code);
         }
         ownedTargets.push(target);
       }

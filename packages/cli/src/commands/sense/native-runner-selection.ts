@@ -9,6 +9,25 @@ import type { PlannedTask } from '../../services/check-runner/types.js';
 import { assertNativeConfigCapabilities } from './native-config-capabilities.js';
 import type { NativeTestResultContract } from './native-test-results.js';
 
+/** Reconstruct the private execution recipe without changing the authored task identity. */
+export function nativeExecutionCommand(root: string, task: PlannedTask, nonce: string) {
+  if (!/^[0-9a-f]{64}$/u.test(nonce)) throw new Error('SENSE_NATIVE_NONCE_INVALID');
+  const contract = task.outputContract['resultPopulation'] as NativeTestResultContract;
+  const outputRoot =
+    contract.selectionEvidence?.reporter === 'playwright-v1'
+      ? resolve(root, '.devai/state/native-config-traces', nonce, 'runtime/playwright-results')
+      : null;
+  return Object.freeze({
+    executable: realpathSync(process.execPath),
+    argv: Object.freeze([
+      task.executable.path,
+      ...task.argv.slice(1),
+      ...(outputRoot === null ? [] : ['--output', outputRoot]),
+    ]),
+    outputRoot,
+  });
+}
+
 /** Actual native collection, package-owned instrumentation, and complete candidate input closure. */
 export function nativeRunnerSelection(
   root: string,
@@ -165,6 +184,7 @@ export function nativeRunnerSelection(
   visitPackage(manifestPath);
   const inputPackages = nativeInputPackageClosure(root);
   return sha256Hex({
+    executionRecipe: vitest ? 'node-native-v1' : 'node-native-owned-playwright-results-v1',
     nodeExecutable: realpathSync(process.execPath),
     nodeExecutableSha256: sha256Hex(readFileSync(process.execPath)),
     nodeVersion: process.version,

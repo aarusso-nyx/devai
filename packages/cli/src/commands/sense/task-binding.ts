@@ -37,7 +37,11 @@ import {
   inspectNativeConfigurationSelection,
   inspectNativeInputProvenance,
 } from './native-input-provenance.js';
-import { nativeInputPreloadPath, nativeRunnerSelection } from './native-runner-selection.js';
+import {
+  nativeExecutionCommand,
+  nativeInputPreloadPath,
+  nativeRunnerSelection,
+} from './native-runner-selection.js';
 import { resolveSensorReadingInstance } from './reading-instance.js';
 import type { SensorInputs } from './shared.js';
 
@@ -113,6 +117,7 @@ export function assertNativeSensorFilesystemTarget(
 
 const trustedBindings = new WeakSet<SensorTaskBinding>();
 const processBindings = new WeakMap<object, SensorTaskBinding>();
+const processCommands = new WeakMap<object, { executable: string; argv: readonly string[] }>();
 const nativeMeasurements = new WeakMap<
   SensorReading,
   { readonly binding: SensorTaskBinding; readonly body: string }
@@ -383,21 +388,14 @@ export function matchDeclaredSensorTaskProcess(
   )
     return undefined;
   const binding = processBindings.get(options);
-  if (binding === undefined) return undefined;
+  const command = processCommands.get(options);
+  if (binding === undefined || command === undefined) return undefined;
   assertFresh(binding);
   if (
     realpathSync(root) !== binding.root ||
     resolvedSensorMember() !== binding.kind ||
-    request.arguments[0] !==
-      (binding.nativeSelectionDigest === undefined
-        ? binding.task.executable.path
-        : process.execPath) ||
-    canonicalize(request.arguments[1]) !==
-      canonicalize(
-        binding.nativeSelectionDigest === undefined
-          ? binding.task.argv.slice(1)
-          : [binding.task.executable.path, ...binding.task.argv.slice(1)],
-      )
+    request.arguments[0] !== command.executable ||
+    canonicalize(request.arguments[1]) !== canonicalize(command.argv)
   )
     return undefined;
   return binding;
@@ -486,6 +484,14 @@ export function executeSensorTask(binding: SensorTaskBinding): SensorReading {
       ? undefined
       : join(binding.root, '.devai/state/native-config-traces', collectionNonce, 'inputs.ndjson');
   const runtimeRoot = tracePath === undefined ? undefined : join(tracePath, '..', 'runtime');
+  const command =
+    collectionNonce === undefined
+      ? Object.freeze({
+          executable: binding.task.executable.path,
+          argv: Object.freeze(binding.task.argv.slice(1)),
+          outputRoot: null,
+        })
+      : nativeExecutionCommand(binding.root, binding.task, collectionNonce);
   if (tracePath !== undefined && runtimeRoot !== undefined)
     nativeFilesystemContext.run(
       { root: binding.root, kind: 'trace', nonce: collectionNonce },
@@ -519,6 +525,9 @@ export function executeSensorTask(binding: SensorTaskBinding): SensorReading {
             DEVAI_NATIVE_INPUT_TRACE: tracePath,
             DEVAI_NATIVE_INPUT_SCOPE: 'main',
             DEVAI_NATIVE_RUNTIME_ROOT: runtimeRoot,
+            ...(command.outputRoot === null
+              ? {}
+              : { DEVAI_NATIVE_RESULT_ROOT: command.outputRoot }),
             DEVAI_NATIVE_RUNNER: (
               binding.task.outputContract['resultPopulation'] as NativeTestResultContract
             ).selectionEvidence?.reporter,
@@ -529,15 +538,9 @@ export function executeSensorTask(binding: SensorTaskBinding): SensorReading {
     }),
   });
   processBindings.set(options, binding);
+  processCommands.set(options, command);
   const start = performance.now();
-  const result =
-    binding.nativeSelectionDigest === undefined
-      ? spawnSync(binding.task.executable.path, binding.task.argv.slice(1), options)
-      : spawnSync(
-          process.execPath,
-          [binding.task.executable.path, ...binding.task.argv.slice(1)],
-          options,
-        );
+  const result = spawnSync(command.executable, [...command.argv], options);
   const duration = Math.round(performance.now() - start);
   assertFresh(binding);
   const stdout = String(result.stdout ?? '');
@@ -571,6 +574,8 @@ export function executeSensorTask(binding: SensorTaskBinding): SensorReading {
   if (collectionNonce !== undefined && binding.nativeSelectionDigest !== undefined) {
     metrics['native_collection_nonce'] = collectionNonce;
     metrics['native_selection_digest'] = binding.nativeSelectionDigest;
+    metrics['native_effective_command'] = canonicalize(command);
+    metrics['native_effective_command_sha256'] = sha256Hex(command);
     const rawTrace =
       tracePath !== undefined && existsSync(tracePath) ? readFileSync(tracePath, 'utf8') : '';
     metrics['native_input_trace'] = rawTrace;

@@ -3,6 +3,7 @@ import { inspectNativeTestResults, type NativeTestResultContract } from './nativ
 import { readdirSync } from 'node:fs';
 import { getValidator } from '@devai-nyx/schemas';
 import { verifyLoadedChain, type EvidenceChain } from '@devai-nyx/evidence';
+import { nativeExecutionCommand } from './native-runner-selection.js';
 import {
   loadCandidateAuditProjection,
   computeHarnessInvariantAlignment,
@@ -178,6 +179,10 @@ export function declaredInvariantProducerStanding(
           typeof nonce !== 'string' ||
           !/^[0-9a-f]{64}$/u.test(nonce) ||
           metrics['native_selection_digest'] !== binding.nativeSelectionDigest ||
+          metrics['native_effective_command'] !==
+            canonicalize(nativeExecutionCommand(binding.root, binding.task, nonce)) ||
+          metrics['native_effective_command_sha256'] !==
+            sha256Hex(nativeExecutionCommand(binding.root, binding.task, nonce)) ||
           typeof metrics['native_input_trace'] !== 'string' ||
           sha256Hex(Buffer.from(metrics['native_input_trace'])) !==
             metrics['native_input_trace_sha256'] ||

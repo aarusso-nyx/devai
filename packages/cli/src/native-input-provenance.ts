@@ -66,6 +66,7 @@ if (trace !== undefined && nonce !== undefined) {
   let trustedReadDepth = 0;
   const original = { ...fs };
   const runtimeRoot = process.env['DEVAI_NATIVE_RUNTIME_ROOT'];
+  const resultRoot = process.env['DEVAI_NATIVE_RESULT_ROOT'];
   const runtimePath = (path: string): boolean =>
     runtimeRoot !== undefined && (path === runtimeRoot || path.startsWith(`${runtimeRoot}/`));
   const scope = process.env['DEVAI_NATIVE_INPUT_SCOPE'] ?? 'main';
@@ -1097,6 +1098,12 @@ if (trace !== undefined && nonce !== undefined) {
         if (!url.startsWith('node:')) unsupported('non-file-module');
         return next(url, context);
       }
+      const modulePath = fileURLToPath(url);
+      if (
+        resultRoot !== undefined &&
+        (modulePath === resultRoot || modulePath.startsWith(`${resultRoot}/`))
+      )
+        unsupported('result-artifact-module');
       let directory = dirname(fileURLToPath(url));
       for (;;) {
         const manifestPath = resolve(directory, 'package.json');

@@ -261,6 +261,22 @@ export function inspectNativeInputProvenance(
     const packageRoots = Object.keys(packageClosure.manifests)
       .filter((path) => path !== resolve(root, 'package.json'))
       .map(dirname);
+    // Playwright 1.60 probes URL pathname strings for its two own entrypoints.
+    // Those literal percent-encoded sibling paths are not decoded or admitted inputs.
+    const playwrightUrlProbes = new Set<string>();
+    if (report.devaiCollection?.reporter === 'playwright-v1') {
+      for (const directory of packageRoots) {
+        const manifest = JSON.parse(readFileSync(resolve(directory, 'package.json'), 'utf8')) as {
+          name?: string;
+          version?: string;
+        };
+        if (manifest.name === 'playwright' && manifest.version === '1.60.0') {
+          for (const entry of ['test.js', 'lib/index.js']) {
+            playwrightUrlProbes.add(pathToFileURL(resolve(directory, entry)).pathname);
+          }
+        }
+      }
+    }
     const admitted = (path: string): boolean => {
       let directory = existsSync(path) && lstatSync(path).isDirectory() ? path : dirname(path);
       for (;;) {
@@ -501,6 +517,11 @@ export function inspectNativeInputProvenance(
           (row['observation'] as Row)?.['value'] === false &&
           resolutionManifests.has(path) &&
           !existsSync(path);
+        const absentPlaywrightUrlProbe =
+          playwrightUrlProbes.has(path) &&
+          operation === 'exists' &&
+          (row['observation'] as Row)?.['value'] === false &&
+          !existsSync(path);
         const absentAncestorManifest =
           ancestorManifests.has(path) &&
           !existsSync(path) &&
@@ -517,6 +538,7 @@ export function inspectNativeInputProvenance(
           !packageInput &&
           !ancestor &&
           !absentResolutionManifest &&
+          !absentPlaywrightUrlProbe &&
           !absentAncestorManifest &&
           !absentConfigProbe
         )

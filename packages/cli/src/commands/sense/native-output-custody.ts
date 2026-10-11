@@ -22,9 +22,26 @@ export function nativeOutputCustody(
   )
     throw new Error('NATIVE_OUTPUT_ROOT_NOT_FRESH');
   const report = JSON.parse(stdout) as {
-    devaiCollection?: { reporter?: string; runtimeOutputRoots?: unknown };
+    devaiCollection?: {
+      reporter?: string;
+      runtimeOutputRoots?: unknown;
+      runtimeResultRoot?: unknown;
+      resolvedSelection?: Row[];
+    };
   };
   const vitest = report.devaiCollection?.reporter === 'vitest-v1';
+  const results = resolve(runtime, 'playwright-results');
+  if (
+    !vitest &&
+    (report.devaiCollection?.reporter !== 'playwright-v1' ||
+      report.devaiCollection.runtimeResultRoot !== results ||
+      !Array.isArray(report.devaiCollection.resolvedSelection) ||
+      report.devaiCollection.resolvedSelection.length === 0 ||
+      !report.devaiCollection.resolvedSelection.every(
+        (project) => project['outputDir'] === results,
+      ))
+  )
+    throw new Error('NATIVE_OUTPUT_ROOT_SELECTION_INVALID');
   const declared = report.devaiCollection?.runtimeOutputRoots;
   if (
     vitest &&
@@ -89,10 +106,21 @@ export function nativeOutputCustody(
         /^[A-Za-z0-9_-]{21}(?:\/ssr(?:\/(?:[0-9a-f]{40}|\.tmp-[0-9]+-[a-z0-9]+))?)?$/u.test(part)
       );
     }
-    return /^playwright(?:\/[0-9a-f]{2}(?:\/[0-9a-f]{10}_[0-9a-f]{7}_[A-Za-z0-9_]*\.(?:js|map|data))?)?$/u.test(
-      part,
+    return (
+      /^playwright(?:\/[0-9a-f]{2}(?:\/[0-9a-f]{10}_[0-9a-f]{7}_[A-Za-z0-9_]*\.(?:js|map|data))?)?$/u.test(
+        part,
+      ) ||
+      /^playwright-results(?:\/(?:[A-Za-z0-9_-]+|\.playwright-artifacts-[0-9]+|\.last-run\.json))?$/u.test(
+        part,
+      )
     );
   };
+  const resultPath = (path: string): boolean => path === results || path.startsWith(`${results}/`);
+  const resultFile = (path: string): boolean => path === resolve(results, '.last-run.json');
+  const cacheSource = (path: string): boolean =>
+    /^playwright\/[0-9a-f]{2}\/[0-9a-f]{10}_[0-9a-f]{7}_[A-Za-z0-9_]*\.js$/u.test(
+      relative(runtime, path),
+    );
   const physicalPath = (path: string): string => resolve(physical, relative(runtime, path));
   const sha = (value: unknown): value is string =>
     typeof value === 'string' && /^[0-9a-f]{64}$/u.test(value);
@@ -109,6 +137,7 @@ export function nativeOutputCustody(
         if (
           !known(created) ||
           !permitted(created) ||
+          (resultPath(created) && resultFile(created)) ||
           entries.has(created) ||
           entry['realpath'] !== physicalPath(created) ||
           typeof entry['mode'] !== 'number' ||
@@ -123,6 +152,7 @@ export function nativeOutputCustody(
       return true;
     }
     if (kind === 'output-write-intent') {
+      if (resultPath(path) && !resultFile(path)) throw new Error('NATIVE_OUTPUT_PATH_INVALID');
       const entry = entries.get(path);
       if (
         row['present'] !== (entry !== undefined) ||
@@ -135,6 +165,8 @@ export function nativeOutputCustody(
     }
     if (kind === 'output-rename-intent') {
       if (
+        resultPath(path) ||
+        (known(row['target']) && resultPath(row['target'])) ||
         row['targetPresent'] !== false ||
         entries.get(path)?.kind !== 'file' ||
         !known(row['target']) ||
@@ -171,6 +203,7 @@ export function nativeOutputCustody(
       return true;
     }
     if (kind === 'output-write') {
+      if (resultPath(path) && !resultFile(path)) throw new Error('NATIVE_OUTPUT_PATH_INVALID');
       complete(row, path, 'write');
       if (
         entries.get(dirname(path))?.kind !== 'directory' ||
@@ -200,6 +233,8 @@ export function nativeOutputCustody(
       if (
         !known(target) ||
         !permitted(target) ||
+        resultPath(path) ||
+        resultPath(target) ||
         entry?.kind !== 'file' ||
         entries.has(target) ||
         entries.get(dirname(target))?.kind !== 'directory' ||
@@ -220,6 +255,8 @@ export function nativeOutputCustody(
     if (kind !== 'observation') throw new Error('NATIVE_OUTPUT_EVENT_INVALID');
     const entry = entries.get(path);
     const operation = row['operation'];
+    if (resultPath(path) && operation === 'readFile')
+      throw new Error('NATIVE_OUTPUT_RESULT_INPUT_REFUSED');
     const observation = row['observation'] as Row;
     if (entry === undefined) {
       if (
@@ -276,8 +313,7 @@ export function nativeOutputCustody(
       return (
         !vitest &&
         [...entries].some(
-          ([path, entry]) =>
-            path.endsWith('.js') && entry.kind === 'file' && entry.sha256 === sha256,
+          ([path, entry]) => cacheSource(path) && entry.kind === 'file' && entry.sha256 === sha256,
         )
       );
     },
