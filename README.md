@@ -17,8 +17,10 @@ declared audit producers, reviewed workflow effects and complete native result
 populations. See the [release notes](CHANGELOG.md#250--2026-10-11) and
 [adopter audit interfaces](docs/dev/operations/adopter-audit-interfaces.md).
 The developing **2.6.0 minor campaign** adds an installed read-only workflow
-review inventory; implementation and independent integration remain required
-before publication.
+review inventory, scoped hook refresh and a finite diagnostic coverage adapter.
+Native service/browser profiles remain forward candidate contracts with an empty
+backend catalogue; they supply no production admission or executed standing.
+Protected release gates remain required before publication.
 
 ```bash
 export NODE_AUTH_TOKEN=<github-token-with-read-packages>

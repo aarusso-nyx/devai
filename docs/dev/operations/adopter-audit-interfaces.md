@@ -1,7 +1,11 @@
 # Adopter audit interfaces
 
 DEVAI 2.5.0 publishes the audit interfaces below; its package remains immutable.
-The developing 2.6.0 minor candidate adds the read-only workflow review inventory.
+The developing 2.6.0 minor candidate adds the read-only workflow review inventory
+and finite diagnostic coverage adapter. Its service/browser profiles remain
+forward candidate contracts: the backend catalogue is empty and service requests
+refuse before execution. Neither diagnostic evidence nor those declarations
+establishes native origin, standing or full adopter audit completion.
 A declared policy or successful binding is not an audit PASS: installed producer
 validation, independent regressions and protected integration must establish each
 result.
@@ -584,3 +588,219 @@ An embedded verifier, edited generated file or stripped annotation does not
 switch the protected executable. Preserve earlier evidence and follow the
 [release discipline](./release-discipline.md#the-verifier-source-boundary-and-the-order-of-a-repin)
 for every later full repin.
+
+## Finite native coverage helper adapter (2.6 candidate)
+
+[ADR-SCR-0019](../../../law/adr/ADR-SCR-0019-package-owned-native-coverage-adapter.md)
+defines the package-owned `@aarusso-nyx/devai/native-coverage-adapter` export and
+`createNativeCoverageAdapter(options)`. It is a forward contract; installed
+hostile tests, actual provider equivalence and output-custody acceptance must
+precede a support claim. No unchanged STYNX provider is admitted by this text.
+
+The closed request contains `packageDir`, `config: "tsconfig.json"`, complete
+`modules: [{source, output}]`, `includes` and `excludes`. The host owns authority
+root, candidate, tracked inputs, dependency bytes and private execution context;
+none can be supplied as an authored grant. The finite API provides pure
+`sha256(string | Uint8Array)`, actual `candidate()`, `sourceCensus()`,
+`compile({mode: "production" | "coverage", source})`, `readVerifiedOutput(path)`,
+`verify()` and detached `evidence()`. Compiled outputs carry actual UTF-8
+`{path, text, sha256}` plus diagnostics. No compiler system/default host,
+arbitrary child command or original IO handle is exposed.
+
+The same subpath's pure named `isProxy(value)` and
+`sameNativeData(left, right)` helpers replace narrow data inspection needs,
+without admitting `node:util` or global Reflect. Captured intrinsics classify
+Proxies without traps and compare only supported primitives/own-data records and
+arrays, including descriptor flags and paired cycles. Proxies, accessors,
+functions, exotic prototypes or the finite depth/pair limit refuse; getters,
+coercions, iterators and prototype methods never execute. No helper grants IO or
+standing.
+
+Initially TypeScript must resolve to exact6.0.3 through the admitted package edge.
+Every custom compiler-host callback, library path, directory/absence probe,
+current directory and resolution input is bound and rechecked. Emission is in
+memory. Existing production JavaScript/maps/declarations receive finite read
+credit only after independent exact production recomputation; an authored hash
+or generic `dist` path is insufficient. Coverage conversion retains original
+source/map/counter identity. The sole git observation is actual bound-executable
+`git rev-parse --verify HEAD` with exact cwd/closed environment and result equal
+to the admitted candidate, repeated at verification/seal and current standing.
+
+The actual coverage-v8 runtime/provider must match exact4.1.11 and its complete
+resolved package closure. Preserve provider initialization, project/options,
+source census, source-map, final counter and threshold checks. Pure structural
+data inspection is bounded; no general crypto, child_process, ts.sys or global
+reflection exception follows. Report/temp writes need separately accepted finite
+forms under the host's fresh nonce-owned runtime root; no arbitrary output/state
+permission or module-input credit follows. Ordinary diagnostic adapter use
+provides zero origin/custody/standing; governed use retains all native collection,
+private origin, per-scope seals and current custody checks.
+
+Private integration must retain the governed factory in the canonical early
+preload and expose no context installer or artifact registrar. Instance facts
+are correlation data; the host independently repeats the requested compiler
+operations and current input/output checks before granting exact generated-input
+credit. Every live adapter verifies before its scope seals, then origin and
+standing revalidate the derivation. A workspace node_modules link cannot relabel
+untracked repository outputs as dependency inputs; their production derivation
+must be proved too. Diagnostic evidence includes the actual physical Git
+`{path, sha256}` identity and still grants no standing.
+
+STYNX e20d01a uses real native privacy coverage. Splitting its shared factory can
+remove an unused helper import from ordinary unit/integration configs only if
+all resolved populations/transforms/aliases and ordinary coverage gates remain
+unchanged. It cannot remove required provider measurements, native variants or
+standalone thresholds. Actual browser, server, database and container effects
+still require separate measured lifecycle profiles; Node TAP remains diagnostic
+UNKNOWN pending a provenance-capable adapter. The 43 PASS/two existing N/A target
+retains those obligations, complete HTTP evidence and actual CI sample windows.
+
+The 176-step workflow roster must remain complete. Harness coherence requires
+proved effects for every job; built-in known classifications need not acquire
+adopter review entries. A separately human-authorized all-occurrence executable-closure target would
+add an obligation, including actions/composites/config/computed reachability;
+an architectural handoff alone does not create that extra PASS gate.
+Do not replace unknown closure with empty files or label an unsupported remote
+action complete. This finite coverage design makes no whole-adoption PASS claim.
+
+## Owned native service profiles (2.6 candidate)
+
+[ADR-SCR-0020](../../../law/adr/ADR-SCR-0020-owned-native-service-fixtures.md)
+defines candidate contracts for `postgres-http-v1`, `postgres-http-s3-v1`,
+`postgres-redis-http-s3-kms-v1` and `playwright-chromium-web-v1`. Their schema and policy are forward inputs;
+implemented private planning, effect guards, installed hostile tests and actual
+complete workload measurements must precede support. No command shown elsewhere
+acquires these effects merely by adding a JSON declaration.
+
+The proposed opt-in `resultPopulation.serviceProfile` references exact toolchain
+and immutable artifact identities, not caller endpoints, secrets, command strings
+or roots. PostgreSQL uses a fresh exclusive cluster because the actual tests
+mutate cluster roles. LocalStack uses its actual digest-bound 3.8.1 image through
+a host-only private Docker control plane behind the finite fixture API; no
+candidate Docker client, ambient engine socket, arbitrary
+image/exec/mount or public network is admitted. Every actual listener, namespace
+endpoint, child and container must have retained lifecycle and cleanup evidence.
+Complete privacy unit/wiring four-file, integration two-file and coverage six-file
+populations, original nine source bindings and all assertions remain required.
+
+The proposed `@aarusso-nyx/devai/native-service-fixtures` export supplies only
+`createNativeServiceFixtures()` with no caller options and no diagnostic fallback.
+Its async `postgres()`, `redis()`, `localstackS3()` and `localstackS3Kms()` create
+fresh per-original-start handles with actual owned endpoints and exact-instance
+`stop()`; `verify()` checks the private context/lifecycle. Keep all original real
+SQL/SDK/HTTP/assertions. The two-file integration graph needs Redis and S3/KMS
+plus its separate dedicated S3 instance, rather than a shared singleton.
+
+Real Redis process suspension is a separate opt-in:
+`serviceProfile.redis.processControl: 'pause-resume-v1'`. It requires an active
+backend's matching `redisProcessControl` record and backend-owned
+`maxTransitionsPerInstance`/`maxPausedMs`, plus the separate
+`fixture:redis-process-control` local-write capability before consent. Frozen
+Redis handles have zero-argument `pause()`/`resume()` methods that refuse when
+control is unselected. Only the privately bound instance can be suspended and
+resumed; actual state, ordered transitions, deadlines and terminal cleanup are
+independently checked. Same-state repetition needs current identity/state proof
+and cannot extend a pause deadline. Failed control or cleanup supplies no PASS.
+No container IDs, Docker commands or general signal capability are exposed.
+
+Preserve the reference API readiness test's real process pause, bounded down
+result and recovery. Redis `CLIENT PAUSE`, quitting a client or a simulated
+disconnect does not prove that case. Its two existing cache cleanup helpers can
+use actual `SCAN MATCH`/`DEL` on owned Redis for the complete original rate-limit
+or idempotency prefix; no generic container exec is needed. A fixture that
+ordinarily falls back to an in-memory store must refuse real-Redis native
+admission when its required startup fails.
+
+For an adopter's published testing package, retain `createTestApp` and its real
+`StartedTestContainer` public contract. A repository-only native fixture helper
+may reuse an explicitly bound private application-setup core with injected
+owned lifecycle/endpoints; keep the public default Testcontainers wrapper and
+all original application, SQL, HTTP and SDK assertions. The core's actual source
+and production derivation must remain in the input/compiler closure. Do not
+mock or alias the public package to a reduced implementation, duplicate its
+application setup, cast a reduced fixture handle to `StartedTestContainer`, or
+add a DEVAI runtime dependency to the published testing package. Migrate fixture
+call sites explicitly; a required compiled-graph contract still applies.
+
+The selected backend design runs the whole native task and independent replay
+in a reviewed prepared Linux runtime, with only owned members sharing a fresh
+network:none anchor. No host ports, external route, engine socket or macOS/Linux
+identity relabelling is admitted. Actual namespace endpoints are explicit
+transport adaptations, never fabricated Docker port metadata. The package-owned
+backend catalogue is currently empty/candidate, so no `backendId` enables service
+execution. Caller image/policy hashes cannot approve records; actual runtime,
+containment, replay and cleanup proofs must precede activation and support.
+
+Before consent, service selection validates only an immutable pending binding
+to the portable declaration, candidate/input/dependency snapshots, package
+helpers, approved backend and exact capabilities. It creates no container or
+volume and claims no actual Linux execution plan. Even an input-only Linux
+planning container requires the full selected profile's `sense run --write`
+consent. After consent, the private supervisor derives and binds the actual
+Linux executable/selection/predecessor tuple before any adopter workload; it
+does not relabel a macOS plan. Failed derivation cleans owned resources and
+refuses. Only independent same-Linux replay, authenticated terminal evidence and
+verified cleanup can complete the measured binding and execution origin.
+
+Declared-invariant standing for this route requires the exact protected
+`sense.task.execute` origin followed by custody, with immutable reading bytes
+binding the sealed Linux receipt, actual derived Linux plan and independent
+same-Linux replay evidence. Current portable candidate/descriptor/policy,
+snapshot artifacts, package/helpers and approved backend identities must match.
+The consumer verifies the actual Linux task/command/results rather than deriving
+a host command or treating `/workspace` as a macOS path. Pending bindings,
+diagnostic receipts and self-consistent supplied metrics grant no standing.
+
+Retained execution-time replay proves only its sealed immutable execution
+facts. It does not satisfy a required live Linux host observation. A current
+Linux-only reread must be independently obtained under existing explicit
+full-profile write consent; read-only standing creates no hidden replay
+container or resource. Missing/stale/changed evidence remains unmeasured, with
+the existing freshness and required-population rules unchanged.
+
+The finite Linux recipe may explicitly deny `io_uring_setup` before the kernel
+with `ENOSYS`, preserving actual Node 24.20.0/libuv fallback without creating a
+ring. The private tracer records the original syscall/arguments, actual process
+birth, denial and verified exact `-ENOSYS` exit. Missing proof, another result,
+prior unobserved execution or an inherited/imported ring descriptor refuses.
+This is a declared contained-runtime restriction, not a claim that the host lacks
+kernel support or permission to normalize arbitrary probes. `io_uring_enter`,
+`io_uring_register`, Linux AIO, `userfaultfd`, `process_vm_*` and `ptrace` remain
+sticky refusals before actuation from bootstrap through every descendant.
+
+The unchanged full workload must exercise actual fallback I/O and retain all
+populations, assertions and failures. Ring-dependent cases remain unsupported
+or fail; no equivalent performance claim follows. Bind the restriction and
+exact architecture/ABI/tracer/helper identities into the actual Linux recipe
+and independent replay. Ordinary host execution is unaffected. This finite
+design does not activate the catalogue or satisfy the still-required immutable
+syscall-input, complete process/FD forest and terminal cleanup proofs.
+
+The examined Linux browser diagnostic uses Playwright 1.60.0's pinned official
+seccomp profile plus only an unconditional `chroot` rule; it does not add outer
+container capabilities. Outer `chroot` remains denied. Chromium may initialize
+its nested user namespace with namespace-local SYS_ADMIN and a single nonroot
+UID/GID mapping; renderers retain zero effective capabilities,
+no-new-privileges and their additional seccomp filter. The complete actual
+browser forest and namespace boundaries require independent verification;
+utility/GPU processes are still confined by the outer container. The successful
+diagnostic launched `headless_shell`, which does not prove the separately
+inventoried full Chrome binary. Neither this diagnostic nor its policy hash
+activates the empty catalogue or supplies a task's execution origin.
+
+Real browser support additionally needs actual Chromium/native asset containment,
+the unchanged selected project, build and API/web/conditional OIDC server graph,
+and PostgreSQL/Redis/JWKS/S3 readiness. Existing browserless result output support
+cannot grant browser effects or accessibility/trace/screenshot/video artifact
+writes. The profile requires exact artifact custody and owned endpoints; ambient
+server reuse cannot satisfy it. Unsupported containment refuses before launch.
+
+The new finite `fixture:*` capabilities are closed literals with local-write
+consent and private plan guards. Generic `net:*` remains remote-write; no
+publication or general Docker/database/network authority follows. No service
+profile removes ordinary gates, history windows, Node obligations or any required
+scorecard cell, and no future contract wording is evidence of PASS.
+
+This batch adds no native veraPDF/PDF-validator or Cognito service profile.
+Their original ordinary graphs, options and mock-based unit cases remain;
+unsupported native requests refuse without removing tests or reducing coverage.
