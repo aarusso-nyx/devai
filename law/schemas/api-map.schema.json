@@ -185,10 +185,12 @@
     },
     "Auth": {
       "type": "object",
+      "description": "Static auth/guard declarations, not proof of complete permission semantics. required=false needs an explicit recognized public marker; missing static Permission metadata never means public. Conditional/unresolved guard permissions remain unresolved (ADR-SCR-0016).",
       "additionalProperties": false,
       "properties": {
         "required": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Observed protected declaration (true) or explicit recognized public marker (false). True does not prove that conditional permission branches are resolved or enforced; absent declarations remain unknown."
         },
         "schemes": {
           "type": "array",
@@ -206,6 +208,7 @@
         },
         "guards": {
           "type": "array",
+          "description": "Observed guard names. Guard identity alone is not a concrete permission, unconditional permission conjunction/disjunction or runtime enforcement proof.",
           "items": {
             "type": "string"
           },
@@ -249,7 +252,8 @@
       "properties": {
         "id": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "Unique endpoint observation identity shared by API, coverage, RBAC and HTTP-evidence consumers (ADR-SCR-0016). The producer emits api:v1: followed by encodeURIComponent of canonical JSON [method,path,controller,evidence], with portable paths and canonically sorted evidence. This preserves source variants, not a claim that every variant is mounted simultaneously. Evidence lines are part of identity; source movement can require authored reference migration. Existing explicit IDs remain readable only when unique and nonconflicting."
         },
         "method": {
           "$ref": "#/$defs/HttpMethod"

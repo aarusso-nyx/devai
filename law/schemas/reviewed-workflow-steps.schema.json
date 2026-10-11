@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/reviewed-workflow-steps.schema.json",
+  "title": "Reviewed Adopter Workflow Steps",
+  "description": "Complete optional adopter-owned reviewed step effects projected only by registered binding. Canonical YAML, exact occurrences and complete executable/import closure must match; no entry changes permissions or grants execution authority (ADR-SCR-0017).",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "steps"],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "steps": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["sha256", "effect", "workflow", "step", "review", "files"],
+        "properties": {
+          "sha256": { "$ref": "#/$defs/sha256" },
+          "effect": { "enum": ["read-only", "repository-write", "publication"] },
+          "workflow": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Exact occurrence notation used by workflowStepInventory: <workflow file>#<job>[<step index>], comma-space separated for multiple occurrences. Semantic validation requires an exact bijection; a filename alone grants no trust."
+          },
+          "step": { "type": "string", "minLength": 1 },
+          "review": { "type": "string", "minLength": 1 },
+          "files": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["path", "sha256"],
+              "properties": {
+                "path": { "$ref": "#/$defs/path" },
+                "sha256": { "$ref": "#/$defs/sha256" }
+              }
+            },
+            "description": "Complete canonical path-sorted executable and import closure, including package-script/config/composite-action dependencies. Missing, extra, duplicate, changed, unreadable or escaping files refuse the reviewed effect."
+          },
+          "computed_imports": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["from", "reason", "files"],
+              "properties": {
+                "from": { "$ref": "#/$defs/path" },
+                "reason": { "type": "string", "minLength": 1 },
+                "files": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": { "$ref": "#/$defs/path" }
+                }
+              }
+            },
+            "description": "Reviewed complete reachability covers for every computed import/require. Each named file must be pinned in files. An empty cover requires a truthful review that no repository file is reachable; unresolved dynamic reachability remains unknown."
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "path": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?![A-Za-z]:)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?!.*//)(?!.*[\\u0000-\\u001f])(?!.*[/]$).+$",
+      "description": "Already-NFC repository-relative POSIX regular-file path. Semantic containment, symlink and duplicate-path checks are mandatory."
+    }
+  },
+  "examples": [{ "schemaVersion": "1.0.0", "steps": [] }]
+}

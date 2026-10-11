@@ -1,0 +1,149 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/test-result-population.schema.json",
+  "title": "Complete Executed Test Population Contract",
+  "description": "Opt-in outputContract.resultPopulation under command-result. Standing requires host-verified execution origin, package-owned native collection and complete final results from the same execution, agreeing with expected IDs and selected source census. Results-only and authored rosters prove no selection. Node TAP remains diagnostic UNKNOWN without complete native provenance (ADR-SCR-0017).",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "format",
+    "projectId",
+    "selectionEvidence",
+    "transport",
+    "executableFiles",
+    "requiredTestIds"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "format": {
+      "enum": ["vitest-json", "playwright-json"]
+    },
+    "projectId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "selectionEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "reporter", "projectName"],
+      "properties": {
+        "kind": {
+          "const": "devai-native-collection"
+        },
+        "reporter": {
+          "enum": ["vitest-v1", "playwright-v1"]
+        },
+        "projectName": {
+          "type": "string",
+          "description": "Exact native runner project name, including the empty default name. Distinct from projectId, the stable task result namespace. Initially exactly one native project may be collected; unrelated or multiple projects refuse rather than merge."
+        }
+      },
+      "description": "Selects the known installed package-owned reporter. Host verifies actual native executable, reporter path/bytes/closure and same-process collection/final facts using an internally injected nonce not controlled by descriptor environment. It is not a caller-declared attestation."
+    },
+    "transport": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {
+            "kind": {
+              "const": "direct"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "prefix"],
+          "properties": {
+            "kind": {
+              "const": "turbo"
+            },
+            "prefix": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Exact reviewed project transport prefix, removed only at physical line starts. Other project streams cannot be merged into this population. Cache replay cannot become actual execution."
+            }
+          }
+        }
+      ]
+    },
+    "executableFiles": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "reviewed-workflow-steps.schema.json#/$defs/path"
+      },
+      "description": "Canonical path-sorted complete selected executable file roster. Must equal the trusted native preexecution collection and final population. Task inputPaths and this authored list are comparisons, not independent selection proof; dynamic config execution conservatively binds all tracked candidate files except the canonical planner harness-mutated prefixes .devai/state/, record/ and scratch/."
+    },
+    "requiredTestIds": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^test:v1:.+"
+      },
+      "description": "Exact complete expected native leaf-test ID set, not a count or sample. ID is test:v1: plus encodeURIComponent(canonical JSON [projectId,portable sourceFile,ancestorTitles,testTitle]); no ordinal or line fallback. Semantic canonical decoding and exact equality to native final IDs are mandatory."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "format": {
+            "const": "vitest-json"
+          }
+        },
+        "required": ["format"]
+      },
+      "then": {
+        "properties": {
+          "selectionEvidence": {
+            "properties": {
+              "reporter": {
+                "const": "vitest-v1"
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "selectionEvidence": {
+            "properties": {
+              "reporter": {
+                "const": "playwright-v1"
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "format": "vitest-json",
+      "projectId": "api",
+      "selectionEvidence": {
+        "kind": "devai-native-collection",
+        "reporter": "vitest-v1",
+        "projectName": ""
+      },
+      "transport": {
+        "kind": "direct"
+      },
+      "executableFiles": ["apps/api/tests/health.test.ts"],
+      "requiredTestIds": [
+        "test:v1:%5B%22api%22%2C%22apps%2Fapi%2Ftests%2Fhealth.test.ts%22%2C%5B%5D%2C%22healthy%22%5D"
+      ]
+    }
+  ]
+}

@@ -37,6 +37,14 @@
       "$ref": "sensor-inputs.schema.json",
       "description": "Optional complete sensor input projection, owned and digest-bound by init bind --adopter-policy under ADR-SCR-0015. Absence preserves an unmanaged target; removal after verified prior ownership retires overrides to the installed canonical defaults."
     },
+    "invariant_producers": {
+      "$ref": "invariant-producers.schema.json",
+      "description": "Complete optional exact invariant/task/result obligations, projected to .devai/config/invariant-producers.json through registered adopter binding and whole-file ownership receipts (ADR-SCR-0017)."
+    },
+    "reviewed_workflow_steps": {
+      "$ref": "reviewed-workflow-steps.schema.json",
+      "description": "Complete optional reviewed adopter workflow effects, projected to .devai/config/reviewed-workflow-steps.json through registered adopter binding; exact executable closure validation remains mandatory (ADR-SCR-0017)."
+    },
     "release_verification": { "$ref": "release-verification-profile.schema.json" },
     "domains": {
       "type": "object",

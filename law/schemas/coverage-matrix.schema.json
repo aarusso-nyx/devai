@@ -24,6 +24,7 @@
     },
     "endpoints": {
       "type": "array",
+      "description": "Complete unique endpoint observation identities from the API population. Distinct source variants sharing method/path remain distinct. A legacy METHOD path reference resolves only to exactly one endpoint; ambiguity earns no endpoint coverage (ADR-SCR-0016).",
       "items": {
         "type": "string"
       },
@@ -136,7 +137,8 @@
           "type": ["string", "null"]
         },
         "endpointId": {
-          "type": ["string", "null"]
+          "type": ["string", "null"],
+          "description": "Exact endpoint observation identity after unambiguous reference resolution. An ambiguous or stale reference cannot produce a credited endpoint link; it remains unresolved and the endpoint remains unmapped."
         },
         "useCaseId": {
           "type": "string"
