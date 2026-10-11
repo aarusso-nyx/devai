@@ -7,6 +7,7 @@ import { sha256Hex } from '../../services/check-runner/canonical.js';
 import { trackedPaths, isHarnessMutatedPath } from '../../services/check-runner/policy-git.js';
 import type { PlannedTask } from '../../services/check-runner/types.js';
 import { assertNativeConfigCapabilities } from './native-config-capabilities.js';
+import { nativeCoverageGitIdentity } from './native-coverage-host.js';
 import type { NativeTestResultContract } from './native-test-results.js';
 
 /** Reconstruct the private execution recipe without changing the authored task identity. */
@@ -33,6 +34,7 @@ export function nativeRunnerSelection(
   root: string,
   task: PlannedTask,
   contract: NativeTestResultContract,
+  privatePreloadPath?: string,
 ): string {
   const selection = contract.selectionEvidence;
   if (selection === undefined) throw new Error('SENSE_NATIVE_COLLECTION_REQUIRED');
@@ -69,6 +71,8 @@ export function nativeRunnerSelection(
   let configPath: string | undefined;
   let reporter = false;
   let loader = !vitest;
+  let coverage = false;
+  const coverageReporters = new Set<string>();
   for (let index = 0; index < argv.length; index += 1) {
     const word = argv[index];
     if (word === '--reporter' || word === `--reporter=${exportName}`) {
@@ -94,10 +98,22 @@ export function nativeRunnerSelection(
         throw new Error('SENSE_NATIVE_PROJECT_SELECTION_INVALID');
     } else if (vitest && ['--no-cache', '--no-file-parallelism'].includes(word ?? '')) {
       // Execution controls do not select files or test names.
+    } else if (vitest && word === '--coverage') {
+      if (coverage) throw new Error('SENSE_NATIVE_COVERAGE_SELECTION_INVALID');
+      coverage = true;
+    } else if (
+      vitest &&
+      ['--coverage.reporter=json', '--coverage.reporter=json-summary'].includes(word ?? '')
+    ) {
+      if (coverageReporters.has(word as string))
+        throw new Error('SENSE_NATIVE_COVERAGE_SELECTION_INVALID');
+      coverageReporters.add(word as string);
     } else throw new Error('SENSE_NATIVE_SELECTION_UNSUPPORTED');
   }
+  if (!coverage && coverageReporters.size > 0)
+    throw new Error('SENSE_NATIVE_COVERAGE_SELECTION_INVALID');
   if (configPath === undefined) throw new Error('SENSE_NATIVE_EXPLICIT_CONFIG_REQUIRED');
-  assertNativeConfigCapabilities(root, configPath);
+  const configCapabilities = assertNativeConfigCapabilities(root, configPath);
   if (!loader) throw new Error('SENSE_NATIVE_CONFIG_LOADER_REQUIRED');
   if (!reporter) throw new Error('SENSE_NATIVE_REPORTER_REQUIRED');
   const reporterPath = require.resolve(exportName);
@@ -109,6 +125,52 @@ export function nativeRunnerSelection(
   const reporterSha = sha256Hex(readFileSync(fileURLToPath(hostPath)));
   if (sha256Hex(readFileSync(reporterPath)) !== reporterSha)
     throw new Error('SENSE_NATIVE_REPORTER_BYTES_MISMATCH');
+  const preload = privatePreloadPath ?? nativeInputPreloadPath();
+  const provenancePreloadSha = sha256Hex(readFileSync(preload));
+  const coverageAdapterSha = sha256Hex(
+    readFileSync(new URL('./native-coverage-adapter.js', pathToFileURL(preload))),
+  );
+  const coverageKernelSha = sha256Hex(
+    readFileSync(new URL('./native-coverage-kernel.js', pathToFileURL(preload))),
+  );
+  const coverageDataSha = sha256Hex(
+    readFileSync(new URL('./native-coverage-data.js', pathToFileURL(preload))),
+  );
+  const serviceFixtureSha = sha256Hex(
+    readFileSync(new URL('./native-service-fixtures.js', pathToFileURL(preload))),
+  );
+  const serviceFixtureKernelSha = sha256Hex(
+    readFileSync(new URL('./native-service-fixtures-kernel.js', pathToFileURL(preload))),
+  );
+  for (const importer of configCapabilities.adapterImporters) {
+    const adapter = createRequire(resolve(root, importer)).resolve(
+      '@aarusso-nyx/devai/native-coverage-adapter',
+    );
+    if (sha256Hex(readFileSync(adapter)) !== coverageAdapterSha)
+      throw new Error('SENSE_NATIVE_COVERAGE_ADAPTER_BYTES_MISMATCH');
+    const kernel = new URL('./native-coverage-kernel.js', pathToFileURL(adapter));
+    if (sha256Hex(readFileSync(kernel)) !== coverageKernelSha)
+      throw new Error('SENSE_NATIVE_COVERAGE_ADAPTER_BYTES_MISMATCH');
+    if (
+      sha256Hex(readFileSync(new URL('./native-coverage-data.js', pathToFileURL(adapter)))) !==
+      coverageDataSha
+    )
+      throw new Error('SENSE_NATIVE_COVERAGE_ADAPTER_BYTES_MISMATCH');
+    const adapterPreload = new URL('./native-input-provenance.js', pathToFileURL(adapter));
+    if (sha256Hex(readFileSync(adapterPreload)) !== provenancePreloadSha)
+      throw new Error('SENSE_NATIVE_COVERAGE_ADAPTER_BYTES_MISMATCH');
+    // Pure helper captures must be the canonical preload's early module instance.
+    if (
+      realpathSync(adapter) !==
+        realpathSync(
+          fileURLToPath(new URL('./native-coverage-adapter.js', pathToFileURL(preload))),
+        ) ||
+      realpathSync(fileURLToPath(new URL('./native-coverage-data.js', pathToFileURL(adapter)))) !==
+        realpathSync(fileURLToPath(new URL('./native-coverage-data.js', pathToFileURL(preload)))) ||
+      realpathSync(fileURLToPath(adapterPreload)) !== realpathSync(preload)
+    )
+      throw new Error('SENSE_NATIVE_COVERAGE_ADAPTER_INSTANCE_MISMATCH');
+  }
   const inputs = new Set(task.inputPaths);
   for (const path of trackedPaths(root)) {
     if (isHarnessMutatedPath(path)) continue;
@@ -182,6 +244,14 @@ export function nativeRunnerSelection(
     }
   };
   visitPackage(manifestPath);
+  for (const provider of configCapabilities.coverageProviderManifests) {
+    if (
+      realpathSync(createRequire(provider).resolve('vitest/package.json')) !==
+      realpathSync(manifestPath)
+    )
+      throw new Error('SENSE_NATIVE_CONFIG_COVERAGE_PROVIDER_INSTANCE_MISMATCH');
+  }
+  for (const path of configCapabilities.packageManifests) visitPackage(path);
   const inputPackages = nativeInputPackageClosure(root);
   return sha256Hex({
     executionRecipe: vitest ? 'node-native-v1' : 'node-native-owned-playwright-results-v1',
@@ -189,14 +259,18 @@ export function nativeRunnerSelection(
     nodeExecutableSha256: sha256Hex(readFileSync(process.execPath)),
     nodeVersion: process.version,
     reporterSha,
-    provenancePreloadSha: sha256Hex(readFileSync(nativeInputPreloadPath())),
+    provenancePreloadSha,
+    coverageAdapterSha,
+    coverageKernelSha,
+    coverageDataSha,
+    serviceFixtureSha,
+    serviceFixtureKernelSha,
+    coverageGit: nativeCoverageGitIdentity(),
     platformProbeHelperSha: sha256Hex(
-      readFileSync(new URL('./native-platform-probes.js', pathToFileURL(nativeInputPreloadPath()))),
+      readFileSync(new URL('./native-platform-probes.js', pathToFileURL(preload))),
     ),
     playwrightLoaderSha: sha256Hex(
-      readFileSync(
-        new URL('./native-playwright-loader.js', pathToFileURL(nativeInputPreloadPath())),
-      ),
+      readFileSync(new URL('./native-playwright-loader.js', pathToFileURL(preload))),
     ),
     runnerManifest: sha256Hex(readFileSync(manifestPath)),
     runnerExecutable: task.executable.sha256,

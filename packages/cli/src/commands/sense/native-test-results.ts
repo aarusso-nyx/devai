@@ -1,11 +1,13 @@
 import { createHash } from 'node:crypto';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 import { canonicalJson } from '@devai-nyx/utils';
+import type { NativeServiceRequest } from './native-service-plan.js';
 
 export interface NativeTestResultContract {
   readonly schemaVersion: '1.0.0';
   readonly format: 'vitest-json' | 'node-tap' | 'playwright-json';
   readonly projectId: string;
+  readonly serviceProfile?: NativeServiceRequest;
   readonly transport:
     { readonly kind: 'direct' } | { readonly kind: 'turbo'; readonly prefix: string };
   readonly executableFiles: readonly string[];
