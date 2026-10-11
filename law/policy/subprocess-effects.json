@@ -400,6 +400,15 @@
       "owner": "architect"
     },
     {
+      "template_id": "declared-native-sensor-task",
+      "executable": "declared-native-sensor-task",
+      "argv_shape": ["<exact-verified-native-task-argv>"],
+      "capabilities": ["proc:declared-sensor-task", "fs:workspace", "fs:proofs", "fs:f5-state"],
+      "effect": "local-write",
+      "reason": "ADR-SCR-0017: descriptive annotation only for the internally trusted native resultPopulation binding and package-owned reporter/provenance path; no generic argv or caller flag is admitted. Existing exact task process identity and explicit --write remain mandatory. Native-only fs:proofs covers the verified origin append to record/proofs/chain.json, creation of record/proofs if absent, and exclusive exact chain.json.tmp.<pid>.<time> staging renamed only to that chain. An internal origin-operation guard must refuse all other proof paths, deletes and unbound writes. Native-only fs:f5-state covers .devai/state/native-config-traces/<internally-minted-nonce> and its exact transient trace artifacts/owned cleanup; parent directory creation grants no sibling write. The host verifies closure and captures complete supported native provenance observations. Ordinary task-bound and read observations gain neither capability nor receipt/trace authority. No public action, role or general workspace/proofs permission is added.",
+      "owner": "architect"
+    },
+    {
       "template_id": "pnpm-recursive-build",
       "executable": "pnpm",
       "argv_shape": ["-r", "build"],

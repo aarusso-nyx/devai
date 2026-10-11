@@ -18,6 +18,16 @@ is `packages/sensors/src/harness-coherence.ts`.
 
 Bound cells: F5×T3.
 
+## Declared adopter review
+
+ADR-SCR-0017 adds the closed optional adopter `reviewed_workflow_steps` source
+and registered whole-file projection. Entries bind exact canonical YAML,
+occurrences and the complete executable/import closure, including scripts and
+configuration that can execute code. They cannot override package-owned effects
+or default unknown effects to read-only. Missing, changed, escaping, duplicate or
+unreadable closure keeps review open. Read-only/repository-write/publication
+semantics, permissions, approvals and effect-specific concurrency remain.
+
 ## Generated adopter workflows
 
 Added 2026-10-09 (#390, 2.3.2). The workflows DEVAI generates into an adopter,
