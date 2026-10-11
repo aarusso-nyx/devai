@@ -166,6 +166,7 @@ describe('CLI shard 09 init core planning', () => {
           ...common,
           ['--force', 'Overwrite existing non-provenance files in this segment'],
           ['--include <component>', 'Also install the hooks component: hooks'],
+          ['--only <component>', 'Install only hooks without bootstrap scaffold: hooks'],
           ['--hook <name>', 'pre-commit | pre-push | post-merge (default: pre-push)'],
           [
             '--command <cmd>',
@@ -361,6 +362,71 @@ describe('CLI shard 09 init core planning', () => {
       });
       expect(readdirSync(root)).toEqual([]);
     }
+  });
+
+  it('installs only the requested hook without creating core scaffold or changing selected authority', async () => {
+    const root = fixture('devai-init-only-hook-', true);
+    mkdirSync(join(root, '.devai/config'), { recursive: true });
+    const project = JSON.stringify({
+      schemaVersion: '1.0.0',
+      project_type: 'platform-package',
+      authority_enforcement: {
+        mode: 'host-integrated',
+        adapter_config: '.devai/config/github-actions-host-adapter.json',
+      },
+    });
+    const policy = '{"schemaVersion":"1.0.0","rules":[]}\n';
+    writeFileSync(join(root, '.devai/config/project.json'), project);
+    writeFileSync(join(root, '.devai/config/authority-policy.json'), policy);
+    const result = await invoke(initApplyArchitect, [
+      'init-apply-architect',
+      '--target',
+      root,
+      '--only',
+      'hooks',
+      '--hook',
+      'pre-commit',
+    ]);
+    expect(result.exit, result.stderr).toBe(0);
+    const payload = JSON.parse(result.stdout) as {
+      plan: unknown;
+      result: unknown;
+      included: { component: string; plan: { path: string; hook: string } }[];
+    };
+    expect(payload.plan).toBeNull();
+    expect(payload.result).toEqual({ created: [], overwritten: [], skipped: [], preserved: [] });
+    expect(payload.included).toHaveLength(1);
+    expect(payload.included[0]).toMatchObject({ component: 'hooks', plan: { hook: 'pre-commit' } });
+    expect(readFileSync(join(root, '.git/hooks/pre-commit'), 'utf8')).toContain(
+      'devai hooks install',
+    );
+    expect(readdirSync(root).sort()).toEqual(['.devai', '.git']);
+    expect(readdirSync(join(root, '.devai')).sort()).toEqual(['config']);
+    expect(readdirSync(join(root, '.devai/config')).sort()).toEqual([
+      'authority-policy.json',
+      'project.json',
+    ]);
+    expect(readFileSync(join(root, '.devai/config/project.json'), 'utf8')).toBe(project);
+    expect(readFileSync(join(root, '.devai/config/authority-policy.json'), 'utf8')).toBe(policy);
+  });
+
+  it.each([
+    { only: 'unknown' },
+    { only: '' },
+    { only: 'hooks,hooks' },
+    { only: 'hooks', include: 'hooks' },
+    { only: 'hooks', force: true },
+    { only: 'hooks', command: 'echo hidden' },
+  ])('refuses malformed scoped refresh selectors before any writes: %j', async (options) => {
+    const root = fixture('devai-init-only-refused-');
+    const result = await invokeDirect(initApplyArchitect, { target: root, ...options });
+    expect(result).toEqual({
+      exit: 2,
+      stdout: '',
+      stderr:
+        'devai init apply architect: --only accepts hooks and cannot be combined with --include, --force or --command\n',
+    });
+    expect(readdirSync(root)).toEqual([]);
   });
 
   it('preserves exact CI and skills include plans targets results and request order', async () => {

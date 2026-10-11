@@ -29,6 +29,7 @@ const EXPECTED_INVENTORY_SLICES = [
   { name: 'routes', members: ['route-inventory'] },
   { name: 'schemas', members: ['schema-inventory'] },
   { name: 'tests', members: ['test-inventory'] },
+  { name: 'workflows', members: ['workflow-step-inventory'] },
   {
     name: 'all',
     members: [
@@ -103,14 +104,21 @@ function emit(
 }
 
 describe('execution-surface inventory discovery', () => {
-  it('exposes every exact slice once and composes all in atomic slice order', () => {
+  it('exposes every exact slice once and preserves the legacy all population beside opt-in workflows', () => {
     expect(INVENTORY_SLICES).toEqual(EXPECTED_INVENTORY_SLICES);
     expect(new Set(INVENTORY_SLICES.map((slice) => slice.name)).size).toBe(INVENTORY_SLICES.length);
-    const atomicMembers = INVENTORY_SLICES.filter((slice) => slice.name !== 'all').flatMap(
-      (slice) => slice.members,
-    );
+    const atomicMembers = INVENTORY_SLICES.filter(
+      (slice) => slice.name !== 'all' && slice.name !== 'workflows',
+    ).flatMap((slice) => slice.members);
     expect(atomicMembers).toEqual(EXPECTED_INVENTORY_SLICES.at(-1)?.members);
     expect(new Set(atomicMembers).size).toBe(atomicMembers.length);
+    expect(INVENTORY_SLICES.find((slice) => slice.name === 'workflows')).toEqual({
+      name: 'workflows',
+      members: ['workflow-step-inventory'],
+    });
+    expect(INVENTORY_SLICES.find((slice) => slice.name === 'all')?.members).not.toContain(
+      'workflow-step-inventory',
+    );
   });
 
   it('renders every inventory slice through the registered command help', () => {

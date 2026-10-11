@@ -609,6 +609,7 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-AUT-0004',
       'ADR-AUT-0005',
       'ADR-AUT-0006',
+      'ADR-AUT-0007',
       'ADR-CFG-0001',
       'ADR-CFG-0002',
       'ADR-CHK-0001',
@@ -723,15 +724,16 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-SCR-0015',
       'ADR-SCR-0016',
       'ADR-SCR-0017',
+      'ADR-SCR-0018',
       'ADR-SEC-0001',
     ]);
-    expect(records).toHaveLength(122);
+    expect(records).toHaveLength(124);
     expect(
       records.filter((record) => record.format === 'legacy-catalog').map((record) => record.adr_id),
     ).toEqual(['ADR-014', 'ADR-MUT-0005', 'ADR-REL-0017']);
     expect(records.filter((record) => record.adr_id === 'ADR-014')).toHaveLength(1);
-    expect(result.files_scanned).toBe(123);
-    expect(result.subject_authorities).toHaveLength(587);
+    expect(result.files_scanned).toBe(125);
+    expect(result.subject_authorities).toHaveLength(598);
     expect(result.effective_authorities).toEqual([
       'ADR-014',
       'ADR-AUT-0001',
@@ -740,6 +742,7 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-AUT-0004',
       'ADR-AUT-0005',
       'ADR-AUT-0006',
+      'ADR-AUT-0007',
       'ADR-CFG-0001',
       'ADR-CFG-0002',
       'ADR-CHK-0001',
@@ -831,6 +834,7 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-SCR-0015',
       'ADR-SCR-0016',
       'ADR-SCR-0017',
+      'ADR-SCR-0018',
       'ADR-SEC-0001',
     ]);
     // ADR-MUT-0014 advances both active provenance subjects through a real supersession.
@@ -1063,6 +1067,24 @@ describe('ADR-v3 public result and semantic authority', () => {
         .map((authority) => authority.subject)
         .sort(),
     ).toEqual([...(pnpmShapes?.affected_rules ?? [])].sort());
+    for (const [id, count] of [
+      ['ADR-AUT-0007', 4],
+      ['ADR-SCR-0018', 7],
+    ] as const) {
+      const added = records.find((record) => record.adr_id === id);
+      expect(added?.affected_rules).toHaveLength(count);
+      expect(added?.supersedes).toEqual([]);
+      expect(result.adrs.find((row) => row.adr_id === id)).toMatchObject({
+        effective: true,
+        effective_affected_rules: [...(added?.affected_rules ?? [])].sort(),
+      });
+      expect(
+        result.subject_authorities
+          .filter((row) => row.lineage_members.includes(id))
+          .map((row) => row.subject)
+          .sort(),
+      ).toEqual([...(added?.affected_rules ?? [])].sort());
+    }
     // ADR-GOV-0024, ADR-AUT-0003, and ADR-AUT-0004 (CMP-0005): each accepted record is
     // effective and is the sole lineage head of every subject it declares, including the
     // adopter schema shared by the first two and the compiler shared by the last two.

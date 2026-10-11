@@ -258,6 +258,20 @@ describe('hooks install planning and execution', () => {
     ).toBe(0);
     mkdirSync(join(linked, '.husky'));
     put(linked, '.devai/config/authority-policy.json', '{"schemaVersion":"1.0.0"}\n');
+    put(
+      linked,
+      '.devai/config/project.json',
+      JSON.stringify({
+        schemaVersion: '1.0.0',
+        project_type: 'platform-package',
+        name: 'fixture',
+        profile: 'tier1',
+        authority_enforcement: {
+          mode: 'host-integrated',
+          adapter_config: '.devai/config/post-merge-host-adapter.json',
+        },
+      }),
+    );
     put(linked, '.devai/pin/constitution.md', '# Pinned constitution\n');
     const binary = put(
       linked,
