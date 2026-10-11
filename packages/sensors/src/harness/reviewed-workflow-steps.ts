@@ -1078,7 +1078,7 @@ const GENERATED_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
     files: [],
   },
   {
-    sha256: 'ffb556b0e44a212cd031505dbb756ec4a6730a0ffe7464b26d84a234ba33ea83',
+    sha256: 'a3ff91c95b99b9f62bb2fc15112f24a45584e1dd5e7daf86a38965f8421540cd',
     effect: 'read-only',
     workflow: 'generated:devai-local-rc-verify.yml#verify-attested-rc[3]',
     step: 'Materialize protected DEVAI verifier package',
