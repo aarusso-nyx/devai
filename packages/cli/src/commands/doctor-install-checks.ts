@@ -491,7 +491,7 @@ export function checkAuthorityEnforcement(repoRoot: string): CheckResult {
         ...adopter.info,
         selected_adapter_policy_bound: selectedAdapterBound,
         cli_runtime_enforced: bindingMatches && enforcement?.mode === 'binding',
-        local_post_merge_enforced: bindingMatches && localPostMerge.ok,
+        local_post_merge_enforced: bindingMatches && postMergeSelected && localPostMerge.ok,
         local_post_merge_facts: localPostMerge.facts,
         ...(postMergeLocation !== undefined && {
           local_post_merge_scope: postMergeLocation.scope,
