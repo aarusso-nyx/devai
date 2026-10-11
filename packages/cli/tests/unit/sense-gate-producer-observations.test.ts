@@ -64,6 +64,12 @@ function git(root: string, ...args: string[]): string {
       'user.email=t@example.invalid',
       '-c',
       'commit.gpgsign=false',
+      // Detached automatic maintenance can recreate .git/objects/pack during teardown.
+      // These disposable repositories require no background maintenance or garbage collection.
+      '-c',
+      'maintenance.auto=false',
+      '-c',
+      'gc.auto=0',
       ...args,
     ],
     { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
