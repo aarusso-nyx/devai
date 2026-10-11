@@ -706,6 +706,7 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-REL-0032',
       'ADR-REL-0033',
       'ADR-REL-0034',
+      'ADR-REL-0035',
       'ADR-SCR-0001',
       'ADR-SCR-0002',
       'ADR-SCR-0003',
@@ -720,15 +721,17 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-SCR-0013',
       'ADR-SCR-0014',
       'ADR-SCR-0015',
+      'ADR-SCR-0016',
+      'ADR-SCR-0017',
       'ADR-SEC-0001',
     ]);
-    expect(records).toHaveLength(119);
+    expect(records).toHaveLength(122);
     expect(
       records.filter((record) => record.format === 'legacy-catalog').map((record) => record.adr_id),
     ).toEqual(['ADR-014', 'ADR-MUT-0005', 'ADR-REL-0017']);
     expect(records.filter((record) => record.adr_id === 'ADR-014')).toHaveLength(1);
-    expect(result.files_scanned).toBe(120);
-    expect(result.subject_authorities).toHaveLength(563);
+    expect(result.files_scanned).toBe(123);
+    expect(result.subject_authorities).toHaveLength(587);
     expect(result.effective_authorities).toEqual([
       'ADR-014',
       'ADR-AUT-0001',
@@ -812,6 +815,7 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-REL-0032',
       'ADR-REL-0033',
       'ADR-REL-0034',
+      'ADR-REL-0035',
       'ADR-SCR-0001',
       'ADR-SCR-0002',
       'ADR-SCR-0003',
@@ -825,6 +829,8 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-SCR-0013',
       'ADR-SCR-0014',
       'ADR-SCR-0015',
+      'ADR-SCR-0016',
+      'ADR-SCR-0017',
       'ADR-SEC-0001',
     ]);
     // ADR-MUT-0014 advances both active provenance subjects through a real supersession.
@@ -832,9 +838,9 @@ describe('ADR-v3 public result and semantic authority', () => {
       effective: false,
       effective_affected_rules: [],
     });
-    for (const adrId of ['ADR-MUT-0014', 'ADR-SCR-0015']) {
+    for (const adrId of ['ADR-MUT-0014']) {
       const declared = records.find((record) => record.adr_id === adrId);
-      expect(declared?.affected_rules).toHaveLength(adrId === 'ADR-MUT-0014' ? 2 : 13);
+      expect(declared?.affected_rules).toHaveLength(2);
       expect(result.adrs.find((row) => row.adr_id === adrId)).toMatchObject({
         effective: true,
         effective_affected_rules: [...(declared?.affected_rules ?? [])].sort(),
@@ -846,6 +852,203 @@ describe('ADR-v3 public result and semantic authority', () => {
           .sort(),
       ).toEqual([...(declared?.affected_rules ?? [])].sort());
     }
+    // The three accepted records add exact source populations and supersede only their
+    // declared subject lineages. Shared paths in unrelated governance lineages remain intact.
+    for (const [adrId, declaredCount, predecessors] of [
+      ['ADR-REL-0035', 6, ['ADR-CHK-0006', 'ADR-CHK-0002']],
+      ['ADR-SCR-0016', 11, []],
+      ['ADR-SCR-0017', 27, ['ADR-SCR-0012', 'ADR-SCR-0015', 'ADR-SCR-0013']],
+    ] as const) {
+      const declared = records.find((record) => record.adr_id === adrId);
+      expect(declared?.affected_rules).toHaveLength(declaredCount);
+      expect(declared?.supersedes).toEqual(predecessors);
+      expect(result.adrs.find((row) => row.adr_id === adrId)).toMatchObject({
+        effective: true,
+        effective_affected_rules: [...(declared?.affected_rules ?? [])].sort(),
+      });
+      expect(
+        result.subject_authorities
+          .filter((row) => row.effective_head === adrId)
+          .map((row) => row.subject)
+          .sort(),
+      ).toEqual([...(declared?.affected_rules ?? [])].sort());
+    }
+    // Preserve all historical declared subjects (especially SCR-0015's thirteen), while
+    // freezing the exact remaining standing after the two new supersessions.
+    for (const [adrId, declaredCount, remaining] of [
+      [
+        'ADR-CHK-0002',
+        9,
+        [
+          '.github/workflows/devai-ledger-verify.yml',
+          '.github/workflows/pull-request-checks.yml',
+          '.github/workflows/release.yml',
+          'packages/cli/src/services/check-runner/runner.ts',
+          'scripts/check-workflows.mjs',
+          'scripts/release-host/provision-toolchain.mjs',
+        ],
+      ],
+      [
+        'ADR-CHK-0006',
+        5,
+        [
+          'packages/cli/src/services/check-runner/policy-descriptor.ts',
+          'scripts/check-test-task-workspace-selectors.mjs',
+          'test-tasks.json',
+        ],
+      ],
+      [
+        'ADR-SCR-0012',
+        15,
+        [
+          '.devai/config/scorecard-na.json',
+          'law/policy/scorecard-na.json',
+          'law/policy/self-dogfood.json',
+          'law/policy/sense-presets.json',
+          'law/schemas/observation-backlog.schema.json',
+          'law/schemas/sensor-reading.schema.json',
+          'packages/cli/src/commands/sense/readings-rebuild.ts',
+          'packages/sensors/src/inventory-adherence.ts',
+          'packages/sensors/src/inventory-performance.ts',
+          'packages/sensors/src/sensor-reading.ts',
+          'packages/skills/src/operations/backlog.ts',
+          'packages/skills/src/post-merge-auditor/observation-bundle.ts',
+        ],
+      ],
+      [
+        'ADR-SCR-0013',
+        8,
+        [
+          '.github/workflows/pull-request-checks.yml',
+          'packages/cli/src/commands/audit/scorecard.ts',
+          'packages/cli/src/commands/sense/adapters.ts',
+          'packages/sensors/src/harness-invariant-alignment-workflow.ts',
+        ],
+      ],
+      [
+        'ADR-SCR-0015',
+        13,
+        [
+          'law/policy/adopter-migrations.json',
+          'law/schemas/sensor-inputs.schema.json',
+          'packages/cli/src/commands/sense/readings-rebuild.ts',
+          'packages/cli/src/commands/sense/run-set.ts',
+          'packages/sensors/src/docs-drift.ts',
+        ],
+      ],
+    ] as const) {
+      expect(records.find((record) => record.adr_id === adrId)?.affected_rules).toHaveLength(
+        declaredCount,
+      );
+      expect(result.adrs.find((row) => row.adr_id === adrId)).toMatchObject({
+        effective: true,
+        effective_affected_rules: remaining,
+      });
+      expect(
+        result.subject_authorities
+          .filter((row) => row.effective_head === adrId)
+          .map((row) => row.subject)
+          .sort(),
+      ).toEqual(remaining);
+    }
+    expect(
+      result.subject_authorities.filter(
+        (row) =>
+          ['ADR-REL-0035', 'ADR-SCR-0016', 'ADR-SCR-0017'].includes(row.effective_head) &&
+          row.lineage_members.length > 1,
+      ),
+    ).toEqual([
+      {
+        subject: '.devai/config/toolchain.json',
+        lineage_members: ['ADR-CHK-0002', 'ADR-REL-0035'],
+        effective_head: 'ADR-REL-0035',
+      },
+      {
+        subject: 'docs/dev/operations/release-discipline.md',
+        lineage_members: ['ADR-CHK-0006', 'ADR-REL-0035'],
+        effective_head: 'ADR-REL-0035',
+      },
+      {
+        subject: 'law/policy/adopter-defaults/toolchain.json',
+        lineage_members: ['ADR-CHK-0002', 'ADR-REL-0035'],
+        effective_head: 'ADR-REL-0035',
+      },
+      {
+        subject: 'law/policy/subprocess-effects.json',
+        lineage_members: ['ADR-SCR-0015', 'ADR-SCR-0017'],
+        effective_head: 'ADR-SCR-0017',
+      },
+      {
+        subject: 'law/policy/trusted-local-rc-verifier-package.json',
+        lineage_members: ['ADR-CHK-0006', 'ADR-REL-0035'],
+        effective_head: 'ADR-REL-0035',
+      },
+      {
+        subject: 'law/schemas/adopter-policy.schema.json',
+        lineage_members: ['ADR-SCR-0015', 'ADR-SCR-0017'],
+        effective_head: 'ADR-SCR-0017',
+      },
+      {
+        subject: 'law/schemas/test-task-descriptor.schema.json',
+        lineage_members: ['ADR-SCR-0015', 'ADR-SCR-0017'],
+        effective_head: 'ADR-SCR-0017',
+      },
+      {
+        subject: 'law/schemas/toolchain-manifest.schema.json',
+        lineage_members: ['ADR-CHK-0002', 'ADR-REL-0035'],
+        effective_head: 'ADR-REL-0035',
+      },
+      {
+        subject: 'packages/cli/src/authority/broker.ts',
+        lineage_members: ['ADR-SCR-0015', 'ADR-SCR-0017'],
+        effective_head: 'ADR-SCR-0017',
+      },
+      {
+        subject: 'packages/cli/src/commands/init/bind-adapters.ts',
+        lineage_members: ['ADR-SCR-0015', 'ADR-SCR-0017'],
+        effective_head: 'ADR-SCR-0017',
+      },
+      {
+        subject: 'packages/cli/src/commands/sense/adapter-readers.ts',
+        lineage_members: ['ADR-SCR-0013', 'ADR-SCR-0017'],
+        effective_head: 'ADR-SCR-0017',
+      },
+      {
+        subject: 'packages/cli/src/commands/sense/reading-instance.ts',
+        lineage_members: ['ADR-SCR-0015', 'ADR-SCR-0017'],
+        effective_head: 'ADR-SCR-0017',
+      },
+      {
+        subject: 'packages/cli/src/commands/sense/record.ts',
+        lineage_members: ['ADR-SCR-0008', 'ADR-SCR-0012', 'ADR-SCR-0013', 'ADR-SCR-0017'],
+        effective_head: 'ADR-SCR-0017',
+      },
+      {
+        subject: 'packages/cli/src/services/adopter-policy-binding.ts',
+        lineage_members: ['ADR-SCR-0015', 'ADR-SCR-0017'],
+        effective_head: 'ADR-SCR-0017',
+      },
+      {
+        subject: 'packages/cli/src/services/adopter-policy.ts',
+        lineage_members: ['ADR-SCR-0015', 'ADR-SCR-0017'],
+        effective_head: 'ADR-SCR-0017',
+      },
+      {
+        subject: 'packages/loop/src/scorecard/inputs.ts',
+        lineage_members: ['ADR-SCR-0008', 'ADR-SCR-0012', 'ADR-SCR-0017'],
+        effective_head: 'ADR-SCR-0017',
+      },
+      {
+        subject: 'packages/sensors/src/harness-invariant-alignment-evidence.ts',
+        lineage_members: ['ADR-SCR-0008', 'ADR-SCR-0012', 'ADR-SCR-0013', 'ADR-SCR-0017'],
+        effective_head: 'ADR-SCR-0017',
+      },
+      {
+        subject: 'packages/sensors/src/harness-invariant-alignment.ts',
+        lineage_members: ['ADR-SCR-0013', 'ADR-SCR-0017'],
+        effective_head: 'ADR-SCR-0017',
+      },
+    ]);
     // ADR-AUT-0006 (#381): the accepted record is effective and adds one subject authority
     // for each of its eight affected rules.
     const pnpmShapes = records.find((record) => record.adr_id === 'ADR-AUT-0006');
@@ -860,15 +1063,6 @@ describe('ADR-v3 public result and semantic authority', () => {
         .map((authority) => authority.subject)
         .sort(),
     ).toEqual([...(pnpmShapes?.affected_rules ?? [])].sort());
-    // ADR-CHK-0006 IA-005: the record is the effective head of every subject it declares.
-    const descriptorKinds = records.find((record) => record.adr_id === 'ADR-CHK-0006');
-    expect(descriptorKinds?.affected_rules.length).toBeGreaterThan(0);
-    expect(
-      result.subject_authorities
-        .filter((authority) => authority.effective_head === 'ADR-CHK-0006')
-        .map((authority) => authority.subject)
-        .sort(),
-    ).toEqual([...(descriptorKinds?.affected_rules ?? [])].sort());
     // ADR-GOV-0024, ADR-AUT-0003, and ADR-AUT-0004 (CMP-0005): each accepted record is
     // effective and is the sole lineage head of every subject it declares, including the
     // adopter schema shared by the first two and the compiler shared by the last two.

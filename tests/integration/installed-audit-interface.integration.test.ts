@@ -449,6 +449,9 @@ describe('installed optional audit interfaces and native task execution', () => 
         expect(result['metrics']).toMatchObject({ tests_passed: 1, tests_failed: 0 });
       else expect((result['metrics'] as Json)['tests_passed']).toBeUndefined();
     },
+    // Five installed CLI bindings plus a native run exceed 30s under concurrent gate load.
+    // Bound this fixture setup at 60s while preserving the native task execution budget.
+    60_000,
   );
 
   it('refuses a present external configuration discovered by the native runner', () => {

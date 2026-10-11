@@ -56,6 +56,7 @@ import { senseTestPerformanceCoverage } from '../src/test-performance-coverage.j
 import { senseTestRobustnessCoverage } from '../src/test-robustness-coverage.js';
 import { senseTestSecurityCoverage } from '../src/test-security-coverage.js';
 import { senseTypeCheck, type TypeCheckOptions } from '../src/type-check.js';
+import { executableTestPopulation } from '../src/test-file-population.js';
 
 /** TypeCheckOptions widened by the declared `argv` input (ADR-SCR-0005). */
 type DeclaredTypeCheckOptions = TypeCheckOptions & { readonly argv?: readonly string[] };
@@ -86,8 +87,8 @@ afterEach(() => {
 
 describe('declared testGlobs reach the four test pattern sensors', () => {
   beforeEach(() => {
-    // The framework layout: tests under packages/*/tests and tests, nothing under the
-    // sensor defaults packages/*/test and packages/*/src.
+    // The complete default census covers both framework test layouts and the legacy
+    // packages/*/test layout; the explicit declaration must replace that population.
     write(
       'packages/alpha/tests/auth-bench.test.ts',
       "it('rejects auth under load', () => { expect(() => f()).toThrow(); vi.fn(); vi.fn(); });\n",
@@ -99,6 +100,27 @@ describe('declared testGlobs reach the four test pattern sensors', () => {
     write('tests/contract/helper.ts', 'export const notATest = 1;\n');
     // A file under the sensor default that the declaration must NOT add back in.
     write('packages/alpha/test/default-root.test.ts', "it('auth', () => {});\n");
+  });
+
+  it('names the exact physical default and declared executable populations', () => {
+    const defaults = executableTestPopulation(root);
+    const declared = executableTestPopulation(root, DEVAI_TEST_GLOBS);
+    expect(defaults.errors).toEqual([]);
+    expect(declared.errors).toEqual([]);
+    expect([...defaults.paths].sort()).toEqual(
+      [
+        'packages/alpha/test/default-root.test.ts',
+        'packages/alpha/tests/auth-bench.test.ts',
+        'tests/contract/csrf-latency.spec.ts',
+      ]
+        .map((path) => join(root, path))
+        .sort(),
+    );
+    expect([...declared.paths].sort()).toEqual(
+      ['packages/alpha/tests/auth-bench.test.ts', 'tests/contract/csrf-latency.spec.ts']
+        .map((path) => join(root, path))
+        .sort(),
+    );
   });
 
   const cases = [
@@ -114,7 +136,7 @@ describe('declared testGlobs reach the four test pattern sensors', () => {
       expect(metric(declared, matchedMetric)).toBe(2);
 
       const defaults = sense({ repoRoot: root });
-      expect(metric(defaults, 'test_files')).toBe(1);
+      expect(metric(defaults, 'test_files')).toBe(3);
     });
   }
 
@@ -124,7 +146,7 @@ describe('declared testGlobs reach the four test pattern sensors', () => {
     expect(metric(declared, 'mock_calls')).toBeGreaterThanOrEqual(2);
 
     const defaults = senseTestIdiomaticity({ repoRoot: root });
-    expect(metric(defaults, 'test_files')).toBe(1);
+    expect(metric(defaults, 'test_files')).toBe(3);
   });
 
   it('a declared root that holds nothing reads as absent, never as the default', () => {

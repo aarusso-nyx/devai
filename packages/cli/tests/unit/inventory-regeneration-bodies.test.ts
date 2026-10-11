@@ -192,19 +192,50 @@ describe('inventory regeneration produces every surface-declared body (#382)', (
     expect(result.report.ok).toBe(true);
 
     // rbac read the staged data model (its RBAC tables) and the staged api map (its @Roles).
-    const rbac = read(root, STATE_BODY.inventory_rbac);
+    const stagedEndpoints = json(root, STATE_BODY.inventory_api)['endpoints'] as Array<{
+      id: string;
+      method: string;
+      path: string;
+    }>;
+    expect(stagedEndpoints.map(({ method, path }) => [method, path]).sort()).toEqual([
+      ['GET', '/users/:id'],
+      ['POST', '/users'],
+    ]);
+    for (const endpoint of stagedEndpoints) {
+      expect(endpoint.id).toMatch(/^api:v1:/u);
+      expect(JSON.parse(decodeURIComponent(endpoint.id.slice('api:v1:'.length)))).toEqual([
+        endpoint.method,
+        endpoint.path,
+        expect.objectContaining({ file: 'apps/api/users.controller.ts', class: 'UsersController' }),
+        [expect.objectContaining({ path: 'apps/api/users.controller.ts' })],
+      ]);
+    }
+    const endpointIds = stagedEndpoints.map(({ id }) => id).sort();
     expect(json(root, STATE_BODY.inventory_rbac)).toMatchObject({
       rbacIlfTables: expect.arrayContaining(['roles', 'permissions', 'role_permissions']),
       roles: expect.arrayContaining([expect.objectContaining({ id: 'role:admin' })]),
     });
-    expect(rbac).toContain('/users/:id');
+    const bindings = (
+      json(root, STATE_BODY.inventory_rbac)['bindings'] as {
+        endpointBindings: Array<{ endpointId: string; permissionId: string }>;
+      }
+    ).endpointBindings;
+    expect(bindings).toHaveLength(4);
+    expect([...new Set(bindings.map(({ endpointId }) => endpointId))].sort()).toEqual(endpointIds);
+    for (const endpointId of endpointIds)
+      expect(
+        bindings
+          .filter((binding) => binding.endpointId === endpointId)
+          .map(({ permissionId }) => permissionId)
+          .sort(),
+      ).toEqual(['guard:SessionGuard', 'role:admin']);
     // data handling seeded the staged data model's PII column.
     const handling = read(root, STATE_BODY.inventory_data_handling);
     expect(handling).toContain('email');
     expect(handling).toContain('users');
     // coverage joined the staged api map and routes.
     expect(json(root, STATE_BODY.inventory_coverage)).toMatchObject({
-      endpoints: expect.arrayContaining(['GET /users/:id', 'POST /users']),
+      endpoints: stagedEndpoints.map(({ id }) => id),
       stats: { endpointCount: 2, routeCount: 1 },
     });
     for (const kind of [

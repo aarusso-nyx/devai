@@ -19,12 +19,16 @@ const ROOT = resolve(import.meta.dirname, '../../../..');
 // source-only catalogue (#235); a source-only name throws in the packed runtime and no pack would
 // ever resolve. ADR-CHK-0007 adds test-task-exclusivity.schema.json, which the check runner
 // validates its scheduling declarations against. ADR-SCR-0015 promotes the reviewed task
-// descriptor and its preflight-probe reference closure. The count is 114.
+// descriptor and its preflight-probe reference closure. ADR-SCR-0017 adds the declared
+// invariant/workflow producers and complete native result population. The count is 117.
 describe('schema roster', () => {
   it('holds the previous roster and the reviewed sensor task descriptor reference closure', () => {
-    expect(ROSTER).toHaveLength(114);
+    expect(ROSTER).toHaveLength(117);
     expect(ROSTER).toContain('test-task-descriptor.schema.json');
     expect(ROSTER).toContain('preflight-probe.schema.json');
+    expect(ROSTER).toContain('invariant-producers.schema.json');
+    expect(ROSTER).toContain('reviewed-workflow-steps.schema.json');
+    expect(ROSTER).toContain('test-result-population.schema.json');
     expect(ROSTER).toContain('test-task-exclusivity.schema.json');
     expect(ROSTER).toContain('stack-adapter.schema.json');
     expect(ROSTER).toContain('model-tiers.schema.json');
