@@ -523,6 +523,85 @@ describe('IA-004: idempotent binding', () => {
 // ---------------------------------------------------------------------------
 
 describe('IA-003: atomic projection and receipt', () => {
+  it.each([
+    {
+      key: 'invariant_producers',
+      target: '.devai/config/invariant-producers.json',
+      original: { schemaVersion: '1.0.0', bindings: [] },
+      next: {
+        schemaVersion: '1.0.0',
+        bindings: [
+          {
+            invariant_id: 'INV-FIX-001',
+            subject: 'fixture.subject',
+            taskId: 'fixture-task',
+            population: 'fixture.complete',
+            requiredTestIds: [
+              'test:v1:%5B%22fixture%22%2C%22tests%2Fone.test.ts%22%2C%5B%5D%2C%22passes%22%5D',
+            ],
+          },
+        ],
+      },
+    },
+    {
+      key: 'reviewed_workflow_steps',
+      target: '.devai/config/reviewed-workflow-steps.json',
+      original: { schemaVersion: '1.0.0', steps: [] },
+      next: {
+        schemaVersion: '1.0.0',
+        steps: [
+          {
+            sha256: 'a'.repeat(64),
+            effect: 'read-only',
+            workflow: '.github/workflows/ci.yml#ci[0]',
+            step: 'Fixture producer',
+            review: 'Reviewed fixture closure',
+            files: [{ path: 'scripts/fixture.mjs', sha256: 'b'.repeat(64) }],
+          },
+        ],
+      },
+    },
+  ])(
+    'rolls back interrupted $key projection together with its receipt',
+    async ({ key, target, original, next }) => {
+      async function changing() {
+        const repo = adopterRepo(baseProject());
+        await expectBound(repo, policy({ [key]: original }));
+        const previous = bytesOf(repo, [...PAIR, target]);
+        put(repo, SOURCE, policy({ policy_version: '1.1.0', [key]: next }));
+        return { repo, previous };
+      }
+      const probe = await changing();
+      seam.recording = true;
+      await expectBound(probe.repo);
+      const index = seam.log.findIndex(
+        (mutation) =>
+          mutation.op === 'renameSync' && mutation.paths[1] === join(probe.repo, target),
+      );
+      disarm();
+      expect(index).toBeGreaterThanOrEqual(0);
+      const { repo, previous } = await changing();
+      arm(index + 1);
+      try {
+        await bind(repo);
+      } catch {
+        /* Simulated frozen process cannot roll back. */
+      }
+      disarm();
+      expect(bytesOf(repo, [...PAIR, target])).toEqual(previous);
+      const blocked = await bind(repo);
+      expect(blocked.stderr).toContain('INIT_UPGRADE_LOCKED');
+      fs.rmSync(join(repo, LOCK));
+      await expectBound(repo);
+      expect(readJson(repo, target)).toEqual(next);
+      expect(pairIsComplete(repo)).toBe(true);
+      expect((readJson(repo, BINDING)['materialized'] as JsonObject)[target]).toBe(
+        sha256(fs.readFileSync(join(repo, target))),
+      );
+      expect(await doctorCheck(repo, 'policy-materialization-current')).toMatchObject({ ok: true });
+    },
+  );
+
   it('recovers an interrupted sensor-input target replacement with its matching receipt digest', async () => {
     const target = '.devai/config/sensor-inputs.json';
     const original = {

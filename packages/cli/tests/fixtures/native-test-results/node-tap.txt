@@ -1,0 +1,36 @@
+TAP version 13
+# Subtest: arithmetic
+    # Subtest: adds
+    ok 1 - adds
+      ---
+      duration_ms: 0.3275
+      type: 'test'
+      ...
+    1..1
+ok 1 - arithmetic
+  ---
+  duration_ms: 0.821958
+  type: 'suite'
+  ...
+# Subtest: arithmetic
+    # Subtest: multiplies
+    ok 1 - multiplies
+      ---
+      duration_ms: 0.344667
+      type: 'test'
+      ...
+    1..1
+ok 2 - arithmetic
+  ---
+  duration_ms: 0.855125
+  type: 'suite'
+  ...
+1..2
+# tests 2
+# suites 2
+# pass 2
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 49.050417

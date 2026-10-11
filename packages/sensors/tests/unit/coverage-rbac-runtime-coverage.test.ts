@@ -877,9 +877,9 @@ describe('senseInventoryRbac binding inference, evidence, and persistence', () =
       { permissionId: 'role:auditor', endpointId: 'POST /users', methods: ['POST'] },
       { permissionId: 'guard:SessionGuard', endpointId: 'ep-list-users', methods: ['GET'] },
     ]);
-    // `auth.required === false` is a claim; `required: true` without guards or
-    // roles, and a missing `auth` block, are not.
-    expect(body.unmapped.endpointsWithoutRole).toEqual(['GET /version', 'DELETE /users/:id']);
+    // Explicit public claims and unresolved protected authorization remain
+    // separate from an endpoint with no authentication declaration.
+    expect(body.unmapped.endpointsWithoutRole).toEqual(['DELETE /users/:id']);
     expect(body.roles.map((role) => role.id)).toEqual(['role:admin', 'role:auditor']);
     expect(body.permissions.map((permission) => permission.id)).toEqual([
       'guard:SessionGuard',
@@ -895,13 +895,20 @@ describe('senseInventoryRbac binding inference, evidence, and persistence', () =
     });
     expect(result.reading.metrics).toMatchObject({
       endpoint_binding_count: 4,
-      endpoints_without_role_count: 2,
+      endpoints_without_role_count: 1,
       synthetic_guard_permission_count: 1,
       synthetic_role_permission_count: 2,
     });
-    // Controller signals alone keep the inventory out of the empty branch.
-    expect(result.reading.status).toBe('pass');
-    expect(result.reading.findings).toBeUndefined();
+    // Guard-only authentication remains visible without claiming static authorization.
+    expect(result.reading.status).toBe('review');
+    expect(codes(result.reading)).toEqual([
+      'RBAC_AUTHORIZATION_UNRESOLVED',
+      'RBAC_AUTHORIZATION_UNRESOLVED',
+    ]);
+    expect(result.reading.findings?.map((finding) => finding.message)).toEqual([
+      'Endpoint ep-list-users declares authentication guards without a resolved static role/permission declaration. Guard identity does not prove conditional authorization semantics.',
+      'Endpoint GET /version declares authentication guards without a resolved static role/permission declaration. Guard identity does not prove conditional authorization semantics.',
+    ]);
   });
 
   it('reviews a data model with no RBAC shape and no controller signals', () => {
@@ -1022,7 +1029,7 @@ describe('senseInventoryRbac binding inference, evidence, and persistence', () =
     }));
 
     expect(result.reading.status).toBe('error');
-    expect(codes(result.reading)).toEqual(['RBAC_SCHEMA_INVALID']);
+    expect(codes(result.reading)).toContain('RBAC_SCHEMA_INVALID');
     expect(findingFor(result.reading, 'RBAC_SCHEMA_INVALID')?.message).toContain(
       'body fails rbac-inventory.schema.json',
     );

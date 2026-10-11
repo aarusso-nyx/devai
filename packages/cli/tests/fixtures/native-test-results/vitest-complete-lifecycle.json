@@ -1,0 +1,46 @@
+[
+  {
+    "scope": "main",
+    "kind": "begin"
+  },
+  {
+    "scope": "main",
+    "kind": "child",
+    "childScope": "25808f3f03523442329bc2385979b85b"
+  },
+  {
+    "scope": "25808f3f03523442329bc2385979b85b",
+    "kind": "begin"
+  },
+  {
+    "scope": "main",
+    "kind": "child",
+    "childScope": "1591d9669e562c5d4a71626b95b0c0c5"
+  },
+  {
+    "scope": "25808f3f03523442329bc2385979b85b",
+    "kind": "end"
+  },
+  {
+    "scope": "main",
+    "kind": "child-end",
+    "childScope": "25808f3f03523442329bc2385979b85b"
+  },
+  {
+    "scope": "1591d9669e562c5d4a71626b95b0c0c5",
+    "kind": "begin"
+  },
+  {
+    "scope": "1591d9669e562c5d4a71626b95b0c0c5",
+    "kind": "end"
+  },
+  {
+    "scope": "main",
+    "kind": "child-end",
+    "childScope": "1591d9669e562c5d4a71626b95b0c0c5"
+  },
+  {
+    "scope": "main",
+    "kind": "end"
+  }
+]

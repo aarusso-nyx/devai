@@ -61,6 +61,7 @@ describe('#264: the adopter migration manifest', () => {
       '2.3.1',
       '2.3.2',
       '2.4.0',
+      '2.5.0',
     ]);
     expect(manifest.releases.find((release) => release.version === '2.3.0')).toMatchObject({
       version: '2.3.0',
@@ -90,7 +91,7 @@ describe('#264: the adopter migration manifest', () => {
         ],
       }),
     ]);
-    const latest = manifest.releases.at(-1);
+    const latest = manifest.releases.find((release) => release.version === '2.4.0');
     expect(latest).toMatchObject({ version: '2.4.0', status: 'released', date: '2026-10-10' });
     expect(latest?.changes).toEqual([
       expect.objectContaining({
@@ -112,6 +113,47 @@ describe('#264: the adopter migration manifest', () => {
         files: ['.devai/config/subprocess-effects.json'],
       }),
     ]);
+  });
+
+  it('declares the exact 2.5.0 audit-interface and verifier migration obligations', () => {
+    const latest = manifest.releases.at(-1);
+    expect(latest).toMatchObject({ version: '2.5.0', status: 'unreleased' });
+    expect(latest?.changes).toEqual([
+      expect.objectContaining({
+        id: 'MIG-2.5.0-audit-interface-projections',
+        kind: 'opt-in-capability',
+        decision_records: ['ADR-SCR-0017', 'ADR-CFG-0002'],
+        segments: ['adopter-policy'],
+        files: [
+          '.devai/config/invariant-producers.json',
+          '.devai/config/reviewed-workflow-steps.json',
+          '.devai/config/adopter-policy-binding.json',
+        ],
+      }),
+      expect.objectContaining({
+        id: 'MIG-2.5.0-complete-test-result-population',
+        kind: 'opt-in-capability',
+        decision_records: ['ADR-SCR-0017', 'ADR-SCR-0015'],
+        segments: ['harness-ci', 'adopter-policy'],
+        files: ['test-tasks.json', '.devai/config/invariant-producers.json'],
+      }),
+      expect.objectContaining({
+        id: 'MIG-2.5.0-trusted-verifier-2-4',
+        kind: 'rebind',
+        decision_records: ['ADR-REL-0035', 'ADR-CHK-0006'],
+        segments: ['operational-law', 'host-adapters', 'harness-ci'],
+        files: [
+          '.devai/config/toolchain.json',
+          '.github/workflows/devai-local-rc-verify.yml',
+          '.devai/config/github-actions-host-adapter.json',
+        ],
+        decision_required: true,
+      }),
+    ]);
+    expect(plannedReleases(manifest, '2.4.0', '2.5.0').map((release) => release.version)).toEqual([
+      '2.5.0',
+    ]);
+    expect(plannedReleases(manifest, '2.5.0', '2.5.0')).toEqual([]);
   });
 
   it('has exactly one entry for every changelog release above the baseline that changed configuration', () => {
@@ -154,18 +196,19 @@ describe('#264: the adopter migration manifest', () => {
     for (const version of CONFIGURATION_NEUTRAL_RELEASES.keys()) {
       expect(released('2.1.0', version)).toEqual([]);
     }
-    // #381, #383, #390: released rebinds are planned only in range, from below them up to them.
+    // #381, #383, #390: released rebinds stay in range; the shipped unreleased 2.5.0
+    // obligations are also planned above the installed/bound floor (#291).
     const planned = (from: string, installedVersion: string) =>
       plannedReleases(manifest, from, installedVersion).map((release) => release.version);
-    expect(planned('2.3.0', '2.3.0')).toEqual([]);
-    expect(planned('2.3.0', '2.3.1')).toEqual(['2.3.1']);
-    expect(planned('2.3.1', '2.3.1')).toEqual([]);
-    expect(planned('2.3.0', '2.3.2')).toEqual(['2.3.1', '2.3.2']);
-    expect(planned('2.3.1', '2.3.2')).toEqual(['2.3.2']);
-    expect(planned('2.3.2', '2.3.2')).toEqual([]);
-    expect(planned('2.3.2', '2.4.0')).toEqual(['2.4.0']);
-    expect(planned('2.3.1', '2.4.0')).toEqual(['2.3.2', '2.4.0']);
-    expect(planned('2.4.0', '2.4.0')).toEqual([]);
+    expect(planned('2.3.0', '2.3.0')).toEqual(['2.5.0']);
+    expect(planned('2.3.0', '2.3.1')).toEqual(['2.3.1', '2.5.0']);
+    expect(planned('2.3.1', '2.3.1')).toEqual(['2.5.0']);
+    expect(planned('2.3.0', '2.3.2')).toEqual(['2.3.1', '2.3.2', '2.5.0']);
+    expect(planned('2.3.1', '2.3.2')).toEqual(['2.3.2', '2.5.0']);
+    expect(planned('2.3.2', '2.3.2')).toEqual(['2.5.0']);
+    expect(planned('2.3.2', '2.4.0')).toEqual(['2.4.0', '2.5.0']);
+    expect(planned('2.3.1', '2.4.0')).toEqual(['2.3.2', '2.4.0', '2.5.0']);
+    expect(planned('2.4.0', '2.4.0')).toEqual(['2.5.0']);
     expect(releasesInRange(manifest, '1.6.0', '1.9.0').map((release) => release.version)).toEqual([
       '1.7.0',
       '1.8.0',
@@ -187,8 +230,8 @@ describe('#264: the adopter migration manifest', () => {
         return { ...rest, status: 'unreleased' };
       }),
     });
-    expect(versions('2.0.0', '2.0.0', unreleased)).toEqual(['2.1.0']);
-    expect(versions('1.9.0', '2.0.0', unreleased)).toEqual(['2.0.0', '2.1.0']);
+    expect(versions('2.0.0', '2.0.0', unreleased)).toEqual(['2.1.0', '2.5.0']);
+    expect(versions('1.9.0', '2.0.0', unreleased)).toEqual(['2.0.0', '2.1.0', '2.5.0']);
     expect(versions('1.6.0', '2.0.0', unreleased).slice(0, 4)).toEqual([
       '1.7.0',
       '1.8.0',
@@ -196,9 +239,9 @@ describe('#264: the adopter migration manifest', () => {
       '2.0.0',
     ]);
     // Once released and installed, it is an ordinary entry, planned only from below it.
-    expect(versions('2.1.0', '2.1.0')).toEqual([]);
-    expect(versions('2.0.0', '2.1.0')).toEqual(['2.1.0']);
-    expect(versions('2.0.0', '2.0.0')).toEqual([]);
+    expect(versions('2.1.0', '2.1.0')).toEqual(['2.5.0']);
+    expect(versions('2.0.0', '2.1.0')).toEqual(['2.1.0', '2.5.0']);
+    expect(versions('2.0.0', '2.0.0')).toEqual(['2.5.0']);
   });
 
   it('cites only decision records that exist and names a canonical segment for each change', () => {
