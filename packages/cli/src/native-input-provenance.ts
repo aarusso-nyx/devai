@@ -110,6 +110,7 @@ if (trace !== undefined && nonce !== undefined) {
     throw new Error(`DEVAI_NATIVE_INPUT_UNSUPPORTED:${operation}`);
   };
   const actualCallSites = getCallSites;
+  const OriginalError = Error;
   const OriginalSession = Session;
   const connectSession = Session.prototype.connect;
   const postSession = Session.prototype.post;
@@ -141,6 +142,7 @@ if (trace !== undefined && nonce !== undefined) {
       returnedValue,
     );
   const platformFacts = new Map<number, Record<string, unknown>>();
+  const platformSourceRoots = new Map<number, Error>();
   let nextPlatformProbe = 0;
   const actualSourceHash = (scriptId: string): string | undefined => {
     if (process.platform !== 'linux') return undefined;
@@ -205,6 +207,10 @@ if (trace !== undefined && nonce !== undefined) {
       const file = callSite.scriptName.startsWith('file:')
         ? fileURLToPath(callSite.scriptName)
         : callSite.scriptName;
+      // Retain the genuine caller frame, without formatting or reading its stack.
+      // Transient CJS initialization scripts otherwise disappear before sealing.
+      // This object supplies lifetime only; fresh V8 queries supply all identity.
+      const sourceRoot = new OriginalError();
       const sourceSha256 = actualSourceHash(callSite.scriptId);
       if (sourceSha256 !== reviewed.sha256) return false;
       const packageRoot = inspectPlatformCaller(file, reviewed);
@@ -231,6 +237,7 @@ if (trace !== undefined && nonce !== undefined) {
         observation,
       };
       platformFacts.set(nextPlatformProbe, fact);
+      platformSourceRoots.set(nextPlatformProbe, sourceRoot);
       emit({ kind: 'framework-platform-probe', ...fact });
       return true;
     } catch {
@@ -1344,6 +1351,7 @@ if (trace !== undefined && nonce !== undefined) {
     }
     emit({ kind: 'end' });
     sealed = true;
+    platformSourceRoots.clear();
   };
   const finishScope = (): void => {
     if (sealed) return;
