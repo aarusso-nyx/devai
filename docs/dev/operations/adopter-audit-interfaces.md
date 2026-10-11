@@ -232,7 +232,7 @@ The initial Vitest provenance mode requires Node 24, Vitest 4.1.11, Vite 7.3.6 a
 explicit `--configLoader native` plus `--config ./path/config.mjs` (or another
 admitted extension). Bare config filenames refuse before execution because
 Vite's native resolver can probe ambient ancestor package paths; DEVAI does not
-rewrite the command. Vite 8 or the default/bundled loader refuses
+rewrite config arguments. Vite 8 or the default/bundled loader refuses
 standing. Native ESM configs need `import.meta.dirname` in place of
 bundler-injected `__dirname`; unmodified STYNX compatibility is not promised.
 
@@ -268,6 +268,32 @@ intent/success pair. Metadata/read observations and the full outer snapshot stay
 visible; context resets on completion/error. Other paths and failed/partial
 cleanup gain no exemption.
 
+Opting into native Playwright 1.60.0 `resultPopulation` also opts into DEVAI's
+owned result directory. DEVAI supplies `--output` with this execution's exact
+physical `runtime/playwright-results` directory beneath the fresh nonce root,
+overriding config `outputDir`. Caller `--output` forms refuse. Ordinary tasks
+keep their authored output selection. Tests depending on a configured output
+location need migration or remain unsupported in this mode.
+
+The authored task argv and portable identity are preserved; private execution
+identity additionally binds the actual Node bytes, complete effective argv and
+owned result root to the authorized process and immutable measured body. Every
+selected project's reporter-resolved `outputDir` must equal that root. This
+permits no general insertion of arguments or arbitrary state writes.
+
+The result ledger is separate from the transform-cache ledger. It admits only
+the exact result root, immediate directories named
+`.playwright-artifacts-<decimal-integer>` or ASCII slugs matching
+`[A-Za-z0-9_-]+`, and full writes of the root's `.last-run.json` metadata file.
+Owned directory metadata/creation/cleanup and ordered result-file
+write/removal must retain fresh/no-link custody. Other files, deeper
+artifacts, unowned overwrites and every rename involving results refuse,
+including cache-to-result/result-to-cache renames.
+Result artifacts grant no `readFile`, executable, module or transformed-source
+input credit. Only verified transform-cache `.js` identities can support the
+Playwright transformed-source allowance. This finite mode does not claim browser
+attachments or other browser-output support.
+
 Exact Playwright 1.60.0 loader-transformed source has its own module-load digest;
 the raw file read is recorded and verified separately. Raw candidate/dependency
 bytes, resolution, complete exact loader/transform closure and fresh owned cache
@@ -302,10 +328,9 @@ an observable JavaScript closure with no hidden I/O; their interface alone grant
 no exception. This finite instrumentation supports cooperative tooling provenance
 and does not claim a security sandbox.
 
-The native Playwright manifest must be exactly version 1.60.0. Its output
-directory must be explicitly scoped beneath the canonical
-harness-mutated state namespace, such as `.devai/state/`; its default
-`test-results` directory can dirty the candidate and receives no implicit write
+The native Playwright manifest must be exactly version 1.60.0. Its result output
+uses the internally bound fresh directory and finite ledger above. Neither the
+default `test-results` directory nor arbitrary `.devai/state/` paths receive
 permission. Browser, server and global-setup effects need exact separate
 admission. An observed Playwright version or a parser fixture alone does not
 establish an installed positive run.
