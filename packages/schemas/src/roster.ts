@@ -117,6 +117,7 @@ export const ROSTER = [
   'translation-witness.schema.json',
   'use-cases.schema.json',
   'validation-result.schema.json',
+  'workflow-step-inventory.schema.json',
 ] as const;
 
 export type SchemaName = (typeof ROSTER)[number] | (string & {});

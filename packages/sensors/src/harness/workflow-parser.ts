@@ -1,6 +1,6 @@
 import ts from 'typescript';
 import { loadCandidateAuditProjection, readCandidateFile } from '../audit-projection.js';
-import { adopterWorkflowClosure } from './adopter-workflow-closure.js';
+import { adopterWorkflowClosure, adopterWorkflowClosureFacts } from './adopter-workflow-closure.js';
 import { foldWorkflowLines } from './folded-lines.js';
 import {
   constants,
@@ -1606,6 +1606,188 @@ export function workflowStepInventory(
   return out;
 }
 
+type AdopterExecution = { readonly run: string; readonly workingDirectory: string };
+
+/** The same finite execution selection is required for review and for its read-only facts. */
+function adopterStepExecution(
+  workflow: Map<string, ExecutionYaml> | undefined,
+  job: Map<string, ExecutionYaml> | undefined,
+  step: Map<string, ExecutionYaml> | undefined,
+): AdopterExecution | undefined {
+  const run = yamlText(step?.get('run'));
+  const workingDirectory = yamlString(step?.get('working-directory'));
+  if (
+    run === undefined ||
+    step?.has('uses') ||
+    workflow?.has('defaults') ||
+    job?.has('defaults') ||
+    workflow?.has('env') ||
+    job?.has('env') ||
+    step?.has('env') ||
+    (step?.has('working-directory') && workingDirectory === undefined) ||
+    (step?.has('shell') && !['bash', 'sh'].includes(yamlString(step.get('shell')) ?? ''))
+  )
+    return undefined;
+  return { run, workingDirectory: workingDirectory ?? '' };
+}
+
+export interface WorkflowReviewStep {
+  readonly job: string;
+  readonly index: number;
+  readonly occurrence: string;
+  readonly name: string;
+  readonly sha256: string | null;
+  readonly closure: {
+    readonly status: 'complete' | 'unknown';
+    readonly files: readonly { readonly path: string; readonly sha256: string }[] | null;
+    readonly reason: string | null;
+  };
+}
+
+export interface WorkflowReviewFile {
+  readonly path: string;
+  readonly sha256: string | null;
+  readonly status: 'complete' | 'unknown';
+  readonly reason: string | null;
+  readonly steps: readonly WorkflowReviewStep[];
+}
+
+export interface WorkflowReviewInventory {
+  readonly schemaVersion: '1.0.0';
+  readonly status: 'complete' | 'unknown';
+  readonly reason: string | null;
+  readonly workflows: readonly WorkflowReviewFile[];
+}
+
+/**
+ * Canonical physical step facts for authoring an adopter review, never an effect approval.
+ * Both observations must agree, including the source population, bound covers and closure.
+ * Unsupported closure exposes no partial file list that could be mistaken for completeness.
+ */
+export function workflowReviewInventory(repoRoot: string): WorkflowReviewInventory {
+  const root = candidateRoot(repoRoot);
+  if (root === undefined) return sourceBindingRefused();
+  const hash = (bytes: string): string => createHash('sha256').update(bytes).digest('hex');
+  const observe = (): { value: WorkflowReviewInventory; reviews: string } => {
+    const selected = listWorkflowFiles(root);
+    let entries: ReadonlyMap<string, ReviewedWorkflowStep> | undefined;
+    let reviews = '';
+    let reviewBindingValid = true;
+    try {
+      entries = adopterReviewedOccurrences(root);
+      reviews = JSON.stringify([...(entries?.entries() ?? [])]);
+    } catch {
+      reviewBindingValid = false;
+    }
+    const workflows: WorkflowReviewFile[] = selected.map((file) => {
+      const path = relative(root, file).split(sep).join('/');
+      const bound = readBoundSource(root, file, true);
+      if (bound === undefined)
+        return {
+          path,
+          sha256: null,
+          status: 'unknown',
+          reason: 'WORKFLOW_INVENTORY_SOURCE_UNREADABLE',
+          steps: [],
+        };
+      const workflow = yamlMap(executionYaml(bound.source));
+      const jobs = yamlMap(workflow?.get('jobs'));
+      const canonical = workflowStepInventory(bound.source);
+      const steps: WorkflowReviewStep[] = [];
+      let complete = jobs !== undefined && jobs.size > 0;
+      if (jobs !== undefined)
+        for (const [job, definition] of jobs) {
+          const fields = yamlMap(definition);
+          const nodes = fields?.get('steps');
+          if (nodes?.kind !== 'list' || nodes.items.length === 0) {
+            complete = false;
+            continue;
+          }
+          nodes.items.forEach((node, index) => {
+            const fact = canonical.find((item) => item.job === job && item.index === index);
+            const occurrence = `${path}#${job}[${String(index)}]`;
+            const execution = adopterStepExecution(workflow, fields, yamlMap(node));
+            let files: WorkflowReviewStep['closure']['files'] = null;
+            let reason: string | null = 'WORKFLOW_INVENTORY_CLOSURE_UNPROVED';
+            if (!reviewBindingValid) reason = 'WORKFLOW_INVENTORY_REVIEW_BINDING_INVALID';
+            else if (fact?.sha256 === undefined) reason = 'WORKFLOW_INVENTORY_STEP_OPAQUE';
+            else if (
+              entries?.has(occurrence) === true &&
+              (entries.get(occurrence)?.sha256 !== fact.sha256 ||
+                entries.get(occurrence)?.step !== fact.name)
+            )
+              reason = 'WORKFLOW_INVENTORY_REVIEW_BINDING_INVALID';
+            else if (execution !== undefined) {
+              // Covers come only from a currently bound, occurrence-validated adopter entry.
+              const entry = entries?.get(occurrence) ?? {
+                sha256: fact.sha256,
+                effect: 'read-only' as const,
+                workflow: occurrence,
+                step: fact.name,
+                review: 'Inventory facts only; no effect is approved.',
+                files: [],
+              };
+              const closure = adopterWorkflowClosureFacts(
+                root,
+                execution.run,
+                entry,
+                execution.workingDirectory,
+              );
+              if (closure !== undefined) {
+                try {
+                  files = closure.map((sourceFile) => {
+                    const source = readBoundSource(root, sourceFile.path, true);
+                    if (source === undefined) throw new Error('unreadable closure source');
+                    if (hash(source.source) !== sourceFile.sha256)
+                      throw new Error('changed analysed closure source');
+                    return sourceFile;
+                  });
+                  reason = null;
+                } catch {
+                  files = null;
+                }
+              }
+            }
+            if (files === null) complete = false;
+            steps.push({
+              job,
+              index,
+              occurrence,
+              name: fact?.name ?? '',
+              sha256: fact?.sha256 ?? null,
+              closure: { status: files === null ? 'unknown' : 'complete', files, reason },
+            });
+          });
+        }
+      return {
+        path,
+        sha256: hash(bound.source),
+        status: complete ? 'complete' : 'unknown',
+        reason: complete ? null : 'WORKFLOW_INVENTORY_INCOMPLETE',
+        steps,
+      };
+    });
+    const complete = workflows.length > 0 && workflows.every((file) => file.status === 'complete');
+    return {
+      reviews,
+      value: {
+        schemaVersion: '1.0.0',
+        status: complete ? 'complete' : 'unknown',
+        reason: complete
+          ? null
+          : workflows.length === 0
+            ? 'WORKFLOW_INVENTORY_EMPTY'
+            : 'WORKFLOW_INVENTORY_INCOMPLETE',
+        workflows,
+      },
+    };
+  };
+  const first = observe();
+  const second = observe();
+  if (JSON.stringify(first) === JSON.stringify(second)) return first.value;
+  throw new Error('WORKFLOW_INVENTORY_CHANGED');
+}
+
 /** A remote owner/repo[@ref] step reference; nested paths and docker:// never match. */
 function remoteActionReference(use: string): { target: string; ref?: string } | undefined {
   const match = /^([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)(?:@([A-Za-z0-9_./-]+))?$/u.exec(use);
@@ -2801,24 +2983,13 @@ export function jobEffectFacts(
   function reviewedEffect(reviewed: { entry: ReviewedWorkflowStep; step: ExecutionYaml }): Effect {
     if (adopterEntries.has(reviewed.entry)) {
       const fields = yamlMap(reviewed.step);
-      const run = yamlText(fields?.get('run'));
-      // Composite/actions and inherited shell/default selectors require explicit supported closure.
-      if (
-        run === undefined ||
-        fields?.has('uses') ||
-        workflowFields?.has('defaults') ||
-        jobFields?.has('defaults') ||
-        workflowFields?.has('env') ||
-        jobFields?.has('env') ||
-        fields?.has('env') ||
-        (fields?.has('shell') && !['bash', 'sh'].includes(yamlString(fields.get('shell')) ?? ''))
-      )
-        return 'unknown';
+      const execution = adopterStepExecution(workflowFields, jobFields, fields);
+      if (execution === undefined) return 'unknown';
       const expected = adopterWorkflowClosure(
         repoRoot,
-        run,
+        execution.run,
         reviewed.entry,
-        yamlString(fields?.get('working-directory')) ?? '',
+        execution.workingDirectory,
       );
       if (
         expected === undefined ||

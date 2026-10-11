@@ -1,26 +1,104 @@
 import { isAbsolute, dirname, relative, resolve, sep } from 'node:path';
-import { existsSync, realpathSync } from 'node:fs';
+import { lstatSync, realpathSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { builtinModules } from 'node:module';
 import ts from 'typescript';
 import { readCandidateFile } from '../audit-projection.js';
 import type { ReviewedWorkflowStep } from './reviewed-workflow-steps.js';
 
 /** Closed execution forms for adopter reviews; unsupported selectors keep the effect unknown. */
-export function adopterWorkflowClosure(
+export function adopterWorkflowClosureFacts(
   root: string,
   run: string,
   entry: ReviewedWorkflowStep,
   workingDirectory = '',
-): readonly string[] | undefined {
+): readonly { readonly path: string; readonly sha256: string }[] | undefined {
   root = realpathSync(root);
   let runtime: 'node' | 'tsx' | undefined;
   const files = new Set<string>();
+  const observed = new Map<string, Buffer>();
+  const resolutionProbes = new Map<string, string>();
   const pending: string[] = [];
   const followed = new Set<string>();
+  const candidatePath = (path: string): string => {
+    const absolute = resolve(root, path);
+    const rel = relative(root, absolute).split(sep).join('/');
+    if (isAbsolute(rel) || rel.split('/').some((part) => part === '..' || part === '.'))
+      throw new Error('unbound resolution path');
+    let current = root;
+    for (const part of rel === '' ? [] : rel.split('/')) {
+      current = resolve(current, part);
+      if (lstatSync(current).isSymbolicLink()) throw new Error('unbound resolution link');
+    }
+    return rel;
+  };
+  const read = (path: string): Buffer => {
+    const rel = candidatePath(path);
+    const prior = observed.get(rel);
+    if (prior !== undefined) return prior;
+    const bytes = readCandidateFile(root, rel);
+    observed.set(rel, bytes);
+    return bytes;
+  };
+  const contained = (path: string): boolean => {
+    const rel = relative(root, resolve(root, path));
+    return rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel);
+  };
+  const absent = (error: unknown): boolean =>
+    error !== null &&
+    typeof error === 'object' &&
+    'code' in error &&
+    (error.code === 'ENOENT' || error.code === 'ENOTDIR');
+  const probeState = (path: string): string => {
+    try {
+      const entry = lstatSync(resolve(root, candidatePath(path)));
+      return JSON.stringify([
+        entry.dev,
+        entry.ino,
+        entry.mode,
+        entry.nlink,
+        entry.size,
+        entry.mtimeMs,
+        entry.isFile(),
+        entry.isDirectory(),
+      ]);
+    } catch (error) {
+      if (absent(error)) return 'absent';
+      throw error;
+    }
+  };
+  const probe = (path: string, kind: 'file' | 'directory'): boolean => {
+    // TypeScript's ancestor search stops at the candidate boundary. Forbidden
+    // in-root probes must refuse, rather than masquerading as absent fallbacks.
+    if (!contained(path)) return false;
+    const absolute = resolve(root, path);
+    const state = probeState(absolute);
+    const prior = resolutionProbes.get(absolute);
+    if (prior !== undefined && prior !== state) throw new Error('resolution changed');
+    resolutionProbes.set(absolute, state);
+    if (state === 'absent') return false;
+    const facts = JSON.parse(state) as readonly unknown[];
+    return facts[kind === 'file' ? 6 : 7] === true;
+  };
+  const host: ts.ModuleResolutionHost = {
+    fileExists: (path) => probe(path, 'file'),
+    readFile: (path) => {
+      if (!contained(path)) return undefined;
+      try {
+        return read(path).toString('utf8');
+      } catch (error) {
+        if (absent(error)) return undefined;
+        throw error;
+      }
+    },
+    directoryExists: (path) => probe(path, 'directory'),
+    realpath: (path) => resolve(root, candidatePath(path)),
+    getCurrentDirectory: () => root,
+  };
   const add = (path: string): string => {
     const absolute = resolve(root, path);
     const rel = relative(resolve(root), absolute).split(sep).join('/');
-    readCandidateFile(root, rel);
+    read(rel);
     if (!files.has(rel)) {
       files.add(rel);
       pending.push(rel);
@@ -40,10 +118,10 @@ export function adopterWorkflowClosure(
         'tsconfig.json',
       ]) {
         const path = directory === '' ? file : `${directory}/${file}`;
-        if (existsSync(resolve(root, path))) add(path);
+        if (probe(resolve(root, path), 'file')) add(path);
       }
       for (const hook of ['.pnpmfile.cjs', 'pnpmfile.cjs', '.pnpmfile.js'])
-        if (existsSync(resolve(root, hook))) throw new Error('unproved package hook');
+        if (probe(resolve(root, hook), 'file')) throw new Error('unproved package hook');
     };
     const execute = (script: string, directory: string, stack: ReadonlySet<string>): void => {
       for (const physical of script.split('\n')) {
@@ -79,7 +157,7 @@ export function adopterWorkflowClosure(
           if (name === undefined || words.length !== index + 1 || !/^[a-z][\w:.-]*$/u.test(name))
             throw new Error('unproved package invocation');
           const manifestPath = directory === '' ? 'package.json' : `${directory}/package.json`;
-          const manifest = JSON.parse(readCandidateFile(root, manifestPath).toString('utf8')) as {
+          const manifest = JSON.parse(read(manifestPath).toString('utf8')) as {
             scripts?: Record<string, unknown>;
           };
           const key = `${directory}:${name}`;
@@ -100,7 +178,7 @@ export function adopterWorkflowClosure(
       const file = pending[index];
       if (file === undefined || followed.has(file)) continue;
       followed.add(file);
-      const bytes = readCandidateFile(root, file).toString('utf8');
+      const bytes = read(file).toString('utf8');
       if (!/\.(?:[cm]?js|[jt]sx?)$/u.test(file)) continue;
       const parsed = ts.createSourceFile(file, bytes, ts.ScriptTarget.Latest, true);
       if (
@@ -108,17 +186,19 @@ export function adopterWorkflowClosure(
           .length > 0
       )
         return undefined;
-      const compilerConfig = ts.findConfigFile(dirname(resolve(root, file)), ts.sys.fileExists);
+      const compilerConfig = ts.findConfigFile(dirname(resolve(root, file)), host.fileExists);
       let options: ts.CompilerOptions = { moduleResolution: ts.ModuleResolutionKind.NodeNext };
       if (compilerConfig !== undefined) {
         add(relative(root, compilerConfig).split(sep).join('/'));
-        const loaded = ts.readConfigFile(compilerConfig, ts.sys.readFile);
+        const loaded = ts.readConfigFile(compilerConfig, (path) => host.readFile(path));
         if (loaded.error !== undefined || loaded.config.extends !== undefined) return undefined;
-        options = ts.parseJsonConfigFileContent(
-          loaded.config,
-          ts.sys,
+        const converted = ts.convertCompilerOptionsFromJson(
+          loaded.config.compilerOptions ?? {},
           dirname(compilerConfig),
-        ).options;
+          compilerConfig,
+        );
+        if (converted.errors.length > 0) return undefined;
+        options = converted.options;
       }
       const module = (specifier: string): void => {
         const builtin = specifier.replace(/^node:/u, '');
@@ -128,9 +208,9 @@ export function adopterWorkflowClosure(
         let actual: string | undefined;
         if (runtime === 'node' && specifier.startsWith('.')) {
           const exact = resolve(root, dirname(file), specifier);
-          if (existsSync(exact)) actual = exact;
+          if (probe(exact, 'file')) actual = exact;
         } else if (runtime === 'tsx') {
-          actual = ts.resolveModuleName(specifier, resolve(root, file), options, ts.sys)
+          actual = ts.resolveModuleName(specifier, resolve(root, file), options, host)
             .resolvedModule?.resolvedFileName;
         } else {
           // Bare workspace/package resolution can select different import/require exports.
@@ -145,7 +225,7 @@ export function adopterWorkflowClosure(
         )
           throw new Error('unbound external import');
         // Inspect the lexical import path before realpath can erase a symlink component.
-        readCandidateFile(root, lexicalRelative.split(sep).join('/'));
+        read(lexicalRelative.split(sep).join('/'));
         const real = realpathSync(actual);
         const rel = relative(root, real);
         if (rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel))
@@ -232,8 +312,29 @@ export function adopterWorkflowClosure(
       };
       visit(parsed);
     }
-    return [...files].sort();
+    // Resolution reads (for example package scope manifests) are inputs too, even when
+    // TypeScript consulted them without returning them as the selected module.
+    for (const path of observed.keys()) files.add(path);
+    for (const [path, bytes] of observed)
+      if (!readCandidateFile(root, path).equals(bytes)) return undefined;
+    for (const [path, state] of resolutionProbes) if (probeState(path) !== state) return undefined;
+    return [...files].sort().map((path) => ({
+      path,
+      sha256: createHash('sha256')
+        .update(observed.get(path) ?? read(path))
+        .digest('hex'),
+    }));
   } catch {
     return undefined;
   }
+}
+
+/** Existing effect verification consumes exactly the same observed closure as inventory. */
+export function adopterWorkflowClosure(
+  root: string,
+  run: string,
+  entry: ReviewedWorkflowStep,
+  workingDirectory = '',
+): readonly string[] | undefined {
+  return adopterWorkflowClosureFacts(root, run, entry, workingDirectory)?.map((file) => file.path);
 }
