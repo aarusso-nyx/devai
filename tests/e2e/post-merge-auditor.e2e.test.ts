@@ -81,7 +81,7 @@ function materializeAuthorityPolicy(): void {
 }
 
 function install() {
-  return spawnSync(
+  const installed = spawnSync(
     'node',
     [
       REAL_BIN,
@@ -102,6 +102,36 @@ function install() {
     ],
     { cwd: repo, env: gitEnv, encoding: 'utf8' },
   );
+  expect(installed.status, installed.stderr).toBe(0);
+  // Installing a hook does not select its adapter. Bind last so its attestation
+  // covers the final authority policy used by these selected-local scenarios.
+  const bound = spawnSync(
+    'node',
+    [
+      REAL_BIN,
+      'init',
+      'bind',
+      '--host-adapter',
+      'post-merge',
+      '--target',
+      repo,
+      '--as-role',
+      'architect',
+      '--write',
+      '--format',
+      'json',
+    ],
+    { cwd: repo, env: gitEnv, encoding: 'utf8' },
+  );
+  expect(bound.status, bound.stderr).toBe(0);
+  expect(
+    JSON.parse(readFileSync(join(repo, '.devai/config/project.json'), 'utf8'))
+      .authority_enforcement,
+  ).toEqual({
+    mode: 'host-integrated',
+    adapter_config: '.devai/config/post-merge-host-adapter.json',
+  });
+  return bound;
 }
 
 beforeEach(() => {
