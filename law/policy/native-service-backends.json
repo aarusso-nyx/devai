@@ -1,0 +1,20 @@
+{
+  "$schema": "../schemas/native-service-backends-policy.schema.json",
+  "schemaVersion": "1.0.0",
+  "policyVersion": "1.0.0",
+  "id": "native-service-backends",
+  "status": "candidate",
+  "authority": "Architect",
+  "introducedIn": "2.6.0",
+  "records": [],
+  "invariants": [
+    "package-owned-record-only-no-adopter-image-or-policy-self-approval",
+    "active-record-and-profile-implementation-required-before-effect",
+    "code-free-reviewed-base-image-prepared-outside-measurement",
+    "exact-linux-runtime-recipe-platform-and-containment-identity",
+    "candidate-dependencies-devai-helpers-and-replay-separately-hashed-readonly-mounts",
+    "network-none-owned-anchor-actual-topology-and-membership-verified",
+    "same-linux-runtime-paths-independent-replay-no-host-identity-relabel",
+    "real-positive-hostile-and-terminal-cleanup-proofs-before-activation"
+  ]
+}

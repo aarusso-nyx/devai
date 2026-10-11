@@ -188,17 +188,29 @@
           },
           {
             "if": {
-              "properties": { "action_id": { "const": "release preflight" } },
+              "properties": {
+                "action_id": {
+                  "const": "release preflight"
+                }
+              },
               "required": ["action_id"]
             },
             "then": {
               "properties": {
-                "effect": { "const": "harness-write" },
-                "authority": { "const": "release_controller" },
+                "effect": {
+                  "const": "harness-write"
+                },
+                "authority": {
+                  "const": "release_controller"
+                },
                 "authority_contract": {
                   "properties": {
-                    "action_id": { "const": "release preflight" },
-                    "effect": { "const": "harness-write" },
+                    "action_id": {
+                      "const": "release preflight"
+                    },
+                    "effect": {
+                      "const": "harness-write"
+                    },
                     "capabilities": {
                       "const": [
                         "fs:f5-state",
@@ -219,7 +231,11 @@
                       }
                     },
                     "consent": {
-                      "const": { "write": true, "allow_publish": false, "experimental": false }
+                      "const": {
+                        "write": true,
+                        "allow_publish": false,
+                        "experimental": false
+                      }
                     },
                     "planner": {
                       "const": {
@@ -245,7 +261,10 @@
                       }
                     },
                     "readiness": {
-                      "const": { "requires_binding": true, "independent_acceptance_required": true }
+                      "const": {
+                        "requires_binding": true,
+                        "independent_acceptance_required": true
+                      }
                     }
                   }
                 }
@@ -254,16 +273,26 @@
           },
           {
             "if": {
-              "properties": { "action_id": { "const": "release certify" } },
+              "properties": {
+                "action_id": {
+                  "const": "release certify"
+                }
+              },
               "required": ["action_id"]
             },
             "then": {
               "properties": {
-                "effect": { "const": "harness-write" },
+                "effect": {
+                  "const": "harness-write"
+                },
                 "authority_contract": {
                   "properties": {
-                    "action_id": { "const": "release certify" },
-                    "effect": { "const": "harness-write" },
+                    "action_id": {
+                      "const": "release certify"
+                    },
+                    "effect": {
+                      "const": "harness-write"
+                    },
                     "capabilities": {
                       "const": [
                         "fs:f5-state",
@@ -286,7 +315,9 @@
                     },
                     "boundary": {
                       "properties": {
-                        "kind": { "const": "mutation-adapters" },
+                        "kind": {
+                          "const": "mutation-adapters"
+                        },
                         "adapter_ids": {
                           "const": [
                             "fs-authority-boundary",
@@ -294,7 +325,9 @@
                             "trusted-certification-evidence-sink-v1"
                           ]
                         },
-                        "final_reverification": { "const": true }
+                        "final_reverification": {
+                          "const": true
+                        }
                       }
                     }
                   }
@@ -304,16 +337,26 @@
           },
           {
             "if": {
-              "properties": { "action_id": { "const": "release prepare" } },
+              "properties": {
+                "action_id": {
+                  "const": "release prepare"
+                }
+              },
               "required": ["action_id"]
             },
             "then": {
               "properties": {
-                "effect": { "const": "local-write" },
+                "effect": {
+                  "const": "local-write"
+                },
                 "authority_contract": {
                   "properties": {
-                    "action_id": { "const": "release prepare" },
-                    "effect": { "const": "local-write" },
+                    "action_id": {
+                      "const": "release prepare"
+                    },
+                    "effect": {
+                      "const": "local-write"
+                    },
                     "capabilities": {
                       "const": ["fs:f5-state", "fs:proofs", "proc:git", "artifact-sink:write"]
                     },
@@ -332,11 +375,15 @@
                     },
                     "boundary": {
                       "properties": {
-                        "kind": { "const": "mutation-adapters" },
+                        "kind": {
+                          "const": "mutation-adapters"
+                        },
                         "adapter_ids": {
                           "const": ["fs-authority-boundary", "trusted-artifact-sink-v3"]
                         },
-                        "final_reverification": { "const": true }
+                        "final_reverification": {
+                          "const": true
+                        }
                       }
                     }
                   }
@@ -346,16 +393,26 @@
           },
           {
             "if": {
-              "properties": { "action_id": { "const": "release export" } },
+              "properties": {
+                "action_id": {
+                  "const": "release export"
+                }
+              },
               "required": ["action_id"]
             },
             "then": {
               "properties": {
-                "effect": { "const": "local-write" },
+                "effect": {
+                  "const": "local-write"
+                },
                 "authority_contract": {
                   "properties": {
-                    "action_id": { "const": "release export" },
-                    "effect": { "const": "local-write" },
+                    "action_id": {
+                      "const": "release export"
+                    },
+                    "effect": {
+                      "const": "local-write"
+                    },
                     "capabilities": {
                       "const": [
                         "fs:f5-state",
@@ -381,7 +438,9 @@
                     },
                     "boundary": {
                       "properties": {
-                        "kind": { "const": "mutation-adapters" },
+                        "kind": {
+                          "const": "mutation-adapters"
+                        },
                         "adapter_ids": {
                           "const": [
                             "fs-authority-boundary",
@@ -389,7 +448,9 @@
                             "protected-export-signer-v1"
                           ]
                         },
-                        "final_reverification": { "const": true }
+                        "final_reverification": {
+                          "const": true
+                        }
                       }
                     }
                   }
@@ -403,7 +464,9 @@
                 "authority_contract": {
                   "properties": {
                     "capabilities": {
-                      "contains": { "const": "protected-export-signer-v1:sign" }
+                      "contains": {
+                        "const": "protected-export-signer-v1:sign"
+                      }
                     }
                   },
                   "required": ["capabilities"]
@@ -412,7 +475,11 @@
               "required": ["authority_contract"]
             },
             "then": {
-              "properties": { "action_id": { "const": "release export" } }
+              "properties": {
+                "action_id": {
+                  "const": "release export"
+                }
+              }
             }
           }
         ]
@@ -584,6 +651,14 @@
                   "db:write",
                   "db:unclassified",
                   "host-cache:write",
+                  "fixture:postgresql",
+                  "fixture:loopback-http",
+                  "fixture:localstack-s3",
+                  "fixture:redis",
+                  "fixture:redis-process-control",
+                  "fixture:localstack-kms",
+                  "fixture:chromium",
+                  "fixture:reference-web",
                   "protected-certification-provider-v3:execute",
                   "certification-evidence-sink:write",
                   "protected-export-signer-v1:sign"

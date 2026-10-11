@@ -1,0 +1,269 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/native-service-profiles-policy.schema.json",
+  "title": "Native service profiles policy",
+  "description": "Closed candidate-only policy for finite native service profiles, conditional capabilities and lifecycle requirements. A declaration grants no execution or standing; admission requires an implemented profile and an independently approved backend.",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "policyVersion",
+    "id",
+    "status",
+    "authority",
+    "introducedIn",
+    "requestSchema",
+    "action",
+    "requiresWrite",
+    "effect",
+    "profiles",
+    "invariants",
+    "backendCatalogue",
+    "redisProcessControl"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "../schemas/native-service-profiles-policy.schema.json"
+    },
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "policyVersion": {
+      "const": "1.0.0"
+    },
+    "id": {
+      "const": "native-service-profiles"
+    },
+    "status": {
+      "const": "candidate"
+    },
+    "authority": {
+      "const": "Architect"
+    },
+    "introducedIn": {
+      "const": "2.6.0"
+    },
+    "requestSchema": {
+      "const": "law/schemas/native-service-profile.schema.json"
+    },
+    "action": {
+      "const": "sense run"
+    },
+    "requiresWrite": {
+      "const": true
+    },
+    "effect": {
+      "const": "local-write"
+    },
+    "profiles": {
+      "const": [
+        {
+          "id": "postgres-http-v1",
+          "format": "vitest-json",
+          "capabilities": [
+            "db:write",
+            "fixture:postgresql",
+            "fixture:loopback-http",
+            "proc:owned-native-fixture"
+          ],
+          "services": ["postgresql", "loopback-http"],
+          "apiOperations": ["postgres", "verify"]
+        },
+        {
+          "id": "postgres-http-s3-v1",
+          "format": "vitest-json",
+          "capabilities": [
+            "db:write",
+            "fixture:postgresql",
+            "fixture:loopback-http",
+            "fixture:localstack-s3",
+            "proc:owned-native-fixture"
+          ],
+          "services": ["postgresql", "loopback-http", "localstack-s3"],
+          "apiOperations": ["postgres", "localstackS3", "verify"]
+        },
+        {
+          "id": "postgres-redis-http-s3-kms-v1",
+          "format": "vitest-json",
+          "capabilities": [
+            "db:write",
+            "fixture:postgresql",
+            "fixture:loopback-http",
+            "fixture:redis",
+            "fixture:localstack-s3",
+            "fixture:localstack-kms",
+            "proc:owned-native-fixture"
+          ],
+          "services": [
+            "postgresql",
+            "redis",
+            "loopback-http",
+            "localstack-s3",
+            "localstack-s3-kms"
+          ],
+          "apiOperations": ["postgres", "redis", "localstackS3", "localstackS3Kms", "verify"]
+        },
+        {
+          "id": "playwright-chromium-web-v1",
+          "format": "playwright-json",
+          "capabilities": [
+            "db:write",
+            "fixture:postgresql",
+            "fixture:loopback-http",
+            "fixture:localstack-s3",
+            "fixture:redis",
+            "fixture:localstack-kms",
+            "fixture:chromium",
+            "fixture:reference-web",
+            "proc:owned-native-fixture"
+          ],
+          "services": [
+            "postgresql",
+            "redis",
+            "localstack-s3-kms",
+            "loopback-http",
+            "chromium",
+            "reviewed-web-servers"
+          ],
+          "apiOperations": ["postgres", "redis", "localstackS3", "localstackS3Kms", "verify"]
+        }
+      ]
+    },
+    "invariants": {
+      "const": [
+        "declaration-alone-grants-no-execution-or-standing",
+        "exact-private-task-candidate-profile-toolchain-artifact-binding-before-any-effect",
+        "preinstalled-immutable-images-only-no-pulls",
+        "fresh-exclusive-cluster-network-storage-no-shared-roles-or-template",
+        "no-raw-engine-socket-no-arbitrary-docker-requests",
+        "positive-transport-only-owned-actual-endpoints-no-dns-or-public-egress",
+        "finite-host-owned-runtime-paths-no-ambient-tmp-or-host-mount",
+        "actual-native-browser-effects-require-enforced-containment",
+        "native-populations-counters-maps-thresholds-and-original-assertions-unchanged",
+        "actual-parent-and-child-lifetimes-and-cleanup-before-origin",
+        "unsupported-or-incomplete-profile-has-no-diagnostic-fallback-standing"
+      ]
+    },
+    "backendCatalogue": {
+      "const": "law/policy/native-service-backends.json"
+    },
+    "redisProcessControl": {
+      "const": {
+        "request": "pause-resume-v1",
+        "requiresRedis": true,
+        "capability": "fixture:redis-process-control",
+        "effect": "local-write",
+        "apiOperations": ["redis.pause", "redis.resume"]
+      }
+    }
+  },
+  "examples": [
+    {
+      "$schema": "../schemas/native-service-profiles-policy.schema.json",
+      "schemaVersion": "1.0.0",
+      "policyVersion": "1.0.0",
+      "id": "native-service-profiles",
+      "status": "candidate",
+      "authority": "Architect",
+      "introducedIn": "2.6.0",
+      "requestSchema": "law/schemas/native-service-profile.schema.json",
+      "action": "sense run",
+      "requiresWrite": true,
+      "effect": "local-write",
+      "profiles": [
+        {
+          "id": "postgres-http-v1",
+          "format": "vitest-json",
+          "capabilities": [
+            "db:write",
+            "fixture:postgresql",
+            "fixture:loopback-http",
+            "proc:owned-native-fixture"
+          ],
+          "services": ["postgresql", "loopback-http"],
+          "apiOperations": ["postgres", "verify"]
+        },
+        {
+          "id": "postgres-http-s3-v1",
+          "format": "vitest-json",
+          "capabilities": [
+            "db:write",
+            "fixture:postgresql",
+            "fixture:loopback-http",
+            "fixture:localstack-s3",
+            "proc:owned-native-fixture"
+          ],
+          "services": ["postgresql", "loopback-http", "localstack-s3"],
+          "apiOperations": ["postgres", "localstackS3", "verify"]
+        },
+        {
+          "id": "postgres-redis-http-s3-kms-v1",
+          "format": "vitest-json",
+          "capabilities": [
+            "db:write",
+            "fixture:postgresql",
+            "fixture:loopback-http",
+            "fixture:redis",
+            "fixture:localstack-s3",
+            "fixture:localstack-kms",
+            "proc:owned-native-fixture"
+          ],
+          "services": [
+            "postgresql",
+            "redis",
+            "loopback-http",
+            "localstack-s3",
+            "localstack-s3-kms"
+          ],
+          "apiOperations": ["postgres", "redis", "localstackS3", "localstackS3Kms", "verify"]
+        },
+        {
+          "id": "playwright-chromium-web-v1",
+          "format": "playwright-json",
+          "capabilities": [
+            "db:write",
+            "fixture:postgresql",
+            "fixture:loopback-http",
+            "fixture:localstack-s3",
+            "fixture:redis",
+            "fixture:localstack-kms",
+            "fixture:chromium",
+            "fixture:reference-web",
+            "proc:owned-native-fixture"
+          ],
+          "services": [
+            "postgresql",
+            "redis",
+            "localstack-s3-kms",
+            "loopback-http",
+            "chromium",
+            "reviewed-web-servers"
+          ],
+          "apiOperations": ["postgres", "redis", "localstackS3", "localstackS3Kms", "verify"]
+        }
+      ],
+      "invariants": [
+        "declaration-alone-grants-no-execution-or-standing",
+        "exact-private-task-candidate-profile-toolchain-artifact-binding-before-any-effect",
+        "preinstalled-immutable-images-only-no-pulls",
+        "fresh-exclusive-cluster-network-storage-no-shared-roles-or-template",
+        "no-raw-engine-socket-no-arbitrary-docker-requests",
+        "positive-transport-only-owned-actual-endpoints-no-dns-or-public-egress",
+        "finite-host-owned-runtime-paths-no-ambient-tmp-or-host-mount",
+        "actual-native-browser-effects-require-enforced-containment",
+        "native-populations-counters-maps-thresholds-and-original-assertions-unchanged",
+        "actual-parent-and-child-lifetimes-and-cleanup-before-origin",
+        "unsupported-or-incomplete-profile-has-no-diagnostic-fallback-standing"
+      ],
+      "backendCatalogue": "law/policy/native-service-backends.json",
+      "redisProcessControl": {
+        "request": "pause-resume-v1",
+        "requiresRedis": true,
+        "capability": "fixture:redis-process-control",
+        "effect": "local-write",
+        "apiOperations": ["redis.pause", "redis.resume"]
+      }
+    }
+  ]
+}
