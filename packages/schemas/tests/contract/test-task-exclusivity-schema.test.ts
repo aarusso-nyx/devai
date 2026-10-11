@@ -25,6 +25,7 @@ const ajv = new Ajv2020({ strict: false, allErrors: true });
 addFormats(ajv);
 ajv.addSchema(readJson('law/schemas/preflight-probe.schema.json'));
 ajv.addSchema(readJson('law/schemas/reviewed-workflow-steps.schema.json'));
+ajv.addSchema(readJson('law/schemas/native-service-profile.schema.json'));
 ajv.addSchema(readJson('law/schemas/test-result-population.schema.json'));
 const validateDescriptor = ajv.compile(readJson('law/schemas/test-task-descriptor.schema.json'));
 const admitsDescriptor = (value: unknown): boolean => validateDescriptor(value) === true;

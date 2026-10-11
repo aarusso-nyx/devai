@@ -1301,6 +1301,9 @@ describe('exact declared invariant subject execution standing', () => {
       recordObligationReading(root, instance);
       expect(alignObligations(root).status).toBe('pass');
     },
+    // Real pinned native execution plus origin/standing replay exceeded 30s under gate load.
+    // Bound only these fixture cases; the native task keeps its separate 600s execution limit.
+    60_000,
   );
 
   it.each(['fail', 'unknown'] as const)(
