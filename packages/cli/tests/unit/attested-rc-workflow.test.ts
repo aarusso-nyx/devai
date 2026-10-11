@@ -465,15 +465,15 @@ describe('attested RC workflow scaffold', () => {
   });
 });
 
-// #383: the attested-RC verifier workflow keeps its bytes and the default toolchain manifest's
-// pin set, which the observation workflow now shares.
+// #383: the attested-RC verifier workflow keeps its reviewed bytes and shares the default
+// toolchain action pins with the observation workflow.
 describe('#383: the attested RC workflow pin set', () => {
   const ROOT = resolve(import.meta.dirname, '../../../..');
   const DEFAULTS = JSON.parse(
     readFileSync(join(ROOT, 'law/policy/adopter-defaults/toolchain.json'), 'utf8'),
   ) as { actions: Record<string, { digest: string }> };
-  /** sha256 of the generated workflow at 2.3.0; the 2.3.1 rebind leaves these bytes alone. */
-  const GOLDEN_SHA256 = '96fb92acd062b840575cc51ab3673fcabf52607be7e7f1cdf3eab4b2f80ba5fb';
+  /** Reviewed workflow bytes after the trusted verifier package repin to published 2.4.0. */
+  const GOLDEN_SHA256 = '30bb7935a0ad1ad7303217f77ac64e9c0c4c6ae3f70860d7c21f3a14e35964dc';
 
   it('pins every adopter-defaults action, upload-artifact included, to its digest', () => {
     const workflow = attestedRcVerificationWorkflow();
