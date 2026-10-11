@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://devai.nyxk.com.br/schemas/toolchain-manifest.schema.json",
   "title": "Toolchain manifest",
-  "description": "One adopter-owned declaration of toolchain identity, materialized at .devai/config/toolchain.json from the law default under law/policy/adopter-defaults/toolchain.json. Workflows, the workflow checker, the provisioning script, and the runner's toolchain probe consume this manifest instead of restating versions inline (ADR-CHK-0002). It declares exact runtime versions, every pinned GitHub Action digest with the ref it was pinned from, the trusted verifier package by name and version with a reference to the trusted verifier policy, and the named repository constants a workflow must agree with.",
+  "description": "One adopter-owned declaration of toolchain identity at .devai/config/toolchain.json, with canonical defaults under law/policy/adopter-defaults/toolchain.json. It is schema-validated adopter configuration, not a byte-identical operational-law materialization; current init operations do not carry a toolchain-only edit (ADR-REL-0035). Workflows, the workflow checker, provisioning and runner probes consume it (ADR-CHK-0002). It declares exact runtimes, pinned GitHub Actions, trusted verifier identity and named repository constants; local pins and constants survive a verifier-only update.",
   "schema_version": "1.0.0",
   "type": "object",
   "additionalProperties": false,

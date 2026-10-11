@@ -98,7 +98,22 @@
           },
           "toolchainKeys": { "type": "array", "items": { "type": "string" } },
           "allowlistedEnv": { "type": "array", "items": { "type": "string" } },
-          "outputContract": { "type": "object" }
+          "outputContract": {
+            "type": "object",
+            "additionalProperties": true,
+            "properties": {
+              "resultPopulation": { "$ref": "test-result-population.schema.json" }
+            },
+            "if": { "required": ["resultPopulation"] },
+            "then": {
+              "required": ["kind", "population"],
+              "properties": {
+                "kind": { "const": "command-result" },
+                "population": { "type": "string", "minLength": 1 }
+              },
+              "not": { "required": ["generated_namespaces"] }
+            }
+          }
         },
         "allOf": [
           {

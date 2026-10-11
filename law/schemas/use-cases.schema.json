@@ -93,6 +93,7 @@
           "uniqueItems": true
         },
         "endpointIds": {
+          "description": "Endpoint observation references (ADR-SCR-0016). Qualified IDs match exactly; legacy METHOD path aliases resolve only when exactly one API endpoint owns the alias. Ambiguous or stale references require explicit migration and never silently credit multiple source variants. Qualified observation IDs include source evidence and are not stable routing identifiers.",
           "type": "array",
           "items": {
             "type": "string"

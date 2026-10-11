@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/invariant-producers.schema.json",
+  "title": "Invariant Producer Bindings",
+  "description": "Complete optional adopter-owned producer obligations projected only by registered binding to .devai/config/invariant-producers.json. Every binding for an invariant must be discharged by exact candidate/task/result custody; generic action matching cannot substitute (ADR-SCR-0017).",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "bindings"],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "bindings": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["invariant_id", "subject", "taskId", "population", "requiredTestIds"],
+        "properties": {
+          "invariant_id": { "$ref": "common-defs.schema.json#/$defs/id_invariant" },
+          "subject": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Reviewed semantic obligation identifier, not proof of source selection. Exact task input selectors and result census bind the implementing source population. Duplicate invariant/subject pairs refuse at semantic validation."
+          },
+          "taskId": { "type": "string", "minLength": 1 },
+          "population": { "type": "string", "minLength": 1 },
+          "requiredTestIds": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": { "type": "string", "pattern": "^test:v1:.+" },
+            "description": "Nonempty subset of the exact complete resultPopulation IDs required for this subject. Each must actually execute and pass; declarations, skips, cache hits and another subject's results discharge nothing."
+          }
+        }
+      }
+    }
+  },
+  "examples": [{ "schemaVersion": "1.0.0", "bindings": [] }]
+}
