@@ -511,12 +511,24 @@ and a SHA-256 bound into the final reading metrics. Each input must match exact
 candidate-tracked bytes or the independently resolved dependency-instance graph
 from declared root manifests, including the presence/absence and exact bytes
 of implicit nameless module-package-scope manifests used during resolution. Negative existence, stat and complete directory
-observations are revalidated against current inputs. A closed native framework
-discovery exception may replay only exact candidate-root ancestor probes for
-`package.json`, `pnpm-workspace.yaml`, `lerna.json` and `tsconfig.json` that
-establish absence (`ENOENT` or `false`). Any positive outside-file observation,
-other filename, other failure or changed probe result refuses; this grants no
-ambient file-read authority. Other excluded state or proof input reads refuse; only the preceding
+observations are revalidated against current inputs. Alongside the exact retained
+resolution-manifest absence facts, closed framework discovery admits only these
+source-derived negative probe sets:
+
+- Candidate-root ancestor `package.json`, `pnpm-workspace.yaml`, `lerna.json`,
+  `tsconfig.json` and `jsconfig.json`: `readFile`/`stat`/`lstat` with `ENOENT`,
+  or `exists(false)`.
+- Exact explicit-task-config-derived candidates beneath each task-cwd ancestor's
+  `node_modules`: the config path without its leading `./`, or its basename,
+  followed by no suffix or `.js`, `.mjs`, `.cjs`, `.ts`, `.mts`, `.cts`, `.jsx`,
+  `.tsx`, `.json`, `.node`. Only `stat`/`lstat` with `ENOENT` qualifies.
+- For the independently resolved exact `playwright@1.60.0` package root, only
+  `test.js` and `lib/index.js` converted to their literal file-URL `pathname`
+  strings, without percent-decoding: only `exists(false)` qualifies.
+
+Every such target must still be absent when replayed. Positive outside-file
+observations, another target/operation/failure or a changed result refuse. These
+sets grant no ambient file-read authority. Other excluded state or proof input reads refuse; only the preceding
 same-execution generated-output ledger qualifies for its narrow read allowance. Unsupported file-descriptor reads, streams, watches or other
 unobserved APIs remain UNKNOWN. A custom `CoverageProviderModule` is permitted
 only when its actual JavaScript closure is observable through this same path and
