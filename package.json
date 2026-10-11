@@ -1,7 +1,7 @@
 {
   "name": "devai",
   "private": true,
-  "version": "2.4.0",
+  "version": "2.5.0",
   "type": "module",
   "description": "DEVAI 1.5 developer-acceleration CLI for focused automation and trustworthy evidence.",
   "license": "Apache-2.0",
@@ -81,9 +81,13 @@
     "eslint": "^9.0.0",
     "globals": "^17.4.0",
     "lint-staged": "17.6.0",
+    "playwright-native-fixture": "npm:@playwright/test@1.60.0",
     "prettier": "^3.9.6",
+    "swc-native-fixture": "npm:@swc/core@1.16.2",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.57.0",
+    "unplugin-swc-native-fixture": "npm:unplugin-swc@1.5.9",
+    "vite-native-fixture": "npm:vite@7.3.6",
     "vitest": "^4.1.11",
     "yaml": "^2.9.0"
   }

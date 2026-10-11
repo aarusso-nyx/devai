@@ -1,6 +1,6 @@
 {
   "name": "@aarusso-nyx/devai",
-  "version": "2.4.0",
+  "version": "2.5.0",
   "description": "Human-supervised developer-acceleration CLI with bounded automation and trustworthy evidence.",
   "license": "Apache-2.0",
   "author": "Antonio Augusto Russo <aarusso@nyxk.com.br>",
@@ -17,6 +17,8 @@
     "devai-evidence-publish": "./dist/runtime/evidence-verification/src/publish-cli.js"
   },
   "exports": {
+    "./native-vitest-reporter": "./dist/runtime/index/native-test-reporter.js",
+    "./native-playwright-reporter": "./dist/runtime/index/native-playwright-reporter.js",
     "./release-host-bootstrap": {
       "types": "./dist/runtime/types/cli/release-host-bootstrap.d.ts",
       "import": "./dist/runtime/index/release-host-bootstrap.js",
@@ -44,6 +46,7 @@
     "ajv": "^8.17.0",
     "ajv-formats": "^3.0.1",
     "cac": "^6.7.0",
+    "import-meta-resolve": "4.2.0",
     "minimatch": "^9.0.0",
     "semver": "7.8.5",
     "typescript": "^5.6.0",
