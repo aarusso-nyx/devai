@@ -319,9 +319,67 @@ has only these finite source-derived negative probe sets:
   converted to literal file-URL `pathname` strings without percent-decoding:
   only `exists(false)`.
 
-All targets must remain absent on replay. Positive outside-file observations,
-other targets/operations/failures or changed results refuse. No ambient file
-permission follows. Other excluded state/proof input reads refuse outside the preceding generated-output
+All negative-probe targets must remain absent on replay; they grant no positive
+outside-file or ambient file permission.
+
+Linux platform detection has a separate closed fact population for four exact
+reviewed synchronous framework reads:
+
+| Pinned caller                                       | Literal read              | Consumed fact                                                                              |
+| --------------------------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------ |
+| Vite 7.3.6 `dist/node/chunks/config.js:15772:13`    | `/proc/version`, `utf8`   | Lowercase text excludes `microsoft`; actual `os.release()` must also exclude it.           |
+| Playwright core 1.60.0 `lib/utilsBundle.js:5679:19` | `/proc/version`, `utf8`   | The same non-Microsoft predicate.                                                          |
+| Playwright core 1.60.0 `lib/coreBundle.js:7669:48`  | `/etc/os-release`, `utf8` | Exact pinned parser's `id` and `version` from `ID`/`VERSION_ID`, without OS normalization. |
+| SWC core 1.16.2 `binding.js:28:12`                  | `/usr/bin/ldd`, `utf-8`   | Actual text excludes `musl`; initial support is the successful GNU branch.                 |
+
+The exact four installed and executing-source SHA-256 identities are recorded in
+[ADR-SCR-0017](../../../law/adr/ADR-SCR-0017-declared-audit-producers-and-complete-results.md).
+The paths `/proc/version` and `/usr/bin/ldd` must resolve to themselves.
+`/etc/os-release` may resolve only to itself or the explicit
+`/usr/lib/os-release` alias. That alias grants no general linked-file support.
+The original read result/error passes through unchanged. A successful fact
+separately binds the actual returned UTF-8 digest and an immediate original
+raw-byte reread digest; equality is required, so invalid UTF-8 or changed bytes
+cannot masquerade as raw identity. Digests and exact consumed values are
+observations, not authored authority assertions.
+
+A saved `util.getCallSites({sourceMap: false})` immediate frame must identify the
+reviewed operation's actual V8 `scriptId`. A fresh private in-process inspector session for each query
+synchronously retrieves that script's exact raw source and verifies its digest,
+package/file and line/column. Filename/stack strings or disk bytes alone do not
+defeat VM/source-URL impersonation. No wrapper/source-map normalization is
+admitted. Original session constructor/method implementations are captured before
+candidate imports and bound only to each privately created session;
+only `Debugger.enable`/`Debugger.getScriptSource` are used. There is no
+evaluation, listening endpoint, network connection or exposed session. Missing,
+failed or asynchronous source lookup is UNKNOWN. Inspector live editing can
+change a body while preserving its `scriptId`, and an existing debugger agent can
+retain old source after changed code executes. Use a fresh private session for
+every probe and every recorded fact's source requery before its own scope seals;
+require the same reviewed raw-source hash. Never reuse a source cache or an
+agent's retained snapshot. Each query connects, completes synchronous
+enable/source lookup and disconnects in `finally`. Missing, asynchronous,
+changed or incomplete checks refuse.
+
+Facts bind nonce/scope and unique probe identity, actual PID/platform/architecture
+and OS release, executing caller/source identity, exact literal API arguments,
+physical target, raw/returned digests and predicate/fields. Each fact needs a
+matching live recheck before its own scope seals, plus independent current-host
+replay before execution-origin append and every later standing decision. Changed,
+missing or duplicate facts/rechecks refuse. The shared probe helper's exact bytes
+are also part of the installed native execution identity. This is measured
+provenance under the immutable execution-origin contract, not a new public input
+schema, action or inspector permission.
+
+Candidate code reading the same paths gains no exception. Other callsites, API
+arguments, physical targets, failed reads, Microsoft/musl branches,
+container/cgroup/report/child-process fallbacks and further WSL inputs remain
+diagnostic UNKNOWN. Observing them must not change native return values or
+branch behavior. Initial normal-Linux support therefore does not claim WSL,
+musl, browser or arbitrary host-file support.
+
+Outside those finite facts, positive outside-file observations, other
+targets/operations/failures or changed results refuse. Other excluded state/proof input reads refuse outside the preceding generated-output
 ledger. Unsupported descriptor reads, streams,
 watches or incomplete traces remain UNKNOWN. Custom coverage providers require
 an observable JavaScript closure with no hidden I/O; their interface alone grants
