@@ -556,9 +556,96 @@ source-derived negative probe sets:
   `test.js` and `lib/index.js` converted to their literal file-URL `pathname`
   strings, without percent-decoding: only `exists(false)` qualifies.
 
-Every such target must still be absent when replayed. Positive outside-file
-observations, another target/operation/failure or a changed result refuse. These
-sets grant no ambient file-read authority. Other excluded state or proof input reads refuse; only the preceding
+Every such target must still be absent when replayed. These negative sets grant
+no positive outside-file or ambient file-read authority.
+
+Linux framework platform facts are a separate finite measured population, not
+candidate-authored external inputs. Only these four exact reviewed callers may
+qualify, with both the installed file and actual executing V8 source matching
+the stated SHA-256 and exact immediate line/column:
+
+- `vite@7.3.6`, `dist/node/chunks/config.js:15772:13`, SHA-256
+  `c2fcfa51206dc1f8d22120ef4a82af8b9acdc02f4476520b6a0897d12a724ba3`:
+  synchronous literal `readFileSync('/proc/version', 'utf8')`.
+- `playwright-core@1.60.0`, `lib/utilsBundle.js:5679:19`, SHA-256
+  `5c42363c10d2f2f5bc91e07feaa9fa5f417a1a55e6559448d0c20d66f73db9e0`:
+  the same literal `/proc/version` read.
+- `playwright-core@1.60.0`, `lib/coreBundle.js:7669:48`, SHA-256
+  `f74353fcb8e406756a70a6af0dfc4a5069acd577e35ec9d923ccf36ac009c2f5`:
+  synchronous literal `readFileSync('/etc/os-release', 'utf8')`.
+- `@swc/core@1.16.2`, `binding.js:28:12`, SHA-256
+  `46163ee878019eb5ddb6d6783d925b6fedaa1f9dbd3c587b96dee3e5631cc72c`:
+  synchronous literal `readFileSync('/usr/bin/ldd', 'utf-8')`.
+
+The first two facts require actual Linux platform and a captured `os.release()`
+whose lowercase value excludes `microsoft`; the returned text's lowercase
+`includes('microsoft')` predicate must also be false. The SWC fact requires the
+actual returned text's `includes('musl')` predicate to be false. The Playwright
+distribution fact retains the exact pinned parser's `id` and `version`: split
+on newlines, take the first `=` token as the lowercased key, join the remaining
+tokens with `=`, and trim the value. When that value both starts and ends with a
+double quote, apply exactly `substring(1, value.length - 1)`, including its
+one-character edge behavior; `slice` is not interchangeable. Let the last
+duplicate key win. Missing `id`/`version_id` yields an empty string
+for `id`/`version` respectively. These are observed values, not an OS override
+or normalized environment.
+
+Physical targets are closed: `/proc/version` and `/usr/bin/ldd` resolve only to
+themselves; `/etc/os-release` resolves only to itself or the explicit
+`/usr/lib/os-release` alias. Bind the actual resolution and bytes; a changed
+resolution or another link target refuses. A fact preserves the original
+framework read result/error unchanged. A successful fact records the SHA-256 of
+the actual returned UTF-8 bytes separately from the SHA-256 of an immediate
+original raw-byte reread. They must agree, proving canonical UTF-8 and a stable
+read; decoded text alone cannot claim raw-byte identity. Only digest and exact
+consumed predicate/fields enter the fact, not an authored assertion of authority.
+
+Capture the immediate caller with saved Node `util.getCallSites` and
+`sourceMap: false`. Filename, disk hash, line/column or an `Error.stack` string
+alone cannot authenticate the executing source. A fresh private in-process
+inspector session for each query must synchronously obtain the actual source for that V8 `scriptId` and
+hash the exact raw source bytes. No source-map or CommonJS-wrapper normalization
+is admitted. Capture the session constructor and original
+connect/post/disconnect implementations before candidate imports; bind those
+originals only to the privately created session. Use only
+`Debugger.enable` and `Debugger.getScriptSource`, with no evaluation, listening
+endpoint, network connection or candidate-exposed session. A missing,
+asynchronous or failed lookup remains UNKNOWN. A `scriptId` does not make source
+immutable: inspector live edits can replace its body, and an existing debugger
+agent can retain an obsolete source snapshot even after changed code executes.
+Use a fresh agent for every probe; never reuse either cached source trust or an
+agent's retained source snapshot. Before the producing
+scope seals, requery every recorded fact's `scriptId` and require the same exact
+reviewed raw-source hash using a fresh private session for each query. Every
+query performs connect, synchronous enable/source lookup and disconnect in
+`finally`; missing, asynchronous, changed or incomplete checks refuse. A
+different-source VM/eval script that impersonates the filename cannot qualify.
+Even an exact reviewed-source copy receives only its finite literal probe, never
+arbitrary external read authority.
+
+Each private fact binds its nonce/scope, unique probe identity, actual PID,
+platform/architecture/OS release, caller package/file/source identities,
+scriptId/line/column, exact operation/path/encoding, physical target, returned and
+raw digests, and consumed semantics. A matching live producer recheck must occur
+before that scope's own terminal seal. Independent current-host replay before
+origin append and every subsequent standing decision must reproduce the actual
+resolution, raw/returned digests, semantics and OS release. Missing, duplicate,
+changed or incomplete facts/rechecks refuse; parent exit cannot invent a child
+recheck. The shared pure probe helper's bytes join the existing private native
+execution digest and installed asset closure. Trace and facts remain bound to
+the immutable execution-origin body, not a public schema, CLI flag or authored
+input capability.
+
+Candidate reads of the same paths, other callers/arguments/APIs, read failures,
+Microsoft or musl branches, container/cgroup probes, report/child-process
+fallbacks and further WSL inputs remain ordinary unsupported observations.
+Observation never substitutes a result, injects a probe error or changes native
+branch behavior to manufacture support. They remain diagnostic UNKNOWN with no
+native executed-population credit. This finite exception adds no general
+external filesystem scope, inspector capability or public action.
+
+Outside these exact finite facts, positive outside-file observations, another
+target/operation/failure or a changed result refuse. Other excluded state or proof input reads refuse; only the preceding
 same-execution generated-output ledger qualifies for its narrow read allowance. Unsupported file-descriptor reads, streams, watches or other
 unobserved APIs remain UNKNOWN. A custom `CoverageProviderModule` is permitted
 only when its actual JavaScript closure is observable through this same path and
