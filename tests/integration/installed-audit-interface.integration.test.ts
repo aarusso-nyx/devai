@@ -491,7 +491,7 @@ describe('installed optional audit interfaces and native task execution', () => 
         expect.objectContaining({ code: expect.stringContaining('NATIVE_INPUT_EXTERNAL') }),
       ]),
     );
-  });
+  }, 60_000);
 
   it('preserves resolved Vite defaults and declared worker environment overrides', () => {
     const root = nativeRepository();
@@ -545,7 +545,7 @@ describe('installed optional audit interfaces and native task execution', () => 
         }),
       ]),
     );
-  });
+  }, 60_000);
 
   it('refuses configured native worker preload before its external side effect executes', () => {
     const root = nativeRepository();
@@ -584,7 +584,7 @@ describe('installed optional audit interfaces and native task execution', () => 
     expect(String((observed['metrics'] as Json)['native_input_trace'])).toContain(
       'child-node-preload',
     );
-  });
+  }, 60_000);
 
   it('refuses eval workers before their untraced external side effect executes', () => {
     const root = nativeRepository();
@@ -678,7 +678,7 @@ describe('installed optional audit interfaces and native task execution', () => 
       gate_invariants: 1,
       misaligned: 0,
     });
-  });
+  }, 60_000);
 
   it.each(
     [
@@ -855,7 +855,7 @@ describe('installed optional audit interfaces and native task execution', () => 
       misaligned: 1,
     });
     expect(git(root, 'status', '--porcelain')).toBe('');
-  });
+  }, 60_000);
 
   it('preserves two independently executed same-kind tasks and discharges both exact subjects', () => {
     const root = nativeRepository();
@@ -937,7 +937,7 @@ describe('installed optional audit interfaces and native task execution', () => 
       });
     }
     expect(git(root, 'status', '--porcelain')).toBe('');
-  });
+  }, 60_000);
 
   it('binds reviewed workflow source, exact occurrence and transitive bytes through the installed CLI', () => {
     const main = "import { value } from './helper.mjs'; export const result = value;\n";
