@@ -333,7 +333,7 @@
     },
     {
       "version": "2.5.0",
-      "status": "unreleased",
+      "status": "released",
       "changes": [
         {
           "id": "MIG-2.5.0-audit-interface-projections",
@@ -367,6 +367,29 @@
             ".devai/config/github-actions-host-adapter.json"
           ],
           "decision_required": true
+        }
+      ],
+      "date": "2026-10-11"
+    },
+    {
+      "version": "2.6.0",
+      "status": "unreleased",
+      "changes": [
+        {
+          "id": "MIG-2.6.0-read-only-workflow-inventory",
+          "kind": "opt-in-capability",
+          "summary": "Use sense inventory --slice workflows to extract exact workflow step occurrences, canonical step digests and complete contained executable/import file digests for independent review. Incomplete or absent workflow populations remain UNKNOWN/REVIEW. Existing slices including all retain their populations. Extraction executes no workflow, writes no policy or evidence and grants no reviewed effect. No rebind is required to use this installed read-only interface.",
+          "decision_records": ["ADR-SCR-0018"],
+          "segments": [],
+          "files": []
+        },
+        {
+          "id": "MIG-2.6.0-selected-post-merge-hook",
+          "kind": "opt-in-capability",
+          "summary": "Refresh installed shared post-merge hook bytes through registered init apply architect --only hooks --hook post-merge, which omits all unrelated bootstrap planning and writes. A validated project identity/authority-selection projection with a nonselected local adapter reports NOT_SELECTED without issuer/receipt/round-close execution; selected post-merge retains every current binding/HMAC/receipt check. Missing, malformed or unknown selection refuses. This does not switch adapter identity, rewrite authority policy or establish simultaneous local enforcement.",
+          "decision_records": ["ADR-AUT-0007"],
+          "segments": [],
+          "files": [".husky/post-merge"]
         }
       ]
     }

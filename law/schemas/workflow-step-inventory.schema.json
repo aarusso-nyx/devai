@@ -1,0 +1,346 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/workflow-step-inventory.schema.json",
+  "title": "Read-only workflow step inventory",
+  "description": "Opt-in read-only workflow review facts from the installed sense inventory workflows slice. Complete closure grants no effect, execution authority, review or readiness (ADR-SCR-0018).",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "status", "reason", "workflows"],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "status": {
+      "enum": ["complete", "unknown"]
+    },
+    "reason": {
+      "enum": [null, "WORKFLOW_INVENTORY_EMPTY", "WORKFLOW_INVENTORY_INCOMPLETE"]
+    },
+    "workflows": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/workflow"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "complete"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "reason": {
+            "type": "null"
+          },
+          "workflows": {
+            "minItems": 1,
+            "items": {
+              "properties": {
+                "status": {
+                  "const": "complete"
+                }
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "reason": {
+            "enum": ["WORKFLOW_INVENTORY_EMPTY", "WORKFLOW_INVENTORY_INCOMPLETE"]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "reason": {
+            "const": "WORKFLOW_INVENTORY_EMPTY"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "workflows": {
+            "maxItems": 0
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "reason": {
+            "const": "WORKFLOW_INVENTORY_INCOMPLETE"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "workflows": {
+            "minItems": 1,
+            "contains": {
+              "properties": {
+                "status": {
+                  "const": "unknown"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "path": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?![A-Za-z]:)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?!.*//)(?!.*[\\u0000-\\u001f])(?!.*[/]$).+$",
+      "description": "Already-NFC contained repository-relative POSIX regular-file path. No symlink components; exact paths are unique and sorted."
+    },
+    "file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/path"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "closure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "files", "reason"],
+      "properties": {
+        "status": {
+          "enum": ["complete", "unknown"]
+        },
+        "files": {
+          "anyOf": [
+            {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/file"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "complete"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "files": {
+                "type": "array"
+              },
+              "reason": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "files": {
+                "type": "null"
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["job", "index", "occurrence", "name", "sha256", "closure"],
+      "properties": {
+        "job": {
+          "type": "string",
+          "minLength": 1
+        },
+        "index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "occurrence": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Exact workflow path plus #job[index], with a zero-based physical YAML step index. Semantic validation requires equality to its enclosing path, job and index."
+        },
+        "name": {
+          "type": "string"
+        },
+        "sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "closure": {
+          "$ref": "#/$defs/closure"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "closure": {
+                "properties": {
+                  "status": {
+                    "const": "complete"
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "sha256": {
+                "$ref": "#/$defs/sha256"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "workflow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "status", "reason", "steps"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^\\.github/workflows/[^/\\\\\\x00-\\x1f]+\\.ya?ml$"
+        },
+        "sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "enum": ["complete", "unknown"]
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/step"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "complete"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "reason": {
+                "type": "null"
+              },
+              "steps": {
+                "items": {
+                  "properties": {
+                    "sha256": {
+                      "$ref": "#/$defs/sha256"
+                    },
+                    "closure": {
+                      "properties": {
+                        "status": {
+                          "const": "complete"
+                        }
+                      }
+                    }
+                  }
+                },
+                "minItems": 1
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "status": "unknown",
+      "reason": "WORKFLOW_INVENTORY_EMPTY",
+      "workflows": []
+    }
+  ]
+}
