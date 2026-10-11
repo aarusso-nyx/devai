@@ -190,6 +190,9 @@ export function nativeRunnerSelection(
     nodeVersion: process.version,
     reporterSha,
     provenancePreloadSha: sha256Hex(readFileSync(nativeInputPreloadPath())),
+    platformProbeHelperSha: sha256Hex(
+      readFileSync(new URL('./native-platform-probes.js', pathToFileURL(nativeInputPreloadPath()))),
+    ),
     playwrightLoaderSha: sha256Hex(
       readFileSync(
         new URL('./native-playwright-loader.js', pathToFileURL(nativeInputPreloadPath())),

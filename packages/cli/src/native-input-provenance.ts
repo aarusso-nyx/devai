@@ -7,6 +7,16 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import childProcess from 'node:child_process';
 import workerThreads from 'node:worker_threads';
+import { Session } from 'node:inspector';
+import { getCallSites } from 'node:util';
+import { release } from 'node:os';
+import {
+  frameworkPlatformProbeCallers,
+  frameworkPlatformPackageRoot,
+  inspectFrameworkPlatformCaller,
+  nativePlatformProbeObservation,
+} from './native-platform-probes.js';
+import type { FrameworkPlatformProbeCaller } from './native-platform-probes.js';
 
 let closeScope: (() => void) | undefined;
 export function sealNativeInputScope(): void {
@@ -74,8 +84,9 @@ if (trace !== undefined && nonce !== undefined) {
   let sealed = false;
   let pendingIO = 0;
   const loaderSealers: (() => void)[] = [];
+  const originalCreateHash = createHash;
   const hash = (bytes: Uint8Array | string): string =>
-    createHash('sha256').update(bytes).digest('hex');
+    originalCreateHash('sha256').update(bytes).digest('hex');
   const emit = (row: Record<string, unknown>): void => {
     if (sealed && row['kind'] !== 'unsupported') {
       original.appendFileSync(
@@ -97,6 +108,135 @@ if (trace !== undefined && nonce !== undefined) {
   const unsupported = (operation: string): never => {
     emit({ kind: 'unsupported', operation });
     throw new Error(`DEVAI_NATIVE_INPUT_UNSUPPORTED:${operation}`);
+  };
+  const actualCallSites = getCallSites;
+  const OriginalSession = Session;
+  const connectSession = Session.prototype.connect;
+  const postSession = Session.prototype.post;
+  const disconnectSession = Session.prototype.disconnect;
+  const invokeSession = Reflect.apply;
+  const originalRelease = release;
+  const nativeHostPlatform = () => ({
+    pid: process.pid,
+    platform: process.platform,
+    arch: process.arch,
+    osRelease: originalRelease(),
+  });
+  const inspectPlatformCaller = (file: string, caller: FrameworkPlatformProbeCaller): string => {
+    const packageRoot = frameworkPlatformPackageRoot(file, caller);
+    return inspectFrameworkPlatformCaller(
+      file,
+      caller,
+      original.realpathSync(file),
+      trustedReadFile(file),
+      trustedReadFile(resolve(packageRoot, 'package.json')),
+    );
+  };
+  const platformObservation = (caller: FrameworkPlatformProbeCaller, returnedValue?: unknown) =>
+    nativePlatformProbeObservation(
+      caller,
+      nativeHostPlatform(),
+      original.realpathSync(caller.path),
+      trustedReadFile(caller.path),
+      returnedValue,
+    );
+  const platformFacts = new Map<number, Record<string, unknown>>();
+  let nextPlatformProbe = 0;
+  const actualSourceHash = (scriptId: string): string | undefined => {
+    if (process.platform !== 'linux') return undefined;
+    let session: Session | undefined;
+    let identity: string | undefined;
+    try {
+      // Debugger agents cache script text, even across edits by another session.
+      // Every lookup needs a fresh in-process agent, closed before returning.
+      session = new OriginalSession();
+      invokeSession(connectSession, session, []);
+      let ready = false;
+      invokeSession(postSession, session, [
+        'Debugger.enable',
+        (error: Error | null): void => {
+          ready = error === null;
+        },
+      ]);
+      if (ready) {
+        let source: string | undefined;
+        let completed = false;
+        invokeSession(postSession, session, [
+          'Debugger.getScriptSource',
+          { scriptId },
+          (error: Error | null, result?: { scriptSource?: unknown }): void => {
+            completed = true;
+            if (error === null && typeof result?.scriptSource === 'string')
+              source = result.scriptSource;
+          },
+        ]);
+        if (completed && source !== undefined) identity = hash(source);
+      }
+    } catch {
+      // Missing or asynchronous identity cannot gain platform-fact standing.
+      identity = undefined;
+    } finally {
+      if (session !== undefined) {
+        try {
+          invokeSession(disconnectSession, session, []);
+        } catch {
+          identity = undefined;
+        }
+      }
+    }
+    return identity;
+  };
+  const platformProbe = (
+    name: string,
+    args: unknown[],
+    value: unknown,
+    callSite?: ReturnType<typeof getCallSites>[number],
+  ): boolean => {
+    if (name !== 'readFile' || args.length !== 2 || callSite === undefined) return false;
+    try {
+      const reviewed = frameworkPlatformProbeCallers.find(
+        (caller) =>
+          args[0] === caller.path &&
+          args[1] === caller.encoding &&
+          callSite.lineNumber === caller.line &&
+          callSite.columnNumber === caller.column,
+      );
+      if (reviewed === undefined || typeof value !== 'string') return false;
+      const file = callSite.scriptName.startsWith('file:')
+        ? fileURLToPath(callSite.scriptName)
+        : callSite.scriptName;
+      const sourceSha256 = actualSourceHash(callSite.scriptId);
+      if (sourceSha256 !== reviewed.sha256) return false;
+      const packageRoot = inspectPlatformCaller(file, reviewed);
+      const observation = platformObservation(reviewed, value);
+      observe(file, 'file');
+      observe(resolve(packageRoot, 'package.json'), 'file');
+      const fact = {
+        probeId: ++nextPlatformProbe,
+        probe: reviewed.probe,
+        ...nativeHostPlatform(),
+        caller: {
+          packageName: reviewed.packageName,
+          packageVersion: reviewed.packageVersion,
+          file,
+          sha256: reviewed.sha256,
+          scriptId: callSite.scriptId,
+          sourceSha256,
+          line: reviewed.line,
+          column: reviewed.column,
+        },
+        api: 'readFileSync',
+        path: reviewed.path,
+        encoding: reviewed.encoding,
+        observation,
+      };
+      platformFacts.set(nextPlatformProbe, fact);
+      emit({ kind: 'framework-platform-probe', ...fact });
+      return true;
+    } catch {
+      // Preserve the native value/error; unproved platform reads remain generic observations.
+      return false;
+    }
   };
   const dlopen = process.dlopen;
   process.dlopen = (...loadArguments: Parameters<typeof dlopen>): void => {
@@ -248,10 +388,17 @@ if (trace !== undefined && nonce !== undefined) {
     if (typeof value !== 'string') return unsupported('unbound-file-descriptor');
     return resolve(value);
   };
-  const capture = (name: string, args: unknown[], value: unknown, error?: unknown): void => {
+  const capture = (
+    name: string,
+    args: unknown[],
+    value: unknown,
+    error?: unknown,
+    callSite?: ReturnType<typeof getCallSites>[number],
+  ): void => {
     const path = pathOf(args[0]);
     if (path === trace || (path.startsWith(`${dirname(trace)}/`) && !runtimePath(path)))
       unsupported('provenance-transport-read');
+    if (error === undefined && platformProbe(name, args, value, callSite)) return;
     const options = args[1];
     const encoding =
       name === 'readFile'
@@ -369,6 +516,20 @@ if (trace !== undefined && nonce !== undefined) {
     const sync = fsMethods[`${name}Sync`];
     if (sync !== undefined) {
       const replacement = (...args: unknown[]): unknown => {
+        let callSite: ReturnType<typeof getCallSites>[number] | undefined;
+        if (
+          name === 'readFile' &&
+          args.length === 2 &&
+          frameworkPlatformProbeCallers.some(
+            (caller) => args[0] === caller.path && args[1] === caller.encoding,
+          )
+        ) {
+          try {
+            callSite = actualCallSites(2, { sourceMap: false })[1];
+          } catch {
+            // Preserve the original operation; missing source proof cannot gain standing.
+          }
+        }
         try {
           let value: unknown;
           if (name === 'readFile') {
@@ -379,7 +540,7 @@ if (trace !== undefined && nonce !== undefined) {
               trustedReadDepth -= 1;
             }
           } else value = sync(...args);
-          capture(name, args, value);
+          capture(name, args, value, undefined, callSite);
           return observedValue(name, args, value);
         } catch (error) {
           capture(name, args, undefined, error);
@@ -1155,10 +1316,32 @@ if (trace !== undefined && nonce !== undefined) {
     runtimePhysicalRoot: runtimeRoot === undefined ? null : original.realpathSync(runtimeRoot),
     runtimeRootMode: runtimeRoot === undefined ? null : original.statSync(runtimeRoot).mode,
     initialRuntimeEntries: runtimeRoot === undefined ? null : original.readdirSync(runtimeRoot),
+    hostPlatform: nativeHostPlatform(),
   });
   closeScope = (): void => {
     if (sealed) throw new Error('NATIVE_LOADER_ALREADY_SEALED');
     if (pendingIO !== 0) unsupported('pending-filesystem-io');
+    for (const fact of platformFacts.values()) {
+      const caller = fact['caller'] as Record<string, unknown>;
+      const reviewed = frameworkPlatformProbeCallers.find(
+        (entry) => entry.sha256 === caller['sha256'] && entry.probe === fact['probe'],
+      );
+      try {
+        if (reviewed === undefined) throw new Error('NATIVE_PLATFORM_PROBE_INVALID');
+        if (actualSourceHash(caller['scriptId'] as string) !== reviewed.sha256)
+          unsupported('framework-platform-source-changed');
+        inspectPlatformCaller(caller['file'] as string, reviewed);
+        const observation = platformObservation(reviewed);
+        if (
+          JSON.stringify(observation) !== JSON.stringify(fact['observation']) ||
+          nativeHostPlatform().osRelease !== fact['osRelease']
+        )
+          unsupported('framework-platform-probe-changed');
+        emit({ kind: 'framework-platform-probe-recheck', ...fact, observation });
+      } catch {
+        unsupported('framework-platform-probe-recheck-failed');
+      }
+    }
     emit({ kind: 'end' });
     sealed = true;
   };
