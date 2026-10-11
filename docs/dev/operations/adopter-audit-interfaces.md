@@ -243,15 +243,60 @@ bundler-injected `__dirname`; unmodified STYNX compatibility is not promised.
 | Rollup 4.64.5                | Guarded source-only parse/parseAsync and in-memory hash APIs.                                                                                                                                                                                                                                  |
 | Esbuild 0.28.1/0.28.2        | Inline transform service protocol with `inputFS: false`; no build/native file operations. Greater-than-1-MiB disk spill remains UNKNOWN.                                                                                                                                                       |
 
+Native generated caches are a same-execution output population, not an external
+input allowance. The host creates only the fresh empty nonce-scoped
+`.devai/state/native-config-traces/<internally-minted-nonce>/runtime` directory.
+The closed environment internally supplies `TMPDIR` at that physical root and
+`PWTEST_CACHE_DIR` at its `playwright` child, refusing descriptor overrides.
+The trusted main-process begin event records the root and empty contents before
+imports. This uses the existing exact native state operation and grants no
+ambient `/tmp` permission or caller-selected cache root.
+
+Only verified finite Vitest 4.1.11/Playwright 1.60.0 cache subdirectories,
+hash-files and staging forms qualify. Actual Vitest context/project temporary
+roots reported by the package-owned reporter must stay in the owned namespace.
+Successful mkdir, full writes, renames and removals form an ordered cross-scope
+virtual output ledger, retaining each live path/encoding/byte SHA-256 identity.
+Each worker read needs a matching earlier live identity. An atomic `.tmp-*` to
+`ssr` hash-file rename must carry the successful write into the target; the target
+path alone earns no credit. Overwrites require ownership, and removal/replacement
+invalidates the old identity. Links, escapes, unowned writes, preexisting files,
+replayed caches, partial/future writes and ambiguous ordering refuse. Owned
+cleanup is replayed; retained custody facts survive deletion. Nested framework
+removal calls may share only the same active owned outer subtree's complete
+intent/success pair. Metadata/read observations and the full outer snapshot stay
+visible; context resets on completion/error. Other paths and failed/partial
+cleanup gain no exemption.
+
+Exact Playwright 1.60.0 loader-transformed source has its own module-load digest;
+the raw file read is recorded and verified separately. Raw candidate/dependency
+bytes, resolution, complete exact loader/transform closure and fresh owned cache
+custody remain required. Transformed bytes never replace raw input custody, and
+a version match alone is insufficient. Other runners gain no transformed-load
+exemption. Provenance UNKNOWN discards native executed-population measurements;
+retained diagnostics cannot earn standing.
+
 Full-run filesystem/module observations are retained as raw trace plus SHA-256
 metrics. Inputs must match candidate-tracked bytes or the resolved dependency
 instance graph rooted in declared manifests. Implicit nameless module-scope
 manifest presence/absence and bytes remain part of resolution provenance. Negative/stat/directory results are
-rechecked. Closed framework discovery may replay only exact candidate-root
-ancestor probes for `package.json`, `pnpm-workspace.yaml`, `lerna.json` and
-`tsconfig.json` that establish absence (`ENOENT` or `false`). Positive outside-file
-observations, other names/failures or changed results refuse; this is no general
-ambient file grant. Excluded state/proofs reads, unsupported descriptor reads, streams,
+rechecked. Alongside bound resolution-manifest absence facts, framework discovery
+has only these finite source-derived negative probe sets:
+
+- Candidate-root ancestor `package.json`, `pnpm-workspace.yaml`, `lerna.json`,
+  `tsconfig.json` and `jsconfig.json`: `readFile`/`stat`/`lstat` must return
+  `ENOENT`, or `exists` must return `false`.
+- Explicit task config path/basename candidates in task-cwd ancestor
+  `node_modules`, with no suffix or `.js`, `.mjs`, `.cjs`, `.ts`, `.mts`, `.cts`,
+  `.jsx`, `.tsx`, `.json`, `.node`: only `stat`/`lstat` returning `ENOENT`.
+- Exact resolved `playwright@1.60.0` package-root `test.js` and `lib/index.js`
+  converted to literal file-URL `pathname` strings without percent-decoding:
+  only `exists(false)`.
+
+All targets must remain absent on replay. Positive outside-file observations,
+other targets/operations/failures or changed results refuse. No ambient file
+permission follows. Other excluded state/proof input reads refuse outside the preceding generated-output
+ledger. Unsupported descriptor reads, streams,
 watches or incomplete traces remain UNKNOWN. Custom coverage providers require
 an observable JavaScript closure with no hidden I/O; their interface alone grants
 no exception. This finite instrumentation supports cooperative tooling provenance
@@ -311,6 +356,33 @@ negative filesystem/stat/directory observations. An incomplete trace or
 unsupported API/process mode refuses standing. Native config dependency lists
 corroborate rather than replace the trace. This supports cooperative native
 provenance; it is not a security sandbox against deliberately bypassing plugins.
+
+Native workers use their own private scope/control port/shared acknowledgement.
+Original `workerData` and transfer semantics are restored before candidate
+imports. Before native `Worker.terminate`, the parent requests the worker's own
+seal; only its preload can persist the actual end and acknowledge after supported
+I/O completes or observably drains. The parent wait is bounded to five seconds.
+Missing acknowledgement, pending/unobserved I/O or termination without closure
+remains UNKNOWN. Normal worker exit also needs actual worker-owned terminal
+evidence; a parent termination event cannot invent it. Each child loader still
+requires its own separate seal, and post-seal hooks/I/O refuse.
+
+Exact Playwright 1.60.0 async ESM loaders require the bound package-owned
+bootstrap/preload and original loader/package closure. Each isolated scope
+imports preload dynamically before dynamically importing the original loader,
+while preserving its initialization data, hooks and port transfers. Static
+re-exports, arbitrary registration targets and adopter-created loaders do not
+qualify. Registration creates a private child scope and separate control
+port/shared acknowledgement buffer; an inherited owner-scope clone refuses.
+Forwarded hooks track active work. Normal parent termination requests a seal;
+only quiescent hooks and completed supported I/O can persist the preload's actual
+end and acknowledge it. Private I/O initiation/completion accounting must drain
+pending operations observably or refuse; termination cannot hide an unfinished
+callback or promise behind an acknowledgement. The parent wait is bounded to
+five seconds, and post-seal hooks/I/O refuse.
+A real begin and persisted seal must close each main/worker loader scope and
+prove observation flush. Normal exit cannot stand in for a missing acknowledgement.
+Missing stages, termination without closure or timeout remain UNKNOWN.
 
 Task readings retain separate current heads for each exact kind/task/population
 within candidate custody. Scorecards keep all heads and use the worst applicable
