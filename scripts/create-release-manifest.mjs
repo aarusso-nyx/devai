@@ -29,7 +29,7 @@ if (
   verifierPackagePolicy.package?.name !== '@aarusso-nyx/devai' ||
   verifierPackageVersion !== verifierPackagePolicy.package.version ||
   verifierProvenanceSha256 !== verifierPackagePolicy.verifier?.provenance_sha256 ||
-  verifierPackagePolicy.verifier?.source_commit !== '8b215d706a828af7361f9c6799b9cb0a30c9d00b' ||
+  verifierPackagePolicy.verifier?.source_commit !== 'ad790aea6f200412da79a3a1bfbaa03cbdb47a2d' ||
   !/^[a-f0-9]{40}$/u.test(verifierPackagePolicy.verifier?.source_commit ?? '')
 ) {
   throw new Error('RELEASE_MANIFEST_VERIFIER_IDENTITY_INVALID');
