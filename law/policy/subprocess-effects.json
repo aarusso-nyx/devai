@@ -409,6 +409,88 @@
       "owner": "architect"
     },
     {
+      "template_id": "owned-native-fixture-inspection",
+      "executable": "owned-native-fixture-inspection",
+      "argv_shape": ["<exact-privately-bound-supervisor-inspection-argv>"],
+      "capabilities": ["proc:owned-native-fixture"],
+      "effect": "read",
+      "reason": "ADR-SCR-0020: descriptive read annotation only for the privately minted sense run service-inspection tuple after closed request and physical supervisor/broker/provisioner/engine identity validation. This marker is not a runnable command or generic argv grant. The exact package-owned supervisor inspection mode may issue only GET /info, GET /version and GET /images/<exact-reviewed-image-reference>/json against the fixed bound local engine socket, returning actual engine/platform/image identities with bounded responses. No provisioning, creation, mutation, pulls, socket export, child native execution, arbitrary image/path/query or general Docker API operation is admitted. The private binding must match the exact actual executable bytes, complete inspection argv/cwd/environment and reviewed requested images before any process starts; supplied JSON or public imports cannot mint it. No fixture capability or write consent is inferred from successful inspection, and the later service launch independently requires the complete privately bound plan and explicit write consent. Missing or mismatched identity refuses without a read-only fallback.",
+      "owner": "architect"
+    },
+    {
+      "template_id": "owned-native-postgres-http-v1",
+      "executable": "owned-native-fixture",
+      "argv_shape": ["<exact-privately-bound-supervisor-argv>"],
+      "capabilities": [
+        "fs:f5-state",
+        "fs:proofs",
+        "db:write",
+        "fixture:postgresql",
+        "fixture:loopback-http",
+        "proc:owned-native-fixture"
+      ],
+      "effect": "local-write",
+      "reason": "ADR-SCR-0020: descriptive annotation only for sense run's privately minted whole service plan and exact host supervisor tuple; this executable marker and argv placeholder are never runnable or generic command admission. Require the validated profile before consent, explicit --write, exact task/population/candidate commit/tree, policy/input/dependency/environment identities, supervisor/broker/child executable bytes and complete effective argv/cwd/environment, physical provisioner/engine identity and preinstalled immutable platform-specific artifacts. Every actual operation remains privately guarded; caller JSON, stdin, a capability name or consistent nonce cannot mint authority. Fresh exclusive PostgreSQL cluster, owned loopback HTTP and finite nonce-runtime fixture files only; no shared roles/database/template, ambient endpoint or socket fallback. Only fresh internally minted nonce/runtime state and existing exact origin-proof operations are covered; no general state/proofs permission follows. Preserve native own-scope seals, private ordered actual lifecycle evidence and complete cleanup before origin; failed, partial or unimplemented provisioning grants no standing. Ordinary native tasks gain no fixture capability. Existing net:* classification and public action/role/publication boundaries remain unchanged.",
+      "owner": "architect"
+    },
+    {
+      "template_id": "owned-native-postgres-http-s3-v1",
+      "executable": "owned-native-fixture",
+      "argv_shape": ["<exact-privately-bound-supervisor-argv>"],
+      "capabilities": [
+        "fs:f5-state",
+        "fs:proofs",
+        "db:write",
+        "fixture:postgresql",
+        "fixture:loopback-http",
+        "fixture:localstack-s3",
+        "proc:owned-native-fixture"
+      ],
+      "effect": "local-write",
+      "reason": "ADR-SCR-0020: descriptive annotation only for sense run's privately minted whole service plan and exact host supervisor tuple; this executable marker and argv placeholder are never runnable or generic command admission. Require the validated profile before consent, explicit --write, exact task/population/candidate commit/tree, policy/input/dependency/environment identities, supervisor/broker/child executable bytes and complete effective argv/cwd/environment, physical provisioner/engine identity and preinstalled immutable platform-specific artifacts. Every actual operation remains privately guarded; caller JSON, stdin, a capability name or consistent nonce cannot mint authority. The PostgreSQL/HTTP boundary plus exact LocalStack S3 image and private finite Docker broker for owned resources only; actual AWS signing/object assertions remain unchanged. No raw engine socket, arbitrary Docker request, pull, exec, mount or public egress. Only fresh internally minted nonce/runtime state and existing exact origin-proof operations are covered; no general state/proofs permission follows. Preserve native own-scope seals, private ordered actual lifecycle evidence and complete cleanup before origin; failed, partial or unimplemented provisioning grants no standing. Ordinary native tasks gain no fixture capability. Existing net:* classification and public action/role/publication boundaries remain unchanged.",
+      "owner": "architect"
+    },
+    {
+      "template_id": "owned-native-postgres-redis-http-s3-kms-v1",
+      "executable": "owned-native-fixture",
+      "argv_shape": ["<exact-privately-bound-supervisor-argv>"],
+      "capabilities": [
+        "fs:f5-state",
+        "fs:proofs",
+        "db:write",
+        "fixture:postgresql",
+        "fixture:loopback-http",
+        "fixture:redis",
+        "fixture:localstack-s3",
+        "fixture:localstack-kms",
+        "proc:owned-native-fixture"
+      ],
+      "effect": "local-write",
+      "reason": "ADR-SCR-0020: descriptive annotation only for sense run's privately minted whole service plan and exact host supervisor tuple; this executable marker and argv placeholder are never runnable or generic command admission. Require the validated profile before consent, explicit --write, exact task/population/candidate commit/tree, policy/input/dependency/environment identities, supervisor/broker/child executable bytes and complete effective argv/cwd/environment, physical provisioner/engine identity and preinstalled immutable platform-specific artifacts. Every actual operation remains privately guarded; caller JSON, stdin, a capability name or consistent nonce cannot mint authority. The PostgreSQL/HTTP boundary plus exact Redis 7-alpine and LocalStack 3.8.1 S3/KMS images, with separate fresh S3 and S3/KMS instances where the original fixtures start them and private finite Docker broker for owned resources only; actual AWS signing/object assertions remain unchanged. No raw engine socket, arbitrary Docker request, pull, exec, mount or public egress. Only fresh internally minted nonce/runtime state and existing exact origin-proof operations are covered; no general state/proofs permission follows. Preserve native own-scope seals, private ordered actual lifecycle evidence and complete cleanup before origin; failed, partial or unimplemented provisioning grants no standing. Ordinary native tasks gain no fixture capability. Existing net:* classification and public action/role/publication boundaries remain unchanged.",
+      "owner": "architect"
+    },
+    {
+      "template_id": "owned-native-playwright-chromium-web-v1",
+      "executable": "owned-native-fixture",
+      "argv_shape": ["<exact-privately-bound-supervisor-argv>"],
+      "capabilities": [
+        "fs:f5-state",
+        "fs:proofs",
+        "db:write",
+        "fixture:postgresql",
+        "fixture:loopback-http",
+        "fixture:localstack-s3",
+        "fixture:redis",
+        "fixture:localstack-kms",
+        "fixture:chromium",
+        "fixture:reference-web",
+        "proc:owned-native-fixture"
+      ],
+      "effect": "local-write",
+      "reason": "ADR-SCR-0020: descriptive annotation only for sense run's privately minted whole service plan and exact host supervisor tuple; this executable marker and argv placeholder are never runnable or generic command admission. Require the validated profile before consent, explicit --write, exact task/population/candidate commit/tree, policy/input/dependency/environment identities, supervisor/broker/child executable bytes and complete effective argv/cwd/environment, physical provisioner/engine identity and preinstalled immutable platform-specific artifacts. Every actual operation remains privately guarded; caller JSON, stdin, a capability name or consistent nonce cannot mint authority. Forward browser/server graph only: exact contained Chromium, complete original server/build/prerequisite graph, PostgreSQL/Redis/LocalStack S3-KMS and actual finite artifacts require implemented independently verified containment. Browserless support does not admit this profile; an unavailable backend refuses before any effect. Only fresh internally minted nonce/runtime state and existing exact origin-proof operations are covered; no general state/proofs permission follows. Preserve native own-scope seals, private ordered actual lifecycle evidence and complete cleanup before origin; failed, partial or unimplemented provisioning grants no standing. Ordinary native tasks gain no fixture capability. Existing net:* classification and public action/role/publication boundaries remain unchanged.",
+      "owner": "architect"
+    },
+    {
       "template_id": "pnpm-recursive-build",
       "executable": "pnpm",
       "argv_shape": ["-r", "build"],
@@ -563,6 +645,21 @@
       "capabilities": ["proc:gh-remote", "net:github-issues"],
       "effect": "remote-write",
       "reason": "Opt-in governance tracking projects public-safe event batches to one governed round's GitHub Issue through the already-authenticated GitHub CLI boundary; no credential is read, extracted, or persisted by DEVAI.",
+      "owner": "architect"
+    },
+    {
+      "template_id": "owned-native-redis-process-control-v1",
+      "executable": "owned-native-fixture",
+      "argv_shape": ["<exact-privately-bound-supervisor-argv>"],
+      "capabilities": [
+        "fs:f5-state",
+        "fs:proofs",
+        "fixture:redis",
+        "fixture:redis-process-control",
+        "proc:owned-native-fixture"
+      ],
+      "effect": "local-write",
+      "reason": "ADR-SCR-0020: descriptive conditional annotation only, never runnable marker or generic process permission. Requires sense run, explicit --write, a Redis-bearing selected profile with redis.processControl=pause-resume-v1, exact active backend support and host-owned finite transition/paused-duration limits, plus the privately minted whole supervisor and exact owned Redis instance binding. Only zero-argument handle pause/resume become private redis-pause/redis-resume requests. Verify actual full owned container identity and live running/Paused state before and after each serialized finite engine operation; return success only after actual target-state observation. No caller container ID, signal, command, image, engine socket or endpoint is accepted. Record ordered requests, results, actual transitions and cleanup; same-state repetition requires independent current identity/state verification. Deadline/termination cleanup resumes the exact owned paused instance before bounded stop/remove and proves final absence; cleanup cannot erase a failed workload operation or mint PASS. No arbitrary Docker, exec, signal, filesystem, network or publication authority; ordinary Redis fixtures gain no process-control capability.",
       "owner": "architect"
     }
   ]
