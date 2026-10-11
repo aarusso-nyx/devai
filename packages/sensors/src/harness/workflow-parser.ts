@@ -459,7 +459,9 @@ function executionYaml(source: string): ExecutionYaml | undefined {
         if (cursor >= rows.length || indentOf(rowText()) <= width)
           throw new Error('unbound YAML item');
         items.push(block(indentOf(rowText())));
-      } else if (/^(?:[A-Za-z0-9_.-]+|'[A-Za-z0-9_.-]+'|"[A-Za-z0-9_.-]+")[ \t]*:/u.test(text))
+      } else if (
+        /^(?:[A-Za-z0-9_.-]+|'[A-Za-z0-9_.-]+'|"[A-Za-z0-9_.-]+")[ \t]*:(?:[ \t]|$)/u.test(text)
+      )
         items.push(mapping(column, text, width));
       else items.push(value(text, width));
     }
