@@ -184,14 +184,17 @@ describe('complete schema canon filesystem checks', () => {
     // moves it from the source-only catalogue into the runtime roster.
     // #235 moves stack-adapter.schema.json into the runtime roster for the pack resolver.
     // ADR-CHK-0007 adds test-task-exclusivity.schema.json for the parallel check runner.
-    expect(ROSTER).toHaveLength(118);
+    expect(ROSTER).toHaveLength(121);
     expect(ROSTER).toContain('test-task-descriptor.schema.json');
     expect(ROSTER).toContain('preflight-probe.schema.json');
     expect(ROSTER).toContain('invariant-producers.schema.json');
     expect(ROSTER).toContain('reviewed-workflow-steps.schema.json');
     expect(ROSTER).toContain('test-result-population.schema.json');
     expect(ROSTER).toContain('workflow-step-inventory.schema.json');
-    expect(report).toMatchObject({ ok: true, canonical_total: 130, findings: [] });
+    expect(ROSTER).toContain('native-service-profile.schema.json');
+    expect(ROSTER).toContain('native-service-profiles-policy.schema.json');
+    expect(ROSTER).toContain('native-service-backends-policy.schema.json');
+    expect(report).toMatchObject({ ok: true, canonical_total: 133, findings: [] });
   });
   it.each(['missing-source-only', 'missing-runtime', 'unexpected'] as const)(
     'reports %s source inventory changes without throwing',
@@ -210,7 +213,7 @@ describe('complete schema canon filesystem checks', () => {
         );
       const report = checkSchemaCanon(root);
       expect(report.ok).toBe(false);
-      expect(report.canonical_total).toBe(kind === 'unexpected' ? 131 : 129);
+      expect(report.canonical_total).toBe(kind === 'unexpected' ? 134 : 132);
       expect(report.findings).toContainEqual({
         rule: 'recursive-closed-complete-objects',
         path: 'law/schemas',
@@ -298,7 +301,7 @@ describe('check schemas command boundary', () => {
     const result = invokeCommand({ repoRoot: canonFixture() });
     expect(JSON.parse(result.stdout)).toEqual({
       ok: true,
-      canonical_total: 130,
+      canonical_total: 133,
       rules: [
         'recursive-closed-complete-objects',
         'predicate-fragments-valid',
@@ -314,7 +317,7 @@ describe('check schemas command boundary', () => {
 
   it('renders the exact passing human summary', () => {
     const result = invokeCommand({ repoRoot: canonFixture(), human: true });
-    expect(result.stdout).toBe('policy check schemas: OK (130 canonical schemas, 0 findings)\n');
+    expect(result.stdout).toBe('policy check schemas: OK (133 canonical schemas, 0 findings)\n');
     expect(result.exitCode).toBe(EXIT_PASS);
   });
 
@@ -326,7 +329,7 @@ describe('check schemas command boundary', () => {
     const result = invokeCommand({ repoRoot: root, human: true });
     expect(result.stdout).toBe(
       [
-        'policy check schemas: FAIL (130 canonical schemas, 1 findings)',
+        'policy check schemas: FAIL (133 canonical schemas, 1 findings)',
         `  [dereferenced-publish-byte-identity] ${missing}: Bundled publish bytes differ from canonical law bytes.`,
         '',
       ].join('\n'),

@@ -725,15 +725,17 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-SCR-0016',
       'ADR-SCR-0017',
       'ADR-SCR-0018',
+      'ADR-SCR-0019',
+      'ADR-SCR-0020',
       'ADR-SEC-0001',
     ]);
-    expect(records).toHaveLength(124);
+    expect(records).toHaveLength(126);
     expect(
       records.filter((record) => record.format === 'legacy-catalog').map((record) => record.adr_id),
     ).toEqual(['ADR-014', 'ADR-MUT-0005', 'ADR-REL-0017']);
     expect(records.filter((record) => record.adr_id === 'ADR-014')).toHaveLength(1);
-    expect(result.files_scanned).toBe(125);
-    expect(result.subject_authorities).toHaveLength(598);
+    expect(result.files_scanned).toBe(127);
+    expect(result.subject_authorities).toHaveLength(621);
     expect(result.effective_authorities).toEqual([
       'ADR-014',
       'ADR-AUT-0001',
@@ -835,6 +837,8 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-SCR-0016',
       'ADR-SCR-0017',
       'ADR-SCR-0018',
+      'ADR-SCR-0019',
+      'ADR-SCR-0020',
       'ADR-SEC-0001',
     ]);
     // ADR-MUT-0014 advances both active provenance subjects through a real supersession.
@@ -1070,6 +1074,8 @@ describe('ADR-v3 public result and semantic authority', () => {
     for (const [id, count] of [
       ['ADR-AUT-0007', 4],
       ['ADR-SCR-0018', 7],
+      ['ADR-SCR-0019', 7],
+      ['ADR-SCR-0020', 16],
     ] as const) {
       const added = records.find((record) => record.adr_id === id);
       expect(added?.affected_rules).toHaveLength(count);
@@ -1085,6 +1091,19 @@ describe('ADR-v3 public result and semantic authority', () => {
           .sort(),
       ).toEqual([...(added?.affected_rules ?? [])].sort());
     }
+    expect(
+      frontmatter(
+        readFileSync(
+          resolve(adrRoot, 'ADR-SCR-0019-package-owned-native-coverage-adapter.md'),
+          'utf8',
+        ),
+      )?.provenance,
+    ).toEqual(['ADR-SCR-0017', 'ADR-SCR-0018']);
+    expect(
+      frontmatter(
+        readFileSync(resolve(adrRoot, 'ADR-SCR-0020-owned-native-service-fixtures.md'), 'utf8'),
+      )?.provenance,
+    ).toEqual(['ADR-SCR-0017', 'ADR-SCR-0019']);
     // ADR-GOV-0024, ADR-AUT-0003, and ADR-AUT-0004 (CMP-0005): each accepted record is
     // effective and is the sole lineage head of every subject it declares, including the
     // adopter schema shared by the first two and the compiler shared by the last two.

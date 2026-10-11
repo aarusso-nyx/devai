@@ -8,6 +8,7 @@ import {
   readFileSync,
   realpathSync,
   rmSync,
+  statSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
@@ -48,6 +49,11 @@ import { nativeInputPreloadPath } from '../../src/commands/sense/native-runner-s
 import { inspectNativeInputProvenance } from '../../src/commands/sense/native-input-provenance.js';
 import { resolveSensorReadingInstance } from '../../src/commands/sense/reading-instance.js';
 import { runCheckTasks } from '../../src/services/check-runner/runner.js';
+import {
+  isHarnessMutatedPath,
+  RELEASE_INPUT_PROJECTION,
+  trackedPaths,
+} from '../../src/services/check-runner/policy-git.js';
 import { installNativeVitest } from '../fixtures/native-test-results/native-runner-fixture.js';
 
 const roots: string[] = [];
@@ -329,6 +335,30 @@ function nativeOutput(root: string): string {
 }
 
 describe('exact reviewed sensor task binding', () => {
+  it('refuses an unimplemented service backend before resolving an absent host binary', () => {
+    const root = fixture({
+      argv: ['devai-inspector-deliberately-absent-native-runner'],
+      sensorKinds: ['unit_test'],
+      outputContract: {
+        kind: 'command-result',
+        population: 'reviewed-population',
+        resultPopulation: {
+          ...nativeContract(),
+          serviceProfile: {
+            schemaVersion: '1.0.0',
+            profile: 'postgres-http-v1',
+            backendId: 'owned-linux-native-v1-linux-arm64',
+            provisioner: { kind: 'owned-docker-v1', toolchainKey: 'docker' },
+            postgres: { image: `postgres:16-alpine@sha256:${'a'.repeat(64)}` },
+          },
+        },
+      },
+    });
+    expect(() =>
+      statSync(join(root, 'node_modules/.bin/devai-inspector-deliberately-absent-native-runner')),
+    ).toThrow();
+    expect(() => binding(root, 'unit_test')).toThrow('SENSE_NATIVE_SERVICE_BACKEND_UNIMPLEMENTED');
+  });
   it('binds exact task/policy/candidate/population and always measures the selected node', () => {
     const root = fixture();
     const bound = binding(root);
@@ -525,11 +555,36 @@ describe('exact reviewed sensor task binding', () => {
     const options = result.requests[0]?.arguments[2] as { env?: Record<string, string> };
     const nonce = options.env?.['DEVAI_NATIVE_COLLECTION_NONCE'];
     expect(nonce).toMatch(/^[a-f0-9]{64}$/u);
+    const contextPath = join(
+      root,
+      '.devai/state/native-config-traces',
+      String(nonce),
+      'adapter-context.json',
+    );
+    const contextBytes = readFileSync(contextPath);
+    const context = JSON.parse(contextBytes.toString('utf8')) as {
+      git: { path: string; sha256: string };
+    };
+    expect(context).toEqual({
+      nonce,
+      repository: root,
+      candidate: git(root, 'rev-parse', 'HEAD'),
+      packageDir: root,
+      git: {
+        path: realpathSync(context.git.path),
+        sha256: createHash('sha256').update(readFileSync(context.git.path)).digest('hex'),
+      },
+      tracked: trackedPaths(root).filter((path) => !isHarnessMutatedPath(path)),
+      excludedPrefixes: RELEASE_INPUT_PROJECTION.excludedPrefixes,
+    });
+    expect(statSync(contextPath).mode & 0o777).toBe(0o400);
+    expect(statSync(contextPath).nlink).toBe(1);
     expect(options.env).toEqual({
       CI: '1',
       NO_COLOR: '1',
       ...bound.environment,
       NODE_V8_COVERAGE: '',
+      DEVAI_NATIVE_ADAPTER_CONTEXT_SHA256: createHash('sha256').update(contextBytes).digest('hex'),
       DEVAI_NATIVE_COLLECTION_NONCE: nonce,
       DEVAI_NATIVE_INPUT_TRACE: join(
         root,
