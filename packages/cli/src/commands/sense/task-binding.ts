@@ -1,4 +1,6 @@
-import { existsSync, mkdirSync, lstatSync, readFileSync, readdirSync, realpathSync } from 'node:fs';
+import { planSensorTasks, sensorTaskPrerequisites } from './sensor-task-plan.js';
+import { writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, lstatSync, readFileSync, realpathSync } from 'node:fs';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomBytes } from 'node:crypto';
 import { appendVerbEvidence, loadChain, verifyLoadedChain } from '#runtime-core';
@@ -14,23 +16,15 @@ import {
   type SensorStatus,
 } from '@devai-nyx/sensors';
 import { resolvedSensorMember } from '../../authority/sensor-member.js';
-import {
-  buildTaskPlan,
-  readTaskDescriptor,
-  taskDescriptorDigest,
-} from '../../services/check-runner/policy.js';
-import { resolveRunnerToolchain } from '../../services/check-runner/runner-plan.js';
-import { resolveTaskEnvironment } from '../../services/check-runner/runner-inputs.js';
+import { readTaskDescriptor, taskDescriptorDigest } from '../../services/check-runner/policy.js';
 import { outputDigests } from '../../services/check-runner/runner-execution.js';
-import { trackedPaths } from '../../services/check-runner/policy-git.js';
-import { CheckCache } from '../../services/check-runner/cache.js';
+import {
+  trackedPaths,
+  isHarnessMutatedPath,
+  RELEASE_INPUT_PROJECTION,
+} from '../../services/check-runner/policy-git.js';
 import { sha256Hex, canonicalize } from '../../services/check-runner/canonical.js';
-import type {
-  CandidateReceipt,
-  PlannedTask,
-  TaskDescriptor,
-  TaskPlan,
-} from '../../services/check-runner/types.js';
+import type { PlannedTask, TaskPlan } from '../../services/check-runner/types.js';
 import { inspectNativeTestResults, type NativeTestResultContract } from './native-test-results.js';
 import { pathToFileURL } from 'node:url';
 import {
@@ -42,6 +36,8 @@ import {
   nativeInputPreloadPath,
   nativeRunnerSelection,
 } from './native-runner-selection.js';
+import { nativeCoverageGitIdentity } from './native-coverage-host.js';
+import { resolveNativeServiceSelection } from './native-service-plan.js';
 import { resolveSensorReadingInstance } from './reading-instance.js';
 import type { SensorInputs } from './shared.js';
 
@@ -109,7 +105,8 @@ export function assertNativeSensorFilesystemTarget(
     context.kind === 'trace' &&
     (path === '.devai/state/native-config-traces' ||
       path === `.devai/state/native-config-traces/${context.nonce}` ||
-      path === `.devai/state/native-config-traces/${context.nonce}/runtime`)
+      path === `.devai/state/native-config-traces/${context.nonce}/runtime` ||
+      path === `.devai/state/native-config-traces/${context.nonce}/adapter-context.json`)
   )
     return;
   throw new Error('AUTHORITY_NATIVE_SENSOR_PATH_REFUSED');
@@ -142,110 +139,6 @@ function containedFile(root: string, path: string): string {
     throw new Error('SENSE_TASK_PATH_ESCAPES_ROOT');
   }
   return actual;
-}
-
-function closure(descriptor: TaskDescriptor, roots: readonly string[]) {
-  const ids = new Set(roots);
-  const pending = [...ids];
-  for (let index = 0; index < pending.length; index += 1) {
-    const task = descriptor.tasks.find((entry) => entry.nodeId === pending[index]);
-    if (task === undefined) throw new Error('SENSE_TASK_UNKNOWN');
-    for (const dependency of task.dependencies) {
-      if (!ids.has(dependency)) {
-        ids.add(dependency);
-        pending.push(dependency);
-      }
-    }
-  }
-  return descriptor.tasks.filter((task) => ids.has(task.nodeId));
-}
-
-function taskPlan(root: string, descriptor: TaskDescriptor, roots: readonly string[]) {
-  const nodes = closure(descriptor, roots);
-  const toolchain = resolveRunnerToolchain(
-    root,
-    nodes.flatMap((task) => task.toolchainKeys),
-  );
-  const environment = resolveTaskEnvironment(
-    root,
-    nodes.flatMap((task) => task.allowlistedEnv),
-  );
-  const plan = buildTaskPlan({
-    repoRoot: root,
-    descriptor,
-    target: 'local',
-    selectedTaskNodes: roots,
-    toolchain,
-    environment,
-    cacheState: () => ({ cacheState: 'execute', reason: 'sensor-measurement-always-executes' }),
-  });
-  return { plan, environment };
-}
-
-/** Require content-addressed prior completion with current candidate, policy and environment. */
-function prerequisites(
-  root: string,
-  descriptor: TaskDescriptor,
-  plan: TaskPlan,
-  task: PlannedTask,
-): Readonly<Record<string, string>> {
-  if (task.dependencies.length === 0) return Object.freeze({});
-  if (!plan.clean) throw new Error('SENSE_TASK_PREREQUISITE_CANDIDATE_DIRTY');
-  const receiptDir = join(root, '.devai/state/check-cache/v1/receipts');
-  if (!existsSync(receiptDir)) throw new Error('SENSE_TASK_PREREQUISITE_REQUIRED');
-  const cache = new CheckCache(root, join(root, '.devai/state/check-cache/v1'));
-  const required = closure(descriptor, task.dependencies).map((node) => node.nodeId);
-  for (const file of readdirSync(receiptDir).sort()) {
-    if (!/^[0-9a-f]{64}\.json$/u.test(file)) continue;
-    try {
-      const receipt = JSON.parse(
-        readFileSync(containedFile(root, `.devai/state/check-cache/v1/receipts/${file}`), 'utf8'),
-      ) as CandidateReceipt;
-      if (
-        sha256Hex(receipt) !== file.slice(0, -5) ||
-        receipt.schemaVersion !== '1.1.0' ||
-        canonicalize(receipt.repository) !== canonicalize(plan.repository) ||
-        !Array.isArray(receipt.tasks) ||
-        !['affected', 'rc'].includes(receipt.profile)
-      )
-        continue;
-      const ids = receipt.tasks.map((node) => node.nodeId);
-      if (new Set(ids).size !== ids.length || !required.every((id) => ids.includes(id))) continue;
-      const current = taskPlan(root, descriptor, ids).plan;
-      if (
-        current.taskPolicyDigest !== receipt.taskPolicyDigest ||
-        current.tasks.length !== ids.length
-      )
-        continue;
-      const digests: Record<string, string> = {};
-      let valid = true;
-      for (const node of current.tasks) {
-        const completed = receipt.tasks.find((entry) => entry.nodeId === node.nodeId);
-        const dependencyDigests: Record<string, string> = {};
-        for (const id of node.dependencies) {
-          const digest = digests[id];
-          if (digest === undefined) throw new Error('SENSE_TASK_PREREQUISITE_REQUIRED');
-          dependencyDigests[id] = digest;
-        }
-        const inspection = cache.inspect(node, dependencyDigests);
-        if (
-          completed?.taskKey !== node.taskKey ||
-          inspection.cacheState !== 'reusable' ||
-          inspection.cachedResultDigest !== completed.resultDigest ||
-          inspection.result?.inputDigest !== node.inputDigest
-        ) {
-          valid = false;
-          break;
-        }
-        digests[node.nodeId] = completed.resultDigest;
-      }
-      if (valid)
-        return Object.freeze(Object.fromEntries(required.map((id) => [id, digests[id] as string])));
-    } catch {
-      // Malformed or stale receipts never provide prerequisite standing.
-    }
-  }
-  throw new Error('SENSE_TASK_PREREQUISITE_REQUIRED');
 }
 
 export function resolveSensorTaskBinding(
@@ -288,7 +181,11 @@ export function resolveSensorTaskBinding(
   ) {
     throw new Error('SENSE_TASK_CONTRACT_UNSUPPORTED');
   }
-  const { plan, environment } = taskPlan(root, descriptor, [node.nodeId]);
+  const requestedNativeResult = node.outputContract['resultPopulation'] as
+    NativeTestResultContract | undefined;
+  if (requestedNativeResult?.serviceProfile !== undefined)
+    resolveNativeServiceSelection(root, undefined, node, requestedNativeResult.serviceProfile);
+  const { plan, environment } = planSensorTasks(root, descriptor, [node.nodeId]);
   const task = plan.tasks.find((entry) => entry.nodeId === node.nodeId);
   if (task === undefined || taskDescriptorDigest(descriptor) !== plan.descriptorDigest)
     throw new Error('SENSE_TASK_POLICY_MISMATCH');
@@ -348,7 +245,7 @@ export function resolveSensorTaskBinding(
     declarationDigest: existsSync(join(root, declaration))
       ? sha256Hex(readFileSync(containedFile(root, declaration)))
       : null,
-    prerequisiteDigests: prerequisites(root, descriptor, plan, task),
+    prerequisiteDigests: sensorTaskPrerequisites(root, descriptor, plan, task),
     ...(nativeSelectionDigest === undefined ? {} : { nativeSelectionDigest }),
   });
   trustedBindings.add(binding);
@@ -492,12 +389,29 @@ export function executeSensorTask(binding: SensorTaskBinding): SensorReading {
           outputRoot: null,
         })
       : nativeExecutionCommand(binding.root, binding.task, collectionNonce);
-  if (tracePath !== undefined && runtimeRoot !== undefined)
+  const adapterGit = collectionNonce === undefined ? undefined : nativeCoverageGitIdentity();
+  const adapterContextBytes =
+    collectionNonce === undefined
+      ? undefined
+      : JSON.stringify({
+          nonce: collectionNonce,
+          repository: binding.root,
+          candidate: binding.plan.repository.commit,
+          packageDir: realpathSync(resolve(binding.root, binding.task.cwd)),
+          git: adapterGit,
+          tracked: trackedPaths(binding.root).filter((path) => !isHarnessMutatedPath(path)),
+          excludedPrefixes: RELEASE_INPUT_PROJECTION.excludedPrefixes,
+        });
+  if (tracePath !== undefined && runtimeRoot !== undefined && adapterContextBytes !== undefined)
     nativeFilesystemContext.run(
       { root: binding.root, kind: 'trace', nonce: collectionNonce },
       () => {
         mkdirSync(join(tracePath, '..'), { recursive: true });
         mkdirSync(runtimeRoot);
+        writeFileSync(join(tracePath, '..', 'adapter-context.json'), adapterContextBytes, {
+          flag: 'wx',
+          mode: 0o400,
+        });
       },
     );
   const options = Object.freeze({
@@ -522,6 +436,10 @@ export function executeSensorTask(binding: SensorTaskBinding): SensorReading {
         ? {}
         : {
             DEVAI_NATIVE_COLLECTION_NONCE: collectionNonce,
+            DEVAI_NATIVE_ADAPTER_CONTEXT_SHA256:
+              adapterContextBytes === undefined
+                ? undefined
+                : sha256Hex(Buffer.from(adapterContextBytes)),
             DEVAI_NATIVE_INPUT_TRACE: tracePath,
             DEVAI_NATIVE_INPUT_SCOPE: 'main',
             DEVAI_NATIVE_RUNTIME_ROOT: runtimeRoot,

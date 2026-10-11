@@ -33,6 +33,14 @@ const nativeReporters = [
   'native-playwright-reporter.js',
   'native-playwright-loader.js',
   'native-input-provenance.js',
+  'native-coverage-adapter.js',
+  'native-coverage-kernel.js',
+  'native-coverage-data.js',
+  'native-service-fixtures.js',
+  'native-service-fixtures-kernel.js',
+  'native-service-supervisor.js',
+  'native-linux-task-supervisor.js',
+  'native-service-docker-broker.js',
   'native-platform-probes.js',
 ];
 const declarationsRoot = join(temporaryRoot, 'types/cli');
@@ -56,6 +64,8 @@ const policyFiles = [
   'github-issues-tracking.json',
   'glob-guards.json',
   'model-runtime-registry.json',
+  'native-service-profiles.json',
+  'native-service-backends.json',
   'mutation-evidence-v2.json',
   'mutation-strength.json',
   'round-execution.json',
@@ -194,7 +204,29 @@ const external = (id) =>
 
 function stageHostDeclarations() {
   const manifest = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8'));
-  const pending = ['release-host.d.ts', 'release-host-bootstrap.d.ts'];
+  const pending = [];
+  const collectExports = (entry) => {
+    if (entry === null || typeof entry !== 'object') return;
+    for (const [condition, target] of Object.entries(entry)) {
+      if (condition === 'types') {
+        const prefix = './dist/runtime/types/cli/';
+        if (
+          typeof target !== 'string' ||
+          !target.startsWith(prefix) ||
+          !target.endsWith('.d.ts') ||
+          target
+            .slice(prefix.length)
+            .split('/')
+            .some((part) => part === '' || part === '.' || part === '..')
+        )
+          throw new Error(`PACKAGE_HOST_DECLARATION_EXPORT_INVALID:${target}`);
+        pending.push(target.slice(prefix.length));
+      } else collectExports(target);
+    }
+  };
+  collectExports(manifest.exports);
+  if (pending.length === 0) throw new Error('PACKAGE_HOST_DECLARATION_EXPORTS_MISSING');
+  const exported = [...pending];
   const copied = new Set();
   while (pending.length > 0) {
     const name = pending.pop();
@@ -232,6 +264,7 @@ function stageHostDeclarations() {
     );
     copied.add(name);
   }
+  return exported;
 }
 
 try {
@@ -247,12 +280,12 @@ try {
       readFileSync(join(repositoryRoot, 'law/policy/sensor-registry.json'), 'utf8'),
     ],
   ]);
-  stageHostDeclarations();
+  const declarationExports = stageHostDeclarations();
   writeFileSync(
     executablePath,
     readFileSync(join(distRoot, 'bin.js'), 'utf8').replace(/^\/\/# sourceMappingURL=.*$/gmu, ''),
   );
-  const bundle = await rolldown({
+  const hostBundleOptions = {
     input: join(distRoot, 'release-host.js'),
     platform: 'node',
     external,
@@ -301,7 +334,23 @@ try {
       },
     },
     treeshake: true,
-  });
+  };
+  const bundle = await rolldown(hostBundleOptions);
+  const privateOutputs = [];
+  for (const name of ['native-linux-plan.js', 'native-linux-replay.js']) {
+    const helper = await rolldown({ ...hostBundleOptions, input: join(distRoot, name) });
+    const result = await helper.write({
+      file: join(temporaryRoot, name),
+      format: 'esm',
+      codeSplitting: false,
+      comments: false,
+      sourcemap: false,
+      banner: `import { createRequire as __devaiCreateRequire } from 'node:module';
+const require = __devaiCreateRequire(import.meta.url);`,
+    });
+    privateOutputs.push(...result.output);
+    await helper.close();
+  }
   const output = await bundle.write({
     file: bundlePath,
     format: 'esm',
@@ -329,7 +378,7 @@ const __dirname = __devaiDirname(__filename);`,
     sourcemap: false,
   });
   // Required dependencies are bundled; every remaining import is explicit.
-  for (const item of [...output.output, ...bootstrapOutput.output]) {
+  for (const item of [...output.output, ...bootstrapOutput.output, ...privateOutputs]) {
     if (item.type !== 'chunk') continue;
     for (const dependency of [...item.imports, ...item.dynamicImports]) {
       if (dependency !== item.fileName && !external(dependency))
@@ -340,7 +389,7 @@ const __dirname = __devaiDirname(__filename);`,
   const reachableSources = [
     ...new Set([
       'packages/cli/src/bin.ts',
-      ...[...output.output, ...bootstrapOutput.output]
+      ...[...output.output, ...bootstrapOutput.output, ...privateOutputs]
         .flatMap((item) => (item.type === 'chunk' ? item.moduleIds : []))
         .filter(
           (id) => id.startsWith(`${repositoryRoot}/packages/`) && !id.includes('/node_modules/'),
@@ -372,6 +421,8 @@ const __dirname = __devaiDirname(__filename);`,
   cpSync(bundlePath, join(runtimeIndex, 'release-host.js'));
   cpSync(bootstrapPath, join(runtimeIndex, 'release-host-bootstrap.js'));
   cpSync(executablePath, join(runtimeIndex, 'bin.js'));
+  for (const name of ['native-linux-plan.js', 'native-linux-replay.js'])
+    copyFileSync(join(temporaryRoot, name), join(runtimeIndex, name));
   for (const name of nativeReporters)
     copyFileSync(join(temporaryRoot, name), join(runtimeIndex, name));
   mkdirSync(join(runtimeRoot, 'host'), { recursive: true });
@@ -427,7 +478,7 @@ const __dirname = __devaiDirname(__filename);`,
 
   // Bundling must retain the notices formerly supplied by dependency packages.
   const dependencyRoots = new Set(
-    [...output.output, ...bootstrapOutput.output]
+    [...output.output, ...bootstrapOutput.output, ...privateOutputs]
       .flatMap((item) => (item.type === 'chunk' ? item.moduleIds : []))
       .filter((id) => id.includes('/node_modules/') && !id.startsWith('\0'))
       .map((id) => {
@@ -477,10 +528,9 @@ const __dirname = __devaiDirname(__filename);`,
     join(runtimeIndex, 'release-host.js'),
     join(runtimeIndex, 'release-host-bootstrap.js'),
     join(runtimeRoot, 'host/provision-package.mjs'),
-    join(runtimeRoot, 'types/cli/release-host-bootstrap.d.ts'),
+    ...declarationExports.map((name) => join(runtimeRoot, 'types/cli', name)),
     join(runtimeIndex, 'lib.d.ts'),
     join(runtimeIndex, 'typescript-libraries.json'),
-    join(runtimeRoot, 'types/cli/release-host.d.ts'),
     join(runtimeIndex, 'schemas/action-result.schema.json'),
     join(runtimeIndex, 'schemas/release-plan-receipt-v2.schema.json'),
     join(runtimeIndex, 'schemas/release-policy-resolution.schema.json'),

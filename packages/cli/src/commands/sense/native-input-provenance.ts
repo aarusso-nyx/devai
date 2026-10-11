@@ -20,6 +20,12 @@ import { nativeInputPackageClosure } from './native-runner-selection.js';
 import { isHarnessMutatedPath, trackedPaths } from '../../services/check-runner/policy-git.js';
 import { assertNativeConfigCapabilities } from './native-config-capabilities.js';
 
+import { replayNativeCoverageAdapters } from './native-coverage-replay.js';
+import {
+  replayNativeServiceFixtures,
+  type NativeServiceParentExchange,
+} from './native-service-replay.js';
+import type { NativeServiceControlContext } from '../../native-service-docker-broker.js';
 import { nativeOutputCustody } from './native-output-custody.js';
 import {
   frameworkPlatformProbeCallers,
@@ -185,6 +191,10 @@ export function inspectNativeInputProvenance(
   raw: string,
   stdout: string,
   task: { readonly argv: readonly string[]; readonly cwd: string },
+  service?: {
+    readonly context: NativeServiceControlContext;
+    readonly exchanges: readonly NativeServiceParentExchange[];
+  },
 ): readonly string[] {
   try {
     if (!/^[0-9a-f]{64}$/u.test(nonce) || Buffer.byteLength(raw) > 64 * 1024 * 1024)
@@ -210,6 +220,19 @@ export function inspectNativeInputProvenance(
     )
       throw new Error('NATIVE_INPUT_TRACE_INCOMPLETE');
     assertNativeScopeLifecycle(rows);
+    if (
+      service !== undefined ||
+      rows.some((row) => row['kind'] === 'service-request' || row['kind'] === 'service-result')
+    ) {
+      if (
+        service === undefined ||
+        service.context.nonce !== nonce ||
+        service.context.repository !== realpathSync(root)
+      )
+        throw new Error('NATIVE_SERVICE_PARENT_TRANSCRIPT_REQUIRED');
+      replayNativeServiceFixtures(service.context, rows, service.exchanges);
+    }
+    const verifiedCompilerOutputs = replayNativeCoverageAdapters(root, task, rows);
     const output = nativeOutputCustody(root, nonce, rows, stdout);
     const report = JSON.parse(stdout) as { devaiCollection?: { reporter?: string } };
     const loaderOperations = new Map<string, string>();
@@ -308,6 +331,7 @@ export function inspectNativeInputProvenance(
       if (!begins.has(row['scope'])) throw new Error('NATIVE_INPUT_TRACE_SCOPE_MISSING');
       if (row['kind'] === 'unsupported')
         throw new Error(`NATIVE_INPUT_UNSUPPORTED:${String(row['operation'])}`);
+      if (String(row['kind']).startsWith('adapter-')) continue;
       if (row['kind'] === 'child') {
         if (
           !begins.has(row['childScope']) ||
@@ -659,12 +683,16 @@ export function inspectNativeInputProvenance(
             !physicalRelative.startsWith('../') &&
             !isAbsolute(physicalRelative);
           if (physicalCandidate && !physicalRelative.split('/').includes('node_modules')) {
-            if (!tracked.has(physicalRelative)) throw new Error('NATIVE_INPUT_UNTRACKED_FILE');
-            readCandidateFile(root, physicalRelative);
+            if (!verifiedCompilerOutputs.has(physical, row)) {
+              if (!tracked.has(physicalRelative)) throw new Error('NATIVE_INPUT_UNTRACKED_FILE');
+              readCandidateFile(root, physicalRelative);
+            }
           }
           if (candidate && !packageInput) {
-            if (!tracked.has(portable)) throw new Error('NATIVE_INPUT_UNTRACKED_FILE');
-            readCandidateFile(root, portable);
+            if (!verifiedCompilerOutputs.has(path, row)) {
+              if (!tracked.has(portable)) throw new Error('NATIVE_INPUT_UNTRACKED_FILE');
+              readCandidateFile(root, portable);
+            }
           } else if (!packageInput) throw new Error('NATIVE_INPUT_EXTERNAL_FILE');
           const encoding = row['encoding'];
           if (encoding !== null && (typeof encoding !== 'string' || !Buffer.isEncoding(encoding)))

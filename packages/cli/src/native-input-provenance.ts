@@ -6,6 +6,16 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import childProcess from 'node:child_process';
+import net from 'node:net';
+import {
+  createNativeServiceFixturesKernel,
+  type NativeServiceFixtures,
+} from './native-service-fixtures-kernel.js';
+import type {
+  NativeServiceControlContext,
+  NativeServiceControlRequest,
+  NativeServiceFixtureKind,
+} from './native-service-docker-broker.js';
 import workerThreads from 'node:worker_threads';
 import { Session } from 'node:inspector';
 import { getCallSites } from 'node:util';
@@ -17,6 +27,141 @@ import {
   nativePlatformProbeObservation,
 } from './native-platform-probes.js';
 import type { FrameworkPlatformProbeCaller } from './native-platform-probes.js';
+
+import { createNativeCoverageAdapterKernel } from './native-coverage-kernel.js';
+import './native-coverage-data.js';
+import type {
+  NativeCoverageAdapterOptions,
+  NativeCoverageKernelHost,
+} from './native-coverage-kernel.js';
+
+const FixtureSocket = net.Socket;
+const fixtureSocketConnect = net.Socket.prototype.connect;
+const fixtureGetPrototype = Object.getPrototypeOf;
+const fixtureNames = Object.getOwnPropertyNames;
+const fixtureSymbols = Object.getOwnPropertySymbols;
+const fixtureDescriptor = Object.getOwnPropertyDescriptor;
+const fixtureSame = Object.is;
+const fixtureTimer = setTimeout;
+const fixtureClearTimer = clearTimeout;
+const fixtureSocketPrototypes: {
+  target: object;
+  parent: object | null;
+  keys: (string | symbol)[];
+  descriptors: PropertyDescriptor[];
+}[] = [];
+for (
+  let target: object | null = FixtureSocket.prototype;
+  target !== null;
+  target = fixtureGetPrototype(target)
+) {
+  const keys = [...fixtureNames(target), ...fixtureSymbols(target)];
+  fixtureSocketPrototypes.push({
+    target,
+    parent: fixtureGetPrototype(target),
+    keys,
+    descriptors: keys.map((key) => fixtureDescriptor(target as object, key) as PropertyDescriptor),
+  });
+}
+const fixtureConstructorKeys = [...fixtureNames(FixtureSocket), ...fixtureSymbols(FixtureSocket)];
+fixtureSocketPrototypes.push({
+  target: FixtureSocket,
+  parent: fixtureGetPrototype(FixtureSocket),
+  keys: fixtureConstructorKeys,
+  descriptors: fixtureConstructorKeys.map(
+    (key) => fixtureDescriptor(FixtureSocket, key) as PropertyDescriptor,
+  ),
+});
+const fixtureSocketPrototypesCurrent = (): boolean => {
+  for (const row of fixtureSocketPrototypes) {
+    if (fixtureGetPrototype(row.target) !== row.parent) return false;
+    const keys = [...fixtureNames(row.target), ...fixtureSymbols(row.target)];
+    if (keys.length !== row.keys.length) return false;
+    for (let index = 0; index < keys.length; index++) {
+      if (keys[index] !== row.keys[index]) return false;
+      const actual = fixtureDescriptor(row.target, keys[index] as string | symbol);
+      const expected = row.descriptors[index];
+      if (
+        actual === undefined ||
+        expected === undefined ||
+        actual.configurable !== expected.configurable ||
+        actual.enumerable !== expected.enumerable ||
+        actual.writable !== expected.writable ||
+        !fixtureSame(actual.value, expected.value) ||
+        !fixtureSame(actual.get, expected.get) ||
+        !fixtureSame(actual.set, expected.set)
+      )
+        return false;
+    }
+  }
+  return true;
+};
+const fixtureSocketWrite = net.Socket.prototype.write;
+const fixtureSocketDestroy = net.Socket.prototype.destroy;
+const fixtureSocketOnce = net.Socket.prototype.once;
+const fixtureSocketOn = net.Socket.prototype.on;
+const applyFixtureSocket = Reflect.apply;
+
+// Captured only in the canonical early preload, never exported or accepted from authored code.
+const coverageAdapterIO: NativeCoverageKernelHost['io'] = Object.freeze({
+  createHash,
+  execFileSync: childProcess.execFileSync,
+  accessSync: fs.accessSync,
+  constants: fs.constants,
+  lstatSync: fs.lstatSync,
+  readFileSync: fs.readFileSync,
+  readdirSync: fs.readdirSync,
+  readlinkSync: fs.readlinkSync,
+  realpathSync: fs.realpathSync,
+  createRequire: moduleApi.createRequire,
+});
+type CoverageAdapterAPI = ReturnType<typeof createNativeCoverageAdapterKernel>['api'];
+let governedCoverageFactory:
+  ((options: NativeCoverageAdapterOptions) => CoverageAdapterAPI) | undefined;
+
+export function createNativeCoverageAdapter(
+  options: NativeCoverageAdapterOptions,
+): CoverageAdapterAPI {
+  if (trace !== undefined || nonce !== undefined) {
+    if (governedCoverageFactory === undefined)
+      throw new Error('NATIVE_COVERAGE_ADAPTER_GOVERNED_CONTEXT_REQUIRED');
+    return governedCoverageFactory(options);
+  }
+  if (
+    process.env['DEVAI_NATIVE_INPUT_TRACE'] !== undefined ||
+    process.env['DEVAI_NATIVE_COLLECTION_NONCE'] !== undefined
+  )
+    throw new Error('NATIVE_COVERAGE_ADAPTER_GOVERNED_CONTEXT_REQUIRED');
+  return createNativeCoverageAdapterKernel(options, {
+    io: coverageAdapterIO,
+    path: process.env.PATH ?? '',
+    mode: 'diagnostic',
+  }).api;
+}
+
+let governedServiceFactory: (() => NativeServiceFixtures) | undefined;
+let serviceFactoryFailure: string | undefined;
+let refuseGovernedServiceFactory: ((reason: string) => never) | undefined;
+const refuseServiceFactory = (reason: string): never => {
+  serviceFactoryFailure ??= reason;
+  if (refuseGovernedServiceFactory !== undefined)
+    return refuseGovernedServiceFactory(serviceFactoryFailure);
+  throw new Error(`NATIVE_SERVICE_FIXTURE_${serviceFactoryFailure}`);
+};
+
+/** Services have no ordinary diagnostic or ambient-endpoint fallback. */
+export function createNativeServiceFixtures(): NativeServiceFixtures {
+  if (arguments.length !== 0) return refuseServiceFactory('ARGUMENTS_INVALID');
+  if (trace === undefined || nonce === undefined || governedServiceFactory === undefined)
+    return refuseServiceFactory('GOVERNED_CONTEXT_REQUIRED');
+  if (serviceFactoryFailure !== undefined) return refuseServiceFactory(serviceFactoryFailure);
+  try {
+    return governedServiceFactory();
+  } catch (error) {
+    serviceFactoryFailure ??= 'FACTORY_REFUSED';
+    throw error;
+  }
+}
 
 let closeScope: (() => void) | undefined;
 export function sealNativeInputScope(): void {
@@ -109,6 +254,502 @@ if (trace !== undefined && nonce !== undefined) {
     emit({ kind: 'unsupported', operation });
     throw new Error(`DEVAI_NATIVE_INPUT_UNSUPPORTED:${operation}`);
   };
+  refuseGovernedServiceFactory = (reason) => unsupported(`native-service-factory-${reason}`);
+  const coverageAdapters: { verify: () => void; seal: () => void }[] = [];
+  const coverageContextPath = resolve(dirname(trace), 'adapter-context.json');
+  let contextIdentity: { dev: number; ino: number } | undefined;
+  const readCoverageContext = (): Buffer => {
+    let directory = dirname(coverageContextPath);
+    for (;;) {
+      if (original.lstatSync(directory).isSymbolicLink())
+        return unsupported('native-coverage-context-link');
+      const parent = dirname(directory);
+      if (parent === directory) break;
+      directory = parent;
+    }
+    const expected = original.lstatSync(coverageContextPath);
+    if (
+      !expected.isFile() ||
+      expected.isSymbolicLink() ||
+      expected.nlink !== 1 ||
+      (expected.mode & 0o777) !== 0o400 ||
+      original.realpathSync(coverageContextPath) !== coverageContextPath
+    )
+      return unsupported('native-coverage-context-file');
+    if (
+      contextIdentity !== undefined &&
+      (contextIdentity.dev !== expected.dev || contextIdentity.ino !== expected.ino)
+    )
+      return unsupported('native-coverage-context-replaced');
+    const descriptor = original.openSync(
+      coverageContextPath,
+      original.constants.O_RDONLY | original.constants.O_NOFOLLOW,
+    );
+    try {
+      const stat = original.fstatSync(descriptor);
+      if (
+        !stat.isFile() ||
+        stat.nlink !== 1 ||
+        stat.dev !== expected.dev ||
+        stat.ino !== expected.ino ||
+        (stat.mode & 0o777) !== 0o400 ||
+        stat.size > 4 * 1024 * 1024
+      )
+        return unsupported('native-coverage-context-file');
+      const bytes = Buffer.alloc(stat.size);
+      let offset = 0;
+      while (offset < bytes.length) {
+        const count = original.readSync(descriptor, bytes, offset, bytes.length - offset, offset);
+        if (count === 0) return unsupported('native-coverage-context-truncated');
+        offset += count;
+      }
+      const after = original.lstatSync(coverageContextPath);
+      if (
+        after.dev !== stat.dev ||
+        after.ino !== stat.ino ||
+        after.nlink !== 1 ||
+        after.isSymbolicLink()
+      )
+        return unsupported('native-coverage-context-replaced');
+      contextIdentity = { dev: stat.dev, ino: stat.ino };
+      return bytes;
+    } finally {
+      original.closeSync(descriptor);
+    }
+  };
+  const coverageContextBytes =
+    initialEnvironment['DEVAI_NATIVE_ADAPTER_CONTEXT_SHA256'] === undefined
+      ? undefined
+      : readCoverageContext();
+  const coverageContextHash =
+    coverageContextBytes === undefined ? undefined : hash(coverageContextBytes);
+  if (coverageContextHash !== initialEnvironment['DEVAI_NATIVE_ADAPTER_CONTEXT_SHA256'])
+    unsupported('native-coverage-context-integrity');
+  const coverageContext =
+    coverageContextBytes === undefined
+      ? undefined
+      : Object.freeze(
+          JSON.parse(coverageContextBytes.toString('utf8')) as {
+            nonce: string;
+            repository: string;
+            candidate: string;
+            packageDir: string;
+            git: { path: string; sha256: string };
+            tracked: readonly string[];
+            excludedPrefixes: readonly string[];
+          },
+        );
+  if (
+    coverageContext !== undefined &&
+    (coverageContext.nonce !== nonce ||
+      JSON.stringify(Object.keys(coverageContext).sort()) !==
+        JSON.stringify(
+          [
+            'nonce',
+            'repository',
+            'candidate',
+            'packageDir',
+            'git',
+            'tracked',
+            'excludedPrefixes',
+          ].sort(),
+        ) ||
+      !Array.isArray(coverageContext.tracked) ||
+      !coverageContext.tracked.every((path) => typeof path === 'string') ||
+      !Array.isArray(coverageContext.excludedPrefixes))
+  )
+    unsupported('native-coverage-context-integrity');
+  const serviceContextHash = initialEnvironment['DEVAI_NATIVE_SERVICE_CONTEXT_SHA256'];
+  const serviceContextPath =
+    runtimeRoot === undefined
+      ? undefined
+      : process.platform === 'linux'
+        ? '/runtime/fixtures/service-context.json'
+        : resolve(runtimeRoot, 'fixtures/service-context.json');
+  let serviceContextIdentity: { dev: number; ino: number } | undefined;
+  const readServiceContext = (): Buffer => {
+    if (serviceContextPath === undefined) return unsupported('native-service-context-path');
+    for (let directory = dirname(serviceContextPath); ;) {
+      if (original.lstatSync(directory).isSymbolicLink())
+        return unsupported('native-service-context-link');
+      const parent = dirname(directory);
+      if (parent === directory) break;
+      directory = parent;
+    }
+    const expected = original.lstatSync(serviceContextPath);
+    if (
+      !expected.isFile() ||
+      expected.nlink !== 1 ||
+      (expected.mode & 0o777) !== 0o400 ||
+      original.realpathSync(serviceContextPath) !== serviceContextPath ||
+      (serviceContextIdentity !== undefined &&
+        (serviceContextIdentity.dev !== expected.dev ||
+          serviceContextIdentity.ino !== expected.ino))
+    )
+      return unsupported('native-service-context-file');
+    const descriptor = original.openSync(
+      serviceContextPath,
+      original.constants.O_RDONLY | original.constants.O_NOFOLLOW,
+    );
+    try {
+      const stat = original.fstatSync(descriptor);
+      if (
+        !stat.isFile() ||
+        stat.nlink !== 1 ||
+        stat.dev !== expected.dev ||
+        stat.ino !== expected.ino ||
+        (stat.mode & 0o777) !== 0o400 ||
+        stat.size > 64 * 1024
+      )
+        return unsupported('native-service-context-file');
+      const bytes = Buffer.alloc(stat.size);
+      let offset = 0;
+      while (offset < bytes.length) {
+        const count = original.readSync(descriptor, bytes, offset, bytes.length - offset, offset);
+        if (count <= 0) return unsupported('native-service-context-file');
+        offset += count;
+      }
+      const after = original.lstatSync(serviceContextPath);
+      if (
+        after.dev !== stat.dev ||
+        after.ino !== stat.ino ||
+        after.nlink !== 1 ||
+        after.isSymbolicLink()
+      )
+        return unsupported('native-service-context-replaced');
+      serviceContextIdentity = { dev: stat.dev, ino: stat.ino };
+      return bytes;
+    } finally {
+      original.closeSync(descriptor);
+    }
+  };
+  const serviceContext =
+    serviceContextHash === undefined
+      ? undefined
+      : (() => {
+          const bytes = readServiceContext();
+          if (!/^[0-9a-f]{64}$/u.test(serviceContextHash) || hash(bytes) !== serviceContextHash)
+            return unsupported('native-service-context-integrity');
+          const context = JSON.parse(bytes.toString('utf8')) as NativeServiceControlContext;
+          const closed = (value: unknown, keys: readonly string[]): boolean =>
+            value !== null &&
+            typeof value === 'object' &&
+            !Array.isArray(value) &&
+            JSON.stringify(Object.keys(value).sort()) === JSON.stringify([...keys].sort());
+          if (
+            !closed(context, [
+              'schemaVersion',
+              'nonce',
+              'repository',
+              'candidate',
+              'taskId',
+              'population',
+              'backend',
+              'socket',
+              'kinds',
+              'redisProcessControl',
+              'limits',
+            ]) ||
+            !closed(context.backend, [
+              'kind',
+              'recordId',
+              'recordSha256',
+              'imageId',
+              'namespace',
+            ]) ||
+            !closed(context.socket, ['path', 'dev', 'ino']) ||
+            !closed(context.limits, [
+              'maxInstances',
+              'maxConcurrent',
+              'requestTimeoutMs',
+              'perKind',
+            ]) ||
+            typeof context.taskId !== 'string' ||
+            context.taskId.length === 0 ||
+            typeof context.population !== 'string' ||
+            context.population.length === 0 ||
+            coverageContext === undefined ||
+            process.platform !== 'linux' ||
+            context.schemaVersion !== '1.0.0' ||
+            context.nonce !== nonce ||
+            context.repository !== coverageContext?.repository ||
+            context.candidate !== coverageContext.candidate ||
+            context.backend?.kind !== 'owned-linux-native-v1' ||
+            !['owned-linux-native-v1-linux-amd64', 'owned-linux-native-v1-linux-arm64'].includes(
+              context.backend.recordId,
+            ) ||
+            !/^[0-9a-f]{64}$/u.test(context.backend.recordSha256) ||
+            !/^sha256:[0-9a-f]{64}$/u.test(context.backend.imageId) ||
+            !/^net:\[[0-9]+\]$/u.test(context.backend.namespace) ||
+            original.readlinkSync('/proc/self/ns/net') !== context.backend.namespace ||
+            context.socket?.path !==
+              (process.platform === 'linux'
+                ? '/runtime/control/control.sock'
+                : resolve(runtimeRoot as string, 'control/control.sock')) ||
+            !Number.isSafeInteger(context.socket.dev) ||
+            !Number.isSafeInteger(context.socket.ino) ||
+            !Array.isArray(context.kinds) ||
+            context.kinds.length === 0 ||
+            new Set(context.kinds).size !== context.kinds.length ||
+            context.kinds.some(
+              (kind) => !['postgres', 'redis', 'localstack-s3', 'localstack-s3-kms'].includes(kind),
+            ) ||
+            (context.redisProcessControl !== null &&
+              (!context.kinds.includes('redis') ||
+                !closed(context.redisProcessControl, [
+                  'kind',
+                  'maxTransitionsPerInstance',
+                  'maxPausedMs',
+                ]) ||
+                context.redisProcessControl?.kind !== 'pause-resume-v1' ||
+                !Number.isSafeInteger(context.redisProcessControl.maxTransitionsPerInstance) ||
+                context.redisProcessControl.maxTransitionsPerInstance < 1 ||
+                context.redisProcessControl.maxTransitionsPerInstance > 64 ||
+                !Number.isSafeInteger(context.redisProcessControl.maxPausedMs) ||
+                context.redisProcessControl.maxPausedMs < 1 ||
+                context.redisProcessControl.maxPausedMs > 60_000)) ||
+            !closed(context.limits.perKind, context.kinds) ||
+            context.kinds.some((kind: NativeServiceFixtureKind) => {
+              const bound = context.limits.perKind[kind];
+              return (
+                !closed(bound, ['maxInstances']) ||
+                !Number.isSafeInteger(bound?.maxInstances) ||
+                (bound?.maxInstances ?? 0) < 1 ||
+                (bound?.maxInstances ?? 0) > context.limits.maxInstances
+              );
+            }) ||
+            !Number.isSafeInteger(context.limits?.maxInstances) ||
+            context.limits.maxInstances < 1 ||
+            context.limits.maxInstances > 128 ||
+            !Number.isSafeInteger(context.limits.maxConcurrent) ||
+            context.limits.maxConcurrent < 1 ||
+            context.limits.maxConcurrent > context.limits.maxInstances ||
+            !Number.isSafeInteger(context.limits.requestTimeoutMs) ||
+            context.limits.requestTimeoutMs < 100 ||
+            context.limits.requestTimeoutMs > 120_000
+          )
+            return unsupported('native-service-context-integrity');
+          return context;
+        })();
+  let serviceFixtures: ReturnType<typeof createNativeServiceFixturesKernel> | undefined;
+  if (serviceContext !== undefined) {
+    const verifyServiceContext = (): void => {
+      if (!fixtureSocketPrototypesCurrent()) return unsupported('native-service-transport-mutated');
+      if (
+        sealed ||
+        hash(readServiceContext()) !== serviceContextHash ||
+        original.readlinkSync('/proc/self/ns/net') !== serviceContext.backend.namespace
+      )
+        return unsupported('native-service-context-changed');
+      const socket = original.lstatSync(serviceContext.socket.path);
+      if (
+        !socket.isSocket() ||
+        socket.dev !== serviceContext.socket.dev ||
+        socket.ino !== serviceContext.socket.ino ||
+        original.realpathSync(serviceContext.socket.path) !== serviceContext.socket.path
+      )
+        return unsupported('native-service-socket-changed');
+    };
+    const requestService = (request: NativeServiceControlRequest): Promise<unknown> =>
+      new Promise((resolveReply, rejectReply) => {
+        verifyServiceContext();
+        const socket = new FixtureSocket({ allowHalfOpen: false });
+        let reply = Buffer.alloc(0),
+          done = false;
+        const finish = (error?: Error, value?: unknown): void => {
+          if (done) return;
+          done = true;
+          fixtureClearTimer(deadline);
+          if (!fixtureSocketPrototypesCurrent()) {
+            // Avoid invoking a mutated lifecycle. Parent cleanup owns terminal resources.
+            try {
+              unsupported('native-service-transport-mutated');
+            } catch (cause) {
+              rejectReply(cause);
+            }
+            return;
+          }
+          applyFixtureSocket(fixtureSocketDestroy, socket, []);
+          if (error !== undefined) rejectReply(error);
+          else resolveReply(value);
+        };
+        const deadline = fixtureTimer(
+          () => finish(new Error('NATIVE_SERVICE_FIXTURE_TIMEOUT')),
+          serviceContext.limits.requestTimeoutMs,
+        );
+        applyFixtureSocket(fixtureSocketOnce, socket, ['error', (error: Error) => finish(error)]);
+        applyFixtureSocket(fixtureSocketOnce, socket, [
+          'connect',
+          () => {
+            if (!fixtureSocketPrototypesCurrent()) {
+              finish(new Error('NATIVE_SERVICE_FIXTURE_TRANSPORT_MUTATED'));
+              return;
+            }
+            applyFixtureSocket(fixtureSocketWrite, socket, [`${JSON.stringify(request)}\n`]);
+          },
+        ]);
+        applyFixtureSocket(fixtureSocketOn, socket, [
+          'data',
+          (chunk: Buffer) => {
+            if (done) return;
+            if (!fixtureSocketPrototypesCurrent()) {
+              finish(new Error('NATIVE_SERVICE_FIXTURE_TRANSPORT_MUTATED'));
+              return;
+            }
+            reply = Buffer.concat([reply, chunk]);
+            if (reply.length > 64 * 1024)
+              finish(new Error('NATIVE_SERVICE_FIXTURE_RESPONSE_INVALID'));
+          },
+        ]);
+        applyFixtureSocket(fixtureSocketOnce, socket, [
+          'end',
+          () => {
+            try {
+              verifyServiceContext();
+              const text = reply.toString('utf8');
+              if (
+                !Buffer.from(text).equals(reply) ||
+                !text.endsWith('\n') ||
+                text.indexOf('\n') !== text.length - 1
+              )
+                throw new Error('NATIVE_SERVICE_FIXTURE_RESPONSE_INVALID');
+              finish(undefined, JSON.parse(text));
+            } catch {
+              finish(new Error('NATIVE_SERVICE_FIXTURE_RESPONSE_INVALID'));
+            }
+          },
+        ]);
+        applyFixtureSocket(fixtureSocketOnce, socket, [
+          'close',
+          () => {
+            if (!done) finish(new Error('NATIVE_SERVICE_FIXTURE_RESPONSE_INCOMPLETE'));
+          },
+        ]);
+        verifyServiceContext();
+        applyFixtureSocket(fixtureSocketConnect, socket, [{ path: serviceContext.socket.path }]);
+      });
+    governedServiceFactory = () => {
+      verifyServiceContext();
+      serviceFixtures ??= createNativeServiceFixturesKernel({
+        context: serviceContext,
+        scope,
+        requestId: () => randomBytes(16).toString('hex'),
+        verifyContext: verifyServiceContext,
+        request: requestService,
+        sha256: hash,
+        emit,
+      });
+      return serviceFixtures.api;
+    };
+  }
+  governedCoverageFactory = (options) => {
+    if (
+      sealed ||
+      coverageContext === undefined ||
+      coverageContext.repository === undefined ||
+      coverageContext.packageDir === undefined ||
+      coverageContext.candidate === undefined ||
+      !/^[0-9a-f]{40}$/u.test(coverageContext.candidate) ||
+      coverageContext.git.path === undefined ||
+      coverageContext.git.sha256 === undefined ||
+      !/^[0-9a-f]{64}$/u.test(coverageContext.git.sha256)
+    )
+      return unsupported('native-coverage-context');
+    const adapterId = coverageAdapters.length + 1;
+    try {
+      const { request, api, lastCompilation } = createNativeCoverageAdapterKernel(options, {
+        io: {
+          ...coverageAdapterIO,
+          readFileSync: ((path: fs.PathLike) => trustedReadFile(path)) as typeof fs.readFileSync,
+        },
+        path: '',
+        mode: 'governed',
+        bound: {
+          repository: coverageContext.repository,
+          candidate: coverageContext.candidate,
+          packageDir: coverageContext.packageDir,
+          git: { path: coverageContext.git.path, sha256: coverageContext.git.sha256 },
+          tracked: coverageContext.tracked,
+          excludedPrefixes: coverageContext.excludedPrefixes,
+        },
+      });
+      emit({
+        kind: 'adapter-begin',
+        adapterId,
+        request,
+        requestSha256: hash(JSON.stringify(request)),
+      });
+      const derived = new Map<string, string>();
+      const guardAdapter = <T>(operation: () => T): T => {
+        if (sealed) return unsupported('native-coverage-sealed');
+        try {
+          return operation();
+        } catch {
+          return unsupported('native-coverage-operation');
+        }
+      };
+      const safe = Object.freeze({
+        sha256: (value: string | Uint8Array) => guardAdapter(() => api.sha256(value)),
+        candidate: () => guardAdapter(() => api.candidate()),
+        sourceCensus: () => guardAdapter(() => api.sourceCensus()),
+        compile: (parameters: Parameters<CoverageAdapterAPI['compile']>[0]) =>
+          guardAdapter(() => {
+            const result = api.compile(parameters);
+            const summary = {
+              outputs: result.outputs.map(({ path, sha256 }) => ({ path, sha256 })),
+              diagnostics: result.diagnostics,
+            };
+            const derivationSha256 = hash(JSON.stringify(summary));
+            const accepted = lastCompilation();
+            if (accepted === undefined) return unsupported('native-coverage-derivation');
+            const { mode, source } = accepted;
+            emit({
+              kind: 'adapter-derived',
+              adapterId,
+              mode,
+              source,
+              ...summary,
+              derivationSha256,
+            });
+            if (mode === 'production')
+              for (const output of result.outputs) derived.set(output.path, derivationSha256);
+            return result;
+          }),
+        readVerifiedOutput: (path: string) =>
+          guardAdapter(() => {
+            const text = api.readVerifiedOutput(path);
+            const derivationSha256 = derived.get(path);
+            if (derivationSha256 === undefined)
+              return unsupported('native-coverage-output-not-derived');
+            emit({
+              kind: 'adapter-verified-output',
+              adapterId,
+              path,
+              sha256: hash(text),
+              derivationSha256,
+            });
+            return text;
+          }),
+        verify: () => guardAdapter(() => api.verify()),
+        evidence: () => guardAdapter(() => api.evidence()),
+      });
+      coverageAdapters.push({
+        verify: () => api.verify(),
+        seal: () => {
+          const evidence = api.evidence();
+          const evidenceSha256 = hash(JSON.stringify(evidence));
+          emit({ kind: 'adapter-evidence', adapterId, evidence, evidenceSha256 });
+          emit({ kind: 'adapter-end', adapterId, evidenceSha256 });
+        },
+      });
+      return safe;
+    } catch (error) {
+      const reason =
+        error instanceof Error ? error.message.split('\n')[0]?.slice(0, 512) : 'unknown';
+      return unsupported(`native-coverage-initialization:${reason}`);
+    }
+  };
+
   const actualCallSites = getCallSites;
   const OriginalError = Error;
   const OriginalSession = Session;
@@ -1326,8 +1967,29 @@ if (trace !== undefined && nonce !== undefined) {
     hostPlatform: nativeHostPlatform(),
   });
   closeScope = (): void => {
+    if (serviceFactoryFailure !== undefined)
+      unsupported(`native-service-factory-${serviceFactoryFailure}`);
     if (sealed) throw new Error('NATIVE_LOADER_ALREADY_SEALED');
     if (pendingIO !== 0) unsupported('pending-filesystem-io');
+    if (coverageContextHash !== undefined && hash(readCoverageContext()) !== coverageContextHash)
+      unsupported('native-coverage-context-changed');
+    if (serviceContextHash !== undefined && hash(readServiceContext()) !== serviceContextHash)
+      unsupported('native-service-context-changed');
+    if (serviceFixtures !== undefined) {
+      try {
+        serviceFixtures.seal();
+      } catch {
+        unsupported('native-service-seal');
+      }
+    }
+    for (const adapter of coverageAdapters) {
+      try {
+        adapter.verify();
+        adapter.seal();
+      } catch {
+        unsupported('native-coverage-seal');
+      }
+    }
     for (const fact of platformFacts.values()) {
       const caller = fact['caller'] as Record<string, unknown>;
       const reviewed = frameworkPlatformProbeCallers.find(

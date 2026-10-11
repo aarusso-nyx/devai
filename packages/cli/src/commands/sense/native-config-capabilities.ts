@@ -1,3 +1,5 @@
+import { readFileSync, realpathSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { dirname, relative, resolve } from 'node:path';
 import ts from 'typescript';
 import { readCandidateFile } from '@devai-nyx/sensors';
@@ -31,12 +33,30 @@ const TYPESCRIPT_AST = new Set([
   'ScriptKind',
   'isExportDeclaration',
   'isImportDeclaration',
+  'SyntaxKind',
+  'isReturnStatement',
 ]);
+const COVERAGE_ADAPTER = '@aarusso-nyx/devai/native-coverage-adapter';
+const COVERAGE_PROVIDER = '@vitest/coverage-v8';
+const COVERAGE_PROVIDER_CLASS = '@vitest/coverage-v8/dist/provider.js';
+const SOURCEMAP_CODEC = '@jridgewell/sourcemap-codec';
+
+export interface NativeConfigCapabilities {
+  readonly adapterImporters: readonly string[];
+  readonly coverageProviderManifests: readonly string[];
+  readonly packageManifests: readonly string[];
+}
 
 /** Finite configuration language; unsupported ambient selection cannot acquire standing. */
-export function assertNativeConfigCapabilities(root: string, entry: string): void {
+export function assertNativeConfigCapabilities(
+  root: string,
+  entry: string,
+): NativeConfigCapabilities {
   const pending = [entry];
   const visited = new Set<string>();
+  const adapterImporters = new Set<string>();
+  const coverageProviderManifests = new Set<string>();
+  const packageManifests = new Set<string>();
   for (let index = 0; index < pending.length; index += 1) {
     const path = pending[index] as string;
     if (visited.has(path)) continue;
@@ -85,6 +105,60 @@ export function assertNativeConfigCapabilities(root: string, entry: string): voi
     };
     findHandles(source);
     const dependency = (specifier: string, declaration?: ts.ImportDeclaration): void => {
+      const namedOnly = (names: ReadonlySet<string>): boolean => {
+        const clause = declaration?.importClause;
+        const bindings = clause?.namedBindings;
+        return (
+          clause?.name === undefined &&
+          clause?.isTypeOnly === false &&
+          bindings !== undefined &&
+          ts.isNamedImports(bindings) &&
+          bindings.elements.length > 0 &&
+          bindings.elements.every(
+            (element) =>
+              !element.isTypeOnly && names.has((element.propertyName ?? element.name).text),
+          )
+        );
+      };
+      const exactPackage = (name: string, version: string): string => {
+        const resolver = createRequire(resolve(root, path));
+        const manifestPath = realpathSync(resolver.resolve(`${name}/package.json`));
+        const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
+          name?: string;
+          version?: string;
+        };
+        if (manifest.name !== name || manifest.version !== version)
+          throw new Error('SENSE_NATIVE_CONFIG_PACKAGE_VERSION_UNSUPPORTED');
+        packageManifests.add(manifestPath);
+        return manifestPath;
+      };
+      if (specifier === COVERAGE_ADAPTER) {
+        if (!namedOnly(new Set(['createNativeCoverageAdapter', 'isProxy', 'sameNativeData'])))
+          throw new Error('SENSE_NATIVE_CONFIG_COVERAGE_ADAPTER_IMPORT_UNSUPPORTED');
+        adapterImporters.add(path);
+        return;
+      }
+      if (specifier === COVERAGE_PROVIDER || specifier === COVERAGE_PROVIDER_CLASS) {
+        const clause = declaration?.importClause;
+        if (
+          specifier === COVERAGE_PROVIDER
+            ? clause?.name === undefined || clause.isTypeOnly || clause.namedBindings !== undefined
+            : !namedOnly(new Set(['V8CoverageProvider']))
+        )
+          throw new Error('SENSE_NATIVE_CONFIG_COVERAGE_PROVIDER_IMPORT_UNSUPPORTED');
+        const manifestPath = exactPackage(COVERAGE_PROVIDER, '4.1.11');
+        const vitestPath = exactPackage('vitest', '4.1.11');
+        if (realpathSync(createRequire(manifestPath).resolve('vitest/package.json')) !== vitestPath)
+          throw new Error('SENSE_NATIVE_CONFIG_COVERAGE_PROVIDER_INSTANCE_MISMATCH');
+        coverageProviderManifests.add(manifestPath);
+        return;
+      }
+      if (specifier === SOURCEMAP_CODEC) {
+        if (!namedOnly(new Set(['decode', 'encode'])))
+          throw new Error('SENSE_NATIVE_CONFIG_SOURCEMAP_CODEC_IMPORT_UNSUPPORTED');
+        exactPackage(SOURCEMAP_CODEC, '1.6.0');
+        return;
+      }
       if (specifier.startsWith('.')) {
         const target = relative(root, resolve(root, dirname(path), specifier));
         if (!/\.(?:[cm]?js|[cm]?ts)$/u.test(target))
@@ -276,4 +350,9 @@ export function assertNativeConfigCapabilities(root: string, entry: string): voi
     };
     visit(source);
   }
+  return Object.freeze({
+    adapterImporters: Object.freeze([...adapterImporters].sort()),
+    coverageProviderManifests: Object.freeze([...coverageProviderManifests].sort()),
+    packageManifests: Object.freeze([...packageManifests].sort()),
+  });
 }

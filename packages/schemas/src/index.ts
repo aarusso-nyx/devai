@@ -170,6 +170,7 @@ function ensureSchemaReferences(name: SchemaName): void {
     name === 'adopter-policy.schema.json'
   ) {
     for (const dependency of [
+      'native-service-profile.schema.json',
       'reviewed-workflow-steps.schema.json',
       ...(name === 'adopter-policy.schema.json'
         ? (['invariant-producers.schema.json'] as const)
