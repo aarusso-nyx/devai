@@ -5,24 +5,25 @@ It combines declared roles, bounded effects, repository sensors, validation, and
 attributable evidence without replacing a project's build, test, or CI tools.
 
 DEVAI ships as one package, `@aarusso-nyx/devai`; the published installation
-below remains pinned to **2.3.2**. This source tree's machine catalog contains
+below is pinned to published **2.4.0**. This source tree's machine catalog contains
 **69 actions** (36 stable, 22 preview, 11 internal), **59 sensors**, and
 **7 host-invoked recipes**. The ordinary public CLI is organized
 into eleven workflow domains: `audit`, `init`, `doctor`, `check`, `sense`, `round`,
 `evidence`, `release`, `triage`, `backlog`, and `campaign`. `task` and `catalog` are internal plumbing exposed by
 `--all` for maintainers and automation.
 
-The **2.4.0 minor candidate** adds policy-owned sensor inputs, exact reviewed
+The published **2.4.0 minor release** adds policy-owned sensor inputs, exact reviewed
 task bindings, candidate-bound measurement instances, and Angular inventory
-inputs. See the [candidate release notes](CHANGELOG.md#240--2026-10-10) and
-[sensor input guide](docs/adopters/sensor-inputs.md). The installation below
-continues to name the published package until 2.4.0 publication is verified.
+inputs. See the [release notes](CHANGELOG.md#240--2026-10-10) and
+[sensor input guide](docs/adopters/sensor-inputs.md). The developing **2.5.0 minor
+campaign** adds [adopter audit interfaces](docs/dev/operations/adopter-audit-interfaces.md);
+implementation and independent integration remain required before publication.
 
 ```bash
 export NODE_AUTH_TOKEN=<github-token-with-read-packages>
 printf '%s\n' '@aarusso-nyx:registry=https://npm.pkg.github.com' \
   '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}' > .npmrc
-pnpm add --save-dev --save-exact @aarusso-nyx/devai@2.3.2
+pnpm add --save-dev --save-exact @aarusso-nyx/devai@2.4.0
 pnpm exec devai --help
 pnpm exec devai catalog actions --format json
 pnpm exec devai init plan --target . --tier tier1 --format json
