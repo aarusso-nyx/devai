@@ -79,6 +79,12 @@ other. Preview or inspect whenever the leaf offers `--dry-run`, plan output, sta
   contract shown by `devai init bind --help`. `--adopter-policy` accepts only a validated source
   under `law/policy`; `--host-adapter` binds `github-actions` or `post-merge` as a verified
   transaction. Selected includes such as hooks or CI can require their host tools.
+- **Scoped hook refresh (2.6 candidate):** `init apply architect --only hooks --hook post-merge`
+  installs only the existing hook/declaration and checkout-local helper/key/attestation
+  operation, with Architect identity and `--write`. It omits unrelated bootstrap planning
+  and writes, is mutually exclusive with `--include`, and rejects `--force`/`--command`.
+  Existing `--include hooks` remains additive initialization. See the
+  [selected-adapter hook contract](../../adopters/install.md#shared-hooks-with-a-github-primary-26-candidate).
 - **Upgrade:** `init upgrade` (preview, Architect-initiated) plans without `--write`: it reads the
   bound `devai_version`, selects the entries of the shipped
   [migration manifest](../../../law/policy/adopter-migrations.json) above it and at or below the

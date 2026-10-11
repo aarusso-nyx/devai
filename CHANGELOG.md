@@ -1,10 +1,29 @@
 # Changelog
 
-## 2.5.0 — Unreleased
+## 2.6.0 — Unreleased
 
-This minor campaign adds supported adopter audit interfaces. Implementation,
-installed regressions and protected integration remain required before release;
-this entry does not claim publication or closure of every demonstrated gap.
+This additive minor candidate adds an installed read-only workflow review
+inventory. Implementation, installed regressions and protected release gates
+remain required; this entry does not claim publication.
+
+- Add `sense inventory --slice workflows` with whole-workflow raw digests,
+  canonical step digests, exact full-path job/index occurrences and complete
+  contained executable/import file digests. Unprovable or absent populations
+  remain UNKNOWN/REVIEW; extraction grants no reviewed effect or execution.
+- Preserve every existing inventory slice, including the `all` member population,
+  the 69-action public surface and the finite native compatibility matrix.
+  The independently trusted verifier remains `@aarusso-nyx/devai@2.4.0`.
+- Make refreshed shared post-merge hooks honor validated adapter selection.
+  GitHub-primary/non-host-integrated checkouts report `NOT_SELECTED` before local
+  receipt processing; selected-local checks remain mandatory. Older hooks need
+  registered `init apply architect --only hooks` refresh, excluding unrelated
+  bootstrap writes. No simultaneous enforcement or new effect is granted.
+
+## 2.5.0 — 2026-10-11
+
+DEVAI 2.5.0 was published on 2026-10-11. It adds supported adopter audit
+interfaces within the finite compatibility boundaries described below;
+publication does not establish adopter readiness or close unsupported populations.
 
 - Preserve source-qualified endpoint observations across API, coverage, RBAC
   and HTTP evidence. Unique legacy method/path references remain compatible;

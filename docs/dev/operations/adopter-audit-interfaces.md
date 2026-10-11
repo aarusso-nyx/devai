@@ -1,13 +1,15 @@
 # Adopter audit interfaces
 
-These contracts target the developing DEVAI 2.5.0 minor release. Published
-2.4.0 remains immutable. A declared policy or successful binding is not an audit
-PASS: installed producer validation, independent regressions and protected
-integration must establish the result.
+DEVAI 2.5.0 publishes the audit interfaces below; its package remains immutable.
+The developing 2.6.0 minor candidate adds the read-only workflow review inventory.
+A declared policy or successful binding is not an audit PASS: installed producer
+validation, independent regressions and protected integration must establish each
+result.
 
 The normative decisions are
 [ADR-SCR-0016](../../../law/adr/ADR-SCR-0016-lossless-endpoint-observation-identity.md),
-[ADR-SCR-0017](../../../law/adr/ADR-SCR-0017-declared-audit-producers-and-complete-results.md)
+[ADR-SCR-0017](../../../law/adr/ADR-SCR-0017-declared-audit-producers-and-complete-results.md),
+[ADR-SCR-0018](../../../law/adr/ADR-SCR-0018-read-only-workflow-step-inventory.md)
 and [ADR-REL-0035](../../../law/adr/ADR-REL-0035-trust-published-verifier-2-4.md).
 
 ## Endpoint references
@@ -106,6 +108,46 @@ without inherited `extends`. Unknown shell grammar, inherited working-directory
 defaults, unsupported package selectors/hooks, composite actions and config
 inheritance remain unknown until their complete execution closure can be proved.
 Declaring an effect or empty file list cannot override that refusal.
+
+### Installed workflow review extraction (2.6 candidate)
+
+Use the installed public read route:
+
+```sh
+devai sense inventory --slice workflows --repo-root . --format json
+```
+
+The `workflow-step-inventory` member value follows
+[workflow-step-inventory.schema.json](../../../law/schemas/workflow-step-inventory.schema.json).
+It lists contained `.github/workflows/*.yml` and `*.yaml` files in deterministic
+order, each with its raw YAML `sha256` and physical step rows. Each step has
+`job`, zero-based `index`, exact `occurrence`, `name`, canonical step `sha256`
+and `closure`. Equal digests retain every occurrence. A complete closure lists
+unique path-sorted `{path, sha256}` rows for contained regular executable,
+import and configuration files; it never substitutes a partial file list.
+
+Canonical step identity uses the existing parser: recursively sorted mapping
+keys, preserved list order and parsed scalar values, then `JSON.stringify`
+and UTF-8 SHA-256. It differs from the whole raw workflow digest. The exact
+occurrence `.github/workflows/example.yml#job[0]` already matches adopter review
+input; package-owned basename registry notation is separate and is not converted.
+
+The extractor shares actual adopter selection and closure rules. Only verified
+current bound computed-import covers may discharge dynamic reachability. There
+is no caller-supplied review flag. Unsupported commands, inherited defaults,
+actions, unresolved imports or invalid bindings stay `unknown`, with a reason;
+an unknown closure has `files: null`. Workflow/YAML failures retain a diagnostic
+workflow row when its identity is available. Any nested unknown gives top reason
+`WORKFLOW_INVENTORY_INCOMPLETE`; no workflows gives `WORKFLOW_INVENTORY_EMPTY`.
+The existing envelope reports REVIEW/exit 1; hard refusal or invalid invocation
+remains exit 2. A complete extraction reports PASS/exit 0.
+
+This route executes no workflow and writes no policy, readings or proofs. It
+does not choose an effect or provide the required review rationale. Independently
+review the complete roster before grouping matching digests into a reviewed
+entry. Package-owned dispositions cannot grant missing adopter closure. Existing
+slices and the existing `all` population remain unchanged; request `workflows`
+explicitly.
 
 Effects keep their existing meanings: `read-only` writes only workspace/runner
 files or step outputs, `repository-write` changes repository branches and
@@ -506,7 +548,15 @@ For the inspected backend/shared-factory configuration:
    heads and discharge every bound obligation; no measured subset substitutes
    for the whole declared population.
 
-Before publishing 2.5, freeze source, manifests, workflows and their reviewed
+The separately inspected STYNX dependency range `@swc/core ^1.15.41` resolves
+in its lock/install to core 1.16.2, with unplugin-swc 1.5.9, Vitest 4.1.11,
+Vite 7.3.6 and esbuild 0.28.1. Actual Vite-resolved Rollup 4.60.4 differs from
+the admitted 4.64.5, and the privacy config still uses `__dirname`. Those facts
+require reviewed migration and installed verification. A matching core version
+alone proves no standing; an actual core 1.15.41 remains unsupported. The workflow
+inventory adds no native version admission.
+
+For the 2.6 candidate, freeze source, manifests, workflows and their reviewed
 execution closures, then validate the exact assembled/installed candidate with
 independent positive and hostile native cases. Schema validation, a draft build
 or a parser fixture is insufficient. The unconditional release checks, exact
