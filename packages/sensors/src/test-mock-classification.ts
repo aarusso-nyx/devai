@@ -22,48 +22,94 @@ export interface TestMockClassification {
   readonly externalPorts: number;
 }
 
-function moduleTarget(file: string, specifier: string): string | undefined {
-  if (specifier.startsWith('node:')) return undefined;
-  let compilerOptions: ts.CompilerOptions = { moduleResolution: ts.ModuleResolutionKind.NodeNext };
-  const config = ts.findConfigFile(dirname(file), ts.sys.fileExists);
-  if (config !== undefined) {
-    const loaded = ts.readConfigFile(config, ts.sys.readFile);
-    if (loaded.error === undefined)
-      compilerOptions = ts.parseJsonConfigFileContent(
-        loaded.config,
-        ts.sys,
-        dirname(config),
-      ).options;
-  }
-  let target = ts.resolveModuleName(specifier, file, compilerOptions, ts.sys).resolvedModule
-    ?.resolvedFileName;
-  if (target === undefined && specifier.startsWith('.')) {
-    const base = resolve(dirname(file), specifier).replace(/\.(?:js|jsx|mjs|cjs)$/u, '');
-    target = [
-      base,
-      ...['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'].map((extension) => `${base}${extension}`),
-      resolve(base, 'index.ts'),
-    ].find(existsSync);
-  }
-  return target;
+interface MockModuleResolution {
+  target(file: string, specifier: string): string | undefined;
+  ownership(file: string, specifier: string): Ownership;
 }
 
-function moduleOwnership(root: string, file: string, specifier: string): Ownership {
-  if (specifier.startsWith('node:')) return 'external';
-  const target = moduleTarget(file, specifier);
-  if (target === undefined) return 'unknown';
-  try {
-    if (lstatSync(target).isSymbolicLink()) return 'unknown';
-    const rel = relative(realpathSync(root), realpathSync(target));
-    return rel === '..' ||
-      rel.startsWith(`..${sep}`) ||
-      isAbsolute(rel) ||
-      rel.split(sep).includes('node_modules')
-      ? 'external'
-      : 'owned';
-  } catch {
-    return 'unknown';
-  }
+/** Resolution is shared only inside one synchronous sensor invocation. */
+function createMockModuleResolution(root: string): MockModuleResolution {
+  const configPaths = new Map<string, string | undefined>();
+  const configOptions = new Map<string, ts.CompilerOptions>();
+  const targets = new Map<string, Map<string, string | undefined>>();
+  const ownerships = new Map<string, Map<string, Ownership>>();
+  const defaults: ts.CompilerOptions = { moduleResolution: ts.ModuleResolutionKind.NodeNext };
+  let physicalRoot: string | undefined;
+  const options = (file: string): ts.CompilerOptions => {
+    const directory = dirname(file);
+    if (!configPaths.has(directory))
+      configPaths.set(directory, ts.findConfigFile(directory, ts.sys.fileExists));
+    const config = configPaths.get(directory);
+    if (config === undefined) return defaults;
+    const cached = configOptions.get(config);
+    if (cached !== undefined) return cached;
+    const loaded = ts.readConfigFile(config, ts.sys.readFile);
+    // Only compiler options participate in module resolution. Expanding include/files
+    // would repeatedly enumerate the whole project for each import without using it.
+    const value =
+      loaded.error === undefined
+        ? ts.parseJsonConfigFileContent(
+            loaded.config,
+            { ...ts.sys, readDirectory: () => [] },
+            dirname(config),
+          ).options
+        : defaults;
+    configOptions.set(config, value);
+    return value;
+  };
+  const target = (file: string, specifier: string): string | undefined => {
+    if (specifier.startsWith('node:')) return undefined;
+    let cache = targets.get(file);
+    if (cache === undefined) {
+      cache = new Map();
+      targets.set(file, cache);
+    }
+    if (cache.has(specifier)) return cache.get(specifier);
+    let resolved = ts.resolveModuleName(specifier, file, options(file), ts.sys).resolvedModule
+      ?.resolvedFileName;
+    if (resolved === undefined && specifier.startsWith('.')) {
+      const base = resolve(dirname(file), specifier).replace(/\.(?:js|jsx|mjs|cjs)$/u, '');
+      resolved = [
+        base,
+        ...['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'].map((extension) => `${base}${extension}`),
+        resolve(base, 'index.ts'),
+      ].find(existsSync);
+    }
+    cache.set(specifier, resolved);
+    return resolved;
+  };
+  const ownership = (file: string, specifier: string): Ownership => {
+    if (specifier.startsWith('node:')) return 'external';
+    let cache = ownerships.get(file);
+    if (cache === undefined) {
+      cache = new Map();
+      ownerships.set(file, cache);
+    }
+    const cached = cache.get(specifier);
+    if (cached !== undefined) return cached;
+    const resolved = target(file, specifier);
+    let value: Ownership = 'unknown';
+    if (resolved !== undefined) {
+      try {
+        if (!lstatSync(resolved).isSymbolicLink()) {
+          physicalRoot ??= realpathSync(root);
+          const rel = relative(physicalRoot, realpathSync(resolved));
+          value =
+            rel === '..' ||
+            rel.startsWith(`..${sep}`) ||
+            isAbsolute(rel) ||
+            rel.split(sep).includes('node_modules')
+              ? 'external'
+              : 'owned';
+        }
+      } catch {
+        // Unreadable, missing and linked targets never gain owned classification.
+      }
+    }
+    cache.set(specifier, value);
+    return value;
+  };
+  return { target, ownership };
 }
 
 function nameOf(expression: ts.Expression): string | undefined {
@@ -141,7 +187,11 @@ function oneShotNegativeWitness(
 }
 
 /** Classify actual call nodes and resolved imports, never comment/string contents. */
-function classifyFileMocks(root: string, file: string, content: string): TestMockClassification {
+function classifyFileMocks(
+  file: string,
+  content: string,
+  resolution: MockModuleResolution,
+): TestMockClassification {
   const source = ts.createSourceFile(
     file,
     content,
@@ -155,7 +205,7 @@ function classifyFileMocks(root: string, file: string, content: string): TestMoc
   for (const statement of source.statements) {
     if (ts.isImportDeclaration(statement) && ts.isStringLiteralLike(statement.moduleSpecifier)) {
       const specifier = statement.moduleSpecifier.text;
-      const ownership = moduleOwnership(root, file, specifier);
+      const ownership = resolution.ownership(file, specifier);
       const clause = statement.importClause;
       if (clause?.name !== undefined) imports.set(clause.name.text, ownership);
       const bindings = clause?.namedBindings;
@@ -344,7 +394,7 @@ function classifyFileMocks(root: string, file: string, content: string): TestMoc
               if (
                 target !== undefined &&
                 ts.isStringLiteralLike(target) &&
-                moduleOwnership(root, file, target.text) === 'external'
+                resolution.ownership(file, target.text) === 'external'
               )
                 classification = 'external-port';
               break;
@@ -356,7 +406,7 @@ function classifyFileMocks(root: string, file: string, content: string): TestMoc
             expression.name.text === 'spyOn'
               ? owner(target)
               : target !== undefined && ts.isStringLiteralLike(target)
-                ? moduleOwnership(root, file, target.text)
+                ? resolution.ownership(file, target.text)
                 : 'unknown';
           classification =
             ownership === 'owned'
@@ -381,43 +431,41 @@ function classifyFileMocks(root: string, file: string, content: string): TestMoc
   return counts;
 }
 
-/** Follow owned imports so a helper cannot hide an authorization substitution. */
-export function classifyTestMocks(
+interface LocalMockAnalysis {
+  readonly bytes: string;
+  readonly counts: TestMockClassification;
+  readonly dependencies: readonly string[];
+}
+
+/** Reuse local facts, never a root's aggregate or visited set, within one scan. */
+export function createTestMockClassifier(
   root: string,
-  file: string,
-  content: string,
-): TestMockClassification {
-  const counts = {
-    mocks: 0,
-    fixtures: 0,
-    snapshots: 0,
-    ownedSubstitutions: 0,
-    unresolved: 0,
-    observers: 0,
-    faultInjections: 0,
-    externalPorts: 0,
-  };
-  const visited = new Set<string>();
-  const inspect = (path: string, bytes: string): void => {
-    const identity = resolve(path);
-    if (visited.has(identity)) return;
-    visited.add(identity);
+): (file: string, content: string) => TestMockClassification {
+  const resolution = createMockModuleResolution(root);
+  const analyses = new Map<string, LocalMockAnalysis>();
+  const analyze = (path: string, content?: string): LocalMockAnalysis => {
+    const cached = analyses.get(path);
+    if (cached !== undefined && (content === undefined || content === cached.bytes)) return cached;
+    const bytes = content ?? readFileSync(path, 'utf8');
     const source = ts.createSourceFile(path, bytes, ts.ScriptTarget.Latest, true);
     const parsed = source as ts.SourceFile & {
       readonly parseDiagnostics: readonly ts.Diagnostic[];
     };
-    if (parsed.parseDiagnostics.length > 0) {
-      counts.mocks += 1;
-      counts.unresolved += 1;
-      return;
-    }
-    const current = classifyFileMocks(root, path, bytes);
-    for (const key of Object.keys(counts) as (keyof typeof counts)[]) counts[key] += current[key];
+    const counts: TestMockClassification =
+      parsed.parseDiagnostics.length > 0
+        ? {
+            mocks: 1,
+            unresolved: 1,
+            fixtures: 0,
+            snapshots: 0,
+            ownedSubstitutions: 0,
+            observers: 0,
+            faultInjections: 0,
+            externalPorts: 0,
+          }
+        : classifyFileMocks(path, bytes, resolution);
     const dependencies = new Set<string>();
-    const unresolved = (): void => {
-      counts.mocks += 1;
-      counts.unresolved += 1;
-    };
+    let unresolvedImports = 0;
     const imports = (node: ts.Node): void => {
       if (
         (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
@@ -438,23 +486,68 @@ export function classifyTestMocks(
         const argument = node.arguments[0];
         if (argument !== undefined && ts.isStringLiteralLike(argument))
           dependencies.add(argument.text);
-        else unresolved();
+        else unresolvedImports += 1;
       }
       ts.forEachChild(node, imports);
     };
-    imports(source);
-    for (const specifier of dependencies) {
-      const ownership = moduleOwnership(root, path, specifier);
-      const target = moduleTarget(path, specifier);
-      if (ownership === 'owned' && target !== undefined && !target.endsWith('.d.ts')) {
-        try {
-          inspect(target, readFileSync(target, 'utf8'));
-        } catch {
-          unresolved();
-        }
-      } else if (ownership === 'unknown' && specifier.startsWith('.')) unresolved();
-    }
+    if (parsed.parseDiagnostics.length === 0) imports(source);
+    const result: LocalMockAnalysis = {
+      bytes,
+      counts: {
+        ...counts,
+        mocks: counts.mocks + unresolvedImports,
+        unresolved: counts.unresolved + unresolvedImports,
+      },
+      dependencies: [...dependencies],
+    };
+    analyses.set(path, result);
+    return result;
   };
-  inspect(file, content);
-  return counts;
+  return (file, content) => {
+    const counts = {
+      mocks: 0,
+      fixtures: 0,
+      snapshots: 0,
+      ownedSubstitutions: 0,
+      unresolved: 0,
+      observers: 0,
+      faultInjections: 0,
+      externalPorts: 0,
+    };
+    const visited = new Set<string>();
+    const unresolved = (): void => {
+      counts.mocks += 1;
+      counts.unresolved += 1;
+    };
+    const inspect = (path: string, bytes?: string): void => {
+      const identity = resolve(path);
+      if (visited.has(identity)) return;
+      const local = analyze(identity, bytes);
+      visited.add(identity);
+      for (const key of Object.keys(counts) as (keyof typeof counts)[])
+        counts[key] += local.counts[key];
+      for (const specifier of local.dependencies) {
+        const ownership = resolution.ownership(identity, specifier);
+        const target = resolution.target(identity, specifier);
+        if (ownership === 'owned' && target !== undefined && !target.endsWith('.d.ts')) {
+          try {
+            inspect(target);
+          } catch {
+            unresolved();
+          }
+        } else if (ownership === 'unknown' && specifier.startsWith('.')) unresolved();
+      }
+    };
+    inspect(file, content);
+    return counts;
+  };
+}
+
+/** Follow owned imports so a helper cannot hide an authorization substitution. */
+export function classifyTestMocks(
+  root: string,
+  file: string,
+  content: string,
+): TestMockClassification {
+  return createTestMockClassifier(root)(file, content);
 }

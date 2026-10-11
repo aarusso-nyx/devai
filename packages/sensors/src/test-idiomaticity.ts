@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
 import { executableTestPopulation } from './test-file-population.js';
-import { classifyTestMocks } from './test-mock-classification.js';
+import { createTestMockClassifier } from './test-mock-classification.js';
 import {
   buildSensorReading,
   type SensorFinding,
@@ -42,6 +42,7 @@ export function senseTestIdiomaticity(opts: TestIdiomaticityOptions): SensorRead
   let faultInjections = 0;
   let externalPorts = 0;
 
+  const classify = createTestMockClassifier(opts.repoRoot);
   for (const f of files) {
     let content: string;
     try {
@@ -50,7 +51,7 @@ export function senseTestIdiomaticity(opts: TestIdiomaticityOptions): SensorRead
       errors.push(`Cannot read executable test ${f}: ${String(error)}`);
       continue;
     }
-    const classified = classifyTestMocks(opts.repoRoot, f, content);
+    const classified = classify(f, content);
     const { mocks, fixtures, snapshots } = classified;
     observers += classified.observers;
     faultInjections += classified.faultInjections;

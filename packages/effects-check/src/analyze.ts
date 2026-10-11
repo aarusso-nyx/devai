@@ -32,6 +32,40 @@ export type {
   SubprocessTemplate,
 } from './contracts.js';
 
+function nativeBoundaryAdvisoryReason(relative: string, node: ts.Node): string | undefined {
+  if (!ts.isCallExpression(node)) return undefined;
+  const [target, receiver] = node.arguments;
+  if (
+    relative === 'packages/cli/src/native-input-provenance.ts' &&
+    node.arguments.length === 3 &&
+    ts.isPropertyAccessExpression(node.expression) &&
+    ts.isIdentifier(node.expression.expression) &&
+    node.expression.expression.text === 'Reflect' &&
+    node.expression.name.text === 'apply' &&
+    target !== undefined &&
+    ts.isIdentifier(target) &&
+    ['write', 'end'].includes(target.text) &&
+    receiver !== undefined &&
+    ts.isIdentifier(receiver) &&
+    receiver.text === 'stdin'
+  ) {
+    return 'Native provenance preserves the captured bound stdin write/end receiver only after the finite esbuild inline-transform frame guard accepts the request and binds its subprocess dependency identity.';
+  }
+  if (
+    relative === 'packages/cli/src/native-playwright-loader.ts' &&
+    node.expression.kind === ts.SyntaxKind.ImportKeyword &&
+    node.arguments.length === 1 &&
+    target !== undefined &&
+    ts.isPropertyAccessExpression(target) &&
+    ts.isIdentifier(target.expression) &&
+    target.expression.text === 'data' &&
+    ['preloadUrl', 'originalUrl'].includes(target.name.text)
+  ) {
+    return 'The private Playwright registration supplies the exact pinned preload and original loader URLs; the preload must evaluate first, and the same-execution loader scope and complete module bytes must seal before execution origin or standing.';
+  }
+  return undefined;
+}
+
 export async function analyzeEffectProgram(input: AnalysisInput): Promise<EffectReport> {
   const started = performance.now();
   const program = loadProgram(resolve(input.tsconfigPath));
@@ -253,7 +287,7 @@ export async function analyzeEffectProgram(input: AnalysisInput): Promise<Effect
       }
       if (pattern !== undefined) {
         const edge = `${relative}:${String(sourceFile.getLineAndCharacterOfPosition(node.getStart()).line + 1)}:${pattern}`;
-        const reason = advisoryAllowlist[relative];
+        const reason = nativeBoundaryAdvisoryReason(relative, node) ?? advisoryAllowlist[relative];
         if (reason === undefined) {
           findings.push({
             code: 'EFFECT_UNANALYZABLE_PATTERN',
