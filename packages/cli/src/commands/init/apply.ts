@@ -138,6 +138,7 @@ function initApplyDefinition(segment: InitSegment) {
       if (segment === 'architect') {
         command
           .option('--include <component>', 'Also install the hooks component: hooks')
+          .option('--only <component>', 'Install only hooks without bootstrap scaffold: hooks')
           .option('--hook <name>', `${HOOK_NAMES.join(' | ')} (default: pre-push)`)
           .option(
             '--command <cmd>',
@@ -153,7 +154,20 @@ function initApplyDefinition(segment: InitSegment) {
       }
       command.action((options: InitOptions) => {
         validateInitTier(options);
-        const includes = requestedIncludes(options, segment);
+        const hooksOnly = segment === 'architect' && options.only === 'hooks';
+        if (
+          options.only !== undefined &&
+          (!hooksOnly ||
+            options.include !== undefined ||
+            options.force === true ||
+            options.command !== undefined)
+        ) {
+          process.stderr.write(
+            'devai init apply architect: --only accepts hooks and cannot be combined with --include, --force or --command\n',
+          );
+          process.exit(EXIT_USAGE);
+        }
+        const includes = hooksOnly ? (['hooks'] as const) : requestedIncludes(options, segment);
         if (options.hook !== undefined && !HOOK_NAMES.includes(options.hook as HookName)) {
           process.stderr.write(
             `devai init apply architect: --hook must be one of ${HOOK_NAMES.join(' | ')} (got '${options.hook}')\n`,
@@ -172,9 +186,9 @@ function initApplyDefinition(segment: InitSegment) {
         if (introspectionTarget === undefined) return;
         const introspection =
           segment === 'harness' ? inspectForInit(options, introspectionTarget) : null;
-        const plan = segmentedPlan(initPlanFor(options, target), segment);
+        const plan = hooksOnly ? null : segmentedPlan(initPlanFor(options, target), segment);
         const targetRoot = resolve(requestedTarget);
-        const coreTargets = preflightBootstrapPlan(plan);
+        const coreTargets = plan === null ? [] : preflightBootstrapPlan(plan);
         const preparedIncludes = prepareIncludedComponents(
           targetRoot,
           includes,
@@ -190,7 +204,10 @@ function initApplyDefinition(segment: InitSegment) {
             ...preparedIncludes.flatMap((component) => component.targets),
           ],
           () => {
-            const result = executeBootstrapPlan(plan, { force: options.force === true });
+            const result =
+              plan === null
+                ? { created: [], overwritten: [], skipped: [], preserved: [] }
+                : executeBootstrapPlan(plan, { force: options.force === true });
             if (segment === 'harness' && introspection !== null) {
               mkdirSync(dirname(introspectionPath), { recursive: true });
               writeFileSync(introspectionPath, JSON.stringify(introspection, null, 2) + '\n');

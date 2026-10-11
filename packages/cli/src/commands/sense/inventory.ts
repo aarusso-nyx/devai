@@ -17,6 +17,7 @@ import {
   withInventoryReadSnapshot,
 } from '#runtime-core';
 import { INVENTORY_SLICES, inventorySlice } from '@devai-nyx/sensors/inventory-slices';
+import { workflowReviewInventory } from '@devai-nyx/sensors';
 import { EXIT_FAIL, EXIT_PASS, EXIT_REVIEW, EXIT_USAGE } from '@devai-nyx/utils';
 import { defineCommand } from '../../define-command.js';
 
@@ -118,6 +119,10 @@ async function inventoryMember(
     case 'test-inventory': {
       const value = discoverTests({ repoRoot });
       return { member, status: 'pass', value: { count: value.length, tests: value } };
+    }
+    case 'workflow-step-inventory': {
+      const value = workflowReviewInventory(repoRoot);
+      return { member, status: value.status === 'complete' ? 'pass' : 'review', value };
     }
     default:
       throw new Error(`SENSE_INVENTORY_MEMBER_UNIMPLEMENTED:${member}`);

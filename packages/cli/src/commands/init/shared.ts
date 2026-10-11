@@ -18,6 +18,7 @@ export interface InitOptions {
   readonly introspect?: boolean;
   readonly tier?: string;
   readonly include?: string;
+  readonly only?: string;
   readonly hook?: string;
   readonly command?: string;
   readonly output?: string;

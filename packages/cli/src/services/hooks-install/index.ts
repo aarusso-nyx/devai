@@ -410,7 +410,48 @@ function validatePostMergeAdapterInputs(plan: HooksInstallPlan): void {
 }
 
 function postMergeCommand(): string {
-  return `devai_git_dir="$(git rev-parse --absolute-git-dir)" || exit $?\nnode "$devai_git_dir/devai/issue-post-merge-receipt.cjs"\n./node_modules/.bin/devai round close --post-merge-receipt --host-receipt "$devai_git_dir/devai/post-merge-receipt.json"`;
+  const selection = String.raw`const { lstatSync, readFileSync } = require('node:fs');
+try {
+  for (const path of ['.devai', '.devai/config', '.devai/config/project.json']) {
+    const entry = lstatSync(path);
+    if (entry.isSymbolicLink() || (path.endsWith('.json') ? !entry.isFile() : !entry.isDirectory()))
+      throw new Error('invalid project path');
+  }
+  const project = JSON.parse(readFileSync('.devai/config/project.json', 'utf8'));
+  if (!project || typeof project !== 'object' || Array.isArray(project) ||
+      project.schemaVersion !== '1.0.0' ||
+      !['runtime-host', 'platform-package', 'docs-archive', 'framework'].includes(project.project_type) ||
+      Object.keys(project).some(key => !['schemaVersion', 'project_type', 'name', 'profile',
+        'adopted_at', 'devai_version', 'constitution', 'invariant_filters', 'feature_flags',
+        'authority_enforcement', 'repo', 'docs', 'ci_economy', 'governance_tracking'].includes(key)))
+    throw new Error('invalid project identity');
+  const selected = project.authority_enforcement;
+  if (!selected || typeof selected !== 'object' || Array.isArray(selected) ||
+      Object.keys(selected).some(key => !['mode', 'adapter_config'].includes(key)) ||
+      (selected.adapter_config !== undefined &&
+        (typeof selected.adapter_config !== 'string' || !selected.adapter_config)))
+    throw new Error('invalid selection');
+  if ((selected.mode === 'cli-only' && selected.adapter_config === undefined) ||
+      (selected.mode === 'host-integrated' && selected.adapter_config === '.devai/config/github-actions-host-adapter.json'))
+    process.stdout.write('not-selected');
+  else if (selected.mode === 'host-integrated' && selected.adapter_config === '.devai/config/post-merge-host-adapter.json')
+    process.stdout.write('selected');
+  else throw new Error('unknown selection');
+} catch {
+  process.stderr.write('POST_MERGE_HOOK_SELECTION_INVALID\n');
+  process.exitCode = 1;
+}`;
+  return `devai_post_merge_selection="$(node <<'DEVAI_POST_MERGE_SELECTION'
+${selection}
+DEVAI_POST_MERGE_SELECTION
+)" || exit $?
+if [ "$devai_post_merge_selection" = "selected" ]; then
+  devai_git_dir="$(git rev-parse --absolute-git-dir)" || exit $?
+  node "$devai_git_dir/devai/issue-post-merge-receipt.cjs" || exit $?
+  ./node_modules/.bin/devai round close --post-merge-receipt --host-receipt "$devai_git_dir/devai/post-merge-receipt.json" || exit $?
+else
+  printf '%s\\n' 'POST_MERGE_HOOK_NOT_SELECTED' >&2
+fi`;
 }
 
 function prePushCommand(): string {

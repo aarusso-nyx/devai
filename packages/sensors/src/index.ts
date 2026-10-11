@@ -19,6 +19,12 @@ export * from './sensor-reading.js';
 export * from './sensor-registry.js';
 export * from './sense-presets.js';
 export * from './inventory-slices.js';
+export {
+  workflowReviewInventory,
+  type WorkflowReviewInventory,
+  type WorkflowReviewFile,
+  type WorkflowReviewStep,
+} from './harness/workflow-parser.js';
 export * from './test.js';
 export * from './test-weakening.js';
 export * from './test-weakening-config.js';
