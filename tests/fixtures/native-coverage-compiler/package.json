@@ -1,0 +1,7 @@
+{
+  "name": "devai-native-coverage-compiler-fixture",
+  "private": true,
+  "dependencies": {
+    "typescript": "6.0.3"
+  }
+}

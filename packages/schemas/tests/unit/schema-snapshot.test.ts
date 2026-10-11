@@ -25,6 +25,9 @@ describe('installed schema snapshot binding', () => {
     'release-plan-receipt-v2.schema.json',
     'release-lifecycle-store-record.schema.json',
     'adopter-policy.schema.json',
+    'test-result-population.schema.json',
+    'test-task-descriptor.schema.json',
+    'native-service-profile.schema.json',
   ])('compiles %s on first use with its complete reference closure', async (name) => {
     const registry = await import('../../src/index.js');
     registry.bindSchemaPackageSnapshot(snapshot());
