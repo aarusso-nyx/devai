@@ -607,7 +607,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
       },
       {
         path: 'scripts/create-release-manifest.mjs',
-        sha256: '495787f4705c8f8ddfbb6db148a8fb41f8334e149fa27a3d9910d48606c15cc4',
+        sha256: '6b74f6407a6118ff853f08d45ef1fe5726c8855c65afa9a0631c51937055089e',
       },
       {
         path: 'scripts/npm-pack-output.mjs',
