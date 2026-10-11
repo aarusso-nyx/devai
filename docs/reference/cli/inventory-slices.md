@@ -278,6 +278,30 @@ costs, and examples. This page does not duplicate the mutable slice population.
 - **Canonical source:** [`law/policy/round-execution.json`](../../../law/policy/round-execution.json#/vocabularies/inventory_slices)
 - **Related workflow:** `sense`
 
+<!-- devai:generated-entry category="inventory-slices" id="workflows" -->
+
+### `workflows` — Workflows
+
+- **Stable ID:** workflows
+- **User-facing label:** Workflows
+- **Purpose:** Extract exact workflow step review facts without execution or persistence.
+- **Population or projection:** `workflow-step-inventory`. Supported stacks: Contained regular .github/workflows/*.yml and *.yaml; the actual finite adopter execution-selection and import-closure grammar.
+- **Prerequisites:** readable contained workflow population; provable adopter executable/import closure; verified bound covers for computed imports
+- **Required external tools:** Not applicable: this slice declares no external tool.
+- **Accepted inputs:** `--repo-root <path>`
+- **Defaults:** repo root .; no caller-injected reviews; no workflow execution or policy writes
+- **Output contract:** Action envelope containing {slice, members, status, results, implicit_persistence:false}; member bodies: `workflow-step-inventory` {schemaVersion, status, reason, workflows} with raw workflow SHA-256, canonical step SHA-256, exact full-path job/index occurrences and complete path-sorted file/SHA closure.
+- **Verdict semantics:** The enclosing member and aggregate statuses are `pass` or `review`; nested review facts use `complete` or `unknown`. Unknown facts make the member review. Exceptions exit fail.
+- **Declared effect:** Not applicable to the vocabulary value; the enclosing canonical inventory action is read-only.
+- **Consent flags:** No role, write, or publish consent is accepted or required by the read-only inventory action.
+- **Cost class:** `moderate`
+- **When to use:** Use for the exact deterministic `workflows` repository projection.
+- **When not to use:** Absent workflows report WORKFLOW_INVENTORY_EMPTY; incomplete YAML, selection, binding or import closure reports unknown with explicit reasons and null incomplete closure files. Complete extraction grants no effect, review, execution authority or readiness. Existing all excludes this opt-in member.
+- **Non-pass semantics:** `unknown` is explicit within review facts and produces enclosing `review`/exit 1; structural refusal or execution errors exit 2. No skipped or N/A result is invented.
+- **Example:** `devai sense inventory --slice workflows --repo-root . --format json`
+- **Canonical source:** [`law/policy/round-execution.json`](../../../law/policy/round-execution.json#/vocabularies/inventory_slices)
+- **Related workflow:** `sense`
+
 <!-- devai:generated-entry category="inventory-slices" id="all" -->
 
 ### `all` — All
@@ -319,6 +343,22 @@ devai sense inventory --slice routes --repo-root . --format json
 
 An unknown slice or unimplemented canonical member fails instead of silently returning
 an empty or partial inventory.
+
+The opt-in `workflows` slice extracts workflow review facts:
+
+```sh
+devai sense inventory --slice workflows --repo-root . --format json
+```
+
+Its typed value follows
+[workflow-step-inventory.schema.json](../../../law/schemas/workflow-step-inventory.schema.json).
+Whole workflow hashes identify raw YAML bytes; step hashes identify canonical
+parsed YAML. Every full-path job/index occurrence remains present, including
+identical steps. Complete closures contain unique path-sorted executable/import
+file hashes. Missing workflows or incomplete closure yield UNKNOWN inside a
+REVIEW envelope, with explicit reasons and null incomplete closure files. No
+workflow is executed and no policy, reading or proof is written. The existing
+`all` member population is unchanged and excludes this new opt-in slice.
 
 ## Inputs and defaults
 

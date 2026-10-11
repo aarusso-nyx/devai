@@ -541,6 +541,28 @@ const INVENTORY_MEMBER_CONTRACTS = Object.freeze({
     limitations:
       'Database records are absent by default; a supplied unreachable URL errors instead of falling back to file-only output.',
   },
+  'workflow-step-inventory': {
+    purpose: 'Extract exact workflow step review facts without execution or persistence.',
+    supported_stacks:
+      'Contained regular .github/workflows/*.yml and *.yaml; the actual finite adopter execution-selection and import-closure grammar.',
+    prerequisites: [
+      'readable contained workflow population',
+      'provable adopter executable/import closure; verified bound covers for computed imports',
+    ],
+    tools: [],
+    inputs: ['--repo-root <path>'],
+    defaults: [
+      'repo root .',
+      'no caller-injected reviews',
+      'no workflow execution or policy writes',
+    ],
+    output:
+      '{schemaVersion, status, reason, workflows} with raw workflow SHA-256, canonical step SHA-256, exact full-path job/index occurrences and complete path-sorted file/SHA closure',
+    status:
+      'pass only for a nonempty complete workflow population; unknown member status is review',
+    limitations:
+      'Absent workflows report WORKFLOW_INVENTORY_EMPTY; incomplete YAML, selection, binding or import closure reports unknown with explicit reasons and null incomplete closure files. Complete extraction grants no effect, review, execution authority or readiness. Existing all excludes this opt-in member.',
+  },
   'test-inventory': {
     purpose: 'Discover TypeScript tests, classify suites, and extract invariant markers.',
     supported_stacks: `${code('*.test.ts')} and ${code('*.spec.ts')} with unit/api/int/e2e/sec/perf/journey/db filename conventions.`,
@@ -600,7 +622,10 @@ function renderInventorySlices(policy) {
         accepted_inputs: list(inputs),
         defaults: defaults.join('; '),
         output_contract: `Action envelope containing {slice, members, status, results, implicit_persistence:false}; member bodies: ${contracts.map((contract, index) => `${code(ids[index])} ${contract.output}`).join('; ')}.`,
-        verdict_semantics: `Only ${code('pass')} and ${code('review')} are emitted in a successful payload; process exit is pass or review respectively. Member rules: ${contracts.map((contract) => contract.status).join('; ')}. Exceptions exit fail.`,
+        verdict_semantics:
+          slice.name === 'workflows'
+            ? `The enclosing member and aggregate statuses are ${code('pass')} or ${code('review')}; nested review facts use ${code('complete')} or ${code('unknown')}. Unknown facts make the member review. Exceptions exit fail.`
+            : `Only ${code('pass')} and ${code('review')} are emitted in a successful payload; process exit is pass or review respectively. Member rules: ${contracts.map((contract) => contract.status).join('; ')}. Exceptions exit fail.`,
         declared_effect:
           'Not applicable to the vocabulary value; the enclosing canonical inventory action is read-only.',
         consent_flags:
@@ -608,7 +633,10 @@ function renderInventorySlices(policy) {
         cost_class: code('moderate'),
         when_to_use: `Use for the exact deterministic ${code(slice.name)} repository projection.`,
         when_not_to_use: contracts.map((contract) => contract.limitations).join(' '),
-        failure_unknown_review_skipped_na_semantics: `${code('review')} is explicit and exits non-pass; implementation exceptions are ${code('fail')}. ${code('unknown')}, ${code('skipped')}, and ${code('N/A')} are not emitted by the current inventory payload.`,
+        failure_unknown_review_skipped_na_semantics:
+          slice.name === 'workflows'
+            ? `${code('unknown')} is explicit within review facts and produces enclosing ${code('review')}/exit 1; structural refusal or execution errors exit 2. No skipped or N/A result is invented.`
+            : `${code('review')} is explicit and exits non-pass; implementation exceptions are ${code('fail')}. ${code('unknown')}, ${code('skipped')}, and ${code('N/A')} are not emitted by the current inventory payload.`,
         example: code(
           `devai sense inventory --slice ${slice.name} --repo-root .${extra} --format json`,
         ),

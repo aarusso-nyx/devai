@@ -20,7 +20,7 @@ printf '%s\n' '@aarusso-nyx:registry=https://npm.pkg.github.com' \
 Do not commit the token or replace `${NODE_AUTH_TOKEN}` with its value.
 
 ```bash
-pnpm add --save-dev --save-exact @aarusso-nyx/devai@2.4.0
+pnpm add --save-dev --save-exact @aarusso-nyx/devai@2.5.0
 pnpm exec devai catalog actions --format json
 ```
 
@@ -363,7 +363,8 @@ pnpm exec devai init bind --target . --host-adapter github-actions --as-role arc
 pnpm exec devai init bind --target . --host-adapter post-merge --as-role architect --write
 ```
 
-This order holds in every checkout, for three reasons:
+Use this order when the checkout deliberately selects the local post-merge adapter,
+for three reasons:
 
 - Each host-adapter bind selects its adapter as the host-policy identity
   (`authority_enforcement.adapter_config` in `.devai/config/project.json`) and re-materializes
@@ -416,7 +417,7 @@ scripts to build (#390).
   declaration is present and canonical, and `init upgrade` restores the declaration of a binding
   whose post-merge adapter is still the selected identity.
 
-Do not bind GitHub Actions last to make it the selected identity. That bind re-materializes the
+When selecting the local post-merge identity, do not bind GitHub Actions last. That bind re-materializes the
 authority policy after the post-merge attestation pinned it, so the post-merge adapter's merge
 receipts are refused as `HOST_RECEIPT_STALE`, and `doctor` warns
 `POST_MERGE_ADAPTER_BINDING_STALE` in the bound checkout; rebinding the post-merge adapter
@@ -424,6 +425,43 @@ restores the order above. After a DEVAI upgrade, rebind both adapters in the sam
 GitHub Actions configuration or this checkout's post-merge attestation binds an older package,
 `doctor` warns `GITHUB_ACTIONS_ADAPTER_VERSION_LAG` or `POST_MERGE_ADAPTER_VERSION_LAG` and names
 the command.
+
+### Shared hooks with a GitHub primary (2.6 candidate)
+
+A GitHub-primary checkout may retain a tracked/shared post-merge hook without a
+valid local receipt binding. The 2.6 generated hook first validates the project's
+identity/authority-selection projection (`schemaVersion`, supported `project_type`
+and closed `authority_enforcement`). This is dispatch validation, not full project
+or host-adapter verification. A valid GitHub Actions selection or recognized
+non-host-integrated mode reports `NOT_SELECTED` and exits before invoking the
+local issuer or round CLI or accessing its key/receipt state. Missing, malformed,
+unknown or inconsistent selection fails. When post-merge is selected, missing
+helpers and every existing HMAC, checkout, current-policy and receipt check still
+fail closed.
+
+Refresh older installed hook bytes through the supported operation:
+
+```sh
+devai init apply architect --target . --only hooks --hook post-merge --as-role architect --write --format json
+```
+
+The closed `--only hooks` scope omits all unrelated bootstrap entries and writes.
+It is mutually exclusive with `--include` and rejects `--force` and `--command`.
+Only the existing hook/declaration and checkout-local helper/key/attestation
+operation is planned, preflighted and rollback-protected. Project selection,
+authority policy, source adopter policy, receipts and missing scaffold remain
+untouched. `--include hooks` keeps its original additive initialization meaning
+and may create unrelated missing scaffold; use the scoped form above for this
+repair. The action still requires Architect identity and explicit write consent.
+The scoped hook operation may materialize/reseal local state against current
+policy bytes; it does not select another adapter.
+Local state beside a GitHub primary does not establish local enforcement, and
+a `NOT_SELECTED` outcome is not an audit PASS or receipt. GitHub observation
+continues through its separately verified workflow. No receipt is fabricated,
+no old receipt is consumed and no unrelated round is closed. Do not hand-edit
+hooks or seals. To select local receipt processing intentionally, use the
+registered post-merge bind and keep its attestation bound to the final policy.
+See [ADR-AUT-0007](../../law/adr/ADR-AUT-0007-selected-post-merge-hook.md).
 
 Releases before 2.1.0 committed the checkout-bound attestation itself as
 `.devai/config/post-merge-host-adapter.json`. `doctor` reports such a file as
