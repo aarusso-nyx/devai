@@ -455,7 +455,32 @@ describe('data and coverage inventory sensors', () => {
         .find((table) => table.name === 'users')
         ?.columns.find((column) => column.name === 'password_hash')?.pii_class,
     ).toBe('credentials');
-    expect(rbac.reading.status).toBe('pass');
+    expect(rbac.reading.status).toBe('review');
+    const unresolvedEndpoints =
+      api.body?.endpoints.filter((endpoint) =>
+        ['create', 'patch'].includes(endpoint.controller?.methodName ?? ''),
+      ) ?? [];
+    expect(unresolvedEndpoints.map((endpoint) => [endpoint.method, endpoint.path]).sort()).toEqual([
+      ['PATCH', '/users/:id'],
+      ['POST', '/users'],
+    ]);
+    for (const endpoint of unresolvedEndpoints)
+      expect(endpoint.auth).toMatchObject({
+        required: true,
+        guards: ['SessionGuard'],
+      });
+    expect(rbac.reading.findings).toEqual(
+      unresolvedEndpoints.map((endpoint) => ({
+        severity: 'info',
+        code: 'RBAC_AUTHORIZATION_UNRESOLVED',
+        message: `Endpoint ${endpoint.id} declares authentication guards without a resolved static role/permission declaration. Guard identity does not prove conditional authorization semantics.`,
+      })),
+    );
+    expect(
+      api.body?.endpoints
+        .filter((endpoint) => endpoint.auth?.required === false)
+        .map((endpoint) => endpoint.path),
+    ).toEqual(['/users/health']);
     const rbacBody = rbac.body as {
       rbacIlfTables: string[];
       bindings: { endpointBindings: Array<{ permissionId: string }> };

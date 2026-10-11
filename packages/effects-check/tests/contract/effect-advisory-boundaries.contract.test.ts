@@ -16,16 +16,89 @@ const lookalikes = [
   'packages/cli/src/authority/index-copy.ts',
   'packages/cli/src/release-host-bootstrap-copy.ts',
 ];
+const nativeSources: Readonly<Record<string, string>> = {
+  'packages/cli/src/native-input-provenance.ts': [
+    'export function forward(write: any, end: any, stdin: any, args: any, other: any) {',
+    'Reflect.apply(write, stdin, args);',
+    'Reflect.apply(end, stdin, args);',
+    'Reflect.apply(other, stdin, args);',
+    'Reflect.apply(write, other, args);',
+    'Reflect.apply(write, stdin);',
+    'Reflect.apply(write, stdin, args, other);',
+    'eval(other);',
+    '}',
+  ].join('\n'),
+  'packages/cli/src/native-playwright-loader.ts': [
+    'export async function load(data: any, target: any) {',
+    'await import(data.preloadUrl);',
+    'await import(data.originalUrl);',
+    'await import(data.unrelatedUrl);',
+    'await import(target);',
+    'await import(data.preloadUrl, {});',
+    'eval(target);',
+    '}',
+  ].join('\n'),
+  'packages/cli/src/native-input-provenance-copy.ts': 'Reflect.apply(write, stdin, args);',
+  'packages/cli/src/native-playwright-loader-copy.ts': 'import(data.preloadUrl);',
+};
+const reflectPattern = 'Reflect.apply with a non-literal target';
+const importPattern = 'non-literal dynamic import';
+const nativeAllowed = [
+  [
+    'packages/cli/src/native-input-provenance.ts',
+    2,
+    reflectPattern,
+    /captured bound stdin write\/end receiver.*finite esbuild/u,
+  ],
+  [
+    'packages/cli/src/native-input-provenance.ts',
+    3,
+    reflectPattern,
+    /captured bound stdin write\/end receiver.*finite esbuild/u,
+  ],
+  [
+    'packages/cli/src/native-playwright-loader.ts',
+    2,
+    importPattern,
+    /exact pinned preload and original loader URLs.*seal/u,
+  ],
+  [
+    'packages/cli/src/native-playwright-loader.ts',
+    3,
+    importPattern,
+    /exact pinned preload and original loader URLs.*seal/u,
+  ],
+] as const;
+const nativeRefused = [
+  ['packages/cli/src/native-input-provenance.ts', 4, reflectPattern],
+  ['packages/cli/src/native-input-provenance.ts', 5, reflectPattern],
+  ['packages/cli/src/native-input-provenance.ts', 6, reflectPattern],
+  ['packages/cli/src/native-input-provenance.ts', 7, reflectPattern],
+  ['packages/cli/src/native-input-provenance.ts', 8, 'eval'],
+  ['packages/cli/src/native-playwright-loader.ts', 4, importPattern],
+  ['packages/cli/src/native-playwright-loader.ts', 5, importPattern],
+  ['packages/cli/src/native-playwright-loader.ts', 6, importPattern],
+  ['packages/cli/src/native-playwright-loader.ts', 7, 'eval'],
+  ['packages/cli/src/native-input-provenance-copy.ts', 1, reflectPattern],
+  ['packages/cli/src/native-playwright-loader-copy.ts', 1, importPattern],
+] as const;
 let root: string | undefined;
 let report: EffectReport;
 
 beforeAll(async () => {
   root = mkdtempSync(join(tmpdir(), 'devai-advisory-boundaries-'));
-  const files = [...boundaries.map(([path]) => path), ...lookalikes].reverse();
+  const files = [
+    ...boundaries.map(([path]) => path),
+    ...lookalikes,
+    ...Object.keys(nativeSources),
+  ].reverse();
   for (const path of files) {
     const absolute = join(root, path);
     mkdirSync(dirname(absolute), { recursive: true });
-    writeFileSync(absolute, 'export const load = (target: string) => import(target);\n');
+    writeFileSync(
+      absolute,
+      nativeSources[path] ?? 'export const load = (target: string) => import(target);\n',
+    );
   }
   const tsconfigPath = join(root, 'tsconfig.json');
   writeFileSync(
@@ -62,9 +135,37 @@ it.each(lookalikes)('does not extend an audited exception to %s', (path) => {
   );
 });
 
+it.each(nativeAllowed)(
+  'disposes only the pinned native boundary %s:%s',
+  (path, line, pattern, rationale) => {
+    const edge = `${path}:${line}:${pattern}`;
+    expect(
+      report.advisory_patterns.dispositions.find((item) => item.edge === edge)?.reason,
+    ).toMatch(rationale);
+    expect(report.findings.some((finding) => finding.message.includes(`${path}:${line}:`))).toBe(
+      false,
+    );
+  },
+);
+
+it.each(nativeRefused)(
+  'retains a finding for an unaudited native operation %s:%s',
+  (path, line, pattern) => {
+    const edge = `${path}:${line}:${pattern}`;
+    expect(report.findings).toContainEqual({
+      code: 'EFFECT_UNANALYZABLE_PATTERN',
+      message: `${pattern} at ${edge} is outside the audited advisory allowlist.`,
+    });
+    expect(report.advisory_patterns.dispositions.some((item) => item.edge === edge)).toBe(false);
+  },
+);
+
 it('keeps every disposition in deterministic source-edge order without hiding violations', () => {
-  expect(report.advisory_patterns.violations).toBe(lookalikes.length);
+  expect(report.advisory_patterns.violations).toBe(lookalikes.length + nativeRefused.length);
   expect(report.advisory_patterns.dispositions.map((item) => item.edge)).toEqual(
-    boundaries.map(([path]) => `${path}:1:non-literal dynamic import`).sort(),
+    [
+      ...boundaries.map(([path]) => `${path}:1:non-literal dynamic import`),
+      ...nativeAllowed.map(([path, line, pattern]) => `${path}:${line}:${pattern}`),
+    ].sort(),
   );
 });

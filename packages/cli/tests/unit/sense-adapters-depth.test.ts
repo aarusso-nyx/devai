@@ -34,6 +34,15 @@ const runtime = vi.hoisted(() => ({
   validateInvariants: vi.fn(),
 }));
 
+const declaredProducers = vi.hoisted(() => ({
+  senseDeclaredHarnessInvariantAlignment: vi.fn((input: unknown) => ({
+    marker: 'senseDeclaredHarnessInvariantAlignment',
+    input,
+    reading: { marker: 'senseDeclaredHarnessInvariantAlignment' },
+  })),
+}));
+vi.mock('../../src/commands/sense/declared-invariant-producers.js', () => declaredProducers);
+
 const schemas = vi.hoisted(() => ({ runtimeCharter: vi.fn() }));
 const local = vi.hoisted(() => ({ regenerateInventoryReadings: vi.fn() }));
 
@@ -351,7 +360,7 @@ describe('sense adapter deterministic boundaries', () => {
       // producers of #235 are always declared.
       [
         'harness_invariant_alignment',
-        'senseHarnessInvariantAlignment',
+        'senseDeclaredHarnessInvariantAlignment',
         {
           repoRoot: '/repo',
           observations: [],
@@ -381,7 +390,10 @@ describe('sense adapter deterministic boundaries', () => {
     ] as const;
 
     for (const [kind, delegateName, expectedInput, returnsReading] of cases) {
-      const delegate = simpleSensors[delegateName];
+      const delegate =
+        delegateName === 'senseDeclaredHarnessInvariantAlignment'
+          ? declaredProducers.senseDeclaredHarnessInvariantAlignment
+          : simpleSensors[delegateName];
       if (delegate === undefined) throw new Error(`missing test delegate: ${delegateName}`);
       const inputs = declaredInputs[kind];
       const result = await sensorAdapter(kind)({
@@ -395,6 +407,7 @@ describe('sense adapter deterministic boundaries', () => {
           : { marker: delegateName, input: expectedInput, reading: { marker: delegateName } },
       );
     }
+    expect(simpleSensors['senseHarnessInvariantAlignment']).not.toHaveBeenCalled();
   });
 
   it('keeps every inventory sweep member read-only whatever bodies are present (#382)', async () => {

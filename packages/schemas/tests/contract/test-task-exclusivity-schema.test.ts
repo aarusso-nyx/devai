@@ -20,10 +20,12 @@ const validateExclusivity = getValidator('test-task-exclusivity.schema.json');
 const admitsExclusivity = (value: unknown): boolean => validateExclusivity(value) === true;
 const declaring = (nodes: Record<string, unknown>) => ({ schemaVersion: '1.0.0', nodes });
 
-// The descriptor schema is source-only (not in the runtime roster), so it is compiled from law.
+// Compile the canonical descriptor and its complete reference closure directly from law.
 const ajv = new Ajv2020({ strict: false, allErrors: true });
 addFormats(ajv);
 ajv.addSchema(readJson('law/schemas/preflight-probe.schema.json'));
+ajv.addSchema(readJson('law/schemas/reviewed-workflow-steps.schema.json'));
+ajv.addSchema(readJson('law/schemas/test-result-population.schema.json'));
 const validateDescriptor = ajv.compile(readJson('law/schemas/test-task-descriptor.schema.json'));
 const admitsDescriptor = (value: unknown): boolean => validateDescriptor(value) === true;
 
