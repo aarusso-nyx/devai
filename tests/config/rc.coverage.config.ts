@@ -49,6 +49,7 @@ export default defineConfig({
     // a genuine hang still surfaces far inside the 30-minute certification task limit. Only this
     // lane changes; the local and other RC lanes keep their defaults.
     testTimeout: 60_000,
+    hookTimeout: 60_000,
     include: [...LOCAL_INCLUDE, 'tests/e2e/**/*.test.ts', 'tests/regression/**/*.test.ts'],
     exclude: [
       '**/node_modules/**',
@@ -56,10 +57,12 @@ export default defineConfig({
       'tests/regression/xref-resolver-performance.regression.test.ts',
     ],
     passWithNoTests: false,
-    // Coverage instruments child processes too, so it uses the local suite's bounded worker
-    // count (half the cores, at least two). Two workers no longer finish the RC suite inside
-    // the trusted runner's fixed 15-minute node limit; four finish it in about 12 minutes.
-    maxWorkers: MAX_TEST_WORKERS,
+    // A full 2.6 RC took 20.4 minutes on an eight-core, 16 GB host with 9.54 GB of swap;
+    // unrelated late TypeScript scans slowed 6-10x during shared-host memory pressure.
+    // Cap this lane at three workers to bound concurrent compiler and subprocess pressure.
+    // The fresh full RC validates this resource choice against the unchanged 30-minute
+    // task guard, complete test population, and coverage thresholds.
+    maxWorkers: Math.min(MAX_TEST_WORKERS, 3),
     coverage: {
       provider: 'custom',
       customProviderModule: resolve('tests/config/subprocess-v8-coverage-provider.ts'),
