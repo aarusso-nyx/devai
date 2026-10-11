@@ -4,6 +4,8 @@ import { validators } from '@devai-nyx/schemas';
 import type { DeclaredSurfaces } from './declared-surfaces.js';
 import { DIRECT_BODY_DIRECTORY, REGENERATED_BODY_DIRECTORY } from './inventory-body-inputs.js';
 import type { SensorReading } from './sensor-reading.js';
+import type { EndpointIdentityInput } from './inventory-endpoint-identity.js';
+export { endpointId } from './inventory-endpoint-identity.js';
 
 /**
  * Inventory sensor: coverage matrix (REDOX-CoverageMatrix, Phase 17.C4).
@@ -36,11 +38,7 @@ import type { SensorReading } from './sensor-reading.js';
  * Per Constitution Article 17 (sensor adapter uniformity); per D-57.
  */
 
-interface ApiMapEndpointShape {
-  readonly id?: string;
-  readonly method: string;
-  readonly path: string;
-}
+type ApiMapEndpointShape = EndpointIdentityInput;
 
 export interface RoutesInventoryShape {
   readonly framework: string;
@@ -121,10 +119,6 @@ export interface InventoryCoverageResult {
   readonly reading: SensorReading;
   readonly body: unknown;
   readonly bodyPath: string | null;
-}
-
-export function endpointId(e: ApiMapEndpointShape): string {
-  return e.id ?? `${e.method} ${e.path}`;
 }
 
 /**
@@ -266,6 +260,7 @@ export function synthesizeLinks(
   cases: readonly UseCasesCase[],
   validRouteIds: ReadonlySet<string>,
   validEndpointIds: ReadonlySet<string>,
+  resolveEndpointReference?: (reference: string) => string | undefined,
 ): readonly SynthesizedLink[] {
   const seen = new Set<string>();
   const out: SynthesizedLink[] = [];
@@ -280,7 +275,15 @@ export function synthesizeLinks(
       const rawRouteIds = step.refs?.routeIds ?? [];
       const rawEndpointIds = step.refs?.endpointIds ?? [];
       const routeIds = rawRouteIds.filter((id) => validRouteIds.has(id));
-      const endpointIds = rawEndpointIds.filter((id) => validEndpointIds.has(id));
+      const endpointIds = [
+        ...new Set(
+          rawEndpointIds
+            .map((id) =>
+              resolveEndpointReference === undefined ? id : resolveEndpointReference(id),
+            )
+            .filter((id): id is string => id !== undefined && validEndpointIds.has(id)),
+        ),
+      ];
       if (routeIds.length > 0 && endpointIds.length > 0) {
         for (const routeId of routeIds) {
           for (const endpointId of endpointIds) {

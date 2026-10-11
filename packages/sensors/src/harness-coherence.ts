@@ -366,7 +366,13 @@ export function senseHarnessCoherence(opts: HarnessCoherenceOptions): SensorRead
     const serialize = requiresSerialization(workflow.relativeFile, workflow.file);
     const effects = workflow.jobs.map((job) => ({
       ...job,
-      ...jobEffectFacts(readFileSync(workflow.file, 'utf8'), opts.repoRoot, job.name),
+      ...jobEffectFacts(
+        readFileSync(workflow.file, 'utf8'),
+        opts.repoRoot,
+        job.name,
+        new Set(),
+        workflow.file,
+      ),
     }));
     // The concurrency policy over one reading of the jobs' effects.
     const holds = (jobs: readonly (typeof effects)[number][]): boolean => {

@@ -7,6 +7,7 @@ import {
   type SensorStatus,
 } from './sensor-reading.js';
 
+import { loadCandidateAuditProjection } from './audit-projection.js';
 import { loadWorkflows } from './harness/workflow-parser.js';
 import {
   loadRunSteps,
@@ -14,6 +15,7 @@ import {
   hasExecutableProducer,
   devaiArguments,
   sameArguments,
+  hasExecutableTask,
 } from './harness-invariant-alignment-workflow.js';
 import {
   safeStat,
@@ -59,6 +61,17 @@ export interface ScopedProducer {
   readonly invariant_id: string;
   readonly action: string;
   readonly arguments: readonly string[];
+}
+
+/** Framework-resolved current task and chain-bound complete result standing. */
+export interface DeclaredInvariantProducerStanding {
+  readonly invariant_id: string;
+  readonly subject: string;
+  readonly taskId: string;
+  readonly population: string;
+  readonly argv: readonly string[];
+  readonly cwd: string;
+  readonly passed: boolean;
 }
 
 export interface HarnessInvariantAlignmentOptions {
@@ -119,10 +132,25 @@ function loadInvariants(dir: string): InvariantRecord[] {
   return out;
 }
 
-export function senseHarnessInvariantAlignment(
+export interface HarnessInvariantAlignmentFacts {
+  readonly status: SensorStatus;
+  readonly findings: SensorFinding[];
+  readonly metrics: Record<string, number | string | boolean>;
+}
+
+/** Fact computation only; registered callers must independently verify producer standing. */
+export function computeHarnessInvariantAlignment(
   opts: HarnessInvariantAlignmentOptions,
-): SensorReading {
+  declaredProducerStanding: readonly DeclaredInvariantProducerStanding[] = [],
+): HarnessInvariantAlignmentFacts {
   const gateSeverity = opts.gateSeverityValue ?? 'gate';
+  const producerDocument = loadCandidateAuditProjection(opts.repoRoot, 'invariant_producers');
+  const declaredBindings = (producerDocument?.['bindings'] ?? []) as {
+    invariant_id: string;
+    subject: string;
+    taskId: string;
+    population: string;
+  }[];
   const invariants = loadInvariants(
     abs(opts.repoRoot, opts.invariantsDir ?? DEFAULT_INVARIANTS_DIR),
   );
@@ -152,14 +180,8 @@ export function senseHarnessInvariantAlignment(
 
   const gates = invariants.filter((i) => i.severity === gateSeverity);
   if (gates.length === 0) {
-    return buildSensorReading({
-      sensorName: 'harness-invariant-alignment',
-      sensorKind: 'harness_invariant_alignment',
-      command: ['devai', 'sense-harness-invariant-alignment'],
+    return {
       status: 'review',
-      deterministic: true,
-      tier: 'L0',
-      ...(opts.now !== undefined && { timestamp: opts.now }),
       findings: [
         {
           severity: 'info',
@@ -168,7 +190,7 @@ export function senseHarnessInvariantAlignment(
         },
       ],
       metrics: { gate_invariants: 0, misaligned: 0 },
-    });
+    };
   }
 
   const findings: SensorFinding[] = [];
@@ -205,6 +227,33 @@ export function senseHarnessInvariantAlignment(
         maxAgeMs,
       );
     };
+    const declared = declaredBindings.filter((binding) => binding.invariant_id === id);
+    if (declared.length > 0) {
+      const obligations = declared.every((binding) => {
+        const standing = declaredProducerStanding.filter(
+          (row) =>
+            row.invariant_id === id &&
+            row.subject === binding.subject &&
+            row.taskId === binding.taskId &&
+            row.population === binding.population,
+        );
+        return (
+          standing?.length === 1 &&
+          standing[0]?.passed === true &&
+          hasExecutableTask(runSteps, standing[0].argv, standing[0].cwd)
+        );
+      });
+      const allMode = inv.measurable_via_mode !== 'all' || candidates.every(matched);
+      if (!obligations || !allMode) {
+        misaligned += 1;
+        findings.push({
+          severity: 'warning',
+          code: 'HARNESS_INVARIANT_ALIGNMENT_DECLARED_PRODUCER_UNMEASURED',
+          message: `Gate invariant ${id} requires every exact declared subject/task/result population and fail-closed CI invocation; all-mode action obligations also remain required.`,
+        });
+      }
+      continue;
+    }
     const scoped = (opts.scopedProducers ?? []).filter((producer) => producer.invariant_id === id);
     if (scoped.length > 0) {
       const producerAligned = (producer: ScopedProducer): boolean =>
@@ -259,14 +308,8 @@ export function senseHarnessInvariantAlignment(
   else if (misaligned <= 2) status = 'review';
   else status = 'fail';
 
-  return buildSensorReading({
-    sensorName: 'harness-invariant-alignment',
-    sensorKind: 'harness_invariant_alignment',
-    command: ['devai', 'sense-harness-invariant-alignment'],
+  return {
     status,
-    deterministic: true,
-    tier: 'L0',
-    ...(opts.now !== undefined && { timestamp: opts.now }),
     findings,
     metrics: {
       gate_invariants: gates.length,
@@ -276,5 +319,21 @@ export function senseHarnessInvariantAlignment(
       evidence_records: evidenceCount,
       candidate_head_resolved: resolvedCandidateHead !== undefined,
     },
+  };
+}
+
+/** Public sensor data cannot supply producer success or execution authority. */
+export function senseHarnessInvariantAlignment(
+  opts: HarnessInvariantAlignmentOptions,
+): SensorReading {
+  const facts = computeHarnessInvariantAlignment(opts);
+  return buildSensorReading({
+    sensorName: 'harness-invariant-alignment',
+    sensorKind: 'harness_invariant_alignment',
+    command: ['devai', 'sense-harness-invariant-alignment'],
+    deterministic: true,
+    tier: 'L0',
+    ...(opts.now === undefined ? {} : { timestamp: opts.now }),
+    ...facts,
   });
 }

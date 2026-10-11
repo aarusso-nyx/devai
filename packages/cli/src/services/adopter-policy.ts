@@ -34,6 +34,8 @@ export interface AdopterPolicyMaterializationSources {
       | 'scorecard-na.json'
       | 'glob-guards.json'
       | 'sensor-inputs.json'
+      | 'invariant-producers.json'
+      | 'reviewed-workflow-steps.json'
       | 'release-verification.json',
   ) => string;
 }
@@ -46,6 +48,8 @@ export const ADOPTER_POLICY_TARGETS = [
   '.devai/config/glob-guards.json',
   '.devai/config/release-verification.json',
   '.devai/config/sensor-inputs.json',
+  '.devai/config/invariant-producers.json',
+  '.devai/config/reviewed-workflow-steps.json',
 ] as const;
 
 export function isJsonObject(value: unknown): value is JsonObject {
@@ -260,5 +264,71 @@ export function resolveAdopterPolicyProjection(
     }
     resolved.set('.devai/config/sensor-inputs.json', bytes);
   }
+  for (const [key, file, schema] of [
+    ['invariant_producers', 'invariant-producers.json', 'invariant-producers.schema.json'],
+    [
+      'reviewed_workflow_steps',
+      'reviewed-workflow-steps.json',
+      'reviewed-workflow-steps.schema.json',
+    ],
+  ] as const) {
+    const target = `.devai/config/${file}` as AdopterPolicyTarget;
+    if (document[key] === undefined && input.ownedTargets?.includes(target) !== true) continue;
+    const bytes = document[key] === undefined ? readPolicy(file) : jsonBytes(document[key]);
+    const value = JSON.parse(bytes) as JsonObject;
+    const validate = validator(schema);
+    if (!validate(value))
+      throw new Error(
+        `ADOPTER_POLICY_${key.toUpperCase()}_INVALID:${JSON.stringify(validate.errors)}`,
+      );
+    validateAuditProjection(key, value);
+    resolved.set(target, bytes);
+  }
   return { files: resolved, retired_keys: retiredKeys };
+}
+
+/** Intrinsic ambiguity refuses before any binding target is staged. */
+function validateAuditProjection(
+  key: 'invariant_producers' | 'reviewed_workflow_steps',
+  value: JsonObject,
+): void {
+  const identities = new Set<string>();
+  const refuse = (detail: string): never => {
+    throw new Error(`ADOPTER_POLICY_${key.toUpperCase()}_INVALID:${detail}`);
+  };
+  if (key === 'invariant_producers') {
+    for (const row of value['bindings'] as JsonObject[]) {
+      const identity = canonicalJson([row['invariant_id'], row['subject']]);
+      if (identities.has(identity)) refuse('duplicate invariant/subject obligation');
+      identities.add(identity);
+    }
+  } else {
+    for (const row of value['steps'] as JsonObject[]) {
+      for (const occurrence of String(row['workflow']).split(', ')) {
+        if (
+          !/^\.github\/workflows\/[^#]+#[^[\],]+\[\d+\]$/u.test(occurrence) ||
+          identities.has(occurrence)
+        )
+          refuse('invalid or duplicate workflow occurrence');
+        identities.add(occurrence);
+      }
+      const paths = (row['files'] as JsonObject[]).map((entry) => String(entry['path']));
+      if (
+        new Set(paths).size !== paths.length ||
+        paths.some((path) => path !== path.normalize('NFC'))
+      )
+        refuse('duplicate or noncanonical closure path');
+      const covers = new Set<string>();
+      for (const cover of (row['computed_imports'] ?? []) as JsonObject[]) {
+        const from = String(cover['from']);
+        if (
+          covers.has(from) ||
+          !paths.includes(from) ||
+          !(cover['files'] as string[]).every((path) => paths.includes(path))
+        )
+          refuse('invalid computed import closure');
+        covers.add(from);
+      }
+    }
+  }
 }

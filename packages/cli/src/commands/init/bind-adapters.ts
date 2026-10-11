@@ -425,17 +425,22 @@ export function planAdopterPolicyBind(
   const priorReceipt = readTextIfPresent(join(targetRoot, ADOPTER_POLICY_RECEIPT));
   if (priorReceipt !== null) {
     const parsed = parseAdopterPolicyBinding(priorReceipt);
-    const sensorTarget = '.devai/config/sensor-inputs.json';
-    if ('binding' in parsed && parsed.binding.materialized[sensorTarget] !== undefined) {
-      const priorBytes = readTextIfPresent(join(targetRoot, sensorTarget));
-      if (
-        parsed.binding.policy_id !== document['policy_id'] ||
-        priorBytes === null ||
-        sha256Bytes(priorBytes) !== parsed.binding.materialized[sensorTarget]
-      ) {
-        throw new Error('ADOPTER_POLICY_SENSOR_INPUTS_OWNERSHIP_MISMATCH');
+    for (const [target, code] of [
+      ['.devai/config/sensor-inputs.json', 'SENSOR_INPUTS'],
+      ['.devai/config/invariant-producers.json', 'INVARIANT_PRODUCERS'],
+      ['.devai/config/reviewed-workflow-steps.json', 'REVIEWED_WORKFLOW_STEPS'],
+    ] as const) {
+      if ('binding' in parsed && parsed.binding.materialized[target] !== undefined) {
+        const priorBytes = readTextIfPresent(join(targetRoot, target));
+        if (
+          parsed.binding.policy_id !== document['policy_id'] ||
+          priorBytes === null ||
+          sha256Bytes(priorBytes) !== parsed.binding.materialized[target]
+        ) {
+          throw new Error(`ADOPTER_POLICY_${code}_OWNERSHIP_MISMATCH`);
+        }
+        ownedTargets.push(target);
       }
-      ownedTargets.push(sensorTarget);
     }
   }
   const projectionInput = {

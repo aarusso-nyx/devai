@@ -19,6 +19,8 @@ const _CANONICAL_POLICY_FILES = [
   ...ADOPTER_LAW_POLICY_FILES,
   'subprocess-effects.json',
   'sensor-inputs.json',
+  'invariant-producers.json',
+  'reviewed-workflow-steps.json',
   'release-verification.json',
 ] as const;
 

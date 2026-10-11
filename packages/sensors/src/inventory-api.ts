@@ -4,6 +4,7 @@ import { mkdirSync, writeFileSync } from '@devai-nyx/authority';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import ts from 'typescript';
 import { validators } from '@devai-nyx/schemas';
+import { qualifiedEndpointId } from './inventory-endpoint-identity.js';
 import {
   allBoundSurfacesAbsent,
   applySurfaceDeclaration,
@@ -136,6 +137,7 @@ export interface ApiMapAuth {
 }
 
 export interface ApiMapEndpoint {
+  readonly id?: string;
   readonly method: string;
   readonly path: string;
   readonly controller: {
@@ -260,7 +262,14 @@ function extractEndpointsFromFile(
 
       const roles: string[] = [];
       const rolesDec = findDecoratorByName(memberDecorators, 'Roles');
-      if (rolesDec !== undefined) roles.push(...decoratorArgIdentifiers(rolesDec));
+      if (
+        rolesDec !== undefined &&
+        ts.isCallExpression(rolesDec.expression) &&
+        rolesDec.expression.arguments.every(
+          (argument) => ts.isIdentifier(argument) || ts.isStringLiteral(argument),
+        )
+      )
+        roles.push(...decoratorArgIdentifiers(rolesDec));
 
       // Phase 22.B (D-A-12): method-level public-marker decorator
       // wins over class-level guards. The `Public()` (or pack-
@@ -283,7 +292,13 @@ function extractEndpointsFromFile(
       if (roles.length > 0) (auth as { roles: string[] }).roles = roles;
       if (isPublic) {
         (auth as { required: boolean }).required = false;
-      } else if (guards.length > 0 || roles.length > 0) {
+      } else if (
+        guards.length > 0 ||
+        roles.length > 0 ||
+        useGuardsDec !== undefined ||
+        classUseGuardsDec !== undefined ||
+        rolesDec !== undefined
+      ) {
         (auth as { required: boolean }).required = true;
       }
 
@@ -356,10 +371,10 @@ function measureInventoryApi(opts: InventoryApiOptions): InventoryApiResult {
     const seen = new Set<string>();
     const deduped: ApiMapEndpoint[] = [];
     for (const e of endpoints) {
-      const key = JSON.stringify([e.method, e.path, e.controller, e.evidence]);
+      const key = qualifiedEndpointId(e);
       if (seen.has(key)) continue;
       seen.add(key);
-      deduped.push(e);
+      deduped.push({ ...e, id: key });
     }
     endpoints = sortEndpoints(deduped);
   } catch (err) {

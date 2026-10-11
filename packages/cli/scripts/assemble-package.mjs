@@ -28,6 +28,12 @@ const temporaryRoot = mkdtempSync(join(tmpdir(), 'devai-cli-assembly-'));
 const bundlePath = join(temporaryRoot, 'release-host.js');
 const bootstrapPath = join(temporaryRoot, 'release-host-bootstrap.js');
 const executablePath = join(temporaryRoot, 'bin.js');
+const nativeReporters = [
+  'native-test-reporter.js',
+  'native-playwright-reporter.js',
+  'native-playwright-loader.js',
+  'native-input-provenance.js',
+];
 const declarationsRoot = join(temporaryRoot, 'types/cli');
 const scaffoldModule = join(repositoryRoot, 'packages/skills/dist/operations/scaffold/index.js');
 const verifierSourceRoot = join(packageRoot, 'vendor/evidence-verification');
@@ -356,6 +362,8 @@ const __dirname = __devaiDirname(__filename);`,
   );
   await bundle.close();
 
+  for (const name of nativeReporters) copyFileSync(join(distRoot, name), join(temporaryRoot, name));
+
   rmSync(distRoot, { recursive: true, force: true });
   const runtimeRoot = join(distRoot, 'runtime');
   const runtimeIndex = join(runtimeRoot, 'index');
@@ -363,6 +371,8 @@ const __dirname = __devaiDirname(__filename);`,
   cpSync(bundlePath, join(runtimeIndex, 'release-host.js'));
   cpSync(bootstrapPath, join(runtimeIndex, 'release-host-bootstrap.js'));
   cpSync(executablePath, join(runtimeIndex, 'bin.js'));
+  for (const name of nativeReporters)
+    copyFileSync(join(temporaryRoot, name), join(runtimeIndex, name));
   mkdirSync(join(runtimeRoot, 'host'), { recursive: true });
   copyFileSync(
     join(packageRoot, 'scripts/release-host/provision-package.mjs'),

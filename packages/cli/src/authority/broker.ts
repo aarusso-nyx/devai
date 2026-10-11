@@ -49,7 +49,10 @@ import {
 } from './policy.js';
 import { expectSuccess, flagValue, isRecord, type JsonRecord } from './broker-values.js';
 import { resolvedSensorMember } from './sensor-member.js';
-import { isBoundSensorTaskProcess } from '../commands/sense/task-binding.js';
+import {
+  assertNativeSensorFilesystemTarget,
+  isBoundSensorTaskProcess,
+} from '../commands/sense/task-binding.js';
 import {
   canonicalRelativePath,
   existingRealpath,
@@ -869,6 +872,13 @@ export function createAuthorityHostBroker(input: BrokerInput): {
     effectCounter += 1;
     if (target.kind === 'fs') {
       const canonicalPath = String(target.canonical_relative_path ?? '');
+      if (action.name === 'sense run')
+        assertNativeSensorFilesystemTarget(
+          repositoryRoot,
+          canonicalPath,
+          String(target.operation),
+          target.rename_from_canonical_relative_path,
+        );
       if (
         constitutionBootstrap &&
         action.name === input.entry.name &&

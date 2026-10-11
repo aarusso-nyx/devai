@@ -18,6 +18,15 @@ function measurement(reading: SensorReading): string {
   return canonicalJson(body);
 }
 
+/** Task instances retire only the same producer obligation; legacy readings stay per-kind. */
+function producerPartition(reading: SensorReading): string {
+  const task = reading.metrics?.task_id;
+  const population = reading.metrics?.population;
+  return typeof task === 'string' && typeof population === 'string'
+    ? canonicalJson([task, population])
+    : 'legacy';
+}
+
 /** Read-only producer instance selection; recording remains a separate Inspector action. */
 export function resolveSensorReadingInstance(
   repoRoot: string,
@@ -60,6 +69,7 @@ export function resolveSensorReadingInstance(
     }
     if (
       head !== null &&
+      producerPartition(prior) === producerPartition(reading) &&
       bindings.some((binding) => binding.sha256 === digest && binding.head === head)
     ) {
       candidates.push(prior);

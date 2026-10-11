@@ -1,5 +1,10 @@
-import { readdirSync, statSync, type Stats } from 'node:fs';
-import { isAbsolute, join, resolve } from 'node:path';
+import { lstatSync } from 'node:fs';
+import {
+  executableTestKind,
+  expandRepositoryPaths,
+  isExecutableTestFile,
+  regularFilePopulation,
+} from './test-file-population.js';
 import {
   buildSensorReading,
   type SensorFinding,
@@ -24,87 +29,25 @@ const DEFAULT_PACKAGE_ROOTS = ['packages/*'];
 const DEFAULT_MIN_RATIO = 0.1;
 const DEFAULT_PASS_RATIO = 0.3;
 
-function abs(repoRoot: string, p: string): string {
-  return isAbsolute(p) ? p : resolve(repoRoot, p);
-}
-
-function safeStat(p: string): Stats | null {
-  try {
-    return statSync(p);
-  } catch {
-    return null;
-  }
-}
-
-function listFiles(dir: string, sink: string[]): void {
-  const st = safeStat(dir);
-  if (st === null) return;
-  if (st.isFile()) {
-    sink.push(dir);
-    return;
-  }
-  if (!st.isDirectory()) return;
-  let entries: string[];
-  try {
-    entries = readdirSync(dir);
-  } catch {
-    return;
-  }
-  for (const e of entries) {
-    if (e === 'node_modules' || e === '.git' || e === 'dist' || e === 'build') continue;
-    listFiles(join(dir, e), sink);
-  }
-}
-
-function isTestFile(name: string): { isTest: boolean; usesTest: boolean; usesSpec: boolean } {
-  const isTest = /\.test\.(ts|tsx|js|jsx)$/.test(name);
-  const isSpec = /\.spec\.(ts|tsx|js|jsx)$/.test(name);
-  return { isTest: isTest || isSpec, usesTest: isTest, usesSpec: isSpec };
-}
-
 function isSourceFile(name: string): boolean {
-  if (!/\.(ts|tsx|js|jsx)$/.test(name)) return false;
-  if (/\.d\.ts$/.test(name)) return false;
-  if (/\.test\.(ts|tsx|js|jsx)$/.test(name)) return false;
-  if (/\.spec\.(ts|tsx|js|jsx)$/.test(name)) return false;
-  return true;
-}
-
-function listPackageDirs(repoRoot: string, roots: readonly string[]): string[] {
-  const out: string[] = [];
-  for (const r of roots) {
-    // Trailing /** is collapsed to /*, since the per-package scanner walks recursively anyway.
-    const normalised = r.replace(/\/\*\*$/, '/*');
-    if (!normalised.includes('*')) {
-      const st = safeStat(abs(repoRoot, normalised));
-      if (st !== null && st.isDirectory()) out.push(abs(repoRoot, normalised));
-      continue;
-    }
-    const parts = normalised.split('/');
-    const wildIdx = parts.findIndex((p) => p.includes('*'));
-    if (wildIdx < 0) continue;
-    const before = parts.slice(0, wildIdx).join('/');
-    const after = parts.slice(wildIdx + 1).join('/');
-    let entries: string[];
-    try {
-      entries = readdirSync(abs(repoRoot, before));
-    } catch {
-      continue;
-    }
-    for (const entry of entries) {
-      const candidate = abs(repoRoot, [before, entry, after].filter((s) => s !== '').join('/'));
-      const st = safeStat(candidate);
-      if (st !== null && st.isDirectory()) out.push(candidate);
-    }
-  }
-  return out;
+  return (
+    /\.(?:ts|tsx|js|jsx|mjs|cjs)$/u.test(name) &&
+    !/\.d\.ts$/u.test(name) &&
+    !isExecutableTestFile(name)
+  );
 }
 
 export function senseTestCoherence(opts: TestCoherenceOptions): SensorReading {
   const roots = opts.packageRoots ?? DEFAULT_PACKAGE_ROOTS;
   const minRatio = opts.minPerPackageRatio ?? DEFAULT_MIN_RATIO;
   const passRatio = opts.passRatio ?? DEFAULT_PASS_RATIO;
-  const pkgDirs = listPackageDirs(opts.repoRoot, roots);
+  const population = expandRepositoryPaths(opts.repoRoot, roots, {
+    optional: opts.packageRoots === undefined,
+  });
+  const pkgDirs = population.paths.filter((path) =>
+    lstatSync(population.physicalRoots?.get(path) ?? path).isDirectory(),
+  );
+  const errors = [...population.errors];
 
   let totalSources = 0;
   let totalTests = 0;
@@ -114,17 +57,17 @@ export function senseTestCoherence(opts: TestCoherenceOptions): SensorReading {
   const findings: SensorFinding[] = [];
 
   for (const pkg of pkgDirs) {
-    const allFiles: string[] = [];
-    listFiles(pkg, allFiles);
+    const allFiles = regularFilePopulation([pkg], population.physicalRoots);
+    errors.push(...allFiles.errors);
     let pkgSources = 0;
     let pkgTests = 0;
-    for (const f of allFiles) {
+    for (const f of allFiles.paths) {
       const base = f.split('/').pop() ?? '';
-      const t = isTestFile(base);
-      if (t.isTest) {
+      const kind = executableTestKind(base);
+      if (kind !== undefined) {
         pkgTests += 1;
-        if (t.usesTest) usesTest += 1;
-        else if (t.usesSpec) usesSpec += 1;
+        if (kind === 'test') usesTest += 1;
+        else if (kind === 'spec' || kind === 'wiring-spec') usesSpec += 1;
       } else if (isSourceFile(base)) {
         pkgSources += 1;
       }
@@ -161,6 +104,17 @@ export function senseTestCoherence(opts: TestCoherenceOptions): SensorReading {
     status = 'pass';
   } else {
     status = 'review';
+  }
+
+  if (errors.length > 0) {
+    status = 'error';
+    findings.push(
+      ...errors.map((message) => ({
+        severity: 'critical' as const,
+        code: 'TEST_EXECUTABLE_POPULATION_INCOMPLETE',
+        message,
+      })),
+    );
   }
 
   return buildSensorReading({

@@ -15,6 +15,7 @@ import {
 } from './declared-surfaces.js';
 import { buildSensorReading, type SensorStatus } from './sensor-reading.js';
 import { resolveBodyInput } from './inventory-body-inputs.js';
+import { endpointIdentityPopulation } from './inventory-endpoint-identity.js';
 import {
   type InventoryCoverageOptions,
   type InventoryCoverageResult,
@@ -124,7 +125,8 @@ function measureInventoryCoverage(opts: InventoryCoverageOptions): InventoryCove
   }
 
   const routeIds = (routesInventory?.routes ?? []).map((r) => r.id);
-  const endpointIds = (apiMap?.endpoints ?? []).map((e) => endpointId(e));
+  const endpointPopulation = endpointIdentityPopulation(apiMap?.endpoints ?? []);
+  const endpointIds = endpointPopulation.ids;
   const inferredPathMatchCount =
     apiMap !== null && routesInventory !== null
       ? countInferredMatches(routesInventory.routes, apiMap.endpoints)
@@ -138,7 +140,17 @@ function measureInventoryCoverage(opts: InventoryCoverageOptions): InventoryCove
   for (const f of loadedUseCases.findings) findings.push(f);
   const validRouteIds = new Set(routeIds);
   const validEndpointIds = new Set(endpointIds);
-  const links = synthesizeLinks(loadedUseCases.cases, validRouteIds, validEndpointIds);
+  const ambiguousReferences = new Set<string>();
+  const links = synthesizeLinks(
+    loadedUseCases.cases,
+    validRouteIds,
+    validEndpointIds,
+    (reference) => {
+      const targets = endpointPopulation.references.get(reference) ?? [];
+      if (targets.length > 1) ambiguousReferences.add(reference);
+      return targets.length === 1 ? targets[0] : undefined;
+    },
+  );
   const useCases = loadedUseCases.cases
     .filter((c) => c.id !== undefined && c.id.length > 0)
     .map((c) => ({
@@ -187,6 +199,23 @@ function measureInventoryCoverage(opts: InventoryCoverageOptions): InventoryCove
         message: `body fails coverage-matrix.schema.json: ${JSON.stringify(validators.coverageMatrix.errors)}`,
       });
     }
+  }
+
+  for (const reference of ambiguousReferences) {
+    findings.push({
+      severity: 'warning',
+      code: 'AMBIGUOUS_ENDPOINT_REFERENCE',
+      message: `Use-case endpoint reference ${JSON.stringify(reference)} names multiple source compositions; no endpoint is credited. Use the exact qualified API endpoint id.`,
+    });
+    if (status === 'pass') status = 'review';
+  }
+  for (const id of endpointPopulation.collisions) {
+    findings.push({
+      severity: 'critical',
+      code: 'ENDPOINT_IDENTITY_COLLISION',
+      message: `API endpoint identity ${JSON.stringify(id)} is not unique; no source entry may be discarded.`,
+    });
+    status = 'error';
   }
 
   // Phase 22.H (D-A-18): the outcome is "pass" when use-cases are

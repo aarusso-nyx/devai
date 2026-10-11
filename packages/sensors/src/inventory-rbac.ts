@@ -4,6 +4,11 @@ import { mkdirSync, writeFileSync } from '@devai-nyx/authority';
 import { dirname, join } from 'node:path';
 import { validators } from '@devai-nyx/schemas';
 import {
+  endpointId,
+  endpointIdentityPopulation,
+  type EndpointIdentityInput,
+} from './inventory-endpoint-identity.js';
+import {
   allBoundSurfacesAbsent,
   applySurfaceDeclaration,
   type DeclaredSurfaces,
@@ -131,10 +136,7 @@ function isRbacJoinTable(
   return hasRoleFk && hasPermFk;
 }
 
-interface ApiMapEndpoint {
-  readonly id?: string;
-  readonly method: string;
-  readonly path: string;
+interface ApiMapEndpoint extends EndpointIdentityInput {
   readonly auth?: {
     readonly required?: boolean;
     readonly guards?: readonly string[];
@@ -144,10 +146,6 @@ interface ApiMapEndpoint {
 
 interface ApiMapBodyShape {
   readonly endpoints?: readonly ApiMapEndpoint[];
-}
-
-function endpointIdOf(e: ApiMapEndpoint): string {
-  return e.id ?? `${e.method} ${e.path}`;
 }
 
 function measureInventoryRbac(opts: InventoryRbacOptions): InventoryRbacResult {
@@ -246,8 +244,16 @@ function measureInventoryRbac(opts: InventoryRbacOptions): InventoryRbacResult {
     methods?: string[];
   }> = [];
   if (apiMap?.endpoints !== undefined) {
+    for (const id of endpointIdentityPopulation(apiMap.endpoints).collisions) {
+      status = 'error';
+      findings.push({
+        severity: 'critical',
+        code: 'ENDPOINT_IDENTITY_COLLISION',
+        message: `API endpoint identity ${JSON.stringify(id)} is not unique; RBAC bindings cannot collapse source entries.`,
+      });
+    }
     for (const ep of apiMap.endpoints) {
-      const epId = endpointIdOf(ep);
+      const epId = endpointId(ep);
       const guards = ep.auth?.guards ?? [];
       const roles = ep.auth?.roles ?? [];
       // Phase 22.B (closes D-A-12): an endpoint carrying an
@@ -259,11 +265,19 @@ function measureInventoryRbac(opts: InventoryRbacOptions): InventoryRbacResult {
       // public" case.
       const explicitlyPublic = ep.auth?.required === false;
       if (explicitlyPublic) continue;
-      if (guards.length === 0 && roles.length === 0) {
+      if (guards.length === 0 && roles.length === 0 && ep.auth?.required !== true) {
         // Endpoint has no auth declarations — surface in unmapped for
         // INV-INVENTORY-003 to gate against.
         endpointsWithoutRole.push(epId);
         continue;
+      }
+      if (roles.length === 0 && (guards.length > 0 || ep.auth?.required === true)) {
+        if (status === 'pass') status = 'review';
+        findings.push({
+          severity: 'info',
+          code: 'RBAC_AUTHORIZATION_UNRESOLVED',
+          message: `Endpoint ${epId} declares authentication guards without a resolved static role/permission declaration. Guard identity does not prove conditional authorization semantics.`,
+        });
       }
       for (const g of guards) {
         const permId = `guard:${g}`;
@@ -362,7 +376,7 @@ function measureInventoryRbac(opts: InventoryRbacOptions): InventoryRbacResult {
     },
   };
 
-  if (status === 'pass') {
+  if (status === 'pass' || status === 'review') {
     const ok = validators.rbacInventory(body);
     if (!ok) {
       status = 'error';

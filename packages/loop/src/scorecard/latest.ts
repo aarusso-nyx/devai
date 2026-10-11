@@ -1,5 +1,14 @@
 import type { SensorReading } from '@devai-nyx/sensors';
 
+/** Each declared producer population has independent immutable instance history. */
+function standingKey(reading: SensorReading): string {
+  const task = reading.metrics?.task_id;
+  const population = reading.metrics?.population;
+  return typeof task === 'string' && typeof population === 'string'
+    ? JSON.stringify([reading.sensor.kind, task, population])
+    : JSON.stringify([reading.sensor.kind]);
+}
+
 /** Validate the complete population already bound to one exact candidate. */
 export function assertCandidateSupersessionGraph(
   readings: readonly SensorReading[],
@@ -14,7 +23,7 @@ export function assertCandidateSupersessionGraph(
   for (const reading of readings) {
     if (reading.supersedes === undefined) continue;
     const previous = byId.get(reading.supersedes);
-    if (previous === undefined || previous.sensor.kind !== reading.sensor.kind) {
+    if (previous === undefined || standingKey(previous) !== standingKey(reading)) {
       throw new Error(`${prefix}_INVALID_SUPERSEDES:${reading.id}`);
     }
     retired.add(previous.id);
@@ -34,10 +43,11 @@ export function assertCandidateSupersessionGraph(
   const heads = new Set<string>();
   for (const reading of readings) {
     if (retired.has(reading.id)) continue;
-    if (heads.has(reading.sensor.kind)) {
+    const key = standingKey(reading);
+    if (heads.has(key)) {
       throw new Error(`${prefix}_AMBIGUOUS:${reading.sensor.kind}`);
     }
-    heads.add(reading.sensor.kind);
+    heads.add(key);
   }
 }
 
@@ -66,24 +76,25 @@ function isNewer(candidate: SensorReading, current: SensorReading): boolean {
  */
 function supersededIds(readings: readonly SensorReading[]): ReadonlySet<string> {
   const kindOf = new Map<string, string>();
-  for (const reading of readings) kindOf.set(reading.id, reading.sensor?.kind);
+  for (const reading of readings) kindOf.set(reading.id, standingKey(reading));
   const retired = new Set<string>();
   for (const reading of readings) {
     const earlier = reading.supersedes;
     if (typeof earlier !== 'string' || earlier === reading.id) continue;
-    if (kindOf.get(earlier) !== reading.sensor?.kind) continue;
+    if (kindOf.get(earlier) !== standingKey(reading)) continue;
     retired.add(earlier);
   }
   const byKind = new Map<string, number>();
   for (const reading of readings) {
     if (retired.has(reading.id)) continue;
-    byKind.set(reading.sensor?.kind, (byKind.get(reading.sensor?.kind) ?? 0) + 1);
+    const key = standingKey(reading);
+    byKind.set(key, (byKind.get(key) ?? 0) + 1);
   }
   // A kind every one of whose instances is retired holds a cycle: keep it whole.
   for (const reading of readings) {
-    if (retired.has(reading.id) && !byKind.has(reading.sensor?.kind)) {
+    if (retired.has(reading.id) && !byKind.has(standingKey(reading))) {
       for (const member of readings) {
-        if (member.sensor?.kind === reading.sensor?.kind) retired.delete(member.id);
+        if (standingKey(member) === standingKey(reading)) retired.delete(member.id);
       }
     }
   }
@@ -107,18 +118,19 @@ export function filterLatestPerKind(readings: readonly SensorReading[]): SensorR
     if (retired.has(reading.id)) continue;
     const kind = reading.sensor?.kind;
     if (typeof kind !== 'string' || kind.length === 0) continue;
-    const current = byKind.get(kind);
+    const key = standingKey(reading);
+    const current = byKind.get(key);
     if (current === undefined) {
-      byKind.set(kind, reading);
+      byKind.set(key, reading);
       continue;
     }
     if (isUnknown(current) && isFailure(reading)) {
-      byKind.set(kind, reading);
+      byKind.set(key, reading);
       continue;
     }
     if (!isNewer(reading, current)) continue;
     if (isFailure(current) && isUnknown(reading)) continue;
-    byKind.set(kind, reading);
+    byKind.set(key, reading);
   }
   return [...byKind.values()].sort((left, right) =>
     left.sensor.kind.localeCompare(right.sensor.kind),

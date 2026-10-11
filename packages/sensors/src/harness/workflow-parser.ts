@@ -1,4 +1,6 @@
 import ts from 'typescript';
+import { loadCandidateAuditProjection, readCandidateFile } from '../audit-projection.js';
+import { adopterWorkflowClosure } from './adopter-workflow-closure.js';
 import { foldWorkflowLines } from './folded-lines.js';
 import {
   constants,
@@ -816,7 +818,7 @@ export function parseWorkflow(file: string, content: string, repoRoot: string): 
     }
   }
   function unboundAware(name: string): ReturnType<typeof jobEffectFacts> | Record<string, never> {
-    const facts = jobEffectFacts(content, repoRoot, name);
+    const facts = jobEffectFacts(content, repoRoot, name, new Set(), file);
     if (bound || !inventoryKnown) return facts;
     return facts.concurrency !== undefined ||
       facts.environment !== undefined ||
@@ -1154,6 +1156,50 @@ const REVIEWED_STEPS: ReadonlyMap<string, ReviewedWorkflowStep> = new Map(
 function reviewedStep(step: ExecutionYaml): ReviewedWorkflowStep | undefined {
   const digest = workflowStepDigest(step);
   return digest === undefined ? undefined : REVIEWED_STEPS.get(digest);
+}
+
+/** Validate the entire occurrence bijection before any adopter entry can contribute an effect. */
+function adopterReviewedOccurrences(
+  root: string,
+): ReadonlyMap<string, ReviewedWorkflowStep> | undefined {
+  const document = loadCandidateAuditProjection(root, 'reviewed_workflow_steps');
+  if (document === undefined) return undefined;
+  const entries = document['steps'] as ReviewedWorkflowStep[];
+  const actual: { occurrence: string; digest: string | undefined; name: string }[] = [];
+  for (const file of listWorkflowFiles(root)) {
+    const path = relative(resolve(root), resolve(file)).split(sep).join('/');
+    const source = readCandidateFile(root, path).toString('utf8');
+    const jobs = yamlMap(yamlMap(executionYaml(source))?.get('jobs'));
+    if (jobs === undefined) throw new Error('ADOPTER_WORKFLOW_INVENTORY_INCOMPLETE');
+    for (const [job, definition] of jobs) {
+      const steps = yamlMap(definition)?.get('steps');
+      if (steps?.kind !== 'list') continue;
+      steps.items.forEach((step, index) =>
+        actual.push({
+          occurrence: `${path}#${job}[${index}]`,
+          digest: workflowStepDigest(step),
+          name:
+            yamlString(yamlMap(step)?.get('name')) ?? yamlString(yamlMap(step)?.get('uses')) ?? '',
+        }),
+      );
+    }
+  }
+  const admitted = new Map<string, ReviewedWorkflowStep>();
+  for (const entry of entries) {
+    if (REVIEWED_STEPS.has(entry.sha256)) throw new Error('ADOPTER_WORKFLOW_PACKAGE_OVERLAP');
+    const declared = entry.workflow.split(', ').sort();
+    const observed = actual.filter((row) => row.digest === entry.sha256);
+    if (
+      JSON.stringify(declared) !== JSON.stringify(observed.map((row) => row.occurrence).sort()) ||
+      observed.some((row) => row.name !== entry.step)
+    )
+      throw new Error('ADOPTER_WORKFLOW_OCCURRENCE_MISMATCH');
+    for (const occurrence of declared) {
+      if (admitted.has(occurrence)) throw new Error('ADOPTER_WORKFLOW_OCCURRENCE_DUPLICATE');
+      admitted.set(occurrence, entry);
+    }
+  }
+  return admitted;
 }
 
 /** A repository script a run line names, optionally through the candidate or control checkout. */
@@ -1612,11 +1658,34 @@ export function jobEffectFacts(
   repoRoot: string,
   name: string,
   visited = new Set<string>(),
+  workflowFile?: string,
 ): Pick<
   WorkflowJob,
   'effect' | 'concurrency' | 'condition' | 'needs' | 'environment' | 'permissions' | 'runScripts'
 > {
   type Effect = HarnessEffect | 'unknown';
+  let adopterReviews: ReadonlyMap<string, ReviewedWorkflowStep> | undefined;
+  let adopterInvalid = false;
+  let occurrenceFile: string | undefined;
+  try {
+    adopterReviews = adopterReviewedOccurrences(repoRoot);
+    if (adopterReviews !== undefined) {
+      const matches =
+        workflowFile === undefined
+          ? listWorkflowFiles(repoRoot).filter((file) => readFileSync(file, 'utf8') === content)
+          : [workflowFile];
+      if (matches.length !== 1 || matches[0] === undefined)
+        throw new Error('ADOPTER_WORKFLOW_SOURCE_AMBIGUOUS');
+      occurrenceFile = relative(resolve(repoRoot), resolve(repoRoot, matches[0]))
+        .split(sep)
+        .join('/');
+      if (readCandidateFile(repoRoot, occurrenceFile).toString('utf8') !== content)
+        throw new Error('ADOPTER_WORKFLOW_SOURCE_CHANGED');
+    }
+  } catch {
+    adopterInvalid = true;
+  }
+  const adopterEntries = new Set(adopterReviews?.values());
   // The strongest effect wins: unknown, then publication, then repository-write, then read-only.
   const rank: Readonly<Record<Effect, number>> = {
     'read-only': 0,
@@ -1726,11 +1795,13 @@ export function jobEffectFacts(
       'continue-on-error',
       'timeout-minutes',
     ]);
-    for (const step of value.items) {
+    if (adopterInvalid) return undefined;
+    for (const [stepIndex, step] of value.items.entries()) {
       // A reviewed step contributes its declared effect; its inputs, env and the bytes it
       // runs were judged in review against its exact canonical YAML (#325). A byte selector
       // among reviewed steps still replaces the bytes any later unreviewed step would run.
-      const reviewed = reviewedStep(step);
+      const reviewed =
+        adopterReviews?.get(`${occurrenceFile}#${name}[${stepIndex}]`) ?? reviewedStep(step);
       if (reviewed !== undefined) {
         const reference = yamlString(yamlMap(step)?.get('uses'));
         const remote = reference === undefined ? undefined : remoteActionReference(reference);
@@ -2728,6 +2799,44 @@ export function jobEffectFacts(
    * that differs from the entry's, reads unknown (#325).
    */
   function reviewedEffect(reviewed: { entry: ReviewedWorkflowStep; step: ExecutionYaml }): Effect {
+    if (adopterEntries.has(reviewed.entry)) {
+      const fields = yamlMap(reviewed.step);
+      const run = yamlText(fields?.get('run'));
+      // Composite/actions and inherited shell/default selectors require explicit supported closure.
+      if (
+        run === undefined ||
+        fields?.has('uses') ||
+        workflowFields?.has('defaults') ||
+        jobFields?.has('defaults') ||
+        workflowFields?.has('env') ||
+        jobFields?.has('env') ||
+        fields?.has('env') ||
+        (fields?.has('shell') && !['bash', 'sh'].includes(yamlString(fields.get('shell')) ?? ''))
+      )
+        return 'unknown';
+      const expected = adopterWorkflowClosure(
+        repoRoot,
+        run,
+        reviewed.entry,
+        yamlString(fields?.get('working-directory')) ?? '',
+      );
+      if (
+        expected === undefined ||
+        JSON.stringify(expected) !== JSON.stringify(reviewed.entry.files.map((file) => file.path))
+      )
+        return 'unknown';
+      try {
+        for (const file of reviewed.entry.files)
+          if (
+            createHash('sha256').update(readCandidateFile(repoRoot, file.path)).digest('hex') !==
+            file.sha256
+          )
+            return 'unknown';
+      } catch {
+        return 'unknown';
+      }
+      return reviewed.entry.effect;
+    }
     const expected = stepExecutedFiles(reviewed.step, {
       read: (path) => contained(path)?.source,
       list: (path) => {

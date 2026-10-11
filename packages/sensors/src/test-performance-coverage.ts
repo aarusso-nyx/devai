@@ -71,6 +71,17 @@ export function senseTestPerformanceCoverage(opts: TestPerformanceCoverageOption
     });
   }
 
+  if ((result.errors?.length ?? 0) > 0) {
+    status = 'error';
+    findings.push(
+      ...(result.errors ?? []).map((message) => ({
+        severity: 'critical' as const,
+        code: 'TEST_EXECUTABLE_POPULATION_INCOMPLETE',
+        message,
+      })),
+    );
+  }
+
   return buildSensorReading({
     sensorName: 'test-performance-coverage',
     sensorKind: 'test_performance_coverage',

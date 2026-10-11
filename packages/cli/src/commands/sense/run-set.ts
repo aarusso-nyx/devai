@@ -23,7 +23,11 @@ import { type SensorInputs } from './shared.js';
 import { resolveMemberInputs } from './member-inputs.js';
 export { resolveMemberInputs } from './member-inputs.js';
 import { resolveTaskBoundSenseSelection } from './task-selection.js';
-import { resolveSensorTaskBinding, executeSensorTask } from './task-binding.js';
+import {
+  resolveSensorTaskBinding,
+  executeSensorTask,
+  attestNativeTaskExecution,
+} from './task-binding.js';
 
 type ReadinessStatus = 'pass' | 'review' | 'fail' | 'unknown' | 'na';
 type StructuredStatus = Exclude<ReadinessStatus, 'na'> | 'skipped' | 'error' | 'killed';
@@ -209,6 +213,7 @@ export async function executeResolvedSenseSelection(
             }),
       );
       const reading = resolveSensorReadingInstance(options.repoRoot, measured);
+      attestNativeTaskExecution(options.repoRoot, measured, reading);
       if (reading.sensor.kind !== member.kind) {
         throw new Error(`SENSE_ADAPTER_KIND_MISMATCH:${member.kind}:${reading.sensor.kind}`);
       }
