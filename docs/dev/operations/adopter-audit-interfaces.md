@@ -361,6 +361,15 @@ agent's retained snapshot. Each query connects, completes synchronous
 enable/source lookup and disconnects in `finally`. Missing, asynchronous,
 changed or incomplete checks refuse.
 
+The preload may privately retain an unformatted `Error` captured during the
+genuine probe with its pre-import captured constructor. This keeps the
+authenticated caller script reachable through its own terminal checks. The
+object stays private: never read or serialize `.stack`, invoke candidate
+formatting, or use it as source or identity authority. Release it only after
+terminal checks. Every source query still uses a fresh private session;
+unavailable or changed source remains UNKNOWN, including failed retention. A
+debugger agent's collected-source cache cannot supply the missing proof.
+
 Facts bind nonce/scope and unique probe identity, actual PID/platform/architecture
 and OS release, executing caller/source identity, exact literal API arguments,
 physical target, raw/returned digests and predicate/fields. Each fact needs a
