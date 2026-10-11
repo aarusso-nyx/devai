@@ -10,6 +10,10 @@ remain required; this entry does not claim publication.
   canonical step digests, exact full-path job/index occurrences and complete
   contained executable/import file digests. Unprovable or absent populations
   remain UNKNOWN/REVIEW; extraction grants no reviewed effect or execution.
+- Add a finite package-owned diagnostic coverage adapter and complete exported
+  type declarations. Diagnostic evidence supplies no execution origin or standing.
+  Native service/browser profiles are forward candidate contracts only: the
+  backend catalogue remains empty and service requests refuse before execution.
 - Preserve every existing inventory slice, including the `all` member population,
   the 69-action public surface and the finite native compatibility matrix.
   The independently trusted verifier remains `@aarusso-nyx/devai@2.4.0`.
