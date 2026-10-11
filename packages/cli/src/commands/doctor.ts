@@ -39,8 +39,13 @@ import {
   checkConstitutionBinding,
 } from './doctor-environment-checks.js';
 export { checkTrustedLocalRcBoundary } from './doctor-install-checks.js';
+import { checkAdopterExecutionReadiness } from './doctor-execution-readiness.js';
 
 const CHECK_SPECS: readonly CheckSpec[] = [
+  {
+    name: 'adopter-execution-readiness',
+    run: (repoRoot) => checkAdopterExecutionReadiness(repoRoot),
+  },
   {
     name: 'f1-paths-present',
     minProfile: 'tier3',
