@@ -896,6 +896,49 @@ describe('Doctor post-merge state kept out of tracked configuration (#266, #291)
     });
   }, 30_000);
 
+  it('reports a refreshed verified local hook as unselected while GitHub remains primary', async () => {
+    const result = await authorityCheck(async ({ repo, policy }) => {
+      await bindPostMergeCheckout(repo, policy, 'husky');
+      await bindGithubActions(repo);
+      configureHostIntegrated(
+        repo,
+        policy,
+        GITHUB_ACTIONS_CONFIG,
+        'github-actions-main-observation',
+      );
+      put(repo, '.devai/config/authority-policy.json', policy);
+      const project = readFileSync(join(repo, '.devai/config/project.json'));
+      const key = readFileSync(join(repo, '.git/devai/post-merge.key'));
+      const plan = buildHooksInstallPlan({
+        targetRoot: repo,
+        hook: 'post-merge',
+        devaiVersion: resolveCliVersion(),
+      });
+      await withAuthorityHostTestScope(() => executeHooksInstallPlan(plan));
+      expect(readFileSync(join(repo, '.devai/config/project.json'))).toEqual(project);
+      expect(readFileSync(join(repo, '.git/devai/post-merge.key'))).toEqual(key);
+    });
+    expect(result).toMatchObject({
+      ok: true,
+      info: {
+        selected_adapter_policy_bound: true,
+        local_post_merge_scope: 'bound',
+        local_post_merge_enforced: false,
+        local_post_merge_facts: {
+          key_present: true,
+          attestation_present: true,
+          policy_bound: true,
+          signature_valid: true,
+          hook_bound: true,
+          package_bound: true,
+        },
+        github_actions_enforced: true,
+      },
+    });
+    expect(result.errors).toBeUndefined();
+    expect(result.warnings).toBeUndefined();
+  }, 30_000);
+
   it("warns when a later bind left this checkout's unselected post-merge binding stale", async () => {
     const result = await authorityCheck(async ({ repo, policy }) => {
       await bindPostMergeCheckout(repo, policy);
