@@ -346,6 +346,47 @@ Missing stages or unsupported I/O, loader or process capabilities remain unknown
 and refuse standing. This is provenance instrumentation for cooperative native
 tooling, not a security sandbox against deliberately bypassing plugin code.
 
+Exact Playwright 1.60.0 asynchronous ESM loader registration requires a
+package-owned bootstrap with independently bound bootstrap/preload bytes and the
+original exact loader/package closure. A fresh isolated trace scope must import
+the trusted preload dynamically before importing the original loader dynamically;
+a static re-export does not establish this order. Original `initialize(data)`,
+hooks and transferred Playwright ports retain their semantics. Only the verified
+pinned loader target qualifies; this does not admit adopter `module.register`,
+arbitrary dynamic loaders or a source-hash-only exception.
+
+Native workers also require privately minted child scopes and a separate
+control port/shared acknowledgement buffer. Original `workerData` and its
+transfer semantics must be restored before candidate imports; provenance control
+metadata cannot replace or leak into the candidate's worker input. Before an
+explicit native `Worker.terminate`, the parent requests the worker's own seal.
+Only the worker preload may persist its actual terminal observation and
+acknowledge after supported I/O is complete or has observably drained. The parent
+wait is bounded to five seconds; failure refuses standing rather than treating
+termination as a successful end. Normal worker exit still requires its own actual
+terminal evidence. A worker acknowledgement cannot replace a child loader's
+separate seal, and post-seal hooks/I/O remain refused.
+
+Every asynchronous loader registration mints a private child scope and a
+separate control port/shared acknowledgement buffer, preserving the original
+Playwright data and transferred port. An inherited owner-scope clone refuses.
+The forwarded hooks account for their starts/completions. On normal parent
+termination, the private control requests a seal; only quiescent hooks and
+completed supported I/O may invoke the preload's actual terminal persistence and
+then acknowledge through the shared buffer. Supported callback/promise I/O
+requires private initiation/completion accounting; pending-at-seal operations
+must drain observably or refuse, never disappear behind an acknowledgement.
+The parent waits at most five seconds for that acknowledgement.
+This is an actual loader-owned terminal event, not a worker-end record invented
+by the parent.
+
+Every loader scope requires a real begin and persisted terminal seal; completion
+must prove observation flush and refuse post-seal hooks/I/O. Normal exit cannot
+replace a missing acknowledgement. Main and worker loader scopes need separate
+closure evidence. Missing registration/begin/seal, termination without closure,
+acknowledgement timeout or incomplete observation remains UNKNOWN and contributes
+no native executed-population measurements.
+
 The finite configuration scanner requires an explicit `--config` path; default
 config discovery is not standing. It recursively checks tracked relative
 `.js`/`.mjs`/`.cjs`/`.ts`/`.mts`/`.cts` imports and re-exports. Admitted package
@@ -419,6 +460,52 @@ On macOS, reviewed fsevents 2.3.2/2.3.3 initialization is permitted only through
 fresh frozen own-key export shim; every callable export is denied, so this does
 not admit watching or later native activity.
 
+Native generated intermediates are a separate same-execution output population,
+not an exception admitting external input files. The host creates only the exact
+fresh empty `.devai/state/native-config-traces/<internally-minted-nonce>/runtime`
+directory under the existing native-only trace operation. The closed environment
+internally sets `TMPDIR` to this physical root and `PWTEST_CACHE_DIR` to its
+`playwright` child; descriptor overrides of either key refuse. Before imports,
+the trusted main-process begin event binds the exact physical root and its empty
+contents. This grants no ambient `/tmp` write, caller-selected cache root or new
+public action.
+
+Only verified finite Vitest 4.1.11 and Playwright 1.60.0 cache subdirectory,
+hash-file and staging-file forms may qualify beneath that owned root. The
+package-owned reporter's actual Vitest context/project temporary directories must
+agree with this namespace; reported paths alone prove neither ownership nor
+freshness. Links, escapes, unrelated metadata access and unowned writes refuse.
+The trusted ordered cross-scope trace records successful mkdir, full-file write,
+rename and removal operations. The host replays their exact paths, encodings and
+byte SHA-256 in a virtual output ledger, retaining only each live file identity.
+
+A worker read must match a preceding successful full write or a successful rename
+that carries that write's identity into the consumed target. Vitest's `.tmp-*`
+to `ssr` hash-file transport requires this exact rename proof; a final target
+path alone is insufficient. Overwrites require ownership of the prior live
+identity; no unowned overwrite is admitted. Removal or replacement invalidates
+the previous live identity. Future writes, ambiguous order, partial/unobserved
+writes, preexisting files and cache replay cannot establish provenance. Cleanup
+is confined to the operation's owned roots/artifacts and is replayed rather than
+rechecked as if removed generated files were current inputs. Nested internal
+cleanup calls may share one outer removal intent/success envelope only within
+the same active owned subtree. Preserve every metadata/read observation and the
+complete outer snapshot/completion; reset the scoped context on completion or
+error. Other paths/operations still undergo their ordinary checks. Partial or
+failed cleanup does not manufacture a successful removal. Raw output-custody
+facts and the exact producer/transform closure survive cleanup and are bound into
+the final execution provenance.
+
+For exact Playwright 1.60.0, loader-transformed module source is recorded separately
+from the raw file-read observation. The raw candidate/dependency bytes, resolved
+module identity, exact loader/transform dependency closure, fresh owned cache
+custody and transformed-source SHA-256 must all be bound to this execution.
+A transformed digest cannot replace raw input verification, and a version match
+alone cannot establish transform provenance. This finite allowance applies only
+to the admitted runner; another runner or an unproved transform remains UNKNOWN.
+On provenance failure, native executed-population measurements are discarded;
+diagnostic trace custody alone grants no standing.
+
 Full-run filesystem results and module observations remain in raw trace bytes
 and a SHA-256 bound into the final reading metrics. Each input must match exact
 candidate-tracked bytes or the independently resolved dependency-instance graph
@@ -429,7 +516,8 @@ discovery exception may replay only exact candidate-root ancestor probes for
 `package.json`, `pnpm-workspace.yaml`, `lerna.json` and `tsconfig.json` that
 establish absence (`ENOENT` or `false`). Any positive outside-file observation,
 other filename, other failure or changed probe result refuses; this grants no
-ambient file-read authority. Reads of excluded state or proof bytes refuse. Unsupported file-descriptor reads, streams, watches or other
+ambient file-read authority. Other excluded state or proof input reads refuse; only the preceding
+same-execution generated-output ledger qualifies for its narrow read allowance. Unsupported file-descriptor reads, streams, watches or other
 unobserved APIs remain UNKNOWN. A custom `CoverageProviderModule` is permitted
 only when its actual JavaScript closure is observable through this same path and
 has no hidden I/O; the interface name alone grants no exception.
