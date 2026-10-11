@@ -99,13 +99,17 @@ describe('senseTestIdiomaticity mock accounting, globs and thresholds', () => {
       {
         severity: 'warning',
         code: 'TEST_IDIOMATICITY_MOCK_IN_INTEGRATION',
-        message: 'Integration/e2e file uses mocks: packages/beta/test/flow.integration.test.ts',
+        message:
+          'Integration/e2e file has unresolved mock ownership: packages/beta/test/flow.integration.test.ts',
         file: 'packages/beta/test/flow.integration.test.ts',
       },
     ]);
     expect(reading.metrics).toEqual({
       test_files: 6,
       mock_calls: 6,
+      call_through_observers: 0,
+      observed_fault_injections: 0,
+      external_port_substitutions: 0,
       fixture_calls: 3,
       snapshot_calls: 2,
       mock_heavy_files: 2,
@@ -126,6 +130,9 @@ describe('senseTestIdiomaticity mock accounting, globs and thresholds', () => {
     expect(reading.metrics).toEqual({
       test_files: 0,
       mock_calls: 0,
+      call_through_observers: 0,
+      observed_fault_injections: 0,
+      external_port_substitutions: 0,
       fixture_calls: 0,
       snapshot_calls: 0,
       mock_heavy_files: 0,
@@ -175,6 +182,9 @@ describe('senseTestIdiomaticity mock accounting, globs and thresholds', () => {
     expect(reading.metrics).toEqual({
       test_files: 2,
       mock_calls: 3,
+      call_through_observers: 0,
+      observed_fault_injections: 0,
+      external_port_substitutions: 0,
       fixture_calls: 3,
       snapshot_calls: 1,
       mock_heavy_files: 1,
@@ -197,6 +207,9 @@ describe('senseTestIdiomaticity mock accounting, globs and thresholds', () => {
     expect(reading.metrics).toEqual({
       test_files: 1,
       mock_calls: 1,
+      call_through_observers: 0,
+      observed_fault_injections: 0,
+      external_port_substitutions: 0,
       fixture_calls: 2,
       snapshot_calls: 1,
       mock_heavy_files: 0,

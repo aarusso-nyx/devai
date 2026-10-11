@@ -69,8 +69,10 @@ describe('test security coverage boundaries', () => {
   });
 
   it('reports an empty configured test population without a false pass', () => {
+    const repo = root();
+    mkdirSync(join(repo, 'custom/empty/tests'), { recursive: true });
     const reading = senseTestSecurityCoverage({
-      repoRoot: root(),
+      repoRoot: repo,
       testGlobs: ['custom/empty/tests'],
       now: NOW,
     });
@@ -82,6 +84,19 @@ describe('test security coverage boundaries', () => {
         { severity: 'info', code: 'TEST_SECURITY_NO_TESTS', message: 'No test files found.' },
       ],
     });
+  });
+
+  it('refuses an explicitly configured missing test root', () => {
+    const reading = senseTestSecurityCoverage({
+      repoRoot: root(),
+      testGlobs: ['custom/missing/tests'],
+      now: NOW,
+    });
+
+    expect(reading.status).toBe('error');
+    expect(reading.findings).toContainEqual(
+      expect.objectContaining({ code: 'TEST_EXECUTABLE_POPULATION_INCOMPLETE' }),
+    );
   });
 
   it('applies the documented default 5% pass, 2% review, and below-review fail boundaries', () => {

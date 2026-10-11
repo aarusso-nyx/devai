@@ -28,7 +28,7 @@ const roots: string[] = [];
 const SOURCE = 'law/policy/devai-adoption.json';
 const BINDING = '.devai/config/adopter-policy-binding.json';
 const CONFIG = '.devai/config';
-const SELECTED_RELEASE_VERSION = '2.4.0';
+const SELECTED_RELEASE_VERSION = '2.5.0';
 const TARGETS = [
   '.devai/config/project.json',
   '.devai/config/domains.json',
@@ -648,5 +648,174 @@ describe('Doctor policy-owned sensor inputs', () => {
       sha256(readFileSync(join(repo, target))),
     );
     expect(await policyCheck(repo)).toMatchObject({ ok: true });
+  });
+});
+
+// ADR-SCR-0017 IA-001: projection establishes ownership, never execution standing.
+describe.each([
+  {
+    key: 'invariant_producers',
+    target: '.devai/config/invariant-producers.json',
+    document: {
+      schemaVersion: '1.0.0',
+      bindings: [
+        {
+          invariant_id: 'INV-FIX-001',
+          subject: 'fixture.subject',
+          taskId: 'fixture-task',
+          population: 'fixture.complete',
+          requiredTestIds: [
+            'test:v1:%5B%22fixture%22%2C%22tests%2Fone.test.ts%22%2C%5B%5D%2C%22passes%22%5D',
+          ],
+        },
+      ],
+    },
+    empty: { schemaVersion: '1.0.0', bindings: [] },
+  },
+  {
+    key: 'reviewed_workflow_steps',
+    target: '.devai/config/reviewed-workflow-steps.json',
+    document: {
+      schemaVersion: '1.0.0',
+      steps: [
+        {
+          sha256: 'a'.repeat(64),
+          effect: 'read-only',
+          workflow: '.github/workflows/ci.yml#ci[0]',
+          step: 'Fixture producer',
+          review: 'Reviewed fixture identity; not runtime execution authority.',
+          files: [{ path: 'scripts/fixture.mjs', sha256: 'b'.repeat(64) }],
+        },
+      ],
+    },
+    empty: { schemaVersion: '1.0.0', steps: [] },
+  },
+])('registered optional $key ownership', ({ key, target, document, empty }) => {
+  it('projects the complete declaration with a verified target digest and read-only Doctor', async () => {
+    const repo = await boundRepo({ ...defaultPolicy(), [key]: document });
+    expect(readJson(repo, target)).toEqual(document);
+    expect((readJson(repo, BINDING)['materialized'] as JsonObject)[target]).toBe(
+      sha256(readFileSync(join(repo, target))),
+    );
+    const before = new Map(
+      [...TARGETS, target, BINDING].map((path) => [path, readFileSync(join(repo, path))]),
+    );
+    expect(await policyCheck(repo)).toMatchObject({ ok: true });
+    expect(
+      new Map([...TARGETS, target, BINDING].map((path) => [path, readFileSync(join(repo, path))])),
+    ).toEqual(before);
+  });
+
+  it('keeps an identical rebind byte-idempotent for the entire owned target and receipt', async () => {
+    const repo = await boundRepo({ ...defaultPolicy(), [key]: document });
+    const before = [target, BINDING].map((path) => [path, readFileSync(join(repo, path))] as const);
+    const result = await invoke(initBind, [
+      'init-bind',
+      '--target',
+      repo,
+      '--adopter-policy',
+      SOURCE,
+      '--write',
+    ]);
+    expect(result.exit, result.stderr).toBe(0);
+    for (const [path, bytes] of before)
+      expect(readFileSync(join(repo, path)).equals(bytes)).toBe(true);
+    expect(await policyCheck(repo)).toMatchObject({ ok: true });
+  });
+
+  it('preserves a never-owned document when its optional source is absent', async () => {
+    const repo = await canonicalRepo();
+    put(repo, target, document);
+    const before = readFileSync(join(repo, target));
+    put(repo, SOURCE, defaultPolicy());
+    const result = await invoke(initBind, [
+      'init-bind',
+      '--target',
+      repo,
+      '--adopter-policy',
+      SOURCE,
+      '--write',
+    ]);
+    expect(result.exit, result.stderr).toBe(0);
+    expect(readFileSync(join(repo, target)).equals(before)).toBe(true);
+    expect((readJson(repo, BINDING)['materialized'] as JsonObject)[target]).toBeUndefined();
+    expect(await policyCheck(repo)).toMatchObject({ ok: true });
+  });
+
+  it('retires verified prior ownership to the canonical empty document with a new digest', async () => {
+    const repo = await boundRepo({ ...defaultPolicy(), [key]: document });
+    put(repo, SOURCE, { ...defaultPolicy(), policy_version: '1.1.0' });
+    const result = await invoke(initBind, [
+      'init-bind',
+      '--target',
+      repo,
+      '--adopter-policy',
+      SOURCE,
+      '--write',
+    ]);
+    expect(result.exit, result.stderr).toBe(0);
+    expect(readJson(repo, target)).toEqual(empty);
+    expect((readJson(repo, BINDING)['materialized'] as JsonObject)[target]).toBe(
+      sha256(readFileSync(join(repo, target))),
+    );
+    expect(await policyCheck(repo)).toMatchObject({ ok: true });
+  });
+
+  it('reports changed target bytes without silently repairing or accepting them', async () => {
+    const repo = await boundRepo({ ...defaultPolicy(), [key]: document });
+    put(repo, target, empty);
+    const before = readFileSync(join(repo, target));
+    const check = await policyCheck(repo);
+    expect(check.ok).toBe(false);
+    expectReason(check, 'TARGET_BYTES_MISMATCH');
+    expect(readFileSync(join(repo, target)).equals(before)).toBe(true);
+  });
+
+  it('refuses conflicting intrinsic duplicate identities before modifying owned targets', async () => {
+    const repo = await boundRepo({ ...defaultPolicy(), [key]: document });
+    const before = new Map([target, BINDING].map((path) => [path, readFileSync(join(repo, path))]));
+    const duplicate = JSON.parse(JSON.stringify(document)) as JsonObject;
+    if (key === 'invariant_producers') {
+      const bindings = duplicate['bindings'] as JsonObject[];
+      bindings.push({ ...bindings[0], taskId: 'different-task' });
+    } else {
+      const steps = duplicate['steps'] as JsonObject[];
+      const files = steps[0]?.['files'] as JsonObject[];
+      files.push({ ...files[0], sha256: 'c'.repeat(64) });
+    }
+    put(repo, SOURCE, { ...defaultPolicy(), [key]: duplicate });
+    const result = await invoke(initBind, [
+      'init-bind',
+      '--target',
+      repo,
+      '--adopter-policy',
+      SOURCE,
+      '--write',
+    ]);
+    expect(result.exit).not.toBe(0);
+    for (const [path, bytes] of before)
+      expect(readFileSync(join(repo, path)).equals(bytes)).toBe(true);
+  });
+
+  it('refuses a forged target receipt digest without treating it as prior ownership', async () => {
+    const repo = await boundRepo({ ...defaultPolicy(), [key]: document });
+    const receipt = readJson(repo, BINDING);
+    (receipt['materialized'] as JsonObject)[target] = '0'.repeat(64);
+    put(repo, BINDING, receipt);
+    const before = readFileSync(join(repo, target));
+    const check = await policyCheck(repo);
+    expect(check.ok).toBe(false);
+    expect(readFileSync(join(repo, target)).equals(before)).toBe(true);
+    put(repo, SOURCE, { ...defaultPolicy(), policy_version: '1.1.0' });
+    const result = await invoke(initBind, [
+      'init-bind',
+      '--target',
+      repo,
+      '--adopter-policy',
+      SOURCE,
+      '--write',
+    ]);
+    expect(result.exit).not.toBe(0);
+    expect(readFileSync(join(repo, target)).equals(before)).toBe(true);
   });
 });

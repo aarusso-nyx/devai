@@ -225,6 +225,19 @@ describe('a producer that does not measure is never published as PASS (#382)', (
     expect(result.reading.status).toBe('fail');
     expect(result.report).toMatchObject({ ok: false, regenerated: [], obsolete: [] });
     expect(result.report.errors.join('\n')).toContain(kind);
+    expect(result.reading.findings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'FIXTURE_PRODUCER_STATUS',
+          message: status,
+          severity: 'error',
+        }),
+        expect.objectContaining({
+          code: 'READINGS_REBUILD_ERROR',
+          message: expect.stringContaining(kind),
+        }),
+      ]),
+    );
     expect(result.reading.metrics?.[`${kind}_status`]).not.toBe('pass');
     expect(result.reading.metrics).toMatchObject({ kinds_touched: 0 });
     for (const [path, body] of Object.entries(earlier)) {

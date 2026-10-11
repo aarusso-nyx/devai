@@ -214,6 +214,26 @@ describe('senseInventoryApi NestJS extraction', () => {
 
     const create = result.body.endpoints.find((endpoint) => endpoint.method === 'POST');
     expect(create).toEqual({
+      id: `api:v1:${encodeURIComponent(
+        JSON.stringify([
+          'POST',
+          '/users',
+          {
+            class: 'UsersController',
+            endLine: lineOf(USERS_CONTROLLER, 'create(@Body()'),
+            file: rel,
+            methodName: 'create',
+            startLine: lineOf(USERS_CONTROLLER, '@Post()'),
+          },
+          [
+            {
+              endLine: lineOf(USERS_CONTROLLER, 'create(@Body()'),
+              path: rel,
+              startLine: lineOf(USERS_CONTROLLER, '@Post()'),
+            },
+          ],
+        ]),
+      )}`,
       method: 'POST',
       path: '/users',
       controller: {

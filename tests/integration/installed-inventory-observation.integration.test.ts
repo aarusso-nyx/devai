@@ -182,6 +182,178 @@ function record(root: string, reading: Json): void {
 }
 
 describe('installed observation and inventory root regressions', () => {
+  it('detects a workspace-owned authorization override through an imported test helper', () => {
+    const root = repository({
+      'tsconfig.json': JSON.stringify({
+        compilerOptions: {
+          baseUrl: '.',
+          paths: { '@fixture/auth': ['packages/auth/src/index.ts'] },
+        },
+      }),
+      'packages/auth/package.json': JSON.stringify({
+        name: '@fixture/auth',
+        exports: './src/index.ts',
+      }),
+      'packages/auth/src/index.ts':
+        'export class StynxAuthGuard { canActivate() { return false; } }\n',
+      'packages/api/test/support/runtime.ts': `import { StynxAuthGuard } from '@fixture/auth';
+import { Test } from '@nestjs/testing';
+export function runtime() {
+return Test.createTestingModule({}).overrideGuard(StynxAuthGuard).useValue({ canActivate: () => true }).compile();
+}`,
+      'packages/api/tests/integration/authorization.test.ts': `import { runtime } from '../../test/support/runtime.js';
+it('exercises authorization', async () => { expect(await runtime()).toBeDefined(); });`,
+    });
+    const reading = observe(
+      root,
+      'test_idiomaticity',
+      ['--input', JSON.stringify({ testGlobs: ['packages/api/tests'] })],
+      'review',
+    );
+    expect(reading['metrics']).toMatchObject({ test_files: 1, mocks_in_integration_files: 1 });
+    expect(
+      (reading['findings'] as Array<{ code: string }>).map((finding) => finding.code),
+    ).toContain('TEST_IDIOMATICITY_MOCK_IN_INTEGRATION');
+  });
+
+  it('counts the complete executable suffix population through the installed default walker', () => {
+    const root = repository(
+      Object.fromEntries(
+        [
+          'packages/api/tests/a.e2e.mjs',
+          'packages/api/tests/b.wiring-spec.cjs',
+          'packages/api/tests/c.spec.mjs',
+          'tests/integration/d.test.cjs',
+        ].map((path) => [path, "it('observes', () => expect(1 + 1).toBe(2));\n"]),
+      ),
+    );
+    const reading = observe(root, 'test_idiomaticity');
+    expect(reading['status']).toBe('pass');
+    expect(reading['metrics']).toMatchObject({ test_files: 4, mocks_in_integration_files: 0 });
+  });
+
+  it.each([
+    [
+      'comment and string text',
+      `// vi.mock('../../src/owned-port.js'); beforeEach(() => {});
+const text = "vi.fn(); spyOn(alias, 'read');";
+it('observes', () => expect(1 + 1).toBe(2));`,
+      'pass',
+      0,
+    ],
+    [
+      'owned call-through observer',
+      `import { ownedPort as alias } from '../../src/owned-port.js';
+it('observes', async () => { const observer = vi.spyOn(alias, 'read'); expect(await alias.read()).toBe(42); expect(observer).toHaveBeenCalledOnce(); });`,
+      'pass',
+      0,
+    ],
+    [
+      'owned implementation replacement',
+      `import { ownedPort as alias } from '../../src/owned-port.js';
+it('replaces', async () => { vi.spyOn(alias, 'read').mockResolvedValue(0); expect(await alias.read()).toBe(0); });`,
+      'review',
+      1,
+    ],
+  ] as const)(
+    'classifies %s through the installed AST boundary',
+    (_label, source, status, owned) => {
+      const root = repository({
+        'packages/api/src/owned-port.ts':
+          'export const ownedPort = { async read() { return 42; } };\n',
+        'packages/api/tests/integration/behavior.test.ts': source,
+      });
+      const reading = observe(
+        root,
+        'test_idiomaticity',
+        ['--input', JSON.stringify({ testGlobs: ['packages/api/tests'] })],
+        status,
+      );
+      expect(reading['status']).toBe(status);
+      expect(reading['metrics']).toMatchObject({
+        test_files: 1,
+        mocks_in_integration_files: owned,
+      });
+      const codes =
+        (reading['findings'] as Array<{ code: string }> | undefined)?.map(
+          (finding) => finding.code,
+        ) ?? [];
+      if (owned === 1) expect(codes).toContain('TEST_IDIOMATICITY_MOCK_IN_INTEGRATION');
+      else expect(codes).not.toContain('TEST_IDIOMATICITY_MOCK_IN_INTEGRATION');
+    },
+  );
+
+  it.each([
+    ['default root', []],
+    ['relative root', ['--repo-root', '.']],
+    ['absolute root', null],
+  ] as const)('preserves alternative same-path API compositions with %s', (_label, rootArgs) => {
+    const root = repository({
+      'apps/api/alternative.controller.ts': [
+        "import { Controller, Post, Roles, UseGuards } from './nest.js';",
+        "import { SessionGuard } from './session.guard.js';",
+        "@Controller('/users')",
+        '@UseGuards(SessionGuard)',
+        'export class AlternativeUsersController {',
+        "  @Post() @Roles('operator') create() { return {}; }",
+        '}',
+      ].join('\n'),
+      'product/use-cases/legacy.json': JSON.stringify({
+        schemaVersion: '1.0.0',
+        roles: ['operator'],
+        cases: [
+          {
+            id: 'UC-legacy',
+            title: 'Create user',
+            mainFlow: [{ action: 'create', refs: { routeIds: [], endpointIds: ['POST /users'] } }],
+          },
+        ],
+      }),
+    });
+    const args = rootArgs ?? ['--repo-root', root];
+    expect(observe(root, 'inventory_api', args)['metrics']).toMatchObject({ endpoint_count: 3 });
+    const reading = observe(root, 'inventory_regeneration', args, 'review');
+    expect(reading['metrics']).toMatchObject({ required_kinds: 7, missing_required_kinds: 0 });
+    expect(reading['findings']).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          message: expect.stringContaining('AMBIGUOUS_ENDPOINT_REFERENCE'),
+        }),
+      ]),
+    );
+    for (const path of Object.values(STATE_BODY))
+      expect(existsSync(join(root, path)), path).toBe(true);
+    const api = JSON.parse(readFileSync(join(root, STATE_BODY.inventory_api), 'utf8')) as {
+      endpoints: Array<{ id: string; method: string; path: string; controller: { class: string } }>;
+    };
+    const alternatives = api.endpoints.filter((e) => e.method === 'POST' && e.path === '/users');
+    expect(api.endpoints).toHaveLength(3);
+    expect(alternatives).toHaveLength(2);
+    expect(new Set(api.endpoints.map((e) => e.id)).size).toBe(3);
+    expect(alternatives.map((e) => e.controller.class).sort()).toEqual([
+      'AlternativeUsersController',
+      'UsersController',
+    ]);
+    for (const endpoint of api.endpoints) expect(endpoint.id).toMatch(/^api:v1:/u);
+    const coverage = JSON.parse(
+      readFileSync(join(root, STATE_BODY.inventory_coverage), 'utf8'),
+    ) as {
+      endpoints: string[];
+      links: Array<{ endpointId: string | null }>;
+      unmapped: { endpoints: string[] };
+    };
+    expect(coverage.endpoints).toEqual(api.endpoints.map((e) => e.id));
+    expect(coverage.unmapped.endpoints).toEqual(api.endpoints.map((e) => e.id));
+    expect(coverage.links.filter((link) => link.endpointId !== null)).toEqual([]);
+    const rbac = JSON.parse(readFileSync(join(root, STATE_BODY.inventory_rbac), 'utf8')) as {
+      bindings: { endpointBindings: Array<{ endpointId: string }> };
+    };
+    expect(new Set(rbac.bindings.endpointBindings.map((binding) => binding.endpointId))).toEqual(
+      new Set(api.endpoints.map((e) => e.id)),
+    );
+    expect(git(root, 'status', '--porcelain')).toBe('');
+  });
+
   it('refuses explicit route populations outside the checkout before measuring', () => {
     const root = repository();
     const outside = mkdtempSync(join(dirname(root), 'external-angular-'));

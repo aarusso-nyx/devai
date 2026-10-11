@@ -1,0 +1,115 @@
+{
+  "numTotalTestSuites": 4,
+  "numPassedTestSuites": 4,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 2,
+  "numPassedTests": 2,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1791683953912,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["arithmetic"],
+          "fullName": "arithmetic adds",
+          "status": "passed",
+          "title": "adds",
+          "duration": 1.3905829999999924,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791683954741,
+      "endTime": 1791683954742.3906,
+      "status": "passed",
+      "message": "",
+      "name": "/native-fixture/tests/one.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["arithmetic"],
+          "fullName": "arithmetic multiplies",
+          "status": "passed",
+          "title": "multiplies",
+          "duration": 0.9729169999999954,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791683954404,
+      "endTime": 1791683954404.973,
+      "status": "passed",
+      "message": "",
+      "name": "/native-fixture/tests/two.test.ts"
+    }
+  ],
+  "devaiCollection": {
+    "schemaVersion": "1.0.0",
+    "reporter": "vitest-v1",
+    "nonce": "fixture-capture-nonce",
+    "plannedFiles": ["/native-fixture/tests/one.test.ts", "/native-fixture/tests/two.test.ts"],
+    "tests": [
+      {
+        "file": "/native-fixture/tests/two.test.ts",
+        "ancestors": ["arithmetic"],
+        "title": "multiplies",
+        "project": "audit-fixture"
+      },
+      {
+        "file": "/native-fixture/tests/one.test.ts",
+        "ancestors": ["arithmetic"],
+        "title": "adds",
+        "project": "audit-fixture"
+      }
+    ],
+    "resolvedSelection": [
+      {
+        "project": "audit-fixture",
+        "root": "/native-fixture",
+        "include": ["tests/**/*.test.ts"],
+        "exclude": ["**/node_modules/**", "**/.git/**"],
+        "configFile": "/native-fixture/vitest.config.mjs",
+        "setupFiles": [],
+        "globalSetup": [],
+        "customProviderModule": null,
+        "pool": "forks",
+        "environment": "node",
+        "viteEnvironment": {
+          "BASE_URL": "/",
+          "DEV": true,
+          "MODE": "test",
+          "PROD": false
+        },
+        "testEnvironment": {},
+        "forceTTY": ""
+      }
+    ],
+    "invalid": [],
+    "runtimeOutputRoots": [
+      "/native-fixture/.devai/state/native-config-traces/fixture-capture-nonce/runtime/hbKrwSfoVabQz-ITTmxfH"
+    ]
+  }
+}

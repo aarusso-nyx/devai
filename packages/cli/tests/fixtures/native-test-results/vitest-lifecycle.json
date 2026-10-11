@@ -1,0 +1,38 @@
+[
+  {
+    "scope": "main",
+    "kind": "begin"
+  },
+  {
+    "scope": "main",
+    "kind": "child",
+    "childScope": "f9e19b0d3411059a595bd11e69bd5779"
+  },
+  {
+    "scope": "f9e19b0d3411059a595bd11e69bd5779",
+    "kind": "begin"
+  },
+  {
+    "scope": "main",
+    "kind": "child",
+    "childScope": "4838afd7f3b58ab6927f67ccd39f141d"
+  },
+  {
+    "scope": "main",
+    "kind": "child-end",
+    "childScope": "f9e19b0d3411059a595bd11e69bd5779"
+  },
+  {
+    "scope": "4838afd7f3b58ab6927f67ccd39f141d",
+    "kind": "begin"
+  },
+  {
+    "scope": "main",
+    "kind": "child-end",
+    "childScope": "4838afd7f3b58ab6927f67ccd39f141d"
+  },
+  {
+    "scope": "main",
+    "kind": "end"
+  }
+]

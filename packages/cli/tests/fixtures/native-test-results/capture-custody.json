@@ -1,0 +1,57 @@
+[
+  {
+    "format": "vitest-json",
+    "version": "4.1.11",
+    "node": "24.20.0",
+    "rawSha256": "c1e1896fa05cea6890c76375af7c614c3d7db5283bd9295e3f448d1dd47e2b89",
+    "normalization": "Only the capture repository absolute root is replaced with /native-fixture. Native titles, file fields, leaf outcomes, retry plans and counters are unchanged."
+  },
+  {
+    "format": "playwright-json",
+    "version": "1.64.0",
+    "node": "24.20.0",
+    "rawSha256": "5e1adb991c2ffeb6e7d290cfa3de21dbcef31fc9ccd34423b00008b642baf2fb",
+    "normalization": "Only the capture repository absolute root is replaced with /native-fixture. Native titles, file fields, leaf outcomes, retry plans and counters are unchanged."
+  },
+  {
+    "format": "node-tap",
+    "version": "24.20.0",
+    "rawSha256": "9a7fdabc01808a1baca9bf0d1efee42bb3e8c5ac2685a004cd1d56cfb3de57a5",
+    "normalization": "none"
+  },
+  {
+    "format": "vitest-json-with-devai-collection",
+    "version": "4.1.11",
+    "vite": "7.3.6",
+    "node": "24.20.0",
+    "rawSha256": "d773c0bf8184499b817c592cf9bc9d090e9394b834c298fc052e498a93e3530a",
+    "stderrSha256": "6ac686771c12f543f95c452c3c1cf024881488a5fa1b32da47dcefe98c7e680d",
+    "reporterSha256": "2516bf13ad45c6420218b0409bc58f817f60fc48851addbd2e716e1a6188c306",
+    "preloadSha256": "9138e33f439587f44d0238648725eebb7973f27fcb0d9de6c5f49872551a3fea",
+    "rawTraceSha256": "0cdc70e3af41afcf04129bcfda27aaf04f2450b11294a3ed0be8ed576c1dacb9",
+    "normalization": "Only capture repository absolute root replaced with /native-fixture and internal nonce replaced with fixture-capture-nonce for trusted process broker replacement. Native IDs, counters, leaf outcomes, resolved selection and environment metadata unchanged. No provenance observations normalized or authored; per-case real subprocess generates its own exact trace."
+  },
+  {
+    "format": "playwright-native-scope-lifecycle",
+    "version": "1.60.0",
+    "node": "24.20.0",
+    "rawTraceSha256": "6e85a2cd86d1520ce9c8512dcb6e3ebf81524b3535d57787822549a061015eb3",
+    "normalization": "Projection retains actual lifecycle kinds and kind/scope/childScope/operation/hook fields only, in unchanged native order. No lifecycle events, identities or transitions authored."
+  },
+  {
+    "format": "vitest-native-scope-lifecycle",
+    "version": "4.1.11",
+    "vite": "7.3.6",
+    "node": "24.20.0",
+    "rawTraceSha256": "5b0b9a725dd1a13cb791605ac51e7edab26cefc8082ad6d2d6219770579d3e50",
+    "normalization": "Projection retains actual lifecycle kinds and kind/scope/childScope/operation/hook fields only, in unchanged native order. No lifecycle events, identities or transitions authored."
+  },
+  {
+    "format": "vitest-complete-native-scope-lifecycle",
+    "version": "4.1.11",
+    "vite": "7.3.6",
+    "node": "24.20.0",
+    "rawTraceSha256": "0cdc70e3af41afcf04129bcfda27aaf04f2450b11294a3ed0be8ed576c1dacb9",
+    "normalization": "Projection retains actual lifecycle kinds and kind/scope/childScope/operation/hook fields only, in unchanged native order. No lifecycle events, identities or transitions authored."
+  }
+]
