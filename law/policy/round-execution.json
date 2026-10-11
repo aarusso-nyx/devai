@@ -236,6 +236,10 @@
         "members": ["test-inventory"]
       },
       {
+        "name": "workflows",
+        "members": ["workflow-step-inventory"]
+      },
+      {
         "name": "all",
         "members": [
           "stack-adapter-pack-resolution",
