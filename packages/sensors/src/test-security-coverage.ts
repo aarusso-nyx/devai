@@ -74,6 +74,17 @@ export function senseTestSecurityCoverage(opts: TestSecurityCoverageOptions): Se
     });
   }
 
+  if ((result.errors?.length ?? 0) > 0) {
+    status = 'error';
+    findings.push(
+      ...(result.errors ?? []).map((message) => ({
+        severity: 'critical' as const,
+        code: 'TEST_EXECUTABLE_POPULATION_INCOMPLETE',
+        message,
+      })),
+    );
+  }
+
   return buildSensorReading({
     sensorName: 'test-security-coverage',
     sensorKind: 'test_security_coverage',

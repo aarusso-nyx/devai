@@ -1,6 +1,7 @@
 export * from './build.js';
 export * from './action-effect-inference.js';
 export * from './inventory-api.js';
+export * from './inventory-endpoint-identity.js';
 export * from './inventory-body-inputs.js';
 export * from './inventory-coverage.js';
 export * from './inventory-data-handling.js';
@@ -59,3 +60,7 @@ export * from './test-invariant-alignment.js';
 export * from './trace-resolve.js';
 export * from './type-check.js';
 export { SENSOR_ACTION_KINDS } from './generated/action-kinds.js';
+
+export { isExecutableTestFile, executableTestPopulation } from './test-file-population.js';
+
+export { loadCandidateAuditProjection, readCandidateFile } from './audit-projection.js';

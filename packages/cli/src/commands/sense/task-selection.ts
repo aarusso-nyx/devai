@@ -22,6 +22,7 @@ export function resolveTaskBoundSenseSelection(
           ...member.capabilities,
           'fs:workspace',
           'proc:declared-sensor-task',
+          ...(binding.nativeSelectionDigest === undefined ? [] : ['fs:proofs', 'fs:f5-state']),
           ...(member.kind === 'migration_check' ? ['db:write'] : []),
         ]),
       ]),

@@ -1,5 +1,7 @@
-import { readdirSync, readFileSync, statSync, type Stats } from 'node:fs';
-import { isAbsolute, join, resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { relative, resolve } from 'node:path';
+import { executableTestPopulation } from './test-file-population.js';
+import { classifyTestMocks } from './test-mock-classification.js';
 import {
   buildSensorReading,
   type SensorFinding,
@@ -19,85 +21,16 @@ export interface TestIdiomaticityOptions {
   readonly now?: string;
 }
 
-const DEFAULT_TEST_GLOBS = ['packages/*/test', 'packages/*/src'];
 const DEFAULT_THRESHOLDS = { review: 0.5, fail: 0.8 } as const;
-
-const MOCK_RE =
-  /\b(jest\.mock|jest\.fn|vi\.mock|vi\.fn|mockReturnValue|mockImplementation|spyOn)\(/g;
-const FIXTURE_RE = /\b(beforeAll|beforeEach|afterAll|afterEach)\(/g;
-const SNAPSHOT_RE = /\btoMatch(Inline)?Snapshot\(/g;
-const INTEGRATION_RE = /\.(integration|e2e)\.(test|spec)\.[jt]sx?$/i;
-
-function abs(repoRoot: string, p: string): string {
-  return isAbsolute(p) ? p : resolve(repoRoot, p);
-}
-
-function safeStat(p: string): Stats | null {
-  try {
-    return statSync(p);
-  } catch {
-    return null;
-  }
-}
-
-function walkTestFiles(dir: string, sink: string[]): void {
-  const st = safeStat(dir);
-  if (st === null) return;
-  if (st.isFile()) {
-    if (/\.(test|spec)\.(ts|tsx|js|jsx)$/.test(dir)) sink.push(dir);
-    return;
-  }
-  if (!st.isDirectory()) return;
-  let entries: string[];
-  try {
-    entries = readdirSync(dir);
-  } catch {
-    return;
-  }
-  for (const e of entries) {
-    if (e === 'node_modules' || e === '.git' || e === 'dist' || e === 'build') continue;
-    walkTestFiles(join(dir, e), sink);
-  }
-}
-
-function expandRoots(repoRoot: string, globs: readonly string[]): string[] {
-  const out: string[] = [];
-  for (const g of globs) {
-    const normalised = g.replace(/\/\*\*$/, '/*');
-    if (!normalised.includes('*')) {
-      out.push(abs(repoRoot, normalised));
-      continue;
-    }
-    const parts = normalised.split('/');
-    const wildIdx = parts.findIndex((p) => p.includes('*'));
-    if (wildIdx < 0) continue;
-    const before = parts.slice(0, wildIdx).join('/');
-    const after = parts.slice(wildIdx + 1).join('/');
-    let entries: string[];
-    try {
-      entries = readdirSync(abs(repoRoot, before));
-    } catch {
-      continue;
-    }
-    for (const entry of entries) {
-      out.push(abs(repoRoot, [before, entry, after].filter((s) => s !== '').join('/')));
-    }
-  }
-  return out;
-}
-
-function countMatches(content: string, re: RegExp): number {
-  const matches = content.match(re);
-  return matches === null ? 0 : matches.length;
-}
+const INTEGRATION_RE =
+  /(?:^|\/)(?:integration|e2e|wiring)(?:\/|$)|\.(?:integration|e2e|wiring-spec)(?:\.(?:test|spec))?\.[cm]?[jt]sx?$/iu;
 
 export function senseTestIdiomaticity(opts: TestIdiomaticityOptions): SensorReading {
-  const globs = opts.testGlobs ?? DEFAULT_TEST_GLOBS;
   const thresholds = opts.thresholds ?? DEFAULT_THRESHOLDS;
 
-  const roots = expandRoots(opts.repoRoot, globs);
-  const files: string[] = [];
-  for (const r of roots) walkTestFiles(r, files);
+  const population = executableTestPopulation(opts.repoRoot, opts.testGlobs);
+  const files = population.paths;
+  const errors = [...population.errors];
 
   let mockHeavyFiles = 0;
   let mocksInIntegration = 0;
@@ -105,28 +38,37 @@ export function senseTestIdiomaticity(opts: TestIdiomaticityOptions): SensorRead
   let totalFixtures = 0;
   let totalSnapshots = 0;
   const findings: SensorFinding[] = [];
+  let observers = 0;
+  let faultInjections = 0;
+  let externalPorts = 0;
 
   for (const f of files) {
     let content: string;
     try {
       content = readFileSync(f, 'utf8');
-    } catch {
+    } catch (error) {
+      errors.push(`Cannot read executable test ${f}: ${String(error)}`);
       continue;
     }
-    const mocks = countMatches(content, MOCK_RE);
-    const fixtures = countMatches(content, FIXTURE_RE);
-    const snapshots = countMatches(content, SNAPSHOT_RE);
+    const classified = classifyTestMocks(opts.repoRoot, f, content);
+    const { mocks, fixtures, snapshots } = classified;
+    observers += classified.observers;
+    faultInjections += classified.faultInjections;
+    externalPorts += classified.externalPorts;
     totalMocks += mocks;
     totalFixtures += fixtures;
     totalSnapshots += snapshots;
     if (mocks >= 2) mockHeavyFiles += 1;
-    if (mocks > 0 && INTEGRATION_RE.test(f)) {
+    const rel = relative(resolve(opts.repoRoot), f).replace(/\\/gu, '/');
+    if (mocks > 0 && INTEGRATION_RE.test(rel)) {
       mocksInIntegration += 1;
-      const rel = f.replace(opts.repoRoot + '/', '');
       findings.push({
         severity: 'warning',
         code: 'TEST_IDIOMATICITY_MOCK_IN_INTEGRATION',
-        message: `Integration/e2e file uses mocks: ${rel}`,
+        message:
+          classified.unresolved > 0
+            ? `Integration/e2e file has unresolved mock ownership: ${rel}`
+            : `Integration/e2e file substitutes owned behavior or an unproved local double: ${rel}`,
         file: rel,
       });
     }
@@ -162,6 +104,17 @@ export function senseTestIdiomaticity(opts: TestIdiomaticityOptions): SensorRead
     status = 'pass';
   }
 
+  if (errors.length > 0) {
+    status = 'error';
+    findings.push(
+      ...errors.map((message) => ({
+        severity: 'critical' as const,
+        code: 'TEST_EXECUTABLE_POPULATION_INCOMPLETE',
+        message,
+      })),
+    );
+  }
+
   return buildSensorReading({
     sensorName: 'test-idiomaticity',
     sensorKind: 'test_idiomaticity',
@@ -174,6 +127,9 @@ export function senseTestIdiomaticity(opts: TestIdiomaticityOptions): SensorRead
     metrics: {
       test_files: total,
       mock_calls: totalMocks,
+      call_through_observers: observers,
+      observed_fault_injections: faultInjections,
+      external_port_substitutions: externalPorts,
       fixture_calls: totalFixtures,
       snapshot_calls: totalSnapshots,
       mock_heavy_files: mockHeavyFiles,

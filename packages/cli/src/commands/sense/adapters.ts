@@ -1,3 +1,4 @@
+import { senseDeclaredHarnessInvariantAlignment } from './declared-invariant-producers.js';
 import {
   senseBuild,
   senseDocsDrift,
@@ -6,7 +7,6 @@ import {
   senseHarnessDepth,
   senseHarnessGreenMain,
   senseHarnessIdiomaticity,
-  senseHarnessInvariantAlignment,
   senseHarnessPerformance,
   senseHarnessRobustness,
   senseHarnessSecurity,
@@ -340,7 +340,7 @@ const ADAPTERS: Readonly<Record<SensorKind, SenseSensorAdapter>> = Object.freeze
   harness_depth: (request) => senseHarnessDepth({ repoRoot: request.repoRoot }),
   harness_coherence: (request) => senseHarnessCoherence({ repoRoot: request.repoRoot }),
   harness_invariant_alignment: async (request) =>
-    senseHarnessInvariantAlignment({
+    senseDeclaredHarnessInvariantAlignment({
       repoRoot: request.repoRoot,
       observations: await observeGateProducers(request.repoRoot),
       scopedProducers: GATE_SCOPED_PRODUCERS,

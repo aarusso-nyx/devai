@@ -80,6 +80,17 @@ export function senseTestRobustnessCoverage(opts: TestRobustnessCoverageOptions)
     });
   }
 
+  if ((result.errors?.length ?? 0) > 0) {
+    status = 'error';
+    findings.push(
+      ...(result.errors ?? []).map((message) => ({
+        severity: 'critical' as const,
+        code: 'TEST_EXECUTABLE_POPULATION_INCOMPLETE',
+        message,
+      })),
+    );
+  }
+
   return buildSensorReading({
     sensorName: 'test-robustness-coverage',
     sensorKind: 'test_robustness_coverage',

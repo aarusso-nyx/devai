@@ -1026,6 +1026,9 @@ async function regenerateForCandidate(
     try {
       const produced = produceKind(repoRoot, kind, candidate, options.surfaces, inputs);
       if (produced.status !== 'pass' && produced.status !== 'review') {
+        // Keep the producer's concrete schema/code diagnostics in this new observation.
+        // The aggregate remains atomic and never rewrites an earlier failed reading.
+        findings.push(...(produced.reading.findings ?? []));
         errors.push(
           `regenerate ${bodyPath} failed: ${kind} read ${produced.status} (${produced.codes})`,
         );

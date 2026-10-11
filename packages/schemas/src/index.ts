@@ -165,6 +165,21 @@ function ensureCommon(): void {
 
 function ensureSchemaReferences(name: SchemaName): void {
   if (
+    name === 'test-task-descriptor.schema.json' ||
+    name === 'test-result-population.schema.json' ||
+    name === 'adopter-policy.schema.json'
+  ) {
+    for (const dependency of [
+      'reviewed-workflow-steps.schema.json',
+      ...(name === 'adopter-policy.schema.json'
+        ? (['invariant-producers.schema.json'] as const)
+        : (['test-result-population.schema.json'] as const)),
+    ]) {
+      if (dependency !== name && ajv.getSchema(dependency) === undefined)
+        ajv.addSchema(schemaDocument(dependency), dependency);
+    }
+  }
+  if (
     name === 'test-task-descriptor.schema.json' &&
     ajv.getSchema('preflight-probe.schema.json') === undefined
   ) {

@@ -9,6 +9,9 @@ function actionSpellings(action: string): readonly (readonly string[])[] {
 }
 
 interface WorkflowRunStep {
+  readonly workingDirectory?: string;
+  readonly inheritedDirectoryUnknown?: boolean;
+  readonly executionContextUnknown?: boolean;
   readonly script: string;
   readonly continueOnError: boolean;
   readonly disabled: boolean;
@@ -121,6 +124,24 @@ export function extractRunSteps(content: string): WorkflowRunStep[] {
     }
 
     const block = lines.slice(start, end);
+    const workingDirectory = block
+      .map(
+        (line) =>
+          stripYamlComment(line).match(/^\s*(?:-\s+)?working-directory\s*:\s*(.*?)\s*$/u)?.[1],
+      )
+      .find((value) => value !== undefined);
+    const location = {
+      ...(workingDirectory === undefined
+        ? {}
+        : { workingDirectory: unquoteYamlScalar(workingDirectory) }),
+      inheritedDirectoryUnknown: /^\s*defaults\s*:/mu.test(content),
+      executionContextUnknown:
+        /^\s*(?:-\s+)?env\s*:/mu.test(content) ||
+        block.some((line) => {
+          const shell = stripYamlComment(line).match(/^\s*(?:-\s+)?shell\s*:\s*(.*?)\s*$/u)?.[1];
+          return shell !== undefined && !['bash', 'sh'].includes(unquoteYamlScalar(shell));
+        }),
+    };
     const continueOnErrorLine = block.find((line) =>
       /^\s*(?:-\s+)?continue-on-error\s*:/.test(line),
     );
@@ -157,13 +178,20 @@ export function extractRunSteps(content: string): WorkflowRunStep[] {
           body.push(bodyLine.slice(Math.min(bodyLine.length, runIndent + 2)));
         }
         steps.push({
+          ...location,
           script: raw.startsWith('>') ? foldWorkflowLines(body) : body.join('\n'),
           continueOnError,
           disabled,
           conditional,
         });
       } else {
-        steps.push({ script: unquoteYamlScalar(raw), continueOnError, disabled, conditional });
+        steps.push({
+          ...location,
+          script: unquoteYamlScalar(raw),
+          continueOnError,
+          disabled,
+          conditional,
+        });
       }
       break;
     }
@@ -645,4 +673,33 @@ export function hasExecutableMeasurement(
         isFailClosedExecutableSegment(segment, candidate),
       ),
   );
+}
+
+/** Exact declared argv in a fail-closed, unconditional CI step at its declared cwd. */
+export function hasExecutableTask(
+  steps: readonly WorkflowRunStep[],
+  argv: readonly string[],
+  cwd: string,
+): boolean {
+  return steps.some((step) => {
+    if (
+      step.continueOnError ||
+      step.disabled ||
+      step.conditional === true ||
+      step.inheritedDirectoryUnknown === true ||
+      step.executionContextUnknown === true ||
+      (step.workingDirectory ?? '.') !== (cwd === '' ? '.' : cwd)
+    )
+      return false;
+    const commands = step.script
+      .split('\n')
+      .map((line) => stripYamlComment(line).trim())
+      .filter((line) => line !== '' && line !== 'set -e' && line !== 'set -euo pipefail');
+    return (
+      commands.length === 1 &&
+      commands[0] !== undefined &&
+      !/[;&|<>`$]/u.test(commands[0]) &&
+      sameArguments(shellWords(commands[0]), argv)
+    );
+  });
 }
