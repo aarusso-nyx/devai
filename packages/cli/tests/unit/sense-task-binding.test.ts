@@ -45,6 +45,7 @@ import {
 } from '../../src/commands/sense/task-binding.js';
 import { resolveTaskBoundSenseSelection } from '../../src/commands/sense/task-selection.js';
 import { nativeInputPreloadPath } from '../../src/commands/sense/native-runner-selection.js';
+import { inspectNativeInputProvenance } from '../../src/commands/sense/native-input-provenance.js';
 import { resolveSensorReadingInstance } from '../../src/commands/sense/reading-instance.js';
 import { runCheckTasks } from '../../src/services/check-runner/runner.js';
 import { installNativeVitest } from '../fixtures/native-test-results/native-runner-fixture.js';
@@ -591,6 +592,152 @@ describe('exact reviewed sensor task binding', () => {
     expect(native['executableFiles']).toEqual(contract.executableFiles);
     expect(result.reading.metrics?.native_result_contract_sha256).toBe(
       createHash('sha256').update(canonicalJson(contract)).digest('hex'),
+    );
+  });
+
+  it.runIf(process.platform === 'linux')(
+    'replays genuine platform facts and refuses changed identity, custody, semantics and missing rechecks',
+    () => {
+      const root = nativeFixture(nativeContract());
+      const bound = binding(root, 'unit_test');
+      const result = execute(bound, nativeOutput(root));
+      expect(result.reading.status, JSON.stringify(result.reading.findings)).toBe('pass');
+      const raw = String(result.reading.metrics?.native_input_trace);
+      const rows = raw
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line) as Record<string, unknown>);
+      const nonce = String(rows[0]?.['nonce']);
+      const index = rows.findIndex((row) => row['kind'] === 'framework-platform-probe');
+      expect(index).toBeGreaterThan(0);
+      const rowAt = (values: Record<string, unknown>[]) => {
+        const row = values[index];
+        if (row === undefined) throw new Error('Authentic platform fact missing');
+        return row;
+      };
+      const fact = rowAt(rows);
+      expect(fact['path']).toBe('/proc/version');
+      const recheckIndex = rows.findIndex(
+        (row) =>
+          row['kind'] === 'framework-platform-probe-recheck' &&
+          row['scope'] === fact['scope'] &&
+          row['probeId'] === fact['probeId'],
+      );
+      expect(recheckIndex).toBeGreaterThan(index);
+      const inspect = (values: Record<string, unknown>[]) =>
+        inspectNativeInputProvenance(
+          root,
+          nonce,
+          values.map((row) => JSON.stringify(row)).join('\n'),
+          result.stdout,
+          bound.task,
+        );
+      expect(inspect(rows)).toEqual([]);
+      for (const [field, value] of [
+        ['api', 'readFile'],
+        ['encoding', 'utf-8'],
+        ['path', '/etc/passwd'],
+        ['arch', 'other'],
+        ['platform', 'darwin'],
+        ['osRelease', 'changed'],
+        ['pid', -1],
+        ['probeId', 0],
+      ] as const) {
+        const changed = structuredClone(rows);
+        rowAt(changed)[field] = value;
+        expect(inspect(changed), field).not.toEqual([]);
+      }
+      for (const [field, value] of [
+        ['packageName', 'lookalike'],
+        ['packageVersion', '0.0.0'],
+        ['sha256', '0'.repeat(64)],
+        ['sourceSha256', '0'.repeat(64)],
+        ['scriptId', '0'],
+        ['line', 1],
+        ['column', 1],
+        ['file', '/tmp/lookalike.js'],
+      ] as const) {
+        const changed = structuredClone(rows);
+        (rowAt(changed)['caller'] as Record<string, unknown>)[field] = value;
+        expect(inspect(changed), field).not.toEqual([]);
+      }
+      for (const [field, value] of [
+        ['sha256', '0'.repeat(64)],
+        ['rawSha256', '0'.repeat(64)],
+        ['realpath', '/tmp/version'],
+        ['semantics', { includesMicrosoft: true }],
+      ] as const) {
+        const changed = structuredClone(rows);
+        (rowAt(changed)['observation'] as Record<string, unknown>)[field] = value;
+        expect(inspect(changed), field).toEqual(['NATIVE_PLATFORM_PROBE_CHANGED']);
+      }
+      const missing = structuredClone(rows);
+      missing.splice(recheckIndex, 1);
+      expect(inspect(missing)).toEqual(['NATIVE_PLATFORM_RECHECK_MISSING']);
+      const orphan = structuredClone(rows);
+      orphan.splice(index, 1);
+      expect(inspect(orphan)).toEqual(['NATIVE_PLATFORM_RECHECK_INVALID']);
+      const duplicate = structuredClone(rows);
+      duplicate.splice(index, 0, structuredClone(fact));
+      expect(inspect(duplicate)).toEqual(['NATIVE_PLATFORM_PROBE_DUPLICATE']);
+      const wrongScope = structuredClone(rows);
+      rowAt(wrongScope)['scope'] = 'unregistered';
+      expect(inspect(wrongScope)).not.toEqual([]);
+      const afterSeal = structuredClone(rows);
+      afterSeal.push(structuredClone(fact));
+      expect(inspect(afterSeal)).toEqual(['NATIVE_INPUT_SCOPE_LIFECYCLE_INVALID']);
+    },
+  );
+
+  it.runIf(process.platform === 'linux').each(['/proc/version', '/etc/os-release', '/usr/bin/ldd'])(
+    'refuses actual candidate reads of %s despite genuine framework facts in the same run',
+    (path) => {
+      const root = nativeFixture(nativeContract());
+      const source = readFileSync(join(root, 'tests/one.test.ts'), 'utf8');
+      put(
+        root,
+        'tests/one.test.ts',
+        `import {readFileSync} from 'node:fs';\n${source}\nreadFileSync(${JSON.stringify(path)},'utf8');\n`,
+      );
+      git(root, 'add', '.');
+      git(root, 'commit', '-qm', 'candidate platform read witness');
+      const result = execute(binding(root, 'unit_test'), nativeOutput(root));
+      expect(result.reading.status).toBe('unknown');
+      expect(result.reading.metrics?.tests_passed).toBeUndefined();
+      expect(result.reading.findings).toContainEqual(
+        expect.objectContaining({ code: `NATIVE_INPUT_EXTERNAL_PATH:${path}` }),
+      );
+    },
+  );
+
+  it('refuses candidate host-file reads through an imported private platform helper', () => {
+    const root = nativeFixture(nativeContract());
+    const outside = realpathSync(mkdtempSync(join(tmpdir(), 'devai candidate outside ç ')));
+    roots.push(outside);
+    const path = join(outside, 'fixture-input.txt');
+    writeFileSync(path, 'owned test bytes');
+    const helper = join(dirname(nativeInputPreloadPath()), 'native-platform-probes.js');
+    const source = readFileSync(join(root, 'tests/one.test.ts'), 'utf8');
+    put(
+      root,
+      'tests/one.test.ts',
+      `
+import {readFileSync} from 'node:fs';
+import {nativePlatformProbeObservation,frameworkPlatformProbeCallers} from ${JSON.stringify(pathToFileURL(helper).href)};
+${source}
+const caller={...frameworkPlatformProbeCallers[0],path:${JSON.stringify(path)}};
+try {nativePlatformProbeObservation(caller);} catch {}
+const bytes=readFileSync(${JSON.stringify(path)});
+nativePlatformProbeObservation(caller,{platform:'linux',osRelease:'6'},${JSON.stringify(path)},bytes);
+`,
+    );
+    git(root, 'add', '.');
+    git(root, 'commit', '-qm', 'candidate private helper read witness');
+    const result = execute(binding(root, 'unit_test'), nativeOutput(root));
+    expect(result.reading.status).toBe('unknown');
+    expect(result.reading.metrics?.tests_passed).toBeUndefined();
+    expect(result.reading.findings).toContainEqual(
+      expect.objectContaining({ code: `NATIVE_INPUT_EXTERNAL_PATH:${path}` }),
     );
   });
 
