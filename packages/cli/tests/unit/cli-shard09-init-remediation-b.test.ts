@@ -125,6 +125,7 @@ describe('cli shard09 init remediation lane B', () => {
           '--human',
           '--force',
           '--include <component>',
+          '--only <component>',
           '--hook <name>',
           '--command <cmd>',
         ],

@@ -21,14 +21,19 @@ const mocks = vi.hoisted(() => ({
   extractRoutes: vi.fn(),
   discoverSchemas: vi.fn(),
   discoverTests: vi.fn(),
+  workflowReviewInventory: vi.fn(),
 }));
 
 vi.mock('@devai-nyx/skills', () => ({ resolveSensorParams: mocks.resolveSensorParams }));
-vi.mock('@devai-nyx/sensors', () => ({ senseMigrateCheck: mocks.senseMigrateCheck }));
+vi.mock('@devai-nyx/sensors', () => ({
+  senseMigrateCheck: mocks.senseMigrateCheck,
+  workflowReviewInventory: mocks.workflowReviewInventory,
+}));
 vi.mock('@devai-nyx/sensors/inventory-slices', () => ({
   INVENTORY_SLICES: [
     { name: 'all', members: [] },
     { name: 'review', members: [] },
+    { name: 'workflows', members: ['workflow-step-inventory'] },
   ],
   inventorySlice: mocks.inventorySlice,
 }));
@@ -120,7 +125,9 @@ beforeEach(() => {
               'inventory-coverage',
             ],
           }
-        : undefined,
+        : name === 'workflows'
+          ? { name: 'workflows', members: ['workflow-step-inventory'] }
+          : undefined,
   );
   mocks.withSnapshot.mockImplementation((operation: () => unknown) => operation());
   mocks.regenerateInventory.mockResolvedValue({ version: 'fixture-inventory' });
@@ -138,6 +145,12 @@ beforeEach(() => {
   mocks.extractRoutes.mockReturnValue([{ path: '/a' }]);
   mocks.discoverSchemas.mockResolvedValue([{ name: 'public' }]);
   mocks.discoverTests.mockReturnValue([{ path: 'tests/a.test.ts' }]);
+  mocks.workflowReviewInventory.mockReturnValue({
+    schemaVersion: '1.0.0',
+    status: 'unknown',
+    reason: 'WORKFLOW_INVENTORY_EMPTY',
+    workflows: [],
+  });
 });
 
 afterEach(() => {
@@ -319,6 +332,55 @@ describe('sense migrate direct contract', () => {
 });
 
 describe('sense inventory direct contract', () => {
+  it.each(['complete', 'unknown'] as const)(
+    'maps workflow facts %s to the existing slice verdict without persistence',
+    async (status) => {
+      const root = temporary();
+      const value = {
+        schemaVersion: '1.0.0',
+        status,
+        reason: status === 'complete' ? null : 'WORKFLOW_INVENTORY_INCOMPLETE',
+        workflows: [
+          {
+            path: '.github/workflows/check.yml',
+            sha256: 'a'.repeat(64),
+            status,
+            reason: status === 'complete' ? null : 'WORKFLOW_INVENTORY_INCOMPLETE',
+            steps: [
+              {
+                job: 'verify',
+                index: 0,
+                occurrence: '.github/workflows/check.yml#verify[0]',
+                name: 'Inspect',
+                sha256: 'b'.repeat(64),
+                closure:
+                  status === 'complete'
+                    ? {
+                        status,
+                        files: [{ path: 'scripts/main.mjs', sha256: 'c'.repeat(64) }],
+                        reason: null,
+                      }
+                    : { status, files: null, reason: 'WORKFLOW_INVENTORY_CLOSURE_UNPROVED' },
+              },
+            ],
+          },
+        ],
+      };
+      mocks.workflowReviewInventory.mockReturnValue(value);
+      const result = await executeInventorySlice('workflows', { repoRoot: root });
+      const verdict = status === 'complete' ? 'pass' : 'review';
+      expect(result).toEqual({
+        slice: 'workflows',
+        members: ['workflow-step-inventory'],
+        status: verdict,
+        results: [{ member: 'workflow-step-inventory', status: verdict, value }],
+        implicit_persistence: false,
+      });
+      expect(mocks.workflowReviewInventory).toHaveBeenCalledExactlyOnceWith(root);
+      expect(mocks.regenerateInventory).not.toHaveBeenCalled();
+    },
+  );
+
   it('preserves the selected member order and delegated source values', async () => {
     const root = temporary();
     trace(root);
@@ -508,7 +570,7 @@ describe('sense inventory direct contract', () => {
       'Render one canonical repository inventory slice without persistence',
     );
     expect(options).toEqual([
-      ['--slice <name>', 'Required slice: all | review'],
+      ['--slice <name>', 'Required slice: all | review | workflows'],
       ['--repo-root <path>', 'Repository root (default: .)'],
       ['--adopter-root <path>', 'Adopter root for stack pack resolution'],
       [
