@@ -47,5 +47,5 @@ describe('binding action-effect CLI', () => {
       extracted_actions: 69,
       unresolved_edges: 0,
     });
-  }, 30_000);
+  });
 });
