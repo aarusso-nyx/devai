@@ -99,7 +99,8 @@ if (trace !== undefined && nonce !== undefined) {
     throw new Error(`DEVAI_NATIVE_INPUT_UNSUPPORTED:${operation}`);
   };
   const dlopen = process.dlopen;
-  process.dlopen = (module, filename, flags): void => {
+  process.dlopen = (...loadArguments: Parameters<typeof dlopen>): void => {
+    const [module, filename] = loadArguments;
     observe(filename, 'file');
     const swc = /[/\\]@swc[/\\]core-[^/\\]+[/\\][^/\\]+\.node$/u.test(filename);
     const rollup = /[/\\]@rollup[/\\]rollup-[^/\\]+[/\\][^/\\]+\.node$/u.test(filename);
@@ -118,7 +119,8 @@ if (trace !== undefined && nonce !== undefined) {
       )
         unsupported('native-addon-version');
     }
-    dlopen(module, filename, flags);
+    // Omitted flags and explicit undefined select different dlopen modes on Linux.
+    dlopen(...loadArguments);
     const nativeExports = (module as { exports: Record<PropertyKey, unknown> }).exports;
     const exports: Record<PropertyKey, unknown> = Object.create(null) as Record<
       PropertyKey,
