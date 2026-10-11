@@ -439,7 +439,7 @@ The initial Vitest provenance mode is finite: Node 24, Vitest 4.1.11 and Vite 7.
 with explicit `--configLoader native` and an explicit relative `--config ./path/config.mjs`
 (or another admitted config extension). A bare config filename refuses before
 execution because native Vite resolution can probe ambient ancestor package
-paths; DEVAI does not rewrite argv. Vite 8 and default/bundled config loading
+paths; DEVAI does not rewrite config arguments. Vite 8 and default/bundled config loading
 refuse standing. Configurations must use native ESM path semantics (for example
 `import.meta.dirname`); compatibility with bundler-injected `__dirname` is not
 inferred. STYNX's existing shared/backend configurations require migration and
@@ -478,6 +478,36 @@ freshness. Links, escapes, unrelated metadata access and unowned writes refuse.
 The trusted ordered cross-scope trace records successful mkdir, full-file write,
 rename and removal operations. The host replays their exact paths, encodings and
 byte SHA-256 in a virtual output ledger, retaining only each live file identity.
+
+The opt-in Playwright 1.60.0 native `resultPopulation` mode uses a separate
+owned result namespace: the exact physical `runtime/playwright-results` child
+of this execution's fresh nonce root. DEVAI internally supplies the native
+`--output` argument for this root, overriding the configuration's `outputDir`.
+This is an explicit governed-mode behavior; ordinary tasks retain their authored
+output selection. Caller `--output` arguments, including equals/alternate forms,
+refuse rather than compete with the internal selection. The authored task argv
+and historical portable identity remain intact. The private execution binding
+must independently bind and reconstruct the actual Node identity, complete
+effective argv and exact owned output root; the effective-tuple digest and
+immutable measured body must agree with the process actually authorized and run.
+No general argument-insertion mechanism is admitted. The package-owned reporter
+must capture every selected project's actual resolved `outputDir`; each must
+equal this exact owned root or native standing refuses.
+
+Result custody is separate from transform-cache custody. Its finite supported
+forms are the exact result root, its immediate framework output directories
+named `.playwright-artifacts-<decimal-integer>` or an ASCII slug matching
+`[A-Za-z0-9_-]+`, and the root's `.last-run.json` metadata file, written only by
+observed full-file writes. Only owned directory metadata/creation/cleanup and
+ordered result-file write/removal operations qualify; links, unowned
+overwrites, arbitrary files, deeper artifacts and every rename involving
+results refuse, including cache-to-result or result-to-cache renames. The same fresh/no-link ordered custody rules
+apply. This does not promise attachment or browser-output support. Result
+artifacts receive no `readFile`, executable, module-load or transformed-source
+input credit; Playwright transformed-source credit remains confined to verified
+transform-cache `.js` identities. A configured output location on which tests
+depend requires migration or remains unsupported in this opt-in mode. Browser,
+server and setup effects still require their own exact admission.
 
 A worker read must match a preceding successful full write or a successful rename
 that carries that write's identity into the consumed target. Vitest's `.tmp-*`
@@ -537,9 +567,9 @@ has no hidden I/O; the interface name alone grants no exception.
 Supported standing formats are Vitest JSON (`testResults`, `assertionResults`
 and consistent final native counters) and exact Playwright 1.60.0 JSON
 (suites/specs/tests/results plus consistent final stats), accompanied by the
-verified collection above. Playwright result artifacts must use an explicitly
-admitted output directory within the canonical harness-mutated state namespace;
-its default repository `test-results` directory is not implicitly admitted.
+verified collection above. Playwright result artifacts must use the internally
+bound fresh result root and finite custody contract above; neither its default
+repository `test-results` nor an arbitrary state directory is admitted.
 Browser, server and global-setup effects require their own exact admission.
 Ordinary Node TAP lacks the required complete native
 collection and unambiguous per-test source provenance. It remains diagnostic
