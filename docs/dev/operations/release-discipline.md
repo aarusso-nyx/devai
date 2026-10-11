@@ -478,6 +478,20 @@ The export path is usable locally and in the preflight lane from step 2, because
 the in-repository copy. It becomes part of the protected release verification only at
 step 4.
 
+ADR-REL-0035 performs step 4 for the independently verified published 2.4.0
+package, advancing the source pin from 1.9.0. Its verifier provenance is
+`fc79da07d4d4dfa466548337a4944ae1b7e0bfdcf2f1c334b341bb1ad477cd4d`.
+Update only the trusted verifier identity in the schema-validated adopter-owned
+toolchain manifest, preserving local runtimes, action pins and constants.
+Current init bind/apply/upgrade operations do not carry a toolchain-only edit.
+Regenerate generated attested-RC workflows through supported host-adapter
+binding/upgrade; DEVAI's protected workflow/checker source retains governed
+Engineer authoring and independent review. Verify repository **and environment** values of
+`DEVAI_LEDGER_VERIFIER_PROVENANCE_SHA256`: an environment value can override the
+repository value. Record protected updates separately; a source pin change does
+not prove they occurred. Never strip `sensorKinds` to make an older verifier
+accept a different task identity.
+
 ## Publish the documentation site without a release
 
 A change that touches only the documentation site, with no semantic or product

@@ -1,12 +1,48 @@
 # Changelog
 
+## 2.5.0 — Unreleased
+
+This minor campaign adds supported adopter audit interfaces. Implementation,
+installed regressions and protected integration remain required before release;
+this entry does not claim publication or closure of every demonstrated gap.
+
+- Preserve source-qualified endpoint observations across API, coverage, RBAC
+  and HTTP evidence. Unique legacy method/path references remain compatible;
+  ambiguous references earn no endpoint credit. Exact observation IDs include
+  source evidence and require explicit migration when that evidence moves.
+- Add closed optional invariant producer and reviewed workflow effect sources,
+  with registered whole-file projection and exact candidate/result or executable
+  closure validation. Existing all-mode obligations, permissions, effect
+  classifications and immutable evidence remain mandatory.
+- Define complete executable census, semantic integration classification and
+  verified package-owned native Vitest/Playwright collection and final result
+  populations, including project-specific Turbo transport and explicit
+  nonexecuted cache results. Results-only cannot establish standing; Node TAP
+  remains diagnostic UNKNOWN. Missing or ambiguous evidence refuses executed PASS.
+- Require native execution-origin receipts and immutable measured-body binding;
+  generic recording cannot mint or refresh execution. Retain every current
+  kind/task/population head and aggregate the worst outcome, leaving missing
+  obligations unmeasured.
+- Constrain native provenance to the documented finite loader, config capability
+  and transform matrix. Trace actual input/resolution/environment observations;
+  unsupported or incomplete provenance remains UNKNOWN. STYNX requires a reviewed
+  native-config migration and exact installed verification before standing.
+- Advance the trusted verifier source pin coherently from published
+  `@aarusso-nyx/devai@1.9.0` to independently verified published
+  `@aarusso-nyx/devai@2.4.0`. Schema-validated adopter toolchain updates, registered
+  generated workflow regeneration and
+  separately recorded effective protected-variable migration remain required.
+
+See [adopter audit interfaces](docs/dev/operations/adopter-audit-interfaces.md)
+for contracts, compatibility limits and migration requirements.
+
 ## 2.4.0 — 2026-10-10
 
-DEVAI 2.4.0 is a minor candidate. It adds opt-in reviewed task bindings and
+DEVAI 2.4.0 is a published minor release. It adds opt-in reviewed task bindings and
 policy-owned sensor inputs, and repairs candidate custody, portable inventory
 roots, Angular route forwarding and bound-constitution measurement. The public
-action set remains 69. Publication and independent artifact verification are
-pending.
+action set remains 69. Publication and independent artifact verification
+completed on 2026-10-10; its immutable package and evidence remain unchanged.
 
 - `init bind --adopter-policy` projects the complete optional `sensor_inputs`
   document with its source and target digests. A never-owned target survives an
