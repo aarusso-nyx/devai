@@ -330,6 +330,45 @@
           "files": [".devai/config/subprocess-effects.json"]
         }
       ]
+    },
+    {
+      "version": "2.5.0",
+      "status": "unreleased",
+      "changes": [
+        {
+          "id": "MIG-2.5.0-audit-interface-projections",
+          "kind": "opt-in-capability",
+          "summary": "Declare invariant_producers and reviewed_workflow_steps as complete closed adopter-policy documents, then use registered adopter-policy binding. Each target is independently receipt-owned and atomic, absent unmanaged targets remain untouched, and previously owned removal retires to canonical empty defaults. Exact obligations and reviewed effects require candidate-dependent measurement validation; binding alone grants no execution or readiness.",
+          "decision_records": ["ADR-SCR-0017", "ADR-CFG-0002"],
+          "segments": ["adopter-policy"],
+          "files": [
+            ".devai/config/invariant-producers.json",
+            ".devai/config/reviewed-workflow-steps.json",
+            ".devai/config/adopter-policy-binding.json"
+          ]
+        },
+        {
+          "id": "MIG-2.5.0-complete-test-result-population",
+          "kind": "opt-in-capability",
+          "summary": "A reviewed command-result task may opt into resultPopulation with exact project/transport, selectionEvidence, executable file roster and complete test IDs. Standing requires verified package-owned Vitest/Playwright native collection and final results from the same execution, agreeing with the candidate-tracked census. Results-only, missing provenance, partial output, duplicates, skipped tests or cache replay cannot be executed PASS. Node TAP remains diagnostic UNKNOWN. No extra planner command is admitted.",
+          "decision_records": ["ADR-SCR-0017", "ADR-SCR-0015"],
+          "segments": ["harness-ci", "adopter-policy"],
+          "files": ["test-tasks.json", ".devai/config/invariant-producers.json"]
+        },
+        {
+          "id": "MIG-2.5.0-trusted-verifier-2-4",
+          "kind": "rebind",
+          "summary": "The trusted verifier advances coherently from published @aarusso-nyx/devai@1.9.0 to independently verified published @aarusso-nyx/devai@2.4.0, admitting the supported sensorKinds descriptor annotation. Update only the verifier identity in the schema-validated adopter-owned toolchain manifest, preserving repository-specific pins/runtimes/constants; no current init operation carries that edit. Regenerate generated attested-RC host-adapter workflows through supported binding/upgrade. Separately verify and update effective repository/environment DEVAI_LEDGER_VERIFIER_PROVENANCE_SHA256 to fc79da07d4d4dfa466548337a4944ae1b7e0bfdcf2f1c334b341bb1ad477cd4d; generated workflows and protected values are not hand-edit exceptions.",
+          "decision_records": ["ADR-REL-0035", "ADR-CHK-0006"],
+          "segments": ["operational-law", "host-adapters", "harness-ci"],
+          "files": [
+            ".devai/config/toolchain.json",
+            ".github/workflows/devai-local-rc-verify.yml",
+            ".devai/config/github-actions-host-adapter.json"
+          ],
+          "decision_required": true
+        }
+      ]
     }
   ]
 }

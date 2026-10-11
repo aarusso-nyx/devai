@@ -5,15 +5,15 @@
   "authority": "Architect",
   "package": {
     "name": "@aarusso-nyx/devai",
-    "version": "1.9.0",
+    "version": "2.4.0",
     "registry": "https://npm.pkg.github.com",
-    "tarball": "https://npm.pkg.github.com/download/@aarusso-nyx/devai/1.9.0/37594fb078f5098b83b3938a3bc70ac5488c3162",
-    "shasum_sha1": "37594fb078f5098b83b3938a3bc70ac5488c3162",
-    "integrity_sri": "sha512-5XPsmj5rOCEETMNAoGSN5WRqhrTgIEVcIHmWsU1aNpNPdfBjqh9IsAyHEUDka2csLQ1J1y7JuV3+A1VH+IfzAg==",
+    "tarball": "https://npm.pkg.github.com/download/@aarusso-nyx/devai/2.4.0/d650e1cf753720569ec826d8e2b93ead23671140",
+    "shasum_sha1": "d650e1cf753720569ec826d8e2b93ead23671140",
+    "integrity_sri": "sha512-WgiBcsUeSECohocQTnFmsycJRtyjHCHVF0KQ0//sHHb1zT7bHgMW248VmcRQNoaSRpXSOo2BRqIpOtnj2HsgWg==",
     "release_source": {
       "repository": "aarusso-nyx/devai",
-      "commit": "75343991140c223240b51cea80c060c516226945",
-      "tree": "90f0f5b64bf594677f96eebf26ae80cf7da1149e"
+      "commit": "9fda759a131c7b7ff43635ad6fa5e4e878f5f836",
+      "tree": "5de4bab35aafdaec115ac03cc54a05630204b677"
     }
   },
   "authentication": {
@@ -49,8 +49,8 @@
   },
   "verifier": {
     "root": "dist/runtime/evidence-verification",
-    "provenance_sha256": "302161f378e54d0a2b14b743a68577f4bfc43a147a1f17568941e08e14e767a0",
-    "source_commit": "8b215d706a828af7361f9c6799b9cb0a30c9d00b",
+    "provenance_sha256": "fc79da07d4d4dfa466548337a4944ae1b7e0bfdcf2f1c334b341bb1ad477cd4d",
+    "source_commit": "ad790aea6f200412da79a3a1bfbaa03cbdb47a2d",
     "payload_file_count": 26,
     "binaries": {
       "devai-evidence-policy": "./dist/runtime/evidence-verification/src/build-policy-cli.js",

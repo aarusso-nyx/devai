@@ -31,6 +31,14 @@ sweep member stays `effect: read`; the bodies come from `sense run inventory_reg
 
 A data model absent from every location keeps `RBAC_REQUIRES_DATA_MODEL` / UNKNOWN.
 
+Synthetic `guard:<Name>` bindings identify declared guards, not resolved
+permission semantics. Under ADR-SCR-0016 a protected endpoint with a conditional
+or unrecognized permission guard retains authentication/guard facts while
+reporting `RBAC_AUTHORIZATION_UNRESOLVED`; it cannot become public or a proved
+complete permission binding merely because a static permission decorator is
+absent. A query-dependent guard must not be flattened into unconditional AND/OR
+permissions. The diagnostic establishes no new permission or runtime authority.
+
 The sensor emits evidence only through its registered cells or diagnostic surface. Any
 future change to identity, standing, tier, or emitter requires an Architect disposition
 before implementation. This note grants no mutation or release authority.
