@@ -13,6 +13,7 @@ import {
   realpathSync,
 } from 'node:fs';
 import { basename, dirname, isAbsolute, relative, resolve } from 'node:path';
+import { release } from 'node:os';
 import { readCandidateFile } from '@devai-nyx/sensors';
 import { canonicalize } from '../../services/check-runner/canonical.js';
 import { nativeInputPackageClosure } from './native-runner-selection.js';
@@ -20,6 +21,12 @@ import { isHarnessMutatedPath, trackedPaths } from '../../services/check-runner/
 import { assertNativeConfigCapabilities } from './native-config-capabilities.js';
 
 import { nativeOutputCustody } from './native-output-custody.js';
+import {
+  frameworkPlatformProbeCallers,
+  frameworkPlatformPackageRoot,
+  inspectFrameworkPlatformCaller,
+  nativePlatformProbeObservation,
+} from '../../native-platform-probes.js';
 
 type Row = Record<string, unknown>;
 const digest = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
@@ -295,6 +302,8 @@ export function inspectNativeInputProvenance(
       }
     };
     const tracked = new Set(trackedPaths(root));
+    const platformFacts = new Map<string, Row>();
+    const platformRechecks = new Set<string>();
     for (const row of rows) {
       if (!begins.has(row['scope'])) throw new Error('NATIVE_INPUT_TRACE_SCOPE_MISSING');
       if (row['kind'] === 'unsupported')
@@ -358,6 +367,103 @@ export function inspectNativeInputProvenance(
         continue;
       }
       if (row['kind'] === 'end' || row['kind'] === 'child-end') continue;
+      if (
+        row['kind'] === 'framework-platform-probe' ||
+        row['kind'] === 'framework-platform-probe-recheck'
+      ) {
+        const caller = row['caller'] as Row | undefined;
+        const reviewed = frameworkPlatformProbeCallers.find(
+          (entry) =>
+            entry.probe === row['probe'] &&
+            entry.sha256 === caller?.['sha256'] &&
+            entry.line === caller['line'] &&
+            entry.column === caller['column'],
+        );
+        const probeId = row['probeId'];
+        const begin = rows.find(
+          (entry) => entry['kind'] === 'begin' && entry['scope'] === row['scope'],
+        );
+        const host = {
+          pid: process.pid,
+          platform: process.platform,
+          arch: process.arch,
+          osRelease: release(),
+        };
+        const initialHost = begin?.['hostPlatform'] as Row | undefined;
+        if (
+          reviewed === undefined ||
+          caller === undefined ||
+          typeof caller['file'] !== 'string' ||
+          typeof caller['scriptId'] !== 'string' ||
+          !/^[1-9][0-9]*$/u.test(caller['scriptId']) ||
+          typeof probeId !== 'number' ||
+          !Number.isSafeInteger(probeId) ||
+          probeId <= 0 ||
+          typeof row['pid'] !== 'number' ||
+          !Number.isSafeInteger(row['pid']) ||
+          row['pid'] <= 0 ||
+          initialHost?.['pid'] !== row['pid'] ||
+          initialHost['platform'] !== host.platform ||
+          initialHost['arch'] !== host.arch ||
+          initialHost['osRelease'] !== host.osRelease
+        )
+          throw new Error('NATIVE_PLATFORM_PROBE_INVALID');
+        const packageRoot = frameworkPlatformPackageRoot(caller['file'], reviewed);
+        if (!packageRoots.includes(packageRoot)) throw new Error('NATIVE_PLATFORM_PACKAGE_UNBOUND');
+        inspectFrameworkPlatformCaller(
+          caller['file'],
+          reviewed,
+          realpathSync(caller['file']),
+          readFileSync(caller['file']),
+          readFileSync(resolve(packageRoot, 'package.json')),
+        );
+        const expected: Row = {
+          nonce,
+          scope: row['scope'],
+          kind: row['kind'],
+          probeId,
+          probe: reviewed.probe,
+          ...host,
+          pid: row['pid'],
+          caller: {
+            packageName: reviewed.packageName,
+            packageVersion: reviewed.packageVersion,
+            file: caller['file'],
+            sha256: reviewed.sha256,
+            scriptId: caller['scriptId'],
+            sourceSha256: reviewed.sha256,
+            line: reviewed.line,
+            column: reviewed.column,
+          },
+          api: 'readFileSync',
+          path: reviewed.path,
+          encoding: reviewed.encoding,
+          observation: nativePlatformProbeObservation(
+            reviewed,
+            host,
+            realpathSync(reviewed.path),
+            readFileSync(reviewed.path),
+          ),
+        };
+        if (canonicalize(row) !== canonicalize(expected))
+          throw new Error('NATIVE_PLATFORM_PROBE_CHANGED');
+        const key = `${String(row['scope'])}:${probeId}`;
+        if (row['kind'] === 'framework-platform-probe') {
+          if (platformFacts.has(key)) throw new Error('NATIVE_PLATFORM_PROBE_DUPLICATE');
+          platformFacts.set(key, row);
+        } else {
+          const fact = platformFacts.get(key);
+          if (
+            fact === undefined ||
+            platformRechecks.has(key) ||
+            canonicalize(row) !==
+              canonicalize({ ...fact, kind: 'framework-platform-probe-recheck' })
+          )
+            throw new Error('NATIVE_PLATFORM_RECHECK_INVALID');
+          platformRechecks.add(key);
+        }
+        continue;
+      }
       if (output(row)) continue;
       if (row['kind'] === 'module-load') {
         if (
@@ -635,6 +741,8 @@ export function inspectNativeInputProvenance(
         throw new Error('NATIVE_INPUT_OBSERVATION_CHANGED');
     }
     if (loaderOperations.size !== 0) throw new Error('NATIVE_INPUT_LOADER_OPERATION_INCOMPLETE');
+    if (platformFacts.size !== platformRechecks.size)
+      throw new Error('NATIVE_PLATFORM_RECHECK_MISSING');
     output.finish();
     return [];
   } catch (error) {

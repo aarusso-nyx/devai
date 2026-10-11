@@ -33,6 +33,7 @@ const nativeReporters = [
   'native-playwright-reporter.js',
   'native-playwright-loader.js',
   'native-input-provenance.js',
+  'native-platform-probes.js',
 ];
 const declarationsRoot = join(temporaryRoot, 'types/cli');
 const scaffoldModule = join(repositoryRoot, 'packages/skills/dist/operations/scaffold/index.js');
