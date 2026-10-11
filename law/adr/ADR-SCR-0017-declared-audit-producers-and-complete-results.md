@@ -623,6 +623,16 @@ different-source VM/eval script that impersonates the filename cannot qualify.
 Even an exact reviewed-source copy receives only its finite literal probe, never
 arbitrary external read authority.
 
+During a genuine probe, the preload may capture and privately retain an
+unformatted `Error` using its constructor captured before candidate imports,
+solely to keep the authenticated caller script reachable until its own terminal
+checks finish. It must not read or serialize `.stack`, invoke a candidate
+formatter, or use the retained object as source or identity authority. Release
+the references only after those terminal checks. Fresh private-session source
+queries remain mandatory; failed retention, unavailable source and changed
+source still refuse. A debugger agent's collected-source cache cannot replace
+this current-source check.
+
 Each private fact binds its nonce/scope, unique probe identity, actual PID,
 platform/architecture/OS release, caller package/file/source identities,
 scriptId/line/column, exact operation/path/encoding, physical target, returned and
