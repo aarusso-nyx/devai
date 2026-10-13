@@ -40,6 +40,7 @@ import {
   nativeExecutionCommand,
   nativeInputPreloadPath,
   nativeRunnerSelection,
+  assertNativeRunnerDeclaration,
 } from './native-runner-selection.js';
 import { nativeCoverageGitIdentity } from './native-coverage-host.js';
 import { resolveNativeServiceSelection } from './native-service-plan.js';
@@ -205,6 +206,8 @@ export function resolveSensorTaskReference(
       !getValidator('test-result-population.schema.json')(resultPopulation))
   )
     throw new Error('SENSE_TASK_RESULT_POPULATION_INVALID');
+  if (resultPopulation !== undefined)
+    assertNativeRunnerDeclaration(root, node, resultPopulation as NativeTestResultContract);
   return { root, descriptor, node, population: inputs['population'], inputs };
 }
 

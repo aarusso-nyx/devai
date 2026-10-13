@@ -29,42 +29,17 @@ export function nativeExecutionCommand(root: string, task: PlannedTask, nonce: s
   });
 }
 
-/** Actual native collection, package-owned instrumentation, and complete candidate input closure. */
-export function nativeRunnerSelection(
+/** Validate authored native selection without probes, execution or trusted standing. */
+export function assertNativeRunnerDeclaration(
   root: string,
-  task: PlannedTask,
+  task: Pick<PlannedTask, 'argv' | 'cwd'>,
   contract: NativeTestResultContract,
-  privatePreloadPath?: string,
-): string {
+) {
   const selection = contract.selectionEvidence;
   if (selection === undefined) throw new Error('SENSE_NATIVE_COLLECTION_REQUIRED');
   const vitest = selection.reporter === 'vitest-v1';
   if ((vitest ? 'vitest-json' : 'playwright-json') !== contract.format)
     throw new Error('SENSE_NATIVE_REPORTER_FORMAT_MISMATCH');
-  const require = createRequire(resolve(root, task.cwd, 'package.json'));
-  const packageName = vitest ? 'vitest' : '@playwright/test';
-  const manifestPath = require.resolve(`${packageName}/package.json`);
-  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
-    name?: string;
-    version?: string;
-    bin?: string | Record<string, string>;
-  };
-  const executableName = vitest ? 'vitest' : 'playwright';
-  const bin = typeof manifest.bin === 'string' ? manifest.bin : manifest.bin?.[executableName];
-  if (
-    manifest.name !== packageName ||
-    typeof bin !== 'string' ||
-    (vitest ? manifest.version !== '4.1.11' : manifest.version !== '1.60.0') ||
-    realpathSync(resolve(dirname(manifestPath), bin)) !== realpathSync(task.executable.path)
-  )
-    throw new Error('SENSE_NATIVE_EXECUTABLE_UNRECOGNIZED');
-  const viteManifest = vitest
-    ? (JSON.parse(
-        readFileSync(createRequire(manifestPath).resolve('vite/package.json'), 'utf8'),
-      ) as { version?: string })
-    : undefined;
-  if (vitest && viteManifest?.version !== '7.3.6')
-    throw new Error('SENSE_NATIVE_VITE_VERSION_UNSUPPORTED');
   const exportName = `@aarusso-nyx/devai/native-${vitest ? 'vitest' : 'playwright'}-reporter`;
   const argv = task.argv.slice(1);
   if (argv.shift() !== (vitest ? 'run' : 'test')) throw new Error('SENSE_NATIVE_RUN_MODE_REQUIRED');
@@ -116,6 +91,47 @@ export function nativeRunnerSelection(
   const configCapabilities = assertNativeConfigCapabilities(root, configPath);
   if (!loader) throw new Error('SENSE_NATIVE_CONFIG_LOADER_REQUIRED');
   if (!reporter) throw new Error('SENSE_NATIVE_REPORTER_REQUIRED');
+  return configCapabilities;
+}
+
+/** Actual native collection, package-owned instrumentation, and complete candidate input closure. */
+export function nativeRunnerSelection(
+  root: string,
+  task: PlannedTask,
+  contract: NativeTestResultContract,
+  privatePreloadPath?: string,
+): string {
+  const selection = contract.selectionEvidence;
+  if (selection === undefined) throw new Error('SENSE_NATIVE_COLLECTION_REQUIRED');
+  const vitest = selection.reporter === 'vitest-v1';
+  if ((vitest ? 'vitest-json' : 'playwright-json') !== contract.format)
+    throw new Error('SENSE_NATIVE_REPORTER_FORMAT_MISMATCH');
+  const require = createRequire(resolve(root, task.cwd, 'package.json'));
+  const packageName = vitest ? 'vitest' : '@playwright/test';
+  const manifestPath = require.resolve(`${packageName}/package.json`);
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
+    name?: string;
+    version?: string;
+    bin?: string | Record<string, string>;
+  };
+  const executableName = vitest ? 'vitest' : 'playwright';
+  const bin = typeof manifest.bin === 'string' ? manifest.bin : manifest.bin?.[executableName];
+  if (
+    manifest.name !== packageName ||
+    typeof bin !== 'string' ||
+    (vitest ? manifest.version !== '4.1.11' : manifest.version !== '1.60.0') ||
+    realpathSync(resolve(dirname(manifestPath), bin)) !== realpathSync(task.executable.path)
+  )
+    throw new Error('SENSE_NATIVE_EXECUTABLE_UNRECOGNIZED');
+  const viteManifest = vitest
+    ? (JSON.parse(
+        readFileSync(createRequire(manifestPath).resolve('vite/package.json'), 'utf8'),
+      ) as { version?: string })
+    : undefined;
+  if (vitest && viteManifest?.version !== '7.3.6')
+    throw new Error('SENSE_NATIVE_VITE_VERSION_UNSUPPORTED');
+  const configCapabilities = assertNativeRunnerDeclaration(root, task, contract);
+  const exportName = `@aarusso-nyx/devai/native-${vitest ? 'vitest' : 'playwright'}-reporter`;
   const reporterPath = require.resolve(exportName);
   const asset = vitest ? 'native-test-reporter.js' : 'native-playwright-reporter.js';
   const besideBundle = new URL(`./${asset}`, import.meta.url);
