@@ -1134,6 +1134,86 @@ nativePlatformProbeObservation(caller,{platform:'linux',osRelease:'6'},${JSON.st
   });
 
   it.each([
+    ['valid', undefined],
+    ['extra argv', 'SENSE_NATIVE_SELECTION_UNSUPPORTED'],
+    ['ambient config', 'SENSE_NATIVE_CONFIG_AMBIENT_SELECTION_UNSUPPORTED'],
+  ] as const)(
+    'validates pre-authority native %s references without process effects',
+    (variant, code) => {
+      const root = fixture({
+        argv: [
+          'devai-inspector-deliberately-absent-native-runner',
+          'run',
+          '--configLoader',
+          'native',
+          '--config',
+          './vitest.config.mjs',
+          '--reporter',
+          '@aarusso-nyx/devai/native-vitest-reporter',
+          ...(variant === 'extra argv' ? ['--testNamePattern', 'selected'] : []),
+        ],
+        outputContract: {
+          kind: 'command-result',
+          population: 'reviewed-population',
+          resultPopulation: nativeContract(),
+        },
+      });
+      put(
+        root,
+        'vitest.config.mjs',
+        `${variant === 'ambient config' ? 'const selected = Date.now();\n' : ''}export default {test:{watch:false}};\n`,
+      );
+      git(root, 'add', '.');
+      git(root, 'commit', '-qm', 'static native reference');
+      const processes: AuthorityHostEffectRequest[] = [];
+      const issuer = createAuthorityDecisionIssuer({
+        issuer_id: 'inspector-native-reference-only',
+        issuer_version: '1.0.0',
+        invocation_id: 'native-reference-only',
+        canonicalSha256: () => 'a'.repeat(64),
+        randomId: () => 'native-reference-only',
+        now: () => new Date().toISOString(),
+        receipt_ttl_ms: 30_000,
+      });
+      const scope: AuthorityHostEffectScope = {
+        action_id: 'sense run',
+        invocation_id: 'native-reference-only',
+        effect: 'read',
+        receipt_store: issuer,
+        apply_effect(request, apply) {
+          if (request.kind === 'process') {
+            processes.push(request);
+            throw new Error('INSPECTOR_NATIVE_REFERENCE_MUST_NOT_SPAWN');
+          }
+          return apply();
+        },
+      };
+      const select = () =>
+        runWithAuthorityHostEffects(scope, () =>
+          resolveTaskBoundSenseSelection(
+            resolveSenseSelection({ kind: 'unit_test' }),
+            root,
+            new Map([['unit_test', { taskId: 'measure', population: 'reviewed-population' }]]),
+          ),
+        );
+      try {
+        if (code === undefined) {
+          const selected = select();
+          expect(selected.aggregate_effect).toBe('local-write');
+          expect(selected.members[0]?.capabilities).toEqual(
+            expect.arrayContaining(['proc:declared-sensor-task', 'fs:proofs', 'fs:f5-state']),
+          );
+          expect(selected.members[0]?.consent).toEqual({ write: true, publish: false });
+        } else expect(select).toThrow(code);
+        expect(processes).toEqual([]);
+        expect(existsSync(join(root, '.devai/state'))).toBe(false);
+      } finally {
+        issuer.dispose();
+      }
+    },
+  );
+
+  it.each([
     ['kind', 'SENSE_TASK_KIND_MISMATCH'],
     ['population', 'SENSE_TASK_POPULATION_MISMATCH'],
     ['command', 'SENSE_TASK_DESCRIPTOR_INVALID'],
