@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   chmodSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -1086,6 +1087,75 @@ nativePlatformProbeObservation(caller,{platform:'linux',osRelease:'6'},${JSON.st
       new Map([['migration_check', { taskId: 'measure', population: 'reviewed-population' }]]),
     );
     expect(migration.members[0]?.capabilities).toContain('db:write');
+  });
+
+  it('resolves pre-authority task references without probing toolchains or prerequisite caches', () => {
+    const root = fixture();
+    const doc = descriptor({ dependencies: ['prepare'], toolchainKeys: ['pnpm', 'git'] });
+    addPrerequisite(doc);
+    put(root, 'test-tasks.json', doc);
+    git(root, 'add', '.');
+    git(root, 'commit', '-qm', 'toolchain prerequisites');
+    const processes: AuthorityHostEffectRequest[] = [];
+    const issuer = createAuthorityDecisionIssuer({
+      issuer_id: 'inspector-reference-only',
+      issuer_version: '1.0.0',
+      invocation_id: 'reference-only',
+      canonicalSha256: () => 'a'.repeat(64),
+      randomId: () => 'reference-only',
+      now: () => new Date().toISOString(),
+      receipt_ttl_ms: 30_000,
+    });
+    const scope: AuthorityHostEffectScope = {
+      action_id: 'sense run',
+      invocation_id: 'reference-only',
+      effect: 'read',
+      receipt_store: issuer,
+      apply_effect(request, apply) {
+        if (request.kind === 'process') {
+          processes.push(request);
+          throw new Error('INSPECTOR_REFERENCE_MUST_NOT_SPAWN');
+        }
+        return apply();
+      },
+    };
+    const selected = runWithAuthorityHostEffects(scope, () =>
+      resolveTaskBoundSenseSelection(
+        resolveSenseSelection({ kind: 'type_check' }),
+        root,
+        new Map([['type_check', { taskId: 'measure', population: 'reviewed-population' }]]),
+      ),
+    );
+    expect(selected.aggregate_effect).toBe('local-write');
+    expect(selected.members[0]?.capabilities).toContain('proc:declared-sensor-task');
+    expect(processes).toEqual([]);
+    expect(existsSync(join(root, '.devai/state'))).toBe(false);
+    expect(() => binding(root)).toThrow('SENSE_TASK_PREREQUISITE_REQUIRED');
+  });
+
+  it.each([
+    ['kind', 'SENSE_TASK_KIND_MISMATCH'],
+    ['population', 'SENSE_TASK_POPULATION_MISMATCH'],
+    ['command', 'SENSE_TASK_DESCRIPTOR_INVALID'],
+  ] as const)('refuses invalid pre-authority %s references', (invalid, code) => {
+    const root = fixture(
+      invalid === 'kind' ? { sensorKinds: ['build'] } : invalid === 'command' ? { argv: [] } : {},
+    );
+    expect(() =>
+      resolveTaskBoundSenseSelection(
+        resolveSenseSelection({ kind: 'type_check' }),
+        root,
+        new Map([
+          [
+            'type_check',
+            {
+              taskId: 'measure',
+              population: invalid === 'population' ? 'wrong-population' : 'reviewed-population',
+            },
+          ],
+        ]),
+      ),
+    ).toThrow(code);
   });
 });
 
