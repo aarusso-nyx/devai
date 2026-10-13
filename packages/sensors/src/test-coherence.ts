@@ -1,4 +1,5 @@
-import { lstatSync } from 'node:fs';
+import { lstatSync, readFileSync } from 'node:fs';
+import { testRunnerFamily } from './test-runner-family.js';
 import {
   executableTestKind,
   expandRepositoryPaths,
@@ -53,6 +54,8 @@ export function senseTestCoherence(opts: TestCoherenceOptions): SensorReading {
   let totalTests = 0;
   let usesTest = 0;
   let usesSpec = 0;
+  let unknownNaming = false;
+  const familyNaming = new Map<string, { test: number; spec: number }>();
   let belowMin = 0;
   const findings: SensorFinding[] = [];
 
@@ -68,6 +71,20 @@ export function senseTestCoherence(opts: TestCoherenceOptions): SensorReading {
         pkgTests += 1;
         if (kind === 'test') usesTest += 1;
         else if (kind === 'spec' || kind === 'wiring-spec') usesSpec += 1;
+        if (kind !== 'e2e') {
+          try {
+            const family = testRunnerFamily(f, readFileSync(f, 'utf8'));
+            if (family === undefined) unknownNaming = true;
+            else {
+              const naming = familyNaming.get(family) ?? { test: 0, spec: 0 };
+              if (kind === 'test') naming.test += 1;
+              else naming.spec += 1;
+              familyNaming.set(family, naming);
+            }
+          } catch (error) {
+            errors.push(`Cannot read executable test ${f}: ${String(error)}`);
+          }
+        }
       } else if (isSourceFile(base)) {
         pkgSources += 1;
       }
@@ -88,7 +105,11 @@ export function senseTestCoherence(opts: TestCoherenceOptions): SensorReading {
   }
 
   const globalRatio = totalSources === 0 ? 1 : totalTests / totalSources;
-  const namingConsistent = usesTest === 0 || usesSpec === 0;
+  const namingConsistent =
+    usesTest === 0 ||
+    usesSpec === 0 ||
+    (!unknownNaming &&
+      [...familyNaming.values()].every((naming) => naming.test === 0 || naming.spec === 0));
   if (!namingConsistent) {
     findings.push({
       severity: 'warning',
