@@ -21,10 +21,10 @@ export function resolveTaskBoundSenseSelection(
         ...new Set([
           ...member.capabilities,
           'fs:workspace',
+          // Every bound task writes its content-addressed check-cache state.
+          'fs:f5-state',
           'proc:declared-sensor-task',
-          ...(binding.node.outputContract['resultPopulation'] === undefined
-            ? []
-            : ['fs:proofs', 'fs:f5-state']),
+          ...(binding.node.outputContract['resultPopulation'] === undefined ? [] : ['fs:proofs']),
           ...(member.kind === 'migration_check' ? ['db:write'] : []),
         ]),
       ]),

@@ -427,14 +427,47 @@ function admissionOf(
 }
 
 /** A change since the candidate was resolved, or undefined when its identity still holds. */
-function snapshotChange(repoRoot: string, candidate: RegenerationCandidate): string | undefined {
+function snapshotChange(
+  repoRoot: string,
+  candidate: RegenerationCandidate,
+  publication?: ReadonlyMap<string, string | null>,
+): string | undefined {
   try {
     const head = git(repoRoot, ['rev-parse', '--verify', 'HEAD^{commit}']);
     if (head !== candidate.head) return `HEAD moved from ${candidate.head} to ${head}`;
     const tree = git(repoRoot, ['rev-parse', '--verify', `${head}^{tree}`]);
     if (tree !== candidate.tree) return `the tree of ${head} changed from ${candidate.tree}`;
-    if (git(repoRoot, ['status', '--porcelain']).length > 0) {
-      return `the working tree no longer matches ${head}`;
+    // A successful regeneration may itself create or replace unignored state bodies.
+    // Admit only the exact paths and bytes this invocation published; any other
+    // source, state or index change still invalidates the candidate snapshot.
+    const status = execFileSync(
+      'git',
+      ['status', '--porcelain=v1', '--untracked-files=all', '-z'],
+      { cwd: repoRoot, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 },
+    );
+    for (const entry of status.split('\0').filter(Boolean)) {
+      const code = entry.slice(0, 2);
+      const path = entry.slice(3);
+      if (
+        entry[2] !== ' ' ||
+        code.includes('R') ||
+        code.includes('C') ||
+        publication === undefined ||
+        !publication.has(path)
+      )
+        return `the working tree no longer matches ${head}`;
+    }
+    for (const [path, expected] of publication ?? []) {
+      const target = join(repoRoot, path);
+      if (expected === null) {
+        if (existsSync(target)) return `obsolete body ${path} was restored`;
+      } else if (
+        !existsSync(target) ||
+        !lstatSync(target).isFile() ||
+        createHash('sha256').update(readFileSync(target)).digest('hex') !== expected
+      ) {
+        return `published body ${path} changed`;
+      }
     }
     return undefined;
   } catch (error) {
@@ -1055,7 +1088,10 @@ async function regenerateForCandidate(
   let walk: BodyWalk = { entries: [], errors: [], created: 0, skipped: 0 };
   if (errors.length === 0) {
     // The walk was asynchronous: publish only if HEAD, its tree and a clean status still hold.
-    const changed = snapshotChange(repoRoot, candidate);
+    const stagedFiles = new Map(
+      staged.map((body) => [relative(repoRoot, body.temporary), body.sha256] as const),
+    );
+    const changed = snapshotChange(repoRoot, candidate, stagedFiles);
     if (changed !== undefined) {
       return unwrittenResult(repoRoot, {
         severity: 'warning',
@@ -1080,7 +1116,11 @@ async function regenerateForCandidate(
       obsolete = removeObsoleteBodies(repoRoot, new Set(staged.map((body) => body.body_path)));
       // Publication is not atomic with the check above: a commit or edit can land between
       // them. Check again afterwards; a stale set is retracted, so no body outlives its HEAD.
-      const late = snapshotChange(repoRoot, candidate);
+      const publication = new Map<string, string | null>(
+        staged.map((body) => [body.body_path, body.sha256]),
+      );
+      for (const body of obsolete) publication.set(body.body_path, null);
+      const late = snapshotChange(repoRoot, candidate, publication);
       if (late !== undefined) return retractedResult(repoRoot, staged, late);
     } catch (error) {
       errors.push(`publish regenerated bodies failed: ${messageOf(error)}`);
