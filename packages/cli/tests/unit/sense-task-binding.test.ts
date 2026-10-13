@@ -1213,6 +1213,105 @@ nativePlatformProbeObservation(caller,{platform:'linux',osRelease:'6'},${JSON.st
     },
   );
 
+  it.each(
+    ['owned-linux-native-v1-linux-amd64', 'owned-linux-native-v1-linux-arm64'].flatMap(
+      (backendId) =>
+        [true, false].flatMap((validRunMode) =>
+          [true, false].flatMap((extraArgv) =>
+            [true, false].map((ambientConfig) => ({
+              backendId,
+              validRunMode,
+              extraArgv,
+              ambientConfig,
+            })),
+          ),
+        ),
+    ),
+  )(
+    'refuses service $backendId before native guards (run=$validRunMode, extra=$extraArgv, ambient=$ambientConfig) without effects',
+    ({ backendId, validRunMode, extraArgv, ambientConfig }) => {
+      const root = fixture({
+        argv: [
+          'devai-inspector-deliberately-absent-native-runner',
+          validRunMode ? 'run' : 'watch',
+          '--configLoader',
+          'native',
+          '--config',
+          './vitest.config.mjs',
+          '--reporter',
+          '@aarusso-nyx/devai/native-vitest-reporter',
+          ...(extraArgv ? ['--testNamePattern', 'selected'] : []),
+        ],
+        sensorKinds: ['unit_test'],
+        toolchainKeys: ['pnpm', 'git'],
+        outputContract: {
+          kind: 'command-result',
+          population: 'reviewed-population',
+          resultPopulation: {
+            ...nativeContract(),
+            serviceProfile: {
+              schemaVersion: '1.0.0',
+              profile: 'postgres-http-v1',
+              backendId,
+              provisioner: { kind: 'owned-docker-v1', toolchainKey: 'docker' },
+              postgres: { image: `postgres:16-alpine@sha256:${'a'.repeat(64)}` },
+            },
+          },
+        },
+      });
+      put(
+        root,
+        'vitest.config.mjs',
+        `${ambientConfig ? 'const selected = Date.now();\n' : ''}export default {test:{watch:false}};\n`,
+      );
+      git(root, 'add', '.');
+      git(root, 'commit', '-qm', 'service refusal precedence');
+      expect(
+        existsSync(
+          join(root, 'node_modules/.bin/devai-inspector-deliberately-absent-native-runner'),
+        ),
+      ).toBe(false);
+      const processes: AuthorityHostEffectRequest[] = [];
+      const issuer = createAuthorityDecisionIssuer({
+        issuer_id: 'inspector-service-reference-only',
+        issuer_version: '1.0.0',
+        invocation_id: 'service-reference-only',
+        canonicalSha256: () => 'a'.repeat(64),
+        randomId: () => 'service-reference-only',
+        now: () => new Date().toISOString(),
+        receipt_ttl_ms: 30_000,
+      });
+      const scope: AuthorityHostEffectScope = {
+        action_id: 'sense run',
+        invocation_id: 'service-reference-only',
+        effect: 'read',
+        receipt_store: issuer,
+        apply_effect(request, apply) {
+          if (request.kind === 'process') {
+            processes.push(request);
+            throw new Error('INSPECTOR_SERVICE_REFERENCE_MUST_NOT_SPAWN');
+          }
+          return apply();
+        },
+      };
+      try {
+        expect(() =>
+          runWithAuthorityHostEffects(scope, () =>
+            resolveTaskBoundSenseSelection(
+              resolveSenseSelection({ kind: 'unit_test' }),
+              root,
+              new Map([['unit_test', { taskId: 'measure', population: 'reviewed-population' }]]),
+            ),
+          ),
+        ).toThrow('SENSE_NATIVE_SERVICE_BACKEND_UNIMPLEMENTED');
+        expect(processes).toEqual([]);
+        expect(existsSync(join(root, '.devai/state'))).toBe(false);
+      } finally {
+        issuer.dispose();
+      }
+    },
+  );
+
   it.each([
     ['kind', 'SENSE_TASK_KIND_MISMATCH'],
     ['population', 'SENSE_TASK_POPULATION_MISMATCH'],
