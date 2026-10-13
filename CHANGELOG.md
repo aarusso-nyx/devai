@@ -1,9 +1,30 @@
 # Changelog
 
-## 2.6.1 — Unreleased
+## 2.6.2 — Unreleased
 
-This bounded patch repairs adopter evidence collection. Installed adoption
-rehearsal, independent review and protected release gates remain required.
+This bounded patch repairs exact-candidate sensing for adopter evidence. It
+adds no sensor kind, task-command shape, threshold, authority grant or public
+interface. Installed-package rehearsal, independent review and protected
+release gates remain required before publication.
+
+- Admit the exact reviewed task-cache member as a local-write effect during
+  task-bound sensing. Existing task identity, kind, argv, population and
+  prerequisite checks remain mandatory; the fix does not grant arbitrary
+  cache-path writes or unsupported commands.
+- Permit repeated inventory regeneration only after verifying prior output
+  paths, reading identity, candidate binding and recorded body digests, then
+  recomputing the same bytes. Mismatched or tampered prior output refuses;
+  historical evidence and generated inventory custody remain intact.
+- Keep the 69-action surface, trusted verifier
+  `@aarusso-nyx/devai@2.4.0`, the supported native populations and all
+  existing readiness boundaries. Installing this patch and running the
+  registered upgrade refreshes the compiled authority policy identity to
+  2.6.2 without changing adopter-owned declarations.
+
+## 2.6.1 — 2026-10-13
+
+DEVAI 2.6.1 was published on 2026-10-13. This bounded patch repairs adopter
+evidence collection without changing execution standing or readiness gates.
 
 - Recognize traced `.test`, `.spec`, `.e2e` and `.wiring-spec` targets across
   TypeScript and JavaScript extensions using the shared executable test census

@@ -1,13 +1,13 @@
 ---
-title: DEVAI 2.6.1
+title: DEVAI 2.6.2
 slug: /
 ---
 
 # DEVAI
 
 DEVAI is a human-supervised control harness for AI-assisted software development on a declared
-stack. The 2.6.1 candidate source tree behind this site provides one CLI package, 69 actions, 59 sensor kinds,
-and seven host-invoked recipes; the published installation guidance stays pinned to 2.6.0.
+stack. The 2.6.2 candidate source tree behind this site provides one CLI package, 69 actions, 59 sensor kinds,
+and seven host-invoked recipes; the published installation guidance stays pinned to 2.6.1.
 
 - [Start here](start/)
 - [Theory](theory/)
