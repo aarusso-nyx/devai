@@ -79,10 +79,14 @@ function put(root: string, path: string, body: string): void {
   writeFileSync(target, body);
 }
 
-function repository(extra: Readonly<Record<string, string>> = {}, sensorInputs?: Json): string {
+function repository(
+  extra: Readonly<Record<string, string>> = {},
+  sensorInputs?: Json,
+  ignoredPaths = '.devai/state/\nrecord/proofs/\n',
+): string {
   const root = mkdtempSync(join(tmpdir(), 'devai-adopter ação with spaces-'));
   workspaces.push(root);
-  put(root, '.gitignore', '.devai/state/\nrecord/proofs/\n');
+  put(root, '.gitignore', ignoredPaths);
   for (const [path, body] of Object.entries(ADOPTER_SOURCES)) put(root, path, body);
   for (const [path, body] of Object.entries(extra)) put(root, path, body);
   for (const selector of ['--constitution', '--operational-law', '--subprocess-effects', null]) {
@@ -405,6 +409,21 @@ it('replaces', async () => { vi.spyOn(alias, 'read').mockResolvedValue(0); expec
     expect(generated['framework']).toBe('angular');
     expect(generated['routes']).toEqual([expect.objectContaining({ path: 'users/:id' })]);
     expect(existsSync(join(root, STATE_BODY.inventory_routes))).toBe(false);
+  });
+
+  it('repeats installed inventory regeneration with only check-cache ignored', () => {
+    const root = repository({}, undefined, '.devai/state/check-cache/\nrecord/proofs/\n');
+    const first = observe(root, 'inventory_regeneration', ['--repo-root', '.'], 'review');
+    const bodies = Object.values(STATE_BODY).map((path) => readFileSync(join(root, path), 'utf8'));
+    const second = observe(root, 'inventory_regeneration', ['--repo-root', '.'], 'review');
+    expect(first['metrics']).toMatchObject({ kinds_rebuilt: 7, kinds_up_to_date: 0 });
+    expect(second['metrics']).toMatchObject({ kinds_rebuilt: 0, kinds_up_to_date: 7 });
+    expect(Object.values(STATE_BODY).map((path) => readFileSync(join(root, path), 'utf8'))).toEqual(
+      bodies,
+    );
+    expect(git(root, 'status', '--porcelain', '--untracked-files=all')).toContain(
+      '.devai/state/sensors/',
+    );
   });
   it.each([
     ['default root', []],
