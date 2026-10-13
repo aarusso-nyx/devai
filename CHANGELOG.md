@@ -12,6 +12,16 @@ rehearsal, independent review and protected release gates remain required.
   families. Unclassified or ambiguous files retain conservative mixed-naming
   REVIEW. Keep every test/source count, package minimum and global threshold.
   Static family recognition supplies no execution admission or result standing.
+  Global test APIs supplied by dynamic runner configuration remain unclassified
+  and retain mixed-naming REVIEW; this patch does not evaluate runner factories.
+- Resolve pre-consent task references without launching planning/version probes
+  or inspecting completion caches. Preserve existing effects, capabilities and
+  explicit write consent; static reference metadata grants no execution binding.
+- Let Doctor diagnose exact declared task/plan compatibility before cached
+  predecessor completion, avoiding a cycle when Doctor is itself a predecessor.
+  Actual sensing, freshness and custody retain full prerequisite verification
+  and existing candidate/native checks; a diagnostic preview grants no execution
+  binding or standing.
 - Preserve the 69-action surface, trusted verifier and native compatibility
   boundaries. Long-duration HTTP execution remains separate successor work.
 

@@ -1,7 +1,7 @@
 # Adopter audit interfaces
 
 DEVAI 2.5.0 publishes the audit interfaces below; its package remains immutable.
-The developing 2.6.0 minor candidate adds the read-only workflow review inventory
+The published 2.6.0 minor release adds the read-only workflow review inventory
 and finite diagnostic coverage adapter. Its service/browser profiles remain
 forward candidate contracts: the backend catalogue is empty and service requests
 refuse before execution. Neither diagnostic evidence nor those declarations
@@ -76,6 +76,32 @@ idempotent; binding and rollback keep targets and receipt atomic.
 Binding checks shape and intrinsic duplicates. Measurement checks the actual
 candidate, tasks, annotations, source population and closure before execution or
 credit. Merely declaring an unknown task or desired effect establishes nothing.
+
+## Diagnostic planning and measurement prerequisites
+
+Before consent, task-bound sense selection reads and validates only the static
+descriptor reference needed to select the existing effect and capabilities. It
+launches no toolchain/version probes, reads no completion caches and grants no
+execution binding. Full planning and execution admission happen under the
+required authority; declared native result presence alone establishes no native
+selection or standing.
+
+In the developing 2.6.1 patch, Doctor checks declared task compatibility without
+requiring prior completion of the affected or RC closure. This lets Doctor remain
+a prerequisite of those closures. It still checks the exact task/kind/population,
+supported contract and plan, contained command context, installed toolchain and
+applicable native/candidate compatibility; it executes no task and grants no
+execution binding, prerequisite completion or sensor standing.
+
+Actual task-bound sensing still requires current verified predecessor results
+for the exact candidate, task policy and environment. Missing or stale results
+continue to refuse sensing. Doctor does not replace those requirements or admit
+an unsupported backend.
+
+The patch also compares naming across proved explicit-import runner families.
+Global test APIs supplied by dynamic runner configuration remain unclassified;
+mixed naming with those unknown files still reports REVIEW. A successful trace
+rehearsal or Doctor diagnostic does not turn that remaining review into PASS.
 
 ## Exact invariant producers
 
