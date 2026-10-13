@@ -735,7 +735,16 @@ describe('ADR-v3 public result and semantic authority', () => {
     ).toEqual(['ADR-014', 'ADR-MUT-0005', 'ADR-REL-0017']);
     expect(records.filter((record) => record.adr_id === 'ADR-014')).toHaveLength(1);
     expect(result.files_scanned).toBe(127);
-    expect(result.subject_authorities).toHaveLength(621);
+    expect(result.subject_authorities).toHaveLength(622);
+    expect(
+      result.subject_authorities.find(
+        (row) => row.subject === 'packages/cli/src/commands/doctor-execution-readiness.ts',
+      ),
+    ).toEqual({
+      subject: 'packages/cli/src/commands/doctor-execution-readiness.ts',
+      lineage_members: ['ADR-SCR-0015'],
+      effective_head: 'ADR-SCR-0015',
+    });
     expect(result.effective_authorities).toEqual([
       'ADR-014',
       'ADR-AUT-0001',
@@ -881,8 +890,8 @@ describe('ADR-v3 public result and semantic authority', () => {
           .sort(),
       ).toEqual([...(declared?.affected_rules ?? [])].sort());
     }
-    // Preserve all historical declared subjects (especially SCR-0015's thirteen), while
-    // freezing the exact remaining standing after the two new supersessions.
+    // Preserve all historical declared subjects and SCR-0015's three declaration seams,
+    // while freezing the exact remaining standing after the two new supersessions.
     for (const [adrId, declaredCount, remaining] of [
       [
         'ADR-CHK-0002',
@@ -935,10 +944,11 @@ describe('ADR-v3 public result and semantic authority', () => {
       ],
       [
         'ADR-SCR-0015',
-        13,
+        16,
         [
           'law/policy/adopter-migrations.json',
           'law/schemas/sensor-inputs.schema.json',
+          'packages/cli/src/commands/doctor-execution-readiness.ts',
           'packages/cli/src/commands/sense/readings-rebuild.ts',
           'packages/cli/src/commands/sense/run-set.ts',
           'packages/sensors/src/docs-drift.ts',
@@ -1029,6 +1039,16 @@ describe('ADR-v3 public result and semantic authority', () => {
       {
         subject: 'packages/cli/src/commands/sense/record.ts',
         lineage_members: ['ADR-SCR-0008', 'ADR-SCR-0012', 'ADR-SCR-0013', 'ADR-SCR-0017'],
+        effective_head: 'ADR-SCR-0017',
+      },
+      {
+        subject: 'packages/cli/src/commands/sense/task-binding.ts',
+        lineage_members: ['ADR-SCR-0015', 'ADR-SCR-0017'],
+        effective_head: 'ADR-SCR-0017',
+      },
+      {
+        subject: 'packages/cli/src/commands/sense/task-selection.ts',
+        lineage_members: ['ADR-SCR-0015', 'ADR-SCR-0017'],
         effective_head: 'ADR-SCR-0017',
       },
       {
