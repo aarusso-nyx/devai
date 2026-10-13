@@ -10,7 +10,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { withAuthorityHostTestScope } from '../../../authority/tests/unit/authority-host-test-scope.js';
 import {
@@ -96,10 +96,12 @@ function repository(
   extra: Readonly<Record<string, string>> = {},
   ignore = '',
   beforeCommit: (root: string) => void = () => undefined,
+  stateIgnore = '.devai/state/',
+  directoryPrefix = 'devai-inventory-hardening-',
 ): { readonly root: string; readonly head: string; readonly tree: string } {
-  const root = mkdtempSync(join(tmpdir(), 'devai-inventory-hardening-'));
+  const root = mkdtempSync(join(tmpdir(), directoryPrefix));
   roots.push(root);
-  put(root, '.gitignore', `.devai/state/\nscratch/\nCLAUDE.md\n${ignore}`);
+  put(root, '.gitignore', `${stateIgnore}\nscratch/\nCLAUDE.md\n${ignore}`);
   for (const [path, body] of Object.entries({ ...SOURCES, ...extra })) put(root, path, body);
   beforeCommit(root);
   git(root, 'init', '--quiet');
@@ -173,6 +175,52 @@ describe('inventory regeneration is bound to the git tree at HEAD (#294)', () =>
 
 describe('inventory regeneration verifies its snapshot before publication (#294)', () => {
   const earlier = '{"earlier":"manifest"}\n';
+
+  it('accepts only its own generated state on an adopter that leaves sensor bodies unignored', async () => {
+    // STYNX ignores check-cache, but intentionally leaves sensor readings and bodies visible.
+    const { root, head } = repository(
+      {},
+      '',
+      () => undefined,
+      '.devai/state/check-cache/',
+      'devai inventory espaço-',
+    );
+    expect(git(root, 'status', '--porcelain')).toBe('');
+
+    const first = await regenerate(root, { surfaces: ACTIONS_ONLY });
+    expect(first.report.ok).toBe(true);
+    expect(first.report.integration_head).toBe(head);
+    expect(first.reading.status).toBe('pass');
+    expect(existsSync(join(root, INVENTORY_BODY_PATH))).toBe(true);
+    expect(existsSync(join(root, DEP_GRAPH_BODY))).toBe(true);
+    const manifest = readFileSync(join(root, INVENTORY_BODY_PATH), 'utf8');
+    const graph = readFileSync(join(root, DEP_GRAPH_BODY), 'utf8');
+
+    // The installed CLI resolves `--repo-root .` to the same physical checkout.
+    const second = await regenerate(relative(process.cwd(), root), {
+      surfaces: ACTIONS_ONLY,
+    });
+    expect(second.report.ok).toBe(true);
+    expect(second.report.integration_head).toBe(head);
+    expect(second.reading.status).toBe('pass');
+    expect(readFileSync(join(root, INVENTORY_BODY_PATH), 'utf8')).toBe(manifest);
+    expect(readFileSync(join(root, DEP_GRAPH_BODY), 'utf8')).toBe(graph);
+  });
+
+  it('does not mistake an unrelated untracked state write for its own generated output', async () => {
+    const { root } = repository({}, '', () => undefined, '.devai/state/check-cache/');
+    interleave.afterWalk = () => put(root, '.devai/state/foreign/receipt.json', '{}\n');
+
+    const result = await regenerate(root, { surfaces: ACTIONS_ONLY });
+
+    expect(result.reading.status).toBe('unknown');
+    expect(result.reading.findings).toEqual([
+      expect.objectContaining({ code: 'INVENTORY_REGENERATION_SNAPSHOT_CHANGED' }),
+    ]);
+    expect(result.report).toMatchObject({ ok: false, regenerated: [] });
+    expect(existsSync(join(root, INVENTORY_BODY_PATH))).toBe(false);
+    expect(existsSync(join(root, DEP_GRAPH_BODY))).toBe(false);
+  });
 
   function expectRefused(
     result: Awaited<ReturnType<typeof regenerate>>,
