@@ -30,24 +30,28 @@ describe('repository-relative evidence targets', () => {
     },
   );
 
-  it.each(['code.ts', 'a.test.js', 'a.spec.tsx', 'a.test.ts.backup', 'a.TEST.ts', 'a.testjson'])(
-    'refuses a non-executable test name %s but accepts it as an ordinary file',
-    (name) => {
-      const root = fixture();
-      writeFileSync(join(root, name), 'data');
-      expect(validateRepositoryTarget(root, name, 'test')).toEqual({
-        ok: false,
-        absolutePath: resolve(root, name),
-        repositoryPath: name,
-        reason: 'path is not an executable test filename',
-      });
-      expect(validateRepositoryTarget(root, name, 'file')).toEqual({
-        ok: true,
-        absolutePath: resolve(root, name),
-        repositoryPath: name,
-      });
-    },
-  );
+  it.each([
+    'code.ts',
+    'a.test.js.map',
+    'a.spec.tsx.backup',
+    'a.test.ts.backup',
+    'a.TEST.ts',
+    'a.testjson',
+  ])('refuses a non-executable test name %s but accepts it as an ordinary file', (name) => {
+    const root = fixture();
+    writeFileSync(join(root, name), 'data');
+    expect(validateRepositoryTarget(root, name, 'test')).toEqual({
+      ok: false,
+      absolutePath: resolve(root, name),
+      repositoryPath: name,
+      reason: 'path is not an executable test filename',
+    });
+    expect(validateRepositoryTarget(root, name, 'file')).toEqual({
+      ok: true,
+      absolutePath: resolve(root, name),
+      repositoryPath: name,
+    });
+  });
 
   it.each([
     '',

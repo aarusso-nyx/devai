@@ -237,9 +237,9 @@ describe('actual declared adopter execution prerequisites', () => {
 
   it('refuses a report if the real candidate advances during prerequisite planning', () => {
     const root = fixture();
-    const original = taskBinding.resolveSensorTaskBinding;
+    const original = taskBinding.resolveSensorTaskDeclaration;
     const spy = vi
-      .spyOn(taskBinding, 'resolveSensorTaskBinding')
+      .spyOn(taskBinding, 'resolveSensorTaskDeclaration')
       .mockImplementationOnce((...args) => {
         put(root, 'src/input.txt', 'candidate advanced during planning\n');
         commit(root);
@@ -301,7 +301,7 @@ describe('actual declared adopter execution prerequisites', () => {
     expect(data.bindings[0]?.remediation).toMatch(/install|executable|dependencies/iu);
   });
 
-  it('reports outstanding prerequisite evidence without executing or manufacturing that evidence', () => {
+  it('validates declarations before prerequisite evidence exists while runtime still refuses execution', () => {
     const root = fixture();
     const doc = descriptor();
     const task = firstTask(doc);
@@ -313,14 +313,67 @@ describe('actual declared adopter execution prerequisites', () => {
     put(root, 'test-tasks.json', doc);
     commit(root);
     const { check, data } = info(root);
-    expect(check.ok).toBe(false);
+    expect(check.ok).toBe(true);
+    expect(data).toMatchObject({ status: 'pass', standing: 'diagnostic-only' });
     expect(data.bindings).toContainEqual(
       expect.objectContaining({
         taskId: 'measure',
-        status: 'blocked',
-        reasonCode: 'SENSE_TASK_PREREQUISITE_REQUIRED',
+        status: 'pass',
+        reasonCode: 'ADOPTER_TASK_PLAN_READY',
+        readinessScope: 'declaration-plan',
       }),
     );
+    expect(() =>
+      taskBinding.resolveSensorTaskBinding(root, 'type_check', {
+        taskId: 'measure',
+        population: 'original-population',
+      }),
+    ).toThrow('SENSE_TASK_PREREQUISITE_REQUIRED');
+    expect(existsSync(join(root, 'SHOULD_NOT_EXECUTE'))).toBe(false);
+    expect(existsSync(join(root, '.devai/state'))).toBe(false);
+  });
+
+  it.each(['kind', 'population', 'command'] as const)(
+    'still rejects an invalid %s declaration before any prerequisite receipt exists',
+    (invalid) => {
+      const root = fixture();
+      const doc = descriptor();
+      const task = firstTask(doc);
+      task.dependencies = ['doctor'];
+      const doctor = { ...task, nodeId: 'doctor', dependencies: [], sensorKinds: [] };
+      Reflect.deleteProperty(doctor, 'sensorKinds');
+      doc.tasks.push(doctor);
+      if (invalid === 'kind') task.sensorKinds = ['build'];
+      if (invalid === 'command') task.argv = [];
+      if (invalid === 'population') {
+        put(root, '.devai/config/sensor-inputs.json', {
+          schemaVersion: '1.0.0',
+          inputs: { type_check: { taskId: 'measure', population: 'wrong-population' } },
+        });
+      }
+      put(root, 'test-tasks.json', doc);
+      commit(root);
+
+      const { check, data } = info(root);
+      expect(check.ok).toBe(false);
+      expect(data.status).toBe('fail');
+      expect(existsSync(join(root, 'SHOULD_NOT_EXECUTE'))).toBe(false);
+      expect(existsSync(join(root, '.devai/state'))).toBe(false);
+    },
+  );
+
+  it('never promotes a declaration preview into a trusted execution binding', () => {
+    const root = fixture();
+    const declaration = taskBinding.resolveSensorTaskDeclaration(root, 'type_check', {
+      taskId: 'measure',
+      population: 'original-population',
+    });
+    expect(declaration).toBeDefined();
+    if (declaration === undefined) throw new Error('Inspector declaration fixture missing');
+    expect('prerequisiteDigests' in declaration).toBe(false);
+    expect(() =>
+      taskBinding.executeSensorTask({ ...declaration, prerequisiteDigests: {} }),
+    ).toThrow('SENSE_TASK_BINDING_UNTRUSTED');
     expect(existsSync(join(root, 'SHOULD_NOT_EXECUTE'))).toBe(false);
     expect(existsSync(join(root, '.devai/state'))).toBe(false);
   });

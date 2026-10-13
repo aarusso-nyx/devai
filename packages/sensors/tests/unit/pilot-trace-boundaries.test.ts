@@ -62,6 +62,41 @@ afterEach(() => {
 });
 
 describe('trace resolution pilot boundaries', () => {
+  it.each(['e2e', 'wiring-spec'])(
+    'resolves a tracked %s executable test without renaming the consumer target',
+    async (suffix) => {
+      const path = `tests/ação com espaço.${suffix}.ts`;
+      fixture(['INV-FAMILY.json'], { invariants: [{ id: 'INV-FAMILY', tests: [{ path }] }] }, [
+        path,
+      ]);
+
+      const reading = await sense();
+      expect(reading.status).toBe('pass');
+      expect(reading.findings).toEqual([]);
+      expect(reading.metrics).toMatchObject({
+        traced_invariants: 1,
+        missing_test_paths: 0,
+        unresolved_trace_entries: 0,
+      });
+    },
+  );
+
+  it.each(['e2e', 'wiring-spec'])(
+    'refuses an untracked %s executable test even when the file exists',
+    async (suffix) => {
+      const path = `tests/untracked.${suffix}.ts`;
+      fixture(['INV-FAMILY.json'], { invariants: [{ id: 'INV-FAMILY', tests: [{ path }] }] });
+      writeFileSync(join(root, path), 'export {};\n');
+
+      const reading = await sense();
+      expect(reading.status).toBe('fail');
+      expect(reading.metrics).toMatchObject({ traced_invariants: 0, missing_test_paths: 1 });
+      expect(reading.findings).toContainEqual(
+        expect.objectContaining({ severity: 'error', code: 'invalid_test_path' }),
+      );
+    },
+  );
+
   it('passes with tracked tests and catalogs only exact INV-*.json filenames', async () => {
     fixture(
       [
