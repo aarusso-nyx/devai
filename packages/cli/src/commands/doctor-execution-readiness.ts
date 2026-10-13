@@ -5,7 +5,7 @@ import { readTaskDescriptor } from '../services/check-runner/policy.js';
 import { getValidator } from '@devai-nyx/schemas';
 import type { ReleaseFailureClass } from '../services/release-preflight.js';
 import { currentRepositoryState } from '../services/check-runner/policy-git.js';
-import { resolveSensorTaskBinding } from './sense/task-binding.js';
+import { resolveSensorTaskDeclaration } from './sense/task-binding.js';
 import type { SensorInputs } from './sense/shared.js';
 import type { CheckResult } from './doctor-support.js';
 
@@ -223,11 +223,12 @@ export function checkAdopterExecutionReadiness(repoRoot: string): CheckResult {
       try {
         if (!validate({ schemaVersion: '1.0.0', inputs: { [sensorKind]: input } }))
           throw new Error('SENSE_TASK_REFERENCE_INVALID');
-        const binding = resolveSensorTaskBinding(root, sensorKind, input as SensorInputs);
+        const binding = resolveSensorTaskDeclaration(root, sensorKind, input as SensorInputs);
         if (binding === undefined) throw new Error('SENSE_TASK_REFERENCE_INVALID');
         Object.assign(row, {
           status: 'pass',
           reasonCode: 'ADOPTER_TASK_PLAN_READY',
+          readinessScope: 'declaration-plan',
           taskKey: binding.task.taskKey,
           ...(binding.nativeSelectionDigest === undefined
             ? {}

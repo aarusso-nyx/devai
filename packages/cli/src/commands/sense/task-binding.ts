@@ -24,7 +24,12 @@ import {
   RELEASE_INPUT_PROJECTION,
 } from '../../services/check-runner/policy-git.js';
 import { sha256Hex, canonicalize } from '../../services/check-runner/canonical.js';
-import type { PlannedTask, TaskPlan } from '../../services/check-runner/types.js';
+import type {
+  PlannedTask,
+  TaskDescriptor,
+  TaskDescriptorNode,
+  TaskPlan,
+} from '../../services/check-runner/types.js';
 import { inspectNativeTestResults, type NativeTestResultContract } from './native-test-results.js';
 import { pathToFileURL } from 'node:url';
 import {
@@ -66,6 +71,9 @@ export interface SensorTaskBinding {
   readonly prerequisiteDigests: Readonly<Record<string, string>>;
   readonly nativeSelectionDigest?: string;
 }
+
+/** Planning compatibility only; never admitted as a trusted execution binding. */
+export type SensorTaskDeclaration = Omit<SensorTaskBinding, 'prerequisiteDigests'>;
 
 const nativeFilesystemContext = new AsyncLocalStorage<{
   root: string;
@@ -141,11 +149,20 @@ function containedFile(root: string, path: string): string {
   return actual;
 }
 
-export function resolveSensorTaskBinding(
+/** Read-only authority projection; no planning probes, completion or execution standing. */
+export function resolveSensorTaskReference(
   repoRoot: string,
   kind: string,
   inputs: SensorInputs | undefined,
-): SensorTaskBinding | undefined {
+):
+  | {
+      root: string;
+      descriptor: TaskDescriptor;
+      node: TaskDescriptorNode;
+      population: string;
+      inputs: SensorInputs;
+    }
+  | undefined {
   if (!TASK_KINDS.has(kind) && inputs?.['taskId'] === undefined) return undefined;
   if (inputs?.['taskId'] === undefined && inputs?.['population'] === undefined) return undefined;
   if (
@@ -181,6 +198,24 @@ export function resolveSensorTaskBinding(
   ) {
     throw new Error('SENSE_TASK_CONTRACT_UNSUPPORTED');
   }
+  const resultPopulation = node.outputContract['resultPopulation'];
+  if (
+    resultPopulation !== undefined &&
+    (node.outputContract['kind'] !== 'command-result' ||
+      !getValidator('test-result-population.schema.json')(resultPopulation))
+  )
+    throw new Error('SENSE_TASK_RESULT_POPULATION_INVALID');
+  return { root, descriptor, node, population: inputs['population'], inputs };
+}
+
+function resolveTaskDeclaration(
+  repoRoot: string,
+  kind: string,
+  inputs: SensorInputs | undefined,
+): { declaration: SensorTaskDeclaration; descriptor: TaskDescriptor } | undefined {
+  const reference = resolveSensorTaskReference(repoRoot, kind, inputs);
+  if (reference === undefined) return undefined;
+  const { root, descriptor, node, population } = reference;
   const requestedNativeResult = node.outputContract['resultPopulation'] as
     NativeTestResultContract | undefined;
   if (requestedNativeResult?.serviceProfile !== undefined)
@@ -227,11 +262,11 @@ export function resolveSensorTaskBinding(
   if (isAbsolute(task.cwd) || rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel))
     throw new Error('SENSE_TASK_PATH_ESCAPES_ROOT');
   const declaration = '.devai/config/sensor-inputs.json';
-  const binding: SensorTaskBinding = Object.freeze({
+  const declarationPreview: SensorTaskDeclaration = Object.freeze({
     root,
     kind: kind as SensorKind,
-    inputs: Object.freeze({ ...inputs }),
-    population: inputs['population'],
+    inputs: Object.freeze({ ...reference.inputs }),
+    population,
     plan,
     task,
     runner: node.runner,
@@ -245,8 +280,36 @@ export function resolveSensorTaskBinding(
     declarationDigest: existsSync(join(root, declaration))
       ? sha256Hex(readFileSync(containedFile(root, declaration)))
       : null,
-    prerequisiteDigests: sensorTaskPrerequisites(root, descriptor, plan, task),
     ...(nativeSelectionDigest === undefined ? {} : { nativeSelectionDigest }),
+  });
+  return { declaration: declarationPreview, descriptor };
+}
+
+/** Diagnose a declared plan without requiring or granting prior task completion. */
+export function resolveSensorTaskDeclaration(
+  repoRoot: string,
+  kind: string,
+  inputs: SensorInputs | undefined,
+): SensorTaskDeclaration | undefined {
+  return resolveTaskDeclaration(repoRoot, kind, inputs)?.declaration;
+}
+
+export function resolveSensorTaskBinding(
+  repoRoot: string,
+  kind: string,
+  inputs: SensorInputs | undefined,
+): SensorTaskBinding | undefined {
+  const resolved = resolveTaskDeclaration(repoRoot, kind, inputs);
+  if (resolved === undefined) return undefined;
+  const { declaration, descriptor } = resolved;
+  const binding: SensorTaskBinding = Object.freeze({
+    ...declaration,
+    prerequisiteDigests: sensorTaskPrerequisites(
+      declaration.root,
+      descriptor,
+      declaration.plan,
+      declaration.task,
+    ),
   });
   trustedBindings.add(binding);
   return binding;
