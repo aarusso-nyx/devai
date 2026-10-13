@@ -1,5 +1,6 @@
 import { statSync } from 'node:fs';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
+import { isExecutableTestFile } from './executable-test-file.js';
 
 export type RepositoryTargetKind = 'test' | 'file';
 
@@ -53,7 +54,7 @@ export function validateRepositoryTarget(
       reason: 'path does not resolve to a regular file',
     };
   }
-  if (kind === 'test' && !/\.(?:test|spec)\.(?:ts|mjs)$/u.test(repositoryPath)) {
+  if (kind === 'test' && !isExecutableTestFile(repositoryPath)) {
     return {
       ok: false,
       absolutePath,

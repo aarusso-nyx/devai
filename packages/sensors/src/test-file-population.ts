@@ -1,4 +1,6 @@
 import { realpathSync, lstatSync, readdirSync, statSync } from 'node:fs';
+import { isExecutableTestFile } from '@devai-nyx/utils';
+export { executableTestKind, isExecutableTestFile } from '@devai-nyx/utils';
 import {
   basename,
   dirname,
@@ -19,17 +21,6 @@ export const DEFAULT_TEST_GLOBS = [
 ] as const;
 
 const IGNORED_DIRECTORIES = new Set(['node_modules', '.git', 'dist', 'build']);
-
-export function executableTestKind(
-  path: string,
-): 'test' | 'spec' | 'e2e' | 'wiring-spec' | undefined {
-  const match = /\.(test|spec|e2e|wiring-spec)\.(?:ts|tsx|js|jsx|mjs|cjs)$/u.exec(path);
-  return match?.[1] as 'test' | 'spec' | 'e2e' | 'wiring-spec' | undefined;
-}
-
-export function isExecutableTestFile(path: string): boolean {
-  return executableTestKind(path) !== undefined;
-}
 
 export interface RepositoryPathPopulation {
   readonly paths: readonly string[];
