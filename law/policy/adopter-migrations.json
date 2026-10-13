@@ -396,12 +396,27 @@
     },
     {
       "version": "2.6.1",
-      "status": "unreleased",
+      "status": "released",
+      "date": "2026-10-13",
       "changes": [
         {
           "id": "MIG-2.6.1-runtime-repair-identity-refresh",
           "kind": "rebind",
           "summary": "This runtime repair patch adds no adopter configuration keys, defaults, interfaces or obligations. After installing the exact published package, normal registered upgrade refreshes the compiled authority policy's framework package and policy version identities to 2.6.1. Existing constitution, authority roots, sensor declarations, prerequisites, execution admission and trusted verifier remain unchanged. Runtime diagnostics do not grant execution or evidence standing.",
+          "decision_records": [],
+          "segments": ["authority"],
+          "files": [".devai/config/authority-policy.json"]
+        }
+      ]
+    },
+    {
+      "version": "2.6.2",
+      "status": "unreleased",
+      "changes": [
+        {
+          "id": "MIG-2.6.2-runtime-repair-identity-refresh",
+          "kind": "rebind",
+          "summary": "This patch admits the exact reviewed task-cache local-write member and verifies prior inventory outputs before repeated regeneration. It adds no adopter configuration keys, defaults, interfaces or obligations. After installing the exact published package, registered upgrade refreshes the compiled authority policy's framework package and policy version identities to 2.6.2. Existing constitution, authority roots, sensor declarations, prerequisites, thresholds and trusted verifier remain unchanged; this refresh alone grants no execution or evidence standing.",
           "decision_records": [],
           "segments": ["authority"],
           "files": [".devai/config/authority-policy.json"]
