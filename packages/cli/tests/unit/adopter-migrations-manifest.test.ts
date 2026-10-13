@@ -183,7 +183,7 @@ describe('#264: the adopter migration manifest', () => {
     ]);
   });
 
-  it('keeps the released 2.6.1 identity refresh and declares only the prospective 2.6.2 refresh', () => {
+  it('keeps the released 2.6.1 identity refresh and declares the prospective 2.6.2 policy refresh', () => {
     const shipped = manifest.releases.find((release) => release.version === '2.6.1');
     expect(shipped).toMatchObject({ version: '2.6.1', status: 'released', date: '2026-10-13' });
     expect(shipped?.changes).toEqual([
@@ -202,9 +202,9 @@ describe('#264: the adopter migration manifest', () => {
       expect.objectContaining({
         id: 'MIG-2.6.2-runtime-repair-identity-refresh',
         kind: 'rebind',
-        decision_records: [],
-        segments: ['authority'],
-        files: ['.devai/config/authority-policy.json'],
+        decision_records: ['ADR-SCR-0017'],
+        segments: ['authority', 'subprocess-effects'],
+        files: ['.devai/config/authority-policy.json', '.devai/config/subprocess-effects.json'],
       }),
     ]);
     expect(plannedReleases(manifest, '2.6.0', '2.6.1')).toEqual([shipped, latest]);
