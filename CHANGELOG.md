@@ -1,10 +1,25 @@
 # Changelog
 
-## 2.6.0 — Unreleased
+## 2.6.1 — Unreleased
 
-This additive minor candidate adds an installed read-only workflow review
-inventory. Implementation, installed regressions and protected release gates
-remain required; this entry does not claim publication.
+This bounded patch repairs adopter evidence collection. Installed adoption
+rehearsal, independent review and protected release gates remain required.
+
+- Recognize traced `.test`, `.spec`, `.e2e` and `.wiring-spec` targets across
+  TypeScript and JavaScript extensions using the shared executable test census
+  classifier. Preserve containment, regular-file and trace validation.
+- Compare test naming within uniquely established static Node TAP, Vitest or Jest
+  families. Unclassified or ambiguous files retain conservative mixed-naming
+  REVIEW. Keep every test/source count, package minimum and global threshold.
+  Static family recognition supplies no execution admission or result standing.
+- Preserve the 69-action surface, trusted verifier and native compatibility
+  boundaries. Long-duration HTTP execution remains separate successor work.
+
+## 2.6.0 — 2026-10-11
+
+DEVAI 2.6.0 was published on 2026-10-11. It adds an installed read-only workflow
+review inventory and the bounded interfaces below; publication does not establish
+adopter readiness or close unsupported populations.
 
 - Add `sense inventory --slice workflows` with whole-workflow raw digests,
   canonical step digests, exact full-path job/index occurrences and complete
