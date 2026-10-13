@@ -22,8 +22,9 @@ rehearsal, independent review and protected release gates remain required.
   Actual sensing, freshness and custody retain full prerequisite verification
   and existing candidate/native checks; a diagnostic preview grants no execution
   binding or standing.
-- Preserve the 69-action surface, trusted verifier and native compatibility
-  boundaries. Long-duration HTTP execution remains separate successor work.
+- Preserve the 69-action surface, trusted verifier
+  `@aarusso-nyx/devai@2.4.0` and native compatibility boundaries. Long-duration
+  HTTP execution remains separate successor work.
 
 ## 2.6.0 — 2026-10-11
 
