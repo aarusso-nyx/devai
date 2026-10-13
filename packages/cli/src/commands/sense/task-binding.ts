@@ -200,6 +200,9 @@ export function resolveSensorTaskReference(
     throw new Error('SENSE_TASK_CONTRACT_UNSUPPORTED');
   }
   const resultPopulation = node.outputContract['resultPopulation'];
+  const requestedNativeResult = resultPopulation as NativeTestResultContract | undefined;
+  if (requestedNativeResult?.serviceProfile !== undefined)
+    resolveNativeServiceSelection(root, undefined, node, requestedNativeResult.serviceProfile);
   if (
     resultPopulation !== undefined &&
     (node.outputContract['kind'] !== 'command-result' ||
@@ -219,10 +222,6 @@ function resolveTaskDeclaration(
   const reference = resolveSensorTaskReference(repoRoot, kind, inputs);
   if (reference === undefined) return undefined;
   const { root, descriptor, node, population } = reference;
-  const requestedNativeResult = node.outputContract['resultPopulation'] as
-    NativeTestResultContract | undefined;
-  if (requestedNativeResult?.serviceProfile !== undefined)
-    resolveNativeServiceSelection(root, undefined, node, requestedNativeResult.serviceProfile);
   const { plan, environment } = planSensorTasks(root, descriptor, [node.nodeId]);
   const task = plan.tasks.find((entry) => entry.nodeId === node.nodeId);
   if (task === undefined || taskDescriptorDigest(descriptor) !== plan.descriptorDigest)
