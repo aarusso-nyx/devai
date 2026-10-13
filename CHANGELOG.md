@@ -3,8 +3,9 @@
 ## 2.6.2 — Unreleased
 
 This bounded patch repairs exact-candidate sensing for adopter evidence. It
-adds no sensor kind, task-command shape, threshold, authority grant or public
-interface. Installed-package rehearsal, independent review and protected
+adds no sensor kind, task-command shape, threshold or public binding interface.
+Its exact task-cache state capability is limited to the verified bound member
+and check-cache target. Installed-package rehearsal, independent review and protected
 release gates remain required before publication.
 
 - Admit the exact reviewed task-cache member as a local-write effect during
