@@ -22,6 +22,9 @@ affected_rules:
   - packages/cli/src/services/adopter-policy.ts
   - packages/cli/src/services/adopter-policy-binding.ts
   - packages/cli/src/commands/init/bind-adapters.ts
+  - packages/cli/src/commands/doctor-execution-readiness.ts
+  - packages/cli/src/commands/sense/task-binding.ts
+  - packages/cli/src/commands/sense/task-selection.ts
   - packages/cli/src/commands/sense/run-set.ts
   - packages/cli/src/commands/sense/reading-instance.ts
   - packages/cli/src/commands/sense/readings-rebuild.ts
@@ -34,6 +37,8 @@ inspector_acceptance:
   - IA-004 -- Execute a type_check preset member through trusted resolver context; reject forged member inputs, unknown or wrong-kind task references, population mismatches, changed task policy and unadmitted subprocess effects before execution.
   - IA-005 -- Run installed CLI from omitted, dot and absolute checkout roots including spaces; direct and regenerated Angular route inventories agree, no React population is fabricated, and real absolute-path leaks remain refused.
   - IA-006 -- Accept a registered constitution entrypoint only when its declared version, pinned bytes and digest agree. Missing, malformed, mismatched or tampered bindings remain failures; no version header is fabricated in adopter prose.
+  - IA-007 -- Doctor validates a supported exact task declaration before predecessor completion without executing tasks or granting a trusted execution binding. Missing or stale predecessor evidence still refuses actual sensing; invalid declarations and changed candidates retain their ordinary refusal.
+  - IA-008 -- Pre-consent task selection validates the contained static task reference without launching planning probes or reading completion caches. It preserves write and capability requirements, refuses invalid references, and cannot grant a trusted execution binding.
 ---
 
 # Candidate-bound sensing without mutable history
@@ -125,6 +130,49 @@ prerequisite identities, but does not execute them implicitly: required prior
 completion must be verified for this candidate, policy and environment or the
 measurement refuses. Only the selected node is measured. A cached result cannot
 replace actual execution when producing a new measurement.
+
+### Static task reference before effect consent
+
+Before consent and final host-effect authorization, sense selection projects
+only the static task reference: contained descriptor bytes, validated input and
+descriptor schemas, exact node/kind/population, supported output contract and
+any declared native result schema. It does not build a task plan, resolve or
+probe executable versions, launch subprocesses, inspect predecessor caches or
+issue a trusted execution binding. Declared native result presence selects the
+existing proof/state capabilities; it does not prove native selection or admit
+an unsupported backend.
+
+The projection retains the existing local-write effect, required explicit write
+consent, exact member and declared sensor-task capability, plus the existing
+native and migration capabilities when applicable. Its output declares required
+authority only. After that authority has been granted, full planning and runtime
+validation still determine whether execution is supported and permitted. The
+reference, diagnostic declaration and trusted execution binding are distinct
+results; no pre-consent metadata grants execution, freshness or result standing.
+
+### Diagnostic planning before prerequisite completion
+
+Doctor's `adopter-execution-readiness` check diagnoses whether declared sensor
+tasks can be planned under the installed interface. It checks the same schema,
+exact task/kind/population, supported output contract, dependency closure, plan,
+contained cwd, executable/toolchain/environment identity and applicable native
+selection and candidate compatibility. Candidate identity remains stable across
+the diagnostic. It does not execute any task, require prior cached predecessor
+completion or manufacture prerequisite result digests.
+
+This diagnostic can itself be a predecessor of the affected or RC task closure.
+Requiring that closure's completion before Doctor would create a bootstrap cycle.
+A compatible declaration therefore can pass this diagnostic before measurement
+prerequisites have completed. Its result is diagnostic plan compatibility only;
+it is not a trusted execution binding, execution origin, result or readiness
+standing. No caller-supplied option may promote that preview into such a binding.
+
+Actual sensing, execution freshness checks and custody retain the full verified
+predecessor requirement above, including current candidate, policy and environment
+identities and existing clean-candidate checks. Missing, stale, malformed or
+mismatched predecessor evidence still refuses measurement. Unsupported native
+backends and invalid declarations remain refused during Doctor; this separation
+changes no sensor admission, dependency edge, task outcome or release gate.
 
 Preset execution supplies the resolved member kind through internal scoped
 context. Neither user argv, sensor input nor caller-created data can impersonate
