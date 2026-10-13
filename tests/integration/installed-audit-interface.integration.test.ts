@@ -680,6 +680,58 @@ describe('installed optional audit interfaces and native task execution', () => 
     });
   }, 60_000);
 
+  it.each(['owned-linux-native-v1-linux-amd64', 'owned-linux-native-v1-linux-arm64'])(
+    'refuses unsupported service %s before native argv and AST through the installed CLI',
+    (backendId) => {
+      const root = nativePlaywrightRepository();
+      const descriptor = JSON.parse(readFileSync(join(root, 'test-tasks.json'), 'utf8'));
+      const task = descriptor.tasks[0];
+      task.argv = ['devai-inspector-deliberately-absent-native-runner', 'watch', '--unsupported'];
+      expect(
+        existsSync(
+          join(root, 'node_modules/.bin/devai-inspector-deliberately-absent-native-runner'),
+        ),
+      ).toBe(false);
+      task.outputContract.resultPopulation.serviceProfile = {
+        schemaVersion: '1.0.0',
+        profile: 'postgres-http-v1',
+        backendId,
+        provisioner: { kind: 'owned-docker-v1', toolchainKey: 'docker' },
+        postgres: { image: `postgres:16-alpine@sha256:${'a'.repeat(64)}` },
+      };
+      put(root, 'test-tasks.json', descriptor);
+      put(root, 'playwright.config.mjs', 'const selected = Date.now(); export default {};\n');
+      commit(root);
+      const chain = join(root, 'record/proofs/chain.json');
+      const before = existsSync(chain) ? readFileSync(chain) : undefined;
+      const result = run(root, [
+        'sense',
+        'run',
+        'unit_test',
+        '--input',
+        JSON.stringify({ taskId: 'test:playwright', population: 'native-playwright' }),
+        '--as-role',
+        'inspector',
+        '--write',
+        '--format',
+        'json',
+      ]);
+      expect(result.status).toBe(2);
+      expect(result.stdout).toBe('');
+      expect(JSON.parse(result.stderr)).toMatchObject({
+        ok: false,
+        error: {
+          code: 'SENSE_SELECTION_INVALID',
+          class: 'routing-authority',
+          exit: 2,
+          context: { detail: 'SENSE_NATIVE_SERVICE_BACKEND_UNIMPLEMENTED' },
+        },
+      });
+      expect(existsSync(chain) ? readFileSync(chain) : undefined).toEqual(before);
+      expect(existsSync(join(root, '.devai/state/native-config-traces'))).toBe(false);
+    },
+  );
+
   it.each(
     [
       ['--output', './caller-results'],
