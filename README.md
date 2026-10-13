@@ -19,9 +19,10 @@ See the [release notes](CHANGELOG.md#260--2026-10-11) and
 Native service/browser profiles remain forward candidate contracts with an empty
 backend catalogue; they supply no production admission or executed standing.
 
-The developing **2.6.1 patch** repairs executable trace-target recognition and
-static test naming comparisons across distinct runner families. Adoption rehearsal
-and protected release gates remain required before its publication.
+The developing **2.6.1 patch** repairs executable trace-target recognition,
+explicit-import runner naming comparisons and Doctor prerequisite planning.
+Unclassified global runner APIs retain conservative naming REVIEW. Adoption
+rehearsal and protected release gates remain required before its publication.
 
 ```bash
 export NODE_AUTH_TOKEN=<github-token-with-read-packages>
