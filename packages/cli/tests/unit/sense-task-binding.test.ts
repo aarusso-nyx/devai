@@ -1089,6 +1089,43 @@ nativePlatformProbeObservation(caller,{platform:'linux',osRelease:'6'},${JSON.st
     expect(migration.members[0]?.capabilities).toContain('db:write');
   });
 
+  it.each(['build', 'type_check', 'perf_test'] as const)(
+    'grants check-cache state only to the exact task-bound %s member',
+    (kind) => {
+      const root = fixture();
+      const unbound = resolveTaskBoundSenseSelection(
+        resolveSenseSelection({ kind }),
+        root,
+        new Map(),
+      );
+      expect(unbound.members[0]?.capabilities).not.toContain('fs:f5-state');
+
+      const selected = resolveTaskBoundSenseSelection(
+        resolveSenseSelection({ kind }),
+        root,
+        new Map([[kind, { taskId: 'measure', population: 'reviewed-population' }]]),
+      );
+      expect(selected.aggregate_effect).toBe('local-write');
+      expect(selected.members[0]).toMatchObject({
+        effect: 'local-write',
+        consent: { write: true, publish: false },
+        capabilities: expect.arrayContaining([
+          'fs:workspace',
+          'fs:f5-state',
+          'proc:declared-sensor-task',
+        ]),
+      });
+      expect(selected.members[0]?.capabilities).not.toContain('fs:proofs');
+
+      // This executes the exact descriptor argv once. The shared host seam also
+      // tests that one extra process argument cannot match the trusted binding.
+      expect(execute(binding(root, kind)).starts).toBe(1);
+      expect(() =>
+        runWithResolvedSensorMember('lint', () => executeSensorTask(binding(root, kind))),
+      ).toThrow('SENSE_TASK_MEMBER_CONTEXT_REQUIRED');
+    },
+  );
+
   it('resolves pre-authority task references without probing toolchains or prerequisite caches', () => {
     const root = fixture();
     const doc = descriptor({ dependencies: ['prepare'], toolchainKeys: ['pnpm', 'git'] });

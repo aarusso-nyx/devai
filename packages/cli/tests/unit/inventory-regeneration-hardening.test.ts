@@ -222,6 +222,26 @@ describe('inventory regeneration verifies its snapshot before publication (#294)
     expect(existsSync(join(root, DEP_GRAPH_BODY))).toBe(false);
   });
 
+  it.each([
+    ['generated body', DEP_GRAPH_BODY, '{"tampered":true}\n'],
+    ['tracked source', 'src/b.ts', 'export const b = 2;\n'],
+  ] as const)('refuses a changed %s after an accepted regeneration', async (_label, path, body) => {
+    const { root } = repository({}, '', () => undefined, '.devai/state/check-cache/');
+    const first = await regenerate(root, { surfaces: ACTIONS_ONLY });
+    expect(first.report.ok).toBe(true);
+    const manifest = readFileSync(join(root, INVENTORY_BODY_PATH), 'utf8');
+    put(root, path, body);
+
+    const second = await regenerate(root, { surfaces: ACTIONS_ONLY });
+
+    expect(second.reading.status).toBe('unknown');
+    expect(second.reading.findings).toEqual([
+      expect.objectContaining({ code: 'INVENTORY_REGENERATION_SOURCE_DIRTY' }),
+    ]);
+    expect(second.report).toMatchObject({ ok: false, regenerated: [] });
+    expect(readFileSync(join(root, INVENTORY_BODY_PATH), 'utf8')).toBe(manifest);
+  });
+
   function expectRefused(
     result: Awaited<ReturnType<typeof regenerate>>,
     root: string,
