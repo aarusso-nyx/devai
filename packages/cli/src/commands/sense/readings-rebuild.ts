@@ -395,6 +395,9 @@ interface RegenerationCandidate {
   readonly admit: (absolutePath: string) => boolean;
   /** The commit time, so the same commit regenerates byte-identical bodies. */
   readonly timestamp: string;
+  /** Uncommitted bodies/readings produced by an earlier run at this exact candidate. */
+  readonly priorOutputs: ReadonlyMap<string, string>;
+  readonly priorBodies: ReadonlyMap<string, string>;
 }
 
 function git(repoRoot: string, args: readonly string[]): string {
@@ -426,6 +429,98 @@ function admissionOf(
   };
 }
 
+function statusEntries(repoRoot: string): readonly { code: string; path: string }[] {
+  const status = execFileSync('git', ['status', '--porcelain=v1', '--untracked-files=all', '-z'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    maxBuffer: 256 * 1024 * 1024,
+  });
+  return status
+    .split('\0')
+    .filter(Boolean)
+    .map((entry) => ({
+      code: entry.slice(0, 2),
+      path: entry[2] === ' ' ? entry.slice(3) : '',
+    }));
+}
+
+function priorBodyKind(path: string): RegeneratedBody['kind'] | undefined {
+  if (path === INVENTORY_BODY_PATH) return 'inventory';
+  for (const kind of REGENERATED_KINDS) {
+    if (kind === 'inventory_routes') {
+      const prefix = `${REGENERATED_BODY_DIRECTORY}/inventory_routes/`;
+      if (path.startsWith(prefix) && /^routes-[a-z0-9-]+\.json$/u.test(path.slice(prefix.length)))
+        return kind;
+    } else if (path === regeneratedBodyPath(kind)) return kind;
+  }
+  return undefined;
+}
+
+/** Only exact earlier regeneration output is exempt from a repeat run's clean-source check. */
+function priorRegenerationOutputs(
+  repoRoot: string,
+  head: string,
+  tree: string,
+): { outputs: ReadonlyMap<string, string>; bodies: ReadonlyMap<string, string> } | undefined {
+  const outputs = new Map<string, string>();
+  const bodies = new Map<string, string>();
+  const readings: SensorReading[] = [];
+  for (const entry of statusEntries(repoRoot)) {
+    if (entry.code !== '??') return undefined;
+    const kind = priorBodyKind(entry.path);
+    const readingPath =
+      /^\.devai\/state\/sensor-readings\/inventory_regeneration\/(SR-[a-f0-9]{16})\.json$/u.exec(
+        entry.path,
+      );
+    if (kind === undefined && readingPath === null) return undefined;
+    const absolute = join(repoRoot, entry.path);
+    if (!lstatSync(absolute).isFile()) return undefined;
+    const bytes = readFileSync(absolute);
+    const digest = createHash('sha256').update(bytes).digest('hex');
+    outputs.set(entry.path, digest);
+    if (kind !== undefined) bodies.set(entry.path, digest);
+    if (readingPath !== null) {
+      const parsed: unknown = JSON.parse(bytes.toString('utf8'));
+      if (!validators.sensorReading(parsed)) return undefined;
+      const reading = parsed as SensorReading;
+      const identity = buildSensorReading({
+        sensorName: 'inventory-regeneration',
+        sensorKind: 'inventory_regeneration',
+        command: ['devai', 'sense', 'run', 'inventory_regeneration'],
+        status: reading.status,
+        deterministic: true,
+        tier: 'L0',
+        timestamp: reading.timestamp,
+        findings: reading.findings ?? [],
+        metrics: reading.metrics ?? {},
+        forceUniqueId: true,
+      });
+      if (
+        reading.id !== readingPath[1] ||
+        reading.id !== identity.id ||
+        reading.command_hash !== identity.command_hash ||
+        reading.sensor.name !== identity.sensor.name ||
+        reading.deterministic !== true ||
+        reading.tier !== 'L0' ||
+        reading.sensor.kind !== 'inventory_regeneration' ||
+        reading.command !== 'devai sense run inventory_regeneration' ||
+        !['pass', 'review'].includes(reading.status) ||
+        reading.metrics?.integration_head !== head ||
+        reading.metrics?.integration_tree !== tree
+      )
+        return undefined;
+      readings.push(reading);
+    }
+  }
+  if (bodies.size > 0 !== readings.length > 0) return undefined;
+  for (const [path, digest] of bodies) {
+    const kind = priorBodyKind(path);
+    const key = kind === 'inventory' ? 'inventory_body_sha256' : `${kind}_input_sha256`;
+    if (!readings.some((reading) => reading.metrics?.[key] === digest)) return undefined;
+  }
+  return { outputs, bodies };
+}
+
 /** A change since the candidate was resolved, or undefined when its identity still holds. */
 function snapshotChange(
   repoRoot: string,
@@ -440,16 +535,9 @@ function snapshotChange(
     // A successful regeneration may itself create or replace unignored state bodies.
     // Admit only the exact paths and bytes this invocation published; any other
     // source, state or index change still invalidates the candidate snapshot.
-    const status = execFileSync(
-      'git',
-      ['status', '--porcelain=v1', '--untracked-files=all', '-z'],
-      { cwd: repoRoot, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 },
-    );
-    for (const entry of status.split('\0').filter(Boolean)) {
-      const code = entry.slice(0, 2);
-      const path = entry.slice(3);
+    for (const { code, path } of statusEntries(repoRoot)) {
       if (
-        entry[2] !== ' ' ||
+        path === '' ||
         code.includes('R') ||
         code.includes('C') ||
         publication === undefined ||
@@ -500,7 +588,9 @@ function resolveCandidate(repoRoot: string): RegenerationCandidate | SensorFindi
     };
   }
   try {
-    if (git(repoRoot, ['status', '--porcelain']).length > 0) {
+    const tree = git(repoRoot, ['rev-parse', '--verify', `${head}^{tree}`]);
+    const prior = priorRegenerationOutputs(repoRoot, head, tree);
+    if (prior === undefined) {
       return {
         severity: 'warning',
         code: 'INVENTORY_REGENERATION_SOURCE_DIRTY',
@@ -508,12 +598,13 @@ function resolveCandidate(repoRoot: string): RegenerationCandidate | SensorFindi
       };
     }
     const committed = git(repoRoot, ['log', '-1', '--format=%cI', head]);
-    const tree = git(repoRoot, ['rev-parse', '--verify', `${head}^{tree}`]);
     return {
       head,
       tree,
       admit: admissionOf(repoRoot, trackedFiles(repoRoot)),
       timestamp: new Date(committed).toISOString(),
+      priorOutputs: prior.outputs,
+      priorBodies: prior.bodies,
     };
   } catch (error) {
     return {
@@ -1088,9 +1179,8 @@ async function regenerateForCandidate(
   let walk: BodyWalk = { entries: [], errors: [], created: 0, skipped: 0 };
   if (errors.length === 0) {
     // The walk was asynchronous: publish only if HEAD, its tree and a clean status still hold.
-    const stagedFiles = new Map(
-      staged.map((body) => [relative(repoRoot, body.temporary), body.sha256] as const),
-    );
+    const stagedFiles = new Map<string, string | null>(candidate.priorOutputs);
+    for (const body of staged) stagedFiles.set(relative(repoRoot, body.temporary), body.sha256);
     const changed = snapshotChange(repoRoot, candidate, stagedFiles);
     if (changed !== undefined) {
       return unwrittenResult(repoRoot, {
@@ -1101,6 +1191,20 @@ async function regenerateForCandidate(
             0,
             400,
           ),
+      });
+    }
+    // Prior disposable outputs have no authority over the source. Recompute all their
+    // bytes and refuse tampering or changed declared surfaces before replacing any body.
+    if (
+      [...candidate.priorBodies].some(
+        ([path, digest]) => staged.find((body) => body.body_path === path)?.sha256 !== digest,
+      )
+    ) {
+      return unwrittenResult(repoRoot, {
+        severity: 'warning',
+        code: 'INVENTORY_REGENERATION_SNAPSHOT_CHANGED',
+        message:
+          'A prior regenerated body differs from the exact candidate recomputation. Nothing was written.',
       });
     }
     try {
@@ -1116,9 +1220,8 @@ async function regenerateForCandidate(
       obsolete = removeObsoleteBodies(repoRoot, new Set(staged.map((body) => body.body_path)));
       // Publication is not atomic with the check above: a commit or edit can land between
       // them. Check again afterwards; a stale set is retracted, so no body outlives its HEAD.
-      const publication = new Map<string, string | null>(
-        staged.map((body) => [body.body_path, body.sha256]),
-      );
+      const publication = new Map<string, string | null>(candidate.priorOutputs);
+      for (const body of staged) publication.set(body.body_path, body.sha256);
       for (const body of obsolete) publication.set(body.body_path, null);
       const late = snapshotChange(repoRoot, candidate, publication);
       if (late !== undefined) return retractedResult(repoRoot, staged, late);
