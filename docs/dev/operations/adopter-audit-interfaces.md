@@ -86,7 +86,7 @@ execution binding. Full planning and execution admission happen under the
 required authority; declared native result presence alone establishes no native
 selection or standing.
 
-In the developing 2.6.1 patch, Doctor checks declared task compatibility without
+In the published 2.6.1 patch, Doctor checks declared task compatibility without
 requiring prior completion of the affected or RC closure. This lets Doctor remain
 a prerequisite of those closures. It still checks the exact task/kind/population,
 supported contract and plan, contained command context, installed toolchain and

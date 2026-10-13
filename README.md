@@ -5,30 +5,30 @@ It combines declared roles, bounded effects, repository sensors, validation, and
 attributable evidence without replacing a project's build, test, or CI tools.
 
 DEVAI ships as one package, `@aarusso-nyx/devai`; the published installation
-below is pinned to published **2.6.0**. This source tree's machine catalog contains
+below is pinned to published **2.6.1**. This source tree's machine catalog contains
 **69 actions** (36 stable, 22 preview, 11 internal), **59 sensors**, and
 **7 host-invoked recipes**. The ordinary public CLI is organized
 into eleven workflow domains: `audit`, `init`, `doctor`, `check`, `sense`, `round`,
 `evidence`, `release`, `triage`, `backlog`, and `campaign`. `task` and `catalog` are internal plumbing exposed by
 `--all` for maintainers and automation.
 
-The published **2.6.0 minor release** adds an installed read-only workflow
-review inventory, scoped hook refresh and a finite diagnostic coverage adapter.
-See the [release notes](CHANGELOG.md#260--2026-10-11) and
+The published **2.6.1 patch** repairs executable trace recognition, static
+runner-family naming comparisons and Doctor prerequisite planning.
+See the [release notes](CHANGELOG.md#261--2026-10-13) and
 [adopter audit interfaces](docs/dev/operations/adopter-audit-interfaces.md).
 Native service/browser profiles remain forward candidate contracts with an empty
 backend catalogue; they supply no production admission or executed standing.
 
-The developing **2.6.1 patch** repairs executable trace-target recognition,
-explicit-import runner naming comparisons and Doctor prerequisite planning.
-Unclassified global runner APIs retain conservative naming REVIEW. Adoption
+The developing **2.6.2 patch** admits the exact reviewed task-cache write and
+repeated inventory regeneration after prior output and candidate custody checks.
+It changes no task-command shape, threshold or execution standing. Adoption
 rehearsal and protected release gates remain required before its publication.
 
 ```bash
 export NODE_AUTH_TOKEN=<github-token-with-read-packages>
 printf '%s\n' '@aarusso-nyx:registry=https://npm.pkg.github.com' \
   '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}' > .npmrc
-pnpm add --save-dev --save-exact @aarusso-nyx/devai@2.6.0
+pnpm add --save-dev --save-exact @aarusso-nyx/devai@2.6.1
 pnpm exec devai --help
 pnpm exec devai catalog actions --format json
 pnpm exec devai init plan --target . --tier tier1 --format json
