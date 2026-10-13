@@ -1,6 +1,6 @@
 import type { ResolvedSenseSelection } from './facade.js';
 import type { SensorInputs } from './shared.js';
-import { resolveSensorTaskBinding } from './task-binding.js';
+import { resolveSensorTaskReference } from './task-binding.js';
 
 /** Task references resolve their complete authority before consent or any measurement. */
 export function resolveTaskBoundSenseSelection(
@@ -10,7 +10,7 @@ export function resolveTaskBoundSenseSelection(
 ): ResolvedSenseSelection {
   let bound = false;
   const members = selection.members.map((member) => {
-    const binding = resolveSensorTaskBinding(root, member.kind, inputs.get(member.kind));
+    const binding = resolveSensorTaskReference(root, member.kind, inputs.get(member.kind));
     if (binding === undefined) return member;
     if (selection.selection.type === 'preset') throw new Error('SENSE_TASK_PRESET_REFUSED');
     bound = true;
@@ -22,7 +22,9 @@ export function resolveTaskBoundSenseSelection(
           ...member.capabilities,
           'fs:workspace',
           'proc:declared-sensor-task',
-          ...(binding.nativeSelectionDigest === undefined ? [] : ['fs:proofs', 'fs:f5-state']),
+          ...(binding.node.outputContract['resultPopulation'] === undefined
+            ? []
+            : ['fs:proofs', 'fs:f5-state']),
           ...(member.kind === 'migration_check' ? ['db:write'] : []),
         ]),
       ]),
