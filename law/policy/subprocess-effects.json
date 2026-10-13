@@ -394,9 +394,9 @@
       "template_id": "declared-sensor-task",
       "executable": "declared-sensor-task",
       "argv_shape": ["<exact-verified-task-argv>"],
-      "capabilities": ["proc:declared-sensor-task", "fs:workspace"],
+      "capabilities": ["proc:declared-sensor-task", "fs:workspace", "fs:f5-state"],
       "effect": "local-write",
-      "reason": "ADR-SCR-0015: only sense run's internally trusted member/task binding admits this process. The executable marker is descriptive, never a runnable command or generic argv shape. Admission binds the exact sensorKinds annotation, population, candidate commit/tree, descriptor and task-policy digests, executable path and byte digest, complete argv, contained cwd, input selectors, dependency completion and toolchain/allowlisted environment identities. A caller cannot manufacture the internal binding; wrong kind, added arguments, changed policy, absent prerequisite custody and unmatched executable bytes refuse before execution. Every bound task requires explicit --write and fs:workspace; migration_check additionally retains db:write. Read presets refuse these members and no remote effect is inferred.",
+      "reason": "ADR-SCR-0015 and ADR-SCR-0017: only sense run's internally trusted member/task binding admits this process. The executable marker is descriptive, never a runnable command or generic argv shape. Admission binds the exact sensorKinds annotation, population, candidate commit/tree, descriptor and task-policy digests, executable path and byte digest, complete argv, contained cwd, input selectors, dependency completion and toolchain/allowlisted environment identities. A caller cannot manufacture the internal binding; wrong kind, added arguments, changed policy, absent prerequisite custody and unmatched executable bytes refuse before execution. Every bound task requires explicit --write and fs:workspace; fs:f5-state permits only the exact verified task-process target's content-addressed .devai/state/check-cache/v1 write and grants no other state path, native provenance trace or proof write. migration_check additionally retains db:write. Read presets refuse these members and no remote effect is inferred.",
       "owner": "architect"
     },
     {

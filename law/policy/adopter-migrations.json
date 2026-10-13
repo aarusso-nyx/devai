@@ -416,10 +416,10 @@
         {
           "id": "MIG-2.6.2-runtime-repair-identity-refresh",
           "kind": "rebind",
-          "summary": "This patch admits the exact reviewed task-cache local-write member and verifies prior inventory outputs before repeated regeneration. It adds no adopter configuration keys, defaults, interfaces or obligations. After installing the exact published package, registered upgrade refreshes the compiled authority policy's framework package and policy version identities to 2.6.2. Existing constitution, authority roots, sensor declarations, prerequisites, thresholds and trusted verifier remain unchanged; this refresh alone grants no execution or evidence standing.",
-          "decision_records": [],
-          "segments": ["authority"],
-          "files": [".devai/config/authority-policy.json"]
+          "summary": "This patch admits the exact reviewed task-cache local-write member and verifies prior inventory outputs before repeated regeneration. It adds no adopter configuration keys or new public action. After installing the exact published package, registered upgrade refreshes the compiled authority policy's framework package and policy version identities to 2.6.2 and rebinds the ordinary declared-sensor-task subprocess template with its exact check-cache state capability. Existing constitution, authority roots, sensor declarations, prerequisites, thresholds and trusted verifier remain unchanged; the rebind grants no arbitrary state path, native provenance trace, proof write or evidence standing.",
+          "decision_records": ["ADR-SCR-0017"],
+          "segments": ["authority", "subprocess-effects"],
+          "files": [".devai/config/authority-policy.json", ".devai/config/subprocess-effects.json"]
         }
       ]
     }

@@ -158,13 +158,19 @@ necessarily a passing result.
 This is a narrow product-law exception to ordinary observation purity and
 ADR-SCR-0008's rule against chain-before-file custody: an execution-origin
 receipt may precede generic persistence, but is not itself artifact custody.
-It runs only under explicit bound-task local-write consent. The resolved native
-member adds `fs:proofs` for this exact origin append and `fs:f5-state` for the
-transient provenance capture below, beside existing `fs:workspace` and
-`proc:declared-sensor-task`. The `declared-native-sensor-task` subprocess annotation
-is descriptive, not a generic executable/argv admission. Ordinary bound tasks and
-read observations gain neither capability. The host must verify the native
-binding before resolving these capabilities, and before every scoped write.
+It runs only under explicit bound-task local-write consent. Every exact task-bound
+member has `fs:f5-state` solely for its content-addressed
+`.devai/state/check-cache/v1` writes through the verified task-process target;
+this does not admit another state path or relax task kind, argv, candidate,
+population, prerequisite, executable or consent checks. A resolved native member
+additionally has `fs:proofs` for the exact origin append and guarded
+`fs:f5-state` operations for the transient provenance capture below, beside
+`fs:workspace` and `proc:declared-sensor-task`. The
+`declared-native-sensor-task` subprocess annotation is descriptive, not a
+generic executable/argv admission. Ordinary bound tasks gain no proof-write,
+execution-origin receipt or native provenance-trace authority; read observations
+gain no write capability. The host must verify the native binding before
+resolving those additional native operations, and before every scoped write.
 No public action or initiator role is added; framework self-dogfood roles remain
 subject to their existing resolved effect matrix.
 
