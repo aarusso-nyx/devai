@@ -1,0 +1,5 @@
+interface:
+  display_name: 'DEVAI resource control'
+  short_description: 'Apply an explicit budget, model or effort change'
+policy:
+  allow_implicit_invocation: false
