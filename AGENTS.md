@@ -6,11 +6,11 @@ This repository is DEVAI's own source and is **maintainer-governed**: maintainer
 
 ## Read what the change touches
 
-- `law/constitution.md`, `law/policy/*` — the article or policy you touch and the ADR behind it (`law/adr/README.md` indexes them).
+- `law/constitution.md`, `law/policy/*` — the article or policy touched and the ADR behind it (`law/adr/README.md` indexes them).
 - `law/schemas/*` — the schema and its consumers (`grep -rl <schema> packages/`).
-- the public CLI action set — `law/policy/action-registry.json`; additions need an ADR.
-- a recipe under `packages/skills/resources/` — `recipe.schema.json` and the adjacent `devai.recipe.json`.
-- release or verification — `law/policy/release-verification.json`, `release-lifecycle.json`.
+- the CLI action set — `law/policy/action-registry.json`; additions need an ADR.
+- a recipe — `packages/skills/resources/recipes/recipe.schema.json` and the adjacent `devai.recipe.json`.
+- release or verification — `law/policy/release-verification.json`, `law/policy/release-lifecycle.json`.
 - adopter-facing docs — `docs/adopters/`, `law/policy/documentation-information-architecture.json`.
 - an unfamiliar component — start at `README.md`.
 
