@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "name": "devai-docs",
   "status": "stable",
-  "description": "Create one evidence-grounded developer document at the selected variant's exact output path.",
+  "description": "Write one evidence-grounded DEVAI developer document at the output path the selected variant declares, citing repository artifacts. Use when asked for a DEVAI overview, architecture, or operations document.",
   "variants": {
     "overview": {
       "description": "Write the repository overview.",

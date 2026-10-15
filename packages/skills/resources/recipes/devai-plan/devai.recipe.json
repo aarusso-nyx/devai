@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "name": "devai-plan",
   "status": "stable",
-  "description": "Turn repository evidence and user intent into a bounded implementation plan without mutating the repository.",
+  "description": "Turn repository evidence and intent into a bounded DEVAI implementation plan (change, init, or module) without mutating the repository. Use when explicitly asked to plan before implementing; not a required step before every change.",
   "variants": {
     "change": {
       "description": "Plan a bounded code or documentation change from current evidence.",

@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "name": "devai-fix",
   "status": "stable",
-  "description": "Repair one failing engineering concern with explicit file bounds and focused verification.",
+  "description": "Repair a known failing DEVAI lint, typecheck, build, test or coverage concern within explicit file bounds. Use when a DEVAI check has failed and the failing files are known.",
   "variants": {
     "lint": {
       "description": "Repair lint failures in explicitly selected package files.",

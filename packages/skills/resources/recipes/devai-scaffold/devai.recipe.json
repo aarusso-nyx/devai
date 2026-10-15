@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "name": "devai-scaffold",
   "status": "stable",
-  "description": "Generate one bounded artifact family from explicit structured inputs and reviewable templates.",
+  "description": "Generate one bounded DEVAI artifact family (entity, module, CI workflow, migration) from explicit structured inputs and reviewed templates. Use when asked to scaffold a new DEVAI/STYNX module or entity.",
   "variants": {
     "db": {
       "description": "Generate database migrations and seeds.",

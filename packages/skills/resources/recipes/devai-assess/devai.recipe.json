@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "name": "devai-assess",
   "status": "stable",
-  "description": "Assess repository state and explain current evidence without changing product files.",
+  "description": "Evidence-based read of a DEVAI-governed repository's health, inventory, or current round, explained without changing files. Use for \"how healthy is this repo\", \"what's in the inventory\", \"what does the current round look like\".",
   "variants": {
     "health": {
       "description": "Run the affected health check and explain failures.",
