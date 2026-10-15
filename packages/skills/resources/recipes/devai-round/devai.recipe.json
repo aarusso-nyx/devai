@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "name": "devai-round",
   "status": "preview",
-  "description": "Preview a local round workflow with explicit phases and runtime-state-only coordination.",
+  "description": "Preview a local DEVAI round (assess, plan, run, close phases) with coordination records kept in runtime state. Use only when the user explicitly asks to preview or drive a round.",
   "variants": {
     "assess": {
       "description": "Inspect the prospective round subject without creating state.",

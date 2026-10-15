@@ -1,6 +1,6 @@
 ---
 name: devai-fix
-description: Repair one failing engineering concern with explicit file bounds and focused verification.
+description: Repair a known failing DEVAI lint, typecheck, build, test or coverage concern within explicit file bounds. Use when a DEVAI check has failed and the failing files are known.
 license: Apache-2.0
 compatibility: Invoked by a host that reads Agent Skills from .agents/skills or .claude/skills; needs the adjacent devai.recipe.json and devai.operations.json and the project-local @aarusso-nyx/devai package.
 metadata:
@@ -10,15 +10,12 @@ metadata:
 
 # DEVAI fix
 
-Before acting, read the adjacent `devai.recipe.json` and `devai.operations.json`. Select only a declared variant, obey its exact effect and write policy, and invoke only the descriptor's exact operation behavior.
+Read the adjacent `devai.recipe.json`. Select the variant that matches the failing concern (`lint`, `typecheck`, `build`, `test`, `coverage`) and stay within its write policy.
 
-Use this recipe only after a concrete failing concern is known.
+1. Name the files you will edit; every one must match the variant's scopes. A file discovered mid-repair that lies inside the authorized task scope may be added — say so in the report. A file outside it is a cross-scope need to report, not an edit.
+2. Reproduce the failure, find the cause, make the smallest repair.
+3. Run the variant's check. After any further edit, run it again. If the repair exposes a failure of another kind (a type fix breaks a test), continue the loop with that kind's check instead of stopping. Use the task's repair limit, or at most three repair/check iterations if unspecified; stop when checks pass, the limit is reached, a failure repeats without new evidence, or progress needs broader authority.
 
-1. Select exactly one declared variant: `lint`, `typecheck`, `build`, `test`, or `coverage`.
-2. Name the exact files to be edited before making changes. Every file must match that variant's scopes.
-3. Reproduce the focused failure, identify its cause, and make the smallest repair.
-4. Do not weaken tests, broaden permissions, or edit files discovered after authorization without reporting the new need.
-5. Run the focused deterministic check once after the repair.
-6. Do not invoke another model, commit, push, or perform remote actions.
+Never weaken a test or widen a permission.
 
-Report changed files, cause, verification, and any remaining risk.
+Report: changed files, cause, checks run with results, remaining risk.

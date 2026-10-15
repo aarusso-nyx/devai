@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "name": "devai-verify",
   "status": "stable",
-  "description": "Review code, documentation, or evidence without modifying product files.",
+  "description": "Independent read-only review of a DEVAI change, docs coherence, or release candidate against its evidence. Use for \"review this change\", \"is the RC coherent\", or when a campaign's review step runs.",
   "variants": {
     "change": {
       "description": "Review a bounded change and its focused evidence, ending the reply with one review verdict document in the shape law/schemas/review-verdict.schema.json declares.",
