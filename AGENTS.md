@@ -1,8 +1,8 @@
 # DEVAI development contract
 
-`CLAUDE.md` holds `@AGENTS.md`; Codex reads this file directly. Edit guidance here and nowhere else (ADR-GOV-0020).
+`CLAUDE.md` holds `@AGENTS.md`; Codex reads this file directly. Edit guidance here only (ADR-GOV-0020).
 
-This repository is DEVAI's own source and is **maintainer-governed**: maintainers choose scope, review changes and authorize releases. The constitutional roles (Owner, Architect, Inspector, Engineer, Auditor) govern DEVAI's _product_ behavior in adopter repositories; a maintainer session here declares none. Write authority here is enforced mechanically (`devai check`, the pre-push hook, the action registry, path refusal); a refused edit names its article.
+This repository is DEVAI's own source and is **maintainer-governed**: maintainers choose scope, review changes and authorize releases. The constitutional roles (Owner, Architect, Inspector, Engineer, Auditor) govern DEVAI's _product_ behavior in adopter repositories; a maintainer session here declares none. Write authority is Constitution Article 6 by path, enforced mechanically (`devai check`, the pre-push hook, the action registry); a refused edit names its article.
 
 ## Read what the change touches
 
@@ -12,6 +12,7 @@ This repository is DEVAI's own source and is **maintainer-governed**: maintainer
 - a recipe under `packages/skills/resources/` — `recipe.schema.json` and the adjacent `devai.recipe.json`.
 - release or verification — `law/policy/release-verification.json`, `release-lifecycle.json`.
 - adopter-facing docs — `docs/adopters/`, `law/policy/documentation-information-architecture.json`.
+- an unfamiliar component — start at `README.md`.
 
 A check that names an article is also a read trigger.
 
