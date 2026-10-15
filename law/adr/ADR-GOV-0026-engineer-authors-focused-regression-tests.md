@@ -9,6 +9,7 @@ supersedes: []
 provenance:
   - law/constitution.md Article 6 (write authority by path)
   - law/constitution.md Article 7 (what each role may author)
+  - law/constitution.md Article 10 (authority separation in a single loop iteration)
   - ADR-AUT-0003 (governed adopter path authority by path classes)
   - ADR-AUT-0004 (registered write verbs per path class)
 affected_rules:
@@ -31,7 +32,7 @@ inspector_acceptance:
 Proposed on 2026-10-14. Owner decision D1 of the same date chose option B. The record is
 not binding while its status is `proposed`, and the authority it describes takes effect only
 when the verb registration and the path enforcement land in the same release as the amended
-Articles 6 and 7.
+Articles 6, 7 and 10.
 
 ## Context
 
@@ -44,12 +45,14 @@ Decision D1 by the Owner (2026-10-14): option B.
 1. The Engineer class gains the write verb `add-or-modify-focused` on the test class, scoped to tests that exercise the files the same task changed. The verb is registered per ADR-AUT-0004 and enforced by path and by diff adjacency (a test file is in scope only if it imports or targets a source file changed in the same task).
 2. The Engineer may not delete tests, change assertions of tests it did not add in this task, or lower coverage/mutation thresholds. Those remain Inspector verbs.
 3. Campaigns may designate a round or task as **independent-assurance**; in that mode Article 6's original binding applies unchanged and the Engineer's test verb is withheld.
-4. The Inspector role is unchanged except that its mandate is now explicitly counterexamples, sensor configuration, and independent assurance rather than every test in the repository.
+4. Article 10 is amended in the same release: its "Engineer may not edit tests" clause and the consequence that cross-substrate work in one role session is impossible are narrowed to admit the Engineer's focused-regression verb, and keep applying unchanged in independent-assurance mode.
+5. The Inspector role is unchanged except that its mandate is now explicitly counterexamples, sensor configuration, and independent assurance rather than every test in the repository.
 
 ## Consequences
 
 - One task completes the repair-and-regression loop; review stays independent (`devai-verify`, `review.mode`).
 - `roles/engineer.md` already describes the new authority; it is effective only once the verb registration and path enforcement land (same release).
+- Articles 6, 7 and 10 are amended together; amending Articles 6 and 7 alone would leave Article 10 forbidding the Engineer test edit the other two grant.
 - Adopters pin a constitution version; this amendment reaches them through the ordinary pin upgrade, not by editing `.devai/pin/constitution.md`.
 - Risk: a weakened separation of duties for routine changes. Mitigation: the independent-assurance designation and the unchanged deletion/assertion/threshold verbs.
 
