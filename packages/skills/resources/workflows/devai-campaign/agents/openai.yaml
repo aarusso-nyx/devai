@@ -1,0 +1,5 @@
+interface:
+  display_name: 'DEVAI campaign'
+  short_description: 'Status, planning and readiness for DEVAI campaigns'
+policy:
+  allow_implicit_invocation: false

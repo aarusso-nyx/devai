@@ -1,0 +1,5 @@
+interface:
+  display_name: 'DEVAI backlog harvest'
+  short_description: 'Harvest unresolved work into issue drafts'
+policy:
+  allow_implicit_invocation: true

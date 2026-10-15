@@ -1,0 +1,5 @@
+interface:
+  display_name: 'DEVAI review control'
+  short_description: 'Review-cycle exceptions and stalled reviews'
+policy:
+  allow_implicit_invocation: true
