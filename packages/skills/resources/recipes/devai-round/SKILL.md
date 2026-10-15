@@ -10,10 +10,14 @@ metadata:
 
 # DEVAI round preview
 
-Read the adjacent `devai.recipe.json`. Select one phase (`assess`, `plan`, `run`, `close`) and keep coordination records under the declared runtime-state scope.
+Before acting, read the adjacent `devai.recipe.json` and `devai.operations.json`.
+
+Select one phase (`assess`, `plan`, `run`, `close`) and keep coordination records under the declared runtime-state scope.
 
 Child operations run under this round's explicit authorization: each child's effect is still checked against the round's declared effects and paths, but a passing check is not a new permission request. Stop on a failed child, missing evidence, or a child whose effect exceeds what the round authorized.
 
 No product-file edits from this recipe.
 
 Report: phase, operations run, records written (paths), and the exact stop reason if any.
+
+Worker boundary: no delegation, commit, push, publish or other remote effect from this recipe — those belong to an explicitly authorized orchestrator operation.

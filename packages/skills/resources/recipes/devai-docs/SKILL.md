@@ -10,6 +10,10 @@ metadata:
 
 # DEVAI docs
 
-Read the adjacent `devai.recipe.json`. Select one document variant; its output path comes from the variant (resolved through the adopter's binding where one exists), never from the request.
+Before acting, read the adjacent `devai.recipe.json` and `devai.operations.json`.
+
+Select one document variant and write to the exact output path the selected variant declares, never one from the request.
 
 Inspect the relevant inventory and source evidence. Cite concrete artifacts; mark inferences; report missing evidence rather than inventing it. Write only that one file.
+
+Worker boundary: no delegation, commit, push, publish or other remote effect from this recipe — those belong to an explicitly authorized orchestrator operation.

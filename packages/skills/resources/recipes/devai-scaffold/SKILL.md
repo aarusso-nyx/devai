@@ -10,8 +10,12 @@ metadata:
 
 # DEVAI scaffold
 
-Read the adjacent `devai.recipe.json` and select one variant. Require explicit structured inputs — do not infer missing identifiers or schema fields.
+Before acting, read the adjacent `devai.recipe.json` and `devai.operations.json`.
 
-Preview target paths (resolved through the adopter's binding) and confirm every target matches the variant's scopes. Create only missing or byte-identical generated files; a drifted file is reported, never overwritten. Review the output and run its focused check.
+Select one variant. Require explicit structured inputs — do not infer missing identifiers or schema fields.
+
+Preview the exact output paths the selected variant declares and confirm every target matches the variant's scopes. Create only missing or byte-identical generated files; a drifted file is reported, never overwritten. Review the output and run its focused check.
 
 No variant switching.
+
+Worker boundary: no delegation, commit, push, publish or other remote effect from this recipe — those belong to an explicitly authorized orchestrator operation.
