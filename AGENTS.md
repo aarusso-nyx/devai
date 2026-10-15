@@ -1,41 +1,30 @@
-# DEVAI v1.0rc development contract
+# DEVAI development contract
 
-This file is the only instruction contract for every host. `CLAUDE.md` beside it
-holds the single line `@AGENTS.md`, the Claude Code import that loads this file once
-and never twice; edit guidance here and nowhere else (ADR-GOV-0020).
+`CLAUDE.md` holds `@AGENTS.md`; Codex reads this file directly. Edit guidance here and nowhere else (ADR-GOV-0020).
 
-This repository is the release-candidate source. DEVAI does not govern its own
-development: human maintainers choose scope, review changes, and decide releases.
+This repository is DEVAI's own source and is **maintainer-governed**: maintainers choose scope, review changes and authorize releases. The constitutional roles (Owner, Architect, Inspector, Engineer, Auditor) govern DEVAI's _product_ behavior in adopter repositories; a maintainer session here declares none. Write authority here is enforced mechanically (`devai check`, the pre-push hook, the action registry, path refusal); a refused edit names its article.
 
-## Roles and reading order
+## Read what the change touches
 
-Declare one of the five roles at session start and keep it: Owner, Architect,
-Inspector, Engineer, or Auditor. Constitution Article 6 fixes write authority by
-path and Article 7 fixes what each role may author; a session never infers or
-elevates its role. Before changing governed repository state, read `README.md`,
-`law/constitution.md`, the decision records under `law/adr`, and the schemas under
-`law/schemas`, in that order.
+- `law/constitution.md`, `law/policy/*` — the article or policy you touch and the ADR behind it (`law/adr/README.md` indexes them).
+- `law/schemas/*` — the schema and its consumers (`grep -rl <schema> packages/`).
+- the public CLI action set — `law/policy/action-registry.json`; additions need an ADR.
+- a recipe under `packages/skills/resources/` — `recipe.schema.json` and the adjacent `devai.recipe.json`.
+- release or verification — `law/policy/release-verification.json`, `release-lifecycle.json`.
+- adopter-facing docs — `docs/adopters/`, `law/policy/documentation-information-architecture.json`.
+
+A check that names an article is also a read trigger.
 
 ## Working rules
 
-- Work in a dedicated branch or worktree and preserve unrelated user changes.
-- Treat `law/constitution.md`, current `law/policy/`, and current `law/schemas/` as
-  product contracts. Do not widen effects, permissions, or write scopes implicitly.
-- Keep the public CLI at the approved action set in `law/policy/action-registry.json`. Recipes are host-invoked contracts,
-  not CLI dispatchers, and deterministic behavior belongs in typed operations.
-- Run the smallest trustworthy checks affected by the change. Reuse fresh evidence for
-  untouched areas; reserve full Vitest and coverage for explicit RC gates.
-- Read command output and `git diff --check` before committing. Keep commits coherent.
-- Before opening a pull request, fetch the base branch and run the local preflight against
-  that fetched base; a `BLOCKED` probe names the environment fix, not a candidate defect.
-- Once the pre-push hook ships (CMP-0007 TASK-0723), every agent session installs and
-  keeps it in its worktree with `pnpm run hooks:install -- --pre-push` and never bypasses
-  it with `--no-verify`. It runs the commit-grammar range check and `check --affected`
-  against the fetched base before every push. Until then, run the local preflight above
-  before pushing. For humans it is opt-in; see
-  `docs/dev/operations/remote-preflight-contract.md`.
-- Write commit subjects as `type(scope)!: subject` from the closed type set in
-  `law/policy/commit-grammar.json`, and keep every commit inside one change family from
-  `law/policy/change-taxonomy.json`; only the pairings that policy lists may cross families.
-- Do not publish packages, tags, releases, deployments, or source unless the Owner gives
-  explicit authorization for that exact external effect.
+- One branch or worktree per change (`.devai/worktrees/<name>`); preserve unrelated changes.
+- `law/constitution.md`, `law/policy/` and `law/schemas/` are product contracts: do not widen effects, permissions or write scopes implicitly.
+- Run the smallest trustworthy checks (`devai check --affected` against the fetched base); full Vitest and coverage are for RC gates.
+- Commit subjects are `type(scope)!: subject` (`law/policy/commit-grammar.json`); one change family per commit (`change-taxonomy.json`).
+- Install the pre-push hook per worktree (`pnpm run hooks:install -- --pre-push`); it runs commit-grammar and `check --affected` before every push. A `BLOCKED` probe names an environment fix, not a candidate defect. Never bypass it.
+- Deliver what was asked at the scope intended, making routine judgment calls yourself and noting them. Check in only when readings differ materially, authority is missing, or an effect is irreversible.
+- Nothing is published — packages, tags, releases, deployments, source — without the Owner's explicit authorization for that exact effect.
+
+## Governed workers and recipes
+
+Recipes are host-invoked contracts, not CLI dispatchers; deterministic behavior lives in typed operations. A dispatched worker, recipes included, holds the single role its task packet names and works only in the task worktree; it cannot widen that authority. Push, merge, pull requests and publication belong to an explicitly authorized orchestrator operation. A worker may not delegate; the orchestrator may launch the independent reviewer. Missing authority blocks only the dependent action.
