@@ -14,7 +14,7 @@ Before acting, read the adjacent `devai.recipe.json` and `devai.operations.json`
 
 Select one variant. Require explicit structured inputs — do not infer missing identifiers or schema fields.
 
-Preview the exact output paths the selected variant declares and confirm every target matches the variant's scopes. Create only missing or byte-identical generated files; a drifted file is reported, never overwritten. Review the output and run its focused check.
+Derive the exact output paths from the typed scaffold operation and the structured inputs (the variant declares only glob scopes), preview them, and confirm every target matches the variant's scopes. Create only missing or byte-identical generated files; a drifted file is reported, never overwritten. Review the output and run its focused check.
 
 No variant switching.
 
