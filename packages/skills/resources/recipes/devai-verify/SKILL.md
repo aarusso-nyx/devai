@@ -10,9 +10,13 @@ metadata:
 
 # DEVAI verify
 
-Read the adjacent `devai.recipe.json`. Select one variant (`change`, `docs-coherence`, `rc`), establish the exact subject and its evidence, then run only that variant's deterministic verification operations.
+Before acting, read the adjacent `devai.recipe.json` and `devai.operations.json`.
+
+Select one variant (`change`, `docs-coherence`, `rc`), establish the exact subject and its evidence, then run only that variant's deterministic verification operations.
 
 Report every failure, missing piece of evidence and uncertainty plainly; report everything you find and let the orchestrator filter by severity. This is read-only: no repairs, no file mutation.
+
+Worker boundary: no delegation, commit, push, publish or other remote effect from this recipe — those belong to an explicitly authorized orchestrator operation.
 
 ## Orchestrator review step
 

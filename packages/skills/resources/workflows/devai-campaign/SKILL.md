@@ -10,7 +10,7 @@ metadata:
 
 # devai-campaign
 
-First, collect facts: run `devai sense --preset governed --format json` and `git status --short` from the repo root. Use the output as the checkout and campaign facts. If the collector fails, say so and continue with what you can read — never guess a HEAD, round id or candidate.
+First, collect read-only facts: `git rev-parse --show-toplevel`, `git remote get-url origin`, `git rev-parse --abbrev-ref HEAD`, `git rev-parse --short HEAD` and `git status --short`, then the live round state under `.devai/state/`: the rounds with runtime state (`.devai/state/round-runs/<round>/`), each round's live controller (`controller.json`) and dispatch journal (`dispatch-journal.jsonl`), and the task records (`.devai/state/tasks/<task>.json`). There is no single current-round pointer; name the round you report on. Run nothing that builds, tests or writes. If the collector fails, say so and continue with what you can read — never guess a HEAD, round id or candidate.
 
 Pick one route from the request.
 

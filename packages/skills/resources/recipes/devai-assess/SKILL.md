@@ -10,8 +10,12 @@ metadata:
 
 # DEVAI assess
 
-Read the adjacent `devai.recipe.json`. Select one variant (`health`, `inventory`, `round`), run only its deterministic operation, and read the complete result before summarizing.
+Before acting, read the adjacent `devai.recipe.json` and `devai.operations.json`.
+
+Select one variant (`health`, `inventory`, `round`), run only its deterministic operation, and read the complete result before summarizing.
 
 Separate observed facts, gaps, and recommendations. Read-only: no edits, no round advancement.
 
 Report: variant, operations run, evidence considered, findings, unresolved gaps.
+
+Worker boundary: no delegation, commit, push, publish or other remote effect from this recipe — those belong to an explicitly authorized orchestrator operation.

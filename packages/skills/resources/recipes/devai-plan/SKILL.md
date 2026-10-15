@@ -10,8 +10,12 @@ metadata:
 
 # DEVAI plan
 
-Read the adjacent `devai.recipe.json`. Select one variant (`change`, `init`, `module`) and use its deterministic operations to inspect current state.
+Before acting, read the adjacent `devai.recipe.json` and `devai.operations.json`.
+
+Select one variant (`change`, `init`, `module`) and use its deterministic operations to inspect current state.
 
 Ask only about choices that materially change the result; otherwise state your assumptions and continue. Define owned paths, dependencies, acceptance checks, rollback points, stop conditions.
 
 Return the plan in the conversation. No governance, law, product-draft or round files.
+
+Worker boundary: no delegation, commit, push, publish or other remote effect from this recipe — those belong to an explicitly authorized orchestrator operation.
