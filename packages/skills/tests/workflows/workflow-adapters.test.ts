@@ -1,0 +1,417 @@
+// Canonical resources/workflows/README.md: internal preview only, without installer authority.
+import { createHash } from 'node:crypto';
+import {
+  cpSync,
+  existsSync,
+  linkSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  readlinkSync,
+  renameSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { parse as parseYaml } from 'yaml';
+import { afterEach, describe, expect, it } from 'vitest';
+import {
+  buildWorkflowSkillPlan,
+  type WorkflowSkillPlanOptions,
+} from '../../src/workflows/bundle.js';
+
+const SOURCE = resolve(dirname(fileURLToPath(import.meta.url)), '../../resources/workflows');
+const SKILLS = [
+  'devai-backlog-harvest',
+  'devai-campaign',
+  'devai-resource-control',
+  'devai-review-control',
+];
+const roots: string[] = [];
+const sha256 = (bytes: string | Uint8Array) => createHash('sha256').update(bytes).digest('hex');
+
+afterEach(() => {
+  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
+});
+
+function temp(): string {
+  const root = mkdtempSync(join(tmpdir(), 'devai-workflow-preview-'));
+  roots.push(root);
+  return root;
+}
+
+function sources(): string {
+  const root = temp();
+  cpSync(SOURCE, root, { recursive: true });
+  return root;
+}
+
+function put(root: string, path: string, bytes: string): void {
+  mkdirSync(dirname(join(root, path)), { recursive: true });
+  writeFileSync(join(root, path), bytes);
+}
+
+function edit(root: string, path: string, change: (text: string) => string): void {
+  writeFileSync(join(root, path), change(readFileSync(join(root, path), 'utf8')));
+}
+
+function plan(options: Partial<WorkflowSkillPlanOptions> = {}) {
+  return buildWorkflowSkillPlan({ targetRoot: temp(), pinnedVersion: '2.7.0', ...options });
+}
+
+function split(markdown: string): { front: Record<string, unknown>; body: string } {
+  const match = /^---\n([\s\S]*?)\n---\n/u.exec(markdown);
+  if (!match) throw new Error('no front matter');
+  return {
+    front: parseYaml(match[1] ?? '') as Record<string, unknown>,
+    body: markdown.slice(match[0].length),
+  };
+}
+
+/** Includes directory identities/metadata and file bytes; reads never follow a link. */
+function state(root: string): unknown[] {
+  if (!existsSync(root)) return [];
+  const found: unknown[] = [];
+  const visit = (relative: string): void => {
+    const path = join(root, relative);
+    const stat = lstatSync(path);
+    found.push({
+      relative,
+      mode: stat.mode,
+      ino: stat.ino,
+      size: stat.size,
+      mtime: stat.mtimeMs,
+      ctime: stat.ctimeMs,
+      content: stat.isFile()
+        ? sha256(readFileSync(path))
+        : stat.isSymbolicLink()
+          ? readlinkSync(path)
+          : null,
+    });
+    if (stat.isDirectory())
+      for (const name of readdirSync(path).sort()) visit(join(relative, name));
+  };
+  visit('');
+  return found;
+}
+
+describe('internal workflow preview', () => {
+  it('previews four sorted workflows as twelve host files with exact canonical bodies and sidecars', () => {
+    const result = plan();
+    expect(result.skills).toEqual(SKILLS);
+    expect(result.files.map((file) => `${file.host} ${file.path}`)).toEqual(
+      SKILLS.flatMap((name) => [
+        `claude .claude/skills/${name}/SKILL.md`,
+        `codex .agents/skills/${name}/SKILL.md`,
+        `codex .agents/skills/${name}/agents/openai.yaml`,
+      ]),
+    );
+    const files = new Map(result.files.map((file) => [file.path, file.content]));
+    for (const name of SKILLS) {
+      const source = readFileSync(join(SOURCE, name, 'SKILL.md'), 'utf8');
+      const claude = split(files.get(`.claude/skills/${name}/SKILL.md`) ?? '');
+      const overlay: unknown = parseYaml(
+        readFileSync(join(SOURCE, name, 'claude.overlay.yaml'), 'utf8'),
+      );
+      expect(files.get(`.agents/skills/${name}/SKILL.md`)).toBe(source);
+      expect(claude.body).toBe(split(source).body);
+      expect(claude.front).toEqual({
+        ...split(source).front,
+        ...(overlay as Record<string, unknown>),
+      });
+      expect(files.get(`.agents/skills/${name}/agents/openai.yaml`)).toBe(
+        readFileSync(join(SOURCE, name, 'agents/openai.yaml'), 'utf8'),
+      );
+    }
+    // Generated afresh from the adapted planner; semantic assertions above guard the golden.
+    expect(Object.fromEntries(files)).toMatchSnapshot();
+  });
+
+  it('changes no source, existing target, local configuration or metadata on success or refusal', () => {
+    const source = sources();
+    const target = temp();
+    put(target, '.codex/config.toml', 'model = "existing"\n');
+    put(target, '.mcp.json', '{"mcpServers":{}}\n');
+    put(target, '.claude/settings.json', '{"hooks":{"UserPromptSubmit":[]}}\n');
+    put(target, '.devai/hooks/custom.mjs', '// operator-owned\n');
+    const ownedPath = '.agents/skills/devai-campaign/SKILL.md';
+    put(target, ownedPath, 'prior generated bytes\n');
+    const owned = new Map([[ownedPath, sha256('prior generated bytes\n')]]);
+    const beforeSource = state(source);
+    const beforeTarget = state(target);
+    expect(plan({ resourcesRoot: source, targetRoot: target, owned }).files).toHaveLength(12);
+    expect(state(source)).toEqual(beforeSource);
+    expect(state(target)).toEqual(beforeTarget);
+    put(source, 'devai-review-control/agents/openai.yaml', 'policy: invalid\n');
+    const invalidSource = state(source);
+    expect(() => plan({ resourcesRoot: source, targetRoot: target, owned })).toThrow(
+      'WORKFLOW_SKILL_OPENAI_YAML_INVALID',
+    );
+    expect(state(source)).toEqual(invalidSource);
+    expect(state(target)).toEqual(beforeTarget);
+  });
+
+  it('does not create a missing target root', () => {
+    const parent = temp();
+    const before = state(parent);
+    expect(plan({ targetRoot: join(parent, 'absent') }).files).toHaveLength(12);
+    expect(state(parent)).toEqual(before);
+  });
+
+  it('preserves a UTF-8 sidecar BOM instead of silently changing copied bytes', () => {
+    const root = sources();
+    const path = 'devai-campaign/agents/openai.yaml';
+    edit(root, path, (text) => `\uFEFF${text}`);
+    const bytes = readFileSync(join(root, path));
+    const preview = plan({ resourcesRoot: root }).files.find(
+      (file) => file.path === '.agents/skills/devai-campaign/agents/openai.yaml',
+    );
+    expect(Buffer.from(preview?.content ?? '', 'utf8')).toEqual(bytes);
+  });
+
+  it('accepts identical existing host files and only unedited caller-recorded prior bytes', () => {
+    const target = temp();
+    for (const file of plan().files) put(target, file.path, file.content);
+    expect(plan({ targetRoot: target }).files).toHaveLength(12);
+    const path = '.claude/skills/devai-campaign/SKILL.md';
+    put(target, path, 'older bytes\n');
+    const owned = new Map([[path, sha256('older bytes\n')]]);
+    expect(plan({ targetRoot: target, owned }).skills).toEqual(SKILLS);
+    put(target, path, 'operator edit\n');
+    const before = state(target);
+    expect(() => plan({ targetRoot: target, owned })).toThrow('WORKFLOW_SKILL_DRIFT');
+    expect(state(target)).toEqual(before);
+  });
+
+  it.each([
+    '2.6.2',
+    '2.7.0-rc.1',
+    '2.7',
+    '2.7.0junk',
+    '02.7.0',
+    '2.7.0-01',
+    '2.7.0+',
+    '2.7.0+a..b',
+    '9007199254740992.0.0',
+  ])('keeps schema 1 unavailable to unsupported or malformed pin %s', (pinnedVersion) => {
+    expect(() => plan({ pinnedVersion })).toThrow('WORKFLOW_SKILL_SCHEMA_UNSUPPORTED');
+  });
+
+  it.each(['2.7.0', '2.7.0+build.1', '2.8.0-rc.1'])(
+    'previews a schema-supported version %s without installing it',
+    (pinnedVersion) => {
+      expect(plan({ pinnedVersion }).files).toHaveLength(12);
+    },
+  );
+});
+
+describe('source and schema refusals', () => {
+  it.each([
+    ['missing front matter', (text: string) => text.replace('---\n', '')],
+    [
+      'wrong directory name',
+      (text: string) => text.replace('name: devai-campaign', 'name: foreign'),
+    ],
+    [
+      'a duplicate core key',
+      (text: string) => text.replace('name: devai-campaign', 'name: devai-campaign\nname: foreign'),
+    ],
+    [
+      'a host-only core key',
+      (text: string) => text.replace('license: Apache-2.0', 'license: Apache-2.0\neffort: high'),
+    ],
+  ])('refuses %s', (_label, change) => {
+    const root = sources();
+    edit(root, 'devai-campaign/SKILL.md', change);
+    expect(() => plan({ resourcesRoot: root })).toThrow('WORKFLOW_SKILL_SOURCE_INVALID');
+  });
+
+  it.each([
+    "devai-workflow-schema: '9'",
+    'devai-workflow-schema: 1',
+    "other-schema: '1'",
+    "devai-workflow-schema: 'toString'",
+  ])('refuses unsupported metadata %s', (replacement) => {
+    const root = sources();
+    edit(root, 'devai-campaign/SKILL.md', (text) =>
+      text.replace("devai-workflow-schema: '1'", replacement),
+    );
+    expect(() => plan({ resourcesRoot: root })).toThrow('WORKFLOW_SKILL_SCHEMA_UNSUPPORTED');
+  });
+
+  it.each(['Run !`git status`.', 'Use $ARGUMENTS.', 'Read ${CLAUDE_SKILL_DIR}.'])(
+    'refuses shared host preprocessing syntax %s',
+    (syntax) => {
+      const root = sources();
+      edit(root, 'devai-campaign/SKILL.md', (text) => `${text}\n${syntax}\n`);
+      expect(() => plan({ resourcesRoot: root })).toThrow('WORKFLOW_SKILL_HOST_SYNTAX');
+    },
+  );
+
+  it.each([
+    ['unknown key', (text: string) => `${text}description: other\n`],
+    [
+      'nonboolean disable',
+      (text: string) =>
+        text.replace('disable-model-invocation: true', 'disable-model-invocation: yes'),
+    ],
+    ['nonstring effort', (text: string) => text.replace('effort: medium', 'effort: {}')],
+  ])('refuses unsupported overlay fields or types %s', (_label, change) => {
+    const root = sources();
+    edit(root, 'devai-campaign/claude.overlay.yaml', change);
+    expect(() => plan({ resourcesRoot: root })).toThrow('WORKFLOW_SKILL_SOURCE_INVALID');
+  });
+
+  it.each([
+    ['devai-campaign', 'false', 'true'],
+    ['devai-review-control', 'true', 'false'],
+  ])('refuses mismatched invocation intent for %s', (name, from, to) => {
+    const root = sources();
+    edit(root, `${name}/agents/openai.yaml`, (text) =>
+      text.replace(`allow_implicit_invocation: ${from}`, `allow_implicit_invocation: ${to}`),
+    );
+    expect(() => plan({ resourcesRoot: root })).toThrow('WORKFLOW_SKILL_INVOCATION_MISMATCH');
+  });
+
+  it.each([
+    'policy: [',
+    '[]',
+    'interface: {}\n',
+    'policy:\n  allow_implicit_invocation: "false"\n',
+    'policy:\n  allow_implicit_invocation: false\n  allow_implicit: false\n',
+    'policy: {allow_implicit_invocation: false}\npolicy: {allow_implicit_invocation: true}\n',
+    'interface: {display_name: false}\npolicy: {allow_implicit_invocation: false}\n',
+    'dependencies: {}\npolicy: {allow_implicit_invocation: false}\n',
+    'interface: {unexpected: title}\npolicy: {allow_implicit_invocation: false}\n',
+    'interface: &value {display_name: title}\npolicy: *value\n',
+  ])('refuses malformed, ambiguous or unsupported sidecar %s', (text) => {
+    const root = sources();
+    put(root, 'devai-campaign/agents/openai.yaml', text);
+    expect(() => plan({ resourcesRoot: root })).toThrow('WORKFLOW_SKILL_OPENAI_YAML_INVALID');
+  });
+});
+
+describe('discovery and filesystem boundaries', () => {
+  it.each([
+    '.codex/skills/devai-campaign/SKILL.md',
+    '.claude/skills/devai-campaign/SKILL.md',
+    '.agents/skills/devai-campaign/SKILL.md',
+    '.agents/skills/devai-campaign/extra.md',
+  ])('refuses a foreign discovery entry at %s', (path) => {
+    const target = temp();
+    put(target, path, 'operator file\n');
+    const before = state(target);
+    expect(() => plan({ targetRoot: target })).toThrow('WORKFLOW_SKILL_DUPLICATE');
+    expect(state(target)).toEqual(before);
+  });
+
+  it('always reserves canonical recipe names as well as caller-reserved names', () => {
+    expect(() => plan({ reservedNames: ['devai-campaign'] })).toThrow('WORKFLOW_SKILL_DUPLICATE');
+    const root = sources();
+    renameSync(join(root, 'devai-campaign'), join(root, 'devai-assess'));
+    edit(root, 'devai-assess/SKILL.md', (text) =>
+      text.replace('name: devai-campaign', 'name: devai-assess'),
+    );
+    expect(() => plan({ resourcesRoot: root })).toThrow('WORKFLOW_SKILL_DUPLICATE');
+  });
+
+  it('refuses an extra file even if a prior receipt claims to own it', () => {
+    const target = temp();
+    const path = '.agents/skills/devai-campaign/extra.md';
+    put(target, path, 'old generated extra\n');
+    expect(() =>
+      plan({ targetRoot: target, owned: new Map([[path, sha256('old generated extra\n')]]) }),
+    ).toThrow('WORKFLOW_SKILL_DUPLICATE');
+  });
+
+  it.each(['SKILL.md', 'extra-directory'])('refuses a target directory in place of %s', (entry) => {
+    const target = temp();
+    mkdirSync(join(target, '.agents/skills/devai-campaign', entry), { recursive: true });
+    const before = state(target);
+    expect(() => plan({ targetRoot: target })).toThrow('WORKFLOW_SKILL_DUPLICATE');
+    expect(state(target)).toEqual(before);
+  });
+
+  it('refuses a non-directory discovery ancestor', () => {
+    const target = temp();
+    put(target, '.agents', 'not a directory\n');
+    expect(() => plan({ targetRoot: target })).toThrow('WORKFLOW_SKILL_DUPLICATE');
+  });
+
+  it('refuses invalid UTF-8 and hardlinks in canonical source files', () => {
+    const root = sources();
+    const path = join(root, 'devai-campaign/SKILL.md');
+    writeFileSync(path, Buffer.from([0xff]));
+    expect(() => plan({ resourcesRoot: root })).toThrow('WORKFLOW_SKILL_SOURCE_INVALID');
+    const other = sources();
+    linkSync(join(other, 'devai-campaign/SKILL.md'), join(temp(), 'source-alias'));
+    expect(() => plan({ resourcesRoot: other })).toThrow('WORKFLOW_SKILL_SOURCE_INVALID');
+  });
+
+  it.each([
+    '.agents',
+    '.agents/skills',
+    '.agents/skills/devai-campaign',
+    '.agents/skills/devai-campaign/agents',
+  ])('refuses a linked discovery ancestor %s, leaving the external tree unchanged', (path) => {
+    const target = temp();
+    const outside = temp();
+    put(outside, 'sentinel', 'outside\n');
+    mkdirSync(dirname(join(target, path)), { recursive: true });
+    symlinkSync(outside, join(target, path));
+    const before = state(outside);
+    expect(() => plan({ targetRoot: target })).toThrow('WORKFLOW_SKILL_DUPLICATE');
+    expect(state(outside)).toEqual(before);
+  });
+
+  it.each([false, true])('refuses a planned leaf symlink (dangling=%s)', (dangling) => {
+    const target = temp();
+    const outside = join(temp(), 'leaf');
+    if (!dangling) writeFileSync(outside, 'outside\n');
+    const path = '.agents/skills/devai-campaign/SKILL.md';
+    mkdirSync(dirname(join(target, path)), { recursive: true });
+    symlinkSync(outside, join(target, path));
+    expect(() => plan({ targetRoot: target })).toThrow('WORKFLOW_SKILL_DUPLICATE');
+  });
+
+  it('refuses a hardlinked target even when its content is the planned content', () => {
+    const target = temp();
+    const file = plan().files.find(
+      (file) => file.path === '.agents/skills/devai-campaign/SKILL.md',
+    );
+    if (!file) throw new Error('missing planned skill');
+    const outside = join(temp(), 'source');
+    writeFileSync(outside, file.content);
+    mkdirSync(dirname(join(target, file.path)), { recursive: true });
+    linkSync(outside, join(target, file.path));
+    expect(() => plan({ targetRoot: target })).toThrow('WORKFLOW_SKILL_DUPLICATE');
+  });
+
+  it.each(['root', 'skill-directory', 'skill-file', 'agents-directory'])(
+    'refuses a linked %s source',
+    (kind) => {
+      let root = sources();
+      if (kind === 'root') {
+        const parent = temp();
+        symlinkSync(root, join(parent, 'linked'));
+        root = join(parent, 'linked');
+      } else {
+        const relative =
+          kind === 'skill-directory'
+            ? 'devai-campaign'
+            : kind === 'skill-file'
+              ? 'devai-campaign/SKILL.md'
+              : 'devai-campaign/agents';
+        const moved = join(temp(), 'source');
+        renameSync(join(root, relative), moved);
+        symlinkSync(moved, join(root, relative));
+      }
+      expect(() => plan({ resourcesRoot: root })).toThrow('WORKFLOW_SKILL_SOURCE_INVALID');
+    },
+  );
+});
