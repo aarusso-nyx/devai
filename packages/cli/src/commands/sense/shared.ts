@@ -206,6 +206,12 @@ const DECLARED_GLOB_KEYS: ReadonlySet<string> = new Set([
   'excludeGlobs',
   'scanDirs',
   'migrationDirs',
+
+  'sourceRoots',
+  'packageRoots',
+  'threatModelDirs',
+  'piiMigrationDirs',
+  'errorContractDirs',
 ]);
 
 export type SenseInputsErrorCode =
