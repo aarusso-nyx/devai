@@ -38,6 +38,40 @@ beforeEach(() =>
 afterEach(() => vi.restoreAllMocks());
 
 describe('security scan audit shape boundaries', () => {
+  it('captures a complete report beyond the default buffer without narrowing the audit population', () => {
+    mocks.spawnSync.mockReturnValueOnce(
+      audit(
+        {
+          vulnerabilities: {
+            dependency: { severity: 'critical', detail: 'x'.repeat(2 * 1024 * 1024) },
+          },
+        },
+        1,
+      ),
+    );
+    const reading = senseSecurityScan({ repoRoot, now });
+    expect(reading.status).toBe('fail');
+    expect(reading.metrics).toMatchObject({ critical: 1, total_vulnerabilities: 1 });
+    expect(mocks.spawnSync).toHaveBeenCalledWith(
+      'pnpm',
+      ['audit', '--json'],
+      expect.objectContaining({ maxBuffer: 64 * 1024 * 1024 }),
+    );
+    expect(mocks.spawnSync).toHaveBeenCalledTimes(1);
+  });
+
+  it('never grades buffered bytes when the process reports output overflow', () => {
+    mocks.spawnSync.mockReturnValueOnce({
+      ...audit({ vulnerabilities: {} }),
+      error: Object.assign(new Error('output exceeds buffer'), { code: 'ENOBUFS' }),
+    });
+    const reading = senseSecurityScan({ repoRoot, now });
+    expect(reading.status).toBe('unknown');
+    expect(reading.findings).toContainEqual(
+      expect.objectContaining({ message: expect.stringContaining('output exceeds buffer') }),
+    );
+  });
+
   it('falls back to the top-level npm shape when metadata is null', () => {
     mocks.spawnSync.mockReturnValueOnce(
       audit({ metadata: null, vulnerabilities: { vite: { severity: 'high' } } }, 1),

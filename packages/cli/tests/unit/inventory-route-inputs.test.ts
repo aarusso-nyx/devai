@@ -3,7 +3,10 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { resolveInventoryRouteInputs } from '../../src/commands/sense/inventory-inputs.js';
+import {
+  resolveInventoryDataModelInputs,
+  resolveInventoryRouteInputs,
+} from '../../src/commands/sense/inventory-inputs.js';
 
 const roots: string[] = [];
 afterEach(() => {
@@ -45,4 +48,31 @@ describe('explicit inventory route population containment', () => {
       resolveInventoryRouteInputs(root, { framework: 'angular', scanDirs: [outside] }),
     ).toThrow();
   });
+});
+
+describe('declared data model population containment', () => {
+  it('keeps defaults when no SQL roots are declared', () => {
+    expect(resolveInventoryDataModelInputs(fixture().root)).toEqual({});
+  });
+  it('accepts a contained nonconventional SQL root', () => {
+    expect(
+      resolveInventoryDataModelInputs(fixture().root, {
+        migrationDirs: ['backend/database/ddl'],
+      }),
+    ).toEqual({ migrationDirs: ['backend/database/ddl'] });
+  });
+  it.each(['../sibling', 'apps/../../sibling', 'escape', 'escape/missing', '/tmp/sql'])(
+    'refuses SQL root %s before walking',
+    (path) => {
+      expect(() =>
+        resolveInventoryDataModelInputs(fixture().root, { migrationDirs: [path] }),
+      ).toThrow();
+    },
+  );
+  it.each([[], ['db', 'db'], ['db/*'], [12]].map((migrationDirs) => ({ migrationDirs })))(
+    'refuses malformed SQL roots $migrationDirs',
+    ({ migrationDirs }) => {
+      expect(() => resolveInventoryDataModelInputs(fixture().root, { migrationDirs })).toThrow();
+    },
+  );
 });
