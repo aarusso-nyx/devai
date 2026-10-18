@@ -131,6 +131,9 @@ function runAudit(tool: AuditTool, cwd: string): AuditResult {
       encoding: 'utf8',
       env: { ...process.env },
       timeout: 60_000,
+      // Complete monorepo advisory reports can exceed Node's 1 MiB default.
+      // Keep a finite ceiling; overflow remains an observation failure below.
+      maxBuffer: 64 * 1024 * 1024,
     });
     if (r.error !== undefined) {
       const err = r.error as NodeJS.ErrnoException;
