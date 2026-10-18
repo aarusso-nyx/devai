@@ -144,15 +144,15 @@ export type PopulationSample =
       readonly minimum: number;
       /** The population metrics (without sample_size, which the sensor owns). */
       readonly metrics: PopulationMetrics;
-      readonly unverifiedFinding: PopulationFinding;
+      readonly unverifiedFinding: PopulationFinding | undefined;
       readonly describe: string;
     };
 
 /**
  * Reads the declared population through the admitted gh run list shape and applies the row
  * filters gh cannot: event and literal head branch re-checks, lookback, cancelled, and last
- * attempt. Base branch and a same-workflow excluded job pair cannot be verified from gh run
- * list rows and are reported as unverified, never filtered on.
+ * attempt. For push events the pushed branch is headBranch and verifies baseBranch. Other
+ * events and same-workflow excluded job pairs remain explicitly unverified.
  */
 export function samplePopulation(
   opts: HarnessPopulationOptions,
@@ -195,6 +195,7 @@ export function samplePopulation(
     (run) =>
       run.event === event &&
       (headBranch === '*' || run.headBranch === headBranch) &&
+      (event !== 'push' || run.headBranch === baseBranch) &&
       run.createdAt !== undefined &&
       Date.parse(run.createdAt) >= cutoffMs,
   );
@@ -218,7 +219,11 @@ export function samplePopulation(
   const sameWorkflowPairs = (opts.excludedJobs ?? []).filter(
     (pair) => pair.workflow === workflow,
   ).length;
-  const unverified = unverifiedFilters({ workflow, baseBranch, sameWorkflowPairs }, false);
+  const baseBranchVerified = event === 'push';
+  const unverified = unverifiedFilters(
+    { workflow, baseBranch, sameWorkflowPairs },
+    baseBranchVerified,
+  );
   return {
     ok: true,
     args,
@@ -234,12 +239,11 @@ export function samplePopulation(
       population_attempts: attempts,
       population_include_cancelled: includeCancelled,
       population_lookback_days: lookbackDays,
-      population_base_branch_verified: false,
+      population_base_branch_verified: baseBranchVerified,
       population_excluded_jobs_unverified: sameWorkflowPairs,
       population_unverified: unverified.names,
     },
-    // A run sample always leaves the base branch unverified, so the finding is always present.
-    unverifiedFinding: unverified.finding as PopulationFinding,
+    unverifiedFinding: unverified.finding,
   };
 }
 

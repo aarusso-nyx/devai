@@ -63,7 +63,7 @@ export function senseHarnessRobustness(opts: HarnessRobustnessOptions): SensorRe
           sample.describe,
           'run(s)',
         ),
-        sample.unverifiedFinding,
+        ...(sample.unverifiedFinding === undefined ? [] : [sample.unverifiedFinding]),
       ],
       metrics: { run_count: total, sample_size: total, ...sample.metrics },
     });
@@ -95,7 +95,7 @@ export function senseHarnessRobustness(opts: HarnessRobustnessOptions): SensorRe
       message: `Flakiness rate ${pct.toFixed(1)}% (above review ${String(thresholds.review)}%).`,
     });
   }
-  findings.push(sample.unverifiedFinding);
+  if (sample.unverifiedFinding !== undefined) findings.push(sample.unverifiedFinding);
 
   return buildSensorReading({
     ...common,
