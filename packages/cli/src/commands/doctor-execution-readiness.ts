@@ -5,7 +5,7 @@ import { readTaskDescriptor } from '../services/check-runner/policy.js';
 import { getValidator } from '@devai-nyx/schemas';
 import type { ReleaseFailureClass } from '../services/release-preflight.js';
 import { currentRepositoryState } from '../services/check-runner/policy-git.js';
-import { resolveSensorTaskDeclaration } from './sense/task-binding.js';
+import { hasSensorTaskReference, resolveSensorTaskDeclaration } from './sense/task-binding.js';
 import type { SensorInputs } from './sense/shared.js';
 import type { CheckResult } from './doctor-support.js';
 
@@ -173,9 +173,7 @@ export function checkAdopterExecutionReadiness(repoRoot: string): CheckResult {
         throw new Error('SENSE_INPUTS_INVALID');
       const inputs = (declaration as { inputs: Record<string, SensorInputs> }).inputs;
       selected.push(
-        ...Object.entries(inputs).filter(
-          ([, input]) => input['taskId'] !== undefined || input['population'] !== undefined,
-        ),
+        ...Object.entries(inputs).filter(([kind, input]) => hasSensorTaskReference(kind, input)),
       );
     }
     if (existsSync(join(root, 'test-tasks.json'))) {

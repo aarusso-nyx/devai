@@ -26,6 +26,9 @@ export function runCommand(argv: readonly string[], opts: RunOptions = {}): RunR
     cwd: opts.cwd,
     encoding: 'utf8',
     timeout: opts.timeoutMs,
+    // Monorepo lint/test reports must be captured completely before parsing.
+    // Output beyond this finite limit remains a failed observation.
+    maxBuffer: 64 * 1024 * 1024,
     env: opts.env !== undefined ? { ...process.env, ...opts.env } : process.env,
     ...(opts.input !== undefined && { input: opts.input }),
   });

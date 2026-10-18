@@ -57,6 +57,12 @@ const TASK_KINDS = new Set([
   'migration_check',
 ]);
 const MAX_OUTPUT = 64 * 1024 * 1024;
+/** Coverage population selectors are not executable task references. */
+export function hasSensorTaskReference(kind: string, inputs: SensorInputs): boolean {
+  return (
+    inputs['taskId'] !== undefined || (TASK_KINDS.has(kind) && inputs['population'] !== undefined)
+  );
+}
 const ANSI_SEQUENCE = new RegExp(`${String.fromCharCode(27)}\\[[0-?]*[ -/]*[@-~]`, 'gu');
 
 export interface SensorTaskBinding {

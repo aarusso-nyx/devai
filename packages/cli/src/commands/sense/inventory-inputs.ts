@@ -1,9 +1,25 @@
-import type { InventoryRoutesOptions } from '@devai-nyx/sensors';
+import type { InventoryDataModelOptions, InventoryRoutesOptions } from '@devai-nyx/sensors';
 import {
   resolveDeclaredSensorInputs,
   validateEffectiveSensorInputs,
   type SensorInputs,
 } from './shared.js';
+
+export function resolveInventoryDataModelInputs(
+  repoRoot: string,
+  explicit?: SensorInputs,
+): Pick<InventoryDataModelOptions, 'migrationDirs'> {
+  const inputs = resolveDeclaredSensorInputs({
+    repoRoot,
+    sensorKind: 'inventory_data_model',
+    ...(explicit === undefined ? {} : { explicit }),
+  });
+  const migrationDirs = inputs['migrationDirs'];
+  if (migrationDirs === undefined) return {};
+  const options = { migrationDirs };
+  validateEffectiveSensorInputs(repoRoot, 'inventory_data_model', options);
+  return { migrationDirs: migrationDirs as string[] };
+}
 
 export function resolveInventoryRouteInputs(
   repoRoot: string,

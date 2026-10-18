@@ -37,7 +37,10 @@ import {
 } from '@devai-nyx/sensors';
 import { regenerateInventory } from '#runtime-core';
 import { persistSensorReading } from './shared.js';
-import { resolveInventoryRouteInputs } from './inventory-inputs.js';
+import {
+  resolveInventoryDataModelInputs,
+  resolveInventoryRouteInputs,
+} from './inventory-inputs.js';
 
 /**
  * Rebuild inventory readings from previously recorded sensor bodies. Walks
@@ -937,7 +940,11 @@ function produceKind(
       });
       break;
     case 'inventory_data_model':
-      produced = senseInventoryDataModel({ ...common, admitFile });
+      produced = senseInventoryDataModel({
+        ...common,
+        ...resolveInventoryDataModelInputs(repoRoot),
+        admitFile,
+      });
       break;
     case 'inventory_rbac':
       produced = senseInventoryRbac({
