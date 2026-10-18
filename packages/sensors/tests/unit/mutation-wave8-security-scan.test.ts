@@ -70,7 +70,8 @@ describe('security scan mutation boundaries', () => {
         expect.objectContaining({
           cwd: root,
           encoding: 'utf8',
-          timeout: 60_000,
+          timeout: 180_000,
+          maxBuffer: 512 * 1024 * 1024,
           env: expect.objectContaining({ DEVAI_SENSOR_ENV_MARKER: 'present' }),
         }),
       );

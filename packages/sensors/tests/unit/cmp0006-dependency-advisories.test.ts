@@ -393,7 +393,8 @@ describe('CMP-0006 registered security_scan audit evidence', () => {
       expect.objectContaining({
         cwd: repoRoot,
         encoding: 'utf8',
-        timeout: 60_000,
+        timeout: 180_000,
+        maxBuffer: 512 * 1024 * 1024,
         env: expect.objectContaining({ PATH: process.env.PATH }),
       }),
     );
