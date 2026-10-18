@@ -13,6 +13,7 @@ import {
 } from '../../src/commands/sense/readings-rebuild.js';
 import {
   ALL_SURFACES,
+  ADOPTER_SOURCES,
   PROOF_BODY,
   STATE_BODY,
   STATE_KINDS,
@@ -133,6 +134,32 @@ function seedEarlierBodies(root: string): Readonly<Record<string, string>> {
 }
 
 describe('regeneration drives the typed producers in dependency order (#382)', () => {
+  it('regenerates the same declared SQL population used by direct sensing', async () => {
+    const { root } = fixture({
+      '.devai/config/sensor-inputs.json': JSON.stringify({
+        schemaVersion: '1.0.0',
+        inputs: { inventory_data_model: { migrationDirs: ['backend/database/ddl'] } },
+      }),
+      'backend/database/ddl/schema.sql': ADOPTER_SOURCES['database/001-schema.sql'] ?? '',
+      'database/001-schema.sql': 'CREATE TABLE wrong_population (id integer PRIMARY KEY);',
+    });
+    const result = await regenerate(root);
+    expect(result.report.ok).toBe(true);
+    expect(callOf('inventory_data_model').options).toMatchObject({
+      migrationDirs: ['backend/database/ddl'],
+    });
+    const body = JSON.parse(read(root, STATE_BODY.inventory_data_model));
+    expect(body.tables).toHaveLength(4);
+    expect(
+      body.tables.every((table: { evidence: { path: string }[] }) =>
+        table.evidence.every((e) => e.path === 'backend/database/ddl/schema.sql'),
+      ),
+    ).toBe(true);
+    expect(body.tables.some((table: { name: string }) => table.name === 'wrong_population')).toBe(
+      false,
+    );
+  });
+
   it('calls every producer once with persistBody false, inputs before their dependents', async () => {
     const { root } = fixture();
 

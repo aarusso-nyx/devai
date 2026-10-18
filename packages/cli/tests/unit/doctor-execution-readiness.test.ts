@@ -131,6 +131,23 @@ function info(root: string) {
 }
 
 describe('actual declared adopter execution prerequisites', () => {
+  it('does not mistake a coverage population selector for an executable task reference', () => {
+    const root = fixture();
+    put(root, '.devai/config/sensor-inputs.json', {
+      schemaVersion: '1.0.0',
+      inputs: {
+        type_check: { taskId: 'measure', population: 'original-population' },
+        test_coverage_depth: { coveragePath: 'coverage/coverage-final.json', population: 'rc' },
+      },
+    });
+    commit(root);
+    const { check, data } = info(root);
+    expect(check.ok).toBe(true);
+    expect(data.bindings).toHaveLength(1);
+    expect(data.bindings[0]?.sensorKind).toBe('type_check');
+    expect(existsSync(join(root, 'SHOULD_NOT_EXECUTE'))).toBe(false);
+  });
+
   it('plans a declared task without executing it, writing evidence, or changing Git state', () => {
     const root = fixture();
     const before = git(root, 'status', '--porcelain=v1', '--untracked-files=all');
