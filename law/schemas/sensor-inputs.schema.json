@@ -332,6 +332,15 @@
             "$ref": "#/$defs/repository_exclude_glob"
           },
           "description": "Repository-relative globs of source files the sensor leaves out of the plant it measures, such as a generated view derived from a law policy (an F4 artifact, not authored plant). The sensor default excludes nothing. Declaring a glob changes which files are counted, never the thresholds."
+        },
+        "sourceRoots": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/repository_path"
+          },
+          "description": "Explicit source directories replacing the conventional packages/*/src population, without changing depth thresholds."
         }
       }
     },
@@ -497,6 +506,95 @@
       "type": "string",
       "minLength": 1,
       "description": "Reviewed execution population label, matched exactly against the referenced node outputContract.population. The task/descriptor, selectors and actual result bind its meaning; the label alone proves no coverage or successful execution."
+    },
+    "spec_alignment_inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "sourceRoots": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/repository_path"
+          },
+          "description": "Explicit repository-relative directory population, replacing the conventional sensor default. Thresholds and predicates are unchanged; missing roots do not establish coverage."
+        }
+      }
+    },
+    "plant_coherence_inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "sourceRoots": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/repository_path"
+          },
+          "description": "Explicit repository-relative directory population, replacing the conventional sensor default. Thresholds and predicates are unchanged; missing roots do not establish coverage."
+        }
+      }
+    },
+    "test_coherence_inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "packageRoots": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/repository_path"
+          },
+          "description": "Explicit repository-relative directory population, replacing the conventional sensor default. Thresholds and predicates are unchanged; missing roots do not establish coverage."
+        }
+      }
+    },
+    "spec_security_coverage_inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "threatModelDirs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/repository_path"
+          },
+          "description": "Explicit repository-relative directory population, replacing the conventional sensor default. Thresholds and predicates are unchanged; missing roots do not establish coverage."
+        },
+        "piiMigrationDirs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/repository_path"
+          },
+          "description": "Explicit repository-relative directory population, replacing the conventional sensor default. Thresholds and predicates are unchanged; missing roots do not establish coverage."
+        }
+      }
+    },
+    "spec_robustness_targets_inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "errorContractDirs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/repository_path"
+          },
+          "description": "Explicit repository-relative directory population, replacing the conventional sensor default. Thresholds and predicates are unchanged; missing roots do not establish coverage."
+        }
+      }
     }
   },
   "properties": {
@@ -573,6 +671,21 @@
         },
         "migration_check": {
           "$ref": "#/$defs/migration_check_inputs"
+        },
+        "spec_alignment": {
+          "$ref": "#/$defs/spec_alignment_inputs"
+        },
+        "plant_coherence": {
+          "$ref": "#/$defs/plant_coherence_inputs"
+        },
+        "test_coherence": {
+          "$ref": "#/$defs/test_coherence_inputs"
+        },
+        "spec_security_coverage": {
+          "$ref": "#/$defs/spec_security_coverage_inputs"
+        },
+        "spec_robustness_targets": {
+          "$ref": "#/$defs/spec_robustness_targets_inputs"
         }
       }
     },

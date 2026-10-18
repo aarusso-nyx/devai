@@ -21,3 +21,11 @@ Bound cells: F1×T8.
 The sensor emits evidence only through its registered cells or diagnostic surface. Any
 future change to identity, standing, tier, or emitter requires an Architect disposition
 before implementation. This note grants no mutation or release authority.
+
+## Declared adopter population
+
+The sensor accepts `errorContractDirs` in the bound sensor-input declaration. Each list names repository-relative
+directories and replaces the corresponding conventional root population. Both declared
+and explicit populations are schema-validated and contained inside the checkout on real
+paths before walking. Omission preserves the existing default; predicates, thresholds,
+standing and mutation authority are unchanged.
