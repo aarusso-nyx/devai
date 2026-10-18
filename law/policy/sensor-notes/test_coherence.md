@@ -54,3 +54,11 @@ naming convention does not require a new runner-classification verdict.
 Read failures retain the existing incomplete-population error. This static
 comparison supplies no execution origin, native runner admission or test-result
 standing; Node TAP execution standing remains unchanged.
+
+## Declared adopter population
+
+The sensor accepts `packageRoots` in the bound sensor-input declaration. Each list names repository-relative
+directories and replaces the corresponding conventional root population. Both declared
+and explicit populations are schema-validated and contained inside the checkout on real
+paths before walking. Omission preserves the existing default; predicates, thresholds,
+standing and mutation authority are unchanged.
