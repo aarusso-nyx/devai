@@ -55,7 +55,7 @@ describe('security scan audit shape boundaries', () => {
     expect(mocks.spawnSync).toHaveBeenCalledWith(
       'pnpm',
       ['audit', '--json'],
-      expect.objectContaining({ maxBuffer: 64 * 1024 * 1024 }),
+      expect.objectContaining({ maxBuffer: 512 * 1024 * 1024, timeout: 180_000 }),
     );
     expect(mocks.spawnSync).toHaveBeenCalledTimes(1);
   });
