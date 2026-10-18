@@ -82,12 +82,12 @@ describe('declared adopter layout populations', () => {
       repoRoot: root,
       inputs: { sourceRoots: ['backend/domain'] },
     });
-    expect(alignment.metrics.source_files_scanned).toBe(1);
+    expect(alignment.metrics?.source_files_scanned).toBe(1);
     const coherence = await sensorAdapter('plant_coherence')({
       repoRoot: root,
       inputs: { sourceRoots: ['backend/domain'] },
     });
-    expect(coherence.metrics.dirs_scanned).toBe(1);
+    expect(coherence.metrics?.dirs_scanned).toBe(1);
   });
 
   it('counts the complete explicit package population and discovers existing error contracts', async () => {
@@ -104,7 +104,7 @@ describe('declared adopter layout populations', () => {
       repoRoot: root,
       inputs: { errorContractDirs: ['docs/framework'] },
     });
-    expect(robustness.metrics.error_contract_files).toBe(1);
+    expect(robustness.metrics?.error_contract_files).toBe(1);
   });
   it('finds threat and PII signals in the declared specification and SQL directories', async () => {
     const root = fixture();
