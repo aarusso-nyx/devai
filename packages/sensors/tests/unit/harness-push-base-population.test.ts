@@ -60,7 +60,9 @@ describe('push population base branch uses the observed pushed branch', () => {
       expect(reading.status).toBe('pass');
       expect(reading.findings).not.toContain(undefined);
       expect(
-        reading.findings.some((finding) => finding.code === 'HARNESS_POPULATION_UNVERIFIED'),
+        (reading.findings ?? []).some(
+          (finding) => finding.code === 'HARNESS_POPULATION_UNVERIFIED',
+        ),
       ).toBe(false);
     },
   );
@@ -71,10 +73,10 @@ describe('push population base branch uses the observed pushed branch', () => {
       runs([row('feature/x'), row(undefined)]);
       const reading = sensor(population);
       expect(reading.status).toBe('unknown');
-      expect(reading.metrics.sample_size).toBe(0);
-      expect(reading.findings.some((finding) => finding.code.endsWith('INSUFFICIENT_SAMPLE'))).toBe(
-        true,
-      );
+      expect(reading.metrics?.sample_size).toBe(0);
+      expect(
+        (reading.findings ?? []).some((finding) => finding.code.endsWith('INSUFFICIENT_SAMPLE')),
+      ).toBe(true);
       expect(reading.findings).not.toContain(undefined);
     },
   );
