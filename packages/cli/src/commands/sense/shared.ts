@@ -201,7 +201,16 @@ const DECLARED_PATH_KEYS: ReadonlySet<string> = new Set([
  * segment each, and plant_depth's file exclusions, whose fixed prefix and first
  * wildcard expansion must stay inside the root the same way.
  */
-const DECLARED_GLOB_KEYS: ReadonlySet<string> = new Set(['testGlobs', 'excludeGlobs', 'scanDirs']);
+const DECLARED_GLOB_KEYS: ReadonlySet<string> = new Set([
+  'testGlobs',
+  'excludeGlobs',
+  'scanDirs',
+  'sourceRoots',
+  'packageRoots',
+  'threatModelDirs',
+  'piiMigrationDirs',
+  'errorContractDirs',
+]);
 
 export type SenseInputsErrorCode =
   | 'SENSE_INPUTS_UNDECLARED_KEY'

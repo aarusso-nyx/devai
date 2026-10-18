@@ -1,3 +1,4 @@
+import { resolveLayoutInputs } from './layout-inputs.js';
 import { senseDeclaredHarnessInvariantAlignment } from './declared-invariant-producers.js';
 import {
   senseBuild,
@@ -304,18 +305,58 @@ const ADAPTERS: Readonly<Record<SensorKind, SenseSensorAdapter>> = Object.freeze
       ...harnessPopulationInput(request),
       ...optional('since', stringInput(request, 'since')),
     }),
-  spec_alignment: (request) => senseSpecAlignment({ repoRoot: request.repoRoot }),
-  spec_security_coverage: (request) => senseSpecSecurityCoverage({ repoRoot: request.repoRoot }),
+  spec_alignment: (request) =>
+    senseSpecAlignment({
+      repoRoot: request.repoRoot,
+      ...optional(
+        'sourceGlobs',
+        resolveLayoutInputs(request.repoRoot, 'spec_alignment', request.inputs).sourceRoots,
+      ),
+    }),
+  spec_security_coverage: (request) => {
+    const roots = resolveLayoutInputs(request.repoRoot, 'spec_security_coverage', request.inputs);
+    return senseSpecSecurityCoverage({
+      repoRoot: request.repoRoot,
+      ...optional('threatModelGlobs', roots.threatModelDirs),
+      ...optional('piiMigrationsGlobs', roots.piiMigrationDirs),
+    });
+  },
   spec_performance_targets: (request) =>
     senseSpecPerformanceTargets({ repoRoot: request.repoRoot }),
-  spec_robustness_targets: (request) => senseSpecRobustnessTargets({ repoRoot: request.repoRoot }),
+  spec_robustness_targets: (request) =>
+    senseSpecRobustnessTargets({
+      repoRoot: request.repoRoot,
+      ...optional(
+        'errorContractDirs',
+        resolveLayoutInputs(request.repoRoot, 'spec_robustness_targets', request.inputs)
+          .errorContractDirs,
+      ),
+    }),
   plant_depth: (request) =>
     sensePlantDepth({
       repoRoot: request.repoRoot,
+      ...optional(
+        'sourceGlobs',
+        resolveLayoutInputs(request.repoRoot, 'plant_depth', request.inputs).sourceRoots,
+      ),
       ...optional('excludeGlobs', stringArrayInput(request, 'excludeGlobs')),
     }),
-  plant_coherence: (request) => sensePlantCoherence({ repoRoot: request.repoRoot }),
-  test_coherence: (request) => senseTestCoherence({ repoRoot: request.repoRoot }),
+  plant_coherence: (request) =>
+    sensePlantCoherence({
+      repoRoot: request.repoRoot,
+      ...optional(
+        'sourceGlobs',
+        resolveLayoutInputs(request.repoRoot, 'plant_coherence', request.inputs).sourceRoots,
+      ),
+    }),
+  test_coherence: (request) =>
+    senseTestCoherence({
+      repoRoot: request.repoRoot,
+      ...optional(
+        'packageRoots',
+        resolveLayoutInputs(request.repoRoot, 'test_coherence', request.inputs).packageRoots,
+      ),
+    }),
   test_idiomaticity: (request) =>
     senseTestIdiomaticity({
       repoRoot: request.repoRoot,
