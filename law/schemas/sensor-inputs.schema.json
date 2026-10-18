@@ -497,6 +497,22 @@
       "type": "string",
       "minLength": 1,
       "description": "Reviewed execution population label, matched exactly against the referenced node outputContract.population. The task/descriptor, selectors and actual result bind its meaning; the label alone proves no coverage or successful execution."
+    },
+    "inventory_data_model_inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["migrationDirs"],
+      "properties": {
+        "migrationDirs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/repository_path"
+          },
+          "description": "Repository-relative SQL source directories shared by direct sensing and candidate-bound regeneration. Omitted declaration preserves conventional migration roots."
+        }
+      }
     }
   },
   "properties": {
@@ -573,6 +589,9 @@
         },
         "migration_check": {
           "$ref": "#/$defs/migration_check_inputs"
+        },
+        "inventory_data_model": {
+          "$ref": "#/$defs/inventory_data_model_inputs"
         }
       }
     },
