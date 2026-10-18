@@ -89,7 +89,7 @@ export function senseHarnessPerformance(opts: HarnessPerformanceOptions): Sensor
           sample.describe,
           'successful run(s)',
         ),
-        sample.unverifiedFinding,
+        ...(sample.unverifiedFinding === undefined ? [] : [sample.unverifiedFinding]),
       ],
       metrics: {
         run_count: total,
@@ -123,7 +123,7 @@ export function senseHarnessPerformance(opts: HarnessPerformanceOptions): Sensor
       message: `median ${String(Math.round(median / 1000))}s, p95 ${String(Math.round(p95 / 1000))}s — above review thresholds.`,
     });
   }
-  findings.push(sample.unverifiedFinding);
+  if (sample.unverifiedFinding !== undefined) findings.push(sample.unverifiedFinding);
 
   return buildSensorReading({
     ...common,

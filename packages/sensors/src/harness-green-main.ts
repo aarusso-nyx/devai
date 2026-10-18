@@ -60,7 +60,7 @@ function population(opts: HarnessGreenMainOptions): Population {
       };
     return {
       ...sample,
-      unverifiedFindings: [sample.unverifiedFinding],
+      unverifiedFindings: sample.unverifiedFinding === undefined ? [] : [sample.unverifiedFinding],
       unit: 'run',
       extraFindings: [],
       extraMetrics: {},
