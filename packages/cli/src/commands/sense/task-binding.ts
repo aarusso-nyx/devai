@@ -488,7 +488,8 @@ export function executeSensorTask(binding: SensorTaskBinding): SensorReading {
   const options = Object.freeze({
     cwd: realpathSync(resolve(binding.root, binding.task.cwd)),
     encoding: 'utf8' as const,
-    timeout: 600_000,
+    // Complete adopter suites include fixture setup; keep a finite 15-minute ceiling.
+    timeout: 900_000,
     maxBuffer: MAX_OUTPUT,
     shell: false as const,
     env: Object.freeze({
