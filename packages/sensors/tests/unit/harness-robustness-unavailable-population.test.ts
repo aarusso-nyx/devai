@@ -96,7 +96,6 @@ describe('harness robustness unavailable and empty populations', () => {
           severity: 'info',
           code: 'HARNESS_ROBUSTNESS_INSUFFICIENT_SAMPLE',
         },
-        { code: 'HARNESS_POPULATION_UNVERIFIED' },
       ],
       metrics: {
         run_count: 0,
@@ -104,6 +103,8 @@ describe('harness robustness unavailable and empty populations', () => {
         minimum_sample: 3,
         population_head_branch: 'release',
         population_event: 'push',
+        population_base_branch_verified: true,
+        population_unverified: '',
       },
     });
     expect(reading.command).toContain('--branch release');
