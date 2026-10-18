@@ -198,6 +198,7 @@ function execute(bound: SensorTaskBinding, output = '', exit = 0, during?: () =>
         starts += 1;
         during?.();
         const processOptions = request.arguments[2] as { env?: Record<string, string> };
+        expect(processOptions).toMatchObject({ timeout: 900_000, maxBuffer: 64 * 1024 * 1024 });
         let actualNativeStdout: string | undefined;
         if (native) {
           // Generate provenance with the real pinned runner, at this exact bound root and nonce.
