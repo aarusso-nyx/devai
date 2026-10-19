@@ -411,7 +411,7 @@
     },
     {
       "version": "2.6.2",
-      "status": "unreleased",
+      "status": "released",
       "changes": [
         {
           "id": "MIG-2.6.2-runtime-repair-identity-refresh",
@@ -420,6 +420,21 @@
           "decision_records": ["ADR-SCR-0017"],
           "segments": ["authority", "subprocess-effects"],
           "files": [".devai/config/authority-policy.json", ".devai/config/subprocess-effects.json"]
+        }
+      ],
+      "date": "2026-10-13"
+    },
+    {
+      "version": "2.6.3",
+      "status": "unreleased",
+      "changes": [
+        {
+          "id": "MIG-2.6.3-measurement-repair-identity-refresh",
+          "kind": "rebind",
+          "summary": "After installing the exact published package, registered upgrade refreshes compiled authority and framework identities to 2.6.3. Optional contained SQL, source, package and specification populations remain adopter-owned declarations and are never invented or expanded automatically. Complete lint/audit output and finite execution budgets repair measurements without changing thresholds, task consent, native coverage provenance or evidence standing. Existing constitution, authority roots, declared inputs and trusted verifier remain unchanged.",
+          "decision_records": ["ADR-SCR-0005", "ADR-SCR-0015", "ADR-SCR-0017"],
+          "segments": ["authority"],
+          "files": [".devai/config/authority-policy.json"]
         }
       ]
     }
