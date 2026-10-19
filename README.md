@@ -19,10 +19,10 @@ See the [release notes](CHANGELOG.md#261--2026-10-13) and
 Native service/browser profiles remain forward candidate contracts with an empty
 backend catalogue; they supply no production admission or executed standing.
 
-The developing **2.6.2 patch** admits the exact reviewed task-cache write and
-repeated inventory regeneration after prior output and candidate custody checks.
-It changes no task-command shape, threshold or execution standing. Adoption
-rehearsal and protected release gates remain required before its publication.
+The developing **2.6.3 patch** repairs complete adopter measurements: declared
+monorepo SQL/source/specification populations, push-branch verification, complete
+lint/audit output and coverage/task readiness classification. Thresholds, native
+provenance and the protected release gates remain unchanged.
 
 ```bash
 export NODE_AUTH_TOKEN=<github-token-with-read-packages>
