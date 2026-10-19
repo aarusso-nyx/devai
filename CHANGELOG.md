@@ -1,6 +1,26 @@
 # Changelog
 
-## 2.6.2 — Unreleased
+## 2.6.3 — Unreleased
+
+This patch repairs complete adopter scorecard measurements while preserving all
+existing thresholds, native execution provenance and publication gates.
+
+- Admit checkout-contained SQL source directories consistently for direct data
+  inventory and candidate-bound regeneration.
+- Forward explicit source, package and specification directory populations to
+  the existing alignment, depth, coherence, security and robustness predicates.
+- Verify push populations against the observed pushed branch; preserve explicit
+  gaps for pull-request base branches and unobserved excluded jobs.
+- Retain complete lint and dependency-audit output within finite resource bounds.
+  A failed or incomplete command remains a failed or incomplete observation.
+- Distinguish a coverage population declaration from a task reference in Doctor.
+  Extend only the finite task orchestration budget; keep suite timeouts and all
+  quality thresholds unchanged.
+- Refresh installed policy identities through registered upgrade. Preserve the
+  69-action surface, trusted verifier 2.4.0 and native compatibility boundaries.
+  Coverage producer provenance gaps and product remediation remain separate.
+
+## 2.6.2 — 2026-10-13
 
 This bounded patch repairs exact-candidate sensing for adopter evidence. It
 adds no sensor kind, task-command shape, threshold or public binding interface.
