@@ -17,7 +17,7 @@ existing thresholds, native execution provenance and publication gates.
   Extend only the finite task orchestration budget; keep suite timeouts and all
   quality thresholds unchanged.
 - Refresh installed policy identities through registered upgrade. Preserve the
-  69-action surface, trusted verifier 2.4.0 and native compatibility boundaries.
+  69-action surface, trusted verifier `@aarusso-nyx/devai@2.4.0` and native compatibility boundaries.
   Coverage producer provenance gaps and product remediation remain separate.
 
 ## 2.6.2 — 2026-10-13
