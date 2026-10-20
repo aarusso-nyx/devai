@@ -169,8 +169,8 @@ export function deriveNativeLinuxTask(raw: string): NativeLinuxDerivedTask {
   if (
     process.platform !== 'linux' ||
     process.version !== 'v24.20.0' ||
-    realpathSync(input.repository) !== '/workspace' ||
-    process.getuid?.() !== 1000
+    process.getuid?.() !== 1000 ||
+    realpathSync(input.repository) !== '/workspace'
   )
     return refuse('RUNTIME_UNSUPPORTED');
   const root = input.repository;
