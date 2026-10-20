@@ -35,6 +35,31 @@ interface NativeJsonReporter {
   onTestRunEnd(modules: readonly NativeModule[]): Promise<void>;
   writeReport(report: string): Promise<void>;
 }
+interface DiagnosticStream {
+  write(content: string): unknown;
+}
+interface NativeLogger {
+  outputStream: DiagnosticStream;
+  errorStream: DiagnosticStream;
+  console: { log: (...args: unknown[]) => unknown };
+  log: (...args: unknown[]) => unknown;
+}
+interface NativeReporterContext {
+  config: { root: string };
+  version?: string;
+  _tmpDir: string;
+  logger: NativeLogger;
+  onClose(callback: () => void): void;
+}
+interface DiagnosticRouting {
+  readonly context: NativeReporterContext;
+  readonly logger: NativeLogger;
+  readonly originalOutput: DiagnosticStream;
+  readonly diagnosticOutput: DiagnosticStream;
+  readonly originalConsole: NativeLogger['console'];
+  readonly originalConsoleLog: NativeLogger['console']['log'];
+  readonly originalLog: NativeLogger['log'];
+}
 
 /** Package-owned Vitest 4 collection and native JSON final result in one execution. */
 export default class DevaiVitestReporter {
@@ -44,8 +69,46 @@ export default class DevaiVitestReporter {
   private resolvedSelection: Record<string, unknown>[] = [];
   private invalid: string[] = [];
   private runtimeOutputRoots: string[] = [];
+  private diagnosticRouting?: DiagnosticRouting;
 
-  onInit(ctx: { config: { root: string }; version?: string; _tmpDir: string }): void {
+  onInit(ctx: NativeReporterContext): void {
+    const previous = this.diagnosticRouting;
+    if (previous !== undefined) {
+      if (
+        previous.context !== ctx ||
+        ctx.logger !== previous.logger ||
+        previous.logger.outputStream !== previous.diagnosticOutput ||
+        previous.logger.errorStream !== previous.diagnosticOutput ||
+        previous.logger.console !== previous.originalConsole ||
+        previous.logger.console.log !== previous.originalConsoleLog ||
+        typeof previous.logger.outputStream.write !== 'function' ||
+        typeof previous.logger.errorStream.write !== 'function' ||
+        previous.logger.log !== previous.originalLog
+      )
+        throw new Error('DEVAI_NATIVE_REPORTER_LOGGER_CHANGED');
+      return;
+    }
+    const logger = ctx.logger;
+    if (
+      logger === null ||
+      typeof logger !== 'object' ||
+      typeof logger.outputStream?.write !== 'function' ||
+      typeof logger.errorStream?.write !== 'function' ||
+      logger.outputStream === logger.errorStream ||
+      typeof logger.console?.log !== 'function' ||
+      typeof logger.log !== 'function' ||
+      typeof ctx.onClose !== 'function'
+    )
+      throw new Error('DEVAI_NATIVE_REPORTER_LOGGER_UNSUPPORTED');
+    const routing: DiagnosticRouting = {
+      context: ctx,
+      logger,
+      originalOutput: logger.outputStream,
+      diagnosticOutput: logger.errorStream,
+      originalConsole: logger.console,
+      originalConsoleLog: logger.console.log,
+      originalLog: logger.log,
+    };
     this.runtimeOutputRoots = [ctx._tmpDir];
     const require = createRequire(resolve(ctx.config.root, 'package.json'));
     const native = require('vitest/node') as {
@@ -74,6 +137,60 @@ export default class DevaiVitestReporter {
         }),
       );
     };
+    // Vitest 4.1.11 snapshots this stream when constructing fork/thread workers.
+    // Its logger Console was bound earlier, so the native JSON writer keeps its
+    // original stdout sink. Main-process/config/globalSetup output is not rerouted.
+    if (
+      logger.outputStream !== routing.originalOutput ||
+      logger.errorStream !== routing.diagnosticOutput ||
+      logger.console !== routing.originalConsole ||
+      logger.console.log !== routing.originalConsoleLog ||
+      logger.log !== routing.originalLog
+    )
+      throw new Error('DEVAI_NATIVE_REPORTER_LOGGER_CHANGED');
+    try {
+      logger.outputStream = routing.diagnosticOutput;
+    } catch (error) {
+      this.reporter = undefined;
+      throw new Error('DEVAI_NATIVE_REPORTER_LOGGER_UNSUPPORTED', { cause: error });
+    }
+    if (logger.outputStream !== routing.diagnosticOutput) {
+      this.reporter = undefined;
+      throw new Error('DEVAI_NATIVE_REPORTER_LOGGER_UNSUPPORTED');
+    }
+    this.diagnosticRouting = routing;
+    try {
+      ctx.onClose(() => {
+        if (this.diagnosticRouting !== routing) return;
+        // Never overwrite routing installed by another owner after initialization.
+        if (
+          logger.outputStream === routing.diagnosticOutput &&
+          logger.errorStream === routing.diagnosticOutput
+        )
+          logger.outputStream = routing.originalOutput;
+        this.diagnosticRouting = undefined;
+        this.reporter = undefined;
+      });
+    } catch (error) {
+      // Initialization failed before any worker is constructed; undo only our write.
+      if (
+        logger.outputStream === routing.diagnosticOutput &&
+        logger.errorStream === routing.diagnosticOutput
+      )
+        logger.outputStream = routing.originalOutput;
+      this.diagnosticRouting = undefined;
+      this.reporter = undefined;
+      throw error;
+    }
+  }
+
+  onUserConsoleLog(log: { content: string; type: 'stdout' | 'stderr' }): void {
+    const routing = this.diagnosticRouting;
+    if (routing === undefined) throw new Error('DEVAI_NATIVE_REPORTER_NOT_INITIALIZED');
+    if (typeof log.content !== 'string') throw new Error('DEVAI_NATIVE_DIAGNOSTIC_INVALID');
+    // Both channels retain the original content, including warnings and JSON-shaped
+    // diagnostics. No shouldLog/onConsoleLog filter or silent setting is applied.
+    routing.diagnosticOutput.write(log.content);
   }
 
   async onTestRunStart(specifications: readonly NativeSpecification[]): Promise<void> {
