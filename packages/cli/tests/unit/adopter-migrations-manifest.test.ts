@@ -66,6 +66,7 @@ describe('#264: the adopter migration manifest', () => {
       '2.6.1',
       '2.6.2',
       '2.6.3',
+      '2.6.4',
     ]);
     expect(manifest.releases.find((release) => release.version === '2.3.0')).toMatchObject({
       version: '2.3.0',
@@ -156,10 +157,10 @@ describe('#264: the adopter migration manifest', () => {
     ]);
     expect(plannedReleases(manifest, '2.4.0', '2.5.0').map((release) => release.version)).toEqual([
       '2.5.0',
-      '2.6.3',
+      '2.6.4',
     ]);
     expect(plannedReleases(manifest, '2.5.0', '2.5.0').map((release) => release.version)).toEqual([
-      '2.6.3',
+      '2.6.4',
     ]);
   });
 
@@ -184,7 +185,7 @@ describe('#264: the adopter migration manifest', () => {
     ]);
   });
 
-  it('keeps the released 2.6.1 identity refresh and declares the prospective 2.6.3 policy refresh', () => {
+  it('keeps the released 2.6.1 identity refresh and declares the prospective 2.6.4 policy refresh', () => {
     const shipped = manifest.releases.find((release) => release.version === '2.6.1');
     expect(shipped).toMatchObject({ version: '2.6.1', status: 'released', date: '2026-10-13' });
     expect(shipped?.changes).toEqual([
@@ -201,10 +202,9 @@ describe('#264: the adopter migration manifest', () => {
       status: 'released',
       date: '2026-10-13',
     });
-    const latest = manifest.releases.at(-1);
-    expect(latest).toMatchObject({ version: '2.6.3', status: 'unreleased' });
-    expect(latest).not.toHaveProperty('date');
-    expect(latest?.changes).toEqual([
+    const previous = manifest.releases.find((release) => release.version === '2.6.3');
+    expect(previous).toMatchObject({ version: '2.6.3', status: 'released', date: '2026-10-19' });
+    expect(previous?.changes).toEqual([
       expect.objectContaining({
         id: 'MIG-2.6.3-measurement-repair-identity-refresh',
         kind: 'rebind',
@@ -213,9 +213,22 @@ describe('#264: the adopter migration manifest', () => {
         files: ['.devai/config/authority-policy.json'],
       }),
     ]);
+    const latest = manifest.releases.at(-1);
+    expect(latest).toMatchObject({ version: '2.6.4', status: 'unreleased' });
+    expect(latest).not.toHaveProperty('date');
+    expect(latest?.changes).toEqual([
+      expect.objectContaining({
+        id: 'MIG-2.6.4-native-reporter-identity-refresh',
+        kind: 'rebind',
+        decision_records: ['ADR-SCR-0017', 'ADR-SCR-0021'],
+        segments: ['authority'],
+        files: ['.devai/config/authority-policy.json'],
+      }),
+    ]);
     expect(plannedReleases(manifest, '2.6.0', '2.6.1')).toEqual([shipped, latest]);
     expect(plannedReleases(manifest, '2.6.1', '2.6.1')).toEqual([latest]);
-    expect(plannedReleases(manifest, '2.6.3', '2.6.3')).toEqual([]);
+    expect(plannedReleases(manifest, '2.6.3', '2.6.4')).toEqual([latest]);
+    expect(plannedReleases(manifest, '2.6.4', '2.6.4')).toEqual([]);
   });
 
   it('has exactly one entry for every changelog release above the baseline that changed configuration', () => {
@@ -258,19 +271,19 @@ describe('#264: the adopter migration manifest', () => {
     for (const version of CONFIGURATION_NEUTRAL_RELEASES.keys()) {
       expect(released('2.1.0', version)).toEqual([]);
     }
-    // #381, #383, #390: released rebinds stay in range; the prospective 2.6.3
+    // #381, #383, #390: released rebinds stay in range; the prospective 2.6.4
     // obligations are also planned above the installed/bound floor (#291).
     const planned = (from: string, installedVersion: string) =>
       plannedReleases(manifest, from, installedVersion).map((release) => release.version);
-    expect(planned('2.3.0', '2.3.0')).toEqual(['2.6.3']);
-    expect(planned('2.3.0', '2.3.1')).toEqual(['2.3.1', '2.6.3']);
-    expect(planned('2.3.1', '2.3.1')).toEqual(['2.6.3']);
-    expect(planned('2.3.0', '2.3.2')).toEqual(['2.3.1', '2.3.2', '2.6.3']);
-    expect(planned('2.3.1', '2.3.2')).toEqual(['2.3.2', '2.6.3']);
-    expect(planned('2.3.2', '2.3.2')).toEqual(['2.6.3']);
-    expect(planned('2.3.2', '2.4.0')).toEqual(['2.4.0', '2.6.3']);
-    expect(planned('2.3.1', '2.4.0')).toEqual(['2.3.2', '2.4.0', '2.6.3']);
-    expect(planned('2.4.0', '2.4.0')).toEqual(['2.6.3']);
+    expect(planned('2.3.0', '2.3.0')).toEqual(['2.6.4']);
+    expect(planned('2.3.0', '2.3.1')).toEqual(['2.3.1', '2.6.4']);
+    expect(planned('2.3.1', '2.3.1')).toEqual(['2.6.4']);
+    expect(planned('2.3.0', '2.3.2')).toEqual(['2.3.1', '2.3.2', '2.6.4']);
+    expect(planned('2.3.1', '2.3.2')).toEqual(['2.3.2', '2.6.4']);
+    expect(planned('2.3.2', '2.3.2')).toEqual(['2.6.4']);
+    expect(planned('2.3.2', '2.4.0')).toEqual(['2.4.0', '2.6.4']);
+    expect(planned('2.3.1', '2.4.0')).toEqual(['2.3.2', '2.4.0', '2.6.4']);
+    expect(planned('2.4.0', '2.4.0')).toEqual(['2.6.4']);
     expect(releasesInRange(manifest, '1.6.0', '1.9.0').map((release) => release.version)).toEqual([
       '1.7.0',
       '1.8.0',
@@ -292,8 +305,8 @@ describe('#264: the adopter migration manifest', () => {
         return { ...rest, status: 'unreleased' };
       }),
     });
-    expect(versions('2.0.0', '2.0.0', unreleased)).toEqual(['2.1.0', '2.6.3']);
-    expect(versions('1.9.0', '2.0.0', unreleased)).toEqual(['2.0.0', '2.1.0', '2.6.3']);
+    expect(versions('2.0.0', '2.0.0', unreleased)).toEqual(['2.1.0', '2.6.4']);
+    expect(versions('1.9.0', '2.0.0', unreleased)).toEqual(['2.0.0', '2.1.0', '2.6.4']);
     expect(versions('1.6.0', '2.0.0', unreleased).slice(0, 4)).toEqual([
       '1.7.0',
       '1.8.0',
@@ -301,9 +314,9 @@ describe('#264: the adopter migration manifest', () => {
       '2.0.0',
     ]);
     // Once released and installed, it is an ordinary entry, planned only from below it.
-    expect(versions('2.1.0', '2.1.0')).toEqual(['2.6.3']);
-    expect(versions('2.0.0', '2.1.0')).toEqual(['2.1.0', '2.6.3']);
-    expect(versions('2.0.0', '2.0.0')).toEqual(['2.6.3']);
+    expect(versions('2.1.0', '2.1.0')).toEqual(['2.6.4']);
+    expect(versions('2.0.0', '2.1.0')).toEqual(['2.1.0', '2.6.4']);
+    expect(versions('2.0.0', '2.0.0')).toEqual(['2.6.4']);
   });
 
   it('cites only decision records that exist and names a canonical segment for each change', () => {

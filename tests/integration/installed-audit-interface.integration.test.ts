@@ -454,7 +454,7 @@ describe('installed optional audit interfaces and native task execution', () => 
     60_000,
   );
 
-  it('refuses a present external configuration discovered by the native runner', () => {
+  it('refuses external configuration bytes consumed by a native worker', () => {
     const holder = mkdtempSync(join(tmpdir(), 'devai external config ç '));
     roots.push(holder);
     const root = nativeRepository(false, holder);
@@ -464,6 +464,14 @@ describe('installed optional audit interfaces and native task execution', () => 
       'node_modules/vitest.one.config.mjs',
       "export default {test:{name:'external',include:[]}};\n",
     );
+    // Canonical config argv avoids unrelated ancestor resolution probes. Make the
+    // selected worker actually read the outside bytes so UNKNOWN still tests custody.
+    put(
+      root,
+      'tests/one.test.ts',
+      `import {describe,it,expect} from 'vitest'; import {readFileSync} from 'node:fs'; describe('arithmetic',()=>{it('adds',()=>expect(readFileSync(${JSON.stringify(externalConfig)},'utf8')).toContain("name:'external'"));});\n`,
+    );
+    commit(root);
     const observed = reading(
       root,
       'unit_test',
@@ -644,11 +652,18 @@ describe('installed optional audit interfaces and native task execution', () => 
       'runtime/playwright-results',
     );
     const task = JSON.parse(readFileSync(join(root, 'test-tasks.json'), 'utf8')).tasks[0];
+    // The portable descriptor retains its authored path; the private recipe alone
+    // materializes the validated config value without changing option order.
+    expect(task.argv[task.argv.indexOf('--config') + 1]).toBe('./playwright.config.mjs');
+    const expectedNativeArgv = task.argv.slice(1);
+    expectedNativeArgv[expectedNativeArgv.indexOf('--config') + 1] = realpathSync(
+      join(root, 'playwright.config.mjs'),
+    );
     expect(JSON.parse(String(metrics['native_effective_command']))).toEqual({
       executable: realpathSync(process.execPath),
       argv: [
         realpathSync(join(root, 'node_modules/@playwright/test/cli.js')),
-        ...task.argv.slice(1),
+        ...expectedNativeArgv,
         '--output',
         outputRoot,
       ],
