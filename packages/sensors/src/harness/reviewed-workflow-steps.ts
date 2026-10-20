@@ -152,7 +152,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
     files: [
       {
         path: '.github/actions/setup-node-toolchain/action.yml',
-        sha256: 'fd52623680a69ece95939fbc4e3e023b223205b3fc0381043a7ebffd1046bada',
+        sha256: '3e220549f47d2d5d345a647dc2d06e7ab532fdcf11946efc70ea32d1ccb8abab',
       },
     ],
   },
@@ -397,7 +397,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
     files: [
       {
         path: '.github/actions/setup-node-toolchain/action.yml',
-        sha256: 'fd52623680a69ece95939fbc4e3e023b223205b3fc0381043a7ebffd1046bada',
+        sha256: '3e220549f47d2d5d345a647dc2d06e7ab532fdcf11946efc70ea32d1ccb8abab',
       },
     ],
   },
@@ -691,7 +691,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
     files: [
       {
         path: '.github/actions/setup-node-toolchain/action.yml',
-        sha256: 'fd52623680a69ece95939fbc4e3e023b223205b3fc0381043a7ebffd1046bada',
+        sha256: '3e220549f47d2d5d345a647dc2d06e7ab532fdcf11946efc70ea32d1ccb8abab',
       },
     ],
   },
@@ -872,7 +872,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
     files: [
       {
         path: '.github/actions/setup-node-toolchain/action.yml',
-        sha256: 'fd52623680a69ece95939fbc4e3e023b223205b3fc0381043a7ebffd1046bada',
+        sha256: '3e220549f47d2d5d345a647dc2d06e7ab532fdcf11946efc70ea32d1ccb8abab',
       },
     ],
   },
