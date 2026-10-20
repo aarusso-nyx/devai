@@ -139,6 +139,38 @@ function binding(root: string, kind = 'type_check') {
   if (result === undefined) throw new Error('Fixture binding missing');
   return result;
 }
+/** Independent oracle for this file's one literal native Vitest fixture recipe. */
+function expectedNativeFixtureArgv(bound: SensorTaskBinding): readonly string[] {
+  const portable = [
+    'vitest',
+    'run',
+    '--configLoader',
+    'native',
+    '--config',
+    './vitest.config.mjs',
+    '--reporter',
+    '@aarusso-nyx/devai/native-vitest-reporter',
+    '--no-cache',
+  ];
+  expect(bound.task.cwd).toBe('.');
+  expect(bound.task.argv).toEqual(portable);
+  const declared = JSON.parse(readFileSync(join(bound.root, 'test-tasks.json'), 'utf8')) as {
+    tasks: { nodeId: string; argv: string[] }[];
+  };
+  expect(declared.tasks.find((task) => task.nodeId === bound.task.nodeId)?.argv).toEqual(portable);
+  // Only the execution recipe resolves this known regular fixture config; authored input stays portable.
+  return [
+    bound.task.executable.path,
+    'run',
+    '--configLoader',
+    'native',
+    '--config',
+    realpathSync(join(bound.root, 'vitest.config.mjs')),
+    '--reporter',
+    '@aarusso-nyx/devai/native-vitest-reporter',
+    '--no-cache',
+  ];
+}
 function execute(bound: SensorTaskBinding, output = '', exit = 0, during?: () => void) {
   let starts = 0;
   let returnedStdout = output;
@@ -170,9 +202,7 @@ function execute(bound: SensorTaskBinding, output = '', exit = 0, during?: () =>
       ) {
         requests.push(request);
         expect(request.arguments[1]).toEqual(
-          native
-            ? [bound.task.executable.path, ...bound.task.argv.slice(1)]
-            : bound.task.argv.slice(1),
+          native ? expectedNativeFixtureArgv(bound) : bound.task.argv.slice(1),
         );
         expect(matchDeclaredSensorTaskProcess(bound.root, request)).toBe(bound);
         expect(
@@ -614,7 +644,7 @@ describe('exact reviewed sensor task binding', () => {
     const measuredOutput = result.stdout;
     const effectiveCommand = canonicalJson({
       executable: realpathSync(process.execPath),
-      argv: [bound.task.executable.path, ...bound.task.argv.slice(1)],
+      argv: expectedNativeFixtureArgv(bound),
       outputRoot: null,
     });
     expect(result.reading.metrics?.native_effective_command).toBe(effectiveCommand);

@@ -11,6 +11,7 @@
 // exclusions, the LOCAL_INCLUDE population contract, and the local coverage producer, whose
 // exports tests/config/local.coverage.config.ts defines.
 import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import {
   existsSync,
   mkdirSync,
@@ -26,7 +27,14 @@ import { dirname, join, matchesGlob, resolve } from 'node:path';
 import Ajv2020 from 'ajv/dist/2020.js';
 import { parse as parseYaml } from 'yaml';
 import { describe, expect, it } from 'vitest';
-import { LOCAL_INCLUDE, RC_ONLY } from '../config/local.config.js';
+import localConfig, {
+  LOCAL_INCLUDE,
+  commandLineExcludes,
+  MAX_TEST_WORKERS,
+  RC_ONLY,
+  SERIAL_LANE,
+  SUBPROCESS_TEST_TIMEOUT_MS,
+} from '../config/local.config.js';
 import localCoverageConfig, {
   LOCAL_COVERAGE_EXCLUSIONS,
   LOCAL_COVERAGE_POPULATION,
@@ -280,6 +288,67 @@ describe('local test population (ADR-SCR-0007 IA-005)', () => {
       expect(defects.every((defect) => defect.startsWith(glob))).toBe(true);
     },
   );
+});
+
+describe('local subprocess scheduling preserves the complete population', () => {
+  const lanes = (localConfig.test?.projects ?? []).flatMap((project) =>
+    typeof project === 'object' && 'test' in project && project.test ? [project.test] : [],
+  );
+  const parallel = lanes.find((lane) => lane.name === 'local');
+  const serial = lanes.find((lane) => lane.name === 'local-serial');
+  const invocationExcludes = commandLineExcludes();
+  const selected = (file: string, lane: (typeof lanes)[number]): boolean =>
+    (lane.include ?? []).some((glob) => matchesGlob(file, glob)) &&
+    !(lane.exclude ?? []).some((glob) => matchesGlob(file, glob));
+
+  it('runs observed expensive lifecycle and native-chain files only in the later serial group', () => {
+    expect(parallel).toBeDefined();
+    expect(serial).toBeDefined();
+    if (parallel === undefined || serial === undefined) throw new Error('local lanes are missing');
+    for (const file of [
+      'packages/cli/tests/unit/release-export-store-bundled-depth.test.ts',
+      'packages/cli/tests/unit/release-lifecycle-command-adapters.test.ts',
+      'packages/cli/tests/unit/sense-task-binding.test.ts',
+    ]) {
+      expect(selected(file, parallel), file).toBe(false);
+      expect(selected(file, serial), file).toBe(
+        !invocationExcludes.some((glob) => matchesGlob(file, glob)),
+      );
+      expect(
+        RC_ONLY.some((glob) => matchesGlob(file, glob)),
+        file,
+      ).toBe(false);
+    }
+    expect(serial.fileParallelism).toBe(false);
+    expect(parallel.sequence?.groupOrder).toBe(0);
+    expect(serial.sequence?.groupOrder).toBe(1);
+    expect(parallel.maxWorkers).toBe(MAX_TEST_WORKERS);
+    expect(localConfig.test?.testTimeout).toBe(SUBPROCESS_TEST_TIMEOUT_MS);
+    expect(localConfig.test?.hookTimeout).toBe(SUBPROCESS_TEST_TIMEOUT_MS);
+    expect(SUBPROCESS_TEST_TIMEOUT_MS).toBe(30_000);
+  });
+
+  it('selects every tracked local test exactly once across both lanes without promoting RC-only cases', () => {
+    const tracked = execFileSync('git', ['ls-files', '-z'], {
+      cwd: ROOT,
+      encoding: 'utf8',
+    })
+      .split('\0')
+      .filter(Boolean);
+    const expected = tracked.filter(
+      (file) =>
+        LOCAL_INCLUDE.some((glob) => matchesGlob(file, glob)) &&
+        !['**/node_modules/**', '**/dist/**', ...RC_ONLY, ...invocationExcludes].some((glob) =>
+          matchesGlob(file, glob),
+        ),
+    );
+    expect(expected.length).toBeGreaterThan(0);
+    const actual = tracked.flatMap((file) =>
+      lanes.filter((lane) => selected(file, lane)).map(() => file),
+    );
+    expect(actual.sort()).toEqual(expected.sort());
+    expect(new Set(SERIAL_LANE).size).toBe(SERIAL_LANE.length);
+  });
 });
 
 // ADR-SCR-0007: tests/config/local.coverage.config.ts is the database-free producer of the

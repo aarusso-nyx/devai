@@ -728,15 +728,16 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-SCR-0018',
       'ADR-SCR-0019',
       'ADR-SCR-0020',
+      'ADR-SCR-0021',
       'ADR-SEC-0001',
     ]);
-    expect(records).toHaveLength(127);
+    expect(records).toHaveLength(128);
     expect(
       records.filter((record) => record.format === 'legacy-catalog').map((record) => record.adr_id),
     ).toEqual(['ADR-014', 'ADR-MUT-0005', 'ADR-REL-0017']);
     expect(records.filter((record) => record.adr_id === 'ADR-014')).toHaveLength(1);
-    expect(result.files_scanned).toBe(128);
-    expect(result.subject_authorities).toHaveLength(622);
+    expect(result.files_scanned).toBe(129);
+    expect(result.subject_authorities).toHaveLength(624);
     expect(
       result.subject_authorities.find(
         (row) => row.subject === 'packages/cli/src/commands/doctor-execution-readiness.ts',
@@ -849,6 +850,7 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-SCR-0018',
       'ADR-SCR-0019',
       'ADR-SCR-0020',
+      'ADR-SCR-0021',
       'ADR-SEC-0001',
     ]);
     // ADR-MUT-0014 advances both active provenance subjects through a real supersession.
@@ -1097,6 +1099,7 @@ describe('ADR-v3 public result and semantic authority', () => {
       ['ADR-SCR-0018', 7],
       ['ADR-SCR-0019', 7],
       ['ADR-SCR-0020', 16],
+      ['ADR-SCR-0021', 2],
     ] as const) {
       const added = records.find((record) => record.adr_id === id);
       expect(added?.affected_rules).toHaveLength(count);
@@ -1125,6 +1128,32 @@ describe('ADR-v3 public result and semantic authority', () => {
         readFileSync(resolve(adrRoot, 'ADR-SCR-0020-owned-native-service-fixtures.md'), 'utf8'),
       )?.provenance,
     ).toEqual(['ADR-SCR-0017', 'ADR-SCR-0019']);
+    const linkMetadataSubjects = [
+      'packages/cli/src/commands/sense/native-candidate-links.ts',
+      'packages/cli/src/commands/sense/native-runner-selection.ts',
+    ];
+    expect(records.find((row) => row.adr_id === 'ADR-SCR-0021')?.affected_rules).toEqual(
+      linkMetadataSubjects,
+    );
+    expect(
+      result.subject_authorities
+        .filter((row) => row.effective_head === 'ADR-SCR-0021')
+        .map((row) => ({ subject: row.subject, members: row.lineage_members })),
+    ).toEqual(linkMetadataSubjects.map((subject) => ({ subject, members: ['ADR-SCR-0021'] })));
+    expect(
+      frontmatter(
+        readFileSync(
+          resolve(adrRoot, 'ADR-SCR-0021-unconsumed-native-directory-link-metadata.md'),
+          'utf8',
+        ),
+      )?.provenance,
+    ).toEqual(['ADR-SCR-0015', 'ADR-SCR-0017']);
+    // Metadata admission adds a separate authority; it does not supersede coverage custody.
+    expect(
+      result.subject_authorities
+        .filter((row) => row.subject === linkMetadataSubjects[1])
+        .map((row) => row.effective_head),
+    ).toEqual(['ADR-SCR-0019', 'ADR-SCR-0021']);
     // ADR-GOV-0024, ADR-AUT-0003, and ADR-AUT-0004 (CMP-0005): each accepted record is
     // effective and is the sole lineage head of every subject it declares, including the
     // adopter schema shared by the first two and the compiler shared by the last two.
