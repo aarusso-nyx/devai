@@ -4,9 +4,10 @@ import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { readCandidateFile } from '@devai-nyx/sensors';
 import { sha256Hex } from '../../services/check-runner/canonical.js';
-import { trackedPaths, isHarnessMutatedPath } from '../../services/check-runner/policy-git.js';
+import { isHarnessMutatedPath } from '../../services/check-runner/policy-git.js';
 import type { PlannedTask } from '../../services/check-runner/types.js';
 import { assertNativeConfigCapabilities } from './native-config-capabilities.js';
+import { nativeCandidateLinkMetadata } from './native-candidate-links.js';
 import { nativeCoverageGitIdentity } from './native-coverage-host.js';
 import type { NativeTestResultContract } from './native-test-results.js';
 
@@ -14,23 +15,32 @@ import type { NativeTestResultContract } from './native-test-results.js';
 export function nativeExecutionCommand(root: string, task: PlannedTask, nonce: string) {
   if (!/^[0-9a-f]{64}$/u.test(nonce)) throw new Error('SENSE_NATIVE_NONCE_INVALID');
   const contract = task.outputContract['resultPopulation'] as NativeTestResultContract;
+  const declaration = parseNativeRunnerDeclaration(root, task, contract);
+  const argv = [task.executable.path, ...task.argv.slice(1)];
+  // Avoid the runner's package-resolution fallback for an already validated local config.
+  argv[declaration.configArgumentIndex] = resolve(root, declaration.configPath);
   const outputRoot =
     contract.selectionEvidence?.reporter === 'playwright-v1'
       ? resolve(root, '.devai/state/native-config-traces', nonce, 'runtime/playwright-results')
       : null;
   return Object.freeze({
     executable: realpathSync(process.execPath),
-    argv: Object.freeze([
-      task.executable.path,
-      ...task.argv.slice(1),
-      ...(outputRoot === null ? [] : ['--output', outputRoot]),
-    ]),
+    argv: Object.freeze([...argv, ...(outputRoot === null ? [] : ['--output', outputRoot])]),
     outputRoot,
   });
 }
 
 /** Validate authored native selection without probes, execution or trusted standing. */
 export function assertNativeRunnerDeclaration(
+  root: string,
+  task: Pick<PlannedTask, 'argv' | 'cwd'>,
+  contract: NativeTestResultContract,
+) {
+  return parseNativeRunnerDeclaration(root, task, contract).capabilities;
+}
+
+/** Keep declaration validation and private config-argument preparation on the same parse. */
+function parseNativeRunnerDeclaration(
   root: string,
   task: Pick<PlannedTask, 'argv' | 'cwd'>,
   contract: NativeTestResultContract,
@@ -44,6 +54,8 @@ export function assertNativeRunnerDeclaration(
   const argv = task.argv.slice(1);
   if (argv.shift() !== (vitest ? 'run' : 'test')) throw new Error('SENSE_NATIVE_RUN_MODE_REQUIRED');
   let configPath: string | undefined;
+  let configArgumentIndex: number | undefined;
+  let configSha256: string | undefined;
   let reporter = false;
   let loader = !vitest;
   let coverage = false;
@@ -65,9 +77,12 @@ export function assertNativeRunnerDeclaration(
       const relativePath = relative(root, resolve(root, task.cwd, path));
       if (isHarnessMutatedPath(relativePath))
         throw new Error('SENSE_NATIVE_CONFIG_IN_MUTATED_NAMESPACE');
-      readCandidateFile(root, relativePath);
+      const bytes = readCandidateFile(root, relativePath);
       if (configPath !== undefined) throw new Error('SENSE_NATIVE_CONFIG_REPEATED');
       configPath = relativePath;
+      // The parse has removed the authored executable and run/test subcommand.
+      configArgumentIndex = index + 2;
+      configSha256 = sha256Hex(bytes);
     } else if (!vitest && word === '--project') {
       if (argv[++index] !== selection.projectName)
         throw new Error('SENSE_NATIVE_PROJECT_SELECTION_INVALID');
@@ -87,11 +102,17 @@ export function assertNativeRunnerDeclaration(
   }
   if (!coverage && coverageReporters.size > 0)
     throw new Error('SENSE_NATIVE_COVERAGE_SELECTION_INVALID');
-  if (configPath === undefined) throw new Error('SENSE_NATIVE_EXPLICIT_CONFIG_REQUIRED');
+  if (configPath === undefined || configArgumentIndex === undefined || configSha256 === undefined)
+    throw new Error('SENSE_NATIVE_EXPLICIT_CONFIG_REQUIRED');
   const configCapabilities = assertNativeConfigCapabilities(root, configPath);
   if (!loader) throw new Error('SENSE_NATIVE_CONFIG_LOADER_REQUIRED');
   if (!reporter) throw new Error('SENSE_NATIVE_REPORTER_REQUIRED');
-  return configCapabilities;
+  return {
+    capabilities: configCapabilities,
+    configPath,
+    configArgumentIndex,
+    configSha256,
+  };
 }
 
 /** Actual native collection, package-owned instrumentation, and complete candidate input closure. */
@@ -130,7 +151,8 @@ export function nativeRunnerSelection(
     : undefined;
   if (vitest && viteManifest?.version !== '7.3.6')
     throw new Error('SENSE_NATIVE_VITE_VERSION_UNSUPPORTED');
-  const configCapabilities = assertNativeRunnerDeclaration(root, task, contract);
+  const declaration = parseNativeRunnerDeclaration(root, task, contract);
+  const configCapabilities = declaration.capabilities;
   const exportName = `@aarusso-nyx/devai/native-${vitest ? 'vitest' : 'playwright'}-reporter`;
   const reporterPath = require.resolve(exportName);
   const asset = vitest ? 'native-test-reporter.js' : 'native-playwright-reporter.js';
@@ -187,12 +209,7 @@ export function nativeRunnerSelection(
     )
       throw new Error('SENSE_NATIVE_COVERAGE_ADAPTER_INSTANCE_MISMATCH');
   }
-  const inputs = new Set(task.inputPaths);
-  for (const path of trackedPaths(root)) {
-    if (isHarnessMutatedPath(path)) continue;
-    if (!inputs.has(path)) throw new Error('SENSE_NATIVE_CONFIG_CLOSURE_INCOMPLETE');
-    readCandidateFile(root, path);
-  }
+  const candidateLinks = nativeCandidateLinkMetadata(root, task.inputPaths);
   const packages: Record<string, string> = {};
   const visited = new Set<string>();
   const resolveManifest = (from: string, name: string): string => {
@@ -270,7 +287,17 @@ export function nativeRunnerSelection(
   for (const path of configCapabilities.packageManifests) visitPackage(path);
   const inputPackages = nativeInputPackageClosure(root);
   return sha256Hex({
-    executionRecipe: vitest ? 'node-native-v1' : 'node-native-owned-playwright-results-v1',
+    executionRecipe: vitest
+      ? 'node-native-canonical-config-v2'
+      : 'node-native-canonical-config-owned-playwright-results-v2',
+    configPreparation: {
+      version: 'canonical-config-argv-v1',
+      argumentIndex: declaration.configArgumentIndex,
+      authoredValue: task.argv[declaration.configArgumentIndex],
+      relativePath: declaration.configPath,
+      absolutePath: resolve(root, declaration.configPath),
+      sha256: declaration.configSha256,
+    },
     nodeExecutable: realpathSync(process.execPath),
     nodeExecutableSha256: sha256Hex(readFileSync(process.execPath)),
     nodeVersion: process.version,
@@ -292,6 +319,7 @@ export function nativeRunnerSelection(
     runnerExecutable: task.executable.sha256,
     packages,
     inputPackages,
+    candidateLinks,
     selection,
   });
 }
