@@ -1,6 +1,24 @@
 # Changelog
 
-## 2.6.3 — Unreleased
+## 2.6.4 — Unreleased
+
+This patch repairs custody of native Vitest machine reports when application tests
+write to stdout or stderr. It preserves complete raw streams and fails closed on
+missing, malformed or inconsistent native results.
+
+- Keep the existing native collection, nonce, task, candidate and execution-origin
+  checks; noisy test output cannot become a fabricated passing report.
+- Bind unrelated tracked internal directory links as opaque candidate metadata
+  under ADR-SCR-0021. Configuration, executable and actual alias reads still
+  refuse; no generic link traversal or Linux transport support is inferred.
+- Resolve the already validated repository-relative native configuration to its
+  canonical absolute execution argument. Bind its bytes and preparation in the
+  selection identity; external, linked and swapped configuration remains refused.
+- Refresh compiled framework and authority identities through registered upgrade.
+  Preserve all thresholds, the 69-action surface and the trusted verifier
+  `@aarusso-nyx/devai@2.4.0`; existing evidence histories retain their bytes.
+
+## 2.6.3 — 2026-10-19
 
 This patch repairs complete adopter scorecard measurements while preserving all
 existing thresholds, native execution provenance and publication gates.
