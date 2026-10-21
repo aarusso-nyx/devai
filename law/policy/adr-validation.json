@@ -4,7 +4,7 @@
   "id": "adr-validation",
   "status": "active",
   "authority": "Architect",
-  "policy_version": "2.7.6",
+  "policy_version": "2.7.7",
   "record_schema": "law/schemas/adr-v2.schema.json",
   "scan": {
     "root": "law/adr",
@@ -234,7 +234,7 @@
     "digest_algorithm": "sha256",
     "canonical_form": "utf8-rfc8785-jcs-of-entries-array-in-utf8-path-order",
     "ordering": "utf8-bytes-ascending-by-path",
-    "catalog_digest_sha256": "4ba9f5291ccfe9804c7ffb79bd029b7024cd2f29708db617dbfc9033299f95bc",
+    "catalog_digest_sha256": "5794c5675a191e39b14cc72be08c3cd706978b758d3e5bbf5157549f7a033ec1",
     "entries": [
       {
         "path": "ADR-014-release-verification-profiles.md",
@@ -296,7 +296,7 @@
       },
       {
         "path": "README.md",
-        "sha256": "05bb15830d4adc3faeab4a1543c7eabed3bce497db1799bf4524cd2bb9fe70fe",
+        "sha256": "44430b8099b0f64887471d3d758b0daac5fac698a786cd780fea34d377b58933",
         "disposition": "non-record",
         "reason": "Generated decision catalogue rendered by renderDecisionIndex from the record frontmatter (ADR-GOV-0021). It is not a decision record and carries no identity; each regeneration re-pins this digest."
       }
