@@ -489,7 +489,7 @@ describe('bridge transports (IA-004, IA-006)', () => {
   }
 
   const messages = { system: 'rubric', user: 'evidence' };
-  const call = { response_format_json: true, temperature: 0, response_schema: REVIEW };
+  const call = { response_format_json: true, response_schema: REVIEW };
 
   function argvOf(): readonly string[] {
     const args = spawnSyncMock.mock.calls[0]?.[1] as readonly string[] | undefined;
@@ -608,6 +608,7 @@ describe('bridge transports (IA-004, IA-006)', () => {
       };
     };
     expect(request.messages.every((message) => message.role !== 'assistant')).toBe(true);
+    expect(request).not.toHaveProperty('temperature');
     expect(request.output_config?.format?.type).toBe('json_schema');
     expect(request.output_config?.format?.schema?.properties.verdict.enum).toEqual([
       'pass',
@@ -633,6 +634,7 @@ describe('bridge transports (IA-004, IA-006)', () => {
       };
     };
     expect(request.messages.every((message) => message.role !== 'assistant')).toBe(true);
+    expect(request).not.toHaveProperty('temperature');
     expect(request.response_format?.type).toBe('json_schema');
     expect(request.response_format?.json_schema?.schema?.properties.classification.enum).toEqual([
       'plant_bug',

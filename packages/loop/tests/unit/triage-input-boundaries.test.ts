@@ -760,7 +760,6 @@ describe('Article-23 ladder prompt construction', () => {
 
     expect(client.calls[0]?.meta).toEqual({ caller: 'tieBreakWithLadder' });
     expect(client.calls[0]?.opts).toEqual({
-      temperature: 0,
       max_output_tokens: 512,
       response_schema: 'triage-breaker.schema.json',
     });

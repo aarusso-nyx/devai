@@ -215,7 +215,8 @@ describe('the ladder reads its vote through the shared extractor', () => {
     const client = breaker({ text: JSON.stringify(VOTE_SECOND) });
     await tieBreakWithLadder({ first, second, breakerClient: client, timestamp: TIMESTAMP });
     expect(client.options).toHaveLength(1);
-    expect(client.options[0]).toMatchObject({ temperature: 0, response_schema: SCHEMA });
+    expect(client.options[0]).toMatchObject({ response_schema: SCHEMA });
+    expect(client.options[0]).not.toHaveProperty('temperature');
   });
 
   it('resolves to the matching candidate from a bare vote', async () => {
