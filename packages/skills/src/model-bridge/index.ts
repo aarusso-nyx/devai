@@ -42,7 +42,6 @@ export interface ModelBridgeCallOptions {
   readonly timeout_ms?: number;
   readonly max_output_bytes?: number;
   readonly max_output_tokens?: number;
-  readonly temperature?: number;
   readonly response_format_json?: boolean;
   readonly response_schema?: ReplySchemaName;
 }
@@ -849,7 +848,6 @@ export function createModelBridge(options: ModelBridgeOptions) {
           {
             model: options.model,
             max_tokens: call?.max_output_tokens ?? 4096,
-            temperature: call?.temperature ?? 0,
             system: messages.system,
             messages: [{ role: 'user', content: messages.user }],
             tools: [],
@@ -885,7 +883,6 @@ export function createModelBridge(options: ModelBridgeOptions) {
           tools: [],
           tool_choice: 'none',
           max_tokens: call?.max_output_tokens ?? 4096,
-          temperature: call?.temperature ?? 0,
           messages: [
             { role: 'system', content: messages.system },
             { role: 'user', content: messages.user },

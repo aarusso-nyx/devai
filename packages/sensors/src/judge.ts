@@ -24,7 +24,6 @@ export interface JudgeLlmClient {
     },
     opts?: {
       readonly max_output_tokens?: number;
-      readonly temperature?: number;
       readonly response_format_json?: boolean;
       readonly response_schema?: 'review-verdict.schema.json' | 'soft-gate-score.schema.json';
     },
@@ -172,7 +171,6 @@ export async function senseJudge(
     (meta as Record<string, unknown>).stack_sha256 = opts.stack_sha256;
   }
   const response = await client.complete({ system, user: opts.evidence }, meta, {
-    temperature: 0.0,
     response_schema: schema,
   });
   // ADR-MDL-0001: one shared extractor, validated against review-verdict.schema.json.
