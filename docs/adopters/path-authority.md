@@ -10,6 +10,14 @@ The extension is the optional `authority` block of the adopter policy source, de
 materialized only through `init bind --adopter-policy`, the same verb, receipt, and drift checks
 that cover every other block of the source ([Install and adopt](install.md)).
 
+Constitution 1.1.0 amends Articles 6, 7 and 10 to give the Engineer a focused-regression verb on
+the test class: within a task that changes sources, the Engineer may add regression tests that
+import or target a file the same task changed, and modify tests that task added; deleting a test,
+changing another test's assertions, and changing a threshold stay Inspector verbs, and a round or
+task designated independent-assurance withholds the verb
+([ADR-GOV-0026](../../law/adr/ADR-GOV-0026-engineer-authors-focused-regression-tests.md)). The
+classes, their order, and the compiled rules below are unchanged by it.
+
 Adopters that declare no block are unaffected: the core rows, their compiled rules, and their
 materialized policies do not change. The framework declares no roots of its own.
 
@@ -19,7 +27,8 @@ An extension names its roots explicitly; no root is inferred from a directory's 
 root never equals or contains a core-table prefix. Under a declared root, authority is decided by
 path class in a fixed order: the architecture class (schema definitions, blueprints, and the
 architectural specifications the extension names) is Architect; the test class (test directories
-and colocated test files) is Inspector; every remaining path under the root, including local
+and colocated test files) is Inspector, with the Engineer's focused-regression verb of Article 7;
+every remaining path under the root, including local
 implementation documentation, is Engineer.
 
 A class rule takes precedence over the root grant, the architecture class over the test class,
@@ -163,7 +172,7 @@ today ([Upgrading DEVAI](install.md#upgrading-devai)). An adopter that wants roo
 sequence below once, in this order, with the pinned package that carries the records; every step
 is a governed write of the Architect role and leaves the previous pair untouched if it refuses.
 
-1. **Rebind the constitution at 1.0.2.** The compiler refuses a block with
+1. **Rebind the constitution at 1.0.2 or later.** The compiler refuses a block with
    `ADOPTER_AUTHORITY_CONSTITUTION_VERSION` while the bound constitution is below 1.0.2, so the
    Article 40 rebind comes first and commits on its own:
 
@@ -213,7 +222,7 @@ adopter bound such an extension before the release of CMP-0005.
 
 ## Binding and drift
 
-Rebind the constitution at 1.0.2 first (`init bind --constitution --write`, the Article 40
+Rebind the constitution at 1.0.2 or later first (`init bind --constitution --write`, the Article 40
 discipline), then add the block, bump `policy_version`, and run
 `init bind --adopter-policy <file> --as-role architect --write`. Binding the same source twice is
 byte-stable; removing the block removes the extension and every rule it compiled.

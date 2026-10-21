@@ -219,7 +219,7 @@ The plan reports, under `plan`:
   `.devai/constitution.md` pointer, and the tracking binding when they name an older version (the
   tracking binding is reported, not refreshed);
 - `obligations`: new requirements and whether they are `satisfied`, `satisfied-by-upgrade`, or
-  `pending`: constitution 1.0.2, the `thresholds.soft_gate` block, the proof-anchor baseline with
+  `pending`: constitution 1.0.2 and 1.1.0, the `thresholds.soft_gate` block, the proof-anchor baseline with
   its `historical-gap` declarations, and the adopter-policy receipt the check members classify by.
 
 The upgrade fails closed on anything that needs an Owner or Architect decision. A retirement of an
@@ -233,6 +233,9 @@ An obligation that needs a decision blocks the write the same way while it is `p
 
 - constitution 1.0.2 (`MIG-1.8.0-constitution-1-0-2`): the constitution is rebound only on request,
   so add `--constitution` once the Architect has reviewed the amendment;
+- constitution 1.1.0 (`MIG-2.7.0-constitution-1-1-0`): the same rebind, after the Architect has
+  reviewed the amendment of Articles 6, 7 and 10 that gives the Engineer the focused-regression
+  test verb;
 - the proof-anchor baseline (`MIG-1.9.0-proof-anchor-baseline`), when `record/proofs/work` holds
   proof lines and no `record/proofs/anchor-baseline.json` exists yet: run
   `pnpm exec devai evidence verify --scope chain --write`, and have the Architect record a
