@@ -21,10 +21,7 @@ function client(): JudgeLlmClient {
       expect(messages.user).toBe('evidence body');
       expect(messages.system).toContain('[RUBRIC]\napply rubric');
       expect(meta).toMatchObject({ caller: 'sense judge' });
-      expect(options).toMatchObject({
-        temperature: 0,
-        response_schema: 'review-verdict.schema.json',
-      });
+      expect(options).toEqual({ response_schema: 'review-verdict.schema.json' });
       return { ...responseBase, text: JSON.stringify(responseJson), json: responseJson };
     },
   };

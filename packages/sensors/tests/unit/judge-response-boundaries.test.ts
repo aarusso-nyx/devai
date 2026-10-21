@@ -172,14 +172,11 @@ async function expectErrorReading(
 }
 
 describe('judge response boundaries', () => {
-  it('asks the bridge for the review verdict schema at temperature zero (IA-006)', async () => {
+  it('asks the bridge for the review verdict schema and sends no temperature (IA-006, #411)', async () => {
     requestOptions.length = 0;
     await senseJudge(baseOptions, client({ text: JSON.stringify(PASS) }));
     expect(requestOptions).toHaveLength(1);
-    expect(requestOptions[0]).toMatchObject({
-      temperature: 0,
-      response_schema: 'review-verdict.schema.json',
-    });
+    expect(requestOptions[0]).toEqual({ response_schema: 'review-verdict.schema.json' });
   });
 
   it('accepts matching selected text and structured output and records provider identity', async () => {
