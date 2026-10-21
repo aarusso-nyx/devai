@@ -222,7 +222,6 @@ export interface BreakerClient {
     opts?: {
       readonly response_format_json?: boolean;
       readonly response_schema?: 'triage-breaker.schema.json';
-      readonly temperature?: number;
       readonly max_output_tokens?: number;
     },
   ): Promise<{
@@ -322,7 +321,7 @@ export async function tieBreakWithLadder(opts: TieBreakLadderOptions): Promise<T
   const response = await opts.breakerClient.complete(
     { system, user },
     { caller: 'tieBreakWithLadder' },
-    { temperature: 0.0, max_output_tokens: 512, response_schema: 'triage-breaker.schema.json' },
+    { max_output_tokens: 512, response_schema: 'triage-breaker.schema.json' },
   );
   const generatedAt = opts.timestamp ?? new Date().toISOString();
   // ADR-MDL-0001: the vote is read through the one shared extractor. An extractor
