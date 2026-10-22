@@ -730,15 +730,16 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-SCR-0019',
       'ADR-SCR-0020',
       'ADR-SCR-0021',
+      'ADR-SCR-0022',
       'ADR-SEC-0001',
     ]);
-    expect(records).toHaveLength(129);
+    expect(records).toHaveLength(130);
     expect(
       records.filter((record) => record.format === 'legacy-catalog').map((record) => record.adr_id),
     ).toEqual(['ADR-014', 'ADR-MUT-0005', 'ADR-REL-0017']);
     expect(records.filter((record) => record.adr_id === 'ADR-014')).toHaveLength(1);
-    expect(result.files_scanned).toBe(130);
-    expect(result.subject_authorities).toHaveLength(630);
+    expect(result.files_scanned).toBe(131);
+    expect(result.subject_authorities).toHaveLength(632);
     expect(
       result.subject_authorities.find(
         (row) => row.subject === 'packages/cli/src/commands/doctor-execution-readiness.ts',
@@ -853,6 +854,7 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-SCR-0019',
       'ADR-SCR-0020',
       'ADR-SCR-0021',
+      'ADR-SCR-0022',
       'ADR-SEC-0001',
     ]);
     // ADR-MUT-0014 advances both active provenance subjects through a real supersession.
@@ -1102,6 +1104,7 @@ describe('ADR-v3 public result and semantic authority', () => {
       ['ADR-SCR-0019', 7],
       ['ADR-SCR-0020', 16],
       ['ADR-SCR-0021', 2],
+      ['ADR-SCR-0022', 2],
     ] as const) {
       const added = records.find((record) => record.adr_id === id);
       expect(added?.affected_rules).toHaveLength(count);
