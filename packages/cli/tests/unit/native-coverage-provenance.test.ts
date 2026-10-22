@@ -146,6 +146,7 @@ function bootstrap(
   body: string,
   missingContext = false,
   contextRoute: 'regular' | 'symlink' | 'hardlink' = 'regular',
+  reportedRuntime?: string,
 ) {
   const nonce = randomBytes(32).toString('hex');
   const directory = join(f.root, '.devai/state/native-config-traces', nonce);
@@ -173,6 +174,15 @@ function bootstrap(
       else linkSync(source, path);
     }
   }
+  let selectedPreload = preload;
+  if (reportedRuntime !== undefined) {
+    // A controlled negative fixture, never a host runtime identity or successful native proof.
+    selectedPreload = join(directory, 'unsupported-runtime.mjs');
+    writeFileSync(
+      selectedPreload,
+      `Object.defineProperty(process,'version',{value:${JSON.stringify(reportedRuntime)}});await import(${JSON.stringify(pathToFileURL(preload).href)});`,
+    );
+  }
   const result = spawnSync(process.execPath, ['--input-type=module', '--eval', body], {
     cwd: f.root,
     encoding: 'utf8',
@@ -187,7 +197,7 @@ function bootstrap(
       DEVAI_NATIVE_RUNTIME_ROOT: runtime,
       DEVAI_NATIVE_RUNNER: 'vitest-v1',
       TMPDIR: runtime,
-      NODE_OPTIONS: `--import=${pathToFileURL(preload).href}`,
+      NODE_OPTIONS: `--import=${pathToFileURL(selectedPreload).href}`,
       ...(!missingContext
         ? {
             DEVAI_NATIVE_ADAPTER_CONTEXT_SHA256: hash(context),
@@ -243,6 +253,90 @@ afterAll(() => {
 });
 
 describe('actual package-owned native coverage context and independent replay', () => {
+  it('binds the approved native runtime to the canonical provider pin', () => {
+    const toolchain = JSON.parse(readFileSync(join(ROOT, '.devai/config/toolchain.json'), 'utf8'));
+    expect(`v${toolchain.runtimes.node}`).toBe('v24.20.0');
+    expect(process.version).toBe('v24.20.0');
+  });
+
+  it.each(['v24.15.0', 'v24.22.0'])(
+    'explicitly refuses %s before private context or authored module execution',
+    (version) => {
+      const actual = bootstrap(
+        genuine,
+        'console.log("AUTHORED_ENTRY_EXECUTED")',
+        true,
+        'regular',
+        version,
+      );
+      expect(actual.result.status).not.toBe(0);
+      expect(actual.result.stderr).toContain(
+        'DEVAI_NATIVE_INPUT_UNSUPPORTED:node-runtime-unsupported',
+      );
+      expect(actual.result.stdout).not.toContain('AUTHORED_ENTRY_EXECUTED');
+      expect(actual.rows).toEqual([
+        expect.objectContaining({ kind: 'unsupported', operation: 'node-runtime-unsupported' }),
+      ]);
+    },
+  );
+
+  it.each(['utf8', 'binary'] as const)(
+    'rejects an unapproved CJS preload before it can retain a %s read binding',
+    (encoding) => {
+      const f = fixture();
+      const marker = join(f.root, '.devai/retained-reference-executed');
+      const early = join(f.root, 'early.cjs');
+      put(
+        f.root,
+        'early.cjs',
+        `const fs=require('node:fs');const retained=fs.readFileSync;fs.writeFileSync(${JSON.stringify(marker)},retained(${JSON.stringify(join(f.root, 'src/index.ts'))}${encoding === 'utf8' ? ",'utf8'" : ''}));`,
+      );
+      const actual = bootstrap(
+        f,
+        `const {spawn}=await import('node:child_process');spawn(process.execPath,['--require',${JSON.stringify(early)},'src/index.ts']);`,
+      );
+      expect(actual.result.status).not.toBe(0);
+      expect(actual.rows).toContainEqual(
+        expect.objectContaining({ kind: 'unsupported', operation: 'child-node-preload' }),
+      );
+      expect(actual.rows.some((row) => row['kind'] === 'child')).toBe(false);
+      expect(existsSync(marker)).toBe(false);
+    },
+  );
+
+  it('refuses a same-named framework CJS preload with unpinned bytes before execution', () => {
+    const f = fixture();
+    const marker = join(f.root, '.devai/changed-preload-executed');
+    const early = join(f.root, 'vitest/suppress-warnings.cjs');
+    put(
+      f.root,
+      'vitest/suppress-warnings.cjs',
+      `require('node:fs').writeFileSync(${JSON.stringify(marker)},'executed');`,
+    );
+    const actual = bootstrap(
+      f,
+      `const {spawn}=await import('node:child_process');spawn(process.execPath,['--require',${JSON.stringify(early)},'src/index.ts']);`,
+    );
+    expect(actual.result.status).not.toBe(0);
+    expect(actual.rows).toContainEqual(
+      expect.objectContaining({ kind: 'unsupported', operation: 'child-node-preload' }),
+    );
+    expect(actual.rows.some((row) => row['kind'] === 'child')).toBe(false);
+    expect(existsSync(marker)).toBe(false);
+  });
+
+  it('keeps direct readable descriptors unsupported on the approved runtime', () => {
+    const actual = bootstrap(
+      genuine,
+      "const fs=await import('node:fs');fs.openSync('src/index.ts','r');",
+    );
+    expect(actual.result.status).not.toBe(0);
+    expect(actual.rows).toContainEqual(
+      expect.objectContaining({ kind: 'unsupported', operation: 'fs.openSync.readable' }),
+    );
+    expect(actual.rows.some((row) => row['kind'] === 'end')).toBe(false);
+  });
+
   it('resolves the public adapter export to this assembled preload package', () => {
     expect(adapterURL).toBe(
       pathToFileURL(join(dirname(preload), 'native-coverage-adapter.js')).href,
