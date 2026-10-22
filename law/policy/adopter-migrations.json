@@ -452,6 +452,30 @@
           "files": [".devai/config/authority-policy.json"]
         }
       ]
+    },
+    {
+      "version": "2.7.0",
+      "status": "unreleased",
+      "changes": [
+        {
+          "id": "MIG-2.7.0-constitution-1-1-0",
+          "kind": "constitution",
+          "summary": "Constitution 1.1.0 amends Articles 6, 7 and 10 so the Engineer holds a focused-regression verb on the test class: within a task that changes sources it may add tests that import or target a file the same task changed and modify tests that task added, never delete a test, change another test's assertions, or lower a threshold; a round or task designated independent-assurance withholds the verb. Every other core path row is unchanged. Binding it replaces the vendored copy and the project.json pin.",
+          "decision_records": ["ADR-GOV-0026", "ADR-CHK-0009"],
+          "issues": [412],
+          "segments": ["constitution", "authority"],
+          "files": [".devai/pin/constitution.md", ".devai/config/project.json"],
+          "decision_required": true,
+          "constitution": {
+            "from": "1.0.2",
+            "to": "1.1.0"
+          },
+          "obligation": {
+            "check": "constitution-version",
+            "requirement": "Bind the installed constitution with init upgrade --constitution (or init bind --constitution) after the Architect has reviewed the amendment."
+          }
+        }
+      ]
     }
   ]
 }
