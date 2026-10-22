@@ -28,7 +28,9 @@ const INTEGRATION_RE =
 export function senseTestIdiomaticity(opts: TestIdiomaticityOptions): SensorReading {
   const thresholds = opts.thresholds ?? DEFAULT_THRESHOLDS;
 
-  const population = executableTestPopulation(opts.repoRoot, opts.testGlobs);
+  const population = executableTestPopulation(opts.repoRoot, opts.testGlobs, {
+    jsonDataAliases: true,
+  });
   const files = population.paths;
   const errors = [...population.errors];
 

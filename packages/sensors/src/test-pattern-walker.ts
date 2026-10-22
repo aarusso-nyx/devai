@@ -21,7 +21,9 @@ export function countPatternMatches(
   pattern: RegExp,
   testGlobs?: readonly string[],
 ): TestPatternCounts {
-  const population = executableTestPopulation(repoRoot, testGlobs);
+  const population = executableTestPopulation(repoRoot, testGlobs, {
+    jsonDataAliases: true,
+  });
   const files = population.paths;
   const errors = [...population.errors];
   const matched: string[] = [];
