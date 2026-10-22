@@ -49,7 +49,7 @@
       "family": "implementation",
       "description": "Test sources, fixtures, helpers, and test configuration under tests/ and packages/*/tests/.",
       "check_members": ["unit-test", "full-tests", "test-trace"],
-      "constitution_authority": "tests/ and packages/*/tests/ — Inspector (F3)"
+      "constitution_authority": "tests/ and packages/*/tests/ — Inspector (F3); the Engineer holds on these paths only the focused-regression verb of Article 7"
     },
     "docs": {
       "family": "implementation",
