@@ -24,6 +24,28 @@ const BOOTSTRAP_CLI = '.devai/state/pr-bootstrap/cli/bin.js';
 const BASE_BRANCH = 'main';
 const ZERO = /^0+$/u;
 
+function runtimeCurrent() {
+  let version;
+  try {
+    const toolchain = JSON.parse(readFileSync(join(root, '.devai/config/toolchain.json'), 'utf8'));
+    version = toolchain?.runtimes?.node;
+    if (typeof version !== 'string' || !/^[1-9]\d*\.\d+\.\d+$/u.test(version))
+      throw new Error('invalid Node pin');
+  } catch {
+    say(
+      'canonical Node pin is missing or invalid; restore .devai/config/toolchain.json before pushing',
+    );
+    return false;
+  }
+  if (process.version !== `v${version}`) {
+    say(
+      `Node ${process.version} differs from the pinned v${version}; select the pinned runtime and retry; no checks were run`,
+    );
+    return false;
+  }
+  return true;
+}
+
 function git(args, options = {}) {
   return spawnSync('git', args, { cwd: root, encoding: 'utf8', ...options });
 }
@@ -64,6 +86,7 @@ function main(argv, readStdin) {
     .filter((fields) => fields.length === 4)
     .filter(([, localSha]) => !ZERO.test(localSha ?? ''));
   if (pushed.length === 0) return 0;
+  if (!runtimeCurrent()) return 1;
 
   // The affected check runs on the working tree, so it can vouch only for the checked-out
   // commit. Annotated tags name tag objects, so peel every pushed object to a commit
