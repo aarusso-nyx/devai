@@ -625,6 +625,7 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-EVI-0003',
       'ADR-EVI-0004',
       'ADR-EVI-0005',
+      'ADR-EVI-0006',
       'ADR-GOV-0001',
       'ADR-GOV-0002',
       'ADR-GOV-0003',
@@ -731,13 +732,13 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-SCR-0021',
       'ADR-SEC-0001',
     ]);
-    expect(records).toHaveLength(128);
+    expect(records).toHaveLength(129);
     expect(
       records.filter((record) => record.format === 'legacy-catalog').map((record) => record.adr_id),
     ).toEqual(['ADR-014', 'ADR-MUT-0005', 'ADR-REL-0017']);
     expect(records.filter((record) => record.adr_id === 'ADR-014')).toHaveLength(1);
-    expect(result.files_scanned).toBe(129);
-    expect(result.subject_authorities).toHaveLength(624);
+    expect(result.files_scanned).toBe(130);
+    expect(result.subject_authorities).toHaveLength(630);
     expect(
       result.subject_authorities.find(
         (row) => row.subject === 'packages/cli/src/commands/doctor-execution-readiness.ts',
@@ -769,6 +770,7 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-EVI-0003',
       'ADR-EVI-0004',
       'ADR-EVI-0005',
+      'ADR-EVI-0006',
       'ADR-GOV-0002',
       'ADR-GOV-0004',
       'ADR-GOV-0007',
