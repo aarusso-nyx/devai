@@ -1247,7 +1247,7 @@ describe('packed adopter path authority', () => {
     );
   });
 
-  it('runs the installed bin at the packed version with the constitution pinned at 1.0.2', () => {
+  it('runs the installed bin at the packed version with the constitution pinned at 1.1.0', () => {
     const version = installedBin(['--version']);
     const packedVersion = (
       JSON.parse(readFileSync(join(installed, 'package.json'), 'utf8')) as { version: string }
@@ -1255,7 +1255,7 @@ describe('packed adopter path authority', () => {
     expect(version.stdout.trim().startsWith(`devai/${packedVersion} `)).toBe(true);
     expect(
       parseConstitutionVersion(readFileSync(join(adopter, '.devai/pin/constitution.md'), 'utf8')),
-    ).toBe('1.0.2');
+    ).toBe('1.1.0');
   });
 
   it('binds the reference source with the receipt field and the second extension entry', () => {

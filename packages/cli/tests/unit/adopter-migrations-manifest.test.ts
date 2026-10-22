@@ -67,6 +67,7 @@ describe('#264: the adopter migration manifest', () => {
       '2.6.2',
       '2.6.3',
       '2.6.4',
+      '2.7.0',
     ]);
     expect(manifest.releases.find((release) => release.version === '2.3.0')).toMatchObject({
       version: '2.3.0',
@@ -158,9 +159,11 @@ describe('#264: the adopter migration manifest', () => {
     expect(plannedReleases(manifest, '2.4.0', '2.5.0').map((release) => release.version)).toEqual([
       '2.5.0',
       '2.6.4',
+      '2.7.0',
     ]);
     expect(plannedReleases(manifest, '2.5.0', '2.5.0').map((release) => release.version)).toEqual([
       '2.6.4',
+      '2.7.0',
     ]);
   });
 
@@ -213,7 +216,8 @@ describe('#264: the adopter migration manifest', () => {
         files: ['.devai/config/authority-policy.json'],
       }),
     ]);
-    const latest = manifest.releases.at(-1);
+    const latest = manifest.releases.find((release) => release.version === '2.6.4');
+    const next = manifest.releases.find((release) => release.version === '2.7.0');
     expect(latest).toMatchObject({ version: '2.6.4', status: 'unreleased' });
     expect(latest).not.toHaveProperty('date');
     expect(latest?.changes).toEqual([
@@ -225,10 +229,30 @@ describe('#264: the adopter migration manifest', () => {
         files: ['.devai/config/authority-policy.json'],
       }),
     ]);
-    expect(plannedReleases(manifest, '2.6.0', '2.6.1')).toEqual([shipped, latest]);
-    expect(plannedReleases(manifest, '2.6.1', '2.6.1')).toEqual([latest]);
-    expect(plannedReleases(manifest, '2.6.3', '2.6.4')).toEqual([latest]);
-    expect(plannedReleases(manifest, '2.6.4', '2.6.4')).toEqual([]);
+    expect(plannedReleases(manifest, '2.6.0', '2.6.1')).toEqual([shipped, latest, next]);
+    expect(plannedReleases(manifest, '2.6.1', '2.6.1')).toEqual([latest, next]);
+    expect(plannedReleases(manifest, '2.6.3', '2.6.4')).toEqual([latest, next]);
+    expect(plannedReleases(manifest, '2.6.4', '2.6.4')).toEqual([next]);
+  });
+
+  it('declares the prospective 2.7.0 constitution 1.1.0 move as an Architect decision (ADR-GOV-0026)', () => {
+    const next = manifest.releases.at(-1);
+    expect(next).toMatchObject({ version: '2.7.0', status: 'unreleased' });
+    expect(next).not.toHaveProperty('date');
+    expect(next?.changes).toEqual([
+      expect.objectContaining({
+        id: 'MIG-2.7.0-constitution-1-1-0',
+        kind: 'constitution',
+        decision_records: ['ADR-GOV-0026', 'ADR-CHK-0009'],
+        issues: [412],
+        segments: ['constitution', 'authority'],
+        files: ['.devai/pin/constitution.md', '.devai/config/project.json'],
+        decision_required: true,
+        constitution: { from: '1.0.2', to: '1.1.0' },
+        obligation: expect.objectContaining({ check: 'constitution-version' }),
+      }),
+    ]);
+    expect(plannedReleases(manifest, '2.7.0', '2.7.0')).toEqual([]);
   });
 
   it('has exactly one entry for every changelog release above the baseline that changed configuration', () => {
@@ -275,15 +299,15 @@ describe('#264: the adopter migration manifest', () => {
     // obligations are also planned above the installed/bound floor (#291).
     const planned = (from: string, installedVersion: string) =>
       plannedReleases(manifest, from, installedVersion).map((release) => release.version);
-    expect(planned('2.3.0', '2.3.0')).toEqual(['2.6.4']);
-    expect(planned('2.3.0', '2.3.1')).toEqual(['2.3.1', '2.6.4']);
-    expect(planned('2.3.1', '2.3.1')).toEqual(['2.6.4']);
-    expect(planned('2.3.0', '2.3.2')).toEqual(['2.3.1', '2.3.2', '2.6.4']);
-    expect(planned('2.3.1', '2.3.2')).toEqual(['2.3.2', '2.6.4']);
-    expect(planned('2.3.2', '2.3.2')).toEqual(['2.6.4']);
-    expect(planned('2.3.2', '2.4.0')).toEqual(['2.4.0', '2.6.4']);
-    expect(planned('2.3.1', '2.4.0')).toEqual(['2.3.2', '2.4.0', '2.6.4']);
-    expect(planned('2.4.0', '2.4.0')).toEqual(['2.6.4']);
+    expect(planned('2.3.0', '2.3.0')).toEqual(['2.6.4', '2.7.0']);
+    expect(planned('2.3.0', '2.3.1')).toEqual(['2.3.1', '2.6.4', '2.7.0']);
+    expect(planned('2.3.1', '2.3.1')).toEqual(['2.6.4', '2.7.0']);
+    expect(planned('2.3.0', '2.3.2')).toEqual(['2.3.1', '2.3.2', '2.6.4', '2.7.0']);
+    expect(planned('2.3.1', '2.3.2')).toEqual(['2.3.2', '2.6.4', '2.7.0']);
+    expect(planned('2.3.2', '2.3.2')).toEqual(['2.6.4', '2.7.0']);
+    expect(planned('2.3.2', '2.4.0')).toEqual(['2.4.0', '2.6.4', '2.7.0']);
+    expect(planned('2.3.1', '2.4.0')).toEqual(['2.3.2', '2.4.0', '2.6.4', '2.7.0']);
+    expect(planned('2.4.0', '2.4.0')).toEqual(['2.6.4', '2.7.0']);
     expect(releasesInRange(manifest, '1.6.0', '1.9.0').map((release) => release.version)).toEqual([
       '1.7.0',
       '1.8.0',
@@ -305,8 +329,8 @@ describe('#264: the adopter migration manifest', () => {
         return { ...rest, status: 'unreleased' };
       }),
     });
-    expect(versions('2.0.0', '2.0.0', unreleased)).toEqual(['2.1.0', '2.6.4']);
-    expect(versions('1.9.0', '2.0.0', unreleased)).toEqual(['2.0.0', '2.1.0', '2.6.4']);
+    expect(versions('2.0.0', '2.0.0', unreleased)).toEqual(['2.1.0', '2.6.4', '2.7.0']);
+    expect(versions('1.9.0', '2.0.0', unreleased)).toEqual(['2.0.0', '2.1.0', '2.6.4', '2.7.0']);
     expect(versions('1.6.0', '2.0.0', unreleased).slice(0, 4)).toEqual([
       '1.7.0',
       '1.8.0',
@@ -314,9 +338,9 @@ describe('#264: the adopter migration manifest', () => {
       '2.0.0',
     ]);
     // Once released and installed, it is an ordinary entry, planned only from below it.
-    expect(versions('2.1.0', '2.1.0')).toEqual(['2.6.4']);
-    expect(versions('2.0.0', '2.1.0')).toEqual(['2.1.0', '2.6.4']);
-    expect(versions('2.0.0', '2.0.0')).toEqual(['2.6.4']);
+    expect(versions('2.1.0', '2.1.0')).toEqual(['2.6.4', '2.7.0']);
+    expect(versions('2.0.0', '2.1.0')).toEqual(['2.1.0', '2.6.4', '2.7.0']);
+    expect(versions('2.0.0', '2.0.0')).toEqual(['2.6.4', '2.7.0']);
   });
 
   it('cites only decision records that exist and names a canonical segment for each change', () => {
@@ -346,9 +370,12 @@ describe('#264: the adopter migration manifest', () => {
 
   it('names the constitution move the installed constitution text carries', () => {
     const constitution = readFileSync(join(ROOT, 'law/constitution.md'), 'utf8');
-    for (const change of changes.filter((candidate) => candidate.kind === 'constitution')) {
-      expect(constitution).toContain(`**Version:** ${change.constitution?.to ?? ''}`);
+    const moves = changes.filter((candidate) => candidate.kind === 'constitution');
+    // Each move starts where the previous one ended, and the latest is the installed text.
+    for (const [index, change] of moves.entries()) {
+      if (index > 0) expect(change.constitution?.from).toBe(moves[index - 1]?.constitution?.to);
     }
+    expect(constitution).toContain(`**Version:** ${moves.at(-1)?.constitution?.to ?? ''}`);
   });
 
   it('refuses releases out of order and change ids outside their release', () => {
