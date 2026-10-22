@@ -1,19 +1,19 @@
 ---
 id: CONSTITUTION
-title: DEVAI Constitution 1.0.2
+title: DEVAI Constitution 1.1.0
 type: constitution
 status: active
-date: 2026-09-30
+date: 2026-10-21
 authority: Architect
 supersedes: null
 superseded_by: null
 ---
 
-# DEVAI Constitution — 1.0.2
+# DEVAI Constitution — 1.1.0
 
 ## Status and scope
 
-**Version:** 1.0.2
+**Version:** 1.1.0
 **Status:** active
 
 This is the immutable axiom set for DEVAI. Every other artifact in the framework — contracts, charters, skills, bootstrap layout, scorecard — derives from these axioms and may not contradict them.
@@ -93,12 +93,12 @@ Core authority is decided by a fixed path prefix of at most two segments — a t
 - `.devai/pin/` and `.devai/config/` — modified only through registered `init apply` or `init bind` actions, materialized from canonical package or policy sources; a checker never writes its own inputs.
 - `.devai/state/` — mutable head state written by executing verbs; never hand-edited.
 - `packages/` and root workspace configuration — Engineer (F2).
-- `tests/` and `packages/*/tests/` — Inspector (F3).
+- `tests/` and `packages/*/tests/` — Inspector (F3); the Engineer holds on these paths only the focused-regression verb of Article 7.
 - `scratch/` — ephemeral; never committed beyond its README; content graduates only by an explicit role-authored commit to a governed tree.
 - Root prose files (`README.md`, `CLAUDE.md`, `AGENTS.md`) — Architect.
 - Host-tool configuration directories (`.changeset/`, `.claude/`, and peers) — path fixed by the toolchain; contents classified by this table per content class (agent permission policy is F5-host under Architect authority; runtime directories are scratch-class).
 
-Clients may extend the path mapping for client-specific disciplines through a declared, versioned, and bound extension. An extension names its roots explicitly; no root is inferred from a directory's existence, and a root never equals or contains a core-table prefix. Under a declared root, authority is decided by path class in a fixed order: the architecture class (schema definitions, blueprints, and the architectural specifications the extension names) is Architect; the test class (test directories and colocated test files) is Inspector; every remaining path under the root, including local implementation documentation, is Engineer. A class rule takes precedence over the root grant, the architecture class over the test class, and two extension rules that would grant different roles at the same precedence are ambiguous: the write is refused. Extensions are additive: they never alter, narrow, or shadow a core row, and the core mapping is immutable at a given constitution version. An extension is materialized only through a registered binding action from a validated, digest-bound source and is verified at every write; an extension whose source is absent, invalid, or unbound fails closed, and no grant survives it.
+Clients may extend the path mapping for client-specific disciplines through a declared, versioned, and bound extension. An extension names its roots explicitly; no root is inferred from a directory's existence, and a root never equals or contains a core-table prefix. Under a declared root, authority is decided by path class in a fixed order: the architecture class (schema definitions, blueprints, and the architectural specifications the extension names) is Architect; the test class (test directories and colocated test files) is Inspector, with the Engineer's focused-regression verb of Article 7; every remaining path under the root, including local implementation documentation, is Engineer. A class rule takes precedence over the root grant, the architecture class over the test class, and two extension rules that would grant different roles at the same precedence are ambiguous: the write is refused. Extensions are additive: they never alter, narrow, or shadow a core row, and the core mapping is immutable at a given constitution version. An extension is materialized only through a registered binding action from a validated, digest-bound source and is verified at every write; an extension whose source is absent, invalid, or unbound fails closed, and no grant survives it.
 
 ---
 
@@ -110,8 +110,8 @@ A human user of DEVAI declares one of five roles at session start. The declarati
 
 - **Owner.** Business and behavioral authority. Authors and modifies business specifications under F1 Owner-authority paths.
 - **Architect.** Engineering authority. Authors and modifies engineering specifications, invariants, trace, and ADRs under F1 Architect-authority paths.
-- **Inspector.** Sensor authority. Authors and modifies tests under F3 paths.
-- **Engineer.** Plant authority. Authors and modifies code under F2 paths.
+- **Inspector.** Sensor authority. Authors and modifies tests under F3 paths. Its mandate is counterexamples, sensor configuration, and independent assurance. Deleting a test, changing an assertion of a test the current task did not add, and changing a coverage or mutation threshold remain Inspector verbs.
+- **Engineer.** Plant authority. Authors and modifies code under F2 paths. Within a task that changes F2 sources, the Engineer may also add focused regression tests under F3 paths, and modify tests that task added, when the test imports or targets a source file the same task changed. The Engineer may not delete a test, change an assertion of a test the task did not add, or lower a coverage or mutation threshold. A round or task designated independent-assurance withholds this verb.
 - **Auditor.** Observer authority. Read-only on all substrates. Produces reports and status assessments only in the active round's designated `.devai/local/rounds/*/audit/` path; runtime-recorded F5 state produced by verbs it executes is attributed to those verbs. Observation output carries no authority over the reference signal: an Auditor report may recommend, never ratify.
 
 ### Article 8. Agent disciplines
@@ -134,7 +134,7 @@ Weakening any fail-closed authority property requires an explicit decision; wher
 
 ### Article 10. Authority separation in a single loop iteration
 
-Within a single human-directed work iteration, no discipline may both set its own reference and actuate against it. Architect may not edit code; Engineer may not edit tests; Inspector may not edit specifications. Cross-substrate work in a single role session is therefore impossible by design; coordinated work traverses the authority chain via coupled task triplets (Article 24).
+Within a single human-directed work iteration, no discipline may both set its own reference and actuate against it. Architect may not edit code; Engineer may not edit tests except through the focused-regression verb of Article 7, which never reaches an existing test's assertions, its deletion, or a threshold; Inspector may not edit specifications. In a round or task designated independent-assurance the Engineer may not edit tests at all. Cross-substrate work in a single role session is otherwise impossible by design; coordinated work traverses the authority chain via coupled task triplets (Article 24).
 
 ---
 
