@@ -44,6 +44,7 @@ export function senseTestCoherence(opts: TestCoherenceOptions): SensorReading {
   const passRatio = opts.passRatio ?? DEFAULT_PASS_RATIO;
   const population = expandRepositoryPaths(opts.repoRoot, roots, {
     optional: opts.packageRoots === undefined,
+    jsonDataAliasesWithin: opts.repoRoot,
   });
   const pkgDirs = population.paths.filter((path) =>
     lstatSync(population.physicalRoots?.get(path) ?? path).isDirectory(),
@@ -60,7 +61,9 @@ export function senseTestCoherence(opts: TestCoherenceOptions): SensorReading {
   const findings: SensorFinding[] = [];
 
   for (const pkg of pkgDirs) {
-    const allFiles = regularFilePopulation([pkg], population.physicalRoots);
+    const allFiles = regularFilePopulation([pkg], population.physicalRoots, {
+      jsonDataAliasesWithin: opts.repoRoot,
+    });
     errors.push(...allFiles.errors);
     let pkgSources = 0;
     let pkgTests = 0;

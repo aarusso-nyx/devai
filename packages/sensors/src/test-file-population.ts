@@ -1,5 +1,6 @@
 import { realpathSync, lstatSync, readdirSync, statSync } from 'node:fs';
 import { isExecutableTestFile } from '@devai-nyx/utils';
+import { isStableJsonDataDirectoryAlias } from './json-data-alias.js';
 export { executableTestKind, isExecutableTestFile } from '@devai-nyx/utils';
 import {
   basename,
@@ -37,7 +38,12 @@ export interface RepositoryPathPopulation {
 export function expandRepositoryPaths(
   repoRoot: string,
   patterns: readonly string[],
-  options: { readonly optional?: boolean; readonly contained?: boolean } = {},
+  options: {
+    readonly optional?: boolean;
+    readonly contained?: boolean;
+    /** Static test observations only; omitted means every link still refuses. */
+    readonly jsonDataAliasesWithin?: string;
+  } = {},
 ): RepositoryPathPopulation {
   const root = resolve(repoRoot);
   const selected = new Map<string, string>();
@@ -84,6 +90,12 @@ export function expandRepositoryPaths(
         return;
       }
       if (stat.isSymbolicLink()) {
+        if (
+          path !== base &&
+          options.jsonDataAliasesWithin !== undefined &&
+          isStableJsonDataDirectoryAlias(options.jsonDataAliasesWithin, path)
+        )
+          return;
         errors.add(`Executable population contains a symbolic link: ${path}`);
         return;
       }
@@ -158,6 +170,7 @@ export function expandRepositoryPaths(
 export function regularFilePopulation(
   roots: readonly string[],
   physicalRoots?: ReadonlyMap<string, string>,
+  options: { readonly jsonDataAliasesWithin?: string } = {},
 ): RepositoryPathPopulation {
   const files = new Map<string, string>();
   const errors = new Set<string>();
@@ -165,6 +178,12 @@ export function regularFilePopulation(
     try {
       const stat = lstatSync(path);
       if (stat.isSymbolicLink()) {
+        if (
+          !roots.includes(display) &&
+          options.jsonDataAliasesWithin !== undefined &&
+          isStableJsonDataDirectoryAlias(options.jsonDataAliasesWithin, path)
+        )
+          return;
         errors.add(`Executable population contains a symbolic link: ${path}`);
       } else if (stat.isFile()) {
         const identity = realpathSync(path);
@@ -190,11 +209,14 @@ export function regularFilePopulation(
 export function executableTestPopulation(
   repoRoot: string,
   patterns?: readonly string[],
+  options: { readonly jsonDataAliases?: boolean } = {},
 ): RepositoryPathPopulation {
+  const dataAliases = options.jsonDataAliases === true ? { jsonDataAliasesWithin: repoRoot } : {};
   const roots = expandRepositoryPaths(repoRoot, patterns ?? DEFAULT_TEST_GLOBS, {
     optional: patterns === undefined,
+    ...dataAliases,
   });
-  const files = regularFilePopulation(roots.paths, roots.physicalRoots);
+  const files = regularFilePopulation(roots.paths, roots.physicalRoots, dataAliases);
   return {
     paths: files.paths.filter(isExecutableTestFile),
     errors: [...new Set([...roots.errors, ...files.errors])].sort(),
