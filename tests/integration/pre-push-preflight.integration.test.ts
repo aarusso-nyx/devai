@@ -32,6 +32,7 @@ const COPIED = [
   'law/policy/commit-grammar.json',
   'law/policy/change-taxonomy.json',
   '.devai/config/change-taxonomy-binding.json',
+  '.devai/config/toolchain.json',
 ] as const;
 const STUB_CLI = '.devai/state/pr-bootstrap/cli/bin.js';
 const STUB_REPORT = '.devai/state/stub-report.json';
@@ -173,6 +174,49 @@ function push(work: string): Result {
 const PASSING = { schemaVersion: '1.0.0', operation: 'run', execution: [], exitCode: 0 };
 
 describe('pre-push preflight (TASK-0727)', () => {
+  it.each(['99.0.0', '24', null, '24.20.0 --import=untrusted'])(
+    'refuses an enabled push before fetching or checking when the Node pin is %s',
+    (node) => {
+      const { work } = fixture();
+      cleanCommit(work, 'runtime-refusal');
+      script(work, 0, PASSING);
+      put(work, '.devai/config/toolchain.json', JSON.stringify({ runtimes: { node } }));
+
+      const result = push(work);
+
+      expect(result.status, result.output).not.toBe(0);
+      expect(result.output).toMatch(/pinned|Node pin/u);
+      expect(calls(work)).toEqual([]);
+      expect(existsSync(join(work, '.git/FETCH_HEAD'))).toBe(false);
+      expect(git(work, 'ls-remote', 'origin', 'refs/heads/feature')).toBe('');
+    },
+    PUSH_TIMEOUT_MS,
+  );
+
+  it.each(['{', 'null'])('refuses a malformed canonical toolchain %s before fetching', (body) => {
+    const { work } = fixture();
+    cleanCommit(work, 'malformed-runtime');
+    script(work, 0, PASSING);
+    put(work, '.devai/config/toolchain.json', body);
+    const result = push(work);
+    expect(result.status, result.output).not.toBe(0);
+    expect(result.output).toContain('Node pin is missing or invalid');
+    expect(calls(work)).toEqual([]);
+    expect(existsSync(join(work, '.git/FETCH_HEAD'))).toBe(false);
+  });
+
+  it('refuses a missing canonical toolchain before fetching', () => {
+    const { work } = fixture();
+    cleanCommit(work, 'missing-runtime');
+    script(work, 0, PASSING);
+    rmSync(join(work, '.devai/config/toolchain.json'));
+    const result = push(work);
+    expect(result.status, result.output).not.toBe(0);
+    expect(result.output).toContain('Node pin is missing or invalid');
+    expect(calls(work)).toEqual([]);
+    expect(existsSync(join(work, '.git/FETCH_HEAD'))).toBe(false);
+  });
+
   it(
     'passes a clean push after the affected check runs against the fetched main',
     () => {
