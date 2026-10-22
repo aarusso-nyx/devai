@@ -254,6 +254,8 @@ if (trace !== undefined && nonce !== undefined) {
     emit({ kind: 'unsupported', operation });
     throw new Error(`DEVAI_NATIVE_INPUT_UNSUPPORTED:${operation}`);
   };
+  // The native runtime is fixed; a different patch must never gain implicit loader standing.
+  if (process.version !== 'v24.20.0') unsupported('node-runtime-unsupported');
   refuseGovernedServiceFactory = (reason) => unsupported(`native-service-factory-${reason}`);
   const coverageAdapters: { verify: () => void; seal: () => void }[] = [];
   const coverageContextPath = resolve(dirname(trace), 'adapter-context.json');
