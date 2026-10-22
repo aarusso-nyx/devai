@@ -1,7 +1,7 @@
 // Invariants: INV-DEVAI-001, INV-DEVAI-015, INV-DEVAI-017
 // Inspector acceptance for ADR-AUT-0004 IA-001, IA-002, IA-003, and the declaration half of
 // IA-005 (over ADR-AUT-0003 IA-001, IA-009, and IA-002): the reference source is bound through
-// `init bind --adopter-policy` in a fixture repository pinned at constitution 1.0.2, and every
+// `init bind --adopter-policy` in a fixture repository pinned at constitution 1.1.0, and every
 // cell of the decision matrix is a real broker decision over the materialized authority policy
 // (bootstrap_policy false), requested with the registry entry exactly as registered: `check`
 // declared by the Inspector, `task start` declared by the Engineer, and `round seal` declared
@@ -267,10 +267,10 @@ afterAll(() => {
 });
 
 describe('ADR-AUT-0003 fixture binding under the ADR-AUT-0004 class verbs', () => {
-  it('pins constitution 1.0.2 and binds the reference source', () => {
+  it('pins constitution 1.1.0 and binds the reference source', () => {
     expect(
       parseConstitutionVersion(readFileSync(join(repo, '.devai/pin/constitution.md'), 'utf8')),
-    ).toBe('1.0.2');
+    ).toBe('1.1.0');
     expect(
       JSON.parse(readFileSync(join(repo, '.devai/config/adopter-policy-binding.json'), 'utf8')),
     ).toMatchObject({ policy_id: 'detran.devai-adoption', source_path: SOURCE });

@@ -400,14 +400,14 @@ describe('#264 review: durability, decisions, exclusion and the measured receipt
   it('refuses an unreviewed constitution move until --constitution settles it', async () => {
     const repo = await stynxAt160(true);
     const pin = readFileSync(join(repo, '.devai/pin/constitution.md'), 'utf8').replaceAll(
+      '1.1.0',
       '1.0.2',
-      '1.0.1',
     );
     put(repo, '.devai/pin/constitution.md', pin);
     const project = json(repo, '.devai/config/project.json');
     put(repo, '.devai/config/project.json', {
       ...project,
-      constitution: { version: '1.0.1', sha256: createHash('sha256').update(pin).digest('hex') },
+      constitution: { version: '1.0.2', sha256: createHash('sha256').update(pin).digest('hex') },
     });
 
     const refused = await runCli(WRITE(repo));
@@ -415,16 +415,16 @@ describe('#264 review: durability, decisions, exclusion and the measured receipt
     expect((JSON.parse(refused.stderr) as { error: JsonObject }).error).toMatchObject({
       code: 'INIT_UPGRADE_DECISION_PENDING',
       context: expect.objectContaining({
-        refusals: [expect.objectContaining({ change: 'MIG-1.8.0-constitution-1-0-2' })],
+        refusals: [expect.objectContaining({ change: 'MIG-2.7.0-constitution-1-1-0' })],
       }),
     });
 
     const applied = await runCli([...WRITE(repo), '--constitution']);
     expect(applied.exit, applied.stderr).toBe(0);
     expect(json(repo, '.devai/config/project.json')['constitution']).toMatchObject({
-      version: '1.0.2',
+      version: '1.1.0',
     });
-    expect(json(repo, RECEIPT)['constitution']).toEqual({ from: '1.0.1', to: '1.0.2' });
+    expect(json(repo, RECEIPT)['constitution']).toEqual({ from: '1.0.2', to: '1.1.0' });
   }, 180_000);
 
   it('keeps an obligation the receipt left pending visible after the upgrade', async () => {
@@ -434,6 +434,11 @@ describe('#264 review: durability, decisions, exclusion and the measured receipt
     const plan = value(settled)['plan'] as JsonObject;
     expect(plan['status']).toBe('no-op');
     expect(plan['obligations']).toEqual([
+      expect.objectContaining({
+        change: 'MIG-2.7.0-constitution-1-1-0',
+        status: 'satisfied',
+        source: 'manifest',
+      }),
       expect.objectContaining({
         change: 'MIG-1.7.0-repository-kind-from-receipt',
         status: 'pending',
@@ -937,6 +942,7 @@ describe('ADR-SCR-0015/0017: init upgrade from 2.3.2 through 2.6.4', () => {
       '2.6.2',
       '2.6.3',
       '2.6.4',
+      '2.7.0',
     ]);
     expect(plan['changed_files']).toEqual(
       expect.arrayContaining([
@@ -986,6 +992,7 @@ describe('ADR-SCR-0015/0017: init upgrade from 2.3.2 through 2.6.4', () => {
         'MIG-2.6.2-runtime-repair-identity-refresh',
         'MIG-2.6.3-measurement-repair-identity-refresh',
         'MIG-2.6.4-native-reporter-identity-refresh',
+        'MIG-2.7.0-constitution-1-1-0',
       ],
       postchecks: [
         { name: 'policy-materialization-current', ok: true },
