@@ -134,6 +134,5 @@ This catalogue lists every decision record in this directory. An adopter adds it
 | [ADR-SCR-0019](./ADR-SCR-0019-package-owned-native-coverage-adapter.md)                          | Package-owned finite native coverage helper adapter                                                           | accepted |       | 2026-10-11 |
 | [ADR-SCR-0020](./ADR-SCR-0020-owned-native-service-fixtures.md)                                  | Finite owned service fixtures for native test populations                                                     | accepted |       | 2026-10-11 |
 | [ADR-SCR-0021](./ADR-SCR-0021-unconsumed-native-directory-link-metadata.md)                      | Bound unconsumed directory links as native candidate metadata                                                 | accepted |       | 2026-10-19 |
+| [ADR-SCR-0022](./ADR-SCR-0022-static-json-data-aliases.md)                                       | Classify bounded JSON data aliases in read-only static test observations                                      | accepted |       | 2026-10-22 |
 | [ADR-SEC-0001](./ADR-SEC-0001-credential-requirements-manifest.md)                               | Declare credential requirements per effect and probe presence without reading values                          | accepted |       | 2026-09-26 |
-
-| [ADR-SCR-0022](./ADR-SCR-0022-static-json-data-aliases.md) | Classify bounded JSON data aliases in read-only static test observations | accepted | | 2026-10-22 |
