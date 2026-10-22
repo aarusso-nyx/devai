@@ -334,7 +334,14 @@ describe('actual package-owned native coverage context and independent replay', 
     expect(actual.rows).toContainEqual(
       expect.objectContaining({ kind: 'unsupported', operation: 'fs.openSync.readable' }),
     );
-    expect(actual.rows.some((row) => row['kind'] === 'end')).toBe(false);
+    expect(actual.result.stderr).toContain('DEVAI_NATIVE_INPUT_UNSUPPORTED:fs.openSync.readable');
+    // A scope seal is not a success verdict; the rejected descriptor must grant no file read.
+    expect(
+      actual.rows.some(
+        (row) =>
+          row['operation'] === 'readFile' && row['path'] === join(genuine.root, 'src/index.ts'),
+      ),
+    ).toBe(false);
   });
 
   it('resolves the public adapter export to this assembled preload package', () => {
