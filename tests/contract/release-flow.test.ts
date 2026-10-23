@@ -1,4 +1,5 @@
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
   existsSync,
   mkdirSync,
@@ -17,7 +18,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 const flowUrl = pathToFileURL(resolve('scripts/process/release-flow.mjs')).href;
 const runnerUrl = pathToFileURL(resolve('scripts/process/validation-runner.mjs')).href;
 const docsUrl = pathToFileURL(resolve('scripts/process/docs-build.mjs')).href;
-const { checkpoint, oneNpmResult, saveJournal, recoverJournal } = await import(flowUrl);
+const { checkpoint, oneNpmResult, saveJournal, recoverJournal, assertPromotedAssets } =
+  await import(flowUrl);
 const { acquireValidation, recoverValidation, runValidation } = await import(runnerUrl);
 const { buildDocs } = await import(docsUrl);
 const roots: string[] = [];
@@ -88,6 +90,16 @@ describe('host validation admission', () => {
     expect(writer.exitCode).toBe(0);
     writeFileSync(join(root, 'later-stop'), '');
   });
+  it('cancels an active exclusive process group without abandoning its lease', async () => {
+    const root = fixture();
+    const actor = worker(root, 'active', true);
+    await until(() => existsSync(join(root, 'active')));
+    actor.kill('SIGTERM');
+    actor.kill('SIGTERM');
+    await until(() => actor.exitCode !== null);
+    expect(actor.exitCode).toBe(143);
+    expect(existsSync(join(root, 'leases/exclusive'))).toBe(false);
+  });
   it('re-enters from descendants without adding environment variables', async () => {
     const root = fixture();
     const code = `import {runValidation} from ${JSON.stringify(runnerUrl)};process.exitCode=await runValidation([process.execPath,'-e','process.exit(17)'],{root:${JSON.stringify(root)}});`;
@@ -134,6 +146,53 @@ describe('host validation admission', () => {
     writeFileSync(join(owner, 'owner.json'), JSON.stringify({ id, pid: 99_999_999 }));
     recoverValidation(root, id);
     expect(existsSync(owner)).toBe(false);
+  });
+});
+
+describe('publication run asset binding', () => {
+  const sha = (bytes: string | Buffer) => createHash('sha256').update(bytes).digest('hex');
+  function assets(version: string) {
+    const directory = fixture();
+    const artifacts = Object.fromEntries(
+      ['package', 'sbom', 'site'].map((kind) => {
+        const file = `${kind}.tgz`,
+          bytes = `${kind}:${version}`;
+        writeFileSync(join(directory, file), bytes);
+        return [kind, { file, sha256: sha(bytes) }];
+      }),
+    );
+    const manifest = JSON.stringify({
+      schemaVersion: '1.0.0',
+      release: {
+        repository: 'aarusso-nyx/devai',
+        package: '@aarusso-nyx/devai',
+        version,
+        tag: `v${version}`,
+      },
+      artifacts,
+    });
+    writeFileSync(join(directory, 'release-manifest.json'), manifest);
+    const files: Record<string, string> = { 'release-manifest.json': sha(manifest) };
+    for (const artifact of Object.values(artifacts)) files[artifact.file] = artifact.sha256;
+    const sums =
+      Object.entries(files)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([name, digest]) => `${digest}  ${name}`)
+        .join('\n') + '\n';
+    writeFileSync(join(directory, 'SHA256SUMS'), sums);
+    files.SHA256SUMS = sha(sums);
+    return { directory, files };
+  }
+  it('accepts the exact manifest-bound promoted bytes', () => {
+    const release = assets('2.7.1');
+    expect(() => assertPromotedAssets(release.files, release.directory)).not.toThrow();
+  });
+  it('rejects a complete valid promoted asset set belonging to another release', () => {
+    const release = assets('2.7.1'),
+      other = assets('2.7.2');
+    expect(() => assertPromotedAssets(release.files, other.directory)).toThrow(
+      'RELEASE_FLOW_PUBLICATION_PROMOTION_MISMATCH',
+    );
   });
 });
 
