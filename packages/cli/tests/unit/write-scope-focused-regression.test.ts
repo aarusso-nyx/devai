@@ -307,6 +307,87 @@ describe('IA-002: deletion, assertion edits and thresholds stay Inspector verbs'
   });
 });
 
+// Codex review on #426 (second pass): assertion identity only sees `expect`, so a test written
+// with node:assert, Chai or an aliased expect could be edited unseen. An Engineer edit to an
+// existing test file must therefore only add to it: every existing statement, nested test bodies
+// included, stays byte-for-byte equivalent, whatever assertion API it uses.
+describe('IA-002: an Engineer may only add to an existing test file', () => {
+  const NODE_ASSERT = [
+    "import assert from 'node:assert/strict';",
+    "import { describe, it } from 'vitest';",
+    "import { a } from '../../src/a.js';",
+    '',
+    "describe('a', () => {",
+    "  it('is one', () => {",
+    '    assert.equal(a, 1);',
+    '  });',
+    '});',
+    '',
+  ].join('\n');
+
+  const modify = (from: string, to: string) =>
+    judge(
+      { ...CHANGED_A, 'packages/x/tests/unit/assert.test.ts': NODE_ASSERT.replace(from, to) },
+      { base: { 'packages/x/tests/unit/assert.test.ts': NODE_ASSERT } },
+    );
+
+  it('refuses changing a node:assert assertion', async () => {
+    expect((await modify('assert.equal(a, 1)', 'assert.equal(a, 2)')).outOfScope).toEqual([
+      'packages/x/tests/unit/assert.test.ts',
+    ]);
+  });
+
+  it('refuses removing a node:assert assertion', async () => {
+    expect((await modify('    assert.equal(a, 1);\n', '')).outOfScope).toEqual([
+      'packages/x/tests/unit/assert.test.ts',
+    ]);
+  });
+
+  it('refuses changing a Chai-style or aliased assertion', async () => {
+    const chai = NODE_ASSERT.replace('assert.equal(a, 1);', 'chai.assert.strictEqual(a, 1);');
+    const aliased = NODE_ASSERT.replace(
+      'assert.equal(a, 1);',
+      'const check = expect;\n    check(a).toBe(1);',
+    );
+    for (const base of [chai, aliased]) {
+      const head = base.replace('a, 1)', 'a, 2)').replace('toBe(1)', 'toBe(2)');
+      const verdict = await judge(
+        { ...CHANGED_A, 'packages/x/tests/unit/assert.test.ts': head },
+        { base: { 'packages/x/tests/unit/assert.test.ts': base } },
+      );
+      expect(verdict.outOfScope).toEqual(['packages/x/tests/unit/assert.test.ts']);
+    }
+  });
+
+  it('refuses changing an existing import of the test', async () => {
+    expect(
+      (await modify("from 'node:assert/strict'", "from '../helpers/lenient-assert.js'")).outOfScope,
+    ).toEqual(['packages/x/tests/unit/assert.test.ts']);
+  });
+
+  it('admits a new test inside an existing suite and a new import statement', async () => {
+    const verdict = await modify(
+      "import { a } from '../../src/a.js';",
+      "import { a } from '../../src/a.js';\nimport { b } from '../../src/b.js';",
+    );
+    expect(verdict.outOfScope).toEqual([]);
+    expect(
+      (
+        await modify(
+          '  });\n});',
+          "  });\n\n  it('is two', () => {\n    assert.equal(a, 2);\n  });\n});",
+        )
+      ).outOfScope,
+    ).toEqual([]);
+  });
+
+  it('admits reformatting an existing statement without changing it', async () => {
+    expect(
+      (await modify('assert.equal(a, 1);', 'assert.equal(\n      a,\n      1,\n    );')).outOfScope,
+    ).toEqual([]);
+  });
+});
+
 describe('IA-003 and IA-004: without the verb Article 6 binds the test class to the Inspector', () => {
   it('refuses the adjacent test of IA-001 when the verb is withheld', async () => {
     const verdict = await judge(

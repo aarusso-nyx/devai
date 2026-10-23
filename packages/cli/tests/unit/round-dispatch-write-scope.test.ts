@@ -357,3 +357,51 @@ describe('round run applies the Engineer focused-regression verb (ADR-GOV-0026)'
     expect(result).toMatchObject({ ok: false, code: 'TASK_WRITE_SCOPE_VIOLATION' });
   });
 });
+
+// Codex review on #426 (second pass): a routine could commit an out-of-scope change and then
+// restore the file in the working tree, so the final tree matched the baseline while the
+// candidate commit carried the change. Committed changes are judged on their own.
+describe('round run judges committed changes even when the working tree is restored', () => {
+  const commitThenRestore = (path: string, content: string): string[] => [
+    process.execPath,
+    '-e',
+    [
+      "const fs = require('node:fs');",
+      "const run = (...args) => require('node:child_process').execFileSync('git', ['-c', 'user.name=R', '-c', 'user.email=r@example.invalid', '-c', 'commit.gpgsign=false', ...args]);",
+      `const original = fs.readFileSync(${JSON.stringify(path)});`,
+      `fs.writeFileSync(${JSON.stringify(path)}, ${JSON.stringify(content)});`,
+      "run('add', '-A'); run('commit', '-qm', 'routine');",
+      `fs.writeFileSync(${JSON.stringify(path)}, original);`,
+    ].join('\n'),
+  ];
+
+  it('fails a routine that commits an out-of-scope change and restores the file', async () => {
+    const root = repository();
+    const result = await dispatch(
+      root,
+      routineTask(commitThenRestore('docs/index.md', '# Hidden\n')),
+    );
+    expect(result).toMatchObject({ ok: false, code: 'TASK_WRITE_SCOPE_VIOLATION' });
+    expect(evidence(root)).toMatchObject({
+      failure: { message: expect.stringContaining('docs/index.md') as unknown },
+    });
+  });
+
+  it('fails a routine whose committed change the working tree no longer matches', async () => {
+    const root = repository();
+    const result = await dispatch(
+      root,
+      routineTask(commitThenRestore('packages/app/src/a.ts', 'export const a = 3;\n')),
+    );
+    expect(result).toMatchObject({ ok: false, code: 'TASK_WRITE_SCOPE_VIOLATION' });
+  });
+
+  it('still passes a routine that commits an in-scope change and keeps it', async () => {
+    const root = repository();
+    const result = await dispatch(
+      root,
+      routineTask(editing({ 'packages/app/src/a.ts': 'export const a = 3;\n' }, true)),
+    );
+    expect(result).toMatchObject({ ok: true });
+  });
+});
