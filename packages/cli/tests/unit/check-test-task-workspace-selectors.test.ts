@@ -167,19 +167,25 @@ function readJson<T>(path: string): T {
   return JSON.parse(readFileSync(join(ROOT, path), 'utf8')) as T;
 }
 
+const VALIDATION_RUNNER = 'node scripts/process/validation-runner.mjs -- ';
+
 describe('the local producer script and the descriptor (IA-003)', () => {
   const manifest = readJson<RootManifest>('package.json');
 
   it('carries test:coverage:local for the local producer, with no database gate', () => {
     expect(manifest.scripts['test:coverage:local']).toBe(
-      `vitest run --config ${LOCAL_COVERAGE_CONFIG}`,
+      `${VALIDATION_RUNNER}vitest run --config ${LOCAL_COVERAGE_CONFIG}`,
     );
   });
 
   it('keeps pnpm test and the local suites on tests/config/local.config.ts', () => {
     expect(manifest.scripts['test']).toBe('pnpm run test:local');
-    expect(manifest.scripts['test:local']).toBe('vitest run --config tests/config/local.config.ts');
-    expect(manifest.scripts['test:e2e:rc']).toBe(`vitest run --config ${E2E_CONFIG}`);
+    expect(manifest.scripts['test:local']).toBe(
+      `${VALIDATION_RUNNER}vitest run --config tests/config/local.config.ts`,
+    );
+    expect(manifest.scripts['test:e2e:rc']).toBe(
+      `${VALIDATION_RUNNER}vitest run --config ${E2E_CONFIG}`,
+    );
   });
 
   it('keeps tests/config/ among the root suite selectors so the producer is in a closure', () => {
@@ -211,7 +217,7 @@ describe('the RC lane still refuses without DEVAI_DB_TESTS (IA-005)', () => {
   it('keeps test:coverage:rc on the RC configuration with DEVAI_DB_TESTS declared', () => {
     const manifest = readJson<RootManifest>('package.json');
     expect(manifest.scripts['test:coverage:rc']).toBe(
-      'vitest run --config tests/config/rc.coverage.config.ts',
+      `${VALIDATION_RUNNER}vitest run --config tests/config/rc.coverage.config.ts`,
     );
     const descriptor = readJson<{ readonly tasks: readonly DescriptorTask[] }>('test-tasks.json');
     const rcCoverage = descriptor.tasks.find((task) => task.nodeId === 'test:coverage:rc');
