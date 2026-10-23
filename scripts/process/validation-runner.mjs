@@ -122,12 +122,23 @@ export async function acquireValidation({
       throw new Error('VALIDATION_LEASE_BUSY');
     return {
       inherited: false,
-      recordChild(pid) {
-        owner.childGroup = pid;
+      recordChild(pid, ownsGroup) {
+        owner.childPid = pid;
+        owner.ownsGroup = ownsGroup;
+        owner.childGroup = ownsGroup
+          ? pid
+          : Number(
+              execFileSync('ps', ['-o', 'pgid=', '-p', String(process.pid)], {
+                encoding: 'utf8',
+              }).trim(),
+            );
         writeFileSync(join(path, 'owner.json'), JSON.stringify(owner), { mode: 0o600 });
       },
       release() {
-        if (owner.childGroup && alive(-owner.childGroup))
+        if (
+          (owner.ownsGroup && alive(-owner.childGroup)) ||
+          (owner.childPid && alive(owner.childPid))
+        )
           throw new Error('VALIDATION_CHILDREN_STILL_RUNNING');
         if (read(path).id !== owner.id) throw new Error('VALIDATION_LEASE_OWNER_CHANGED');
         rmSync(path, { recursive: true });
@@ -166,17 +177,21 @@ export async function runValidation(argv, options = {}) {
     for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.off(signal, cancel);
   }
   let child;
+  // Only the outer exclusive host controller creates a process group. Shared
+  // task wrappers MUST remain inside the authority runner's existing group,
+  // preserving its timeout termination and protected-namespace writer census.
+  const ownsGroup = options.exclusive === true && !lease.inherited;
   const forward = (signal) => {
-    if (child?.pid) process.kill(lease.inherited ? child.pid : -child.pid, signal);
+    if (child?.pid) process.kill(ownsGroup ? -child.pid : child.pid, signal);
   };
   const signals = ['SIGINT', 'SIGTERM', 'SIGHUP'];
   const handlers = signals.map((signal) => () => forward(signal));
   try {
     child = spawn(argv[0], argv.slice(1), {
       stdio: 'inherit',
-      detached: !lease.inherited,
+      detached: ownsGroup,
     });
-    if (child.pid && !lease.inherited) lease.recordChild(child.pid);
+    if (child.pid && !lease.inherited) lease.recordChild(child.pid, ownsGroup);
     signals.forEach((signal, index) => process.on(signal, handlers[index]));
     return await new Promise((resolveResult, reject) => {
       child.once('error', reject);
