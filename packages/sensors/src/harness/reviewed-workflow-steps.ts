@@ -439,7 +439,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
     files: [
       {
         path: 'docs/site/package.json',
-        sha256: 'd6f40c119dc4957119d82e67b8d1ada2ca99561d7ca0302bd73f60e09c665735',
+        sha256: 'e160af70594f4ebaa5a8f040b84261971849074a42c17859b24415356ca8b1a5',
       },
       {
         path: 'docs/site/scripts/check-dependency-audit.mjs',
@@ -895,7 +895,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
     files: [
       {
         path: 'docs/site/package.json',
-        sha256: 'd6f40c119dc4957119d82e67b8d1ada2ca99561d7ca0302bd73f60e09c665735',
+        sha256: 'e160af70594f4ebaa5a8f040b84261971849074a42c17859b24415356ca8b1a5',
       },
       {
         path: 'docs/site/scripts/check-dependency-audit.mjs',
