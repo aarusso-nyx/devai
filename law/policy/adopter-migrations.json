@@ -455,7 +455,8 @@
     },
     {
       "version": "2.7.0",
-      "status": "unreleased",
+      "status": "released",
+      "date": "2026-10-23",
       "changes": [
         {
           "id": "MIG-2.7.0-constitution-1-1-0",
