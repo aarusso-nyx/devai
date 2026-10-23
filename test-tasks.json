@@ -675,6 +675,10 @@
         {
           "kind": "exact",
           "pattern": "scripts/process/validation-runner.mjs"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/process/docs-build.mjs"
         }
       ],
       "toolchainKeys": ["node", "pnpm", "vitest"],
