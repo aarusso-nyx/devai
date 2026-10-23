@@ -175,7 +175,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
     files: [
       {
         path: 'package.json',
-        sha256: 'e1db3b6e6ff8753f0d100466fe0a006650b03b3421a99ea73c563e60224551a3',
+        sha256: '7a76c7a2f692c7caadfbe69b7ce52312f94640164385b07b97d29fe581f5f036',
       },
       {
         path: 'scripts/process/bootstrap-check-runner.mjs',
@@ -234,7 +234,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
     files: [
       {
         path: 'package.json',
-        sha256: 'e1db3b6e6ff8753f0d100466fe0a006650b03b3421a99ea73c563e60224551a3',
+        sha256: '7a76c7a2f692c7caadfbe69b7ce52312f94640164385b07b97d29fe581f5f036',
       },
       {
         path: 'scripts/check-commit-range.mjs',
@@ -425,7 +425,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
     files: [
       {
         path: 'package.json',
-        sha256: 'e1db3b6e6ff8753f0d100466fe0a006650b03b3421a99ea73c563e60224551a3',
+        sha256: '7a76c7a2f692c7caadfbe69b7ce52312f94640164385b07b97d29fe581f5f036',
       },
     ],
   },
@@ -455,7 +455,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
       },
       {
         path: 'package.json',
-        sha256: 'e1db3b6e6ff8753f0d100466fe0a006650b03b3421a99ea73c563e60224551a3',
+        sha256: '7a76c7a2f692c7caadfbe69b7ce52312f94640164385b07b97d29fe581f5f036',
       },
       {
         path: 'packages/authority/package.json',
@@ -463,7 +463,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
       },
       {
         path: 'packages/cli/package.json',
-        sha256: '6bede0a6a14685cabe5540070ab95424da3bb8ca3a79aecb4b177f757bcee80b',
+        sha256: '16580db0df5fd26bc6ac44c671aab01a19de28fc46ee26ee73a91c2f8710db39',
       },
       {
         path: 'packages/cli/scripts/assemble-package.mjs',
@@ -654,7 +654,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
     files: [
       {
         path: 'package.json',
-        sha256: 'e1db3b6e6ff8753f0d100466fe0a006650b03b3421a99ea73c563e60224551a3',
+        sha256: '7a76c7a2f692c7caadfbe69b7ce52312f94640164385b07b97d29fe581f5f036',
       },
     ],
   },
@@ -755,7 +755,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
     files: [
       {
         path: 'package.json',
-        sha256: 'e1db3b6e6ff8753f0d100466fe0a006650b03b3421a99ea73c563e60224551a3',
+        sha256: '7a76c7a2f692c7caadfbe69b7ce52312f94640164385b07b97d29fe581f5f036',
       },
       {
         path: 'scripts/process/publication-state.mjs',
