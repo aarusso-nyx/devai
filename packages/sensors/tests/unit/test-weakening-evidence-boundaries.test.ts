@@ -114,6 +114,13 @@ describe('test weakening compares actual evidence through the guarded host seam'
         file: 'case.test.ts',
         message: 'assertions 5 → 3 (decrease ratio 0.40); skip delta 3',
       },
+      // ADR-GOV-0026: the five base assertions left their suite, more than the drop of two.
+      {
+        severity: 'warning',
+        code: 'assertion_changed',
+        file: 'case.test.ts',
+        message: expect.stringContaining('5 existing assertion(s) changed or removed') as unknown,
+      },
     ]);
   });
 
