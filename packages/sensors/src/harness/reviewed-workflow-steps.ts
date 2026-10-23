@@ -68,7 +68,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
     files: [
       {
         path: 'scripts/process/release-prerequisites.mjs',
-        sha256: '14573fc97c0804462c4be5bc92a3e9301bbe20ffa2fb3dc4141ba206ff5e605b',
+        sha256: 'd750e25813a407e33ce4483a83ffa0751f86fe9bff861c0c526fa8d9f74ab7de',
       },
     ],
   },
@@ -175,7 +175,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
     files: [
       {
         path: 'package.json',
-        sha256: '7a76c7a2f692c7caadfbe69b7ce52312f94640164385b07b97d29fe581f5f036',
+        sha256: '6e03702e6bb1ad660998443f636ac776c98f755615e7cc4dc89ae31580652306',
       },
       {
         path: 'scripts/process/bootstrap-check-runner.mjs',
@@ -234,7 +234,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
     files: [
       {
         path: 'package.json',
-        sha256: '7a76c7a2f692c7caadfbe69b7ce52312f94640164385b07b97d29fe581f5f036',
+        sha256: '6e03702e6bb1ad660998443f636ac776c98f755615e7cc4dc89ae31580652306',
       },
       {
         path: 'scripts/check-commit-range.mjs',
@@ -314,7 +314,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
     files: [
       {
         path: 'scripts/process/release-prerequisites.mjs',
-        sha256: '14573fc97c0804462c4be5bc92a3e9301bbe20ffa2fb3dc4141ba206ff5e605b',
+        sha256: 'd750e25813a407e33ce4483a83ffa0751f86fe9bff861c0c526fa8d9f74ab7de',
       },
     ],
   },
@@ -337,7 +337,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
     files: [
       {
         path: 'scripts/process/release-prerequisites.mjs',
-        sha256: '14573fc97c0804462c4be5bc92a3e9301bbe20ffa2fb3dc4141ba206ff5e605b',
+        sha256: 'd750e25813a407e33ce4483a83ffa0751f86fe9bff861c0c526fa8d9f74ab7de',
       },
     ],
   },
@@ -425,12 +425,12 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
     files: [
       {
         path: 'package.json',
-        sha256: '7a76c7a2f692c7caadfbe69b7ce52312f94640164385b07b97d29fe581f5f036',
+        sha256: '6e03702e6bb1ad660998443f636ac776c98f755615e7cc4dc89ae31580652306',
       },
     ],
   },
   {
-    sha256: 'd7e834d61f567e9f76d6dc77c6f37a758c943fa29779116c49745d29a1412c4b',
+    sha256: 'f297782639ae2ae9dfabcd5ddefefb7bfe785eab18e473d1aa2391c11207515c',
     effect: 'read-only',
     workflow: 'release.yml#build-release[4]',
     step: 'Build package and site once',
@@ -455,7 +455,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
       },
       {
         path: 'package.json',
-        sha256: '7a76c7a2f692c7caadfbe69b7ce52312f94640164385b07b97d29fe581f5f036',
+        sha256: '6e03702e6bb1ad660998443f636ac776c98f755615e7cc4dc89ae31580652306',
       },
       {
         path: 'packages/authority/package.json',
@@ -577,6 +577,10 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
         path: 'scripts/generate-scorecard-page.mjs',
         sha256: 'd558520cc9a8883d069205a3069777c075d93c1a2a8602de10267913ed243e40',
       },
+      {
+        path: 'scripts/process/docs-build.mjs',
+        sha256: '64c74cb2373e0c8c6bc1dc8b0437f472523378fb44aa4e161c4f0222a1fd1371',
+      },
     ],
     computed_imports: [
       {
@@ -594,7 +598,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
     ],
   },
   {
-    sha256: 'a64db5042d93fc6db8f3d5c308e5d9c20bbe83459637e93176fb262b0b52dc35',
+    sha256: 'f6a463d1e55af144e5cae785960653d29d8694489a6b61b7337b7f119bb1bfca',
     effect: 'read-only',
     workflow: 'release.yml#build-release[5]',
     step: 'Assemble immutable release artifacts',
@@ -654,7 +658,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
     files: [
       {
         path: 'package.json',
-        sha256: '7a76c7a2f692c7caadfbe69b7ce52312f94640164385b07b97d29fe581f5f036',
+        sha256: '6e03702e6bb1ad660998443f636ac776c98f755615e7cc4dc89ae31580652306',
       },
     ],
   },
@@ -755,7 +759,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
     files: [
       {
         path: 'package.json',
-        sha256: '7a76c7a2f692c7caadfbe69b7ce52312f94640164385b07b97d29fe581f5f036',
+        sha256: '6e03702e6bb1ad660998443f636ac776c98f755615e7cc4dc89ae31580652306',
       },
       {
         path: 'scripts/process/publication-state.mjs',
