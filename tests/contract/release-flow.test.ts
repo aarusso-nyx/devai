@@ -18,8 +18,14 @@ import { afterEach, describe, expect, it } from 'vitest';
 const flowUrl = pathToFileURL(resolve('scripts/process/release-flow.mjs')).href;
 const runnerUrl = pathToFileURL(resolve('scripts/process/validation-runner.mjs')).href;
 const docsUrl = pathToFileURL(resolve('scripts/process/docs-build.mjs')).href;
-const { checkpoint, oneNpmResult, saveJournal, recoverJournal, assertPromotedAssets } =
-  await import(flowUrl);
+const {
+  checkpoint,
+  oneNpmResult,
+  saveJournal,
+  recoverJournal,
+  assertPromotedAssets,
+  assertControlPaths,
+} = await import(flowUrl);
 const { acquireValidation, recoverValidation, runValidation } = await import(runnerUrl);
 const { buildDocs } = await import(docsUrl);
 const roots: string[] = [];
@@ -146,6 +152,25 @@ describe('host validation admission', () => {
     writeFileSync(join(owner, 'owner.json'), JSON.stringify({ id, pid: 99_999_999 }));
     recoverValidation(root, id);
     expect(existsSync(owner)).toBe(false);
+  });
+});
+
+describe('preflight protected control paths', () => {
+  it('rejects a user-controlled parent symlink before certification', () => {
+    const root = fixture();
+    const target = join(root, 'keys'),
+      alias = join(root, 'key-alias');
+    mkdirSync(target);
+    symlinkSync(target, alias);
+    expect(() => assertControlPaths({ publicKey: join(alias, 'public.pem') })).toThrow(
+      'RELEASE_FLOW_CONTROL_SYMLINK:publicKey',
+    );
+  });
+  it('accepts ordinary directories including the supported macOS temporary root', () => {
+    const root = fixture();
+    expect(() =>
+      assertControlPaths({ publicKey: join(root, 'public.pem'), outputDir: join(root, 'export') }),
+    ).not.toThrow();
   });
 });
 
