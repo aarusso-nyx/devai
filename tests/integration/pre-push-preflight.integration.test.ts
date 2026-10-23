@@ -234,6 +234,7 @@ describe('pre-push preflight (TASK-0727)', () => {
       expect(args.slice(0, 1)).toEqual(['check']);
       expect(args).toContain('--affected');
       expect(args).toContain('--run');
+      expect(args[args.indexOf('--task-workers') + 1]).toBe('1');
       expect(args[args.indexOf('--base') + 1]).toBe(base);
       expect(git(work, 'ls-remote', 'origin', 'refs/heads/feature')).toContain(
         git(work, 'rev-parse', 'HEAD'),
