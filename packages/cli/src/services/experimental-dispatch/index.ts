@@ -3,15 +3,13 @@
  * admitted agent task it composes the governed prompt, then runs the Article 19
  * ladder — up to three attempts at the requested model and one at the next tier —
  * each in a fresh task worktree, around the hash-linked dispatch journal, with the
- * Article 6 write-scope check and non-promoting evidence after every attempt.
+ * Article 6 write-scope check (the Engineer focused-regression verb of ADR-GOV-0026 included)
+ * and non-promoting evidence after every attempt.
  * Attempts are numbered for the task's lifetime, so a retried task continues its
  * ladder (ADR-MDL-0007). Nothing here pushes, merges, publishes, or retries uncertain
  * work.
  */
 import {
-  ENGINEER_ROOT_WORKSPACE_FILES,
-  INSPECTOR_TEST_DIRECTORY_SEGMENT,
-  STATIC_AUTHORITY_PREFIXES,
   execFileSync,
   existsSync,
   lstatSync,
@@ -60,6 +58,13 @@ import { canonicalSha256 } from '@devai-nyx/utils';
 import { createHash } from 'node:crypto';
 import { hostname } from 'node:os';
 import { dirname, join, relative, resolve, sep } from 'node:path';
+import {
+  focusedRegressionAvailable,
+  judgeWriteScope,
+  type WriteChange,
+} from '../write-scope/index.js';
+
+export { article6Role } from '../write-scope/index.js';
 
 /**
  * Per-runtime model order from law/policy/model-tiers.json, lowest capability first;
@@ -177,25 +182,6 @@ export function bumpedModel(
   return admitted.includes(next) ? next : undefined;
 }
 
-/** The Article 6 role that owns a repository-relative path, or undefined when none may. */
-export function article6Role(path: string): string | undefined {
-  const normalized = path.split(sep).join('/');
-  const segments = normalized.split('/');
-  if (segments.length === 1) {
-    return (ENGINEER_ROOT_WORKSPACE_FILES as readonly string[]).includes(normalized)
-      ? 'engineer'
-      : undefined;
-  }
-  if (segments[0] === 'packages' && segments[2] === INSPECTOR_TEST_DIRECTORY_SEGMENT) {
-    return 'inspector';
-  }
-  const match = [...STATIC_AUTHORITY_PREFIXES]
-    .sort((a, b) => b.prefix.length - a.prefix.length)
-    .find((entry) => normalized.startsWith(entry.prefix));
-  const authority = match?.authority as readonly string[] | undefined;
-  return authority?.length === 1 ? authority[0] : undefined;
-}
-
 /**
  * Whether a changed path lies inside the task's declared boundary (`intent_diff.planned_files`,
  * the campaign `boundary.paths`; ADR-MDL-0009): an exact path, or a path under an entry that
@@ -266,9 +252,28 @@ export function snapshotWorktree(root: string): WorktreeSnapshot {
 function changedPaths(
   before: ReadonlyMap<string, string>,
   after: ReadonlyMap<string, string>,
-): string[] {
+): WriteChange[] {
   const paths = new Set([...before.keys(), ...after.keys()]);
-  return [...paths].filter((path) => before.get(path) !== after.get(path)).sort();
+  return [...paths]
+    .filter((path) => before.get(path) !== after.get(path))
+    .sort()
+    .map((path) => ({
+      path,
+      kind: !after.has(path) ? 'deleted' : before.has(path) ? 'modified' : 'added',
+    }));
+}
+
+/** A path's content at the attempt base commit, or undefined when Git cannot show it. */
+function baseContent(worktree: string, base: string, path: string): string | undefined {
+  try {
+    return execFileSync('git', ['show', `${base}:${path.split(sep).join('/')}`], {
+      cwd: worktree,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+  } catch {
+    return undefined;
+  }
 }
 
 function gitHead(cwd: string): string {
@@ -457,7 +462,7 @@ function prepareAttempt(
   context: ExperimentalDispatchContext,
   task: TaskRecord,
   plan: AttemptPlan,
-): Readonly<{ worktree: WorktreeRecord; before: WorktreeSnapshot }> {
+): Readonly<{ worktree: WorktreeRecord; before: WorktreeSnapshot; base: string }> {
   const worktree = createWorktree({
     repoRoot: context.repoRoot,
     id: `WT-${task.id}-A${String(plan.number)}`,
@@ -469,7 +474,7 @@ function prepareAttempt(
   try {
     const before = snapshotWorktree(worktree.path);
     if (before.escaping.size > 0) throw new Error('EXPERIMENTAL_SYMLINK_ESCAPE');
-    return { worktree, before };
+    return { worktree, before, base: gitHead(worktree.path) };
   } catch (error) {
     destroyWorktree({ repoRoot: context.repoRoot, id: worktree.id });
     throw error;
@@ -618,10 +623,10 @@ async function runAttempt(
   plan: AttemptPlan,
   composed: ReturnType<typeof composeAgentPrompt>,
   wallClockMs: number,
-  prepared: Readonly<{ worktree: WorktreeRecord; before: WorktreeSnapshot }>,
+  prepared: Readonly<{ worktree: WorktreeRecord; before: WorktreeSnapshot; base: string }>,
 ): Promise<AttemptOutcome> {
   const { repoRoot, roundId } = context;
-  const { worktree, before } = prepared;
+  const { worktree, before, base } = prepared;
   const journal = (entry: Record<string, unknown>) =>
     appendDispatchJournalEvent(repoRoot, roundId, {
       task_id: task.id,
@@ -676,9 +681,23 @@ async function runAttempt(
     writeDiagnostics(repoRoot, roundId, `${task.id}-A${String(plan.number)}`, attempt);
     const completedAt = new Date().toISOString();
     const after = snapshotWorktree(worktree.path);
-    const changed = changedPaths(before.files, after.files);
+    const changes = changedPaths(before.files, after.files);
+    const changed = changes.map(({ path }) => path);
     const escaping = [...after.escaping].sort();
-    const outOfScope = changed.filter((path) => article6Role(path) !== task.discipline);
+    // Article 6 by the static path table, with the Engineer focused-regression verb judged by
+    // diff adjacency against the attempt base (ADR-GOV-0026); no file is read through an
+    // escaping link, which refuses first.
+    const scope =
+      escaping.length > 0
+        ? { outOfScope: [], violations: [] }
+        : judgeWriteScope({
+            discipline: task.discipline,
+            changes,
+            focusedRegression: focusedRegressionAvailable(repoRoot, task),
+            headRoot: worktree.path,
+            readBase: (path) => baseContent(worktree.path, base, path),
+          });
+    const outOfScope = scope.outOfScope;
     const boundary = declaredBoundary(task);
     const outOfBoundary =
       boundary.length === 0
@@ -719,7 +738,7 @@ async function runAttempt(
       code,
       verdict,
       violations:
-        escaping.length > 0 ? escaping : outOfScope.length > 0 ? outOfScope : outOfBoundary,
+        escaping.length > 0 ? escaping : outOfScope.length > 0 ? scope.violations : outOfBoundary,
       // The sandbox is recorded as provider-enforced only once a provider process started;
       // a refused or failed spawn ran nothing, so its evidence names no sandbox.
       sandbox: spawned ? sandbox : undefined,
