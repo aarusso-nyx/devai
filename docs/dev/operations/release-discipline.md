@@ -18,6 +18,110 @@ checkout cannot turn formatting into an empty check. Commit hooks still fix only
 staged files. Vendored dependencies and checksum-controlled fixtures retain their
 existing byte-verification contracts instead of being reformatted.
 
+## Resumable maintainer release preparation
+
+Use the maintainer host controller for the next release. It adds early checks and
+resource admission around the existing RC, exporter and rehearsal verifier; it does
+not change the product action registry, test population, coverage thresholds,
+per-test guards, task timeout, protected environments or publication permissions.
+
+Keep the candidate clean and committed. Use the external prerequisites configuration
+[documented here](process-simplification-rollout.md#local-prerequisites-and-certification), including
+its separate, mode-0600 `runtimeEnvironment` file. Put the configuration, journal,
+keys and export directory outside the candidate. For publication readback also set
+`releaseSigners` to the external, approved SSH allowed-signers file before creating
+the journal. Do not put secret values into the configuration or journal.
+
+```bash
+pnpm run release:flow preflight /external/release/config.json /external/release/journal.json
+pnpm run release:flow prepare /external/release/config.json /external/release/journal.json
+```
+
+`preflight` checks the exact candidate, installed verifier and package identity,
+policy reconstruction, toolchain/environment maps, signer/trust, output location,
+runtime environment identities, workflow contracts, static integrity and a fresh
+docs dependency audit with the existing waiver and vendor-patch checks. It runs no
+RC tests and signs nothing. `prepare` repeats that preflight, runs the full fixed RC
+through the installed CLI, validates its exact receipt, and exports signed evidence
+through the installed exporter. Certification retains the existing 30-minute
+per-task limit. Repeating `prepare` resumes from the journal: a completed RC receipt
+is independently preflighted before reuse; an existing export is cryptographically
+verified against the current candidate, policy and trust. A crash after a complete
+export is reconciled without rerunning RC. Partial or different exports stop the
+flow and are preserved for diagnosis.
+
+The journal binds configuration bytes, commit/tree, policy, verifier/package,
+trust, toolchain/environment maps and control scripts. Any changed binding requires
+a new journal and candidate validation. The journal itself grants no eligibility;
+completed phases are verified again on resume, and live advisory checks repeat.
+
+After separately authorized evidence upload and rehearsal dispatch, supply the
+exact expected context accepted by `scripts/process/rehearsal.mjs promote`, including
+the complete externally expected ledger and exact run/attempt, workflow and control
+commits. The controller additionally compares that ledger with the local verified
+export and current trust inputs:
+
+```bash
+pnpm run release:flow rehearsal /external/release/config.json /external/release/journal.json /external/release/expected-rehearsal.json
+```
+
+After separately authorized signed-tag publication and the protected publication
+workflow, observe its exact run and independently read back the immutable Release
+assets and registry tarball:
+
+```bash
+pnpm run release:flow publication /external/release/config.json /external/release/journal.json /external/release/expected-rehearsal.json 123456789
+```
+
+A successful rehearsal never counts as publication. Readback requires the successful
+publication jobs, the approved signed tag, the complete manifest-bound Release asset
+population and the exact registry package bytes. Pending, failed or mismatching
+observations stop; repeat the command after transient platform state settles. These
+commands do not upload evidence, dispatch workflows, push tags, publish packages,
+change protected settings or deploy Pages. Those effects retain their existing exact
+Owner authorization and environment approvals. Promotion still rebuilds nothing.
+
+### Validation resource admission
+
+`release:flow` reserves a host-wide exclusive validation lease until it exits.
+The supported `pnpm` test scripts and pre-push hook take shared leases, so normal
+validation can run concurrently while an RC drains existing runs and queues new
+ones. Descendant RC tasks re-enter the lease through process ancestry without
+forwarding credentials or expanding the check runner's environment allowlist.
+The lease lives under `~/.cache/devai/validation-v1/<hostname>`, shared by worktrees
+using the same OS account. Existing direct Vitest processes are detected and drained
+before exclusive work starts. Upgrade other worktrees to these wrappers and use the
+supported commands: unrelated programs started outside admission cannot be prevented
+from consuming the host's CPU or memory. The runner never kills competing work.
+
+Cancellation forwards to the owned process group. Surviving children retain the
+lease. After a hard crash, inspect `owner.json`; recover its exact ID only after the
+owner and child group have stopped:
+
+```bash
+node scripts/process/validation-runner.mjs recover <lease-owner-id>
+pnpm run release:flow recover /external/release/journal.json
+```
+
+Journal recovery also refuses a live owner and runs under exclusive admission.
+Recovery removes ownership locks only; it does not delete evidence or mark a phase
+complete.
+
+### Isolated docs builds
+
+```bash
+pnpm run release:docs build . /external/release/docs-output
+```
+
+The existing output parent must be outside the candidate. The helper archives the
+committed docs into a fresh directory, runs the same security, frozen install,
+typecheck, build and Pages-byte checks there, and retains a `result.json` with source
+commit/tree and output paths. `preflight` audits a disposable snapshot; `stage`
+prepares a snapshot for the release workflow's explicit npm commands. The release
+workflow builds and archives that isolated site's bytes. Generated docs,
+`node_modules`, `.docusaurus` and site output never enter the candidate's source
+scans. The rehearsal repeats its security audit independently of local preflight.
+
 ## Inspect
 
 ```bash
