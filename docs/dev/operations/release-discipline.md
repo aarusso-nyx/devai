@@ -30,7 +30,9 @@ Keep the candidate clean and committed. Use the external prerequisites configura
 its separate, mode-0600 `runtimeEnvironment` file. Put the configuration, journal,
 keys and export directory outside the candidate. For publication readback also set
 `releaseSigners` to the external, approved SSH allowed-signers file before creating
-the journal. Do not put secret values into the configuration or journal.
+the journal. Do not put secret values into the configuration or journal. Protected input
+paths must traverse no user-created symlinks; preflight names the field that needs
+a canonical path. The verifier's stable macOS `/var` and `/tmp` aliases remain supported.
 
 ```bash
 pnpm run release:flow preflight /external/release/config.json /external/release/journal.json
