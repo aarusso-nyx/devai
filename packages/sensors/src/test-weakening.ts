@@ -7,10 +7,11 @@ import {
   type SensorReading,
   type SensorStatus,
 } from './sensor-reading.js';
+import { changedAssertions } from './test-assertions.js';
 
 export interface TestWeakeningOptions {
   readonly cwd: string;
-  /** Git ref to diff against (default: HEAD~1). */
+  /** Git ref to diff against: the task base when there is one (default: HEAD~1). */
   readonly baseRef?: string;
   /** Decrease ratio above which the change is flagged. Default per D-21: 0.20. */
   readonly thresholdRatio?: number;
@@ -27,7 +28,9 @@ interface AssertionCounts {
  * AST-diff weakening detection: for each changed *.test.ts / *.spec.ts
  * file, count `expect(...)` calls and skip/todo annotations before and
  * after the change, flag if the after-count drops by more than the
- * threshold ratio.
+ * threshold ratio. Per-assertion identity (ADR-GOV-0026) adds one
+ * `assertion_changed` review finding when base assertions were edited,
+ * moved or re-marked beyond what the count drop already explains.
  *
  * The default threshold is a 20% decrease. Reports
  * one finding per drift; the overall status is 'fail' if any finding
@@ -143,6 +146,17 @@ export function senseTestWeakening(opts: TestWeakeningOptions): SensorReading {
         severity: ratio > threshold ? 'error' : 'warning',
         code: ratio > threshold ? 'unjustified_weakening' : 'weakening',
         message: `assertions ${String(before.assertions)} → ${String(after.assertions)} (decrease ratio ${ratio.toFixed(2)}); skip delta ${String(skipDelta)}`,
+        file,
+      });
+    }
+    const changed = changedAssertions(baseText, headText);
+    if (changed.length > Math.max(decrease, 0)) {
+      const shown = changed.slice(0, 5).join('; ');
+      const more = changed.length > 5 ? `; and ${String(changed.length - 5)} more` : '';
+      findings.push({
+        severity: 'warning',
+        code: 'assertion_changed',
+        message: `${String(changed.length)} existing assertion(s) changed or removed: ${shown}${more}`,
         file,
       });
     }

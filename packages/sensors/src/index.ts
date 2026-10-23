@@ -26,6 +26,7 @@ export {
   type WorkflowReviewStep,
 } from './harness/workflow-parser.js';
 export * from './test.js';
+export * from './test-assertions.js';
 export * from './test-weakening.js';
 export * from './test-weakening-config.js';
 export * from './inventory-adherence.js';
