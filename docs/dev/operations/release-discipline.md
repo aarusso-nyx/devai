@@ -158,12 +158,11 @@ release containing both fixes, after the docs audit and build remain green.
 
 The docs dependency audit records its Owner-authorized non-regression baseline in
 `docs/site/dependency-audit-waivers.json`, bound to the exact site lockfile SHA-256 recorded there.
-The current lockfile includes the patched dependencies adopted for 2.3.1 (#374, #378); only
-`braces` (GHSA-vfj7-8cjw-p6xm) remains waived. The Owner extended that exception on 2026-10-09
-through 2026-11-17T23:59:59Z because it still had no patched release. It reaches only Docusaurus
-build tooling; the npm package itself carries no audit waiver (#233). The audit rejects critical
-advisories and any changed or additional advisory. A dependency or lockfile change must remove
-the applicable waiver or obtain a new explicitly recorded decision.
+The current lockfile includes patched `follow-redirects` 1.16.1 and `launch-editor` 2.14.2
+adopted for 2.7.0. The current npm audit reports no vulnerabilities, so the former `braces`
+exception has been removed. The npm package itself carries no audit waiver (#233).
+The audit rejects critical advisories and any changed or additional advisory. A dependency
+or lockfile change must remove the applicable waiver or obtain a new explicitly recorded decision.
 
 Repository settings are separate Owner-authorized effects: enable immutable Releases,
 prohibit update/deletion of `v*` tags, require signed annotated release tags, configure the

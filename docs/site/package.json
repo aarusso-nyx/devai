@@ -61,7 +61,7 @@
     "image-size": "$image-size",
     "http-proxy-middleware": "2.0.10",
     "joi": "17.13.8",
-    "launch-editor": "2.14.1",
+    "launch-editor": "2.14.2",
     "nanoid@3.x": "3.3.18",
     "postcss": "8.5.26",
     "serialize-javascript": "7.0.5",
