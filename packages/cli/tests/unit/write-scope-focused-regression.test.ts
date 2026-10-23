@@ -65,6 +65,7 @@ const BASE: Readonly<Record<string, string>> = {
         development: './src/index.ts',
         default: './dist/index.js',
       },
+      './dist/*': './dist/*.js',
     },
   })}\n`,
   'packages/x/src/index.ts': "export { a } from './a.js';\n",
@@ -176,6 +177,22 @@ describe('IA-001: an Engineer test adjacent to the task change is admitted', () 
       'packages/x/tests/unit/entry.test.ts': regression('@fixture/x'),
     });
     expect(verdict.outOfScope).toEqual([]);
+  });
+
+  it('admits a test whose import matches a wildcard export key and names the changed source', async () => {
+    const verdict = await judge({
+      ...CHANGED_A,
+      'packages/x/tests/unit/a-wildcard.test.ts': regression('@fixture/x/dist/a'),
+    });
+    expect(verdict.outOfScope).toEqual([]);
+  });
+
+  it('refuses a test whose wildcard export import names only an unchanged source', async () => {
+    const verdict = await judge({
+      ...CHANGED_A,
+      'packages/x/tests/unit/b-wildcard.test.ts': regression('@fixture/x/dist/b'),
+    });
+    expect(verdict.outOfScope).toEqual(['packages/x/tests/unit/b-wildcard.test.ts']);
   });
 
   it('admits an existing test that gains a new test and keeps every assertion', async () => {
