@@ -36,6 +36,7 @@ interface CampaignTask {
   readonly prompt: { readonly path: string };
   readonly execution: { readonly time_budget_minutes?: number };
   readonly executor?: CampaignAgentExecutor;
+  readonly independent_assurance?: boolean;
 }
 
 /** The optional agent executor contract of a campaign task (ADR-MDL-0009). */
@@ -74,6 +75,7 @@ interface CampaignRound {
   readonly status: string;
   readonly depends_on?: readonly string[];
   readonly waves: readonly CampaignWave[];
+  readonly independent_assurance?: boolean;
 }
 
 export interface CampaignPlan {
@@ -346,7 +348,9 @@ function agentExecutor(
  * discipline and whose instructions are the campaign prompt. A task that declares an
  * agent executor contract gets an agent executor instead (ADR-MDL-0009), validated by
  * campaignAgentExecutorRefusal and bound to its composed prompt; without a binding such
- * a task refuses.
+ * a task refuses. A round or task designated independent-assurance marks the record so
+ * dispatch withholds the Engineer's focused-regression verb (ADR-GOV-0026); an undesignated
+ * record carries no such field.
  */
 export function campaignTaskRecord(
   campaign: LoadedCampaign,
@@ -382,6 +386,9 @@ export function campaignTaskRecord(
       contract === undefined
         ? humanExecutor(campaign, task)
         : agentExecutor(campaign, task, contract),
+    ...((round.independent_assurance === true || task.independent_assurance === true) && {
+      independent_assurance: true,
+    }),
   } as unknown as TaskRecord;
   if (contract === undefined || agent === undefined) return record;
   return {

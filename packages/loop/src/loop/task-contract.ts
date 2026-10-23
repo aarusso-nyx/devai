@@ -127,6 +127,12 @@ export interface TaskRecord {
   readonly iteration_trail?: readonly TaskIterationRecord[];
   readonly priority?: number;
   readonly tags?: readonly string[];
+  /**
+   * The ADR-GOV-0026 independent-assurance designation: when true the Engineer's
+   * focused-regression test verb is withheld and Article 6 binds the test class to the
+   * Inspector alone.
+   */
+  readonly independent_assurance?: boolean;
 }
 
 export type TaskRecordClassification =
