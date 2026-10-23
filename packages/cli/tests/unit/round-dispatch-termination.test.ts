@@ -31,12 +31,15 @@ import {
 import { dispatchRoundTask } from '../../src/commands/round/dispatch.js';
 
 const spawn = vi.hoisted(() => vi.fn());
-/** When set, the dispatcher's candidate resolution (`git rev-parse`) fails once. */
+/**
+ * When set, the dispatcher's first Git call after the routine spawned fails once. The
+ * pre-routine write-scope baseline (#412 ruling (b)) also reads Git, before any spawn.
+ */
 const candidateFailure = vi.hoisted(() => ({ armed: false }));
 vi.mock('@devai-nyx/authority', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@devai-nyx/authority')>();
   const execFileSync = ((...args: Parameters<typeof actual.execFileSync>) => {
-    if (candidateFailure.armed && args[0] === 'git') {
+    if (candidateFailure.armed && args[0] === 'git' && spawn.mock.calls.length > 0) {
       candidateFailure.armed = false;
       throw new Error('injected candidate resolution failure');
     }
