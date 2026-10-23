@@ -77,9 +77,46 @@ export function checkpoint(path, journal, name, execute, verify) {
   return value;
 }
 
+// Prerequisites check the final files. Match the exporter's no-follow parent
+// rules too, before spending time on RC. Stable macOS system aliases are allowed
+// by the installed verifier; user-created directory aliases are not.
+export function assertControlPaths(config) {
+  const check = (field, directory = false) => {
+    if (typeof config[field] !== 'string') return;
+    let cursor = resolve(directory ? config[field] : dirname(config[field]));
+    if (
+      process.platform === 'darwin' &&
+      (cursor === '/var' ||
+        cursor.startsWith('/var/') ||
+        cursor === '/tmp' ||
+        cursor.startsWith('/tmp/'))
+    )
+      cursor = `/private${cursor}`;
+    while (cursor !== dirname(cursor)) {
+      if (lstatSync(cursor).isSymbolicLink())
+        throw new Error(`RELEASE_FLOW_CONTROL_SYMLINK:${field}`);
+      cursor = dirname(cursor);
+    }
+  };
+  for (const field of [
+    'toolchain',
+    'environment',
+    'runtimeEnvironment',
+    'privateKey',
+    'publicKey',
+    'trustStore',
+    'releaseSigners',
+  ])
+    check(field);
+  check('repo', true);
+  check('packageRoot', true);
+  check('outputDir');
+}
+
 export function releasePreflight(config, descriptor) {
   // Reuse the exact existing security and workflow checks. None substitutes for
   // the full RC or the independently repeated rehearsal security audit.
+  assertControlPaths(config);
   certificationEnvironment(config, descriptor);
   command([process.execPath, join(config.repo, 'scripts/check-workflows.mjs')], config.repo);
   command(
@@ -414,13 +451,15 @@ export function resumeRelease(
     // Re-run live advisories, current trust and environment checks on every resume.
     releasePreflight(config, descriptor);
     if (mode === 'preflight') return { ok: true, phase: 'preflight', journal: journalPath };
-    const fresh = () =>
-      assertFresh(
+    const fresh = () => {
+      assertControlPaths(config);
+      return assertFresh(
         report,
         inspectPrerequisites(config, configPath, {
           allowExistingOutput: existsSync(config.outputDir),
         }),
       );
+    };
     // A crash after export but before checkpoint is reconciled by the verifier.
     // An incomplete or foreign export refuses; it is never deleted or repaired.
     if (existsSync(config.outputDir)) {
