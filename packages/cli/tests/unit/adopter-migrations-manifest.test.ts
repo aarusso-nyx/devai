@@ -159,11 +159,9 @@ describe('#264: the adopter migration manifest', () => {
     expect(plannedReleases(manifest, '2.4.0', '2.5.0').map((release) => release.version)).toEqual([
       '2.5.0',
       '2.6.4',
-      '2.7.0',
     ]);
     expect(plannedReleases(manifest, '2.5.0', '2.5.0').map((release) => release.version)).toEqual([
       '2.6.4',
-      '2.7.0',
     ]);
   });
 
@@ -229,16 +227,18 @@ describe('#264: the adopter migration manifest', () => {
         files: ['.devai/config/authority-policy.json'],
       }),
     ]);
-    expect(plannedReleases(manifest, '2.6.0', '2.6.1')).toEqual([shipped, latest, next]);
-    expect(plannedReleases(manifest, '2.6.1', '2.6.1')).toEqual([latest, next]);
-    expect(plannedReleases(manifest, '2.6.3', '2.6.4')).toEqual([latest, next]);
-    expect(plannedReleases(manifest, '2.6.4', '2.6.4')).toEqual([next]);
+    // 2.6.4 was never published: its code ships in 2.7.0, so it stays unreleased and is planned
+    // with that code, while the released 2.7.0 is planned only when installed.
+    expect(plannedReleases(manifest, '2.6.0', '2.6.1')).toEqual([shipped, latest]);
+    expect(plannedReleases(manifest, '2.6.1', '2.6.1')).toEqual([latest]);
+    expect(plannedReleases(manifest, '2.6.3', '2.6.4')).toEqual([latest]);
+    expect(plannedReleases(manifest, '2.6.3', '2.7.0')).toEqual([latest, next]);
+    expect(plannedReleases(manifest, '2.6.4', '2.6.4')).toEqual([]);
   });
 
-  it('declares the prospective 2.7.0 constitution 1.1.0 move as an Architect decision (ADR-GOV-0026)', () => {
+  it('declares the released 2.7.0 constitution 1.1.0 move as an Architect decision (ADR-GOV-0026)', () => {
     const next = manifest.releases.at(-1);
-    expect(next).toMatchObject({ version: '2.7.0', status: 'unreleased' });
-    expect(next).not.toHaveProperty('date');
+    expect(next).toMatchObject({ version: '2.7.0', status: 'released', date: '2026-10-23' });
     expect(next?.changes).toEqual([
       expect.objectContaining({
         id: 'MIG-2.7.0-constitution-1-1-0',
@@ -299,15 +299,15 @@ describe('#264: the adopter migration manifest', () => {
     // obligations are also planned above the installed/bound floor (#291).
     const planned = (from: string, installedVersion: string) =>
       plannedReleases(manifest, from, installedVersion).map((release) => release.version);
-    expect(planned('2.3.0', '2.3.0')).toEqual(['2.6.4', '2.7.0']);
-    expect(planned('2.3.0', '2.3.1')).toEqual(['2.3.1', '2.6.4', '2.7.0']);
-    expect(planned('2.3.1', '2.3.1')).toEqual(['2.6.4', '2.7.0']);
-    expect(planned('2.3.0', '2.3.2')).toEqual(['2.3.1', '2.3.2', '2.6.4', '2.7.0']);
-    expect(planned('2.3.1', '2.3.2')).toEqual(['2.3.2', '2.6.4', '2.7.0']);
-    expect(planned('2.3.2', '2.3.2')).toEqual(['2.6.4', '2.7.0']);
-    expect(planned('2.3.2', '2.4.0')).toEqual(['2.4.0', '2.6.4', '2.7.0']);
-    expect(planned('2.3.1', '2.4.0')).toEqual(['2.3.2', '2.4.0', '2.6.4', '2.7.0']);
-    expect(planned('2.4.0', '2.4.0')).toEqual(['2.6.4', '2.7.0']);
+    expect(planned('2.3.0', '2.3.0')).toEqual(['2.6.4']);
+    expect(planned('2.3.0', '2.3.1')).toEqual(['2.3.1', '2.6.4']);
+    expect(planned('2.3.1', '2.3.1')).toEqual(['2.6.4']);
+    expect(planned('2.3.0', '2.3.2')).toEqual(['2.3.1', '2.3.2', '2.6.4']);
+    expect(planned('2.3.1', '2.3.2')).toEqual(['2.3.2', '2.6.4']);
+    expect(planned('2.3.2', '2.3.2')).toEqual(['2.6.4']);
+    expect(planned('2.3.2', '2.4.0')).toEqual(['2.4.0', '2.6.4']);
+    expect(planned('2.3.1', '2.4.0')).toEqual(['2.3.2', '2.4.0', '2.6.4']);
+    expect(planned('2.4.0', '2.4.0')).toEqual(['2.6.4']);
     expect(releasesInRange(manifest, '1.6.0', '1.9.0').map((release) => release.version)).toEqual([
       '1.7.0',
       '1.8.0',
@@ -329,8 +329,8 @@ describe('#264: the adopter migration manifest', () => {
         return { ...rest, status: 'unreleased' };
       }),
     });
-    expect(versions('2.0.0', '2.0.0', unreleased)).toEqual(['2.1.0', '2.6.4', '2.7.0']);
-    expect(versions('1.9.0', '2.0.0', unreleased)).toEqual(['2.0.0', '2.1.0', '2.6.4', '2.7.0']);
+    expect(versions('2.0.0', '2.0.0', unreleased)).toEqual(['2.1.0', '2.6.4']);
+    expect(versions('1.9.0', '2.0.0', unreleased)).toEqual(['2.0.0', '2.1.0', '2.6.4']);
     expect(versions('1.6.0', '2.0.0', unreleased).slice(0, 4)).toEqual([
       '1.7.0',
       '1.8.0',
@@ -338,9 +338,9 @@ describe('#264: the adopter migration manifest', () => {
       '2.0.0',
     ]);
     // Once released and installed, it is an ordinary entry, planned only from below it.
-    expect(versions('2.1.0', '2.1.0')).toEqual(['2.6.4', '2.7.0']);
-    expect(versions('2.0.0', '2.1.0')).toEqual(['2.1.0', '2.6.4', '2.7.0']);
-    expect(versions('2.0.0', '2.0.0')).toEqual(['2.6.4', '2.7.0']);
+    expect(versions('2.1.0', '2.1.0')).toEqual(['2.6.4']);
+    expect(versions('2.0.0', '2.1.0')).toEqual(['2.1.0', '2.6.4']);
+    expect(versions('2.0.0', '2.0.0')).toEqual(['2.6.4']);
   });
 
   it('cites only decision records that exist and names a canonical segment for each change', () => {

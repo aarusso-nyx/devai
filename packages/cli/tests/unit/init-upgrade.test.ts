@@ -433,12 +433,9 @@ describe('#264 review: durability, decisions, exclusion and the measured receipt
     const settled = await runCli(PLAN(repo));
     const plan = value(settled)['plan'] as JsonObject;
     expect(plan['status']).toBe('no-op');
+    // The released 2.7.0 move is settled by the upgrade and no longer planned; the receipt's
+    // pending obligation stays visible.
     expect(plan['obligations']).toEqual([
-      expect.objectContaining({
-        change: 'MIG-2.7.0-constitution-1-1-0',
-        status: 'satisfied',
-        source: 'manifest',
-      }),
       expect.objectContaining({
         change: 'MIG-1.7.0-repository-kind-from-receipt',
         status: 'pending',
@@ -897,7 +894,7 @@ describe('#390: init upgrade rebinds a 2.3.1 observation workflow to the script-
   }, 180_000);
 });
 
-describe('ADR-SCR-0015/0017: init upgrade from 2.3.2 through 2.6.4', () => {
+describe('ADR-SCR-0015/0017: init upgrade from 2.3.2 through 2.7.0', () => {
   it('projects opted-in sensor inputs, rebinds the task template, and repeats without a byte change', async () => {
     const repo = await stynxAt160(true);
     expect((await runCli(WRITE(repo))).exit).toBe(0);
@@ -933,7 +930,7 @@ describe('ADR-SCR-0015/0017: init upgrade from 2.3.2 through 2.6.4', () => {
     expect(planned.exit, planned.stderr).toBe(0);
     expect(snapshot(repo)).toEqual(before);
     const plan = value(planned)['plan'] as JsonObject;
-    expect(plan).toMatchObject({ from: '2.3.2', to: '2.6.4', status: 'ready' });
+    expect(plan).toMatchObject({ from: '2.3.2', to: '2.7.0', status: 'ready' });
     expect((plan['releases'] as JsonObject[]).map((release) => release['version'])).toEqual([
       '2.4.0',
       '2.5.0',
@@ -979,7 +976,7 @@ describe('ADR-SCR-0015/0017: init upgrade from 2.3.2 through 2.6.4', () => {
     ]);
     expect(json(repo, RECEIPT)).toMatchObject({
       from: '2.3.2',
-      to: '2.6.4',
+      to: '2.7.0',
       migrations: [
         'MIG-2.4.0-sensor-inputs-projection',
         'MIG-2.4.0-declared-sensor-task-template',
