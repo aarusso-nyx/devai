@@ -377,6 +377,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          node scripts/process/docs-build.mjs preflight . "$RUNNER_TEMP"
           pnpm run build
           pnpm run format:check
           # The JSON report is one line of several hundred kilobytes that the run
@@ -388,10 +389,16 @@ jobs:
           pnpm run typecheck
           pnpm run release:static-integrity
           pnpm run release:closure
-          npm --prefix docs/site ci
-          npm --prefix docs/site run security:check
-          npm --prefix docs/site run typecheck
-          npm --prefix docs/site run build
+          node scripts/process/docs-build.mjs stage . "$RUNNER_TEMP" "$RUNNER_TEMP/docs-build.json"
+          docs_source="$(node -p 'JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8")).source' "$RUNNER_TEMP/docs-build.json")"
+          (
+            cd "$docs_source"
+            npm --prefix docs/site ci
+            npm --prefix docs/site run security:check
+            npm --prefix docs/site run typecheck
+            npm --prefix docs/site run build
+          )
+          node -e 'const fs=require("node:fs"); const result=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); fs.appendFileSync(process.env.GITHUB_ENV,`DOCS_BUILD_PATH=${result.site}\n`);' "$RUNNER_TEMP/docs-build.json"
       - name: Assemble immutable release artifacts
         id: artifacts
         shell: bash
@@ -421,10 +428,10 @@ jobs:
           test "$(node -e 'const p=JSON.parse(process.argv[1]); process.stdout.write(String(p.reproductions))' "$stage_json")" = 2
           test "$(node -e 'const p=JSON.parse(process.argv[1]); process.stdout.write(p.sbom_subject_sha256)' "$stage_json")" = \
             "$(sha256sum "$tarball" | cut -d' ' -f1)"
-          node scripts/process/verify-pages-bytes.mjs local docs/site/build
+          node scripts/process/verify-pages-bytes.mjs local "$DOCS_BUILD_PATH"
           site="$release_dir/devai-site-$PACKAGE_VERSION.tar.gz"
           tar --sort=name --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner \
-            -czf "$site" -C docs/site/build .
+            -czf "$site" -C "$DOCS_BUILD_PATH" .
           manifest="$release_dir/release-manifest.json"
           PACKAGE_NAME="$PACKAGE_NAME" RELEASE_TAG="$RELEASE_TAG" PACKAGE_TARBALL="$tarball" \
             SITE_ARCHIVE="$site" SBOM_FILE="$sbom" OUTPUT_FILE="$manifest" \

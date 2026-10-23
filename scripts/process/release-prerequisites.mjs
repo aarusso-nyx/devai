@@ -74,7 +74,7 @@ export function walkPackage(directory, root) {
   });
 }
 
-export function inspectPrerequisites(config, configPath) {
+export function inspectPrerequisites(config, configPath, { allowExistingOutput = false } = {}) {
   const checks = [];
   const bindings = {};
   const attempt = (id, dependencies, operation) => {
@@ -221,7 +221,7 @@ export function inspectPrerequisites(config, configPath) {
     bindings.trust = sha(regular(config.trustStore));
   });
   attempt('destination', [], () => {
-    requireValue(!existsSync(config.outputDir), 'OUTPUT_EXISTS');
+    requireValue(allowExistingOutput || !existsSync(config.outputDir), 'OUTPUT_EXISTS');
     const parent = external(repo, dirname(resolve(config.outputDir)));
     accessSync(parent, constants.W_OK | constants.X_OK);
     bindings.destination = join(parent, config.outputDir.split(sep).at(-1));
@@ -438,60 +438,41 @@ function runControlCommit() {
   }
 }
 
-function run() {
-  const [phase, configPath, receiptPath] = process.argv.slice(2);
-  if (phase === 'credentials') {
-    runCredentials(configPath, receiptPath);
-    return;
-  }
-  if (phase === 'control-commit') {
-    runControlCommit();
-    return;
-  }
-  requireValue(
-    ['prerequisites', 'certify', 'evidence'].includes(phase) && configPath && receiptPath,
-    'USAGE',
-  );
-  const config = read(configPath);
-  const current = inspectPrerequisites(config, configPath);
-  const { descriptor, ...report } = current;
-  if (phase === 'prerequisites') {
-    writeFileSync(receiptPath, `${JSON.stringify(report, null, 2)}\n`, { flag: 'wx', mode: 0o600 });
-    process.stdout.write(`${JSON.stringify({ ok: report.ok, checks: report.checks })}\n`);
-    process.exitCode = report.ok ? 0 : 1;
-    return;
-  }
-  assertFresh(read(receiptPath), report);
-  let candidateReceipt = config.receipt;
-  if (phase === 'certify') {
-    const environment = certificationEnvironment(config, descriptor);
-    const cli = resolve(config.packageRoot, 'dist/runtime/index/bin.js');
-    const output = command(
-      [
-        process.execPath,
-        cli,
-        'check',
-        '--rc',
-        '--run',
-        '--task-timeout-ms',
-        String(CERTIFICATION_TASK_TIMEOUT_MS),
-        '--as-role',
-        'inspector',
-        '--write',
-        '--format',
-        'json',
-        '--repo-root',
-        config.repo,
-      ],
+export function certifyCandidate(config, descriptor) {
+  const environment = certificationEnvironment(config, descriptor);
+  const cli = resolve(config.packageRoot, 'dist/runtime/index/bin.js');
+  const output = command(
+    [
+      process.execPath,
+      join(config.repo, 'scripts/process/validation-runner.mjs'),
+      '--exclusive',
+      '--',
+      process.execPath,
+      cli,
+      'check',
+      '--rc',
+      '--run',
+      '--task-timeout-ms',
+      String(CERTIFICATION_TASK_TIMEOUT_MS),
+      '--as-role',
+      'inspector',
+      '--write',
+      '--format',
+      'json',
+      '--repo-root',
       config.repo,
-      environment,
-    );
-    const result = JSON.parse(output);
-    const taskReport = result.result?.value ?? result;
-    requireValue(taskReport.exitCode === 0 && taskReport.receipt?.path, 'RC_RECEIPT_MISSING');
-    candidateReceipt = taskReport.receipt.path;
-    assertFresh(report, inspectPrerequisites(config, configPath));
-  }
+    ],
+    config.repo,
+    environment,
+  );
+  const result = JSON.parse(output);
+  const taskReport = result.result?.value ?? result;
+  requireValue(taskReport.exitCode === 0 && taskReport.receipt?.path, 'RC_RECEIPT_MISSING');
+  const candidateReceipt = taskReport.receipt.path;
+  return candidateReceipt;
+}
+
+export function exportCandidate(config, report, candidateReceipt, configPath) {
   requireValue(candidateReceipt, 'CANDIDATE_RECEIPT_REQUIRED');
   const exporter = join(config.packageRoot, 'dist/runtime/evidence-verification/src/export-cli.js');
   const args = [
@@ -524,6 +505,36 @@ function run() {
   ];
   command([...args, '--preflight', 'true'], dirname(configPath));
   command(args, dirname(configPath));
+}
+
+function run() {
+  const [phase, configPath, receiptPath] = process.argv.slice(2);
+  if (phase === 'credentials') {
+    runCredentials(configPath, receiptPath);
+    return;
+  }
+  if (phase === 'control-commit') {
+    runControlCommit();
+    return;
+  }
+  requireValue(
+    ['prerequisites', 'certify', 'evidence'].includes(phase) && configPath && receiptPath,
+    'USAGE',
+  );
+  const config = read(configPath);
+  const current = inspectPrerequisites(config, configPath);
+  const { descriptor, ...report } = current;
+  if (phase === 'prerequisites') {
+    writeFileSync(receiptPath, `${JSON.stringify(report, null, 2)}\n`, { flag: 'wx', mode: 0o600 });
+    process.stdout.write(`${JSON.stringify({ ok: report.ok, checks: report.checks })}\n`);
+    process.exitCode = report.ok ? 0 : 1;
+    return;
+  }
+  assertFresh(read(receiptPath), report);
+  const candidateReceipt =
+    phase === 'certify' ? certifyCandidate(config, descriptor) : config.receipt;
+  assertFresh(report, inspectPrerequisites(config, configPath));
+  exportCandidate(config, report, candidateReceipt, configPath);
   process.stdout.write('{"ok":true,"phase":"evidence"}\n');
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
