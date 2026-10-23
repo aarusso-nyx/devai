@@ -14,8 +14,10 @@ interface Scope {
 
 /**
  * The title and run markers (`skip`, `only`, `todo`, `skipIf`, ...) of a describe/it/test call
- * that registers a body, or undefined when the call is not one. `it.skipIf(c)('title', fn)` and
- * `it.each(rows)('title', fn)` are judged at their outer call.
+ * that registers a test or suite, or undefined when the call is not one. A registration names a
+ * title and a body, inline or referenced (`it('x', body)`), or is a todo. `it.skipIf(c)('title',
+ * fn)` and `it.each(rows)('title', fn)` are judged at their outer call; their inner call takes a
+ * single argument and registers nothing.
  */
 function testCall(
   node: ts.CallExpression,
@@ -31,9 +33,7 @@ function testCall(
     } else break;
   }
   if (!ts.isIdentifier(callee) || !TEST_CALLEES.has(callee.text)) return undefined;
-  const registersBody =
-    markers.includes('todo') ||
-    node.arguments.some((arg) => ts.isArrowFunction(arg) || ts.isFunctionExpression(arg));
+  const registersBody = markers.includes('todo') || node.arguments.length >= 2;
   const [first] = node.arguments;
   if (!registersBody || first === undefined) return undefined;
   return { title: ts.isStringLiteralLike(first) ? first.text : first.getText(source), markers };
@@ -99,15 +99,14 @@ function canonicalText(node: ts.Node, source: ts.SourceFile): string {
   return text;
 }
 
-/**
- * Every `expect` assertion of a test source, in source order, by its identity: the describe/it
- * titles that hold it, the run markers on that chain, and its canonical text (ADR-GOV-0026).
- * An assertion outside any test is identified by the file alone. Identical assertions in one
- * test appear once each.
- */
-export function assertionIdentities(source: string): readonly string[] {
+/** The assertion and registration identities of a test source, in source order. */
+function identitiesOf(source: string): {
+  readonly assertions: readonly string[];
+  readonly registrations: readonly string[];
+} {
   const file = ts.createSourceFile('x.ts', source, ts.ScriptTarget.Latest, true);
   const identities: string[] = [];
+  const registrations: string[] = [];
   const walk = (node: ts.Node, scope: Scope): void => {
     if (ts.isCallExpression(node)) {
       const test = testCall(node, file);
@@ -116,6 +115,7 @@ export function assertionIdentities(source: string): readonly string[] {
           titles: [...scope.titles, test.title],
           markers: [...scope.markers, ...test.markers],
         };
+        registrations.push(`${inner.titles.join(' > ')} :: ${inner.markers.join(',')}`);
         walk(node.expression, scope);
         for (const argument of node.arguments) walk(argument, inner);
         return;
@@ -132,7 +132,30 @@ export function assertionIdentities(source: string): readonly string[] {
     });
   };
   walk(file, { titles: [], markers: [] });
-  return identities;
+  return { assertions: identities, registrations };
+}
+
+/**
+ * Every `expect` assertion of a test source, in source order, by its identity: the describe/it
+ * titles that hold it, the run markers on that chain, and its canonical text (ADR-GOV-0026).
+ * An assertion outside any test is identified by the file alone. Identical assertions in one
+ * test appear once each.
+ */
+export function assertionIdentities(source: string): readonly string[] {
+  return identitiesOf(source).assertions;
+}
+
+/** The base identities the head no longer holds, each lost occurrence named once. */
+function lost(base: readonly string[], head: readonly string[]): readonly string[] {
+  const remaining = new Map<string, number>();
+  for (const identity of head) remaining.set(identity, (remaining.get(identity) ?? 0) + 1);
+  const changed: string[] = [];
+  for (const identity of base) {
+    const left = remaining.get(identity) ?? 0;
+    if (left > 0) remaining.set(identity, left - 1);
+    else changed.push(identity);
+  }
+  return changed;
 }
 
 /**
@@ -141,15 +164,15 @@ export function assertionIdentities(source: string): readonly string[] {
  * added assertions change nothing. Each lost occurrence is named once.
  */
 export function changedAssertions(base: string, head: string): readonly string[] {
-  const remaining = new Map<string, number>();
-  for (const identity of assertionIdentities(head)) {
-    remaining.set(identity, (remaining.get(identity) ?? 0) + 1);
-  }
-  const changed: string[] = [];
-  for (const identity of assertionIdentities(base)) {
-    const left = remaining.get(identity) ?? 0;
-    if (left > 0) remaining.set(identity, left - 1);
-    else changed.push(identity);
-  }
-  return changed;
+  return lost(assertionIdentities(base), assertionIdentities(head));
+}
+
+/**
+ * The base test and suite registrations the head no longer holds with the same describe/it
+ * chain and run markers: removed, renamed or re-marked tests, including those registered with a
+ * referenced callback (`it('x', body)`), whose assertions live outside the registration and so
+ * never carry its markers. Added registrations change nothing.
+ */
+export function changedTestRegistrations(base: string, head: string): readonly string[] {
+  return lost(identitiesOf(base).registrations, identitiesOf(head).registrations);
 }

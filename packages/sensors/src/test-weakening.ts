@@ -7,7 +7,7 @@ import {
   type SensorReading,
   type SensorStatus,
 } from './sensor-reading.js';
-import { changedAssertions } from './test-assertions.js';
+import { changedAssertions, changedTestRegistrations } from './test-assertions.js';
 
 export interface TestWeakeningOptions {
   readonly cwd: string;
@@ -30,7 +30,8 @@ interface AssertionCounts {
  * after the change, flag if the after-count drops by more than the
  * threshold ratio. Per-assertion identity (ADR-GOV-0026) adds one
  * `assertion_changed` review finding when base assertions were edited,
- * moved or re-marked beyond what the count drop already explains.
+ * moved or re-marked beyond what the count drop already explains, or when
+ * an existing test was removed, renamed or re-marked.
  *
  * The default threshold is a 20% decrease. Reports
  * one finding per drift; the overall status is 'fail' if any finding
@@ -150,13 +151,24 @@ export function senseTestWeakening(opts: TestWeakeningOptions): SensorReading {
       });
     }
     const changed = changedAssertions(baseText, headText);
-    if (changed.length > Math.max(decrease, 0)) {
-      const shown = changed.slice(0, 5).join('; ');
-      const more = changed.length > 5 ? `; and ${String(changed.length - 5)} more` : '';
+    const registrations = changedTestRegistrations(baseText, headText);
+    const listed = (identities: readonly string[]): string =>
+      `${identities.slice(0, 5).join('; ')}${identities.length > 5 ? `; and ${String(identities.length - 5)} more` : ''}`;
+    const parts = [
+      ...(changed.length > Math.max(decrease, 0)
+        ? [`${String(changed.length)} existing assertion(s) changed or removed: ${listed(changed)}`]
+        : []),
+      ...(registrations.length > 0
+        ? [
+            `${String(registrations.length)} existing test(s) removed, renamed or re-marked: ${listed(registrations)}`,
+          ]
+        : []),
+    ];
+    if (parts.length > 0) {
       findings.push({
         severity: 'warning',
         code: 'assertion_changed',
-        message: `${String(changed.length)} existing assertion(s) changed or removed: ${shown}${more}`,
+        message: parts.join('; '),
         file,
       });
     }
