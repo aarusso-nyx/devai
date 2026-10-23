@@ -21,6 +21,17 @@ import { canonicalSha256 } from '@devai-nyx/utils';
 import { trackGovernanceEvent } from '@devai-nyx/loop';
 import { createHash } from 'node:crypto';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
+import {
+  declaredBoundary,
+  focusedRegressionAvailable,
+  judgeWriteScope,
+  withinDeclaredBoundary,
+} from '../../services/write-scope/index.js';
+import {
+  captureWorkspace,
+  workspaceChanges,
+  type WorkspaceBaseline,
+} from '../../services/write-scope/workspace-changes.js';
 
 function taskExecutionRoot(repoRoot: string, task: TaskRecord): string {
   if (task.worktree_id === undefined) return repoRoot;
@@ -74,6 +85,45 @@ function notApplicable(reason: string): Readonly<{ not_applicable_reason: string
 /** Retained bytes per routine output stream, matching the former spawnSync buffer (1 MiB). */
 const ROUTINE_OUTPUT_BYTES = 1024 * 1024;
 
+/**
+ * The diff-scope failure of a routine (Owner ruling (b) on #412): every path the routine changed
+ * in its execution root must belong to the task discipline by Article 6, the Engineer
+ * focused-regression verb included (ADR-GOV-0026), and lie inside the declared task boundary,
+ * exactly as an experimental attempt is judged.
+ */
+function routineScopeFailure(
+  repoRoot: string,
+  executionRoot: string,
+  task: TaskRecord,
+  baseline: WorkspaceBaseline,
+): Readonly<{ code: string; message: string }> | undefined {
+  const { changes, readBase } = workspaceChanges(executionRoot, baseline);
+  const scope = judgeWriteScope({
+    discipline: task.discipline,
+    changes,
+    focusedRegression: focusedRegressionAvailable(repoRoot, task),
+    headRoot: executionRoot,
+    readBase,
+  });
+  if (scope.outOfScope.length > 0) {
+    return {
+      code: 'TASK_WRITE_SCOPE_VIOLATION',
+      message: `routine writes outside the ${task.discipline} paths: ${scope.violations.slice(0, 20).join(', ')}`,
+    };
+  }
+  const boundary = declaredBoundary(task);
+  const outOfBoundary =
+    boundary.length === 0
+      ? []
+      : changes.map(({ path }) => path).filter((path) => !withinDeclaredBoundary(path, boundary));
+  return outOfBoundary.length > 0
+    ? {
+        code: 'TASK_BOUNDARY_VIOLATION',
+        message: `routine writes outside the declared task boundary: ${outOfBoundary.slice(0, 20).join(', ')}`,
+      }
+    : undefined;
+}
+
 function evidenceId(task: TaskRecord, startedAt: string, completedAt: string): string {
   return `TXE-${canonicalSha256({ task, startedAt, completedAt }).slice(0, 16)}`;
 }
@@ -94,6 +144,8 @@ async function dispatchRoutine(
   };
   saveTask(repoRoot, running);
   const executionRoot = taskExecutionRoot(repoRoot, running);
+  // Taken before the routine starts, so changes already in the tree are not charged to it.
+  const baseline = captureWorkspace(executionRoot);
   const startedAt = new Date().toISOString();
   let timedOut = false;
   let terminationUnconfirmed = false;
@@ -174,7 +226,10 @@ async function dispatchRoutine(
           message: `routine exceeded its ${String(executor.timeout_ms)} ms deadline and was terminated`,
         }
       : undefined;
-  const succeeded = result.ok && processFailure === undefined;
+  const scopeFailure = routineScopeFailure(repoRoot, executionRoot, running, baseline);
+  const succeeded = result.ok && processFailure === undefined && scopeFailure === undefined;
+  // A routine that ran to completion but wrote out of scope fails; it did not error.
+  const verdict = succeeded ? 'pass' : result.ok && processFailure === undefined ? 'fail' : 'error';
   const resolvedArgv = result.ok ? (result.resolved.argv ?? []) : (executor.argv ?? []);
   const evidenceTask = running as unknown as TaskRecordBinding;
   const evidence: TaskExecutionEvidence = buildTaskExecutionEvidence(evidenceTask, {
@@ -204,13 +259,16 @@ async function dispatchRoutine(
     cost: notApplicable('routine executor has no provider cost'),
     started_at: startedAt,
     completed_at: completedAt,
-    verdict: succeeded ? 'pass' : 'error',
+    verdict,
     ...(!succeeded && {
       failure: {
-        ...(processFailure ?? {
-          code: result.ok ? 'TASK_ROUTINE_EXIT_NONZERO' : result.code,
-          message: result.ok ? 'literal argv failed without an adapter diagnostic' : result.message,
-        }),
+        ...(processFailure ??
+          (result.ok
+            ? (scopeFailure ?? {
+                code: 'TASK_ROUTINE_EXIT_NONZERO',
+                message: 'literal argv failed without an adapter diagnostic',
+              })
+            : { code: result.code, message: result.message })),
         rollback_disposition: 'preserved-for-repair' as const,
       },
     }),
