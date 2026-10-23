@@ -177,12 +177,22 @@ export async function runValidation(argv, options = {}) {
     for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.off(signal, cancel);
   }
   let child;
+  let requestedSignal;
   // Only the outer exclusive host controller creates a process group. Shared
   // task wrappers MUST remain inside the authority runner's existing group,
   // preserving its timeout termination and protected-namespace writer census.
   const ownsGroup = options.exclusive === true && !lease.inherited;
   const forward = (signal) => {
-    if (child?.pid) process.kill(ownsGroup ? -child.pid : child.pid, signal);
+    requestedSignal = signal;
+    if (child?.pid) {
+      try {
+        process.kill(ownsGroup ? -child.pid : child.pid, signal);
+      } catch (error) {
+        // A second signal can race a process group's exit. Never throw out of
+        // the handler and abandon ownership; wait for exit and verify quiescence.
+        if (error.code !== 'ESRCH') process.stderr.write('VALIDATION_SIGNAL_NOT_DELIVERED\n');
+      }
+    }
   };
   const signals = ['SIGINT', 'SIGTERM', 'SIGHUP'];
   const handlers = signals.map((signal) => () => forward(signal));
@@ -196,7 +206,13 @@ export async function runValidation(argv, options = {}) {
     return await new Promise((resolveResult, reject) => {
       child.once('error', reject);
       child.once('exit', (code, signal) =>
-        resolveResult(code ?? (signal === 'SIGINT' ? 130 : 143)),
+        resolveResult(
+          requestedSignal
+            ? requestedSignal === 'SIGINT'
+              ? 130
+              : 143
+            : (code ?? (signal === 'SIGINT' ? 130 : 143)),
+        ),
       );
     });
   } finally {

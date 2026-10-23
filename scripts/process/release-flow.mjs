@@ -170,6 +170,11 @@ export function oneNpmResult(value) {
   throw new Error('RELEASE_FLOW_NPM_RESPONSE_AMBIGUOUS');
 }
 
+export function assertPromotedAssets(expectedFiles, directory) {
+  if (!same(inspectAssets(directory).files, expectedFiles))
+    throw new Error('RELEASE_FLOW_PUBLICATION_PROMOTION_MISMATCH');
+}
+
 function rehearsal(config, journal, expected, parent) {
   if (
     expected.commit !== journal.bindings.commit ||
@@ -288,6 +293,26 @@ function publication(config, journal, parent, runId) {
     throw new Error('RELEASE_FLOW_PUBLICATION_INCOMPLETE');
   const temporary = mkdtempSync(join(parent, 'publication-'));
   try {
+    // Bind successful publication jobs to this release, not merely another tag
+    // published by the same workflow commit. These are the exact assets handed
+    // from protected verification to the publisher in the selected attempt.
+    const promoted = join(temporary, 'promoted');
+    command(
+      [
+        'gh',
+        'run',
+        'download',
+        String(runId),
+        '--repo',
+        'aarusso-nyx/devai',
+        '--name',
+        `devai-release-assets-${workflow.run_attempt}`,
+        '--dir',
+        promoted,
+      ],
+      config.repo,
+    );
+    assertPromotedAssets(files, promoted);
     command(
       ['gh', 'release', 'download', tag, '--repo', 'aarusso-nyx/devai', '--dir', temporary],
       config.repo,
