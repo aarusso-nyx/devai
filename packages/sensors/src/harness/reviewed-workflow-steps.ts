@@ -238,7 +238,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
       },
       {
         path: 'scripts/check-commit-range.mjs',
-        sha256: '24b9264694666133329ff30a0c87399c6c3118592b3a49541cb491c4392fce30',
+        sha256: '92217349cd340271500108a971d34468acdc62273ce522293ceb8025cdf05c86',
       },
       {
         path: 'scripts/pr-failure-diagnostics.mjs',
