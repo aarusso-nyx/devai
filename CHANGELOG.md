@@ -1,22 +1,36 @@
 # Changelog
 
-## 2.6.4 — Unreleased
+## 2.7.0 — 2026-10-23
 
-This patch repairs custody of native Vitest machine reports when application tests
-write to stdout or stderr. It preserves complete raw streams and fails closed on
-missing, malformed or inconsistent native results.
+This minor release ships constitution 1.1.0 with its enforcement (WS-6, #412). The
+Engineer may author focused regression tests for its own change; designated
+independent assurance keeps the test class with the Inspector. It also carries the
+unreleased 2.6.4 native-custody repairs.
 
-- Keep the existing native collection, nonce, task, candidate and execution-origin
-  checks; noisy test output cannot become a fabricated passing report.
-- Bind unrelated tracked internal directory links as opaque candidate metadata
-  under ADR-SCR-0021. Configuration, executable and actual alias reads still
-  refuse; no generic link traversal or Linux transport support is inferred.
-- Resolve the already validated repository-relative native configuration to its
-  canonical absolute execution argument. Bind its bytes and preparation in the
-  selection identity; external, linked and swapped configuration remains refused.
-- Refresh compiled framework and authority identities through registered upgrade.
-  Preserve all thresholds, the 69-action surface and the trusted verifier
-  `@aarusso-nyx/devai@2.4.0`; existing evidence histories retain their bytes.
+- Amend Articles 6, 7 and 10 (constitution 1.1.0, ADR-GOV-0026). Adopters move to it
+  through `init upgrade --constitution` (`MIG-2.7.0-constitution-1-1-0`); a 1.0.2 pin
+  keeps the original Inspector-only binding.
+- Enforce the Engineer focused-regression verb through the static path table and a
+  diff-time import-adjacency check, without widening the action registry. A test file
+  the task adds, or extends without changing existing code, is admitted only when it
+  imports a source the same task changed. Deleting a test, editing an existing
+  assertion or test, and touching thresholds or other test configuration stay
+  Inspector verbs. An `independent_assurance` round or task withholds the verb.
+- Give routine `round run` the same diff-scope check as experimental dispatch:
+  out-of-scope or out-of-boundary writes, deletions, mode changes, symbolic links and
+  committed changes fail with `TASK_WRITE_SCOPE_VIOLATION` or `TASK_BOUNDARY_VIOLATION`.
+- Admit Engineer focused regression tests in the commit-range author table
+  (ADR-CHK-0009); Inspector commits are judged as before.
+- Report edits to existing assertions and tests in the test-weakening sensor through
+  per-assertion and per-registration identity.
+- Activate the Engineer focused-regression prompt and restate the Inspector mandate as
+  counterexamples, sensor configuration and independent assurance.
+- Native custody repairs from 2.6.4: keep native Vitest machine reports intact when
+  tests write to stdout or stderr, bind unrelated tracked directory links as opaque
+  candidate metadata (ADR-SCR-0021), and resolve the validated native configuration
+  to its canonical absolute argument.
+- Preserve all thresholds, the 69-action surface and the trusted verifier
+  `@aarusso-nyx/devai@2.4.0`.
 
 ## 2.6.3 — 2026-10-19
 
