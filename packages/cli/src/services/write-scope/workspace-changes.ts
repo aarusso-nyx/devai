@@ -122,22 +122,28 @@ export function captureWorkspace(root: string): WorkspaceBaseline {
 
 /**
  * The paths a process changed since the baseline, each as added, modified or deleted against
- * its baseline state, and the baseline text of a path.
+ * its baseline state, and the baseline text of a path. A change the process committed counts
+ * even when the working tree was restored afterwards; such a committed path whose working-tree
+ * state no longer matches the commit is also named as divergent, because the tree then hides
+ * what the candidate commit holds.
  */
 export function workspaceChanges(
   root: string,
   baseline: WorkspaceBaseline,
 ): {
   readonly changes: readonly WriteChange[];
+  readonly divergent: readonly string[];
   readonly readBase: (path: string) => string | undefined;
 } {
   const head = git(root, ['rev-parse', 'HEAD']).trim();
   const candidates = new Set([...baseline.dirty.keys(), ...dirtyPaths(root)]);
+  const committedPaths = new Set<string>();
   if (head !== baseline.head) {
     for (const path of git(root, ['diff', '--name-only', '-z', '--no-renames', baseline.head, head])
       .split('\0')
       .filter((entry) => entry !== '' && !runtimePath(entry))) {
       candidates.add(path);
+      committedPaths.add(path);
     }
   }
   const before = (path: string): Digest =>
@@ -145,15 +151,26 @@ export function workspaceChanges(
       ? (baseline.dirty.get(path) ?? null)
       : committedDigest(root, baseline.head, path);
   const changes: WriteChange[] = [];
+  const divergent: string[] = [];
+  const kindOf = (was: Digest, is: Digest): WriteChange['kind'] =>
+    is === null ? 'deleted' : was === null ? 'added' : 'modified';
   for (const path of [...candidates].sort()) {
     const was = before(path);
     const is = workingDigest(root, path);
-    if (was === is) continue;
-    changes.push({ path, kind: is === null ? 'deleted' : was === null ? 'added' : 'modified' });
+    if (committedPaths.has(path)) {
+      const committedBefore = committedDigest(root, baseline.head, path);
+      const committedAfter = committedDigest(root, head, path);
+      if (committedAfter !== is) divergent.push(path);
+      if (was === is && committedBefore !== committedAfter) {
+        changes.push({ path, kind: kindOf(committedBefore, committedAfter) });
+        continue;
+      }
+    }
+    if (was !== is) changes.push({ path, kind: kindOf(was, is) });
   }
   const readBase = (path: string): string | undefined =>
     baseline.dirty.has(path)
       ? baseline.texts.get(path)
       : committed(root, baseline.head, path)?.toString('utf8');
-  return { changes, readBase };
+  return { changes, divergent, readBase };
 }
