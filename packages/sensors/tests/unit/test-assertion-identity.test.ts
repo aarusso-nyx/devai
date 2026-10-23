@@ -4,7 +4,11 @@
 // that chain, and its canonical text; a base assertion that no longer appears in the head with
 // the same identity is changed. Formatting, comments, reordering and additions change nothing.
 import { describe, expect, it } from 'vitest';
-import { assertionIdentities, changedAssertions } from '../../src/test-assertions.js';
+import {
+  assertionIdentities,
+  changedAssertions,
+  changedTestRegistrations,
+} from '../../src/test-assertions.js';
 
 const BASE = `
 import { describe, expect, it } from 'vitest';
@@ -125,5 +129,68 @@ describe('changed assertions between a base and a head', () => {
 
   it('treats an absent head as removing every assertion', () => {
     expect(changedAssertions(BASE, '')).toHaveLength(4);
+  });
+});
+
+// Codex review on #426: a test registered with a referenced callback (`it('x', body)`) keeps its
+// assertions in the callback's own scope, so its run markers never reach their identity. The
+// registrations themselves therefore carry an identity too: the describe/it chain and its run
+// markers. A base registration the head no longer holds is a removed, renamed or re-marked test.
+describe('changed test registrations', () => {
+  const REFERENCED = [
+    "import { expect, it } from 'vitest';",
+    'function body() {',
+    '  expect(value()).toBe(1);',
+    '}',
+    "it('reads the value', body);",
+    "it('runs without assertions', () => { run(); });",
+    '',
+  ].join('\n');
+
+  it('finds nothing when the registrations are unchanged', () => {
+    expect(changedTestRegistrations(REFERENCED, REFERENCED)).toEqual([]);
+  });
+
+  it.each([
+    ['skipped', "it.skip('reads the value', body)"],
+    ['marked todo', "it.todo('reads the value', body)"],
+    ['skipped conditionally', "it.skipIf(ci)('reads the value', body)"],
+    ['focused', "it.only('reads the value', body)"],
+  ])('names a referenced-callback test that is %s', (_label, registration) => {
+    const head = REFERENCED.replace("it('reads the value', body)", registration);
+    const changed = changedTestRegistrations(REFERENCED, head);
+    expect(changed).toHaveLength(1);
+    expect(changed[0]).toContain('reads the value');
+  });
+
+  it('names a skipped test that has no assertions', () => {
+    const head = REFERENCED.replace(
+      "it('runs without assertions'",
+      "it.skip('runs without assertions'",
+    );
+    expect(changedTestRegistrations(REFERENCED, head)).toHaveLength(1);
+  });
+
+  it('names a removed or renamed test', () => {
+    expect(
+      changedTestRegistrations(
+        REFERENCED,
+        REFERENCED.replace("it('reads the value', body);\n", ''),
+      ),
+    ).toHaveLength(1);
+    expect(
+      changedTestRegistrations(REFERENCED, REFERENCED.replace("'reads the value'", "'reads it'")),
+    ).toHaveLength(1);
+  });
+
+  it('ignores added tests, including referenced-callback ones', () => {
+    const head = `${REFERENCED}it('reads it again', body);\ntest('with options', { timeout: 10 }, body);\n`;
+    expect(changedTestRegistrations(REFERENCED, head)).toEqual([]);
+  });
+
+  it('does not take the inner call of a curried registration for a test', () => {
+    const base = "it.each([1, 2])('reads %i', (n) => expect(n).toBeGreaterThan(0));\n";
+    expect(changedTestRegistrations(base, base)).toEqual([]);
+    expect(changedTestRegistrations(base, base.replace('it.each', 'it.skip.each'))).toHaveLength(1);
   });
 });
