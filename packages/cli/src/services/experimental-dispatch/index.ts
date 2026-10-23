@@ -59,12 +59,14 @@ import { createHash } from 'node:crypto';
 import { hostname } from 'node:os';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import {
+  declaredBoundary,
   focusedRegressionAvailable,
   judgeWriteScope,
+  withinDeclaredBoundary,
   type WriteChange,
 } from '../write-scope/index.js';
 
-export { article6Role } from '../write-scope/index.js';
+export { article6Role, withinDeclaredBoundary } from '../write-scope/index.js';
 
 /**
  * Per-runtime model order from law/policy/model-tiers.json, lowest capability first;
@@ -180,24 +182,6 @@ export function bumpedModel(
   if (order.indexOf(model) < 0 || next === undefined) return undefined;
   const admitted = activation.runtimes.find((entry) => entry.runtime === runtime)?.models ?? [];
   return admitted.includes(next) ? next : undefined;
-}
-
-/**
- * Whether a changed path lies inside the task's declared boundary (`intent_diff.planned_files`,
- * the campaign `boundary.paths`; ADR-MDL-0009): an exact path, or a path under an entry that
- * ends with `/`. A task that declares no boundary is bounded by its Article 6 role alone.
- */
-export function withinDeclaredBoundary(path: string, boundary: readonly string[]): boolean {
-  const normalized = path.split(sep).join('/');
-  return boundary.some((entry) =>
-    entry.endsWith('/') ? normalized.startsWith(entry) : normalized === entry,
-  );
-}
-
-function declaredBoundary(task: TaskRecord): readonly string[] {
-  const planned = (task as { readonly intent_diff?: { readonly planned_files?: unknown } })
-    .intent_diff?.planned_files;
-  return Array.isArray(planned) ? (planned as string[]) : [];
 }
 
 /** A worktree's file digests, and the symbolic links in it that resolve outside it. */

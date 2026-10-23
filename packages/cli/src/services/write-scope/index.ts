@@ -61,6 +61,25 @@ export function focusedRegressionAvailable(repoRoot: string, task: TaskRecord): 
   );
 }
 
+/**
+ * Whether a changed path lies inside the task's declared boundary (`intent_diff.planned_files`,
+ * the campaign `boundary.paths`; ADR-MDL-0009): an exact path, or a path under an entry that
+ * ends with `/`. A task that declares no boundary is bounded by its Article 6 role alone.
+ */
+export function withinDeclaredBoundary(path: string, boundary: readonly string[]): boolean {
+  const normalized = path.split(sep).join('/');
+  return boundary.some((entry) =>
+    entry.endsWith('/') ? normalized.startsWith(entry) : normalized === entry,
+  );
+}
+
+/** The task's declared boundary; empty when it declares none. */
+export function declaredBoundary(task: TaskRecord): readonly string[] {
+  const planned = (task as { readonly intent_diff?: { readonly planned_files?: unknown } })
+    .intent_diff?.planned_files;
+  return Array.isArray(planned) ? (planned as string[]) : [];
+}
+
 export type WriteChangeKind = 'added' | 'modified' | 'deleted';
 
 export interface WriteChange {
