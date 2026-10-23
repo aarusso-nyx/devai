@@ -72,7 +72,11 @@ const printer = ts.createPrinter({ removeComments: true });
  * spacing and trailing commas never change it. Words stay separated by one space.
  */
 function canonicalText(node: ts.Node, source: ts.SourceFile): string {
-  const printed = printer.printNode(ts.EmitHint.Expression, node, source);
+  const printed = printer.printNode(
+    ts.isStatement(node) ? ts.EmitHint.Unspecified : ts.EmitHint.Expression,
+    node,
+    source,
+  );
   const scanner = ts.createScanner(
     ts.ScriptTarget.Latest,
     true,
@@ -175,4 +179,75 @@ export function changedAssertions(base: string, head: string): readonly string[]
  */
 export function changedTestRegistrations(base: string, head: string): readonly string[] {
   return lost(identitiesOf(base).registrations, identitiesOf(head).registrations);
+}
+
+/** A test or suite registration statement with an inline block body, split into key and body. */
+function registrationBlock(
+  statement: ts.Statement,
+  source: ts.SourceFile,
+): { readonly key: string; readonly body: readonly ts.Statement[] } | undefined {
+  if (!ts.isExpressionStatement(statement) || !ts.isCallExpression(statement.expression)) {
+    return undefined;
+  }
+  const call = statement.expression;
+  if (testCall(call, source) === undefined) return undefined;
+  const body = [...call.arguments]
+    .reverse()
+    .find(
+      (argument): argument is ts.ArrowFunction | ts.FunctionExpression =>
+        (ts.isArrowFunction(argument) || ts.isFunctionExpression(argument)) &&
+        ts.isBlock(argument.body),
+    );
+  if (body === undefined) return undefined;
+  const key = [
+    canonicalText(call.expression, source),
+    ...call.arguments.filter((argument) => argument !== body).map((a) => canonicalText(a, source)),
+    body.parameters.map((parameter) => canonicalText(parameter, source)).join(','),
+    String(body.modifiers?.some((m) => m.kind === ts.SyntaxKind.AsyncKeyword) ?? false),
+  ].join(' | ');
+  return { key, body: (body.body as ts.Block).statements };
+}
+
+/**
+ * The base statements the head does not preserve, in order. The head may insert statements
+ * anywhere; every base statement must reappear, in order, with the same canonical text, except a
+ * registration with an inline body, which must reappear with the same key and a body that in
+ * turn preserves its own statements. An edit that only adds tests, imports or assertions keeps
+ * the list empty, whatever assertion library the existing statements use.
+ */
+export function unpreservedStatements(base: string, head: string): readonly string[] {
+  const baseFile = ts.createSourceFile('base.ts', base, ts.ScriptTarget.Latest, true);
+  const headFile = ts.createSourceFile('head.ts', head, ts.ScriptTarget.Latest, true);
+  const compare = (
+    before: readonly ts.Statement[],
+    after: readonly ts.Statement[],
+  ): readonly string[] => {
+    const lostStatements: string[] = [];
+    let next = 0;
+    for (const statement of before) {
+      const registration = registrationBlock(statement, baseFile);
+      const text = registration === undefined ? canonicalText(statement, baseFile) : undefined;
+      let matched = -1;
+      let nested: readonly string[] = [];
+      for (let index = next; index < after.length && matched < 0; index += 1) {
+        const candidate = after[index] as ts.Statement;
+        if (registration === undefined) {
+          if (canonicalText(candidate, headFile) === text) matched = index;
+          continue;
+        }
+        const other = registrationBlock(candidate, headFile);
+        if (other?.key === registration.key) {
+          matched = index;
+          nested = compare(registration.body, other.body);
+        }
+      }
+      if (matched < 0) lostStatements.push(text ?? registration?.key ?? '');
+      else {
+        lostStatements.push(...nested);
+        next = matched + 1;
+      }
+    }
+    return lostStatements;
+  };
+  return compare(baseFile.statements, headFile.statements);
 }
