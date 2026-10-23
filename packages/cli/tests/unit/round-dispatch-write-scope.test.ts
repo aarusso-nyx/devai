@@ -7,7 +7,15 @@
 import { runWithAuthorityHostEffects, type AuthorityHostEffectScope } from '@devai-nyx/authority';
 import type { TaskRecord } from '@devai-nyx/loop';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -221,6 +229,69 @@ describe('round run judges a routine diff by Article 6 (ruling (b))', () => {
     const root = repository();
     const result = await dispatch(root, routineTask([process.execPath, '-e', 'process.exit(0)']));
     expect(result).toMatchObject({ ok: true });
+  });
+});
+
+// Codex review on #426: Git tracks a file's executable bit and a symbolic link's target, not only
+// regular-file bytes, so a routine must not be able to change either outside its scope unseen.
+describe('round run sees mode and symbolic-link changes', () => {
+  const node = (script: string): string[] => [process.execPath, '-e', script];
+
+  it('fails a routine that only makes an out-of-scope file executable', async () => {
+    const root = repository();
+    const result = await dispatch(
+      root,
+      routineTask(node("require('node:fs').chmodSync('docs/index.md', 0o755)")),
+    );
+    expect(result).toMatchObject({ ok: false, code: 'TASK_WRITE_SCOPE_VIOLATION' });
+  });
+
+  it('passes a routine that makes an in-scope file executable', async () => {
+    const root = repository();
+    const result = await dispatch(
+      root,
+      routineTask(node("require('node:fs').chmodSync('packages/app/src/a.ts', 0o755)")),
+    );
+    expect(result).toMatchObject({ ok: true });
+  });
+
+  it('fails a routine that adds an out-of-scope symbolic link', async () => {
+    const root = repository();
+    const result = await dispatch(
+      root,
+      routineTask(node("require('node:fs').symlinkSync('../AGENTS.md', 'docs/link.md')")),
+    );
+    expect(result).toMatchObject({ ok: false, code: 'TASK_WRITE_SCOPE_VIOLATION' });
+    expect(evidence(root)).toMatchObject({
+      failure: { message: expect.stringContaining('docs/link.md') as unknown },
+    });
+  });
+
+  it('fails a routine that retargets a tracked out-of-scope symbolic link', async () => {
+    const root = repository();
+    symlinkSync('index.md', join(root, 'docs/current.md'));
+    git(root, 'add', '-A');
+    git(root, 'commit', '-qm', 'link');
+    const result = await dispatch(
+      root,
+      routineTask(
+        node(
+          "const fs = require('node:fs'); fs.rmSync('docs/current.md'); fs.symlinkSync('../AGENTS.md', 'docs/current.md');",
+        ),
+      ),
+    );
+    expect(result).toMatchObject({ ok: false, code: 'TASK_WRITE_SCOPE_VIOLATION' });
+  });
+
+  it('fails a routine that adds a symbolic link outside the declared boundary', async () => {
+    const root = repository();
+    const result = await dispatch(
+      root,
+      routineTask(node("require('node:fs').symlinkSync('a.ts', 'packages/app/src/alias.ts')"), {
+        intent_diff: { planned_files: ['packages/app/src/a.ts'] },
+      }),
+    );
+    expect(result).toMatchObject({ ok: false, code: 'TASK_BOUNDARY_VIOLATION' });
   });
 });
 

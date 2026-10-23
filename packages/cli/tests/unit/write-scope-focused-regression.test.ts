@@ -7,7 +7,7 @@
 // independent-assurance task withholds the verb entirely.
 import { runWithAuthorityHostEffects, type AuthorityHostEffectScope } from '@devai-nyx/authority';
 import type { TaskRecord } from '@devai-nyx/loop';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -78,20 +78,35 @@ const BASE: Readonly<Record<string, string>> = {
  * A head tree on disk: the base with `edits` applied (a null edit deletes), and the changes the
  * judge sees, in the shape a task diff reports them.
  */
-function task(edits: Readonly<Record<string, string | null>>) {
+interface TaskOptions {
+  /** Further base files, present before the task. */
+  readonly base?: Readonly<Record<string, string>>;
+  /** Symbolic links the task adds, by path and target. */
+  readonly links?: Readonly<Record<string, string>>;
+}
+
+function task(edits: Readonly<Record<string, string | null>>, options: TaskOptions = {}) {
   const root = mkdtempSync(join(tmpdir(), 'devai-write-scope-'));
   roots.push(root);
-  const head = { ...BASE, ...edits };
+  const base: Readonly<Record<string, string>> = { ...BASE, ...options.base };
+  const head = { ...base, ...edits };
   for (const [path, content] of Object.entries(head)) {
     if (content === null) continue;
     mkdirSync(dirname(join(root, path)), { recursive: true });
     writeFileSync(join(root, path), content);
   }
-  const changes: WriteChange[] = Object.entries(edits).map(([path, content]) => ({
-    path,
-    kind: content === null ? 'deleted' : Object.hasOwn(BASE, path) ? 'modified' : 'added',
-  }));
-  return { root, changes, readBase: (path: string) => BASE[path] };
+  for (const [path, target] of Object.entries(options.links ?? {})) {
+    mkdirSync(dirname(join(root, path)), { recursive: true });
+    symlinkSync(target, join(root, path));
+  }
+  const changes: WriteChange[] = [
+    ...Object.entries(edits).map(([path, content]): WriteChange => ({
+      path,
+      kind: content === null ? 'deleted' : Object.hasOwn(base, path) ? 'modified' : 'added',
+    })),
+    ...Object.keys(options.links ?? {}).map((path): WriteChange => ({ path, kind: 'added' })),
+  ];
+  return { root, changes, readBase: (path: string) => base[path] };
 }
 
 const CHANGED_A = { 'packages/x/src/a.ts': 'export const a = 2;\n' };
@@ -107,9 +122,12 @@ const regression = (specifier: string) =>
 
 async function judge(
   edits: Readonly<Record<string, string | null>>,
-  options: { readonly discipline?: string; readonly focusedRegression?: boolean } = {},
+  options: TaskOptions & {
+    readonly discipline?: string;
+    readonly focusedRegression?: boolean;
+  } = {},
 ) {
-  const { root, changes, readBase } = task(edits);
+  const { root, changes, readBase } = task(edits, options);
   return permissive(() =>
     judgeWriteScope({
       discipline: options.discipline ?? 'engineer',
@@ -235,6 +253,37 @@ describe('IA-002: deletion, assertion edits and thresholds stay Inspector verbs'
       'packages/x/tests/unit/a.test.ts': EXISTING_TEST.replace("it('is one'", "it.skip('is one'"),
     });
     expect(verdict.outOfScope).toEqual(['packages/x/tests/unit/a.test.ts']);
+  });
+
+  it('refuses skipping an existing test registered with a referenced callback', async () => {
+    const referenced = [
+      "import { expect, it } from 'vitest';",
+      "import { a } from '../../src/a.js';",
+      'function isTwo() {',
+      '  expect(a).toBe(2);',
+      '}',
+      "it('is two', isTwo);",
+      '',
+    ].join('\n');
+    const verdict = await judge(
+      {
+        ...CHANGED_A,
+        'packages/x/tests/unit/ref.test.ts': referenced.replace("it('is two'", "it.skip('is two'"),
+      },
+      { base: { 'packages/x/tests/unit/ref.test.ts': referenced } },
+    );
+    expect(verdict.outOfScope).toEqual(['packages/x/tests/unit/ref.test.ts']);
+  });
+
+  it('refuses a test-class path that is a symbolic link, even to an adjacent test', async () => {
+    const verdict = await judge(
+      {
+        ...CHANGED_A,
+        'packages/x/tests/unit/a-regression.test.ts': regression('../../src/a.js'),
+      },
+      { links: { 'packages/x/tests/unit/linked.test.ts': 'a-regression.test.ts' } },
+    );
+    expect(verdict.outOfScope).toEqual(['packages/x/tests/unit/linked.test.ts']);
   });
 
   it('refuses lowering a coverage threshold', async () => {
