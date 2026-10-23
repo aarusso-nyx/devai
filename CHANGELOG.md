@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.7.1 — 2026-10-23
+
+This patch reduces release rework while preserving all validation and publication gates.
+
+- Check release prerequisites and docs dependencies before expensive RC validation.
+- Coordinate participating validation commands across worktrees with a host-wide
+  shared/exclusive lease, cancellation and explicit abandoned-lock recovery.
+- Build docs from committed sources in an external snapshot, preserving the candidate
+  checkout and the existing security, typecheck, build and Pages checks.
+- Resume release preparation only after rechecking exact candidate bindings and
+  evidence; verify rehearsal and publication against their exact workflow attempts.
+- Run pre-push affected tasks serially to avoid contention between large suites.
+- Preserve release profiles, coverage thresholds, timeouts, approved verifier
+  `@aarusso-nyx/devai@2.4.0` and all publication approvals.
+
 ## 2.7.0 — 2026-10-23
 
 This minor release ships constitution 1.1.0 with its enforcement (WS-6, #412). The
