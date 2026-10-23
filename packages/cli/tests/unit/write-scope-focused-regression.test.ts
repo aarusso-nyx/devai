@@ -386,6 +386,39 @@ describe('IA-002: an Engineer may only add to an existing test file', () => {
       (await modify('assert.equal(a, 1);', 'assert.equal(\n      a,\n      1,\n    );')).outOfScope,
     ).toEqual([]);
   });
+
+  // Codex review on #426 (third pass): preserving every base statement is not enough when new
+  // code may run before it. Only import declarations that bind names and new test or suite
+  // registrations may be inserted into an existing test file.
+  it.each([
+    [
+      'a return before an existing assertion',
+      '    assert.equal(a, 1);',
+      '    return;\n    assert.equal(a, 1);',
+    ],
+    [
+      'a guard that skips an existing assertion',
+      '    assert.equal(a, 1);',
+      '    if (a !== 1) return;\n    assert.equal(a, 1);',
+    ],
+    [
+      'a hook inside an existing suite',
+      "describe('a', () => {",
+      "describe('a', () => {\n  beforeEach(() => { globalThis.lenient = true; });",
+    ],
+    [
+      'a module mock at the top of the file',
+      "import { a } from '../../src/a.js';",
+      "import { a } from '../../src/a.js';\nvi.mock('node:assert/strict');",
+    ],
+    [
+      'a side-effect import',
+      "import { a } from '../../src/a.js';",
+      "import { a } from '../../src/a.js';\nimport '../helpers/patch-assert.js';",
+    ],
+  ])('refuses inserting %s', async (_label, from, to) => {
+    expect((await modify(from, to)).outOfScope).toEqual(['packages/x/tests/unit/assert.test.ts']);
+  });
 });
 
 describe('IA-003 and IA-004: without the verb Article 6 binds the test class to the Inspector', () => {
