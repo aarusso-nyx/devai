@@ -125,8 +125,15 @@ export function judgeWriteScope(input: WriteScopeInput): WriteScopeVerdict {
   const focusedRefusal = (change: WriteChange): string | undefined => {
     if (change.kind === 'deleted') return 'deletes a test';
     if (!TEST_FILE_PATTERN.test(change.path)) return 'is not a test file';
-    // A link is not a test the task authored, and reading through it could leave the tree.
-    if (!lstatSync(join(input.headRoot, change.path)).isFile()) return 'is not a regular file';
+    // A link is not a test the task authored, and reading through it could leave the tree. A
+    // path the diff names but the tree no longer holds cannot be judged.
+    let regular = false;
+    try {
+      regular = lstatSync(join(input.headRoot, change.path)).isFile();
+    } catch {
+      return 'is absent from the working tree';
+    }
+    if (!regular) return 'is not a regular file';
     const head = readFileSync(join(input.headRoot, change.path), 'utf8');
     workspaces ??= workspacePackages(input.headRoot);
     const imports = importedRepositoryFiles(input.headRoot, change.path, head, workspaces);
