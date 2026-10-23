@@ -27,6 +27,7 @@ const IDENTITY = { name: 'DEVAI Inspector', email: 'inspector@devai.local' };
 const COPIED = [
   '.githooks/pre-push',
   'scripts/pre-push-preflight.mjs',
+  'scripts/process/validation-runner.mjs',
   'scripts/check-commit-range.mjs',
   'scripts/process/summarize-check-report.mjs',
   'law/policy/commit-grammar.json',
