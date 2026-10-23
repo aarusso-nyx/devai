@@ -168,6 +168,8 @@ function preflight(remote, label, baseRef, pushed) {
       'check',
       '--affected',
       '--run',
+      '--task-workers',
+      '1',
       '--base',
       base,
       '--as-role',
