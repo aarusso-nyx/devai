@@ -365,12 +365,15 @@ const TEST_CLASS = /^(?:tests\/|packages\/[^/]+\/tests\/)/u;
 const TEST_FILE = /\.(?:test|spec)\.[cm]?[jt]sx?$/u;
 /** The first constitution whose Articles 6 and 7 grant the Engineer focused-regression verb. */
 export const FOCUSED_REGRESSION_MIN_CONSTITUTION = '1.1.0';
-const CONSTITUTION_SOURCES = ['law/constitution.md', '.devai/pin/constitution.md'];
+/** The pinned constitution governs; the framework source stands in only where nothing is pinned. */
+const CONSTITUTION_SOURCES = ['.devai/pin/constitution.md', 'law/constitution.md'];
 // Mirrors parseConstitutionVersion in packages/utils/src/constitution-version.ts.
 const CONSTITUTION_VERSION =
   /^\*\*(?:Candidate version|Version):\*\*\s*([0-9]+\.[0-9]+\.[0-9]+)\s*$/mu;
 const SOURCE_EXTENSIONS = ['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs'];
 const ENTRY_CONDITIONS = ['development', 'import', 'default', 'types', 'require'];
+/** A path segment Node refuses in a wildcard export match: empty, `.`, `..` or `node_modules`. */
+const INVALID_SEGMENTS = new Set(['', '.', '..', 'node_modules']);
 
 /** Whether a dotted version is at least the minimum; an unparsable version is not. */
 export function versionAtLeast(version, minimum) {
@@ -424,6 +427,38 @@ function candidateFiles(target) {
   return candidates;
 }
 
+// Mirrors subpathEntry in packages/cli/src/services/write-scope/import-adjacency.ts.
+function subpathEntry(exported, subpath) {
+  if (Object.hasOwn(exported, subpath) && !subpath.includes('*')) {
+    return { entry: exported[subpath], match: undefined };
+  }
+  let best;
+  for (const key of Object.keys(exported)) {
+    const star = key.indexOf('*');
+    if (star === -1 || star !== key.lastIndexOf('*')) continue;
+    const prefix = key.slice(0, star);
+    const suffix = key.slice(star + 1);
+    if (
+      subpath.length < key.length ||
+      !subpath.startsWith(prefix) ||
+      !subpath.endsWith(suffix) ||
+      (best !== undefined &&
+        (prefix.length < best.prefix.length ||
+          (prefix.length === best.prefix.length && key.length <= best.key.length)))
+    ) {
+      continue;
+    }
+    best = { key, prefix, match: subpath.slice(prefix.length, subpath.length - suffix.length) };
+  }
+  if (
+    best === undefined ||
+    best.match.split(/[/\\]/u).some((segment) => INVALID_SEGMENTS.has(segment.toLowerCase()))
+  ) {
+    return { entry: undefined, match: undefined };
+  }
+  return { entry: exported[best.key], match: best.match };
+}
+
 /** The entry targets a workspace package exports for a subpath (`.` or `./name`). */
 function exportTargets(manifest, subpath) {
   const exported = manifest.exports;
@@ -435,25 +470,27 @@ function exportTargets(manifest, subpath) {
     typeof exported === 'object' &&
     !Array.isArray(exported) &&
     !Object.keys(exported).some((key) => key.startsWith('.'));
-  const entry =
+  const { entry, match } =
     typeof exported === 'string' || conditional
-      ? subpath === '.'
-        ? exported
-        : undefined
-      : exported[subpath];
-  if (typeof entry === 'string') return [entry];
-  if (entry === null || typeof entry !== 'object') return [];
-  return ENTRY_CONDITIONS.flatMap((condition) =>
-    typeof entry[condition] === 'string' ? [entry[condition]] : [],
-  );
+      ? { entry: subpath === '.' ? exported : undefined, match: undefined }
+      : subpathEntry(exported, subpath);
+  const targets =
+    typeof entry === 'string'
+      ? [entry]
+      : entry === null || typeof entry !== 'object'
+        ? []
+        : ENTRY_CONDITIONS.flatMap((condition) =>
+            typeof entry[condition] === 'string' ? [entry[condition]] : [],
+          );
+  return match === undefined ? targets : targets.map((target) => target.replaceAll('*', match));
 }
 
 /**
  * The repository files one import specifier of `from` resolves to: a relative specifier against
  * the importing file, a workspace specifier through the exports of the `packages/*` manifest that
- * names it, where an emitted `dist/` target stands for its `src/` source. Bare specifiers of any
- * other package resolve to nothing. Mirrors resolveImport in
- * packages/cli/src/services/write-scope/import-adjacency.ts.
+ * names it (a wildcard key such as `./dist/*` included), where an emitted `dist/` target stands
+ * for its `src/` source. Bare specifiers of any other package resolve to nothing. Mirrors
+ * resolveImport in packages/cli/src/services/write-scope/import-adjacency.ts.
  */
 export function resolveImport(specifier, from, files, workspaces) {
   const present = (targets) =>
