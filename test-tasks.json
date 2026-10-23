@@ -78,6 +78,10 @@
         {
           "kind": "prefix",
           "pattern": "packages/schemas/"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/process/validation-runner.mjs"
         }
       ],
       "toolchainKeys": ["node", "pnpm", "vitest"],
@@ -166,6 +170,10 @@
         {
           "kind": "exact",
           "pattern": "vitest.config.ts"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/process/validation-runner.mjs"
         }
       ],
       "toolchainKeys": ["node", "pnpm", "vitest"],
@@ -179,6 +187,9 @@
       "nodeId": "test:package-staging",
       "dependencies": ["build"],
       "argv": [
+        "node",
+        "scripts/process/validation-runner.mjs",
+        "--",
         "pnpm",
         "exec",
         "vitest",
@@ -268,6 +279,10 @@
         {
           "kind": "exact",
           "pattern": "package.json"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/process/validation-runner.mjs"
         }
       ],
       "toolchainKeys": ["node", "pnpm", "vitest"],
@@ -295,6 +310,10 @@
         {
           "kind": "exact",
           "pattern": "tests/config/local.config.ts"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/process/validation-runner.mjs"
         }
       ],
       "toolchainKeys": ["node", "pnpm", "vitest"],
@@ -334,6 +353,10 @@
         {
           "kind": "exact",
           "pattern": "tests/config/local.config.ts"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/process/validation-runner.mjs"
         }
       ],
       "toolchainKeys": ["node", "pnpm", "vitest"],
@@ -393,6 +416,10 @@
         {
           "kind": "prefix",
           "pattern": "packages/evidence/"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/process/validation-runner.mjs"
         }
       ],
       "toolchainKeys": ["node", "pnpm", "vitest"],
@@ -644,6 +671,10 @@
         {
           "kind": "exact",
           "pattern": "scripts/stage-release-package.mjs"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/process/validation-runner.mjs"
         }
       ],
       "toolchainKeys": ["node", "pnpm", "vitest"],
@@ -675,6 +706,10 @@
         {
           "kind": "exact",
           "pattern": "tests/config/local.config.ts"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/process/validation-runner.mjs"
         }
       ],
       "toolchainKeys": ["node", "pnpm", "vitest"],
@@ -738,6 +773,10 @@
         {
           "kind": "prefix",
           "pattern": "packages/evidence/"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/process/validation-runner.mjs"
         }
       ],
       "toolchainKeys": ["node", "pnpm", "vitest"],
@@ -781,6 +820,10 @@
         {
           "kind": "exact",
           "pattern": "tests/config/local.config.ts"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/process/validation-runner.mjs"
         }
       ],
       "toolchainKeys": ["node", "pnpm", "vitest"],
@@ -808,6 +851,10 @@
         {
           "kind": "exact",
           "pattern": "tests/config/local.config.ts"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/process/validation-runner.mjs"
         }
       ],
       "toolchainKeys": ["node", "pnpm", "vitest"],
@@ -863,6 +910,18 @@
         {
           "kind": "prefix",
           "pattern": "packages/spec/src/"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/process/validation-runner.mjs"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/process/docs-build.mjs"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/process/release-flow.mjs"
         }
       ],
       "toolchainKeys": ["node", "pnpm", "vitest"],
@@ -1642,6 +1701,10 @@
         {
           "kind": "exact",
           "pattern": "pnpm-lock.yaml"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/process/validation-runner.mjs"
         }
       ],
       "toolchainKeys": ["node", "pnpm", "vitest", "typescript", "postgres"],
