@@ -15,10 +15,11 @@ import {
   STATIC_AUTHORITY_PREFIXES,
   TEST_FILE_PATTERN,
   existsSync,
+  lstatSync,
   readFileSync,
 } from '@devai-nyx/authority';
 import type { TaskRecord } from '@devai-nyx/loop';
-import { changedAssertions } from '@devai-nyx/sensors';
+import { changedAssertions, changedTestRegistrations } from '@devai-nyx/sensors';
 import { parseConstitutionVersion } from '@devai-nyx/skills';
 import { join, sep } from 'node:path';
 import { gte, valid } from 'semver';
@@ -120,6 +121,8 @@ export function judgeWriteScope(input: WriteScopeInput): WriteScopeVerdict {
   const focusedRefusal = (change: WriteChange): string | undefined => {
     if (change.kind === 'deleted') return 'deletes a test';
     if (!TEST_FILE_PATTERN.test(change.path)) return 'is not a test file';
+    // A link is not a test the task authored, and reading through it could leave the tree.
+    if (!lstatSync(join(input.headRoot, change.path)).isFile()) return 'is not a regular file';
     const head = readFileSync(join(input.headRoot, change.path), 'utf8');
     workspaces ??= workspacePackages(input.headRoot);
     const imports = importedRepositoryFiles(input.headRoot, change.path, head, workspaces);
@@ -131,6 +134,9 @@ export function judgeWriteScope(input: WriteScopeInput): WriteScopeVerdict {
       if (base === undefined) return 'its task-base content is unreadable';
       if (changedAssertions(base, head).length > 0) {
         return 'changes an assertion of a test this task did not add';
+      }
+      if (changedTestRegistrations(base, head).length > 0) {
+        return 'removes, renames or re-marks a test this task did not add';
       }
     }
     return undefined;

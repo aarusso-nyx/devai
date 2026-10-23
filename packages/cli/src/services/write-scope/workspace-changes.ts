@@ -3,10 +3,11 @@
  * routine execution root of `round run`, which may be the repository root itself. A baseline is
  * taken before the process starts and the tree is compared after it ends, so changes already
  * present at the baseline are not the process's own, and a further change to such a path is.
- * Commits the process made are seen through the moved HEAD. Ignored files are not observed;
+ * Commits the process made are seen through the moved HEAD. A path's state is what Git tracks:
+ * its bytes and executable bit, or a symbolic link's target. Ignored files are not observed;
  * runtime state, worktrees and scratch space are never charged to the process.
  */
-import { execFileSync, readFileSync, lstatSync } from '@devai-nyx/authority';
+import { execFileSync, lstatSync, readFileSync, readlinkSync } from '@devai-nyx/authority';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import type { WriteChange } from './index.js';
@@ -14,7 +15,7 @@ import type { WriteChange } from './index.js';
 /** Runtime paths a process may always write: never committed, owned by the executing verb. */
 const RUNTIME_PREFIXES = ['.devai/state/', '.devai/worktrees/', '.devai/local/', 'scratch/'];
 
-/** The digest of a path's bytes, or null when it is absent. */
+/** The digest of a path's tracked state (bytes and executable bit, or link target); null when absent. */
 type Digest = string | null;
 
 export interface WorkspaceBaseline {
@@ -52,6 +53,7 @@ function dirtyPaths(root: string): string[] {
   return entries.map((entry) => entry.slice(3)).filter((path) => !runtimePath(path));
 }
 
+/** A regular file's bytes, for assertion comparison; undefined for a link or an absent path. */
 function fileBytes(root: string, path: string): Buffer | undefined {
   try {
     return lstatSync(join(root, path)).isFile() ? readFileSync(join(root, path)) : undefined;
@@ -60,8 +62,23 @@ function fileBytes(root: string, path: string): Buffer | undefined {
   }
 }
 
-function digestOf(bytes: Buffer | undefined): Digest {
-  return bytes === undefined ? null : createHash('sha256').update(bytes).digest('hex');
+function digest(kind: 'file' | 'executable' | 'link', bytes: Buffer | string): string {
+  return `${kind}:${createHash('sha256').update(bytes).digest('hex')}`;
+}
+
+/** The tracked state of a working-tree path, as Git would record it (core.fileMode). */
+function workingDigest(root: string, path: string): Digest {
+  try {
+    const stat = lstatSync(join(root, path));
+    if (stat.isSymbolicLink()) return digest('link', readlinkSync(join(root, path)));
+    if (!stat.isFile()) return null;
+    return digest(
+      (stat.mode & 0o100) !== 0 ? 'executable' : 'file',
+      readFileSync(join(root, path)),
+    );
+  } catch {
+    return null;
+  }
 }
 
 function committed(root: string, head: string, path: string): Buffer | undefined {
@@ -70,10 +87,24 @@ function committed(root: string, head: string, path: string): Buffer | undefined
       cwd: root,
       maxBuffer: 64 * 1024 * 1024,
       stdio: ['ignore', 'pipe', 'ignore'],
-    }) as unknown as Buffer;
+    });
   } catch {
     return undefined;
   }
+}
+
+/** The tracked state of a path at a commit: its mode from the tree, its blob as bytes or target. */
+function committedDigest(root: string, head: string, path: string): Digest {
+  let entry: string;
+  try {
+    entry = git(root, ['ls-tree', '-z', head, '--', path]).split('\0')[0] ?? '';
+  } catch {
+    return null;
+  }
+  const mode = /^(\d+) blob /u.exec(entry)?.[1];
+  const bytes = mode === undefined ? undefined : committed(root, head, path);
+  if (bytes === undefined) return null;
+  return digest(mode === '120000' ? 'link' : mode === '100755' ? 'executable' : 'file', bytes);
 }
 
 /** The baseline of a working tree before a process runs in it. */
@@ -82,8 +113,8 @@ export function captureWorkspace(root: string): WorkspaceBaseline {
   const dirty = new Map<string, Digest>();
   const texts = new Map<string, string>();
   for (const path of dirtyPaths(root)) {
+    dirty.set(path, workingDigest(root, path));
     const bytes = fileBytes(root, path);
-    dirty.set(path, digestOf(bytes));
     if (bytes !== undefined) texts.set(path, bytes.toString('utf8'));
   }
   return { head, dirty, texts };
@@ -112,11 +143,11 @@ export function workspaceChanges(
   const before = (path: string): Digest =>
     baseline.dirty.has(path)
       ? (baseline.dirty.get(path) ?? null)
-      : digestOf(committed(root, baseline.head, path));
+      : committedDigest(root, baseline.head, path);
   const changes: WriteChange[] = [];
   for (const path of [...candidates].sort()) {
     const was = before(path);
-    const is = digestOf(fileBytes(root, path));
+    const is = workingDigest(root, path);
     if (was === is) continue;
     changes.push({ path, kind: is === null ? 'deleted' : was === null ? 'added' : 'modified' });
   }
