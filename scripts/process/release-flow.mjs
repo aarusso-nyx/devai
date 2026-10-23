@@ -184,6 +184,8 @@ function rehearsal(config, journal, expected, parent) {
     toolchain_sha256: journal.bindings.toolchain,
     environment_sha256: journal.bindings.environment,
     verifier_provenance_sha256: journal.bindings.verifier,
+    verifier_package: '@aarusso-nyx/devai',
+    verifier_package_version: journal.bindings.packageVersion,
   };
   if (config.releaseSigners) ledger.release_signers_sha256 = journal.bindings.releaseSigners;
   if (Object.entries(ledger).some(([key, value]) => expected.ledger[key] !== value))
@@ -235,7 +237,7 @@ function publication(config, journal, parent, runId) {
         'api',
         '--paginate',
         '--slurp',
-        `repos/aarusso-nyx/devai/actions/runs/${runId}/jobs?filter=latest&per_page=100`,
+        `repos/aarusso-nyx/devai/actions/runs/${runId}/attempts/${workflow.run_attempt}/jobs?per_page=100`,
       ],
       config.repo,
     ),
@@ -319,6 +321,7 @@ function publication(config, journal, parent, runId) {
       throw new Error('RELEASE_FLOW_REGISTRY_BYTES_MISMATCH');
     return {
       runId: String(runId),
+      attempt: workflow.run_attempt,
       releaseId: release.id,
       tag,
       packageSha256: manifest.artifacts.package.sha256,
