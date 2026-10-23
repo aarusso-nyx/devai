@@ -4,7 +4,7 @@
  * no import graph of the repository; one test file is read, its module specifiers are scanned
  * with the TypeScript pre-processor (so comments and strings never count), and each specifier
  * is resolved against the head tree. scripts/check-commit-range.mjs mirrors this resolution for
- * commits (ADR-CHK-0009).
+ * the commits of a pull-request range.
  */
 import { existsSync, lstatSync, readFileSync, readdirSync } from '@devai-nyx/authority';
 import { join, posix } from 'node:path';
