@@ -19,7 +19,11 @@ import {
   readFileSync,
 } from '@devai-nyx/authority';
 import type { TaskRecord } from '@devai-nyx/loop';
-import { changedAssertions, changedTestRegistrations } from '@devai-nyx/sensors';
+import {
+  changedAssertions,
+  changedTestRegistrations,
+  unpreservedStatements,
+} from '@devai-nyx/sensors';
 import { parseConstitutionVersion } from '@devai-nyx/skills';
 import { join, sep } from 'node:path';
 import { gte, valid } from 'semver';
@@ -137,6 +141,11 @@ export function judgeWriteScope(input: WriteScopeInput): WriteScopeVerdict {
       }
       if (changedTestRegistrations(base, head).length > 0) {
         return 'removes, renames or re-marks a test this task did not add';
+      }
+      // Assertion identity sees `expect` only; preserving every existing statement covers any
+      // assertion library, helper or import the test already had.
+      if (unpreservedStatements(base, head).length > 0) {
+        return 'changes existing code of a test this task did not add';
       }
     }
     return undefined;
