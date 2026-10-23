@@ -56,6 +56,17 @@ afterEach(async () => {
 });
 
 describe('host validation admission', () => {
+  it('keeps shared tasks inside the caller process group for authority cleanup', async () => {
+    const root = fixture();
+    const output = join(root, 'group');
+    const parentGroup = execFileSync('ps', ['-o', 'pgid=', '-p', String(process.pid)], {
+      encoding: 'utf8',
+    }).trim();
+    const code = `require('node:fs').writeFileSync(${JSON.stringify(output)},require('node:child_process').execFileSync('ps',['-o','pgid=','-p',String(process.pid)],{encoding:'utf8'}).trim());`;
+    expect(await runValidation([process.execPath, '-e', code], { root })).toBe(0);
+    expect(readFileSync(output, 'utf8')).toBe(parentGroup);
+  });
+
   it('drains shared runs, reserves the host against new work, then releases it', async () => {
     const root = fixture();
     worker(root, 'first', false);
