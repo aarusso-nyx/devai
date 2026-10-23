@@ -10,7 +10,9 @@
 // It also judges provenance (ADR-CHK-0008): a commit with more than one parent is refused,
 // the author must be an exact DEVAI role identity admitted by the author-path table for every
 // path the commit changes, and the committer must be the author's role or the update-branch
-// App. Each refusal names the commit.
+// App. Each refusal names the commit. ADR-CHK-0009 replaces the test-class row: the Engineer is
+// also admitted there for a test file the commit adds or modifies, never deletes, that imports a
+// `packages/` file the same commit changes, once the constitution grants that verb (1.1.0).
 //
 // The module also exports the helpers the commit hooks share. Classification
 // reads law/policy/change-taxonomy.json and the materialized binding directly,
@@ -20,7 +22,8 @@
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, realpathSync } from 'node:fs';
-import { join } from 'node:path';
+import { createRequire } from 'node:module';
+import { join, posix } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const GRAMMAR_PATH = 'law/policy/commit-grammar.json';
@@ -191,6 +194,27 @@ function commitPaths(root, sha) {
     .filter(Boolean);
 }
 
+/** Each path the commit changes with its status letter (A, M, D, T); renames are a D and an A. */
+function commitChanges(root, sha) {
+  const fields = gitIn(root, [
+    'diff-tree',
+    '--root',
+    '--no-commit-id',
+    '-r',
+    '--no-renames',
+    '--name-status',
+    '-z',
+    sha,
+  ])
+    .split('\0')
+    .filter(Boolean);
+  const changes = new Map();
+  for (let index = 0; index + 1 < fields.length; index += 2) {
+    changes.set(fields[index + 1], fields[index].charAt(0));
+  }
+  return changes;
+}
+
 /** Maximum bump floor over the commits in base..head, merges excluded. */
 export function bumpFloorOverRange(root, grammar, base, head) {
   const rank = { none: 0, patch: 1, minor: 2, major: 3 };
@@ -336,12 +360,197 @@ const ENGINEER_BINDINGS = new Set([
 const PLACEHOLDERS = new Set(['.devai/state/.gitkeep', '.devai/worktrees/.gitkeep']);
 const NEVER_COMMITTED = ['scratch/', '.devai/state/', '.devai/worktrees/', '.devai/local/'];
 
+const TEST_CLASS = /^(?:tests\/|packages\/[^/]+\/tests\/)/u;
+/** A test file of the test class; configuration, helpers and fixtures there are not tests. */
+const TEST_FILE = /\.(?:test|spec)\.[cm]?[jt]sx?$/u;
+/** The first constitution whose Articles 6 and 7 grant the Engineer focused-regression verb. */
+export const FOCUSED_REGRESSION_MIN_CONSTITUTION = '1.1.0';
+const CONSTITUTION_SOURCES = ['law/constitution.md', '.devai/pin/constitution.md'];
+// Mirrors parseConstitutionVersion in packages/utils/src/constitution-version.ts.
+const CONSTITUTION_VERSION =
+  /^\*\*(?:Candidate version|Version):\*\*\s*([0-9]+\.[0-9]+\.[0-9]+)\s*$/mu;
+const SOURCE_EXTENSIONS = ['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs'];
+const ENTRY_CONDITIONS = ['development', 'import', 'default', 'types', 'require'];
+
+/** Whether a dotted version is at least the minimum; an unparsable version is not. */
+export function versionAtLeast(version, minimum) {
+  const parse = (value) =>
+    /^(\d+)\.(\d+)\.(\d+)$/u
+      .exec(value ?? '')
+      ?.slice(1)
+      .map(Number);
+  const actual = parse(version);
+  const floor = parse(minimum);
+  if (actual === undefined || floor === undefined) return false;
+  for (let index = 0; index < 3; index += 1) {
+    if (actual[index] !== floor[index]) return actual[index] > floor[index];
+  }
+  return true;
+}
+
+let typescript;
+/** The installed TypeScript compiler, loaded only when an Engineer commit reaches a test path. */
+function loadTypescript() {
+  if (typescript === undefined) {
+    try {
+      typescript = createRequire(import.meta.url)('typescript');
+    } catch {
+      typescript = null;
+    }
+  }
+  return typescript;
+}
+
 /**
- * The authors the ADR-CHK-0008 table admits for one path, judged with the other paths of the
- * same commit (the law-with-generated pairing); an empty set refuses the path. The most
- * specific row decides, and a path no row names is refused.
+ * The module specifiers a source imports, re-exports, requires or loads dynamically. Comments and
+ * strings are not imports. Null when the TypeScript scanner is unavailable.
  */
-export function admittedAuthors(path, commitPaths, binding) {
+export function importSpecifiers(text) {
+  const ts = loadTypescript();
+  if (ts === null) return null;
+  return ts.preProcessFile(text, true, true).importedFiles.map(({ fileName }) => fileName);
+}
+
+// Mirrors candidateFiles in packages/cli/src/services/write-scope/import-adjacency.ts.
+function candidateFiles(target) {
+  const candidates = [target];
+  const emitted = /\.([mc]?)js(x?)$/u.exec(target);
+  if (emitted !== null) {
+    candidates.push(`${target.slice(0, -emitted[0].length)}.${emitted[1]}ts${emitted[2]}`);
+  }
+  if (target.endsWith('.d.ts')) candidates.push(`${target.slice(0, -'.d.ts'.length)}.ts`);
+  for (const extension of SOURCE_EXTENSIONS) candidates.push(`${target}${extension}`);
+  for (const extension of SOURCE_EXTENSIONS) candidates.push(`${target}/index${extension}`);
+  return candidates;
+}
+
+/** The entry targets a workspace package exports for a subpath (`.` or `./name`). */
+function exportTargets(manifest, subpath) {
+  const exported = manifest.exports;
+  if (exported === undefined || exported === null) {
+    if (subpath === '.') return [manifest.main ?? 'index.js'];
+    return [subpath];
+  }
+  const conditional =
+    typeof exported === 'object' &&
+    !Array.isArray(exported) &&
+    !Object.keys(exported).some((key) => key.startsWith('.'));
+  const entry =
+    typeof exported === 'string' || conditional
+      ? subpath === '.'
+        ? exported
+        : undefined
+      : exported[subpath];
+  if (typeof entry === 'string') return [entry];
+  if (entry === null || typeof entry !== 'object') return [];
+  return ENTRY_CONDITIONS.flatMap((condition) =>
+    typeof entry[condition] === 'string' ? [entry[condition]] : [],
+  );
+}
+
+/**
+ * The repository files one import specifier of `from` resolves to: a relative specifier against
+ * the importing file, a workspace specifier through the exports of the `packages/*` manifest that
+ * names it, where an emitted `dist/` target stands for its `src/` source. Bare specifiers of any
+ * other package resolve to nothing. Mirrors resolveImport in
+ * packages/cli/src/services/write-scope/import-adjacency.ts.
+ */
+export function resolveImport(specifier, from, files, workspaces) {
+  const present = (targets) =>
+    targets.flatMap((target) =>
+      candidateFiles(target)
+        .filter((path) => files.has(path))
+        .slice(0, 1),
+    );
+  if (specifier.startsWith('./') || specifier.startsWith('../')) {
+    const target = posix.normalize(posix.join(posix.dirname(from), specifier));
+    return target.startsWith('../') ? [] : present([target]);
+  }
+  const workspace = [...workspaces]
+    .filter(({ name }) => specifier === name || specifier.startsWith(`${name}/`))
+    .sort((a, b) => b.name.length - a.name.length)[0];
+  if (workspace === undefined) return [];
+  const subpath = specifier === workspace.name ? '.' : `.${specifier.slice(workspace.name.length)}`;
+  return present(
+    exportTargets(workspace.manifest, subpath).flatMap((entry) => {
+      const target = posix.normalize(posix.join(workspace.directory, entry));
+      const emitted = `${workspace.directory}/dist/`;
+      return target.startsWith(emitted)
+        ? [target, `${workspace.directory}/src/${target.slice(emitted.length)}`]
+        : [target];
+    }),
+  );
+}
+
+/**
+ * The focused-regression judge of one commit (ADR-CHK-0009): whether the Engineer is admitted on
+ * a test-class path because the commit adds or modifies that test file, never deletes it, and one
+ * of its imports resolves to a file under `packages/`, outside the test class, that the same
+ * commit adds or modifies, under a constitution that grants the verb. Repository facts are read
+ * once, and only when a test-class path is judged.
+ */
+export function focusedRegressionJudge(root, sha, changes) {
+  let facts;
+  const load = () => {
+    const text = CONSTITUTION_SOURCES.map((path) => {
+      try {
+        return gitIn(root, ['show', `${sha}:${path}`]);
+      } catch {
+        return undefined;
+      }
+    }).find((candidate) => candidate !== undefined);
+    const version = text === undefined ? undefined : CONSTITUTION_VERSION.exec(text)?.[1];
+    if (!versionAtLeast(version, FOCUSED_REGRESSION_MIN_CONSTITUTION)) return { active: false };
+    const files = new Set(
+      gitIn(root, ['ls-tree', '-r', '-z', '--name-only', sha]).split('\0').filter(Boolean),
+    );
+    const workspaces = [...files]
+      .filter((path) => /^packages\/[^/]+\/package\.json$/u.test(path))
+      .flatMap((path) => {
+        try {
+          const manifest = JSON.parse(gitIn(root, ['show', `${sha}:${path}`]));
+          return typeof manifest.name === 'string'
+            ? [{ name: manifest.name, directory: posix.dirname(path), manifest }]
+            : [];
+        } catch {
+          return [];
+        }
+      });
+    const sources = new Set(
+      [...changes]
+        .filter(
+          ([path, status]) =>
+            status !== 'D' && path.startsWith('packages/') && !TEST_CLASS.test(path),
+        )
+        .map(([path]) => path),
+    );
+    return { active: true, files, workspaces, sources };
+  };
+  return (path) => {
+    const status = changes.get(path);
+    if (status === undefined || status === 'D' || !TEST_CLASS.test(path) || !TEST_FILE.test(path)) {
+      return false;
+    }
+    facts ??= load();
+    if (!facts.active || facts.sources.size === 0) return false;
+    const specifiers = importSpecifiers(gitIn(root, ['show', `${sha}:${path}`]));
+    if (specifiers === null) return false;
+    return specifiers.some((specifier) =>
+      resolveImport(specifier, path, facts.files, facts.workspaces).some((target) =>
+        facts.sources.has(target),
+      ),
+    );
+  };
+}
+
+/**
+ * The authors the ADR-CHK-0008 table, with the test-class row of ADR-CHK-0009, admits for one
+ * path, judged with the other paths of the same commit (the law-with-generated pairing); an
+ * empty set refuses the path. The most specific row decides, and a path no row names is refused.
+ * `focused` is the commit's focused-regression judge; without one the test class admits only the
+ * Inspector.
+ */
+export function admittedAuthors(path, commitPaths, binding, focused = undefined) {
   const only = (...roles) => new Set(roles);
   if (path === 'scratch/README.md') return only('Architect');
   if (PLACEHOLDERS.has(path)) return only('Engineer');
@@ -360,8 +569,9 @@ export function admittedAuthors(path, commitPaths, binding) {
   if (path.startsWith('product/')) return only('Owner');
   if (path.startsWith('docs/')) return only('Architect');
   if (ROOT_PROSE.has(path)) return only('Architect');
-  if (path.startsWith('tests/') || /^packages\/[^/]+\/tests\//u.test(path))
-    return only('Inspector');
+  if (TEST_CLASS.test(path)) {
+    return focused?.(path) === true ? only('Inspector', 'Engineer') : only('Inspector');
+  }
   if (path.startsWith('packages/')) return only('Engineer');
   if (ROOT_WORKSPACE.has(path) || /^tsconfig[^/]*\.json$/u.test(path)) return only('Engineer');
   if (path.startsWith('scripts/') || path.startsWith('.githooks/') || path.startsWith('.github/')) {
@@ -375,7 +585,7 @@ export function admittedAuthors(path, commitPaths, binding) {
 }
 
 /** Provenance findings for one commit of a pull-request range; empty when it is admitted. */
-export function provenanceFindings({ parents, author, committer, paths, binding }) {
+export function provenanceFindings({ parents, author, committer, paths, binding, focused }) {
   const findings = [];
   if (parents > 1) {
     findings.push(
@@ -395,12 +605,16 @@ export function provenanceFindings({ parents, author, committer, paths, binding 
       );
     }
     for (const path of paths) {
-      const admitted = admittedAuthors(path, paths, binding);
+      const admitted = admittedAuthors(path, paths, binding, focused);
       if (admitted.size === 0) {
         findings.push(`path ${path} is not admitted for any author by the ADR-CHK-0008 table`);
       } else if (!admitted.has(role)) {
+        const verb =
+          role === 'Engineer' && TEST_CLASS.test(path)
+            ? `; the Engineer focused-regression verb (ADR-CHK-0009) admits only a test file this commit adds or modifies that imports a packages/ file this commit changes, under constitution ${FOCUSED_REGRESSION_MIN_CONSTITUTION} or later`
+            : '';
         findings.push(
-          `path ${path} admits ${[...admitted].join(' or ')}, not the author role ${role}`,
+          `path ${path} admits ${[...admitted].join(' or ')}, not the author role ${role}${verb}`,
         );
       }
     }
@@ -442,12 +656,14 @@ function checkRange(root, base, head) {
     )
       .replace(/\n$/u, '')
       .split('\0');
+    const changes = parentCount > 1 ? new Map() : commitChanges(root, sha);
     const provenance = provenanceFindings({
       binding,
       parents: parentCount,
       author: { name: authorName, email: authorEmail },
       committer: { name: committerName, email: committerEmail },
-      paths: parentCount > 1 ? [] : commitPaths(root, sha),
+      paths: [...changes.keys()],
+      focused: focusedRegressionJudge(root, sha, changes),
     });
     if (parentCount > 1) {
       offenders.push({
