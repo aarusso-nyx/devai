@@ -463,7 +463,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
       },
       {
         path: 'packages/cli/package.json',
-        sha256: '16580db0df5fd26bc6ac44c671aab01a19de28fc46ee26ee73a91c2f8710db39',
+        sha256: 'bb8dcd98d359c4709e55cf1bd4d01578c31403b88a63e86dd6afd19d40c4c3ef',
       },
       {
         path: 'packages/cli/scripts/assemble-package.mjs',
