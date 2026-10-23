@@ -32,12 +32,25 @@ const decisionRecords = new Set(
  * configuration, and an entry needs at least one change). Each one is named with its reason;
  * init upgrade across one only restamps the bound version.
  */
-const CONFIGURATION_NEUTRAL_RELEASES: ReadonlyMap<string, string> = new Map([
-  [
-    '2.2.0',
-    'Behavior and diagnostics only (refusal envelopes, audit observe --previous, coverage report binding); no law, policy, schema or materialized adopter file changed since 2.1.0.',
-  ],
-]);
+const CONFIGURATION_NEUTRAL_RELEASES: ReadonlyMap<string, { from: string; reason: string }> =
+  new Map([
+    [
+      '2.2.0',
+      {
+        from: '2.1.0',
+        reason:
+          'Behavior and diagnostics only (refusal envelopes, audit observe --previous, coverage report binding); no law, policy, schema or materialized adopter file changed since 2.1.0.',
+      },
+    ],
+    [
+      '2.7.1',
+      {
+        from: '2.7.0',
+        reason:
+          'Maintainer release preflight, validation admission, isolated docs builds and verified resume only; no law, policy, schema or materialized adopter file changed since 2.7.0.',
+      },
+    ],
+  ]);
 
 describe('#264: the adopter migration manifest', () => {
   it('validates against its schema with ascending releases and version-scoped change ids', () => {
@@ -292,8 +305,8 @@ describe('#264: the adopter migration manifest', () => {
       plannedReleases(manifest, from, installedVersion).filter(
         (release) => release.status === 'released',
       );
-    for (const version of CONFIGURATION_NEUTRAL_RELEASES.keys()) {
-      expect(released('2.1.0', version)).toEqual([]);
+    for (const [version, { from }] of CONFIGURATION_NEUTRAL_RELEASES) {
+      expect(released(from, version)).toEqual([]);
     }
     // #381, #383, #390: released rebinds stay in range; the prospective 2.6.4
     // obligations are also planned above the installed/bound floor (#291).
