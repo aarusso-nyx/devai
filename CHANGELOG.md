@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.7.1 — 2026-10-23
+## 2.7.1 — 2026-10-24
 
 This patch reduces release rework while preserving all validation and publication gates.
 
