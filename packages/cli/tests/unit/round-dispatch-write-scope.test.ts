@@ -405,3 +405,57 @@ describe('round run judges committed changes even when the working tree is resto
     expect(result).toMatchObject({ ok: true });
   });
 });
+
+// Codex review on #426 (third pass): a submodule is a gitlink, which the snapshot ignored, and a
+// focused test committed then removed from the working tree made the judge throw instead of
+// recording a violation.
+describe('round run sees submodule pointers and removed committed tests', () => {
+  it('fails a routine that moves an out-of-scope submodule pointer', async () => {
+    const root = repository();
+    const vendor = join(root, 'docs/vendor');
+    mkdirSync(vendor, { recursive: true });
+    git(vendor, 'init', '-q');
+    git(vendor, 'config', 'commit.gpgsign', 'false');
+    writeFileSync(join(vendor, 'README.md'), 'v1\n');
+    git(vendor, 'add', '-A');
+    git(vendor, 'commit', '-qm', 'v1');
+    git(root, 'add', 'docs/vendor');
+    git(root, 'commit', '-qm', 'vendor');
+    const result = await dispatch(
+      root,
+      routineTask([
+        process.execPath,
+        '-e',
+        [
+          "const fs = require('node:fs');",
+          "fs.writeFileSync('docs/vendor/README.md', 'v2\\n');",
+          "require('node:child_process').execFileSync('git', ['-C', 'docs/vendor', '-c', 'user.name=R', '-c', 'user.email=r@example.invalid', '-c', 'commit.gpgsign=false', 'commit', '-qam', 'v2']);",
+        ].join('\n'),
+      ]),
+    );
+    expect(result).toMatchObject({ ok: false, code: 'TASK_WRITE_SCOPE_VIOLATION' });
+    expect(evidence(root)).toMatchObject({
+      failure: { message: expect.stringContaining('docs/vendor') as unknown },
+    });
+  });
+
+  it('records a violation for a focused test committed then removed from the tree', async () => {
+    const root = repository('1.1.0');
+    const result = await dispatch(
+      root,
+      routineTask([
+        process.execPath,
+        '-e',
+        [
+          "const fs = require('node:fs');",
+          "const run = (...args) => require('node:child_process').execFileSync('git', ['-c', 'user.name=R', '-c', 'user.email=r@example.invalid', '-c', 'commit.gpgsign=false', ...args]);",
+          "fs.writeFileSync('packages/app/src/a.ts', 'export const a = 2;\\n');",
+          "fs.writeFileSync('packages/app/tests/unit/a-regression.test.ts', \"import { a } from '../../src/a.js';\\nit('is two', () => expect(a).toBe(2));\\n\");",
+          "run('add', '-A'); run('commit', '-qm', 'routine');",
+          "fs.rmSync('packages/app/tests/unit/a-regression.test.ts');",
+        ].join('\n'),
+      ]),
+    );
+    expect(result).toMatchObject({ ok: false, code: 'TASK_WRITE_SCOPE_VIOLATION' });
+  });
+});

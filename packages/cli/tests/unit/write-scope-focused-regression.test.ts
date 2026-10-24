@@ -65,6 +65,7 @@ const BASE: Readonly<Record<string, string>> = {
         development: './src/index.ts',
         default: './dist/index.js',
       },
+      './dist/*': './dist/*.js',
     },
   })}\n`,
   'packages/x/src/index.ts': "export { a } from './a.js';\n",
@@ -176,6 +177,22 @@ describe('IA-001: an Engineer test adjacent to the task change is admitted', () 
       'packages/x/tests/unit/entry.test.ts': regression('@fixture/x'),
     });
     expect(verdict.outOfScope).toEqual([]);
+  });
+
+  it('admits a test whose import matches a wildcard export key and names the changed source', async () => {
+    const verdict = await judge({
+      ...CHANGED_A,
+      'packages/x/tests/unit/a-wildcard.test.ts': regression('@fixture/x/dist/a'),
+    });
+    expect(verdict.outOfScope).toEqual([]);
+  });
+
+  it('refuses a test whose wildcard export import names only an unchanged source', async () => {
+    const verdict = await judge({
+      ...CHANGED_A,
+      'packages/x/tests/unit/b-wildcard.test.ts': regression('@fixture/x/dist/b'),
+    });
+    expect(verdict.outOfScope).toEqual(['packages/x/tests/unit/b-wildcard.test.ts']);
   });
 
   it('admits an existing test that gains a new test and keeps every assertion', async () => {
@@ -385,6 +402,39 @@ describe('IA-002: an Engineer may only add to an existing test file', () => {
     expect(
       (await modify('assert.equal(a, 1);', 'assert.equal(\n      a,\n      1,\n    );')).outOfScope,
     ).toEqual([]);
+  });
+
+  // Codex review on #426 (third pass): preserving every base statement is not enough when new
+  // code may run before it. Only import declarations that bind names and new test or suite
+  // registrations may be inserted into an existing test file.
+  it.each([
+    [
+      'a return before an existing assertion',
+      '    assert.equal(a, 1);',
+      '    return;\n    assert.equal(a, 1);',
+    ],
+    [
+      'a guard that skips an existing assertion',
+      '    assert.equal(a, 1);',
+      '    if (a !== 1) return;\n    assert.equal(a, 1);',
+    ],
+    [
+      'a hook inside an existing suite',
+      "describe('a', () => {",
+      "describe('a', () => {\n  beforeEach(() => { globalThis.lenient = true; });",
+    ],
+    [
+      'a module mock at the top of the file',
+      "import { a } from '../../src/a.js';",
+      "import { a } from '../../src/a.js';\nvi.mock('node:assert/strict');",
+    ],
+    [
+      'a side-effect import',
+      "import { a } from '../../src/a.js';",
+      "import { a } from '../../src/a.js';\nimport '../helpers/patch-assert.js';",
+    ],
+  ])('refuses inserting %s', async (_label, from, to) => {
+    expect((await modify(from, to)).outOfScope).toEqual(['packages/x/tests/unit/assert.test.ts']);
   });
 });
 
