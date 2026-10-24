@@ -96,6 +96,78 @@ describe('host validation admission', () => {
     expect(writer.exitCode).toBe(0);
     writeFileSync(join(root, 'later-stop'), '');
   });
+  it('drains real tests without counting a queued wrapper as active Vitest', async () => {
+    const root = fixture();
+    const env = { ...process.env, HOME: root };
+    const runner = resolve('scripts/process/validation-runner.mjs');
+    const vitest = join(root, 'vitest/vitest.mjs');
+    const directMarker = join(root, 'direct');
+    const queuedMarker = join(root, 'queued');
+    const queuedPidFile = join(root, 'queued-pid');
+    const census = join(root, 'census');
+    const entered = join(root, 'exclusive-entered');
+    const stop = join(root, 'exclusive-stop');
+    mkdirSync(join(root, 'vitest'));
+    writeFileSync(
+      vitest,
+      "import {writeFileSync} from 'node:fs';writeFileSync(process.argv[2],'started');if(process.argv[3]==='hold')setInterval(()=>{},100);",
+    );
+    // A real Vitest command must still count when the wrapper is a later argument.
+    const direct = spawn(process.execPath, [vitest, directMarker, 'hold', runner], { env });
+    children.push(direct);
+    if (!direct.pid) throw new Error('direct fixture did not start');
+    const directPid = direct.pid;
+    await until(() => existsSync(directMarker));
+    const claimant = spawn(
+      process.execPath,
+      [
+        '--input-type=module',
+        '-e',
+        `import * as fs from 'node:fs';import {setTimeout as delay} from 'node:timers/promises';import {acquireValidation,competingTestPids} from ${JSON.stringify(runnerUrl)};
+const lease=await acquireValidation({exclusive:true,waitMs:7000,activeTests:()=>{
+const queuedPid=fs.existsSync(${JSON.stringify(queuedPidFile)})?Number(fs.readFileSync(${JSON.stringify(queuedPidFile)},'utf8')):0;
+const active=competingTestPids().filter(pid=>pid===${directPid}||pid===queuedPid);
+fs.writeFileSync(${JSON.stringify(census)},JSON.stringify({queuedPid,active}));return active;}});
+fs.writeFileSync(${JSON.stringify(entered)},'');while(!fs.existsSync(${JSON.stringify(stop)}))await delay(20);lease.release();`,
+      ],
+      { env, stdio: 'pipe' },
+    );
+    children.push(claimant);
+    let observed = { queuedPid: 0, active: [] as number[] };
+    const sampled = () => {
+      try {
+        observed = JSON.parse(readFileSync(census, 'utf8')) as typeof observed;
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    await until(() => sampled() && observed.active.includes(directPid));
+    const queued = spawn(process.execPath, [runner, '--', process.execPath, vitest, queuedMarker], {
+      env,
+      stdio: 'pipe',
+    });
+    children.push(queued);
+    if (!queued.pid) throw new Error('queued fixture did not start');
+    let queuedLog = '';
+    queued.stderr?.on('data', (chunk) => (queuedLog += String(chunk)));
+    await until(() => queuedLog.includes('validation queued'));
+    writeFileSync(queuedPidFile, String(queued.pid));
+    await until(
+      () => sampled() && observed.queuedPid === queued.pid && observed.active.includes(directPid),
+    );
+    expect(observed.active).not.toContain(queued.pid);
+    expect(existsSync(entered)).toBe(false);
+    expect(existsSync(queuedMarker)).toBe(false);
+    direct.kill('SIGTERM');
+    await until(() => existsSync(entered));
+    expect(existsSync(queuedMarker)).toBe(false);
+    writeFileSync(stop, '');
+    await until(() => queued.exitCode !== null && claimant.exitCode !== null);
+    expect(claimant.exitCode).toBe(0);
+    expect(queued.exitCode).toBe(0);
+    expect(existsSync(queuedMarker)).toBe(true);
+  });
   it('cancels an active exclusive process group without abandoning its lease', async () => {
     const root = fixture();
     const actor = worker(root, 'active', true);
