@@ -93,6 +93,69 @@ afterEach(async () => {
 });
 
 describe('host validation admission', () => {
+  it.each(['owner', 'child', 'journal'])(
+    'recovers a zombie %s PID while retaining the live-PID guard',
+    (mode) => {
+      const root = fixture();
+      const result = JSON.parse(
+        execFileSync(
+          process.execPath,
+          [
+            '--input-type=module',
+            '-e',
+            `import cp from 'node:child_process';import fs from 'node:fs';import {join} from 'node:path';import {syncBuiltinESMExports} from 'node:module';
+const {recoverValidation}=await import(${JSON.stringify(runnerUrl)});const {recoverJournal}=await import(${JSON.stringify(flowUrl)});
+const root=${JSON.stringify(root)},mode=${JSON.stringify(mode)},pid=99999998,id='12345678-1234-1234-1234-123456789abc';
+const originalExec=cp.execFileSync,originalKill=process.kill;let state='S',blocked=false;
+cp.execFileSync=function(command,args,options){const output=originalExec.call(this,command,args,options);return state!=='missing'&&command==='ps'&&args.includes('pid=,ppid=,pgid=,stat=,lstart=')?output+'\\n'+pid+' 1 '+pid+' '+state+' Sat Oct 24 01:00:00 2026\\n':output};
+process.kill=function(target,signal){if(target===pid&&signal===0)return true;return originalKill.call(this,target,signal)};syncBuiltinESMExports();
+try{
+ let recover,path;
+ if(mode==='journal'){path=join(root,'journal.json.lock');fs.writeFileSync(path,String(pid));recover=()=>recoverJournal(join(root,'journal.json'))}
+ else{path=join(root,'exclusive');fs.mkdirSync(path);fs.writeFileSync(join(path,'owner.json'),JSON.stringify(mode==='owner'?{id,pid}:{id,pid:99999997,childPid:pid,ownsGroup:false}));recover=()=>recoverValidation(root,id)}
+ for(const observed of ['S','missing']){state=observed;blocked=false;try{recover()}catch(error){blocked=error.message===(mode==='journal'?'RELEASE_FLOW_LOCK_LIVE':'VALIDATION_RECOVERY_LIVE_WORK')}
+ if(!blocked)throw new Error('live PID was not protected: '+observed)}
+ state='Z';recover();console.log(JSON.stringify({blocked,remaining:fs.existsSync(path)}));
+}finally{cp.execFileSync=originalExec;process.kill=originalKill;syncBuiltinESMExports();}`,
+          ],
+          { encoding: 'utf8' },
+        ),
+      );
+      expect(result).toEqual({ blocked: true, remaining: false });
+    },
+  );
+
+  it('admits exclusive work after zombie Vitest workers stop without ignoring live tests', () => {
+    const root = fixture();
+    const result = JSON.parse(
+      execFileSync(
+        process.execPath,
+        [
+          '--input-type=module',
+          '-e',
+          `import cp from 'node:child_process';import {syncBuiltinESMExports} from 'node:module';
+const {acquireValidation,competingTestPids}=await import(${JSON.stringify(runnerUrl)});
+const original=cp.execFileSync;let live=true;
+cp.execFileSync=function(command,args,options){
+  if(command==='ps'&&(args.includes('pid=,ppid=,command=')||args.includes('pid=,ppid=,stat=,command='))){
+    const states=args.includes('pid=,ppid=,stat=,command=');
+    return [[99999990,'Z','[node (vitest)] <defunct>'],[99999991,'Z+','[node (vitest 2)] <defunct>'],...(live?[[99999992,'Sl','node /fixture/vitest/vitest.mjs run']]:[])].map(([pid,state,cmd])=>pid+' 1 '+(states?state+' ':'')+cmd).join('\\n')+'\\n';
+  }
+  return original.call(this,command,args,options);
+};syncBuiltinESMExports();
+try{
+  const active=competingTestPids();live=false;
+  const lease=await acquireValidation({root:${JSON.stringify(root)},exclusive:true,waitMs:150,activeTests:competingTestPids});
+  lease.release();console.log(JSON.stringify({active,after:competingTestPids()}));
+}finally{cp.execFileSync=original;syncBuiltinESMExports();}`,
+        ],
+        { encoding: 'utf8' },
+      ),
+    );
+    expect(result.active).toEqual([99_999_992]);
+    expect(result.after).toEqual([]);
+  });
+
   it.each(['release', 'recovery', 'shutdown'])(
     'ignores zombie-only groups during %s without ignoring live group members',
     (mode) => {
