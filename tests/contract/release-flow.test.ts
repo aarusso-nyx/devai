@@ -93,6 +93,61 @@ afterEach(async () => {
 });
 
 describe('host validation admission', () => {
+  it.each(['release', 'recovery', 'shutdown'])(
+    'ignores zombie-only groups during %s without ignoring live group members',
+    (mode) => {
+      const root = fixture();
+      const result = JSON.parse(
+        execFileSync(
+          process.execPath,
+          [
+            '--input-type=module',
+            '-e',
+            `import cp from 'node:child_process';import fs from 'node:fs';import {join} from 'node:path';import {syncBuiltinESMExports} from 'node:module';
+const {acquireValidation,recoverValidation,runValidation}=await import(${JSON.stringify(runnerUrl)});
+const root=${JSON.stringify(root)},mode=${JSON.stringify(mode)};
+const originalExec=cp.execFileSync,originalSpawn=cp.spawn,originalKill=process.kill;
+let group=99999999,state='S',snapshots=0,blocked=false;
+cp.execFileSync=function(command,args,options){
+  const output=originalExec.call(this,command,args,options);
+  if(command==='ps'&&args.includes('pid=,ppid=,pgid=,stat=,lstart=')){
+    snapshots++;return output+'\\n99999998 1 '+group+' '+state+' Sat Oct 24 01:00:00 2026\\n';
+  }
+  return output;
+};
+// Linux killpg(..., 0) succeeds even when every remaining member is a zombie.
+process.kill=function(pid,signal){if(pid===-group&&signal===0)return true;return originalKill.call(this,pid,signal)};
+cp.spawn=function(...args){const child=originalSpawn.apply(this,args);if(mode==='shutdown')group=child.pid;return child};
+syncBuiltinESMExports();
+try{
+  if(mode==='shutdown'){
+    state='Z';const code=await runValidation([process.execPath,'-e','process.exit(17)'],{root,exclusive:true});
+    console.log(JSON.stringify({code,snapshots,remaining:fs.existsSync(join(root,'exclusive'))}));
+  }else{
+    let release;
+    if(mode==='release'){
+      const lease=await acquireValidation({root,exclusive:true});lease.recordChild(group,true);release=()=>lease.release();
+    }else{
+      const id='12345678-1234-1234-1234-123456789abc';fs.mkdirSync(join(root,'exclusive'));
+      fs.writeFileSync(join(root,'exclusive/owner.json'),JSON.stringify({id,pid:99999997,ownsGroup:true,childGroup:group}));
+      release=()=>recoverValidation(root,id);
+    }
+    try{release()}catch(error){blocked=error.message=== (mode==='release'?'VALIDATION_CHILDREN_STILL_RUNNING':'VALIDATION_RECOVERY_LIVE_WORK')}
+    if(!blocked)throw new Error('live group was not protected');
+    state='Z';release();console.log(JSON.stringify({blocked,snapshots,remaining:fs.existsSync(join(root,'exclusive'))}));
+  }
+}finally{cp.execFileSync=originalExec;cp.spawn=originalSpawn;process.kill=originalKill;syncBuiltinESMExports();}`,
+          ],
+          { encoding: 'utf8' },
+        ),
+      );
+      expect(result.snapshots).toBeGreaterThan(0);
+      expect(result.remaining).toBe(false);
+      if (mode === 'shutdown') expect(result.code).toBe(17);
+      else expect(result.blocked).toBe(true);
+    },
+  );
+
   it('does not inherit an abandoned owner whose PID is now an actual ancestor', async () => {
     const root = fixture();
     const path = join(root, 'exclusive');
