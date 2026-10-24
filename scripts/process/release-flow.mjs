@@ -21,7 +21,7 @@ import {
   inspectPrerequisites,
 } from './release-prerequisites.mjs';
 import { inspectAssets } from './rehearsal.mjs';
-import { runValidation } from './validation-runner.mjs';
+import { processRunning, runValidation } from './validation-runner.mjs';
 
 const read = (path) => {
   if (!lstatSync(path).isFile() || lstatSync(path).isSymbolicLink())
@@ -51,14 +51,8 @@ export function recoverJournal(path) {
     throw new Error('RELEASE_FLOW_LOCK_INVALID');
   const owner = Number(readFileSync(lock, 'utf8').trim());
   if (!Number.isSafeInteger(owner) || owner <= 1) throw new Error('RELEASE_FLOW_LOCK_INVALID');
-  try {
-    process.kill(owner, 0);
-  } catch (error) {
-    if (error.code !== 'ESRCH') throw error;
-    rmSync(lock);
-    return;
-  }
-  throw new Error('RELEASE_FLOW_LOCK_LIVE');
+  if (processRunning(owner)) throw new Error('RELEASE_FLOW_LOCK_LIVE');
+  rmSync(lock);
 }
 
 /** A journal is a restart hint. Every completed phase must verify its output again. */
