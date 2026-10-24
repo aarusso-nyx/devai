@@ -27,6 +27,40 @@ const alive = (pid) => {
     throw error;
   }
 };
+function processSnapshot() {
+  const processes = new Map();
+  const output = execFileSync('ps', ['-axo', 'pid=,ppid=,pgid=,stat=,lstart='], {
+    encoding: 'utf8',
+    env: { ...process.env, LC_ALL: 'C' },
+    maxBuffer: 8 * 1024 * 1024,
+  });
+  for (const line of output.split('\n')) {
+    const row = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\S+)\s+(.+)$/u.exec(line);
+    if (row)
+      processes.set(Number(row[1]), {
+        pid: Number(row[1]),
+        parentPid: Number(row[2]),
+        groupPid: Number(row[3]),
+        state: row[4],
+        startedAt: row[5].trim(),
+      });
+  }
+  if (!processes.has(process.pid)) throw new Error('VALIDATION_PROCESS_CENSUS_INVALID');
+  return processes;
+}
+const sameRunningProcess = (identity, processes) => {
+  const current = processes.get(identity.pid);
+  return (
+    current !== undefined &&
+    current.startedAt === identity.startedAt?.trim() &&
+    !current.state.includes('Z')
+  );
+};
+const descendantsRunning = (owner) => {
+  if (!owner.descendants?.length) return false;
+  const processes = processSnapshot();
+  return owner.descendants.some((identity) => sameRunningProcess(identity, processes));
+};
 function ancestors() {
   const result = new Set([process.pid]);
   let pid = process.ppid;
@@ -118,7 +152,7 @@ export async function acquireValidation({
     }
     if (lineage.has(leaseOwner.pid)) {
       if (exclusive && path !== writer) throw new Error('VALIDATION_LEASE_UPGRADE_REFUSED');
-      return { inherited: true, release() {}, recordChild() {} };
+      return { inherited: true, release() {}, recordChild() {}, recordDescendants() {} };
     }
   }
   const owner = { id: randomUUID(), pid: process.pid, startedAt: new Date().toISOString() };
@@ -164,10 +198,15 @@ export async function acquireValidation({
             );
         writeOwner(path, owner);
       },
+      recordDescendants(identities) {
+        owner.descendants = identities;
+        writeOwner(path, owner);
+      },
       release() {
         if (
           (owner.ownsGroup && alive(-owner.childGroup)) ||
-          (owner.childPid && alive(owner.childPid))
+          (owner.childPid && alive(owner.childPid)) ||
+          descendantsRunning(owner)
         )
           throw new Error('VALIDATION_CHILDREN_STILL_RUNNING');
         if (read(path).id !== owner.id) throw new Error('VALIDATION_LEASE_OWNER_CHANGED');
@@ -187,7 +226,11 @@ export function recoverValidation(root, id) {
     if (!existsSync(join(path, 'owner.json'))) continue;
     const owner = read(path);
     if (owner.id !== id) continue;
-    if (alive(owner.pid) || (owner.childGroup && alive(-owner.childGroup)))
+    if (
+      alive(owner.pid) ||
+      (owner.childGroup && alive(-owner.childGroup)) ||
+      descendantsRunning(owner)
+    )
       throw new Error('VALIDATION_RECOVERY_LIVE_WORK');
     rmSync(path, { recursive: true });
     return;
@@ -208,32 +251,110 @@ export async function runValidation(argv, options = {}) {
   }
   let child;
   let requestedSignal;
+  let signalAt;
+  let monitor;
+  let censusError;
+  let quiescent = false;
+  let childStartedAt;
+  let recorded = '';
+  const descendants = new Map();
   // Only the outer exclusive host controller creates a process group. Shared
   // task wrappers MUST remain inside the authority runner's existing group,
   // preserving its timeout termination and protected-namespace writer census.
   const ownsGroup = options.exclusive === true && !lease.inherited;
+  const capture = () => {
+    const processes = processSnapshot();
+    const root = processes.get(child.pid);
+    if (childStartedAt === undefined && root && child.exitCode === null)
+      childStartedAt = root.startedAt;
+    const owned = new Set(
+      [...descendants.values()]
+        .filter((identity) => sameRunningProcess(identity, processes))
+        .map((identity) => identity.pid),
+    );
+    if (root && root.startedAt === childStartedAt && !root.state.includes('Z'))
+      owned.add(child.pid);
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const process of processes.values())
+        if (!owned.has(process.pid) && owned.has(process.parentPid)) {
+          owned.add(process.pid);
+          changed = true;
+        }
+    }
+    descendants.clear();
+    for (const pid of owned) {
+      const identity = processes.get(pid);
+      if (identity && !identity.state.includes('Z')) descendants.set(pid, identity);
+    }
+    const identities = [...descendants.values()]
+      .map(({ pid, startedAt }) => ({ pid, startedAt }))
+      .sort((a, b) => a.pid - b.pid);
+    const serialized = JSON.stringify(identities);
+    if (serialized !== recorded) {
+      lease.recordDescendants(identities);
+      recorded = serialized;
+    }
+    return processes;
+  };
+  const deliver = (pid, signal) => {
+    try {
+      process.kill(pid, signal);
+    } catch (error) {
+      if (error.code !== 'ESRCH') process.stderr.write('VALIDATION_SIGNAL_NOT_DELIVERED\n');
+    }
+  };
+  const signalOwned = (signal, processes) => {
+    if (ownsGroup && child?.pid) deliver(-child.pid, signal);
+    for (const identity of [...descendants.values()].reverse())
+      if (
+        sameRunningProcess(identity, processes) &&
+        !(ownsGroup && identity.groupPid === child.pid)
+      )
+        deliver(identity.pid, signal);
+    if (!ownsGroup && child?.pid && !descendants.has(child.pid) && child.exitCode === null)
+      deliver(child.pid, signal);
+  };
   const forward = (signal) => {
     requestedSignal = signal;
-    if (child?.pid) {
+    signalAt ??= Date.now();
+    if (child?.pid)
       try {
-        process.kill(ownsGroup ? -child.pid : child.pid, signal);
+        signalOwned(signal, capture());
       } catch (error) {
-        // A second signal can race a process group's exit. Never throw out of
-        // the handler and abandon ownership; wait for exit and verify quiescence.
-        if (error.code !== 'ESRCH') process.stderr.write('VALIDATION_SIGNAL_NOT_DELIVERED\n');
+        censusError = error;
+        deliver(ownsGroup ? -child.pid : child.pid, signal);
       }
-    }
   };
   const signals = ['SIGINT', 'SIGTERM', 'SIGHUP'];
   const handlers = signals.map((signal) => () => forward(signal));
+  const releaseQuiescent = () => {
+    if (child?.pid && !quiescent)
+      throw new Error(
+        censusError ? 'VALIDATION_PROCESS_CENSUS_FAILED' : 'VALIDATION_CHILDREN_STILL_RUNNING',
+      );
+    lease.release();
+  };
+  signals.forEach((signal, index) => process.on(signal, handlers[index]));
   try {
     child = spawn(argv[0], argv.slice(1), {
       stdio: 'inherit',
       detached: ownsGroup,
     });
     if (child.pid && !lease.inherited) lease.recordChild(child.pid, ownsGroup);
-    signals.forEach((signal, index) => process.on(signal, handlers[index]));
-    return await new Promise((resolveResult, reject) => {
+    if (child.pid) {
+      capture();
+      monitor = setInterval(() => {
+        try {
+          capture();
+        } catch (error) {
+          censusError = error;
+        }
+      }, 500);
+      monitor.unref();
+    }
+    const outcome = await new Promise((resolveResult, reject) => {
       child.once('error', reject);
       child.once('exit', (code, signal) =>
         resolveResult(
@@ -245,9 +366,27 @@ export async function runValidation(argv, options = {}) {
         ),
       );
     });
+    // The immediate child can exit before its descendants, including a task
+    // that authority put in a separate group. Keep admission while they drain.
+    const confirmBy = Date.now() + 3_000;
+    let escalated = false;
+    for (;;) {
+      const processes = capture();
+      if (censusError) throw censusError;
+      if (descendants.size === 0 && !(ownsGroup && alive(-child.pid))) break;
+      if (requestedSignal && !escalated && Date.now() >= signalAt + 1_000) {
+        signalOwned('SIGKILL', processes);
+        escalated = true;
+      }
+      if (Date.now() >= confirmBy) throw new Error('VALIDATION_CHILDREN_STILL_RUNNING');
+      await delay(50);
+    }
+    quiescent = true;
+    return outcome;
   } finally {
+    clearInterval(monitor);
     signals.forEach((signal, index) => process.off(signal, handlers[index]));
-    lease.release();
+    releaseQuiescent();
   }
 }
 
