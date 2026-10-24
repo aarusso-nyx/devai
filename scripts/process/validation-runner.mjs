@@ -68,14 +68,19 @@ const childRunning = (owner) => {
     : owner.descendants?.find(({ pid }) => pid === owner.childPid);
   return identity ? sameRunningProcess(identity, processSnapshot()) : alive(owner.childPid);
 };
-function ancestors() {
+const ownerRunning = (owner, processes = undefined) =>
+  typeof owner.processStartedAt === 'string'
+    ? sameRunningProcess(
+        { pid: owner.pid, startedAt: owner.processStartedAt },
+        processes ?? processSnapshot(),
+      )
+    : alive(owner.pid);
+function ancestors(processes = processSnapshot()) {
   const result = new Set([process.pid]);
-  let pid = process.ppid;
+  let pid = processes.get(process.pid).parentPid;
   while (pid > 1 && !result.has(pid)) {
     result.add(pid);
-    pid = Number(
-      execFileSync('ps', ['-o', 'ppid=', '-p', String(pid)], { encoding: 'utf8' }).trim(),
-    );
+    pid = processes.get(pid)?.parentPid ?? 0;
   }
   return result;
 }
@@ -145,8 +150,9 @@ export async function acquireValidation({
   const readers = join(root, 'shared');
   const writer = join(root, 'exclusive');
   mkdirSync(readers, { recursive: true, mode: 0o700 });
-  const lineage = ancestors();
-  // Reentrance uses actual process ancestry, so it also works through the
+  const processes = processSnapshot();
+  const lineage = ancestors(processes);
+  // Reentrance binds process birth as well as actual ancestry, and works through the
   // check runner's deliberately scrubbed environment. No credential is forwarded.
   for (const path of [writer, ...readdirSync(readers).map((name) => join(readers, name))]) {
     let leaseOwner;
@@ -157,12 +163,21 @@ export async function acquireValidation({
       if (error.code === 'ENOENT') continue;
       throw error;
     }
-    if (lineage.has(leaseOwner.pid)) {
+    if (
+      lineage.has(leaseOwner.pid) &&
+      typeof leaseOwner.processStartedAt === 'string' &&
+      ownerRunning(leaseOwner, processes)
+    ) {
       if (exclusive && path !== writer) throw new Error('VALIDATION_LEASE_UPGRADE_REFUSED');
       return { inherited: true, release() {}, recordChild() {}, recordDescendants() {} };
     }
   }
-  const owner = { id: randomUUID(), pid: process.pid, startedAt: new Date().toISOString() };
+  const owner = {
+    id: randomUUID(),
+    pid: process.pid,
+    processStartedAt: processes.get(process.pid).startedAt,
+    startedAt: new Date().toISOString(),
+  };
   const path = exclusive ? writer : join(readers, owner.id);
   const deadline = Date.now() + waitMs;
   let held = false,
@@ -229,7 +244,7 @@ export function recoverValidation(root, id) {
     const owner = read(path);
     if (owner.id !== id) continue;
     if (
-      alive(owner.pid) ||
+      ownerRunning(owner) ||
       (owner.ownsGroup && owner.childGroup && alive(-owner.childGroup)) ||
       childRunning(owner) ||
       descendantsRunning(owner)
