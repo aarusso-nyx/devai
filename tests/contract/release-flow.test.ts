@@ -5,6 +5,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -31,10 +32,16 @@ const { acquireValidation, recoverValidation, runValidation } = await import(run
 const { buildDocs } = await import(docsUrl);
 const roots: string[] = [];
 const children: ChildProcess[] = [];
+const ownedPidMarkers = new Map<number, string>();
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), 'devai-release-flow-'));
   roots.push(root);
   return root;
+}
+function sharedOwnerFile(root: string) {
+  const [id] = readdirSync(join(root, 'leases/shared'));
+  if (id === undefined) throw new Error('shared fixture lease was not registered');
+  return join(root, 'leases/shared', id, 'owner.json');
 }
 async function until(predicate: () => boolean) {
   const deadline = Date.now() + 8_000;
@@ -60,11 +67,174 @@ function worker(root: string, name: string, exclusive: boolean) {
 afterEach(async () => {
   for (const child of children.splice(0))
     if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');
+  for (const [pid, marker] of ownedPidMarkers) {
+    try {
+      const command = execFileSync('ps', ['-p', String(pid), '-o', 'command='], {
+        encoding: 'utf8',
+      });
+      if (command.includes(marker)) process.kill(pid, 'SIGKILL');
+    } catch {
+      // The fixture may already have exited; never signal a reused PID.
+    }
+  }
+  ownedPidMarkers.clear();
   await delay(100);
   roots.splice(0).forEach((root) => rmSync(root, { recursive: true, force: true }));
 });
 
 describe('host validation admission', () => {
+  it('escalates cancellation when the immediate child ignores SIGTERM', async () => {
+    const root = fixture();
+    const ready = join(root, 'resistant-parent-ready');
+    const stopping = join(root, 'resistant-parent-stopping');
+    const code = `const fs=require('node:fs');process.on('SIGTERM',()=>fs.writeFileSync(${JSON.stringify(stopping)},''));fs.writeFileSync(${JSON.stringify(ready)},'');setInterval(()=>{},100);`;
+    const actor = spawn(
+      process.execPath,
+      [
+        '--input-type=module',
+        '-e',
+        `import {runValidation} from ${JSON.stringify(runnerUrl)};process.exitCode=await runValidation(${JSON.stringify([process.execPath, '-e', code])},{root:${JSON.stringify(join(root, 'leases'))}});`,
+      ],
+      { stdio: 'pipe' },
+    );
+    children.push(actor);
+    await until(() => existsSync(ready));
+    const leasePath = sharedOwnerFile(root);
+    await until(() => Number.isSafeInteger(JSON.parse(readFileSync(leasePath, 'utf8')).childPid));
+    ownedPidMarkers.set(JSON.parse(readFileSync(leasePath, 'utf8')).childPid, ready);
+    const writer = worker(root, 'after-resistant-parent', true);
+    let queuedLog = '';
+    writer.stderr?.on('data', (chunk) => (queuedLog += String(chunk)));
+    await until(() => queuedLog.includes('validation queued'));
+    actor.kill('SIGTERM');
+    await until(() => existsSync(stopping));
+    expect(actor.exitCode).toBeNull();
+    expect(existsSync(leasePath)).toBe(true);
+    expect(existsSync(join(root, 'after-resistant-parent'))).toBe(false);
+    await until(() => actor.exitCode !== null && existsSync(join(root, 'after-resistant-parent')));
+    expect(actor.exitCode).toBe(143);
+    writeFileSync(join(root, 'after-resistant-parent-stop'), '');
+    await until(() => writer.exitCode !== null);
+    expect(writer.exitCode).toBe(0);
+  });
+
+  it('keeps shared admission while a recorded worker outlives its normally exited parent', async () => {
+    const root = fixture();
+    const ready = join(root, 'normal-ready');
+    const pidFile = join(root, 'normal-pid');
+    const parentStop = join(root, 'parent-stop');
+    const workerStop = join(root, 'worker-stop');
+    const descendantCode = `const fs=require('node:fs');fs.writeFileSync(${JSON.stringify(ready)},'');setInterval(()=>{if(fs.existsSync(${JSON.stringify(workerStop)}))process.exit(0)},20);`;
+    const parentCode = `const fs=require('node:fs');const child=require('node:child_process').spawn(process.execPath,['-e',${JSON.stringify(descendantCode)}],{stdio:'ignore',detached:true});fs.writeFileSync(${JSON.stringify(pidFile)},String(child.pid));setInterval(()=>{if(fs.existsSync(${JSON.stringify(parentStop)}))process.exit(0)},20);`;
+    const actor = spawn(
+      process.execPath,
+      [
+        '--input-type=module',
+        '-e',
+        `import {runValidation} from ${JSON.stringify(runnerUrl)};process.exitCode=await runValidation(${JSON.stringify([process.execPath, '-e', parentCode])},{root:${JSON.stringify(join(root, 'leases'))}});`,
+      ],
+      { stdio: 'pipe' },
+    );
+    children.push(actor);
+    await until(() => existsSync(ready) && existsSync(pidFile));
+    const descendantPid = Number(readFileSync(pidFile, 'utf8'));
+    ownedPidMarkers.set(descendantPid, ready);
+    const leasePath = sharedOwnerFile(root);
+    await until(() =>
+      JSON.parse(readFileSync(leasePath, 'utf8')).descendants?.some(
+        ({ pid }: { pid: number }) => pid === descendantPid,
+      ),
+    );
+    const writer = worker(root, 'after-normal-worker', true);
+    let queuedLog = '';
+    writer.stderr?.on('data', (chunk) => (queuedLog += String(chunk)));
+    await until(() => queuedLog.includes('validation queued'));
+    writeFileSync(parentStop, '');
+    await delay(200);
+    expect(actor.exitCode).toBeNull();
+    expect(existsSync(leasePath)).toBe(true);
+    expect(existsSync(join(root, 'after-normal-worker'))).toBe(false);
+    writeFileSync(workerStop, '');
+    await until(() => actor.exitCode !== null && existsSync(join(root, 'after-normal-worker')));
+    expect(actor.exitCode).toBe(0);
+    writeFileSync(join(root, 'after-normal-worker-stop'), '');
+    await until(() => writer.exitCode !== null);
+    expect(writer.exitCode).toBe(0);
+  });
+
+  it('refuses recovery of a live recorded descendant and distinguishes reused PIDs', () => {
+    const root = fixture();
+    const owner = join(root, 'exclusive');
+    const id = '12345678-1234-1234-1234-123456789abc';
+    const startedAt = execFileSync('ps', ['-p', String(process.pid), '-o', 'lstart='], {
+      encoding: 'utf8',
+      env: { ...process.env, LC_ALL: 'C', TZ: 'UTC' },
+    }).trim();
+    mkdirSync(owner);
+    writeFileSync(
+      join(owner, 'owner.json'),
+      JSON.stringify({ id, pid: 99_999_999, descendants: [{ pid: process.pid, startedAt }] }),
+    );
+    expect(() => recoverValidation(root, id)).toThrow('VALIDATION_RECOVERY_LIVE_WORK');
+    writeFileSync(
+      join(owner, 'owner.json'),
+      JSON.stringify({
+        id,
+        pid: 99_999_999,
+        descendants: [{ pid: process.pid, startedAt: 'different process birth' }],
+      }),
+    );
+    recoverValidation(root, id);
+    expect(existsSync(owner)).toBe(false);
+  });
+
+  it.each([
+    { label: 'shared', exclusive: false, resistsTerm: false },
+    { label: 'exclusive', exclusive: true, resistsTerm: false },
+    { label: 'shared with a TERM-resistant worker', exclusive: false, resistsTerm: true },
+  ])(
+    'retains $label admission until detached descendants stop on cancellation',
+    async ({ exclusive, resistsTerm }) => {
+      const root = fixture();
+      const ready = join(root, 'descendant-ready');
+      const stopping = join(root, 'descendant-stopping');
+      const pidFile = join(root, 'descendant-pid');
+      const descendantCode = `const fs=require('node:fs');let stopping=false;process.on('SIGTERM',()=>{if(stopping)return;stopping=true;fs.writeFileSync(${JSON.stringify(stopping)},'');if(!${JSON.stringify(resistsTerm)})setTimeout(()=>process.exit(0),350)});fs.writeFileSync(${JSON.stringify(ready)},'');setInterval(()=>{},100);`;
+      const parentCode = `const {spawn}=require('node:child_process');const fs=require('node:fs');const child=spawn(process.execPath,['-e',${JSON.stringify(descendantCode)}],{stdio:'ignore',detached:true});fs.writeFileSync(${JSON.stringify(pidFile)},String(child.pid));setInterval(()=>{},100);`;
+      const actor = spawn(
+        process.execPath,
+        [
+          '--input-type=module',
+          '-e',
+          `import {runValidation} from ${JSON.stringify(runnerUrl)};process.exitCode=await runValidation(${JSON.stringify([process.execPath, '-e', parentCode])},${JSON.stringify({ root: join(root, 'leases'), exclusive, waitMs: 7000 })});`,
+        ],
+        { stdio: 'pipe' },
+      );
+      children.push(actor);
+      await until(() => existsSync(ready) && existsSync(pidFile));
+      const descendantPid = Number(readFileSync(pidFile, 'utf8'));
+      ownedPidMarkers.set(descendantPid, ready);
+      const leasePath = exclusive
+        ? join(root, 'leases/exclusive/owner.json')
+        : sharedOwnerFile(root);
+      const writer = worker(root, 'after-descendant', true);
+      let queuedLog = '';
+      writer.stderr?.on('data', (chunk) => (queuedLog += String(chunk)));
+      await until(() => queuedLog.includes('validation queued'));
+      actor.kill('SIGTERM');
+      await until(() => existsSync(stopping) || actor.exitCode !== null);
+      expect(existsSync(stopping)).toBe(true);
+      expect(actor.exitCode).toBeNull();
+      expect(JSON.parse(readFileSync(leasePath, 'utf8')).pid).toBe(actor.pid);
+      expect(existsSync(join(root, 'after-descendant'))).toBe(false);
+      await until(() => actor.exitCode !== null && existsSync(join(root, 'after-descendant')));
+      expect(actor.exitCode).toBe(143);
+      writeFileSync(join(root, 'after-descendant-stop'), '');
+      await until(() => writer.exitCode !== null);
+      expect(writer.exitCode).toBe(0);
+    },
+  );
+
   it('exposes only complete metadata during initial publication and child registration', () => {
     const root = fixture();
     const result = JSON.parse(
