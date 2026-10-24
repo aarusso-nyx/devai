@@ -2,7 +2,8 @@
 
 ## 2.7.1 — 2026-10-24
 
-This patch reduces release rework while preserving all validation and publication gates.
+This patch reduces release rework and refreshes security dependencies while preserving
+all validation and publication gates.
 
 - Check release prerequisites and docs dependencies before expensive RC validation.
 - Coordinate participating validation commands across worktrees with a host-wide
@@ -12,6 +13,8 @@ This patch reduces release rework while preserving all validation and publicatio
 - Resume release preparation only after rechecking exact candidate bindings and
   evidence; verify rehearsal and publication against their exact workflow attempts.
 - Run pre-push affected tasks serially to avoid contention between large suites.
+- Update production and documentation `fast-uri` to 3.1.9 and docs-only
+  `body-parser` to 1.20.9 to resolve current advisories without audit waivers.
 - Preserve release profiles, coverage thresholds, timeouts, approved verifier
   `@aarusso-nyx/devai@2.4.0` and all publication approvals.
 
