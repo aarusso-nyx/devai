@@ -44,9 +44,14 @@ export function competingTestPids() {
   return rows
     .filter((row) => {
       const pid = Number(row[1]);
+      const test = /(?:\/vitest\/vitest\.mjs|\bvitest run\b|\(vitest(?: \d+)?\))/u.exec(row[3]);
+      const wrapper = /(?:^|[/\s])validation-runner\.mjs(?=\s|$)/u.exec(row[3]);
       if (
         lineage.has(pid) ||
-        !/(?:\/vitest\/vitest\.mjs|\bvitest run\b|\(vitest(?: \d+)?\))/u.test(row[3])
+        !test ||
+        // A queued participant carries its future command in argv. Its actual
+        // Vitest child, when started, has the test marker before any wrapper argument.
+        (wrapper && wrapper.index < test.index)
       )
         return false;
       const seen = new Set();
