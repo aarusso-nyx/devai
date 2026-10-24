@@ -175,7 +175,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
     files: [
       {
         path: 'package.json',
-        sha256: '80013fffcc8052481f38c90828cc02b3537dc72fe2b1f52fb2a388aa4f6e4fe2',
+        sha256: '35f7b31086defa4e51081c2ed5e1da904a01d69f7928f504060e25f5d6bf26c1',
       },
       {
         path: 'scripts/process/bootstrap-check-runner.mjs',
@@ -234,7 +234,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
     files: [
       {
         path: 'package.json',
-        sha256: '80013fffcc8052481f38c90828cc02b3537dc72fe2b1f52fb2a388aa4f6e4fe2',
+        sha256: '35f7b31086defa4e51081c2ed5e1da904a01d69f7928f504060e25f5d6bf26c1',
       },
       {
         path: 'scripts/check-commit-range.mjs',
@@ -425,7 +425,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
     files: [
       {
         path: 'package.json',
-        sha256: '80013fffcc8052481f38c90828cc02b3537dc72fe2b1f52fb2a388aa4f6e4fe2',
+        sha256: '35f7b31086defa4e51081c2ed5e1da904a01d69f7928f504060e25f5d6bf26c1',
       },
     ],
   },
@@ -455,7 +455,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
       },
       {
         path: 'package.json',
-        sha256: '80013fffcc8052481f38c90828cc02b3537dc72fe2b1f52fb2a388aa4f6e4fe2',
+        sha256: '35f7b31086defa4e51081c2ed5e1da904a01d69f7928f504060e25f5d6bf26c1',
       },
       {
         path: 'packages/authority/package.json',
@@ -658,7 +658,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
     files: [
       {
         path: 'package.json',
-        sha256: '80013fffcc8052481f38c90828cc02b3537dc72fe2b1f52fb2a388aa4f6e4fe2',
+        sha256: '35f7b31086defa4e51081c2ed5e1da904a01d69f7928f504060e25f5d6bf26c1',
       },
     ],
   },
@@ -759,7 +759,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
     files: [
       {
         path: 'package.json',
-        sha256: '80013fffcc8052481f38c90828cc02b3537dc72fe2b1f52fb2a388aa4f6e4fe2',
+        sha256: '35f7b31086defa4e51081c2ed5e1da904a01d69f7928f504060e25f5d6bf26c1',
       },
       {
         path: 'scripts/process/publication-state.mjs',
