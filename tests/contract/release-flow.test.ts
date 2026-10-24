@@ -21,6 +21,7 @@ const docsUrl = pathToFileURL(resolve('scripts/process/docs-build.mjs')).href;
 const {
   checkpoint,
   oneNpmResult,
+  normalizeNpmDistTags,
   saveJournal,
   recoverJournal,
   assertPromotedAssets,
@@ -376,6 +377,26 @@ describe('resumable release checkpoints', () => {
       expect(() => oneNpmResult(shape)).toThrow('RELEASE_FLOW_NPM_RESPONSE_AMBIGUOUS');
     },
   );
+  it.each([
+    { response: { latest: '2.7.0', next: '1.5.0-rc.1' } },
+    { response: [{ latest: '2.7.0', next: '1.5.0-rc.1' }] },
+  ])('accepts registry dist-tags as an object or a single result', ({ response }) => {
+    expect(normalizeNpmDistTags(response)).toEqual({ latest: '2.7.0', next: '1.5.0-rc.1' });
+  });
+  it.each(
+    [
+      [],
+      [{ latest: '2.7.0' }, { latest: '2.7.1' }],
+      [[{ latest: '2.7.1' }]],
+      { latest: { latest: '2.7.1' } },
+      {},
+      null,
+      '2.7.1',
+      { latest: 271 },
+    ].map((response) => ({ response })),
+  )('refuses ambiguous or malformed registry dist-tags', ({ response }) => {
+    expect(() => normalizeNpmDistTags(response)).toThrow('RELEASE_FLOW_NPM_RESPONSE_AMBIGUOUS');
+  });
 });
 
 describe('isolated documentation preparation', () => {
