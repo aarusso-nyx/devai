@@ -31,7 +31,7 @@ function processSnapshot() {
   const processes = new Map();
   const output = execFileSync('ps', ['-axo', 'pid=,ppid=,pgid=,stat=,lstart='], {
     encoding: 'utf8',
-    env: { ...process.env, LC_ALL: 'C' },
+    env: { ...process.env, LC_ALL: 'C', TZ: 'UTC' },
     maxBuffer: 8 * 1024 * 1024,
   });
   for (const line of output.split('\n')) {
@@ -253,6 +253,8 @@ export async function runValidation(argv, options = {}) {
   let requestedSignal;
   let signalAt;
   let monitor;
+  let killTimer;
+  let escalated = false;
   let censusError;
   let quiescent = false;
   let childStartedAt;
@@ -316,16 +318,29 @@ export async function runValidation(argv, options = {}) {
     if (!ownsGroup && child?.pid && !descendants.has(child.pid) && child.exitCode === null)
       deliver(child.pid, signal);
   };
+  const escalate = () => {
+    if (escalated || !child?.pid) return;
+    escalated = true;
+    try {
+      signalOwned('SIGKILL', capture());
+    } catch (error) {
+      censusError = error;
+      deliver(ownsGroup ? -child.pid : child.pid, 'SIGKILL');
+    }
+  };
   const forward = (signal) => {
     requestedSignal = signal;
     signalAt ??= Date.now();
-    if (child?.pid)
+    if (child?.pid) {
       try {
         signalOwned(signal, capture());
       } catch (error) {
         censusError = error;
         deliver(ownsGroup ? -child.pid : child.pid, signal);
       }
+      killTimer ??= setTimeout(escalate, 1_000);
+      killTimer.unref();
+    }
   };
   const signals = ['SIGINT', 'SIGTERM', 'SIGHUP'];
   const handlers = signals.map((signal) => () => forward(signal));
@@ -369,14 +384,12 @@ export async function runValidation(argv, options = {}) {
     // The immediate child can exit before its descendants, including a task
     // that authority put in a separate group. Keep admission while they drain.
     const confirmBy = Date.now() + 3_000;
-    let escalated = false;
     for (;;) {
-      const processes = capture();
+      capture();
       if (censusError) throw censusError;
       if (descendants.size === 0 && !(ownsGroup && alive(-child.pid))) break;
       if (requestedSignal && !escalated && Date.now() >= signalAt + 1_000) {
-        signalOwned('SIGKILL', processes);
-        escalated = true;
+        escalate();
       }
       if (Date.now() >= confirmBy) throw new Error('VALIDATION_CHILDREN_STILL_RUNNING');
       await delay(50);
@@ -385,6 +398,7 @@ export async function runValidation(argv, options = {}) {
     return outcome;
   } finally {
     clearInterval(monitor);
+    clearTimeout(killTimer);
     signals.forEach((signal, index) => process.off(signal, handlers[index]));
     releaseQuiescent();
   }
