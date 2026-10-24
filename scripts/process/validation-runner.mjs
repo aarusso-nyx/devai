@@ -90,8 +90,15 @@ export async function acquireValidation({
   // Reentrance uses actual process ancestry, so it also works through the
   // check runner's deliberately scrubbed environment. No credential is forwarded.
   for (const path of [writer, ...readdirSync(readers).map((name) => join(readers, name))]) {
-    if (!existsSync(join(path, 'owner.json'))) continue;
-    if (lineage.has(read(path).pid)) {
+    let leaseOwner;
+    try {
+      leaseOwner = read(path);
+    } catch (error) {
+      // Another runner may release its lease while this scan is in progress.
+      if (error.code === 'ENOENT') continue;
+      throw error;
+    }
+    if (lineage.has(leaseOwner.pid)) {
       if (exclusive && path !== writer) throw new Error('VALIDATION_LEASE_UPGRADE_REFUSED');
       return { inherited: true, release() {}, recordChild() {} };
     }
