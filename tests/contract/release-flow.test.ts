@@ -43,6 +43,16 @@ function sharedOwnerFile(root: string) {
   if (id === undefined) throw new Error('shared fixture lease was not registered');
   return join(root, 'leases/shared', id, 'owner.json');
 }
+function fixtureProcessRunning(pid: number) {
+  try {
+    const state = execFileSync('ps', ['-p', String(pid), '-o', 'stat='], {
+      encoding: 'utf8',
+    }).trim();
+    return state.length > 0 && !state.includes('Z');
+  } catch {
+    return false;
+  }
+}
 async function until(predicate: () => boolean) {
   const deadline = Date.now() + 8_000;
   while (!predicate()) {
@@ -83,6 +93,84 @@ afterEach(async () => {
 });
 
 describe('host validation admission', () => {
+  it('recovers a hard-killed shared wrapper after its child finishes in a still-live caller group', async () => {
+    const root = fixture();
+    const ready = join(root, 'abandoned-shared-ready');
+    const stop = join(root, 'abandoned-shared-stop');
+    const code = `const fs=require('node:fs');fs.writeFileSync(${JSON.stringify(ready)},'');setInterval(()=>{if(fs.existsSync(${JSON.stringify(stop)}))process.exit(0)},20);`;
+    const actor = spawn(
+      process.execPath,
+      [
+        '--input-type=module',
+        '-e',
+        `import {runValidation} from ${JSON.stringify(runnerUrl)};process.exitCode=await runValidation(${JSON.stringify([process.execPath, '-e', code])},{root:${JSON.stringify(join(root, 'leases'))}});`,
+      ],
+      { stdio: 'pipe' },
+    );
+    children.push(actor);
+    await until(() => existsSync(ready));
+    const leasePath = sharedOwnerFile(root);
+    await until(() => JSON.parse(readFileSync(leasePath, 'utf8')).descendants?.length > 0);
+    const owner = JSON.parse(readFileSync(leasePath, 'utf8'));
+    ownedPidMarkers.set(owner.childPid, ready);
+    const callerGroup = Number(
+      execFileSync('ps', ['-p', String(process.pid), '-o', 'pgid='], { encoding: 'utf8' }).trim(),
+    );
+    actor.kill('SIGKILL');
+    await until(() => actor.signalCode === 'SIGKILL');
+    expect(() => recoverValidation(join(root, 'leases'), owner.id)).toThrow(
+      'VALIDATION_RECOVERY_LIVE_WORK',
+    );
+    writeFileSync(stop, '');
+    await until(() => !fixtureProcessRunning(owner.childPid));
+    expect(() => process.kill(-callerGroup, 0)).not.toThrow();
+    recoverValidation(join(root, 'leases'), owner.id);
+    expect(existsSync(leasePath)).toBe(false);
+    const next = await acquireValidation({
+      root: join(root, 'leases'),
+      exclusive: true,
+      waitMs: 1000,
+    });
+    next.release();
+  });
+
+  it('preserves owned-group and live-child recovery guards while ignoring a reused shared child PID', () => {
+    const root = fixture();
+    const path = join(root, 'exclusive');
+    const id = '12345678-1234-1234-1234-123456789abc';
+    const group = Number(
+      execFileSync('ps', ['-p', String(process.pid), '-o', 'pgid='], { encoding: 'utf8' }).trim(),
+    );
+    const startedAt = execFileSync('ps', ['-p', String(process.pid), '-o', 'lstart='], {
+      encoding: 'utf8',
+      env: { ...process.env, LC_ALL: 'C', TZ: 'UTC' },
+    }).trim();
+    mkdirSync(path);
+    const write = (value: object) =>
+      writeFileSync(
+        join(path, 'owner.json'),
+        JSON.stringify({ id, pid: 99_999_999, descendants: [], ...value }),
+      );
+    write({ ownsGroup: true, childGroup: group, childPid: 99_999_999 });
+    expect(() => recoverValidation(root, id)).toThrow('VALIDATION_RECOVERY_LIVE_WORK');
+    write({
+      ownsGroup: false,
+      childGroup: 99_999_999,
+      childPid: process.pid,
+      childStartedAt: startedAt,
+    });
+    expect(() => recoverValidation(root, id)).toThrow('VALIDATION_RECOVERY_LIVE_WORK');
+    write({
+      ownsGroup: false,
+      childGroup: group,
+      childPid: process.pid,
+      childStartedAt: 'different process birth',
+    });
+    recoverValidation(root, id);
+    expect(existsSync(path)).toBe(false);
+    expect(() => process.kill(process.pid, 0)).not.toThrow();
+  });
+
   it('escalates cancellation when the immediate child ignores SIGTERM', async () => {
     const root = fixture();
     const ready = join(root, 'resistant-parent-ready');
