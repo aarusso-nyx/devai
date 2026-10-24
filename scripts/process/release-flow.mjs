@@ -207,6 +207,19 @@ export function oneNpmResult(value) {
   throw new Error('RELEASE_FLOW_NPM_RESPONSE_AMBIGUOUS');
 }
 
+export function normalizeNpmDistTags(value) {
+  const tags = Array.isArray(value) && value.length === 1 ? value[0] : value;
+  if (
+    tags &&
+    typeof tags === 'object' &&
+    !Array.isArray(tags) &&
+    Object.keys(tags).length > 0 &&
+    Object.values(tags).every((version) => typeof version === 'string')
+  )
+    return tags;
+  throw new Error('RELEASE_FLOW_NPM_RESPONSE_AMBIGUOUS');
+}
+
 export function assertPromotedAssets(expectedFiles, directory) {
   if (!same(inspectAssets(directory).files, expectedFiles))
     throw new Error('RELEASE_FLOW_PUBLICATION_PROMOTION_MISMATCH');
@@ -364,10 +377,12 @@ function publication(config, journal, parent, runId) {
     );
     if (metadata.name !== manifest.release.package || metadata.version !== manifest.release.version)
       throw new Error('RELEASE_FLOW_REGISTRY_IDENTITY_MISMATCH');
-    const tags = JSON.parse(
-      command(
-        ['npm', 'view', manifest.release.package, 'dist-tags', registry, '--json'],
-        temporary,
+    const tags = normalizeNpmDistTags(
+      JSON.parse(
+        command(
+          ['npm', 'view', manifest.release.package, 'dist-tags', registry, '--json'],
+          temporary,
+        ),
       ),
     );
     if (tags[manifest.release.dist_tag] !== manifest.release.version)
