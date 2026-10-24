@@ -93,6 +93,41 @@ afterEach(async () => {
 });
 
 describe('host validation admission', () => {
+  it('does not inherit an abandoned owner whose PID is now an actual ancestor', async () => {
+    const root = fixture();
+    const path = join(root, 'exclusive');
+    mkdirSync(path);
+    writeFileSync(
+      join(path, 'owner.json'),
+      JSON.stringify({
+        id: '12345678-1234-1234-1234-123456789abc',
+        pid: process.pid,
+        processStartedAt: 'different process birth',
+      }),
+    );
+    await expect(acquireValidation({ root, waitMs: 150 })).rejects.toThrow('VALIDATION_LEASE_BUSY');
+    expect(existsSync(path)).toBe(true);
+  });
+
+  it('recovers a reused owner PID but refuses recovery of the actual current owner', async () => {
+    const root = fixture();
+    const path = join(root, 'exclusive');
+    const id = '12345678-1234-1234-1234-123456789abc';
+    mkdirSync(path);
+    writeFileSync(
+      join(path, 'owner.json'),
+      JSON.stringify({ id, pid: process.pid, processStartedAt: 'different process birth' }),
+    );
+    recoverValidation(root, id);
+    expect(existsSync(path)).toBe(false);
+    const lease = await acquireValidation({ root, exclusive: true });
+    const owner = JSON.parse(readFileSync(join(path, 'owner.json'), 'utf8'));
+    expect(owner.processStartedAt).toEqual(expect.any(String));
+    expect(() => recoverValidation(root, owner.id)).toThrow('VALIDATION_RECOVERY_LIVE_WORK');
+    lease.release();
+    expect(() => process.kill(process.pid, 0)).not.toThrow();
+  });
+
   it('recovers a hard-killed shared wrapper after its child finishes in a still-live caller group', async () => {
     const root = fixture();
     const ready = join(root, 'abandoned-shared-ready');
