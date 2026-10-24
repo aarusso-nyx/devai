@@ -56,6 +56,11 @@ const sameRunningProcess = (identity, processes) => {
     !current.state.includes('Z')
   );
 };
+// killpg(..., 0) also sees unreaped zombies; only live members can do work.
+const groupRunning = (groupPid, processes = processSnapshot()) =>
+  [...processes.values()].some(
+    (current) => current.groupPid === groupPid && !current.state.includes('Z'),
+  );
 const descendantsRunning = (owner) => {
   if (!owner.descendants?.length) return false;
   const processes = processSnapshot();
@@ -221,7 +226,7 @@ export async function acquireValidation({
       },
       release() {
         if (
-          (owner.ownsGroup && alive(-owner.childGroup)) ||
+          (owner.ownsGroup && groupRunning(owner.childGroup)) ||
           childRunning(owner) ||
           descendantsRunning(owner)
         )
@@ -245,7 +250,7 @@ export function recoverValidation(root, id) {
     if (owner.id !== id) continue;
     if (
       ownerRunning(owner) ||
-      (owner.ownsGroup && owner.childGroup && alive(-owner.childGroup)) ||
+      (owner.ownsGroup && owner.childGroup && groupRunning(owner.childGroup)) ||
       childRunning(owner) ||
       descendantsRunning(owner)
     )
@@ -403,9 +408,9 @@ export async function runValidation(argv, options = {}) {
     // that authority put in a separate group. Keep admission while they drain.
     const confirmBy = Date.now() + 3_000;
     for (;;) {
-      capture();
+      const processes = capture();
       if (censusError) throw censusError;
-      if (descendants.size === 0 && !(ownsGroup && alive(-child.pid))) break;
+      if (descendants.size === 0 && !(ownsGroup && groupRunning(child.pid, processes))) break;
       if (requestedSignal && !escalated && Date.now() >= signalAt + 1_000) {
         escalate();
       }
