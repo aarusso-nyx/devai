@@ -65,6 +65,52 @@ afterEach(async () => {
 });
 
 describe('host validation admission', () => {
+  it.each(['departed', 'inaccessible', 'malformed'])(
+    'handles a %s lease during the reentrance scan',
+    (condition) => {
+      const root = fixture();
+      const prior = join(root, 'shared/prior');
+      const ownerFile = join(prior, 'owner.json');
+      mkdirSync(prior, { recursive: true });
+      writeFileSync(
+        ownerFile,
+        condition === 'malformed'
+          ? 'invalid json'
+          : JSON.stringify({ id: 'prior', pid: process.pid }),
+      );
+      const result = JSON.parse(
+        execFileSync(
+          process.execPath,
+          [
+            '--input-type=module',
+            '-e',
+            `import fs from 'node:fs';import {syncBuiltinESMExports} from 'node:module';
+const {acquireValidation}=await import(${JSON.stringify(runnerUrl)});
+const original=fs.readFileSync;let intercepted=0;
+fs.readFileSync=function(path,...args){
+  if(path===${JSON.stringify(ownerFile)}){
+    intercepted++;
+    if(${JSON.stringify(condition)}==='departed')fs.rmSync(${JSON.stringify(prior)},{recursive:true});
+    if(${JSON.stringify(condition)}==='inaccessible')throw Object.assign(new Error('access denied'),{code:'EACCES'});
+  }
+  return original.call(this,path,...args);
+};syncBuiltinESMExports();
+try{const lease=await acquireValidation({root:${JSON.stringify(root)},waitMs:1000});
+const inherited=lease.inherited;lease.release();console.log(JSON.stringify({intercepted,inherited,remaining:fs.readdirSync(${JSON.stringify(join(root, 'shared'))}).length}));
+}catch(error){console.log(JSON.stringify({intercepted,code:error.code,syntax:error instanceof SyntaxError}));
+}finally{fs.readFileSync=original;syncBuiltinESMExports();}`,
+          ],
+          { encoding: 'utf8' },
+        ),
+      );
+      expect(result.intercepted).toBe(1);
+      if (condition === 'departed')
+        expect(result).toEqual({ intercepted: 1, inherited: false, remaining: 0 });
+      else if (condition === 'inaccessible') expect(result.code).toBe('EACCES');
+      else expect(result.syntax).toBe(true);
+    },
+  );
+
   it('keeps shared tasks inside the caller process group for authority cleanup', async () => {
     const root = fixture();
     const output = join(root, 'group');
