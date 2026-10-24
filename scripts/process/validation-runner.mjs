@@ -18,14 +18,17 @@ import { setTimeout as delay } from 'node:timers/promises';
 
 export const validationRoot = () => join(homedir(), '.cache/devai/validation-v1', hostname());
 const read = (path) => JSON.parse(readFileSync(join(path, 'owner.json'), 'utf8'));
-const alive = (pid) => {
+export const processRunning = (pid) => {
   try {
     process.kill(pid, 0);
-    return true;
   } catch (error) {
     if (error.code === 'ESRCH') return false;
     throw error;
   }
+  // Preserve conservative handling of a live PID absent from the census, but
+  // do not confuse a known unreaped zombie with work that can still execute.
+  const current = processSnapshot().get(pid);
+  return current === undefined || !current.state.includes('Z');
 };
 function processSnapshot() {
   const processes = new Map();
@@ -71,7 +74,9 @@ const childRunning = (owner) => {
   const identity = owner.childStartedAt
     ? { pid: owner.childPid, startedAt: owner.childStartedAt }
     : owner.descendants?.find(({ pid }) => pid === owner.childPid);
-  return identity ? sameRunningProcess(identity, processSnapshot()) : alive(owner.childPid);
+  return identity
+    ? sameRunningProcess(identity, processSnapshot())
+    : processRunning(owner.childPid);
 };
 const ownerRunning = (owner, processes = undefined) =>
   typeof owner.processStartedAt === 'string'
@@ -79,7 +84,7 @@ const ownerRunning = (owner, processes = undefined) =>
         { pid: owner.pid, startedAt: owner.processStartedAt },
         processes ?? processSnapshot(),
       )
-    : alive(owner.pid);
+    : processRunning(owner.pid);
 function ancestors(processes = processSnapshot()) {
   const result = new Set([process.pid]);
   let pid = processes.get(process.pid).parentPid;
@@ -94,19 +99,20 @@ function ancestors(processes = processSnapshot()) {
 // Drain those too before starting an exclusive run; never kill another task.
 export function competingTestPids() {
   const lineage = ancestors();
-  const rows = execFileSync('ps', ['-axo', 'pid=,ppid=,command='], { encoding: 'utf8' })
+  const rows = execFileSync('ps', ['-axo', 'pid=,ppid=,stat=,command='], { encoding: 'utf8' })
     .trim()
     .split('\n')
-    .map((row) => /^\s*(\d+)\s+(\d+)\s+(.*)$/u.exec(row))
+    .map((row) => /^\s*(\d+)\s+(\d+)\s+(\S+)\s+(.*)$/u.exec(row))
     .filter(Boolean);
   const parents = new Map(rows.map((row) => [Number(row[1]), Number(row[2])]));
   return rows
     .filter((row) => {
       const pid = Number(row[1]);
-      const test = /(?:\/vitest\/vitest\.mjs|\bvitest run\b|\(vitest(?: \d+)?\))/u.exec(row[3]);
-      const wrapper = /(?:^|[/\s])validation-runner\.mjs(?=\s|$)/u.exec(row[3]);
+      const test = /(?:\/vitest\/vitest\.mjs|\bvitest run\b|\(vitest(?: \d+)?\))/u.exec(row[4]);
+      const wrapper = /(?:^|[/\s])validation-runner\.mjs(?=\s|$)/u.exec(row[4]);
       if (
         lineage.has(pid) ||
+        row[3].includes('Z') ||
         !test ||
         // A queued participant carries its future command in argv. Its actual
         // Vitest child, when started, has the test marker before any wrapper argument.
