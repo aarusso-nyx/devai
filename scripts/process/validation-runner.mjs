@@ -2,7 +2,15 @@
 // Cooperative host admission, not an evidence cache or an authorization boundary.
 import { spawn, execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { homedir, hostname } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -65,6 +73,16 @@ export function competingTestPids() {
     })
     .map((row) => Number(row[1]));
 }
+function writeOwner(path, owner) {
+  const temporary = join(path, `owner.${randomUUID()}.tmp`);
+  try {
+    writeFileSync(temporary, JSON.stringify(owner), { flag: 'wx', mode: 0o600 });
+    renameSync(temporary, join(path, 'owner.json'));
+  } finally {
+    rmSync(temporary, { force: true });
+  }
+}
+
 function claim(path, owner) {
   try {
     mkdirSync(path, { mode: 0o700 });
@@ -72,7 +90,7 @@ function claim(path, owner) {
     if (error.code === 'EEXIST') return false;
     throw error;
   }
-  writeFileSync(join(path, 'owner.json'), JSON.stringify(owner), { flag: 'wx', mode: 0o600 });
+  writeOwner(path, owner);
   return true;
 }
 
@@ -144,7 +162,7 @@ export async function acquireValidation({
                 encoding: 'utf8',
               }).trim(),
             );
-        writeFileSync(join(path, 'owner.json'), JSON.stringify(owner), { mode: 0o600 });
+        writeOwner(path, owner);
       },
       release() {
         if (
