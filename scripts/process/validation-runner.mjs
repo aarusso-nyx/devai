@@ -61,6 +61,13 @@ const descendantsRunning = (owner) => {
   const processes = processSnapshot();
   return owner.descendants.some((identity) => sameRunningProcess(identity, processes));
 };
+const childRunning = (owner) => {
+  if (!owner.childPid) return false;
+  const identity = owner.childStartedAt
+    ? { pid: owner.childPid, startedAt: owner.childStartedAt }
+    : owner.descendants?.find(({ pid }) => pid === owner.childPid);
+  return identity ? sameRunningProcess(identity, processSnapshot()) : alive(owner.childPid);
+};
 function ancestors() {
   const result = new Set([process.pid]);
   let pid = process.ppid;
@@ -189,23 +196,18 @@ export async function acquireValidation({
       recordChild(pid, ownsGroup) {
         owner.childPid = pid;
         owner.ownsGroup = ownsGroup;
-        owner.childGroup = ownsGroup
-          ? pid
-          : Number(
-              execFileSync('ps', ['-o', 'pgid=', '-p', String(process.pid)], {
-                encoding: 'utf8',
-              }).trim(),
-            );
+        owner.childGroup = ownsGroup ? pid : undefined;
         writeOwner(path, owner);
       },
       recordDescendants(identities) {
+        owner.childStartedAt ??= identities.find(({ pid }) => pid === owner.childPid)?.startedAt;
         owner.descendants = identities;
         writeOwner(path, owner);
       },
       release() {
         if (
           (owner.ownsGroup && alive(-owner.childGroup)) ||
-          (owner.childPid && alive(owner.childPid)) ||
+          childRunning(owner) ||
           descendantsRunning(owner)
         )
           throw new Error('VALIDATION_CHILDREN_STILL_RUNNING');
@@ -228,7 +230,8 @@ export function recoverValidation(root, id) {
     if (owner.id !== id) continue;
     if (
       alive(owner.pid) ||
-      (owner.childGroup && alive(-owner.childGroup)) ||
+      (owner.ownsGroup && owner.childGroup && alive(-owner.childGroup)) ||
+      childRunning(owner) ||
       descendantsRunning(owner)
     )
       throw new Error('VALIDATION_RECOVERY_LIVE_WORK');
