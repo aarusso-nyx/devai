@@ -65,6 +65,46 @@ afterEach(async () => {
 });
 
 describe('host validation admission', () => {
+  it('exposes only complete metadata during initial publication and child registration', () => {
+    const root = fixture();
+    const result = JSON.parse(
+      execFileSync(
+        process.execPath,
+        [
+          '--input-type=module',
+          '-e',
+          `import fs from 'node:fs';import {dirname,join} from 'node:path';import {syncBuiltinESMExports} from 'node:module';
+const {acquireValidation}=await import(${JSON.stringify(runnerUrl)});
+const original=fs.writeFileSync;const observations=[];
+fs.writeFileSync=function(path,data,options={}){
+  if(typeof path!=='string'||!path.startsWith(${JSON.stringify(`${root}/`)}))return original.call(this,path,data,options);
+  const opts=typeof options==='string'?{encoding:options}:options;
+  const fd=fs.openSync(path,opts.flag??'w',opts.mode);
+  try{
+    const canonical=join(dirname(path),'owner.json');
+    observations.push(fs.existsSync(canonical)?JSON.parse(fs.readFileSync(canonical,'utf8')):null);
+    return original.call(this,fd,data,{encoding:opts.encoding??'utf8'});
+  }finally{fs.closeSync(fd);}
+};syncBuiltinESMExports();
+try{const lease=await acquireValidation({root:${JSON.stringify(root)},waitMs:1000});
+lease.recordChild(99999999,false);
+const shared=join(${JSON.stringify(root)},'shared');const updated=JSON.parse(fs.readFileSync(join(shared,fs.readdirSync(shared)[0],'owner.json'),'utf8'));
+lease.release();console.log(JSON.stringify({observations,updated}));
+}finally{fs.writeFileSync=original;syncBuiltinESMExports();}`,
+        ],
+        { encoding: 'utf8' },
+      ),
+    );
+    expect(result.observations).toHaveLength(2);
+    expect(result.observations[0]).toBeNull();
+    expect(result.observations[1]).toMatchObject({
+      id: result.updated.id,
+      pid: result.updated.pid,
+    });
+    expect(result.observations[1]).not.toHaveProperty('childPid');
+    expect(result.updated.childPid).toBe(99_999_999);
+  });
+
   it.each(['departed', 'inaccessible', 'malformed'])(
     'handles a %s lease during the reentrance scan',
     (condition) => {
