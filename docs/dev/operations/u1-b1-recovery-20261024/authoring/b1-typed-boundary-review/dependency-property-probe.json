@@ -1,0 +1,38 @@
+{
+  "source_sha256": "841ccdb072d9c0ba9f0b7c59c0a2e86c4824a74c623331922e386d62fcaf2791",
+  "dist_sha256": "a7c9b9ef0e385f0ab4fce60f6762453121a9b5a7d60c0bfe9101f64aef13a502",
+  "cases": [
+    {
+      "kind": "missing",
+      "calls": 0,
+      "returned": {
+        "ok": false,
+        "category": "usage-error",
+        "code": "AUTHORITY_RESOURCE_TARGET_INVALID",
+        "reasons": [
+          "AUTHORITY_RESOURCE_TARGET_INVALID"
+        ]
+      }
+    },
+    {
+      "kind": "admit-throws",
+      "calls": 0,
+      "returned": {
+        "ok": false,
+        "category": "dependency-error",
+        "code": "AUTHORITY_TYPED_RESOURCE_ADAPTER_REQUIRED",
+        "reasons": [
+          "AUTHORITY_TYPED_RESOURCE_ADAPTER_REQUIRED"
+        ]
+      }
+    },
+    {
+      "kind": "dependency-property-throws",
+      "calls": 1,
+      "threw": true,
+      "name": "Error",
+      "message": "sentinel-native-detail"
+    }
+  ],
+  "scope": "Actual built classifier dependency failure projection only; no action/receipt/adapter effect. Constructor dependency accessors are invalid fixture inputs, not a compromised-host isolation claim."
+}

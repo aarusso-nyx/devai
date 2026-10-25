@@ -1,0 +1,12 @@
+{
+  "packages/authority/src/runtime/reconciliation-owner-state.ts": "b59cce447c545f2bcb8396d384dac39613ca87c1721d0f12e3e16345edb0d2b8",
+  "packages/authority/tests/unit/reconciliation-owner-state.test.ts": "88f9672f72e6f9f2a929a9d0497d2ad48da72fdc9c22c7240009639a62639e6d",
+  "packages/authority/src/runtime/reconciliation-owner-record.ts": "fd7d944ce09f640ff4040abeae090ad8b694b55e3e285feb46ea59650735cbda",
+  "packages/authority/src/runtime/reconciliation-clock.ts": "d9ab0faba163f45a7d7caf13e2cae5307ccb0ad2be7cb5b7565e1054f1844dd3",
+  "law/schemas/reconciliation-owner.schema.json": "39002520c0ffa410ef41a9caf34d16af123b9bc88f0ab1e426deaf70af284344",
+  "docs/reference/error-codes.md": "ed7c7205b733fb4e5e50fe1cded1c6dfa5cafe4a6aca2854454de04ecb55ac38",
+  "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/owner-state-checkpoint.json": "45fbde08e157a45d615cc26e885beac6197611fd64dc517dafd0348ee975703f",
+  "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/owner-state-order-amendment.json": "71f1dd131c023652cb4720310401216cee8f418d215502198b59a001621412ed",
+  "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/owner-state-interface.json": "44cc580bb6cc4586ca6ab4e4117d8a785ddc4ceb5fd8cef811acb76bb54aca7a",
+  "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/owner-state-interface.pre-phase-mapping.json": "bbd8012e8e01089592837218af1cb16a3509369881f5cd39c7f62ced35973494"
+}

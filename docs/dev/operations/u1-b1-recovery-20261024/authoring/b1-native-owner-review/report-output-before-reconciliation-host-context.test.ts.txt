@@ -1,0 +1,765 @@
+import {
+  existsSync,
+  readFileSync,
+  writeFileSync,
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  readdirSync,
+  lstatSync,
+  readlinkSync,
+  symlinkSync,
+  renameSync,
+  linkSync,
+  chmodSync,
+  copyFileSync,
+  constants,
+} from 'node:fs';
+import { createHash } from 'node:crypto';
+import { tmpdir } from 'node:os';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
+import { resolve } from 'node:path';
+import { afterAll, describe, expect, it } from 'vitest';
+
+const ROOT = resolve(import.meta.dirname, '../../../..');
+const sourcePath = resolve(
+  ROOT,
+  'packages/authority/src/boundaries/reconciliation-host-context.ts',
+);
+const packetPath = resolve(
+  ROOT,
+  'docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/host-context-checkpoint.json',
+);
+describe('actual readonly reconciliation host context', () => {
+  it('has the actual host context module required by the frozen checkpoint', () => {
+    expect(existsSync(sourcePath), 'actual host context module is absent').toBe(true);
+  });
+  it('retains exact read-only API scope and six closed diagnostics', () => {
+    const packet = JSON.parse(readFileSync(packetPath, 'utf8')) as { codes: string[] };
+    expect(packet.codes).toEqual([
+      'RECONCILIATION_HOST_INVALID',
+      'RECONCILIATION_HOST_ENVIRONMENT_INVALID',
+      'RECONCILIATION_HOST_UNAVAILABLE',
+      'RECONCILIATION_HOST_CONTEXT_UNKNOWN',
+      'RECONCILIATION_HOST_STALE',
+      'RECONCILIATION_HOST_CLOCK_UNAVAILABLE',
+    ]);
+  });
+});
+
+const distPath = resolve(ROOT, 'packages/authority/dist/boundaries/reconciliation-host-context.js');
+const external = realpathSync(mkdtempSync(resolve(tmpdir(), 'devai-host-context-inspector-')));
+const worker = resolve(external, 'worker.mjs');
+const cleanEnv = {
+  PATH: '/usr/bin:/bin',
+  LC_ALL: 'C',
+  HOME: external,
+  GIT_CONFIG_NOSYSTEM: '1',
+  GIT_CONFIG_SYSTEM: '/dev/null',
+  GIT_CONFIG_GLOBAL: '/dev/null',
+};
+const childReceipts: unknown[] = [];
+const digest = (value: string | Uint8Array): string =>
+  createHash('sha256').update(value).digest('hex');
+function canonical(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) return '[' + value.map(canonical).join(',') + ']';
+  return (
+    '{' +
+    Object.keys(value)
+      .sort()
+      .map((k) => JSON.stringify(k) + ':' + canonical((value as Record<string, unknown>)[k]))
+      .join(',') +
+    '}'
+  );
+}
+function git(root: string, args: readonly string[]): string {
+  return execFileSync('/usr/bin/git', ['-C', root, ...args], {
+    env: cleanEnv,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  }).trim();
+}
+function fixture(
+  linked = false,
+  relative = false,
+  format: 'sha1' | 'sha256' = 'sha1',
+): { root: string; primary: string; base: string } {
+  const base = realpathSync(mkdtempSync(resolve(external, 'fixture-')));
+  const primary = resolve(base, 'répo space?#');
+  mkdirSync(primary, { mode: 0o700 });
+  git(primary, ['init', '--initial-branch=main', `--object-format=${format}`]);
+  git(primary, [
+    '-c',
+    'user.name=Fixture',
+    '-c',
+    'user.email=fixture@invalid.test',
+    '-c',
+    'commit.gpgsign=false',
+    '-c',
+    'core.hooksPath=/dev/null',
+    'commit',
+    '--allow-empty',
+    '-m',
+    'fixture',
+  ]);
+  if (!linked) return { root: primary, primary, base };
+  const root = resolve(base, 'linked worktree?#');
+  git(primary, [
+    '-c',
+    'core.hooksPath=/dev/null',
+    'worktree',
+    'add',
+    ...(relative ? ['--relative-paths'] : []),
+    '-b',
+    'linked-fixture',
+    root,
+  ]);
+  return { root: realpathSync(root), primary, base };
+}
+function inventory(dir: string): unknown[] {
+  return readdirSync(dir, { withFileTypes: true })
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .flatMap((entry) => {
+      const p = resolve(dir, entry.name),
+        stat = lstatSync(p, { bigint: true });
+      const row = {
+        path: p.slice(dir.length + 1),
+        dev: String(stat.dev),
+        ino: String(stat.ino),
+        mode: String(stat.mode),
+        size: String(stat.size),
+        mtime: String(stat.mtimeNs),
+        ctime: String(stat.ctimeNs),
+        bytes: entry.isFile()
+          ? digest(readFileSync(p))
+          : entry.isSymbolicLink()
+            ? readlinkSync(p)
+            : null,
+      };
+      return entry.isDirectory()
+        ? [row, ...inventory(p).map((item) => ({ directory: entry.name, item }))]
+        : [row];
+    });
+}
+function directoryIdentity(path: string): Record<string, string> {
+  const s = lstatSync(path, { bigint: true });
+  return {
+    dev: String(s.dev),
+    ino: String(s.ino),
+    birthtime_ns: String(s.birthtimeNs),
+    uid: String(s.uid),
+    mode: String(s.mode & 0o7777n),
+  };
+}
+function fileIdentity(path: string): Record<string, string> {
+  const stat = lstatSync(path, { bigint: true });
+  return {
+    ...directoryIdentity(path),
+    size_bytes: String(stat.size),
+    mtime_ns: String(stat.mtimeNs),
+    ctime_ns: String(stat.ctimeNs),
+  };
+}
+function identityProjection(root: string): Record<string, unknown> {
+  const git_dir = realpathSync(git(root, ['rev-parse', '--absolute-git-dir'])),
+    common_dir = realpathSync(
+      git(root, ['rev-parse', '--path-format=absolute', '--git-common-dir']),
+    );
+  const entry = resolve(root, '.git'),
+    s = lstatSync(entry, { bigint: true });
+  return {
+    repository_id: 'fixture-repository',
+    repository_root: root,
+    git_dir,
+    common_dir,
+    root_identity: directoryIdentity(root),
+    git_dir_identity: directoryIdentity(git_dir),
+    common_dir_identity: directoryIdentity(common_dir),
+    git_entry_identity: s.isDirectory()
+      ? directoryIdentity(entry)
+      : {
+          ...directoryIdentity(entry),
+          size_bytes: String(s.size),
+          mtime_ns: String(s.mtimeNs),
+          ctime_ns: String(s.ctimeNs),
+        },
+    git_entry_sha256: s.isDirectory() ? null : digest(readFileSync(entry)),
+    git_backlink_identity: s.isDirectory() ? null : fileIdentity(resolve(git_dir, 'gitdir')),
+    git_backlink_sha256: s.isDirectory() ? null : digest(readFileSync(resolve(git_dir, 'gitdir'))),
+    commondir_identity: s.isDirectory() ? null : fileIdentity(resolve(git_dir, 'commondir')),
+    commondir_sha256: s.isDirectory() ? null : digest(readFileSync(resolve(git_dir, 'commondir'))),
+  };
+}
+interface Reply {
+  identity: Record<string, unknown>;
+  paths: { repository_root: string; git_dir: string; common_dir: string; private_root: string };
+  clock: { clock_source: string; boot_id: string; monotonic_ns: string; wall_ms: number };
+  error: { code: string; message: string; name: string };
+  before: Record<string, unknown>;
+  fresh: Record<string, unknown>;
+  results: { error?: { code: string }; value?: unknown }[];
+  touches: number;
+  frozen: boolean;
+  opens: string[];
+  probes: { file: string; args: string[]; options: Record<string, unknown>; output: string }[];
+}
+function run(
+  mode: string,
+  root: string,
+  variant = '',
+  executable = process.execPath,
+  extraEnv: Record<string, string> = {},
+): Reply {
+  writeFileSync(worker, workerSource);
+  const before = process.hrtime.bigint();
+  const result = spawnSync(executable, [worker, mode, root, variant], {
+    env: { ...cleanEnv, ...extraEnv },
+    encoding: 'utf8',
+    timeout: 4500,
+    maxBuffer: 1024 * 1024,
+  });
+  const after = process.hrtime.bigint();
+  childReceipts.push({
+    mode,
+    root,
+    variant,
+    executable,
+    pid: result.pid,
+    exit: result.status,
+    signal: result.signal,
+    stdout: result.stdout,
+    stderr: result.stderr,
+    parent_before_ns: String(before),
+    parent_after_ns: String(after),
+  });
+  expect(result.signal, result.stderr).toBeNull();
+  expect(result.status, result.stderr).toBe(0);
+  return JSON.parse(result.stdout.trim()) as Reply;
+}
+afterAll(() => {
+  const d = resolve(
+    ROOT,
+    'docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-host-context-inspector',
+  );
+  writeFileSync(
+    resolve(d, external.split('/').at(-1) + '.json'),
+    JSON.stringify(
+      {
+        external_fixture: external,
+        source_sha256: existsSync(sourcePath) ? digest(readFileSync(sourcePath)) : null,
+        dist_sha256: existsSync(distPath) ? digest(readFileSync(distPath)) : null,
+        worker_sha256: digest(workerSource),
+        child_receipts: childReceipts,
+      },
+      null,
+      2,
+    ) + '\n',
+  );
+});
+const workerSource = String.raw`
+import fs from 'node:fs';import cp from 'node:child_process';import{syncBuiltinESMExports}from'node:module';import{resolve}from'node:path';
+const [mode,root,variant]=process.argv.slice(2);const probes=[],opens=[];const oldOpen=fs.openSync;fs.openSync=function(path,...args){opens.push(String(path));return oldOpen(path,...args)};const oldSpawn=cp.spawnSync,oldExec=cp.execFileSync;
+function probe(file,args,options,invoke){const result=invoke();probes.push({file,args,options:{timeout:options?.timeout,maxBuffer:options?.maxBuffer,env:options?.env,stdio:options?.stdio},output:typeof result==='string'?result:Buffer.isBuffer(result)?result.toString():String(result?.stdout??'')});return result}
+cp.spawnSync=function(file,args,options){return probe(file,args,options,()=>oldSpawn(file,args,options))};cp.execFileSync=function(file,args,options){return probe(file,args,options,()=>oldExec(file,args,options))};syncBuiltinESMExports();
+const host=await import(${JSON.stringify(pathToFileURL(distPath).href)});const print=v=>process.stdout.write(JSON.stringify({...v,probes,opens}));const capture=fn=>{try{return{value:fn()}}catch(e){return{error:{name:e?.name,code:e?.code,message:e?.message,cause:!!e?.cause,stack:String(e?.stack)}}}};
+const context=()=>host.captureReconciliationHostContext(root,'fixture-repository');const read=ctx=>host.readReconciliationHostIdentity(ctx);
+if(mode==='basic'){const ctx=context();const identity=read(ctx),paths=host.readReconciliationHostPaths(ctx),clock=host.readReconciliationHostClock(ctx);print({identity,paths,clock,frozen:Object.isFrozen(ctx)&&Object.isFrozen(identity)&&Object.isFrozen(identity.merge_heads)&&Object.isFrozen(paths)&&Object.isFrozen(clock),keys:Object.keys(ctx)});}
+else if(mode==='capture'){print(capture(context));}
+else if(mode==='membership'){const ctx=context();let touches=0;const clone={...ctx},getter=Object.defineProperty({},'identity',{get(){touches++;throw Error('SECRET_CONTEXT_GETTER')}}),proxy=new Proxy(ctx,{get(){touches++;throw Error('SECRET_CONTEXT_PROXY')}});const results=[];for(const value of [clone,getter,proxy]){results.push(capture(()=>read(value)));host.disposeReconciliationHostContext(value)}results.push(capture(()=>read(ctx)));host.disposeReconciliationHostContext(ctx);host.disposeReconciliationHostContext(ctx);for(const fn of [host.readReconciliationHostIdentity,host.readReconciliationHostPaths,host.readReconciliationHostClock])results.push(capture(()=>fn(ctx)));print({results,touches});}
+else if(mode==='drift'){const ctx=context(),before=read(ctx);const paths=host.readReconciliationHostPaths(ctx);if(variant==='head')oldExec('/usr/bin/git',['-C',root,'-c','user.name=Fixture','-c','user.email=fixture@invalid.test','-c','commit.gpgsign=false','-c','core.hooksPath=/dev/null','commit','--allow-empty','-m','next'],{stdio:'ignore',env:{PATH:'/usr/bin:/bin',GIT_CONFIG_NOSYSTEM:'1',GIT_CONFIG_SYSTEM:'/dev/null',GIT_CONFIG_GLOBAL:'/dev/null'}});if(variant==='root-mode')fs.chmodSync(root,0o777);if(variant==='admin-mode')fs.chmodSync(paths.git_dir,0o777);if(variant==='backlink')fs.writeFileSync(resolve(paths.git_dir,'gitdir'),fs.readFileSync(resolve(paths.git_dir,'gitdir')));if(variant==='commondir')fs.writeFileSync(resolve(paths.git_dir,'commondir'),fs.readFileSync(resolve(paths.git_dir,'commondir')));if(variant==='pointer')fs.writeFileSync(resolve(root,'.git'),fs.readFileSync(resolve(root,'.git')));if(variant==='dangling-devai')fs.symlinkSync(resolve(root,'NEVER_EXISTING_PRIVATE_TARGET'),resolve(paths.git_dir,'devai'));if(variant==='dangling-private')fs.symlinkSync(resolve(root,'NEVER_EXISTING_PRIVATE_TARGET'),resolve(paths.git_dir,'devai/reconciliation'));if(variant==='namespace')fs.mkdirSync(resolve(paths.git_dir,'devai'),{mode:0o700});if(variant==='env')process.env.GIT_INDEX_FILE='/SECRET_FOREIGN_INDEX';if(variant==='executable')fs.chmodSync(process.execPath,0o777);if(variant==='merge')fs.writeFileSync(resolve(paths.git_dir,'MERGE_HEAD'),'a'.repeat(40)+'\n');const results=[capture(()=>read(ctx)),capture(()=>host.readReconciliationHostPaths(ctx)),capture(()=>host.readReconciliationHostClock(ctx))];let fresh;if(variant==='head')fresh=context().identity;print({before,results,fresh});}
+else if(mode==='ordinary-child'){const ctx=context();const before=read(ctx);fs.writeFileSync(resolve(root,'ordinary-untracked-fixture'),'fixture');print({before,identity:read(ctx)});}
+else if(mode==='restore-head'){const ctx=context();const before=read(ctx);const args=['-C',root,'-c','user.name=Fixture','-c','user.email=fixture@invalid.test','-c','commit.gpgsign=false','-c','core.hooksPath=/dev/null','commit','--allow-empty','-m','next'];oldExec('/usr/bin/git',args,{env:{PATH:'/usr/bin:/bin',GIT_CONFIG_NOSYSTEM:'1',GIT_CONFIG_SYSTEM:'/dev/null',GIT_CONFIG_GLOBAL:'/dev/null'}});const first=capture(()=>read(ctx));oldExec('/usr/bin/git',['-C',root,'update-ref','refs/heads/main',before.head],{env:{PATH:'/usr/bin:/bin',GIT_CONFIG_NOSYSTEM:'1',GIT_CONFIG_SYSTEM:'/dev/null',GIT_CONFIG_GLOBAL:'/dev/null'}});const results=[first,capture(()=>read(ctx)),capture(()=>host.readReconciliationHostPaths(ctx)),capture(()=>host.readReconciliationHostClock(ctx))];print({before,results,fresh:context().identity});}
+else if(mode==='fault'){const ctx=variant.startsWith('sample-')||variant==='boot-stale'||variant==='runtime-stale'||variant==='member-env'?context():undefined;let touches=0;const original=cp.spawnSync;
+ if(['git-failure','clock-timeout','clock-malformed','clock-oversize','boot-stale'].includes(variant)){cp.spawnSync=function(file,args,options){const git=file==='/usr/bin/git',node=file===process.execPath,boot=file==='/usr/sbin/sysctl';if((variant==='git-failure'&&git)||(variant.startsWith('clock-')&&node)||(variant==='boot-stale'&&boot)){if(variant==='clock-timeout')return{error:Error('SECRET_NATIVE_TIMEOUT'),signal:null,status:null,stdout:Buffer.from('SECRET_STDOUT'),stderr:Buffer.from('SECRET_STDERR')};if(variant==='git-failure')return{signal:null,status:1,stdout:Buffer.from('SECRET_STDOUT'),stderr:Buffer.from('SECRET_STDERR')};return{signal:null,status:0,stdout:Buffer.from(variant==='boot-stale'?'ffffffff-ffff-ffff-ffff-ffffffffffff\n':variant==='clock-oversize'?'x'.repeat(4097):'SECRET_MALFORMED_JSON'),stderr:Buffer.alloc(0)}}return original(file,args,options)};syncBuiltinESMExports();}
+ if(variant==='sample-width'||variant==='sample-rollback'||variant==='sample-unsafe'){const now=Date.now();let index=0;Date.now=()=>{index++;return variant==='sample-unsafe'?NaN:index===1?now:variant==='sample-width'?now+251:now-1};}
+ if(variant==='sample-zero')process.hrtime.bigint=()=>0n;
+ if(variant==='runtime-stale')Object.defineProperty(process.versions,'uv',{value:'0.0.0'});
+ if(variant==='member-env'){process.env.GIT_INDEX_FILE='/SECRET_FOREIGN_INDEX';const results=[capture(()=>read({...ctx})),capture(()=>read(ctx))];delete process.env.GIT_INDEX_FILE;results.push(capture(()=>read(ctx)));print({results});}
+ else print(ctx?variant.startsWith('sample-')?capture(()=>host.readReconciliationHostClock(ctx)):capture(()=>read(ctx)):capture(context));}
+else if(mode==='bad-argument'){let touches=0;const bad=new Proxy({},{get(){touches++;throw Error('SECRET_ARGUMENT')}});const result=variant==='root'?capture(()=>host.captureReconciliationHostContext(bad,'fixture-repository')):capture(()=>host.captureReconciliationHostContext(root,bad));print({...result,touches});}
+else if(mode==='runtime'){Object.defineProperty(process.versions,'node',{value:'0.0.0'});print(capture(context));}
+`;
+
+describe('actual committed direct/linked worktrees and clock origin', () => {
+  for (const linked of [false, true])
+    it(`derives exact ${linked ? 'linked' : 'direct'} identity and paths without persistent writes`, () => {
+      const f = fixture(linked);
+      const projection = identityProjection(f.root);
+      const worktree_id = 'wt-' + digest(canonical(projection)).slice(0, 48);
+      const expected = {
+        schemaVersion: '1.0.0',
+        kind: 'reconciliation-host-context',
+        repository_id: 'fixture-repository',
+        worktree_id,
+        host_identity_sha256: digest(canonical({ ...projection, worktree_id })),
+        head: git(f.root, ['rev-parse', '--verify', 'HEAD']),
+        object_format: git(f.root, ['rev-parse', '--show-object-format']),
+        merge_heads: [],
+      };
+      const before = inventory(f.base);
+      const value = run('basic', f.root);
+      expect(value.identity).toEqual(expected);
+      expect(value.paths).toEqual({
+        repository_root: f.root,
+        git_dir: projection.git_dir,
+        common_dir: projection.common_dir,
+        private_root: resolve(String(projection.git_dir), 'devai/reconciliation'),
+      });
+      expect(value.frozen).toBe(true);
+      expect(inventory(f.base)).toEqual(before);
+      expect(existsSync(value.paths.private_root)).toBe(false);
+      expect(JSON.stringify(value.identity)).not.toContain(f.root);
+      expect(value.clock.clock_source).toBe('node-uv-hrtime-ns-v1');
+      expect(value.clock.boot_id).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u,
+      );
+      expect(BigInt(value.clock.monotonic_ns)).toBeGreaterThan(0n);
+    });
+  it('gives actual linked worktree a distinct persistent identity and private root', () => {
+    const f = fixture(true);
+    const primary = run('basic', f.primary),
+      linked = run('basic', f.root);
+    expect(primary.identity.worktree_id).not.toBe(linked.identity.worktree_id);
+    expect(primary.identity.host_identity_sha256).not.toBe(linked.identity.host_identity_sha256);
+    expect(primary.paths.common_dir).toBe(linked.paths.common_dir);
+    expect(primary.paths.private_root).not.toBe(linked.paths.private_root);
+  });
+  it('brackets three fresh actual child clock observations on the observed runtime/platform', () => {
+    const f = fixture();
+    const values = [];
+    for (let i = 0; i < 3; i++) {
+      const before = process.hrtime.bigint();
+      const value = run('basic', f.root);
+      const after = process.hrtime.bigint();
+      expect(BigInt(value.clock.monotonic_ns)).toBeGreaterThanOrEqual(before);
+      expect(BigInt(value.clock.monotonic_ns)).toBeLessThanOrEqual(after);
+      values.push(value.clock);
+    }
+    expect(new Set(values.map((v) => v.boot_id)).size).toBe(1);
+    if (process.versions.node === '24.22.0') expect(process.versions.node).toBe('24.22.0');
+    else expect(process.versions.node).toBe('24.20.0');
+    expect(process.versions.uv).toBe('1.52.1');
+    expect(['darwin', 'linux']).toContain(process.platform);
+  });
+  it('rejects cloned/getter/Proxy/disposed contexts without touching hooks or disposing the member', () => {
+    const value = run('membership', fixture().root);
+    expect(value.touches).toBe(0);
+    expect(value.results.slice(0, 3).map((x) => x.error?.code)).toEqual(
+      Array.from({ length: 3 }, () => 'RECONCILIATION_HOST_CONTEXT_UNKNOWN'),
+    );
+    expect(value.results[3]?.error).toBeUndefined();
+    expect(value.results.slice(4).map((x) => x.error?.code)).toEqual(
+      Array.from({ length: 3 }, () => 'RECONCILIATION_HOST_CONTEXT_UNKNOWN'),
+    );
+  });
+  for (const variant of ['head', 'root-mode', 'admin-mode', 'namespace', 'merge'])
+    it(`old context refuses actual ${variant} drift`, () => {
+      const value = run('drift', fixture().root, variant);
+      expect(value.results.map((x) => x.error?.code)).toEqual(
+        Array.from({ length: 3 }, () => 'RECONCILIATION_HOST_STALE'),
+      );
+      if (variant === 'head') {
+        expect(value.fresh.worktree_id).toBe(value.before.worktree_id);
+        expect(value.fresh.host_identity_sha256).toBe(value.before.host_identity_sha256);
+        expect(value.fresh.head).not.toBe(value.before.head);
+      }
+    });
+  it('pins actual linked .git pointer bytes/metadata', () => {
+    const value = run('drift', fixture(true).root, 'pointer');
+    expect(value.results.map((x) => x.error?.code)).toEqual(
+      Array.from({ length: 3 }, () => 'RECONCILIATION_HOST_STALE'),
+    );
+  });
+  it('does not pin legitimate root directory mtime/ctime child publication', () => {
+    const value = run('ordinary-child', fixture().root);
+    expect(value.identity).toEqual(value.before);
+  });
+  it('refuses newly inherited Git override on all actual reads', () => {
+    const value = run('drift', fixture().root, 'env');
+    expect(value.results.map((x) => x.error?.code)).toEqual(
+      Array.from({ length: 3 }, () => 'RECONCILIATION_HOST_ENVIRONMENT_INVALID'),
+    );
+  });
+  it('refuses unknown runtime fingerprint without fallback', () => {
+    expect(run('runtime', fixture().root).error.code).toBe('RECONCILIATION_HOST_UNAVAILABLE');
+  });
+  it('pins the actual executable metadata while changing only an owned clone', () => {
+    const f = fixture();
+    const executable = resolve(f.base, 'owned-node');
+    copyFileSync(process.execPath, executable, constants.COPYFILE_FICLONE);
+    chmodSync(executable, 0o700);
+    const value = run('drift', f.root, 'executable', executable);
+    expect(value.results.map((x) => x.error?.code)).toEqual(
+      Array.from({ length: 3 }, () => 'RECONCILIATION_HOST_STALE'),
+    );
+  });
+});
+
+const forbidden = [
+  'GIT_DIR',
+  'GIT_WORK_TREE',
+  'GIT_INDEX_FILE',
+  'GIT_COMMON_DIR',
+  'GIT_OBJECT_DIRECTORY',
+  'GIT_ALTERNATE_OBJECT_DIRECTORIES',
+  'GIT_NAMESPACE',
+  'GIT_CONFIG_COUNT',
+  'GIT_CONFIG_PARAMETERS',
+  'GIT_REPLACE_REF_BASE',
+  'GIT_SHALLOW_FILE',
+];
+describe('actual refused repository and namespace inputs', () => {
+  for (const name of forbidden)
+    it(`refuses inherited ${name} without probing another repository`, () => {
+      const value = run('capture', fixture().root, '', process.execPath, {
+        [name]: '/SECRET_FOREIGN_OVERRIDE',
+      });
+      expect(value.error.code).toBe('RECONCILIATION_HOST_ENVIRONMENT_INVALID');
+      expect(JSON.stringify(value.error)).not.toContain('SECRET_');
+    });
+  for (const variant of [
+    'unborn',
+    'bare',
+    'root-symlink',
+    'git-symlink',
+    'root-mode',
+    'git-mode',
+    'devai-mode',
+    'private-mode',
+    'private-file',
+    'pointer-size',
+  ])
+    it(`refuses actual ${variant} repository pin`, () => {
+      const f = fixture(variant === 'pointer-size');
+      let root = f.root;
+      const admin = git(root, ['rev-parse', '--absolute-git-dir']);
+      if (variant === 'unborn') {
+        root = resolve(f.base, 'unborn');
+        mkdirSync(root);
+        git(root, ['init']);
+      }
+      if (variant === 'bare') {
+        root = resolve(f.base, 'bare');
+        mkdirSync(root);
+        git(root, ['init', '--bare']);
+      }
+      if (variant === 'root-symlink') {
+        root = f.root + '-alias';
+        symlinkSync(f.root, root);
+      }
+      if (variant === 'git-symlink') {
+        renameSync(resolve(root, '.git'), resolve(f.base, 'moved-admin'));
+        symlinkSync(resolve(f.base, 'moved-admin'), resolve(root, '.git'));
+      }
+      if (variant === 'root-mode') chmodSync(root, 0o777);
+      if (variant === 'git-mode') chmodSync(admin, 0o777);
+      if (['devai-mode', 'private-mode', 'private-file'].includes(variant)) {
+        mkdirSync(resolve(admin, 'devai'), { mode: variant === 'devai-mode' ? 0o777 : 0o700 });
+        if (variant === 'devai-mode') chmodSync(resolve(admin, 'devai'), 0o777);
+        if (variant === 'private-mode')
+          mkdirSync(resolve(admin, 'devai/reconciliation'), { mode: 0o755 });
+        if (variant === 'private-file')
+          writeFileSync(resolve(admin, 'devai/reconciliation'), 'PRIVATE_PATH_SENTINEL');
+      }
+      if (variant === 'pointer-size') writeFileSync(resolve(root, '.git'), 'x'.repeat(4097));
+      const value = run('capture', root);
+      expect(value.error.code).toBe('RECONCILIATION_HOST_INVALID');
+      expect(value.error.message).toBe(value.error.code);
+      expect(JSON.stringify(value.error)).not.toContain(root);
+    });
+  for (const variant of [
+    'head',
+    'duplicate',
+    'no-LF',
+    'uppercase',
+    'wrong-format',
+    'too-many',
+    'bad-hex',
+    'oversize',
+  ])
+    it(`refuses ${variant} MERGE_HEAD bytes`, () => {
+      const f = fixture();
+      const head = git(f.root, ['rev-parse', 'HEAD']),
+        admin = git(f.root, ['rev-parse', '--absolute-git-dir']);
+      let text = 'b'.repeat(40) + '\n';
+      if (variant === 'head') text = head + '\n';
+      if (variant === 'duplicate') text += 'b'.repeat(40) + '\n';
+      if (variant === 'no-LF') text = text.trim();
+      if (variant === 'uppercase') text = text.toUpperCase();
+      if (variant === 'wrong-format') text = 'b'.repeat(64) + '\n';
+      if (variant === 'too-many')
+        text =
+          Array.from({ length: 33 }, (_, i) => (i + 1).toString(16).padStart(40, '0')).join('\n') +
+          '\n';
+      if (variant === 'bad-hex') text = 'g'.repeat(40) + '\n';
+      if (variant === 'oversize') text = 'b'.repeat(4097);
+      writeFileSync(resolve(admin, 'MERGE_HEAD'), text);
+      expect(run('capture', f.root).error.code).toBe('RECONCILIATION_HOST_INVALID');
+    });
+  it('observes valid merge heads in file order without modifying the merge', () => {
+    const f = fixture();
+    const admin = git(f.root, ['rev-parse', '--absolute-git-dir']);
+    const parents = ['b'.repeat(40), 'c'.repeat(40)];
+    writeFileSync(resolve(admin, 'MERGE_HEAD'), parents.join('\n') + '\n');
+    const before = inventory(f.base);
+    expect(run('basic', f.root).identity.merge_heads).toEqual(parents);
+    expect(inventory(f.base)).toEqual(before);
+  });
+  it('never opens private issuer/seed contents while observing an existing secure namespace', () => {
+    const f = fixture();
+    const admin = git(f.root, ['rev-parse', '--absolute-git-dir']),
+      privateRoot = resolve(admin, 'devai/reconciliation');
+    mkdirSync(privateRoot, { recursive: true, mode: 0o700 });
+    chmodSync(resolve(admin, 'devai'), 0o700);
+    for (const name of ['issuer.json', 'admission.sqlite'])
+      writeFileSync(resolve(privateRoot, name), 'PRIVATE_PAYLOAD_SENTINEL_NOT_AN_ACTUAL_RECORD', {
+        mode: 0o600,
+      });
+    const before = inventory(f.base);
+    const value = run('basic', f.root);
+    expect(value.opens.filter((x) => x.startsWith(privateRoot + '/'))).toEqual([]);
+    expect(inventory(f.base)).toEqual(before);
+    expect(JSON.stringify(value.identity)).not.toContain('PRIVATE_PAYLOAD_SENTINEL');
+  });
+  it('refuses an actual submodule working tree', () => {
+    const f = fixture();
+    const child = fixture();
+    git(f.root, [
+      '-c',
+      'protocol.file.allow=always',
+      '-c',
+      'core.hooksPath=/dev/null',
+      'submodule',
+      'add',
+      child.root,
+      'nested-module',
+    ]);
+    expect(run('capture', resolve(f.root, 'nested-module')).error.code).toBe(
+      'RECONCILIATION_HOST_INVALID',
+    );
+  });
+});
+
+describe('registered linked-worktree reciprocal origin', () => {
+  it('rejects a copied legitimate forward pointer even when all seven original Git probes succeed', () => {
+    const f = fixture(true);
+    const borrowed = resolve(f.base, 'borrowed-origin');
+    mkdirSync(borrowed, { mode: 0o700 });
+    copyFileSync(resolve(f.root, '.git'), resolve(borrowed, '.git'));
+    expect(git(borrowed, ['rev-parse', '--is-bare-repository'])).toBe('false');
+    expect(git(borrowed, ['rev-parse', '--show-toplevel'])).toBe(borrowed);
+    for (const args of [
+      ['rev-parse', '--absolute-git-dir'],
+      ['rev-parse', '--path-format=absolute', '--git-common-dir'],
+      ['rev-parse', '--show-superproject-working-tree'],
+      ['rev-parse', '--show-object-format'],
+      ['rev-parse', '--verify', 'HEAD'],
+    ])
+      expect(() => git(borrowed, args)).not.toThrow();
+    expect(run('capture', borrowed).error.code).toBe('RECONCILIATION_HOST_INVALID');
+  });
+  it('accepts actual relative-paths linked worktree with exact independently recomputed reciprocal file witnesses', () => {
+    const f = fixture(true, true);
+    const projection = identityProjection(f.root);
+    const worktree_id = 'wt-' + digest(canonical(projection)).slice(0, 48);
+    const before = inventory(f.base);
+    const value = run('basic', f.root);
+    expect(value.identity.worktree_id).toBe(worktree_id);
+    expect(value.identity.host_identity_sha256).toBe(
+      digest(canonical({ ...projection, worktree_id })),
+    );
+    expect(value.paths.git_dir).toBe(projection.git_dir);
+    expect(inventory(f.base)).toEqual(before);
+  });
+  for (const name of ['gitdir', 'commondir'])
+    for (const variant of ['missing', 'symlink', 'hardlink', 'malformed', 'oversize', 'foreign'])
+      it(`refuses actual ${variant} ${name} reciprocal file`, () => {
+        const f = fixture(true);
+        const admin = git(f.root, ['rev-parse', '--absolute-git-dir']);
+        const target = resolve(admin, name);
+        if (variant === 'missing') renameSync(target, target + '.held');
+        if (variant === 'symlink') {
+          renameSync(target, target + '.held');
+          symlinkSync(target + '.held', target);
+        }
+        if (variant === 'hardlink') linkSync(target, target + '.second-link');
+        if (variant === 'malformed') writeFileSync(target, 'PRIVATE_PATH_SENTINEL\nextra\n');
+        if (variant === 'oversize') writeFileSync(target, 'x'.repeat(4097));
+        if (variant === 'foreign') writeFileSync(target, f.base + '\n');
+        expect(run('capture', f.root).error.code).toBe('RECONCILIATION_HOST_INVALID');
+      });
+  for (const variant of ['backlink', 'commondir'])
+    it(`same-byte ${variant} metadata rewrite invalidates all old context reads`, () => {
+      expect(run('drift', fixture(true).root, variant).results.map((x) => x.error?.code)).toEqual(
+        Array.from({ length: 3 }, () => 'RECONCILIATION_HOST_STALE'),
+      );
+    });
+  it('rejects actual separate-git-dir layout', () => {
+    const f = fixture();
+    const root = resolve(f.base, 'separate-root');
+    mkdirSync(root);
+    git(root, ['init', '--separate-git-dir', resolve(f.base, 'separate-admin')]);
+    git(root, [
+      '-c',
+      'user.name=Fixture',
+      '-c',
+      'user.email=fixture@invalid.test',
+      '-c',
+      'commit.gpgsign=false',
+      '-c',
+      'core.hooksPath=/dev/null',
+      'commit',
+      '--allow-empty',
+      '-m',
+      'separate',
+    ]);
+    expect(run('capture', root).error.code).toBe('RECONCILIATION_HOST_INVALID');
+  });
+});
+
+for (const leaf of ['devai', 'private'])
+  it(`refuses actual dangling ${leaf} namespace symlink at capture`, () => {
+    const f = fixture();
+    const admin = git(f.root, ['rev-parse', '--absolute-git-dir']);
+    if (leaf === 'private') mkdirSync(resolve(admin, 'devai'), { mode: 0o700 });
+    const target = resolve(admin, leaf === 'devai' ? 'devai' : 'devai/reconciliation');
+    symlinkSync(resolve(f.base, 'NEVER_EXISTING_PRIVATE_TARGET'), target);
+    expect(run('capture', f.root).error.code).toBe('RECONCILIATION_HOST_INVALID');
+  });
+for (const leaf of ['devai', 'private'])
+  it(`stales old context after actual dangling ${leaf} namespace link appears`, () => {
+    const f = fixture();
+    if (leaf === 'private')
+      mkdirSync(resolve(git(f.root, ['rev-parse', '--absolute-git-dir']), 'devai'), {
+        mode: 0o700,
+      });
+    expect(
+      run('drift', f.root, leaf === 'devai' ? 'dangling-devai' : 'dangling-private').results.map(
+        (x) => x.error?.code,
+      ),
+    ).toEqual(Array.from({ length: 3 }, () => 'RECONCILIATION_HOST_STALE'));
+  });
+
+it('an observed HEAD drift stays terminally STALE after restoring the original HEAD', () => {
+  const value = run('restore-head', fixture().root);
+  expect(value.results.map((x) => x.error?.code)).toEqual(
+    Array.from({ length: 4 }, () => 'RECONCILIATION_HOST_STALE'),
+  );
+  expect(value.fresh.head).toBe(value.before.head);
+  expect(value.fresh.worktree_id).toBe(value.before.worktree_id);
+  expect(value.fresh.host_identity_sha256).toBe(value.before.host_identity_sha256);
+});
+
+describe('isolated negative producer and sampling failures without changing OS clocks', () => {
+  for (const variant of [
+    'git-failure',
+    'clock-timeout',
+    'clock-malformed',
+    'clock-oversize',
+    'boot-stale',
+    'runtime-stale',
+    'sample-width',
+    'sample-rollback',
+    'sample-unsafe',
+    'sample-zero',
+  ])
+    it(`refuses child-local ${variant} without raw diagnostics or fallback`, () => {
+      const value = run('fault', fixture().root, variant);
+      expect(value.error.code).toBe(
+        variant === 'git-failure'
+          ? 'RECONCILIATION_HOST_INVALID'
+          : ['boot-stale', 'runtime-stale'].includes(variant)
+            ? 'RECONCILIATION_HOST_STALE'
+            : 'RECONCILIATION_HOST_CLOCK_UNAVAILABLE',
+      );
+      expect(value.error.message).toBe(value.error.code);
+      expect(JSON.stringify(value.error)).not.toContain('SECRET_');
+    });
+  for (const variant of ['root', 'repository'])
+    it(`does not coerce Proxy ${variant} input`, () => {
+      const value = run('bad-argument', fixture().root, variant);
+      expect(value.error.code).toBe('RECONCILIATION_HOST_INVALID');
+      expect(value.touches).toBe(0);
+    });
+  it('membership precedes environment refusal and environment-only failure does not silently dispose the real member', () => {
+    const value = run('fault', fixture().root, 'member-env');
+    expect(value.results[0]?.error?.code).toBe('RECONCILIATION_HOST_CONTEXT_UNKNOWN');
+    expect(value.results[1]?.error?.code).toBe('RECONCILIATION_HOST_ENVIRONMENT_INVALID');
+    expect(value.results[2]?.error).toBeUndefined();
+  });
+  it('actual pass-through probes have fixed tools, flags, clean environment and native bounds', () => {
+    const value = run('basic', fixture().root);
+    const gitProbes = value.probes.filter((p) => p.file === '/usr/bin/git');
+    expect(gitProbes.length).toBeGreaterThanOrEqual(7);
+    for (const probe of gitProbes) {
+      for (const flag of [
+        '--no-optional-locks',
+        '--no-replace-objects',
+        '--no-lazy-fetch',
+        'core.fsmonitor=false',
+      ])
+        expect(probe.args).toContain(flag);
+      expect(probe.options.timeout).toBe(10000);
+      expect(probe.options.maxBuffer).toBe(65536);
+      const env = probe.options.env as Record<string, string>;
+      expect(env).toMatchObject({
+        PATH: '/usr/bin:/bin',
+        LC_ALL: 'C',
+        GIT_CONFIG_NOSYSTEM: '1',
+        GIT_CONFIG_SYSTEM: '/dev/null',
+        GIT_CONFIG_GLOBAL: '/dev/null',
+      });
+      expect(env).not.toHaveProperty('NODE_OPTIONS');
+      for (const name of forbidden) expect(env).not.toHaveProperty(name);
+    }
+    const children = value.probes.filter((p) => p.file === realpathSync(process.execPath));
+    expect(children).toHaveLength(3);
+    for (const probe of children) {
+      expect(probe.args[0]).toBe('-e');
+      expect(probe.options.timeout).toBe(3000);
+      expect(probe.options.maxBuffer).toBe(4096);
+      const observed = JSON.parse(probe.output) as {
+        node: string;
+        uv: string;
+        platform: string;
+        monotonic_ns: string;
+      };
+      expect(observed).toMatchObject({
+        node: process.versions.node,
+        uv: process.versions.uv,
+        platform: process.platform,
+      });
+      expect(BigInt(observed.monotonic_ns)).toBeGreaterThan(0n);
+    }
+  });
+});
+
+for (const linked of [false, true])
+  it(`qualifies actual committed SHA256 ${linked ? 'linked' : 'direct'} Git object format and64hex merge identities`, () => {
+    const f = fixture(linked, false, 'sha256');
+    const admin = git(f.root, ['rev-parse', '--absolute-git-dir']);
+    const parents = ['b'.repeat(64), 'c'.repeat(64)];
+    writeFileSync(resolve(admin, 'MERGE_HEAD'), parents.join('\n') + '\n');
+    const projection = identityProjection(f.root),
+      worktree_id = 'wt-' + digest(canonical(projection)).slice(0, 48);
+    const before = inventory(f.base);
+    const value = run('basic', f.root);
+    expect(value.identity.object_format).toBe('sha256');
+    expect(value.identity.head).toMatch(/^[0-9a-f]{64}$/u);
+    expect(value.identity.merge_heads).toEqual(parents);
+    expect(value.identity.worktree_id).toBe(worktree_id);
+    expect(value.identity.host_identity_sha256).toBe(
+      digest(canonical({ ...projection, worktree_id })),
+    );
+    expect(inventory(f.base)).toEqual(before);
+  });
+it('refuses40hex MERGE_HEAD in an actual SHA256 repository', () => {
+  const f = fixture(false, false, 'sha256');
+  writeFileSync(
+    resolve(git(f.root, ['rev-parse', '--absolute-git-dir']), 'MERGE_HEAD'),
+    'b'.repeat(40) + '\n',
+  );
+  expect(run('capture', f.root).error.code).toBe('RECONCILIATION_HOST_INVALID');
+});

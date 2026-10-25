@@ -1,0 +1,84 @@
+{
+  "kind": "lossless-session-capture-relocation",
+  "files": [
+    {
+      "source_path": "release-280/b1-design/internal-owner-source-milestone-20261025.json",
+      "archive_path": "docs/dev/operations/u1-b1-recovery-20261024/release-280/root-relative-captures/b1-design/internal-owner-source-milestone-20261025.json",
+      "bytes": 7182,
+      "sha256": "5832042738081fd32cff8475a5e88e5f060709ceda09bac2c6218fa178a8ac6f"
+    },
+    {
+      "source_path": "release-280/b1-design/native-selection-index-source-checkpoint-20261025.json",
+      "archive_path": "docs/dev/operations/u1-b1-recovery-20261024/release-280/root-relative-captures/b1-design/native-selection-index-source-checkpoint-20261025.json",
+      "bytes": 15226,
+      "sha256": "84000d288cd3bb426c03eba5fb97203b5cbceca283c71abd0bc84d0831bde773"
+    },
+    {
+      "source_path": "release-280/b1-design/historical-canonical-registry-constructor.before-plan.ts.txt",
+      "archive_path": "docs/dev/operations/u1-b1-recovery-20261024/release-280/root-relative-captures/b1-design/historical-canonical-registry-constructor.before-plan.ts.txt",
+      "bytes": 12909,
+      "sha256": "a71d2ee559078a6e2cb0a4258f06bb06ac75b7fd189367525591ab157eba2fc2"
+    },
+    {
+      "source_path": "release-280/b1-design/normal-chain.before-pure-record-kernel.ts.txt",
+      "archive_path": "docs/dev/operations/u1-b1-recovery-20261024/release-280/root-relative-captures/b1-design/normal-chain.before-pure-record-kernel.ts.txt",
+      "bytes": 12794,
+      "sha256": "9fe1706faf4728fbc58e0341adad9b0ff86287d6d9b3aed48526194b77f1c241"
+    },
+    {
+      "source_path": "release-280/b1-design/native-owner-source-checkpoint-20261025.json",
+      "archive_path": "docs/dev/operations/u1-b1-recovery-20261024/release-280/root-relative-captures/b1-design/native-owner-source-checkpoint-20261025.json",
+      "bytes": 7140,
+      "sha256": "4e5ea8c5fed423c18f6bfd04137bac00582e94d2eaae3be70af9e37524427e49"
+    },
+    {
+      "source_path": "release-280/b1-design/public-provision09-qualification.json",
+      "archive_path": "docs/dev/operations/u1-b1-recovery-20261024/release-280/root-relative-captures/b1-design/public-provision09-qualification.json",
+      "bytes": 2250,
+      "sha256": "af324188be71d24c0b6e1370a1d8567097d2cdb7a387b9316c949c0faf6323cf"
+    },
+    {
+      "source_path": "release-280/b1-design/reconciliation-owner-schemas.test.ts.before-public-runtime.txt",
+      "archive_path": "docs/dev/operations/u1-b1-recovery-20261024/release-280/root-relative-captures/b1-design/reconciliation-owner-schemas.test.ts.before-public-runtime.txt",
+      "bytes": 12075,
+      "sha256": "97084f8117035381eb530c3ccce11dd7bc766344730cdd331bd8cda688ef4354"
+    },
+    {
+      "source_path": "release-280/b1-design/native-custody-source-checkpoint-20261025.json",
+      "archive_path": "docs/dev/operations/u1-b1-recovery-20261024/release-280/root-relative-captures/b1-design/native-custody-source-checkpoint-20261025.json",
+      "bytes": 9184,
+      "sha256": "c13435a6bbd397d68e3bb1af1e1b29f0be06e94b596374222336dd8e05927f15"
+    },
+    {
+      "source_path": "release-280/b1-design/reconciliation-host-context.test.ts.before-pinned-node-compatibility.txt",
+      "archive_path": "docs/dev/operations/u1-b1-recovery-20261024/release-280/root-relative-captures/b1-design/reconciliation-host-context.test.ts.before-pinned-node-compatibility.txt",
+      "bytes": 36914,
+      "sha256": "f0ecd47fc8cc7b7f575ba8225febfca09e76bebcd2b8893be6b9ae7b0925a120"
+    },
+    {
+      "source_path": "release-280/b1-design/reconciliation-host-context.ts.before-pinned-node-compatibility.txt",
+      "archive_path": "docs/dev/operations/u1-b1-recovery-20261024/release-280/root-relative-captures/b1-design/reconciliation-host-context.ts.before-pinned-node-compatibility.txt",
+      "bytes": 22581,
+      "sha256": "a1f2b7b9ad63a8be55a2ccdedb112608006b4b17a9303e46e6305617c3573339"
+    },
+    {
+      "source_path": "release-280/b1-design/proof-index-reconciliation-contract.test.ts.before-public-runtime.txt",
+      "archive_path": "docs/dev/operations/u1-b1-recovery-20261024/release-280/root-relative-captures/b1-design/proof-index-reconciliation-contract.test.ts.before-public-runtime.txt",
+      "bytes": 4280,
+      "sha256": "6a83b251b4cc57a8220cb0984d3d6e45d4d09ebe3889c9643584a5f46ea05f63"
+    },
+    {
+      "source_path": "release-280/b1-design/historical-canonical-registry-constructor.before-runtime.ts.txt",
+      "archive_path": "docs/dev/operations/u1-b1-recovery-20261024/release-280/root-relative-captures/b1-design/historical-canonical-registry-constructor.before-runtime.ts.txt",
+      "bytes": 12992,
+      "sha256": "ad5051c37ac06d09a4ecc5977e8650a25cedba2c55dfc6d44efbc8c04cbd2c6b"
+    },
+    {
+      "source_path": "release-280/b1-design/historical-policy-review-test.before-frozen-fixture.ts.txt",
+      "archive_path": "docs/dev/operations/u1-b1-recovery-20261024/release-280/root-relative-captures/b1-design/historical-policy-review-test.before-frozen-fixture.ts.txt",
+      "bytes": 58613,
+      "sha256": "0b2e35671ca2097b207e48bc56e1254d05278a245c1e4dc71f8e994845f5e69e"
+    }
+  ],
+  "historical_claims_changed": false
+}

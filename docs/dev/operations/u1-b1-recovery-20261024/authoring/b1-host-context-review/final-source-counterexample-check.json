@@ -1,0 +1,64 @@
+{
+  "source_sha256": "7cfcf6a1f504698a11ec40d1cf08fde86038ec389e5df3964caa5c7b61d3a54d",
+  "dist_sha256": "605ac8cb6e76343fd4bd17ef2f0de1e7a0659b2bdd4c25112624999d8638b1a7",
+  "source_unchanged": true,
+  "dist_unchanged": true,
+  "environment": {
+    "node": "v24.22.0",
+    "uv": "1.52.1",
+    "platform": "darwin"
+  },
+  "outcomes": {
+    "clean_read": {
+      "ok": true
+    },
+    "danglingAncestor": {
+      "ok": false,
+      "code": "RECONCILIATION_HOST_INVALID"
+    },
+    "danglingRoot": {
+      "ok": false,
+      "code": "RECONCILIATION_HOST_INVALID"
+    },
+    "observedStale": {
+      "ok": false,
+      "code": "RECONCILIATION_HOST_STALE"
+    },
+    "restoredIdentity": {
+      "ok": false,
+      "code": "RECONCILIATION_HOST_STALE"
+    },
+    "restoredPaths": {
+      "ok": false,
+      "code": "RECONCILIATION_HOST_STALE"
+    },
+    "restoredClock": {
+      "ok": false,
+      "code": "RECONCILIATION_HOST_STALE"
+    },
+    "freshIdentity": {
+      "ok": true
+    },
+    "freshClock": {
+      "ok": true
+    },
+    "disposed": {
+      "ok": false,
+      "code": "RECONCILIATION_HOST_CONTEXT_UNKNOWN"
+    }
+  },
+  "checks": {
+    "clean_context_works": true,
+    "dangling_ancestor_invalid": true,
+    "dangling_private_root_invalid": true,
+    "head_change_stale": true,
+    "restored_identity_still_stale": true,
+    "restored_paths_still_stale": true,
+    "restored_clock_still_stale": true,
+    "fresh_identity_works": true,
+    "fresh_clock_works": true,
+    "disposed_context_unknown": true
+  },
+  "scope": "Actual compiled exact product module on own disposable repo. Counterexample closure only, not independent full suite or action/adapter/effect qualification.",
+  "fixture_removed": true
+}

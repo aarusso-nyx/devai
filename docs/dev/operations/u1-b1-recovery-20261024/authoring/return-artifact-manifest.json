@@ -1,0 +1,88 @@
+{
+  "status": "CONTRACT_AUTHORING_RETURN_ONLY_BINDING_INTEGRATION_HELD",
+  "constitution_version": "1.2.0",
+  "constitution_sha256": "d5dfdc972161e0f848dd859be7bbfa510973c5c9a449a0f9e6b8960e4f5ac96a",
+  "original_preparation_manifest_sha256": "5152b029680c17089ccc8ae5b438d29790f806435489248c56b52444b1d208bf",
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 8775,
+      "sha256": "c28fad1d6c8883c3504b1b59c699896759362020dcca3d7e25c9d373164a67e8"
+    },
+    {
+      "path": "approval-receipt.md",
+      "bytes": 1648,
+      "sha256": "8d61de225910e5d7da79adf6be1ad63bd69cecbce63f254a55d70d44f7032362"
+    },
+    {
+      "path": "authored-effects-manifest.json",
+      "bytes": 13958,
+      "sha256": "374be3e7c123a421810391f11fa2f33b5133c0b888798b41067a0c223471eb4e"
+    },
+    {
+      "path": "binding-plan.json",
+      "bytes": 6951,
+      "sha256": "ba630beafcc45fcb7180e5aee93ffedf608c96d2581b0a33ceb26fa71b3b8189"
+    },
+    {
+      "path": "inspector/catalogue-red.json",
+      "bytes": 1237,
+      "sha256": "800ed9a735628c9a6a029f96b962922c0fc30490b3187faf5a57b113fe1a8c16"
+    },
+    {
+      "path": "inspector/constitutional-transition-tests.log",
+      "bytes": 2752,
+      "sha256": "70d300de659b28bfbe92ed9ca39a3be89ddc1fd5d3d39b8e46554f6334430848"
+    },
+    {
+      "path": "inspector/constitutional-transition-tests.txt",
+      "bytes": 2752,
+      "sha256": "70d300de659b28bfbe92ed9ca39a3be89ddc1fd5d3d39b8e46554f6334430848"
+    },
+    {
+      "path": "inspector/final-focused-tests.log",
+      "bytes": 2737,
+      "sha256": "7dbef142dd94c9ca008f632e87f79c4f0a8e69171881e3dac08813501dcedaf0"
+    },
+    {
+      "path": "inspector/final-focused-tests.txt",
+      "bytes": 2737,
+      "sha256": "7dbef142dd94c9ca008f632e87f79c4f0a8e69171881e3dac08813501dcedaf0"
+    },
+    {
+      "path": "inspector/final-review.json",
+      "bytes": 4987,
+      "sha256": "e677977977db962bb50e65a637484270dbedc80dad3e4c070c023fe19582fbba"
+    },
+    {
+      "path": "inspector/schema-lint-fix-eslint.log",
+      "bytes": 362,
+      "sha256": "689d370e8c06bdc4d786c596f733e4fd11d13ae585434f61cc90eeeaf5155785"
+    },
+    {
+      "path": "inspector/schema-lint-fix-eslint.txt",
+      "bytes": 362,
+      "sha256": "689d370e8c06bdc4d786c596f733e4fd11d13ae585434f61cc90eeeaf5155785"
+    },
+    {
+      "path": "inspector/schema-lint-fix-tests.log",
+      "bytes": 633,
+      "sha256": "828b47e234e9d8da2bbe80d55e15acc8e7c7b1ca3d94824cb84410e00bfdef15"
+    },
+    {
+      "path": "inspector/schema-lint-fix-tests.txt",
+      "bytes": 633,
+      "sha256": "828b47e234e9d8da2bbe80d55e15acc8e7c7b1ca3d94824cb84410e00bfdef15"
+    },
+    {
+      "path": "prospective-outputs/constitution.md",
+      "bytes": 34899,
+      "sha256": "d5dfdc972161e0f848dd859be7bbfa510973c5c9a449a0f9e6b8960e4f5ac96a"
+    },
+    {
+      "path": "prospective-outputs/project.json",
+      "bytes": 386,
+      "sha256": "e6c405d15131ffbad5be96ccf0597397b3c9d582dc7c020cee57043796500f87"
+    }
+  ]
+}

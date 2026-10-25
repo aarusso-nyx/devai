@@ -1,0 +1,18 @@
+{
+  "files": 5116,
+  "fstat_only_ms": [
+    7.776417000000038,
+    7.071416999999997,
+    8.39304100000004,
+    7.068750000000023,
+    7.192541000000006
+  ],
+  "fstat_plus_named_lstat_ms": [
+    19.69608299999993,
+    19.95420900000022,
+    19.158249999999953,
+    19.231250000000045,
+    19.348415999999816
+  ],
+  "qualification": "Actual installednative10 closure read-only independent scan microbenchmark. Excludes directory/resolution checks, included separately in production-helper benchmark. Not installedcandidate12 or fullphase qualification."
+}

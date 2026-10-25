@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/release-280/host-operation/historical-p1-final.txt","kind":"historical-transcript-custody-pointer","original_bytes":662,"original_bytes_changed":false,"original_sha256":"7ba284f73deb9dd110d295e793fcd1032598ce1d101eba292ae08aae09a8933d"}

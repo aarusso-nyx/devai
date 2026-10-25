@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/release-280/reader-engineer/targeted-regressions.txt","kind":"historical-transcript-custody-pointer","original_bytes":638,"original_bytes_changed":false,"original_sha256":"e5d000f5f57b188b8e7885dcabb3313fbc6c3e38c05be09abcc80f7bc38fdc66"}

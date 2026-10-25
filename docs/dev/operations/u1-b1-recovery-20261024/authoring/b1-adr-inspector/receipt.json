@@ -1,0 +1,78 @@
+{
+  "standing": "B1_ADR_AUTHORING_CONTRACT_INDEPENDENT_GREEN_NOT_RUNTIME_QUALIFICATION",
+  "recorded_at": "2026-10-24T18:09:24.339688+00:00",
+  "scope": "Independent ADR contract test and additive evidence; exact historical-file-count correction separately authorized by root. No runtime/schema/registry changes by Inspector.",
+  "result": {
+    "passed": 23,
+    "failed": 0,
+    "new_cases": 5,
+    "existing_governance_cases": 18,
+    "raw_log": "independent-final.txt",
+    "duration_seconds": 1.0
+  },
+  "checks": {
+    "targeted_eslint": "PASS",
+    "targeted_prettier": "PASS",
+    "test_paths_diff_check": "PASS"
+  },
+  "population": {
+    "frozen_records": 133,
+    "frozen_files": 134,
+    "current_records": 134,
+    "current_files": 135,
+    "added_id": "ADR-EVI-0007",
+    "supersedes": [],
+    "new_unique_subjects": 7,
+    "historical_accepted_file_byte_checks": 129,
+    "approved_prior_ratifications": [
+      "ADR-GOV-0027",
+      "ADR-AUT-0008"
+    ],
+    "old_metadata_delta": "None except these two status transitions. Every other preexisting metadata record is identical.",
+    "old_graph_delta": "None after the two ratifications; the seven new unique subject rows have only ADR-EVI-0007 as lineage and effective head."
+  },
+  "preservation": {
+    "historical_fixture_sha256": "05c776122fd5e4a939f446b5343943db03ef51a6e0051deaaa2099797f75fc0e",
+    "accepted_bytes_anchor": "Frozen P1 entry-preservation.json pinned by literal SHA c9797b07c2f7b91a357490d1ddaa31bdba3353dbfa6071ec5e4e8715a30f0306",
+    "private_publisher_source_tests_modified": false
+  },
+  "corrections": [
+    {
+      "log": "independent-first.txt",
+      "meaning": "20PASS3FAIL: one authentic historical-fixture inconsistency plus two new test projection errors. Legacy source_format was accidentally spread into projection and is now explicitly excluded to match original fixture representation."
+    },
+    {
+      "log": "projection-correction-incomplete.txt",
+      "meaning": "No tests collected: incomplete local projection edit left undefined legacy identifier. Corrected before final run; no product defect claimed."
+    },
+    {
+      "path": "packages/schemas/tests/contract/governance-v15-adr.test.ts",
+      "line": 1286,
+      "meaning": "Root authorized changing only matchesAdrSemantics file-count argument from live Markdown count135 to historical.files_scanned134 for frozen133-record assertion. All old expected graph values and fixture bytes unchanged."
+    }
+  ],
+  "logical_resource_review": "Read-only checkpoint scope is consistent with ADR: pure closed shape accepts no permission, opaque operation handle or physical Git path. Independent resource RED/qualification belongs to b1_contract_inspector; no duplicate qualification claimed.",
+  "limitations": [
+    "Accepted ADR records a maintainer-approved implementation contract; it does not establish native admission, Owner-origin authentication, phase safety, real index publication, installed command readiness or release completion.",
+    "Immutable SQLite anchor remains a candidate awaiting bootstrap/descriptor/effect/actual-adapter closure.",
+    "DETRAN and downstream execution remain excluded."
+  ],
+  "sha256": {
+    "law/adr/ADR-EVI-0007-owner-approved-merge-reconciliation.md": "1bfaa9703fa5cd667de523c74a3d8f4b584b7c630290f1c2400a71a871a53bd4",
+    "law/adr/README.md": "1b8971917f74470fc643b65f1032e62ee15a6a22c7f16dd1e36d00906c620474",
+    "law/policy/adr-validation.json": "9b4187c703c13b7bbe0e5d015474680e0ac19007457a0f5e5f2c907275dc570e",
+    "packages/schemas/tests/contract/reconciliation-adr-contract.test.ts": "ea88dc21301e9e4bc0f91f2e2f4471d04bf66c285615d3a499f13a705da0d274",
+    "packages/schemas/tests/contract/governance-v15-adr.test.ts": "6c24a2d9bd3185b4168556d723497c5d7874eab8c1c166e65cf73f253f5cd645",
+    "packages/schemas/tests/fixtures/adr-pre-280-ratification.json": "05c776122fd5e4a939f446b5343943db03ef51a6e0051deaaa2099797f75fc0e",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/logical-resource-checkpoint.json": "9d5fbfc7bbf565d3dd0001618e10b853b13b1128ef93fbe5245098182585e81c"
+  },
+  "raw_sha256": {
+    "independent-final.txt": "d12dafce8bc4ebded32e8a4c4dfaac66dc8ef9567689491854f969796fa99564",
+    "independent-first.txt": "7d217e505e8e797eacc862b9bf11dfd796c6244d4b21773fda9013130be5c566",
+    "projection-correction-incomplete.txt": "00f9ce2306ef7384b9a1c53d17aceb71719645366ceeb5ac11c737fa39fd7f0a"
+  },
+  "graft": {
+    "calls": 1,
+    "tokens_saved_estimate": 55230
+  }
+}

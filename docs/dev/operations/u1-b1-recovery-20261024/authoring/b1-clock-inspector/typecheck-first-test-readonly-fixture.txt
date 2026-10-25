@@ -1,0 +1,8 @@
+ WARN  Issue while reading "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/.npmrc". Failed to replace env in config: ${NODE_AUTH_TOKEN}
+ WARN  Issue while reading "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/.npmrc". Failed to replace env in config: ${NODE_AUTH_TOKEN}
+
+> devai@2.8.0 typecheck /Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024
+> tsc -b packages/cli/tsconfig.typecheck.json --force && tsc --noEmit -p tsconfig.typecheck.json
+
+packages/authority/tests/unit/reconciliation-clock.test.ts(169,16): error TS2704: The operand of a 'delete' operator cannot be a read-only property.
+ ELIFECYCLE  Command failed with exit code 2.

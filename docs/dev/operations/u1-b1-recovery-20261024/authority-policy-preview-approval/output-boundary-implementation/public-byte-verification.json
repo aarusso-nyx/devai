@@ -1,0 +1,104 @@
+{
+  "status": "EXACT_NORMALIZED_PUBLIC_SOURCE_FIXTURE_EVIDENCE_LIVE_USE_HELD",
+  "scenarios": [
+    {
+      "scenario": "create",
+      "public_plan_sha256": "3104a5fe71a283e534b1a4f1e167801fa985daa067a7152136eb83dc8c10c6b3",
+      "artifact_sha256": "5a87c40f80f9aab847037853b1ed45074968f4ce03d1295ce34b13b2f330b0a8",
+      "size_bytes": 69922,
+      "source_package": {
+        "name": "@aarusso-nyx/devai",
+        "version": "2.7.1"
+      },
+      "constitution": {
+        "digest_sha256": "d5dfdc972161e0f848dd859be7bbfa510973c5c9a449a0f9e6b8960e4f5ac96a",
+        "version": "1.2.0"
+      },
+      "checks": {
+        "input_not_delivered_at_ready": true,
+        "ready_verdict_review": true,
+        "ready_non_authorizing": true,
+        "whole_plan_sha256_exact": true,
+        "base64_size_sha256_exact": true,
+        "two_envelopes": true,
+        "ready_matches_first": true,
+        "only_policy_added_after_precursor": true,
+        "on_disk_hash_exact": true,
+        "report_size_hash_exact": true,
+        "exact_prompt": true,
+        "exact_precursor_transition": true,
+        "constitution_exact": true,
+        "exact_created_completion": true
+      },
+      "live_authority": false
+    },
+    {
+      "scenario": "successor",
+      "public_plan_sha256": "353b297df087877c305b9884b0b6decfbf001c83ba4579633c0bc92a7df1d753",
+      "artifact_sha256": "350d0319039e66e9bc2657ce1d97b5358787b55b21bacff426687c8ac3e649bf",
+      "size_bytes": 69922,
+      "source_package": {
+        "name": "@aarusso-nyx/devai",
+        "version": "2.7.1"
+      },
+      "constitution": {
+        "digest_sha256": "d5dfdc972161e0f848dd859be7bbfa510973c5c9a449a0f9e6b8960e4f5ac96a",
+        "version": "1.2.0"
+      },
+      "checks": {
+        "input_not_delivered_at_ready": true,
+        "ready_verdict_review": true,
+        "ready_non_authorizing": true,
+        "whole_plan_sha256_exact": true,
+        "base64_size_sha256_exact": true,
+        "two_envelopes": true,
+        "ready_matches_first": true,
+        "only_policy_added_after_precursor": true,
+        "on_disk_hash_exact": true,
+        "report_size_hash_exact": true,
+        "exact_prompt": true,
+        "exact_precursor_transition": true,
+        "constitution_exact": true,
+        "exact_created_completion": true
+      },
+      "live_authority": false
+    },
+    {
+      "scenario": "indeterminate",
+      "public_plan_sha256": "d63973a8f6ac93b1be7452d3df6c00531af1cd672ac6bdbcd025fcf9c4b543b9",
+      "artifact_sha256": "0cf58c794b821f9e9a3e3e5bc502f098df8d7b35da8213e98190833238d0aae6",
+      "size_bytes": 69922,
+      "source_package": {
+        "name": "@aarusso-nyx/devai",
+        "version": "2.7.1"
+      },
+      "constitution": {
+        "digest_sha256": "d5dfdc972161e0f848dd859be7bbfa510973c5c9a449a0f9e6b8960e4f5ac96a",
+        "version": "1.2.0"
+      },
+      "checks": {
+        "input_not_delivered_at_ready": true,
+        "ready_verdict_review": true,
+        "ready_non_authorizing": true,
+        "whole_plan_sha256_exact": true,
+        "base64_size_sha256_exact": true,
+        "two_envelopes": true,
+        "ready_matches_first": true,
+        "only_policy_added_after_precursor": true,
+        "on_disk_hash_exact": true,
+        "report_size_hash_exact": true,
+        "exact_prompt": true,
+        "exact_precursor_transition": true,
+        "constitution_exact": true,
+        "no_success": true,
+        "existing_normalized_infra6": true,
+        "exact_publisher_code": true,
+        "unknown_durability": true,
+        "lossless_inode_identity": true,
+        "staged_presence_retained": true
+      },
+      "live_authority": false
+    }
+  ],
+  "note": "Synthetic disposable fixtures only. Handles are gone; no token or artifact can be replayed as authority."
+}

@@ -1,0 +1,7 @@
+{
+  "standing":"EXACT_BOUNDED_CENSUS_FIX_AFTER_AUTHENTIC_NATIVE_OBSERVATION",
+  "source":"packages/authority/src/boundaries/reconciliation-host-namespace.ts only",
+  "evidence":"b1-provision-review/census-native-observation.json: old code already refused10000 entries correctly, but materialized the whole array first. This is a resource-bound defect, not a permission/acceptance failure.",
+  "algorithm":"Use native opendirSync cursor with bufferSize min(32,limit+1); collect at most limit names, inspect one additional entry to refuse, sort only the bounded result, close cursor in finally for success/error. Root limit3, approvals directory limit4096, per-approval file directory limit4096. Both initial enumeration and each final recheck use the same bounded helper. Existing total16384file and1MiB individual-byte limits remain unchanged.",
+  "qualification":"Real oversized root observes at most4 cursor entries; approvals at most4097; cursor is closed. Native prefetch is bounded by bufferSize, not a claim of exact physical OS read count. Unknown/oversized entries remain preserved and same closed INVALID refusal. Ordinary protected namespace/publisher/admission behavior and fixed API unchanged."
+}

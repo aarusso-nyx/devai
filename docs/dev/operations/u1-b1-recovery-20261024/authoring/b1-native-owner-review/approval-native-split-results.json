@@ -1,0 +1,32 @@
+{
+  "kind": "independent-native-initial-owner-approval",
+  "fixture": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-initial-owner-plan-jJqJW9/repository",
+  "qualification": "Actual historical Git, local remote, native private publication/admission and typed receipt stack; synthetic B5/policy origin; no installed/public Owner CLI claim",
+  "passed": [
+    "cancel before effects; forged receiver, foreign scope, confirm replay and interrupt replay refuse",
+    "actual native admission + typed receipt + signed private approval exact bytes and owned identity",
+    "source change after preview refuses before new approval effects",
+    "foreign namespace competitor refuses before effects and preserves foreign entry"
+  ],
+  "index_sha256": "542553c911bcd2f5e65dd8a27b66f0f1dbcb703278477cb27df920ede95eadce",
+  "plan_sha256": "5f6f81b3595b4c1e9f06ab9f4bbd1f2b682ddbb981de6585d5f3925af6e7b4e5",
+  "approved": {
+    "approval_id": "fe13a53d2a7d942b9605f38ab4175c540f60e1963f72a5bbba2d2eac66fc1555",
+    "approval_sha256": "b8be6be9e0bfd6d50cb67256b9fe035dd08dc45077a56f2f1b0376fe16c1cf87",
+    "owned": [
+      {
+        "target": "worktree-host/devai/reconciliation/approvals/fe13a53d2a7d942b9605f38ab4175c540f60e1963f72a5bbba2d2eac66fc1555",
+        "dev": "16777233",
+        "ino": "1124728315",
+        "birthtime_ns": "1792897458638840204"
+      },
+      {
+        "target": "worktree-host/devai/reconciliation/approvals/fe13a53d2a7d942b9605f38ab4175c540f60e1963f72a5bbba2d2eac66fc1555/approval.json",
+        "dev": "16777233",
+        "ino": "1124728326",
+        "birthtime_ns": "1792897459967134051"
+      }
+    ]
+  },
+  "effect_callbacks": 2
+}

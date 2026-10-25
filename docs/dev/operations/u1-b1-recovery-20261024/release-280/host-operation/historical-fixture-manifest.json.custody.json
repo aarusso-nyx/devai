@@ -1,0 +1,11 @@
+{
+  "original_source_path": "docs/dev/operations/u1-b1-recovery-20261024/release-280/host-operation/historical-fixture-manifest.json",
+  "external_custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/release-280/host-operation/historical-fixture-manifest.json",
+  "sha256": "6854b1d18e5fd37b7c262ff26cb50e87c2f6ef6d6478d8e6068bbf4314f47980",
+  "bytes": 377876,
+  "dev": "16777245",
+  "ino": "77962465",
+  "mode": "0o644",
+  "historical_bytes_changed": false,
+  "standing": "historical diagnostic artifact; no authority or completion promotion"
+}

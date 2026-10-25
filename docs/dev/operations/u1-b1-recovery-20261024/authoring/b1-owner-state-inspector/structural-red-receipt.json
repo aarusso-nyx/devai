@@ -1,0 +1,15 @@
+{
+  "standing": "AUTHENTIC_STRUCTURAL_REQUIRED_MODULE_ABSENCE_RED_ONLY",
+  "pass": 0,
+  "fail": 1,
+  "source_absent": true,
+  "log": "structural-red.txt",
+  "log_sha256": "d6780d23010bbcba4cf024a7d59dbfe4235f14df0099780d4026a579f2b899f8",
+  "inputs_captured_after_run": {
+    "packages/authority/tests/unit/reconciliation-owner-state.test.ts": "e487fb71b8134243496e20cb953ff6fd2a704fe432f70c3a8b3e50cda99b8bd0",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/owner-state-checkpoint.json": "45fbde08e157a45d615cc26e885beac6197611fd64dc517dafd0348ee975703f",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/owner-state-order-amendment.json": "71f1dd131c023652cb4720310401216cee8f418d215502198b59a001621412ed",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/owner-state-interface.json": "bbd8012e8e01089592837218af1cb16a3509369881f5cd39c7f62ced35973494"
+  },
+  "note": "No semantic qualification claim; native HMAC/JCS/raw-SHA graph fixtures will be independently authored against final resolved interface. Final samegrant-renewal/newintent clarification may follow this structural run."
+}

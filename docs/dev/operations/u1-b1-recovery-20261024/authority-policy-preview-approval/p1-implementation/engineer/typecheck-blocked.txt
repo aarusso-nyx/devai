@@ -1,0 +1,6 @@
+Command executed: node_modules/.bin/tsc --noEmit --incremental false --composite false -p packages/cli/tsconfig.json
+Exit 2. No build or emit performed. Output was 699 lines; this is a diagnostic excerpt, not the full log.
+Existing unbuilt workspace declaration resolution blocks this source check:
+TS2307 Cannot find module @devai-nyx/authority, @devai-nyx/schemas, @devai-nyx/skills and other workspace packages.
+TS2305 #runtime-core has no exported member computeManifestHash, deriveEvidenceId, gatherGitContext, EvidenceChain, EvidenceRecord.
+Derived downstream missing-type diagnostics also occurred. No typecheck PASS is claimed.

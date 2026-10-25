@@ -1,0 +1,80 @@
+{
+  "object_format": "sha256",
+  "linked": true,
+  "index_sha256": "b2de769455003f2839ec095cec015f48f573f192a8d5eda1cc3e95287511759d",
+  "merged_index_sha256": "dd52610f352c9f59fdcf9bbdd5df04d4950dc5b9cfa6b01e978415e0ef08862e",
+  "replacement_oid": "525b069b0969d1afb9532e2ae9bfe6c23e8c3699661e5dcdfe0997a6a5a13fd5",
+  "unmerged_entries": [
+    {
+      "path": "nested/executable.sh",
+      "mode": "100755",
+      "oid": "664f466ca5b367cfb8cfdccb8a74f13789c7ba984b3e984e64fc4c4d002e1609",
+      "stage": 0,
+      "assume_valid": false
+    },
+    {
+      "path": "other-conflict.txt",
+      "mode": "100644",
+      "oid": "15bce8c248d5aa969cbf1a9c92b2dac5b44f750ade3a31fbbe2cb9ea821746ba",
+      "stage": 1,
+      "assume_valid": false
+    },
+    {
+      "path": "other-conflict.txt",
+      "mode": "100644",
+      "oid": "5b717143990ae75ec37535c83974b689d6c9bdc326d5d9dc17693050eea52fd9",
+      "stage": 2,
+      "assume_valid": false
+    },
+    {
+      "path": "other-conflict.txt",
+      "mode": "100644",
+      "oid": "a6fd43192896550ac9086b85989449b975b76956aaa4d1f8ce1655b381f299a9",
+      "stage": 3,
+      "assume_valid": false
+    },
+    {
+      "path": "record/proofs/chain.json",
+      "mode": "100644",
+      "oid": "37c8abffc7dae36f56e24828d2aa8356a2b6fb9156adf5892a2a0b47a2d52874",
+      "stage": 1,
+      "assume_valid": false
+    },
+    {
+      "path": "record/proofs/chain.json",
+      "mode": "100644",
+      "oid": "a161829e3a303b19a40c4a831a1bb185015ec90428b3a5c9c3592c92f7e38a8a",
+      "stage": 2,
+      "assume_valid": false
+    },
+    {
+      "path": "record/proofs/chain.json",
+      "mode": "100644",
+      "oid": "7004379797c51e35df1182e6e093236276757aad0bc232663a75cff492f54540",
+      "stage": 3,
+      "assume_valid": false
+    },
+    {
+      "path": "retained space.txt",
+      "mode": "100644",
+      "oid": "946785baece2792928e39795d82eba9a42f33988d45ec606ac62687506f63407",
+      "stage": 0,
+      "assume_valid": true
+    },
+    {
+      "path": "retained-gitlink",
+      "mode": "160000",
+      "oid": "e4654be17168882b50136f7bd151c63e486750375b17aedd87fe8d7d1aedbfff",
+      "stage": 0,
+      "assume_valid": false
+    },
+    {
+      "path": "retained-link",
+      "mode": "120000",
+      "oid": "533aa08cae42b33afd37804d06d9fc2b7e231e74fe4f020a4ef60fb5a22283ab",
+      "stage": 0,
+      "assume_valid": false
+    }
+  ],
+  "producer": "Actual Git init/update-index/ordinary merge; bundle verified by Git. No codec or host mutation capability established."
+}

@@ -1,0 +1,13 @@
+{
+  "standing": "AUTHENTIC_MISSING_MODULE_RED_ONLY_NO_ORIGIN_QUALIFICATION",
+  "pass": 0,
+  "fail": 1,
+  "source_absent": true,
+  "inputs": {
+    "packages/authority/tests/unit/reconciliation-host-owner.test.ts": "a2593b7d9d8ab5308583fdcdb27a551cdd1d41835cb96d9bd19ea65498be49cd",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/native-owner-read-checkpoint.json": "2ce67c333acafb3d86eb07e3a743e3fa9a90a3ea9260c11dbafc519d532a7ffc",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/native-owner-read-interface.json": "066e8b03186c288fb600eb5dfaf2bf6cac7d37ad269fbab631019b897ab8c1f7",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/readonly-checkpoint-review.json": "b48919b913dd957df6b46267fad7d41ee81cd96126c55345ccbc06c91058a363"
+  },
+  "log_sha256": "73c050d705a2c7d5a520f831cf52895df16f922d09197ccd704b4f7a9cbe1039"
+}

@@ -1,0 +1,99 @@
+{
+  "scope": "Independent pure Owner-state Inspector evidence",
+  "files": [
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-owner-state-inspector/README.md",
+      "sha256": "76cdb0caae395e98e8021ef757a3fc55813d50b347dccfca9d75492c40b3b1e3",
+      "size_bytes": 3272
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-owner-state-inspector/diagnostic-reference-delta.json",
+      "sha256": "6d631819155487e018ac012227166c3fd92043031736bdae8c5bd89ed1e5bd9b",
+      "size_bytes": 300
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-owner-state-inspector/final-input-verification.json",
+      "sha256": "9d5ac23f79d0b7b0b9c9cb5bada5bbb33d8939b546a001d112c742671be83423",
+      "size_bytes": 1876
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-owner-state-inspector/first-behavior.txt",
+      "sha256": "282f6e01f4da0a3d3dbc2e729fcb37ad5d1610eecb1a61026026751e99ee9bb9",
+      "size_bytes": 275
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-owner-state-inspector/first-inputs.json",
+      "sha256": "395997601efaba5ba281a7e28e8c34a39235683faa695d163963d932eff86341",
+      "size_bytes": 1448
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-owner-state-inspector/format-final.txt",
+      "sha256": "9a047bca19390f90234e566131a549fefdde204b2f6b6173253d4d68013d7ea8",
+      "size_bytes": 428
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-owner-state-inspector/historical-input-verification.json",
+      "sha256": "fed4762754ff5228e2c37a1e8963e66aa6068d30ed38c20cf3b25e6629185e12",
+      "size_bytes": 1486
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-owner-state-inspector/lint-draft.txt",
+      "sha256": "689d370e8c06bdc4d786c596f733e4fd11d13ae585434f61cc90eeeaf5155785",
+      "size_bytes": 362
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-owner-state-inspector/lint-final.txt",
+      "sha256": "689d370e8c06bdc4d786c596f733e4fd11d13ae585434f61cc90eeeaf5155785",
+      "size_bytes": 362
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-owner-state-inspector/public-oracle-observations.json",
+      "sha256": "5b1d1696126465a88fa8d0204693b215372662490221922d6fb7b61c702890f3",
+      "size_bytes": 454
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-owner-state-inspector/receipt.json",
+      "sha256": "ef64b74c029e17f4ce0ead7774d2c9d67c19abccb19f821b5a8878c11b1accb7",
+      "size_bytes": 10834
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-owner-state-inspector/species-final.txt",
+      "sha256": "ad92f202ddfe3740d3e00880c4355556025c6d6757b3566b759c0e04f7831331",
+      "size_bytes": 286
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-owner-state-inspector/species-typing-verification.txt",
+      "sha256": "20ad97cfda4b90ce27c67abdab07b40b4d6c7c52faa31b4ae9fe8dbf7ea05e24",
+      "size_bytes": 287
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-owner-state-inspector/structural-red-receipt.json",
+      "sha256": "496f3487b4326ec7af1d04397254f9925068ff1b5a429da2b7ee0c2a2ced469b",
+      "size_bytes": 1158
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-owner-state-inspector/structural-red.txt",
+      "sha256": "d6780d23010bbcba4cf024a7d59dbfe4235f14df0099780d4026a579f2b899f8",
+      "size_bytes": 1261
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-owner-state-inspector/typecheck-final.txt",
+      "sha256": "3801203c7d9e4544ad471c57f0ab2386897e4413121a6c6be2a61c5af2fd37fb",
+      "size_bytes": 573
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-owner-state-inspector/typecheck.txt",
+      "sha256": "79d257d0933d05303beb1d8c0a4054cfa263cdbc266e3ed8e6554731c62149ea",
+      "size_bytes": 1435
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-owner-state-inspector/unchanged-regressions.txt",
+      "sha256": "011f76040bb3c5231dceca4c3b856bd847d45c244793a71be7f95a024d4c2735",
+      "size_bytes": 276
+    }
+  ],
+  "owned_test": {
+    "path": "packages/authority/tests/unit/reconciliation-owner-state.test.ts",
+    "sha256": "7c6b161141797656b738eea0192666cf7f660eb68d3ecf508493095416c85196"
+  }
+}

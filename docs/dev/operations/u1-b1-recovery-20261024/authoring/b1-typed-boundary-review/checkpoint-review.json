@@ -1,0 +1,60 @@
+{
+  "standing": "BOUNDED_TYPED_BOUNDARY_CHECKPOINT_DESIGN_ACCEPTED_IMPLEMENTATION_AND_INDEPENDENT_RED_GREEN_PENDING",
+  "reviewed_sha256": {
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/typed-boundary-checkpoint.json": "a1fb4f25f5f4c06e096c968b13c3bd167a676884c92ff5ae8288dec0d5b0b29f",
+    "law/adr/ADR-EVI-0007-owner-approved-merge-reconciliation.md": "1bfaa9703fa5cd667de523c74a3d8f4b584b7c630290f1c2400a71a871a53bd4",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/logical-kernel-checkpoint.json": "544546bb99b5b4159f9c3cb6f7345fe728d03667f27aec44d335a4bcc45e9fcb",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/logical-kernel-header-amendment.json": "168802908a459c10e0f6810ba65eadfd610f312dd7f353865cddd3e83edabdc4",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-kernel-inspector/header-final-green-review.json": "9ec1191d529cc12ea6313e3b274418d1a70bd8ce05ccbc9853ba051ded318348",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-resource-inspector/final-green-review.json": "2ca018142816066b34032a0135b308581b785441999f8ff06345a58c81aeb992",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-host-context-review/custom-scope-kind-review.json": "9790dbc0c765f6439150842f64af6097c30e471ecd6e9ab75ba53146933e114f"
+  },
+  "observed_preintegration_sources_sha256": {
+    "packages/authority/src/boundaries/resource-classification.ts": "f611eb182ad2b0714c7f08bb42e4b0eb4b87419ef944f4f3cc3685516600b3de",
+    "packages/authority/src/boundaries/boundary-runtime-targets.ts": "ea6af1fcc1c8861b2f226326aa36455428bc3e69a56f50e7349a661a99f85fe0",
+    "packages/authority/src/boundaries/boundary-runtime.ts": "e5f3b77a63d54e924e530736b5ba2e0c4969344e8f5e8bc40c4210c438fab099"
+  },
+  "accepted_contract": [
+    "Explicit separate matching typed dependency admission at classify/prepare/apply, true only, with snapshot/apply methods required. Target shape/printed data cannot supply that dependency or create host authority.",
+    "Unconfigured valid shapes retain exact original AUTHORITY_RESOURCE_TARGET_INVALID refusal. Existing configured fs/git/db/remote behavior and typed58+99kernel tests remain unchanged.",
+    "Single exact target only: authentic plan membership, exact target/adapter binding, consumed issuer decision, fresh admission and stable captured snapshot precede exactly selected apply call. Explicit ok:false propagates; dispatch absence cannot report applied:true.",
+    "No new selectors/policy matcher/schema/registry permission. Batch registration and execution-unit prepare/apply explicitly refuse both typed kinds even with forged selector or applyAtomic.",
+    "Typed snapshot validation occurs before receipt consumption; used prepared handles remain used after stale/admission failure. New safe diagnostics apply to new dependency checks only.",
+    "Trusted adapter test callbacks qualify generic boundary machinery only. Actual broker opaque invocation operation, role/argv/consent/bindings and native effects remain unimplemented separatefullintegration gates."
+  ],
+  "verified_caller_census": [
+    {
+      "caller": "prepare",
+      "old_line": 218
+    },
+    {
+      "caller": "prepareUnit",
+      "old_line": 289
+    },
+    {
+      "caller": "apply",
+      "old_line": 331
+    },
+    {
+      "caller": "applyUnit",
+      "old_line": 406
+    }
+  ],
+  "implementation_acceptance_points_not_new_design_blockers": [
+    "Capture an independent validated snapshot copy or digest at prepare time. If a mutable adapter object is stored directly, same-reference mutation can defeat prepare/apply equality; independent tests should cover it. Existing ordinary FS snapshot timing must remain unchanged.",
+    "Canonical JSON record checks need descriptor-safe recursive handling: reject Proxy/accessors/cycles/non-JSON values and malformed hashing support without invoking arbitrary snapshot getters or leaking raw errors. Do not silently hash undefined/null as valid typed snapshot.",
+    "Perform exact target full validator/header guards before accessing malformed target payloads, preserving qualified pure/header safety and unconfigured refusal.",
+    "Apply must consume prepared membership once before late admission/snapshot attempts, catch new dependency failures safely, and dispatch only matching typed dependency; no filesystem/git/remote fallback or manufactured success."
+  ],
+  "confirmed_design_blockers": [],
+  "code_validation_claim": "No new typed implementation observed or qualified by this design receipt. P1Inspector owns authentic runtime RED and subsequent behavior tests; root owns exact3source integration. Existing source was read to verify caller seams and old refusal/receipt timing, not to claim implemented typed behavior.",
+  "historical_preservation_required": "Prior pure validators/kernel/schema/clock/host/native/Owner receipts unchanged; original fs/git/db/remote and atomic-unit tests must remain true.",
+  "reviewer_product_or_test_edits": false,
+  "writes_only": "authoring/b1-typed-boundary-review/",
+  "graft": {
+    "calls_this_review": 2,
+    "tokens_saved_estimate": 37829,
+    "cumulative_calls": 13,
+    "cumulative_tokens_saved_estimate": 258429
+  }
+}

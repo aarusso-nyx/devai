@@ -1,0 +1,20 @@
+{
+  "copied_root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-pointer-review-IT3Oxa/copied",
+  "legitimate_linked_root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-pointer-review-IT3Oxa/linked",
+  "commands": {
+    "rev-parse --is-bare-repository": "false\n",
+    "rev-parse --show-toplevel": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-pointer-review-IT3Oxa/copied\n",
+    "rev-parse --absolute-git-dir": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-pointer-review-IT3Oxa/direct/.git/worktrees/linked\n",
+    "rev-parse --path-format=absolute --git-common-dir": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-pointer-review-IT3Oxa/direct/.git\n",
+    "rev-parse --show-superproject-working-tree": "",
+    "rev-parse --show-object-format": "sha1\n",
+    "rev-parse --verify HEAD": "bd13865c2d454fc858bde498cbcda6bb91dfa9a3\n"
+  },
+  "admin_gitdir_backpointer": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-pointer-review-IT3Oxa/linked/.git\n",
+  "copied_pointer": "gitdir: /private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-pointer-review-IT3Oxa/direct/.git/worktrees/linked\n",
+  "all_frozen_git_commands_succeed": true,
+  "show_toplevel_equals_copied_root": true,
+  "same_private_namespace_as_legitimate_linked": true,
+  "scope": "Actual Git parser discovery only. No product source/context/host acceptance run. Copied pointer external fixture only; demonstrates commands alone do not authenticate registered linked-worktree backlink.",
+  "fixture_removed": true
+}

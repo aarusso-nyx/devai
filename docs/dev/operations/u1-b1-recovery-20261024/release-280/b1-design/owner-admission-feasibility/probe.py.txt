@@ -1,0 +1,39 @@
+import json, os, pathlib, select, signal, subprocess, tempfile
+here = pathlib.Path(__file__).resolve().parent
+root = pathlib.Path(tempfile.mkdtemp(prefix='sqlite-admission-', dir=here))
+root.chmod(0o700)
+db = root / 'admission.sqlite'
+fd = os.open(db, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+os.close(fd)
+node = '/Users/aarusso/.nvm/versions/node/v24.22.0/bin/node'
+init = subprocess.run([node, '--input-type=module', '-e', "import {DatabaseSync} from 'node:sqlite';const db=new DatabaseSync(process.argv[1]);db.exec('PRAGMA journal_mode=DELETE; PRAGMA synchronous=FULL; CREATE TABLE counter(value INTEGER NOT NULL); INSERT INTO counter VALUES(0)');db.close();", str(db)], capture_output=True, text=True, check=True)
+def start(mode):
+    return subprocess.Popen([node, str(here/'worker.mjs'), str(db), mode], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+holder = start('holder')
+try:
+    assert select.select([holder.stdout], [], [], 5)[0], 'holder did not acquire'
+    held = json.loads(holder.stdout.readline())
+    assert held['acquired']
+    private_modes = {p.name: oct(p.stat().st_mode & 0o777) for p in root.iterdir()}
+    assert set(private_modes.values()) == {'0o600'}, private_modes
+    contender = start('contender')
+    busy_out, busy_err = contender.communicate(timeout=5)
+    busy = json.loads(busy_out)
+    assert busy['acquired'] is False and busy['errcode'] == 5, busy
+    holder.kill()
+    holder.communicate(timeout=5)
+    assert holder.returncode == -signal.SIGKILL
+    recovery = start('normal')
+    recovered_out, recovered_err = recovery.communicate(timeout=5)
+    recovered = json.loads(recovered_out)
+    assert recovered == {'acquired': True, 'before': 0, 'after': 1}, recovered
+    pair = [start('normal'), start('normal')]
+    serial = [json.loads(p.communicate(timeout=5)[0]) for p in pair]
+    assert sorted(x['before'] for x in serial) == [1,2], serial
+    assert sorted(x['after'] for x in serial) == [2,3], serial
+    result = {'scope':'disposable SQLite kernel-admission feasibility only; not B1 host acceptance', 'node': subprocess.check_output([node,'--version'],text=True).strip(), 'sqlite':subprocess.check_output([node,'--input-type=module','-e',"import{DatabaseSync}from'node:sqlite';const d=new DatabaseSync(':memory:');console.log(d.prepare('select sqlite_version() as v').get().v);d.close()"],text=True).strip(), 'held':held, 'private_modes_while_transaction_live':private_modes, 'live_contender':busy, 'holder_exit':holder.returncode, 'crash_recovery':recovered, 'serialized_pair':serial, 'db_retained':str(db), 'result':'PASS'}
+    (here/'result.json').write_text(json.dumps(result, indent=2)+'\n')
+    print(json.dumps(result, indent=2))
+finally:
+    if holder.poll() is None:
+        holder.kill(); holder.communicate(timeout=5)

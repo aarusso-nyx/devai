@@ -1,0 +1,18 @@
+{
+  "all_count": 15802,
+  "nonexception_count": 15798,
+  "first_nonexceptions": [
+    ".claude/agents/architect-blueprint.md",
+    ".claude/agents/engineer-backend.md",
+    ".claude/agents/engineer-frontend.md",
+    ".claude/agents/inspector-tests.md",
+    ".claude/agents/transcriber-docs.md",
+    ".claude/skills/detran-manual-architect-blueprint/SKILL.md",
+    ".claude/skills/detran-manual-engineer-backend/SKILL.md",
+    ".claude/skills/detran-manual-engineer-frontend/SKILL.md",
+    ".claude/skills/detran-manual-inspector-tests/SKILL.md",
+    ".claude/skills/detran-manual-transcriber-docs/SKILL.md",
+    ".codex/agents/architect-blueprint.toml",
+    ".codex/agents/engineer-backend.toml"
+  ]
+}

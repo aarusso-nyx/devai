@@ -1,0 +1,85 @@
+{
+  "standing": "EXACT_HISTORICAL_AND_REVIEWED_INPUT_HASHES_VERIFIED",
+  "files": {
+    "packages/authority/src/boundaries/reconciliation-admission-seed.ts": {
+      "sha256": "d912846ddb518a132ed1e2484dfa56f23b8ff2c7a7bc25b2157fb379f25490fe",
+      "expected": "d912846ddb518a132ed1e2484dfa56f23b8ff2c7a7bc25b2157fb379f25490fe",
+      "unchanged": true
+    },
+    "packages/authority/src/boundaries/host-reconciliation-admission.ts": {
+      "sha256": "318c52a0f5de908e549e79ace095a4720acb190c7389e88a41a673fd2fa60a91",
+      "expected": "318c52a0f5de908e549e79ace095a4720acb190c7389e88a41a673fd2fa60a91",
+      "unchanged": true
+    },
+    "packages/authority/tests/unit/reconciliation-admission.test.ts": {
+      "sha256": "c8cc48aa2d28e9c8ef96df1fd5689c5e88f710e6042e8ce25e535dc25a87ad76",
+      "expected": "c8cc48aa2d28e9c8ef96df1fd5689c5e88f710e6042e8ce25e535dc25a87ad76",
+      "unchanged": true
+    },
+    "packages/authority/src/runtime/reconciliation-clock.ts": {
+      "sha256": "d9ab0faba163f45a7d7caf13e2cae5307ccb0ad2be7cb5b7565e1054f1844dd3",
+      "expected": "d9ab0faba163f45a7d7caf13e2cae5307ccb0ad2be7cb5b7565e1054f1844dd3",
+      "unchanged": true
+    },
+    "packages/authority/src/runtime/reconciliation-owner-record.ts": {
+      "sha256": "fd7d944ce09f640ff4040abeae090ad8b694b55e3e285feb46ea59650735cbda",
+      "expected": "fd7d944ce09f640ff4040abeae090ad8b694b55e3e285feb46ea59650735cbda",
+      "unchanged": true
+    },
+    "law/schemas/reconciliation-owner.schema.json": {
+      "sha256": "39002520c0ffa410ef41a9caf34d16af123b9bc88f0ab1e426deaf70af284344",
+      "expected": "39002520c0ffa410ef41a9caf34d16af123b9bc88f0ab1e426deaf70af284344",
+      "unchanged": true
+    },
+    "packages/authority/tests/unit/reconciliation-owner-record.test.ts": {
+      "sha256": "201be15666d9235268feafc446ecdf9c6facb39f2e91da99ca211f836c07e31b",
+      "expected": "201be15666d9235268feafc446ecdf9c6facb39f2e91da99ca211f836c07e31b",
+      "unchanged": true
+    },
+    "packages/schemas/tests/fixtures/adr-pre-280-ratification.json": {
+      "sha256": "05c776122fd5e4a939f446b5343943db03ef51a6e0051deaaa2099797f75fc0e",
+      "expected": "05c776122fd5e4a939f446b5343943db03ef51a6e0051deaaa2099797f75fc0e",
+      "unchanged": true
+    },
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-admission-inspector/receipt.json": {
+      "sha256": "0952e1aa22d462e23f771fad5ff8cc1a6dfe52ce600f92215dcc30537fb0b9b5",
+      "expected": "0952e1aa22d462e23f771fad5ff8cc1a6dfe52ce600f92215dcc30537fb0b9b5",
+      "unchanged": true
+    },
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-clock-inspector/receipt.json": {
+      "sha256": "a60f14928b1ebd097edba8be5fec58593973de87a4f1eef5240c4b89193b9ef8",
+      "expected": "a60f14928b1ebd097edba8be5fec58593973de87a4f1eef5240c4b89193b9ef8",
+      "unchanged": true
+    },
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-owner-schema-inspector/receipt.json": {
+      "sha256": "ecbb9dc6472e6597e1b753c60f75b4f5698e6884fa4227a79d9f0d2eb5fb650e",
+      "expected": "ecbb9dc6472e6597e1b753c60f75b4f5698e6884fa4227a79d9f0d2eb5fb650e",
+      "unchanged": true
+    },
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-owner-record-inspector/receipt.json": {
+      "sha256": "f38b19733d0dea9374855c8d1f21c88146a50f9ff9bf370b12d819a19c915436",
+      "expected": "f38b19733d0dea9374855c8d1f21c88146a50f9ff9bf370b12d819a19c915436",
+      "unchanged": true
+    },
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/host-context-checkpoint.json": {
+      "sha256": "9fe2c38674fd4fcdf5e0f314d536eeb13c7299d1122f3352a70b825ded4b54f5",
+      "expected": "9fe2c38674fd4fcdf5e0f314d536eeb13c7299d1122f3352a70b825ded4b54f5",
+      "unchanged": true
+    },
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/host-context-pointer-amendment.json": {
+      "sha256": "e935aebb794981973c46c8c7c49b6e179e87b456f3a195255bafdd500a04d961",
+      "expected": "e935aebb794981973c46c8c7c49b6e179e87b456f3a195255bafdd500a04d961",
+      "unchanged": true
+    },
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-host-context-review/receipt.json": {
+      "sha256": "c423e824531920c50cad91752db1388d21867a8299373e558300f9dde8f70ca8",
+      "expected": "c423e824531920c50cad91752db1388d21867a8299373e558300f9dde8f70ca8",
+      "unchanged": true
+    },
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-host-context-review/source-review.json": {
+      "sha256": "6d1e309a60f95a06af969d052c911e38f36da812a4c6d6e1f98af3d79e6d1ac2",
+      "expected": "6d1e309a60f95a06af969d052c911e38f36da812a4c6d6e1f98af3d79e6d1ac2",
+      "unchanged": true
+    }
+  }
+}

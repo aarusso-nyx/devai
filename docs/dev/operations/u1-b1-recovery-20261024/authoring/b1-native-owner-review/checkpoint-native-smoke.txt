@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/checkpoint-native-smoke.txt","kind":"historical-transcript-custody-pointer","original_bytes":634,"original_bytes_changed":false,"original_sha256":"093346594502b41b3142f1341d0d7d56afb812d2b44cc91c464762078a9786ee"}

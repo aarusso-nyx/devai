@@ -1,0 +1,40 @@
+{
+  "node": "24.22.0",
+  "uv": "1.52.1",
+  "platform": "darwin",
+  "observations": [
+    {
+      "case": "same10000entryroot",
+      "readdirCalls": 0,
+      "cursors": [
+        {
+          "path": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-census-observation-eXUdP5/devai/reconciliation",
+          "bufferSize": 4,
+          "entries": 4,
+          "readCalls": 4,
+          "closeCalls": 1
+        }
+      ]
+    },
+    {
+      "case": "emptyinitialandfinalreread",
+      "readdirCalls": 0,
+      "cursors": [
+        {
+          "path": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-census-fixed-empty-Uj8ksV/devai/reconciliation",
+          "bufferSize": 4,
+          "entries": 0,
+          "readCalls": 1,
+          "closeCalls": 1
+        },
+        {
+          "path": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-census-fixed-empty-Uj8ksV/devai/reconciliation",
+          "bufferSize": 4,
+          "entries": 0,
+          "readCalls": 1,
+          "closeCalls": 1
+        }
+      ]
+    }
+  ]
+}

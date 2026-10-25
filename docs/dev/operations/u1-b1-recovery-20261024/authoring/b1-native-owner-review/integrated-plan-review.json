@@ -1,0 +1,73 @@
+{
+  "scope": "Independent bounded integrated readonly plan controls and publication-origin review; evidence only.",
+  "status": "Controls qualified by six focused probes; native integrated plan/source verifier and packaged DETRAN rehearsal remain pending.",
+  "inputs": {
+    "packages/authority/src/boundaries/reconciliation-host-operation.ts": "31a9d465b410bedb40ad370680fe1c95f82701c5c1e163852cd297b850c9cf00",
+    "packages/cli/src/authority/reconciliation-host-input.ts": "8af996fd0df49a8f2571918a2b350c5c3592ece66b58084ddcb5ac8d36d77dca"
+  },
+  "evidence": {
+    "plan-control-presence-red.txt": "2b10354e8107926ca8af93b3380f276f7f2e89302cf80683c948c14158088b79",
+    "plan-control-probes.first-2.test.ts.snapshot": "0444e80a81fd080f5bffe51e4a0905cd14515bede16ff0ce0254c857880c6333",
+    "plan-operation-presence-source.snapshot": "ec838c845a16b243b871524fdc63dd9a544f68c35eaebdf39de16acd71c5331c",
+    "plan-control-expanded.txt": "fef4240f8e601d27f231d752643ee1c060849f30dac71ad986539586482ae6a6",
+    "plan-control-expanded-premise.test.ts.snapshot": "d46c1122412afdab0671bd5c0d60900b30a9bb5c401cd5bf41b4e0cd6db7c92f",
+    "plan-control-probes.test.ts": "e943371cc458277dd410d4a5ffd6ab5bcb26d38a2ab5d298109453cb77389e8d",
+    "plan-control-final.txt": "4591e321f77a4f58091bc3351744ad697e40b144cc42424b44f251b8a227d23a",
+    "integrated-plan-origin-probes.py": "426a7d90bfb50625173288f0f8a5eef3687e8dfd5b50d3414faccce08c6a44a6",
+    "integrated-plan-origin-observation.json": "816511788a57bd598190d383bcc5a0e229e4cc84a0e950a759ba693b35919c9c",
+    "integrated-plan-branch-observation.json": "d2558c91be1b1ba72f3da9043c504f60dc8309968b13a6fb99d14584e2460fff",
+    "plan-control-current-replay.txt": "ca12107b6af84ab680373720bdd4ef03dbc04d04c4ee28de7d5fc12115f57987",
+    "plan-control-current-replay.json": "af0f4d8ba159e2152490c5c9e69ae9cc1c5c150880b803d87b4591d2c3725548"
+  },
+  "results": {
+    "initial_actual_control_red": {
+      "passed": 0,
+      "failed": 2,
+      "finding": "Own selected_parent or published_ref with undefined value was accepted for non-plan controls. Fixed with own-field presence refusal."
+    },
+    "expanded_initial_harness": {
+      "passed": 4,
+      "failed": 2,
+      "classification": "Harness expectation correction, not product defect: current selector helper properly rejects local-write scope."
+    },
+    "final_focused": {
+      "passed": 6,
+      "failed": 0,
+      "command": "pnpm exec node scripts/process/validation-runner.mjs -- vitest run --config docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/plan-probe.config.mts --maxWorkers 1",
+      "checks": [
+        "Own undefined selectors forbidden on non-plan controls (two cases).",
+        "Readonly plan selectors return exact frozen fields only in read scope.",
+        "Local-write scope cannot read plan selectors.",
+        "Host and proof mutation targets refuse before effects or binding provider calls in both scope forms."
+      ],
+      "source_custody": {
+        "exit_code": 0,
+        "source_before": "31a9d465b410bedb40ad370680fe1c95f82701c5c1e163852cd297b850c9cf00",
+        "source_after": "31a9d465b410bedb40ad370680fe1c95f82701c5c1e163852cd297b850c9cf00",
+        "stable": true,
+        "log_sha256": "ca12107b6af84ab680373720bdd4ef03dbc04d04c4ee28de7d5fc12115f57987"
+      }
+    }
+  },
+  "historical_transition": {
+    "accepted": true,
+    "change": "Only newly recognized malformed evidence reconcile plan changes from unrelated undefined to INVOCATION_INVALID; ordinary bind/doctor assertions and original snapshot retained by parent."
+  },
+  "required_native_reader_invariants": [
+    "Exact unique ls-remote returned refname equals requested refs/heads branch before selected OID equality or ancestry. Actual Git counterexample returns a nested tag matching the branch suffix.",
+    "Fixed native plan API takes canonical root only and derives selectors from sealed original argv custody; Owner recomputation derives from exact SHA-bound plan bytes.",
+    "Effective Git transport allowlist after rewrites, bounded sanitized commands, no fetch/ref writes, actual advertised OID locally available before ancestry.",
+    "Whole raw Git source manifests keyed by commit and path; separate raw blob SHA and unchanged historical manifest/epoch hash algorithms.",
+    "Before/after actual HEAD, MERGE_HEAD, index, source and relevant config/publication witnesses; staged producer inputs include configuration and unresolved catalogue is not a producer."
+  ],
+  "limitations": [
+    "No filesystem/native plan reader or installed public positive exercised by six control tests.",
+    "No actual plan source integrity, current approval writer authority, native mutation, or DETRAN rehearsal completion inferred.",
+    "No product source or historical test edited by this reviewer."
+  ],
+  "graft": {
+    "successful_calls_total": 30,
+    "estimated_saved_tokens_total": 598130,
+    "current_review_saved_tokens": 37637
+  }
+}

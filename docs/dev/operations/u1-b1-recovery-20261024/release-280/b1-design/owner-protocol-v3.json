@@ -1,0 +1,96 @@
+{
+  "status": "ARCHITECT_REPLACEMENT_FOR_INDEPENDENT_REVIEW_NOT_RUNTIME_ACCEPTANCE",
+  "revision": 3,
+  "authorization": "../authorization.json",
+  "replaces": "Only the rejected mutable admission.lock and incomplete bootstrap/encoding/binding rules of owner-intake-checkpoint.json revision2. Historical files remain unchanged.",
+  "retained": [
+    "All five registered action responsibilities and their initiation/write-consent boundaries in accepted ADR-EVI-0007",
+    "Revision2 intent_authority_matrix in its entirety; intent consumes once, renewal can resume the exact named intent and revocation is terminal",
+    "Complete durable custody before canonical selection, separate normal-writer selection event, separately authorized U1 recovery, real-index one-entry CAS and seven-body diagnostic staged inventory",
+    "Closed logical host/proof-index resources and invocation-local final-adapter handle; printed data never grants authority",
+    "Fresh ordinary policy/adapter decisions for every write; generic effect ledger unchanged"
+  ],
+  "admission": {
+    "primitive": "admission-primitive-checkpoint.json plus admission-callback-amendment.json; source qualification is necessary but not final installed adapter qualification",
+    "anchor": "The worktree host's single fixed admission.sqlite, exact8192-byte packaged seed with SHA256 3f6b742405bb199a11ed0952c9aa049285ef25dc69954e901d2e987cd15c4372",
+    "exclusion": "Every approval/grant/intent/completion/lease transition holds this distinct native kernel exclusion. Domain production may release admission after durable intent and owned lease, but every later metadata transition reacquires it and verifies exact intent/grant/lease ownership.",
+    "removed_protocol": "No admission.lock file exists in the new protocol. No mutable filesystem mutex is reaped, renamed, restored or used as a fallback.",
+    "recovery": "Native process exit releases kernel exclusion. Direct Owner recover-owned-lease acquires native admission first, then verifies the exact expected authenticated lease and actual same-host/boot PID observation. Only ESRCH permits exact owned lease removal. Live/reused/EPERM/foreign/unknown state refuses. ABSENT verifies absence and performs no removal. No process is terminated.",
+    "descriptor_lifetime": "The exact lower primitive owns all anchor descriptors. Private issuer/approval/lease helpers must never reopen or close admission.sqlite while the connection lives. In-lock validation uses only the fixed SQL reads and metadata checks; all callbacks are fixed trusted synchronous host code.",
+    "qualification": "Actual supported host filesystem, direct/linked worktree, installed Node runtime, namespace, package and final adapter must pass real contention/crash checks before public activation. Unknown filesystem or unsupported locking behavior refuses. Feasibility alone cannot admit a filesystem."
+  },
+  "namespace": {
+    "root": "Trusted resolution of the actual worktree gitdir followed by devai/reconciliation; never caller-supplied physical Git paths or environment override. Direct and linked worktree resolution bind actual gitdir/common-dir identities.",
+    "directory_mode": "0700 from creation; effective UID ownership, canonical realpath, no symlink, lossless device/inode/birthtime identities",
+    "file_mode": "0600 from first byte, regular single-linked owned file; private create-only publisher with exact uncertainty custody",
+    "paths": [
+      "admission.sqlite",
+      "issuer.json",
+      "approvals/<host-generated-64hex-ID>/approval.json",
+      "approvals/<ID>/grant-<six-digit-sequence-starting-000002>.json",
+      "approvals/<ID>/intent-01.json through intent-04.json",
+      "approvals/<ID>/phase-01.json through phase-04.json",
+      "approvals/<ID>/lease.json"
+    ],
+    "intermediates": "Only exact private publisher .<basename>.<pid>-<uuid>.publish-staged and exact lease remover .lease.json.<pid>-<uuid>.remove-quarantine identities. Unknown remnants refuse; no recursive cleanup or assumed ownership by name.",
+    "trust_anchor": "Trusted local OS account and runtime, protected resolved namespace and typed-only governed writes. Arbitrary same-UID external filesystem replacement, compromised runtime/VFS and OS administrator are explicitly outside this threat model. A co-located key/MAC is not an external authentication anchor. Caller JSON, labels, receipts and generic ledgers remain untrusted."
+  },
+  "bootstrap": {
+    "grammar": "init bind --reconciliation-host --target ROOT --as-role architect [--write] --format json; exact original argv selector, no mixed bind mode, caller key/admin/output paths or authority session",
+    "no_write": "Only read-only planning, stdout and private in-memory preparation. No directory, seed, key file, issuer, receipt, policy, proof or writable SQLite connection.",
+    "first_confirmation": "PREPARE RECONCILIATION-HOST <seed_plan_sha256>",
+    "first_plan": "Freeze actual admitted existing parent identities, exact missing0700 directory targets, fixed seed path/bytes/size/hash, existing absence witnesses, current package/constitution/policy and child effects. Missing inode identities are explicitly absent at this stage, never represented as known identities. Revalidate fresh ordinary authority and all three real terminal streams before effect.",
+    "first_effect": "Create only the exact missing0700 directories and fixed private seed, with durable readback. Existing exact precursor can resume after complete namespace validation; foreign state or uncertainty refuses. No issuer/key/grant is published.",
+    "second_confirmation": "BIND RECONCILIATION-HOST <issuer_plan_sha256>",
+    "second_plan": "After actual precursor identities exist, read and freeze the complete actual root/seed witness, generate32 private random bytes in host memory, and freeze the exact complete private issuer bytes. READY exposes issuer size/hash and safe metadata only. Plan binds its exact bytes, namespace, current bindings and effects. Single-use review handle expires after300000 monotonic milliseconds.",
+    "second_effect": "After exact confirmation and fresh ordinary authority, acquire native admission, recheck metadata without raw anchor opens, and privately publish only the frozen issuer with no replacement. Readback issuer only, verify exact hash/mode/identity and durability. Do not rewrite anchor or rotate key.",
+    "cancellation": "Before first confirmation: zero filesystem effects. After first stage but before second confirmation: only the fixed inert precursor remains. No private issuer/key/grant file. SIGINT/EOF/wrong token/expiry/drift returns one safe cancellation/refusal envelope and retains only exact owned uncertainty evidence.",
+    "repeat": "Whole matching issuer returns its original identity. Precursor-only state may resume second preview with newly prepared key. Complete issuer is never regenerated, silently migrated or automatically rotated. Malformed/foreign/partially published issuer remains held."
+  },
+  "authentication_encoding": {
+    "schema_version": "1.0.0",
+    "algorithm": "HMAC-SHA256",
+    "private_key": "Exactly32 random bytes encoded with RFC4648 standard padded base64; decoded length32 and re-encoding byte-identical to input. No whitespace, alternate alphabet, omitted padding or permissive decoder aliases. Key digest is SHA256 of decoded raw32 bytes.",
+    "kinds": [
+      "issuer",
+      "approval",
+      "renewal",
+      "revocation",
+      "lease",
+      "phase-intent",
+      "phase-completion"
+    ],
+    "domain": "Literal ASCII devai.reconciliation.owner.v1/<kind>, where kind is exactly one of the closed kinds",
+    "mac_input": "UTF8(domain) followed by one zero byte followed by UTF8(RFC8785 JCS of the validated closed record with only its mac field omitted). Domain remains a signed field and must match the kind. No raw JSON text, pretty whitespace, parser excerpt or implicit object serialization enters this MAC input.",
+    "mac": "Exactly64 lowercase hexadecimal characters, representing32 digest bytes; verify using equal-length timing-safe byte comparison after closed schema/canonical-key validation",
+    "digests": "Fields ending _sha256 name SHA256 of exact referenced artifact bytes unless explicitly named _payload_sha256. A payload digest names JCS unsigned-record bytes; it is never interchangeable with the raw file digest. Stored signed files use UTF8 JCS of the whole validated signed record plus one LF; signatures do not include that LF. References to grant/intent/completion/issuer bind the exact whole stored bytes including LF.",
+    "data_boundary": "Closed schema validation and descriptor-safe bounded data copying precede canonicalization/signing. No unknown fields, accessors, Proxy values, prototype-bearing authority objects, cycles, non-JSON values, duplicate JSON keys, lone surrogates or noncanonical integer encodings. All native/parser errors become fixed safe codes without raw cause/message/key/payload excerpts. Schema writeOnly alone is not an output guard.",
+    "authority_limit": "A valid MAC establishes only provenance within the admitted host namespace. It cannot replace current ordinary action authority, final opaque handle, active grant/phase eligibility or exact current input witnesses."
+  },
+  "clock": {
+    "units": "Wall time is integer Unix milliseconds; monotonic time is canonical unsigned decimal system-uptime milliseconds. Filesystem IDs/timestamps remain canonical unsigned decimal strings, never Number coercion.",
+    "sources": "Trusted host samples Date.now plus floor(os.uptime()*1000) and actual boot identity. Linux boot identity is the canonical UUID from /proc/sys/kernel/random/boot_id; Darwin uses the canonical kern.bootsessionuuid from a fixed sysctl invocation without shell. No caller clock/host value or process-relative fake epoch. Cross-process behavior is independently qualified on the actual host.",
+    "sampling": "Read wall-before, uptime, boot identity, wall-after; refuse backwards wall or sample width over250ms. Store wall-after as wall_ms. All units must be safe integers or canonical unsigned decimal strings as declared. Never treat a failed clock observation as zero or fallback to wall-only expiry.",
+    "grant_bounds": "Maximum900000ms from issue in BOTH wall and system-uptime clocks, on the same actual boot. A phase may start/resume only before both expiry bounds. Observation before signed issue/predecessor time, future issue, boot change or disagreement of elapsed wall/uptime by more than2000ms refuses new domain writes. Refusal never auto-renews or revokes.",
+    "review_bounds": "Host-owned in-memory single-use review handles use monotonic elapsed time and maximum300000ms; they are not persisted or reconstructed from caller data.",
+    "renewal": "Fresh direct Owner review creates a linked same-scope grant with its own current issue/expiry bounds and exact resumable_intent_sha256 or null. Original approval and prior intent bytes remain immutable. Revoked approval never renews. A reboot invalidates old grant eligibility; new approval requires fresh complete review."
+  },
+  "issuer_and_current_bindings": {
+    "installation": "Issuer installed_at_head and installation package/module/registry/constitution/policy digests are immutable observations of provisioning, not claims that future operations run at that old HEAD. Root/seed identities and private key origin remain independently reverified.",
+    "current_action": "Each new approval binds the actual current package/module/registry/constitution/policy, repository/worktree identity, HEAD/merge parents/base, plan/source bytes, selected published parent/prefix and index witnesses. Phase, retry and same-scope renewal must match those original approval bindings; changing any requires a new separately reviewed approval.",
+    "compatibility": "The final host must explicitly validate the current issuer schema/protocol and installed origin. A legitimate package/HEAD change cannot silently rewrite or rotate issuer, mutate an old approval scope, or cause auto-migration. Unsupported issuer protocol refuses. Same trusted namespace key may authenticate a fresh separately reviewed approval under current supported protocol; this does not revive old grants."
+  },
+  "public_output": {
+    "boundary": "Add an exact reconciliation review variant to action-output.ts and its caller/original-argv custody checks. Existing P1 review kind/target is not an implicit permission for this stream.",
+    "ready": "Safe operation/mode/targets/effects, public plan/source/input digests, artifact size/hash, grants_authority=false, exact token and handle lifetime. No private issuer bytes/base64 key, signed private bundle, raw parser/native errors or private handle is serialized.",
+    "terminal": "One final closed outcome envelope for success/cancel/refusal/indeterminate state; uncertain publication reports only safe exact ownership/durability witnesses and never claims clean refusal or completion."
+  },
+  "next_schema_and_effect_gate": "This replacement freezes semantic direction for independent review. Exact closed schema field lists/variants, runtime source/consumer census, five-mode argv/output matrix and typed child-effect inventory still need their own reviewed concrete packet and authentic RED before implementation. No claim those product gates are already closed.",
+  "remaining_acceptance": [
+    "Independent review of this replacement and concrete closed schemas/clock source tests",
+    "Typed final host operation handle and exact native-admission/private-publication effects",
+    "Actual public bootstrap/Owner actions and real crash/retry/expiry/revocation matrix",
+    "Full canonical materialization, one-entry real-index CAS and seven-body staged host integration",
+    "Installed public qualification, integration/CI, protected RC/rehearsal/publication and immutable registry/Release readback"
+  ]
+}

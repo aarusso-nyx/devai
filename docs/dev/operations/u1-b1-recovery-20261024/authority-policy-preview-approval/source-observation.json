@@ -1,0 +1,304 @@
+{
+  "standing": "Read-only static planning observation, not runtime test or F4 inventory",
+  "observed_at_utc": "2026-10-24T14:40:13.030743+00:00",
+  "host": "thiamat-1903.local",
+  "branch": "codex/u1-b1-approval-plan-20261024",
+  "target_root": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024",
+  "sources": [
+    {
+      "path": "law/adr/README.md",
+      "sha256": "6b80e1a1680cdf99233c3e736b22a3adc42b8d4e141e5a30a6959bd1f1299e11",
+      "bytes": 33150
+    },
+    {
+      "path": "law/policy/adr-validation.json",
+      "sha256": "fdf4440f30db8a210354a38880aa29b03ace2572260462b9b313d7697e6e55f9",
+      "bytes": 16030
+    },
+    {
+      "path": "docs/reference/cli/index.md",
+      "sha256": "92090924074752e3080a1735c254735190922295914e7053a6f0679110231da7",
+      "bytes": 30617
+    },
+    {
+      "path": "packages/cli/src/command-router.ts",
+      "sha256": "56fc536af257b6fa922d17eac3cd432733f6416e136573aef7cd07d2076eb405",
+      "bytes": 16633
+    },
+    {
+      "path": "packages/cli/src/commands/init/index.ts",
+      "sha256": "f5762f8a53f55709e0816804e42a6b514bda2aeac969461f4fef82241922efcf",
+      "bytes": 4665
+    },
+    {
+      "path": "packages/cli/src/commands/init/shared.ts",
+      "sha256": "f7560a09727e3636ddbbbae7105ee2ccc37649fff9f281ff23b28291ed25dcf4",
+      "bytes": 3768
+    },
+    {
+      "path": "packages/cli/src/authority/command-capabilities.ts",
+      "sha256": "741390d45c13586d6e3ea3ffcaa00e3e2c46da3d5a2ed7e0469b4b294cddced7",
+      "bytes": 1077
+    },
+    {
+      "path": "packages/cli/src/authority/broker.ts",
+      "sha256": "36b53703786d04e4e6332fc7aa72d309a9ab575b9d4dba5a5c6f74c51b65b2bb",
+      "bytes": 70645
+    },
+    {
+      "path": "packages/cli/src/authority/policy.ts",
+      "sha256": "9d23d89a7eaa31588862dfb66d47633f43619b89096b0bbfe46f0c60a8d35044",
+      "bytes": 5049
+    },
+    {
+      "path": "packages/cli/src/authority/policy-support.ts",
+      "sha256": "f4914ef10a230ac5aeae0d662919af6a57052476a66d9eb096460049cd9c7ebb",
+      "bytes": 8947
+    },
+    {
+      "path": "packages/cli/tests/unit/authority-command-boundary-finalization.test.ts",
+      "sha256": "c03873c3a1813d69a688c896033ef7b2732914e936bb30de99b45aadbdfcdb65",
+      "bytes": 7043
+    },
+    {
+      "path": "packages/cli/tests/unit/cli-shard09-init-bind-adapters-policy.test.ts",
+      "sha256": "88fa29e74eca9146d4b621005310938769b30370c3b351a889360ad7d387d112",
+      "bytes": 18526
+    },
+    {
+      "path": "packages/schemas/tests/contract/governance-v15-adr.test.ts",
+      "sha256": "0921bcfb4e61ec499ab34a75a2a31798eac8dd745a902c2f8e80e41ca9bbcc7b",
+      "bytes": 42867
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "30d5b294a198f46a6fec9eece3a76cfe62eaa84d9d8e75517a836b1f3772d982",
+      "bytes": 2998
+    },
+    {
+      "path": "packages/authority/src/runtime/policy-materializer.ts",
+      "sha256": "50fe76f79dd299fc31a576da12fbb7c70b0d80ff8dd53d97d6bcf003f43e17d4",
+      "bytes": 9523
+    },
+    {
+      "path": "packages/authority/src/runtime/machine-context.ts",
+      "sha256": "095d5379f33d54a287a3e28c71fa71c4e7745d09dcfb926c56b19e22a52d500a",
+      "bytes": 4384
+    },
+    {
+      "path": "packages/authority/src/runtime/declaration.ts",
+      "sha256": "a55baadc6156f169bf5cadf8fa310b841574d022fe1d7f8e29e55e1778f797b6",
+      "bytes": 8302
+    },
+    {
+      "path": "packages/authority/src/boundaries/host-publish.ts",
+      "sha256": "67c4a170473bb5449251847f61baeb5401b1439615412105183484dacf91e222",
+      "bytes": 5267
+    },
+    {
+      "path": "packages/authority/src/boundaries/host-effects.ts",
+      "sha256": "2344545ce0650a7242d75134e913336d83be63914e66058d0d381c988f09db91",
+      "bytes": 22284
+    },
+    {
+      "path": "packages/cli/src/authority/index.ts",
+      "sha256": "fe7b97b231ec4315909ad9f6946f34423bf839068088eaa59c9ef8468bcd835a",
+      "bytes": 21350
+    },
+    {
+      "path": "packages/cli/src/authority/authority-session.ts",
+      "sha256": "17fd1dd2e9c6fc22d3cdf3f24ac5482e3c0e24585770f7e309ee9c1b9872ea38",
+      "bytes": 6556
+    },
+    {
+      "path": "packages/cli/src/authority/broker-paths.ts",
+      "sha256": "7500f1cb23d80d7e87d5854f5280b4842f678849317d53021b046b68a943073e",
+      "bytes": 10410
+    },
+    {
+      "path": "packages/cli/src/authority/policy-adopter-extension.ts",
+      "sha256": "531e85a5f7e55d9094c58d00d8bb1eff50c0daf055b6a6129a678198f23e9c82",
+      "bytes": 17541
+    },
+    {
+      "path": "law/policy/devai-adoption.json",
+      "sha256": "bea07d2450757501b04c652c9393f3595cc944eae880ea4286efce1b6594dab0",
+      "bytes": 2728
+    },
+    {
+      "path": "packages/cli/src/services/schema-prompts.ts",
+      "sha256": "cb42de9e2a23691a989ff0098490222612a658afc8ea7ff9b5c60b099946a4d0",
+      "bytes": 9178
+    },
+    {
+      "path": "packages/cli/src/commands/init/upgrade-lock.ts",
+      "sha256": "8bc3f9ec4934636acebb0f86d0313871ceb5c242979b9044f44a9cc6f2f5a822",
+      "bytes": 6598
+    },
+    {
+      "path": "law/policy/action-registry.json",
+      "sha256": "59deac2d823e80058a8223799c31653d7c8fc14dcc7a0ad49ca295545f01de27",
+      "bytes": 141692
+    },
+    {
+      "path": "law/schemas/authority-policy.schema.json",
+      "sha256": "1c11d6e9c1d106462cae2c248c7c7c0d5bf3d6c848e4d0fa72e3454c8628a45f",
+      "bytes": 20888
+    },
+    {
+      "path": "law/constitution.md",
+      "sha256": "d5dfdc972161e0f848dd859be7bbfa510973c5c9a449a0f9e6b8960e4f5ac96a",
+      "bytes": 34899
+    },
+    {
+      "path": "scripts/generate-error-code-reference.mjs",
+      "sha256": "3b5f04790e8bf7933ff668790c48df3ef65126b59c5602b8d947eb6dea71686f",
+      "bytes": 11920
+    },
+    {
+      "path": "packages/cli/tests/unit/error-code-reference.test.ts",
+      "sha256": "55135e318935a28fe1722fb099e14d90aded8e1e445ba5616844a726c22ceb0f",
+      "bytes": 7869
+    },
+    {
+      "path": "packages/authority/tests/unit/host-publish-no-replace.test.ts",
+      "sha256": "1e2c0ffe9acb2563f055a6541eec5a96db7b4d380fc72483930f36db0a10fe3a",
+      "bytes": 9725
+    }
+  ],
+  "binding_prestate": [
+    {
+      "path": ".devai/pin/constitution.md",
+      "exists": true,
+      "sha256": "8353c3b81d38e0f9b913cbeb6762bc149605989c1b16f52d2c63ba9892f71270"
+    },
+    {
+      "path": ".devai/constitution.md",
+      "exists": true,
+      "sha256": "e89b59e3d6daed5f7c4b20cf200c3b1b9c87ee52d84f7727dc2f9b296445b999"
+    },
+    {
+      "path": ".devai/config/project.json",
+      "exists": true,
+      "sha256": "dce97394bf34f17bd02793e9e0d07f0cee041174bb53f7211a77845a2e7560c8"
+    },
+    {
+      "path": ".devai/config/authority-policy.json",
+      "exists": false,
+      "sha256": null
+    },
+    {
+      "path": ".devai/config/adopter-policy-binding.json",
+      "exists": true,
+      "sha256": "a752edc51e4627f2f4cfd345b7051a6692f2f08e35b4f63764d4c8f6b59822fc"
+    },
+    {
+      "path": ".devai/config/upgrade.lock",
+      "exists": false,
+      "sha256": null
+    }
+  ],
+  "adopter_receipt_present_without_authority_extension": true,
+  "adopter_source_has_no_authority_block": true,
+  "preserved_parent_authoring_paths": [
+    {
+      "role": "Architect",
+      "path": "law/constitution.md",
+      "operation": "update",
+      "before_sha256": "8353c3b81d38e0f9b913cbeb6762bc149605989c1b16f52d2c63ba9892f71270",
+      "after_sha256": "d5dfdc972161e0f848dd859be7bbfa510973c5c9a449a0f9e6b8960e4f5ac96a",
+      "after_bytes": 34899
+    },
+    {
+      "role": "Architect",
+      "path": "law/adr/ADR-GOV-0027-source-bound-canonical-selection-and-proof-index.md",
+      "operation": "create",
+      "before_sha256": null,
+      "after_sha256": "053137f13deae10ace08a8606e882fd67458d8a2ca1ffb7f3856b38984b3583b",
+      "after_bytes": 10220
+    },
+    {
+      "role": "Architect",
+      "path": "law/adr/README.md",
+      "operation": "update",
+      "before_sha256": "f23892d4257a1ea12aca6442c19957f3b7dcdef0e592ec9cbecba4dc1df7b0b9",
+      "after_sha256": "6b80e1a1680cdf99233c3e736b22a3adc42b8d4e141e5a30a6959bd1f1299e11",
+      "after_bytes": 33150
+    },
+    {
+      "role": "Architect",
+      "path": "law/policy/adr-validation.json",
+      "operation": "update",
+      "before_sha256": "3e99c32e0a3dc0e88a1ebd3a31a6e9144c1b257b4958992aac56b72591691c3a",
+      "after_sha256": "fdf4440f30db8a210354a38880aa29b03ace2572260462b9b313d7697e6e55f9",
+      "after_bytes": 16030
+    },
+    {
+      "role": "Architect",
+      "path": "law/schemas/proof-index-reconciliation-contract.schema.json",
+      "operation": "create",
+      "before_sha256": null,
+      "after_sha256": "21844d42ded67cff9d96df372688d8a7759ad414568892e5a4b84735f417fff9",
+      "after_bytes": 11100
+    },
+    {
+      "role": "Inspector",
+      "path": "packages/cli/tests/unit/constitution-article-6-amendment.test.ts",
+      "operation": "update",
+      "before_sha256": "d23f29d9cf8d8f009adffdffab1717d637ed11f787fa440c190e4ca2c611d899",
+      "after_sha256": "0629ca1d1900badaa858719db49b5b4c71020c16296e76ac62671eacdc1b2c2d",
+      "after_bytes": 11925
+    },
+    {
+      "role": "Inspector",
+      "path": "packages/cli/tests/unit/canonical-selection-constitution-amendment.test.ts",
+      "operation": "create",
+      "before_sha256": null,
+      "after_sha256": "a08f428fdb7a328b041c856ca69fcedd16bd50af803325e699e42321e4e31ff9",
+      "after_bytes": 4013
+    },
+    {
+      "role": "Inspector",
+      "path": "packages/schemas/tests/contract/governance-v15-adr.test.ts",
+      "operation": "update",
+      "before_sha256": "d175e57624aa789e4b10a8f3cea605a6585fede4c4d85ae5a9b4629abaad9ff1",
+      "after_sha256": "0921bcfb4e61ec499ab34a75a2a31798eac8dd745a902c2f8e80e41ca9bbcc7b",
+      "after_bytes": 42867
+    },
+    {
+      "role": "Inspector",
+      "path": "packages/schemas/tests/contract/proof-index-reconciliation-contract.test.ts",
+      "operation": "create",
+      "before_sha256": null,
+      "after_sha256": "4b0a91176838033f02c771ed11cb36a301dacd84ec8801b9a53b5dc2f9cf34c2",
+      "after_bytes": 4280
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/cli/src/commands/check/schemas.ts",
+      "operation": "update",
+      "before_sha256": "727d24ba51c50c4fbc3fb719a8e5e04f06ad6a86f707c2f53f15db334d289dc0",
+      "after_sha256": "4f32713cb5b20cc5162c998361c5c055ca5737956716d7897be3a2f402a074d6",
+      "after_bytes": 8238
+    },
+    {
+      "role": "Inspector",
+      "path": "packages/cli/tests/unit/check-schemas-adopter-boundaries.test.ts",
+      "operation": "update",
+      "before_sha256": "56d0d84914a4dd3887bcafe047d65973c8e4743f0f77ea508fa03397f36a3496",
+      "after_sha256": "5716b8563e5823ce6948c02381dbab3e374839bcdc8b77b0497f5ac745a76209",
+      "after_bytes": 16249
+    },
+    {
+      "role": "Inspector",
+      "path": "packages/cli/tests/unit/cli-shard06-contracts-schema-residual.test.ts",
+      "operation": "update",
+      "before_sha256": "bd146689b4e7ce187562de8701b910c8530775be1bb61cd997460ec3a95d9ca7",
+      "after_sha256": "0550606142b2a492c4dc9179ca45532be17c749f26cf2a527999ab125730d5cb",
+      "after_bytes": 20616
+    }
+  ],
+  "parent_authoring_manifest_sha256": "bf7149be529fc5b50ff5f162494e835e42b3995551282559ca8f416e524bcfaa",
+  "adr_aut_0008_free_in_current_checkout": true,
+  "preview_mode_or_flag_available_now": false
+}

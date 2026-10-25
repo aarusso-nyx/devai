@@ -1,0 +1,67 @@
+{
+  "role": "Engineer",
+  "mode": "read-only inventory; no checkout/reset/rebase/merge/test/proof writes",
+  "verified_main": "b796e2e07bbb08c2f3fec25a4efe31e136bfd59e",
+  "pr211": {
+    "head": "9b2a190aa1276f4b15469b7079ed0d7c4c8c4c99",
+    "state": "OPEN",
+    "mergeable": "CONFLICTING",
+    "mergeStateStatus": "DIRTY",
+    "hold": "unmerged"
+  },
+  "historical_candidate": {
+    "former_path": "/Volumes/Development/.codex/worktrees/rait-progress-replan/detran",
+    "current_existence": false,
+    "source_head": "9b2a190aa1276f4b15469b7079ed0d7c4c8c4c99",
+    "merge_parent": "7dfab8bd",
+    "reviewed_later_main": "80505ac0",
+    "unresolved": [
+      "record/proofs/chain.json",
+      "law/security/authorization.json"
+    ],
+    "semantic_index_sha256": "73396fc09b63d8418e679b7be18f3941cd4367771c74ef31f24172acd34976ec",
+    "archive_snapshot": "68084d5b5d0d5ce9d0b81d6a4f7b618b4b08c871",
+    "archive_ref": "refs/codex/snapshots/7221a06c7d19b9e8762dc83054bd45c24fdfceab",
+    "other_preserved_snapshot": "4b0fcc22b670f487bcbe4be823ee943142ac0a3f",
+    "index_custody": "/Volumes/Development/.codex/artifacts/detran/pr211-binding-authority-refresh-20261023/preserved-index-stage-entries.bin",
+    "index_status": "Archived Git checkout is absent; the raw stage-entry custody snapshot is retained externally. No live unresolved Git index is claimed."
+  },
+  "adr_collisions": {
+    "historical_candidate": [
+      "ADR-0061-rait-risk-source-transaction-locks.md",
+      "ADR-0062-rait-candidate-universe-linearization.md"
+    ],
+    "current_main": [
+      "ADR-0061-devai-270-measurement-adoption.md",
+      "ADR-0062-source-bound-governed-upgrade-compatibility.md"
+    ],
+    "resolution": "Future actual S2 reconciliation candidate requires then-free ADR identifiers through the ADR-0035 renumber procedure and refreshed provenance/alias compatibility. No identifiers assigned or bodies changed in this preparation."
+  },
+  "blockers": [
+    "Historical installed DEVAI2.7.0/source review lacked qualified U1/B1 canonical selection and typed single proof-index Git boundary. Current release capability must be re-audited independently (Auditor checking newly published2.7.1); no current absence claim or adoption authorization follows from the old audit. Latest preserved REC-B1-A proposal specifies contract-only nine-path upstream scope, not old27-path B1-I.",
+    "Native seven orphan records retained: canonical selection and line7/line8 recovery need actual release/adoption and exact packet; no manual chain splice or side selection.",
+    "Authorization1139main/1141S2 tuples and232source/nativeID changes require attributable native candidate admission/export/bootstrap, no JSON merge.",
+    "Historical merged index used7dfab8bd; new main drift requires fresh exact binding after source/index preservation.",
+    "PR211 smoke transport and provisioning15s failures require source-bound investigation; no cause or repair established by current-main M1 results.",
+    "C6 stays blocked; S3 runtime and PR211 merge remain held."
+  ],
+  "no_loss_sequence": [
+    "Keep original refs, snapshots, external index bytes, old chain epochs, approved packet hashes and scorecard work unchanged.",
+    "Before any restore, verify snapshot/body/index custody hashes and reconstruct into a separate candidate, preserving original index stage records; do not reset existing clean S2 checkpoints or fabricate a live original merge index.",
+    "Prepare new current-main source/ADR collision packet with Architect ownership; obtain actual capable upstream contract/release/adoption before native recovery.",
+    "Reconcile native evidence and authorization only through supported exact approved actions, independent Inspector verification and separate merge authority."
+  ],
+  "independent_work": [
+    "Exact approved CI diagnostic printing step is eligible now; no smoke behavior change and no manual CI execution during STYNX resource window.",
+    "Read-only map smoke writeReport transport/error handling and historic failed target traces; do not infer root cause.",
+    "Read-only compare provisioning fresh-process readiness/termination contracts and historical15s failure logs; do not change budgets or assertions."
+  ],
+  "custody_sources": [
+    "pr211-main-reconciliation-20261023/summary.md",
+    "pr211-main-reconciliation-20261023/proof-custody.json",
+    "pr211-main-reconciliation-20261023/adr-renumber-config.json",
+    "pr211-approved-preparation-20261023/preservation-after.json",
+    "pr211-binding-authority-refresh-20261023/preservation-and-results.json",
+    "pr211-smoke-diagnostics-20261023/summary.md"
+  ]
+}

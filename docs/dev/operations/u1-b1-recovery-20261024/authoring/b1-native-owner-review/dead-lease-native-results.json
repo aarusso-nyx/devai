@@ -1,0 +1,22 @@
+{
+  "fixture": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-initial-owner-plan-jJqJW9/repository",
+  "approval_id": "030d8eefa95292f46f31d68705e6cbd0381162855795f994c0ef7a3ddfff3e36",
+  "lease_sha256": "681a231ed1911ef441bf4a052df677c7b898c8d1900c9ab639c0c29c58ccc0f7",
+  "witness": {
+    "dev": "16777233",
+    "ino": "1124915168",
+    "birthtime_ns": "1792898754793704831"
+  },
+  "passed": [
+    "actual alive refuses; killed child reaches ESRCH",
+    "wrong/missing expected lease",
+    "cancel/borrowed/scope/replay/interrupt",
+    "unknown quarantine preserved, no ownership inference",
+    "saved plan drift refuses before removal",
+    "exact SHA/device/inode/birth removal; grants and intent unchanged",
+    "ABSENT explicit no filesystem effect; stale old lease refuses"
+  ],
+  "index_sha256": "542553c911bcd2f5e65dd8a27b66f0f1dbcb703278477cb27df920ede95eadce",
+  "effect_callbacks": 3,
+  "qualification": "Real native namespace, authenticated Owner records, typed policy receipts and actual child alive/SIGKILL/ESRCH. Intent/lease manually signed in disposable fixture; synthetic B5 and policy origin. No materialize or installed/public Owner claim."
+}

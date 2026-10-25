@@ -1,0 +1,24 @@
+{
+  "standing": "FINAL_OWNER_STATE_INTERFACE_CLARIFICATIONS_FOR_INDEPENDENT_RED",
+  "checkpoint_sha256": "45fbde08e157a45d615cc26e885beac6197611fd64dc517dafd0348ee975703f",
+  "order_amendment_sha256": "71f1dd131c023652cb4720310401216cee8f418d215502198b59a001621412ed",
+  "precedence": "This companion replaces only the expressly identified ambiguous statements in the checkpoint/order amendment; all other exact fields, bounds, graph/currentgrant/clock rules and nativehost authority separation remain.",
+  "outputs_ingress": "Only exact strings absent, partial-known, complete, unknown. All other values INVALID without coercion/getters. Final nativehost classifies foreign/changed/indeterminate as unknown before invoking reducer. Pure input classification itself proves no output witness.",
+  "digest_nullability": "Assessment intent_sha256 and completion_sha256 are always present, each exact current samephase rawfile SHA or null iff absent. This applies to every disposition, including held/start/completed. No additional state SHA field or alternative digest recipe.",
+  "samegrant_retry": "Replace firstlease and unconditional renewal-resumable statements: same-grant lease (lease.grant_sha256 equals original intent.grant_sha256) may be initial or owned retry with distinctnonce/invocation, including a NEW intent first created under a renewal whose resumable_intent_sha256 is null. Explicit renewal resumable-intent match is required ONLY crossgrant retry: when lease.grant differs from original intent grant, lease grant must be a renewal expressly naming original intent. Retained lease alone cannot prove first/retry. Full reference/currentgrant/deadline/clock/phase/action/initiator/host checks remain. Nativehost independently proves firstlease identity and actual ownedretry/PID/recovery before effects.",
+  "completed_lease_remnant": "Replace uncompleted-intent-only lease rule: lease may name completed intent as a valid completion-before-cleanup crash remnant. Add lease < samephase completion edge when completion exists. Every original lease/currentgrant/clock/deadline check remains; creation after completion contradicts ordering. Readstate retains exact lease_sha256. Completeoutputs may return completed (and exact completion digest) with this remnant; unknown/absent/partial output rules remain held. Neither read nor assessment deletes/settles lease or proves ownership. Actual admitted nativehost must independently handle exact dead/owned lease and never infer ownership from completion.",
+  "source_census": [
+    "packages/authority/src/runtime/reconciliation-owner-state.ts",
+    "packages/authority/tests/unit/reconciliation-owner-state.test.ts",
+    "scripts/error-code-sources.mjs (add exact new runtime source to generated error census if required by its current explicit source list)",
+    "docs/reference/error-codes.md (one exact newSTATE_INVALID row; all1303 historical rows preserved)"
+  ],
+  "generated_error": "One closed code RECONCILIATION_OWNER_STATE_INVALID. No arbitrary new error prefix or raw cause. Existing CLI reconciliation prefix already admits family; actual consumer/installed checks remain separate.",
+  "required_added_independent_cases": [
+    "Samegrant distinctnonce/invocation retry passes graph, does not claim ownership",
+    "Exact completedintent+priorlease crash remnant passes graph and completeassessment; no mutation; strict-time leaseaftercompletion refuses",
+    "All other packet/order tests retained; independent reviewers confirm resolved packet before authenticRED/productimplementation",
+    "New intent created under renewal with null resumable plus samegrant initial/retry lease accepted; crossgrant renewal retry without exact resumable match refused"
+  ],
+  "exact_input_descriptors": "All six exact required own input fields must be enumerable data descriptors; reject hidden data/accessors/symbols/extra fields without invoking traps. Descriptor-safe arrays remain as declared. Actual byte views follow existing codec intrinsic handling, including safe subclass/shadow getter bypass; no shared/detached buffers or mutable retained aliases."
+}

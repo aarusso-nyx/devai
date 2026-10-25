@@ -1,0 +1,51 @@
+{
+  "standing": "SOURCE_REVIEW_TWO_BOUNDED_GAPS_AUTHENTICATED_NO_PUBLIC_QUALIFICATION",
+  "source_hashes": {
+    "packages/authority/src/boundaries/reconciliation-host-operation.ts": "09f414b75860ec3953c616bf50d58d2c1532b1c44b61caac345444bc0c7174ef",
+    "packages/authority/src/boundaries/host-scope.ts": "20120a6084a077999738e3652135457dc988430b1c3530d9a46621701c1840aa",
+    "packages/authority/src/boundaries/host-atomic-effects.ts": "92d3be45f4d9e541252f16c44d55bb9fb7f009aa583d57bb54d5a3a6c76ffd6c",
+    "packages/authority/src/index.ts": "7acc1feb7a4cd9a7585b737feaccad8ef6344624f2c118c0feb9a23b3a7eae4d",
+    "packages/cli/src/authority/reconciliation-host-input.ts": "61f7ef316ef5bc26abaacfe74793bc5197a55794d1c76f27a8b58c8cc404ca30",
+    "packages/cli/src/authority/broker.ts": "7fd4df9c746a8ab1979f4bd7aa7f26c68ccf7f947ed1df3ff1157f4a4b39c5d1",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/host-operation-checkpoint.json": "7e21ad1550c123b633a9af72d8e90f3a37d31ddeee6ee835abc0c8566fc41912"
+  },
+  "scope": "Independent six-path source review and evidence-only probes. No product/test edits, builds, source publication, native effects or installed positive claims.",
+  "confirmed_findings": [
+    {
+      "id": "HO01",
+      "finding": "Promise-only result guard accepts thenables as completed synchronous result. Own then accessor probe returns normally without invoking accessor.",
+      "required": "Descriptor-safe refusal of thenable/accessor shapes without invoking untrusted accessors, maintaining fixed synchronous callback contract; no arbitrary-JS isolation claim."
+    },
+    {
+      "id": "HO02",
+      "finding": "readCurrentBindings callback throw escapes unchanged from read-only preview and initial invoke capture. Both emit PRIVATE_PROVIDER_SENTINEL in actual issuer-backed scoped probes.",
+      "required": "Project trusted binding-provider failures to closed OPERATION_STALE diagnostic; preserve cleanup and handler nonexecution."
+    }
+  ],
+  "positive_source_observations": [
+    "Opaque private invocation/token/view identity and actual live ALS/issuer checks.",
+    "Target immutable copy precedes trusted providers; pending invocation prevents nested handler reuse; token/view membership removed before fixed callback.",
+    "Stable snapshot verifies actual context, current B5, target digest and dual-clock review window; observed pending stale state latches terminally.",
+    "Broker compares actual process.argv and root/role/input fingerprint; forces policyFor bootstrap_policy=false before logical authorization and in B5 provider.",
+    "Actual installed inventory helper refuses source path origin; no deterministic provider fixture is installed package attestation.",
+    "Broker logical branch gates exact-plan/kind/capability/adapter before actual declaration/resolver/issuer/prepare/apply.",
+    "record_init explicitly rejects every non-filesystem request after process case; typed kinds cannot fall through as filesystem.",
+    "Existing default registry/corepolicy/schema/action/native writer activation unchanged by these six paths."
+  ],
+  "initial_probe": {
+    "cases": 3,
+    "pass": 0,
+    "fail": 3,
+    "log": "edge-probes-red.txt",
+    "harness": "derived unchanged setup from current p1 operation tests; real owned Git fixture/issuer policy receipt and ALS, deterministic B5 explicitly not installed origin"
+  },
+  "remaining_obligations": [
+    "Independent p1 operation/parser and unchanged regressions; root types/build.",
+    "Actual installed inventory/B5 positive, actual native domain writers and public action/registry/default grants require later qualification.",
+    "Plan/current-grant/current-lease bytes and public confirmations remain future fixed native handler obligations."
+  ],
+  "limitations": [
+    "No whole-workspace test run or installed public positive.",
+    "No claim of detecting unobserved transient filesystem drift."
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "current_count": 1304,
+  "current_sha256": "ed7c7205b733fb4e5e50fe1cded1c6dfa5cafe4a6aca2854454de04ecb55ac38",
+  "new_code": "RECONCILIATION_OWNER_STATE_INVALID",
+  "new_rows": 1,
+  "remove_exact_new_row_restores_1303_sha256": "970def534b24124e54d79673692824af7690ed46d07459ee6745f32b07415667"
+}

@@ -1,0 +1,75 @@
+{
+  "standing": "AUTHENTIC_PURE_READER_RED_RUNTIME_UNMODIFIED",
+  "recorded_at": "2026-10-24T17:15:22.220315+00:00",
+  "tests": {
+    "path": "packages/sensors/tests/unit/staged-inventory-readers.test.ts",
+    "sha256": "53194bb9e054c4ce16c13d32c2eaaabb7b83d9f72710f611a4a1e765b6a43a33",
+    "passed": 7,
+    "failed": 36,
+    "total": 43,
+    "raw_log": "staged-readers-final-red.txt",
+    "default_timeout_unchanged": true,
+    "runtime_import_failures": false,
+    "lint_exit": 0,
+    "prettier_exit": 0
+  },
+  "architect_checkpoint_sha256": "5a12a017baec70eb708a322118962ed846ee9985242bb8579e164a58de71a7fc",
+  "source_sha256": {
+    "packages/cli/src/command-manifest.ts": "5e112ae6785431ae33799bba66b12c7c00959014448d8501de551c734bddfc73",
+    "packages/cli/src/commands/sense/inventory-inputs.ts": "60b35f7b9c93e2534357499fcc66ac39ad2817ef5a0cdfc14a76cd55304955dd",
+    "packages/cli/src/commands/sense/shared.ts": "703649a0f0bed469ca0e016645cad6dab2f9febe3ba00e26cca7ac1274a176bb",
+    "packages/sensors/src/inventory-walker.ts": "4b76409a93cbc24534f0bd77a71e0404e5db88e31130e509bbde18736aec9330",
+    "packages/sensors/src/inventory-api.ts": "83d997f7951f68c248156bafa38f3656a1ef29e804c73bd895aecf09a6e96ee5",
+    "packages/sensors/src/inventory-routes.ts": "c8ed63a0fc51cf76c9d11df863f268ede3a3f1a11a42fdcd031d0d0ef626dc5f",
+    "packages/sensors/src/inventory-routes-extract.ts": "4200bd8ede9f6e3a86059cd2077679888e7546b36494dbdf1c4a69c83c0aa1ff",
+    "packages/sensors/src/inventory-data-model.ts": "de50c1bd2ae7e3e4910ac199952553571b9d170509804d1f60107ce0dbccc090",
+    "packages/sensors/src/inventory-data-model-types.ts": "787f55a0089ad6ef65b5ff90dbbb630e0c3befc91578edb103ef3d5ee30994c0",
+    "packages/sensors/src/inventory-data-model-sql.ts": "103054c2133c614f387161af8cb9e569b575030aab7518a7fdc4383b628bd7a8",
+    "packages/sensors/src/inventory-rbac.ts": "51ffd9855b2db10578773628203eebc44e8c978bd184c03cc50b62d1fd69c3ba",
+    "packages/sensors/src/inventory-data-handling.ts": "68136d52f754db07679fbc69d28234a0c6d5d43a2d4fe523eccf7acd1bf1b143",
+    "packages/sensors/src/inventory-dep-graph.ts": "d7542b476034f2c3ac5b863cdcd009377ea4779f0daa0165a2bfdea1ceb2dbf0",
+    "packages/sensors/src/inventory-coverage.ts": "3d027a5af769d6655d95fb54a004c9e3199458d4298c0dfc67f9cd00883ef98b",
+    "packages/sensors/src/inventory-coverage-inputs.ts": "a70c16a4cfb786c5a21b071fad22d989bc7a4fd9121c181da0d6c66daa0af036",
+    "packages/sensors/src/inventory-body-inputs.ts": "7f7359fa29fee73258f8cbd3201c232b24d6d47f5ac2d25eb321ff960ab070ae",
+    "packages/sensors/src/declared-surfaces.ts": "31bc7f1db8165de7826488b3c986d71f3cc04982d580565494767f42170e945a",
+    "packages/sensors/src/index.ts": "19a959d3296b2b65f94d386c2a5eae65eef71e5d80ac3e1d05cff5ccd156a80a"
+  },
+  "fixture": "Each real producer first derives a nonempty differentiated ordinary staged-A body. Same physical live paths are replaced with B, then immutable private fixture-map reader supplies A. Snapshot-only variant removes all A files and adds live-only files. Dependent model/API/routes bodies come from stage-A overlay. No global mocks or package import replacements.",
+  "case_groups": {
+    "ordinary_no_reader_no_write": 7,
+    "all_seven_staged_A_live_B": 7,
+    "all_seven_staged_only_live_only": 7,
+    "all_seven_read_fault_blocking": 7,
+    "walker_list_fault_blocking": 4,
+    "malformed_required_body_blocking": 3,
+    "missing_required_body_blocking": 3,
+    "declaration_route_model_config_reader": 3,
+    "registry_usecase_reader": 1,
+    "body_membership_reader": 1
+  },
+  "api_agreement": {
+    "producer_config_option": "sourceReader?: InventorySourceReader",
+    "positional_helpers": "final optional sourceReader argument",
+    "reader_methods": [
+      "readFile(absolutePath): string",
+      "listDirectory(absolutePath): readonly {name,kind:file|directory}[]",
+      "exists(absolutePath): boolean",
+      "isDirectory(absolutePath): boolean"
+    ]
+  },
+  "historical_attempts": [
+    {
+      "raw_log": "staged-readers-before-source.txt",
+      "standing": "initial fixture attempt; three empty discriminators identified, not security proof for those rows"
+    },
+    {
+      "raw_log": "staged-readers-discriminated-red.txt",
+      "standing": "31 differentiated runtime failures before standalone ordinary/missing-body/helper cases were added"
+    }
+  ],
+  "effect_scope": "Pure reader tests only. No runtime/schema mutation; no B1 Owner approval, index/proof/custody writer admission.",
+  "graft_delta": {
+    "calls": 1,
+    "tokens_saved_estimate": 48399
+  }
+}

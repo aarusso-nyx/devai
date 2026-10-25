@@ -1,0 +1,27 @@
+test_cancel_preserves_all_files (__main__.InstalledReview.test_cancel_preserves_all_files) ... FAIL
+test_exact_precursor_then_exact_create (__main__.InstalledReview.test_exact_precursor_then_exact_create) ... ok
+test_existing_target_is_preserved (__main__.InstalledReview.test_existing_target_is_preserved) ... ok
+test_installed_version_matches_manifest (__main__.InstalledReview.test_installed_version_matches_manifest) ... ok
+test_legacy_dry_branches (__main__.InstalledReview.test_legacy_dry_branches) ... ok
+test_pipe_refuses_before_preparation (__main__.InstalledReview.test_pipe_refuses_before_preparation) ... ok
+test_public_help (__main__.InstalledReview.test_public_help) ... ok
+test_wrong_confirmation_preserves_all_files (__main__.InstalledReview.test_wrong_confirmation_preserves_all_files) ... ok
+
+======================================================================
+FAIL: test_cancel_preserves_all_files (__main__.InstalledReview.test_cancel_preserves_all_files)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/cli/tests/installed/authority_policy_review_pty.py", line 182, in test_cancel_preserves_all_files
+    self.assertEqual(terminal.finish(), 0)
+                     ~~~~~~~~~~~~~~~^^
+  File "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/cli/tests/installed/authority_policy_review_pty.py", line 85, in finish
+    self.receive(lambda raw: len(envelopes(raw)) == 2)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/cli/tests/installed/authority_policy_review_pty.py", line 76, in receive
+    raise AssertionError(f"PTY closed before expected output: {self.raw[-3000:]!r}")
+AssertionError: PTY closed before expected output: b'MSIsInNlbGVjdG9yIjp7ImVuZHBvaW50X2lkcyI6WyJyb3V0aW5lLWV4ZWN1dG9yIl0sImtpbmQiOiJyZW1vdGUiLCJvcGVyYXRpb25faWRzIjpbImludm9rZSJdLCJwdWJsaWNhdGlvbiI6ZmFsc2UsInN5c3RlbV9pZCI6ImxvY2FsLWNvbW1hbmQifSwic3ViamVjdHMiOlt7ImFjdG9yIjoiaGFybmVzcyIsImluaXRpYXRvciI6eyJhbGxvd2VkX3JvbGVzIjpbIm93bmVyIiwiYXJjaGl0ZWN0IiwiaW5zcGVjdG9yIiwiZW5naW5lZXIiLCJhdWRpdG9yIl0sInByZXNlcnZlX2luX2NvbnRleHQiOnRydWV9LCJraW5kIjoiZGVyaXZlZC1tYWNoaW5lIiwidHJhbnNpdGlvbiI6Imhhcm5lc3Mtd3JpdGUifV19LHsiYWN0aW9uX2lkcyI6WyJldmlkZW5jZSByZWNvcmQiXSwiY29uc3RpdHV0aW9uYWxfYW5jaG9ycyI6WzYsNyw4LDksMTBdLCJlZmZlY3QiOiJhbGxvdyIsIm9yaWdpbiI6ImFkZGl0aXZlLWV4dGVuc2lvbiIsInByZWNlZGVuY2UiOjUwMCwicmF0aW9uYWxlIjoiVHlwZWQgcmVtb3RlIGF1dGhvcml0eSBmb3IgdGhlIGV4YWN0IHRlc3QgY29tbWFuZCBkZWNsYXJlZCBieSBldmlkZW5jZSByZWNvcmQuIiwicmVxdWlyZWRfY29uc2VudCI6eyJhbGxvd19wdWJsaXNoIjpmYWxzZSwiZXhwZXJpbWVudGFsIjpmYWxzZSwid3JpdGUiOnRydWV9LCJydWxlX2lkIjoiYWRvcHRlci1yZW1vdGUtZXZpZGVuY2UtcmVjb3JkLTEiLCJzZWxlY3RvciI6eyJlbmRwb2ludF9pZHMiOlsidGVzdC1ydW5uZXIiXSwia2luZCI6InJlbW90ZSIsIm9wZXJhdGlvbl9pZHMiOlsiaW52b2tlIl0sInB1YmxpY2F0aW9uIjpmYWxzZSwic3lzdGVtX2lkIjoibG9jYWwtY29tbWFuZCJ9LCJzdWJqZWN0cyI6W3siYWN0b3IiOiJoYXJuZXNzIiwiaW5pdGlhdG9yIjp7ImFsbG93ZWRfcm9sZXMiOlsib3duZXIiLCJhcmNoaXRlY3QiLCJpbnNwZWN0b3IiLCJlbmdpbmVlciIsImF1ZGl0b3IiXSwicHJlc2VydmVfaW5fY29udGV4dCI6dHJ1ZX0sImtpbmQiOiJkZXJpdmVkLW1hY2hpbmUiLCJ0cmFuc2l0aW9uIjoiaGFybmVzcy13cml0ZSJ9XX0seyJhY3Rpb25faWRzIjpbInRhc2sgZmluaXNoIl0sImNvbnN0aXR1dGlvbmFsX2FuY2hvcnMiOls2LDcsOCw5LDEwXSwiZWZmZWN0IjoiYWxsb3ciLCJvcmlnaW4iOiJhZGRpdGl2ZS1leHRlbnNpb24iLCJwcmVjZWRlbmNlIjo1MDAsInJhdGlvbmFsZSI6IlR5cGVkIGRhdGFiYXNlIGF1dGhvcml0eSBmb3IgdGFzayBmaW5pc2guIiwicmVxdWlyZWRfY29uc2VudCI6eyJhbGxvd19wdWJsaXNoIjpmYWxzZSwiZXhwZXJpbWVudGFsIjpmYWxzZSwid3JpdGUiOnRydWV9LCJydWxlX2lkIjoiYWRvcHRlci1kYi10YXNrLWZpbmlzaC0xIiwic2VsZWN0b3IiOnsiY29ubmVjdGlvbl9pZCI6ImRldmFpLWNvbnRyb2wiLCJkYXRhYmFzZV9pZF9nbG9iIjoiKioiLCJraW5kIjoiZGIiLCJvYmplY3RfaWRfZ2xvYiI6IioqIiwib3BlcmF0aW9ucyI6WyJpbnNlcnQiLCJ1cGRhdGUiLCJkZWxldGUiLCJkZGwiLCJleGVjdXRlIl19LCJzdWJqZWN0cyI6W3siYWN0b3IiOiJoYXJuZXNzIiwiaW5pdGlhdG9yIjp7ImFsbG93ZWRfcm9sZXMiOlsiZW5naW5lZXIiXSwicHJlc2VydmVfaW5fY29udGV4dCI6dHJ1ZX0sImtpbmQiOiJkZXJpdmVkLW1hY2hpbmUiLCJ0cmFuc2l0aW9uIjoiaGFybmVzcy13cml0ZSJ9XX1dLCJzY2hlbWFWZXJzaW9uIjoiMS4wLjAiLCJzb3VyY2VfcG9saWN5Ijp7ImRpZ2VzdF9zaGEyNTYiOiI3Zjk3Y2Y0NTZiMDc4NmU0YzRmZjJjZTI1MzlmODkwNTE4MjUxYTFhYWU0YjVlMTE0MjY4NzJmMjIwY2I3YjYzIiwicG9saWN5X2lkIjoiZGV2YWktY29yZS1hdXRob3JpdHkiLCJwb2xpY3lfdmVyc2lvbiI6IjEuMC4wIn19","size_bytes":71367,"sha256":"f74ac9fc031f51b628b8251804c06e2ebec656a394950683edb4bc264bf7860d"},"plan_sha256":"558e889947f11f5f5b61d85d7f7b2ae057424266295007a46e4ba935ca6c6d8d"}}}\r\nType CREATE 558e889947f11f5f5b61d85d7f7b2ae057424266295007a46e4ba935ca6c6d8d f74ac9fc031f51b628b8251804c06e2ebec656a394950683edb4bc264bf7860d to create the reviewed policy; EOF cancels.\r\n^D\x08\x08{"schemaVersion":"1.0.0","action_id":"init bind","ok":true,"result":{"verdict":"pass","media_type":"application/json","value":{"status":"cancelled","binding_performed":false}}}\r\n'
+
+----------------------------------------------------------------------
+Ran 8 tests in 11.526s
+
+FAILED (failures=1)

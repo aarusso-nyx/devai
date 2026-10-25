@@ -1,0 +1,27 @@
+{
+  "kind": "independent-exact-source-helper-tests",
+  "broker_sha256": "3233c1d3d05cb022183c9dc8f00d9f80e92fca1ddfcb308a7a7530ee839ff09d",
+  "extracted_functions_sha256": "0378e4051fbe3cb2a703604a2dceb7ccc4ba74dcfb8caf396f8bef254128c2e9",
+  "passed": [
+    "regular source retains strict regular observation",
+    "outside source link is opaque hashed metadata and target is unread",
+    "target-content mutation changes no link observation",
+    "raw target text is absent from observation",
+    "dangling source link is observed without following",
+    "link-byte replacement changes full observed snapshot",
+    "regular-to-link kind substitution changes snapshot",
+    "source leaf link through a symlink parent refuses",
+    "strict authority/package/binding helper still refuses link",
+    "strict authority/package/binding helper refuses symlink parent",
+    "lexically outside source paths refuse",
+    "directory source refuses",
+    "concurrent in-read link replacement refuses metadata comparison"
+  ],
+  "tests": 13,
+  "target_content_reads": 0,
+  "limitations": [
+    "Exact private helper source executed through TypeScript transpilation and VM; no product code changes.",
+    "In-read replacement uses instrumented readlink hook; other filesystem cases use real native temporary files/links.",
+    "Snapshot difference proves watched data changes; installed public preview/apply refusal and target create-only route remain separately required."
+  ]
+}

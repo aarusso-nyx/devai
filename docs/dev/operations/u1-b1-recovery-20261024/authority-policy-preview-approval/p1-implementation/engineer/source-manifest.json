@@ -1,0 +1,53 @@
+{
+  "status": "BOUNDED_PRIVATE_IMPLEMENTATION_PUBLIC_FAIL_CLOSED",
+  "count": 9,
+  "paths": [
+    {
+      "path": "packages/cli/src/command-router.ts",
+      "sha256": "af2cf5df04006d049c6e269cf30d44ceaef650fb8cb9c563dc03c6e00d90837a",
+      "size_bytes": 18442
+    },
+    {
+      "path": "packages/cli/src/commands/init/index.ts",
+      "sha256": "984da375d7f480413f043341e33f797ab517dc07eb22cfb2d2f3b5c1f3d86bc3",
+      "size_bytes": 5111
+    },
+    {
+      "path": "packages/cli/src/commands/init/shared.ts",
+      "sha256": "ddb802c8ad36b2f80ef225934af541934f86e852805aaa2a25e313ddc67393c3",
+      "size_bytes": 3852
+    },
+    {
+      "path": "packages/cli/src/commands/init/review-authority-policy.ts",
+      "sha256": "398ef75f3bdd5105e1f5d9ee6f6ae2faaffd718005a3a07d63999bb16ffa1efc",
+      "size_bytes": 3497
+    },
+    {
+      "path": "packages/cli/src/authority/command-capabilities.ts",
+      "sha256": "f29ca8306a798c2842d8e4a7138f37331e9b16d926e06925985b330f779232d2",
+      "size_bytes": 1236
+    },
+    {
+      "path": "packages/cli/src/authority/broker.ts",
+      "sha256": "50721c2d784e8849cbf50ad7a07daa7d2b3513a5618ecd81ac0ec8040b2f7735",
+      "size_bytes": 87451
+    },
+    {
+      "path": "packages/cli/src/authority/policy-review.ts",
+      "sha256": "5235d957e108596cc550b48297091c5d3be530515fc60ecbbe999ca0b7e80de4",
+      "size_bytes": 3095
+    },
+    {
+      "path": "packages/cli/src/authority/policy.ts",
+      "sha256": "3b32792eed1c482009a3cb217074fc642b95808e806b41859f485e2ddf533bee",
+      "size_bytes": 5634
+    },
+    {
+      "path": "packages/cli/src/authority/policy-support.ts",
+      "sha256": "156b296bf26a87816c9f8206843b9c0a79414fa698dc1829a6dccd6860ede739",
+      "size_bytes": 10045
+    }
+  ],
+  "public_live_use": "HELD_streaming_action_output_boundary_outside_approved_scope",
+  "binding_integration_runtime_release_detran_effects": "HELD"
+}

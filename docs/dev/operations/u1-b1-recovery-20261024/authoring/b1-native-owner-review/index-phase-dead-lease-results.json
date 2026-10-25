@@ -1,0 +1,19 @@
+{
+  "fixture": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-initial-owner-plan-jJqJW9/repository",
+  "lease_sha256": "0b0b4b7a1371865c4b802c2744ad82fedc9cf7a81a1e055d4467961157005dc0",
+  "index_sha256": "a9ae42654e20e902c3d3e120478597bfd9a9a7f36d5d9bd073078581d26cd3ad",
+  "result": {
+    "kind": "reconciliation-dead-lease-result",
+    "outcome": "recovered",
+    "approval_id": "24b3953e410a7654b1ecdbad8c03a512439a904d9ed90349b116d6685a761caf",
+    "plan_sha256": "5d55b291ae2e31c578ec2c064bd83c8471cda1afbd197734c946f7fd87f61141",
+    "expected_lease_sha256": "0b0b4b7a1371865c4b802c2744ad82fedc9cf7a81a1e055d4467961157005dc0",
+    "lease_witness": {
+      "dev": "16777233",
+      "ino": "1124976841",
+      "birthtime_ns": "1792904215887372849"
+    },
+    "grants_authority": false
+  },
+  "qualification": "Actual03writer lease from exited testPID, native ESRCH recovery only; no index/object/chain rewrites; syntheticB5/policy/TTY."
+}

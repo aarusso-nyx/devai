@@ -1,0 +1,27 @@
+{
+  "standing": "AUTHENTIC_OLDER_INSTALLED_PUBLIC_PLAN_BASELINE_NOT_GUARD_QUALIFICATION",
+  "package": "/private/tmp/devai-release-280-01a16e18/installed-06/node_modules/@aarusso-nyx/devai",
+  "exit": 2,
+  "argv": [
+    "evidence",
+    "reconcile",
+    "plan",
+    "--repo-root",
+    "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-detran-historical-WwmCPH/repository",
+    "--selected-parent",
+    "7dfab8bdf61ffe935bca45578e0e65c09883f633",
+    "--published-ref",
+    "refs/heads/main",
+    "--as-role",
+    "architect",
+    "--format",
+    "json"
+  ],
+  "package_json_sha256": "3359770406e0b0084e9dfc8941b630a68d98dab848a3de04c348cf11812f7442",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderr_sha256": "53c3306d46513f03d1ec71ea9fc90760a9813abdda34e299a58fa75415e0bab7",
+  "stdout": "",
+  "stderr": "{\"schemaVersion\":\"1.0.0\",\"code\":\"ROUTE_UNKNOWN\",\"class\":\"routing-authority\",\"exit\":2,\"message\":\"Unknown or incomplete command 'evidence reconcile plan'.\",\"remediation\":\"Run devai --help.\",\"refs\":{\"doc\":\"docs/reference/cli/\"},\"context\":{\"argv\":[\"evidence\",\"reconcile\",\"plan\"]}}\n",
+  "fixture_upgraded": false,
+  "negative_guards_qualified": false
+}

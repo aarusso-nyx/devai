@@ -1,0 +1,768 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/authority-policy.schema.json",
+  "title": "Materialized Authority Policy",
+  "description": "Version- and digest-bound resolved authority policy written only by the trusted binding transition.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "policy_id",
+    "policy_version",
+    "repository_id",
+    "framework_package",
+    "constitution",
+    "source_policy",
+    "additive_extensions",
+    "resolved_digest_sha256",
+    "materialized_at",
+    "materialization",
+    "enforcement",
+    "host_enforcement",
+    "rules"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "policy_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9._-]{2,127}$"
+    },
+    "policy_version": {
+      "$ref": "#/$defs/semver"
+    },
+    "repository_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+    },
+    "framework_package": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": {
+          "const": "@aarusso-nyx/devai"
+        },
+        "version": {
+          "$ref": "#/$defs/semver"
+        }
+      }
+    },
+    "constitution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "digest_sha256"],
+      "properties": {
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+        },
+        "digest_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "source_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy_id", "policy_version", "digest_sha256"],
+      "properties": {
+        "policy_id": {
+          "const": "devai-core-authority"
+        },
+        "policy_version": {
+          "$ref": "#/$defs/semver"
+        },
+        "digest_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "additive_extensions": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["extension_id", "extension_version", "digest_sha256"],
+        "properties": {
+          "extension_id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9._-]{2,127}$"
+          },
+          "extension_version": {
+            "$ref": "#/$defs/semver"
+          },
+          "digest_sha256": {
+            "$ref": "#/$defs/sha256"
+          }
+        }
+      }
+    },
+    "resolved_digest_sha256": {
+      "$ref": "#/$defs/sha256",
+      "description": "Canonical SHA-256 of the fully resolved ordered rule set."
+    },
+    "materialized_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "materialization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action_id",
+        "invocation_id",
+        "machine_principal",
+        "initiated_by",
+        "consent",
+        "materialization_digest_sha256"
+      ],
+      "properties": {
+        "action_id": {
+          "const": "init bind"
+        },
+        "invocation_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "machine_principal": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "actor",
+            "transition",
+            "trusted_adapter_id",
+            "context_digest_sha256"
+          ],
+          "properties": {
+            "kind": {
+              "const": "machine"
+            },
+            "actor": {
+              "const": "binding"
+            },
+            "transition": {
+              "const": "bind"
+            },
+            "trusted_adapter_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "context_digest_sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        },
+        "initiated_by": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "role", "declaration_source"],
+          "properties": {
+            "kind": {
+              "const": "human"
+            },
+            "role": {
+              "const": "architect"
+            },
+            "declaration_source": {
+              "enum": ["cli-flag", "session-state"]
+            },
+            "session_id": {
+              "type": "string",
+              "pattern": "^AUTH-SESSION-[A-Za-z0-9][A-Za-z0-9_-]{15,127}$"
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "declaration_source": {
+                    "const": "session-state"
+                  }
+                },
+                "required": ["declaration_source"]
+              },
+              "then": {
+                "required": ["session_id"]
+              },
+              "else": {
+                "not": {
+                  "required": ["session_id"]
+                }
+              }
+            }
+          ]
+        },
+        "consent": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["write"],
+          "properties": {
+            "write": {
+              "const": true
+            }
+          }
+        },
+        "materialization_digest_sha256": {
+          "$ref": "#/$defs/sha256",
+          "description": "Canonical digest of materialization with this field omitted; audit integrity only, never a capability."
+        }
+      }
+    },
+    "enforcement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode"],
+      "properties": {
+        "mode": {
+          "enum": ["binding", "shadow"]
+        },
+        "shadow": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["reason", "approved_by", "expires_at"],
+          "properties": {
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            },
+            "approved_by": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["role", "declaration_source"],
+              "properties": {
+                "role": {
+                  "const": "architect"
+                },
+                "declaration_source": {
+                  "enum": ["cli-flag", "session-state"]
+                },
+                "session_id": {
+                  "type": "string",
+                  "pattern": "^AUTH-SESSION-[A-Za-z0-9][A-Za-z0-9_-]{15,127}$"
+                }
+              },
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "declaration_source": {
+                        "const": "session-state"
+                      }
+                    },
+                    "required": ["declaration_source"]
+                  },
+                  "then": {
+                    "required": ["session_id"]
+                  },
+                  "else": {
+                    "not": {
+                      "required": ["session_id"]
+                    }
+                  }
+                }
+              ]
+            },
+            "expires_at": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "shadow"
+              }
+            },
+            "required": ["mode"]
+          },
+          "then": {
+            "required": ["shadow"]
+          },
+          "else": {
+            "not": {
+              "required": ["shadow"]
+            }
+          }
+        }
+      ]
+    },
+    "host_enforcement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode"],
+      "properties": {
+        "mode": {
+          "enum": ["cli-only", "host-integrated"]
+        },
+        "adapter": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["adapter_id", "adapter_version"],
+          "properties": {
+            "adapter_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "adapter_version": {
+              "$ref": "#/$defs/semver"
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "host-integrated"
+              }
+            },
+            "required": ["mode"]
+          },
+          "then": {
+            "required": ["adapter"]
+          },
+          "else": {
+            "not": {
+              "required": ["adapter"]
+            }
+          }
+        }
+      ]
+    },
+    "rules": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/rule"
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "semver": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-[A-Za-z0-9.-]+)?$"
+    },
+    "humanSubject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "roles"],
+      "properties": {
+        "kind": {
+          "const": "human"
+        },
+        "roles": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": ["owner", "architect", "inspector", "engineer", "auditor"]
+          }
+        }
+      }
+    },
+    "machineSubject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "actor", "transition", "initiator"],
+      "properties": {
+        "kind": {
+          "const": "derived-machine"
+        },
+        "actor": {
+          "enum": ["harness", "binding", "release"],
+          "description": "bootstrap is a non-authorizing planner/orchestrator identity and is forbidden from policy allow subjects."
+        },
+        "transition": {
+          "enum": ["harness-write", "bind", "release"]
+        },
+        "initiator": {
+          "oneOf": [
+            {
+              "const": "none"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["allowed_roles", "preserve_in_context"],
+              "properties": {
+                "allowed_roles": {
+                  "type": "array",
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "items": {
+                    "enum": ["owner", "architect", "inspector", "engineer", "auditor"]
+                  },
+                  "description": "The runtime binds exactly one actual initiated_by role from this set and requires it to match the invocation flag or session."
+                },
+                "preserve_in_context": {
+                  "const": true
+                }
+              }
+            }
+          ]
+        }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "actor": {
+              "const": "harness"
+            },
+            "transition": {
+              "const": "harness-write"
+            }
+          }
+        },
+        {
+          "properties": {
+            "actor": {
+              "const": "binding"
+            },
+            "transition": {
+              "const": "bind"
+            },
+            "initiator": {
+              "type": "object",
+              "required": ["allowed_roles"],
+              "properties": {
+                "allowed_roles": {
+                  "const": ["architect"]
+                }
+              }
+            }
+          }
+        },
+        {
+          "properties": {
+            "actor": {
+              "const": "release"
+            },
+            "transition": {
+              "const": "release"
+            },
+            "initiator": {
+              "type": "object",
+              "required": ["allowed_roles"],
+              "properties": {
+                "allowed_roles": {
+                  "const": ["architect"]
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "selector": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "repository_id", "canonical_relative_path_glob", "operations"],
+          "properties": {
+            "kind": {
+              "const": "fs"
+            },
+            "repository_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "canonical_relative_path_glob": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"
+            },
+            "operations": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "enum": ["create", "update", "delete", "rename"]
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "repository_id", "ref_glob", "operations"],
+          "properties": {
+            "kind": {
+              "const": "git-ref"
+            },
+            "repository_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ref_glob": {
+              "type": "string",
+              "pattern": "^refs/",
+              "minLength": 6
+            },
+            "remote_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "operations": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "enum": ["create", "update", "delete", "merge", "push"]
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "connection_id", "database_id_glob", "object_id_glob", "operations"],
+          "properties": {
+            "kind": {
+              "const": "db"
+            },
+            "connection_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]+$"
+            },
+            "database_id_glob": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9.*?_-]+$"
+            },
+            "object_id_glob": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9.*?_-]+$"
+            },
+            "operations": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "enum": ["insert", "update", "delete", "ddl", "execute"]
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "system_id", "endpoint_ids", "operation_ids", "publication"],
+          "properties": {
+            "kind": {
+              "const": "remote"
+            },
+            "system_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]+$"
+            },
+            "endpoint_ids": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9._*-]+$"
+              }
+            },
+            "operation_ids": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9._*-]+$"
+              }
+            },
+            "publication": {
+              "type": "boolean"
+            }
+          }
+        }
+      ]
+    },
+    "rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rule_id",
+        "origin",
+        "precedence",
+        "action_ids",
+        "selector",
+        "effect",
+        "subjects",
+        "required_consent",
+        "constitutional_anchors",
+        "rationale"
+      ],
+      "properties": {
+        "rule_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9._-]{2,127}$"
+        },
+        "origin": {
+          "enum": ["immutable-core", "additive-extension"]
+        },
+        "precedence": {
+          "type": "integer",
+          "enum": [500, 650, 700, 750, 800, 900, 1000]
+        },
+        "action_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "description": "Exact canonical action IDs. Wildcards are forbidden so a machine transition is never a universal authority bypass.",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*( [a-z][a-z0-9-]*)*$"
+          }
+        },
+        "selector": {
+          "$ref": "#/$defs/selector"
+        },
+        "effect": {
+          "enum": ["allow", "deny"]
+        },
+        "subjects": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/humanSubject"
+              },
+              {
+                "$ref": "#/$defs/machineSubject"
+              }
+            ]
+          }
+        },
+        "required_consent": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["write", "allow_publish", "experimental"],
+          "properties": {
+            "write": {
+              "type": "boolean"
+            },
+            "allow_publish": {
+              "type": "boolean"
+            },
+            "experimental": {
+              "type": "boolean"
+            }
+          }
+        },
+        "constitutional_anchors": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 40
+          }
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        }
+      }
+    }
+  },
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "additive_extensions": [],
+      "constitution": {
+        "digest_sha256": "6459c2ff660bfa36841307a488a26121cf7627ca61f14eb31bbd23d667eaaca3",
+        "version": "1.0.0"
+      },
+      "enforcement": {
+        "mode": "binding"
+      },
+      "framework_package": {
+        "name": "@aarusso-nyx/devai",
+        "version": "1.0.0"
+      },
+      "host_enforcement": {
+        "mode": "cli-only"
+      },
+      "materialization": {
+        "action_id": "init bind",
+        "consent": {
+          "write": true
+        },
+        "initiated_by": {
+          "declaration_source": "cli-flag",
+          "kind": "human",
+          "role": "architect"
+        },
+        "invocation_id": "cli-82807-ee100589-8c88-4bd6-92f7-8e64436ecbc6",
+        "machine_principal": {
+          "actor": "binding",
+          "context_digest_sha256": "307a0dd590681d4447d231450ff24ed3f8c7caf98186393068dd7b02383f91a5",
+          "kind": "machine",
+          "transition": "bind",
+          "trusted_adapter_id": "devai-cli-authority"
+        },
+        "materialization_digest_sha256": "3d4bf9df60890fe05459d4af6dce79a386fa17596e1cc08a9094c11b9f4d84a2"
+      },
+      "materialized_at": "2026-07-22T15:39:08.398Z",
+      "policy_id": "devai-authority",
+      "policy_version": "1.0.0",
+      "repository_id": "example-repository",
+      "resolved_digest_sha256": "f9cd53741be54eb361441db85f8f30b3693695dc89e270823b89612b267ec1fc",
+      "rules": [
+        {
+          "action_ids": ["init apply owner"],
+          "constitutional_anchors": [6],
+          "effect": "allow",
+          "origin": "immutable-core",
+          "precedence": 650,
+          "rationale": "Article 6 Owner product directory authority.",
+          "required_consent": {
+            "allow_publish": false,
+            "experimental": false,
+            "write": true
+          },
+          "rule_id": "core-owner-product-root",
+          "selector": {
+            "canonical_relative_path_glob": "product",
+            "kind": "fs",
+            "operations": ["create"],
+            "repository_id": "example-repository"
+          },
+          "subjects": [
+            {
+              "kind": "human",
+              "roles": ["owner"]
+            }
+          ]
+        }
+      ],
+      "schemaVersion": "1.0.0",
+      "source_policy": {
+        "digest_sha256": "31fe73f70c0130798789601d42f00d3bae4a2aa4509bb546e9387a739d293517",
+        "policy_id": "devai-core-authority",
+        "policy_version": "1.0.0"
+      }
+    }
+  ]
+}

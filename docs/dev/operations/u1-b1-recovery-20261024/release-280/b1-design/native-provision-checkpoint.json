@@ -1,0 +1,33 @@
+{
+  "standing": "BOUNDED_NATIVE_PROVISION_IMPLEMENTATION_AND_INDEPENDENT_QUALIFICATION",
+  "authority": "Full internal v2.8.0 goal; ADR-EVI-0007; owner-protocol-v3 bootstrap semantics and later qualified ns clock/codec/admission/invocation components.",
+  "source_paths": [
+    "packages/authority/src/boundaries/reconciliation-host-provision.ts (new)",
+    "packages/authority/src/boundaries/reconciliation-host-namespace.ts (new, private native metadata reader)",
+    "packages/authority/src/index.ts (named public internal review API exports only)"
+  ],
+  "test_paths": ["packages/authority/tests/unit/reconciliation-host-provision.test.ts (new)"],
+  "api": {
+    "createReconciliationHostProvisionReview": "(repositoryRoot:string)=>frozen handle {start(),confirm(token:string),cancel()}; exact this/member/actual ALS scope custody, never reconstructed from serialized report. Root is only a readonly selector: actual context identity must equal the sealed broker readReconciliationHostBinding identity, including canonical root/admin identities. No caller physical target or callback is accepted.",
+    "start": "Once only. Readonly observation, no directory/file/SQLite mutation. Whole valid existing issuer returns original safe identity without rotation. Precursor-only starts issuer review; missing seed starts seed review. Current HEAD/merge identity, B5, namespace and actual boot/dual-clock review age are frozen/rechecked. Initial no-write operation may preview; actual invoke enforces write/direct Architect/TTY consent.",
+    "confirm": "Exact PREPARE RECONCILIATION-HOST <seedplan> creates only missing0700 directories and fixed0600 seed, durable readback, then returns second issuer READY. Exact BIND RECONCILIATION-HOST <issuerplan> invokes ordinary typed provision permission, fsyncs exact precursor before any native connection, acquires actual native admission, rechecks without raw anchor opens, publishes only frozen whole0600 issuer with no replacement and verifies owned identity/hash/durability. Each stage has its own actual exact target/receipt. No arbitrary writer/callback accepted.",
+    "cancel": "Terminal safe cancellation before either confirmation; before first zero effects, between stages only inert precursor. Wrong token closes handle. Clone/foreign/cross-scope/replayed/detached methods refuse. Exceptions never reveal native path/key/payload/cause."
+  },
+  "namespace": {
+    "resolution": "Actual worktree gitdir/devai/reconciliation from verified host context. New devai and reconciliation directories0700 from creation, no recursive mkdir or chmod/normalization of existing entries. Existing devai ancestor follows already-qualified host-context requirement: owned canonical nonsymlink directory with no group/world write; protected reconciliation root must0700. This explicitly preserves existing shared devai ancestor permissions while the entire private leaf namespace is0700.",
+    "closed_contents": "Precursor-only permits only admission.sqlite. Complete state permits admission.sqlite, issuer.json and optional approvals; unknown root entries or publication/removal remnants refuse and survive. Optional approval directories64lowerhex/0700 and known immutable record/lease names0600/one-link are inspected and authenticated with the admitted issuer key, matching repo/worktree/approval IDs. Bounded census, no recursion outside that closed tree.",
+    "in_lock": "Use previously frozen actual anchor metadata witness and lstat only for admission.sqlite while connection lives; never read/open/close the raw anchor in callback. Existing lower primitive owns all anchor descriptors and SQL checks. Issuer/approval files are separate bounded nofollow descriptor reads.",
+    "platform": "Initial native provisioning qualification envelope is actual Darwin filesystem type26, observed on both development volume and disposable fixtures. Unknown platform/filesystem refuses; Linux support remains unqualified and cannot be claimed by source shape. No alternate lock or age-based cleanup.",
+    "durability": "File publisher fsyncs bytes before no-replace link and parent directory after unlink; each newly created directory and its parent fsynced. Resume fsyncs exact precursor before acquiring native admission. Any post-entry uncertainty is terminal indeterminate with safe owned witnesses, preserves entries and never retries or rotates key."
+  },
+  "issuer": "Single whole signed codec issuer.json. Actual32 random bytes, canonical padded base64, key digest and domain-separated MAC; actual seed anchor, identity, current B5, installed HEAD, seed_plan and acyclic provision_context graph. Private artifact is frozen in memory; READY exposes only size/hash. Existing supported issuer installation bindings/HEAD are immutable observations; current action bindings are fresh and may differ. Exact root/seed/repo/worktree/host identity and MAC must still match. No implicit migration.",
+  "public_projection": "Closed safe stage/result values with kind, action_id init bind, stage/outcome, repository_id/worktree_id, host/binding/namespace/plan digests, logical worktree-host targets/effects, artifact hash/size, confirmation and300000ms lifetime, grants_authority=false. No key, key digest, MAC, private bundle/base64, raw physical root/admin paths or raw cause is serialized. Public CLI/action-output/registry/default grants remain separate REQUIRED integration, not activated here.",
+  "tests": [
+    "Actual missing-module RED then direct/registered-linked issuer-backed ALS ordinary resolver/receipt/prepare/apply positive stages using explicitly synthetic B5 origin, not installed attestation",
+    "Readonly/no-write inventory unchanged; wrong/cancel/clone/detached/replay/cross-scope consent cases; exact seed-before-issuer and real0700/0600/readback/MAC/identity",
+    "Precursor resume and whole-issuer idempotence without rotation; HEAD/binding/namespace/mode/foreign-entry/staged-remnant drift refusals and preservation",
+    "No raw anchor open while native lock held, fixed seed hash unchanged; real contention/crash/durability uncertainty qualification in owned fixtures",
+    "No private key, raw bytes, paths or sentinel native causes in READY/result/errors; existing host-operation/native publisher/admission/codec/context historical checks preserved",
+    "Actual installed/public positive, public two-prompt output custody and remaining Owner/phase/index/staged functionality remain REQUIRED"
+  ]
+}

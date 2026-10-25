@@ -1,0 +1,32 @@
+{
+  "status": "EXACT_TYPED_DATA_KERNEL_CHECKPOINT_FOR_INDEPENDENT_RED",
+  "prerequisite": "logical-resource-checkpoint.json; independent99-test qualification",
+  "scope": "Integrate the qualified closed target data into typed exact-plan validation. Do not add runtime policy permissions, target selectors, adapters or actions before their separate complete contracts.",
+  "sources": [
+    "packages/authority/src/types.ts",
+    "packages/authority/src/decision-plan.ts",
+    "packages/authority/src/runtime/policy-resolver.ts"
+  ],
+  "test": "packages/authority/tests/unit/reconciliation-resource-kernel.test.ts",
+  "changes": {
+    "types": "Import and re-export only the two qualified target types; include both in ResourceTarget. Keep ResourceTargetSelector unchanged: no new bounded-batch branch.",
+    "malformedTarget": "For either new kind, use its complete qualified pure validator before any generic id.trim or payload access. Valid exact targets produce no shape errors; invalid new targets produce a deterministic nonempty shape error, never a method-call exception. Existing four-kind behavior remains unchanged.",
+    "resourceIdentity": "Proof identity fixes repository/worktree/proof_path, independent of approval and digest witness. Host identity fixes repository/worktree/operation plus approval_id if present and phase if consume-phase. Invalid new shapes yield a safe fixed invalid identity without interpolating their untrusted fields.",
+    "matchesSelector": "New kinds always return false. No bounded selector may admit either target, including a caller-forged new selector or a generic fs/Git/DB/remote selector.",
+    "resourceValid": "Use the qualified pure validators for the two new kinds. A valid shape is a valid query input, not policy permission. Existing policy selectors still cannot match either kind.",
+    "authority": "No new classification or domain dispatch is implemented in this step. classifyAuthorityResource must still refuse these targets; no prepared host/index capability or applied=true result can follow from this data integration. Do not add a classifier branch until the real final adapter contract and dispatch are implemented together."
+  },
+  "independent_tests": [
+    "Actual malformedPlan exact new targets pass shape validation with existing valid envelope, while malformed fields and extra physical paths fail without throwing or mutating input.",
+    "Logical resource duplicates remain duplicates even if digest or approval witnesses differ. Distinct worktrees and exact host operations remain distinct, with no widened filesystem identity.",
+    "All new-kind bounded batches and forged/generic selectors are refused; exact policy selector attempts still cannot match.",
+    "Actual resourceValid accepts only the qualified shapes and refuses unknown keys/physical paths. Shape acceptance remains distinct from actual classifier refusal and policy denial.",
+    "Unchanged original decision contracts and policy resolver tests retain their meanings. No registry, schema, adapter, CLI or authority function-barrel export changes."
+  ],
+  "remaining": [
+    "Close exact policy selectors and bound permission compiler with schema consumers",
+    "Close real final adapter capture/apply, admission and operation-handle custody",
+    "Integrate classification and dispatch atomically with actual adapter availability and safe refusal",
+    "All public B1 workflows and release qualification"
+  ]
+}

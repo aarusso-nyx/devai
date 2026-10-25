@@ -1,0 +1,53 @@
+{
+  "kind": "independent-native-grant-review",
+  "fixture": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-initial-owner-plan-jJqJW9/repository",
+  "approval_id": "fe13a53d2a7d942b9605f38ab4175c540f60e1963f72a5bbba2d2eac66fc1555",
+  "passed": [
+    "stale expected-grant refuses",
+    "missing sealed expected-grant refuses",
+    "cancel/borrowed/scope/replay",
+    "synthetic controlled B5 policy drift",
+    "namespace competitor retained",
+    "saved-plan drift during publication retains uncertainty",
+    "renew sequence2; revoke sequence3; revoked terminal"
+  ],
+  "renewed": {
+    "kind": "reconciliation-grant-result",
+    "operation": "renew",
+    "outcome": "renewed",
+    "approval_id": "fe13a53d2a7d942b9605f38ab4175c540f60e1963f72a5bbba2d2eac66fc1555",
+    "plan_sha256": "5f6f81b3595b4c1e9f06ab9f4bbd1f2b682ddbb981de6585d5f3925af6e7b4e5",
+    "record_sha256": "f59937fe92ee209f5c6d57d6de0664596745f454b7fccccb9b80ce25295fe36b",
+    "sequence": 2,
+    "owned": [
+      {
+        "target": "worktree-host/devai/reconciliation/approvals/fe13a53d2a7d942b9605f38ab4175c540f60e1963f72a5bbba2d2eac66fc1555/grant-000002.json",
+        "dev": "16777233",
+        "ino": "1124913769",
+        "birthtime_ns": "1792898209892764676"
+      }
+    ],
+    "grants_authority": false
+  },
+  "revoked": {
+    "kind": "reconciliation-grant-result",
+    "operation": "revoke",
+    "outcome": "revoked",
+    "approval_id": "fe13a53d2a7d942b9605f38ab4175c540f60e1963f72a5bbba2d2eac66fc1555",
+    "plan_sha256": "5f6f81b3595b4c1e9f06ab9f4bbd1f2b682ddbb981de6585d5f3925af6e7b4e5",
+    "record_sha256": "58e3caf08be359d00211b039c7318eb41348aa591a32c638ecf05448b0e382c5",
+    "sequence": 3,
+    "owned": [
+      {
+        "target": "worktree-host/devai/reconciliation/approvals/fe13a53d2a7d942b9605f38ab4175c540f60e1963f72a5bbba2d2eac66fc1555/grant-000003.json",
+        "dev": "16777233",
+        "ino": "1124913787",
+        "birthtime_ns": "1792898224181133465"
+      }
+    ],
+    "grants_authority": false
+  },
+  "index_sha256": "542553c911bcd2f5e65dd8a27b66f0f1dbcb703278477cb27df920ede95eadce",
+  "effect_callbacks": 4,
+  "qualification": "Actual native signed grants/admission/typed receipts; synthetic B5 and policy origin; no public installed Owner route."
+}

@@ -1,0 +1,4 @@
+ WARN  Issue while reading "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/.npmrc". Failed to replace env in config: ${NODE_AUTH_TOKEN}
+ WARN  Issue while reading "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/.npmrc". Failed to replace env in config: ${NODE_AUTH_TOKEN}
+Checking formatting...
+All matched files use Prettier code style!

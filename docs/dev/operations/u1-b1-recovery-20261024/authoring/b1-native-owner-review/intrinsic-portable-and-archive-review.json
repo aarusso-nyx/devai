@@ -1,0 +1,28 @@
+{
+  "portable_test": "packages/effects-check/tests/contract/effect-reconciliation-intrinsics.contract.test.ts",
+  "test_sha256": "01a574ca2cd4d83c4de5a254ca0e6f3e82ab53c53339d553ebd078db87c74178",
+  "pass_count": 1,
+  "matrix": {
+    "accepted": 5,
+    "refused": 45
+  },
+  "log": "reconciliation-intrinsic-portable-qualified.txt",
+  "archive_checks": [
+    {
+      "manifest": "packet-manifest.json",
+      "verified_files": 29,
+      "original_manifest_sha256": "5152b029680c17089ccc8ae5b438d29790f806435489248c56b52444b1d208bf",
+      "current_manifest_sha256": "d1aa14676aa365f194210ccff890eec590fd3f33b1ff548fe38a7ec367de827f"
+    },
+    {
+      "manifest": "reference/preserved-packets-manifest.json",
+      "verified_files": 16,
+      "original_manifest_sha256": "b2acdedc7aec2afa703e7bb491703e29a57cfe57eb940c4d6c85c3460f0b9a0b",
+      "current_manifest_sha256": "b3b18259435afc4baaf622e82737f60b4b4e27de947d336bc355abb9994a1d31"
+    }
+  ],
+  "external_snapshot_bytes_equal": true,
+  "finding": null,
+  "bounds": "Only two local MD sources relocated to .md.txt with same hashes+sizes and explanatory MD wrappers. Nested manifest hash/size updated in parent and original nested bytes verify against prior parent. No linkchecker ignore added by these changes. Existing advisory historical tests unchanged.",
+  "graft_tokens_saved_this_turn": 28187
+}

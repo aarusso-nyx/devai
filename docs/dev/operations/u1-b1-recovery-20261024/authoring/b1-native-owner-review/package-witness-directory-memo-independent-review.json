@@ -1,0 +1,42 @@
+{
+  "review": "Addendum: directory cold census memo under fresh full directory witness before and after retained-FD scan",
+  "previous_review_sha256": "18834b1ca59fdfea900c8dde117da7439203b88ad1adbdc6135ae90b8c4640a5",
+  "source_sha256": "91e37839f5a426bc6f615ade9f5e52a8c8166acee422bcea37c730c00fbcd2c7",
+  "portable_test_sha256": "d77b1c39dd29e1113bcdb1837fa69c056780e15d21938ecf2438990f7ede7d3f",
+  "tests": {
+    "review": {
+      "passed": 20,
+      "log": "package-witness-directory-witness-qualified.txt"
+    },
+    "portable": {
+      "passed": 18,
+      "log": "package-witness-portable-qualified.txt",
+      "lint": "package-witness-portable-lint.txt"
+    }
+  },
+  "new_counterexamples": [
+    "directory rename and return",
+    "directory chmod and restore",
+    "file add then remove before verification",
+    "child directory add then remove before verification",
+    "two named paths swapped then returned"
+  ],
+  "proof": "Each restores exact original names; nonrestorable directory ctime differs, triggering permanent refusal. Full directory dev/ino/birth/ctime/mtime/size/mode/uid/gid/nlink are freshly compared on both sides of FDscan; cold exact census and broker second original bundle review remain.",
+  "benchmark": {
+    "snapshot": "/private/tmp/devai-release-280-01a16e18/native10-335-public/policy-create.json",
+    "package_root": "/private/tmp/devai-release-280-01a16e18/installed-native-10/node_modules/@aarusso-nyx/devai",
+    "packages": 72,
+    "files": 5219,
+    "cold_ms": 1026.7818750000001,
+    "fresh_verify_ms": [
+      29.212375000000065,
+      21.10349999999994,
+      25.23412499999995,
+      21.587333999999828,
+      30.31895799999984
+    ],
+    "qualification": "Actual saved P1 cold bundle hashes revalidated by new witness against installednative10; metadata-only warmverify timings. Not fullbroker/nativephase/package11qualification. No issuerkeys or fixtureeffects."
+  },
+  "limits": "Source/helper only. Installed candidate12 and native fullphase timing pending. Prior failure and oldreview retained.",
+  "graft_tokens_saved_this_turn": 28938
+}

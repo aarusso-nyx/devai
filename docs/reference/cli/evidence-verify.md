@@ -217,6 +217,46 @@ repair the baseline, declare a historical gap, or manufacture historical provena
 The registered initiating Inspector and authority check on the exact chain append remain
 required; consent alone grants no additional role or write scope.
 
+## Custody-proven divergent-anchor recovery
+
+[ADR-EVI-0006](../../../law/adr/ADR-EVI-0006-custody-proven-divergent-anchor-recovery.md)
+defines recovery of one non-newest line whose original direct anchor survives in a
+preserved divergent chain. Preserve that chain before resolving a merge conflict.
+The supported invocation is:
+
+```bash
+devai evidence record --recover-divergent-anchor \
+  --proof-path record/proofs/work/generic/R-9999.jsonl --proof-sequence 7 \
+  --source-chain preserved/source-chain.json --source-chain-sha256 <sha256> \
+  --expected-head <current-manifest-hash> --repo-root . --as-role inspector --write
+```
+
+The source must be a regular repository-contained file reached without symlinks,
+with the supplied whole-file SHA-256. It must verify as a chain and share at least
+one identical initial entry with the canonical chain. Exactly one source entry
+after the fork must directly anchor the named line. Its physical-line digest and
+every other source-anchored line in that epoch must still match. The active chain,
+newest line, existing direct anchor, historical declaration and unproved orphan
+cannot be used as substitutes for this custody.
+
+Recovery appends one ordinary direct anchor through the normal writer. Its closed
+`recovered_from` object records `source_chain_path`, `source_chain_sha256`,
+`source_entry_id`, `source_entry_sequence`, `source_entry_manifest_hash` and
+`fork_sequence` (the identical common-prefix length). The source-chain digest and
+physical-line digest are manifest-bound artifacts. Earlier canonical entries, the
+source chain, proof epoch and baseline remain unchanged. Later verification checks
+the bound artifacts without requiring the external preserved source to remain
+available.
+
+The expected head, source bytes and line are checked again inside serialized
+publication. A changed head refuses as `PROOF_ANCHOR_RECOVERY_STALE_HEAD` without
+an append. Other invalid custody refuses as `PROOF_ANCHOR_RECOVERY_REFUSED` with
+its reason. An exact retry against the new head returns the existing entry with
+`alreadyAnchored`; a different source chain or source entry for the same line
+refuses. Keep the actual receipt after interruption and inspect the chain before
+retrying; never edit a proof or delete history to force recovery. Run the unchanged
+chain verification afterward and retain any unrelated failures it reports.
+
 ## The verification result
 
 The result keeps the existing sequence, link, hash, and head findings, which still fail on their

@@ -1,0 +1,66 @@
+{
+  "status": "ARCHITECT_BOUNDARY_CHECKPOINT_FOR_INDEPENDENT_RED",
+  "resource_kind": "proof-index",
+  "operation": "compare-and-swap",
+  "capability": "proof-index:chain-cas",
+  "adapter_id": "proof-index-authority-boundary",
+  "action_id": "evidence reconcile stage-proof",
+  "initiator": "human Inspector with explicit write consent",
+  "fixed_entry": "record/proofs/chain.json",
+  "logical_binding": [
+    "repository_id",
+    "worktree_id",
+    "approved_plan_sha256",
+    "verified_phase_sha256",
+    "before_semantic_index_sha256",
+    "other_entries_sha256",
+    "result_chain_sha256",
+    "result_blob_oid",
+    "result_mode"
+  ],
+  "host_resolution": [
+    "Resolve canonical repository root, worktree Git directory, common Git directory, index and object format through the trusted host.",
+    "Refuse caller GIT_DIR, GIT_WORK_TREE, GIT_INDEX_FILE, object-directory/alternate-object overrides, symlink administration components, submodule targets, split/sparse index and unsupported index representation.",
+    "Caller supplies no physical index, lock, object-directory or administration path."
+  ],
+  "supported_index": {
+    "signature": "DIRC",
+    "versions": [2],
+    "object_formats": ["sha1", "sha256"],
+    "extensions": ["TREE"],
+    "tree_extension": "Validate framing then discard the invalidated cache-tree extension on publication; it never supplies entry authority.",
+    "unknown_extension": "Refuse before mutation. Do not silently discard mandatory or unfamiliar optional extensions.",
+    "entry_validation": "Verify full file checksum, entry counts, canonical sorted unique path/stage pairs, exact lengths/NUL/padding, regular supported modes and flags. Reject extended/intent-to-add/skip-worktree representations until deliberately supported.",
+    "semantic_witness": "Canonical sorted path/mode/blob/stage/semantic flags; exclude only filesystem stat cache fields. Bind all non-proof entries separately."
+  },
+  "publication": [
+    "Before any mutation validate actual trusted Owner approval and predecessor phase, complete custody and passing native chain/anchor verification; validate the exact working chain bytes and derived Git blob identity.",
+    "Acquire the REAL resolved index.lock exclusively. Never use alternate-index locking or unrestricted git add/update-index.",
+    "Under the held lock reread actual parents, source, phase, chain and index. Compare the approved semantic witness and all other entries.",
+    "Remove only the declared proof entry's unresolved stages and install its verified stage0 regular-file blob/mode. Preserve every other entry's raw bytes and semantic identity.",
+    "Materialize only the exact verified content-addressed blob object if absent. Verify existing object contents instead of replacing it. Object publication is an explicit child effect of this logical boundary, never a broad object-directory grant.",
+    "Write the complete checksummed index into the owned index.lock, flush it, atomically rename onto the real index, flush its parent, then return the exact new semantic witness and publication identity.",
+    "An ambiguous post-publication error preserves complete object/index/lock/phase evidence and reports unknown durability. Never delete a foreign successor or roll back published proof history."
+  ],
+  "exact_effect_recipes": [
+    "trusted-host-resolved-git-dir/index.lock (exclusive lock and complete staged index)",
+    "trusted-host-resolved-git-dir/index (one-entry CAS publication)",
+    "trusted-host-resolved-common-git-dir/objects/<first-two-oid-hex>/<remaining-oid-hex> (only derived proof-chain blob)",
+    "trusted-host-resolved-common-git-dir/objects/<first-two-oid-hex>/.<remaining-oid-hex>.<pid>-<uuid>.publish-staged (existing guarded no-replace primitive)"
+  ],
+  "prohibited": [
+    "ref update, commit, push or merge commit",
+    "business-source or catalogue staging",
+    "arbitrary Git administration filesystem grant",
+    "caller-created resource or receipt as authority",
+    "force removal, age-based lock stealing or unknown-file cleanup"
+  ],
+  "test_requirements": [
+    "Real linked-worktree administration outside checkout, both object formats and valid cache-tree extension.",
+    "Two actual processes contend on real index.lock; loser preserves winner bytes/inode and all unrelated entries.",
+    "Stale semantic index/parents/source/phase/chain and foreign logical/physical identity refuse.",
+    "Unknown extension/version, bad checksum, flags, malformed path, symlink, override and foreign lock refuse before dependent mutation.",
+    "Crash or fault at each durable object/index boundary preserves old-or-new complete index and exact owned/foreign custody; retry cannot broaden the approved phase."
+  ],
+  "implementation_standing": "No adapter or runtime target is implemented by this design document. Exact source ownership and closed runtime schemas remain required before writer edits."
+}

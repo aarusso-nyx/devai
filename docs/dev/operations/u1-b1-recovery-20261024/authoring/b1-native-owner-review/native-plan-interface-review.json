@@ -1,0 +1,41 @@
+{
+  "scope": "Bounded integrated native read-only plan output/interface review. No product/test/build changes.",
+  "decision": "No unresolved interface blocker after parent accepted explicit all-index-stage custody; implementation and real packaged rehearsal remain unqualified.",
+  "resolved": [
+    {
+      "finding": "Permitted authorization conflict can have three different indexed blobs at same path.",
+      "actual_evidence": "integrated-plan-stage-observation.json",
+      "correction_to_initial_claim": "Stage omission alone does not lose information when index.entries already binds stage+oid and an exhaustive exact content join exists. Initial suggestion was clarified before implementation.",
+      "accepted_output": "staged_files adds stage0|1|2|3, every actual index entry binds exact blob bytes; only stage0 noncatalogue is producer input."
+    },
+    {
+      "finding": "Plan digest determinism needs explicit array ordering as well as JCS key sorting.",
+      "accepted_output": "Sources UTF8(commit,path); staged entries native index path/stage order; bases ASCII; obligations UTF8(path)/sequence; ancestry commit OID."
+    }
+  ],
+  "required_source_invariants": [
+    "Derive initial selectors solely from current read-scoped sealed argv helper, not native API arguments.",
+    "Exact unique returned publication refname before OID equality or ancestry; effective transport allowlist after rewrites.",
+    "Complete actual parent/base chain and epoch versions plus raw commit ancestry. Refuse missing/shallow/promisor/alternates or graph overrides unless explicitly supported and proven complete; no replacement/lazy-fetch. These are retained dependency-review requirements.",
+    "Batch-check sizes before allocation, independently verify object type/length/Git object ID and raw SHA after read, enforce aggregate512MiB/perblob32MiB/index32MiB/100kentries/20kcommits before retaining unbounded data.",
+    "Every actual index entry accounted for, conflict variants data-only, no dirty or untracked producer substitution, complete stage0 configuration included, unresolved catalogue never producer.",
+    "Reobserve actual context HEAD/MERGE_HEAD/index/config/source/publication witnesses before returning. Git reads use no optional locks/ref/fetch/index mutation.",
+    "Validate original direct-anchor source in actual immutable history, complete epoch custody and unchanged historical chain/epoch hashes; no caller-labelled receipt substitutes.",
+    "Closed plan remains grants_authority:false; external exact canonicalJCS+LF SHA, no selfdigest. Output/effect recipes must close before any Owner publication or phase writer."
+  ],
+  "limits": [
+    "No native source module execution reviewed in this addendum.",
+    "No authority to mutate or stage derives from plan data or hashes.",
+    "No installed public positive or DETRAN end-to-end rehearsal completion claimed."
+  ],
+  "evidence": {
+    "integrated-plan-stage-observation.json": "e3293f724a85362a0bc7435407ccb718ce69569ae6d714c5538d371447d130b3",
+    "integrated-plan-origin-observation.json": "816511788a57bd598190d383bcc5a0e229e4cc84a0e950a759ba693b35919c9c",
+    "dependency-review.json": "36b409e14777b7bba8a8c009c1324469e81ad8af4541fa63e398ff984f31c817"
+  },
+  "graft": {
+    "current_saved_tokens": 21740,
+    "successful_calls_total": 31,
+    "estimated_saved_tokens_total": 619870
+  }
+}

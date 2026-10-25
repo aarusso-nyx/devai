@@ -1,0 +1,1554 @@
+// REC-B1-A-P1 private lifecycle fixture. These callbacks are never a public authority grant.
+import { createHash, randomUUID } from 'node:crypto';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { execFileSync, spawn } from 'node:child_process';
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+import type { AuthorityHostEffectRequest } from '@devai-nyx/authority';
+import { createAuthorityPolicyReview } from '../../src/authority/policy-review.js';
+
+const bytes = Buffer.from('{"fixture":"immutable exact bytes","materialized_at":"fixture-time"}\n');
+const hash = (value: Uint8Array) => createHash('sha256').update(value).digest('hex');
+const payload = () => ({
+  kind: 'authority-policy-create-review',
+  schema_version: '1.0.0',
+  status: 'awaiting-exact-confirmation',
+  target: '.devai/config/authority-policy.json',
+  operation: 'create',
+  grants_authority: false,
+});
+function fixture() {
+  let clock = 10;
+  const verifyActual = vi.fn();
+  const publish = vi.fn((frozen: Uint8Array) => ({ observed_sha256: hash(frozen) }));
+  const sourceBytes = Buffer.from(bytes);
+  const sourceReady = payload();
+  const handle = createAuthorityPolicyReview({
+    ready: sourceReady,
+    bytes: sourceBytes,
+    now: () => clock,
+    verifyActual,
+    publish,
+  });
+  return {
+    handle,
+    sourceBytes,
+    sourceReady,
+    verifyActual,
+    publish,
+    setClock: (n: number) => {
+      clock = n;
+    },
+  };
+}
+interface ReviewReport extends Readonly<Record<string, unknown>> {
+  readonly plan_sha256: string;
+  readonly artifact: {
+    readonly sha256: string;
+    readonly bytes_base64: string;
+    readonly size_bytes: number;
+    readonly encoding: string;
+  };
+}
+function start(handle: ReturnType<typeof createAuthorityPolicyReview>): ReviewReport {
+  return handle.start() as ReviewReport;
+}
+const confirmation = (report: ReviewReport) =>
+  `CREATE ${report.plan_sha256} ${report.artifact.sha256}`;
+
+describe('REC-B1-A-P1 owned review lifecycle', () => {
+  it('P1-04/P1-05 freezes exact displayed bytes defensively and grants no authority', () => {
+    const f = fixture();
+    f.sourceBytes.fill(0);
+    f.sourceReady.target = 'foreign';
+    const report = start(f.handle);
+    expect(report.target).toBe('.devai/config/authority-policy.json');
+    expect(report.grants_authority).toBe(false);
+    expect(report.artifact).toEqual({
+      bytes_base64: bytes.toString('base64'),
+      size_bytes: bytes.length,
+      sha256: hash(bytes),
+      encoding: 'base64',
+    });
+    expect(report.plan_sha256).toMatch(/^[a-f0-9]{64}$/u);
+    expect(Object.isFrozen(report)).toBe(true);
+    expect(Object.isFrozen(report.artifact)).toBe(true);
+    expect(f.verifyActual).not.toHaveBeenCalled();
+    expect(f.publish).not.toHaveBeenCalled();
+  });
+
+  it('P1-05 binds every ready field into whole-report plan SHA256', () => {
+    const f = fixture();
+    const report = start(f.handle);
+    const { plan_sha256, ...ready } = report;
+    function canonical(value: unknown): string {
+      if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
+      if (value !== null && typeof value === 'object') {
+        return `{${Object.keys(value)
+          .sort()
+          .map(
+            (key) => `${JSON.stringify(key)}:${canonical((value as Record<string, unknown>)[key])}`,
+          )
+          .join(',')}}`;
+      }
+      return JSON.stringify(value);
+    }
+    expect(plan_sha256).toBe(hash(Buffer.from(canonical(ready))));
+    expect(plan_sha256).not.toBe(hash(Buffer.from(canonical({ ...ready, target: 'other' }))));
+  });
+
+  it('P1-08/P1-20 refuses confirmation before ready and closes cancelled handles', () => {
+    const before = fixture();
+    expect(() => before.handle.confirm('CREATE anything anything')).toThrow(
+      'AUTHORITY_POLICY_REVIEW_HANDLE_INVALID',
+    );
+    expect(before.publish).not.toHaveBeenCalled();
+    const f = fixture();
+    const report = start(f.handle);
+    expect(f.handle.cancel()).toMatchObject({ status: 'cancelled', binding_performed: false });
+    expect(() => f.handle.confirm(confirmation(report))).toThrow(
+      'AUTHORITY_POLICY_REVIEW_HANDLE_INVALID',
+    );
+    expect(f.publish).not.toHaveBeenCalled();
+  });
+
+  it.each([0, 299_999])('P1-09 accepts monotonic elapsed %i below 300000ms', (elapsed) => {
+    const f = fixture();
+    f.setClock(100);
+    const report = start(f.handle);
+    f.setClock(100 + elapsed);
+    f.handle.confirm(confirmation(report));
+    expect(f.verifyActual).toHaveBeenCalledOnce();
+    expect(f.publish).toHaveBeenCalledOnce();
+  });
+
+  it.each([300_000, 300_001])('P1-09 expires monotonically at elapsed %i', (elapsed) => {
+    const f = fixture();
+    const report = start(f.handle);
+    f.setClock(10 + elapsed);
+    expect(() => f.handle.confirm(confirmation(report))).toThrow('AUTHORITY_POLICY_REVIEW_EXPIRED');
+    expect(f.verifyActual).not.toHaveBeenCalled();
+    expect(f.publish).not.toHaveBeenCalled();
+  });
+
+  it.each(['', 'yes', 'CREATE', 'create', 'PLAN_ONLY', 'ARTIFACT_ONLY'])(
+    'P1-10 refuses wrong exact confirmation %s and disposes',
+    (token) => {
+      const f = fixture();
+      const report = start(f.handle);
+      const wrong =
+        token === 'PLAN_ONLY'
+          ? `CREATE ${report.plan_sha256}`
+          : token === 'ARTIFACT_ONLY'
+            ? `CREATE ${report.artifact.sha256}`
+            : token;
+      expect(() => f.handle.confirm(wrong)).toThrow(
+        'AUTHORITY_POLICY_REVIEW_CONFIRMATION_MISMATCH',
+      );
+      expect(() => f.handle.confirm(confirmation(report))).toThrow(
+        'AUTHORITY_POLICY_REVIEW_HANDLE_INVALID',
+      );
+      expect(f.publish).not.toHaveBeenCalled();
+    },
+  );
+
+  it('P1-08 refuses another invocation report even for identical policy bytes', () => {
+    const first = createAuthorityPolicyReview({
+      ready: { ...payload(), invocation_id: 'one' },
+      bytes,
+      verifyActual: vi.fn(),
+      publish: vi.fn(),
+    });
+    const publish = vi.fn();
+    const second = createAuthorityPolicyReview({
+      ready: { ...payload(), invocation_id: 'two' },
+      bytes,
+      verifyActual: vi.fn(),
+      publish,
+    });
+    const report = start(first);
+    start(second);
+    expect(() => second.confirm(confirmation(report))).toThrow(
+      'AUTHORITY_POLICY_REVIEW_CONFIRMATION_MISMATCH',
+    );
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  it('P1-12/P1-14/P1-15 actual-state failure prevents publication and cannot be retried', () => {
+    const f = fixture();
+    f.verifyActual.mockImplementation(() => {
+      throw new Error('AUTHORITY_POLICY_REVIEW_PRECURSOR_PENDING');
+    });
+    const report = start(f.handle);
+    expect(() => f.handle.confirm(confirmation(report))).toThrow(
+      'AUTHORITY_POLICY_REVIEW_PRECURSOR_PENDING',
+    );
+    expect(f.publish).not.toHaveBeenCalled();
+    expect(() => f.handle.confirm(confirmation(report))).toThrow(
+      'AUTHORITY_POLICY_REVIEW_HANDLE_INVALID',
+    );
+  });
+
+  it('P1-16/P1-20 rechecks actual state immediately before single-use frozen-byte publication', () => {
+    const f = fixture();
+    const order: string[] = [];
+    f.verifyActual.mockImplementation(() => {
+      order.push('actual');
+    });
+    f.publish.mockImplementation((frozen) => {
+      order.push('publish');
+      expect(Buffer.from(frozen)).toEqual(bytes);
+      return { observed_sha256: hash(frozen) };
+    });
+    const report = start(f.handle);
+    f.handle.confirm(confirmation(report));
+    expect(order).toEqual(['actual', 'publish']);
+    expect(() => f.handle.confirm(confirmation(report))).toThrow(
+      'AUTHORITY_POLICY_REVIEW_HANDLE_INVALID',
+    );
+    expect(f.publish).toHaveBeenCalledOnce();
+  });
+
+  it('P1-08 a cloned or detached public report cannot impersonate its private handle', () => {
+    const f = fixture();
+    const report = start(f.handle);
+    const clone = { ...f.handle };
+    expect(() => clone.confirm(confirmation(report))).toThrow(
+      'AUTHORITY_POLICY_REVIEW_HANDLE_INVALID',
+    );
+    const detached = f.handle.confirm;
+    expect(() => detached(confirmation(report))).toThrow('AUTHORITY_POLICY_REVIEW_HANDLE_INVALID');
+    expect(f.publish).not.toHaveBeenCalled();
+    f.handle.cancel();
+  });
+
+  it('P1-19 propagates publication uncertainty without retry or rollback', () => {
+    const f = fixture();
+    f.publish.mockImplementation(() => {
+      throw new Error('AUTHORITY_PUBLISH_CLEANUP_INCOMPLETE');
+    });
+    const report = start(f.handle);
+    expect(() => f.handle.confirm(confirmation(report))).toThrow(
+      'AUTHORITY_PUBLISH_CLEANUP_INCOMPLETE',
+    );
+    expect(() => f.handle.confirm(confirmation(report))).toThrow(
+      'AUTHORITY_POLICY_REVIEW_HANDLE_INVALID',
+    );
+    expect(f.publish).toHaveBeenCalledOnce();
+  });
+});
+
+// Synthetic installed-layout fixture, explicitly not an admitted distributable package.
+// Only test mocks supply this private import location and resolver; public CLI has no override.
+const fixtureRoots: string[] = [];
+const originalTty = [process.stdin, process.stdout, process.stderr].map((stream) => ({
+  stream,
+  descriptor: Object.getOwnPropertyDescriptor(stream, 'isTTY'),
+}));
+const sourceRoot = resolve(import.meta.dirname, '../../../..');
+afterEach(() => {
+  vi.doUnmock('node:fs');
+  vi.doUnmock('node:url');
+  vi.doUnmock('@devai-nyx/skills');
+  vi.resetModules();
+  for (const { stream, descriptor } of originalTty) {
+    if (descriptor) Object.defineProperty(stream, 'isTTY', descriptor);
+    else delete (stream as { isTTY?: boolean }).isTTY;
+  }
+  for (const root of fixtureRoots.splice(0)) rmSync(root, { recursive: true, force: true });
+});
+function put(root: string, path: string, content: string | object) {
+  const target = join(root, path);
+  mkdirSync(dirname(target), { recursive: true });
+  writeFileSync(
+    target,
+    typeof content === 'string' ? content : `${JSON.stringify(content, null, 2)}\n`,
+  );
+}
+function inventory(root: string): Record<string, string> {
+  const result: Record<string, string> = {};
+  function walk(path: string) {
+    for (const entry of readdirSync(join(root, path), { withFileTypes: true })) {
+      const name = path ? `${path}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) walk(name);
+      else if (entry.isFile()) result[name] = hash(readFileSync(join(root, name)));
+      else result[name] = `special:${lstatSync(join(root, name)).mode}`;
+    }
+  }
+  walk('');
+  return result;
+}
+async function productionFixture(
+  withReceipt = false,
+  syntheticAdmission = true,
+  shared?: { readonly root: string; readonly packageRoot: string },
+) {
+  const outer = shared
+    ? dirname(shared.root)
+    : realpathSync(mkdtempSync(join(tmpdir(), 'devai-p1-synthetic-')));
+  if (!shared) fixtureRoots.push(outer);
+  const root = shared?.root ?? join(outer, 'repository');
+  const packageRoot = shared?.packageRoot ?? join(outer, 'synthetic-package');
+  const canonicalPath = join(packageRoot, 'dist/law/constitution.md');
+  const git = (args: readonly string[]) =>
+    execFileSync('git', [...args], {
+      cwd: root,
+      encoding: 'utf8',
+      env: { ...process.env, GIT_OPTIONAL_LOCKS: '0' },
+    }).trim();
+  if (!shared) {
+    mkdirSync(root);
+    put(packageRoot, 'package.json', {
+      name: '@aarusso-nyx/devai',
+      version: '2.7.1',
+      dependencies: { 'devai-p1-fixture-dependency': '1.0.0' },
+    });
+    put(packageRoot, 'node_modules/devai-p1-fixture-dependency/package.json', {
+      name: 'devai-p1-fixture-dependency',
+      version: '1.0.0',
+    });
+    put(
+      packageRoot,
+      'node_modules/devai-p1-fixture-dependency/index.js',
+      '// synthetic dependency, no installed package qualification\n',
+    );
+    put(
+      packageRoot,
+      'dist/runtime/index/broker.js',
+      '// SYNTHETIC fixture identity, never a live package\n',
+    );
+    put(
+      packageRoot,
+      'dist/law/constitution.md',
+      readFileSync(join(sourceRoot, 'law/constitution.md'), 'utf8'),
+    );
+    put(
+      root,
+      '.devai/pin/constitution.md',
+      readFileSync(join(sourceRoot, '.devai/pin/constitution.md'), 'utf8'),
+    );
+    put(
+      root,
+      '.devai/config/project.json',
+      JSON.parse(readFileSync(join(sourceRoot, '.devai/config/project.json'), 'utf8')),
+    );
+    put(
+      root,
+      '.devai/constitution.md',
+      readFileSync(join(sourceRoot, '.devai/constitution.md'), 'utf8'),
+    );
+    put(root, 'README.md', '# isolated P1 fixture\n');
+    if (withReceipt) {
+      put(
+        root,
+        '.devai/config/adopter-policy-binding.json',
+        readFileSync(join(sourceRoot, '.devai/config/adopter-policy-binding.json'), 'utf8'),
+      );
+      put(
+        root,
+        'law/policy/devai-adoption.json',
+        readFileSync(join(sourceRoot, 'law/policy/devai-adoption.json'), 'utf8'),
+      );
+    }
+    git(['init', '-q']);
+    git([
+      '-c',
+      'user.name=P1 Fixture',
+      '-c',
+      'user.email=p1@example.invalid',
+      '-c',
+      'core.hooksPath=/dev/null',
+      'add',
+      '.',
+    ]);
+    git([
+      '-c',
+      'user.name=P1 Fixture',
+      '-c',
+      'user.email=p1@example.invalid',
+      '-c',
+      'commit.gpgSign=false',
+      '-c',
+      'core.hooksPath=/dev/null',
+      'commit',
+      '-qm',
+      'fixture',
+    ]);
+  }
+  vi.resetModules();
+  const rawMutations = vi.fn();
+  vi.doMock('node:fs', async () => {
+    const actual = await vi.importActual<typeof import('node:fs')>('node:fs');
+    const result: Record<string, unknown> = { ...actual };
+    for (const name of [
+      'writeFileSync',
+      'mkdirSync',
+      'writeSync',
+      'renameSync',
+      'unlinkSync',
+      'rmSync',
+      'rmdirSync',
+      'linkSync',
+      'symlinkSync',
+      'truncateSync',
+      'ftruncateSync',
+      'copyFileSync',
+      'cpSync',
+      'fsyncSync',
+    ] as const) {
+      result[name] = (...args: unknown[]) => {
+        rawMutations(name, args);
+        return Reflect.apply(actual[name], actual, args);
+      };
+    }
+    result.openSync = (...args: unknown[]) => {
+      const flags = args[1];
+      if (
+        typeof flags === 'string'
+          ? /[wa+]/u.test(flags)
+          : typeof flags === 'number' &&
+            (flags &
+              (actual.constants.O_WRONLY |
+                actual.constants.O_RDWR |
+                actual.constants.O_CREAT |
+                actual.constants.O_TRUNC |
+                actual.constants.O_APPEND)) !==
+              0
+      )
+        rawMutations('openSync', args);
+      return Reflect.apply(actual.openSync, actual, args);
+    };
+    return result;
+  });
+  if (syntheticAdmission) {
+    vi.doMock('node:url', async () => {
+      const actual = await vi.importActual<typeof import('node:url')>('node:url');
+      return {
+        ...actual,
+        fileURLToPath: (url: string | URL, options?: { windows?: boolean }) => {
+          const path = actual.fileURLToPath(url, options);
+          return path.endsWith('/src/authority/broker.ts')
+            ? join(packageRoot, 'dist/runtime/index/broker.js')
+            : path;
+        },
+      };
+    });
+    vi.doMock('@devai-nyx/skills', async () => {
+      const actual = await vi.importActual<typeof import('@devai-nyx/skills')>('@devai-nyx/skills');
+      return {
+        ...actual,
+        resolveCanonicalConstitution: () => {
+          const text = readFileSync(canonicalPath, 'utf8');
+          return {
+            text,
+            version: actual.parseConstitutionVersion(text),
+            sha256: hash(Buffer.from(text)),
+            path: canonicalPath,
+            source: 'bundled',
+          };
+        },
+      };
+    });
+  }
+  const { createAuthorityHostBroker } = await import('../../src/authority/broker.js');
+  const { canonicalRegistry } = await import('../../src/define-command.js');
+  const { runWithAuthorityHostEffects } = await import('@devai-nyx/authority');
+  const { buildTrustedAuthoritySources, buildProspectiveAuthoritySources } =
+    await import('../../src/authority/policy.js');
+  const { reconcileProjectConfig } = await import('@devai-nyx/skills');
+  const entries = canonicalRegistry();
+  const entry = entries.find((row) => row.name === 'init bind');
+  if (!entry) throw new Error('fixture init bind registry missing');
+  const brokerInput = {
+    entry,
+    entries,
+    argv: [
+      'node',
+      'devai',
+      'init',
+      'bind',
+      '--review-authority-policy',
+      '--after-constitution',
+      '--target',
+      root,
+      '--as-role',
+      'architect',
+      '--write',
+      '--format',
+      'json',
+    ],
+    role: 'architect' as const,
+    declaration: { as_role: 'architect' as const },
+    repository_root: root,
+    package_version: '2.7.1',
+    bootstrap_policy: true,
+  };
+  const host = createAuthorityHostBroker(brokerInput);
+  const previewEffects = vi.fn((request: AuthorityHostEffectRequest, apply: () => unknown) =>
+    host.scope.apply_effect(request, apply),
+  );
+  function prepare() {
+    for (const { stream } of originalTty)
+      Object.defineProperty(stream, 'isTTY', { configurable: true, value: true });
+    return runWithAuthorityHostEffects({ ...host.scope, apply_effect: previewEffects }, () =>
+      host.policy_materialization?.(),
+    ) as ReturnType<typeof createAuthorityPolicyReview>;
+  }
+  function advance() {
+    const text = readFileSync(canonicalPath, 'utf8');
+    const project = JSON.parse(readFileSync(join(root, '.devai/config/project.json'), 'utf8'));
+    put(root, '.devai/pin/constitution.md', text);
+    put(
+      root,
+      '.devai/config/project.json',
+      reconcileProjectConfig(project, {
+        version: '2.7.1',
+        constitution: { version: '1.2.0', sha256: hash(Buffer.from(text)) },
+      }),
+    );
+  }
+  return {
+    root,
+    packageRoot,
+    canonicalPath,
+    git,
+    host,
+    newBroker: () => createAuthorityHostBroker(brokerInput),
+    previewEffects,
+    rawMutations,
+    prepare,
+    advance,
+    runWithAuthorityHostEffects,
+    entries,
+    buildTrustedAuthoritySources,
+    buildProspectiveAuthoritySources,
+  };
+}
+
+describe('REC-B1-A-P1 production broker with isolated synthetic bundle fixture', () => {
+  it('P1-11 refuses source checkout as installed authority without the test-only synthetic bundle seam', async () => {
+    const f = await productionFixture(false, false);
+    try {
+      expect(f.prepare).toThrow('AUTHORITY_POLICY_REVIEW_INPUTS_UNSUPPORTED');
+    } finally {
+      f.host.dispose();
+    }
+  });
+
+  it.each([false, true])(
+    'P1-03/P1-04/P1-06/P1-22 projects1.2 while actual1.1 remains unchanged; receipt=%s',
+    async (receipt) => {
+      const f = await productionFixture(receipt);
+      try {
+        const before = inventory(f.root);
+        const handle = f.prepare();
+        const report = start(handle);
+        const artifact = JSON.parse(
+          Buffer.from(report.artifact.bytes_base64, 'base64').toString('utf8'),
+        ) as Record<string, unknown>;
+        expect(report.grants_authority).toBe(false);
+        expect(report.allowed_precursor_transition).toEqual([
+          '.devai/pin/constitution.md',
+          '.devai/config/project.json',
+        ]);
+        expect(report.inputs_before).not.toEqual(report.prospective_after);
+        expect(artifact.constitution).toEqual({
+          version: '1.2.0',
+          digest_sha256: hash(readFileSync(f.canonicalPath)),
+        });
+        expect(readFileSync(join(f.root, '.devai/pin/constitution.md'), 'utf8')).toContain('1.1.0');
+        expect(inventory(f.root)).toEqual(before);
+        const prospective = f.buildProspectiveAuthoritySources(f.entries, f.root, '2.7.1');
+        expect(prospective.sources.constitution_binding.version).toBe('1.2.0');
+        f.advance();
+        const actual = f.buildTrustedAuthoritySources(f.entries, f.root, '2.7.1');
+        expect(actual.provenance).toEqual(prospective.sources.provenance);
+        expect(actual.rules).toEqual(prospective.sources.rules);
+        handle.cancel();
+        expect(f.previewEffects).not.toHaveBeenCalled();
+        expect(f.rawMutations).not.toHaveBeenCalled();
+      } finally {
+        f.host.dispose();
+      }
+    },
+  );
+
+  it('P1-14/P1-15 refuses final publication while real precursor is still pending', async () => {
+    const f = await productionFixture();
+    try {
+      const before = inventory(f.root);
+      const handle = f.prepare();
+      const report = start(handle);
+      expect(() =>
+        f.runWithAuthorityHostEffects(f.host.scope, () => handle.confirm(confirmation(report))),
+      ).toThrow('AUTHORITY_POLICY_REVIEW_PRECURSOR_PENDING');
+      expect(inventory(f.root)).toEqual(before);
+    } finally {
+      f.host.dispose();
+    }
+  });
+
+  it('P1-16 emits exactly the frozen policy after fixture-only legitimate actual successor transition', async () => {
+    const f = await productionFixture(true);
+    try {
+      const handle = f.prepare();
+      const report = start(handle);
+      f.advance();
+      const beforePublish = inventory(f.root);
+      const result = f.runWithAuthorityHostEffects(f.host.scope, () =>
+        handle.confirm(confirmation(report)),
+      );
+      expect(result).toMatchObject({
+        status: 'created',
+        binding_performed: true,
+        digest_sha256: report.artifact.sha256,
+      });
+      const actual = readFileSync(join(f.root, '.devai/config/authority-policy.json'));
+      expect(actual).toEqual(Buffer.from(report.artifact.bytes_base64, 'base64'));
+      expect(hash(actual)).toBe(report.artifact.sha256);
+      const after = inventory(f.root);
+      delete after['.devai/config/authority-policy.json'];
+      expect(after).toEqual(beforePublish);
+      const evidenceDirectory = process.env['DEVAI_P1_FIXTURE_EVIDENCE_DIR'];
+      if (evidenceDirectory) {
+        const label =
+          'SYNTHETIC DISPOSABLE FIXTURE ONLY; not an admitted package or live-use approval';
+        writeFileSync(
+          join(evidenceDirectory, 'synthetic-fixture-ready.json'),
+          `${JSON.stringify({ label, ready: report }, null, 2)}\n`,
+        );
+        writeFileSync(
+          join(evidenceDirectory, 'synthetic-fixture-completion.json'),
+          `${JSON.stringify({ label, result, before: beforePublish, after: inventory(f.root) }, (_key, value: unknown) => (typeof value === 'bigint' ? value.toString() : value), 2)}\n`,
+        );
+      }
+    } finally {
+      f.host.dispose();
+    }
+  });
+
+  it.each([
+    'pointer',
+    'source',
+    'project',
+    'pin-only',
+    'index',
+    'head',
+    'package',
+    'lock',
+    'parent-config',
+    'parent-pin',
+    'receipt',
+    'receipt-source',
+    'host-mode',
+    'dependency',
+  ])('P1-12/P1-14/P1-21 refuses changed %s inputs', async (changed) => {
+    const f = await productionFixture(true);
+    try {
+      const handle = f.prepare();
+      const report = start(handle);
+      f.advance();
+      if (changed === 'pointer') put(f.root, '.devai/constitution.md', 'foreign pointer\n');
+      if (changed === 'source') put(f.root, 'README.md', 'foreign source\n');
+      if (changed === 'project') {
+        const project = JSON.parse(
+          readFileSync(join(f.root, '.devai/config/project.json'), 'utf8'),
+        );
+        put(f.root, '.devai/config/project.json', { ...project, foreign: true });
+      }
+      if (changed === 'pin-only')
+        put(
+          f.root,
+          '.devai/config/project.json',
+          readFileSync(join(sourceRoot, '.devai/config/project.json'), 'utf8'),
+        );
+      if (changed === 'parent-config' || changed === 'parent-pin') {
+        const directory = join(
+          f.root,
+          changed === 'parent-config' ? '.devai/config' : '.devai/pin',
+        );
+        const files = readdirSync(directory).map(
+          (name) => [name, readFileSync(join(directory, name))] as const,
+        );
+        rmSync(directory, { recursive: true });
+        mkdirSync(directory);
+        for (const [name, bytes] of files) writeFileSync(join(directory, name), bytes);
+      }
+      if (changed === 'index') f.git(['add', '.devai/pin/constitution.md']);
+      if (changed === 'head')
+        f.git([
+          '-c',
+          'user.name=P1 Fixture',
+          '-c',
+          'user.email=p1@example.invalid',
+          '-c',
+          'commit.gpgSign=false',
+          '-c',
+          'core.hooksPath=/dev/null',
+          'commit',
+          '--allow-empty',
+          '-qm',
+          'foreign',
+        ]);
+      if (changed === 'receipt') {
+        const receipt = JSON.parse(
+          readFileSync(join(f.root, '.devai/config/adopter-policy-binding.json'), 'utf8'),
+        );
+        put(f.root, '.devai/config/adopter-policy-binding.json', { ...receipt, foreign: true });
+      }
+      if (changed === 'receipt-source') {
+        const source = JSON.parse(
+          readFileSync(join(f.root, 'law/policy/devai-adoption.json'), 'utf8'),
+        );
+        put(f.root, 'law/policy/devai-adoption.json', { ...source, policy_version: '1.3.1' });
+      }
+      if (changed === 'host-mode') {
+        const project = JSON.parse(
+          readFileSync(join(f.root, '.devai/config/project.json'), 'utf8'),
+        );
+        put(f.root, '.devai/config/project.json', {
+          ...project,
+          authority_enforcement: { mode: 'host-integrated' },
+        });
+      }
+      if (changed === 'dependency')
+        put(
+          f.packageRoot,
+          'node_modules/devai-p1-fixture-dependency/index.js',
+          '// changed fixture dependency\n',
+        );
+      if (changed === 'package')
+        put(f.packageRoot, 'dist/runtime/index/broker.js', 'foreign installed code\n');
+      if (changed === 'lock') put(f.root, '.devai/config/upgrade.lock', '{"stale":true}\n');
+      const before = inventory(f.root);
+      expect(() =>
+        f.runWithAuthorityHostEffects(f.host.scope, () => handle.confirm(confirmation(report))),
+      ).toThrow(
+        /AUTHORITY_POLICY_REVIEW_(?:STALE_INPUT|PRECURSOR_PENDING|LOCKED|INPUTS_UNSUPPORTED)/u,
+      );
+      expect(inventory(f.root)).toEqual(before);
+      expect(existsSync(join(f.root, '.devai/config/authority-policy.json'))).toBe(false);
+    } finally {
+      f.host.dispose();
+    }
+  });
+
+  it.each(['file', 'malformed', 'symlink', 'directory', 'special'])(
+    'P1-17 refuses preexisting %s without replacement or cleanup',
+    async (kind) => {
+      const f = await productionFixture();
+      try {
+        const target = join(f.root, '.devai/config/authority-policy.json');
+        if (kind === 'special') execFileSync('mkfifo', [target]);
+        else if (kind === 'directory') mkdirSync(target);
+        else if (kind === 'symlink') symlinkSync(join(f.root, 'README.md'), target);
+        else writeFileSync(target, kind === 'file' ? '{"rules":[]}\n' : 'malformed\n');
+        const before = inventory(f.root);
+        expect(f.prepare).toThrow('AUTHORITY_POLICY_REVIEW_TARGET_NOT_ABSENT');
+        expect(inventory(f.root)).toEqual(before);
+      } finally {
+        f.host.dispose();
+      }
+    },
+  );
+
+  it.each([
+    'extension-receipt',
+    'authority-source',
+    'missing-source',
+    'drifted-source',
+    'host-integrated',
+    'lock',
+  ])('P1-13/P1-21 rejects unsupported %s at admission', async (kind) => {
+    const f = await productionFixture(true);
+    try {
+      if (kind === 'extension-receipt') {
+        const receipt = JSON.parse(
+          readFileSync(join(f.root, '.devai/config/adopter-policy-binding.json'), 'utf8'),
+        );
+        put(f.root, '.devai/config/adopter-policy-binding.json', {
+          ...receipt,
+          authority_extension: {},
+        });
+      }
+      if (kind === 'missing-source') rmSync(join(f.root, 'law/policy/devai-adoption.json'));
+      if (kind === 'drifted-source') put(f.root, 'law/policy/devai-adoption.json', '{}\n');
+      if (kind === 'authority-source') {
+        const source = JSON.parse(
+          readFileSync(join(f.root, 'law/policy/devai-adoption.json'), 'utf8'),
+        );
+        const bytes = `${JSON.stringify({ ...source, authority: { fixture: true } }, null, 2)}\n`;
+        put(f.root, 'law/policy/devai-adoption.json', bytes);
+        const receipt = JSON.parse(
+          readFileSync(join(f.root, '.devai/config/adopter-policy-binding.json'), 'utf8'),
+        );
+        put(f.root, '.devai/config/adopter-policy-binding.json', {
+          ...receipt,
+          source_digest_sha256: hash(Buffer.from(bytes)),
+        });
+      }
+      if (kind === 'host-integrated') {
+        const project = JSON.parse(
+          readFileSync(join(f.root, '.devai/config/project.json'), 'utf8'),
+        );
+        put(f.root, '.devai/config/project.json', {
+          ...project,
+          authority_enforcement: { mode: 'host-integrated' },
+        });
+      }
+      if (kind === 'lock') put(f.root, '.devai/config/upgrade.lock', 'stale\n');
+      const before = inventory(f.root);
+      expect(f.prepare).toThrow(/AUTHORITY_POLICY_REVIEW_(?:INPUTS_UNSUPPORTED|LOCKED)/u);
+      expect(inventory(f.root)).toEqual(before);
+    } finally {
+      f.host.dispose();
+    }
+  });
+});
+
+describe('P1 remaining private counterexamples', () => {
+  it('P1-09 wall-clock jump cannot expire or extend a review whose monotonic clock is unchanged', () => {
+    const f = fixture();
+    const report = start(f.handle);
+    const wall = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 86_400_000);
+    try {
+      f.handle.confirm(confirmation(report));
+      expect(f.publish).toHaveBeenCalledOnce();
+    } finally {
+      wall.mockRestore();
+    }
+    const expired = fixture();
+    const second = start(expired.handle);
+    const backward = vi.spyOn(Date, 'now').mockReturnValue(Date.now() - 86_400_000);
+    try {
+      expired.setClock(300_010);
+      expect(() => expired.handle.confirm(confirmation(second))).toThrow(
+        'AUTHORITY_POLICY_REVIEW_EXPIRED',
+      );
+      expect(expired.publish).not.toHaveBeenCalled();
+    } finally {
+      backward.mockRestore();
+    }
+  });
+
+  it.each(['plan', 'artifact', 'case', 'literal', 'leading-space', 'trailing-space'])(
+    'P1-10 complete token with changed %s refuses and disposes',
+    (change) => {
+      const f = fixture();
+      const report = start(f.handle);
+      const correct = confirmation(report);
+      const replaceFirst = (value: string) => `${value[0] === '0' ? '1' : '0'}${value.slice(1)}`;
+      const wrong =
+        change === 'plan'
+          ? `CREATE ${replaceFirst(report.plan_sha256)} ${report.artifact.sha256}`
+          : change === 'artifact'
+            ? `CREATE ${report.plan_sha256} ${replaceFirst(report.artifact.sha256)}`
+            : change === 'case'
+              ? correct.toLowerCase()
+              : change === 'literal'
+                ? `${report.plan_sha256} ${report.artifact.sha256}`
+                : change === 'leading-space'
+                  ? ` ${correct}`
+                  : `${correct} `;
+      expect(() => f.handle.confirm(wrong)).toThrow(
+        'AUTHORITY_POLICY_REVIEW_CONFIRMATION_MISMATCH',
+      );
+      expect(() => f.handle.confirm(correct)).toThrow('AUTHORITY_POLICY_REVIEW_HANDLE_INVALID');
+      expect(f.publish).not.toHaveBeenCalled();
+    },
+  );
+
+  it('P1-03 fresh review from already exact successor preserves state, creates a new plan and rejects the previous confirmation', async () => {
+    const f = await productionFixture(true);
+    let second: ReturnType<typeof f.newBroker> | undefined;
+    let third: ReturnType<typeof f.newBroker> | undefined;
+    try {
+      const predecessor = f.prepare();
+      const oldReport = start(predecessor);
+      f.advance();
+      const successorInventory = inventory(f.root);
+      second = f.newBroker();
+      const secondScope = second.scope;
+      const fresh = f.runWithAuthorityHostEffects(second.scope, () =>
+        second?.policy_materialization?.(),
+      ) as ReturnType<typeof createAuthorityPolicyReview>;
+      const freshReport = start(fresh);
+      expect(freshReport.inputs_before).toEqual(freshReport.prospective_after);
+      expect(freshReport.plan_sha256).not.toBe(oldReport.plan_sha256);
+      expect(freshReport.invocation_id).not.toBe(oldReport.invocation_id);
+      expect(inventory(f.root)).toEqual(successorInventory);
+      expect(() =>
+        f.runWithAuthorityHostEffects(secondScope, () => fresh.confirm(confirmation(oldReport))),
+      ).toThrow('AUTHORITY_POLICY_REVIEW_CONFIRMATION_MISMATCH');
+      expect(inventory(f.root)).toEqual(successorInventory);
+      third = f.newBroker();
+      const live = f.runWithAuthorityHostEffects(third.scope, () =>
+        third?.policy_materialization?.(),
+      ) as ReturnType<typeof createAuthorityPolicyReview>;
+      const report = start(live);
+      const result = f.runWithAuthorityHostEffects(third.scope, () =>
+        live.confirm(confirmation(report)),
+      );
+      expect(result).toMatchObject({ status: 'created', digest_sha256: report.artifact.sha256 });
+      expect(readFileSync(join(f.root, '.devai/config/authority-policy.json'))).toEqual(
+        Buffer.from(report.artifact.bytes_base64, 'base64'),
+      );
+      predecessor.cancel();
+    } finally {
+      second?.dispose();
+      third?.dispose();
+      f.host.dispose();
+    }
+  });
+
+  it('P1-17 refuses symlinked ancestor configuration directory without touching its referent', async () => {
+    const f = await productionFixture();
+    try {
+      const directory = join(f.root, '.devai/config');
+      const preserved = readFileSync(join(directory, 'project.json'));
+      const referent = join(f.root, 'foreign-config');
+      mkdirSync(referent);
+      writeFileSync(join(referent, 'project.json'), preserved);
+      rmSync(directory, { recursive: true });
+      symlinkSync(referent, directory);
+      const before = inventory(f.root);
+      expect(f.prepare).toThrow('AUTHORITY_POLICY_REVIEW_INPUTS_UNSUPPORTED');
+      expect(inventory(f.root)).toEqual(before);
+      expect(readFileSync(join(referent, 'project.json'))).toEqual(preserved);
+    } finally {
+      f.host.dispose();
+    }
+  });
+});
+
+describe('approved output amendment integrated disposable public fixture', () => {
+  it.each(['created', 'indeterminate', 'created-successor'] as const)(
+    'observes actual broker READY before input and exact %s outcome through both real boundaries',
+    async (mode) => {
+      const f = await productionFixture(true);
+      if (mode === 'created-successor') f.advance();
+      const saved = { argv: process.argv, exitCode: process.exitCode };
+      let stdout = '';
+      let stderr = '';
+      let pending: unknown;
+      const { EventEmitter } = await import('node:events');
+      const terminal = new EventEmitter() as InstanceType<typeof EventEmitter> & { close(): void };
+      terminal.close = () => {
+        terminal.emit('close');
+      };
+      vi.doMock('node:readline', () => ({ createInterface: () => terminal }));
+      const { createRequire } = await import('node:module');
+      const { cac } = createRequire(import.meta.url)('../../node_modules/cac/index-compat.js') as {
+        cac: (name?: string) => import('cac').CAC;
+      };
+      const { initBind } = await import('../../src/commands/init/index.js');
+      const {
+        attachAuthorityCommandBoundaries,
+        authorizeCliArgv,
+        disposeCliInvocationAuthority,
+        stripAuthorityArgv,
+      } = await import('../../src/authority/index.js');
+      const { attachActionOutputBoundaries, requireAuthorityPolicyReviewOutput } =
+        await import('../../src/action-output.js');
+      const { executeAuthorityPolicyMaterialization } =
+        await import('../../src/authority/command-capabilities.js');
+      const { routeArgv } = await import('../../src/command-router.js');
+      const out = vi.spyOn(process.stdout, 'write').mockImplementation(((chunk: unknown) => {
+        stdout += String(chunk);
+        return true;
+      }) as typeof process.stdout.write);
+      const err = vi.spyOn(process.stderr, 'write').mockImplementation(((chunk: unknown) => {
+        stderr += String(chunk);
+        return true;
+      }) as typeof process.stderr.write);
+      const streams = {
+        stdout: process.stdout.write,
+        stderr: process.stderr.write,
+        exit: process.exit,
+      };
+      for (const { stream } of originalTty)
+        Object.defineProperty(stream, 'isTTY', { configurable: true, value: true });
+      process.argv = [
+        'node',
+        'devai',
+        'init',
+        'bind',
+        '--review-authority-policy',
+        '--after-constitution',
+        '--target',
+        f.root,
+        '--as-role',
+        'architect',
+        '--write',
+        '--format',
+        'json',
+      ];
+      const cli = cac('devai-p1-actual-public-fixture');
+      initBind.register(cli);
+      cli.option('--format <format>', 'Output format');
+      attachAuthorityCommandBoundaries(cli.commands, f.entries);
+      attachActionOutputBoundaries(cli.commands, f.entries);
+      try {
+        const route = routeArgv(stripAuthorityArgv(process.argv), f.entries, '2.7.1');
+        expect(route.kind).toBe('dispatch');
+        if (route.kind !== 'dispatch') throw new Error('fixture did not route');
+        cli.parse(route.argv, { run: false });
+        expect(authorizeCliArgv(process.argv, f.entries)).toBeUndefined();
+        const before = inventory(f.root);
+        pending = cli.runMatchedCommand();
+        expect(pending).toBeInstanceOf(Promise);
+        const initial = stdout
+          .trim()
+          .split('\n')
+          .map((line) => JSON.parse(line));
+        expect(initial).toHaveLength(1);
+        expect(initial[0]).toMatchObject({
+          action_id: 'init bind',
+          ok: true,
+          result: { verdict: 'review' },
+        });
+        const report = initial[0].result.value as ReviewReport;
+        expect(report.status).toBe('awaiting-exact-confirmation');
+        expect(stderr).toContain(`CREATE ${report.plan_sha256} ${report.artifact.sha256}`);
+        expect(inventory(f.root)).toEqual(before);
+        expect(f.rawMutations).not.toHaveBeenCalled();
+        expect(existsSync(join(f.root, '.devai/config/authority-policy.json'))).toBe(false);
+        const observedBeforeInput = {
+          label:
+            'SYNTHETIC DISPOSABLE PUBLIC FIXTURE ONLY; not an admitted package or live-use approval',
+          ready_envelope: initial[0],
+          prompt: stderr,
+          inventory: before,
+          input_delivered: false,
+        };
+        if (mode !== 'created-successor') f.advance();
+        else expect(report.inputs_before).toEqual(report.prospective_after);
+        const actualSuccessor = inventory(f.root);
+        if (mode === 'indeterminate') {
+          let linked = false;
+          f.rawMutations.mockImplementation((name: string) => {
+            if (name === 'linkSync') linked = true;
+            if (name === 'fsyncSync' && linked)
+              throw Object.assign(new Error('fixture directory fsync EIO'), { code: 'EIO' });
+          });
+        }
+        terminal.emit('line', `CREATE ${report.plan_sha256} ${report.artifact.sha256}`);
+        await pending;
+        const envelopes = [...stdout.split('\n'), ...stderr.split('\n')]
+          .filter((line) => line.startsWith('{'))
+          .map((line) => JSON.parse(line));
+        expect(envelopes).toHaveLength(2);
+        if (mode !== 'indeterminate') {
+          expect(envelopes[1]).toMatchObject({
+            action_id: 'init bind',
+            ok: true,
+            result: {
+              verdict: 'pass',
+              value: {
+                status: 'created',
+                binding_performed: true,
+                digest_sha256: report.artifact.sha256,
+              },
+            },
+          });
+        } else {
+          const stat = lstatSync(join(f.root, '.devai/config/authority-policy.json'), {
+            bigint: true,
+          });
+          expect(envelopes[1]).toMatchObject({
+            action_id: 'init bind',
+            ok: false,
+            error: {
+              code: 'ACTION_INVOCATION_REFUSED',
+              class: 'infrastructure',
+              exit: 6,
+              context: {
+                publication: {
+                  code: 'AUTHORITY_PUBLISH_CLEANUP_INCOMPLETE',
+                  path: join(f.root, '.devai/config/authority-policy.json'),
+                  staged_remaining: false,
+                  identity: {
+                    dev: stat.dev.toString(),
+                    ino: stat.ino.toString(),
+                    birthtimeNs: stat.birthtimeNs.toString(),
+                  },
+                },
+              },
+            },
+          });
+          expect(process.exitCode).toBe(6);
+          expect(
+            envelopes.some((entry) => entry.ok === true && entry.result?.verdict === 'pass'),
+          ).toBe(false);
+        }
+        const actual = readFileSync(join(f.root, '.devai/config/authority-policy.json'));
+        expect(actual).toEqual(Buffer.from(report.artifact.bytes_base64, 'base64'));
+        expect(hash(actual)).toBe(report.artifact.sha256);
+        const after = inventory(f.root);
+        delete after['.devai/config/authority-policy.json'];
+        expect(after).toEqual(actualSuccessor);
+        expect(process.stdout.write).toBe(streams.stdout);
+        expect(process.stderr.write).toBe(streams.stderr);
+        expect(process.exit).toBe(streams.exit);
+        disposeCliInvocationAuthority();
+        expect(executeAuthorityPolicyMaterialization).toThrow(
+          'AUTHORITY_POLICY_MATERIALIZATION_REQUIRED',
+        );
+        expect(requireAuthorityPolicyReviewOutput).toThrow(
+          'AUTHORITY_POLICY_REVIEW_INPUTS_UNSUPPORTED',
+        );
+        const evidence = process.env['DEVAI_P1_PUBLIC_FIXTURE_EVIDENCE_DIR'];
+        if (evidence) {
+          writeFileSync(
+            join(
+              evidence,
+              mode === 'created'
+                ? 'public-ready-before-input.json'
+                : mode === 'created-successor'
+                  ? 'public-successor-ready-before-input.json'
+                  : 'public-indeterminate-ready-before-input.json',
+            ),
+            `${JSON.stringify(observedBeforeInput, null, 2)}\n`,
+          );
+          writeFileSync(
+            join(
+              evidence,
+              mode === 'created'
+                ? 'public-completion.json'
+                : mode === 'created-successor'
+                  ? 'public-successor-completion.json'
+                  : 'public-indeterminate-completion.json',
+            ),
+            `${JSON.stringify({ label: observedBeforeInput.label, envelopes, stdout, stderr, actual_successor: actualSuccessor, after: inventory(f.root), artifact_sha256: hash(actual), size_bytes: actual.byteLength }, null, 2)}\n`,
+          );
+        }
+      } finally {
+        terminal.emit('close');
+        await pending;
+        disposeCliInvocationAuthority();
+        f.host.dispose();
+        vi.doUnmock('node:readline');
+        out.mockRestore();
+        err.mockRestore();
+        process.argv = saved.argv;
+        process.exitCode = saved.exitCode;
+      }
+    },
+  );
+});
+
+describe('remaining bounded predecessor and target counterexamples', () => {
+  it('P1-14 monotonic expiry after the exact fixture precursor preserves that genuine state without policy creation', async () => {
+    const f = await productionFixture();
+    const { performance } = await import('node:perf_hooks');
+    const clock = vi.spyOn(performance, 'now').mockReturnValue(100);
+    try {
+      const handle = f.prepare();
+      const report = start(handle);
+      f.advance();
+      const successor = inventory(f.root);
+      clock.mockReturnValue(300_100);
+      expect(() =>
+        f.runWithAuthorityHostEffects(f.host.scope, () => handle.confirm(confirmation(report))),
+      ).toThrow('AUTHORITY_POLICY_REVIEW_EXPIRED');
+      expect(inventory(f.root)).toEqual(successor);
+      expect(existsSync(join(f.root, '.devai/config/authority-policy.json'))).toBe(false);
+    } finally {
+      clock.mockRestore();
+      f.host.dispose();
+    }
+  });
+
+  it('P1-17 a schema-valid exact candidate already at the target is refused without adoption, replacement or cleanup', async () => {
+    const f = await productionFixture();
+    try {
+      const handle = f.prepare();
+      const report = start(handle);
+      const bytes = Buffer.from(report.artifact.bytes_base64, 'base64');
+      const { getValidator } = await import('@devai-nyx/schemas');
+      expect(getValidator('authority-policy.schema.json')(JSON.parse(bytes.toString('utf8')))).toBe(
+        true,
+      );
+      writeFileSync(join(f.root, '.devai/config/authority-policy.json'), bytes);
+      const before = inventory(f.root);
+      expect(f.prepare).toThrow('AUTHORITY_POLICY_REVIEW_TARGET_NOT_ABSENT');
+      expect(inventory(f.root)).toEqual(before);
+      expect(readFileSync(join(f.root, '.devai/config/authority-policy.json'))).toEqual(bytes);
+      handle.cancel();
+    } finally {
+      f.host.dispose();
+    }
+  });
+});
+
+interface SharedRaceChild {
+  readonly root: string;
+  readonly packageRoot: string;
+  readonly control: string;
+  readonly id: 'first' | 'second';
+  readonly nonce: string;
+}
+const PUBLIC_RACE_TEST = 'P1-18 two independent full public review processes preserve one winner';
+async function awaitRaceJson(path: string, stopped?: () => string | undefined) {
+  const deadline = Date.now() + 20_000;
+  while (!existsSync(path)) {
+    const failure = stopped?.();
+    if (failure) throw new Error(failure);
+    if (Date.now() >= deadline) throw new Error(`fixture coordination deadline: ${path}`);
+    await new Promise<void>((done) => setTimeout(done, 20));
+  }
+  return JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>;
+}
+async function runPublicRaceChild(config: SharedRaceChild) {
+  // The parent owns these disposable roots; child setup and cleanup never mutate them.
+  const owner = JSON.parse(readFileSync(join(config.control, 'owner.json'), 'utf8'));
+  expect(owner).toEqual({
+    label: 'SYNTHETIC DISPOSABLE P1-18 RACE',
+    root: config.root,
+    packageRoot: config.packageRoot,
+    nonce: config.nonce,
+  });
+  expect(dirname(config.root)).toBe(dirname(config.packageRoot));
+  expect(config.control.startsWith(config.root)).toBe(false);
+  expect(config.control.startsWith(config.packageRoot)).toBe(false);
+  const f = await productionFixture(true, true, config);
+  const saved = { argv: process.argv, exitCode: process.exitCode };
+  let stdout = '';
+  let stderr = '';
+  let pending: unknown;
+  const { EventEmitter } = await import('node:events');
+  const terminal = new EventEmitter() as InstanceType<typeof EventEmitter> & { close(): void };
+  terminal.close = () => {
+    terminal.emit('close');
+  };
+  vi.doMock('node:readline', () => ({ createInterface: () => terminal }));
+  const { createRequire } = await import('node:module');
+  const { cac } = createRequire(import.meta.url)('../../node_modules/cac/index-compat.js') as {
+    cac: (name?: string) => import('cac').CAC;
+  };
+  const { initBind } = await import('../../src/commands/init/index.js');
+  const {
+    attachAuthorityCommandBoundaries,
+    authorizeCliArgv,
+    disposeCliInvocationAuthority,
+    stripAuthorityArgv,
+  } = await import('../../src/authority/index.js');
+  const { attachActionOutputBoundaries, requireAuthorityPolicyReviewOutput } =
+    await import('../../src/action-output.js');
+  const { routeArgv } = await import('../../src/command-router.js');
+  const out = vi.spyOn(process.stdout, 'write').mockImplementation(((chunk: unknown) => {
+    stdout += String(chunk);
+    return true;
+  }) as typeof process.stdout.write);
+  const err = vi.spyOn(process.stderr, 'write').mockImplementation(((chunk: unknown) => {
+    stderr += String(chunk);
+    return true;
+  }) as typeof process.stderr.write);
+  const streams = {
+    stdout: process.stdout.write,
+    stderr: process.stderr.write,
+    exit: process.exit,
+  };
+  for (const { stream } of originalTty)
+    Object.defineProperty(stream, 'isTTY', { configurable: true, value: true });
+  process.argv = [
+    'node',
+    'devai',
+    'init',
+    'bind',
+    '--review-authority-policy',
+    '--after-constitution',
+    '--target',
+    config.root,
+    '--as-role',
+    'architect',
+    '--write',
+    '--format',
+    'json',
+  ];
+  const cli = cac(`devai-race-${config.id}`);
+  initBind.register(cli);
+  cli.option('--format <format>', 'Output format');
+  attachAuthorityCommandBoundaries(cli.commands, f.entries);
+  attachActionOutputBoundaries(cli.commands, f.entries);
+  try {
+    const route = routeArgv(stripAuthorityArgv(process.argv), f.entries, '2.7.1');
+    expect(route.kind).toBe('dispatch');
+    if (route.kind !== 'dispatch') throw new Error('child route refused');
+    cli.parse(route.argv, { run: false });
+    expect(authorizeCliArgv(process.argv, f.entries)).toBeUndefined();
+    const before = inventory(config.root);
+    pending = cli.runMatchedCommand();
+    expect(pending).toBeInstanceOf(Promise);
+    const initial = stdout
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line));
+    expect(initial).toHaveLength(1);
+    expect(initial[0]).toMatchObject({
+      action_id: 'init bind',
+      ok: true,
+      result: { verdict: 'review' },
+    });
+    const ready = initial[0].result.value as ReviewReport;
+    expect(stderr).toContain(`CREATE ${ready.plan_sha256} ${ready.artifact.sha256}`);
+    expect(f.rawMutations).not.toHaveBeenCalled();
+    expect(inventory(config.root)).toEqual(before);
+    // Harness coordination files are outside the immutable repository and package.
+    writeFileSync(
+      join(config.control, `${config.id}.ready.json`),
+      `${JSON.stringify({ label: owner.label, pid: process.pid, id: config.id, ready_envelope: initial[0], prompt: stderr, input_delivered: false, before }, null, 2)}\n`,
+    );
+    const command = await awaitRaceJson(join(config.control, `${config.id}.confirm.json`));
+    expect(command.nonce).toBe(config.nonce);
+    expect(typeof command.confirmation).toBe('string');
+    terminal.emit('line', command.confirmation);
+    await pending;
+    const envelopes = [...stdout.split('\n'), ...stderr.split('\n')]
+      .filter((line) => line.startsWith('{'))
+      .map((line) => JSON.parse(line));
+    expect(envelopes).toHaveLength(2);
+    const stat = lstatSync(join(config.root, '.devai/config/authority-policy.json'), {
+      bigint: true,
+    });
+    const bytes = readFileSync(join(config.root, '.devai/config/authority-policy.json'));
+    const observed = {
+      sha256: hash(bytes),
+      bytes_base64: bytes.toString('base64'),
+      identity: {
+        dev: stat.dev.toString(),
+        ino: stat.ino.toString(),
+        birthtimeNs: stat.birthtimeNs.toString(),
+      },
+    };
+    const result = {
+      label: owner.label,
+      pid: process.pid,
+      id: config.id,
+      envelopes,
+      stdout,
+      stderr,
+      exit: process.exitCode ?? 0,
+      observed,
+      after: inventory(config.root),
+    };
+    expect(process.stdout.write).toBe(streams.stdout);
+    expect(process.stderr.write).toBe(streams.stderr);
+    expect(process.exit).toBe(streams.exit);
+    disposeCliInvocationAuthority();
+    expect(requireAuthorityPolicyReviewOutput).toThrow(
+      'AUTHORITY_POLICY_REVIEW_INPUTS_UNSUPPORTED',
+    );
+    writeFileSync(
+      join(config.control, `${config.id}.result.json`),
+      `${JSON.stringify(result, null, 2)}\n`,
+    );
+  } finally {
+    terminal.emit('close');
+    await pending;
+    disposeCliInvocationAuthority();
+    f.host.dispose();
+    vi.doUnmock('node:readline');
+    out.mockRestore();
+    err.mockRestore();
+    process.argv = saved.argv;
+    process.exitCode = saved.exitCode;
+  }
+}
+
+it(PUBLIC_RACE_TEST, async () => {
+  const inherited = process.env['DEVAI_P1_RACE_CHILD_CONFIG'];
+  if (inherited !== undefined) {
+    await runPublicRaceChild(JSON.parse(inherited) as SharedRaceChild);
+    return;
+  }
+  const f = await productionFixture(true);
+  const control = realpathSync(mkdtempSync(join(tmpdir(), 'devai-p1-race-control-')));
+  fixtureRoots.push(control);
+  const nonce = randomUUID();
+  const owner = {
+    label: 'SYNTHETIC DISPOSABLE P1-18 RACE',
+    root: f.root,
+    packageRoot: f.packageRoot,
+    nonce,
+  };
+  writeFileSync(join(control, 'owner.json'), `${JSON.stringify(owner)}\n`);
+  const startChild = (id: 'first' | 'second') => {
+    const child = spawn(
+      process.execPath,
+      [
+        'scripts/process/validation-runner.mjs',
+        '--',
+        'node_modules/.bin/vitest',
+        'run',
+        '--config',
+        'tests/config/local.config.ts',
+        '--maxWorkers',
+        '1',
+        'packages/cli/tests/unit/authority-policy-review.test.ts',
+        '-t',
+        PUBLIC_RACE_TEST,
+      ],
+      {
+        cwd: sourceRoot,
+        env: {
+          ...process.env,
+          GIT_OPTIONAL_LOCKS: '0',
+          DEVAI_P1_RACE_CHILD_CONFIG: JSON.stringify({ ...owner, control, id }),
+        },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      },
+    );
+    let output = '';
+    let errors = '';
+    let closed = false;
+    let code: number | null = null;
+    child.stdout.on('data', (chunk: Buffer) => {
+      output += chunk.toString();
+    });
+    child.stderr.on('data', (chunk: Buffer) => {
+      errors += chunk.toString();
+    });
+    const completion = new Promise<void>((done, fail) => {
+      child.once('error', fail);
+      child.once('close', (exit) => {
+        closed = true;
+        code = exit;
+        done();
+      });
+    });
+    return {
+      child,
+      completion,
+      get closed() {
+        return closed;
+      },
+      get code() {
+        return code;
+      },
+      get log() {
+        return output + errors;
+      },
+      failure: () => (closed ? `owned child ${id} exited ${code}: ${output}${errors}` : undefined),
+    };
+  };
+  const first = startChild('first');
+  const second = startChild('second');
+  let readyRecords: Record<string, unknown>[] = [];
+  let results: Record<string, unknown>[] = [];
+  try {
+    const before = inventory(f.root);
+    readyRecords = await Promise.all([
+      awaitRaceJson(join(control, 'first.ready.json'), first.failure),
+      awaitRaceJson(join(control, 'second.ready.json'), second.failure),
+    ]);
+    expect(readyRecords[0]?.pid).not.toBe(readyRecords[1]?.pid);
+    expect(readyRecords[0]?.pid).not.toBe(process.pid);
+    expect(readyRecords[1]?.pid).not.toBe(process.pid);
+    expect(inventory(f.root)).toEqual(before);
+    expect(existsSync(join(f.root, '.devai/config/authority-policy.json'))).toBe(false);
+    const ready = readyRecords.map((record) => {
+      expect(record.input_delivered).toBe(false);
+      return (record.ready_envelope as { result: { value: ReviewReport } }).result.value;
+    });
+    expect(ready[0]?.plan_sha256).not.toBe(ready[1]?.plan_sha256);
+    expect(ready[0]?.artifact.sha256).not.toBe(ready[1]?.artifact.sha256);
+    const capturedBeforePrecursor = {
+      ...owner,
+      ready: readyRecords,
+      inventory: before,
+      precursor_performed: false,
+    };
+    f.advance();
+    const successor = inventory(f.root);
+    for (const [index, id] of (['first', 'second'] as const).entries()) {
+      const report = ready[index];
+      if (!report) throw new Error('missing child ready');
+      writeFileSync(
+        join(control, `${id}.confirm.json`),
+        `${JSON.stringify({ nonce, confirmation: confirmation(report) })}\n`,
+      );
+    }
+    results = await Promise.all([
+      awaitRaceJson(join(control, 'first.result.json'), first.failure),
+      awaitRaceJson(join(control, 'second.result.json'), second.failure),
+    ]);
+    await Promise.all([first.completion, second.completion]);
+    expect(first.code, first.log).toBe(0);
+    expect(second.code, second.log).toBe(0);
+    const terminal = (record: Record<string, unknown>) =>
+      (record.envelopes as Array<Record<string, unknown>>)[1];
+    const winners = results.filter((record) => terminal(record)?.ok === true);
+    const losers = results.filter((record) => terminal(record)?.ok === false);
+    expect(winners).toHaveLength(1);
+    expect(losers).toHaveLength(1);
+    const winner = winners[0];
+    const loser = losers[0];
+    if (!winner || !loser) throw new Error('race outcome missing');
+    const winnerReady = readyRecords.find((record) => record.id === winner.id);
+    if (!winnerReady) throw new Error('winner ready missing');
+    const approved = (winnerReady.ready_envelope as { result: { value: ReviewReport } }).result
+      .value;
+    const bytes = readFileSync(join(f.root, '.devai/config/authority-policy.json'));
+    expect(bytes).toEqual(Buffer.from(approved.artifact.bytes_base64, 'base64'));
+    expect(hash(bytes)).toBe(approved.artifact.sha256);
+    const stat = lstatSync(join(f.root, '.devai/config/authority-policy.json'), { bigint: true });
+    const identity = {
+      dev: stat.dev.toString(),
+      ino: stat.ino.toString(),
+      birthtimeNs: stat.birthtimeNs.toString(),
+    };
+    expect(winner.observed).toEqual(loser.observed);
+    expect(winner.observed).toEqual({
+      sha256: hash(bytes),
+      bytes_base64: bytes.toString('base64'),
+      identity,
+    });
+    expect((terminal(winner)?.result as { value: Record<string, unknown> }).value).toMatchObject({
+      status: 'created',
+      binding_performed: true,
+      digest_sha256: approved.artifact.sha256,
+      publication_identity: identity,
+    });
+    expect(loser.exit).not.toBe(0);
+    const after = inventory(f.root);
+    delete after['.devai/config/authority-policy.json'];
+    expect(after).toEqual(successor);
+    expect(
+      readdirSync(join(f.root, '.devai/config')).some((name) => name.endsWith('.publish-staged')),
+    ).toBe(false);
+    const evidence = process.env['DEVAI_P1_RACE_EVIDENCE_DIR'];
+    if (evidence) {
+      writeFileSync(
+        join(evidence, 'p1-18-both-ready-before-precursor.json'),
+        `${JSON.stringify(capturedBeforePrecursor, null, 2)}\n`,
+      );
+      writeFileSync(
+        join(evidence, 'p1-18-race-completion.json'),
+        `${JSON.stringify({ ...owner, results, winner: winner.id, loser: loser.id, identity, artifact_sha256: hash(bytes), actual_successor: successor, after: inventory(f.root) }, null, 2)}\n`,
+      );
+    }
+  } finally {
+    if (!first.closed) first.child.kill('SIGTERM');
+    if (!second.closed) second.child.kill('SIGTERM');
+    await Promise.allSettled([first.completion, second.completion]);
+    const evidence = process.env['DEVAI_P1_RACE_EVIDENCE_DIR'];
+    if (evidence) {
+      writeFileSync(join(evidence, 'p1-18-child-first.txt'), first.log);
+      writeFileSync(join(evidence, 'p1-18-child-second.txt'), second.log);
+    }
+    f.host.dispose();
+  }
+});

@@ -1,0 +1,65 @@
+{
+  "status": "PROPOSED_NOT_APPROVED",
+  "upstream_baseline": "ff8accd83c912d02d17df80eccbe147aafd082e3",
+  "total": 9,
+  "architect": 5,
+  "inspector": 4,
+  "paths": [
+    {
+      "role": "Architect",
+      "path": "law/constitution.md",
+      "new": false,
+      "baseline_git_blob": "199cf2787904f64599abd0828620d903a9cb2368"
+    },
+    {
+      "role": "Architect",
+      "path": "law/adr/ADR-GOV-0027-source-bound-canonical-selection-and-proof-index.md",
+      "new": true,
+      "baseline_git_blob": null
+    },
+    {
+      "role": "Architect",
+      "path": "law/adr/README.md",
+      "new": false,
+      "baseline_git_blob": "ad1a89c7773cf708aa731923cb77b02cb8729a35"
+    },
+    {
+      "role": "Architect",
+      "path": "law/policy/adr-validation.json",
+      "new": false,
+      "baseline_git_blob": "2c36a8f85770c4057a7070ae5fcb921116707893"
+    },
+    {
+      "role": "Architect",
+      "path": "law/schemas/proof-index-reconciliation-contract.schema.json",
+      "new": true,
+      "baseline_git_blob": null
+    },
+    {
+      "role": "Inspector",
+      "path": "packages/cli/tests/unit/constitution-article-6-amendment.test.ts",
+      "new": false,
+      "baseline_git_blob": "413733c2d1b214f27a45a9daa7f61467c17e1698"
+    },
+    {
+      "role": "Inspector",
+      "path": "packages/cli/tests/unit/canonical-selection-constitution-amendment.test.ts",
+      "new": true,
+      "baseline_git_blob": null
+    },
+    {
+      "role": "Inspector",
+      "path": "packages/schemas/tests/contract/governance-v15-adr.test.ts",
+      "new": false,
+      "baseline_git_blob": "e8d70250d340d49135aa379754f991e67ffffbb8"
+    },
+    {
+      "role": "Inspector",
+      "path": "packages/schemas/tests/contract/proof-index-reconciliation-contract.test.ts",
+      "new": true,
+      "baseline_git_blob": null
+    }
+  ],
+  "no_engineer_runtime_paths": true,
+  "no_machine_binding_outputs_authorized": true
+}

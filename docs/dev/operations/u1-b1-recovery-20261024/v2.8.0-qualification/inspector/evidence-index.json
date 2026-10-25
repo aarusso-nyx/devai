@@ -1,0 +1,171 @@
+{
+  "standing": "INSTALLED_P1_QUALIFICATION_PASS_U1_B1_IMPLEMENTATION_NOT_COMPLETE",
+  "recorded_at": "2026-10-24T17:06:49.470361+00:00",
+  "installed_candidate": {
+    "tarball": "/private/tmp/devai-release-280-01a16e18/qualification-02/aarusso-nyx-devai-2.8.0.tgz",
+    "sha256": "0d829a6103141dfd54ec5435d0fc59d5b194f7c75c9e4268356ce004b0396bb7",
+    "size_bytes": 7288934,
+    "package_root": "/private/tmp/devai-release-280-01a16e18/installed-02/node_modules/@aarusso-nyx/devai",
+    "public_version": "devai/2.8.0",
+    "final_release_qualification": false
+  },
+  "installed_tests": {
+    "passed": 10,
+    "failed": 0,
+    "raw_log": "installed-02-extended.txt",
+    "framework": "Python unittest with real OS PTY and actual Node installed bin",
+    "product_mocks": false,
+    "predecessor_fixture_commit": "2df84159caabf869b866fb2a05e5b06be83295fb"
+  },
+  "ratification_and_original_binding": {
+    "passed": 28,
+    "failed": 0,
+    "raw_log": "ratification-and-original-binding.txt"
+  },
+  "ready_proofs": {
+    "test_exact_precursor_then_exact_create-ready.json": {
+      "plan_sha256": "fb114ceb2610657b13eed4e6117ab21799d638c1f6229b060b630aa1a8f11409",
+      "artifact_sha256": "b5f4f03d3371c95142ecce29b8a9a694df65d586d8959d785dced2c8a9d83a39",
+      "size_bytes": 71367,
+      "input_delivered": false
+    },
+    "test_cancel_preserves_all_files-ready.json": {
+      "plan_sha256": "c829c738e3f752fb044120519547dec8407171037b39b83dc6f58dedb0472fd4",
+      "artifact_sha256": "83adf8d7cbdd996c0d41e98cd61a45257bfdd0b0e088617f695235f7d2b29e0e",
+      "size_bytes": 71367,
+      "input_delivered": false
+    },
+    "test_wrong_confirmation_preserves_all_files-ready.json": {
+      "plan_sha256": "76cc1e7a99083b32d65078dcc2ea54765d738ca37a6251be23563ea2f4dafdf2",
+      "artifact_sha256": "0348f31cd2400871a16d0ee0d7f3a50ce51ac71159e8b9c6daca1d95078c3b37",
+      "size_bytes": 71367,
+      "input_delivered": false
+    },
+    "race-first-ready.json": {
+      "plan_sha256": "7e3855b2c5503956f7c5c96bd8e9915fdc0548e2125cfb5802b847dc50f51bfa",
+      "artifact_sha256": "0d6337e7500dea41b4039cfaba285ad8e544d211b3a9057d5c6e6762f89f9035",
+      "size_bytes": 71367,
+      "input_delivered": false
+    },
+    "test_fresh_review_of_actual_successor-ready.json": {
+      "plan_sha256": "706d0a34afeeec93c79a82a13d219d4d7d121b6e58c4a6b3c6dce7294591d72d",
+      "artifact_sha256": "07dfae4c462375f77298ffeb2a0a27ae52a56f647aea39d7292c5d1278bc605d",
+      "size_bytes": 71367,
+      "input_delivered": false
+    },
+    "race-second-ready.json": {
+      "plan_sha256": "220c0ece84a2fefa481476d4d849288caf9d5e590c2de50ddabbc9942d5863ba",
+      "artifact_sha256": "0155fb68419d45224cdfb692179fa8ed43d5feded7b5b9f3eb4a828e3adf05db",
+      "size_bytes": 71367,
+      "input_delivered": false
+    }
+  },
+  "source_and_review_sha256": {
+    "packages/cli/tests/installed/authority_policy_review_pty.py": "20595ab7908fdeaa62bdebd7b157163597e31b0cb333f6fd4abb3ba6fb6ab380",
+    "packages/schemas/tests/fixtures/adr-pre-280-ratification.json": "05c776122fd5e4a939f446b5343943db03ef51a6e0051deaaa2099797f75fc0e",
+    "packages/schemas/tests/contract/governance-v15-adr.test.ts": "baaefccdfe0d687d828e9c121ae643fc52e7a5bc49a3d6f0ee9c1918a0c2f4d6",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/inspector-review.json": "e5b0d7ff571f83a882e5549acd81bc198f9aa443c7fa17df9800e1e537c1b561",
+    "packages/sensors/tests/unit/staged-inventory-readers.test.ts": "ba7ac6de8afc65e72658439c9daedf35a56b3490666dd10fcd790c4f97d36c9b",
+    "packages/authority/tests/unit/private-publication.test.ts": "b25026dd339eb1b6ce38eb5209e7279010eff7ae186c83749cb3c803babb1589",
+    "packages/cli/tests/installed/reconciliation_owner_baseline_pty.py": "18e5bf0902c9dfb90fde4e7090168092d4bcbe6a7a91a9446a8cf9abc55000b0",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/owner-intake-inspector-review.json": "e6b3ca03a93f20f48af1d1c8d2f09b79413a7abc0fc18dbdc5451edfb42dd079"
+  },
+  "evidence_sha256": {
+    "actual-binding-historical-contracts.txt": "7c997aaf5b356b0f38de8c2fa7e05556113de9058302941c90bb54188c0cbd1d",
+    "installed-01/help.json": "9e54266efcc836d16a1da4b112c3d0f12ee5b772da9a5c0c9fc51ae8249e9bcd",
+    "installed-01-first.txt": "18162d603d4bd7496ec4d12b4fdd055c426c7dac6eefcd86c76d4f23b74c4f67",
+    "installed-02/created.json": "e84338d4927e98a521227ff6e26aa6a0ad7bdcc10d47c87bce2704784044a1f1",
+    "installed-02/help.json": "22db731d574f3688572c740f7f48b39356f3dc27b34329a65a703d4c37544fa4",
+    "installed-02/test_cancel_preserves_all_files-ready.json": "ff2286cd77bebdd448681f82564ea4d5716b6619d79387dda9d51eb65714c07d",
+    "installed-02/test_exact_precursor_then_exact_create-ready.json": "31dbadd7c2b60995a0e696ce4c5e343b635e76e7e85254fb6ad3606d6c17e3e4",
+    "installed-02/test_wrong_confirmation_preserves_all_files-ready.json": "3e9e55b7d88f620cd59063a345fc8111a86fa069010b0b1d4a941be58ba01876",
+    "installed-02-extended/cancel.json": "f2c0541107ae895cdd0687190b001af54a759215dea8a0535bfed2247dfc912c",
+    "installed-02-extended/created.json": "f272400c728e41a576b4629b58c89ad31c520ee74a886abca3f114d8ac543ef7",
+    "installed-02-extended/fresh-successor-created.json": "8f8d4325c724f6b9bd1200ba587f9994b9bf1576d1311faccbc00cf60818d16b",
+    "installed-02-extended/help.json": "22db731d574f3688572c740f7f48b39356f3dc27b34329a65a703d4c37544fa4",
+    "installed-02-extended/race-first-ready.json": "465356354bcf848d5ff9bc75fb4715b17a04889579a8e6796a3c2d33b874b6fe",
+    "installed-02-extended/race-second-ready.json": "cfda006c5417fad42c84f16a7e41d6737d2cc15699e983fbb6c437210eb97201",
+    "installed-02-extended/test_cancel_preserves_all_files-ready.json": "b4ccb6d17d7f7586dfa1080dc880dede22149a80bf773d2648c27bbda1d959c2",
+    "installed-02-extended/test_exact_precursor_then_exact_create-ready.json": "8be40670b6ccddbd3ac4ee4cb564d66fb90624b053d0829feba9f4f4a7e8b598",
+    "installed-02-extended/test_fresh_review_of_actual_successor-ready.json": "efac38a0bb6e570a9784bff98f745ba86b33317274545b91a75c92f7d98d6e28",
+    "installed-02-extended/test_wrong_confirmation_preserves_all_files-ready.json": "eb55538a85dc9c6e7dc72cd51c4b554772bbcc51dcea14b23e18841253b90d2f",
+    "installed-02-extended/two-process-race.json": "74662b202522ff9efe203cff0e2c6c0ca5db446af183cc68d5f82ad40b332ce2",
+    "installed-02-extended.txt": "8cf07966462a29d28baf4cb448342ccc9b6bd73ae54930baef37bbf1a2e3af4e",
+    "installed-02-final/cancel.json": "b3cdf1c7161fd58aaea37366ab77e39fbb5873ca79178e32607a5233db6dfb97",
+    "installed-02-final/created.json": "a156bf3002c333411df23fc0a3e0db01e787b15adcfe5b3454179d9eca593409",
+    "installed-02-final/help.json": "22db731d574f3688572c740f7f48b39356f3dc27b34329a65a703d4c37544fa4",
+    "installed-02-final/test_cancel_preserves_all_files-ready.json": "0a24b749ff4b620adc0e41dffcfd6ae17e220da68b32a318e0510e00b242890e",
+    "installed-02-final/test_exact_precursor_then_exact_create-ready.json": "75d7629f8d1bffb63a6040be74854940725e5e0c02c6c70d41350e78ccff6c29",
+    "installed-02-final/test_wrong_confirmation_preserves_all_files-ready.json": "9b80abfb2770e81f80d0eaa8c2c6f29a19e600e80cd9254170c5d9cf38c60c5a",
+    "installed-02-final.txt": "026acc37d36b6f90605d9d34151acdbc49a029ad560a6eebb9c93cb3a6e58a33",
+    "installed-02-first.txt": "0068fb1332d890669885aadcb7f5f4639a8e11f2cc074321faeed0364a462044",
+    "qualification-plan.md": "c5019be1c14b3b5e0eb2b8acf9a9503806a09e22b9b2dec501e2b2b5de43fb86",
+    "ratification-and-original-binding.txt": "d3c275af212c4565e89e0308d3a4fa1c9b9407798d6d8b16b1a9f5584e098947",
+    "ratification-before-source.txt": "0855d8986d58dc897d73e8ced5c7e96b50ea31953e60e7ebb455518943a64f7e",
+    "ratification-first-fixture-format-mismatch.txt": "a2e0861d26c57db16d82f485d1decbca0a3b5250446b88bce40bda2a7da8f788",
+    "ratification-second-fixture-local-error.txt": "09cf3e3c906cb7e815d9b2b92f306ae468f789b062ca85cebdff1644f2019da4",
+    "reader-edge-red-engineer-manifest.json": "f873f3a87ead00284dc7fff9d3a2c958e0ae5f5c97617d15cd8f80ef037bbbff",
+    "reader-final-format.txt": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20",
+    "reader-final-lint.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reader-green-receipt.json": "6940a603dbf85dc2dc0de7b4b7fd8885948be0c73c858d99d60ea7c2ec8b25d5",
+    "reader-green.md": "ce54465abe2fcc65f5d3f6b8497d8d1a48e7137898ebabcb9398d79cd16b4a03",
+    "reader-red-checkpoint.json": "d7e866b66edf79ca5450bab5bec22d53018435e5b9c04daf29cd40e81519ad0f",
+    "staged-readers-before-source.txt": "8beb42bab4c17cd3f38e57dd0af0bf26473f1ec1d3cd367032780d56f7914d35",
+    "staged-readers-discriminated-red.txt": "b36d8f533df5eec5a66fcb8b4f963df0ef452535b4ca650313d05d5d2e113be5",
+    "staged-readers-edge-counterexamples.txt": "889fb824e488f0136b25d2a4950547cbdc936980e25adc64d7f948335801f7dc",
+    "staged-readers-final-independent-green.txt": "ae05700e8c7eb6e609035590a14c13d6970a68949e372e7574d1df6c751b7a70",
+    "staged-readers-final-red.txt": "6356993490e0aebde51c0763f70850f45b8581e407255176be640262853b9f4e",
+    "staged-readers-independent-green.txt": "a0c553d090fbfab33fa4e53bb346601b26d250a98461cbf8cea061f3d292dc44",
+    "owner-admission-stale-reaper-counterexample.json": "92b2dbb504555864e0e042792a540a0faca220aa8e6809edc6b17aa5f1ae8144",
+    "owner-installed-06-baseline/test_architect_reconciliation_host_read_only_positive_grammar.json": "0706f0574190704b0c8ba268c5312e01a24a797ebe3e196d56154d5aaae3a50d",
+    "owner-installed-06-baseline/test_direct_owner_approval_positive_grammar_reaches_registered_route.json": "ff7921b7ab5359be46bc161f4eda771b8b9fa6ebf6d360a5025576ccb38eb57a",
+    "owner-installed-06-baseline/test_owner_approve_help_is_registered.json": "653f9e3ca84d43bd01b681db6163e57b07ed0085a41a22bf887e60cd1885237a",
+    "owner-installed-06-baseline-red.txt": "cdc521ee274994f41701ab88d10736c4ca0e56072c0811cef7620ca754ce62e8",
+    "private-publication-before-source-red.txt": "a7d885159e1237f8e873c94fab842ca4d1a41f54703ac56a3af13fdf04e7bfdf",
+    "private-publication-final-independent-green.txt": "9bcfccb10a5741115137140db901140bda38b9e034ee709b204a771d11353aa2",
+    "private-publication-final-red.txt": "df48723cbbc3422a483d84b03d517c23491c54028649e35280308c4e2188ac5f",
+    "private-publication-green-receipt.json": "d7003e67d5184c6d4dd4fe2657e4169f71de39390561513b418aff5cec4001d5",
+    "private-publication-green.md": "667ea349799cfdacb9928f2243257fc753f1a86d390ea1ca5dab01a0dff6a45a",
+    "private-publication-independent-green.txt": "6bf67c01102b6ebc326a79737fe7e94fe900cd796bc9cb4b0085a9ed1da99d9d"
+  },
+  "holds": [
+    "DETRAN and downstream execution excluded",
+    "Final U1/B1 implementation, exact-head CI and final release artifact still required",
+    "Real installed uncertainty fault facility and actual five-minute expiry not exercised"
+  ],
+  "graft_saved_this_turn": {
+    "calls": 5,
+    "tokens_saved_estimate": 298884
+  },
+  "actual_binding_historical_contracts": {
+    "passed": 67,
+    "failed": 0,
+    "raw_log": "actual-binding-historical-contracts.txt"
+  },
+  "reader_red_checkpoint": {
+    "passed": 7,
+    "failed": 36,
+    "total": 43,
+    "path": "reader-red-checkpoint.json",
+    "raw_log": "staged-readers-final-red.txt",
+    "scope": "pure readers only; no B1 writer permission"
+  },
+  "reader_independent_green": {
+    "receipt": "reader-green-receipt.json",
+    "passed": 188,
+    "failed": 0,
+    "reader_cases": 57
+  },
+  "private_publication_independent_green": {
+    "receipt": "private-publication-green-receipt.json",
+    "passed": 41,
+    "failed": 0,
+    "new_cases": 17
+  },
+  "owner_intake_review": {
+    "path": "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/owner-intake-inspector-review.json",
+    "standing": "OWNER_INTAKE_DESIGN_REVIEW_REQUIRES_KERNEL_ADMISSION_AND_SCHEMA_EFFECT_FREEZE",
+    "installed_baseline_failed": 3,
+    "negative_guards_qualified": false
+  }
+}

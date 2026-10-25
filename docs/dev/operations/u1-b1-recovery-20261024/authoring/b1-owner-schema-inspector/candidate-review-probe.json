@@ -1,0 +1,31 @@
+{
+  "candidate_sha256": "39002520c0ffa410ef41a9caf34d16af123b9bc88f0ab1e426deaf70af284344",
+  "probe": [
+    {
+      "path": "repository_id",
+      "value": "repo\n",
+      "accepted": false
+    },
+    {
+      "path": "clock.monotonic_ns",
+      "value": "123\n",
+      "accepted": false
+    },
+    {
+      "def": "logical",
+      "value": "123\n",
+      "accepted": false
+    },
+    {
+      "def": "decimal",
+      "value": "123\n",
+      "accepted": false
+    },
+    {
+      "def": "ns",
+      "value": "123\n",
+      "accepted": false
+    }
+  ],
+  "canonical_count": 134
+}

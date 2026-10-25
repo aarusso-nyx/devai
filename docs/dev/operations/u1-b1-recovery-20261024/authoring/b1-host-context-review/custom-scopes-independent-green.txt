@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-host-context-review/custom-scopes-independent-green.txt","kind":"historical-transcript-custody-pointer","original_bytes":872,"original_bytes_changed":false,"original_sha256":"923ad813138f81306d8dfa7e99efdb0afe56220ed9e1e5f14a2ae9000f3b4ad0"}

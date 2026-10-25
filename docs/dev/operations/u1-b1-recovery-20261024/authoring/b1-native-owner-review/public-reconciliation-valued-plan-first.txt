@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/public-reconciliation-valued-plan-first.txt","kind":"historical-transcript-custody-pointer","original_bytes":636,"original_bytes_changed":false,"original_sha256":"6d9a8885c17a3be6a4d38604d8ed6add8cfbf27e32bc629ad093db5ede1f6fdb"}

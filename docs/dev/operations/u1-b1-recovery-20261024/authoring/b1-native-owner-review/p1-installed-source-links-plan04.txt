@@ -1,0 +1,9 @@
+test_opaque_source_link_success (__main__.SourceLinks.test_opaque_source_link_success) ... ok
+test_linkbyte_drift_refuses (__main__.SourceLinks.test_linkbyte_drift_refuses) ... ok
+test_strict_authority_pin_symlink_refuses (__main__.SourceLinks.test_strict_authority_pin_symlink_refuses) ... ok
+test_target_symlink_refuses (__main__.SourceLinks.test_target_symlink_refuses) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 7.735s
+
+OK

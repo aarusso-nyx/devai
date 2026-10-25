@@ -1,0 +1,44 @@
+{
+  "frozen_receipts": {
+    "b1-admission-inspector/receipt.json": {
+      "expected": "0952e1aa22d462e23f771fad5ff8cc1a6dfe52ce600f92215dcc30537fb0b9b5",
+      "actual": "0952e1aa22d462e23f771fad5ff8cc1a6dfe52ce600f92215dcc30537fb0b9b5",
+      "unchanged": true
+    },
+    "b1-clock-inspector/receipt.json": {
+      "expected": "a60f14928b1ebd097edba8be5fec58593973de87a4f1eef5240c4b89193b9ef8",
+      "actual": "a60f14928b1ebd097edba8be5fec58593973de87a4f1eef5240c4b89193b9ef8",
+      "unchanged": true
+    },
+    "b1-owner-record-inspector/receipt.json": {
+      "expected": "f38b19733d0dea9374855c8d1f21c88146a50f9ff9bf370b12d819a19c915436",
+      "actual": "f38b19733d0dea9374855c8d1f21c88146a50f9ff9bf370b12d819a19c915436",
+      "unchanged": true
+    },
+    "b1-host-context-inspector/receipt.json": {
+      "expected": "2d5af14f7636c7376e0f1ebe3df88227395df4c6234de3df9fe3285091e3fa1d",
+      "actual": "2d5af14f7636c7376e0f1ebe3df88227395df4c6234de3df9fe3285091e3fa1d",
+      "unchanged": true
+    },
+    "b1-typed-boundary-inspector/receipt.json": {
+      "expected": "240d44807b3e8df351dc3f25ac1f9cb3070f4d31b935aa7c12bb035ab6ec4b1f",
+      "actual": "240d44807b3e8df351dc3f25ac1f9cb3070f4d31b935aa7c12bb035ab6ec4b1f",
+      "unchanged": true
+    },
+    "b1-host-operation-inspector/receipt.json": {
+      "expected": "ab95cc5580904ef80de5ab7af57683fa8bcb97433f4dd9204cbc348cf1cc0f4a",
+      "actual": "ab95cc5580904ef80de5ab7af57683fa8bcb97433f4dd9204cbc348cf1cc0f4a",
+      "unchanged": true
+    }
+  },
+  "regression_tests_sha256": {
+    "packages/authority/tests/unit/reconciliation-admission.test.ts": "c8cc48aa2d28e9c8ef96df1fd5689c5e88f710e6042e8ce25e535dc25a87ad76",
+    "packages/authority/tests/unit/private-publication.test.ts": "b25026dd339eb1b6ce38eb5209e7279010eff7ae186c83749cb3c803babb1589",
+    "packages/authority/tests/unit/reconciliation-owner-record.test.ts": "201be15666d9235268feafc446ecdf9c6facb39f2e91da99ca211f836c07e31b",
+    "packages/authority/tests/unit/reconciliation-clock.test.ts": "4d11893a95b7fec182794892df3b3fd737ff23da3b7dcfef8dcbd369dcf4689b",
+    "packages/authority/tests/unit/reconciliation-host-operation.test.ts": "f422dcf36893d6e7b014063eff0f948daea5575a72b644f1b5325ea10c398a54",
+    "packages/cli/tests/unit/reconciliation-error-codes.test.ts": "0da439cf541f019cb07ce795c133020bcfd88f5d38c86e97e4768a5ce1397ac3",
+    "packages/cli/tests/unit/error-code-reference.test.ts": "55135e318935a28fe1722fb099e14d90aded8e1e445ba5616844a726c22ceb0f"
+  },
+  "capture": "during source-frozen final behavioral run; no old test edits"
+}

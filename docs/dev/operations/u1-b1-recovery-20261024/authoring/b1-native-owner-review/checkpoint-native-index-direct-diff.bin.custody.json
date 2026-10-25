@@ -1,0 +1,11 @@
+{
+  "original_source_path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/checkpoint-native-index-direct-diff.bin",
+  "external_custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/checkpoint-native-index-direct-diff.bin",
+  "sha256": "f7487203c744b38c4242d06223fd076c0da1aa2a3bc2d41b751f00eee33f39e3",
+  "bytes": 2115246,
+  "dev": "16777245",
+  "ino": "78186263",
+  "mode": "0o644",
+  "historical_bytes_changed": false,
+  "standing": "historical diagnostic artifact; no authority or completion promotion"
+}

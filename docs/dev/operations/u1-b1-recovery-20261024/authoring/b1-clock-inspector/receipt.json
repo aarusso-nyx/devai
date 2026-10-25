@@ -1,0 +1,108 @@
+{
+  "standing": "PURE_CLOCK_ELIGIBILITY_INDEPENDENT_GREEN_NO_HOST_TIME_OR_AUTHORITY_QUALIFICATION",
+  "recorded_at": "2026-10-24T19:09:17.277299+00:00",
+  "result": {
+    "passed": 110,
+    "failed": 0,
+    "pure_clock_cases": 86,
+    "unchanged_diagnostic_reference_cases": 24,
+    "raw_log": "independent-after-types.txt",
+    "duration_seconds": 4.84,
+    "command": "node scripts/process/validation-runner.mjs -- node_modules/.bin/vitest run --config tests/config/local.config.ts --maxWorkers 1 packages/authority/tests/unit/reconciliation-clock.test.ts packages/cli/tests/unit/reconciliation-error-codes.test.ts packages/cli/tests/unit/error-code-reference.test.ts"
+  },
+  "checks": {
+    "fullworkspace_typecheck": "PASS",
+    "fullworkspace_typecheck_command": "pnpm run typecheck",
+    "typecheck_log": "typecheck-final.txt",
+    "test_eslint": "PASS",
+    "test_prettier": "PASS",
+    "test_diff_check": "PASS",
+    "timeouts_skips_thresholds_or_assertions_relaxed": false,
+    "live_process_handles": []
+  },
+  "sha256": {
+    "packages/authority/src/runtime/reconciliation-clock.ts": "d9ab0faba163f45a7d7caf13e2cae5307ccb0ad2be7cb5b7565e1054f1844dd3",
+    "packages/authority/tests/unit/reconciliation-clock.test.ts": "4d11893a95b7fec182794892df3b3fd737ff23da3b7dcfef8dcbd369dcf4689b",
+    "docs/reference/error-codes.md": "5e9022868e703e0d65f33fa15522498008f47be0e2327d121c0afebb56e1c5d4",
+    "packages/cli/tests/unit/reconciliation-error-codes.test.ts": "0da439cf541f019cb07ce795c133020bcfd88f5d38c86e97e4768a5ce1397ac3",
+    "packages/cli/tests/unit/error-code-reference.test.ts": "55135e318935a28fe1722fb099e14d90aded8e1e445ba5616844a726c22ceb0f"
+  },
+  "contract_sha256": {
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/owner-clock-kernel-checkpoint.json": "d71357ad5868130c6597db6e0d8fcf7fc611279722785a601633014a722ee56c",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/owner-clock-amendment.json": "63da78eb95e638d1ba8d5317a4e81e4030d204593f107a7a5344bba3642d5e2c"
+  },
+  "independent_cases": [
+    "Descriptor-only exact own enumerable four-field/plain-or-null observation shape. Proxy/getters/coercions/symbols/prototypes/unknown fields never execute traps.",
+    "Canonical lowercase UUID and literal clock source; positive canonical uint64 ns including endpoints; safe wall endpoints; negative-zero/NaN/Infinity/unsafe/string/BigInt and malformed decimal refusal.",
+    "Exact observed-minus-issue1ns above2^53, just-before review/grant bounds, both equality-expired and independent wall-only or monotonic-only expiry, one-ns/ms after boundary.",
+    "Issue-plus-full-lifetime uint64 and wall-safe overflow is INVALID; exact highest non-overflowing issue remains valid.",
+    "Same boot, issue/predecessor rollback, predecessor older than renewed issue and older than lifetime without resetting issue time.",
+    "Both signs of exact2s drift accepted and1ns/ms beyond refused relative to issue and independently to predecessor.",
+    "Validate all supplied data first, then overflow/boot/rollback/drift/expiry precedence. Explicit malformed predecessor refuses; omitted/undefined equivalent.",
+    "Distinct frozen validated copies and elapsed-only frozen result; caller observations remain unchanged and no authority/success marker added."
+  ],
+  "error_reference": {
+    "before_rows": 1279,
+    "after_rows": 1284,
+    "added_rows": [
+      "| `RECONCILIATION_CLOCK_BOOT_CHANGED` | reconciliation clock boot changed | Stable diagnostic for reconciliation clock boot changed. | Follow the structured envelope remediation and retry only after its condition is satisfied. | per action: set by the surfacing envelope |",
+      "| `RECONCILIATION_CLOCK_DIVERGED` | reconciliation clock diverged | Stable diagnostic for reconciliation clock diverged. | Follow the structured envelope remediation and retry only after its condition is satisfied. | per action: set by the surfacing envelope |",
+      "| `RECONCILIATION_CLOCK_EXPIRED` | reconciliation clock expired | Stable diagnostic for reconciliation clock expired. | Follow the structured envelope remediation and retry only after its condition is satisfied. | per action: set by the surfacing envelope |",
+      "| `RECONCILIATION_CLOCK_INVALID` | reconciliation clock invalid | Stable diagnostic for reconciliation clock invalid. | Follow the structured envelope remediation and retry only after its condition is satisfied. | per action: set by the surfacing envelope |",
+      "| `RECONCILIATION_CLOCK_ROLLBACK` | reconciliation clock rollback | Stable diagnostic for reconciliation clock rollback. | Follow the structured envelope remediation and retry only after its condition is satisfied. | per action: set by the surfacing envelope |"
+    ],
+    "exact_only_five_row_delta_proof": "Removing exactly five CLOCK rows reconstructs the complete prior1279-row reference bytes SHA256.",
+    "reconstructed_before_sha256": "ef4e93b0ed44cffb42c07cf09c743152b3cae73cb3e8e7bfc5840e7e610f1f6d",
+    "prefix_changes": false
+  },
+  "history": [
+    {
+      "log": "structural-red.txt",
+      "passed": 1,
+      "failed": 1,
+      "meaning": "Actual module absent before root implementation; frozen five-code list independently passed."
+    },
+    {
+      "log": "independent-first.txt",
+      "passed": 81,
+      "failed": 0,
+      "meaning": "First actual pure implementation behavior; no product defect found."
+    },
+    {
+      "log": "independent-final.txt",
+      "passed": 110,
+      "failed": 0,
+      "meaning": "Expanded86 clock cases plus unchanged24 diagnostic/reference tests before test-only typing correction."
+    },
+    {
+      "log": "typecheck-first-test-readonly-fixture.txt",
+      "exit": 2,
+      "meaning": "Test-only readonly Partial<Observation> deletion in malformed missing-field fixture. Replaced with object-rest omission, preserving same missing-field data and assertion; source unchanged. Final typecheck and110 rerun pass."
+    }
+  ],
+  "source_review": "Only node:util types import; no IO, OS/process clock reading, signature, handle, public barrel export or product caller. Clock arithmetic is deterministic data eligibility only.",
+  "historical_receipts_unchanged": {
+    "native_receipt_sha256": "0952e1aa22d462e23f771fad5ff8cc1a6dfe52ce600f92215dcc30537fb0b9b5",
+    "error_census_receipt_sha256": "a9e6283fff96f1681a3c8113d0a307d2f5ac4920876a2538843f5cc00385b6b2"
+  },
+  "limitations": [
+    "No trusted origin for caller-supplied observations or clock data established.",
+    "Actual host boot reader, normalization, wall-before/ns/boot/wall-after sampling and250ms bound remain unimplemented/unqualified here.",
+    "Node/libuv/runtime/platform/time-namespace/shared epoch and suspend behavior require actual final host qualification; prior other-lane probes are not claimed as this pure test result.",
+    "No Owner review/grant lifecycle, MAC/phase/lease, ordinary policy authority, adapter/index write, installed public CLI, B1 integration or release qualified.",
+    "DETRAN/downstream execution excluded."
+  ],
+  "graft": {
+    "calls": 1,
+    "tokens_saved_estimate": 63555
+  },
+  "evidence_sha256": {
+    "independent-after-types.txt": "e3f5c0a953bbab859e2be5d72f845db02837508a173b24f9c9f81d3146d59b68",
+    "independent-final.txt": "0785ae821d5a039b76fe645beb85ff57e41857dadcf4ae3e3155b0a68c62894a",
+    "independent-first.txt": "1fdb1ae6013ddcc64eac23b07a941072dadcbd7bafbb10617cc2b60b5eebd42c",
+    "structural-red-receipt.json": "541717619c1b91e2c1fb4a2c3f098e5e691082654b64f793ab9e6655553eaf84",
+    "structural-red.txt": "9972e66749fbf5c6419ae8728be60037956796c48a122c6efb8efac1a5e611cf",
+    "typecheck-final.txt": "3801203c7d9e4544ad471c57f0ab2386897e4413121a6c6be2a61c5af2fd37fb",
+    "typecheck-first-test-readonly-fixture.txt": "5a88ecbfb337d2ac23bf47733ddcd025a296f6e8b31e7e05f86ff7679de7d4aa"
+  }
+}

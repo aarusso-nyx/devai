@@ -1,0 +1,65 @@
+{
+  "standing": "EXPLICIT_POLICY_ONLY_SELECTOR_AMENDMENT_ACCEPTED_IMPLEMENTATION_TESTS_PENDING",
+  "amendment_sha256": "398e48045200fab3c0b49186184299987dd171687fb9c81d93c2d0cceab2993c",
+  "original_checkpoint_review_sha256": "fb04df6d5ab674cba7ad1461b45a0e47552e7c966473c5a4b6282aa35f70f652",
+  "observed_source_test_sha256": {
+    "packages/authority/src/runtime/policy-resolver.ts": "70ba57bb7760b9654aa12978fdfaf736f3ee6bb886b2796039b7cb641c9af8a0",
+    "packages/authority/src/runtime/decision-issuer.ts": "918c0adf55e83ed17e2de4f21db7b5691a149a7aa651767b4107a166a21a4443",
+    "packages/authority/src/boundaries/boundary-runtime.ts": "fd7752892ed598daddc310a05aa42a350cf9ed88daa683634b3b872987a1fcda",
+    "packages/authority/src/types.ts": "1b2c122d0c4a8139b5a8b012fe5a7d3583ef8f372e7ce052536c794aad8393a2",
+    "packages/authority/src/decision-plan.ts": "a3c91fa2be505502c0dcb4a3fc5b69307a702781c8f1e99b1dc0e06ae265f2f5",
+    "law/schemas/authority-policy.schema.json": "1c11d6e9c1d106462cae2c248c7c7c0d5bf3d6c848e4d0fa72e3454c8628a45f",
+    "packages/authority/tests/unit/reconciliation-resource-kernel.test.ts": "da8a78cd5e4aca842ceaab29b38337f3662949c5c82525ceb89b71a28008898a",
+    "packages/authority/tests/unit/reconciliation-resources.test.ts": "87fa27e5c50865b484275baa242966f298e237c51ec903f62e5eb7ba7bb1b36c"
+  },
+  "genuine_dependency_confirmed": "Actual issuer.issueAllow reads private resolutionRecords, requires allowed outcomes and exact context/policy/target/action/operation/consent/query bindings. Current resolver uses legacyselectorMatches which returnsfalse for both typed resources. A real typed allow receipt needs the explicit policy consumer seam; fake resolution custody would violate authentic tests.",
+  "caller_census": {
+    "new_policy_matcher_only": [
+      "runtime/policy-resolver.ts classification formerlyline273",
+      "runtime/policy-resolver.ts operationRules formerlyline385"
+    ],
+    "legacy_matcher_must_remain": [
+      "boundaries/boundary-runtime.ts registerBatch line91",
+      "runtime/decision-issuer.ts bounded exactTargets line63",
+      "existing exported selectorMatches function and ResourceTargetSelector union",
+      "decision-plan bounded selector matching"
+    ]
+  },
+  "schema_preservation_baseline": {
+    "existing_first4_kinds": [
+      "fs",
+      "git-ref",
+      "db",
+      "remote"
+    ],
+    "existing_first4_semantic_sha256": "b9c4f2e2f1671efb0e01269c02dc3da0ebadbe18f4eb6817b592553097155472",
+    "examples_semantic_sha256": "c5bf833af130aacf15593f006e01a9dd0425e5dae41471a615b8a46d3c7f8daa",
+    "schemaVersion": "1.0.0",
+    "observed_variant_count": 4,
+    "rule": "Append exactly2closedvariants only; preserve all existing variants/examples and current policy/core/adopter/registry grant bytes. No population/count change."
+  },
+  "accepted_contract": [
+    "New policy-only selector exact3fields kind/repository_id/operations; typed logical repository alphabet1..128, exact repo/kind, finite nonempty unique operation arrays; no wildcard/physical/worktree path selector.",
+    "Descriptor-safe full target+selector validation, no unknown fields/accessors/Proxy/sparse arrays. Ordinary kinds delegate existingselectorMatches unchanged.",
+    "Classification can ignore operations only using existingclassifyOnly semantics; actual operation match must check finiteoperation list. No lower-precedence fallback or role union changes.",
+    "New matching function usedONLY2internalpolicyresolvercalls. Legacy matcher/typed planning/batch/unit refusal remain intact, preserving original58kernel+99shape checks byte-identically.",
+    "Authority-policy schema extends vocabulary only. Actual owned policy fixture+real loader/declaration/context/resolver/issuer custody qualifies test decision machinery, never actual opaquehost origin/effects.",
+    "Receipt prepare captures independent immutable snapshot copy/digest BEFOREconsume. Actual newdependency failures remain safe; actualapply exception behavior is not broadened into fabricated clean refusal."
+  ],
+  "confirmed_design_blockers": [],
+  "next_independent_checks": [
+    "Both typed selectors pass actual registered authority-policy schema; rejectmissing/extra/wildcard/crosskind/repo/operation/duplicates/descriptor/proxy/sparse variants.",
+    "Complete owned fixtures exercise genuineactualpolicyallow+issuerreceipt+boundarydispatch; never injectprivate resolutionRecords/mock positiveissuer.",
+    "New policy allow must not make OLDselectorMatches/registerBatch/issuerboundedexactTargets/prepareUnit/applyUnit admit typedtargets.",
+    "Originalvariants/examples,currentcore/adopter/actionregistrybytes unchanged; stagedcanonical schema consumers and originalpolicy/kernellanes qualify afterimplementation."
+  ],
+  "no_product_or_test_edits": true,
+  "writes_only": "authoring/b1-typed-boundary-review/",
+  "bounds": "Bounded schema/policy machinery review only; no installed/public authority,brokeropaquehandle,nativehost/indexeffects or registry grant accepted.",
+  "graft": {
+    "calls_this_amendment_review": 1,
+    "tokens_saved_estimate": 12056,
+    "cumulative_calls": 14,
+    "cumulative_tokens_saved_estimate": 270485
+  }
+}

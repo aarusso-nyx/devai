@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-detran-inspector/installed06-initial-red.txt","kind":"historical-transcript-custody-pointer","original_bytes":1669,"original_bytes_changed":false,"original_sha256":"35fc761f6eeeca42d5b22d014e1778d577bdfb252f267382d46ec28bfc15d768"}

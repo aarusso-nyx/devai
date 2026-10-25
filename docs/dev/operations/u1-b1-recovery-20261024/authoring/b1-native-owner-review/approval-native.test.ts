@@ -1,0 +1,142 @@
+import {createHash} from 'node:crypto';
+import {readFileSync,writeFileSync,mkdtempSync,mkdirSync,realpathSync,renameSync,unlinkSync,symlinkSync,lstatSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join,resolve} from 'node:path';
+import {expect,it,vi,beforeAll,afterAll} from 'vitest';
+import {canonicalJson} from '@devai-nyx/utils';
+const hook=vi.hoisted(()=>({afterGit:undefined as undefined|((args:readonly string[])=>void)}));
+vi.mock('node:child_process',async()=>{const actual=await vi.importActual<typeof import('node:child_process')>('node:child_process');return {...actual,spawnSync:(command:string,args:readonly string[],options:unknown)=>{const result=Reflect.apply(actual.spawnSync,undefined,[command,args,options]);hook.afterGit?.(args);return result;}};});
+import {execFileSync} from 'node:child_process';
+import {readReconciliationPlan,readInitialReconciliationPlan} from '/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/src/boundaries/reconciliation-plan.ts';
+import {createReconciliationHostInvocation,disposeReconciliationHostInvocation} from '/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/src/boundaries/reconciliation-host-operation.ts';
+import {runWithAuthorityHostEffects} from '/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/src/boundaries/host-scope.ts';
+import {createIssuer,runtimeApi,CONSENT,actionDocumentWithId,canonicalSha256,declarationDependencies,exactSubject,expectSuccess,makePolicyPlant,policyBindingFromPlant} from '/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/tests/unit/authority-runtime-testkit.ts';
+const here=import.meta.dirname;
+const original=JSON.parse(readFileSync(join(here,'native-plan-fixture.json'),'utf8'));
+const reuse=process.env.DEVAI_NATIVE_APPROVAL_REUSE_FIXTURE;
+const base=reuse?realpathSync(join(reuse,'..')):realpathSync(mkdtempSync(join(tmpdir(),'devai-initial-owner-plan-'))),root=reuse?realpathSync(reuse):join(base,'repository');
+if(!reuse)execFileSync('/bin/cp',['-cR',original.fixture_root,root]);
+const clientPath='.devai/native-owner-plan.json',absolute=join(root,clientPath);
+mkdirSync(join(root,'.git/info'),{recursive:true});
+writeFileSync(join(root,'.git/info/exclude'),readFileSync(join(root,'.git/info/exclude'),'utf8')+'\n/.devai/native-owner-plan*\n');
+const bindings={package_sha256:'a'.repeat(64),module_sha256:'b'.repeat(64),registry_sha256:'c'.repeat(64),constitution_sha256:'d'.repeat(64),policy_sha256:'e'.repeat(64)};
+const hash=(b:Uint8Array|string)=>createHash('sha256').update(b).digest('hex');
+import {getValidator} from '@devai-nyx/schemas';
+import {createAuthorityBoundaryRuntime} from '/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/src/boundaries/boundary-runtime.ts';
+import {computeMutationEnvelopeDigest} from '/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/src/index.ts';
+import {boundaryDependencies} from '/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/tests/unit/authority-boundary-testkit.ts';
+import {reconciliationHostOperation,reconciliationHostOperationSnapshot} from '/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/src/boundaries/reconciliation-host-operation.ts';
+import {createReconciliationHostProvisionReview} from '/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/src/boundaries/reconciliation-host-provision.ts';
+import {createReconciliationApprovalReview} from '/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/src/boundaries/reconciliation-host-approve.ts';
+let effects=0;
+
+function issue(api: any, issuer: any, target: any, action: string, role: string) {
+  const rule = {
+    rule_id: 'native-provision-fixture',
+    origin: 'additive-extension',
+    precedence: 500,
+    action_ids: [action],
+    selector: {
+      kind: target.kind,
+      repository_id: target.repository_id,
+      operations: [target.operation],
+    },
+    effect: 'allow',
+    subjects: [{ kind: 'human', roles: [role] }],
+    required_consent: CONSENT,
+    constitutional_anchors: [6],
+    rationale: 'Owned actual native fixture; deterministic B5 is not installed origin.',
+  };
+  const plant = makePolicyPlant({ additiveRules: [rule] });
+  expect(getValidator('authority-policy.schema.json')(plant.document)).toBe(true);
+  const context = expectSuccess<{ context_receipt: unknown }>(
+    api.resolveAuthorityDeclaration(
+      {
+        action_id: action,
+        invocation_id: 'invocation-1',
+        dry_run: false,
+        declaration: { as_role: role },
+        consent: CONSENT,
+      },
+      declarationDependencies(
+        issuer,
+        actionDocumentWithId(action, 'local-write', { kind: 'human', allowed_roles: [role] }),
+        undefined,
+        policyBindingFromPlant(plant),
+      ),
+    ),
+  );
+  const policy = expectSuccess(api.loadAuthorityPolicy({ document: plant.document }, plant.deps));
+  const resolution = api.resolveAuthorityPolicy(
+    policy,
+    {
+      action_id: action,
+      context_receipt: context.context_receipt,
+      consent: CONSENT,
+      resource: target,
+      operation: target.operation,
+    },
+    { receiptStore: issuer, canonicalSha256 },
+  );
+  expect(resolution).toMatchObject({ outcome: 'allow' });
+  const base = exactSubject([target], plant) as { plan: { envelope: MutationEnvelope } };
+  const envelope = {
+    ...base.plan.envelope,
+    request: { ...base.plan.envelope.request, action_id: action },
+  } as any;
+  const subject = {
+    plan: {
+      ...base.plan,
+      envelope: {
+        ...envelope,
+        issued_by: {
+          ...envelope.issued_by,
+          envelope_digest_sha256: computeMutationEnvelopeDigest(envelope),
+        },
+      },
+    },
+  };
+  const decision = issuer.issueAllow({
+    resolutions: [resolution],
+    subject,
+    context_receipt: context.context_receipt,
+    invocation_id: 'invocation-1',
+    boundary_adapter_id: 'reconciliation-host-authority-boundary',
+  }) as { issued: boolean; receipt: unknown };
+  expect(decision.issued).toBe(true);
+  return { subject, receipt: decision.receipt };
+}
+
+async function run<T>(mode:'provision'|'plan'|'approve',planSha:string,fn:(scope:any)=>T):Promise<T>{
+ const api=await runtimeApi(),issuer=createIssuer(api);const saved=process.argv;
+ const owner=mode==='approve',provision=mode==='provision',action=provision?'init bind':owner?'evidence reconcile approve':'evidence reconcile plan',role=owner?'owner':'architect';
+ process.argv=[process.execPath,'synthetic-native-approval',...(provision?['init','bind','--reconciliation-host','--target',root]:['evidence','reconcile',owner?'approve':'plan','--repo-root',root]),...(owner?['--plan',clientPath,'--plan-sha256',planSha]:mode==='plan'?['--selected-parent',original.selected_parent,'--published-ref',original.published_ref]:[]),...(mode!=='plan'?['--write']:[]),'--as-role',role,'--format','json'];
+ const argvHash=hash(canonicalJson(process.argv));
+ const invocation=createReconciliationHostInvocation({invocation_id:'invocation-1',action_id:action,receipt_store:issuer,repository_root:root,repository_id:'detran-native-approval-inspector',original_argv_sha256:argvHash,initiator:role,operation:provision?'provision':owner?'approve':'plan',phases:[],write:mode!=='plan',require_tty:mode!=='plan',...(owner?{plan_path:clientPath,plan_sha256:planSha}:mode==='plan'?{selected_parent:original.selected_parent,published_ref:original.published_ref}:{}),readCurrentBindings:()=>bindings,verifyActual:()=>{if(hash(canonicalJson(process.argv))!==argvHash)throw new Error('synthetic argv drift');if(mode!=='plan'&&[process.stdin,process.stdout,process.stderr].some(s=>s.isTTY!==true))throw new Error('synthetic missing terminal');}} as never);
+ const scope={action_id:action,invocation_id:'invocation-1',effect:mode==='plan'?'read':'local-write',receipt_store:issuer,reconciliation_invocation:invocation,apply_effect:(request:any,apply:()=>unknown)=>{
+  const view=reconciliationHostOperation(request,invocation);expect(view).toBeDefined();if(!view)throw Error('missing actual operation');const target=view.target,grant=issue(api,issuer,target,action,role);let result:unknown;
+  const adapter={admit:(candidate:any)=>reconciliationHostOperation(request,invocation)===view&&canonicalSha256(candidate)===canonicalSha256(target),snapshot:()=>reconciliationHostOperationSnapshot(view,invocation,target),apply:()=>{effects++;result=apply();return result;}};
+  const runtime=createAuthorityBoundaryRuntime(boundaryDependencies(issuer,[],{reconciliation_host:adapter}));const handle=expectSuccess(runtime.plannerRegistry.registerPlan({subject:grant.subject,invocation_id:'invocation-1'}));const prepared=expectSuccess(runtime.prepare({subject:grant.subject,plan_handle:handle,target,decision_receipt:grant.receipt,adapter_id:'reconciliation-host-authority-boundary'}));expectSuccess(runtime.apply({prepared}));return result;
+ }};
+ try{return runWithAuthorityHostEffects(scope as never,()=>fn(scope));}finally{process.argv=saved;disposeReconciliationHostInvocation(invocation);issuer.dispose();}
+}
+
+const tty=[process.stdin,process.stdout,process.stderr].map(stream=>({stream,descriptor:Object.getOwnPropertyDescriptor(stream,'isTTY')}));
+let digest='',index='',approved:unknown;const passed:string[]=[];
+beforeAll(async()=>{for(const{stream}of tty)Object.defineProperty(stream,'isTTY',{value:true,configurable:true});
+ if(!reuse)await run('provision','',()=>{const h=createReconciliationHostProvisionReview(root);let p=h.start();while(p.kind==='reconciliation-provision-review')p=h.confirm(p.confirmation);expect(p.outcome).toBe('created');});
+ const plan=await run('plan','',()=>readReconciliationPlan(root)),bytes=Buffer.from(canonicalJson(plan)+'\n');digest=hash(bytes);writeFileSync(absolute,bytes);index=hash(readFileSync(join(root,'.git/index')));
+},180000);
+afterAll(()=>{expect(hash(readFileSync(join(root,'.git/index')))).toBe(index);writeFileSync(join(here,'approval-native-split-results.json'),JSON.stringify({kind:'independent-native-initial-owner-approval',fixture:root,qualification:'Actual historical Git, local remote, native private publication/admission and typed receipt stack; synthetic B5/policy origin; no installed/public Owner CLI claim',passed,index_sha256:index,plan_sha256:digest,approved,effect_callbacks:effects},null,2)+'\n');for(const{stream,descriptor}of tty){if(descriptor)Object.defineProperty(stream,'isTTY',descriptor);else Reflect.deleteProperty(stream,'isTTY');}});
+it('cancels without effects and rejects borrowed receivers, scope changes and replay',async()=>{
+ const before=effects;await run('approve',digest,(scope)=>{const h=createReconciliationApprovalReview(root),p=h.preview();expect(()=>Reflect.apply(h.confirm,{...h},[p.confirmation])).toThrow('RECONCILIATION_APPROVAL_INVALID');expect(()=>runWithAuthorityHostEffects({...scope},()=>h.preview())).toThrow('RECONCILIATION_APPROVAL_INVALID');expect(h.confirm('WRONG').outcome).toBe('cancelled');expect(()=>h.confirm(p.confirmation)).toThrow('RECONCILIATION_APPROVAL_INVALID');expect(h.interrupt().outcome).toBe('cancelled');expect(()=>h.interrupt()).toThrow('RECONCILIATION_APPROVAL_INVALID');});expect(effects).toBe(before);passed.push('cancel before effects; forged receiver, foreign scope, confirm replay and interrupt replay refuse');
+},180000);
+it('publishes actual native signed approval with typed receipt and exact owned identity',async()=>{
+ approved=await run('approve',digest,()=>{const h=createReconciliationApprovalReview(root),p=h.preview();const r=h.confirm(p.confirmation);expect(r.outcome).toBe('approved');expect(()=>h.confirm(p.confirmation)).toThrow('RECONCILIATION_APPROVAL_INVALID');const file=join(root,'.git/devai/reconciliation/approvals',p.approval_id,'approval.json');const stat=lstatSync(file,{bigint:true});const owned=r.owned.find(x=>x.target.endsWith('/approval.json'));expect(owned).toMatchObject({dev:String(stat.dev),ino:String(stat.ino),birthtime_ns:String(stat.birthtimeNs)});expect(hash(readFileSync(file))).toBe(p.approval_sha256);expect(Number(stat.mode&0o7777n)).toBe(0o600);return{approval_id:p.approval_id,approval_sha256:p.approval_sha256,owned:r.owned};});passed.push('actual native admission + typed receipt + signed private approval exact bytes and owned identity');
+},180000);
+it('refuses actual source drift after preview before approval effects',async()=>{
+ const before=effects;await run('approve',digest,()=>{const h=createReconciliationApprovalReview(root),p=h.preview();const readme=join(root,'README.md'),saved=readFileSync(readme);writeFileSync(readme,Buffer.concat([saved,Buffer.from('\nAPPROVAL SOURCE DRIFT\n')]));try{expect(()=>h.confirm(p.confirmation)).toThrow('RECONCILIATION_PLAN_SOURCE_INVALID');}finally{writeFileSync(readme,saved);}expect(h.interrupt().outcome).toBe('cancelled');});expect(effects).toBe(before);passed.push('source change after preview refuses before new approval effects');
+},180000);
+it('preserves foreign namespace competitor and refuses before domain writes',async()=>{
+ await run('approve',digest,()=>{const h=createReconciliationApprovalReview(root),p=h.preview();const foreign=join(root,'.git/devai/reconciliation/foreign-review-competitor');writeFileSync(foreign,'foreign',{mode:0o600});try{expect(()=>h.confirm(p.confirmation)).toThrow();expect(readFileSync(foreign,'utf8')).toBe('foreign');}finally{unlinkSync(foreign);}expect(h.interrupt().outcome).toBe('cancelled');});passed.push('foreign namespace competitor refuses before effects and preserves foreign entry');
+},180000);

@@ -1,0 +1,2451 @@
+{
+  "external_fixture": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc",
+  "environment": {
+    "node": "24.22.0",
+    "uv": "1.52.1",
+    "platform": "darwin"
+  },
+  "source_sha256": {
+    "packages/authority/src/boundaries/reconciliation-host-operation.ts": "92fea363e62d8972ccc7f3c295e2d7b2cbfc40d26b59418527e168babc243808",
+    "packages/authority/src/boundaries/reconciliation-host-context.ts": "a1f2b7b9ad63a8be55a2ccdedb112608006b4b17a9303e46e6305617c3573339",
+    "packages/authority/src/boundaries/host-scope.ts": "b020edc440e1c4e6cabf6e12daad1a6fdebd426ca6dddfbfa76c949cc164ea1c",
+    "packages/authority/src/boundaries/host-atomic-effects.ts": "92d3be45f4d9e541252f16c44d55bb9fb7f009aa583d57bb54d5a3a6c76ffd6c",
+    "packages/authority/src/index.ts": "662a1b6f9157a71161aaa502d7146dd9e3353682468860454b7c647a732b93e5",
+    "packages/cli/src/authority/reconciliation-host-input.ts": "7a7bbae9464546ea0511d7cd326bdd10aa3f9a8440d54dfdf842fa35c38bdf69",
+    "packages/cli/src/authority/broker.ts": "ad57361539314b514b306f2bddda6bbb199e829ade19e52e2c059e78eae410fb"
+  },
+  "synthetic_bindings_not_installed_origin": true,
+  "tty_flags_synthetic_not_actual_pty_qualification": true,
+  "observations": [
+    {
+      "fixture": {
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-sSg5ZJ/repository",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-sSg5ZJ/repository"
+      },
+      "action": "init bind",
+      "role": "architect",
+      "operation": "provision",
+      "phases": [],
+      "target": {
+        "kind": "reconciliation-host",
+        "id": "reconciliation-host:example-repository:wt-8dd278bfab11c794154154266a9de7daed68fb1c05c1e3bd:provision",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-8dd278bfab11c794154154266a9de7daed68fb1c05c1e3bd",
+        "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "operation": "provision",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5"
+      },
+      "preview": {
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-8dd278bfab11c794154154266a9de7daed68fb1c05c1e3bd",
+          "host_identity_sha256": "d84541bc1e20e4b60d36e9e918ea2c7d37130c89d577b4d35bfafd73ebb4225d",
+          "head": "8b153bff3af5caf0d9d65fd1d2e858c070e37e7f",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "bindings": {
+          "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "module_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "constitution_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "629187440033208",
+          "wall_ms": 1792908349793
+        },
+        "grants_authority": false
+      },
+      "original_argv_sha256": "857e7019ad1d1a8facf5015b3ce3b22285e72b8968f1bd73b9501c78700d4ee7",
+      "installed_origin_attested": false,
+      "tty_flags_synthetic": true
+    },
+    {
+      "fixture": {
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-tDDwWu/linked",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-tDDwWu/repository"
+      },
+      "action": "init bind",
+      "role": "architect",
+      "operation": "provision",
+      "phases": [],
+      "target": {
+        "kind": "reconciliation-host",
+        "id": "reconciliation-host:example-repository:wt-f4206fe8242ef7e6d672554ef913da9f352a9d4a3d56b541:provision",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-f4206fe8242ef7e6d672554ef913da9f352a9d4a3d56b541",
+        "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "operation": "provision",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5"
+      },
+      "preview": {
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-f4206fe8242ef7e6d672554ef913da9f352a9d4a3d56b541",
+          "host_identity_sha256": "806038c58ffba296b298ec4a26067926a5bd57b004b47f264f64f227f8271313",
+          "head": "a8bcd034ed3eceb7755b60d67203241a488672a9",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "bindings": {
+          "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "module_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "constitution_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "629191448729791",
+          "wall_ms": 1792908353800
+        },
+        "grants_authority": false
+      },
+      "original_argv_sha256": "05e496f0c8fadae4e52ee0f42c2894e88d949e5cb7dcff460e8387de2e50513d",
+      "installed_origin_attested": false,
+      "tty_flags_synthetic": true
+    },
+    {
+      "fixture": {
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-FZJhwc/repository",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-FZJhwc/repository"
+      },
+      "action": "init bind",
+      "role": "architect",
+      "operation": "provision",
+      "phases": [],
+      "target": {
+        "kind": "reconciliation-host",
+        "id": "reconciliation-host:example-repository:wt-7cce14bc9ce4aa4efa4356849efe600185619f402a5d4a8a:provision",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-7cce14bc9ce4aa4efa4356849efe600185619f402a5d4a8a",
+        "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "operation": "provision",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5"
+      },
+      "preview": {
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-7cce14bc9ce4aa4efa4356849efe600185619f402a5d4a8a",
+          "host_identity_sha256": "51cf3e7b845fdf05aa2fee92cc226bfdfcf47a45136075096cef9ab81e7b7877",
+          "head": "e5ca170ed2b1537569d4e5630d814ab63fb99ef9",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "bindings": {
+          "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "module_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "constitution_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "629195424319416",
+          "wall_ms": 1792908357777
+        },
+        "grants_authority": false
+      },
+      "original_argv_sha256": "92ec8f1b6407a6209049f738035ee3817b16b652ee6d4472f566c34a767df080",
+      "installed_origin_attested": false,
+      "tty_flags_synthetic": true
+    },
+    {
+      "fixture": {
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-TedwSF/repository",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-TedwSF/repository"
+      },
+      "action": "init bind",
+      "role": "architect",
+      "operation": "provision",
+      "phases": [],
+      "target": {
+        "kind": "reconciliation-host",
+        "id": "reconciliation-host:example-repository:wt-e46f4608ccc00879e2150c045958fd6619712833c6432f3f:provision",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-e46f4608ccc00879e2150c045958fd6619712833c6432f3f",
+        "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "operation": "provision",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5"
+      },
+      "preview": {
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-e46f4608ccc00879e2150c045958fd6619712833c6432f3f",
+          "host_identity_sha256": "9c4f849450d1fb3c083743796b357faeb3fe5581145da8a1ec6ca47f29211b0a",
+          "head": "e5ca170ed2b1537569d4e5630d814ab63fb99ef9",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "bindings": {
+          "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "module_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "constitution_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "629196120518500",
+          "wall_ms": 1792908358474
+        },
+        "grants_authority": false
+      },
+      "original_argv_sha256": "d46ec4543a5e50ced306890467411ac9edbde9a51a602c0de98e877698a686b2",
+      "installed_origin_attested": false,
+      "tty_flags_synthetic": true
+    },
+    {
+      "fixture": {
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-fS17fh/repository",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-fS17fh/repository"
+      },
+      "action": "init bind",
+      "role": "architect",
+      "operation": "provision",
+      "phases": [],
+      "target": {
+        "kind": "reconciliation-host",
+        "id": "reconciliation-host:example-repository:wt-c13c19f45742a19f1b0794f6f368ae357f13dd8c35a7a2ad:provision",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-c13c19f45742a19f1b0794f6f368ae357f13dd8c35a7a2ad",
+        "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "operation": "provision",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5"
+      },
+      "preview": {
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-c13c19f45742a19f1b0794f6f368ae357f13dd8c35a7a2ad",
+          "host_identity_sha256": "d802559692a89ae030fc0c2ea22cc411215e3388bcc5604d5fc2164728c765ea",
+          "head": "3128f03b2e8f509ceb10bf3cc7f0c869f71aecc9",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "bindings": {
+          "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "module_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "constitution_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "629197416079541",
+          "wall_ms": 1792908359768
+        },
+        "grants_authority": false
+      },
+      "original_argv_sha256": "d0039871615c1e61c076aba90c44a3c127fd073ea3e76b96e7604c656501956a",
+      "installed_origin_attested": false,
+      "tty_flags_synthetic": true
+    },
+    {
+      "fixture": {
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-4AXIew/repository",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-4AXIew/repository"
+      },
+      "action": "init bind",
+      "role": "architect",
+      "operation": "provision",
+      "phases": [],
+      "target": {
+        "kind": "reconciliation-host",
+        "id": "reconciliation-host:example-repository:wt-ff5100356b27b08808d9f46bc78e25a358f94f4e02a869ef:provision",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-ff5100356b27b08808d9f46bc78e25a358f94f4e02a869ef",
+        "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "operation": "provision",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5"
+      },
+      "preview": {
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-ff5100356b27b08808d9f46bc78e25a358f94f4e02a869ef",
+          "host_identity_sha256": "32b34442ac1feaa91fd3436a1863c02a9b26ced45f7242d35d20a58240d3883e",
+          "head": "a564eaccc48dd5529060de0ad374c4d3ea7dec72",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "bindings": {
+          "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "module_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "constitution_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "629198689438958",
+          "wall_ms": 1792908361043
+        },
+        "grants_authority": false
+      },
+      "original_argv_sha256": "56be4c4d860222e118199553bcc02c01c045100fb7f19700226ce022ef95ec0c",
+      "installed_origin_attested": false,
+      "tty_flags_synthetic": true
+    },
+    {
+      "fixture": {
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-v2i6kN/repository",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-v2i6kN/repository"
+      },
+      "action": "init bind",
+      "role": "architect",
+      "operation": "provision",
+      "phases": [],
+      "target": {
+        "kind": "reconciliation-host",
+        "id": "reconciliation-host:example-repository:wt-907796cead313f9e3d478a674a5478d602943cc12754d4ef:provision",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-907796cead313f9e3d478a674a5478d602943cc12754d4ef",
+        "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "operation": "provision",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5"
+      },
+      "preview": {
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-907796cead313f9e3d478a674a5478d602943cc12754d4ef",
+          "host_identity_sha256": "ae71e66b8903b1d465ec3c27a96e3c074656c6efa0bedc9af1e0ed0b8dbf13b9",
+          "head": "14f0a00f61337fd29b5ed895fd8ad40d25808f5a",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "bindings": {
+          "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "module_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "constitution_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "629199876372833",
+          "wall_ms": 1792908362227
+        },
+        "grants_authority": false
+      },
+      "original_argv_sha256": "dec91cb28732ac0707b60ba2c9dd07843239562a8babba403aa9cf506074f3b0",
+      "installed_origin_attested": false,
+      "tty_flags_synthetic": true
+    },
+    {
+      "fixture": {
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-8nvr05/repository",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-8nvr05/repository"
+      },
+      "action": "init bind",
+      "role": "architect",
+      "operation": "provision",
+      "phases": [],
+      "target": {
+        "kind": "reconciliation-host",
+        "id": "reconciliation-host:example-repository:wt-f5a9c1534d28e50e8fbefcaa9c204864e0b103c00e6deb9e:provision",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-f5a9c1534d28e50e8fbefcaa9c204864e0b103c00e6deb9e",
+        "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "operation": "provision",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5"
+      },
+      "preview": {
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-f5a9c1534d28e50e8fbefcaa9c204864e0b103c00e6deb9e",
+          "host_identity_sha256": "201fe21e1c5a72a5fdf9d05c8381631fec05eb8c783d02644272df5bc2e7b29f",
+          "head": "f00b07d2a28309ce1bc31382485af9091c85fc20",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "bindings": {
+          "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "module_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "constitution_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "629200988845250",
+          "wall_ms": 1792908363340
+        },
+        "grants_authority": false
+      },
+      "original_argv_sha256": "4b1eccbe39f6e9fd2482565a4f95a386d91dd1231278439c36d85ff730bd0622",
+      "installed_origin_attested": false,
+      "tty_flags_synthetic": true
+    },
+    {
+      "fixture": {
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-RHoXSr/repository",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-RHoXSr/repository"
+      },
+      "action": "init bind",
+      "role": "architect",
+      "operation": "provision",
+      "phases": [],
+      "target": {
+        "kind": "reconciliation-host",
+        "id": "reconciliation-host:example-repository:wt-e27cb2befdb0b99f06132b1c01a431cd8f633d545aceecab:provision",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-e27cb2befdb0b99f06132b1c01a431cd8f633d545aceecab",
+        "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "operation": "provision",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5"
+      },
+      "preview": {
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-e27cb2befdb0b99f06132b1c01a431cd8f633d545aceecab",
+          "host_identity_sha256": "f8b1a5b0a1c8e0025bceacd05e3c72ac621d683cf7da1d0181b474c05437151c",
+          "head": "379bf8446b8873481959280c8affd28193b23ba2",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "bindings": {
+          "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "module_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "constitution_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "629202078425250",
+          "wall_ms": 1792908364431
+        },
+        "grants_authority": false
+      },
+      "original_argv_sha256": "7f80024fecd107fee527a1cdc392f94e8caf318b988b46acb11bc133530f82a6",
+      "installed_origin_attested": false,
+      "tty_flags_synthetic": true
+    },
+    {
+      "fixture": {
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-OGkgYK/repository",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-OGkgYK/repository"
+      },
+      "action": "init bind",
+      "role": "architect",
+      "operation": "provision",
+      "phases": [],
+      "target": {
+        "kind": "reconciliation-host",
+        "id": "reconciliation-host:example-repository:wt-3a677c0b7b2df00d832ec9b55a4a0616c19ebd3e12b68ade:provision",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-3a677c0b7b2df00d832ec9b55a4a0616c19ebd3e12b68ade",
+        "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "operation": "provision",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5"
+      },
+      "preview": {
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-3a677c0b7b2df00d832ec9b55a4a0616c19ebd3e12b68ade",
+          "host_identity_sha256": "c6c7b15bd0e0ca51cb99fa4833943058c1b2586cc69847370fbd913d37b22bf7",
+          "head": "09a092b1d69a01552bb3a1af0907907afbfa277c",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "bindings": {
+          "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "module_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "constitution_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "629206042906166",
+          "wall_ms": 1792908368396
+        },
+        "grants_authority": false
+      },
+      "original_argv_sha256": "f58d1868af6714655373b9b5a0f9aa3246122961fc8b16c9d669514eae5ab59b",
+      "installed_origin_attested": false,
+      "tty_flags_synthetic": true
+    },
+    {
+      "fixture": {
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-lPcVeq/repository",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-lPcVeq/repository"
+      },
+      "action": "init bind",
+      "role": "architect",
+      "operation": "provision",
+      "phases": [],
+      "target": {
+        "kind": "reconciliation-host",
+        "id": "reconciliation-host:example-repository:wt-0370c3c2dca97fead48d531bee5f27eabf8434fab2b16731:provision",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-0370c3c2dca97fead48d531bee5f27eabf8434fab2b16731",
+        "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "operation": "provision",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5"
+      },
+      "preview": {
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-0370c3c2dca97fead48d531bee5f27eabf8434fab2b16731",
+          "host_identity_sha256": "be15d8253f5ea923818f3d7e9620b339b909cb037f99e5b497a56fb0352814bc",
+          "head": "1d40492ab2219511c16973499f5b213917a75c6f",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "bindings": {
+          "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "module_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "constitution_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "629206655184916",
+          "wall_ms": 1792908369007
+        },
+        "grants_authority": false
+      },
+      "original_argv_sha256": "4d16efbd419a17865dbffbfad61396457b0e10eb9bbadf682018ece8751a68d3",
+      "installed_origin_attested": false,
+      "tty_flags_synthetic": true
+    },
+    {
+      "fixture": {
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-eNDPry/repository",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-eNDPry/repository"
+      },
+      "action": "init bind",
+      "role": "architect",
+      "operation": "provision",
+      "phases": [],
+      "target": {
+        "kind": "reconciliation-host",
+        "id": "reconciliation-host:example-repository:wt-e26598609b720c6c0cb91651663dc78b8ca964546bdef52c:provision",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-e26598609b720c6c0cb91651663dc78b8ca964546bdef52c",
+        "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "operation": "provision",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5"
+      },
+      "preview": {
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-e26598609b720c6c0cb91651663dc78b8ca964546bdef52c",
+          "host_identity_sha256": "5ef7ddb1d89cad5b4f79366968e50c42cda94c934417025015e27b617f61f9a4",
+          "head": "6e8d5335ecf72de3e44f6e080a472ec65a96b2bc",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "bindings": {
+          "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "module_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "constitution_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "629207931017750",
+          "wall_ms": 1792908370286
+        },
+        "grants_authority": false
+      },
+      "original_argv_sha256": "3c19fa4eb90f2fb624c5542cf5013c727115eaf2a210f49486b10bc3a450cc9e",
+      "installed_origin_attested": false,
+      "tty_flags_synthetic": true
+    },
+    {
+      "fixture": {
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-kmisNI/repository",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-kmisNI/repository"
+      },
+      "action": "init bind",
+      "role": "architect",
+      "operation": "provision",
+      "phases": [],
+      "target": {
+        "kind": "reconciliation-host",
+        "id": "reconciliation-host:example-repository:wt-226b47bbcf14ec0f16acf4797c5c46c15ecbdbb14e53ce25:provision",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-226b47bbcf14ec0f16acf4797c5c46c15ecbdbb14e53ce25",
+        "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "operation": "provision",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5"
+      },
+      "preview": {
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-226b47bbcf14ec0f16acf4797c5c46c15ecbdbb14e53ce25",
+          "host_identity_sha256": "dea733f37c34666a945e8fcdd0f513d3560b90c29ca121e01a7ef830437f763a",
+          "head": "0e2937db438b42dd7a5c73bf369f892addea52ae",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "bindings": {
+          "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "module_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "constitution_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "629208636838958",
+          "wall_ms": 1792908370988
+        },
+        "grants_authority": false
+      },
+      "original_argv_sha256": "50112258c88e4a32d111050867d56b7ea460194d82a324ba20ebd79c0697bbf5",
+      "installed_origin_attested": false,
+      "tty_flags_synthetic": true
+    },
+    {
+      "fixture": {
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-4UefSI/repository",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-4UefSI/repository"
+      },
+      "action": "init bind",
+      "role": "architect",
+      "operation": "provision",
+      "phases": [],
+      "target": {
+        "kind": "reconciliation-host",
+        "id": "reconciliation-host:example-repository:wt-9838cfcf0999fedcb5f5269c36ea5af8d14568e9c813fa01:provision",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-9838cfcf0999fedcb5f5269c36ea5af8d14568e9c813fa01",
+        "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "operation": "provision",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5"
+      },
+      "preview": {
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-9838cfcf0999fedcb5f5269c36ea5af8d14568e9c813fa01",
+          "host_identity_sha256": "6431b2e19a7d71bc9a2029fbbe5477072aeb93db196396c6d4e8d6e8249f2749",
+          "head": "30f69bce90f959406b8d6927acc4c548920afc16",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "bindings": {
+          "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "module_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "constitution_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "629209262044416",
+          "wall_ms": 1792908371613
+        },
+        "grants_authority": false
+      },
+      "original_argv_sha256": "e2a37d360666e5048a040ca3031ff048e41a0d1e8f7e8b41fcd201180cdbac95",
+      "installed_origin_attested": false,
+      "tty_flags_synthetic": true
+    },
+    {
+      "fixture": {
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-tGLN3F/repository",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-tGLN3F/repository"
+      },
+      "action": "init bind",
+      "role": "architect",
+      "operation": "provision",
+      "phases": [],
+      "target": {
+        "kind": "reconciliation-host",
+        "id": "reconciliation-host:example-repository:wt-86def376802e5122db2e9f8d85d15994de934c6a17327cfb:provision",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-86def376802e5122db2e9f8d85d15994de934c6a17327cfb",
+        "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "operation": "provision",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5"
+      },
+      "preview": {
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-86def376802e5122db2e9f8d85d15994de934c6a17327cfb",
+          "host_identity_sha256": "0f79fa8931a2f042999d51f954acea086fa3e88e52a97595f69a9b273b2b0f34",
+          "head": "30f69bce90f959406b8d6927acc4c548920afc16",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "bindings": {
+          "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "module_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "constitution_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "629209938674291",
+          "wall_ms": 1792908372290
+        },
+        "grants_authority": false
+      },
+      "original_argv_sha256": "6db6de5436d0f2c02e63f18539b00bf25be912ad7fcc8d3ea50f5bfc49ceff24",
+      "installed_origin_attested": false,
+      "tty_flags_synthetic": true
+    },
+    {
+      "fixture": {
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-uNTPQZ/repository",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-uNTPQZ/repository"
+      },
+      "action": "init bind",
+      "role": "architect",
+      "operation": "provision",
+      "phases": [],
+      "target": {
+        "kind": "reconciliation-host",
+        "id": "reconciliation-host:example-repository:wt-0836e244f72b104271200ffad40c0dd774a1618739084a19:provision",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-0836e244f72b104271200ffad40c0dd774a1618739084a19",
+        "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "operation": "provision",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5"
+      },
+      "preview": {
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-0836e244f72b104271200ffad40c0dd774a1618739084a19",
+          "host_identity_sha256": "4df02fa16c199f3bfa650e9297fb5c3b8766e9652d07912bb7d88b117ed6354a",
+          "head": "b1848f320e5b0ab9eff1c542b61a361eaf145ddf",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "bindings": {
+          "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "module_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "constitution_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "629210551441000",
+          "wall_ms": 1792908372904
+        },
+        "grants_authority": false
+      },
+      "original_argv_sha256": "af68555e87410e6d7c0805da01cae8a5147096193450d3ca2194f6484a790d7f",
+      "installed_origin_attested": false,
+      "tty_flags_synthetic": true
+    },
+    {
+      "fixture": {
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-DbVElb/repository",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-DbVElb/repository"
+      },
+      "action": "init bind",
+      "role": "architect",
+      "operation": "provision",
+      "phases": [],
+      "target": {
+        "kind": "reconciliation-host",
+        "id": "reconciliation-host:example-repository:wt-daa03963c708252300b194f4508f715483d480dabc9355dc:provision",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-daa03963c708252300b194f4508f715483d480dabc9355dc",
+        "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "operation": "provision",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5"
+      },
+      "preview": {
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-daa03963c708252300b194f4508f715483d480dabc9355dc",
+          "host_identity_sha256": "ada6081cb4501b0a6230ba556dc254404f7a0fb80a99b7e2d8154bb326f1fb84",
+          "head": "b1848f320e5b0ab9eff1c542b61a361eaf145ddf",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "bindings": {
+          "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "module_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "constitution_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "629211153877583",
+          "wall_ms": 1792908373505
+        },
+        "grants_authority": false
+      },
+      "original_argv_sha256": "a50c05ed8b0a1defb302233eeb7edb61eb5729d7d06fee455c3f1d15c3b5ee08",
+      "installed_origin_attested": false,
+      "tty_flags_synthetic": true
+    },
+    {
+      "fixture": {
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-r6uU7f/repository",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-r6uU7f/repository"
+      },
+      "action": "init bind",
+      "role": "architect",
+      "operation": "provision",
+      "phases": [],
+      "target": {
+        "kind": "reconciliation-host",
+        "id": "reconciliation-host:example-repository:wt-fa359c9c3729265494f75a386553b5a464d966f7b21a75a4:provision",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-fa359c9c3729265494f75a386553b5a464d966f7b21a75a4",
+        "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "operation": "provision",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5"
+      },
+      "preview": {
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-fa359c9c3729265494f75a386553b5a464d966f7b21a75a4",
+          "host_identity_sha256": "7866cfa125ea532136ac8a28ec60564c3774a283c8b9a2a385a15df2c822cc6b",
+          "head": "90c952d6b7ccdac52a5019ab4286b563522f3dee",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "bindings": {
+          "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "module_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "constitution_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "629211804365250",
+          "wall_ms": 1792908374156
+        },
+        "grants_authority": false
+      },
+      "original_argv_sha256": "6cfad68264c206f46fe24c00d6efb489d53056411dd7e2117b2e6f0974ab652e",
+      "installed_origin_attested": false,
+      "tty_flags_synthetic": true
+    },
+    {
+      "fixture": {
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-Hw1nIS/repository",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-Hw1nIS/repository"
+      },
+      "action": "init bind",
+      "role": "architect",
+      "operation": "provision",
+      "phases": [],
+      "target": {
+        "kind": "reconciliation-host",
+        "id": "reconciliation-host:example-repository:wt-1d2cc4d5b5718b45c60b8308299745c20d393d1db03cf3f9:provision",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-1d2cc4d5b5718b45c60b8308299745c20d393d1db03cf3f9",
+        "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "operation": "provision",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5"
+      },
+      "preview": {
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-1d2cc4d5b5718b45c60b8308299745c20d393d1db03cf3f9",
+          "host_identity_sha256": "09aa266442dc9af4a672ce0f9042a3539c787790f5fa8123210f4bf05f9c16cb",
+          "head": "d130a4c215ab5ad6bcbb43da432b07a34e4174bf",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "bindings": {
+          "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "module_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "constitution_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "629212990463500",
+          "wall_ms": 1792908375343
+        },
+        "grants_authority": false
+      },
+      "original_argv_sha256": "77d60165b53ec517460b1bfcb2f33ee77c663fc491773dabb90dbf05e9747ab8",
+      "installed_origin_attested": false,
+      "tty_flags_synthetic": true
+    },
+    {
+      "fixture": {
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-ZgVYa4/repository",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-ZgVYa4/repository"
+      },
+      "action": "init bind",
+      "role": "architect",
+      "operation": "provision",
+      "phases": [],
+      "target": {
+        "kind": "reconciliation-host",
+        "id": "reconciliation-host:example-repository:wt-55c96bae3696596a5a458d95cd18a427abea6f4bffd1fdac:provision",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-55c96bae3696596a5a458d95cd18a427abea6f4bffd1fdac",
+        "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "operation": "provision",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5"
+      },
+      "preview": {
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-55c96bae3696596a5a458d95cd18a427abea6f4bffd1fdac",
+          "host_identity_sha256": "27ce24e44afe33c60d0780a8667deaa5ca1c19b9cff395158a4a8de1edb162a2",
+          "head": "c6f10e1f68051249b263467bd5e849f4e946a42d",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "bindings": {
+          "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "module_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "constitution_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "629214140069875",
+          "wall_ms": 1792908376492
+        },
+        "grants_authority": false
+      },
+      "original_argv_sha256": "4339fc943e79db774f22dbbc03cc746d44c2db6fe8b625cd9f4a3aa6251023e0",
+      "installed_origin_attested": false,
+      "tty_flags_synthetic": true
+    },
+    {
+      "fixture": {
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-Q6xNpl/repository",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-Q6xNpl/repository"
+      },
+      "action": "init bind",
+      "role": "architect",
+      "operation": "provision",
+      "phases": [],
+      "target": {
+        "kind": "reconciliation-host",
+        "id": "reconciliation-host:example-repository:wt-1a3cf7a456c20b7cabfea40277c6d9650bc7336204a0e56d:provision",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-1a3cf7a456c20b7cabfea40277c6d9650bc7336204a0e56d",
+        "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "operation": "provision",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5"
+      },
+      "preview": {
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-1a3cf7a456c20b7cabfea40277c6d9650bc7336204a0e56d",
+          "host_identity_sha256": "b53deefd3e1c0c4722f97b8a7b76649255ea5f0ecdb7e3a4b1a4606e6bf0f871",
+          "head": "fcd638282d8f3226bf2cfab4086ea37418ab22ab",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "bindings": {
+          "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "module_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "constitution_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "629215266821458",
+          "wall_ms": 1792908377619
+        },
+        "grants_authority": false
+      },
+      "original_argv_sha256": "a11beed476bb5aac10c633aa589ff0eec3508f251fff5a5577629a033aef6858",
+      "installed_origin_attested": false,
+      "tty_flags_synthetic": true
+    },
+    {
+      "fixture": {
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-bNhns2/repository",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-bNhns2/repository"
+      },
+      "action": "init bind",
+      "role": "architect",
+      "operation": "provision",
+      "phases": [],
+      "target": {
+        "kind": "reconciliation-host",
+        "id": "reconciliation-host:example-repository:wt-0e0747125a4423a2ac8def6f64a0343ff2f8aed94843b713:provision",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-0e0747125a4423a2ac8def6f64a0343ff2f8aed94843b713",
+        "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "operation": "provision",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5"
+      },
+      "preview": {
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-0e0747125a4423a2ac8def6f64a0343ff2f8aed94843b713",
+          "host_identity_sha256": "5a7a4c1b0f6e1c171658de96f80819ca763850e738ae0aed4966f17284ffa871",
+          "head": "7eec33d98c98944b6cbb2f6f73508aef3c24c66d",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "bindings": {
+          "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "module_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "constitution_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "629216454775875",
+          "wall_ms": 1792908378808
+        },
+        "grants_authority": false
+      },
+      "original_argv_sha256": "be58d69a64f08d889840617702f0d7e90199456eb5329b061692431b398ad035",
+      "installed_origin_attested": false,
+      "tty_flags_synthetic": true
+    },
+    {
+      "fixture": {
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-ShDAzi/repository",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-ShDAzi/repository"
+      },
+      "action": "init bind",
+      "role": "architect",
+      "operation": "provision",
+      "phases": [],
+      "target": {
+        "kind": "reconciliation-host",
+        "id": "reconciliation-host:example-repository:wt-d84b759b54e7d44bd9c99bf433dc63f91ba57a3833f1ae42:provision",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-d84b759b54e7d44bd9c99bf433dc63f91ba57a3833f1ae42",
+        "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "operation": "provision",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5"
+      },
+      "preview": {
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-d84b759b54e7d44bd9c99bf433dc63f91ba57a3833f1ae42",
+          "host_identity_sha256": "25defa3ff2403b1c1f2bfe62c615f34e47de57eec1bd48ab0248c633e5c1ba19",
+          "head": "05f88b8aa8db2ccad3f6648e5e6d0b24bf944239",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "bindings": {
+          "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "module_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "constitution_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "629219752954583",
+          "wall_ms": 1792908382104
+        },
+        "grants_authority": false
+      },
+      "original_argv_sha256": "89009bedbdb2a48172bbb9bb13e3191bf97e4dcdfd96e196c63e3bb76190f826",
+      "installed_origin_attested": false,
+      "tty_flags_synthetic": true
+    },
+    {
+      "fixture": {
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-cL2IJO/repository",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-cL2IJO/repository"
+      },
+      "action": "init bind",
+      "role": "architect",
+      "operation": "provision",
+      "phases": [],
+      "target": {
+        "kind": "reconciliation-host",
+        "id": "reconciliation-host:example-repository:wt-9d151ea147c28015a1df12bfc43485faf489cf74e2c32089:provision",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-9d151ea147c28015a1df12bfc43485faf489cf74e2c32089",
+        "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "operation": "provision",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5"
+      },
+      "preview": {
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-9d151ea147c28015a1df12bfc43485faf489cf74e2c32089",
+          "host_identity_sha256": "5bc87bbcc1e920d8bce2acbd84731ce6355342a63749ec1ca2d653bbe9038de6",
+          "head": "e5da8d5c7ccee868f0d40df3ef5a646ba88bf3da",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "bindings": {
+          "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "module_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "constitution_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "629222709661458",
+          "wall_ms": 1792908385062
+        },
+        "grants_authority": false
+      },
+      "original_argv_sha256": "28978f4ea10c4291c763026deeb6d055f0eddb9d35d53780b114abac70db5a72",
+      "installed_origin_attested": false,
+      "tty_flags_synthetic": true
+    },
+    {
+      "fixture": {
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-OEquS4/repository",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-OEquS4/repository"
+      },
+      "action": "init bind",
+      "role": "architect",
+      "operation": "provision",
+      "phases": [],
+      "target": {
+        "kind": "reconciliation-host",
+        "id": "reconciliation-host:example-repository:wt-b91530436b58186c6d3e260096db8093a6196e1f80c94344:provision",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-b91530436b58186c6d3e260096db8093a6196e1f80c94344",
+        "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "operation": "provision",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5"
+      },
+      "preview": {
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-b91530436b58186c6d3e260096db8093a6196e1f80c94344",
+          "host_identity_sha256": "08cff8d2e672f43e0ed72e1107ce4cbbe31560f529eee36b2f6ce674e2542fc6",
+          "head": "9582cd4534101f1df19f9dff1a490a482745bc3a",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "bindings": {
+          "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "module_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "constitution_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "629223690742833",
+          "wall_ms": 1792908386042
+        },
+        "grants_authority": false
+      },
+      "original_argv_sha256": "3612f15026f2ebf6b31f84c1e5347d25eda083822772adb28613eaf30b79daa8",
+      "installed_origin_attested": false,
+      "tty_flags_synthetic": true
+    },
+    {
+      "fixture": {
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-6hEgW0/repository",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-6hEgW0/repository"
+      },
+      "action": "init bind",
+      "role": "architect",
+      "operation": "provision",
+      "phases": [],
+      "target": {
+        "kind": "reconciliation-host",
+        "id": "reconciliation-host:example-repository:wt-ee0ed63da6d7388632c5f50f3a3188dd81ed1a83c1ba0cae:provision",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-ee0ed63da6d7388632c5f50f3a3188dd81ed1a83c1ba0cae",
+        "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "operation": "provision",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5"
+      },
+      "preview": {
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-ee0ed63da6d7388632c5f50f3a3188dd81ed1a83c1ba0cae",
+          "host_identity_sha256": "2f221030e2be77561683a5db5c0230a7545d372659eda1dae027a5d328bea94c",
+          "head": "cdd92a11fe1fb8479b87c77d1dc6bd8cc2a95a3b",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "bindings": {
+          "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "module_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "constitution_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "629226765093708",
+          "wall_ms": 1792908389116
+        },
+        "grants_authority": false
+      },
+      "original_argv_sha256": "09a1fd7ecd45c2b2108177fe4999b1e3e5b8d2c541d89a88540de2d555173ebb",
+      "installed_origin_attested": false,
+      "tty_flags_synthetic": true
+    },
+    {
+      "fixture": {
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-dSBB2Z/repository",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-dSBB2Z/repository"
+      },
+      "action": "evidence reconcile approve",
+      "role": "owner",
+      "operation": "approve",
+      "phases": [],
+      "target": {
+        "kind": "reconciliation-host",
+        "id": "reconciliation-host:example-repository:wt-52b09ec36baa1af18532b53780efc248b3a30580d86118f2:approve:1111111111111111111111111111111111111111111111111111111111111111",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-52b09ec36baa1af18532b53780efc248b3a30580d86118f2",
+        "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "operation": "approve",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "approval_id": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "preview": {
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-52b09ec36baa1af18532b53780efc248b3a30580d86118f2",
+          "host_identity_sha256": "449993c5f0944cedcae82934ba6222342af86acd3886aab520982eda85ad9876",
+          "head": "f98df39bbae6990f394430a126733560a2d55f8a",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "bindings": {
+          "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "module_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "constitution_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "629227814102583",
+          "wall_ms": 1792908390167
+        },
+        "grants_authority": false
+      },
+      "original_argv_sha256": "e8585f5f7f3c72165cd4368398873e1671abb6969056da6836ec027e1b77cdbc",
+      "installed_origin_attested": false,
+      "tty_flags_synthetic": true
+    },
+    {
+      "fixture": {
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-s0yVd0/repository",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-s0yVd0/repository"
+      },
+      "action": "evidence reconcile approve",
+      "role": "owner",
+      "operation": "renew",
+      "phases": [],
+      "target": {
+        "kind": "reconciliation-host",
+        "id": "reconciliation-host:example-repository:wt-037bfde942ea0a2cf3c2685db67c6c46ec099f43b90f3e43:renew:1111111111111111111111111111111111111111111111111111111111111111",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-037bfde942ea0a2cf3c2685db67c6c46ec099f43b90f3e43",
+        "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "operation": "renew",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "approval_id": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "preview": {
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-037bfde942ea0a2cf3c2685db67c6c46ec099f43b90f3e43",
+          "host_identity_sha256": "c4218f61028133d14ca888e4b821fc1ceb2e878c4c70ac92c48d2befcb6aa973",
+          "head": "756589f314b7a68775752a8f8ad726eaecdb80be",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "bindings": {
+          "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "module_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "constitution_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "629230851142500",
+          "wall_ms": 1792908393202
+        },
+        "grants_authority": false
+      },
+      "original_argv_sha256": "49c9cc779d1b897b930cd0f923643ff2fd22341032b022d5f09f21bd7e55a754",
+      "installed_origin_attested": false,
+      "tty_flags_synthetic": true
+    },
+    {
+      "fixture": {
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-Qx3Dos/repository",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-Qx3Dos/repository"
+      },
+      "action": "evidence reconcile approve",
+      "role": "owner",
+      "operation": "revoke",
+      "phases": [],
+      "target": {
+        "kind": "reconciliation-host",
+        "id": "reconciliation-host:example-repository:wt-efdf8c1e0315d0e794b7d59269a76f0b6c2c12012927c828:revoke:1111111111111111111111111111111111111111111111111111111111111111",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-efdf8c1e0315d0e794b7d59269a76f0b6c2c12012927c828",
+        "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "operation": "revoke",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "approval_id": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "preview": {
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-efdf8c1e0315d0e794b7d59269a76f0b6c2c12012927c828",
+          "host_identity_sha256": "f56a4016eb447f1205051bf3015979576e96ee44581d0b76e30156c637ac27ca",
+          "head": "ba75df0d880c16fd187862657313a5932d55acd3",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "bindings": {
+          "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "module_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "constitution_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "629233879938666",
+          "wall_ms": 1792908396231
+        },
+        "grants_authority": false
+      },
+      "original_argv_sha256": "009c20a324dd6dcb507523f1337e45af640573665b4d0a67172e86e61cc811cc",
+      "installed_origin_attested": false,
+      "tty_flags_synthetic": true
+    },
+    {
+      "fixture": {
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-zJosyf/repository",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-zJosyf/repository"
+      },
+      "action": "evidence reconcile approve",
+      "role": "owner",
+      "operation": "recover-owned-lease",
+      "phases": [],
+      "target": {
+        "kind": "reconciliation-host",
+        "id": "reconciliation-host:example-repository:wt-a61d91b8a237d072eef1e25e89e8ffe3c7002e17258a401b:recover-owned-lease:1111111111111111111111111111111111111111111111111111111111111111",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-a61d91b8a237d072eef1e25e89e8ffe3c7002e17258a401b",
+        "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "operation": "recover-owned-lease",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "approval_id": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "preview": {
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-a61d91b8a237d072eef1e25e89e8ffe3c7002e17258a401b",
+          "host_identity_sha256": "8ee3f54fdba10a2dcf035796dde6ff00a609abe1b6fc2c0a57b6c55b54883d07",
+          "head": "8165387480d0d657bf6416d1c5f38ca3cb54a8ac",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "bindings": {
+          "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "module_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "constitution_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "629236971190750",
+          "wall_ms": 1792908399322
+        },
+        "grants_authority": false
+      },
+      "original_argv_sha256": "3b23d1813ef043c3aa32a6084f9f23e78d75c9a9d804bdbe95dd9f1dcb3f8569",
+      "installed_origin_attested": false,
+      "tty_flags_synthetic": true
+    },
+    {
+      "fixture": {
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-kB48u6/repository",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-kB48u6/repository"
+      },
+      "action": "evidence reconcile materialize",
+      "role": "inspector",
+      "operation": "consume-phase",
+      "phases": [
+        "01",
+        "02"
+      ],
+      "target": {
+        "kind": "reconciliation-host",
+        "id": "reconciliation-host:example-repository:wt-46808b52634654b1d24a5bb182bf428f4567246978e3dfe4:consume-phase:1111111111111111111111111111111111111111111111111111111111111111:01",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-46808b52634654b1d24a5bb182bf428f4567246978e3dfe4",
+        "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "operation": "consume-phase",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "approval_id": "1111111111111111111111111111111111111111111111111111111111111111",
+        "phase": "01"
+      },
+      "preview": {
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-46808b52634654b1d24a5bb182bf428f4567246978e3dfe4",
+          "host_identity_sha256": "4aed177450623ed0838afabe753d52a58386b1f451461caa613d8a1219fe27fb",
+          "head": "6563e5b823ade7a859a5da9935290b10fffd578a",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "bindings": {
+          "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "module_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "constitution_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "629239949739958",
+          "wall_ms": 1792908402301
+        },
+        "grants_authority": false
+      },
+      "original_argv_sha256": "f5e0cf1676328f4c5521bb35d6cc1b8cc0a7409c328fde7800b75e7ef01b00f3",
+      "installed_origin_attested": false,
+      "tty_flags_synthetic": true
+    },
+    {
+      "fixture": {
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-5pcZtc/repository",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-5pcZtc/repository"
+      },
+      "action": "evidence reconcile stage-proof",
+      "role": "inspector",
+      "operation": "consume-phase",
+      "phases": [
+        "03"
+      ],
+      "target": {
+        "kind": "reconciliation-host",
+        "id": "reconciliation-host:example-repository:wt-184e904a7bd4cbb9500cd13a0f5c40fe562885f5eb5484b3:consume-phase:1111111111111111111111111111111111111111111111111111111111111111:03",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-184e904a7bd4cbb9500cd13a0f5c40fe562885f5eb5484b3",
+        "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "operation": "consume-phase",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "approval_id": "1111111111111111111111111111111111111111111111111111111111111111",
+        "phase": "03"
+      },
+      "preview": {
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-184e904a7bd4cbb9500cd13a0f5c40fe562885f5eb5484b3",
+          "host_identity_sha256": "a7a6cf3eec307f6d363fc29456ce7c4a18c0a37bc21e0c575f804f540ab2d06b",
+          "head": "f7347521f37e45b77f22ed22e5123ebb0a262d94",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "bindings": {
+          "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "module_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "constitution_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "629242959492041",
+          "wall_ms": 1792908405310
+        },
+        "grants_authority": false
+      },
+      "original_argv_sha256": "a1423c3bfd5e3dd1bdc5047aba11d6e1f495cf7eac5fec2243627338630e5892",
+      "installed_origin_attested": false,
+      "tty_flags_synthetic": true
+    },
+    {
+      "fixture": {
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-3uCUdI/repository",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-3uCUdI/repository"
+      },
+      "action": "evidence reconcile stage-proof",
+      "role": "inspector",
+      "operation": "consume-phase",
+      "phases": [
+        "03"
+      ],
+      "target": {
+        "kind": "proof-index",
+        "id": "proof-index:example-repository:wt-fed3bbccb30080b28097a32769a8ccb52fa74786f1bc7d2e:record/proofs/chain.json",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-fed3bbccb30080b28097a32769a8ccb52fa74786f1bc7d2e",
+        "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "operation": "chain-cas",
+        "proof_path": "record/proofs/chain.json",
+        "approval_id": "1111111111111111111111111111111111111111111111111111111111111111",
+        "phase_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "before_index_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "other_entries_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+        "verified_chain_sha256": "5555555555555555555555555555555555555555555555555555555555555555"
+      },
+      "preview": {
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-fed3bbccb30080b28097a32769a8ccb52fa74786f1bc7d2e",
+          "host_identity_sha256": "69ee80a9c4db9c4f4e9752e7088d14dfb74bcdd423e053a01edff0a217872f4b",
+          "head": "034245cb92bd035436ba6e2bff0cb7026da513c9",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "bindings": {
+          "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "module_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "constitution_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "629245814306625",
+          "wall_ms": 1792908408165
+        },
+        "grants_authority": false
+      },
+      "original_argv_sha256": "cc24d5c510842e3e9aeb9c68843819d2ae093596b3c0ee5ed4b2cab7d7a8258b",
+      "installed_origin_attested": false,
+      "tty_flags_synthetic": true
+    },
+    {
+      "fixture": {
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-jaGsN0/repository",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-jaGsN0/repository"
+      },
+      "action": "sense bootstrap-inventory",
+      "role": "architect",
+      "operation": "consume-phase",
+      "phases": [
+        "04"
+      ],
+      "target": {
+        "kind": "reconciliation-host",
+        "id": "reconciliation-host:example-repository:wt-05b5092b345a957f8927e70d3c6038b1082e0d0a5b452feb:consume-phase:1111111111111111111111111111111111111111111111111111111111111111:04",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-05b5092b345a957f8927e70d3c6038b1082e0d0a5b452feb",
+        "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "operation": "consume-phase",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "approval_id": "1111111111111111111111111111111111111111111111111111111111111111",
+        "phase": "04"
+      },
+      "preview": {
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-05b5092b345a957f8927e70d3c6038b1082e0d0a5b452feb",
+          "host_identity_sha256": "1db41de99fe906bad8fea5a2282abab73aa01882c435ca4d8f87a8fec147a9e9",
+          "head": "a23540bbecc268893e31e1b4b13b514661547412",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "bindings": {
+          "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "module_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "constitution_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "629248695051166",
+          "wall_ms": 1792908411046
+        },
+        "grants_authority": false
+      },
+      "original_argv_sha256": "c8264b47710aff3afe1902748a93b70841cd06841b766633f87c55e459476f7c",
+      "installed_origin_attested": false,
+      "tty_flags_synthetic": true
+    },
+    {
+      "fixture": {
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-ekzeL9/repository",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-ekzeL9/repository"
+      },
+      "action": "evidence reconcile materialize",
+      "role": "inspector",
+      "operation": "consume-phase",
+      "phases": [
+        "01",
+        "02"
+      ],
+      "target": {
+        "kind": "reconciliation-host",
+        "id": "reconciliation-host:example-repository:wt-e696c9c932845908f04fe94cc3aec53edb6ab758f556570a:consume-phase:1111111111111111111111111111111111111111111111111111111111111111:02",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-e696c9c932845908f04fe94cc3aec53edb6ab758f556570a",
+        "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "operation": "consume-phase",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "approval_id": "1111111111111111111111111111111111111111111111111111111111111111",
+        "phase": "02"
+      },
+      "preview": {
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-e696c9c932845908f04fe94cc3aec53edb6ab758f556570a",
+          "host_identity_sha256": "7113c93103edfaf03b00724ae2aa693e2183e91464ee6a4569bcf40900d2e56b",
+          "head": "9d2d866f61f23936f5309cfd2a96234eba3c1466",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "bindings": {
+          "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "module_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "constitution_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "629251729789333",
+          "wall_ms": 1792908414081
+        },
+        "grants_authority": false
+      },
+      "original_argv_sha256": "e6759568c200519d9a2033d0db84a7e360e6591bffde56b17e752fb1643e55cd",
+      "installed_origin_attested": false,
+      "tty_flags_synthetic": true
+    },
+    {
+      "fixture": {
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-oySeTc/repository",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-oySeTc/repository"
+      },
+      "action": "init bind",
+      "role": "architect",
+      "operation": "provision",
+      "phases": [],
+      "target": {
+        "kind": "reconciliation-host",
+        "id": "reconciliation-host:example-repository:wt-a9e9d92d6638f51f11ad7af6454bfc46ea2468af064d5099:provision",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-a9e9d92d6638f51f11ad7af6454bfc46ea2468af064d5099",
+        "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "operation": "provision",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5"
+      },
+      "preview": {
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-a9e9d92d6638f51f11ad7af6454bfc46ea2468af064d5099",
+          "host_identity_sha256": "28ec82724cd35e74be68b7a01ef2d7102957cf7bca96c589f4e8e8bf0fab9157",
+          "head": "9359c75421241f59bf64127c98cec6439b756b18",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "bindings": {
+          "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "module_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "constitution_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "629254802479208",
+          "wall_ms": 1792908417154
+        },
+        "grants_authority": false
+      },
+      "original_argv_sha256": "bc8489a3451c82fae7fb208b181aef89e7e44319261c8697171965228027ddca",
+      "installed_origin_attested": false,
+      "tty_flags_synthetic": true
+    },
+    {
+      "fixture": {
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-CK0gh7/repository",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-CK0gh7/repository"
+      },
+      "action": "init bind",
+      "role": "architect",
+      "operation": "provision",
+      "phases": [],
+      "target": {
+        "kind": "reconciliation-host",
+        "id": "reconciliation-host:example-repository:wt-a94b6f9845505b767a14b9daf5c2b0646c27d947f82d7bc5:provision",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-a94b6f9845505b767a14b9daf5c2b0646c27d947f82d7bc5",
+        "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "operation": "provision",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5"
+      },
+      "preview": {
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-a94b6f9845505b767a14b9daf5c2b0646c27d947f82d7bc5",
+          "host_identity_sha256": "3dcf6515b28a3bd5977ff925505177437e69a3af2997ea5ac47eb97cece3232f",
+          "head": "0e66b6a83c8e8eb0b44ef87c1d5c49b56e9e85ce",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "bindings": {
+          "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "module_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "constitution_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "629258022607041",
+          "wall_ms": 1792908420374
+        },
+        "grants_authority": false
+      },
+      "original_argv_sha256": "391cbabae48b23751a3d8496e7f63058b96651440145810aa685ea40fd3e3e70",
+      "installed_origin_attested": false,
+      "tty_flags_synthetic": true
+    },
+    {
+      "fixture": {
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-DhMmlC/repository",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-DhMmlC/repository"
+      },
+      "action": "init bind",
+      "role": "architect",
+      "operation": "provision",
+      "phases": [],
+      "target": {
+        "kind": "reconciliation-host",
+        "id": "reconciliation-host:example-repository:wt-c6cf4bc2677e3531499bc23a809af95acf6dd3b5b4d6c353:provision",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-c6cf4bc2677e3531499bc23a809af95acf6dd3b5b4d6c353",
+        "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "operation": "provision",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5"
+      },
+      "preview": {
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-c6cf4bc2677e3531499bc23a809af95acf6dd3b5b4d6c353",
+          "host_identity_sha256": "6e568ccd3186afe6a40754dfc1c9875b3f5e96c22fbb4cb64bb205756182aa0e",
+          "head": "a9b6805c409b2ed6c6aa2b912a65ecf0db37219b",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "bindings": {
+          "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "module_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "constitution_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "629258522640000",
+          "wall_ms": 1792908420874
+        },
+        "grants_authority": false
+      },
+      "original_argv_sha256": "e291dad0c30fdd507b69ce84bf8618a471ea7d52793a1ad6149e87882f2a5746",
+      "installed_origin_attested": false,
+      "tty_flags_synthetic": true
+    },
+    {
+      "fixture": {
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-XuLaCO/repository",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-XuLaCO/repository"
+      },
+      "action": "init bind",
+      "role": "architect",
+      "operation": "provision",
+      "phases": [],
+      "target": {
+        "kind": "reconciliation-host",
+        "id": "reconciliation-host:example-repository:wt-0c6ec53218c61e3d10728a702187a134f746b0c9d4be14ac:provision",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-0c6ec53218c61e3d10728a702187a134f746b0c9d4be14ac",
+        "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "operation": "provision",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5"
+      },
+      "preview": {
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-0c6ec53218c61e3d10728a702187a134f746b0c9d4be14ac",
+          "host_identity_sha256": "f2d9e70a553cc632a3b0cc9530afb8eba708b605ba26b1ecc0734ceccfdc1804",
+          "head": "a9b6805c409b2ed6c6aa2b912a65ecf0db37219b",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "bindings": {
+          "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "module_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "constitution_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "629259038391875",
+          "wall_ms": 1792908421390
+        },
+        "grants_authority": false
+      },
+      "original_argv_sha256": "28f05b9a7f20f9b4bd127fc6687fcf81978f17738c965959085b5f213a3eae1b",
+      "installed_origin_attested": false,
+      "tty_flags_synthetic": true
+    },
+    {
+      "fixture": {
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-jvajoT/repository",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-jvajoT/repository"
+      },
+      "action": "init bind",
+      "role": "architect",
+      "operation": "provision",
+      "phases": [],
+      "target": {
+        "kind": "reconciliation-host",
+        "id": "reconciliation-host:example-repository:wt-fdf85b433ffb341671959dae48f10d38bca0f07c7494298f:provision",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-fdf85b433ffb341671959dae48f10d38bca0f07c7494298f",
+        "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "operation": "provision",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5"
+      },
+      "preview": {
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-fdf85b433ffb341671959dae48f10d38bca0f07c7494298f",
+          "host_identity_sha256": "4a85950a7be1c7979de391d97b9ca052890c5c218427278c4caf994b17568c16",
+          "head": "9b5f7a19a996bfba4f16bdeaf61c92d79d2078d0",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "bindings": {
+          "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "module_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "constitution_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "629259563528333",
+          "wall_ms": 1792908421915
+        },
+        "grants_authority": false
+      },
+      "original_argv_sha256": "60d0c9064f69e3a8dff83325cec341bc804e10d93b34ceb39f7a803aec255b2c",
+      "installed_origin_attested": false,
+      "tty_flags_synthetic": true
+    },
+    {
+      "fixture": {
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-vT0uL9/repository",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-vT0uL9/repository"
+      },
+      "action": "init bind",
+      "role": "architect",
+      "operation": "provision",
+      "phases": [],
+      "target": {
+        "kind": "reconciliation-host",
+        "id": "reconciliation-host:example-repository:wt-66c5a4a1bb64d867ca20e2d59fab4dc21676d3a5f2a8aac7:provision",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-66c5a4a1bb64d867ca20e2d59fab4dc21676d3a5f2a8aac7",
+        "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "operation": "provision",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5"
+      },
+      "preview": {
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-66c5a4a1bb64d867ca20e2d59fab4dc21676d3a5f2a8aac7",
+          "host_identity_sha256": "a6212da1c37406418db2aa550d07a98af0b7713b2c46f9efc2871cb1b81f3cab",
+          "head": "9b5f7a19a996bfba4f16bdeaf61c92d79d2078d0",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "bindings": {
+          "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "module_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "constitution_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "629260076785458",
+          "wall_ms": 1792908422428
+        },
+        "grants_authority": false
+      },
+      "original_argv_sha256": "009ce0d0afc36fdd73ed02c3e61391152130879e2c2dbb865f5a16d623ea222d",
+      "installed_origin_attested": false,
+      "tty_flags_synthetic": true
+    },
+    {
+      "fixture": {
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-rVpZ7O/repository",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-rVpZ7O/repository"
+      },
+      "action": "init bind",
+      "role": "architect",
+      "operation": "provision",
+      "phases": [],
+      "target": {
+        "kind": "reconciliation-host",
+        "id": "reconciliation-host:example-repository:wt-24a64b224d958567976462eee98afc157ec2c709d26be09f:provision",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-24a64b224d958567976462eee98afc157ec2c709d26be09f",
+        "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "operation": "provision",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5"
+      },
+      "preview": {
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-24a64b224d958567976462eee98afc157ec2c709d26be09f",
+          "host_identity_sha256": "c5d29ba802007d9d611ee6cd47eaa30d25611a3eaca732c6df0e0456fac23f63",
+          "head": "037faea888581785f4477779f8b187b1e696cca7",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "bindings": {
+          "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "module_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "constitution_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "629260568011916",
+          "wall_ms": 1792908422919
+        },
+        "grants_authority": false
+      },
+      "original_argv_sha256": "709a6a881d239b56406e3ce6d6d32913cce21123ef9737751003fa2ffb59ba80",
+      "installed_origin_attested": false,
+      "tty_flags_synthetic": true
+    },
+    {
+      "fixture": {
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-folM8w/repository",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-folM8w/repository"
+      },
+      "action": "init bind",
+      "role": "architect",
+      "operation": "provision",
+      "phases": [],
+      "target": {
+        "kind": "reconciliation-host",
+        "id": "reconciliation-host:example-repository:wt-7a190ff409ed69f14cb75d00c22470ebea896852f6b613ac:provision",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-7a190ff409ed69f14cb75d00c22470ebea896852f6b613ac",
+        "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "operation": "provision",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5"
+      },
+      "preview": {
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-7a190ff409ed69f14cb75d00c22470ebea896852f6b613ac",
+          "host_identity_sha256": "12e10b9aa8c180a6dca2ac8a9986f3c8631563f8283cb76d3068e917c7939e72",
+          "head": "037faea888581785f4477779f8b187b1e696cca7",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "bindings": {
+          "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "module_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "constitution_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "629261050382375",
+          "wall_ms": 1792908423401
+        },
+        "grants_authority": false
+      },
+      "original_argv_sha256": "d132c9efc819e760b42816126367a5fec35216421ce9e04529637dfbdab8fbac",
+      "installed_origin_attested": false,
+      "tty_flags_synthetic": true
+    },
+    {
+      "fixture": {
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-CwuT8S/repository",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-CwuT8S/repository"
+      },
+      "action": "init bind",
+      "role": "architect",
+      "operation": "provision",
+      "phases": [],
+      "target": {
+        "kind": "reconciliation-host",
+        "id": "reconciliation-host:example-repository:wt-e21a783ce68527dbe85da734565de11c63a0d9ad1b46299e:provision",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-e21a783ce68527dbe85da734565de11c63a0d9ad1b46299e",
+        "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "operation": "provision",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5"
+      },
+      "preview": {
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-e21a783ce68527dbe85da734565de11c63a0d9ad1b46299e",
+          "host_identity_sha256": "e4ff137c259da6cadb7aac177c18a9be48b67e8db377af50de67a0a27637834e",
+          "head": "17f55185a8094a0286651b37c2f41f33bb8d22ed",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "bindings": {
+          "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "module_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "constitution_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "629261534983416",
+          "wall_ms": 1792908423886
+        },
+        "grants_authority": false
+      },
+      "original_argv_sha256": "0d1acaf3ba9c134616bdade36b4094bc276634775bfb717269195ee1903182dc",
+      "installed_origin_attested": false,
+      "tty_flags_synthetic": true
+    },
+    {
+      "fixture": {
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-kcG7I1/repository",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-kcG7I1/repository"
+      },
+      "action": "init bind",
+      "role": "architect",
+      "operation": "provision",
+      "phases": [],
+      "target": {
+        "kind": "reconciliation-host",
+        "id": "reconciliation-host:example-repository:wt-9f565c064e1ef9365fe2f80961b4195348ba6cdb27183cad:provision",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-9f565c064e1ef9365fe2f80961b4195348ba6cdb27183cad",
+        "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "operation": "provision",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5"
+      },
+      "preview": {
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-9f565c064e1ef9365fe2f80961b4195348ba6cdb27183cad",
+          "host_identity_sha256": "adc88d3e732f1e6dced6f598e088129a665d27db5a873eab9cac3adb2052e118",
+          "head": "c0ae7ee261d7ccc4aed2d4333e6e6a737dd2001b",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "bindings": {
+          "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "module_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "constitution_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "629262712634791",
+          "wall_ms": 1792908425064
+        },
+        "grants_authority": false
+      },
+      "original_argv_sha256": "bd99f9604354b16728c19c9d82e1d619eb184e4b5e728c24fcd82890e9eb9bd6",
+      "installed_origin_attested": false,
+      "tty_flags_synthetic": true
+    },
+    {
+      "fixture": {
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-IYZr6K/repository",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-IYZr6K/repository"
+      },
+      "action": "init bind",
+      "role": "architect",
+      "operation": "provision",
+      "phases": [],
+      "target": {
+        "kind": "reconciliation-host",
+        "id": "reconciliation-host:example-repository:wt-9c2de6f926068df9b6ddb3584bf7cda86b4d2da731d450d5:provision",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-9c2de6f926068df9b6ddb3584bf7cda86b4d2da731d450d5",
+        "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "operation": "provision",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5"
+      },
+      "preview": {
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-9c2de6f926068df9b6ddb3584bf7cda86b4d2da731d450d5",
+          "host_identity_sha256": "ba0653ffc621535b73fa9da28af16c8713ae36cf6f9178475e2d0b11bfafe908",
+          "head": "2cbac0b28d424926ac2a7cb04b2bda2c5bfeb94f",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "bindings": {
+          "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "module_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "constitution_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "629263848922166",
+          "wall_ms": 1792908426200
+        },
+        "grants_authority": false
+      },
+      "original_argv_sha256": "46b02c5241a5c0761d47d103ea52415bb3b7feab0438d90c28119649bf951854",
+      "installed_origin_attested": false,
+      "tty_flags_synthetic": true
+    },
+    {
+      "fixture": {
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-sFiahm/repository",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-sFiahm/repository"
+      },
+      "action": "init bind",
+      "role": "architect",
+      "operation": "provision",
+      "phases": [],
+      "target": {
+        "kind": "reconciliation-host",
+        "id": "reconciliation-host:example-repository:wt-4d448cc098dca6f72d8d49aca6553ccb5052e3012143a015:provision",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-4d448cc098dca6f72d8d49aca6553ccb5052e3012143a015",
+        "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "operation": "provision",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5"
+      },
+      "preview": {
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-4d448cc098dca6f72d8d49aca6553ccb5052e3012143a015",
+          "host_identity_sha256": "421844d8caf31a1bf506a6e476159e16986daa1f1bfc220243a841acd7306c29",
+          "head": "d43168ac5a0f076ff2ce19b35647ef3cdc61607c",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "bindings": {
+          "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "module_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "constitution_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "629266975620916",
+          "wall_ms": 1792908429327
+        },
+        "grants_authority": false
+      },
+      "original_argv_sha256": "84792d8462146b70c59d81f131824a68533d07cabaf73817b354fffddc18762c",
+      "installed_origin_attested": false,
+      "tty_flags_synthetic": true
+    },
+    {
+      "fixture": {
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-rLoJde/repository",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-rLoJde/repository"
+      },
+      "action": "init bind",
+      "role": "architect",
+      "operation": "provision",
+      "phases": [],
+      "target": {
+        "kind": "reconciliation-host",
+        "id": "reconciliation-host:example-repository:wt-422bc82639e33396744593e1df8b7f9cc6319e8424bd74fd:provision",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-422bc82639e33396744593e1df8b7f9cc6319e8424bd74fd",
+        "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "operation": "provision",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5"
+      },
+      "preview": {
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-422bc82639e33396744593e1df8b7f9cc6319e8424bd74fd",
+          "host_identity_sha256": "d75bdc085854a0ec89b876f84d9e712c740923f403ca790427746c0b6c494ee8",
+          "head": "d612d6793012e1ec0700346b04f0033062b7ea20",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "bindings": {
+          "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "module_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "constitution_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "629267872575166",
+          "wall_ms": 1792908430224
+        },
+        "grants_authority": false
+      },
+      "original_argv_sha256": "98c5e22517a5126170fd10481739175d7863d049f2adc29926eaa5f61737be71",
+      "installed_origin_attested": false,
+      "tty_flags_synthetic": true
+    },
+    {
+      "fixture": {
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-VG2PZV/repository",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-operation-inspector-Le3WLc/fixture-VG2PZV/repository"
+      },
+      "action": "init bind",
+      "role": "architect",
+      "operation": "provision",
+      "phases": [],
+      "target": {
+        "kind": "reconciliation-host",
+        "id": "reconciliation-host:example-repository:wt-c32e256fd8e27e6adadcfae4a3177f22ccfe084d2a5220f2:provision",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-c32e256fd8e27e6adadcfae4a3177f22ccfe084d2a5220f2",
+        "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "operation": "provision",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5"
+      },
+      "preview": {
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-c32e256fd8e27e6adadcfae4a3177f22ccfe084d2a5220f2",
+          "host_identity_sha256": "782a879a7bc631d8a4a97ac4e3f8331de1297c28b44346184c330337c9dd16e8",
+          "head": "6cbbe7ffec23fe12e8e709f1c65b47dcbca87d39",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "bindings": {
+          "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "module_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "constitution_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "629268682207375",
+          "wall_ms": 1792908431033
+        },
+        "grants_authority": false
+      },
+      "original_argv_sha256": "740e6e3cbada8f79f89e4e7e75cf89f4016e90dd7aa8a0392779be61b18c104b",
+      "installed_origin_attested": false,
+      "tty_flags_synthetic": true
+    }
+  ]
+}

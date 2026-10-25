@@ -1,0 +1,18 @@
+{
+  "status": "VERIFIED_REGISTERED_SELF_BINDING",
+  "changed_paths": [
+    ".devai/pin/constitution.md",
+    ".devai/config/project.json",
+    ".devai/config/authority-policy.json"
+  ],
+  "historical_proofs_unchanged": true,
+  "adopter_receipt_and_source_unchanged": true,
+  "files": {
+    "before.json": "1da3f7951036168dd9d71b07e5aaee291ee4e652aeaef45cc91d54bccdbebd99",
+    "prospective-authority-policy.json": "575ee8c75f0dab4da2a12579dee845b88f843a909ac4a45cb6dc1f4e72789d0b",
+    "after.json": "d34a010a0d5dd5617a3abf78e6f6d9a43ba638ba7d098c79ffceb52dc7f179c9",
+    "terminal.json": "e6a5fceb628d1dadc820ee1790cc1043c77975e08b96b2643bff0d9eb372d2d2",
+    "ready.json": "489d4afee06e15022d0271821651f059d97aa7bc7caccdcfb896d0d2d2a4c02c",
+    "pty.bin": "4827a15a25891c8eca64084ae8a08a47f5d2973c65d3b17f74bb88c929e40085"
+  }
+}

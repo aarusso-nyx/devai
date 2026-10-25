@@ -1,0 +1,54 @@
+{
+  "result": "PURE_LOGICAL_RESOURCE_SHAPE_INDEPENDENT_GREEN_ONLY",
+  "source": "packages/authority/src/boundaries/reconciliation-resources.ts",
+  "source_sha256": "864cb540fda9ac911d88d4972da8923f7caffa4b02a7b9a3ec01a98ead75ae62",
+  "test": "packages/authority/tests/unit/reconciliation-resources.test.ts",
+  "test_sha256": "87fa27e5c50865b484275baa242966f298e237c51ec903f62e5eb7ba7bb1b36c",
+  "final": {
+    "passed": 99,
+    "failed": 0,
+    "skipped": 0,
+    "log": "final-green.log",
+    "single_worker": true
+  },
+  "red": {
+    "classification": "Structuralmissingmoduleonly; no publicruntime or host-origin claim",
+    "failed": 98,
+    "passed": 0,
+    "log": "structural-red-final.log",
+    "test_sha256": "2269ce2aac44ab2c6753e03c5ea2ef6d25206fe650be37e1f3fe3f9ccc847df6"
+  },
+  "initial_green": {
+    "passed": 98,
+    "log": "independent-green.log",
+    "standing": "Initial source before root nullprototype descriptor-copy hardening; not substituted for final exact-source run."
+  },
+  "additional_regression": "One extra test verifies root hardening: a missing host binding field never reads a live inherited Object.prototype getter; descriptor restored in finally and input unchanged.",
+  "source_review": [
+    "Only node:util.types.isProxy import; no IO APIs or authorizer/handle issuer.",
+    "Proxy/reflectiontrap refusal precedes prototype/descriptor inspection; plain/null prototype own enumerable data only.",
+    "Copy validated own descriptor values into nullprototype data; no accessors or inherited field reads.",
+    "Closed keys, exact operations/phaseconditionals/formula IDs, fixed64 digest lengths and illegal-character exclusion.",
+    "Exhaustive newname references in authoritysrc/actionregistry found only private module definitions; no barrel/targetunion/policy/selector/action integration established by this lane."
+  ],
+  "eslint": {
+    "exit_code": 0,
+    "log": "final-eslint.log"
+  },
+  "remaining_gates": [
+    "Actual scope/role/consent/originalargv",
+    "Authenticated host ID origin and fresh private operationhandles",
+    "Runtime ResourceTarget union/schema/policy/selector/actionregistry consumers",
+    "Realhost/privateissuer/indexlock/oneentryCAS/publiccommands/release/adopter qualification"
+  ],
+  "scope": "Inspector changed only new authorized test and authoring/b1-resource-inspector evidence. No runtime, schema, registry, pin or binding edits.",
+  "log_sha256": {
+    "final-green.log": "f8ecfce7efe44e79b639d0f373cd1fda92ef7b7d3bc7918e30cf0325c4ca87dc",
+    "test-eslint.log": "c73bf1a3e3a01e70dfeba324870fba52d3e1a99173b4a59d0b61ecf284dcaf5c",
+    "structural-red-final.log": "0c058a2d14fa067c6bf0fce1daa914f4a667794eb53b71197d27f62fc0668b38",
+    "test-eslint-final.log": "689d370e8c06bdc4d786c596f733e4fd11d13ae585434f61cc90eeeaf5155785",
+    "independent-green.log": "0950e5130ad0a1df2e8b319fc245be7f7619845b1b167130cae24387156d0f01",
+    "final-eslint.log": "689d370e8c06bdc4d786c596f733e4fd11d13ae585434f61cc90eeeaf5155785",
+    "structural-red.log": "595ee9aaa4961e080e5c9f31dabbdf619952bb3e19fe89167bce02baf8ef1270"
+  }
+}

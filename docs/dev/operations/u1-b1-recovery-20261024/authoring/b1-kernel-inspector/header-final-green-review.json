@@ -1,0 +1,65 @@
+{
+  "status": "INDEPENDENT_HEADER_HARDENED_TYPED_DATA_KERNEL_GREEN_NO_EFFECT_AUTHORITY",
+  "tests": {
+    "files": 6,
+    "total": 300,
+    "passed": 300,
+    "failed": 0,
+    "kernel": 58,
+    "prior_shape": 99,
+    "unchanged_original_decision_policy": 143
+  },
+  "source_and_test_sha256": {
+    "packages/authority/src/types.ts": "1b2c122d0c4a8139b5a8b012fe5a7d3583ef8f372e7ce052536c794aad8393a2",
+    "packages/authority/src/decision-plan.ts": "a3c91fa2be505502c0dcb4a3fc5b69307a702781c8f1e99b1dc0e06ae265f2f5",
+    "packages/authority/src/runtime/policy-resolver.ts": "70ba57bb7760b9654aa12978fdfaf736f3ee6bb886b2796039b7cb641c9af8a0",
+    "packages/authority/src/boundaries/reconciliation-resources.ts": "864cb540fda9ac911d88d4972da8923f7caffa4b02a7b9a3ec01a98ead75ae62",
+    "packages/authority/tests/unit/reconciliation-resource-kernel.test.ts": "da8a78cd5e4aca842ceaab29b38337f3662949c5c82525ceb89b71a28008898a",
+    "packages/authority/tests/unit/reconciliation-resources.test.ts": "87fa27e5c50865b484275baa242966f298e237c51ec903f62e5eb7ba7bb1b36c"
+  },
+  "command": "pnpm exec node scripts/process/validation-runner.mjs -- vitest run --config tests/config/local.config.ts --maxWorkers 1 packages/authority/tests/unit/reconciliation-resource-kernel.test.ts packages/authority/tests/unit/reconciliation-resources.test.ts packages/authority/tests/unit/authority-decision-contracts.test.ts packages/authority/tests/unit/authority-decision-derivation-contracts.test.ts packages/authority/tests/unit/authority-decision-issuer.red.robust.test.ts packages/authority/tests/unit/authority-policy-resolver-contracts.test.ts",
+  "log_sha256": "8853aaee0d549562932468bf0f0ad2c59746b264bab3597c181518abde437da2",
+  "independent_defect": {
+    "reproduced": "Four own-id-accessor cases failed after initial288PASS. Rejected payload getter executed by duplicate ID extraction or legacy query fallback.",
+    "fixed": "Invalid new-kind ID extraction now uses fixed placeholder; resourceValid recognized new kinds return qualified validator result immediately. All original46 and added4 assertions retained."
+  },
+  "review": [
+    "types.ts imports/reexports exactly two data types and extends ResourceTarget; selector union unchanged",
+    "malformedTarget validates complete new shapes before id.trim; safe fixed invalid identities and diagnostic labels",
+    "proof identity fixes repository/worktree/proof_path; host identity fixes operation, approval when applicable, phase for consumption; witnesses do not create new resource identities",
+    "new kinds remain unconditionally excluded from bounded selector matching",
+    "resourceValid data-only admission does not add selectors or policy permission",
+    "no classifier branch, dispatcher, adapter, registry, CLI, schema or authority function-barrel export added in kernel change",
+    "original four decision/policy test files unchanged; prior99 shape test hash unchanged",
+    "existing boundaries/index.ts one-line mutator census change is prior U1 work, not a kernel export",
+    "Header amendment explicitly refuses Proxy, inherited or accessor kind headers while preserving ordinary JSON four-kind behavior. This report covers target traversal, not arbitrary hostile plan/selector/envelope object safety."
+  ],
+  "limits": [
+    "No host ID origin, role, physical resource scope, operation-handle custody or actual adapter permission claimed",
+    "No prepared/apply capability or public B1 workflow qualification claimed",
+    "No repository-wide build/typecheck/release conclusion; parent owns those gates"
+  ],
+  "eslint_test_exit_code": 0,
+  "inspector_writes_only": [
+    "packages/authority/tests/unit/reconciliation-resource-kernel.test.ts",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-kernel-inspector/"
+  ],
+  "graft_reported_saved_tokens_cumulative": 68712,
+  "graft_calls_cumulative": 6,
+  "header_defect": {
+    "authentic_red": "Eight failures: own kind getter and Proxy-wrapped targets execute rejected header trap in both plan and query validation for both new kinds. Prior50 tests pass.",
+    "fix_review": "node:util isProxy rejects before descriptor inspection; own data-property kind checked before header dispatch. malformedTarget, duplicate ID extraction, identity, bounded matching, batch diagnostics and remote publication traversal all guard the header. resourceValid guards header before payload and immediately returns full pure predicate result for either new kind.",
+    "extended_test_sha256": "da8a78cd5e4aca842ceaab29b38337f3662949c5c82525ceb89b71a28008898a",
+    "preserved": [
+      "header-red.log",
+      "header-red-checkpoint.json",
+      "accessor-id-red.log",
+      "accessor-id-red-checkpoint.json",
+      "structural-red.log",
+      "red-checkpoint.json",
+      "final-green.log",
+      "final-green-review.json",
+      "sealed-50-test.ts.txt"
+    ]
+  }
+}

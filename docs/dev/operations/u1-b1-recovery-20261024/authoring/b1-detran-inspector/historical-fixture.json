@@ -1,0 +1,39 @@
+{
+  "standing": "EXACT_HISTORICAL_335_SOURCE_FIXTURE_NOT_RUNTIME_SUCCESS",
+  "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-detran-historical-WwmCPH/repository",
+  "base": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-detran-historical-WwmCPH",
+  "mode": "historical",
+  "selected_parent": "7dfab8bdf61ffe935bca45578e0e65c09883f633",
+  "head": "9b2a190aa1276f4b15469b7079ed0d7c4c8c4c99",
+  "merge_head": "7dfab8bdf61ffe935bca45578e0e65c09883f633",
+  "selected_records": 335,
+  "selected_head": "27ae053cbf3eca92fd9d855da6fc4e64e2a8a2f439a08fe69c364f5137d2b8cc",
+  "selected_sha256": "04234742be13562cdd26b98a535b36947b60212fb42eb02a9512c94d506b3252",
+  "epoch_sha256": "bd1d8b085a1aa929b689f2e4e58af93620870f9b347fc75c0c88eba3c4c85c41",
+  "semantic_index_sha256": "73396fc09b63d8418e679b7be18f3941cd4367771c74ef31f24172acd34976ec",
+  "unresolved": [
+    "law/security/authorization.json",
+    "record/proofs/chain.json"
+  ],
+  "expected_orphans": [
+    {
+      "proof_path": "record/proofs/work/generic/R-0025.jsonl",
+      "proof_sequence": 7,
+      "proof_sha256": "28de325bb2b82c31ce6103c4036ef70f3de284108f37810534cf5d12faea547d",
+      "raw_line_with_lf_sha256": "9d9904ad66d536e9e257bb19fbd079da9c9785b8d4c6e9242ca1d628ba64b270"
+    },
+    {
+      "proof_path": "record/proofs/work/generic/R-0025.jsonl",
+      "proof_sequence": 8,
+      "proof_sha256": "958931109f3d1c6c061698c7343c4b1788820d5b6095b7de64d7540dd7c491cf",
+      "raw_line_with_lf_sha256": "689f41f981fd2a5d8c97b81b820932340ae8184823aeb7467a21c9f5505f9ebf"
+    }
+  ],
+  "old_pin_sha256": "d7f8791f1d00a7247bced66bdcdf8b1af431bb57e49d03b6ddd7024cb52f957d",
+  "old_policy_sha256": "01b9fbb88ab59841d1826f7b0bff3a06956429b142007a6125de86e8ac80654b",
+  "source_artifacts_sha256": "5f5f5e9962eaba13fb6e194a84dc2a01c74ec52aa75d9f6b441bcbec53bf0b2a",
+  "exporter_contract_sha256": "d4d040e27816cc9ab86e677038ed66678ecf72ebec98a2083a342a83e35eab1f",
+  "upgraded": false,
+  "native_ready": false,
+  "detrAn_live_effects": false
+}

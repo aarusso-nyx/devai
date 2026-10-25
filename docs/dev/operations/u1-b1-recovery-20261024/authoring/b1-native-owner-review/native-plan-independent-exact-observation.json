@@ -1,0 +1,44 @@
+{
+  "qualification": "Native source harness; real historical Git and bare remote; synthetic B5; no installed package claim",
+  "selected_parent": "7dfab8bdf61ffe935bca45578e0e65c09883f633",
+  "head": "9b2a190aa1276f4b15469b7079ed0d7c4c8c4c99",
+  "merge_heads": [
+    "7dfab8bdf61ffe935bca45578e0e65c09883f633"
+  ],
+  "index": "542553c911bcd2f5e65dd8a27b66f0f1dbcb703278477cb27df920ede95eadce",
+  "semantic_index": "f63cdfb3597daf3f3d6e85732a12fe8c630bf81c4a338d63be998f3dc61ee393",
+  "plan_sha256": "ea4140a176b7b84d7a8c2bcaf9239fe48fbc9ae0613cd05a86e2abb942795c8f",
+  "source_manifest_sha256": "204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5",
+  "obligations": [
+    {
+      "proof_path": "record/proofs/work/generic/R-0025.jsonl",
+      "proof_sequence": 7,
+      "proof_sha256": "28de325bb2b82c31ce6103c4036ef70f3de284108f37810534cf5d12faea547d",
+      "source_commit": "16af3d8fe31ae74de6bae8bf55f840c6cdc9bd64",
+      "source_chain_sha256": "46b1459576b3e51fbaf6ea1e8f3492d91c3171239fadf38bd8af78917cb36f73",
+      "source_entry_manifest_hash": "528006c1defb85d01b55d0a57a64d049c2ffbd77151a831deb47e72cbbf72708",
+      "mode": "divergent"
+    },
+    {
+      "proof_path": "record/proofs/work/generic/R-0025.jsonl",
+      "proof_sequence": 8,
+      "proof_sha256": "958931109f3d1c6c061698c7343c4b1788820d5b6095b7de64d7540dd7c491cf",
+      "source_commit": null,
+      "source_chain_sha256": null,
+      "source_entry_manifest_hash": null,
+      "mode": "newest"
+    }
+  ],
+  "before": {
+    "index": "542553c911bcd2f5e65dd8a27b66f0f1dbcb703278477cb27df920ede95eadce",
+    "files": "38b7a5fa4c737995fe3961027c833b7e0f3590e09462022f60cd93112a7fe61e",
+    "entries": 15800
+  },
+  "after": {
+    "index": "542553c911bcd2f5e65dd8a27b66f0f1dbcb703278477cb27df920ede95eadce",
+    "files": "38b7a5fa4c737995fe3961027c833b7e0f3590e09462022f60cd93112a7fe61e",
+    "entries": 15800
+  },
+  "effect_calls": 0,
+  "closed_schema": true
+}

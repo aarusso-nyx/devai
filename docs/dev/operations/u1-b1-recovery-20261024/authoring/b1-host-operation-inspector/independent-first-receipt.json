@@ -1,0 +1,17 @@
+{
+  "standing": "INITIAL_SOURCE_BEHAVIOR_124PASS_7FAIL_TRIAGE_REQUIRED",
+  "passed": 124,
+  "failed": 7,
+  "hashes": {
+    "packages/authority/src/boundaries/reconciliation-host-operation.ts": "b09de1f76917e77d4740329bb9409e80b9dd8e20a569ce9bd5872c69768d52f4",
+    "packages/cli/src/authority/reconciliation-host-input.ts": "6635a1464344cec122d88c9787699143007bfa035c1a09b1400dc571cc836ce6",
+    "packages/authority/tests/unit/reconciliation-host-operation.test.ts": "72751aaef4c3735a789f97940ab9af96bf4d646f793120efba90ba714e6d9c80",
+    "packages/cli/tests/unit/reconciliation-host-input.test.ts": "242ccd8f1c8f01ba0749c5be2cf0d549d661d8b6ea08442fd4a94c4614b937e7"
+  },
+  "raw_sha256": "64d6548f2d967547f43dd9838cf6a6b708c77f8eee87638303e2c432f4851f31",
+  "triage": [
+    "5 diagnostics mismatches: changed B5 before invoke refused OPERATION_INVALID rather than test-expected STALE; no handler effects.",
+    "Actual HEAD drift after preview accepted; contract timing and trusted verifyActual snapshot requirement need clarification.",
+    "Nested operation reaches second broker request and reused genuine receipt refusal instead of module-level nested operation guard."
+  ]
+}

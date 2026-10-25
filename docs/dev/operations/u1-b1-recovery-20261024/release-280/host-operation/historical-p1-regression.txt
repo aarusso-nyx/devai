@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/release-280/host-operation/historical-p1-regression.txt","kind":"historical-transcript-custody-pointer","original_bytes":662,"original_bytes_changed":false,"original_sha256":"3254edb5809f9a14bbff381c4db2efc9a16a2831c16e0ca44901f09fadd54b4a"}

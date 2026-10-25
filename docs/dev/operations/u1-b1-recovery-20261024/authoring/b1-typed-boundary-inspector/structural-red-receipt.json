@@ -1,0 +1,16 @@
+{
+  "standing": "AUTHENTIC_MISSING_CONFIGURED_TYPED_CLASSIFICATION_RED",
+  "passed": 2,
+  "failed": 2,
+  "hashes": {
+    "packages/authority/src/boundaries/resource-classification.ts": "f611eb182ad2b0714c7f08bb42e4b0eb4b87419ef944f4f3cc3685516600b3de",
+    "packages/authority/src/boundaries/boundary-runtime-targets.ts": "ea6af1fcc1c8861b2f226326aa36455428bc3e69a56f50e7349a661a99f85fe0",
+    "packages/authority/src/boundaries/boundary-runtime.ts": "e5f3b77a63d54e924e530736b5ba2e0c4969344e8f5e8bc40c4210c438fab099",
+    "packages/authority/tests/unit/reconciliation-typed-boundary.test.ts": "63b4d29f87750b9c0afe77dbde5109f5358e5f1b01c5cfce995ff56cbb9847e8",
+    "packages/authority/tests/unit/reconciliation-resource-kernel.test.ts": "da8a78cd5e4aca842ceaab29b38337f3662949c5c82525ceb89b71a28008898a",
+    "packages/authority/tests/unit/reconciliation-resources.test.ts": "87fa27e5c50865b484275baa242966f298e237c51ec903f62e5eb7ba7bb1b36c",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/typed-boundary-checkpoint.json": "a1fb4f25f5f4c06e096c968b13c3bd167a676884c92ff5ae8288dec0d5b0b29f"
+  },
+  "raw_sha256": "2db433d6a8346a8004439bb87cacd124ff22d06e28b9c9d0782cc3869b84375c",
+  "limit": "Configured classification RED only; no fabricated issuer receipt or policy grant. Genuine issuer positive pipeline is blocked by deliberately closed typed policy selectors and remains unqualified."
+}

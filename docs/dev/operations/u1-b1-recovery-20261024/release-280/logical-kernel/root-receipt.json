@@ -1,0 +1,15 @@
+{
+  "status": "TYPED_DATA_ONLY_GREEN_NOT_B1_RUNTIME_OR_RELEASE",
+  "independent_report": "../../authoring/b1-kernel-inspector/header-final-green-review.json",
+  "independent_report_sha256": "9ec1191d529cc12ea6313e3b274418d1a70bd8ce05ccbc9853ba051ded318348",
+  "current_source_and_tests_match_independent_hashes": true,
+  "tests": "300PASS:58kernel+99pure-shape+143unchangeddecision/policy",
+  "root_checks": {
+    "authority_build": "PASS",
+    "scoped_source_eslint": "PASS",
+    "full_workspace_typecheck_after_build": "PASS; typecheck-kernel-header-serial.log",
+    "git_diff_check": "PASS"
+  },
+  "scope": "New closed logical targets and exact-plan data validation only; no new target selector, classifier branch, adapter dispatch, action or actual effect permission.",
+  "remaining": "Trusted Owner/admission host, full durable custody/canonical selection, actual one-entry index CAS and staged diagnostics; public installed B1 workflow, integration and protected v2.8.0 publication gates."
+}

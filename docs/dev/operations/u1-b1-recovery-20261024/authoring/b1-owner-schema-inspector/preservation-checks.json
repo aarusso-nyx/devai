@@ -1,0 +1,8 @@
+{
+  "proof_index_only_count_changed": true,
+  "cli_only_reviewed_count_and_membership_changes": true,
+  "schema_roster_only_reviewed_body_change": true,
+  "historical_adr_fixture_sha256": "05c776122fd5e4a939f446b5343943db03ef51a6e0051deaaa2099797f75fc0e",
+  "historical_adr_fixture_unchanged": true,
+  "synthetic_shard06_unchanged": true
+}

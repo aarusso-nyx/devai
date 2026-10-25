@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "1.0.0",
+  "kind": "independent-source-review",
+  "source_path": "packages/authority/src/boundaries/reconciliation-plan.ts",
+  "source_sha256": "8c5ff6f7e79e001f1d766b53bd7275d42db856ed704259ba1a6045f864b3b55e",
+  "verdict": "changes-required",
+  "scope": "Native read-only plan historical anchor/baseline/declaration parity and bound staged source closure",
+  "execution": "Source inspection only; no runtime/build while root session 19323 live",
+  "findings": [
+    {
+      "id": "R1",
+      "severity": "high",
+      "lines": "792-840,904-976",
+      "problem": "Parent/base epoch rows drive obligations while stage-0 epoch and baseline blobs are only witnessed, not validated against source histories. Truncation, mutation, deletion, or a new staged epoch can escape obligation derivation.",
+      "counterexample": "Keep original parent/base epochs; replace one staged+working canonical epoch with a shorter valid prefix, or remove its stage-0 entry and working file. Existing staged/working equality checks pass, but recovery still uses parent/base rows.",
+      "fix": "Parse canonical staged epochs and baseline; require immutable original physical prefixes and baseline retention; derive actual output obligations from the bound staged epoch rows."
+    },
+    {
+      "id": "R2",
+      "severity": "medium",
+      "lines": "850-889",
+      "problem": "Historical-gap authorization decision accepts whitespace through minLength:1 schema, while unchanged anchors.ts additionally rejects decision.trim().length===0.",
+      "counterexample": "A schema-valid, directly digest-anchored historical-gap payload whose Architect authorization decision is three spaces is accepted natively but rejected as MISSING_AUTHORIZATION by anchors.ts.",
+      "fix": "After declaration schema validation, enforce nonempty trimmed authorization.decision as unchanged anchors.ts does."
+    }
+  ],
+  "confirmed_alignment": [
+    "Notes-only anchors resolve only through actual same-source baseline digests; duplicates and missing/mismatched physical lines refuse.",
+    "Selected-parent declarations enforce structured direct declaration anchor, matching cutoff, original observed_at, physical digest, no direct target anchor and unique target.",
+    "Real readonly remote advertisement is checked twice and bound to config/effective origin, with selected parent required equal to or ancestor of actual observed tip."
+  ],
+  "limitations": [
+    "Counterexamples have not been executed; findings follow direct control/data-flow inspection.",
+    "No installed package claim, full workflow readiness, DETRAN live effect or release qualification."
+  ]
+}

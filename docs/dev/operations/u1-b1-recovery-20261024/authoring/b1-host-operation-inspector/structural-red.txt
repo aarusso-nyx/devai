@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-host-operation-inspector/structural-red.txt","kind":"historical-transcript-custody-pointer","original_bytes":2544,"original_bytes_changed":false,"original_sha256":"2d03e00f77de70cdee60c212b2af5c59ec76a7ae223a7d6e536e64ba30ac2062"}

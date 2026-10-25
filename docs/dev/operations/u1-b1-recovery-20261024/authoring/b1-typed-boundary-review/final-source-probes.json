@@ -1,0 +1,142 @@
+{
+  "source_sha256": {
+    "packages/authority/src/boundaries/resource-classification.ts": "f165fe7faf0f43ae098a9963489706df265751fad3c2c14548e7fbef5134d214",
+    "packages/authority/src/boundaries/boundary-runtime-targets.ts": "2f5d6889c5578681a75dda7c1e21d99badc7afff468ffd39f84fe0a09020aa35",
+    "packages/authority/src/boundaries/boundary-runtime.ts": "daf606d3db0642a413e7ae6e04e91fa5d131c51b7fbfefb209801adaf89b178d",
+    "packages/authority/src/runtime/policy-resolver.ts": "def28be2251d5b8a8d675a41909b2838dbd0a47e60eb49363f5336333324eeed",
+    "law/schemas/authority-policy.schema.json": "2cbda030144afe417d25cd1fb3c0e7799b8d7c80e67742567a94a66c0a67bf9d"
+  },
+  "environment": {
+    "node": "v24.22.0",
+    "uv": "1.52.1",
+    "platform": "darwin"
+  },
+  "passed": 14,
+  "failed": 0,
+  "getterCalls": 0,
+  "results": [
+    {
+      "name": "missing dependency preserves usage refusal",
+      "passed": true,
+      "value": {
+        "ok": false,
+        "category": "usage-error",
+        "code": "AUTHORITY_RESOURCE_TARGET_INVALID",
+        "reasons": [
+          "AUTHORITY_RESOURCE_TARGET_INVALID"
+        ]
+      }
+    },
+    {
+      "name": "dependency property refuses without getter",
+      "passed": true,
+      "value": {
+        "ok": false,
+        "category": "dependency-error",
+        "code": "AUTHORITY_TYPED_RESOURCE_ADAPTER_REQUIRED",
+        "reasons": [
+          "AUTHORITY_TYPED_RESOURCE_ADAPTER_REQUIRED"
+        ]
+      }
+    },
+    {
+      "name": "throwing admit projects safe dependency refusal",
+      "passed": true,
+      "value": {
+        "ok": false,
+        "category": "dependency-error",
+        "code": "AUTHORITY_TYPED_RESOURCE_ADAPTER_REQUIRED",
+        "reasons": [
+          "AUTHORITY_TYPED_RESOURCE_ADAPTER_REQUIRED"
+        ]
+      }
+    },
+    {
+      "name": "revoked classifier target refuses",
+      "passed": true,
+      "value": {
+        "ok": false,
+        "category": "usage-error",
+        "code": "AUTHORITY_RESOURCE_TARGET_INVALID",
+        "reasons": [
+          "AUTHORITY_RESOURCE_TARGET_INVALID"
+        ]
+      }
+    },
+    {
+      "name": "revoked typedkind target undefined",
+      "passed": true,
+      "value": "undefined"
+    },
+    {
+      "name": "revoked policy target false",
+      "passed": true,
+      "value": false
+    },
+    {
+      "name": "revoked policy selector false",
+      "passed": true,
+      "value": false
+    },
+    {
+      "name": "revoked operations false",
+      "passed": true,
+      "value": false
+    },
+    {
+      "name": "revoked adapter candidate undefined",
+      "passed": true,
+      "value": "undefined"
+    },
+    {
+      "name": "policy-only matcher valid selector true",
+      "passed": true,
+      "value": true
+    },
+    {
+      "name": "legacy batch matcher still false",
+      "passed": true,
+      "value": false
+    },
+    {
+      "name": "configured classifier admits selected dependency",
+      "passed": true,
+      "value": {
+        "ok": true,
+        "value": {
+          "target": {
+            "kind": "proof-index",
+            "id": "proof-index:repository:worktree:record/proofs/chain.json",
+            "repository_id": "repository",
+            "worktree_id": "worktree",
+            "operation": "chain-cas",
+            "proof_path": "record/proofs/chain.json",
+            "approval_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "plan_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "phase_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "before_index_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "other_entries_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "verified_chain_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "atomicity": "whole-plan",
+          "adapter_id": "proof-index-authority-boundary"
+        }
+      }
+    },
+    {
+      "name": "snapshot copy independent and deep frozen",
+      "passed": true,
+      "value": {
+        "old": 1,
+        "frozen": true,
+        "same": false
+      }
+    },
+    {
+      "name": "lone-surrogate snapshot key safely refuses",
+      "passed": true,
+      "value": "AUTHORITY_TYPED_RESOURCE_SNAPSHOT_INVALID"
+    }
+  ],
+  "scope": "Actual compiled entry/helper counterexample closure. No actualissuer prepare/apply, native effects, policy/core installation or public authority qualification; P1owns full pipeline suite."
+}

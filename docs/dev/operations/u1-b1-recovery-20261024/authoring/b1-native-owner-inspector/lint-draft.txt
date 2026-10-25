@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-inspector/lint-draft.txt","kind":"historical-transcript-custody-pointer","original_bytes":597,"original_bytes_changed":false,"original_sha256":"5002370df9d83a14cf4dc0dd5e4e2a7f4a7c07a09351539ddd66ada44ae02d5a"}

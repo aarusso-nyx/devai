@@ -1,0 +1,40 @@
+{
+  "standing": "READ_ONLY_PRELIMINARY_COMPATIBILITY_PROBE_NOT_APPROVAL_OR_CONSTRUCTION",
+  "parents": {
+    "HEAD": "9b2a190aa1276f4b15469b7079ed0d7c4c8c4c99",
+    "MERGE_HEAD": "7abe89cd3e7049fdcf38b33411d38a3442a0e1e1"
+  },
+  "stage_entries": 16382,
+  "semantic_sha256": "4c361b875f78001dc6913764a0216ed0e5ee83da89af0ec9260440eb711bedef",
+  "stage_modes": {
+    "100644": 16371,
+    "120000": 1,
+    "100755": 10
+  },
+  "stages": {
+    "0": 16376,
+    "1": 2,
+    "2": 2,
+    "3": 2
+  },
+  "unresolved_paths": [
+    "law/security/authorization.json",
+    "record/proofs/chain.json"
+  ],
+  "all_stage_objects_available": true,
+  "unique_primary_blobs": 14970,
+  "unique_external_blobs": 15,
+  "external_blob_bytes": 112098,
+  "adr13_stage_bytes_match_manifest": true,
+  "original_R25_blob_preserved": true,
+  "needs_final_auditor_manifest": true,
+  "new_fixture_constructed": false,
+  "existing_fixtures_changed": false,
+  "object_ingress_plan": "Admit exact stage dump; for each required blob absent from independent cloned fixture, decode bounded artifact loose blob, verify complete Git-object SHA/type/length and final manifest SHA, then git hash-object -w --stdin into fixture; never retain alternates or install a semantic dump as DIRC.",
+  "tracked_symlink": {
+    "path": "apps/rait/web/src/app/preview/fixtures",
+    "mode": "120000",
+    "blob": "e88de36ae1899cf59c8e79aac6200e158cfb36eb",
+    "qualification": "Actual staged source member; do not dereference silently or omit from source census"
+  }
+}

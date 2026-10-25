@@ -1,0 +1,22 @@
+{
+  "status": "AUTHENTIC_HEADER_DISPATCH_RED",
+  "counts": {
+    "passed": 50,
+    "failed": 8,
+    "total": 58
+  },
+  "test_sha256": "da8a78cd5e4aca842ceaab29b38337f3662949c5c82525ceb89b71a28008898a",
+  "pre_fix_source_sha256": {
+    "packages/authority/src/types.ts": "1b2c122d0c4a8139b5a8b012fe5a7d3583ef8f372e7ce052536c794aad8393a2",
+    "packages/authority/src/decision-plan.ts": "c138aec62af0cb49845acb6e6ce2cd22cdc048f4c6eec6b5c936f1bf52f88dcf",
+    "packages/authority/src/runtime/policy-resolver.ts": "8a76763ea1312bba0c1b1f4530ff0fcbe31867fe3f04d49d2d6a59bf8b23d393"
+  },
+  "finding": "Own kind accessor and Proxy-wrapped new-kind target execute thrown trap before pure validator in both malformedPlan and resourceValid, for both target kinds.",
+  "prior_checkpoint_preserved": [
+    "final-green.log",
+    "final-green-review.json",
+    "sealed-50-test.ts.txt"
+  ],
+  "raw_log_sha256": "1be396ff106a9f7db5aa480c0e24602b848618eb2d12cee7e31b27f8c3d426ba",
+  "authority": "No source mutations; no new effect authority. Previous292PASS is historical qualification before these additional cases, not final clearance."
+}

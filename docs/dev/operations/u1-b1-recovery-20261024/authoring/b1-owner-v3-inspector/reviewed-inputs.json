@@ -1,0 +1,11 @@
+{
+  "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/owner-protocol-v3.json": "ed7b6ff199ece13c841e457258468303f8d87ffc3d67b96cebaed0e42015030c",
+  "law/adr/ADR-EVI-0007-owner-approved-merge-reconciliation.md": "1bfaa9703fa5cd667de523c74a3d8f4b584b7c630290f1c2400a71a871a53bd4",
+  "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/owner-intake-inspector-review.json": "e6b3ca03a93f20f48af1d1c8d2f09b79413a7abc0fc18dbdc5451edfb42dd079",
+  "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/owner-intake-checkpoint.v2.json": "31ce036cce162838c173d1f11125b978a300f677d4ca9b7637122bd3c0ee56c0",
+  "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/admission-primitive-checkpoint.json": "2d7957218249db895228123dac4c33f71878ba2c895df02f91b40255d91ff73c",
+  "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/admission-callback-amendment.json": "f1bdfd732e11a9c0431e06e53a77eac5b3f996df758b75cbf78b275b6beb0eaf",
+  "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-admission-inspector/receipt.json": "0952e1aa22d462e23f771fad5ff8cc1a6dfe52ce600f92215dcc30537fb0b9b5",
+  "packages/authority/src/boundaries/reconciliation-admission-seed.ts": "d912846ddb518a132ed1e2484dfa56f23b8ff2c7a7bc25b2157fb379f25490fe",
+  "packages/authority/src/boundaries/host-reconciliation-admission.ts": "318c52a0f5de908e549e79ace095a4720acb190c7389e88a41a673fd2fa60a91"
+}

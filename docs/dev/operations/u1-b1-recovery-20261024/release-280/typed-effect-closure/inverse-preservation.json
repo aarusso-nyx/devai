@@ -1,0 +1,30 @@
+{
+  "packages/cli/src/services/github-issues-tracking/reconcile-authority.ts": {
+    "current_sha256": "67550c8d496b5d2dda13b6a980b1550b8541a47772cedde78f48afa4b880b4c1",
+    "inverse_reconstructs_exact_red_source": true,
+    "before_sha256": "95ccf96820e58ca6a827a7f1cec6cbdf8b5fc403b07fcfbece67e146e77c64d2"
+  },
+  "packages/skills/src/post-merge-auditor/host-receipt.ts": {
+    "current_sha256": "00d4f2cb1bc2ba52b6803b10f74f47779200ed9ca9c560807653a8b34c5d56bc",
+    "inverse_reconstructs_exact_red_source": true,
+    "before_sha256": "cdd8ba192e6b7f8e40472e15b99bb19166ac7de45cce0b593254e5f9b178ab4d"
+  },
+  "packages/cli/tests/unit/tracking-reconcile-authority.test.ts": {
+    "current_sha256": "cac12a4e08282eec4421c21d7678a3b4992aceba5b64ee4a2681ce848e4ebe82",
+    "historical_head_sha256": "7295e3d358dcc262e939f4e54abcc0610c93c29862ba15c4d4348fe2f47cf01b",
+    "removing_only_four_new_cases_and_inserted_blank_line_recovers_exact_original_test_bytes": true,
+    "removal": {
+      "start_byte": 15152,
+      "end_byte": 15910
+    }
+  },
+  "packages/skills/tests/unit/post-merge-boundaries.test.ts": {
+    "current_sha256": "864a97f152fa459af8c78eeedf81b6f3b620c57c7f976b426f20c3debae43fe7",
+    "historical_head_sha256": "ba992c7458a27b0eeddaf7d678cb5cc6a7df90d1af2faf6a6775fbd55e13be94",
+    "removing_only_four_new_cases_and_inserted_blank_line_recovers_exact_original_test_bytes": true,
+    "removal": {
+      "start_byte": 25870,
+      "end_byte": 26634
+    }
+  }
+}

@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/release-280/owner-state/graft-build.txt","kind":"historical-transcript-custody-pointer","original_bytes":118827,"original_bytes_changed":false,"original_sha256":"247ba3d2e6e73f448d4c462285a5f1562e3060c50726c4c93921308168ee0da0"}

@@ -1,0 +1,299 @@
+{
+  "external_fixture": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-provision-inspector-Y8cI1s",
+  "environment": {
+    "node": "24.22.0",
+    "uv": "1.52.1",
+    "platform": "darwin"
+  },
+  "source_sha256": {
+    "packages/authority/src/boundaries/reconciliation-host-provision.ts": "8c439589cdc0265681ed00a732e6ac0b4c2ab2ad6a520b87e57d2238e1a140b0",
+    "packages/authority/src/boundaries/reconciliation-host-namespace.ts": "b64fd3338e31c5c72e264a26f015d97850c7aeff254f5bb6c775ef770f735f32",
+    "packages/authority/src/boundaries/host-publish.ts": "b2aa704c775009240b624b4581339cebaec8bcd6f7f95fbf7e71eabf296e054a",
+    "packages/authority/src/index.ts": "9d665d51e73c550819c4c223b34e0d110eb3b5305e02758a754977d46359272c"
+  },
+  "synthetic_B5_and_TTY_not_installed_origin": true,
+  "private_issuer_or_keys_logged": false,
+  "observations": [
+    {
+      "repo": {
+        "base": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-provision-inspector-Y8cI1s/fixture-Jw7f6t",
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-provision-inspector-Y8cI1s/fixture-Jw7f6t/repository",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-provision-inspector-Y8cI1s/fixture-Jw7f6t/repository",
+        "gitDir": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-provision-inspector-Y8cI1s/fixture-Jw7f6t/repository/.git",
+        "namespace": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-provision-inspector-Y8cI1s/fixture-Jw7f6t/repository/.git/devai/reconciliation"
+      },
+      "linked": false,
+      "ready_seed": {
+        "kind": "reconciliation-provision-review",
+        "action_id": "init bind",
+        "stage": "seed",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-6ad355e4dbb5b8cf4e73516f7aec3f005dcad51dd169fa85",
+        "host_identity_sha256": "5aac657fd4e365ec614fd87494269f6a26e09d168dd2a7ef2835fc3ccf24543a",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "namespace_sha256": "226be7c64afcc080b0ad19c5d5dc3276b6d6c269280ecf979271583bab4e1786",
+        "artifact": {
+          "sha256": "3f6b742405bb199a11ed0952c9aa049285ef25dc69954e901d2e987cd15c4372",
+          "size_bytes": 8192
+        },
+        "effects": [
+          {
+            "target": "worktree-host/devai",
+            "operation": "create-directory",
+            "mode": "0700"
+          },
+          {
+            "target": "worktree-host/devai/reconciliation",
+            "operation": "create-directory",
+            "mode": "0700"
+          },
+          {
+            "target": "worktree-host/devai/reconciliation/admission.sqlite",
+            "operation": "publish-seed",
+            "mode": "0600"
+          }
+        ],
+        "lifetime_ms": 300000,
+        "grants_authority": false,
+        "plan_sha256": "621bd0ce21835129c7fc9062e457af5bcd586a291191ebcee044e2a726f9beaf",
+        "confirmation": "PREPARE RECONCILIATION-HOST 621bd0ce21835129c7fc9062e457af5bcd586a291191ebcee044e2a726f9beaf"
+      },
+      "ready_issuer": {
+        "kind": "reconciliation-provision-review",
+        "action_id": "init bind",
+        "stage": "issuer",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-6ad355e4dbb5b8cf4e73516f7aec3f005dcad51dd169fa85",
+        "host_identity_sha256": "5aac657fd4e365ec614fd87494269f6a26e09d168dd2a7ef2835fc3ccf24543a",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "namespace_sha256": "023b5b187391c938d44a387812e965fdf74294c0958c2becb1b3be323372ba61",
+        "artifact": {
+          "sha256": "e9fb1f641bd76cff10fe86699d0ff7bf5a457806aa3860eb64bb44c15296e897",
+          "size_bytes": 2050
+        },
+        "effects": [
+          {
+            "target": "worktree-host/devai/reconciliation/admission.sqlite",
+            "operation": "sync-precursor",
+            "mode": "0600"
+          },
+          {
+            "target": "worktree-host/devai/reconciliation/issuer.json",
+            "operation": "publish-issuer",
+            "mode": "0600"
+          }
+        ],
+        "lifetime_ms": 300000,
+        "grants_authority": false,
+        "plan_sha256": "998c1c2076fa5c12ab114e25c166396a4863258d813fd56be77dc81a2408cd2e",
+        "confirmation": "BIND RECONCILIATION-HOST 998c1c2076fa5c12ab114e25c166396a4863258d813fd56be77dc81a2408cd2e"
+      },
+      "result": {
+        "kind": "reconciliation-provision-result",
+        "action_id": "init bind",
+        "outcome": "created",
+        "stage": "issuer",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-6ad355e4dbb5b8cf4e73516f7aec3f005dcad51dd169fa85",
+        "issuer_sha256": "e9fb1f641bd76cff10fe86699d0ff7bf5a457806aa3860eb64bb44c15296e897",
+        "owned": [
+          {
+            "target": "worktree-host/devai",
+            "dev": "16777233",
+            "ino": "1118840591",
+            "birthtime_ns": "1792877277378465914"
+          },
+          {
+            "target": "worktree-host/devai/reconciliation",
+            "dev": "16777233",
+            "ino": "1118840593",
+            "birthtime_ns": "1792877277773895742"
+          },
+          {
+            "target": "worktree-host/devai/reconciliation/admission.sqlite",
+            "dev": "16777233",
+            "ino": "1118840596",
+            "birthtime_ns": "1792877278565671113"
+          },
+          {
+            "target": "worktree-host/devai/reconciliation/issuer.json",
+            "dev": "16777233",
+            "ino": "1118840617",
+            "birthtime_ns": "1792877285076753132"
+          }
+        ],
+        "grants_authority": false
+      },
+      "issuer_sha256": "e9fb1f641bd76cff10fe86699d0ff7bf5a457806aa3860eb64bb44c15296e897",
+      "seed_sha256": "3f6b742405bb199a11ed0952c9aa049285ef25dc69954e901d2e987cd15c4372",
+      "key_material_logged": false
+    },
+    {
+      "repo": {
+        "base": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-provision-inspector-Y8cI1s/fixture-LtYO2V",
+        "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-provision-inspector-Y8cI1s/fixture-LtYO2V/linked",
+        "primary": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-provision-inspector-Y8cI1s/fixture-LtYO2V/repository",
+        "gitDir": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-provision-inspector-Y8cI1s/fixture-LtYO2V/repository/.git/worktrees/linked",
+        "namespace": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-provision-inspector-Y8cI1s/fixture-LtYO2V/repository/.git/worktrees/linked/devai/reconciliation"
+      },
+      "linked": true,
+      "ready_seed": {
+        "kind": "reconciliation-provision-review",
+        "action_id": "init bind",
+        "stage": "seed",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-cb4fd70d647f9a0126d33868645a539cd6e56d8d38c5a751",
+        "host_identity_sha256": "f6b369139afffb377547495cfda6c9d1325e3b0ac617f8ad461c3e22116cf6eb",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "namespace_sha256": "226be7c64afcc080b0ad19c5d5dc3276b6d6c269280ecf979271583bab4e1786",
+        "artifact": {
+          "sha256": "3f6b742405bb199a11ed0952c9aa049285ef25dc69954e901d2e987cd15c4372",
+          "size_bytes": 8192
+        },
+        "effects": [
+          {
+            "target": "worktree-host/devai",
+            "operation": "create-directory",
+            "mode": "0700"
+          },
+          {
+            "target": "worktree-host/devai/reconciliation",
+            "operation": "create-directory",
+            "mode": "0700"
+          },
+          {
+            "target": "worktree-host/devai/reconciliation/admission.sqlite",
+            "operation": "publish-seed",
+            "mode": "0600"
+          }
+        ],
+        "lifetime_ms": 300000,
+        "grants_authority": false,
+        "plan_sha256": "2e2722422734ecb4e105b7a34d5ab2f1d30a65be74cdedf3999406d28d87c45b",
+        "confirmation": "PREPARE RECONCILIATION-HOST 2e2722422734ecb4e105b7a34d5ab2f1d30a65be74cdedf3999406d28d87c45b"
+      },
+      "ready_issuer": {
+        "kind": "reconciliation-provision-review",
+        "action_id": "init bind",
+        "stage": "issuer",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-cb4fd70d647f9a0126d33868645a539cd6e56d8d38c5a751",
+        "host_identity_sha256": "f6b369139afffb377547495cfda6c9d1325e3b0ac617f8ad461c3e22116cf6eb",
+        "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "namespace_sha256": "cdb55f8a112844b70e499d3d1739de2f7a5bed2e2a78fc36f09024b5ddedce2d",
+        "artifact": {
+          "sha256": "f9b4ccea5e9503b844dbc7651e43d01300c99166c2359c131eab351a4a5640ce",
+          "size_bytes": 2067
+        },
+        "effects": [
+          {
+            "target": "worktree-host/devai/reconciliation/admission.sqlite",
+            "operation": "sync-precursor",
+            "mode": "0600"
+          },
+          {
+            "target": "worktree-host/devai/reconciliation/issuer.json",
+            "operation": "publish-issuer",
+            "mode": "0600"
+          }
+        ],
+        "lifetime_ms": 300000,
+        "grants_authority": false,
+        "plan_sha256": "946fe9a17d419d9bcc84fef5120b460da3e71f3795d8bf78a15b3e8df6c3bab4",
+        "confirmation": "BIND RECONCILIATION-HOST 946fe9a17d419d9bcc84fef5120b460da3e71f3795d8bf78a15b3e8df6c3bab4"
+      },
+      "result": {
+        "kind": "reconciliation-provision-result",
+        "action_id": "init bind",
+        "outcome": "created",
+        "stage": "issuer",
+        "repository_id": "example-repository",
+        "worktree_id": "wt-cb4fd70d647f9a0126d33868645a539cd6e56d8d38c5a751",
+        "issuer_sha256": "f9b4ccea5e9503b844dbc7651e43d01300c99166c2359c131eab351a4a5640ce",
+        "owned": [
+          {
+            "target": "worktree-host/devai",
+            "dev": "16777233",
+            "ino": "1118840721",
+            "birthtime_ns": "1792877293812811836"
+          },
+          {
+            "target": "worktree-host/devai/reconciliation",
+            "dev": "16777233",
+            "ino": "1118840723",
+            "birthtime_ns": "1792877294219579458"
+          },
+          {
+            "target": "worktree-host/devai/reconciliation/admission.sqlite",
+            "dev": "16777233",
+            "ino": "1118840726",
+            "birthtime_ns": "1792877295054911160"
+          },
+          {
+            "target": "worktree-host/devai/reconciliation/issuer.json",
+            "dev": "16777233",
+            "ino": "1118840743",
+            "birthtime_ns": "1792877301390978687"
+          }
+        ],
+        "grants_authority": false
+      },
+      "issuer_sha256": "f9b4ccea5e9503b844dbc7651e43d01300c99166c2359c131eab351a4a5640ce",
+      "seed_sha256": "3f6b742405bb199a11ed0952c9aa049285ef25dc69954e901d2e987cd15c4372",
+      "key_material_logged": false
+    },
+    {
+      "kind": "actual-native-process-contention",
+      "holder_signal": "SIGKILL",
+      "loser": {
+        "reply": {
+          "kind": "reconciliation-provision-result",
+          "action_id": "init bind",
+          "outcome": "indeterminate",
+          "stage": "issuer",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-7d4490e4273472402e15dd7d1bfca27877e320c8fda0df7a",
+          "issuer_sha256": null,
+          "owned": [],
+          "grants_authority": false
+        },
+        "anchorOpenInLock": 0,
+        "anchorCloseInLock": 0
+      },
+      "successor": {
+        "reply": {
+          "kind": "reconciliation-provision-result",
+          "action_id": "init bind",
+          "outcome": "created",
+          "stage": "issuer",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-7d4490e4273472402e15dd7d1bfca27877e320c8fda0df7a",
+          "issuer_sha256": "8f42364834d845ac8128cb009c50c53b835da48d65dd59e3a59457e649c88bd6",
+          "owned": [
+            {
+              "target": "worktree-host/devai/reconciliation/issuer.json",
+              "dev": "16777233",
+              "ino": "1118842889",
+              "birthtime_ns": "1792877484656359465"
+            }
+          ],
+          "grants_authority": false
+        },
+        "anchorOpenInLock": 0,
+        "anchorCloseInLock": 0
+      },
+      "seed_unchanged": true
+    },
+    {
+      "kind": "actual-native-link-crash",
+      "signal": "SIGKILL",
+      "entries": [
+        ".issuer.json.99490-91aaa7f2-6d49-4b4b-a426-c2899cae80e7.publish-staged",
+        "admission.sqlite",
+        "issuer.json"
+      ],
+      "inventory_preserved": true,
+      "terminal_success": false
+    }
+  ]
+}

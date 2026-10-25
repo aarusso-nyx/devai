@@ -1,0 +1,169 @@
+{
+  "kind": "actual-installed-closed-stdout-after-completed-phase",
+  "exit": 1,
+  "seconds": 33.741,
+  "argv": [
+    "sense",
+    "bootstrap-inventory",
+    "--repo-root",
+    "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-detran-historical-EVZ9Te/repository",
+    "--plan",
+    ".devai/reconciliation-public-plan.json",
+    "--plan-sha256",
+    "23b13fc4b5ac48fb1a596a5ab1a6cff258574c926106d4892b76af0e984fefc0",
+    "--approval",
+    "6657f2dfe08d8eebb44dae89c028a0c4029e3a0b96061acc21e5a4c15959aca3",
+    "--as-role",
+    "architect",
+    "--write",
+    "--format",
+    "json"
+  ],
+  "before": {
+    ".git/index": {
+      "sha256": "e03d1c77cc20135155a14767c1b2937d09e59449f9f6b74afefdc87da60f31ae",
+      "dev": "16777233",
+      "ino": "1125702865",
+      "mode": "0o644",
+      "nlink": 1
+    },
+    "record/proofs/chain.json": {
+      "sha256": "26379e09098f0691e37bac2c76e8a39eb73b93dce94140f827ec5a36e3f860f9",
+      "dev": "16777233",
+      "ino": "1125702799",
+      "mode": "0o644",
+      "nlink": 1
+    },
+    "record/proofs/work/generic/R-0025.jsonl": {
+      "sha256": "bd1d8b085a1aa929b689f2e4e58af93620870f9b347fc75c0c88eba3c4c85c41",
+      "dev": "16777233",
+      "ino": "1125664328",
+      "mode": "0o644",
+      "nlink": 1
+    },
+    ".devai/state/reconciliation/02e4990b155bc0c203472cec2a03a0ad3a17f04cc68fcd377b8e85e353f964d4/inventory/inventory_api/api-map.json": {
+      "sha256": "d8f4e062c7f3c8d1d1ec0a5ef6a5dd0382969842bf10013a6fe9852f854adfa5",
+      "dev": "16777233",
+      "ino": "1125703065",
+      "mode": "0o600",
+      "nlink": 1
+    },
+    ".devai/state/reconciliation/02e4990b155bc0c203472cec2a03a0ad3a17f04cc68fcd377b8e85e353f964d4/inventory/inventory_routes/routes-angular.json": {
+      "sha256": "cfccefb7c9179f02083ef2ca8d5f48689ae357935a93ad56b9334eb072600d25",
+      "dev": "16777233",
+      "ino": "1125703070",
+      "mode": "0o600",
+      "nlink": 1
+    },
+    ".devai/state/reconciliation/02e4990b155bc0c203472cec2a03a0ad3a17f04cc68fcd377b8e85e353f964d4/inventory/inventory_data_model/data-model.json": {
+      "sha256": "46dadb2c228c047d478516cf17c06de3de8d498c6ac54a2a7a4b323f886ab52c",
+      "dev": "16777233",
+      "ino": "1125703074",
+      "mode": "0o600",
+      "nlink": 1
+    },
+    ".devai/state/reconciliation/02e4990b155bc0c203472cec2a03a0ad3a17f04cc68fcd377b8e85e353f964d4/inventory/inventory_data_handling/data-model-pii.json": {
+      "sha256": "aa1f36db82398512e94db1f0eb45ab14a61db01a40e2d352e3be64dd9de1feae",
+      "dev": "16777233",
+      "ino": "1125703077",
+      "mode": "0o600",
+      "nlink": 1
+    },
+    ".devai/state/reconciliation/02e4990b155bc0c203472cec2a03a0ad3a17f04cc68fcd377b8e85e353f964d4/inventory/inventory_rbac/rbac.json": {
+      "sha256": "ca82d943f7ad74baf4cee13f9bf358c1f5269a1b3861786e9e0eebd5c0ed7dd9",
+      "dev": "16777233",
+      "ino": "1125703080",
+      "mode": "0o600",
+      "nlink": 1
+    },
+    ".devai/state/reconciliation/02e4990b155bc0c203472cec2a03a0ad3a17f04cc68fcd377b8e85e353f964d4/inventory/inventory_dep_graph/dep-graph.json": {
+      "sha256": "c5cc8b4d13b787d2a577432656bd5bad383beb7cd465e962ef53cf1b4181d77d",
+      "dev": "16777233",
+      "ino": "1125703083",
+      "mode": "0o600",
+      "nlink": 1
+    },
+    ".devai/state/reconciliation/02e4990b155bc0c203472cec2a03a0ad3a17f04cc68fcd377b8e85e353f964d4/inventory/inventory_coverage/coverage-matrix.json": {
+      "sha256": "53d58a7c381aed146d48472c2382a7387c8f5cc3192ceefe0542a8bda3c448dc",
+      "dev": "16777233",
+      "ino": "1125703086",
+      "mode": "0o600",
+      "nlink": 1
+    }
+  },
+  "after": {
+    ".git/index": {
+      "sha256": "e03d1c77cc20135155a14767c1b2937d09e59449f9f6b74afefdc87da60f31ae",
+      "dev": "16777233",
+      "ino": "1125702865",
+      "mode": "0o644",
+      "nlink": 1
+    },
+    "record/proofs/chain.json": {
+      "sha256": "26379e09098f0691e37bac2c76e8a39eb73b93dce94140f827ec5a36e3f860f9",
+      "dev": "16777233",
+      "ino": "1125702799",
+      "mode": "0o644",
+      "nlink": 1
+    },
+    "record/proofs/work/generic/R-0025.jsonl": {
+      "sha256": "bd1d8b085a1aa929b689f2e4e58af93620870f9b347fc75c0c88eba3c4c85c41",
+      "dev": "16777233",
+      "ino": "1125664328",
+      "mode": "0o644",
+      "nlink": 1
+    },
+    ".devai/state/reconciliation/02e4990b155bc0c203472cec2a03a0ad3a17f04cc68fcd377b8e85e353f964d4/inventory/inventory_api/api-map.json": {
+      "sha256": "d8f4e062c7f3c8d1d1ec0a5ef6a5dd0382969842bf10013a6fe9852f854adfa5",
+      "dev": "16777233",
+      "ino": "1125703065",
+      "mode": "0o600",
+      "nlink": 1
+    },
+    ".devai/state/reconciliation/02e4990b155bc0c203472cec2a03a0ad3a17f04cc68fcd377b8e85e353f964d4/inventory/inventory_routes/routes-angular.json": {
+      "sha256": "cfccefb7c9179f02083ef2ca8d5f48689ae357935a93ad56b9334eb072600d25",
+      "dev": "16777233",
+      "ino": "1125703070",
+      "mode": "0o600",
+      "nlink": 1
+    },
+    ".devai/state/reconciliation/02e4990b155bc0c203472cec2a03a0ad3a17f04cc68fcd377b8e85e353f964d4/inventory/inventory_data_model/data-model.json": {
+      "sha256": "46dadb2c228c047d478516cf17c06de3de8d498c6ac54a2a7a4b323f886ab52c",
+      "dev": "16777233",
+      "ino": "1125703074",
+      "mode": "0o600",
+      "nlink": 1
+    },
+    ".devai/state/reconciliation/02e4990b155bc0c203472cec2a03a0ad3a17f04cc68fcd377b8e85e353f964d4/inventory/inventory_data_handling/data-model-pii.json": {
+      "sha256": "aa1f36db82398512e94db1f0eb45ab14a61db01a40e2d352e3be64dd9de1feae",
+      "dev": "16777233",
+      "ino": "1125703077",
+      "mode": "0o600",
+      "nlink": 1
+    },
+    ".devai/state/reconciliation/02e4990b155bc0c203472cec2a03a0ad3a17f04cc68fcd377b8e85e353f964d4/inventory/inventory_rbac/rbac.json": {
+      "sha256": "ca82d943f7ad74baf4cee13f9bf358c1f5269a1b3861786e9e0eebd5c0ed7dd9",
+      "dev": "16777233",
+      "ino": "1125703080",
+      "mode": "0o600",
+      "nlink": 1
+    },
+    ".devai/state/reconciliation/02e4990b155bc0c203472cec2a03a0ad3a17f04cc68fcd377b8e85e353f964d4/inventory/inventory_dep_graph/dep-graph.json": {
+      "sha256": "c5cc8b4d13b787d2a577432656bd5bad383beb7cd465e962ef53cf1b4181d77d",
+      "dev": "16777233",
+      "ino": "1125703083",
+      "mode": "0o600",
+      "nlink": 1
+    },
+    ".devai/state/reconciliation/02e4990b155bc0c203472cec2a03a0ad3a17f04cc68fcd377b8e85e353f964d4/inventory/inventory_coverage/coverage-matrix.json": {
+      "sha256": "53d58a7c381aed146d48472c2382a7387c8f5cc3192ceefe0542a8bda3c448dc",
+      "dev": "16777233",
+      "ino": "1125703086",
+      "mode": "0o600",
+      "nlink": 1
+    }
+  },
+  "envelopes": [],
+  "new_domain_effects": false,
+  "live_detran_effects": false
+}

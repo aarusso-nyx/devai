@@ -1,0 +1,28 @@
+{
+  "passed": 151,
+  "failed": 1,
+  "standing": "151PASS_ONE_FIXTURE_LIFECYCLE_MISTAKE",
+  "source_and_test_unchanged": true,
+  "before": {
+    "packages/authority/src/boundaries/reconciliation-host-operation.ts": "09f414b75860ec3953c616bf50d58d2c1532b1c44b61caac345444bc0c7174ef",
+    "packages/authority/src/boundaries/host-scope.ts": "20120a6084a077999738e3652135457dc988430b1c3530d9a46621701c1840aa",
+    "packages/authority/src/boundaries/host-atomic-effects.ts": "92d3be45f4d9e541252f16c44d55bb9fb7f009aa583d57bb54d5a3a6c76ffd6c",
+    "packages/authority/src/index.ts": "7acc1feb7a4cd9a7585b737feaccad8ef6344624f2c118c0feb9a23b3a7eae4d",
+    "packages/cli/src/authority/reconciliation-host-input.ts": "61f7ef316ef5bc26abaacfe74793bc5197a55794d1c76f27a8b58c8cc404ca30",
+    "packages/cli/src/authority/broker.ts": "7fd4df9c746a8ab1979f4bd7aa7f26c68ccf7f947ed1df3ff1157f4a4b39c5d1",
+    "packages/authority/tests/unit/reconciliation-host-operation.test.ts": "138e8707afaebf4f5fabc5b0a8cc46d4080e98fbc10817902693b9bdfebb76c9",
+    "packages/cli/tests/unit/reconciliation-host-input.test.ts": "1e18d62fa24ac503617e50b606bcff3a442303797a429203bda48495060a0a50"
+  },
+  "after": {
+    "packages/authority/src/boundaries/reconciliation-host-operation.ts": "09f414b75860ec3953c616bf50d58d2c1532b1c44b61caac345444bc0c7174ef",
+    "packages/authority/src/boundaries/host-scope.ts": "20120a6084a077999738e3652135457dc988430b1c3530d9a46621701c1840aa",
+    "packages/authority/src/boundaries/host-atomic-effects.ts": "92d3be45f4d9e541252f16c44d55bb9fb7f009aa583d57bb54d5a3a6c76ffd6c",
+    "packages/authority/src/index.ts": "7acc1feb7a4cd9a7585b737feaccad8ef6344624f2c118c0feb9a23b3a7eae4d",
+    "packages/cli/src/authority/reconciliation-host-input.ts": "61f7ef316ef5bc26abaacfe74793bc5197a55794d1c76f27a8b58c8cc404ca30",
+    "packages/cli/src/authority/broker.ts": "7fd4df9c746a8ab1979f4bd7aa7f26c68ccf7f947ed1df3ff1157f4a4b39c5d1",
+    "packages/authority/tests/unit/reconciliation-host-operation.test.ts": "138e8707afaebf4f5fabc5b0a8cc46d4080e98fbc10817902693b9bdfebb76c9",
+    "packages/cli/tests/unit/reconciliation-host-input.test.ts": "1e18d62fa24ac503617e50b606bcff3a442303797a429203bda48495060a0a50"
+  },
+  "raw_sha256": "68457eb3111e5a9857150f3c40c3c079b2038cf4d50f3af1ba4770d77d0bce76",
+  "finding": "Fixture intentionally called snapshot with altered exact target, marking genuine operation terminal STALE, then incorrectly attempted positive dispatch. Separate invalid-token/view and stale-target tests required; retain stale latch."
+}

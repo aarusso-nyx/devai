@@ -1,0 +1,308 @@
+{
+  "git_version": "git version 2.54.0 (Apple Git-157)",
+  "environment": {
+    "node": "24.22.0",
+    "uv": "1.52.1",
+    "platform": "darwin"
+  },
+  "direct": {
+    "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-reciprocal-review-46VDOH/direct espaço?#",
+    "git_dir": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-reciprocal-review-46VDOH/direct espaço?#/.git",
+    "common_dir": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-reciprocal-review-46VDOH/direct espaço?#/.git",
+    "forward_pointer": null,
+    "backlink": null,
+    "commondir": null,
+    "registry_parent": null,
+    "checks": {
+      "direct_layout": true,
+      "all_four_link_fields_null": true
+    },
+    "projection": {
+      "repository_id": "fixture-repository",
+      "repository_root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-reciprocal-review-46VDOH/direct espaço?#",
+      "git_dir": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-reciprocal-review-46VDOH/direct espaço?#/.git",
+      "common_dir": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-reciprocal-review-46VDOH/direct espaço?#/.git",
+      "root_identity": {
+        "dev": "16777233",
+        "ino": "1118713404",
+        "birthtime_ns": "1792871398235100782",
+        "uid": "501",
+        "mode": "493"
+      },
+      "git_dir_identity": {
+        "dev": "16777233",
+        "ino": "1118713406",
+        "birthtime_ns": "1792871398245870271",
+        "uid": "501",
+        "mode": "493"
+      },
+      "common_dir_identity": {
+        "dev": "16777233",
+        "ino": "1118713406",
+        "birthtime_ns": "1792871398245870271",
+        "uid": "501",
+        "mode": "493"
+      },
+      "git_entry_identity": {
+        "dev": "16777233",
+        "ino": "1118713406",
+        "birthtime_ns": "1792871398245870271",
+        "uid": "501",
+        "mode": "493"
+      },
+      "git_entry_sha256": null,
+      "git_backlink_identity": null,
+      "git_backlink_sha256": null,
+      "commondir_identity": null,
+      "commondir_sha256": null
+    },
+    "worktree_id": "wt-de7976dc5c5bc9a99823f3c2e5f7e3bf05febf4788b9cef8",
+    "host_identity_sha256": "375bf4d5ce45cf1312c2d1b2e7051f9aa9a8e18fb98539a0c88ef70057f0dfdc"
+  },
+  "absolute": {
+    "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-reciprocal-review-46VDOH/absolute espaço?#",
+    "git_dir": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-reciprocal-review-46VDOH/direct espaço?#/.git/worktrees/absolute-espaço-#",
+    "common_dir": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-reciprocal-review-46VDOH/direct espaço?#/.git",
+    "forward_pointer": "gitdir: /private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-reciprocal-review-46VDOH/direct espaço?#/.git/worktrees/absolute-espaço-#\n",
+    "backlink": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-reciprocal-review-46VDOH/absolute espaço?#/.git\n",
+    "commondir": "../..\n",
+    "registry_parent": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-reciprocal-review-46VDOH/direct espaço?#/.git/worktrees",
+    "checks": {
+      "forward_realpath": true,
+      "backlink_lexical": true,
+      "backlink_realpath": true,
+      "commondir_realpath": true,
+      "registered_immediate_parent": true
+    },
+    "projection": {
+      "repository_id": "fixture-repository",
+      "repository_root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-reciprocal-review-46VDOH/absolute espaço?#",
+      "git_dir": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-reciprocal-review-46VDOH/direct espaço?#/.git/worktrees/absolute-espaço-#",
+      "common_dir": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-reciprocal-review-46VDOH/direct espaço?#/.git",
+      "root_identity": {
+        "dev": "16777233",
+        "ino": "1118713466",
+        "birthtime_ns": "1792871398290444442",
+        "uid": "501",
+        "mode": "493"
+      },
+      "git_dir_identity": {
+        "dev": "16777233",
+        "ino": "1118713464",
+        "birthtime_ns": "1792871398290276229",
+        "uid": "501",
+        "mode": "493"
+      },
+      "common_dir_identity": {
+        "dev": "16777233",
+        "ino": "1118713406",
+        "birthtime_ns": "1792871398245870271",
+        "uid": "501",
+        "mode": "493"
+      },
+      "git_entry_identity": {
+        "dev": "16777233",
+        "ino": "1118713468",
+        "birthtime_ns": "1792871398290609405",
+        "uid": "501",
+        "mode": "420",
+        "size_bytes": "152",
+        "mtime_ns": "1792871398290642781",
+        "ctime_ns": "1792871398290642781"
+      },
+      "git_entry_sha256": "52910d1f2088902fbf37faab54bd62a350b99f36cdd01bc9ccc744e6013ecc5a",
+      "git_backlink_identity": {
+        "dev": "16777233",
+        "ino": "1118713467",
+        "birthtime_ns": "1792871398290531195",
+        "uid": "501",
+        "mode": "420",
+        "size_bytes": "117",
+        "mtime_ns": "1792871398290567654",
+        "ctime_ns": "1792871398290567654"
+      },
+      "git_backlink_sha256": "5688e5691b978201581d6e15127f1ba7f4644e086a2d0b5ffa2443fe37d8bece",
+      "commondir_identity": {
+        "dev": "16777233",
+        "ino": "1118713469",
+        "birthtime_ns": "1792871398290679657",
+        "uid": "501",
+        "mode": "420",
+        "size_bytes": "6",
+        "mtime_ns": "1792871398290714200",
+        "ctime_ns": "1792871398290714200"
+      },
+      "commondir_sha256": "340ddcb67a6204f742cd1e28e5b462622dde7daaa8ee36001897196aacdc6d47"
+    },
+    "worktree_id": "wt-c41565d36e6d82733f3b710d1dc8e4e9502b78865454dfe3",
+    "host_identity_sha256": "8a7ffdda1c9e44eedee8290c1c52dfeff0c10b5739356359f7194f9db8e78d73"
+  },
+  "relative": {
+    "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-reciprocal-review-46VDOH/relative espaço?#",
+    "git_dir": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-reciprocal-review-46VDOH/direct espaço?#/.git/worktrees/relative-espaço-#",
+    "common_dir": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-reciprocal-review-46VDOH/direct espaço?#/.git",
+    "forward_pointer": "gitdir: ../direct espaço?#/.git/worktrees/relative-espaço-#\n",
+    "backlink": "../../../../relative espaço?#/.git\n",
+    "commondir": "../..\n",
+    "registry_parent": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-reciprocal-review-46VDOH/direct espaço?#/.git/worktrees",
+    "checks": {
+      "forward_realpath": true,
+      "backlink_lexical": true,
+      "backlink_realpath": true,
+      "commondir_realpath": true,
+      "registered_immediate_parent": true
+    },
+    "projection": {
+      "repository_id": "fixture-repository",
+      "repository_root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-reciprocal-review-46VDOH/relative espaço?#",
+      "git_dir": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-reciprocal-review-46VDOH/direct espaço?#/.git/worktrees/relative-espaço-#",
+      "common_dir": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-reciprocal-review-46VDOH/direct espaço?#/.git",
+      "root_identity": {
+        "dev": "16777233",
+        "ino": "1118713486",
+        "birthtime_ns": "1792871398318711957",
+        "uid": "501",
+        "mode": "493"
+      },
+      "git_dir_identity": {
+        "dev": "16777233",
+        "ino": "1118713484",
+        "birthtime_ns": "1792871398318548993",
+        "uid": "501",
+        "mode": "493"
+      },
+      "common_dir_identity": {
+        "dev": "16777233",
+        "ino": "1118713406",
+        "birthtime_ns": "1792871398245870271",
+        "uid": "501",
+        "mode": "493"
+      },
+      "git_entry_identity": {
+        "dev": "16777233",
+        "ino": "1118713490",
+        "birthtime_ns": "1792871398319512272",
+        "uid": "501",
+        "mode": "420",
+        "size_bytes": "62",
+        "mtime_ns": "1792871398319545023",
+        "ctime_ns": "1792871398319545023"
+      },
+      "git_entry_sha256": "d1c34205ee600878803ba9de6b4ccc0b4772329d8bfc1f5fa762d5ec9139fb12",
+      "git_backlink_identity": {
+        "dev": "16777233",
+        "ino": "1118713489",
+        "birthtime_ns": "1792871398319440854",
+        "uid": "501",
+        "mode": "420",
+        "size_bytes": "36",
+        "mtime_ns": "1792871398319474938",
+        "ctime_ns": "1792871398319474938"
+      },
+      "git_backlink_sha256": "725ed71af7ff75e1e83b411313c853e5dd394fa17bb68e80836cda4bad5a9b1e",
+      "commondir_identity": {
+        "dev": "16777233",
+        "ino": "1118713491",
+        "birthtime_ns": "1792871398319581066",
+        "uid": "501",
+        "mode": "420",
+        "size_bytes": "6",
+        "mtime_ns": "1792871398319613567",
+        "ctime_ns": "1792871398319613567"
+      },
+      "commondir_sha256": "340ddcb67a6204f742cd1e28e5b462622dde7daaa8ee36001897196aacdc6d47"
+    },
+    "worktree_id": "wt-97b8e6fd8497e1271dc40fc52bbd4229d451cedfd026710f",
+    "host_identity_sha256": "9ca58e0057a231d93ad307e21041d50511fe8b12a073f6dddcc7a9448feaf154"
+  },
+  "copied": {
+    "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-reciprocal-review-46VDOH/copied",
+    "git_dir": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-reciprocal-review-46VDOH/direct espaço?#/.git/worktrees/absolute-espaço-#",
+    "common_dir": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-reciprocal-review-46VDOH/direct espaço?#/.git",
+    "forward_pointer": "gitdir: /private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-reciprocal-review-46VDOH/direct espaço?#/.git/worktrees/absolute-espaço-#\n",
+    "backlink": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-reciprocal-review-46VDOH/absolute espaço?#/.git\n",
+    "commondir": "../..\n",
+    "registry_parent": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-reciprocal-review-46VDOH/direct espaço?#/.git/worktrees",
+    "checks": {
+      "forward_realpath": true,
+      "backlink_lexical": false,
+      "backlink_realpath": false,
+      "commondir_realpath": true,
+      "registered_immediate_parent": true
+    },
+    "projection": {
+      "repository_id": "fixture-repository",
+      "repository_root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-reciprocal-review-46VDOH/copied",
+      "git_dir": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-reciprocal-review-46VDOH/direct espaço?#/.git/worktrees/absolute-espaço-#",
+      "common_dir": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-reciprocal-review-46VDOH/direct espaço?#/.git",
+      "root_identity": {
+        "dev": "16777233",
+        "ino": "1118713405",
+        "birthtime_ns": "1792871398235170617",
+        "uid": "501",
+        "mode": "493"
+      },
+      "git_dir_identity": {
+        "dev": "16777233",
+        "ino": "1118713464",
+        "birthtime_ns": "1792871398290276229",
+        "uid": "501",
+        "mode": "493"
+      },
+      "common_dir_identity": {
+        "dev": "16777233",
+        "ino": "1118713406",
+        "birthtime_ns": "1792871398245870271",
+        "uid": "501",
+        "mode": "493"
+      },
+      "git_entry_identity": {
+        "dev": "16777233",
+        "ino": "1118713504",
+        "birthtime_ns": "1792871398290642781",
+        "uid": "501",
+        "mode": "420",
+        "size_bytes": "152",
+        "mtime_ns": "1792871398390252019",
+        "ctime_ns": "1792871398390252019"
+      },
+      "git_entry_sha256": "52910d1f2088902fbf37faab54bd62a350b99f36cdd01bc9ccc744e6013ecc5a",
+      "git_backlink_identity": {
+        "dev": "16777233",
+        "ino": "1118713467",
+        "birthtime_ns": "1792871398290531195",
+        "uid": "501",
+        "mode": "420",
+        "size_bytes": "117",
+        "mtime_ns": "1792871398290567654",
+        "ctime_ns": "1792871398290567654"
+      },
+      "git_backlink_sha256": "5688e5691b978201581d6e15127f1ba7f4644e086a2d0b5ffa2443fe37d8bece",
+      "commondir_identity": {
+        "dev": "16777233",
+        "ino": "1118713469",
+        "birthtime_ns": "1792871398290679657",
+        "uid": "501",
+        "mode": "420",
+        "size_bytes": "6",
+        "mtime_ns": "1792871398290714200",
+        "ctime_ns": "1792871398290714200"
+      },
+      "commondir_sha256": "340ddcb67a6204f742cd1e28e5b462622dde7daaa8ee36001897196aacdc6d47"
+    },
+    "worktree_id": "wt-41052cd3e31e6cb45daebb83c56869555db2cb5b6c401c58",
+    "host_identity_sha256": "bd3505c18bdb447de41abf5be36115b8c1fd64d377570559858cb1122d82ef59"
+  },
+  "checks": {
+    "direct_valid": true,
+    "absolute_valid": true,
+    "relative_valid": true,
+    "relative_forward_is_relative": true,
+    "relative_backlink_is_relative": true,
+    "copied_refused_by_lexical_backlink": true,
+    "copied_refused_by_realpath_backlink": true,
+    "distinct_persistent_ids": true
+  },
+  "scope": "Independent actual Git layouts and amendment predicates/formulas only; no product module or adapter qualification. External disposable fixtures only.",
+  "fixture_removed": true
+}

@@ -1,0 +1,88 @@
+{
+  "kind": "independent-inspector-contract-authoring-review",
+  "result": "Contract authoring and catalogue checks pass; overall validation remains FAILED at two held binding gates.",
+  "focused_tests": {
+    "passed": 118,
+    "failed": 2,
+    "total": 120,
+    "files_passed": 5,
+    "files_failed": 2
+  },
+  "unexpected_failures": [],
+  "held_failures": [
+    {
+      "test": "requires real successor pin parity before integration (binding approval held)",
+      "actual": "pin version1.1.0 differs from source1.2.0",
+      "classification": "pending binding approval; pin unchanged"
+    },
+    {
+      "test": "binds the real framework authority policy to the exact held or successor pin",
+      "actual": "authority-policy.json absent",
+      "classification": "preexisting clean-worktree missing binding input; no file synthesized"
+    }
+  ],
+  "historical_evidence": {
+    "constitution1.1.0_sha256": "8353c3b81d38e0f9b913cbeb6762bc149605989c1b16f52d2c63ba9892f71270",
+    "constitution1.0.2_sha256": "d7f8791f1d00a7247bced66bdcdf8b1af431bb57e49d03b6ddd7024cb52f957d",
+    "exact_reconstructions": "PASS",
+    "pin_transition": "Both held1.1.0 and exact source1.2.0 pins reconstruct the same byte-bound1.1.0 predecessor. Real policy must match actual pin version and SHA; no fixture or fabricated binding. Separate live successor parity still requires1.2.0."
+  },
+  "census": {
+    "canonical_schemas": 134,
+    "source_only_schemas": 13,
+    "runtime_roster": 121,
+    "adr_records": 132,
+    "adr_markdown_scanned": 133,
+    "effective_subject_authorities": 642,
+    "new_adr_status": "proposed",
+    "new_adr_effective": false
+  },
+  "artifact_sha256": {
+    "packages/cli/tests/unit/constitution-article-6-amendment.test.ts": "0629ca1d1900badaa858719db49b5b4c71020c16296e76ac62671eacdc1b2c2d",
+    "packages/cli/tests/unit/canonical-selection-constitution-amendment.test.ts": "a08f428fdb7a328b041c856ca69fcedd16bd50af803325e699e42321e4e31ff9",
+    "packages/schemas/tests/contract/governance-v15-adr.test.ts": "0921bcfb4e61ec499ab34a75a2a31798eac8dd745a902c2f8e80e41ca9bbcc7b",
+    "packages/schemas/tests/contract/proof-index-reconciliation-contract.test.ts": "4b0a91176838033f02c771ed11cb36a301dacd84ec8801b9a53b5dc2f9cf34c2",
+    "packages/cli/tests/unit/check-schemas-adopter-boundaries.test.ts": "5716b8563e5823ce6948c02381dbab3e374839bcdc8b77b0497f5ac745a76209",
+    "packages/cli/tests/unit/cli-shard06-contracts-schema-residual.test.ts": "0550606142b2a492c4dc9179ca45532be17c749f26cf2a527999ab125730d5cb",
+    "law/constitution.md": "d5dfdc972161e0f848dd859be7bbfa510973c5c9a449a0f9e6b8960e4f5ac96a",
+    "law/schemas/proof-index-reconciliation-contract.schema.json": "21844d42ded67cff9d96df372688d8a7759ad414568892e5a4b84735f417fff9",
+    "packages/cli/src/commands/check/schemas.ts": "4f32713cb5b20cc5162c998361c5c055ca5737956716d7897be3a2f402a074d6"
+  },
+  "log_sha256": "7dbef142dd94c9ca008f632e87f79c4f0a8e69171881e3dac08813501dcedaf0",
+  "holds": [
+    "Binding",
+    "Integration",
+    "Runtime",
+    "Release",
+    "DETRAN effects"
+  ],
+  "constitutional_transition_rerun": {
+    "passed": 6,
+    "failed": 2,
+    "total": 8,
+    "exit_code": 1,
+    "log": "constitutional-transition-tests.log",
+    "log_sha256": "70d300de659b28bfbe92ed9ca39a3be89ddc1fd5d3d39b8e46554f6334430848",
+    "combined_evidence": "112 unchanged tests from prior five-file pass plus6 current constitutional passes and2 current held failures; no claim of a newly repeated seven-file run."
+  },
+  "review": {
+    "unexpected_defects": [],
+    "approved_law_delta": "Exactly two Article6 insertions plus three version markers and amendment date;1.1.0 reconstruction hash freezes all existing rows, Article9 and every other article. New ADR proposed, supersedes[], exact two affected subjects; no effective authority standing. Source schema exact approved draft. Policy changes only generated README digest and aggregate exception catalogue digest; all historical record bytes/checks preserved.",
+    "companion": "Exactly one SOURCE_ONLY_SCHEMAS addition, runtime ROSTER unchanged; census/output fixtures updated without weakening refusal cases.",
+    "binding": "No pin/config/proof/index write performed. Missing real authority policy remains visible. No invented dry-run or dynamic binding output."
+  },
+  "schema_lint_fix": {
+    "change": "Replace non-null assertions with explicit missing-fixture guards; use Reflect.deleteProperty for dynamic omission. No case or semantics removed.",
+    "focused_schema_test": {
+      "passed": 42,
+      "failed": 0,
+      "exit_code": 0
+    },
+    "targeted_eslint_exit_code": 0,
+    "logs": {
+      "schema-lint-fix-tests.log": "828b47e234e9d8da2bbe80d55e15acc8e7c7b1ca3d94824cb84410e00bfdef15",
+      "schema-lint-fix-eslint.log": "689d370e8c06bdc4d786c596f733e4fd11d13ae585434f61cc90eeeaf5155785"
+    },
+    "combined_evidence": "118 passed and2 held binding failures retained; only42 unchanged-schema cases rerun after lint fixes."
+  }
+}

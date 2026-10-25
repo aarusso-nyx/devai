@@ -1,0 +1,350 @@
+{
+  "fixture": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-initial-owner-plan-jJqJW9/repository",
+  "approval_id": "24b3953e410a7654b1ecdbad8c03a512439a904d9ed90349b116d6685a761caf",
+  "records_before": 336,
+  "records_after": 338,
+  "first": {
+    "ok": true,
+    "id": "EV-0c00b5ce60d1bb1b"
+  },
+  "second": {
+    "ok": true,
+    "id": "EV-46f5ecdf9a16168b"
+  },
+  "events": [
+    {
+      "id": "EV-0c00b5ce60d1bb1b",
+      "sequence": 337,
+      "proof_path": "record/proofs/work/generic/R-0025.jsonl",
+      "proof_sequence": 7,
+      "proof_sha256": "28de325bb2b82c31ce6103c4036ef70f3de284108f37810534cf5d12faea547d",
+      "previous_run_hash": "4b09b46f8d831f72897412f5a959a47ec76e293a905f304cf530f323f7ad126c",
+      "manifest_hash": "73ee5a500c2a6ee9269837a9e1bf5b2b9f3785272d96a2da1781b60409d82b78",
+      "recovered_from": {
+        "source_chain_path": "record/proofs/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/objects/46b1459576b3e51fbaf6ea1e8f3492d91c3171239fadf38bd8af78917cb36f73",
+        "source_chain_sha256": "46b1459576b3e51fbaf6ea1e8f3492d91c3171239fadf38bd8af78917cb36f73",
+        "source_entry_id": "EV-a20749884f3d97aa",
+        "source_entry_sequence": 165,
+        "source_entry_manifest_hash": "528006c1defb85d01b55d0a57a64d049c2ffbd77151a831deb47e72cbbf72708",
+        "fork_sequence": 164
+      }
+    },
+    {
+      "id": "EV-46f5ecdf9a16168b",
+      "sequence": 338,
+      "proof_path": "record/proofs/work/generic/R-0025.jsonl",
+      "proof_sequence": 8,
+      "proof_sha256": "958931109f3d1c6c061698c7343c4b1788820d5b6095b7de64d7540dd7c491cf",
+      "previous_run_hash": "73ee5a500c2a6ee9269837a9e1bf5b2b9f3785272d96a2da1781b60409d82b78",
+      "manifest_hash": "6fdfb41edd10c6540deed8e66745a57dea83b9f92d82a61fba7c7056661a7a2f"
+    }
+  ],
+  "epoch_sha256": "bd1d8b085a1aa929b689f2e4e58af93620870f9b347fc75c0c88eba3c4c85c41",
+  "index_sha256": "542553c911bcd2f5e65dd8a27b66f0f1dbcb703278477cb27df920ede95eadce",
+  "active_chain_sha256": "ca6d4fbf83d268875b45c150bf2314c49fb8f6ac274c849fb43236987b0163c8",
+  "fs_effects": [
+    {
+      "symbol": "publishFileNoReplaceSync",
+      "path": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-initial-owner-plan-jJqJW9/repository/record/proofs/chain.json.append.lock"
+    },
+    {
+      "symbol": "writeFileSync",
+      "path": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-initial-owner-plan-jJqJW9/repository/record/proofs/chain.json.tmp.64422.1792903037038"
+    },
+    {
+      "symbol": "renameSync",
+      "path": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-initial-owner-plan-jJqJW9/repository/record/proofs/chain.json.tmp.64422.1792903037038",
+      "target": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-initial-owner-plan-jJqJW9/repository/record/proofs/chain.json"
+    },
+    {
+      "symbol": "removeEntryIfIdentitySync",
+      "path": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-initial-owner-plan-jJqJW9/repository/record/proofs/chain.json.append.lock"
+    },
+    {
+      "symbol": "publishFileNoReplaceSync",
+      "path": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-initial-owner-plan-jJqJW9/repository/record/proofs/chain.json.append.lock"
+    },
+    {
+      "symbol": "writeFileSync",
+      "path": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-initial-owner-plan-jJqJW9/repository/record/proofs/chain.json.tmp.64422.1792903050091"
+    },
+    {
+      "symbol": "renameSync",
+      "path": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-initial-owner-plan-jJqJW9/repository/record/proofs/chain.json.tmp.64422.1792903050091",
+      "target": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-initial-owner-plan-jJqJW9/repository/record/proofs/chain.json"
+    },
+    {
+      "symbol": "removeEntryIfIdentitySync",
+      "path": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-initial-owner-plan-jJqJW9/repository/record/proofs/chain.json.append.lock"
+    }
+  ],
+  "process_audit": [
+    {
+      "argv": [
+        "rev-parse",
+        "--verify",
+        "--quiet",
+        "HEAD"
+      ],
+      "GIT_OPTIONAL_LOCKS": "0"
+    },
+    {
+      "argv": [
+        "-c",
+        "diff.autoRefreshIndex=false",
+        "diff",
+        "--no-ext-diff",
+        "--no-color",
+        "--no-renames",
+        "--unified=0",
+        "HEAD",
+        "--",
+        "record/proofs/work"
+      ],
+      "GIT_OPTIONAL_LOCKS": "0"
+    },
+    {
+      "argv": [
+        "-c",
+        "diff.autoRefreshIndex=false",
+        "diff",
+        "--no-ext-diff",
+        "--no-color",
+        "--no-renames",
+        "--unified=100000000",
+        "HEAD",
+        "--",
+        "record/proofs/chain.json"
+      ],
+      "GIT_OPTIONAL_LOCKS": "0"
+    },
+    {
+      "argv": [
+        "rev-parse",
+        "HEAD"
+      ],
+      "GIT_OPTIONAL_LOCKS": "0"
+    },
+    {
+      "argv": [
+        "status",
+        "--porcelain=v1",
+        "-z",
+        "--untracked-files=all"
+      ],
+      "GIT_OPTIONAL_LOCKS": "0"
+    },
+    {
+      "argv": [
+        "rev-parse",
+        "--verify",
+        "--quiet",
+        "HEAD"
+      ],
+      "GIT_OPTIONAL_LOCKS": "0"
+    },
+    {
+      "argv": [
+        "-c",
+        "diff.autoRefreshIndex=false",
+        "diff",
+        "--no-ext-diff",
+        "--no-color",
+        "--no-renames",
+        "--unified=0",
+        "HEAD",
+        "--",
+        "record/proofs/work"
+      ],
+      "GIT_OPTIONAL_LOCKS": "0"
+    },
+    {
+      "argv": [
+        "-c",
+        "diff.autoRefreshIndex=false",
+        "diff",
+        "--no-ext-diff",
+        "--no-color",
+        "--no-renames",
+        "--unified=100000000",
+        "HEAD",
+        "--",
+        "record/proofs/chain.json"
+      ],
+      "GIT_OPTIONAL_LOCKS": "0"
+    },
+    {
+      "argv": [
+        "rev-parse",
+        "--verify",
+        "--quiet",
+        "HEAD"
+      ],
+      "GIT_OPTIONAL_LOCKS": "0"
+    },
+    {
+      "argv": [
+        "-c",
+        "diff.autoRefreshIndex=false",
+        "diff",
+        "--no-ext-diff",
+        "--no-color",
+        "--no-renames",
+        "--unified=0",
+        "HEAD",
+        "--",
+        "record/proofs/work"
+      ],
+      "GIT_OPTIONAL_LOCKS": "0"
+    },
+    {
+      "argv": [
+        "-c",
+        "diff.autoRefreshIndex=false",
+        "diff",
+        "--no-ext-diff",
+        "--no-color",
+        "--no-renames",
+        "--unified=100000000",
+        "HEAD",
+        "--",
+        "record/proofs/chain.json"
+      ],
+      "GIT_OPTIONAL_LOCKS": "0"
+    },
+    {
+      "argv": [
+        "rev-parse",
+        "--verify",
+        "--quiet",
+        "HEAD"
+      ],
+      "GIT_OPTIONAL_LOCKS": "0"
+    },
+    {
+      "argv": [
+        "-c",
+        "diff.autoRefreshIndex=false",
+        "diff",
+        "--no-ext-diff",
+        "--no-color",
+        "--no-renames",
+        "--unified=0",
+        "HEAD",
+        "--",
+        "record/proofs/work"
+      ],
+      "GIT_OPTIONAL_LOCKS": "0"
+    },
+    {
+      "argv": [
+        "-c",
+        "diff.autoRefreshIndex=false",
+        "diff",
+        "--no-ext-diff",
+        "--no-color",
+        "--no-renames",
+        "--unified=100000000",
+        "HEAD",
+        "--",
+        "record/proofs/chain.json"
+      ],
+      "GIT_OPTIONAL_LOCKS": "0"
+    },
+    {
+      "argv": [
+        "rev-parse",
+        "HEAD"
+      ],
+      "GIT_OPTIONAL_LOCKS": "0"
+    },
+    {
+      "argv": [
+        "status",
+        "--porcelain=v1",
+        "-z",
+        "--untracked-files=all"
+      ],
+      "GIT_OPTIONAL_LOCKS": "0"
+    },
+    {
+      "argv": [
+        "rev-parse",
+        "--verify",
+        "--quiet",
+        "HEAD"
+      ],
+      "GIT_OPTIONAL_LOCKS": "0"
+    },
+    {
+      "argv": [
+        "-c",
+        "diff.autoRefreshIndex=false",
+        "diff",
+        "--no-ext-diff",
+        "--no-color",
+        "--no-renames",
+        "--unified=0",
+        "HEAD",
+        "--",
+        "record/proofs/work"
+      ],
+      "GIT_OPTIONAL_LOCKS": "0"
+    },
+    {
+      "argv": [
+        "-c",
+        "diff.autoRefreshIndex=false",
+        "diff",
+        "--no-ext-diff",
+        "--no-color",
+        "--no-renames",
+        "--unified=100000000",
+        "HEAD",
+        "--",
+        "record/proofs/chain.json"
+      ],
+      "GIT_OPTIONAL_LOCKS": "0"
+    },
+    {
+      "argv": [
+        "rev-parse",
+        "--verify",
+        "--quiet",
+        "HEAD"
+      ],
+      "GIT_OPTIONAL_LOCKS": "0"
+    },
+    {
+      "argv": [
+        "-c",
+        "diff.autoRefreshIndex=false",
+        "diff",
+        "--no-ext-diff",
+        "--no-color",
+        "--no-renames",
+        "--unified=0",
+        "HEAD",
+        "--",
+        "record/proofs/work"
+      ],
+      "GIT_OPTIONAL_LOCKS": "0"
+    },
+    {
+      "argv": [
+        "-c",
+        "diff.autoRefreshIndex=false",
+        "diff",
+        "--no-ext-diff",
+        "--no-color",
+        "--no-renames",
+        "--unified=100000000",
+        "HEAD",
+        "--",
+        "record/proofs/chain.json"
+      ],
+      "GIT_OPTIONAL_LOCKS": "0"
+    }
+  ],
+  "qualification": "Actual existing separate U1 divergent/newest source operations and actual checkpoint/native protected Owner graph on historical335 fixture. Explicit synthetic source fixture effect harness permits only normal append lock, exact single-record chain temp write+rename and readonly Git. Parent OPTIONAL_LOCKS1 proves production childoptions0. No installed/public command or generic effect authority claim."
+}

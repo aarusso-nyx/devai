@@ -1,0 +1,79 @@
+{
+  "standing": "BOUNDED_SOURCE_REVIEW_ACCEPTED_AFTER_THREE_AUTHENTICATED_FIXES_NO_INSTALLED_PUBLIC_QUALIFICATION",
+  "source_hashes": {
+    "packages/authority/src/boundaries/reconciliation-host-operation.ts": "ce8dc730e1a6d92890a013e0471fe81d3d64212a77e987f2cb05ca99bd3d0be1",
+    "packages/authority/src/boundaries/host-scope.ts": "20120a6084a077999738e3652135457dc988430b1c3530d9a46621701c1840aa",
+    "packages/authority/src/boundaries/host-atomic-effects.ts": "92d3be45f4d9e541252f16c44d55bb9fb7f009aa583d57bb54d5a3a6c76ffd6c",
+    "packages/authority/src/index.ts": "7acc1feb7a4cd9a7585b737feaccad8ef6344624f2c118c0feb9a23b3a7eae4d",
+    "packages/cli/src/authority/reconciliation-host-input.ts": "c26435b615eede984973fc1f9d247742c3dbbced43c538d1e171976ce06f8185",
+    "packages/cli/src/authority/broker.ts": "7fd4df9c746a8ab1979f4bd7aa7f26c68ccf7f947ed1df3ff1157f4a4b39c5d1",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/host-operation-checkpoint.json": "7e21ad1550c123b633a9af72d8e90f3a37d31ddeee6ee835abc0c8566fc41912"
+  },
+  "scope": "Independent six-path source review and evidence-only probes. No product/test edits, builds, source publication, native effects or installed positive claims.",
+  "confirmed_findings": [
+    {
+      "id": "HO01",
+      "disposition": "FIXED",
+      "finding": "Thenable/accessor result no longer claims completed synchronous operation. Descriptor-safe result examination rejects then accessors/functions and Proxy without invoking them; actual Promise still rejected."
+    },
+    {
+      "id": "HO02",
+      "disposition": "FIXED",
+      "finding": "currentBindings catches trusted provider failure and projects closed OPERATION_STALE for preview/invoke/snapshot; actual sentinel leak probes now pass."
+    },
+    {
+      "id": "HO03",
+      "disposition": "FIXED",
+      "finding": "Ordinary initbind path containing reconciliation-host no longer activates special grammar; activation checks only --option tokens. Existing alias/equals fullparser population belongs to independent Inspector regression suite."
+    }
+  ],
+  "positive_source_observations": [
+    "Opaque private invocation/token/view identity and actual live ALS/issuer checks.",
+    "Target immutable copy precedes trusted providers; pending invocation prevents nested handler reuse; token/view membership removed before fixed callback.",
+    "Stable snapshot verifies actual context, current B5, target digest and dual-clock review window; observed pending stale state latches terminally.",
+    "Broker compares actual process.argv and root/role/input fingerprint; forces policyFor bootstrap_policy=false before logical authorization and in B5 provider.",
+    "Actual installed inventory helper refuses source path origin; no deterministic provider fixture is installed package attestation.",
+    "Broker logical branch gates exact-plan/kind/capability/adapter before actual declaration/resolver/issuer/prepare/apply.",
+    "record_init explicitly rejects every non-filesystem request after process case; typed kinds cannot fall through as filesystem.",
+    "Existing default registry/corepolicy/schema/action/native writer activation unchanged by these six paths."
+  ],
+  "remaining_obligations": [
+    "Independent p1 operation/parser and unchanged regressions; root types/build.",
+    "Actual installed inventory/B5 positive, actual native domain writers and public action/registry/default grants require later qualification.",
+    "Plan/current-grant/current-lease bytes and public confirmations remain future fixed native handler obligations.",
+    "This report does not replace the independent full operation/parser/unchanged regression qualification or root final type/lint checks."
+  ],
+  "limitations": [
+    "No whole-workspace test run or installed public positive.",
+    "No claim of detecting unobserved transient filesystem drift."
+  ],
+  "verification": {
+    "command": "pnpm exec node scripts/process/validation-runner.mjs -- vitest run --config docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-host-operation-review/probe.config.mts --maxWorkers 1",
+    "final_pass": 5,
+    "final_fail": 0,
+    "final_log": "edge-probes-final-green.txt",
+    "initial_authentic_RED": "edge-probes-red.txt:0pass/3fail; edge-probes-red-4.txt:0pass/4fail",
+    "second_candidate": "edge-probes-second-candidate.txt:4pass/1fail",
+    "tests_source": "Evidence-only harness derives actual Git, issuer-policy/declaration/receipt and ALS setup from independent p1 testfile; deterministic B5 values are not installed origin attestation. Source modules loaded by Vitest development imports; no build.",
+    "source_review": "Six stated paths reviewed; no additional verified lifecycle/forgery/broker/record-init defect within bounded review."
+  },
+  "artifacts": {
+    "edge-probes-second-candidate.txt": "8c939b4857c08f9a225e18c0eec66e8326abdc1a096d2619e94bb8561f1173a0",
+    "source-review-second-candidate.json": "20b5c50d0255b413f1d7f1071bb80ac5d132651ff9678a5a3fc417f2b482cc61",
+    "edge-probes-second-candidate.test.ts.snapshot": "c04a4ea7e486e787f5fb00dadd9a7e8c941655886a1223ff862a320c5cd4d90b",
+    "probe.config.mts": "93925df817db90c06fdde5267e6aa6eec15c15f2fa8a5207bdcca8a7be68d5f4",
+    "edge-probes-red.txt": "36be1a976b2442198d3173078fca9faa338537a52b8043f71cffc5ba87e011a3",
+    "edge-probes-red-4.txt": "14df1448c323371fce7ea2a36de69ee82d0dfdd263a20575b92ab5966d6d12af",
+    "source-review-initial.json": "9e383079edd90c5c047415fa9b22145f0c39059e996feef0efbe2defabe14f31",
+    "edge-probes-initial-3.test.ts.snapshot": "702028dae28a3afd8c3393fe79194f06df6dffb3c716dcaf140b9b8a11ff33c9",
+    "edge-probes-red-4.test.ts.snapshot": "fd6f5b2f455861152d71985a1037a682ba83f88048e4e502ddd839edb84bec7b",
+    "edge-probes-final-green.txt": "fbdc7ba843d4d6fe43cbef22d04e15730d2f241c9e281568b5124d9254d96f44",
+    "edge-probes.test.ts": "c04a4ea7e486e787f5fb00dadd9a7e8c941655886a1223ff862a320c5cd4d90b",
+    "checkpoint-review.json": "4f15f3610d3fff315c1785c00b2f91a1ec2d2996ab8c05275b2407e432f887dd"
+  },
+  "graft": {
+    "current_review": "New source unindexed; exact skeleton returned no indexed definitions and no savings; fallback exact source reads.",
+    "inherited_successful_savings_calls": 16,
+    "inherited_approx_tokens_saved": 323360
+  }
+}

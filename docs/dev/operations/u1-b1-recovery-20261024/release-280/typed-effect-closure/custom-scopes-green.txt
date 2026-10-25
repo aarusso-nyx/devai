@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/release-280/typed-effect-closure/custom-scopes-green.txt","kind":"historical-transcript-custody-pointer","original_bytes":872,"original_bytes_changed":false,"original_sha256":"293136a924fa3d16e0f1ae89788232507b79eac46d6eae23300121aca26f6604"}

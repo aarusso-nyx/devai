@@ -1,0 +1,142 @@
+{
+  "title": "M2 recovery capability and authority audit",
+  "role": "Auditor",
+  "verdict": "RECOVERY_BLOCKED; independent source/planning work can begin",
+  "method": "Read-only exact Git objects, installed packaged runtime/schema and preserved source packets; no native CLI, recovery, tests, regeneration, allocation, source edits or sibling writes. No network/latest-release query; conclusions concern installed/released2.7 artifact and retained approved contracts, not every possible newer release.",
+  "identities": {
+    "current_main": "b796e2e07bbb08c2f3fec25a4efe31e136bfd59e",
+    "protected_PR211_head": "9b2a190aa1276f4b15469b7079ed0d7c4c8c4c99",
+    "installed_provider": "@aarusso-nyx/devai2.7.0",
+    "released_provider_source": "ff8accd83c912d02d17df80eccbe147aafd082e3",
+    "closed_M1_measurement_source": "21427c25fe2e1c7977ca0311156d4c59d8cfea35",
+    "proof_sources": {
+      "b796e2e07bbb08c2f3fec25a4efe31e136bfd59e": {
+        "record/proofs/chain.json": {
+          "sha256": "03945961b9c82dac7d94db73661d24fa3d707f9aba1691634043d8deae6a171a",
+          "population": 449
+        },
+        "record/proofs/work/generic/R-0025.jsonl": {
+          "sha256": "406e818ab9b4f521cba1bf771f15f7bde1ca5ab8ff7ff8ba7599b5669780fcdd",
+          "population": 6
+        }
+      },
+      "9b2a190aa1276f4b15469b7079ed0d7c4c8c4c99": {
+        "record/proofs/chain.json": {
+          "sha256": "fdc8a9fd4b77500aa6388ad20ccd9f3329e057229bc1369869428a1ef2ddc5b9",
+          "population": 169
+        },
+        "record/proofs/work/generic/R-0025.jsonl": {
+          "sha256": "bd1d8b085a1aa929b689f2e4e58af93620870f9b347fc75c0c88eba3c4c85c41",
+          "population": 8
+        }
+      }
+    }
+  },
+  "capabilities": [
+    {
+      "id": "newest-line recovery",
+      "status": "AVAILABLE in installed public record route; not executed",
+      "contract": "evidence record --recover-newest-line with canonical proof-path and newest physical proof-sequence; role/write consent via governed harness",
+      "source": "/Volumes/Development/.codex/worktrees/completion-roadmap/detran/node_modules/.pnpm/@aarusso-nyx+devai@2.7.0/node_modules/@aarusso-nyx/devai/dist/runtime/index/release-host.js:174600-174648;234301-234348",
+      "guards": "regular repository-local paths; full immutable epoch; newest complete physical line only; no historical declaration replacement; ambiguity/digest refusal; exact already-anchored retry; protected-input recheck before append. Cannot recover S2 line7 while line8 exists."
+    },
+    {
+      "id": "U1 custody-proven divergent-anchor recovery",
+      "status": "ACCEPTED CONTRACT; ABSENT implementation/public capability in installed2.7",
+      "contract": "ADR-EVI-0006 at released sourceff8accd83c912d02d17df80eccbe147aafd082e3; proposed/accepted evidence record --recover-divergent-anchor with proof-path/sequence/source-chain/source-chain-sha256/expected-head; inspector/write. This is not executable advice for installed2.7.",
+      "source": "law/adr/ADR-EVI-0006-custody-proven-divergent-anchor-recovery.md:35-42,65-139 at ff8accd83c912d02d17df80eccbe147aafd082e3",
+      "implementation_absence": "No installed --recover-divergent-anchor route; installed evidence schema has no recovered_from; newest-line implementation remains explicit. Accepted ADR disclaimer says acceptance does not report implementation or authorize release/adopter effect.",
+      "required_behavior": "One exact post-fork original direct-anchor custody proof, same-repo common-prefix/epoch digests, expected current head, one linked append without source-sequence reuse, recovered_from+digest manifests, safe paths, exact retry/conflict/concurrency/crash/role negatives; IA001-008."
+    },
+    {
+      "id": "B1 multi-origin canonical reconciliation/staged inventory bootstrap",
+      "status": "DESIGN ONLY; B1-I PROPOSED/UNAPPROVED; ABSENT installed public actions",
+      "contract": "Prepared B1 draftADR-EVI-0007/B1-I; proposed four actions: evidence reconcile plan, materialize, stage-proof; sense bootstrap-inventory. None is callable in2.7.",
+      "source": "/Volumes/Development/.codex/artifacts/detran/pr211-approved-preparation-20261023/prepared-packets/B1-I-proposed-implementation-packet.md:3-24,72-107",
+      "distinct_need": "U1 alone does not choose current main canonical prefix, preserve displaced old S2 recovered8 as archival, update only verified chain index, or resolve staged inventory/catalogue cycle. Requires source-bound parents/index semantic hash, custody, isolated diagnostic bodies, phase tokens/journal/lease/CAS and clean-candidate final native revalidation.",
+      "authority_gate": "Upstream Architect must accept canonical materialization interpretation under Article6 (separate constitution amendment if needed), then explicit B1-I implementation approval, Inspector-first tests/review/exact CI and separately authorized release."
+    }
+  ],
+  "approval_boundaries": {
+    "verified_original_packet_hashes": {
+      "REC-U1-upstream-recovery.md": "f198bde3bea26c776f91709217320beaf1b20c20e6b2890a17a36d38e5ca222d",
+      "REC-B1-canonical-bootstrap-design.md": "35133cbcbad7bed680c803c64af8ae79f5d7d182b4dd6f9bc9847cb831384514",
+      "REC-D1-adoption-and-execution-gates.md": "8d1ed4804a68b2d01604b8896423842ec3ec95789c076dbd5de5c61737388111"
+    },
+    "human_receipt": "/Volumes/Development/.codex/artifacts/detran/pr211-approved-preparation-20261023/prepared-packets/D1-owner-approval.md",
+    "REC_U1": "Approved handoff envelope in DETRAN only; no sibling write/release/adoption authority. Do not message another thread without direct human authorization.",
+    "REC_B1": "Approved design only; B1-I not approved by that receipt.",
+    "REC_D1": "Preparation/proposed main-prefix disposition only. Exact release-specific D1-L approval absent; current annex target/integrity/diff/effects/Owner execution fields null and execution_allowed false. Its2.6.3 observation is dated provenance; installed measurement provider is now2.7.0.",
+    "M2_begin": "Allows approved roadmap work within existing packets; does not silently approve B1-I/upstream writes/D1-L effects/#211merge/C6activation."
+  },
+  "source_binding_prerequisites": [
+    "Preserve staged reconciliation, linked worktrees/index bundles, all main/S2/original166 chains, eight-line epoch, legacy/old readings and failure receipts.",
+    "Refresh exact main/parents/index/current expected head before future review; old335\u2192336\u2192337 and1141 catalogue population are historical conditional targets. Current main has449 chain records; old main335 snapshots must never replace new main or erase M1. No prediction of future append count/head.",
+    "Line7 custody source original166 SHA46b1459576b3e51fbaf6ea1e8f3492d91c3171239fadf38bd8af78917cb36f73; raw line7 SHA28de325bb2b82c31ce6103c4036ef70f3de284108f37810534cf5d12faea547d differs from internal line_hash. After canonical disposition expected7/8 must be derived from actual complete epochs; archived S2 recovered8 is not active on main.",
+    "Require actual immutable U1+B1-capable published package/source/tag, SRI/tarballSHA, routed installed help/schema/capabilities, tests/review/CI and Node/pnpm compatibility. No sibling build/latest assumption.",
+    "Prepare exact root package/lock/transitive/peer diff and registered upgrade/bind dry-plan with closed role-owned paths/effects/hash/authority. Constitution/config/index/producer/wrapper changes require exact added scope; M1 migration approval cannot be reused.",
+    "Present exact D1-L release/diff/parents/index/protocol/effect annex and Owner execution approval before installation/canonical materialization/recovery.",
+    "After approved qualification and execution, use only registered released B1/U1/newest actions serially with immediate head/source guards; stop any new orphan/effect. Never truncate proof history, choose chain sides by hand, import private helpers, replay payloads, expand historical gaps or weaken required checks.",
+    "Final genuine clean candidate must run unchanged full native inventory/deterministic exports/chain/history/law/doctor/affected-full exact-head gates and independent review. Diagnostic bootstrap does not supply final readiness. Separate explicit #211 merge hold removal still required."
+  ],
+  "safe_independent_M2_work": [
+    "A1 read-only ownership/conflict/acceptance inventory against current main and protected S2head; preserve all source amendments/local staged work/security and ADR numbering.",
+    "A2 diagnose existing complete smoke/provisioning/CI/raw logs and classify inherited vs new failures; formulate bounded owned repair packets retaining four-control/full population/budget boundaries. This Auditor task executes no tests or repair.",
+    "Refresh REC-D1 preparation factual capability/identity matrix and exact missing approvals outside protected source; draft actual release annex only after a real supporting release exists.",
+    "Prepare U1/B1 upstream handoff/decision requests with exact hashes/paths and current constraints; dispatch or sibling implementation requires direct human/upstream authorization.",
+    "Continue previously authorized S3 packet/source operation-to-view preparation only; preserve exact refreshed-packet approval and S2 integrated/audited prerequisite for runtime.",
+    "Root reports a separately assigned Engineer/Inspector exact insertion of an already Owner-approved one-file stack diagnostics step from9b2ahead; this Auditor neither edits nor validates that source change and does not infer a recovery capability from it."
+  ],
+  "protected_holds": "#211 stays pinned/unmerged; C6nineinactive/emptybindings; S3runtimeheld; no campaign/round closure or normalization. Root reports current-main required checks green; no CI fix is warranted from this audit.",
+  "sources_sha256": {
+    "/Volumes/Development/.codex/worktrees/completion-roadmap/detran/COMPLETION-PLAN.md": "f6fb3e63bb43457027c71ba45e2af97b679a639db733021478b014e4fcb482ed",
+    "/Volumes/Development/.codex/worktrees/completion-roadmap/detran/docs/meta/knowledge-base/rait-progress-plan-2026-10-23.md": "e50e984a749a0489019a21337a7882b9ba236a103949c3fb5558037ff3a6a662",
+    "/Volumes/Development/.codex/worktrees/completion-roadmap/detran/docs/meta/adr/ADR-0061-devai-270-measurement-adoption.md": "c31596e84f98b77fe095e30ff04d879a0458721662bfd1c737b59f428a07bee6",
+    "/Volumes/Development/.codex/worktrees/completion-roadmap/detran/docs/meta/knowledge-base/session-artifacts/orchestration-handoff.md": "36d7d4d01fcb10713533e8594baf218f1e18226fa5065d3a85667e1f41db8772",
+    "/Volumes/Development/.codex/worktrees/completion-roadmap/detran/work/rounds/R-0025/reports/P4-02-S2-approval-packet.md": "495d9b553a8ac5ba553076ad9b3f89d0a30ea10d387e5bbe15f10da23b586a72",
+    "/Volumes/Development/.codex/worktrees/completion-roadmap/detran/node_modules/.pnpm/@aarusso-nyx+devai@2.7.0/node_modules/@aarusso-nyx/devai/package.json": "23174cf9f62aeef95d9d522d1371a04ebb91fd719e902508bcb269d4af7d77ca",
+    "/Volumes/Development/.codex/worktrees/completion-roadmap/detran/node_modules/.pnpm/@aarusso-nyx+devai@2.7.0/node_modules/@aarusso-nyx/devai/dist/runtime/index/release-host.js": "e584f38cf27610432249ad8855c6230dbbaecb5be698901a43e36ede8c30d0c4",
+    "/Volumes/Development/.codex/worktrees/completion-roadmap/detran/node_modules/.pnpm/@aarusso-nyx+devai@2.7.0/node_modules/@aarusso-nyx/devai/dist/runtime/index/schemas/evidence.schema.json": "591886e0bd2cd23775de825d82270e30f10f742461d68abc98554db39bc5e173",
+    "/Volumes/Development/.codex/artifacts/detran/pr211-approved-preparation-20261023/prepared-packets/REC-U1-upstream-recovery.md": "f198bde3bea26c776f91709217320beaf1b20c20e6b2890a17a36d38e5ca222d",
+    "/Volumes/Development/.codex/artifacts/detran/pr211-approved-preparation-20261023/prepared-packets/REC-U1-handoff-prepared.md": "a20365a8d4559295949e751f90fdad5b296d8f5e461513f3a3208931135a25ef",
+    "/Volumes/Development/.codex/artifacts/detran/pr211-approved-preparation-20261023/prepared-packets/REC-B1-canonical-bootstrap-design.md": "35133cbcbad7bed680c803c64af8ae79f5d7d182b4dd6f9bc9847cb831384514",
+    "/Volumes/Development/.codex/artifacts/detran/pr211-approved-preparation-20261023/prepared-packets/B1-design-draft-ADR-EVI-0007.md": "662b61bdd8708f56ce3a4c0dea4ee3c72c741d0c2d9c5c8380057fc2b9b5b7f7",
+    "/Volumes/Development/.codex/artifacts/detran/pr211-approved-preparation-20261023/prepared-packets/B1-I-proposed-implementation-packet.md": "07768b045f6f81d6e667bf9c58006ef020fe7a7f6e38b2c38bbf19467143a850",
+    "/Volumes/Development/.codex/artifacts/detran/pr211-approved-preparation-20261023/prepared-packets/REC-D1-adoption-and-execution-gates.md": "8d1ed4804a68b2d01604b8896423842ec3ec95789c076dbd5de5c61737388111",
+    "/Volumes/Development/.codex/artifacts/detran/pr211-approved-preparation-20261023/prepared-packets/D1-release-binding.json": "7b7a6516e7b07f8b271af0284a153e4975f308846c783418b3f90ef8e79690c9",
+    "/Volumes/Development/.codex/artifacts/detran/pr211-approved-preparation-20261023/prepared-packets/D1-owner-approval.md": "f62fd8715cffff7a435a379cb788b1c31083c1fc5b205c708228fc101f8eaf49",
+    "/Volumes/Development/.codex/artifacts/detran/pr211-approved-preparation-20261023/prepared-packets/reference-ADR-EVI-0006.md": "89e4bebfc1147662efc3d779b490e71339a838bfe8531cbd6907e2fb073eea09",
+    "/Volumes/Development/.codex/artifacts/detran/pr211-approved-preparation-20261023/prepared-packets/approval-manifest.json": "2d2b36ea4e7f48679c3debaeb112f00ff1cb37368a62f219d4d2d50f20278370"
+  },
+  "released_ADR6_sha256": "89e4bebfc1147662efc3d779b490e71339a838bfe8531cbd6907e2fb073eea09",
+  "custody": "Read-only audit complete; source read custody released. No source/sibling/native/state effects.",
+  "lossless_handoff_sources": {
+    "REC-U1-upstream-recovery.md": {
+      "path": "/Volumes/Development/.codex/artifacts/detran/pr211-approved-preparation-20261023/prepared-packets/REC-U1-upstream-recovery.md",
+      "bytes": 5126,
+      "sha256": "f198bde3bea26c776f91709217320beaf1b20c20e6b2890a17a36d38e5ca222d"
+    },
+    "REC-B1-canonical-bootstrap-design.md": {
+      "path": "/Volumes/Development/.codex/artifacts/detran/pr211-approved-preparation-20261023/prepared-packets/REC-B1-canonical-bootstrap-design.md",
+      "bytes": 5943,
+      "sha256": "35133cbcbad7bed680c803c64af8ae79f5d7d182b4dd6f9bc9847cb831384514"
+    },
+    "REC-D1-adoption-and-execution-gates.md": {
+      "path": "/Volumes/Development/.codex/artifacts/detran/pr211-approved-preparation-20261023/prepared-packets/REC-D1-adoption-and-execution-gates.md",
+      "bytes": 6930,
+      "sha256": "8d1ed4804a68b2d01604b8896423842ec3ec95789c076dbd5de5c61737388111"
+    },
+    "HC-01-eight-line-compatibility.md": {
+      "path": "/Volumes/Development/.codex/artifacts/detran/pr211-approved-preparation-20261023/prepared-packets/HC-01-eight-line-compatibility.md",
+      "bytes": 5458,
+      "sha256": "c67a38923f78f152c0704996a3546f5fb7f5992294ea9ae8bca2728055389f14"
+    }
+  },
+  "lossless_handoff_authority_source": {
+    "path": "/Volumes/Development/.codex/artifacts/detran/pr211-approved-preparation-20261023/working-tree-snapshot/work/rounds/R-0025/AUTHORIZATION.md",
+    "sha256": "6afa7c2332edf0b1273e8abbd64b7f4943722d1eb07eb97447ec17f7dc26cb08",
+    "bytes": 26399,
+    "bounded_excerpt_lines": "413-422",
+    "standing": "Preserved historical Owner receipt; copy losslessly with existing scope limits, no new Owner grant."
+  }
+}

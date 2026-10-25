@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-provision-inspector/final-census-and-resume.txt","kind":"historical-transcript-custody-pointer","original_bytes":290,"original_bytes_changed":false,"original_sha256":"e516bf71c326b914a28811f54f7072e5577877734fdeffa4376c61f49ee6b81b"}

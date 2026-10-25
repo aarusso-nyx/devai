@@ -1,0 +1,11 @@
+{
+  "status": "BOUNDED_IMPLEMENTATION_AMENDMENT_FOR_INDEPENDENT_VERIFICATION",
+  "parent": "admission-primitive-checkpoint.json",
+  "scope": "The two existing lower primitive source modules only; no caller, effect authority, action, policy or runtime activation added.",
+  "evidence": "Independent actual compiled child tests reproduced an errcode getter escaping native error sanitization and an ordinary rejected Promise causing an unhandled rejection after synchronous CALLBACK_INVALID refusal. Original RED and pre-fix source/output receipts remain preserved in authoring/b1-admission-inspector.",
+  "native_error_projection": "Only an own data-property errcode on a non-Proxy object/function is read. Only numeric5/6 produce BUSY; all other native thrown values yield UNAVAILABLE. No getter, inherited errcode, raw message, cause or serialization is used.",
+  "promise_result": "Every Promise result still fails CALLBACK_INVALID. An ordinary native Promise additionally receives a rejection sink through the captured intrinsic Promise.prototype.then. Before that call, descriptor-only traversal must prove constructor lookup resolves to the captured original Promise and its Symbol.species still uses the captured original built-in getter. The intrinsic built-in species getter is allowed; result-defined then methods, constructor accessors, custom species and Proxy traps are never invoked. The sink never emits or serializes the rejection value.",
+  "trust_limit": "Production callbacks are fixed trusted synchronous host code. Custom-constructor/species Promise results are unsupported contract violations: refusal does not guarantee drainage of their rejections. This primitive does not execute or isolate arbitrary hostile user callback programs. Tests of accessor refusal must not claim otherwise.",
+  "preserved": "Synchronous callback exceptions remain unchanged after normal lock cleanup. No callback effects are rolled back by this primitive. Existing witness, read-only seed, native lock, descriptor lifetime, SQL, missing-file, cleanup and indeterminate-custody requirements remain unchanged.",
+  "review": "Independent Inspector agreed the narrow intrinsic-only sink scope is coherent and will retain the actual ordinary rejected-Promise RED plus a clearly labelled already-handled custom-constructor accessor-refusal fixture."
+}

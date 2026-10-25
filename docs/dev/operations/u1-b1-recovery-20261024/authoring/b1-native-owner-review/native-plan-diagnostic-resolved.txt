@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/native-plan-diagnostic-resolved.txt","kind":"historical-transcript-custody-pointer","original_bytes":2901,"original_bytes_changed":false,"original_sha256":"7fbd0ea2e74b32fba566b90cb7f6953e9f11577055182bfa66c2ffa5a775cc63"}

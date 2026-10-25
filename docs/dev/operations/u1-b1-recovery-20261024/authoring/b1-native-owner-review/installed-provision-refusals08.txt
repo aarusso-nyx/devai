@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/installed-provision-refusals.py", line 21, in <module>
+    else:assert error['code'] in ['AUTHORITY_RECONCILIATION_INVOCATION_INVALID','AUTHORITY_DECLARATION_NOT_APPLICABLE','AUTHORITY_HUMAN_ROLE_DENIED'],(name,error)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ('missing-role', {'schemaVersion': '1.0.0', 'code': 'ACTION_INVOCATION_REFUSED', 'class': 'infrastructure', 'exit': 6, 'message': 'AUTHORITY_RECONCILIATION_INVOCATION_INVALID', 'remediation': 'Correct the invocation or satisfy the reported precondition, then retry.'})

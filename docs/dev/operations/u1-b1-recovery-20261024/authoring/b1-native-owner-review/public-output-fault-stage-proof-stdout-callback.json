@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "1.0.0",
+  "action_id": "evidence reconcile stage-proof",
+  "ok": false,
+  "error": {
+    "class": "infrastructure",
+    "code": "ACTION_INFRASTRUCTURE_FAILURE",
+    "context": {
+      "reconciliation": {
+        "approval_id": "24b3953e410a7654b1ecdbad8c03a512439a904d9ed90349b116d6685a761caf",
+        "completion_sha256": "662c54e2ef6088877e5300d9951691c6299c93615d08e08825638ae22b111bab",
+        "grants_authority": false,
+        "intent_sha256": "6d9e291a346b5562c8a10be1fcf361f5a9c478b6d67a88263e9bee9416e840e5",
+        "kind": "reconciliation-index-result",
+        "outcome": "indeterminate",
+        "outputs_manifest_sha256": "8ccbae0f77c1b28edbce79598b5efb07422e0d9c3abeb19363477cc3f3d1ee32",
+        "owned": [
+          {
+            "birthtime_ns": "1792904590748238914",
+            "dev": "16777233",
+            "ino": "1124982548",
+            "target": "worktree-host/devai/reconciliation/approvals/24b3953e410a7654b1ecdbad8c03a512439a904d9ed90349b116d6685a761caf/phase-03.json"
+          }
+        ],
+        "phase": "03",
+        "plan_sha256": "5d55b291ae2e31c578ec2c064bd83c8471cda1afbd197734c946f7fd87f61141"
+      }
+    },
+    "exit": 6,
+    "message": "Reconciliation delivery or finalization failed; inspect preserved native custody before retrying.",
+    "schemaVersion": "1.0.0"
+  }
+}

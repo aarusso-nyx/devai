@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-owner-record-inspector/independent-final.txt","kind":"historical-transcript-custody-pointer","original_bytes":276,"original_bytes_changed":false,"original_sha256":"01596a014eb281c17d32d7fa8b9e961c7f1e00e7bed1c56c920f7c2af9e14959"}

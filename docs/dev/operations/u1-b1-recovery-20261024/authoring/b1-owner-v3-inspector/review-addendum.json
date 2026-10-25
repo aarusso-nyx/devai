@@ -1,0 +1,105 @@
+{
+  "standing": "BOUNDED_V3_DESIGN_REVIEW_CLOCK_SOURCE_CLOSURE_AND_CONCRETE_SCHEMA_EFFECT_FREEZE_REQUIRED",
+  "reviewed_sha256": {
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/owner-protocol-v3.json": "ed7b6ff199ece13c841e457258468303f8d87ffc3d67b96cebaed0e42015030c",
+    "law/adr/ADR-EVI-0007-owner-approved-merge-reconciliation.md": "1bfaa9703fa5cd667de523c74a3d8f4b584b7c630290f1c2400a71a871a53bd4",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/owner-intake-inspector-review.json": "e6b3ca03a93f20f48af1d1c8d2f09b79413a7abc0fc18dbdc5451edfb42dd079",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/owner-intake-checkpoint.v2.json": "31ce036cce162838c173d1f11125b978a300f677d4ca9b7637122bd3c0ee56c0",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/admission-primitive-checkpoint.json": "2d7957218249db895228123dac4c33f71878ba2c895df02f91b40255d91ff73c",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/admission-callback-amendment.json": "f1bdfd732e11a9c0431e06e53a77eac5b3f996df758b75cbf78b275b6beb0eaf",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-admission-inspector/receipt.json": "0952e1aa22d462e23f771fad5ff8cc1a6dfe52ce600f92215dcc30537fb0b9b5",
+    "packages/authority/src/boundaries/reconciliation-admission-seed.ts": "d912846ddb518a132ed1e2484dfa56f23b8ff2c7a7bc25b2157fb379f25490fe",
+    "packages/authority/src/boundaries/host-reconciliation-admission.ts": "318c52a0f5de908e549e79ace095a4720acb190c7389e88a41a673fd2fa60a91"
+  },
+  "source_changes_by_inspector": false,
+  "historical_receipts_edited": false,
+  "accepted_direction": [
+    "No admission.lock or mutable mutex reaping. Native primitive alone owns SQLite anchor descriptors; trusted callback helpers must not reopen/close anchor. Fixed SQL and metadata-only in-lock checks align OI01/03/04.",
+    "Two independent confirmations resolve inode bootstrap: precursor plan explicitly has absent identities; issuer plan is generated only after actual precursor identities exist. No issuer/key/grant on first stage.",
+    "Exact issuer bytes are frozen privately before second READY and published create-only without replacement. Foreign/malformed/uncertain state remains held. Concurrency and crash handling still require actual final host tests.",
+    "Raw artifact-byte SHA256, JCS unsigned payload digest and domain-separated HMAC inputs are explicitly distinguished. Strict32-byte standard padded base64 and timing-safe MAC verification are coherent requirements.",
+    "Protected same-UID namespace is the explicit origin trust anchor; colocated MAC/key does not claim external authentication. No ordinary authority, role or opaque-handle bypass.",
+    "Installation HEAD/package/constitution/policy observations are immutable historical observations. Fresh approvals bind current exact inputs; renewal/retry cannot migrate original scope. Unsupported issuer protocols refuse; no auto-rotation.",
+    "Revision2 ten-cell intent_authority_matrix is retained in entirety; expired/revoked complete outputs settle metadata only, partial output cannot resume domain writes. Native SQL rollback cannot erase immutable domain intent truth.",
+    "56GREEN lower native receipt qualifies only exact lower primitive on stated environment; neither actual host resolver/adapter nor public workflow is accepted."
+  ],
+  "findings": [
+    {
+      "id": "V3-01",
+      "classification": "ACTUAL_PROTOCOL_SOURCE_CLAIM_MISMATCH_NOT_PROVEN_EXPIRY_EXPLOIT",
+      "severity": "schema-freeze-blocker",
+      "subject": "clock.units/sources/review_bounds",
+      "finding": "The specified floor(os.uptime()*1000) is labelled monotonic system-uptime milliseconds, but actual Node24.22.0 Darwin uv_uptime uses time(NULL)-KERN_BOOTTIME and returns whole seconds. Multiplication by1000 does not supply independent monotonic provenance or millisecond resolution. A300000ms monotonic-only review bound measured in truncated seconds can permit up to nearly1000ms more real elapsed time; wall grant bound does not repair review-only quantization. No wall-change/backwards exploit was executed or asserted.",
+      "primary_sources": [
+        {
+          "url": "https://github.com/nodejs/node/blob/v24.22.0/src/node_os.cc#L161-L170",
+          "supports": "GetUptime delegates to uv_uptime."
+        },
+        {
+          "url": "https://github.com/nodejs/node/blob/v24.22.0/deps/uv/src/unix/darwin.c#L165-L177",
+          "supports": "Darwin source uses time(NULL), KERN_BOOTTIME, whole-second subtraction."
+        },
+        {
+          "url": "https://github.com/nodejs/node/blob/v24.22.0/deps/uv/src/unix/darwin.c#L50-L58",
+          "supports": "Different uv_hrtime implementation uses mach_continuous_time; candidate only, not adopted by this review."
+        },
+        {
+          "url": "https://github.com/nodejs/node/blob/v24.22.0/deps/uv/src/unix/linux.c#L1576-L1591",
+          "supports": "Linux uptime comes from /proc/uptime or CLOCK_BOOTTIME with a seconds-only fallback; platform behavior differs."
+        }
+      ],
+      "actual_evidence": "clock-observation.json: actual Nodev24.22.0/libuv1.52.1 Darwin parent+child; wall elapsed127ms while uptime_ms unchanged. No system clock, boot or suspend mutated.",
+      "required_resolution": "Freeze actual qualified monotonic source, common boot/host epoch and resolution/rounding/suspend/clock-adjustment semantics for grants and review handles. Keep wall bounds independently. Either replace uptime with a qualified monotonic observation or explicitly establish required guarantees/uncertainty and conservative lifetime treatment. Do not label os.uptime as proved monotonic merely because local samples agree."
+    }
+  ],
+  "next_concrete_freeze_blockers": [
+    {
+      "id": "SF-01",
+      "requirement": "Close V3-01; specify exact boot UUID wire normalization (observed Darwin sysctl uppercase), fixed executable/args and bounded safe failure. Freeze integer/decimal/range/expiry inequalities, predecessor/boot comparisons, and the complete expiry/reboot/renew/revoke/settlement transition table. Test actual cross-process observations and deterministic boundary/error cases."
+    },
+    {
+      "id": "SF-02",
+      "requirement": "Freeze exact closed variants/field lists for issuer, approval, renewal, revocation, lease, phase-intent, phase-completion and safe projections; exact sequence/predecessor/phase/effect-output bounds, immutable scope and canonical namespace identity encoding. Preserve every retained intent-matrix cell. Define an acyclic digest dependency graph: if legacy issuer provision_plan_sha256 survives, it must not hash the same final plan that already binds that issuer file hash; name its pre-byte/seed-plan meaning explicitly."
+    },
+    {
+      "id": "SF-03",
+      "requirement": "Freeze bounded raw UTF8 ingest and descriptor-safe copies, exact JCS implementation, canonical signed file+LF equality or strict duplicate-key parsing BEFORE permissive JSON.parse loses duplicate provenance; lone surrogate/numeric-lexeme/key ordering limits; exact domain and key validation. Ordinary JSON.parse plus post-schema validation alone cannot discharge duplicate-key refusal. No same-byte raw-vs-payload digest substitution."
+    },
+    {
+      "id": "EF-01",
+      "requirement": "Freeze typed child-effect inventory and consumer/source census for both bootstrap stages and every metadata transition: private0700 dirs, seed publication/readback, writable SQLite lock acquisition/closed SQL/rollback/close, exact issuer/grant/intent/completion/lease publish, exact quarantine removal and indeterminate custody. No raw anchor descriptor read/close anywhere in live connection callbacks; no native lock from no-write/preconfirmation paths. Register exact capability/handle dispatch only with actual adapter, role/action/argv/consent/policy witnesses."
+    },
+    {
+      "id": "EF-02",
+      "requirement": "Freeze five-mode original-argv/output matrix plus separate Architect provisioning grammar, three actual TTY streams, exact confirmation/handle expiry, cancellation/drift/indeterminate outcomes and safe private projections. Preserve original action initiation and unchanged generic effect ledger. Stage2 retries must distinguish exact reviewed issuer bytes, already-observed complete issuer, competing different issuer, owned staged uncertainty and foreign remnants; no different-byte winner may satisfy a stale READY plan."
+    },
+    {
+      "id": "QF-01",
+      "requirement": "After concrete contracts and authentic RED, qualify final host adapter on actual supported filesystem/direct+linked worktree/installed Node: callback composition with no raw anchor closes, contention/SIGKILL, no sidecars,2stage crash/retry, namespace/issuer substitution, MAC/parser secrecy, all intent/expiry/renew/revoke/recover schedules. Native56GREEN is prerequisite only. Then actual real-index/staged inventory/public installed workflow and existing protected release gates remain separate."
+    }
+  ],
+  "not_design_contradictions": [
+    "The two-stage precursor leaves inert seed after cancellation; this is explicitly reviewed scope, not a claim of zero filesystem effects after first confirmation.",
+    "Immutable installation bindings can coexist with new current-binding approvals; supported-protocol verification and explicit scope matching are implementation obligations, not automatic migration.",
+    "JCS signing and raw whole-file reference digests are coherent because their byte domains are named separately. Exact field/parser implementation remains pending.",
+    "Retained issuer provision_plan_sha256 could create a hash cycle only if mapped to the same issuer-byte-bound final plan. V3 has not frozen these fields, so this is a schema-freeze hazard, not an asserted existing contradiction."
+  ],
+  "primary_standards": [
+    {
+      "url": "https://www.sqlite.org/howtocorrupt.html#posix_advisory_locks_canceled_by_a_separate_thread_doing_close",
+      "supports": "Separate close of same DB file can cancel process advisory locks; future helper composition must preserve descriptor lifetime."
+    },
+    {
+      "url": "https://www.rfc-editor.org/rfc/rfc8785#section-3.1",
+      "supports": "JCS input constraints include no duplicate object property names and IEEE754-compatible numeric values."
+    }
+  ],
+  "bounds": "Design review only. No schema/action/effect/native runtime implementation, no source acceptance, no installed adapter acceptance, no release or downstream effects.",
+  "graft": {
+    "calls_this_review": 1,
+    "tokens_saved_this_review_estimate": 50946,
+    "cumulative_calls": 7,
+    "cumulative_tokens_saved_estimate": 119658
+  },
+  "clock_observation_sha256": "71cc41177669db503950cc8cc6d8471ea0b0f783a4bd7929e2e65a66acce5858"
+}

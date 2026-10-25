@@ -1,0 +1,18 @@
+{
+  "amendment_sha256": "398e48045200fab3c0b49186184299987dd171687fb9c81d93c2d0cceab2993c",
+  "standing": "BOUNDED_POLICY_VOCABULARY_REVIEWED_FOR_INDEPENDENT_TESTS_NOT_PUBLIC_AUTHORITY",
+  "actual_preimplementation_pipeline_red": {
+    "failed": 30,
+    "passed": 22,
+    "raw_sha256": "dbd31701dd1cf75c1d168fdc9db50ca0e9ada5746054baee133960a657efe9f9",
+    "scope": "Authentic resolution denies typed query; no fabricated resolution custody. Later tests added schema and matcher cases; this log is historical, not final source qualification."
+  },
+  "required_separation": [
+    "policy-only matcher accepts exact closed selector vocabulary",
+    "bounded selector matcher continues refusing all typed targets",
+    "no default materialized rule or registry permission grant",
+    "snapshot value retained independently before consuming receipt",
+    "actual policy/declaration/issuer pipeline required for positive dispatch"
+  ],
+  "test_design": "Deterministic trusted logical adapter observes exact target; no host native or public action authority claim."
+}

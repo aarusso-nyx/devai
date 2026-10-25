@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-admission-inspector/error-census-red.txt","kind":"historical-transcript-custody-pointer","original_bytes":19246,"original_bytes_changed":false,"original_sha256":"13e334aa5969310b7ec5b24d6043d6d37778947c70d3a7dc63ee9bcf713b432f"}

@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/public-reconciliation-output-fault-first.txt","kind":"historical-transcript-custody-pointer","original_bytes":1538,"original_bytes_changed":false,"original_sha256":"a617e51364348cfe27a71bc700b3774df6ac92dec5cf07ee9d2131d8c70e5663"}

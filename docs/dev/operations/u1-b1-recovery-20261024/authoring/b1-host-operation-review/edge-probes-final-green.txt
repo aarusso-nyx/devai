@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-host-operation-review/edge-probes-final-green.txt","kind":"historical-transcript-custody-pointer","original_bytes":634,"original_bytes_changed":false,"original_sha256":"fbdc7ba843d4d6fe43cbef22d04e15730d2f241c9e281568b5124d9254d96f44"}

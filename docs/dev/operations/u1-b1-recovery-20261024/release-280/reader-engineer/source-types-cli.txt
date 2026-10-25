@@ -1,0 +1,5 @@
+ WARN  Issue while reading "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/.npmrc". Failed to replace env in config: ${NODE_AUTH_TOKEN}
+ WARN  Issue while reading "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/.npmrc". Failed to replace env in config: ${NODE_AUTH_TOKEN}
+packages/cli/src/commands/sense/inventory-inputs.ts(1,15): error TS2305: Module '"@devai-nyx/sensors"' has no exported member 'InventorySourceReader'.
+packages/cli/src/commands/sense/shared.ts(1,15): error TS2305: Module '"@devai-nyx/sensors"' has no exported member 'InventorySourceReader'.
+packages/cli/src/commands/sense/shared.ts(372,49): error TS7006: Parameter 'entry' implicitly has an 'any' type.

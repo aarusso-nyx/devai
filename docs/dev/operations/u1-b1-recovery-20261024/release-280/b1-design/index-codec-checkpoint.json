@@ -1,0 +1,47 @@
+{
+  "status": "ARCHITECT_PURE_CODEC_INTERFACE_FOR_INDEPENDENT_RED",
+  "reference": "index-boundary-checkpoint.json",
+  "runtime_path": "packages/authority/src/boundaries/proof-index-codec.ts",
+  "test_path": "packages/authority/tests/unit/proof-index-codec.test.ts",
+  "exports": {
+    "parseProofIndex": "(bytes: Uint8Array, objectFormat: 'sha1' | 'sha256') => ProofIndexSnapshot",
+    "planProofIndexUpdate": "(bytes: Uint8Array, objectFormat: 'sha1' | 'sha256', replacement: { path: 'record/proofs/chain.json'; mode: '100644' | '100755'; oid: string }) => ProofIndexUpdate"
+  },
+  "snapshot_fields": {
+    "version": "2",
+    "object_format": "sha1 | sha256",
+    "raw_sha256": "SHA256 of exact complete supplied index bytes",
+    "semantic_sha256": "SHA256 of canonical JSON of ordered entries, including path, mode, oid, stage and assume_valid; excludes stat cache and name-length encoding",
+    "other_entries_sha256": "Same digest over entries excluding only record/proofs/chain.json",
+    "entries": "Immutable ordered array of closed {path,mode,oid,stage,assume_valid} entries",
+    "has_tree_extension": "boolean"
+  },
+  "update_fields": {
+    "before": "Verified parsed original snapshot",
+    "after": "Verified parsed planned result snapshot",
+    "bytes_base64": "Exact complete planned checksummed index bytes as immutable base64 string; no mutable retained Buffer aliases",
+    "proof_path": "record/proofs/chain.json",
+    "blob_oid": "Exact supplied and validated replacement object identity",
+    "mode": "Exact supplied regular-file mode"
+  },
+  "rules": [
+    "Pure byte operations only: no filesystem, process, authority grant or actual index/object mutation.",
+    "Validate DIRC version2, object-format-specific trailer checksum, complete entry count, supported flags, exact NUL/padding, UTF8 canonical relative paths and byte-order sorting. Refuse malformed/truncated/duplicate/mixed stage0+unmerged entries and unknown extensions/versions.",
+    "Support legal other-entry modes 100644,100755,120000,160000 and preserve them exactly; accepting a symlink/gitlink entry in this byte codec grants no source-reader or target-path admission. Refuse sparse-directory representation and extended flags.",
+    "Validate TREE extension framing and cache-tree node structure, then invalidate that optional cache on replacement. No unknown extension is dropped silently.",
+    "Replace only proof-path stages1/2/3 or its existing stage0 with one stage0 entry; refuse an absent proof entry. New proof entry has zero stat cache and false assume_valid; validate regular mode and exact object-format OID.",
+    "Every non-proof entry's original raw bytes and semantic identity remain unchanged. Recompute the complete checksum; independently reparse the planned result and compare all other entries.",
+    "Deep-freeze reports/entry arrays. Caller mutation of supplied bytes after return cannot alter the report or planned output.",
+    "Canonical JSON sorts object keys by UTF8 byte order, preserves array order and uses compact UTF8 JSON encoding. Git entry ordering uses raw UTF8 path bytes then stage.",
+    "Errors use PROOF_INDEX_FORMAT_UNSUPPORTED for unsupported but recognizable representations and PROOF_INDEX_INVALID for malformed input; invalid replacement or forbidden proof path uses PROOF_INDEX_REPLACEMENT_REFUSED.",
+    "This codec never establishes Owner approval, trusted host identity, a live lock, CAS eligibility, publication durability or readiness. Actual index adapter remains separately required."
+  ],
+  "required_tests": [
+    "Actual Git-created regular and linked-worktree unresolved two-path indices; both SHA1 and SHA256 repositories.",
+    "One proof entry resolution preserves every other staged/unmerged entry, mode, flag, stat-cache bytes and blob; Git independently reads the planned index in a disposable fixture.",
+    "Valid TREE and no-extension cases, variable name lengths and saturated name-length flags.",
+    "Wrong checksum/header/count/truncation/NUL/padding/path/order/stage/flags/mode and unknown extension/version refuse.",
+    "Wrong proof path, wrong-length/nonhex object identity, absent proof entry and nonregular replacement refuse.",
+    "No filesystem change while parsing/planning, immutable outputs and no buffer alias."
+  ]
+}

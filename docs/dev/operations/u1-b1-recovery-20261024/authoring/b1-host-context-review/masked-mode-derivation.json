@@ -1,0 +1,133 @@
+{
+  "checkpoint_sha256": "9fe2c38674fd4fcdf5e0f314d536eeb13c7299d1122f3352a70b825ded4b54f5",
+  "mode_rule": "stat.mode &07777 decimal; file type independently checked",
+  "source_evidence_sha256": "987068dcb4bc3ad38c759ef9c9c41fe0cdaa51e39f830b47c674a136e5ec2a26",
+  "direct_before": {
+    "projection": {
+      "repository_id": "fixture-repository",
+      "repository_root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-context-review-rlONTu/direct espa\u00e7o?#",
+      "git_dir": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-context-review-rlONTu/direct espa\u00e7o?#/.git",
+      "common_dir": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-context-review-rlONTu/direct espa\u00e7o?#/.git",
+      "root_identity": {
+        "dev": "16777233",
+        "ino": "1118711417",
+        "birthtime_ns": "1792871016076374043",
+        "uid": "501",
+        "mode": "493"
+      },
+      "git_dir_identity": {
+        "dev": "16777233",
+        "ino": "1118711418",
+        "birthtime_ns": "1792871016088820292",
+        "uid": "501",
+        "mode": "493"
+      },
+      "common_dir_identity": {
+        "dev": "16777233",
+        "ino": "1118711418",
+        "birthtime_ns": "1792871016088820292",
+        "uid": "501",
+        "mode": "493"
+      },
+      "git_entry_identity": {
+        "dev": "16777233",
+        "ino": "1118711418",
+        "birthtime_ns": "1792871016088820292",
+        "uid": "501",
+        "mode": "493"
+      },
+      "git_entry_sha256": null
+    },
+    "worktree_id": "wt-eec0ce8c9611dde5f3910169a8ab353c06298a19e80ae9ec",
+    "host_identity_sha256": "f936550278f9304fbb816f0348f5e9f724e0e13e1c8ee630aafbfef414aaa0e6"
+  },
+  "linked": {
+    "projection": {
+      "repository_id": "fixture-repository",
+      "repository_root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-context-review-rlONTu/linked espa\u00e7o?#",
+      "git_dir": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-context-review-rlONTu/direct espa\u00e7o?#/.git/worktrees/linked-espa\u00e7o-#",
+      "common_dir": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-context-review-rlONTu/direct espa\u00e7o?#/.git",
+      "root_identity": {
+        "dev": "16777233",
+        "ino": "1118711487",
+        "birthtime_ns": "1792871016154399093",
+        "uid": "501",
+        "mode": "493"
+      },
+      "git_dir_identity": {
+        "dev": "16777233",
+        "ino": "1118711484",
+        "birthtime_ns": "1792871016153989705",
+        "uid": "501",
+        "mode": "493"
+      },
+      "common_dir_identity": {
+        "dev": "16777233",
+        "ino": "1118711418",
+        "birthtime_ns": "1792871016088820292",
+        "uid": "501",
+        "mode": "493"
+      },
+      "git_entry_identity": {
+        "dev": "16777233",
+        "ino": "1118711489",
+        "birthtime_ns": "1792871016154574306",
+        "uid": "501",
+        "mode": "420",
+        "size_bytes": "147",
+        "mtime_ns": "1792871016154621057",
+        "ctime_ns": "1792871016154621057"
+      },
+      "git_entry_sha256": "1c1512dbd30c71708ce014ab115de69c71a5744ae9b5c6e67e91c6227788b16c"
+    },
+    "worktree_id": "wt-0c7877f660dde3d5447e20980bba8d5d112a714d949c1614",
+    "host_identity_sha256": "e6ca1082132178dd23aaf1d406220ea41e041bc487a0871a775a9498103efc9b"
+  },
+  "direct_after": {
+    "projection": {
+      "repository_id": "fixture-repository",
+      "repository_root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-context-review-rlONTu/direct espa\u00e7o?#",
+      "git_dir": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-context-review-rlONTu/direct espa\u00e7o?#/.git",
+      "common_dir": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-context-review-rlONTu/direct espa\u00e7o?#/.git",
+      "root_identity": {
+        "dev": "16777233",
+        "ino": "1118711417",
+        "birthtime_ns": "1792871016076374043",
+        "uid": "501",
+        "mode": "493"
+      },
+      "git_dir_identity": {
+        "dev": "16777233",
+        "ino": "1118711418",
+        "birthtime_ns": "1792871016088820292",
+        "uid": "501",
+        "mode": "493"
+      },
+      "common_dir_identity": {
+        "dev": "16777233",
+        "ino": "1118711418",
+        "birthtime_ns": "1792871016088820292",
+        "uid": "501",
+        "mode": "493"
+      },
+      "git_entry_identity": {
+        "dev": "16777233",
+        "ino": "1118711418",
+        "birthtime_ns": "1792871016088820292",
+        "uid": "501",
+        "mode": "493"
+      },
+      "git_entry_sha256": null
+    },
+    "worktree_id": "wt-eec0ce8c9611dde5f3910169a8ab353c06298a19e80ae9ec",
+    "host_identity_sha256": "f936550278f9304fbb816f0348f5e9f724e0e13e1c8ee630aafbfef414aaa0e6"
+  },
+  "checks": {
+    "directory_mode493": true,
+    "pointer_mode420": true,
+    "head_change_persistent_worktree_identity_stable": true,
+    "head_change_persistent_host_identity_stable": true,
+    "direct_linked_worktree_ids_distinct": true
+  },
+  "scope": "Exact current masked-mode formula independently recomputed from captured actual bigint stat fields. Original full-mode observation retained as historical alternative, not normative acceptance."
+}

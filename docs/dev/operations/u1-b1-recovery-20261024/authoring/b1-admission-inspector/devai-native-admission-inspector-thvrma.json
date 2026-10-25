@@ -1,0 +1,583 @@
+{
+  "external_fixture": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma",
+  "worker_sha256": "70229f155e4f3439c02507271a77fe0ea7defed84924a8da2113dcd0480147c3",
+  "child_receipts": [
+    {
+      "mode": "seed",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-e975b7ed110b98",
+      "variant": "",
+      "pid": 79111,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"size\":8192,\"sha\":\"3f6b742405bb199a11ed0952c9aa049285ef25dc69954e901d2e987cd15c4372\",\"copy\":true,\"hash\":\"3f6b742405bb199a11ed0952c9aa049285ef25dc69954e901d2e987cd15c4372\"}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "inspect-no-native",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/question?#-805a5172ea48f8",
+      "variant": "",
+      "pid": 79112,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"sql\":0,\"mutations\":0,\"witness\":{\"schemaVersion\":\"1.0.0\",\"kind\":\"reconciliation-admission-anchor\",\"root\":\"/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/question?#-805a5172ea48f8\",\"root_identity\":{\"dev\":\"16777233\",\"ino\":\"1117802857\",\"birthtime_ns\":\"1792868014778188111\",\"uid\":\"501\",\"mode\":\"0700\"},\"seed_identity\":{\"dev\":\"16777233\",\"ino\":\"1117802858\",\"birthtime_ns\":\"1792868014778398492\",\"uid\":\"501\",\"mode\":\"0600\",\"size_bytes\":8192,\"mtime_ns\":\"1792868014778471161\",\"ctime_ns\":\"1792868014778471161\"},\"seed_sha256\":\"3f6b742405bb199a11ed0952c9aa049285ef25dc69954e901d2e987cd15c4372\"}}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "basic",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/question?#-805a5172ea48f8",
+      "variant": "",
+      "pid": 79113,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"witness\":{\"schemaVersion\":\"1.0.0\",\"kind\":\"reconciliation-admission-anchor\",\"root\":\"/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/question?#-805a5172ea48f8\",\"root_identity\":{\"dev\":\"16777233\",\"ino\":\"1117802857\",\"birthtime_ns\":\"1792868014778188111\",\"uid\":\"501\",\"mode\":\"0700\"},\"seed_identity\":{\"dev\":\"16777233\",\"ino\":\"1117802858\",\"birthtime_ns\":\"1792868014778398492\",\"uid\":\"501\",\"mode\":\"0600\",\"size_bytes\":8192,\"mtime_ns\":\"1792868014778471161\",\"ctime_ns\":\"1792868014778471161\"},\"seed_sha256\":\"3f6b742405bb199a11ed0952c9aa049285ef25dc69954e901d2e987cd15c4372\"},\"frozen\":true,\"value\":{\"opaque\":\"callback-result\"},\"unchanged\":true,\"inodeSame\":true,\"entries\":[\"admission.sqlite\"]}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "expected",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-fc2e7438b1be08",
+      "variant": "unknown",
+      "pid": 79114,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"message\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_ANCHOR_INVALID\\n    at invalid (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:46:11)\\n    at witness (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:136:9)\\n    at Module.withReconciliationAdmissionSteps (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:319:29)\\n    at invoke (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:18:44)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:44:43\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:44:31\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"},\"touches\":0,\"callbacks\":0}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "expected",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-f0a58da47b8c88",
+      "variant": "getter",
+      "pid": 79132,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"message\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_ANCHOR_INVALID\\n    at invalid (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:46:11)\\n    at witness (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:136:9)\\n    at Module.withReconciliationAdmissionSteps (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:319:29)\\n    at invoke (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:18:44)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:44:43\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:44:31\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"},\"touches\":0,\"callbacks\":0}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "expected",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-64e4b049c60fa8",
+      "variant": "proxy",
+      "pid": 79134,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"message\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_ANCHOR_INVALID\\n    at invalid (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:46:11)\\n    at witness (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:136:9)\\n    at Module.withReconciliationAdmissionSteps (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:319:29)\\n    at invoke (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:18:44)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:44:43\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:44:31\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"},\"touches\":0,\"callbacks\":0}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "expected",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-1e12d75c7c324",
+      "variant": "nested-getter",
+      "pid": 79144,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"message\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_ANCHOR_INVALID\\n    at invalid (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:46:11)\\n    at witness (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:147:9)\\n    at Module.withReconciliationAdmissionSteps (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:319:29)\\n    at invoke (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:18:44)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:44:43\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:44:31\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"},\"touches\":0,\"callbacks\":0}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "expected",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-a9f7740752e8e8",
+      "variant": "nested-proxy",
+      "pid": 79145,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"message\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_ANCHOR_INVALID\\n    at invalid (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:46:11)\\n    at witness (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:147:9)\\n    at Module.withReconciliationAdmissionSteps (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:319:29)\\n    at invoke (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:18:44)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:44:43\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:44:31\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"},\"touches\":0,\"callbacks\":0}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "expected",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-68775bbf254678",
+      "variant": "symbol",
+      "pid": 79146,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"message\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_ANCHOR_INVALID\\n    at invalid (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:46:11)\\n    at witness (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:136:9)\\n    at Module.withReconciliationAdmissionSteps (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:319:29)\\n    at invoke (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:18:44)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:44:43\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:44:31\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"},\"touches\":0,\"callbacks\":0}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "expected",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-2293867ac34208",
+      "variant": "nonenumerable",
+      "pid": 79147,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"message\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_ANCHOR_INVALID\\n    at invalid (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:46:11)\\n    at witness (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:136:9)\\n    at Module.withReconciliationAdmissionSteps (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:319:29)\\n    at invoke (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:18:44)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:44:43\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:44:31\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"},\"touches\":0,\"callbacks\":0}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "expected",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-8857812fbc103",
+      "variant": "decimal",
+      "pid": 79148,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"message\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_ANCHOR_INVALID\\n    at invalid (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:46:11)\\n    at witness (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:147:9)\\n    at Module.withReconciliationAdmissionSteps (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:319:29)\\n    at invoke (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:18:44)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:44:43\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:44:31\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"},\"touches\":0,\"callbacks\":0}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "expected",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-bf1cdb7b341e2",
+      "variant": "mode",
+      "pid": 79149,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"message\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_ANCHOR_INVALID\\n    at invalid (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:46:11)\\n    at witness (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:147:9)\\n    at Module.withReconciliationAdmissionSteps (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:319:29)\\n    at invoke (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:18:44)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:44:43\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:44:31\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"},\"touches\":0,\"callbacks\":0}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "expected",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-349eff83480538",
+      "variant": "stale",
+      "pid": 79150,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_STALE\",\"message\":\"RECONCILIATION_ADMISSION_STALE\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_STALE\\n    at stale (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:49:11)\\n    at Module.withReconciliationAdmissionSteps (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:322:9)\\n    at invoke (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:18:44)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:44:43\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:44:31\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"},\"touches\":0,\"callbacks\":0}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "callback",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-a353fe51a33ec8",
+      "variant": "async",
+      "pid": 79151,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_CALLBACK_INVALID\",\"message\":\"RECONCILIATION_ADMISSION_CALLBACK_INVALID\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_CALLBACK_INVALID\\n    at Module.withReconciliationAdmissionSteps (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:318:15)\\n    at invoke (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:18:44)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:60:27\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:60:15\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"},\"touches\":0,\"callbacks\":0,\"next\":{\"value\":7}}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "callback",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-753ce45c74817",
+      "variant": "generator",
+      "pid": 79152,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_CALLBACK_INVALID\",\"message\":\"RECONCILIATION_ADMISSION_CALLBACK_INVALID\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_CALLBACK_INVALID\\n    at Module.withReconciliationAdmissionSteps (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:318:15)\\n    at invoke (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:18:44)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:60:27\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:60:15\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"},\"touches\":0,\"callbacks\":0,\"next\":{\"value\":7}}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "callback",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-ff46adc00e221",
+      "variant": "async-generator",
+      "pid": 79153,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_CALLBACK_INVALID\",\"message\":\"RECONCILIATION_ADMISSION_CALLBACK_INVALID\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_CALLBACK_INVALID\\n    at Module.withReconciliationAdmissionSteps (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:318:15)\\n    at invoke (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:18:44)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:60:27\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:60:15\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"},\"touches\":0,\"callbacks\":0,\"next\":{\"value\":7}}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "callback",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-15e5af3f3f474",
+      "variant": "proxy",
+      "pid": 79163,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_CALLBACK_INVALID\",\"message\":\"RECONCILIATION_ADMISSION_CALLBACK_INVALID\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_CALLBACK_INVALID\\n    at Module.withReconciliationAdmissionSteps (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:318:15)\\n    at invoke (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:18:44)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:60:27\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:60:15\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"},\"touches\":0,\"callbacks\":0,\"next\":{\"value\":7}}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "callback",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-8db22426c3ece",
+      "variant": "nonfunction",
+      "pid": 79164,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_CALLBACK_INVALID\",\"message\":\"RECONCILIATION_ADMISSION_CALLBACK_INVALID\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_CALLBACK_INVALID\\n    at Module.withReconciliationAdmissionSteps (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:318:15)\\n    at invoke (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:18:44)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:60:27\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:60:15\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"},\"touches\":0,\"callbacks\":0,\"next\":{\"value\":7}}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "callback",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-849af6d14e57f",
+      "variant": "promise",
+      "pid": 79165,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_CALLBACK_INVALID\",\"message\":\"RECONCILIATION_ADMISSION_CALLBACK_INVALID\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_CALLBACK_INVALID\\n    at Module.withReconciliationAdmissionSteps (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:348:19)\\n    at invoke (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:18:44)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:60:27\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:60:15\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"},\"touches\":0,\"callbacks\":1,\"next\":{\"value\":7}}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "callback",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-d87605a2bda7c",
+      "variant": "rejected-promise",
+      "pid": 79166,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_CALLBACK_INVALID\",\"message\":\"RECONCILIATION_ADMISSION_CALLBACK_INVALID\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_CALLBACK_INVALID\\n    at Module.withReconciliationAdmissionSteps (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:348:19)\\n    at invoke (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:18:44)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:60:27\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:60:15\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"},\"touches\":0,\"callbacks\":1,\"next\":{\"value\":7}}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "callback",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-23ecccec075ad8",
+      "variant": "promise-constructor-getter",
+      "pid": 79167,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_CALLBACK_INVALID\",\"message\":\"RECONCILIATION_ADMISSION_CALLBACK_INVALID\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_CALLBACK_INVALID\\n    at Module.withReconciliationAdmissionSteps (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:348:19)\\n    at invoke (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:18:44)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:60:27\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:60:15\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"},\"touches\":0,\"callbacks\":1,\"next\":{\"value\":7}}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "callback",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-058ddc001a0bc",
+      "variant": "promise-species-getter",
+      "pid": 79168,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_CALLBACK_INVALID\",\"message\":\"RECONCILIATION_ADMISSION_CALLBACK_INVALID\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_CALLBACK_INVALID\\n    at Module.withReconciliationAdmissionSteps (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:348:19)\\n    at invoke (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:18:44)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:60:27\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:60:15\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"},\"touches\":0,\"callbacks\":1,\"next\":{\"value\":7}}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "callback",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-c54a108f86b9d8",
+      "variant": "thenable",
+      "pid": 79169,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_CALLBACK_INVALID\",\"message\":\"RECONCILIATION_ADMISSION_CALLBACK_INVALID\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_CALLBACK_INVALID\\n    at Module.withReconciliationAdmissionSteps (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:348:19)\\n    at invoke (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:18:44)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:60:27\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:60:15\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"},\"touches\":0,\"callbacks\":1,\"next\":{\"value\":7}}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "callback",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-40ca5412066af8",
+      "variant": "result-proxy",
+      "pid": 79170,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_CALLBACK_INVALID\",\"message\":\"RECONCILIATION_ADMISSION_CALLBACK_INVALID\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_CALLBACK_INVALID\\n    at Module.withReconciliationAdmissionSteps (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:348:19)\\n    at invoke (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:18:44)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:60:27\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:60:15\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"},\"touches\":0,\"callbacks\":1,\"next\":{\"value\":7}}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "ordinary-error",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-405ea8d3c2a9b",
+      "variant": "",
+      "pid": 79172,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"same\":true,\"next\":7,\"entries\":[\"admission.sqlite\"]}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "reentrant",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-d9f296794aa718",
+      "variant": "",
+      "pid": 79182,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"nested\":{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_REENTRANT\",\"message\":\"RECONCILIATION_ADMISSION_REENTRANT\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_REENTRANT\\n    at Module.readReconciliationAdmissionAnchor (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:178:19)\\n    at inspect (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:17:33)\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:72:14\\n    at Module.withReconciliationAdmissionSteps (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:346:18)\\n    at invoke (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:18:44)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:69:2\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"}},\"alias\":{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"message\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_ANCHOR_INVALID\\n    at invalid (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:46:11)\\n    at Module.readReconciliationAdmissionAnchor (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:172:13)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:72:59\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:72:37\\n    at Module.withReconciliationAdmissionSteps (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:346:18)\\n    at invoke (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:18:44)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:69:2\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\"}},\"opens\":0,\"closes\":0,\"foreign\":{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_BUSY\",\"message\":\"RECONCILIATION_ADMISSION_BUSY\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_BUSY\\n    at nativeFailure (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:237:11)\\n    at Module.withReconciliationAdmissionSteps (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:343:13)\\n    at invoke (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:18:44)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:109:20\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:109:8\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"}},\"next\":8}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "fault",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-8620ab5c06115",
+      "variant": "begin",
+      "pid": 79184,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_UNAVAILABLE\",\"message\":\"RECONCILIATION_ADMISSION_UNAVAILABLE\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_UNAVAILABLE\\n    at nativeFailure (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:237:11)\\n    at Module.withReconciliationAdmissionSteps (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:343:13)\\n    at invoke (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:18:44)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:79:27\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:79:15\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"},\"next\":{\"value\":{\"schemaVersion\":\"1.0.0\",\"kind\":\"reconciliation-admission-anchor\",\"root\":\"/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-8620ab5c06115\",\"root_identity\":{\"dev\":\"16777233\",\"ino\":\"1117802909\",\"birthtime_ns\":\"1792868016099258156\",\"uid\":\"501\",\"mode\":\"0700\"},\"seed_identity\":{\"dev\":\"16777233\",\"ino\":\"1117802910\",\"birthtime_ns\":\"1792868016099467788\",\"uid\":\"501\",\"mode\":\"0600\",\"size_bytes\":8192,\"mtime_ns\":\"1792868016099542123\",\"ctime_ns\":\"1792868016099542123\"},\"seed_sha256\":\"3f6b742405bb199a11ed0952c9aa049285ef25dc69954e901d2e987cd15c4372\"}},\"sql\":[\"BEGIN IMMEDIATE\"]}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "fault",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-9a331f55bee89",
+      "variant": "rollback",
+      "pid": 79202,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_RELEASE_INDETERMINATE\",\"message\":\"RECONCILIATION_ADMISSION_RELEASE_INDETERMINATE\",\"stage\":\"rollback\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_RELEASE_INDETERMINATE\\n    at Module.withReconciliationAdmissionSteps (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:373:15)\\n    at invoke (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:18:44)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:79:27\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:79:15\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"},\"next\":{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_REENTRANT\",\"message\":\"RECONCILIATION_ADMISSION_REENTRANT\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_REENTRANT\\n    at Module.readReconciliationAdmissionAnchor (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:178:19)\\n    at inspect (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:17:33)\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:80:13\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"}},\"sql\":[\"BEGIN IMMEDIATE\",\"ROLLBACK\"]}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "fault",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-578cac973e2d6",
+      "variant": "close",
+      "pid": 79220,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_RELEASE_INDETERMINATE\",\"message\":\"RECONCILIATION_ADMISSION_RELEASE_INDETERMINATE\",\"stage\":\"close\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_RELEASE_INDETERMINATE\\n    at Module.withReconciliationAdmissionSteps (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:373:15)\\n    at invoke (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:18:44)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:79:27\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:79:15\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"},\"next\":{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_REENTRANT\",\"message\":\"RECONCILIATION_ADMISSION_REENTRANT\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_REENTRANT\\n    at Module.readReconciliationAdmissionAnchor (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:178:19)\\n    at inspect (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:17:33)\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:80:13\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"}},\"sql\":[\"BEGIN IMMEDIATE\",\"ROLLBACK\"]}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "sql",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-a4de1d662069d8",
+      "variant": "",
+      "pid": 79221,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"queries\":[\"BEGIN IMMEDIATE\",\"SELECT type,name,tbl_name,rootpage,sql FROM sqlite_schema ORDER BY name\",\"SELECT singleton,version FROM admission_protocol ORDER BY singleton\",\"SELECT type,name,tbl_name,rootpage,sql FROM sqlite_schema ORDER BY name\",\"SELECT singleton,version FROM admission_protocol ORDER BY singleton\",\"ROLLBACK\"],\"descriptorEffects\":[],\"hash\":\"3f6b742405bb199a11ed0952c9aa049285ef25dc69954e901d2e987cd15c4372\",\"entries\":[\"admission.sqlite\"]}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "increment",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-5f055bbbaac708",
+      "pid": 79223,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"ready\":true,\"pid\":79223}\n{\"value\":{\"before\":0,\"after\":1},\"busy\":0}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "increment",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-5f055bbbaac708",
+      "pid": 79222,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"ready\":true,\"pid\":79222}\n{\"value\":{\"before\":1,\"after\":2},\"busy\":1}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "probe",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-24b23f103c5508",
+      "variant": "",
+      "pid": 79225,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_BUSY\",\"message\":\"RECONCILIATION_ADMISSION_BUSY\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_BUSY\\n    at nativeFailure (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:237:11)\\n    at Module.withReconciliationAdmissionSteps (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:343:13)\\n    at invoke (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:18:44)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:109:20\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:109:8\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"}}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "holder",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-24b23f103c5508",
+      "pid": 79224,
+      "exit": null,
+      "signal": "SIGKILL",
+      "stdout": "{\"acquired\":true,\"pid\":79224}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "probe",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-24b23f103c5508",
+      "variant": "",
+      "pid": 79243,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"value\":{\"acquired\":true}}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "physical",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-8c83a076a42f18",
+      "variant": "",
+      "pid": 79253,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"message\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_ANCHOR_INVALID\\n    at invalid (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:46:11)\\n    at rootIdentity (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:61:9)\\n    at Module.readReconciliationAdmissionAnchor (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:173:26)\\n    at inspect (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:17:33)\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:23:8\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"}}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "physical",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-7347d5d1f9226",
+      "variant": "",
+      "pid": 79254,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"message\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_ANCHOR_INVALID\\n    at invalid (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:46:11)\\n    at seedIdentity (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:76:9)\\n    at Module.readReconciliationAdmissionAnchor (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:179:22)\\n    at inspect (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:17:33)\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:23:8\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"}}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "physical",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-a86b6c19b72e3",
+      "variant": "",
+      "pid": 79255,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"message\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_ANCHOR_INVALID\\n    at invalid (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:46:11)\\n    at seedIdentity (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:76:9)\\n    at Module.readReconciliationAdmissionAnchor (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:179:22)\\n    at inspect (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:17:33)\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:23:8\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"}}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "physical",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-b23b22d22fed48",
+      "variant": "",
+      "pid": 79256,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"message\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_ANCHOR_INVALID\\n    at invalid (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:46:11)\\n    at seedIdentity (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:76:9)\\n    at Module.readReconciliationAdmissionAnchor (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:179:22)\\n    at inspect (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:17:33)\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:23:8\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"}}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "physical",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-1f5be2790bf48",
+      "variant": "",
+      "pid": 79258,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"message\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_ANCHOR_INVALID\\n    at invalid (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:46:11)\\n    at Module.readReconciliationAdmissionAnchor (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:199:17)\\n    at inspect (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:17:33)\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:23:8\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"}}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "physical",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-4d9a3434638818",
+      "variant": "",
+      "pid": 79259,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"message\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_ANCHOR_INVALID\\n    at invalid (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:46:11)\\n    at Module.readReconciliationAdmissionAnchor (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:227:9)\\n    at inspect (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:17:33)\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:23:8\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"}}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "physical",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-76ec88485aeee8",
+      "variant": "",
+      "pid": 79260,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"message\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_ANCHOR_INVALID\\n    at invalid (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:46:11)\\n    at seedIdentity (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:76:9)\\n    at Module.readReconciliationAdmissionAnchor (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:179:22)\\n    at inspect (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:17:33)\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:23:8\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"}}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "physical",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-e3923678ec4368-link",
+      "variant": "",
+      "pid": 79261,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"message\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_ANCHOR_INVALID\\n    at invalid (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:46:11)\\n    at Module.readReconciliationAdmissionAnchor (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:172:13)\\n    at inspect (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:17:33)\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:23:8\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"}}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "physical",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-7e8aeb8bd91ad",
+      "variant": "",
+      "pid": 79262,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"message\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_ANCHOR_INVALID\\n    at invalid (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:46:11)\\n    at seedIdentity (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:76:9)\\n    at Module.readReconciliationAdmissionAnchor (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:179:22)\\n    at inspect (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:17:33)\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:23:8\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"}}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "physical",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-e1ea3af9e5533",
+      "variant": "",
+      "pid": 79272,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"message\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_ANCHOR_INVALID\\n    at invalid (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:46:11)\\n    at sidecarsAbsent (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:98:9)\\n    at Module.readReconciliationAdmissionAnchor (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:180:9)\\n    at inspect (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:17:33)\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:23:8\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"}}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "physical",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-1171ec6428c788",
+      "variant": "",
+      "pid": 79273,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"message\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_ANCHOR_INVALID\\n    at invalid (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:46:11)\\n    at sidecarsAbsent (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:98:9)\\n    at Module.readReconciliationAdmissionAnchor (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:180:9)\\n    at inspect (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:17:33)\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:23:8\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"}}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "physical",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-22d9e2c551b81",
+      "variant": "",
+      "pid": 79274,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"message\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_ANCHOR_INVALID\\n    at invalid (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:46:11)\\n    at sidecarsAbsent (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:98:9)\\n    at Module.readReconciliationAdmissionAnchor (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:180:9)\\n    at inspect (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:17:33)\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:23:8\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"}}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "physical",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-fe478b9bdf39c8",
+      "variant": "",
+      "pid": 79275,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"message\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_ANCHOR_INVALID\\n    at invalid (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:46:11)\\n    at sidecarsAbsent (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:98:9)\\n    at Module.readReconciliationAdmissionAnchor (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:180:9)\\n    at inspect (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:17:33)\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:23:8\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"}}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "physical",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-b5d92138241f38",
+      "variant": "",
+      "pid": 79276,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"message\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_ANCHOR_INVALID\\n    at invalid (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:46:11)\\n    at seedIdentity (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:76:9)\\n    at Module.readReconciliationAdmissionAnchor (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:179:22)\\n    at inspect (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:17:33)\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:23:8\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"}}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "raw-close-fault",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-fab69873711eb",
+      "variant": "",
+      "pid": 79277,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_RELEASE_INDETERMINATE\",\"message\":\"RECONCILIATION_ADMISSION_RELEASE_INDETERMINATE\",\"stage\":\"close\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_RELEASE_INDETERMINATE\\n    at Module.readReconciliationAdmissionAnchor (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:211:19)\\n    at inspect (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:17:33)\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:94:15\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"},\"next\":{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_REENTRANT\",\"message\":\"RECONCILIATION_ADMISSION_REENTRANT\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_REENTRANT\\n    at Module.readReconciliationAdmissionAnchor (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:178:19)\\n    at inspect (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:17:33)\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:94:89\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"}},\"calls\":1}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "missing-at-open",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-8d743d84374688",
+      "variant": "",
+      "pid": 79278,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_UNAVAILABLE\",\"message\":\"RECONCILIATION_ADMISSION_UNAVAILABLE\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_UNAVAILABLE\\n    at nativeFailure (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:237:11)\\n    at Module.withReconciliationAdmissionSteps (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:343:13)\\n    at invoke (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:18:44)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:98:27\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:98:15\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"},\"callbacks\":0,\"exists\":false,\"held\":true,\"entries\":[\"admission.sqlite.held-owned\"]}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "legitimate-child",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-b1079f74b6f7e8",
+      "variant": "",
+      "pid": 79279,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"result\":3,\"next\":4,\"entries\":[\"admission.sqlite\",\"ordinary-owned-child\"]}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "post-callback-drift",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-b84c99f91f4ed8",
+      "variant": "",
+      "pid": 79280,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_STALE\",\"message\":\"RECONCILIATION_ADMISSION_STALE\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_STALE\\n    at stale (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:49:11)\\n    at verifyLocked (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:250:9)\\n    at Module.withReconciliationAdmissionSteps (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:349:9)\\n    at invoke (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:18:44)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:103:51\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:103:39\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"},\"next\":{\"value\":5}}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "owner",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-1e510c2e341c5",
+      "variant": "",
+      "pid": 79281,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"message\":\"RECONCILIATION_ADMISSION_ANCHOR_INVALID\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_ANCHOR_INVALID\\n    at invalid (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:46:11)\\n    at rootIdentity (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:61:9)\\n    at Module.readReconciliationAdmissionAnchor (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:173:26)\\n    at inspect (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:17:33)\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:105:72\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"}}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "native-getter",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-2a77e4deec6458",
+      "variant": "",
+      "pid": 79282,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"error\":{\"code\":\"RECONCILIATION_ADMISSION_UNAVAILABLE\",\"message\":\"RECONCILIATION_ADMISSION_UNAVAILABLE\",\"cause\":false,\"diagnostic\":\"ReconciliationAdmissionError: RECONCILIATION_ADMISSION_UNAVAILABLE\\n    at nativeFailure (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:237:11)\\n    at Module.withReconciliationAdmissionSteps (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/host-reconciliation-admission.js:343:13)\\n    at invoke (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:18:44)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:91:27\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/worker.mjs:91:15\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"},\"touches\":0,\"next\":{\"value\":{\"schemaVersion\":\"1.0.0\",\"kind\":\"reconciliation-admission-anchor\",\"root\":\"/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-2a77e4deec6458\",\"root_identity\":{\"dev\":\"16777233\",\"ino\":\"1117802975\",\"birthtime_ns\":\"1792868017459092866\",\"uid\":\"501\",\"mode\":\"0700\"},\"seed_identity\":{\"dev\":\"16777233\",\"ino\":\"1117802976\",\"birthtime_ns\":\"1792868017459695050\",\"uid\":\"501\",\"mode\":\"0600\",\"size_bytes\":8192,\"mtime_ns\":\"1792868017459769261\",\"ctime_ns\":\"1792868017459769261\"},\"seed_sha256\":\"3f6b742405bb199a11ed0952c9aa049285ef25dc69954e901d2e987cd15c4372\"}}}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "throw-value",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-dbbeaf28709468",
+      "variant": "undefined",
+      "pid": 79309,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"caught\":true,\"same\":true,\"next\":6}\n",
+      "stderr": ""
+    },
+    {
+      "mode": "throw-value",
+      "root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-thvrma/anchor-a7dbe8e11d6cc",
+      "variant": "null",
+      "pid": 79328,
+      "exit": 0,
+      "signal": null,
+      "stdout": "{\"caught\":true,\"same\":true,\"next\":6}\n",
+      "stderr": ""
+    }
+  ],
+  "sources": {
+    "packages/authority/src/boundaries/reconciliation-admission-seed.ts": {
+      "source_sha256": "d912846ddb518a132ed1e2484dfa56f23b8ff2c7a7bc25b2157fb379f25490fe",
+      "output_sha256": "05f4ab80ab653a5d1488f6bfc621c9a105ffca99380a963040a841f517954c40"
+    },
+    "packages/authority/src/boundaries/host-reconciliation-admission.ts": {
+      "source_sha256": "318c52a0f5de908e549e79ace095a4720acb190c7389e88a41a673fd2fa60a91",
+      "output_sha256": "f5b0d69a6b05d94f3f2b56d0852d48c53a439a2f71b39de0755ffd7e6631cc6c"
+    }
+  }
+}

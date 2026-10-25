@@ -1,0 +1,63 @@
+{
+  "standing": "EXACT_NATIVE_DIAGNOSTIC_CONSUMER_CENSUS_GREEN",
+  "recorded_at": "2026-10-24T18:58:20.119957+00:00",
+  "result": {
+    "passed": 24,
+    "failed": 0,
+    "new_tests": 16,
+    "unchanged_reference_tests": 8,
+    "raw_log": "error-census-green.txt",
+    "duration_seconds": 6.86,
+    "command": "node scripts/process/validation-runner.mjs -- node_modules/.bin/vitest run --config tests/config/local.config.ts --maxWorkers 1 packages/cli/tests/unit/reconciliation-error-codes.test.ts packages/cli/tests/unit/error-code-reference.test.ts"
+  },
+  "checks": "New test ESLint/Prettier/diff PASS; no skips, timeout or assertion relaxations",
+  "red": {
+    "passed": 0,
+    "failed": 16,
+    "receipt_sha256": "19d435c21ed3f24b34e6153cb65eb1cfce0c734b9d1198dc7d68e955bfb38946",
+    "raw_sha256": "13e334aa5969310b7ec5b24d6043d6d37778947c70d3a7dc63ee9bcf713b432f",
+    "meaning": "Missing seven generated rows; actual leading code became fallback/infrastructure6; two missing scanner exclusions."
+  },
+  "bounded_source_change": "Only RECONCILIATION prefix added to existing mirrored sets and two seed metadata constants added to NOT_CODES. No command route, effect permission, native source or authority behavior added.",
+  "reference_delta": {
+    "before_rows": 1272,
+    "after_rows": 1279,
+    "added_rows": [
+      "| `RECONCILIATION_ADMISSION_ANCHOR_INVALID` | reconciliation admission anchor invalid | Stable diagnostic for reconciliation admission anchor invalid. | Follow the structured envelope remediation and retry only after its condition is satisfied. | per action: set by the surfacing envelope |",
+      "| `RECONCILIATION_ADMISSION_BUSY` | reconciliation admission busy | Stable diagnostic for reconciliation admission busy. | Follow the structured envelope remediation and retry only after its condition is satisfied. | per action: set by the surfacing envelope |",
+      "| `RECONCILIATION_ADMISSION_CALLBACK_INVALID` | reconciliation admission callback invalid | Stable diagnostic for reconciliation admission callback invalid. | Follow the structured envelope remediation and retry only after its condition is satisfied. | per action: set by the surfacing envelope |",
+      "| `RECONCILIATION_ADMISSION_REENTRANT` | reconciliation admission reentrant | Stable diagnostic for reconciliation admission reentrant. | Follow the structured envelope remediation and retry only after its condition is satisfied. | per action: set by the surfacing envelope |",
+      "| `RECONCILIATION_ADMISSION_RELEASE_INDETERMINATE` | reconciliation admission release indeterminate | Stable diagnostic for reconciliation admission release indeterminate. | Follow the structured envelope remediation and retry only after its condition is satisfied. | per action: set by the surfacing envelope |",
+      "| `RECONCILIATION_ADMISSION_STALE` | reconciliation admission stale | Stable diagnostic for reconciliation admission stale. | Follow the structured envelope remediation and retry only after its condition is satisfied. | per action: set by the surfacing envelope |",
+      "| `RECONCILIATION_ADMISSION_UNAVAILABLE` | reconciliation admission unavailable | Stable diagnostic for reconciliation admission unavailable. | Follow the structured envelope remediation and retry only after its condition is satisfied. | per action: set by the surfacing envelope |"
+    ],
+    "only_seven_rows_changed_byte_proof": "Removing exactly the seven native rows from final reference reconstructs complete pre-fix document SHA256 exactly.",
+    "reconstructed_before_sha256": "54d7d6053f2aa13a4e66686ff4d133e5d31a4779949850b1ecc9ece483b71370",
+    "seed_constants_excluded": [
+      "RECONCILIATION_ADMISSION_SEED_SHA256",
+      "RECONCILIATION_ADMISSION_SEED_SIZE"
+    ]
+  },
+  "actual_command_refusal": "Each exact bare code and CODE:safe detail is preserved with requested routing-authority/2 and remediation/context; the pre-fix fallback/infrastructure6 no longer occurs. This test supplies exit2 to check identity preservation, not a fixed universal native error exit classification.",
+  "sha256": {
+    "scripts/error-code-sources.mjs": "f33f4cf55f58f619fe1f64f7911d5a497fb4472c96c87b98a2ced5bd14018d42",
+    "packages/cli/src/error-code-prefixes.ts": "54d29efa5416fe087f969e901e0f74acbbf4604e953ac841f5d1a41881f97ffb",
+    "docs/reference/error-codes.md": "ef4e93b0ed44cffb42c07cf09c743152b3cae73cb3e8e7bfc5840e7e610f1f6d",
+    "packages/cli/tests/unit/reconciliation-error-codes.test.ts": "0da439cf541f019cb07ce795c133020bcfd88f5d38c86e97e4768a5ce1397ac3",
+    "packages/cli/tests/unit/error-code-reference.test.ts": "55135e318935a28fe1722fb099e14d90aded8e1e445ba5616844a726c22ceb0f"
+  },
+  "native_receipt_unchanged_sha256": "0952e1aa22d462e23f771fad5ff8cc1a6dfe52ce600f92215dcc30537fb0b9b5",
+  "evidence_sha256": {
+    "error-census-green.txt": "14e000d45f2abe27307689acea932d3cd8ca955cbcf61e5571b96d6b8cf2ada0",
+    "error-census-red.txt": "13e334aa5969310b7ec5b24d6043d6d37778947c70d3a7dc63ee9bcf713b432f"
+  },
+  "graft": {
+    "calls": 1,
+    "tokens_saved_estimate": 45251
+  },
+  "limitations": [
+    "Diagnostic consumer census only; no new public route or effect authority.",
+    "Native prerequisite receipt remains unchanged; remaining Owner host/bootstrap, actual adapter/phase/index, installed integration and release gates are separate.",
+    "DETRAN/downstream execution excluded."
+  ]
+}

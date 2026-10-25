@@ -1,0 +1,176 @@
+{
+  "environment": {
+    "node": "24.22.0",
+    "uv": "1.52.1",
+    "platform": "darwin",
+    "arch": "arm64",
+    "git": "git version 2.54.0 (Apple Git-157)"
+  },
+  "direct_before": {
+    "git_dir": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-context-review-rlONTu/direct espaço?#/.git",
+    "common_dir": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-context-review-rlONTu/direct espaço?#/.git",
+    "private_root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-context-review-rlONTu/direct espaço?#/.git/devai/reconciliation",
+    "head": "3dc8a77f2c12e7a4165985a889816d94289bb280",
+    "top_exact": true,
+    "bare": "false\n",
+    "superproject": "",
+    "object_format": "sha1\n",
+    "git_entry_kind": "directory",
+    "git_pointer": null,
+    "git_entry_nlink": "13",
+    "projection": {
+      "repository_id": "fixture-repository",
+      "repository_root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-context-review-rlONTu/direct espaço?#",
+      "git_dir": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-context-review-rlONTu/direct espaço?#/.git",
+      "common_dir": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-context-review-rlONTu/direct espaço?#/.git",
+      "root_identity": {
+        "dev": "16777233",
+        "ino": "1118711417",
+        "birthtime_ns": "1792871016076374043",
+        "uid": "501",
+        "mode": "16877"
+      },
+      "git_dir_identity": {
+        "dev": "16777233",
+        "ino": "1118711418",
+        "birthtime_ns": "1792871016088820292",
+        "uid": "501",
+        "mode": "16877"
+      },
+      "common_dir_identity": {
+        "dev": "16777233",
+        "ino": "1118711418",
+        "birthtime_ns": "1792871016088820292",
+        "uid": "501",
+        "mode": "16877"
+      },
+      "git_entry_identity": {
+        "dev": "16777233",
+        "ino": "1118711418",
+        "birthtime_ns": "1792871016088820292",
+        "uid": "501",
+        "mode": "16877"
+      },
+      "git_entry_sha256": null
+    },
+    "worktree_id": "wt-38c0a046c960f76cf63ef726c06d1a42c9d3558c9b18d8d7",
+    "host_identity_sha256": "55bdc0caa3f4186978a543e7571b4265f3df579633f8d43ecbf76d234ecd3455"
+  },
+  "linked": {
+    "git_dir": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-context-review-rlONTu/direct espaço?#/.git/worktrees/linked-espaço-#",
+    "common_dir": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-context-review-rlONTu/direct espaço?#/.git",
+    "private_root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-context-review-rlONTu/direct espaço?#/.git/worktrees/linked-espaço-#/devai/reconciliation",
+    "head": "3dc8a77f2c12e7a4165985a889816d94289bb280",
+    "top_exact": true,
+    "bare": "false\n",
+    "superproject": "",
+    "object_format": "sha1\n",
+    "git_entry_kind": "file",
+    "git_pointer": "gitdir: /private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-context-review-rlONTu/direct espaço?#/.git/worktrees/linked-espaço-#\n",
+    "git_entry_nlink": "1",
+    "projection": {
+      "repository_id": "fixture-repository",
+      "repository_root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-context-review-rlONTu/linked espaço?#",
+      "git_dir": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-context-review-rlONTu/direct espaço?#/.git/worktrees/linked-espaço-#",
+      "common_dir": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-context-review-rlONTu/direct espaço?#/.git",
+      "root_identity": {
+        "dev": "16777233",
+        "ino": "1118711487",
+        "birthtime_ns": "1792871016154399093",
+        "uid": "501",
+        "mode": "16877"
+      },
+      "git_dir_identity": {
+        "dev": "16777233",
+        "ino": "1118711484",
+        "birthtime_ns": "1792871016153989705",
+        "uid": "501",
+        "mode": "16877"
+      },
+      "common_dir_identity": {
+        "dev": "16777233",
+        "ino": "1118711418",
+        "birthtime_ns": "1792871016088820292",
+        "uid": "501",
+        "mode": "16877"
+      },
+      "git_entry_identity": {
+        "dev": "16777233",
+        "ino": "1118711489",
+        "birthtime_ns": "1792871016154574306",
+        "uid": "501",
+        "mode": "33188",
+        "size_bytes": "147",
+        "mtime_ns": "1792871016154621057",
+        "ctime_ns": "1792871016154621057"
+      },
+      "git_entry_sha256": "1c1512dbd30c71708ce014ab115de69c71a5744ae9b5c6e67e91c6227788b16c"
+    },
+    "worktree_id": "wt-8ae9c4b6b6f851ea20960eed77c6b72c80f78e6bf5277c9d",
+    "host_identity_sha256": "4aa993098dd7c0dc6bd4b6950dfadfe3b9682e6c60a00849fc2b2648ff9b02ac"
+  },
+  "direct_after": {
+    "git_dir": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-context-review-rlONTu/direct espaço?#/.git",
+    "common_dir": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-context-review-rlONTu/direct espaço?#/.git",
+    "private_root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-context-review-rlONTu/direct espaço?#/.git/devai/reconciliation",
+    "head": "5a1b1ba65cd84a96d5eb1cf1db9cab1d6e119cfc",
+    "top_exact": true,
+    "bare": "false\n",
+    "superproject": "",
+    "object_format": "sha1\n",
+    "git_entry_kind": "directory",
+    "git_pointer": null,
+    "git_entry_nlink": "13",
+    "projection": {
+      "repository_id": "fixture-repository",
+      "repository_root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-context-review-rlONTu/direct espaço?#",
+      "git_dir": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-context-review-rlONTu/direct espaço?#/.git",
+      "common_dir": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-host-context-review-rlONTu/direct espaço?#/.git",
+      "root_identity": {
+        "dev": "16777233",
+        "ino": "1118711417",
+        "birthtime_ns": "1792871016076374043",
+        "uid": "501",
+        "mode": "16877"
+      },
+      "git_dir_identity": {
+        "dev": "16777233",
+        "ino": "1118711418",
+        "birthtime_ns": "1792871016088820292",
+        "uid": "501",
+        "mode": "16877"
+      },
+      "common_dir_identity": {
+        "dev": "16777233",
+        "ino": "1118711418",
+        "birthtime_ns": "1792871016088820292",
+        "uid": "501",
+        "mode": "16877"
+      },
+      "git_entry_identity": {
+        "dev": "16777233",
+        "ino": "1118711418",
+        "birthtime_ns": "1792871016088820292",
+        "uid": "501",
+        "mode": "16877"
+      },
+      "git_entry_sha256": null
+    },
+    "worktree_id": "wt-38c0a046c960f76cf63ef726c06d1a42c9d3558c9b18d8d7",
+    "host_identity_sha256": "55bdc0caa3f4186978a543e7571b4265f3df579633f8d43ecbf76d234ecd3455"
+  },
+  "checks": {
+    "direct_directory": true,
+    "linked_pointer": true,
+    "separate_git_dirs": true,
+    "same_common_dir": true,
+    "separate_private_roots": true,
+    "distinct_worktree_ids": true,
+    "head_changed": true,
+    "persistent_worktree_unchanged": true,
+    "persistent_host_unchanged": true,
+    "unicode_space_question_hash_roots": true
+  },
+  "scope": "Fixture independently demonstrates Git outputs/identity formula using full fs.Stats.mode decimal strings. It is not the absent product module or adapter qualification. Only external disposable repositories changed.",
+  "fixture_removed": true
+}

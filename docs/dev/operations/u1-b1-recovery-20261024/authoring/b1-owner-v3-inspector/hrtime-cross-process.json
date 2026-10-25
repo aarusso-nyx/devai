@@ -1,0 +1,68 @@
+{
+  "platform": "darwin",
+  "node": "v24.22.0",
+  "uv": "1.52.1",
+  "parent_pid": 9715,
+  "boot": "BB4143DF-40C6-43B7-A2C7-C88C606A2559",
+  "observations": [
+    {
+      "parent_before_ns": "589160366391375",
+      "child": {
+        "pid": 9735,
+        "node": "v24.22.0",
+        "uv": "1.52.1",
+        "boot": "BB4143DF-40C6-43B7-A2C7-C88C606A2559",
+        "monotonic_ns": "589160407291333",
+        "wall_ms": 1792868322080
+      },
+      "parent_after_ns": "589160411061833",
+      "child_exit": 0,
+      "within_parent_bracket": true,
+      "same_boot": true,
+      "wall_bracket_ms": [
+        1792868322039,
+        1792868322083
+      ]
+    },
+    {
+      "parent_before_ns": "589160411129916",
+      "child": {
+        "pid": 9737,
+        "node": "v24.22.0",
+        "uv": "1.52.1",
+        "boot": "BB4143DF-40C6-43B7-A2C7-C88C606A2559",
+        "monotonic_ns": "589160454454000",
+        "wall_ms": 1792868322127
+      },
+      "parent_after_ns": "589160457599333",
+      "child_exit": 0,
+      "within_parent_bracket": true,
+      "same_boot": true,
+      "wall_bracket_ms": [
+        1792868322084,
+        1792868322130
+      ]
+    },
+    {
+      "parent_before_ns": "589160457622833",
+      "child": {
+        "pid": 9739,
+        "node": "v24.22.0",
+        "uv": "1.52.1",
+        "boot": "BB4143DF-40C6-43B7-A2C7-C88C606A2559",
+        "monotonic_ns": "589160503378250",
+        "wall_ms": 1792868322176
+      },
+      "parent_after_ns": "589160506639041",
+      "child_exit": 0,
+      "within_parent_bracket": true,
+      "same_boot": true,
+      "wall_bracket_ms": [
+        1792868322130,
+        1792868322179
+      ]
+    }
+  ],
+  "all_bracketed": true,
+  "limitations": "Actual Darwin same-host same-boot process observations only; no Linux run, suspend/resume, wall-clock adjustment, reboot, container/time-namespace crossing or installed CLI qualification."
+}

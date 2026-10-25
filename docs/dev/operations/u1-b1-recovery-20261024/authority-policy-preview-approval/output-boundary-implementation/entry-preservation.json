@@ -1,0 +1,128 @@
+{
+  "observed_at_utc": "2026-10-24T15:26:41.609648+00:00",
+  "baseline_commit": "2df84159caabf869b866fb2a05e5b06be83295fb",
+  "prior_return_manifest": {
+    "path": "docs/dev/operations/u1-b1-recovery-20261024/authority-policy-preview-approval/p1-implementation/return-artifact-manifest.json",
+    "sha256": "72ff8c4e17ba0d6279f36248da52f1017166f3d93a4747041b9946f9a58f94e7",
+    "entries": 36
+  },
+  "entry_source_files": [
+    {
+      "path": "law/adr/ADR-AUT-0008-exact-authority-policy-create-review.md",
+      "sha256": "1b84ae5b6699003db62f2a917925dd17f848f0a40c13caafed5ab89ecd731082",
+      "bytes": 11548
+    },
+    {
+      "path": "law/adr/README.md",
+      "sha256": "747bac356abc80705305cbb50daeae41d1ae2dd54ee1a1942d73481e7523afd8",
+      "bytes": 33395
+    },
+    {
+      "path": "law/policy/adr-validation.json",
+      "sha256": "dd3a312e0f52676481abf05ccbc1ae6fb5da5e22a96afdcbd2dd0581e75a5d21",
+      "bytes": 16030
+    },
+    {
+      "path": "docs/reference/cli/index.md",
+      "sha256": "6f178aa1d571b750accdd43332a7500bbaf006066840badd8693e5c25a9f7e0c",
+      "bytes": 31951
+    },
+    {
+      "path": "packages/cli/src/command-router.ts",
+      "sha256": "af2cf5df04006d049c6e269cf30d44ceaef650fb8cb9c563dc03c6e00d90837a",
+      "bytes": 18442
+    },
+    {
+      "path": "packages/cli/src/commands/init/index.ts",
+      "sha256": "984da375d7f480413f043341e33f797ab517dc07eb22cfb2d2f3b5c1f3d86bc3",
+      "bytes": 5111
+    },
+    {
+      "path": "packages/cli/src/commands/init/shared.ts",
+      "sha256": "ddb802c8ad36b2f80ef225934af541934f86e852805aaa2a25e313ddc67393c3",
+      "bytes": 3852
+    },
+    {
+      "path": "packages/cli/src/commands/init/review-authority-policy.ts",
+      "sha256": "398ef75f3bdd5105e1f5d9ee6f6ae2faaffd718005a3a07d63999bb16ffa1efc",
+      "bytes": 3497
+    },
+    {
+      "path": "packages/cli/src/authority/command-capabilities.ts",
+      "sha256": "f29ca8306a798c2842d8e4a7138f37331e9b16d926e06925985b330f779232d2",
+      "bytes": 1236
+    },
+    {
+      "path": "packages/cli/src/authority/broker.ts",
+      "sha256": "50721c2d784e8849cbf50ad7a07daa7d2b3513a5618ecd81ac0ec8040b2f7735",
+      "bytes": 87451
+    },
+    {
+      "path": "packages/cli/src/authority/policy-review.ts",
+      "sha256": "5235d957e108596cc550b48297091c5d3be530515fc60ecbbe999ca0b7e80de4",
+      "bytes": 3095
+    },
+    {
+      "path": "packages/cli/src/authority/policy.ts",
+      "sha256": "3b32792eed1c482009a3cb217074fc642b95808e806b41859f485e2ddf533bee",
+      "bytes": 5634
+    },
+    {
+      "path": "packages/cli/src/authority/policy-support.ts",
+      "sha256": "156b296bf26a87816c9f8206843b9c0a79414fa698dc1829a6dccd6860ede739",
+      "bytes": 10045
+    },
+    {
+      "path": "packages/cli/tests/unit/authority-policy-review.test.ts",
+      "sha256": "d18e4f6c22b098fc9aba685022e92276a66d2f5006df0c600412f983076c56ae",
+      "bytes": 33696
+    },
+    {
+      "path": "packages/cli/tests/unit/init-authority-policy-review.test.ts",
+      "sha256": "5dd184e04a93f3ead5b122636d2296daf66cabefc1c145c21ba28c2fd0c2f4f7",
+      "bytes": 14795
+    },
+    {
+      "path": "packages/cli/tests/unit/authority-policy-review-publication.test.ts",
+      "sha256": "39dcb82ef3b4b56982a15138e4b4c45f14ba6e30ab094d2387aede3dfb25b34e",
+      "bytes": 8843
+    },
+    {
+      "path": "packages/cli/tests/unit/authority-command-boundary-finalization.test.ts",
+      "sha256": "728990fcd1b31e03272d19fe01cd785b0030b6ba70cb1e311ff2942386f521d4",
+      "bytes": 9262
+    },
+    {
+      "path": "packages/cli/tests/unit/cli-shard09-init-bind-adapters-policy.test.ts",
+      "sha256": "c5f9aa4c11455cdf712273ad98d626ed5656d413587bdc3c2c7e0cdf1e75e9e6",
+      "bytes": 19741
+    },
+    {
+      "path": "packages/schemas/tests/contract/governance-v15-adr.test.ts",
+      "sha256": "7df5916d5fcee90419767ae44fd579e8e7a96bd1c1e1f66cc3246a5338146afb",
+      "bytes": 44102
+    },
+    {
+      "path": "docs/reference/error-codes.md",
+      "sha256": "b5bbc2493d4cb427790081c01e42f2f087071febd223a3d0aba58d83f70eebfd",
+      "bytes": 331240
+    },
+    {
+      "path": "packages/cli/src/action-output.ts",
+      "sha256": "11da5e163aa687ce01130367bf8b2715c19f56c5e8ef50bbc4e9c18459791c8d",
+      "bytes": 12516
+    }
+  ],
+  "prior_protected_entry_snapshot": {
+    "path": "docs/dev/operations/u1-b1-recovery-20261024/authority-policy-preview-approval/p1-implementation/entry-preservation.json",
+    "sha256": "c9797b07c2f7b91a357490d1ddaa31bdba3353dbfa6071ec5e4e8715a30f0306"
+  },
+  "held_effects": [
+    "live preview",
+    "binding",
+    "integration/source publication",
+    "U1/B1 runtime",
+    "release",
+    "DETRAN"
+  ]
+}

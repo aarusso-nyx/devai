@@ -1,0 +1,78 @@
+{
+  "phase": "Source GREEN after independently found and repaired ordinary-writer identity race; final installed05/exactbootstrap qualification pending",
+  "source_green": {
+    "files": 4,
+    "tests": 103,
+    "failed": 0,
+    "log": "green-final-source.log"
+  },
+  "earlier_regressions": {
+    "files": 3,
+    "tests": 68,
+    "failed": 0,
+    "candidate": "officialbootstrap04 before IDrepair",
+    "log": "unchanged-cli-regressions.log"
+  },
+  "earlier_installed_public": {
+    "tests": 4,
+    "failed": 0,
+    "candidate": "installed04 before IDrepair",
+    "log": "installed04-public.log",
+    "tarball_sha256": "47a44e9b058901ae0238dbab476979212b1b750d91a80cc8fbfeebe8f60d31fe"
+  },
+  "independent_defect": {
+    "issue": "Ordinary append used stale prelock predecessor when deriving record ID; actual persisted predecessor was reloaded inside lock.",
+    "authentic_red": "ordinary-id-race-red.log",
+    "red_cases_failed": 1,
+    "repair": "Engineer added optional ID derivation from actual head under existing shared append lock; legacyfixed-ID callers and manifestalgorithm unchanged.",
+    "green": "Included in final103case source run."
+  },
+  "lock_crash_receipts": [
+    "foreignfile/symlink/directory refused without replacement",
+    "recognized held lock neverstolen after bounded10s wait",
+    "foreign inode replacement retained at cleanup; completed append truthfully reported",
+    "injected post-temp/pre-rename failure preserves old canonical and fulltemp; safe retry"
+  ],
+  "limits": [
+    "No processkill during actual atomicrename claimed; exactfaultboundary exercised through realwriter with injectedrename failure.",
+    "Installed04 does not qualify repairedIDbinary; final05 publicqualification required.",
+    "Historicalregressionbootstrap04 must be refreshed for finalexactcandidate run."
+  ],
+  "sha256": {
+    "packages/evidence/src/evidence/verb-evidence.ts": "a73cce8f04e12034275b3a796b1c01e01d6e7b325dc6b91a185a777ea003f976",
+    "packages/evidence/src/evidence/anchors.ts": "ea332646c2de48642a88e08d3402cdda1137f78a0c7d5fb8e456d8545535b1de",
+    "packages/evidence/src/evidence/chain.ts": "5cf3fd14a108a7012e79d22d6108655c61ac6b9e4bdbf3d44da96b0fb23bc08b",
+    "packages/cli/src/commands/evidence/facade.ts": "26527bd1a83a947908edbd4797a1c7ab564a90a05f0909847802b028e73f8f98",
+    "packages/cli/src/commands/evidence/facade-collect-record.ts": "5bbe9d4517ea7d92b671ecff638a9146161c3188ed62cca79ec33d255bae920c",
+    "law/schemas/evidence.schema.json": "6bcb8e4f288ef01b633e2bfeb8bff568303a7023a47c1d18cb6549557d16182a",
+    "docs/reference/cli/evidence-verify.md": "fc0ef13a7252d7f3c3470fa3c2ceb9506e02402cc1300795062937c828192379",
+    "packages/evidence/tests/unit/divergent-anchor-recovery.test.ts": "a2acae3c613e49099be9c6c4bbc5ada2eda5bdd66b9dd4df69185401dba5f634",
+    "packages/cli/tests/unit/divergent-anchor-recovery.test.ts": "d04131b10feab8ce0869827297d021d558a7aec7919493c83067cb92bfea5d06",
+    "packages/schemas/tests/contract/divergent-anchor-recovery-schema.test.ts": "b2e9ca884973bc36a71536d733d3bbfa5fefa697254490be4205d6118077ddfc",
+    "packages/evidence/tests/unit/verb-evidence.test.ts": "e7197acc3e7673fcfd6d161c527ae605f775cbb1f96d15317da8958ea3c0bcc5",
+    "packages/evidence/tests/proof-line-anchoring.test.ts": "de99330ccc3ccc3160aad5ac768faee9b110a114f45ed6a5080e990ec8f793d6",
+    "packages/cli/tests/unit/cmp0006-evidence-recovery.test.ts": "bca321dd85a183c7c0fd202264b91d2aadd59b37c08f0edd8c810f0f4c6255ac",
+    "packages/cli/tests/unit/evidence-facade-acceptance.test.ts": "d661e13c9f036206538899a2ccd99444996d9e69a41acc387cf0332652bceb71",
+    "packages/cli/tests/unit/evidence-verify-anchors.test.ts": "af91d317c9b7b327873626e931d6dd863f9626b24283cd1b75c511b81b1a5cb1"
+  },
+  "logs_sha256": {
+    "schema-red.log": "96da57888f950aedfa7ee52d6b6ad72434925e59924ae8b7172bb6b7ea8a5c4f",
+    "regression-additions-check.log": "3d95945e6e32f8a2c6c96b0b80431a4e6429554292939ecc25dee04ca8ad8576",
+    "installed04-public.log": "b1d3f5d7ad11d79ad6450c1c231f96e30dea6497c5e9f694b0591c2f58d7e90e",
+    "ordinary-id-race-red.log": "083928cfa7a0001ca4d25135d0c6f9fbb3d63c8aeef9e6bb35fda1fd2909212e",
+    "shared-held-lock.log": "31f545ea0042d6898541b4ccb6f0be14ed4483836fe7e3dcc08400eb0c26bfb1",
+    "green-first-backend.log": "09e9fe05758b378e8b8da608ac2dbc3e55aaf79fa943b74c33edc411e0143d0b",
+    "lint-first.log": "689d370e8c06bdc4d786c596f733e4fd11d13ae585434f61cc90eeeaf5155785",
+    "installed02-help-red.log": "780e7de6b4c44021557949abf7b77412041266015d5cffa4cc935c9291331625",
+    "custody-red.log": "939f0101793e7a8dc2f0e7d4a96437e46ac8f011c07f02f282569bd5f7ceace3",
+    "unchanged-cli-regressions.log": "580ae08aca099b0b766128d476f6d77565bf2d4cd5f9457f0c7c2ce7309bee74",
+    "lint-second.log": "689d370e8c06bdc4d786c596f733e4fd11d13ae585434f61cc90eeeaf5155785",
+    "id-race-tests-eslint.log": "689d370e8c06bdc4d786c596f733e4fd11d13ae585434f61cc90eeeaf5155785",
+    "shared-lock-eslint.log": "689d370e8c06bdc4d786c596f733e4fd11d13ae585434f61cc90eeeaf5155785",
+    "runtime-red.log": "c932944bfd3a5184ca51a5a6bd5317ebaacd9fb9d4d0054e2b00d8458593525d",
+    "green-final-source.log": "39eb72380de0ae0e4f1048273395272fcddeb08e43ca89165cf8d3c17e84e240",
+    "shared-lock-negatives.log": "8b9eb0f8b0c490596f5d2c1457212ff94513ae73ecb3793c66700b34cc526534",
+    "public-help-red.log": "d94e600c5ddec072fd86ccbbea809a5b6692d5770eed844f3d4d5ba72e7ded36",
+    "lint-final-red.log": "689d370e8c06bdc4d786c596f733e4fd11d13ae585434f61cc90eeeaf5155785"
+  }
+}

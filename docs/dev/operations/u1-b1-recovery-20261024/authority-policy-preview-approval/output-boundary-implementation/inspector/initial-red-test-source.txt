@@ -1,0 +1,46 @@
+import { createRequire } from 'node:module';
+import type { CAC } from '../../node_modules/cac/dist/index.d.ts';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { attachActionOutputBoundaries } from '../../src/action-output.js';
+import { canonicalRegistry } from '../../src/define-command.js';
+
+const { cac } = createRequire(import.meta.url)('../../node_modules/cac/index-compat.js') as {
+  cac: (name?: string) => CAC;
+};
+const originalArgv = process.argv;
+const originalExit = process.exitCode;
+afterEach(() => {
+  process.argv = originalArgv;
+  process.exitCode = originalExit;
+  vi.restoreAllMocks();
+});
+const exactArgs = ['init', 'bind', '--review-authority-policy', '--after-constitution', '--target', '/disposable/fixture', '--as-role', 'architect', '--write', '--format', 'json'];
+
+describe('REC-B1-A-P1 amended real output boundary', () => {
+  it('authentic RED: READY action envelope and stderr prompt must be observable while real wrapper is pending', async () => {
+    let stdout = '';
+    let stderr = '';
+    vi.spyOn(process.stdout, 'write').mockImplementation(((chunk: unknown) => { stdout += String(chunk); return true; }) as typeof process.stdout.write);
+    vi.spyOn(process.stderr, 'write').mockImplementation(((chunk: unknown) => { stderr += String(chunk); return true; }) as typeof process.stderr.write);
+    const cli = cac('devai-output-review-red');
+    let resume: (() => void) | undefined;
+    const waiting = new Promise<void>((done) => { resume = done; });
+    cli.command('init-bind').action(async () => {
+      process.stdout.write('{"status":"awaiting-exact-confirmation"}\n');
+      process.stderr.write('Type CREATE fixture-plan fixture-artifact\n');
+      await waiting;
+      process.stdout.write('{"status":"cancelled","binding_performed":false}\n');
+    });
+    process.argv = ['node', 'devai', ...exactArgs];
+    attachActionOutputBoundaries(cli.commands, canonicalRegistry());
+    const pending = cli.commands[0]?.commandAction?.();
+    try {
+      expect(pending).toBeInstanceOf(Promise);
+      expect(stdout).toContain('awaiting-exact-confirmation');
+      expect(stderr).toContain('Type CREATE fixture-plan fixture-artifact');
+    } finally {
+      resume?.();
+      await pending;
+    }
+  });
+});

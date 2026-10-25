@@ -1,0 +1,38 @@
+{
+  "standing": "FOCUSED_NATIVE_OWNER_READ_19_DISTINCT_CASES_PASS_ACROSS_PRESERVED_RUNS_NOT_FULL_INTEGRATION",
+  "results": [
+    {
+      "log": "first-behavior.txt",
+      "pass": 14,
+      "fail": 5,
+      "total": 19,
+      "duration_seconds": 443.17
+    },
+    {
+      "log": "fixture-corrected-focused.txt",
+      "pass": 5,
+      "not_selected": 14,
+      "duration_seconds": 131.92
+    }
+  ],
+  "unique_cases_passed": 19,
+  "corrections": [
+    "Read actual namespace.witness.approvals instead of nonexistent namespace.approvals",
+    "Assert exact existing AUTHORITY_RECONCILIATION_OPERATION_INVALID prefix",
+    "Call actual withReconciliationAdmissionSteps(root,anchor,callback), including actual child process",
+    "Scope-drift timeout preserved; same unchanged 30000ms threshold passes targeted retry"
+  ],
+  "limitations": [
+    "Synthetic B5/TTY custody; real disposable native direct and registered linked repositories",
+    "No installed public workflow or native Owner/phase/index writer qualification",
+    "No whole-heap erasure claim; byte zeroing only captured reader-owned returned buffers",
+    "Parent instructed defer component fullworkspace types/regression/sealing in favor of integrated B1 workflow"
+  ],
+  "files": {
+    "packages/authority/src/boundaries/reconciliation-host-owner.ts": "d2ea3a0b345ffc48f809e819807c3f738bd9cddaf91673387bd310b8e05456c3",
+    "packages/authority/tests/unit/reconciliation-host-owner.test.ts": "f774494ad8aae3279d15cc0f26b00869098d8c7ee122e157b13528f89fbb8fa4",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-inspector/first-inputs.json": "ad4fea711515365f832ed6d468eb6305d0c3c68fae1de908e999293814dd7328",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-inspector/first-behavior.txt": "303a72fe185031712df16b64323e26a83e59cd5bd7af0c3b1c7b197cd868673e",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-inspector/fixture-corrected-focused.txt": "952739c8a9d5526c660da091896d3a708d9020bc59ad23fe50ae7187183063b4"
+  }
+}

@@ -1,5 +1,25 @@
 # Changelog
 
+## 2.8.0 — 2026-10-25
+
+This minor release adds bounded recovery of a historical proof anchor and
+Owner-approved merge reconciliation under constitution 1.2.0.
+
+- Recover a specified historical physical line from an explicitly preserved
+  divergent source, with exact source digests and current-head guards. Newest-line
+  recovery remains a separate operation.
+- Preserve complete parent and base custody before selecting the whole published
+  proof-history prefix and appending a normal attributable selection event.
+- Require native host provisioning, an exact saved plan, direct Owner confirmation
+  and a current authenticated grant for each bounded reconciliation phase.
+- Publish only the verified proof-chain index entry, preserving every other entry,
+  then produce seven diagnostic catalogue bodies from one immutable staged source.
+- Preview creation of a missing generated authority policy with explicit target
+  paths and byte digests; preserve existing artifacts and require exact confirmation.
+- Preserve custody when native work or public output delivery is indeterminate.
+  No reconciliation action authorizes commits, integration, release or downstream
+  live operations. Existing historical checks and release gates remain in force.
+
 ## 2.7.1 — 2026-10-24
 
 This patch reduces release rework and refreshes security dependencies while preserving

@@ -1,0 +1,22 @@
+import { writeFileSync } from 'node:fs';
+const orders = (nodes) => nodes.length ? nodes.flatMap((n,i)=>orders(nodes.filter((_,j)=>i!==j)).map(rest=>[n,...rest])) : [[]];
+const solve = (c, fences) => orders(Object.keys(c.clock)).filter(order=>{
+ const index=Object.fromEntries(order.map((n,i)=>[n,i]));
+ return [...c.edges,...(fences?c.fences:[])].every(([a,b])=>index[a]<index[b]) && order.every((n,i)=>i===0||c.clock[order[i-1]]<=c.clock[n]);
+});
+// Design constraint models only: no product implementation, MAC/host origin or effect is exercised.
+const cases=[
+ {id:'T01',meaning:'All clocks tie; renewal names existing I and completion observes renewal.',clock:{A:0,I:0,R:0,C:0},edges:[['A','R'],['A','I'],['I','R'],['I','C'],['R','C']],fences:[['I','R']],expected:1},
+ {id:'T02',meaning:'All clocks tie; renewal null asserts no existing I and I references renewal.',clock:{A:0,R:0,I:0,C:0},edges:[['A','R'],['R','I'],['I','C'],['R','C']],fences:[],expected:1},
+ {id:'T03',meaning:'Renewal names I but I references that same renewal: impossible mutual-before.',clock:{A:0,R:0,I:0},edges:[['A','R'],['R','I'],['I','R']],fences:[],expected:0},
+ {id:'T04',meaning:'Renewal excludes phase01, but C01 observes renewal: impossible mutual-before.',clock:{A:0,I:0,R:0,C:0},edges:[['A','I'],['I','C'],['A','R'],['R','C'],['C','R']],fences:[],expected:0},
+ {id:'T05',meaning:'Renewal null+remaining01 means R before I; I names old A. Current-grant fence rejects.',clock:{A:0,R:0,I:0},edges:[['A','R'],['A','I'],['R','I']],fences:[['I','R']],expected:0,weakMustAccept:true},
+ {id:'T06',meaning:'Strict-time intent after terminal revocation names still-unexpired A. Current-grant fence rejects.',clock:{A:0,V:10,I:20},edges:[['A','V'],['A','I']],fences:[['I','V']],expected:0,weakMustAccept:true},
+ {id:'T07',meaning:'Preexisting I before V may settle C observing V; terminal revocation does not erase I.',clock:{A:0,I:10,V:20,C:30},edges:[['A','I'],['A','V'],['I','C'],['V','C']],fences:[['I','V']],expected:1},
+ {id:'T08',meaning:'C issued after R still observes old A; current-observation fence rejects.',clock:{A:0,I:5,R:10,C:20},edges:[['A','I'],['A','R'],['I','R'],['I','C'],['A','C'],['R','C']],fences:[['I','R'],['C','R']],expected:0,weakMustAccept:true},
+ {id:'T09',meaning:'Retry lease after R names original A; current-grant creation fence rejects.',clock:{A:0,I:5,R:10,L:20},edges:[['A','I'],['A','R'],['I','R'],['I','L'],['A','L']],fences:[['I','R'],['L','R']],expected:0,weakMustAccept:true},
+ {id:'T10',meaning:'Original lease created before renewal may remain; it is not retrospectively required to name R.',clock:{A:0,I:5,L:7,R:10},edges:[['A','I'],['A','R'],['I','R'],['I','L'],['A','L']],fences:[['I','R'],['L','R']],expected:1},
+];
+const result=cases.map(c=>{const full=solve(c,true),weak=solve(c,false);if(full.length!==c.expected||(c.weakMustAccept&&weak.length===0))throw new Error('DESIGN_PROBE_EXPECTATION_INVALID:'+c.id);return{...c,consistentOrders:full,weakerKnownGrantOnlyOrders:weak};});
+writeFileSync(new URL('./partial-order-results.json',import.meta.url),JSON.stringify({meaning:'Independent small design constraint models; no product RED or cryptographic/host qualification.',pass:result.length,fail:0,cases:result},null,2)+'\n');
+console.log(JSON.stringify({pass:result.length,fail:0}));

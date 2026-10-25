@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-owner-state-inspector/species-typing-verification.txt","kind":"historical-transcript-custody-pointer","original_bytes":287,"original_bytes_changed":false,"original_sha256":"20ad97cfda4b90ce27c67abdab07b40b4d6c7c52faa31b4ae9fe8dbf7ea05e24"}

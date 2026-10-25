@@ -1,0 +1,477 @@
+import {vi} from 'vitest';
+const hooks=vi.hoisted(()=>({afterSync:undefined as undefined|(()=>void)}));
+vi.mock('node:fs',async(importOriginal)=>{const actual=await importOriginal<typeof import('node:fs')>(); return {...actual,fsyncSync:(fd:number)=>{actual.fsyncSync(fd);const h=hooks.afterSync;if(h){hooks.afterSync=undefined;h();}}};});
+import { execFileSync } from 'node:child_process';
+import { createHash, createHmac } from 'node:crypto';
+import {
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  readFileSync,
+  readdirSync,
+  lstatSync,
+  writeFileSync,
+  chmodSync,
+  symlinkSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { afterAll, afterEach } from 'vitest';
+import { getValidator } from '@devai-nyx/schemas';
+import { runWithAuthorityHostEffects } from '/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/src/boundaries/host-scope.js';
+import type { AuthorityHostEffectRequest } from '/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/src/boundaries/host-atomic-effects.js';
+import { createAuthorityBoundaryRuntime } from '/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/src/boundaries/boundary-runtime.js';
+import {
+  createReconciliationHostInvocation,
+  disposeReconciliationHostInvocation,
+  reconciliationHostOperation,
+  reconciliationHostOperationSnapshot,
+} from '/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/src/boundaries/reconciliation-host-operation.js';
+import { computeMutationEnvelopeDigest, type MutationEnvelope } from '/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/src/index.js';
+import {
+  CONSENT,
+  actionDocumentWithId,
+  canonicalSha256,
+  createIssuer,
+  declarationDependencies,
+  exactSubject,
+  expectSuccess,
+  makePolicyPlant,
+  policyBindingFromPlant,
+  runtimeApi,
+  type RuntimeApi,
+  type AuthorityDecisionIssuer,
+} from '/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/tests/unit/authority-runtime-testkit.js';
+import { boundaryDependencies } from '/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/tests/unit/authority-boundary-testkit.js';
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
+
+type Data = Record<string, unknown>;
+interface Ready {
+  kind: 'reconciliation-provision-review';
+  action_id: 'init bind';
+  stage: 'seed' | 'issuer';
+  repository_id: string;
+  worktree_id: string;
+  host_identity_sha256: string;
+  binding_sha256: string;
+  namespace_sha256: string;
+  plan_sha256: string;
+  artifact: { sha256: string; size_bytes: number };
+  effects: readonly { target: string; operation: string; mode: string }[];
+  confirmation: string;
+  lifetime_ms: number;
+  grants_authority: false;
+}
+interface Result {
+  kind: 'reconciliation-provision-result';
+  action_id: 'init bind';
+  outcome: 'created' | 'existing' | 'cancelled' | 'indeterminate';
+  repository_id: string;
+  worktree_id: string;
+  issuer_sha256: string | null;
+  stage: 'seed' | 'issuer' | null;
+  owned: readonly { target: string; dev: string; ino: string; birthtime_ns: string }[];
+  grants_authority: false;
+}
+interface Review {
+  start(): Ready | Result;
+  confirm(token: string): Ready | Result;
+  cancel(): Result;
+}
+async function provisionApi() {
+  return (await import('/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/src/boundaries/reconciliation-host-provision.js')) as unknown as {
+    createReconciliationHostProvisionReview(root: string): Review;
+  };
+}
+const ROOT = '/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024';
+const external = realpathSync(mkdtempSync(resolve(tmpdir(), 'devai-native-provision-inspector-')));
+const cleanEnv = {
+  PATH: '/usr/bin:/bin',
+  LC_ALL: 'C',
+  HOME: external,
+  GIT_CONFIG_NOSYSTEM: '1',
+  GIT_CONFIG_SYSTEM: '/dev/null',
+  GIT_CONFIG_GLOBAL: '/dev/null',
+};
+const originalArgv = [...process.argv];
+const ttyDescriptors = [process.stdin, process.stdout, process.stderr].map(
+  (stream) => [stream, Object.getOwnPropertyDescriptor(stream, 'isTTY')] as const,
+);
+const observations: unknown[] = [];
+afterEach(() => {
+  process.argv = [...originalArgv];
+  for (const [stream, descriptor] of ttyDescriptors) {
+    if (descriptor) Object.defineProperty(stream, 'isTTY', descriptor);
+    else Reflect.deleteProperty(stream, 'isTTY');
+  }
+});
+const hash = (bytes: string | Uint8Array) => createHash('sha256').update(bytes).digest('hex');
+function jcs(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) return '[' + value.map(jcs).join(',') + ']';
+  const object = value as Data;
+  return (
+    '{' +
+    Object.keys(object)
+      .sort()
+      .map((key) => JSON.stringify(key) + ':' + jcs(object[key]))
+      .join(',') +
+    '}'
+  );
+}
+function git(root: string, args: string[]): string {
+  return execFileSync('/usr/bin/git', ['-C', root, ...args], {
+    env: cleanEnv,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  }).trim();
+}
+function repository(linked = false) {
+  const base = realpathSync(mkdtempSync(resolve(external, 'fixture-')));
+  const primary = resolve(base, 'repository');
+  mkdirSync(primary, { mode: 0o700 });
+  git(primary, ['init', '--initial-branch=main']);
+  git(primary, [
+    '-c',
+    'user.name=Fixture',
+    '-c',
+    'user.email=fixture@example.invalid',
+    '-c',
+    'commit.gpgsign=false',
+    '-c',
+    'core.hooksPath=/dev/null',
+    'commit',
+    '--allow-empty',
+    '-m',
+    'fixture',
+  ]);
+  let root = primary;
+  if (linked) {
+    root = resolve(base, 'linked');
+    git(primary, ['worktree', 'add', '--detach', root, 'HEAD']);
+    root = realpathSync(root);
+  }
+  const gitDir = realpathSync(git(root, ['rev-parse', '--absolute-git-dir']));
+  return { base, root, primary, gitDir, namespace: resolve(gitDir, 'devai/reconciliation') };
+}
+function inventory(path: string): unknown {
+  if (!existsSync(path)) return null;
+  const s = lstatSync(path, { bigint: true });
+  if (s.isSymbolicLink()) return { kind: 'symlink', ino: String(s.ino), mode: String(s.mode) };
+  return s.isDirectory()
+    ? {
+        kind: 'directory',
+        ino: String(s.ino),
+        mode: String(s.mode),
+        entries: readdirSync(path)
+          .sort()
+          .map((name) => [name, inventory(resolve(path, name))]),
+      }
+    : {
+        kind: 'file',
+        ino: String(s.ino),
+        mode: String(s.mode),
+        size: String(s.size),
+        sha256: hash(readFileSync(path)),
+      };
+}
+function issue(api: RuntimeApi, issuer: AuthorityDecisionIssuer, target: Data) {
+  const action = 'init bind',
+    role = 'architect';
+  const rule = {
+    rule_id: 'native-provision-fixture',
+    origin: 'additive-extension',
+    precedence: 500,
+    action_ids: [action],
+    selector: {
+      kind: target.kind,
+      repository_id: target.repository_id,
+      operations: [target.operation],
+    },
+    effect: 'allow',
+    subjects: [{ kind: 'human', roles: [role] }],
+    required_consent: CONSENT,
+    constitutional_anchors: [6],
+    rationale: 'Owned actual native fixture; deterministic B5 is not installed origin.',
+  };
+  const plant = makePolicyPlant({ additiveRules: [rule] });
+  expect(getValidator('authority-policy.schema.json')(plant.document)).toBe(true);
+  const context = expectSuccess<{ context_receipt: unknown }>(
+    api.resolveAuthorityDeclaration(
+      {
+        action_id: action,
+        invocation_id: 'invocation-1',
+        dry_run: false,
+        declaration: { as_role: role },
+        consent: CONSENT,
+      },
+      declarationDependencies(
+        issuer,
+        actionDocumentWithId(action, 'local-write', { kind: 'human', allowed_roles: [role] }),
+        undefined,
+        policyBindingFromPlant(plant),
+      ),
+    ),
+  );
+  const policy = expectSuccess(api.loadAuthorityPolicy({ document: plant.document }, plant.deps));
+  const resolution = api.resolveAuthorityPolicy(
+    policy,
+    {
+      action_id: action,
+      context_receipt: context.context_receipt,
+      consent: CONSENT,
+      resource: target,
+      operation: target.operation,
+    },
+    { receiptStore: issuer, canonicalSha256 },
+  );
+  expect(resolution).toMatchObject({ outcome: 'allow' });
+  const base = exactSubject([target], plant) as { plan: { envelope: MutationEnvelope } };
+  const envelope = {
+    ...base.plan.envelope,
+    request: { ...base.plan.envelope.request, action_id: action },
+  } as MutationEnvelope;
+  const subject = {
+    plan: {
+      ...base.plan,
+      envelope: {
+        ...envelope,
+        issued_by: {
+          ...envelope.issued_by,
+          envelope_digest_sha256: computeMutationEnvelopeDigest(envelope),
+        },
+      },
+    },
+  };
+  const decision = issuer.issueAllow({
+    resolutions: [resolution],
+    subject,
+    context_receipt: context.context_receipt,
+    invocation_id: 'invocation-1',
+    boundary_adapter_id: 'reconciliation-host-authority-boundary',
+  }) as { issued: boolean; receipt: unknown };
+  expect(decision.issued).toBe(true);
+  return { subject, receipt: decision.receipt };
+}
+async function harness(
+  options: { linked?: boolean; write?: boolean; repo?: ReturnType<typeof repository> } = {},
+) {
+  const api = await runtimeApi();
+  const module = await provisionApi();
+  const repo = options.repo ?? repository(options.linked);
+  const issuer = createIssuer(api);
+  const write = options.write ?? true;
+  process.argv = [
+    process.execPath,
+    'devai',
+    'init',
+    'bind',
+    '--reconciliation-host',
+    '--target',
+    repo.root,
+    '--as-role',
+    'architect',
+    ...(write ? ['--write'] : []),
+    '--format',
+    'json',
+  ];
+  for (const stream of [process.stdin, process.stdout, process.stderr])
+    Object.defineProperty(stream, 'isTTY', { value: true, configurable: true });
+  const bindings = {
+    package_sha256: 'a'.repeat(64),
+    module_sha256: 'b'.repeat(64),
+    registry_sha256: 'c'.repeat(64),
+    constitution_sha256: 'd'.repeat(64),
+    policy_sha256: 'e'.repeat(64),
+  };
+  let currentBindings = bindings;
+  const argvSha = canonicalSha256(process.argv);
+  const invocation = createReconciliationHostInvocation({
+    invocation_id: 'invocation-1',
+    action_id: 'init bind',
+    receipt_store: issuer,
+    repository_root: repo.root,
+    repository_id: 'example-repository',
+    original_argv_sha256: argvSha,
+    initiator: 'architect',
+    operation: 'provision',
+    phases: [],
+    write,
+    require_tty: write,
+    readCurrentBindings: () => currentBindings,
+    verifyActual: () => {
+      if (canonicalSha256(process.argv) !== argvSha) throw new Error('argv drift');
+    },
+  });
+  const targets: Data[] = [];
+  const scope = {
+    action_id: 'init bind',
+    invocation_id: 'invocation-1',
+    effect: 'local-write' as const,
+    receipt_store: issuer,
+    reconciliation_invocation: invocation,
+    apply_effect: (request: AuthorityHostEffectRequest, apply: () => unknown) => {
+      const view = reconciliationHostOperation(request, invocation);
+      expect(view).toBeDefined();
+      if (!view) throw new Error('missing actual native operation');
+      const target = view.target as unknown as Data;
+      targets.push(target);
+      const grant = issue(api, issuer, target);
+      let result: unknown;
+      const adapter = {
+        admit: (candidate: Data) =>
+          reconciliationHostOperation(request, invocation) === view &&
+          canonicalSha256(candidate) === canonicalSha256(target),
+        snapshot: () => reconciliationHostOperationSnapshot(view, invocation, view.target),
+        apply: () => {
+          result = apply();
+          return result;
+        },
+      };
+      const runtime = createAuthorityBoundaryRuntime(
+        boundaryDependencies(issuer, [], { reconciliation_host: adapter }),
+      );
+      const handle = expectSuccess(
+        runtime.plannerRegistry.registerPlan({
+          subject: grant.subject,
+          invocation_id: 'invocation-1',
+        }),
+      );
+      const prepared = expectSuccess(
+        runtime.prepare({
+          subject: grant.subject,
+          plan_handle: handle,
+          target,
+          decision_receipt: grant.receipt,
+          adapter_id: 'reconciliation-host-authority-boundary',
+        }),
+      );
+      expectSuccess(runtime.apply({ prepared }));
+      return result;
+    },
+  };
+  return {
+    module,
+    repo,
+    scope,
+    targets,
+    bindings,
+    run: <T>(callback: () => T) => runWithAuthorityHostEffects(scope, callback),
+    setBindings: (value: typeof bindings) => {
+      currentBindings = value;
+    },
+    dispose: () => {
+      disposeReconciliationHostInvocation(invocation);
+      issuer.dispose();
+    },
+  };
+}
+function ready(value: Ready | Result, stage: 'seed' | 'issuer'): Ready {
+  expect(value).toMatchObject({
+    kind: 'reconciliation-provision-review',
+    stage,
+    action_id: 'init bind',
+    lifetime_ms: 300000,
+    grants_authority: false,
+  });
+  if (value.kind !== 'reconciliation-provision-review') throw new Error('expected native READY');
+  const { plan_sha256, confirmation, ...projection } = value;
+  expect(plan_sha256).toBe(hash(jcs(projection)));
+  expect(confirmation).toBe(
+    `${stage === 'seed' ? 'PREPARE' : 'BIND'} RECONCILIATION-HOST ${plan_sha256}`,
+  );
+  expect(Object.isFrozen(value)).toBe(true);
+  return value;
+}
+function result(value: Ready | Result, outcome: Result['outcome']): Result {
+  expect(value).toMatchObject({
+    kind: 'reconciliation-provision-result',
+    action_id: 'init bind',
+    outcome,
+    grants_authority: false,
+  });
+  if (value.kind !== 'reconciliation-provision-result') throw new Error('expected result');
+  return value;
+}
+function safe(value: unknown, repo: ReturnType<typeof repository>, privateValues: string[] = []) {
+  const text = JSON.stringify(value);
+  for (const secret of [repo.root, repo.gitDir, repo.namespace, ...privateValues])
+    expect(text).not.toContain(secret);
+  for (const key of ['private_key_base64', 'key_sha256', 'mac', 'cause'])
+    expect(text).not.toContain(`"${key}":`);
+}
+
+const seedBytes = Buffer.from(
+  readFileSync(
+    resolve(
+      ROOT,
+      'docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/admission-seed/seed.base64.txt',
+    ),
+    'utf8',
+  ).trim(),
+  'base64',
+);
+function issuerOracle(f: Awaited<ReturnType<typeof harness>>, r: Ready, created: Result) {
+  const bytes = readFileSync(resolve(f.repo.namespace, 'issuer.json'));
+  const record = JSON.parse(bytes.toString('utf8')) as Data;
+  expect(hash(bytes)).toBe(r.artifact.sha256);
+  expect(bytes.length).toBe(r.artifact.size_bytes);
+  expect(created.issuer_sha256).toBe(hash(bytes));
+  expect(bytes.toString('utf8')).toBe(jcs(record));
+  const key = Buffer.from(String(record.private_key_base64), 'base64');
+  expect(key.length).toBe(32);
+  expect(key.toString('base64')).toBe(record.private_key_base64);
+  expect(hash(key)).toBe(record.key_sha256);
+  const { mac, ...unsigned } = record;
+  expect(mac).toBe(
+    createHmac('sha256', key)
+      .update(String(record.domain))
+      .update(Buffer.from([0]))
+      .update(jcs(unsigned))
+      .digest('hex'),
+  );
+  expect(record).toMatchObject({
+    kind: 'issuer',
+    repository_id: r.repository_id,
+    worktree_id: r.worktree_id,
+    host_identity_sha256: r.host_identity_sha256,
+    installation_bindings: f.bindings,
+    installed_at_head: git(f.repo.root, ['rev-parse', 'HEAD']),
+  });
+  const anchor = record.admission_anchor as Data;
+  expect(anchor.root).toBe(f.repo.namespace);
+  expect(anchor.seed_sha256).toBe(hash(seedBytes));
+  expect(record.provision_context_sha256).toBe(
+    hash(
+      jcs({
+        seed_plan_sha256: record.seed_plan_sha256,
+        host_identity_sha256: record.host_identity_sha256,
+        admission_anchor_sha256: hash(jcs(anchor)),
+        installation_bindings_sha256: hash(jcs(record.installation_bindings)),
+        installed_at_head: record.installed_at_head,
+      }),
+    ),
+  );
+  return { record, bytes, key };
+}
+function complete(f: Awaited<ReturnType<typeof harness>>) {
+  const review = f.module.createReconciliationHostProvisionReview(f.repo.root);
+  const a = ready(review.start(), 'seed');
+  expect(a.artifact).toEqual({ sha256: hash(seedBytes), size_bytes: 8192 });
+  const b = ready(review.confirm(a.confirmation), 'issuer');
+  const c = result(review.confirm(b.confirmation), 'created');
+  return { review, a, b, c };
+}
+
+for(const drift of ['binding','HEAD']) it(`fresh ${drift} after precursor fsync refuses issuer publication`,async()=>{
+ const f=await harness();try{f.run(()=>{
+ const review=f.module.createReconciliationHostProvisionReview(f.repo.root);
+ const a=ready(review.start(),'seed');const b=ready(review.confirm(a.confirmation),'issuer');
+ let injected=0;hooks.afterSync=()=>{injected++;if(drift==='binding')f.setBindings({...f.bindings,policy_sha256:'9'.repeat(64)});else git(f.repo.root,['-c','user.name=Fixture','-c','user.email=fixture@example.invalid','-c','commit.gpgsign=false','commit','--allow-empty','-m','concurrent-head-drift']);};
+ const outcome=review.confirm(b.confirmation);
+ expect(injected).toBe(1);
+ expect(existsSync(resolve(f.repo.namespace,'issuer.json')),'issuer must remain absent after observed prelock drift').toBe(false);
+ expect(outcome).not.toMatchObject({outcome:'created'});
+ });}finally{hooks.afterSync=undefined;f.dispose();}
+});

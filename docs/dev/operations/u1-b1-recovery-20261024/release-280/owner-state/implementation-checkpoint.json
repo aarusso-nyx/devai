@@ -1,0 +1,26 @@
+{
+  "standing": "IMPLEMENTED_BUILD_LINT_FORMAT_PASS_INDEPENDENT_BEHAVIOR_AND_SOURCE_REVIEW_PENDING",
+  "recorded_at": "2026-10-24T21:58:55.252958+00:00",
+  "inputs": {
+    "packages/authority/src/runtime/reconciliation-owner-state.ts": "b59cce447c545f2bcb8396d384dac39613ca87c1721d0f12e3e16345edb0d2b8",
+    "packages/authority/dist/runtime/reconciliation-owner-state.js": "98abd3add5bf0adb70c332688071d416f8a46e1437d1ffa13c6506e1ec31f4ca",
+    "docs/reference/error-codes.md": "ed7c7205b733fb4e5e50fe1cded1c6dfa5cafe4a6aca2854454de04ecb55ac38"
+  },
+  "contracts": {
+    "owner-state-checkpoint.json": "45fbde08e157a45d615cc26e885beac6197611fd64dc517dafd0348ee975703f",
+    "owner-state-order-amendment.json": "71f1dd131c023652cb4720310401216cee8f418d215502198b59a001621412ed",
+    "owner-state-interface.json": "44cc580bb6cc4586ca6ab4e4117d8a785ddc4ceb5fd8cef811acb76bb54aca7a"
+  },
+  "authentic_absence_red_receipt_sha256": "496f3487b4326ec7af1d04397254f9925068ff1b5a429da2b7ee0c2a2ced469b",
+  "scope": "Pure authenticated immutable Owner record graph reducer and branded eligibility data; no root exports, host effects, registry/capability/policy changes or public activation. This advances actual native Owner/phase implementation requirements and does not complete them.",
+  "checks": {
+    "authority_tsc": "PASS",
+    "source_eslint": "PASS",
+    "source_prettier": "PASS",
+    "generated_error_reference": "1304PASS,exact1newrowinverse1303verified",
+    "independent_semantics": "PENDING",
+    "full_workspace_types_after_newcomponent": "PENDING"
+  },
+  "historical_corrections": "Pre-mapping interface bbd8012 snapshot preserved. Review hypothesis that old schema had enum-only mappings was false; actual old schema already has correct conditionals, unchanged. Mapping-premise before snapshot retained; product redundant guard correct.",
+  "remaining": "Independent graph and ten-row matrix qualification, then native Owner lifecycle/phase/lease effects, full plans/custody/canonical/index/staged/public integration, installed runtime, clean integration/CI, protected release gates and actual v2.8.0 publication."
+}

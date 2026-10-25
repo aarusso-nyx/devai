@@ -1,0 +1,210 @@
+{
+  "standing": "BOUNDED_SOURCE_NATIVE_PROVISIONING_QUALIFIED_NOT_INSTALLED_OR_PUBLIC_AUTHORITY",
+  "results": {
+    "provisioning_unique_cases_passed": 42,
+    "unchanged_regression_cases_passed": 378,
+    "combined_unique_passing_cases": 420,
+    "broader_run": {
+      "files": 8,
+      "pass": 413,
+      "fail": 1,
+      "log": "final-behavior.txt",
+      "failure": "test oracle accessed {record,bytes} wrapper rather than record; fixed in follow-up"
+    },
+    "follow_on": {
+      "pass": 7,
+      "filtered_prior_cases": 35,
+      "log": "final-census-and-resume.txt",
+      "selection": "six authenticated source-census variants and corrected resumed-plan oracle"
+    },
+    "full_workspace_typecheck": "PASS",
+    "five_path_eslint": "PASS",
+    "five_path_prettier_check": "PASS"
+  },
+  "sha256": {
+    "packages/authority/src/boundaries/reconciliation-host-provision.ts": "8c439589cdc0265681ed00a732e6ac0b4c2ab2ad6a520b87e57d2238e1a140b0",
+    "packages/authority/src/boundaries/reconciliation-host-namespace.ts": "44e2abbeb68f0b771e8f82e34d745bfc0435bf532cd2ae710118978339588484",
+    "packages/authority/src/boundaries/host-publish.ts": "b2aa704c775009240b624b4581339cebaec8bcd6f7f95fbf7e71eabf296e054a",
+    "packages/authority/src/index.ts": "9d665d51e73c550819c4c223b34e0d110eb3b5305e02758a754977d46359272c",
+    "packages/authority/tests/unit/reconciliation-host-provision.test.ts": "fd799ff4080ff7bc44963489aa288c0e5faeef164d36bd33e52f7a1073d79dc8",
+    "packages/authority/dist/boundaries/reconciliation-host-provision.js": "8a0fb0e261adc68c7cb7260149eb3f7bf5bd1ff19ab5dde69d0e24d2b8b3bcc3",
+    "packages/authority/dist/boundaries/reconciliation-host-namespace.js": "3bf6c37dc107d60defb2c892bbdda3363e5e25bd601621b3901f22eecf5029d6",
+    "packages/authority/dist/boundaries/host-publish.js": "4a2d5b90657212c33c2d25fd098b5e4e75415c4d04e37c7f38ba46340ff32cbc",
+    "packages/authority/dist/index.js": "95225e1cf8ca8b8c83ad9c3de3414bd09a3eee1ae6d837f0f6b0d29ede036bcc",
+    "docs/reference/error-codes.md": "970def534b24124e54d79673692824af7690ed46d07459ee6745f32b07415667",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/native-provision-checkpoint.json": "b5781dc107baee06410015fc031cd3372022ccd1c2234a1449a3115419dd149d",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/native-provision-interface.json": "1062f7f05db0d88505bac87fd0fc63d685bca53ba2e72003561a6dc2e485de0e",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/native-provision-namespace.json": "168d8bb1b1a438b7418c855213731ab1f7c472804dc72d143c7a53f46b811d81",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/native-provision-freshness-amendment.json": "029fbb5f8c487e1551e65ff4ea41b7ddeb30cf2bef0583184b0a697725af9a76",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/native-provision-census-amendment.json": "8ce2c612ead389a451ff537f53c684fe48d620e2ec10fd336c0b62839d9cc6e0"
+  },
+  "actual_environment": {
+    "node": "24.22.0",
+    "uv": "1.52.1",
+    "platform": "darwin",
+    "arch": "arm64",
+    "os_release": "27.0.0",
+    "fixture_filesystem_type": 26,
+    "claims_linux_qualification": false,
+    "synthetic_B5_and_TTY": true
+  },
+  "native_process_evidence": {
+    "fixture_manifest": "devai-native-provision-inspector-pcM4oz.json",
+    "actual_built_components": true,
+    "actual_native_sqlite": true,
+    "actual_policy_issuer_receipts_prepare_apply": true,
+    "live_holder_prevents_publication": true,
+    "holder_self_targeted_sigkill_then_fresh_success": true,
+    "seed_identity_bytes_unchanged": true,
+    "observed_raw_anchor_opens_and_closes_in_successful_lock_window": 0,
+    "self_targeted_sigkill_after_real_issuer_link": true,
+    "post_link_remnant_preserved_and_future_bootstrap_refuses": true
+  },
+  "authenticated_census": {
+    "fixture_manifest": "devai-native-provision-inspector-7bAVNP.json",
+    "signed_kinds": [
+      "approval",
+      "renewal",
+      "revocation",
+      "phase-intent",
+      "phase-completion",
+      "lease"
+    ],
+    "oracle": "Independent canonical JCS+LF and node:crypto domain+NUL+JCS HMAC under real disposable issuer key; actual schema checks fixture shapes",
+    "variants": [
+      "valid idempotent existing",
+      "valid MAC wrong filename/kind",
+      "tampered MAC",
+      "valid MAC foreign repository",
+      "valid MAC foreign worktree",
+      "valid MAC foreign approval ID"
+    ],
+    "observed_mutations_or_dispatches": 0,
+    "owner_grant_or_phase_authority_claimed": false
+  },
+  "other_qualified_cases": [
+    "direct and registered linked actual committed Git contexts",
+    "distinct fresh seed/issuer plan targets and genuine receipts",
+    "independent artifact byte/hash/HMAC/provision-context oracles",
+    "readonly/cancel zero persistent inventory changes and zero observed parent-process fs mutators",
+    "exact method receiver/ALS/replay custody and foreign selector STALE refusal",
+    "wrong confirmation cancellation and write consent refusal",
+    "same-flow seed plan and independently computed fresh precursor-resume plan",
+    "idempotence without issuer/key rotation despite fresh current HEAD/B5",
+    "supported0755 devai ancestor unchanged; protected leaf0700/files0600",
+    "namespace mode/link/unknown-remnant drift and seed byte/mode/hardlink drift",
+    "pre-effect HEAD/B5 STALE with no observed mutation",
+    "late actual precursor/staged-file fsync HEAD/B5 drift terminal indeterminate, no issuer link, precursor preserved",
+    "actual precursor fsync native cause redacted into safe terminal indeterminate",
+    "real oversized closed root and approvals directory bounded cursor reads/closure, no bulk enumeration, exact preservation"
+  ],
+  "source_review": {
+    "receipt": "authoring/b1-provision-review/source-review.json",
+    "authentic_findings": "NP01 late native freshness; bounded census allocation observation",
+    "historical_replay_preserved": true,
+    "note": "Reviewer owns independent evidence; current exact four-path and packet hashes are sealed here",
+    "receipt_sha256": "0077d31c767da4488ad25c78b27cd57c3642f3646deffe7fe08aaaed1d126ee5",
+    "exact_scope": "Freshness source review covers namespace before cursor-only census amendment; final exact cursor source is independently exercised in final36case run and sealed current input manifest. Root owns final aggregate review."
+  },
+  "diagnostic_reference": {
+    "current_sha256": "970def534b24124e54d79673692824af7690ed46d07459ee6745f32b07415667",
+    "new_codes": [
+      "RECONCILIATION_PROVISION_INVALID",
+      "RECONCILIATION_PROVISION_STALE",
+      "RECONCILIATION_PROVISION_UNSUPPORTED",
+      "RECONCILIATION_PROVISION_REVIEW_INVALID"
+    ],
+    "exact_new_rows": 4,
+    "without_new_rows_sha256": "4e944a0c52bf8d0ea1594f68a882ff5f9699e902e0b3849cad1eb23fd5099955",
+    "historical_1299_sha256": "4e944a0c52bf8d0ea1594f68a882ff5f9699e902e0b3849cad1eb23fd5099955",
+    "inverse_matches_historical": true
+  },
+  "historical_inputs": "historical-input-verification.json; six prior sealed receipts unchanged, selected old tests preserved",
+  "historical_runs": [
+    {
+      "log": "structural-red.txt",
+      "pass": 0,
+      "fail": 2,
+      "standing": "authentic required-module absence before source"
+    },
+    {
+      "public_log": "independent-first.redacted.txt",
+      "pass": 8,
+      "fail": 3,
+      "standing": "incorrect bare-JCS test oracle; exact codec format is JCS+LF; diagnostic disclosure corrected with boolean private oracles"
+    },
+    {
+      "log": "independent-second.txt",
+      "pass": 29,
+      "fail": 1,
+      "standing": "foreign valid root intended STALE, fixture incorrectly expected INVALID"
+    },
+    {
+      "log": "final-behavior.txt",
+      "pass": 413,
+      "fail": 1,
+      "standing": "resume oracle wrapper destructuring corrected and independently re-executed"
+    }
+  ],
+  "private_artifacts_excluded_from_publication": [
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-inspector/independent-first.txt",
+      "sha256": "68d353c5c3255172d738bbc7915583cd38f0c7236ceda67c52043c88c9bcccf6",
+      "mode": "0o600",
+      "reason": "Original failure diff contains disposable private issuer keys/MACs; retain local audit bytes only, never public index payload or source publication",
+      "public_redacted_view": "independent-first.redacted.txt",
+      "gitignored": true
+    }
+  ],
+  "limitations": [
+    "B5 and TTY deterministic synthetic fixtures, not real installed provenance/public transport",
+    "Darwin filesystem type26 only; no Linux/unknown filesystem or VFS power-loss qualification",
+    "Counterexample and process cases are bounded, not exhaustive combinations or compromised-runtime isolation",
+    "Observed parent-process fs instrumentation is not whole-OS transient trace; anchor counters cover actual successful BEGIN-to-ROLLBACK window",
+    "No full five-minute elapsed native-expiry wait; independent pure clock equality/overflow/adversarial cases remain separate preserved qualification",
+    "Namespace per-file/per-leaf/aggregate bounds beyond exercised root and approvals-directory thresholds are source-reviewed, not every resource-limit combination fault-tested here",
+    "Authenticated census is structural/MAC validation, not Owner approval custody/grant graph/phase/index authority",
+    "Installed/public positive, registry/default grants, real terminal custody, release closure and DETRAN remain unqualified by this component"
+  ],
+  "inspector_writes": [
+    "packages/authority/tests/unit/reconciliation-host-provision.test.ts",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-inspector/"
+  ],
+  "graft": {
+    "packet_calls": 4,
+    "packet_estimated_tokens_saved": 52667
+  },
+  "private_diagnostic_scan": "diagnostic-private-material-scan.json; zero exact known disposable key/base64 digest/MAC values in public artifacts/test",
+  "evidence_sha256": {
+    ".gitignore": "b70261272e803438b612e3496d0f285f72a3e7ed15530ebbbd05e6154aa9e906",
+    "README.md": "849acb717cd69ac72fe04b141ddbc94c42c494f978aaa0c932606fc95255745c",
+    "devai-native-provision-inspector-7bAVNP.json": "f9a118b5a6b57f5fcf62fc6bd9ee49326bbf63e179271217d28e9d32d04b6136",
+    "devai-native-provision-inspector-Y8cI1s.json": "341c3b464cb444bd523465832d5e68659de3aaf4b564a429be79165c45b2be19",
+    "devai-native-provision-inspector-pcM4oz.json": "a9cb78fa993bcd9316d944c3482937d0bb19f7e26a938229d590789b4a91a5f1",
+    "diagnostic-private-material-scan.json": "74a6f350e71e657da7f56aa2577d1cc940a94e2472f9a14508554b5b17778bca",
+    "diagnostic-reference-delta.json": "f9ab87598155deaf31b0fe0231cb11e8ffb98b7752f235034765d7e411db9314",
+    "final-behavior.txt": "faab3950ccbbaf40d4aa8ff14f075ba37252b24d669e48946e895e9994388abe",
+    "final-census-and-resume.txt": "e516bf71c326b914a28811f54f7072e5577877734fdeffa4376c61f49ee6b81b",
+    "final-input-verification.json": "f525a7fbeaddff2e8e8fa15539e690df9a4ddc76e27114e15d1429fa27729dc3",
+    "final-run-inputs.json": "47f8856ba27ed3fa194f9c6cbbc70ecfba9ca40ccce0dc4d01095a0aad0cc8d3",
+    "first-run-inputs.json": "8013e2731f2557c832a5e0f964b633cbdb5b147a7895702d41dcdc1d16be5784",
+    "follow-on-inputs.json": "09ffaa7817e5f37486a4c1dcb63a2997c106445c5bcc659c82f45698f17f574c",
+    "format-draft.txt": "030a472d2b76c7ea85d621734ca39b500abaa34042f63e3216c73ca5e8f97495",
+    "format-draft2.txt": "f1e47678d049983f3b46db63cb1ad252fe47c2b3a79c831e214acca8fddf2d91",
+    "format-draft3.txt": "14e44606c6d7b5ed4f176466584be586c819e92fb655c03f9dd3fac4e584b158",
+    "format-final.txt": "9a047bca19390f90234e566131a549fefdde204b2f6b6173253d4d68013d7ea8",
+    "historical-input-verification.json": "2e069897b58ed0ae3a51c89528ac05b0f49c3f1abcfcf5c867064c56f3ffb52c",
+    "independent-first-receipt.json": "040f750b731bef50a5dcdd14dd69e7ae1811efb71e52f166bf83f970d6962c47",
+    "independent-first.redacted.txt": "43b93f46aa7d22ed7a775ebdfd6888311a0835e68a32d219d6126e4d44182367",
+    "independent-second.txt": "43fad9623022877d3b30602b2579b93997a35fca1240ab78a135e2cf30a1bd5d",
+    "lint-draft.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "lint-final.txt": "689d370e8c06bdc4d786c596f733e4fd11d13ae585434f61cc90eeeaf5155785",
+    "runtime-fingerprint.json": "42b6fad4eec9f155360b5b99b881510f1372d78a8c12c319e41dff7080db0f8c",
+    "second-run-inputs.json": "4e2613345c0a7290aa80ff755f2ddeaa34c1e4f2f6bc16e3411f4f3db3d672c1",
+    "structural-red-receipt.json": "ff1079530bb40e683449ad5b8d0a2f0dbddd165816dc69e9a17f8f58fd978d6f",
+    "structural-red.txt": "f869c9b797be5054f34f94465ee19453fed791a4df10aeb9961b53767c7004d5",
+    "test-eslint-draft-2.txt": "689d370e8c06bdc4d786c596f733e4fd11d13ae585434f61cc90eeeaf5155785",
+    "test-eslint-draft.txt": "689d370e8c06bdc4d786c596f733e4fd11d13ae585434f61cc90eeeaf5155785",
+    "typecheck.txt": "3801203c7d9e4544ad471c57f0ab2386897e4413121a6c6be2a61c5af2fd37fb"
+  }
+}

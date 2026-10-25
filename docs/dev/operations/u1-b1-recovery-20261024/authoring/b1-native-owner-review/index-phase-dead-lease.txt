@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/index-phase-dead-lease.txt","kind":"historical-transcript-custody-pointer","original_bytes":1276,"original_bytes_changed":false,"original_sha256":"e0c6105ea0cfa25cfef8b7fd3f66b77b49074410ca8e26ada3d387218f877467"}

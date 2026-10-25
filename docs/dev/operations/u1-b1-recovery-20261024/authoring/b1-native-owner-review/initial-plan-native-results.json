@@ -1,0 +1,18 @@
+{
+  "kind": "independent-native-initial-plan-fixture",
+  "fixture": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-initial-owner-plan-CoZWmr/repository",
+  "qualification": "Actual historical Git and local bare remote; synthetic B5 and invocation origin; no installed/public Owner approval claim",
+  "passed": [
+    "actual335 exact saved-plan positive recapture",
+    "noncanonical bytes refuse even with matching sealed digest",
+    "sealed digest mismatch refuses",
+    "leaf symlink refuses",
+    "same bytes in replaced pathname inode refuse after actual capture",
+    "actual working source drift after initial snapshot refuses"
+  ],
+  "plan_sha256": "6d0956516f2e3ab5de0076c96fc0ba8916f7da6f462474e05573d3a197bba2ab",
+  "source_manifest_sha256": "204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5",
+  "index_sha256": "542553c911bcd2f5e65dd8a27b66f0f1dbcb703278477cb27df920ede95eadce",
+  "effect_calls": 0,
+  "drift_hooks": "Harness-only actual spawnSync post-observation mutation; no runtime provider."
+}

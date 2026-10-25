@@ -1,0 +1,45 @@
+{
+  "status": "FROZEN_PURE_CLOCK_ELIGIBILITY_FOR_INDEPENDENT_RED",
+  "authority": "Accepted ADR-EVI-0007 and owner-clock-amendment.json under internal v2.8.0 authorization; no role declaration is required for this maintainer implementation",
+  "source": "packages/authority/src/runtime/reconciliation-clock.ts",
+  "test": "packages/authority/tests/unit/reconciliation-clock.test.ts",
+  "scope": "Pure deterministic eligibility/data validation only. No filesystem, process, OS clock read, native lock, signature, key, approval, CLI route, authority handle, barrel export or write permission. Final host must supply separately qualified actual observations; caller data never becomes trusted time or action authority.",
+  "api": {
+    "ReconciliationClockObservation": "Readonly exact4 fields: clock_source literal node-uv-hrtime-ns-v1; boot_id lowercase hyphenated UUID; monotonic_ns positive canonical uint64 decimal string; wall_ms nonnegative safe integer number",
+    "ReconciliationClockError": "Error name ReconciliationClockError; code one of closed5 codes below; message exactly code, no cause or offending value",
+    "validateReconciliationClockObservation": "(value: unknown) => ReconciliationClockObservation; returns distinct frozen copy after descriptor-only flat validation",
+    "checkReconciliationClockWindow": "(issued: unknown, observed: unknown, kind: 'review'|'grant', predecessor?: unknown) => Readonly<{wall_elapsed_ms:number; monotonic_elapsed_ns:string}>; returns only elapsed metadata after all eligibility checks, throws a closed error otherwise"
+  },
+  "shape": [
+    "Exact own enumerable data properties, plain/null prototype, no unknown keys, symbols, getters, Proxy or non-JSON values. Never call valueOf/toString/toJSON or mutate any input.",
+    "UUID is exactly36 lowercase ASCII hex/hyphen characters in8-4-4-4-12 layout, no newline/whitespace/aliases. Host boot reader normalization remains separate.",
+    "monotonic_ns matches positive canonical decimal1..18446744073709551615 inclusive, at most20 digits; zero, signs, leading zeros, exponent, whitespace, Number/BigInt values refuse. Use BigInt only after syntax/length validation.",
+    "wall_ms is finite nonnegative Number.isSafeInteger, rejecting negative zero. Max is Number.MAX_SAFE_INTEGER. No string coercion."
+  ],
+  "comparison_order": [
+    "Validate kind and all supplied observations first. An explicitly supplied null or other malformed predecessor is invalid; omitted/undefined means no predecessor.",
+    "Reject issue plus full requested lifetime overflowing uint64, or wall safe-integer range, as CLOCK_INVALID rather than wrap/saturate.",
+    "BOOT_CHANGED when current or predecessor boot differs from issue. Source is fixed by shape.",
+    "ROLLBACK if observed wall or monotonic is below issued or any supplied predecessor. A predecessor may precede issued, as renewal can follow an earlier intent; it must share the boot.",
+    "DIVERGED if absolute elapsed wall*1000000 minus monotonic elapsed exceeds2000000000ns, relative to issued OR supplied predecessor. Equality at2000000000ns remains allowed.",
+    "EXPIRED if elapsed wall >=review300000ms/grant900000ms OR monotonic elapsed >=review300000000000ns/grant900000000000ns. Equality is expired. Never compute via floating nanoseconds.",
+    "Return distinct frozen elapsed-only metadata after all checks; no authority/grant/successful-effect marker."
+  ],
+  "codes": [
+    "RECONCILIATION_CLOCK_INVALID",
+    "RECONCILIATION_CLOCK_BOOT_CHANGED",
+    "RECONCILIATION_CLOCK_ROLLBACK",
+    "RECONCILIATION_CLOCK_DIVERGED",
+    "RECONCILIATION_CLOCK_EXPIRED"
+  ],
+  "required_independent_tests": [
+    "Authentic absent module RED, all exact supported observation values and independent frozen copies",
+    "Every malformed key/prototype/getter/Proxy/coercion/UUID/decimal/safe-number/negative-zero/uint64-overflow case refuses without touching traps or mutating inputs",
+    "Review/grant just-before, exact-equality and after-expiry; wall-only and monotonic-only expiry with drift within guard; BigInt values beyond2^53 retain exact1ns boundary differences",
+    "Issue/predecessor sameboot, changedboot and rollback; predecessor earlier than renewed issue remains permitted if current observation passes every comparison",
+    "Both signs of wall/monotonic disagreement at exact2s and beyond2s; predecessor-relative drift must also refuse",
+    "No raw input or getter/Proxy marker in errors; malformed explicit predecessor refuses even if other inputs would expire",
+    "Source is pure and adds no caller/permission/host qualification. Unchanged existing authority/policy tests preserve their original inputs and expectations."
+  ],
+  "remaining_host_tests": "Actual boot reader source/normalization/sampling order and250ms bound, fixed runtime/platform/time namespace, actual cross-process shared epoch, wall adjustment/reboot/suspend handling, private handle ownership and all public Owner/review consumers remain separate implementation gates. This pure helper alone qualifies none of them."
+}

@@ -1,0 +1,24 @@
+{
+  "standing": "IMPLEMENTED_GENUINE_COUNTEREXAMPLE_FIXES_PENDING_FINAL_FULL_SUITE_RECEIPT",
+  "source_sha256": "7cfcf6a1f504698a11ec40d1cf08fde86038ec389e5df3964caa5c7b61d3a54d",
+  "dist_sha256": "605ac8cb6e76343fd4bd17ef2f0de1e7a0659b2bdd4c25112624999d8638b1a7",
+  "design_receipt_sha256": "c423e824531920c50cad91752db1388d21867a8299373e558300f9dde8f70ca8",
+  "source_review_sha256": "6d1e309a60f95a06af969d052c911e38f36da812a4c6d6e1f98af3d79e6d1ac2",
+  "resolutions": [
+    {
+      "finding": "SRC-01",
+      "rule": "Only lstat ENOENT is absent; canonicality/type/owner failures for existing directory entries refuse. Dangling symlinks cannot be treated as missing namespaces."
+    },
+    {
+      "finding": "SRC-02",
+      "rule": "Observed repository/pin/runtime/boot revalidation failure permanently marks the captured context STALE until disposal. Returning HEAD to original value cannot revive that context. Fresh capture is required. This does not detect unobserved transient drift or automatically renew any approval."
+    }
+  ],
+  "diagnostic_reference": {
+    "count": 1294,
+    "sha256": "254bcc6bbc7ab21005a57894e43f8648fef0ab50b10e39f85674f7c6767716cf",
+    "prior_1288_reconstructed_after_removing_exact_six_host_rows": "542a8002916715801dec36c4894e9e9444e6e44ed4db9f088c815b2861c54ab6",
+    "non_diagnostics": "Eleven literal GIT environment variable names are explicitly NOT_CODES; no diagnostic permission or prefix widened."
+  },
+  "remaining": "Actual Owner/bootstrap namespace and native-lock composition, opaque operation/effect/broker integration, five public actions, full materialization/index/staged workflow, final candidate/integration/CI/RC/publication remain required."
+}

@@ -1,0 +1,58 @@
+{
+  "status": "VERIFIED_WITH_EXPLICIT_HELD_FAILURES_AND_PUBLIC_GAP",
+  "observed_at_utc": "2026-10-24T15:15:21.513284+00:00",
+  "protected_sources_checked": 140,
+  "live_files_checked": 43,
+  "old_manifests": [
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/packet-manifest.json",
+      "sha256": "5152b029680c17089ccc8ae5b438d29790f806435489248c56b52444b1d208bf",
+      "entries_checked": 29,
+      "mismatches": []
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/return-artifact-manifest.json",
+      "sha256": "bf7149be529fc5b50ff5f162494e835e42b3995551282559ca8f416e524bcfaa",
+      "entries_checked": 16,
+      "mismatches": []
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authority-policy-preview-approval/packet-manifest.json",
+      "sha256": "284d3c9d1fae8c676c14b69ee49011f9cd7b779d69d27461e417b0310835a8a2",
+      "entries_checked": 5,
+      "mismatches": []
+    }
+  ],
+  "preservation_mismatches": [],
+  "real_policy_absent": true,
+  "historical_selected_tests": {
+    "passed": 147,
+    "failed": 2,
+    "meaning": "absent policy and held1.1pin versus successor1.2"
+  },
+  "p1_inspector_six_path_tests": {
+    "passed": 145,
+    "failed": 7,
+    "total": 152,
+    "meaning": "five required public flows blocked; two unchanged cases cannot resolve installed constitution asset"
+  },
+  "test_selections_overlap": true,
+  "architect_and_generated_formatting": "PASS",
+  "engineer_nine_path_formatting_lint": "PASS; engineer logs",
+  "inspector_formatting_lint": "PASS; final extended logs",
+  "error_reference_generator_check": "PASS;1257 codes",
+  "git_diff_check": "PASS",
+  "source_typecheck": "BLOCKED unbuilt workspace declarations; no build performed",
+  "devai_check_affected": "NOT RUN; packages/cli/dist/runtime/index/bin.js absent; build remains outside scope",
+  "public_protocol": "BLOCKED; action-output.ts excluded from approved scope",
+  "live_preview": "NOT RUN",
+  "integration": "HELD",
+  "existing_issuer_boundary_tests": {
+    "passed": 120,
+    "failed": 0,
+    "files": 5,
+    "standing": "unchanged lower-boundary checks; no public/installed qualification"
+  },
+  "all_twenty_implementation_paths_formatting": "PASS; final-format.txt",
+  "source_and_tests_frozen": true
+}

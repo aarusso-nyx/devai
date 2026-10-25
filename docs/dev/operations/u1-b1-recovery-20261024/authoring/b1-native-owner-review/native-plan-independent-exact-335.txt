@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/native-plan-independent-exact-335.txt","kind":"historical-transcript-custody-pointer","original_bytes":636,"original_bytes_changed":false,"original_sha256":"995755de6e68cef48831414b88f3a81acff4e7ae9d9c6e8e2b9800597b73a1f4"}

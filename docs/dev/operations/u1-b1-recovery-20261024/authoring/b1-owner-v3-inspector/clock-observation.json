@@ -1,0 +1,25 @@
+{
+  "node": "v24.22.0",
+  "uv": "1.52.1",
+  "platform": "darwin",
+  "boot_observed": "BB4143DF-40C6-43B7-A2C7-C88C606A2559",
+  "samples": [
+    {
+      "wall_ms": 1792868194690,
+      "uptime_ms": 589035000,
+      "hrtime_ns": "589033021720791"
+    },
+    {
+      "wall_ms": 1792868194817,
+      "uptime_ms": 589035000,
+      "hrtime_ns": "589033148227916"
+    }
+  ],
+  "child_exit": 0,
+  "child": {
+    "wall_ms": 1792868194873,
+    "uptime_ms": 589035000,
+    "hrtime_ns": "589033204868666"
+  },
+  "scope": "Disposable read-only observation only. No clock adjustment, reboot, suspend or monotonicity proof. hrtime is observed as a candidate only, not adopted as protocol."
+}

@@ -1,0 +1,76 @@
+{
+  "kind": "ONE_FROZEN_INSTALLED_PUBLIC_DISPOSABLE_HANDOFF",
+  "version": "2.8.0",
+  "tarball": "/Volumes/Development/.codex/artifacts/devai/u1-b1-public-native15-20261025/aarusso-nyx-devai-2.8.0.tgz",
+  "tarball_sha256": "8133477cb170f613798cc6e6a4d2dcc41a8a4a1c2ab4b0517fe7913e0176fb2a",
+  "tarball_integrity": "sha512-WIKyQFTWpoSct1/HQKVSAUlZ1VyOZcb3rSiBQWpurd+nzI0RKpEjHRvIqevOh0ehengMu8yNOMY3ky4Q52F3+g==",
+  "sbom_sha256": "f28afa1ea8bc9fa40e39f44fc6adae95a74adea161bb0da8430317ee27401835",
+  "public_driver": "/Volumes/Development/.codex/artifacts/devai/u1-b1-public-native15-20261025/reconciliation_public_workflow.py",
+  "public_driver_sha256": "721e0b6ff6d031caf33ab1594c18e00b084444f28523b31957eb5969879676b1",
+  "source_head": "2d196c97aec0d511f4424a7d77a6e82771181c42",
+  "implementation_fix_commit": "82402df21504e3787d54d4d22d8d43c694720731",
+  "runtime": {
+    "arch": "arm64",
+    "executable": "/Volumes/Development/runtimes/nvm/versions/node/v24.20.0/bin/node",
+    "executable_sha256": "9d050fd455b56426e25d4d603c7c501cbb2630348e836cf221dcce748e90588a",
+    "node": "24.20.0",
+    "platform": "darwin",
+    "uv": "1.52.1"
+  },
+  "workflows": {
+    "native15-335": {
+      "result_sha256": "094b3c6d48ee39c1f681d477de85d09b9308340ea5704a2f30b0e2e37e31f373",
+      "actual_closed_stdout_receipt_sha256": "951f83f9a5ab2b1207894095c62c4c9d841a0d54a4b3184e23f61494b6c82c03",
+      "verification_sha256": "15c45cfa9851cd5616a087616830862da874b99c74fd3b95b35398ac1e0a1234",
+      "fixture_root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-detran-historical-bv7gdE/repository",
+      "plan_sha256": "a944294973481f2ebc44a34b907047fb468e7c2ae224ad1bfb980c4792483b6b",
+      "approval_id": "e7e44bb6f3530e640a1498fc2d3c0129e0b0d2b501477aaaf10e2af03e61e2c2",
+      "source_manifest_sha256": "350b7ef676d6f020bb99c44a028f9e0d407eec0658e50210e65be183c3f50c9c",
+      "verification": {
+        "standing": "READ_ONLY_FINAL_WITNESSES_PASS",
+        "all_non_proof_index_entries_unchanged": true,
+        "seven_outputs_match_bytes_sha256_and_mode": true,
+        "epoch_and_parents_unchanged": true,
+        "published_prefix_records": 335,
+        "final_chain_records": 338,
+        "actual_closed_stdout": {
+          "exit": 6,
+          "indeterminate_custody_preserved": true,
+          "new_domain_effects": false
+        },
+        "live_detran_effects": false
+      }
+    },
+    "native15-449-reviewed": {
+      "result_sha256": "ef1528592a945c46152588f6cd302f09990e6a16ef6a57afa8569fd942264cfc",
+      "actual_closed_stdout_receipt_sha256": "b1f4989a6b8d95522b84f4df98a352e5c7b1a31774b337ecf6df5e50fdf8534a",
+      "verification_sha256": "4f1f7b057870092b23abf16e84febe553f57fe9fa952a8983e767849f7c4cde1",
+      "fixture_root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-detran-refreshed-native15-dr7qf2hb/repository",
+      "plan_sha256": "9831536744e1f93c7149617db7bb83d0728f1bb8bbe59302bd33c128b3292071",
+      "approval_id": "d4e6f356efb9aed8a9fff5ce3a33ff7c12389fa0200175931cb46ed340b32c32",
+      "source_manifest_sha256": "29d78418b03d6391256b12ecfd8837f4118787fcd8b61e3653ad85586c22935d",
+      "verification": {
+        "standing": "READ_ONLY_FINAL_WITNESSES_PASS",
+        "all_non_proof_index_entries_unchanged": true,
+        "seven_outputs_match_bytes_sha256_and_mode": true,
+        "epoch_and_parents_unchanged": true,
+        "published_prefix_records": 449,
+        "final_chain_records": 452,
+        "actual_closed_stdout": {
+          "exit": 6,
+          "indeterminate_custody_preserved": true,
+          "new_domain_effects": false
+        },
+        "live_detran_effects": false
+      }
+    }
+  },
+  "common_ground": "preserve complete custody; select whole published prefix plus normal selection event; separate exact-head U1 and newest recovery; one proof-index CAS; seven immutable diagnostic bodies consumed through existing exporters",
+  "standing": "Exact installed disposable qualification complete; integration, protected RC, stable publication and DETRAN live adoption remain separate",
+  "holds": [
+    "DETRAN live installation/recovery pending exact D1-L",
+    "DETRAN #211 merge",
+    "C6",
+    "S3"
+  ]
+}

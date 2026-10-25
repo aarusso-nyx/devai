@@ -1,0 +1,29 @@
+{
+  "result": "PASS",
+  "scope": "immutable SQLite kernel-lock anchor feasibility only; not B1 adapter acceptance",
+  "node": "v24.22.0",
+  "seed_sha256": "3f6b742405bb199a11ed0952c9aa049285ef25dc69954e901d2e987cd15c4372",
+  "seed_bytes": 8192,
+  "seed_unchanged": true,
+  "seed_inode_unchanged": true,
+  "no_sidecars_during_or_after_lock": true,
+  "live_contender": {
+    "acquired": false,
+    "errcode": 5
+  },
+  "holder_exit": -9,
+  "serialized_external_counter": [
+    {
+      "acquired": true,
+      "before": 1,
+      "after": 2
+    },
+    {
+      "acquired": true,
+      "before": 0,
+      "after": 1
+    }
+  ],
+  "db_mode": "0o600",
+  "fixture_retained": "/private/tmp/devai-release-280-01a16e18/owner-admission-probe/immutable-sqlite-admission-7cdwop8p"
+}

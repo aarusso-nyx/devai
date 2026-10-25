@@ -1,0 +1,72 @@
+{
+  "standing": "VERIFIED_PRE_REFUSAL_ENUMERATION_NOT_RESOURCE_CAPPED_COUNT_REFUSAL_CORRECT",
+  "source_sha256": "cd7574ba6e32c714ff99955bc1549e5083606b00644836823cb2a0c3193132d6",
+  "source": "packages/authority/src/boundaries/reconciliation-host-namespace.ts",
+  "finding": {
+    "id": "NP02",
+    "scope": "Boundedness audit only; preserved prior source-review.json is historical freshness-review acceptance.",
+    "actual_behavior": "readdirSync(root).sort() returns a full namearray before the4096 child/file count checks; closedroot also enumerates+sorts every entry before unknown-name refusal. Same fullenumeration pattern repeats in entry-list rereads.",
+    "exact_claim": "The current code enforces accepted counts correctly, but does not cap the enumeration allocation/work before refusal. If boundedcensus is interpreted solely as accepted-population size, that property already holds. It cannot support a maximum enumeration resource bound with current API usage.",
+    "packet_basis": [
+      "native-provision-checkpoint.namespace.closed_contents: Bounded census, no recursion outside that closed tree.",
+      "native-provision-namespace.approvals.maximum_children4096, bounds.files_per_approval_directory4096, total_approval_files16384; closedroot permits only3names."
+    ],
+    "observed_product_result": "Closed RECONCILIATION_PROVISION_INVALID refusal, not falseacceptance.",
+    "not_claimed": [
+      "No out-of-memory, measured exploit, authority widening or native write was observed.",
+      "The refusal-only rootmetadata fixture does not authenticate an actual host or installed origin.",
+      "No invented failing product assertion: observational test passes because it proves existing allocation and correct refusal."
+    ]
+  },
+  "primary_runtime": {
+    "source": "process.binding(natives).fs exact embedded function readdirSync from actual Node24.22.0",
+    "path": "node24-readdirSync-primary.txt",
+    "sha256": "3b44b3b775d38bfc0271e462e15e0c51d37aaeafabec3239c73880ed010d82af",
+    "implementation": "Calls binding.readdir(path,encoding,withFileTypes) and returns its entire result; no countlimit parameter or early cap supplied by product."
+  },
+  "actual_observation": {
+    "closed_root_limit": 3,
+    "closed_root_cursor_read_count": 4,
+    "observation": "oversized-directory-resource-bound",
+    "actual_namespace_result": "closed INVALID refusal",
+    "actual_readdir_materialized_names": 10000,
+    "candidate_child_limit": 4096,
+    "candidate_cursor_read_count": 4097,
+    "candidate_buffer_size": 32,
+    "node": "24.22.0",
+    "uv": "1.52.1",
+    "platform": "darwin",
+    "fixture": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-census-observation-eXUdP5"
+  },
+  "recommended_bounded_fix": {
+    "primitive": "opendirSync with fixed small bufferSize (observed32), iterate until acceptedmax+1, closeSync in finally, then sort only bounded names. Equivalent genuinely bounded iteration is acceptable; opendir itself may prefetch one bounded native batch.",
+    "caps": {
+      "closed_root": 3,
+      "approval_directories": 4096,
+      "files_per_approval_directory": 4096
+    },
+    "application": "Apply helper at every initial and later reread census site; retain exact sorting/name/MAC/identity/recheck/currenterror meaning. Existing totalfiles16384 check remains.",
+    "preserved": "No new accepted name, file, record, permission, cleanup or grapheligibility. A changed refusal timing is not an authorization widening."
+  },
+  "verification": {
+    "observational_cases_pass": 1,
+    "fail": 0,
+    "log": "census-observation-final.txt",
+    "fixture_mutation": "10,000 empty files only in disposable external owned directory, no native issuer/seed/public positive. No checkout product/test edits or builds.",
+    "candidate_cursor": "On same actual directory JS readSync returns4entries at rootcap3+1 or4097 at childcap4096+1, closes promptly, using bounded32entry native prefetch. Not a claim that OS reads exactlymax+1 entries."
+  },
+  "evidence_sha256": {
+    "census-observation.test.ts": "65a07ade8913abc80a03955d61eb3b3c560b6280713d6ba398fdef2ee0bf7982",
+    "census.config.mts": "1e1d02826914da8130ce094240e6c79b328f411ab968e803e36f974e16177b68",
+    "census-native-observation.json": "27663c5724bd89525720e775eafbc1e06fcb5953cebf2c07b544582b70618135",
+    "census-observation.txt": "5438c03686832f336b3843f92c8f0f1156ecd08b776bd6d52d5c3349a1f735ac",
+    "census-observation-final.txt": "071d32e42646626589f75c45de0e454d018223b21c5a839f5724ed7e6206b2c1",
+    "node24-readdirSync-primary.txt": "3b44b3b775d38bfc0271e462e15e0c51d37aaeafabec3239c73880ed010d82af"
+  },
+  "graft": {
+    "current_calls": 1,
+    "current_estimated_tokens_saved": 22284,
+    "cumulative_successful_calls": 21,
+    "cumulative_estimated_tokens_saved": 407660
+  }
+}

@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-typed-boundary-inspector/unchanged-rc-containment.txt","kind":"historical-transcript-custody-pointer","original_bytes":273,"original_bytes_changed":false,"original_sha256":"dad58503a769f6fea55cba5e43856956a486ee36a97a3ff65170bd73b98ffec1"}

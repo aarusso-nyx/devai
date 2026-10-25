@@ -1,0 +1,29 @@
+{
+  "fixture": "/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-plan-index-stages-v19pmeoi",
+  "git_version": "git version 2.54.0 (Apple Git-157)",
+  "actual_ls_files_stage": "100644 495b87c6b7e4703a60fccf2d70628a769d5b44b5 1\tlaw/security/authorization.json\n100644 9da32dabef52f85bce8ecc744786f9154dcb36e6 2\tlaw/security/authorization.json\n100644 1b0f7e44bb608f63e4efd9664c1b1ad80a74988a 3\tlaw/security/authorization.json\n",
+  "blobs": [
+    {
+      "stage": 1,
+      "path": "law/security/authorization.json",
+      "oid": "495b87c6b7e4703a60fccf2d70628a769d5b44b5",
+      "sha256": "12aa017d945e8347b0a899afcf9dbdc27eeb83cf2e7a5e3efc9ddc79d74a79ab",
+      "bytes": 19
+    },
+    {
+      "stage": 2,
+      "path": "law/security/authorization.json",
+      "oid": "9da32dabef52f85bce8ecc744786f9154dcb36e6",
+      "sha256": "6209ec3e892ad2feaef8f91ef69c5f1966c104c60ef3db0deeebb9646ee5dc22",
+      "bytes": 19
+    },
+    {
+      "stage": 3,
+      "path": "law/security/authorization.json",
+      "oid": "1b0f7e44bb608f63e4efd9664c1b1ad80a74988a",
+      "sha256": "8d0973259401138d60fcef396846a88a100902b3313854d40474590c76b666fb",
+      "bytes": 19
+    }
+  ],
+  "finding": "A permitted unresolved authorization path has three distinct indexed blobs. A complete indexed source manifest needs stage in its composite key (path,stage)."
+}

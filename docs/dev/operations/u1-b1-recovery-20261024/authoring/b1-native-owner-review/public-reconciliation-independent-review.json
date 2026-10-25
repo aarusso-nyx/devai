@@ -1,0 +1,59 @@
+{
+  "kind": "independent-public-reconciliation-source-review",
+  "qualification": "Source/schema/routing/output-boundary review only. Fault tests register actual CLI handlers but deliberately mock native facet, B5 lookup and inventory composer; no nativeeffects, no installedpackage/publicworkflowclaim. Native Ownerrevoke-preview/cancel uses actual protected fixture and synthetic B5/policy/TTY; no writes.",
+  "findings_closed": [
+    "Exact four required valued savedplan arguments no longer use generic planOnly shortcut; native closedgrammar runs before shortcuts.",
+    "Exact three machine phase output transports preserve closed knowncustody through finalizer/stdout/schema failures.",
+    "Owner terminal custody captured before schema validation; native review retained until capture.",
+    "Closed custody projection retains known Owner approval digest/action/sequence and excludes arbitrary extra/private fields."
+  ],
+  "checks": [
+    {
+      "name": "actual saved native receipts plus grammar/routing/authorization/core-rule bounds",
+      "passed": 19,
+      "log": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/public-reconciliation-contracts-core-rules.txt",
+      "sha256": "25c17ee9d89484d9ff2df85069e302bca4eabbd7025a1b22034de061f8dcc480"
+    },
+    {
+      "name": "actual handler synthetic output/finalizer faults",
+      "passed": 5,
+      "log": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/public-reconciliation-output-fault-qualified.txt",
+      "sha256": "3b968973772873b1e787c8f85d43ccf55db6f04bad0bb1e4c64eae01f6d6e984",
+      "cases": [
+        "stageproof finalizer",
+        "stageproof stdout callback",
+        "stageproof invalid schema after native return",
+        "inventory finalizer",
+        "materialize selection throw with 1681 exact phase01 identities"
+      ]
+    },
+    {
+      "name": "actual native Owner revoke preview and cancellation schema/no writes",
+      "passed": 1,
+      "log": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/public-owner-preview-schema.txt",
+      "sha256": "08af2d9456be78ba95d461fba4538f393e073773bfc365a285e69d10c970b9fd",
+      "results_sha256": "a8f3717825b4896d90547e8212f64e4d98dc82225450a1e1c37e7fcfa8941bfc"
+    }
+  ],
+  "preserved_first_custody_loss": {
+    "log": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/public-reconciliation-output-fault-cac-alias.txt",
+    "sha256": "6f857aee5bec6b8915b817531fb3cae2e71f0b7f7fc4128a325e6435d4d82c3a"
+  },
+  "source_sha256": {
+    "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/cli/src/authority/index.ts": "30be1f4f98a9a1916923d8188dd9c378b1959b332210279a1c2f4ee21c6c3a34",
+    "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/cli/src/authority/policy-core-rules.ts": "e32e10c91a5ef3ea1070212dc47c48ac47a7cbea32a6dd4ed3fae6ea5b4af957",
+    "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/cli/src/action-output.ts": "eeb42442d9430782d07410c53d22be83e74190bc75e986db51e6561c697b9717",
+    "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/cli/src/reconciliation-phase-output.ts": "70eb652fdef3ef93b8ee9979d664da908aa359d243c5504e57d16f378aa04fb9",
+    "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/cli/src/reconciliation-owner-output.ts": "013b317454ace8b2cfe4d5d233e5bf28f93b5fcbe709bb67fa5485d8e41b1af2",
+    "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/cli/src/reconciliation-output-custody.ts": "422362bf1ba31bcc3d08f4d9cc7593a19918c2d693d26c4f2901c686ef5ad283",
+    "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/cli/src/commands/evidence/reconciliation-approve.ts": "b17d373d3ad9894ed72bdfe8b5420c339992ccb2128d30cdb281640801ed3ac9",
+    "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/cli/src/commands/evidence/reconciliation-phases.ts": "956c857dd3f975990fcdc3f80e74d709926d7235a03f6ef2eba02d6d5131e917",
+    "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/cli/src/commands/sense/bootstrap-inventory.ts": "6b09121165ed833b5f8b47d13d4dbd0e0f79d02dbca8df81e64db6ecb1493a50",
+    "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/src/reconciliation-native.ts": "3c05d73bed59f418a70ab1398040f9a7871935cf64c353d1220a1a68fae38ac9"
+  },
+  "limits": [
+    "Initial Ownerapproval preview not newly exercised by this publicschema run; installed genuine335/449 workflow remains parent gate.",
+    "Final source fresh03CAS not repeated by this review; historical actualCAS+failure+deadlease+settlement and current completedretry separately retained.",
+    "Whole workflow restart after03 is not qualified: phase02 retains original-index guard; phase02 repeat before03 and phase03/04 individual repeats are separately qualified."
+  ]
+}

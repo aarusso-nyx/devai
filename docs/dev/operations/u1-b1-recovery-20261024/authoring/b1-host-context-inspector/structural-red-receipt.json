@@ -1,0 +1,9 @@
+{
+  "standing": "AUTHENTIC_ABSENT_HOST_CONTEXT_MODULE_RED",
+  "passed": 1,
+  "failed": 1,
+  "raw_sha256": "a5e4da5ac96e27cbfe09dc8b5dc1609ce033153331c89e8e0823279d4b5b2108",
+  "test_sha256": "a15e7211c76795ce9213cb7d3eaee8bda6887cf6e1bab21870b65e749f18e3fe",
+  "packet_sha256": "9fe2c38674fd4fcdf5e0f314d536eeb13c7299d1122f3352a70b825ded4b54f5",
+  "meaning": "Actual source absent before root implementation; exact six-code contract census passes. No actual host behavior qualified yet."
+}

@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/plan-control-presence-red.txt","kind":"historical-transcript-custody-pointer","original_bytes":1724,"original_bytes_changed":false,"original_sha256":"2b10354e8107926ca8af93b3380f276f7f2e89302cf80683c948c14158088b79"}

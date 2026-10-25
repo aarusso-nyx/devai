@@ -1,0 +1,5 @@
+{
+  "packages/cli/src/action-output.ts": "11da5e163aa687ce01130367bf8b2715c19f56c5e8ef50bbc4e9c18459791c8d",
+  "packages/cli/src/commands/init/review-authority-policy.ts": "398ef75f3bdd5105e1f5d9ee6f6ae2faaffd718005a3a07d63999bb16ffa1efc",
+  "packages/cli/tests/unit/action-output-authority-policy-review.test.ts": "110a53769981b85e3612c0113d7fdab78cb86c510b89af1c2f2361f41b9c1e78"
+}

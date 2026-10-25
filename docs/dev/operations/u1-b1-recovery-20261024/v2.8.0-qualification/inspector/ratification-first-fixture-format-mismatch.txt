@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/v2.8.0-qualification/inspector/ratification-first-fixture-format-mismatch.txt","kind":"historical-transcript-custody-pointer","original_bytes":2837,"original_bytes_changed":false,"original_sha256":"a2e0861d26c57db16d82f485d1decbca0a3b5250446b88bce40bda2a7da8f788"}

@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/installed-provision-refusals.py", line 23, in <module>
+    assert error['code']==expected,(name,error)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ('missing-write', {'schemaVersion': '1.0.0', 'code': 'AUTHORITY_RECONCILIATION_INVOCATION_INVALID', 'class': 'contract-violation', 'exit': 7, 'message': 'authority reconciliation invocation invalid', 'remediation': 'Use a declared role and the required consent flags.', 'refs': {'doc': 'law/constitution.md#article-6'}, 'context': {'category': 'refused', 'action_id': 'init bind'}})

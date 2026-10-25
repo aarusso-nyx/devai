@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/package-witness-review-pinned-fd-qualified.txt","kind":"historical-transcript-custody-pointer","original_bytes":634,"original_bytes_changed":false,"original_sha256":"39c20679b9ac8d96d04ab391262ad6c0d0484b93d9a8bb79f6bdf3a3d31a1bd9"}

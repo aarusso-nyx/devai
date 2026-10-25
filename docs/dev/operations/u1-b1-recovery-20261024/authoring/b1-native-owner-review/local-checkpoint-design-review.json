@@ -1,0 +1,54 @@
+{
+  "kind": "independent-local-reconciliation-checkpoint-design-review",
+  "source_findings": [
+    {
+      "path": "packages/evidence/src/evidence/anchors.ts",
+      "lines": "272-356",
+      "finding": "HEAD-versus-working-tree proof/chain mutation detection only; no parent-transition history walk."
+    },
+    {
+      "path": "packages/evidence/src/evidence/anchors.ts",
+      "lines": "395-460",
+      "finding": "Historical guard precedes baseline and physical epoch checks; passing or checkpointing chain history does not bypass later validation."
+    },
+    {
+      "path": "packages/cli/src/authority/broker.ts",
+      "lines": "895-991",
+      "finding": "Broker owns canonical root, policy repository ID, actual invocation/issuer and exact installed B5 calculation; ordinary host scope lacks root/B5."
+    }
+  ],
+  "minimal_bridge": {
+    "transport": "Separate scope/issuer/invocation/root-bound WeakMap observation capsule; fixed eligible existing actions; no mutating invocation/role inference/caller provider.",
+    "native_reuse": [
+      "captureReconciliationHostContext",
+      "readReconciliationHostPaths",
+      "readNativeReconciliationNamespace",
+      "readReconciliationOwnerState",
+      "privately factored native approval-reader core"
+    ],
+    "observations": [
+      "actual local issuer-authenticated approval and phase01/02 intent/completion linkage",
+      "exact unchanged current B5 and HEAD/merge identity",
+      "custody manifest approved source SHA and original object SHA/GitOID/body",
+      "selected parent actual merge-parent original chain",
+      "exact authenticated selected-chain plus selection-event base",
+      "valid append-only suffix after selected base",
+      "stable namespace/source/HEAD/merge/chain rechecks before return"
+    ],
+    "exception": "Only canonical active-chain HEAD-prefix replacement finding during exact approved unresolved merge. Preserve original finding when native authentication is absent/invalid/drifting; never bypass proof epoch history or baseline/anchor/declaration checks.",
+    "read_only": "No admission-lock creation, private-state writes, general capability, signer or mutator. Double snapshot/revalidate and refuse concurrent drift.",
+    "clean_head": "When current chain equals HEAD no checkpoint is necessary for this historical guard; all other checks retain their own outcomes."
+  },
+  "counterexamples": [
+    "caller JSON or copied receipt cannot authorize",
+    "foreign worktree/root/HEAD/merge/B5 refuses",
+    "wrong/missing phase01/02 completion refuses",
+    "selection receipt/event alone without native authentication refuses",
+    "tampered custody or selected historical object refuses",
+    "noncanonical chain and epoch rewrites never exempt",
+    "selected prefix/event alteration refuses",
+    "unknown concurrent scratch/quarantine/namespace mutation refuses",
+    "clean committed checkout never requires local private issuer"
+  ],
+  "qualification": "Independent source/design review only; no implementation, new protocol, product edits, CI success or public runtime claim."
+}

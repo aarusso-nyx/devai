@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-adr-inspector/independent-first.txt","kind":"historical-transcript-custody-pointer","original_bytes":6005,"original_bytes_changed":false,"original_sha256":"7d217e505e8e797eacc862b9bf11dfd796c6244d4b21773fda9013130be5c566"}

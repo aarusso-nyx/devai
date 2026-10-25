@@ -1,0 +1,7 @@
+{
+  "source_and_three_final_contracts_verified": true,
+  "review_evidence_hashes_verified": 11,
+  "prior_native_seal_unchanged": true,
+  "prior_native_source_dist_test_packet_inputs_unchanged": 14,
+  "error_reference_deliberately_added_one_state_row_after_native_seal": true
+}

@@ -1,0 +1,61 @@
+{
+  "scope": "Pure independently signed graph fixtures; no native origin or effect authority",
+  "private_key_or_records_logged": false,
+  "observations": [
+    {
+      "kind": "empty-state",
+      "state": {
+        "kind": "reconciliation-owner-state",
+        "repository_id": "fixture-repository",
+        "worktree_id": "fixture-worktree",
+        "host_identity_sha256": "4740ae6347b0172c01254ff55bae5aff5199f4446e7f6d643d40185b3f475145",
+        "binding_sha256": "a92053f4c72aa2510fe706387ecb310103969a1641cefa955da3ce87fc7d8970",
+        "plan_sha256": "64879f7d6b960a01909762d911a32d4582c20010c5641ee90278b644a9e3b525",
+        "source_manifest_sha256": "41cf6794ba4200b839c53531555f0f3998df4cbb01a4d5cb0b94e3ca5e23947d",
+        "approval_id": "b0da65c9205ca85dd0607b9722e832ff2fd046df3d3ef6346ddab4d2034ed384",
+        "issuer_sha256": "52892c363322b15d601d049ff86e39d09c586f2790eef42030af8cc6ace03d50",
+        "approval_sha256": "f7960efadca343a7831d8116fb6f2bef6088f77b36bf6a2f169fd174bdd4d1f7",
+        "scope_sha256": "f243c12b86e27b8ee75f4f2f75b8256cf0583087d3788b68949f162dffd8f6d1",
+        "grant_sha256": "f7960efadca343a7831d8116fb6f2bef6088f77b36bf6a2f169fd174bdd4d1f7",
+        "grant_sequence": 1,
+        "grant_kind": "approval",
+        "lease_sha256": null,
+        "phases": [
+          {
+            "phase": "01",
+            "intent_sha256": null,
+            "completion_sha256": null
+          },
+          {
+            "phase": "02",
+            "intent_sha256": null,
+            "completion_sha256": null
+          },
+          {
+            "phase": "03",
+            "intent_sha256": null,
+            "completion_sha256": null
+          },
+          {
+            "phase": "04",
+            "intent_sha256": null,
+            "completion_sha256": null
+          }
+        ],
+        "grants_authority": false
+      },
+      "assessment": {
+        "phase": "01",
+        "grant_status": "live",
+        "disposition": "start",
+        "intent_sha256": null,
+        "completion_sha256": null,
+        "grants_authority": false
+      }
+    }
+  ],
+  "sha256": {
+    "packages/authority/src/runtime/reconciliation-owner-state.ts": "b59cce447c545f2bcb8396d384dac39613ca87c1721d0f12e3e16345edb0d2b8",
+    "packages/authority/tests/unit/reconciliation-owner-state.test.ts": "7c6b161141797656b738eea0192666cf7f660eb68d3ecf508493095416c85196"
+  }
+}

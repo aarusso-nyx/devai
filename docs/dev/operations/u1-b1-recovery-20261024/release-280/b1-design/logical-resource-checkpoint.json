@@ -1,0 +1,87 @@
+{
+  "status": "EXACT_LOGICAL_SHAPE_CHECKPOINT_FOR_INDEPENDENT_RED",
+  "adr": "law/adr/ADR-EVI-0007-owner-approved-merge-reconciliation.md",
+  "scope": "Pure closed target validation and exported types only. Shape classification grants no permission, opaque operation handle, private-host access or real index write.",
+  "source": "packages/authority/src/boundaries/reconciliation-resources.ts",
+  "test": "packages/authority/tests/unit/reconciliation-resources.test.ts",
+  "api": {
+    "isProofIndexResourceTarget": "(value: unknown) => value is ProofIndexResourceTarget",
+    "isReconciliationHostResourceTarget": "(value: unknown) => value is ReconciliationHostResourceTarget"
+  },
+  "shared": {
+    "record": "Plain Object or null prototype, own enumerable data properties only; reject accessors, symbols, arrays and unknown keys without executing getters.",
+    "logical_id": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+    "digest_and_approval_id": "^[a-f0-9]{64}$",
+    "mutation": "Never mutate input, perform IO, authenticate, issue handles or treat accepted shape as authority.",
+    "plans": "Exact-plan only; no new ResourceTargetSelector branch or wildcard admission. Actual policy target selectors must be separately closed and integrated."
+  },
+  "proof_index": {
+    "required_keys": [
+      "kind",
+      "id",
+      "repository_id",
+      "worktree_id",
+      "operation",
+      "proof_path",
+      "approval_id",
+      "plan_sha256",
+      "phase_sha256",
+      "before_index_sha256",
+      "other_entries_sha256",
+      "verified_chain_sha256"
+    ],
+    "kind": "proof-index",
+    "operation": "chain-cas",
+    "proof_path": "record/proofs/chain.json",
+    "id": "proof-index:<repository_id>:<worktree_id>:record/proofs/chain.json",
+    "digests": [
+      "plan_sha256",
+      "phase_sha256",
+      "before_index_sha256",
+      "other_entries_sha256",
+      "verified_chain_sha256"
+    ],
+    "meaning": "Only an exact current approved final chain may replace the one proof path after preserving all other semantic index entries. All origin, role, consent and state checks belong to fresh runtime/host policy and the final opaque-handle adapter."
+  },
+  "host": {
+    "required_keys": [
+      "kind",
+      "id",
+      "repository_id",
+      "worktree_id",
+      "operation",
+      "binding_sha256",
+      "plan_sha256"
+    ],
+    "conditional_keys": ["approval_id", "phase"],
+    "kind": "reconciliation-host",
+    "operations": [
+      "provision",
+      "approve",
+      "consume-phase",
+      "renew",
+      "revoke",
+      "recover-owned-lease"
+    ],
+    "provision": "approval_id and phase absent; id=reconciliation-host:<repository_id>:<worktree_id>:provision",
+    "approval_modes": "Every non-provision operation requires host-generated64hex approval_id. Its value is only shape checked here, never accepted as host origin. phase is absent except consume-phase.",
+    "consume-phase": "phase is exactly01|02|03|04",
+    "id": "Non-provision: reconciliation-host:<repository_id>:<worktree_id>:<operation>:<approval_id> with :<phase> suffix only for consume-phase",
+    "binding_sha256": "Exact trusted operation binding projection. Preprovision binding observes actual package/module/constitution/policy/repository/worktree and seed intent; existing-issuer operations also authenticate exact issuer. This validator checks digest shape only.",
+    "meaning": "No physical path, generic SQL/database permission, wildcard operation or caller receipt is accepted. Final adapter custody remains required."
+  },
+  "independent_tests": [
+    "Every exact supported shape, null prototype and frozen JSON clone succeeds without mutation.",
+    "Unknown physical index/gitdir/key/output paths, symbols, non-enumerable properties, getters, inherited and exotic objects refuse without calling getters.",
+    "Wrong entry/operation/case/digest/ID/repository/worktree or substituted digest property refuses.",
+    "Provision cannot carry approval or phase; every other operation requires approval; only consume-phase may carry one exact phase.",
+    "No IO, authority barrel export, runtime union, policy permission, selector, action registry or actual host writer is added by this pure module."
+  ],
+  "remaining_integration": [
+    "Runtime ResourceTarget union, exact-plan validation and resource identities",
+    "Runtime resourceValid, target matching and policy/schema kind consumers",
+    "Closed policy/action schema, command capabilities and generated registry",
+    "Trusted final host/index adapters and actual opaque operation handles",
+    "All public command, custody, staged diagnostic and release gates"
+  ]
+}

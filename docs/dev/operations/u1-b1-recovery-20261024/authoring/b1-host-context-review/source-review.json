@@ -1,0 +1,76 @@
+{
+  "standing": "BOUNDED_INDEPENDENT_SOURCE_REVIEW_AUTHENTIC_DEFECTS_FIXED_FINAL_EXACT_BYTES_REVIEWED_NOT_FULL_RUNTIME_SUITE",
+  "source": "packages/authority/src/boundaries/reconciliation-host-context.ts",
+  "source_sha256": "7cfcf6a1f504698a11ec40d1cf08fde86038ec389e5df3964caa5c7b61d3a54d",
+  "dist_sha256": "605ac8cb6e76343fd4bd17ef2f0de1e7a0659b2bdd4c25112624999d8638b1a7",
+  "original_packet_sha256": "9fe2c38674fd4fcdf5e0f314d536eeb13c7299d1122f3352a70b825ded4b54f5",
+  "pointer_amendment_sha256": "e935aebb794981973c46c8c7c49b6e179e87b456f3a195255bafdd500a04d961",
+  "historical_design_receipt_sha256": "c423e824531920c50cad91752db1388d21867a8299373e558300f9dde8f70ca8",
+  "reviewed_scope": [
+    "Reciprocal forward/backlink/commondir registered-origin checks, exact direct/linked administrative layout and13field persistent identity projection",
+    "No-group/world-write directory checks, maskedmode identities, nofollow single-linked bounded file reads and namespace absence/type checks",
+    "Fixed readonly Git and clock subprocess programs/args/cleanenvironment/timeouts/output bounds; no SQLite/admission anchor/key/approval/action effect",
+    "Exact supported runtime metadata/executable, boot UUID normalization, Linux time namespace and3child sharedclock brackets; no allNode24/Linux-runtime generalization",
+    "WeakMap context/getter/Proxy guard, fresh revalidation, observed-stale terminal lifecycle, private internal paths vs public identity and safe codes"
+  ],
+  "authentic_findings": [
+    {
+      "id": "SRC-01",
+      "first_source_sha256": "765a46387e2efdf63519b4d6988c63489c3663ded5a0773158e8a985c53d769e",
+      "first_dist_sha256": "ae9502f30d896cc185b4be975ff2cb83b9624cc81d2b6a1bd3e69cca77dea932",
+      "evidence": "dangling-namespace-source-probe.json",
+      "evidence_sha256": "3d5881f25377bb1c7ab11c4d3cc1d42343091d934cc51ce060931ae0b2a6fcc1",
+      "defect": "Both danglingdevaiancestor and danglingreconciliationroot were accepted as absent, because optionalDirectory caught realpathENOENT before lstat existing entry check. Actual capture+readpaths succeeded.",
+      "fix": "Only lstat missing entry classifies absence; canonicality/type/ownership checks for existing entry run outside absence catch. Existing dangling link now INVALID."
+    },
+    {
+      "id": "SRC-02",
+      "first_source_sha256": "1d5f4ea0838636c961d6599c4b9239244ca238b777cde497c40cfd5ef5c98ce6",
+      "first_dist_sha256": "fda498e7f2734f7dd44f37451b3fbc2c7d5e67836a7aef90d579cd7a6fe470a0",
+      "evidence": "stale-restoration-source-probe.json",
+      "evidence_sha256": "526ccb5991e891b4f92019ab7b7b407371855c13f09b5f543c348f7879e42b37",
+      "defect": "After actual changedHEAD read producedSTALE, restoring oldHEAD revived samecontext. That violated observed invalidation/freshcapture lifecycle interpretation; no unobserved transient detection was claimed.",
+      "fix": "Module-private WeakSet latches observed repository/pin/runtime/boot revalidation failure asSTALEuntil dispose. Freshcapture remains possible; disposal removes membership and stale marker."
+    }
+  ],
+  "final_counterexample_recheck": {
+    "file": "final-source-counterexample-check.json",
+    "sha256": "adb749cbf1e2f3630af3931b5ed40b4fe5a31e84099fe1fbccc1080b0d9d2323",
+    "checks_passed": 10,
+    "checks_failed": 0,
+    "environment": {
+      "node": "v24.22.0",
+      "uv": "1.52.1",
+      "platform": "darwin"
+    },
+    "exact_source_and_dist_unchanged_during_probe": true,
+    "fixtures_removed": true,
+    "checks": {
+      "clean_context_works": true,
+      "dangling_ancestor_invalid": true,
+      "dangling_private_root_invalid": true,
+      "head_change_stale": true,
+      "restored_identity_still_stale": true,
+      "restored_paths_still_stale": true,
+      "restored_clock_still_stale": true,
+      "fresh_identity_works": true,
+      "fresh_clock_works": true,
+      "disposed_context_unknown": true
+    }
+  },
+  "remaining_confirmed_source_findings": [],
+  "limitations": [
+    "Focused compiled-product counterexample closure and independent source review only; p1Inspector owns full runtime test suite and all other actual cases.",
+    "No actual Linux host execution, compromised runtime/VFS, hostile sameUID filesystem actor or unobserved transient drift detection proved.",
+    "Read-only context is not issuer origin, authority/action receipt, namespace bootstrap, admission lock, approval/operation handle or generic FS capability.",
+    "Native admission descriptor-safe composition, final host/broker writes and full installed/public workflow/effects remain separate subsequent gates."
+  ],
+  "preservation": "Historical designreceipt and all previous positive/RED/counterexample probes retained unchanged; this is a separate appended source review. No product/test edits by Inspector.",
+  "graft": {
+    "calls_this_source_review": 1,
+    "tokens_saved_estimate": 4127,
+    "cumulative_calls": 10,
+    "cumulative_tokens_saved_estimate": 188063,
+    "tool_note": "graft skeleton reported automatic2file graphrefresh; taskworktree gitstatus --graft empty. No product/test source mutation by Inspector."
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "standing": "PRESERVED_PRE_FIX_COMPILED_SOURCE_COUNTEREXAMPLE",
+  "source_output_manifest": {
+    "external_fixture": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-0Dbruz",
+    "worker_sha256": "bc166eaf9ba1a4ad70ce648543cae0ec12a9e55f96206277ef6a9c08fa203322",
+    "sources": {
+      "packages/authority/src/boundaries/reconciliation-admission-seed.ts": {
+        "source_sha256": "d912846ddb518a132ed1e2484dfa56f23b8ff2c7a7bc25b2157fb379f25490fe",
+        "output_sha256": "05f4ab80ab653a5d1488f6bfc621c9a105ffca99380a963040a841f517954c40"
+      },
+      "packages/authority/src/boundaries/host-reconciliation-admission.ts": {
+        "source_sha256": "d6f238f4c22afcae3d4c3feeb3adf2e7faec8049c576ce182001bfce1d953631",
+        "output_sha256": "c1a6836e0a9f6b783f088927e92ade652e2b8be0bdde3a7afd18d9b57b1eaba5"
+      }
+    }
+  },
+  "mode": "native-getter",
+  "exit": 0,
+  "stdout": "{\"error\":{\"message\":\"SECRET_ERRCODE_GETTER\",\"cause\":false,\"diagnostic\":\"Error: SECRET_ERRCODE_GETTER\\n    at Object.get (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-0Dbruz/worker.mjs:80:135)\\n    at nativeFailure (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-0Dbruz/host-reconciliation-admission.js:222:23)\\n    at Module.withReconciliationAdmissionSteps (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-0Dbruz/host-reconciliation-admission.js:300:13)\\n    at invoke (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-0Dbruz/worker.mjs:18:44)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-0Dbruz/worker.mjs:81:27\\n    at capture (file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-0Dbruz/worker.mjs:16:47)\\n    at file:///private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-0Dbruz/worker.mjs:81:15\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"},\"touches\":1,\"next\":{\"value\":{\"schemaVersion\":\"1.0.0\",\"kind\":\"reconciliation-admission-anchor\",\"root\":\"/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-0Dbruz/anchor-ed50b299435ba\",\"root_identity\":{\"dev\":\"16777233\",\"ino\":\"1117692231\",\"birthtime_ns\":\"1792867537856097753\",\"uid\":\"501\",\"mode\":\"0700\"},\"seed_identity\":{\"dev\":\"16777233\",\"ino\":\"1117692232\",\"birthtime_ns\":\"1792867537856484973\",\"uid\":\"501\",\"mode\":\"0600\",\"size_bytes\":8192,\"mtime_ns\":\"1792867537856552016\",\"ctime_ns\":\"1792867537856552016\"},\"seed_sha256\":\"3f6b742405bb199a11ed0952c9aa049285ef25dc69954e901d2e987cd15c4372\"}}}\n",
+  "stderr": ""
+}

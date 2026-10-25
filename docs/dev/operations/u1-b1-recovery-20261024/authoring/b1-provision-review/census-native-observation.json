@@ -1,0 +1,14 @@
+{
+  "closed_root_limit": 3,
+  "closed_root_cursor_read_count": 4,
+  "observation": "oversized-directory-resource-bound",
+  "actual_namespace_result": "closed INVALID refusal",
+  "actual_readdir_materialized_names": 10000,
+  "candidate_child_limit": 4096,
+  "candidate_cursor_read_count": 4097,
+  "candidate_buffer_size": 32,
+  "node": "24.22.0",
+  "uv": "1.52.1",
+  "platform": "darwin",
+  "fixture": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-census-observation-eXUdP5"
+}

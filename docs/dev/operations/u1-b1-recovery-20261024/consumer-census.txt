@@ -1,0 +1,54 @@
+PATTERN SOURCE_ONLY_SCHEMAS
+packages/cli/src/commands/check/schemas.ts:43:const SOURCE_ONLY_SCHEMAS = [
+packages/cli/src/commands/check/schemas.ts:64:  const roster = [...ROSTER, ...SOURCE_ONLY_SCHEMAS].sort();
+packages/cli/tests/unit/cli-shard06-contracts-schema-residual.test.ts:399:const SOURCE_ONLY_SCHEMAS = [
+packages/cli/tests/unit/cli-shard06-contracts-schema-residual.test.ts:416:  for (const name of [...schemaBoundary.roster, ...SOURCE_ONLY_SCHEMAS]) {
+packages/cli/tests/unit/cli-shard06-contracts-schema-residual.test.ts:438:      ...SOURCE_ONLY_SCHEMAS.slice(0, -1).reverse(),
+
+PATTERN canonical_total: 133
+packages/cli/tests/unit/check-schemas-adopter-boundaries.test.ts:197:    expect(report).toMatchObject({ ok: true, canonical_total: 133, findings: [] });
+packages/cli/tests/unit/check-schemas-adopter-boundaries.test.ts:304:      canonical_total: 133,
+
+PATTERN 133 canonical schemas
+packages/cli/tests/unit/check-schemas-adopter-boundaries.test.ts:320:    expect(result.stdout).toBe('policy check schemas: OK (133 canonical schemas, 0 findings)\n');
+packages/cli/tests/unit/check-schemas-adopter-boundaries.test.ts:332:        'policy check schemas: FAIL (133 canonical schemas, 1 findings)',
+
+PATTERN canonical_total: 16
+packages/cli/tests/unit/cli-shard06-contracts-schema-residual.test.ts:443:      canonical_total: 16,
+packages/cli/tests/unit/cli-shard06-contracts-schema-residual.test.ts:518:      canonical_total: 16,
+
+PATTERN toHaveLength(121)
+packages/schemas/tests/contract/schema-roster.test.ts:26:    expect(ROSTER).toHaveLength(121);
+packages/cli/tests/unit/check-schemas-adopter-boundaries.test.ts:187:    expect(ROSTER).toHaveLength(121);
+
+PATTERN toHaveLength(131)
+packages/schemas/tests/contract/governance-v15-adr.test.ts:737:    expect(records).toHaveLength(131);
+
+PATTERN files_scanned).toBe(132)
+packages/schemas/tests/contract/governance-v15-adr.test.ts:742:    expect(result.files_scanned).toBe(132);
+
+PATTERN subject_authorities).toHaveLength(642)
+packages/schemas/tests/contract/governance-v15-adr.test.ts:743:    expect(result.subject_authorities).toHaveLength(642);
+
+PATTERN copy-constitution
+packages/cli/src/services/release-production-outputs.ts:110:          'tsc -b && node scripts/copy-constitution.mjs && node scripts/copy-policy.mjs',
+packages/skills/scripts/copy-constitution.mjs:23:  console.error(`copy-constitution: source missing: ${src}`);
+packages/skills/package.json:31:    "build": "tsc -b && node scripts/copy-constitution.mjs && node scripts/copy-policy.mjs",
+packages/cli/tests/unit/cli-shard09-release-production-outputs-package-contract.test.ts:202:      'tsc -b && node scripts/copy-constitution.mjs && node scripts/copy-policy.mjs',
+packages/sensors/src/harness/reviewed-workflow-steps.ts:505:        path: 'packages/skills/scripts/copy-constitution.mjs',
+
+PATTERN copy-law
+packages/sensors/package.json:45:    "build": "tsc -b && node scripts/copy-law.mjs",
+packages/sensors/src/harness/reviewed-workflow-steps.ts:489:        path: 'packages/schemas/scripts/copy-law.mjs',
+packages/sensors/src/harness/reviewed-workflow-steps.ts:497:        path: 'packages/sensors/scripts/copy-law.mjs',
+packages/cli/src/services/release-production-outputs.ts:109:          'tsc -b && node scripts/copy-law.mjs',
+packages/schemas/package.json:25:    "build": "tsc -b && node scripts/copy-law.mjs",
+packages/cli/tests/unit/cli-shard09-release-production-outputs-package-contract.test.ts:201:      'tsc -b && node scripts/copy-law.mjs',
+
+PATTERN schemaRoots
+packages/cli/scripts/assemble-package.mjs:22:import { ROSTER as schemaRoots } from '../../schemas/dist/roster.js';
+packages/cli/scripts/assemble-package.mjs:272:  const packagedSchemas = schemaClosure(schemaRoots);
+
+PATTERN schemaClosure
+packages/cli/scripts/assemble-package.mjs:82:function schemaClosure(roots) {
+packages/cli/scripts/assemble-package.mjs:272:  const packagedSchemas = schemaClosure(schemaRoots);

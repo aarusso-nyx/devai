@@ -1,0 +1,73 @@
+{
+  "standing": "INDEPENDENT_CUSTOM_SCOPE_DISCRIMINANT_GUARD_REVIEW_GREEN_NARROW_REFUSAL_ONLY",
+  "changes": [
+    {
+      "path": "packages/cli/src/services/github-issues-tracking/reconcile-authority.ts",
+      "before_sha256": "95ccf96820e58ca6a827a7f1cec6cbdf8b5fc403b07fcfbece67e146e77c64d2",
+      "after_sha256": "67550c8d496b5d2dda13b6a980b1550b8541a47772cedde78f48afa4b880b4c1",
+      "inverse_exactly_recovers_original_bytes": true,
+      "sealed_red_reference_matches": true
+    },
+    {
+      "path": "packages/skills/src/post-merge-auditor/host-receipt.ts",
+      "before_sha256": "cdd8ba192e6b7f8e40472e15b99bb19166ac7de45cce0b593254e5f9b178ab4d",
+      "after_sha256": "00d4f2cb1bc2ba52b6803b10f74f47779200ed9ca9c560807653a8b34c5d56bc",
+      "inverse_exactly_recovers_original_bytes": true,
+      "sealed_red_reference_matches": true
+    },
+    {
+      "path": "packages/cli/tests/unit/tracking-reconcile-authority.test.ts",
+      "before_sha256": "7295e3d358dcc262e939f4e54abcc0610c93c29862ba15c4d4348fe2f47cf01b",
+      "after_sha256": "cac12a4e08282eec4421c21d7678a3b4992aceba5b64ee4a2681ce848e4ebe82",
+      "inverse_exactly_recovers_original_bytes": true,
+      "sealed_red_reference_matches": true
+    },
+    {
+      "path": "packages/skills/tests/unit/post-merge-boundaries.test.ts",
+      "before_sha256": "ba992c7458a27b0eeddaf7d678cb5cc6a7df90d1af2faf6a6775fbd55e13be94",
+      "after_sha256": "864a97f152fa459af8c78eeedf81b6f3b620c57c7f976b426f20c3debae43fe7",
+      "inverse_exactly_recovers_original_bytes": true,
+      "sealed_red_reference_matches": true
+    }
+  ],
+  "authentic_red": {
+    "manifest": "docs/dev/operations/u1-b1-recovery-20261024/release-280/typed-effect-closure/custom-scopes-red.json",
+    "manifest_sha256": "5468307a2506fde5e07fe1e80d94dc479848982b6522b45f5347385975b84f24",
+    "raw_log_sha256": "11a81c6366ef59c734133a69beaff6dac86462e219291e9096b7c92c14f68795",
+    "failed": 8,
+    "passed": 70,
+    "meaning": "Both actual derived scopes invoked supplied inert callbacks for four non-process kinds with otherwise allowed gh/git arguments. No real process/domain effect was executed by new probes."
+  },
+  "root_green": {
+    "raw_log_sha256": "293136a924fa3d16e0f1ae89788232507b79eac46d6eae23300121aca26f6604",
+    "passed": 78,
+    "failed": 0
+  },
+  "independent_replay": {
+    "command": "pnpm exec node scripts/process/validation-runner.mjs -- vitest run --config tests/config/local.config.ts --maxWorkers 1 packages/cli/tests/unit/tracking-reconcile-authority.test.ts packages/skills/tests/unit/post-merge-boundaries.test.ts",
+    "log": "custom-scopes-independent-green.txt",
+    "log_sha256": "923ad813138f81306d8dfa7e99efdb0afe56220ed9e1e5f14a2ae9000f3b4ad0",
+    "passed": 78,
+    "failed": 0,
+    "files": 2,
+    "duration_seconds": 13.12,
+    "note": "Started after root GREEN log terminal; no fullworkspace typecheck or broad suite run by reviewer."
+  },
+  "review": [
+    "Tracking guard excludes every kind except filesystem/process before any symbol/argument interpretation. Historical filesystem target policy and process gh-api policy are byte-identical.",
+    "Postmerge preserves historical filesystem branch unchanged and requires process before executable/argument interpretation. Historical Git policy is byte-identical.",
+    "Existing TRACKING_RECONCILE_PROCESS_FORBIDDEN and POST_MERGE_PROCESS_FORBIDDEN codes reused; no new error surface contract.",
+    "Eight added negatives cover protected-release/reconciliation-host/proof-index/unknown with allowed-looking args, asserting refusal and inert callback not invoked. No original test/assertion removed or weakened; original70 remain byte-identical after removing additions.",
+    "No new effect kind/tag, registry/classifier/action/policy permission, public release capability or namespace grant in this fix. Unknown future discriminants fail closed in these two scopes."
+  ],
+  "remaining_confirmed_findings": [],
+  "limits": "Scope is exact two custom derived scopes and their typed trusted effect requests. No claim arbitrary hostile JavaScript request getters/Proxy are isolated, no repository-wide consumer census qualification or future B1 adapter/action authority. Root owns wider typecheck/lint/newunion integration.",
+  "prior_design_and_source_reviews_unchanged": true,
+  "inspector_source_or_test_edits": false,
+  "graft": {
+    "calls_this_review": 1,
+    "tokens_saved_estimate": 32537,
+    "cumulative_calls": 11,
+    "cumulative_tokens_saved_estimate": 220600
+  }
+}

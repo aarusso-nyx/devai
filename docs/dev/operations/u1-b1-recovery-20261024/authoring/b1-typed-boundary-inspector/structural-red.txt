@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-typed-boundary-inspector/structural-red.txt","kind":"historical-transcript-custody-pointer","original_bytes":4130,"original_bytes_changed":false,"original_sha256":"2db433d6a8346a8004439bb87cacd124ff22d06e28b9c9d0782cc3869b84375c"}

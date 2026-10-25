@@ -1,0 +1,52 @@
+{
+  "standing": "CONCRETE_TYPED_BOUNDARY_INTEGRATION_FOR_IMPLEMENTATION_AND_INDEPENDENT_RED",
+  "authority": "Full internal v2.8.0 authorization and accepted ADR-EVI-0007; no additional user approval required.",
+  "purpose": "Connect the two already-validated exact logical targets to explicit trusted dependency admission, stable prepare/apply snapshots and actual apply dispatch. This closes the missing generic boundary consumer seam before the real broker/opaque host adapter is installed. No policy/registry/selector or physical Git path permission is changed here.",
+  "source_paths": [
+    "packages/authority/src/boundaries/resource-classification.ts",
+    "packages/authority/src/boundaries/boundary-runtime-targets.ts",
+    "packages/authority/src/boundaries/boundary-runtime.ts"
+  ],
+  "test_path": "packages/authority/tests/unit/reconciliation-typed-boundary.test.ts",
+  "review_path": "authoring/b1-typed-boundary-review/",
+  "dependency_contract": {
+    "reconciliation_host": "Trusted createAuthorityBoundaryRuntime dependency object for kind reconciliation-host only. Exactly relevant methods admit(target):boolean, snapshot(target):plain JSON record, apply(target):unknown. Fixed broker will later install these closures over its real sealed invocation operation. They are not caller/target fields.",
+    "proof_index": "Separate same-shaped trusted dependency for kind proof-index only; never substitute fs/git/remote/other adapter.",
+    "admit": "Only boolean true admits. Every dependent classify/prepare/apply stage asks fresh admission for the exact target. Absence, invalid type, false, throwing admission or missing snapshot/apply method refuses. A caller-supplied target cannot supply this dependency.",
+    "snapshot": "Read fresh actual trusted-adapter snapshot at prepare and apply; require a plain non-Proxy record and canonical JSON hashing support. Undefined/null/arrays/noncanonical values refuse with fixed safe diagnostic. Stable target+snapshot equality required before apply. Snapshot itself is never a permission; final broker adapter must bind actual host/input witnesses.",
+    "apply": "Dispatch to exactly the selected logical adapter with the unchanged exact target, once, only after original plan membership, exact target digest, classified adapter ID, authentic consumed decision receipt, fresh admission and snapshot equality. Explicit ok:false effect result propagates; never manufacture applied:true when dispatch is unavailable.",
+    "trusted_dependency_limit": "Tests may supply owned deterministic trusted adapters to exercise boundary machinery. Their callbacks/observations are not evidence of actual host/SQLite/index writes or public policy authority. Real opaque broker adapter and native composition remain required next."
+  },
+  "classification": {
+    "unconfigured": "Preserve original AUTHORITY_RESOURCE_TARGET_INVALID usage refusal for the two shapes if their trusted dependency is absent. All existing reconciliation-resource-kernel tests remain byte-identical.",
+    "configured": "Only exact closed isReconciliationHostResourceTarget/isProofIndexResourceTarget passes; reject malformed/Proxy/accessor kind without executing getters. Require trusted selected adapter admission and snapshot/apply functions. Return adapter_id reconciliation-host-authority-boundary or proof-index-authority-boundary and atomicity whole-plan. Shape validation alone grants no authority.",
+    "exceptions": "Catch only new typed-adapter admission/dependency failures into fixed refusal; no raw adapter error/path/payload diagnostic. Existing fs/git/db/remote behavior unchanged."
+  },
+  "snapshots": {
+    "signature": "Internal snapshotTarget(target,dependencies) replaces snapshotTarget(target,fsAdapter); update precisely four existing call sites from Graft caller census. Existing fs/fs-rename snapshots still delegate to dependencies.fs without behavior change.",
+    "typed": "Use matching new dependency snapshot, with fresh admission. Before receipt consumption validate typed dependency and capture its snapshot; preserve existing ordinary FS timing. Any malformed/noncanonical snapshot refuses instead of silently binding undefined.",
+    "apply": "Recheck adapter admission, target digest and fresh snapshot before calling apply. Already-used prepared handle refuses even after a failed stale/admission apply; no retry grant minted."
+  },
+  "exact_only": "No new ResourceTargetSelector, policy matcher, authority-policy schema, registry or broker permission is added here. Existing exact data planning and all selector refusals remain. registerBatch explicitly rejects either typed target even if supplied an invented selector. prepareUnit/applyUnit refuse typed targets even if a supplied dependency advertises applyAtomic; typed recipes require their own single target effect, not generic multi-target rollback.",
+  "diagnostics": [
+    "AUTHORITY_TYPED_RESOURCE_ADAPTER_REQUIRED",
+    "AUTHORITY_TYPED_RESOURCE_SNAPSHOT_INVALID"
+  ],
+  "preserved": [
+    "Original reconciliation-resources validators and source hashes",
+    "Original typed-data kernel58 + prior99shape checks and policy selector refusals",
+    "Original fs/git/db/remote classification/runtime/atomic-unit behavior and tests",
+    "Historical host/clock/Owner/native/publisher/schema/ADR receipts"
+  ],
+  "independent_cases": [
+    "Authentic preimplementation RED for missing typed dispatch/admission/snapshot branch",
+    "Both typed kinds; exact one target authentic issuer plan/receipt prepare/apply invokes only matching dependency once",
+    "No dependency, wrong adapter, foreign fs/git/remote fallback, malformed/getter/Proxy targets and admit false/throw/missing methods refuse before apply",
+    "Missing/null/array/Proxy/noncanonical snapshots refuse, snapshot drift or late admission loss refuses; original exact target digest bound",
+    "Cloned/foreign/replayed prepared handles, changed target/subject/plan/receipt/invocation reject without effect",
+    "Adapter ok:false propagates; no phantom applied success; thrown native diagnostics not exposed by new dependency checks",
+    "Bounded batch and generic execution units refuse both typed kinds even with invented selectors/applyAtomic",
+    "Unchanged data-kernel/classification/containment/failclosed/boundary/atomic/decision suites remain passing"
+  ],
+  "remaining": "Actual sealed invocation token, broker current argv/role/consent/bindings checks, policy/schema/registry consumers, bootstrap/Owner/phase/native composition and public end-to-end work are still required. No claim these are delivered by generic dependency dispatch."
+}

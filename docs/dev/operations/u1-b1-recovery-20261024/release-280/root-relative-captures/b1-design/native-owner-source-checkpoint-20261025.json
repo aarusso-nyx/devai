@@ -1,0 +1,112 @@
+{
+  "schemaVersion": "1.0.0",
+  "kind": "native-owner-custody-read-source-checkpoint",
+  "version": "2.8.0",
+  "base_head": "2df84159caabf869b866fb2a05e5b06be83295fb",
+  "source_uncommitted": true,
+  "installed_public_owner_qualified": false,
+  "release_published": false,
+  "evidence": [
+    {
+      "path": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/dead-lease-native-results.json",
+      "sha256": "e8e634a858d3fd6722fc2025c7fc94703192080ba5583bcd19b9d551774f6e65",
+      "bytes": 1182
+    },
+    {
+      "path": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/local-checkpoint-design-review.json",
+      "sha256": "573fe16ed9225e7f05906d68bc0084aaccea0ab28934d5c4705f4ff745f29105",
+      "bytes": 3095
+    },
+    {
+      "path": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/removal-opaque-quarantine-review.json",
+      "sha256": "a1bcebebf84dd7fcb0339811d02e9feb3c280525ff5f6ae5dc49d56f656b6ed7",
+      "bytes": 2047
+    },
+    {
+      "path": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/approval-native-split-results.json",
+      "sha256": "b8dfe7bc9bf5ac2e8435336e91053b7f987ec6a10ae6cad784619f332410ecca",
+      "bytes": 1673
+    },
+    {
+      "path": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/grant-native-results.json",
+      "sha256": "75bf607c9841906cd8fcc9cdefe1a46bd7873e2276b0e48e830eef74967377dd",
+      "bytes": 2272
+    },
+    {
+      "path": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/custody-input-native-results.json",
+      "sha256": "63fc403108a78a8a2250a62ed8450c4c72ef8e6d24783525e6aa660519cda5fb",
+      "bytes": 498
+    }
+  ],
+  "sources": [
+    {
+      "path": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/src/boundaries/reconciliation-host-dead-lease.ts",
+      "sha256": "97786ec45e56cbf9d9d872e09bfdc67cc9afa15a4437a218423e0fc5d29c92f0",
+      "bytes": 11930
+    },
+    {
+      "path": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/src/boundaries/reconciliation-host-grant.ts",
+      "sha256": "321d107e2d66d104a1a9779cac8700e8f62f9269e1fe2028802d7e670d40dd81",
+      "bytes": 15201
+    },
+    {
+      "path": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/src/boundaries/reconciliation-host-approve.ts",
+      "sha256": "0903d778f1c8c1a6c1c378dca7a3ed878b5f09a2a5a5a7eb507c336b845e5307",
+      "bytes": 14846
+    },
+    {
+      "path": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/src/boundaries/reconciliation-custody-input.ts",
+      "sha256": "d120a2472b4d052dfc54214c9a8cf05db11fc3a475070aa026ae58cf0cbdaf9d",
+      "bytes": 5322
+    },
+    {
+      "path": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/src/boundaries/reconciliation-effect-plan.ts",
+      "sha256": "d4a2b06fa31258d241a663ed307c6eb63a0c4270a927c7eef48406890bdc5273",
+      "bytes": 12548
+    },
+    {
+      "path": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/src/boundaries/reconciliation-plan.ts",
+      "sha256": "4d917df65bc84d377ce370651c9342cafc50afe272276cb1fb2d5a6715ed2d6f",
+      "bytes": 47974
+    },
+    {
+      "path": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/src/boundaries/reconciliation-host-operation.ts",
+      "sha256": "b1b7860596bd1257a07040ba46ce444f66a2ab7b741b4ca0c7941b2c0f3c8071",
+      "bytes": 22081
+    },
+    {
+      "path": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/law/schemas/evidence-reconciliation-plan.schema.json",
+      "sha256": "2ca7f5a6ab93b374f0a861ca8ac902dddc882523314256399abcebfaab2096f5",
+      "bytes": 37754
+    }
+  ],
+  "qualification": {
+    "native_initial_owner_split": 4,
+    "fresh_current_recipe_owner_initial": 1,
+    "native_renew_revoke": 7,
+    "native_dead_lease": 7,
+    "native_raw_custody_reader": 6,
+    "sealed_input_history_and_CAS_controls": 199,
+    "portable_effect_recipe": 13,
+    "normal_chain_epoch_recovery_history": 157,
+    "private_publication_history_and_new_fixed_scratch": 41,
+    "independent_recipe_and_old_normal_kernel_parity": 17
+  },
+  "limitations": [
+    "Native tests use explicitly synthetic B5/policy origin.",
+    "Dead-lease test intent/lease were explicitly manually signed setup, not materialize implementation.",
+    "Original aggregate Owner test timed out at 180s; preserved. Split tests passed without changing assertions/bounds.",
+    "No remaining public action registration, installed Owner qualification, custody/selection writes, real index adapter, seven-body bootstrap, integration or release yet."
+  ],
+  "next_critical_path": {
+    "historical_verifier": "anchors.ts proofHistoryModifications compares only workingtree vs HEAD. Once chain is committed and equals HEAD, existing CI history guard requires no private state; retain all independent epoch/baseline/anchor/declaration checks.",
+    "local_checkpoint": "Build separate read-only WeakMap observation capsule for existing verify/check/recovery scope, actual root/issuer/invocation/B5; do not widen mutating B1 controls. Authenticate phase01+02 completion/custody and exact selected-prefix+selection-event chain output before suppressing only exact chain replacement finding. No public JSON authority or new cryptotrust root.",
+    "phase01_resume": "Authenticated consumed intent must bind every output path/body. Existing complete regular0600/nlink1 artifacts may be securely reread, compared with actual original Git objects and fsynced as verified durable custody, never claimed created/owned; unknown scratch/quarantine or extra/mismatched outputs preserve/refuse. Only exact verified custody outputs may be excluded from untracked-input source recapture.",
+    "phase_scratch": "Signed live lease fields deterministically derive publication scratch UUID; domain output manifest independent attempt scratch. Opaque removal quarantine remains fresh native-unexposed random and may not be prepared/public; preserve/fail closed unknown crash remnants."
+  },
+  "holds": [
+    "DETRAN live work/#211/C6/S3",
+    "binding/integration outside disposable qualification",
+    "release/tag/registry publication until complete B1 and protected gates"
+  ]
+}

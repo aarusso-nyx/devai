@@ -1,0 +1,67 @@
+{
+  "standing": "EXACT_READONLY_NATIVE_OWNER_DESIGN_ACCEPTED_FOR_RED_NO_IMPLEMENTATION_OR_PLAN_WRITER_QUALIFICATION",
+  "packet_sha256": {
+    "native-owner-read-checkpoint.json": "2ce67c333acafb3d86eb07e3a743e3fa9a90a3ea9260c11dbafc519d532a7ffc",
+    "native-owner-read-interface.json": "066e8b03186c288fb600eb5dfaf2bf6cac7d37ad269fbab631019b897ab8c1f7"
+  },
+  "dependency_proposal_separate_sha256": "36b409e14777b7bba8a8c009c1324469e81ad8af4541fa63e398ff984f31c817",
+  "reviewed_existing_source_sha256": {
+    "packages/authority/src/boundaries/reconciliation-host-operation.ts": "ce8dc730e1a6d92890a013e0471fe81d3d64212a77e987f2cb05ca99bd3d0be1",
+    "packages/authority/src/boundaries/reconciliation-host-context.ts": "7cfcf6a1f504698a11ec40d1cf08fde86038ec389e5df3964caa5c7b61d3a54d",
+    "packages/authority/src/boundaries/reconciliation-host-namespace.ts": "44e2abbeb68f0b771e8f82e34d745bfc0435bf532cd2ae710118978339588484",
+    "packages/authority/src/boundaries/host-reconciliation-admission.ts": "318c52a0f5de908e549e79ace095a4720acb190c7389e88a41a673fd2fa60a91",
+    "packages/authority/src/runtime/reconciliation-owner-state.ts": "b59cce447c545f2bcb8396d384dac39613ca87c1721d0f12e3e16345edb0d2b8"
+  },
+  "findings": [],
+  "resolved_clarifications": [
+    {
+      "id": "NOR01",
+      "issue": "Literal allprivatebuffers zeroization would exceed what one newreader can reach while namespace/codec helpers remain sealed.",
+      "resolution": "Interface limits explicitzeroing to returned/ownedfirst+finalissuer buffers and selectedprivatefile bytes registered immediately onreturn; helperinternaltemporarybuffers and immutablekeystrings excluded. No allheap/forensic zeroization promise."
+    },
+    {
+      "id": "NOR02",
+      "issue": "ReadonlylogicalIDselector versus originalopaqueinvocation approvalselector was ambiguous.",
+      "resolution": "Any actualwitnessed same-repository approvalID is readonlyinspectable under4allowedsealedactions. No existingcontrolgetter or sourcewidening. This confers no write/phaseplanpermission; laterwriter exacteligible approval/target controls remain mandatory."
+    },
+    {
+      "id": "NOR03",
+      "issue": "Stableinvalidgraph and observedread drift must have deterministicclosed diagnostic classification.",
+      "resolution": "Initialmalformed/missing namespace and stabledecodedinvalidgraph INVALID; validforeigncanonicalroot and selected/finalcontext/B5/namespace/scope/clock failures STALE. No fabricatedtransaction/linearizability or unobserveddrift classification."
+    },
+    {
+      "id": "NOR04",
+      "issue": "Aggregatebudget and allocation scope needed preciseclaim.",
+      "resolution": "Precharge witnessedsize+issuer before selectedreads, independentlycapped1MiB reader, immediate identity/size/SHAcompare; totalretainedmatchinginput<=32MiB with atmostonebounded in-flightallocation ondrift. Fullnamespacehelper transientallocations are not included in32MiB or wholeheapclaim."
+    }
+  ],
+  "implementability_conclusions": [
+    "One new privatefixedreadonly module can compose existingbrands/context/namespace/reducer without adding package cycle, rootexport, callerproviders or effectpermission.",
+    "Canonicalrootfullidentity comparison precedesprivate reads; approvalIDexact64lowerhex preventsphysicalpath selection. Only witnessedfixedfilenames are reread and matched identity/SHA.",
+    "Bothfullnamespace witnesses, selectedfilematches and finalactualidentity/B5/ALS/dualclock constrain a boundedreadonly observation; graphdata neverclaims currentplan/source/outputeligibility or actualownership.",
+    "ActualcurrentB5 differing originalapprovalscope yields readablebinding_matches_approval=false, not implicitmigration/renewal. Oldapprovalboot/currenteligibility still governed separately by pureassessment/nativehost.",
+    "Existing lower readReconciliationAdmissionAnchor checks liveAnchors by actualseeddev/inode BEFORE rawopenSync; readonlywrapper can safelyrefuse reentrantnativeadmission rather than reopen/close anchor. Newin-lockwriter must use metadata-only path, not thiswrapper.",
+    "Safeoriginal brandedstate can feed pureassessment but snapshot/JSONclone grantsnoeffects, nofutureapplyhandle and noactualplanverification."
+  ],
+  "required_independent_gates": [
+    "Authentic absentmoduleRED, actualdirect/linked nativeprovisionedissuer+independentvalid/invalidgraphs undergenuineissuer-backed ALS (syntheticB5/TTY limitation explicit).",
+    "Foreignrootbeforeprivatecensus; missingwrongscope/ID/selector/action; midreadHEAD/B5/file/mode/inode/remnant drift; currentreadonlysame-repoIDdifferentfromcontrol; sourcechangedstate preserved.",
+    "Actualnativeadmission reentry refusesbefore rawanchoropen/close and doesnotdrop holderlock; readonlymutators/writableSQLite zero.",
+    "Ownedreturnedbufferzeroing onsuccess/refusal observedasbooleans, secretvaluesneverlogged; exactsafeprojection/statebrand and noallhelper-memory claim.",
+    "Existing420nativeprovision/state/codec/clock/operation/diagnostic qualifications stayseparate and immutable; exactgeneratedtwoerrorrows inversepreserves prior1304."
+  ],
+  "source_absent_at_review": true,
+  "remaining_scope_blockers": [
+    "Actual verifiedplan/source/completecustody/epochs/ancestry/index and trustedpublishedselectedparent provenance remain required BEFORE nativeOwner approvalpublication. Dependencyproposal is not deliveredplancontract.",
+    "NativeOwner writer/renew/revoke/deadlease/phaseownership, canonicalselection/normalwriter/indexCAS/stagedbodies and actualpublic/installed/integration/release remain separate authorizedwork, not qualifiedbyreadonlysnapshot."
+  ],
+  "edits": "Owned evidenceonly; no product/tests/build/dependency/rootexport/action/schema/effect changes, no newagents. Nativeprovision/Ownerstate seals untouched.",
+  "graft": {
+    "this_bounded_readonly_addendum_extra_calls": 0,
+    "combined_current_task_successful_calls": 5,
+    "combined_current_task_nohit_skeleton_calls": 1,
+    "combined_current_estimated_tokens_saved": 52904,
+    "cumulative_successful_calls": 29,
+    "cumulative_estimated_tokens_saved": 560493
+  }
+}

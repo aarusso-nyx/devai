@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/native-plan-first-actual.txt","kind":"historical-transcript-custody-pointer","original_bytes":1804,"original_bytes_changed":false,"original_sha256":"218638171e9675da294743621bface5ddb12c4385cc98dc17fa2190cf9a169f7"}

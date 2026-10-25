@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-owner-state-review/source-probes-final.txt","kind":"historical-transcript-custody-pointer","original_bytes":632,"original_bytes_changed":false,"original_sha256":"3543c2f8f64749ded9b85a950cecd49f36b21bbc494a4a0a5abe04cc9d9d8d0e"}

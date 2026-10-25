@@ -1,0 +1,207 @@
+{
+  "standing": "OWNER_INTAKE_DESIGN_REVIEW_REQUIRES_KERNEL_ADMISSION_AND_SCHEMA_EFFECT_FREEZE",
+  "recorded_at": "2026-10-24T18:04:52.247095+00:00",
+  "checkpoint_revision": 2,
+  "checkpoint_sha256": "9d65240da6c4b92c1bcbfdfd3ceb19839c45197bc5b6e5bb0b8db351593f94a4",
+  "checkpoint_status": "ADMISSION_PROTOCOL_COUNTEREXAMPLE_REQUIRES_REPLACEMENT",
+  "source_changes_by_inspector": false,
+  "closed_findings": [
+    {
+      "finding": "Private0600 publication unavailable through original default publisher",
+      "resolution": "Exact narrow private primitive implemented in host-publish.ts/host-effects.ts; direct-mutator registry in boundaries/index.ts. Independent41PASS supports only this isolated prerequisite."
+    },
+    {
+      "finding": "Expiry/revocation/partial-intent retry and renewal eligibility ambiguous",
+      "resolution": "Revision2 intent_authority_matrix names live/expired/renewed/revoked/unknown-output cases and exact existing-intent resumption. Preserve in replacement protocol."
+    },
+    {
+      "finding": "Recursive mutable recovery.lock crash liveness",
+      "resolution": "Mutable recovery/admission reaping rejected after actual lower-primitive ABA counterexample; SQLite replacement remains feasibility only, not resolved implementation."
+    }
+  ],
+  "blocking_kernel_admission": {
+    "finding": "Revision2 shared admission.lock is not a linearizable exclusion mechanism under stale dead-lock reaping.",
+    "source": "packages/authority/src/boundaries/host-remove.ts111-120,125-159",
+    "actual_counterexample": "../../v2.8.0-qualification/inspector/owner-admission-stale-reaper-counterexample.json",
+    "result": "A live successor A is quarantined; B occupies the public admission path; restoration refuses AUTHORITY_REMOVE_RESTORE_INCOMPLETE. No inode is deleted, but exclusion is broken.",
+    "candidate": "owner-kernel-admission-candidate.json / Node built-in SQLite BEGIN IMMEDIATE",
+    "standing": "Immutable8192-byte seed feasibility reviewed: bytes/inode unchanged, no sidecars, live SQLITE_BUSY5, own holder SIGKILL and two-process external counter serialization. This closes feasibility only; actual trusted adapter and two-step bootstrap/effects remain unfrozen."
+  },
+  "remaining_contract_closure": [
+    {
+      "id": "OI-01",
+      "requirement": "Freeze exact packaged immutable seed bytes/SHA/schema/rows/version and logical path;0700 parents/0600 seed. Runtime permits only closed validation SQL plus BEGIN IMMEDIATE/ROLLBACK; no SQL writes, PRAGMA mutations, ATTACH, extension, VACUUM, checkpoint, journal recovery or alternate DB. Refuse unsupported filesystems/locking."
+    },
+    {
+      "id": "OI-02",
+      "requirement": "Freeze two separately confirmed bootstrap stages: exact seed/directory precursor first, then exact issuer bytes bound to actual stable database/directory identities. Define absent/precursor-only/issuer-published crash/retry states; cancellation after precursor leaves only inert owned seed and no key/grant. Foreign or malformed preexisting state refuses; never rename/unlink database."
+    },
+    {
+      "id": "OI-03",
+      "requirement": "No-write and preconfirmation paths perform no writable SQLite access. Reject all journal/WAL/SHM sidecars before opening. Fresh actual authority and the appropriate exact confirmation precede seed publication or writable kernel-lock connection. Runtime has no hot-journal recovery authority."
+    },
+    {
+      "id": "OI-04",
+      "requirement": "Read exact seed hash before opening SQLite. While connection lives, no raw DB opens/closes or second connection: in-lock closed SQL schema/row validation and metadata-only lstat binding only. Callback is synchronous/non-reentrant, serialized in process, cannot escape connection/Promise. A held-readonly-fd alternative needs separate exact lifetime proof before adoption."
+    },
+    {
+      "id": "OI-05",
+      "requirement": "Database rollback must not erase signed immutable intent/consumption truth while domain files survived. Define authoritative phase/grant chain and exact restart reconciliation; native admission is not an independent grant."
+    },
+    {
+      "id": "OI-06",
+      "requirement": "Freeze domain strings, raw-byte versus canonical-payload digests, exact UTF8/base64 key encoding, closed schema variants, lossless decimal inode/birthtime fields, clock units/source and cross-process monotonic/boot identity."
+    },
+    {
+      "id": "OI-07",
+      "requirement": "Freeze all five approve modes exact argv/expected-digest/plan obligations and public cancellation/error envelopes. Current action-output.ts399-437 only admits P1 init-bind review kind/target; a new owner stream cannot use it implicitly."
+    },
+    {
+      "id": "OI-08",
+      "requirement": "Explicitly define filesystem trust anchor for issuer origin: actual protected resolved0700/0600 host namespace and typed-only writes. A MAC co-located with its own key is not independently authenticated against arbitrary same-UID filesystem replacement; either exclude that attacker or add an external trust anchor. Caller JSON/files/labels/ledgers remain untrusted."
+    },
+    {
+      "id": "OI-09",
+      "requirement": "Separate issuer installation observation (installed_at_head) from currently admitted action bindings. Define behavior after legitimate HEAD/package/registry/constitution/policy changes; same-scope renewal cannot silently migrate old issuer/grant scope, and automatic rotation/rewrite remains forbidden."
+    },
+    {
+      "id": "OI-10",
+      "requirement": "Private READY exposes size/hash/targets only; schema writeOnly is not a serializer guard. Validate safe projections and error causes for malformed bundle/MAC/schema, cancellation, cleanup and uncertainty; never emit private bytes/base64 or parser excerpts."
+    }
+  ],
+  "minimal_proposed_inventory": {
+    "note": "Responsibility-based exact path proposal for Architect consolidation, not a claim current50-path inventory is closed or runtime permission. A pure-codec path already assigned elsewhere may be reused after root confirms its exact name. Native admission source/effect paths cannot freeze until OI01-05 close.",
+    "new_sources": [
+      {
+        "path": "packages/authority/src/boundaries/reconciliation-host.ts",
+        "purpose": "Private typed host custody, actual physical namespace, issuer/approval verification and operation-owned handles. Native admission bootstrap remains separate exact freeze."
+      },
+      {
+        "path": "packages/authority/src/runtime/reconciliation-approval.ts",
+        "purpose": "Proposed closed domain/canonicalization/MAC/clock/grant/intent transition codec; no standalone data-to-authority upgrade or public key getter."
+      },
+      {
+        "path": "packages/cli/src/commands/init/bind-reconciliation-host.ts",
+        "purpose": "Architect-only selector no-write plan and real-terminal exact-confirm provisioning."
+      },
+      {
+        "path": "packages/cli/src/commands/evidence/approve-reconciliation.ts",
+        "purpose": "Owner initial/renew/revoke/recovery grammar and owned review flow."
+      }
+    ],
+    "existing_sources_to_close": [
+      "packages/cli/src/commands/init/index.ts",
+      "packages/cli/src/commands/init/shared.ts",
+      "packages/cli/src/commands/evidence/reconcile.ts",
+      "packages/cli/src/commands/evidence/facade.ts",
+      "packages/cli/src/cli-runtime.ts",
+      "packages/cli/src/command-router.ts",
+      "packages/cli/src/command-manifest.ts",
+      "packages/cli/src/action-output.ts",
+      "packages/cli/src/authority/index.ts",
+      "packages/cli/src/authority/broker.ts",
+      "packages/cli/src/authority/broker-paths.ts",
+      "packages/cli/src/authority/broker-targets.ts",
+      "packages/cli/src/authority/command-capabilities.ts",
+      "packages/cli/src/authority/policy-core-rules.ts",
+      "packages/authority/src/types.ts",
+      "packages/authority/src/decision-plan.ts",
+      "packages/authority/src/runtime/policy-resolver.ts",
+      "packages/authority/src/boundaries/resource-classification.ts",
+      "packages/authority/src/boundaries/boundary-runtime.ts",
+      "packages/authority/src/boundaries/boundary-runtime-targets.ts",
+      "packages/authority/src/boundaries/host-atomic-effects.ts"
+    ],
+    "private_prerequisite_sources": [
+      "packages/authority/src/boundaries/host-publish.ts",
+      "packages/authority/src/boundaries/host-effects.ts",
+      "packages/authority/src/boundaries/index.ts"
+    ],
+    "new_schema_minimum": [
+      {
+        "path": "law/schemas/reconciliation-owner.schema.json",
+        "purpose": "One closed discriminated schema with reusable defs for issuer/public projection/approval/renewal/revocation/lease/clock and native-admission binding; exact fields root-owned before deep tests."
+      }
+    ],
+    "existing_contracts": [
+      "law/adr/ADR-EVI-0007-canonical-reconciliation-and-staged-bootstrap.md",
+      "law/adr/README.md",
+      "law/policy/adr-validation.json",
+      "law/policy/action-registry.json",
+      "law/schemas/action-registry.schema.json",
+      "law/schemas/authority-policy.schema.json",
+      "law/schemas/evidence-reconciliation-plan.schema.json",
+      "law/schemas/evidence-reconciliation-phase.schema.json",
+      "packages/schemas/src/roster.ts"
+    ],
+    "new_tests": [
+      "packages/authority/tests/unit/private-publication.test.ts",
+      "packages/authority/tests/unit/reconciliation-owner-intake.test.ts",
+      "packages/authority/tests/unit/reconciliation-owner-admission.test.ts",
+      "packages/cli/tests/unit/init-reconciliation-host.test.ts",
+      "packages/cli/tests/unit/evidence-reconcile-approve.test.ts",
+      "packages/cli/tests/unit/action-output-reconciliation-review.test.ts",
+      "packages/schemas/tests/contract/reconciliation-owner-schemas.test.ts"
+    ],
+    "preserved_tests": [
+      "packages/sensors/tests/unit/staged-inventory-readers.test.ts",
+      "packages/authority/tests/unit/host-publish-no-replace.test.ts",
+      "packages/authority/tests/unit/host-remove-identity.test.ts",
+      "packages/cli/tests/unit/action-output-authority-policy-review.test.ts"
+    ],
+    "generated_and_docs": [
+      "packages/cli/src/generated/action-registry.ts",
+      "packages/effects-check/src/generated/action-catalog.ts",
+      "docs/reference/error-codes.md",
+      "docs/reference/cli/evidence-reconcile.md",
+      "docs/reference/cli/index.md"
+    ],
+    "validation_only": [
+      "packages/authority/src/index.ts (host-effects export* already propagates private primitive)",
+      "packages/cli/src/release-host.ts and release-host-bootstrap.ts (no new caller-visible key/handle factory)",
+      "law/schemas/effect-authorization-event.schema.json and runtime/effect-authorization-types.ts (general ledger deliberately unchanged; no B1 hash-as-grant)"
+    ]
+  },
+  "required_next_independent_tests": [
+    "Actual direct/linked worktree provisioning, original-argv/role/consent/TTY custody and read-only/preconfirmation zero effects.",
+    "Actual immutable-anchor adapter contention, holder self-SIGKILL, unchanged seed bytes/inode and zero sidecars; malformed/foreign seed or any existing sidecar refuses without recovery; inode/symlink/mode substitution and two-step bootstrap crash/cancel/retry.",
+    "No raw DB file read/close during live native connection, no async/reentrant callback, no caller DB/key/path/SQL injection.",
+    "Forged Owner-labelled JSON/self-consistent ledger, fake issuer/domain/MAC, noncanonical private key encoding, escaped/cloned/reused handles and altered scope refuse.",
+    "Cross-process boot/monotonic/wall bounds, exact same-scope renewal, terminal revocation and every intent_authority_matrix cell.",
+    "Crash each bootstrap/approval/grant/intent/output/completion point, authenticated ESRCH-only lease recovery, original event/phase identities and no hidden proof tracking.",
+    "Real installed tarball help/positive route, exact safe READY/prompt/cancellation/publication/uncertainty without secret bytes or duplicate envelope."
+  ],
+  "installed_baseline": {
+    "package_root": "/private/tmp/devai-release-280-01a16e18/installed-06/node_modules/@aarusso-nyx/devai",
+    "tarball_sha256": "dc806a721e47fb69a141bae34dd1009ca08747c1a9472789374355605ef8b77b",
+    "raw_log": "../../v2.8.0-qualification/inspector/owner-installed-06-baseline-red.txt",
+    "tests_failed": 3,
+    "meaning": "Actual readonly Architect selector, Owner approve help and direct positive approval grammar are absent. All three real terminal streams and before/after inventories captured.",
+    "plan_semantics": "Benign JSON sentinel with exact bytes/hash only; final source/plan schema not frozen, so semantic plan validity is not claimed.",
+    "negative_guards_qualified": false
+  },
+  "primary_sources": [
+    {
+      "url": "https://www.sqlite.org/howtocorrupt.html",
+      "supports": "Separate raw fd close can cancel process SQLite locks; do not rename/unlink open DB or delete hot journal."
+    },
+    {
+      "url": "https://www.sqlite.org/lockingv3.html",
+      "supports": "Reading may roll back hot journal; rollback journal writes/cleanup are real effects, not a pure observation."
+    },
+    {
+      "url": "https://nodejs.org/download/release/latest-v24.x/docs/api/sqlite.html",
+      "supports": "DatabaseSync opens by default; readOnly defaults false and extension loading defaults false."
+    }
+  ],
+  "kernel_candidate_sha256": "d2b19a2144bbe53fb1a347ae704c45c1d03478dbb03a59b7c9905360d4c5e0d8",
+  "private_publication_receipt": "../../v2.8.0-qualification/inspector/private-publication-green-receipt.json",
+  "preferred_kernel_candidate": {
+    "standing": "FEASIBILITY_ONLY_NOT_IMPLEMENTED_ADAPTER",
+    "fixture": "owner-admission-feasibility/immutable-result.json",
+    "fixture_sha256": "793fbbed1b9637856534aa423433872828bfe0984adb6d32d3b40d15e3c73531",
+    "seed_bytes": 8192,
+    "seed_sha256": "3f6b742405bb199a11ed0952c9aa049285ef25dc69954e901d2e987cd15c4372",
+    "refinement": "Pre-read hash before SQLite open; no raw descriptor close during connection; closed SQL/lstat checks inside lock; reject sidecars; two confirmed bootstrap stages. No callback/host implementation acceptance yet."
+  }
+}

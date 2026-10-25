@@ -1,0 +1,19 @@
+{
+  "standing": "AUTHENTIC_ABSENT_MODULE_RED",
+  "failed": 2,
+  "passed": 0,
+  "hashes": {
+    "packages/authority/tests/unit/reconciliation-host-operation.test.ts": "c107db59e25413f63d1953052140799c5bf33dc09e504a9d0a36a097c8b7ac00",
+    "packages/cli/tests/unit/reconciliation-host-input.test.ts": "994499efece17290c6df2cdce6c566a071f9e167d76fe2590675393254c9efce",
+    "packages/authority/src/boundaries/host-scope.ts": "1f994229fc70eecab71964b3197359485e5db99835c0339d85ef0319f93f1d51",
+    "packages/authority/src/boundaries/host-atomic-effects.ts": "bde337e567f1cb0e818df5dd8bdc757e0a85244446fcb46b323ca598b84d8e80",
+    "packages/authority/src/index.ts": "46a8ad13520c2ab7896988cdc68ad644cef45a8a45b4f3789c61b95f87abb8a7",
+    "packages/cli/src/authority/broker.ts": "50721c2d784e8849cbf50ad7a07daa7d2b3513a5618ecd81ac0ec8040b2f7735",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/host-operation-checkpoint.json": "7e21ad1550c123b633a9af72d8e90f3a37d31ddeee6ee835abc0c8566fc41912"
+  },
+  "absent": [
+    "packages/authority/src/boundaries/reconciliation-host-operation.ts",
+    "packages/cli/src/authority/reconciliation-host-input.ts"
+  ],
+  "raw_sha256": "2d03e00f77de70cdee60c212b2af5c59ec76a7ae223a7d6e536e64ba30ac2062"
+}

@@ -1,0 +1,17 @@
+{
+  "packages/authority/src/boundaries/reconciliation-host-provision.ts": "8c439589cdc0265681ed00a732e6ac0b4c2ab2ad6a520b87e57d2238e1a140b0",
+  "packages/authority/src/boundaries/reconciliation-host-namespace.ts": "44e2abbeb68f0b771e8f82e34d745bfc0435bf532cd2ae710118978339588484",
+  "packages/authority/src/boundaries/host-publish.ts": "b2aa704c775009240b624b4581339cebaec8bcd6f7f95fbf7e71eabf296e054a",
+  "packages/authority/src/index.ts": "9d665d51e73c550819c4c223b34e0d110eb3b5305e02758a754977d46359272c",
+  "packages/authority/tests/unit/reconciliation-host-provision.test.ts": "34bcfd9cc2d6cb40b3ce56e82500055d413ce0eb7ddca4ae4fe87f97b4f7b8d7",
+  "packages/authority/dist/boundaries/reconciliation-host-provision.js": "8a0fb0e261adc68c7cb7260149eb3f7bf5bd1ff19ab5dde69d0e24d2b8b3bcc3",
+  "packages/authority/dist/boundaries/reconciliation-host-namespace.js": "3bf6c37dc107d60defb2c892bbdda3363e5e25bd601621b3901f22eecf5029d6",
+  "packages/authority/dist/boundaries/host-publish.js": "4a2d5b90657212c33c2d25fd098b5e4e75415c4d04e37c7f38ba46340ff32cbc",
+  "packages/authority/dist/index.js": "95225e1cf8ca8b8c83ad9c3de3414bd09a3eee1ae6d837f0f6b0d29ede036bcc",
+  "docs/reference/error-codes.md": "970def534b24124e54d79673692824af7690ed46d07459ee6745f32b07415667",
+  "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/native-provision-checkpoint.json": "b5781dc107baee06410015fc031cd3372022ccd1c2234a1449a3115419dd149d",
+  "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/native-provision-interface.json": "1062f7f05db0d88505bac87fd0fc63d685bca53ba2e72003561a6dc2e485de0e",
+  "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/native-provision-namespace.json": "168d8bb1b1a438b7418c855213731ab1f7c472804dc72d143c7a53f46b811d81",
+  "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/native-provision-freshness-amendment.json": "029fbb5f8c487e1551e65ff4ea41b7ddeb30cf2bef0583184b0a697725af9a76",
+  "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/native-provision-census-amendment.json": "8ce2c612ead389a451ff537f53c684fe48d620e2ec10fd336c0b62839d9cc6e0"
+}

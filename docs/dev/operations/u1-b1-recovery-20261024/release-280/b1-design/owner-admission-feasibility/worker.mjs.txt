@@ -1,0 +1,20 @@
+import { DatabaseSync } from 'node:sqlite';
+const [path, mode] = process.argv.slice(2);
+const db = new DatabaseSync(path, { timeout: mode === 'contender' ? 200 : 2000 });
+try {
+  db.exec('PRAGMA journal_mode=DELETE; PRAGMA synchronous=FULL; BEGIN IMMEDIATE');
+  if (mode === 'holder') {
+    db.exec('UPDATE counter SET value=99');
+    console.log(JSON.stringify({ acquired: true, uncommitted: 99 }));
+    setInterval(() => {}, 1000);
+  } else {
+    const before = db.prepare('SELECT value FROM counter').get().value;
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50);
+    db.exec('UPDATE counter SET value=value+1; COMMIT');
+    console.log(JSON.stringify({ acquired: true, before, after: before + 1 }));
+    db.close();
+  }
+} catch (error) {
+  console.log(JSON.stringify({ acquired: false, code: error.code, errcode: error.errcode }));
+  db.close();
+}

@@ -1,0 +1,8 @@
+{
+  "standing": "INDEPENDENT_PYTHON_STDLIB_FIXED_REVOCATION_VECTOR_PUBLIC_DISPOSABLE_KEY",
+  "oracle": "Python hashlib/hmac+json sort_keys/separators; fixed ASCII-key fixture only",
+  "mac": "74f491ee2d51dc4e5532e48bd2db7392c16b76bf98bc0f6d5bcacf20e81566c1",
+  "raw_sha256": "31ad4d18a68ce12c83f8e78c491459db1cbfa8681bcbf0822ed5567852dcb5bb",
+  "size_bytes": 834,
+  "raw_utf8": "{\"approval_id\":\"b0da65c9205ca85dd0607b9722e832ff2fd046df3d3ef6346ddab4d2034ed384\",\"approval_sha256\":\"9deb65b8788f41ff94a217842017db2f843954fc0eb46110835903908e5a265f\",\"clock\":{\"boot_id\":\"11111111-2222-3333-4444-555555555555\",\"clock_source\":\"node-uv-hrtime-ns-v1\",\"monotonic_ns\":\"9007199254740993123\",\"wall_ms\":1792868400000},\"domain\":\"devai.reconciliation.owner.v1/revocation\",\"issuer_sha256\":\"535c6f8eb511f5d966a1b0725df92ebf27514faba945cbbd698e23ac72c41757\",\"kind\":\"revocation\",\"mac\":\"74f491ee2d51dc4e5532e48bd2db7392c16b76bf98bc0f6d5bcacf20e81566c1\",\"previous_grant_sha256\":\"3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020\",\"repository_id\":\"fixture-repository\",\"schemaVersion\":\"1.0.0\",\"scope_sha256\":\"8de77d1c13401c73dc6c0f98222bca0e241f9f8f7fce887bff542d78af44af14\",\"sequence\":2,\"worktree_id\":\"fixture-worktree\"}\n"
+}

@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/inventory-phase-renew.txt","kind":"historical-transcript-custody-pointer","original_bytes":1272,"original_bytes_changed":false,"original_sha256":"1f4548ea51e89e597950d264ca129d275fbf71a9195d53cdef066305e3525e15"}

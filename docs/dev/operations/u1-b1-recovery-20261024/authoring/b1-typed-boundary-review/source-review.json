@@ -1,0 +1,80 @@
+{
+  "standing": "BOUNDED_INDEPENDENT_TYPED_BOUNDARY_SOURCE_REVIEW_GREEN_COUNTEREXAMPLES_CLOSED_NOT_FINAL_HOST_AUTHORITY",
+  "contracts_sha256": {
+    "checkpoint": "a1fb4f25f5f4c06e096c968b13c3bd167a676884c92ff5ae8288dec0d5b0b29f",
+    "policy_amendment": "398e48045200fab3c0b49186184299987dd171687fb9c81d93c2d0cceab2993c"
+  },
+  "source_sha256": {
+    "packages/authority/src/boundaries/resource-classification.ts": "f165fe7faf0f43ae098a9963489706df265751fad3c2c14548e7fbef5134d214",
+    "packages/authority/src/boundaries/boundary-runtime-targets.ts": "2f5d6889c5578681a75dda7c1e21d99badc7afff468ffd39f84fe0a09020aa35",
+    "packages/authority/src/boundaries/boundary-runtime.ts": "daf606d3db0642a413e7ae6e04e91fa5d131c51b7fbfefb209801adaf89b178d",
+    "packages/authority/src/runtime/policy-resolver.ts": "def28be2251d5b8a8d675a41909b2838dbd0a47e60eb49363f5336333324eeed",
+    "law/schemas/authority-policy.schema.json": "2cbda030144afe417d25cd1fb3c0e7799b8d7c80e67742567a94a66c0a67bf9d"
+  },
+  "dist_sha256": {
+    "packages/authority/dist/boundaries/resource-classification.js": "77b3bed48e8933e3cf195670ccee07611ca4d7163c217091903844dff3ff895e",
+    "packages/authority/dist/boundaries/boundary-runtime-targets.js": "f5e5b6c6ecf423a1a38862d534d055e826f977e336e207f6416b6e7dd7acefda",
+    "packages/authority/dist/boundaries/boundary-runtime.js": "48447f5596a56c8217bfbd0ccd5e359a3f42b4c3b2d004bf7dd680a23faaedd7",
+    "packages/authority/dist/runtime/policy-resolver.js": "df31e74df031a7d5a4612ef916e8c856ba83d819e22589b6ca1acfb6ec92cbe4"
+  },
+  "independent_actual_helper_probes": {
+    "file": "final-source-probes.json",
+    "sha256": "8d5d3380fae6b91b9dd3395d0d359ce5f1c11d19f704a7022221b37fc8398fc3",
+    "passed": 14,
+    "failed": 0,
+    "dependency_getter_calls": 0,
+    "environment": {
+      "node": "v24.22.0",
+      "uv": "1.52.1",
+      "platform": "darwin"
+    },
+    "limit": "Actual compiled classifier/policy/snapshot helper probes only; authenticissuer prepare/apply+historical full regression suite owned by P1Inspector."
+  },
+  "source_review": [
+    "Full closed typed target validation before trusted matching dependency admission; no unconfigured classification upgrade and no fs/git/db/remote fallback. Constructor typed properties use own descriptors; accessor providers refuse without invocation.",
+    "Proxy guards precede IsArray/isRecord at newtypedheader,target,selector,operationsarray,candidate andsnapshotroot paths, covering revokedProxy as well as activeProxy.",
+    "Bounded descriptor-safe recursive snapshot copy validates Unicodevalues ANDkeys, rejectsnonJSON/proxy/accessor/cycle forms, stores independent frozen preparation state before typedreceipt.consume and verifies hashing support. Existing FS snapshot timing preserved.",
+    "Prepared handle marksused before latechecks. Target digest and matching storedadapter identity bound; current snapshot compared, then fresh selectedsameadapter admission checked immediately before apply. okfalse effect result propagates; actualapply exceptions preserve normal caller behavior.",
+    "Typed batch registration and execution-unit prepare/apply explicitly refuse; advertising applyAtomic or forgedpolicyselectors cannot acquire genericbatch/unit dispatch.",
+    "Policy-only matching uses closed3fields, exacttypedrepo/kind and finiteuniqueoperations; exactly2resolvercalls changed, ordinary matching delegates unchanged. This supplies authenticpolicyresolution vocabulary but no currentcore/adopter/actionregistry rule or publicpermission.",
+    "No new helper oroperation handle barrel/public command surface; prior boundaries/index one-line privatepublisher mutator census belongs to earlierwork, not this integration."
+  ],
+  "preservation": {
+    "first4schema_variants_unchanged": true,
+    "schema_examples_unchanged": true,
+    "exactly2newclosed_selector_variants": true,
+    "legacy_exported_selector_function_byte_identical": true,
+    "exactly2internal_policy_matcher_calls": true,
+    "kernel58_sha256": "da8a78cd5e4aca842ceaab29b38337f3662949c5c82525ceb89b71a28008898a",
+    "prior99_sha256": "87fa27e5c50865b484275baa242966f298e237c51ec903f62e5eb7ba7bb1b36c"
+  },
+  "authentic_counterexample_history": {
+    "p1_late_admission_key_receipt": {
+      "path": "authoring/b1-typed-boundary-inspector/late-admission-key-red-receipt.json",
+      "sha256": "cf346b834632468e385f63b47b0487c85ff39107a10389d070fbce4a09dedf1b",
+      "meaning": "P1 authentic102PASS4FAIL identified snapshot-timeadmissionloss andlonesurrogatekey; finalsource contains narrowrepairs. No P1fullsuite GREEN count inferred here."
+    },
+    "reviewer": {
+      "interim_report_sha256": "f24da06127b6d93c260013edd5382f248e6402da8984e8d4c1e116e300aa74ff",
+      "dependency_property_probe_sha256": "ba11d7284b30529b7aa7ac514cf0378e6016bd3dbebe65ef88a9248118043671",
+      "revoked_proxy_probe_sha256": "a3da634a05126dd4f5ef45077289aa59646fcb0f1fbcbeca149dea15d6e0be22",
+      "nested_revoked_probe_sha256": "e9df3e61a7b04eb731f3cd5e093e3380ccd5ba2d9e350ec51aefeb72e98e630f",
+      "meaning": "Actual initialclassification841/resolver0d3a leaked dependencygetterError and6revokedProxy nativeTypeErrors. Finaldescriptor guards/Proxy-first order repairboth; all originalprobe files retained."
+    }
+  },
+  "remaining_confirmed_source_findings": [],
+  "limits": [
+    "No claim of arbitrary hostile trustedcallback/compromisedruntime isolation, actualopaquehost/operationorigin, nativeSQLite/index effects or realpublicpolicygrant.",
+    "Snapshot/classification helper success is not actualeffect evidence. Real broker operationtoken,currentargv/role/consent/package+policy checks, finalnativehost/indexadapters andpublicworkflow remain required.",
+    "P1owns fullactualissuer/regression verification; rootownsfulltypes/build/lint/stagedschema/exactcandidateintegration. This review does not replace those gates."
+  ],
+  "original_design_receipts_unchanged": true,
+  "reviewer_source_or_test_edits": false,
+  "writes_only": "authoring/b1-typed-boundary-review/",
+  "graft": {
+    "calls_this_source_review": 1,
+    "tokens_saved_estimate": 25760,
+    "cumulative_calls": 15,
+    "cumulative_tokens_saved_estimate": 296245
+  }
+}

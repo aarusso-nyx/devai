@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-host-operation-inspector/lint-draft.txt","kind":"historical-transcript-custody-pointer","original_bytes":536,"original_bytes_changed":false,"original_sha256":"999cb6afda08d02608d70f2a406afbe7ab14811318ae7ac0c59a1b71ded45730"}

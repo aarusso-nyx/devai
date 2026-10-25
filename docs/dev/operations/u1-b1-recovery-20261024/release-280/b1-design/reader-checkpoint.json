@@ -1,0 +1,33 @@
+{
+  "status": "ARCHITECT_INTERFACE_CHECKPOINT_FOR_INDEPENDENT_RED",
+  "authorization": "release-280/authorization.json",
+  "decision": "Use an explicit immutable staged source reader throughout every producer and configuration/body input seam. Admission predicates alone cannot establish staged-byte provenance.",
+  "interface": {
+    "export": "InventorySourceReader from packages/sensors/src/inventory-walker.ts and packages/sensors/src/index.ts",
+    "readFile": "(absolutePath: string) => string; immutable UTF-8 text from the admitted snapshot; missing, malformed UTF-8 or unadmitted input throws",
+    "listDirectory": "(absolutePath: string) => readonly { name: string; kind: 'file' | 'directory' }[]; names only, no dot, slash or symlink entries",
+    "exists": "(absolutePath: string) => boolean; snapshot membership only",
+    "isDirectory": "(absolutePath: string) => boolean; snapshot namespace only"
+  },
+  "producer_option": "sourceReader?: InventorySourceReader on every affected typed inventory/config/body API; omitted preserves existing ordinary behavior",
+  "constraints": [
+    "No global filesystem replacement, fake clean checkout, hidden default body or fallback to live reads when a reader is supplied.",
+    "The production reader is created only from trusted-host admitted exact stage0 blob bytes and a private same-run dependent-body overlay; a serialized caller object is never production admission or mutation authority.",
+    "Enumerate snapshot-only files even when absent on disk; exclude live-only files. Walk ignore, extension and declaration behavior remains the same.",
+    "Configuration, declared surfaces, registry, use-cases, SQL and dependent bodies use the same reader. Missing or malformed required inputs block the diagnostic operation rather than producing an incomplete PASS.",
+    "All seven native body producers receive exact current-run inputs. The ordinary clean-candidate guard and final native readiness behavior remain unchanged.",
+    "This checkpoint authorizes independent pure-reader RED only. It does not claim complete B1 runtime authority, Owner approval intake, index adapter, schemas or effects are implemented."
+  ],
+  "test_paths": [
+    "packages/sensors/tests/unit/staged-inventory-readers.test.ts",
+    "packages/loop/tests/unit/staged-inventory-bootstrap.test.ts"
+  ],
+  "source_path_closure": "inventory.proposed.json plus the 18 exact missing_candidate_paths in inspector-review.json; no unrelated sensor algorithm or threshold change",
+  "required_counterexamples": [
+    "Each producer reads staged A when the live path holds B.",
+    "Staged-only files are discoverable; live-only files never enter the result.",
+    "Staged configuration and dependent bodies override poisoned live defaults without consulting them.",
+    "Reader errors remain blocking, including invalid/missing inputs; no catch-and-skip or live fallback.",
+    "Ordinary no-reader outputs and failure behavior remain unchanged."
+  ]
+}

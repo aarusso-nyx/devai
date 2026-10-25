@@ -1,0 +1,180 @@
+{
+  "status": "PROPOSED_NOT_APPROVED",
+  "baseline_commit": "2df84159caabf869b866fb2a05e5b06be83295fb",
+  "current_parent_constitution": {
+    "version": "1.2.0",
+    "sha256": "d5dfdc972161e0f848dd859be7bbfa510973c5c9a449a0f9e6b8960e4f5ac96a"
+  },
+  "human_authored_path_count": 19,
+  "role_counts": {
+    "Architect": 4,
+    "Engineer": 9,
+    "Inspector": 6
+  },
+  "paths": [
+    {
+      "role": "Architect",
+      "path": "law/adr/ADR-AUT-0008-exact-authority-policy-create-review.md",
+      "new": true,
+      "current_sha256": null,
+      "baseline_git_blob": null,
+      "permitted_delta": "New proposed ADR for explicit same-invocation armed review, trusted prospective constitution projection and create-only publication; no accepted authority or constitutional delta."
+    },
+    {
+      "role": "Architect",
+      "path": "law/adr/README.md",
+      "new": false,
+      "current_sha256": "6b80e1a1680cdf99233c3e736b22a3adc42b8d4e141e5a30a6959bd1f1299e11",
+      "baseline_git_blob": "ad1a89c7773cf708aa731923cb77b02cb8729a35",
+      "permitted_delta": "Existing deterministic decision-index generator, one proposed ADR row."
+    },
+    {
+      "role": "Architect",
+      "path": "law/policy/adr-validation.json",
+      "new": false,
+      "current_sha256": "fdf4440f30db8a210354a38880aa29b03ace2572260462b9b313d7697e6e55f9",
+      "baseline_git_blob": "2c36a8f85770c4057a7070ae5fcb921116707893",
+      "permitted_delta": "Only generated README exception SHA and aggregate catalog digest; preserve all historical entries and authority semantics."
+    },
+    {
+      "role": "Architect",
+      "path": "docs/reference/cli/index.md",
+      "new": false,
+      "current_sha256": "92090924074752e3080a1735c254735190922295914e7053a6f0679110231da7",
+      "baseline_git_blob": "59f60087e30e4489ff531fd507da46ed4d0736bc",
+      "permitted_delta": "Bounded init workflow narrative: armed review is not a read action; exact confirmation, projection, create-only limits and holds."
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/cli/src/command-router.ts",
+      "new": false,
+      "current_sha256": "56fc536af257b6fa922d17eac3cd432733f6416e136573aef7cd07d2076eb405",
+      "baseline_git_blob": "cdd1f3d102bf89bf29af769059a2cc1128fe36fc",
+      "permitted_delta": "New review selector validation; reject conflicting modes/flags before dispatch; preserve existing routes."
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/cli/src/commands/init/index.ts",
+      "new": false,
+      "current_sha256": "f5762f8a53f55709e0816804e42a6b514bda2aeac969461f4fef82241922efcf",
+      "baseline_git_blob": "9e5617139127548cc0b84ef3788c0f15f485c814",
+      "permitted_delta": "Register --review-authority-policy and --after-constitution; review branch only; preserve all legacy branches."
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/cli/src/commands/init/shared.ts",
+      "new": false,
+      "current_sha256": "f7560a09727e3636ddbbbae7105ee2ccc37649fff9f281ff23b28291ed25dcf4",
+      "baseline_git_blob": "41a14de8d427f788b41ab56298fce06b67a1bae7",
+      "permitted_delta": "Add exactly two optional review selector booleans to InitBindOptions."
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/cli/src/commands/init/review-authority-policy.ts",
+      "new": true,
+      "current_sha256": null,
+      "baseline_git_blob": null,
+      "permitted_delta": "TTY JSON-lines ready/completion display and exact digest confirmation; no file writer, replay file, hidden action or automatic precursor."
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/cli/src/authority/command-capabilities.ts",
+      "new": false,
+      "current_sha256": "741390d45c13586d6e3ea3ffcaa00e3e2c46da3d5a2ed7e0469b4b294cddced7",
+      "baseline_git_blob": "31431ef5e95c26220190c14295514699b266f392",
+      "permitted_delta": "Typed internal access to host-owned review handle through existing invocation-local operation; no serializable or public capability."
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/cli/src/authority/broker.ts",
+      "new": false,
+      "current_sha256": "36b53703786d04e4e6332fc7aa72d309a9ab575b9d4dba5a5c6f74c51b65b2bb",
+      "baseline_git_blob": "a3548eacce2627546936bfe5f629ae88688e8534",
+      "permitted_delta": "Prepare artifact once, isolate prospective data from actual effect authority, revalidate real poststate, fresh ordinary publication decision and guarded no-replace create only; exact preexisting branch behavior preserved."
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/cli/src/authority/policy-review.ts",
+      "new": true,
+      "current_sha256": null,
+      "baseline_git_blob": null,
+      "permitted_delta": "Private owned review state, immutable bytes/hash, input snapshots, permitted two-file transition, confirmation/deadline/disposal and single-use publication closure."
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/cli/src/authority/policy.ts",
+      "new": false,
+      "current_sha256": "9d23d89a7eaa31588862dfb66d47633f43619b89096b0bbfe46f0c60a8d35044",
+      "baseline_git_blob": "a8adf4d8588c1b014c16c29e646906165ff61e08",
+      "permitted_delta": "Share pure trusted policy projection from fixed admitted canonical constitution/project snapshot; keep normal actual-source path unchanged."
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/cli/src/authority/policy-support.ts",
+      "new": false,
+      "current_sha256": "f4914ef10a230ac5aeae0d662919af6a57052476a66d9eb096460049cd9c7ebb",
+      "baseline_git_blob": "5856b80cb350b87184d12b448057c25f3c9a2a3f",
+      "permitted_delta": "Closed canonical prospective binding projection, not a caller-supplied root/path/source override; unchanged ordinary authorityBindings."
+    },
+    {
+      "role": "Inspector",
+      "path": "packages/cli/tests/unit/authority-policy-review.test.ts",
+      "new": true,
+      "current_sha256": null,
+      "baseline_git_blob": null,
+      "permitted_delta": "Owned handle, exact projected bytes and hashes, real/prospective separation, stale guards, expiry/replay/consent and zero-mutation preview."
+    },
+    {
+      "role": "Inspector",
+      "path": "packages/cli/tests/unit/init-authority-policy-review.test.ts",
+      "new": true,
+      "current_sha256": null,
+      "baseline_git_blob": null,
+      "permitted_delta": "Public route, TTY, exact grammar, two-phase JSON and independent confirmation, non-TTY/cancel/wrong token/disposal negatives."
+    },
+    {
+      "role": "Inspector",
+      "path": "packages/cli/tests/unit/authority-policy-review-publication.test.ts",
+      "new": true,
+      "current_sha256": null,
+      "baseline_git_blob": null,
+      "permitted_delta": "Disposable real-filesystem create race, EEXIST preservation, crash/fault receipts and byte identity through existing no-replace seam."
+    },
+    {
+      "role": "Inspector",
+      "path": "packages/cli/tests/unit/authority-command-boundary-finalization.test.ts",
+      "new": false,
+      "current_sha256": "c03873c3a1813d69a688c896033ef7b2732914e936bb30de99b45aadbdfcdb65",
+      "baseline_git_blob": "c6ae74f73cbfed46e30390627cda3141381583c7",
+      "permitted_delta": "Async scope remains active during review; fresh decision only on confirm; issuer/context cleanup and no escaped closure; existing cases retained."
+    },
+    {
+      "role": "Inspector",
+      "path": "packages/cli/tests/unit/cli-shard09-init-bind-adapters-policy.test.ts",
+      "new": false,
+      "current_sha256": "88fa29e74eca9146d4b621005310938769b30370c3b351a889360ad7d387d112",
+      "baseline_git_blob": "590535089e3f55cd442e5c141af8773eec1a30e4",
+      "permitted_delta": "New option/selector assertions; preserve exact legacy default/full/constitution/adopter/upgrade behavior and output meaning."
+    },
+    {
+      "role": "Inspector",
+      "path": "packages/schemas/tests/contract/governance-v15-adr.test.ts",
+      "new": false,
+      "current_sha256": "0921bcfb4e61ec499ab34a75a2a31798eac8dd745a902c2f8e80e41ca9bbcc7b",
+      "baseline_git_blob": "e8d70250d340d49135aa379754f991e67ffffbb8",
+      "permitted_delta": "One proposed ADR census/subjects, preserve all effective authority lineages and historical entries."
+    }
+  ],
+  "machine_generated_paths": [
+    {
+      "path": "law/adr/README.md",
+      "generator": "unchanged renderDecisionIndex; already included in Architect census"
+    },
+    {
+      "path": "docs/reference/error-codes.md",
+      "generator": "unchanged scripts/generate-error-code-reference.mjs; only actual new code rows, no hand edit"
+    }
+  ],
+  "no_runtime_or_binding_implementation_authorized_now": true,
+  "distinct_future_write_path_count_including_generated": 20
+}

@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-inspector/fixture-corrected-focused.txt","kind":"historical-transcript-custody-pointer","original_bytes":290,"original_bytes_changed":false,"original_sha256":"952739c8a9d5526c660da091896d3a708d9020bc59ad23fe50ae7187183063b4"}

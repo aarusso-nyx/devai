@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-provision-inspector/independent-first.redacted.txt","kind":"historical-transcript-custody-pointer","original_bytes":4794,"original_bytes_changed":false,"original_sha256":"43b93f46aa7d22ed7a775ebdfd6888311a0835e68a32d219d6126e4d44182367"}

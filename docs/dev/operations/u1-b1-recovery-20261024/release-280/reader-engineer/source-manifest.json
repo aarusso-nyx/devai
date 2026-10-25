@@ -1,0 +1,93 @@
+{
+  "status": "INDEPENDENT_READER_188_PASS",
+  "runtime_path_count": 17,
+  "scope": "Only explicit sourceReader propagation and reader-only blocking errors; no U1/P1/issuer/canonical/index writers",
+  "paths": [
+    {
+      "path": "packages/cli/src/commands/sense/inventory-inputs.ts",
+      "sha256_before": "60b35f7b9c93e2534357499fcc66ac39ad2817ef5a0cdfc14a76cd55304955dd",
+      "sha256": "bb4184e116f275f360793ebfc62e884ccad5964f371ed80c2752c68b6a65ac6b"
+    },
+    {
+      "path": "packages/cli/src/commands/sense/shared.ts",
+      "sha256_before": "703649a0f0bed469ca0e016645cad6dab2f9febe3ba00e26cca7ac1274a176bb",
+      "sha256": "3d434e13af46c361df5431d6d9f0f827cd82bdc6d7e1f2916a2b8933a87c6a45"
+    },
+    {
+      "path": "packages/sensors/src/inventory-walker.ts",
+      "sha256_before": "4b76409a93cbc24534f0bd77a71e0404e5db88e31130e509bbde18736aec9330",
+      "sha256": "8f010951aefc2c328a78fcc311fedfe906eb6462b22182808d6c215b886506ba"
+    },
+    {
+      "path": "packages/sensors/src/inventory-api.ts",
+      "sha256_before": "83d997f7951f68c248156bafa38f3656a1ef29e804c73bd895aecf09a6e96ee5",
+      "sha256": "be5693af833137e40d416977acc3af2d259094b69d64d3176c5254dc0b37d4fd"
+    },
+    {
+      "path": "packages/sensors/src/inventory-routes.ts",
+      "sha256_before": "c8ed63a0fc51cf76c9d11df863f268ede3a3f1a11a42fdcd031d0d0ef626dc5f",
+      "sha256": "048ddfce97ae5ddbb823039672f7351329d597300d1177ca908872998660422e"
+    },
+    {
+      "path": "packages/sensors/src/inventory-routes-extract.ts",
+      "sha256_before": "4200bd8ede9f6e3a86059cd2077679888e7546b36494dbdf1c4a69c83c0aa1ff",
+      "sha256": "ed43bbf8b9aa44361d2fa4b49ccc9d5970ab2d83e5c24af2685625e5313be4af"
+    },
+    {
+      "path": "packages/sensors/src/inventory-data-model.ts",
+      "sha256_before": "de50c1bd2ae7e3e4910ac199952553571b9d170509804d1f60107ce0dbccc090",
+      "sha256": "0d970840beeeb090396ac557db4c04b8009574c683f7c1377eedbdefba1d045b"
+    },
+    {
+      "path": "packages/sensors/src/inventory-data-model-types.ts",
+      "sha256_before": "787f55a0089ad6ef65b5ff90dbbb630e0c3befc91578edb103ef3d5ee30994c0",
+      "sha256": "4b6850446ed002af26cd616cc99ec65a3fa58b1ffd9f36edeef3d7604df03457"
+    },
+    {
+      "path": "packages/sensors/src/inventory-data-model-sql.ts",
+      "sha256_before": "103054c2133c614f387161af8cb9e569b575030aab7518a7fdc4383b628bd7a8",
+      "sha256": "e6c4c7bd1a028652f105c99ebc163d4a6a2fe1e5bd4ed6c37ddd34e88f3777d4"
+    },
+    {
+      "path": "packages/sensors/src/inventory-rbac.ts",
+      "sha256_before": "51ffd9855b2db10578773628203eebc44e8c978bd184c03cc50b62d1fd69c3ba",
+      "sha256": "84526ec0ecf603f31165257b42e9d114db1d828d42ae9f0ad8fc186ad968ede6"
+    },
+    {
+      "path": "packages/sensors/src/inventory-data-handling.ts",
+      "sha256_before": "68136d52f754db07679fbc69d28234a0c6d5d43a2d4fe523eccf7acd1bf1b143",
+      "sha256": "816d7d6ce696b16a4df9444acc0c9306293a54ba7705a847dab7c34d22903b78"
+    },
+    {
+      "path": "packages/sensors/src/inventory-dep-graph.ts",
+      "sha256_before": "d7542b476034f2c3ac5b863cdcd009377ea4779f0daa0165a2bfdea1ceb2dbf0",
+      "sha256": "8c070825e1bac7d9d33a7279e10e2f2538bb7120b2f4b01609b9a0939ae661e0"
+    },
+    {
+      "path": "packages/sensors/src/inventory-coverage.ts",
+      "sha256_before": "3d027a5af769d6655d95fb54a004c9e3199458d4298c0dfc67f9cd00883ef98b",
+      "sha256": "8d63ba0d2b99070d98bec83bdc7539f986e58ef8fda60a2ed34be16328c07f70"
+    },
+    {
+      "path": "packages/sensors/src/inventory-coverage-inputs.ts",
+      "sha256_before": "a70c16a4cfb786c5a21b071fad22d989bc7a4fd9121c181da0d6c66daa0af036",
+      "sha256": "9d5bf285ac1d009c6ae8c218afd1a48134b571157c3d41ffbf8fe186a619ff82"
+    },
+    {
+      "path": "packages/sensors/src/inventory-body-inputs.ts",
+      "sha256_before": "7f7359fa29fee73258f8cbd3201c232b24d6d47f5ac2d25eb321ff960ab070ae",
+      "sha256": "0cd6845ceacc27ff0b136870974f32e16b9591a169ac5c5e8772747a71b2da52"
+    },
+    {
+      "path": "packages/sensors/src/declared-surfaces.ts",
+      "sha256_before": "31bc7f1db8165de7826488b3c986d71f3cc04982d580565494767f42170e945a",
+      "sha256": "ca9c6270625aaae9b75db9f3e70206d717ad6d870a47ffc6afe29d24183edded"
+    },
+    {
+      "path": "packages/sensors/src/index.ts",
+      "sha256_before": "19a959d3296b2b65f94d386c2a5eae65eef71e5d80ac3e1d05cff5ccd156a80a",
+      "sha256": "68dbed13fc29df8f16b1a63e7ccad08cca4825e6f223ba431d07caa7e1998b5f"
+    }
+  ],
+  "independent_validation": "Inspector57reader cases + five unchanged ordinary/config suites188PASS0FAIL; registryentry genuineRED preserved, allother16 hashes unchanged from edgeRED."
+}

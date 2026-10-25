@@ -1,0 +1,81 @@
+{
+  "meaning": "Actual Git2.54 branchgrammar observation; no product parser invoked.",
+  "cases": [
+    {
+      "branch": "feature/topic",
+      "valid_Git_branch": true
+    },
+    {
+      "branch": "release/v2.8.0",
+      "valid_Git_branch": true
+    },
+    {
+      "branch": "a@b",
+      "valid_Git_branch": true
+    },
+    {
+      "branch": "a.locked",
+      "valid_Git_branch": true
+    },
+    {
+      "branch": "a./b",
+      "valid_Git_branch": true
+    },
+    {
+      "branch": "feature/ação",
+      "valid_Git_branch": true
+    },
+    {
+      "branch": "@",
+      "valid_Git_branch": true
+    },
+    {
+      "branch": "-main",
+      "valid_Git_branch": false
+    },
+    {
+      "branch": "foo.lock/bar",
+      "valid_Git_branch": false
+    },
+    {
+      "branch": "a/.hidden/b",
+      "valid_Git_branch": false
+    },
+    {
+      "branch": "a:b",
+      "valid_Git_branch": false
+    },
+    {
+      "branch": "a b",
+      "valid_Git_branch": false
+    },
+    {
+      "branch": "a?b",
+      "valid_Git_branch": false
+    },
+    {
+      "branch": "a[0]",
+      "valid_Git_branch": false
+    },
+    {
+      "branch": "a~b",
+      "valid_Git_branch": false
+    },
+    {
+      "branch": "a^b",
+      "valid_Git_branch": false
+    },
+    {
+      "branch": "a//b",
+      "valid_Git_branch": false
+    },
+    {
+      "branch": "a.",
+      "valid_Git_branch": false
+    },
+    {
+      "branch": "a@{1}",
+      "valid_Git_branch": false
+    }
+  ]
+}

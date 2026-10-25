@@ -1,0 +1,7 @@
+{
+  "packages/authority/src/boundaries/reconciliation-host-provision.ts": "8c439589cdc0265681ed00a732e6ac0b4c2ab2ad6a520b87e57d2238e1a140b0",
+  "packages/authority/src/boundaries/reconciliation-host-namespace.ts": "b64fd3338e31c5c72e264a26f015d97850c7aeff254f5bb6c775ef770f735f32",
+  "packages/authority/src/boundaries/host-publish.ts": "b2aa704c775009240b624b4581339cebaec8bcd6f7f95fbf7e71eabf296e054a",
+  "packages/authority/src/index.ts": "9d665d51e73c550819c4c223b34e0d110eb3b5305e02758a754977d46359272c",
+  "packages/authority/tests/unit/reconciliation-host-provision.test.ts": "d74284fe153fa73f0b881dd8c065bb1af40fb2d5b1d0bda8b84d7e0fdb10ef80"
+}

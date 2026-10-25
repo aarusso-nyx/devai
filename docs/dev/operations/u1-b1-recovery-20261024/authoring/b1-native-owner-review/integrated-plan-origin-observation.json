@@ -1,0 +1,14 @@
+{
+  "meaning": "Actual Git command semantics only; no product implementation/authority/publication qualification. Fixture localrefs prepared only in disposable external repo; no push/fetch or taskrepo mutation.",
+  "git_version": "git version 2.54.0 (Apple Git-157)",
+  "requested_ref": "refs/heads/main",
+  "actual_rows": [
+    [
+      "0fc709f91986c33c45398e57fdcec4eee508c902",
+      "refs/tags/refs/heads/main"
+    ]
+  ],
+  "exact_requested_ref_rows": [],
+  "counterexample": "ls-remote pattern matches a tail of another ref; --refs does not restrict to heads. OID equality alone is insufficient. Require exact returned refname and unambiguous exactone result before selected equality/ancestry.",
+  "fixture": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-plan-ref-observation-2sikltk6"
+}

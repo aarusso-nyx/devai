@@ -1,0 +1,124 @@
+{
+  "status": "RETURN_ONLY_ALL_LIVE_EFFECTS_HELD",
+  "registered_public_fixture_exercised": true,
+  "live_preview_executed": false,
+  "actual_binding_executed": false,
+  "target_root": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024",
+  "source_package": {
+    "name": "@aarusso-nyx/devai",
+    "version": "2.7.1",
+    "qualified_installed_bundle_sha256": null
+  },
+  "constitution": {
+    "version": "1.2.0",
+    "sha256": "d5dfdc972161e0f848dd859be7bbfa510973c5c9a449a0f9e6b8960e4f5ac96a",
+    "predecessor_version": "1.1.0",
+    "predecessor_sha256": "8353c3b81d38e0f9b913cbeb6762bc149605989c1b16f52d2c63ba9892f71270"
+  },
+  "live_before": {
+    "pin_sha256": "8353c3b81d38e0f9b913cbeb6762bc149605989c1b16f52d2c63ba9892f71270",
+    "project_sha256": "dce97394bf34f17bd02793e9e0d07f0cee041174bb53f7211a77845a2e7560c8",
+    "pointer_sha256": "e89b59e3d6daed5f7c4b20cf200c3b1b9c87ee52d84f7727dc2f9b296445b999",
+    "authority_policy_present": false
+  },
+  "held_sequence": [
+    {
+      "id": "QUALIFY-INSTALLED-CANDIDATE",
+      "standing": "Separate build/resource/effect authorization required. Source and synthetic fixture hashes are not an admitted bundle digest."
+    },
+    {
+      "id": "PUBLIC-EXACT-REVIEW",
+      "standing": "Held. Armed local-write review requires its own exact live-use approval; never launch from this fixture receipt.",
+      "argv": [
+        "devai",
+        "init",
+        "bind",
+        "--review-authority-policy",
+        "--after-constitution",
+        "--target",
+        "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024",
+        "--as-role",
+        "architect",
+        "--write",
+        "--format",
+        "json"
+      ],
+      "before_confirmation_effects": "TTY READY envelope and stderr prompt only; zero filesystem mutation.",
+      "return_required": "Fresh live whole policy bytes/base64/size/SHA, whole plan SHA, before/prospective manifests, actual installed identity. Fixture confirmation and nonce are not reusable."
+    },
+    {
+      "id": "SEPARATE-CONSTITUTION-PRECURSOR",
+      "standing": "Held. Independent explicit approval and registered invocation required while live review is pending. Preview never runs or authorizes it.",
+      "argv": [
+        "devai",
+        "init",
+        "bind",
+        "--constitution",
+        "--target",
+        "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024",
+        "--as-role",
+        "architect",
+        "--write"
+      ],
+      "exact_conditional_outputs": [
+        {
+          "path": ".devai/pin/constitution.md",
+          "operation": "update",
+          "before": {
+            "exists": true,
+            "bytes": 33124,
+            "sha256": "8353c3b81d38e0f9b913cbeb6762bc149605989c1b16f52d2c63ba9892f71270"
+          },
+          "after": {
+            "bytes": 34899,
+            "sha256": "d5dfdc972161e0f848dd859be7bbfa510973c5c9a449a0f9e6b8960e4f5ac96a",
+            "review_copy": "prospective-outputs/constitution.md"
+          }
+        },
+        {
+          "path": ".devai/constitution.md",
+          "operation": "unchanged-existing-pointer",
+          "before": {
+            "exists": true,
+            "bytes": 328,
+            "sha256": "e89b59e3d6daed5f7c4b20cf200c3b1b9c87ee52d84f7727dc2f9b296445b999"
+          },
+          "after": {
+            "exists": true,
+            "bytes": 328,
+            "sha256": "e89b59e3d6daed5f7c4b20cf200c3b1b9c87ee52d84f7727dc2f9b296445b999"
+          }
+        },
+        {
+          "path": ".devai/config/project.json",
+          "operation": "update",
+          "before": {
+            "exists": true,
+            "bytes": 386,
+            "sha256": "dce97394bf34f17bd02793e9e0d07f0cee041174bb53f7211a77845a2e7560c8"
+          },
+          "after": {
+            "bytes": 386,
+            "sha256": "e6c405d15131ffbad5be96ccf0597397b3c9d582dc7c020cee57043796500f87",
+            "review_copy": "prospective-outputs/project.json"
+          }
+        }
+      ],
+      "condition": "Exact prospective bytes only if the subsequently admitted installed package contains the reviewed constitution and CLI version2.7.1, the current source version; no new release version is selected. Reject drift, missing pointer or changed prestate."
+    },
+    {
+      "id": "EXACT-POLICY-CREATE",
+      "standing": "Held. Separate approval of exact fresh live bytes/plan plus terminal CREATE confirmation in same unexpired invocation required.",
+      "target": ".devai/config/authority-policy.json",
+      "operation": "create-only",
+      "artifact_digest": "Unknown until fresh live READY; never use synthetic fixture digest.",
+      "lifetime_ms": 300000,
+      "final_authority": "Fresh ordinary filesystem decision from actual exact successor bindings; no prospective grant reuse.",
+      "existing_target": "Refuse, never replace/delete/adopt equal semantics.",
+      "uncertainty": "Preserve complete linked target and owned identity; report indeterminate durability/staged state, no rollback/cleanup."
+    }
+  ],
+  "on_expiry_or_interrupt": "Preserve separately approved precursor. Fresh review at actual state required; no automatic rollback or token replay.",
+  "post_binding_gates": "Historical binding checks, installed qualification, exact source integration/CI, U1/B1 runtime, release and DETRAN remain independent and require their own authorization.",
+  "earlier_binding_plan_preserved": "docs/dev/operations/u1-b1-recovery-20261024/authoring/binding-plan.json"
+}

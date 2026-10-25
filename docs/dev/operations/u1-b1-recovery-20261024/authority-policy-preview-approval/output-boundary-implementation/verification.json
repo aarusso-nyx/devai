@@ -1,0 +1,55 @@
+{
+  "status": "VERIFIED_SOURCE_FIXTURES_WITH_EXPLICIT_HELD_CHECKS",
+  "observed_at_utc": "2026-10-24T16:14:29.377333+00:00",
+  "protected_sources_checked": 140,
+  "live_files_checked": 43,
+  "prior_manifests": [
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/packet-manifest.json",
+      "sha256": "5152b029680c17089ccc8ae5b438d29790f806435489248c56b52444b1d208bf",
+      "entries": 29,
+      "mismatches": []
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/return-artifact-manifest.json",
+      "sha256": "bf7149be529fc5b50ff5f162494e835e42b3995551282559ca8f416e524bcfaa",
+      "entries": 16,
+      "mismatches": []
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authority-policy-preview-approval/packet-manifest.json",
+      "sha256": "284d3c9d1fae8c676c14b69ee49011f9cd7b779d69d27461e417b0310835a8a2",
+      "entries": 5,
+      "mismatches": []
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authority-policy-preview-approval/p1-implementation/return-artifact-manifest.json",
+      "sha256": "72ff8c4e17ba0d6279f36248da52f1017166f3d93a4747041b9946f9a58f94e7",
+      "entries": 36,
+      "mismatches": []
+    }
+  ],
+  "preservation_mismatches": [],
+  "real_policy_absent": true,
+  "real_pin_version": "1.1.0",
+  "inspector_tests": {
+    "passed": 201,
+    "failed": 2,
+    "total": 203,
+    "meaning": "All required public cases pass; two preserved legacy tests lack installed canonical assets."
+  },
+  "historical_selected_tests": {
+    "passed": 156,
+    "failed": 2,
+    "meaning": "Absent real policy and held1.1pin versus successor1.2."
+  },
+  "selections_overlap_do_not_sum": true,
+  "full_public_two_process_race": "PASS in synthetic disposable fixtures; bothREADY before precursor, one winner and preservedinode/bytes",
+  "formatting_lint": "PASS all22format +10Engineer/7Inspectorlintlogs",
+  "error_reference": "PASS1257codes; unchangedgenerator/classifier/historicalassertions",
+  "adr_policy_delta": "Only generatedREADMEexceptionSHA andaggregate digest; proposed133records/134files/642effective subjects unchanged",
+  "source_typecheck": "Unbuilt workspace declarations remain prerequisite blocker; no package build performed",
+  "devai_check_affected": "Not run: provisioned built CLI entrypoint absent; no build or bypass",
+  "live_use_and_installed_qualification": "HELD",
+  "binding_integration_U1_B1_runtime_release_DETRAN": "HELD"
+}

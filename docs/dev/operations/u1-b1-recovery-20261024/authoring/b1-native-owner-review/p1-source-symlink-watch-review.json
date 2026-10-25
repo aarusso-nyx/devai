@@ -1,0 +1,23 @@
+{
+  "kind": "independent-bounded-interface-review",
+  "verdict": "accepted-with-listed-invariants-before-implementation",
+  "source_before_sha256": "7fd4df9c746a8ab1979f4bd7aa7f26c68ccf7f947ed1df3ff1157f4a4b39c5d1",
+  "scope": "P1 source_files observational watch snapshot only; no authority input, package input, target or write-scope changes",
+  "invariants": [
+    "Only reviewInputs source_files loop may use separate reviewSourceFile. Existing reviewFile remains unchanged for authority/policy binding source/index/package/target checks.",
+    "Leaf parent must be canonical: realpath(dirname(absolute)) equals dirname(absolute); absolute lexical path remains within canonical root. Parent symlinks refuse.",
+    "Regular files retain unchanged strict reviewFile behavior. Unknown non-file objects refuse.",
+    "Symlink leaf read uses readlink bytes only, never target resolution/open/read; return only present:true, kind:symlink, SHA256 link bytes.",
+    "Pre/post bigint lstat both show symlink and exactly match dev, ino, birthtimeNs, ctimeNs, mtimeNs, size and mode.",
+    "Preview/apply compares complete snapshot, so link replacement, target text change or regular/link kind change refuses."
+  ],
+  "required_counterexamples": [
+    "Opaque source leaf symlink to outside or nonexistent target: observation permitted, target not opened, raw target not emitted.",
+    "Changing outside target contents alone does not confer authority or change observed link-byte digest.",
+    "Changing link bytes after preview refuses apply.",
+    "Regular-to-link replacement after preview refuses apply.",
+    "Source link nested through a symlink parent refuses.",
+    "Authority pin, local policy, bound adopter policy source, installed package files, target and parent symlinks retain previous refusal behavior."
+  ],
+  "qualification": "Interface/source inspection only; implementation and installed positive/refusal evidence remain required."
+}

@@ -1,0 +1,160 @@
+{
+  "status": "BOUNDED_IMPLEMENTATION_PUBLIC_PREVIEW_BLOCKED",
+  "baseline_commit": "2df84159caabf869b866fb2a05e5b06be83295fb",
+  "human_authored_paths": 19,
+  "distinct_paths_with_generated_output": 20,
+  "paths": [
+    {
+      "role": "Architect",
+      "path": "law/adr/ADR-AUT-0008-exact-authority-policy-create-review.md",
+      "before_p1_sha256": null,
+      "after_sha256": "1b84ae5b6699003db62f2a917925dd17f848f0a40c13caafed5ab89ecd731082",
+      "after_bytes": 11548
+    },
+    {
+      "role": "Architect",
+      "path": "law/adr/README.md",
+      "before_p1_sha256": "6b80e1a1680cdf99233c3e736b22a3adc42b8d4e141e5a30a6959bd1f1299e11",
+      "after_sha256": "747bac356abc80705305cbb50daeae41d1ae2dd54ee1a1942d73481e7523afd8",
+      "after_bytes": 33395
+    },
+    {
+      "role": "Architect",
+      "path": "law/policy/adr-validation.json",
+      "before_p1_sha256": "fdf4440f30db8a210354a38880aa29b03ace2572260462b9b313d7697e6e55f9",
+      "after_sha256": "dd3a312e0f52676481abf05ccbc1ae6fb5da5e22a96afdcbd2dd0581e75a5d21",
+      "after_bytes": 16030
+    },
+    {
+      "role": "Architect",
+      "path": "docs/reference/cli/index.md",
+      "before_p1_sha256": "92090924074752e3080a1735c254735190922295914e7053a6f0679110231da7",
+      "after_sha256": "6f178aa1d571b750accdd43332a7500bbaf006066840badd8693e5c25a9f7e0c",
+      "after_bytes": 31951
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/cli/src/command-router.ts",
+      "before_p1_sha256": "56fc536af257b6fa922d17eac3cd432733f6416e136573aef7cd07d2076eb405",
+      "after_sha256": "af2cf5df04006d049c6e269cf30d44ceaef650fb8cb9c563dc03c6e00d90837a",
+      "after_bytes": 18442
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/cli/src/commands/init/index.ts",
+      "before_p1_sha256": "f5762f8a53f55709e0816804e42a6b514bda2aeac969461f4fef82241922efcf",
+      "after_sha256": "984da375d7f480413f043341e33f797ab517dc07eb22cfb2d2f3b5c1f3d86bc3",
+      "after_bytes": 5111
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/cli/src/commands/init/shared.ts",
+      "before_p1_sha256": "f7560a09727e3636ddbbbae7105ee2ccc37649fff9f281ff23b28291ed25dcf4",
+      "after_sha256": "ddb802c8ad36b2f80ef225934af541934f86e852805aaa2a25e313ddc67393c3",
+      "after_bytes": 3852
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/cli/src/commands/init/review-authority-policy.ts",
+      "before_p1_sha256": null,
+      "after_sha256": "398ef75f3bdd5105e1f5d9ee6f6ae2faaffd718005a3a07d63999bb16ffa1efc",
+      "after_bytes": 3497
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/cli/src/authority/command-capabilities.ts",
+      "before_p1_sha256": "741390d45c13586d6e3ea3ffcaa00e3e2c46da3d5a2ed7e0469b4b294cddced7",
+      "after_sha256": "f29ca8306a798c2842d8e4a7138f37331e9b16d926e06925985b330f779232d2",
+      "after_bytes": 1236
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/cli/src/authority/broker.ts",
+      "before_p1_sha256": "36b53703786d04e4e6332fc7aa72d309a9ab575b9d4dba5a5c6f74c51b65b2bb",
+      "after_sha256": "50721c2d784e8849cbf50ad7a07daa7d2b3513a5618ecd81ac0ec8040b2f7735",
+      "after_bytes": 87451
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/cli/src/authority/policy-review.ts",
+      "before_p1_sha256": null,
+      "after_sha256": "5235d957e108596cc550b48297091c5d3be530515fc60ecbbe999ca0b7e80de4",
+      "after_bytes": 3095
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/cli/src/authority/policy.ts",
+      "before_p1_sha256": "9d23d89a7eaa31588862dfb66d47633f43619b89096b0bbfe46f0c60a8d35044",
+      "after_sha256": "3b32792eed1c482009a3cb217074fc642b95808e806b41859f485e2ddf533bee",
+      "after_bytes": 5634
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/cli/src/authority/policy-support.ts",
+      "before_p1_sha256": "f4914ef10a230ac5aeae0d662919af6a57052476a66d9eb096460049cd9c7ebb",
+      "after_sha256": "156b296bf26a87816c9f8206843b9c0a79414fa698dc1829a6dccd6860ede739",
+      "after_bytes": 10045
+    },
+    {
+      "role": "Inspector",
+      "path": "packages/cli/tests/unit/authority-policy-review.test.ts",
+      "before_p1_sha256": null,
+      "after_sha256": "d18e4f6c22b098fc9aba685022e92276a66d2f5006df0c600412f983076c56ae",
+      "after_bytes": 33696
+    },
+    {
+      "role": "Inspector",
+      "path": "packages/cli/tests/unit/init-authority-policy-review.test.ts",
+      "before_p1_sha256": null,
+      "after_sha256": "5dd184e04a93f3ead5b122636d2296daf66cabefc1c145c21ba28c2fd0c2f4f7",
+      "after_bytes": 14795
+    },
+    {
+      "role": "Inspector",
+      "path": "packages/cli/tests/unit/authority-policy-review-publication.test.ts",
+      "before_p1_sha256": null,
+      "after_sha256": "39dcb82ef3b4b56982a15138e4b4c45f14ba6e30ab094d2387aede3dfb25b34e",
+      "after_bytes": 8843
+    },
+    {
+      "role": "Inspector",
+      "path": "packages/cli/tests/unit/authority-command-boundary-finalization.test.ts",
+      "before_p1_sha256": "c03873c3a1813d69a688c896033ef7b2732914e936bb30de99b45aadbdfcdb65",
+      "after_sha256": "728990fcd1b31e03272d19fe01cd785b0030b6ba70cb1e311ff2942386f521d4",
+      "after_bytes": 9262
+    },
+    {
+      "role": "Inspector",
+      "path": "packages/cli/tests/unit/cli-shard09-init-bind-adapters-policy.test.ts",
+      "before_p1_sha256": "88fa29e74eca9146d4b621005310938769b30370c3b351a889360ad7d387d112",
+      "after_sha256": "c5f9aa4c11455cdf712273ad98d626ed5656d413587bdc3c2c7e0cdf1e75e9e6",
+      "after_bytes": 19741
+    },
+    {
+      "role": "Inspector",
+      "path": "packages/schemas/tests/contract/governance-v15-adr.test.ts",
+      "before_p1_sha256": "0921bcfb4e61ec499ab34a75a2a31798eac8dd745a902c2f8e80e41ca9bbcc7b",
+      "after_sha256": "7df5916d5fcee90419767ae44fd579e8e7a96bd1c1e1f66cc3246a5338146afb",
+      "after_bytes": 44102
+    },
+    {
+      "role": "Generated",
+      "path": "docs/reference/error-codes.md",
+      "before_p1_sha256": null,
+      "after_sha256": "b5bbc2493d4cb427790081c01e42f2f087071febd223a3d0aba58d83f70eebfd",
+      "after_bytes": 331240
+    }
+  ],
+  "effect": "source-only and disposable-fixture tests",
+  "live_policy_created": false,
+  "public_review_enabled": false,
+  "extra_tracked_source_paths": [],
+  "held_effects": [
+    "live preview",
+    "binding",
+    "source publication/integration",
+    "U1/B1 operations",
+    "release",
+    "DETRAN"
+  ]
+}

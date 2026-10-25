@@ -1,0 +1,77 @@
+{
+  "standing": "PURE_OWNER_GRAPH_AND_PHASE_ELIGIBILITY_SOURCE_COMPONENT_VERIFIED_FULL_V280_GOAL_INCOMPLETE",
+  "recorded_at": "2026-10-24T22:05:41.369795+00:00",
+  "base_commit": "2df84159caabf869b866fb2a05e5b06be83295fb",
+  "scope": "One new pure source composes fixed canonical seven-record MAC codec and immutable graph/current-grant/phase/clock eligibility. Safe WeakMap-branded projection carries no issuer key and grants no authority. Fixed native Owner lifecycle and effects remain required.",
+  "inputs": {
+    "packages/authority/src/runtime/reconciliation-owner-state.ts": "b59cce447c545f2bcb8396d384dac39613ca87c1721d0f12e3e16345edb0d2b8",
+    "packages/authority/tests/unit/reconciliation-owner-state.test.ts": "7c6b161141797656b738eea0192666cf7f660eb68d3ecf508493095416c85196",
+    "packages/authority/src/runtime/reconciliation-owner-record.ts": "fd7d944ce09f640ff4040abeae090ad8b694b55e3e285feb46ea59650735cbda",
+    "packages/authority/src/runtime/reconciliation-clock.ts": "d9ab0faba163f45a7d7caf13e2cae5307ccb0ad2be7cb5b7565e1054f1844dd3",
+    "law/schemas/reconciliation-owner.schema.json": "39002520c0ffa410ef41a9caf34d16af123b9bc88f0ab1e426deaf70af284344",
+    "docs/reference/error-codes.md": "ed7c7205b733fb4e5e50fe1cded1c6dfa5cafe4a6aca2854454de04ecb55ac38",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/owner-state-checkpoint.json": "45fbde08e157a45d615cc26e885beac6197611fd64dc517dafd0348ee975703f",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/owner-state-order-amendment.json": "71f1dd131c023652cb4720310401216cee8f418d215502198b59a001621412ed",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/owner-state-interface.json": "44cc580bb6cc4586ca6ab4e4117d8a785ddc4ceb5fd8cef811acb76bb54aca7a",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/owner-state-interface.pre-phase-mapping.json": "bbd8012e8e01089592837218af1cb16a3509369881f5cd39c7f62ced35973494"
+  },
+  "compiled_module_sha256": "98abd3add5bf0adb70c332688071d416f8a46e1437d1ffa13c6506e1ec31f4ca",
+  "verification": {
+    "unique_passing_cases": 414,
+    "new_owner_state_cases": 159,
+    "unchanged_regressions": 255,
+    "files": 5,
+    "typing_affected_cases_rerun": 2,
+    "source_review_actual_probes": 7,
+    "full_workspace_typecheck": "PASS terminal83743",
+    "source_test_lint": "PASS",
+    "source_test_format": "PASS",
+    "test_only_typing_inverse_matches_original_159pass_bytes": true,
+    "independent_index_artifacts_verified": 18,
+    "independent_receipt_evidence_verified": 17,
+    "source_review_evidence_verified": 11,
+    "historical_receipts_verified": 7,
+    "old_regression_test_hashes_verified": 4,
+    "authority_root_export_unchanged": true,
+    "error_reference": {
+      "current_count": 1304,
+      "current_sha256": "ed7c7205b733fb4e5e50fe1cded1c6dfa5cafe4a6aca2854454de04ecb55ac38",
+      "new_code": "RECONCILIATION_OWNER_STATE_INVALID",
+      "new_rows": 1,
+      "remove_exact_new_row_restores_1303_sha256": "970def534b24124e54d79673692824af7690ed46d07459ee6745f32b07415667"
+    }
+  },
+  "artifacts": {
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-owner-state-inspector/receipt.json": "ef64b74c029e17f4ce0ead7774d2c9d67c19abccb19f821b5a8878c11b1accb7",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-owner-state-inspector/index.json": "2f076d24bb401d34764e7ab4368dc555eaa47a0efd226c4cf72bf3ef23910714",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-owner-state-review/source-review.json": "2a1ee60cbbc03e78e2e7b208650bc9f247f298c2ca49887cdb393ce205549a9d",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-owner-state-review/mapping-addendum.json": "711ff35813eaba00dc70bdde3fe7072c7605e7497024270997976930e01f9a0c",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/owner-state/root-review-verification.json": "00b9c15547e7786d08e509937ef0f99399f7d25fd75384f20abcf41f8dfe6833",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/owner-state/initial-manifest.json": "918ad21bb9126a7603fe960ad870978de14b981f018c4568bde5a0e01f71d905",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/owner-state/initial-source.ts.txt": "b59cce447c545f2bcb8396d384dac39613ca87c1721d0f12e3e16345edb0d2b8",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/owner-state/implementation-checkpoint.json": "9ae4c8b2a60930c598c90a3006d2d98b77a93650c4b527dc3e17af28e7dd7747",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/owner-state/source-eslint.txt": "689d370e8c06bdc4d786c596f733e4fd11d13ae585434f61cc90eeeaf5155785",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/owner-state/graft-build.txt": "247ba3d2e6e73f448d4c462285a5f1562e3060c50726c4c93921308168ee0da0"
+  },
+  "authenticated_design_corrections": [
+    "Grantcurrentness fences and renewal snapshot partial order resolve tied clocks without new fields; contradictions are cycles",
+    "Samegrant newintent or retry lease allowed; crossgrant retry requires exact resumable intent",
+    "Lease-before-completion remnant retained without any ownership/deletion authority",
+    "Unknown output first-held; completed only with exact complete output classification; actual host still verifies all bytes/identities/durability"
+  ],
+  "historical_precision": "Authentic source-absence RED, initial159pass and two test-only species typing corrections preserved. Corrected review hypothesis: original schema already enforces phase/action mappings; old schema/codec unchanged. New redundant guard coherent.14designmodels are not added to producttest count.",
+  "qualification_limits": [
+    "Caller-supplied canonical issuer/MAC graph proves data relationships only, not actual host origin, current B5/authority or installed provenance",
+    "Clock/output classifications are input data; actual trusted sampling and durable output readback remain native host responsibilities",
+    "Lease graph proves no PID/liveness/ownership and no cleanup; native admission and exact Owner recovery are separate",
+    "No filesystem/SQLite/process/domain writer, root export, action/policy/capability/registry or public activation added by new state module"
+  ],
+  "remaining": [
+    "Fixed native direct Owner review/approval/renewal/revocation/ESRCH-only lease recovery under actual admission and fresh ordinary authority",
+    "Native phase intent/lease/output/completion lifecycle and exact actual scope/plan/source/current B5 eligibility",
+    "Durable whole-history custody, canonical selection event, actual one-entry real-index CAS and seven-body immutable staged integration",
+    "Public action/output/registry/capability/policy, installed runtime and supported bindings refresh",
+    "Clean candidate, affected checks, independent integration/exacthead CI, protected RC/rehearsal/signing/immutable v2.8.0 publication and release/registry readback"
+  ],
+  "authorization": "Full internal v2.8.0 goal remains active; DETRAN/downstream adoption and execution remain excluded."
+}

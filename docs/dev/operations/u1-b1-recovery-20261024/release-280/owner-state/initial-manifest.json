@@ -1,0 +1,16 @@
+{
+  "standing": "FIRST_IMPLEMENTATION_BUILDS_BEHAVIOR_AND_REVIEW_PENDING",
+  "recorded_at": "2026-10-24T21:55:33.931265+00:00",
+  "source_sha256": "b59cce447c545f2bcb8396d384dac39613ca87c1721d0f12e3e16345edb0d2b8",
+  "source_snapshot": "docs/dev/operations/u1-b1-recovery-20261024/release-280/owner-state/initial-source.ts.txt",
+  "source_snapshot_sha256": "b59cce447c545f2bcb8396d384dac39613ca87c1721d0f12e3e16345edb0d2b8",
+  "authority_tsc": "PASS after initial clock field compile correction",
+  "source_lint": "PASS firstdraft before additional phase mapping; finalcheck required",
+  "error_reference": {
+    "count": 1304,
+    "sha256": "ed7c7205b733fb4e5e50fe1cded1c6dfa5cafe4a6aca2854454de04ecb55ac38",
+    "new_rows": 1,
+    "exact_inverse_1303_sha256": "970def534b24124e54d79673692824af7690ed46d07459ee6745f32b07415667"
+  },
+  "native_provisioning_seal": "Preserved native420-case receipt qualifies preceding1303document/current4provisionsource hashes; new errorrow is deliberate subsequent component addition, not rewritten historical evidence."
+}

@@ -1,0 +1,75 @@
+{
+  "phase": "U1 Inspector RED checkpoint; Engineer implementation pending independent GREEN",
+  "red_evidence": {
+    "schema-red.log": {
+      "passed": 15,
+      "failed": 1,
+      "meaning": "valid closed recovered_from rejected as unknown additionalproperty; legacyexampleaccepted"
+    },
+    "runtime-red.log": {
+      "passed": 1,
+      "failed": 24,
+      "meaning": "real two-branch merge eight-line fixture succeeds; missingprovenance/artifacts and unsafe missingrecovery refusal/head/recheck semantics fail"
+    },
+    "custody-red.log": {
+      "selected_passed": 0,
+      "selected_failed": 1,
+      "meaning": "reproduced actual IA001missingprovenance while preserving full Git/proof/source custody"
+    },
+    "installed02-help-red.log": {
+      "selected_passed": 0,
+      "selected_failed": 1,
+      "meaning": "actual installed package publicaction succeeds but accepteddivergentmode flag absent",
+      "bin_sha256": "8ad61056af95fa44d9019619dbb1cd2d20ae879d813f1dddd5b464737b6e49a2"
+    },
+    "regression-additions-check.log": {
+      "selected_passed": 1,
+      "selected_failed": 1,
+      "meaning": "newest-only preserved; verified acceptedhistoricaldeclaration incorrectly recovered"
+    }
+  },
+  "non_feature_failure": {
+    "public-help-red.log": "environmentblocked: default registeredbootstrapbin absent; no missingfeature claim from that run"
+  },
+  "current_test_sha256": {
+    "packages/evidence/tests/unit/divergent-anchor-recovery.test.ts": "1449492740a467173ff63a95a49da6e7276cf963e980c76618df5df3796c3903",
+    "packages/cli/tests/unit/divergent-anchor-recovery.test.ts": "347c63634ac1d2a1c78a52a93420b2ab22ee1944a9760b036dba56c36dc8394b",
+    "packages/schemas/tests/contract/divergent-anchor-recovery-schema.test.ts": "b2e9ca884973bc36a71536d733d3bbfa5fefa697254490be4205d6118077ddfc",
+    "packages/evidence/tests/unit/verb-evidence.test.ts": "e7197acc3e7673fcfd6d161c527ae605f775cbb1f96d15317da8958ea3c0bcc5",
+    "packages/evidence/tests/proof-line-anchoring.test.ts": "de99330ccc3ccc3160aad5ac768faee9b110a114f45ed6a5080e990ec8f793d6"
+  },
+  "logs_sha256": {
+    "schema-red.log": "96da57888f950aedfa7ee52d6b6ad72434925e59924ae8b7172bb6b7ea8a5c4f",
+    "regression-additions-check.log": "3d95945e6e32f8a2c6c96b0b80431a4e6429554292939ecc25dee04ca8ad8576",
+    "lint-first.log": "689d370e8c06bdc4d786c596f733e4fd11d13ae585434f61cc90eeeaf5155785",
+    "installed02-help-red.log": "780e7de6b4c44021557949abf7b77412041266015d5cffa4cc935c9291331625",
+    "custody-red.log": "939f0101793e7a8dc2f0e7d4a96437e46ac8f011c07f02f282569bd5f7ceace3",
+    "lint-second.log": "689d370e8c06bdc4d786c596f733e4fd11d13ae585434f61cc90eeeaf5155785",
+    "runtime-red.log": "c932944bfd3a5184ca51a5a6bd5317ebaacd9fb9d4d0054e2b00d8458593525d",
+    "public-help-red.log": "d94e600c5ddec072fd86ccbbea809a5b6692d5770eed844f3d4d5ba72e7ded36"
+  },
+  "scope": {
+    "new_tests": [
+      "packages/evidence/tests/unit/divergent-anchor-recovery.test.ts",
+      "packages/cli/tests/unit/divergent-anchor-recovery.test.ts",
+      "packages/schemas/tests/contract/divergent-anchor-recovery-schema.test.ts"
+    ],
+    "existing_tests_additions": [
+      "packages/evidence/tests/unit/verb-evidence.test.ts",
+      "packages/evidence/tests/proof-line-anchoring.test.ts"
+    ],
+    "unchanged_regression_targets": [
+      "packages/cli/tests/unit/cmp0006-evidence-recovery.test.ts",
+      "packages/cli/tests/unit/evidence-facade-acceptance.test.ts",
+      "packages/cli/tests/unit/evidence-verify-anchors.test.ts"
+    ]
+  },
+  "coverage_limits": [
+    "Injected crash test stops before normalappend publication; no claim of processkill during actual rename.",
+    "Public two-subprocess concurrent acceptance awaits U1installedcandidate.",
+    "Full independent GREEN against exact Engineercandidate not yet run."
+  ],
+  "custody_manifest": "red-fixture-custody-manifest.json",
+  "historical_adr": "accepted ADR-EVI-0006 unchanged; originalpaths/effects amendments root-owned",
+  "source_baseline_revision": "2df84159caabf869b866fb2a05e5b06be83295fb"
+}

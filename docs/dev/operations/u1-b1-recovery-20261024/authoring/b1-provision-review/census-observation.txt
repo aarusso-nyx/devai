@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-provision-review/census-observation.txt","kind":"historical-transcript-custody-pointer","original_bytes":633,"original_bytes_changed":false,"original_sha256":"5438c03686832f336b3843f92c8f0f1156ecd08b776bd6d52d5c3349a1f735ac"}

@@ -1,0 +1,43 @@
+{
+  "status": "NARROW_REGISTERED_LINKED_ORIGIN_AMENDMENT_FOR_IMPLEMENTATION_AND_INDEPENDENT_TESTS",
+  "supersedes_only": "Original host-context-checkpoint.json pointer origin and persistent projection details; original packet, actual copied-pointer counterexample and authentic absent-module RED remain immutable.",
+  "original_packet_sha256": "9fe2c38674fd4fcdf5e0f314d536eeb13c7299d1122f3352a70b825ded4b54f5",
+  "counterexample_sha256": "c4636436aaeb83a2db45023efed53f6df3c07440d1de06c53203a041cfe1d13a",
+  "accepted_layouts": "Direct owned physical root/.git directory with git_dir=common_dir=root/.git; or actual registered linked worktree with root/.git regular forward pointer, git_dir != common_dir and dirname(git_dir)=common_dir/worktrees. Refuse separate-git-dir, bare and submodule layouts without an authenticated reciprocal registered-worktree association. This helper does not repair Git layouts.",
+  "links": {
+    "git_entry": "Existing bounded owned single-linked nofollow root/.git regular file. Exactly gitdir: <nonempty UTF8 path> plus LF; no NUL/CR/embedded LF. Resolve relative to root; require realpath equals exact canonical admitted git_dir.",
+    "git_backlink": "Required actual git_dir/gitdir bounded4096-byte owned single-linked regular nofollow file. Exactly nonempty UTF8 path plus LF, no NUL/CR/embedded LF. Resolve relative to git_dir per Git relative worktree semantics; require resolved lexical path and realpath both equal exact admitted root/.git. Pin byte hash plus file identity before/after every repository probe and context read.",
+    "commondir": "Required actual git_dir/commondir same bounded nofollow file contract. Resolve relative to git_dir; require realpath equals exact admitted common_dir. Pin byte hash plus file identity before/after every repository probe and context read.",
+    "registry_parent": "Require common_dir/worktrees owned canonical nonsymlink non-group/world-writable directory. Pin its directory identity for active context; directory mtime/ctime excluded. Registered admin git_dir must be an immediate physical child. Direct .git directory needs no backlink/commondir; both fields null."
+  },
+  "persistent_identity_projection": [
+    "repository_id",
+    "repository_root",
+    "git_dir",
+    "common_dir",
+    "root_identity",
+    "git_dir_identity",
+    "common_dir_identity",
+    "git_entry_identity",
+    "git_entry_sha256",
+    "git_backlink_identity",
+    "git_backlink_sha256",
+    "commondir_identity",
+    "commondir_sha256"
+  ],
+  "derivation": "Use the exact original canonicalJson and SHA256 formulas, now with precisely the amended projection fields. New four backlink/commondir fields null for direct .git directory; linked files use original complete file identity (masked permission mode, dev,ino,birthtime_ns,uid,size_bytes,mtime_ns,ctime_ns) and raw-byte SHA256. No other persistent fields. Registry parent separately active-pinned. Same HEAD/private namespace rules unchanged.",
+  "error_precedence": "Unknown/cloned/Proxy/disposed membership first without getters; inherited forbidden environment ENVIRONMENT_INVALID; capture malformed repository/pins INVALID, unsupported runtime UNAVAILABLE, unavailable clock CLOCK_UNAVAILABLE; on member reads any repository/pin/runtime/boot mismatch or failure STALE, then clock sampling failure CLOCK_UNAVAILABLE. Disposal of nonmembers is harmless.",
+  "independent_tests": [
+    "Actual copied forward pointer into second owned root refuses despite all original Git commands succeeding",
+    "Authentic absolute and git worktree add --relative-paths linked layouts pass with independently recomputed amended formula",
+    "Foreign/missing/symlink/hardlink/malformed/oversize backlink and commondir refuse",
+    "Same-bytes metadata rewrite or actual byte drift of either linking file stales all old context reads",
+    "Source/clock/native/Owner historical receipts unchanged"
+  ],
+  "primary_sources": [
+    "https://git-scm.com/docs/gitrepository-layout",
+    "https://git-scm.com/docs/git-worktree",
+    "https://github.com/git/git/blob/v2.54.0/worktree.c#L1026-L1056"
+  ],
+  "effects": "Readonly host observation only, no namespace/bootstrap/issuer/admission/key/action authority or public API export. Full authorized runtime work remains subsequent required integration."
+}

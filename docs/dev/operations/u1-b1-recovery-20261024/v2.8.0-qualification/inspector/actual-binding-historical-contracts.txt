@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/v2.8.0-qualification/inspector/actual-binding-historical-contracts.txt","kind":"historical-transcript-custody-pointer","original_bytes":273,"original_bytes_changed":false,"original_sha256":"7c997aaf5b356b0f38de8c2fa7e05556113de9058302941c90bb54188c0cbd1d"}

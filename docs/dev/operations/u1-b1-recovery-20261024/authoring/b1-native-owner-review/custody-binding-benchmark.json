@@ -1,0 +1,13 @@
+{
+  "times_ms": [
+    499.14487499999996,
+    448.657917,
+    464.62179100000003,
+    390.3510839999999,
+    391.81254100000024
+  ],
+  "mean_ms": 438.9176416,
+  "objects": 1674,
+  "guard_reads_estimate_per_object": 5,
+  "qualification": "Real native host context/clock/Git recapture, synthetic constant B5 collector; installed B5 would add bundle reads."
+}

@@ -1,0 +1,11 @@
+{
+  "fixture": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-initial-owner-plan-jJqJW9/repository",
+  "approval_id": "24b3953e410a7654b1ecdbad8c03a512439a904d9ed90349b116d6685a761caf",
+  "old_records": 335,
+  "new_records": 336,
+  "receipt_sha256": "7fee13e510dd372e12a0d1079a668e671224a54d8eeea3685158d0f2d0080ea8",
+  "candidate_sha256": "1a6a3ea0e0e5ee74daf512fcc8f94e3cc923775bab8ce9636f94bc13c164145d",
+  "outputs_manifest_sha256": "4e02b4226babd7aa4755f194a6068a85a0c4b2785c158fedc1fdf1a4ce0df1d9",
+  "index_sha256": "542553c911bcd2f5e65dd8a27b66f0f1dbcb703278477cb27df920ede95eadce",
+  "qualification": "Actual historical selected raw chain and native authenticated phase01-completed Owner state; pure candidate builder only, synthetic B5; no chain publication or local checkpoint acceptance."
+}

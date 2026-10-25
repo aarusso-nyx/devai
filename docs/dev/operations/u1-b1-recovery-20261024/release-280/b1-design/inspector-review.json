@@ -1,0 +1,207 @@
+{
+  "standing": "DESIGN_NOT_YET_FROZEN_MISSING_READER_AND_TYPE_CLOSURE",
+  "observed_at": "2026-10-24T17:03:29.644381+00:00",
+  "reviewed_inventory_sha256": "d3af6f33f70ce137d6ad44958232ff09dcb49d5b8cc842dadda67eace7e5c9a3",
+  "reviewed_inventory_count": 50,
+  "source_changes_by_inspector": false,
+  "missing_candidate_paths": [
+    {
+      "path": "packages/cli/src/command-manifest.ts",
+      "listed": false,
+      "sha256_before": "5e112ae6785431ae33799bba66b12c7c00959014448d8501de551c734bddfc73",
+      "reason": "ActionCapability9-27 and AuthorityTargetKind61-69 reject the proposed proof-index:chain-cas capability and logical kind."
+    },
+    {
+      "path": "packages/cli/src/commands/sense/inventory-inputs.ts",
+      "listed": false,
+      "sha256_before": "60b35f7b9c93e2534357499fcc66ac39ad2817ef5a0cdfc14a76cd55304955dd",
+      "reason": "Resolvers call declaration loader even when explicit inputs supplied; staged framework/migrationDirs/scanDirs must not merge live declaration."
+    },
+    {
+      "path": "packages/cli/src/commands/sense/shared.ts",
+      "listed": false,
+      "sha256_before": "703649a0f0bed469ca0e016645cad6dab2f9febe3ba00e26cca7ac1274a176bb",
+      "reason": "resolveDeclaredSensorInputs460-490 reads live config; validateDeclaration/path checks must distinguish snapshot inputs from live filesystem."
+    },
+    {
+      "path": "packages/sensors/src/inventory-walker.ts",
+      "listed": false,
+      "sha256_before": "4b76409a93cbc24534f0bd77a71e0404e5db88e31130e509bbde18736aec9330",
+      "reason": "walkFiles39-76,walkTs83-91,walkTsxJsx95-102,parseSource110-125 enumerate/stat/read live files."
+    },
+    {
+      "path": "packages/sensors/src/inventory-api.ts",
+      "listed": false,
+      "sha256_before": "83d997f7951f68c248156bafa38f3656a1ef29e804c73bd895aecf09a6e96ee5",
+      "reason": "InventoryApiOptions63+; uniqueExistingDirs110; parseSource362 consumes live source; thread explicit reader."
+    },
+    {
+      "path": "packages/sensors/src/inventory-routes.ts",
+      "listed": false,
+      "sha256_before": "c8ed63a0fc51cf76c9d11df863f268ede3a3f1a11a42fdcd031d0d0ef626dc5f",
+      "reason": "uniqueExistingDirs47; walkTsxJsx91; parseSource93 consume live source."
+    },
+    {
+      "path": "packages/sensors/src/inventory-routes-extract.ts",
+      "listed": false,
+      "sha256_before": "4200bd8ede9f6e3a86059cd2077679888e7546b36494dbdf1c4a69c83c0aa1ff",
+      "reason": "InventoryRoutesOptions is declared here; extend typed options for explicit reader."
+    },
+    {
+      "path": "packages/sensors/src/inventory-data-model.ts",
+      "listed": false,
+      "sha256_before": "de50c1bd2ae7e3e4910ac199952553571b9d170509804d1f60107ce0dbccc090",
+      "reason": "Live stat37, walkFiles61, SQL parser calls; pass immutable staged reader."
+    },
+    {
+      "path": "packages/sensors/src/inventory-data-model-types.ts",
+      "listed": false,
+      "sha256_before": "787f55a0089ad6ef65b5ff90dbbb630e0c3befc91578edb103ef3d5ee30994c0",
+      "reason": "InventoryDataModelOptions is declared here; reader must be part of typed API."
+    },
+    {
+      "path": "packages/sensors/src/inventory-data-model-sql.ts",
+      "listed": false,
+      "sha256_before": "103054c2133c614f387161af8cb9e569b575030aab7518a7fdc4383b628bd7a8",
+      "reason": "parseSqlFile345-350 reads SQL live; parse supplied snapshot bytes instead."
+    },
+    {
+      "path": "packages/sensors/src/inventory-rbac.ts",
+      "listed": false,
+      "sha256_before": "51ffd9855b2db10578773628203eebc44e8c978bd184c03cc50b62d1fd69c3ba",
+      "reason": "exists/read172-202 of dataModel/apiMap need explicit in-memory current-run body overlay, no state fallback."
+    },
+    {
+      "path": "packages/sensors/src/inventory-data-handling.ts",
+      "listed": false,
+      "sha256_before": "68136d52f754db07679fbc69d28234a0c6d5d43a2d4fe523eccf7acd1bf1b143",
+      "reason": "exists193/read202 of model need same current-run overlay."
+    },
+    {
+      "path": "packages/sensors/src/inventory-dep-graph.ts",
+      "listed": false,
+      "sha256_before": "d7542b476034f2c3ac5b863cdcd009377ea4779f0daa0165a2bfdea1ceb2dbf0",
+      "reason": "walkTs/parseSource75 require staged reader."
+    },
+    {
+      "path": "packages/sensors/src/inventory-coverage.ts",
+      "listed": false,
+      "sha256_before": "3d027a5af769d6655d95fb54a004c9e3199458d4298c0dfc67f9cd00883ef98b",
+      "reason": "exists/read61-115 and351-361 of dependent bodies; route through explicit body/source reader."
+    },
+    {
+      "path": "packages/sensors/src/inventory-coverage-inputs.ts",
+      "listed": false,
+      "sha256_before": "a70c16a4cfb786c5a21b071fad22d989bc7a4fd9121c181da0d6c66daa0af036",
+      "reason": "Options52+; use-case enumeration/stat/read157-192; routes resolution375-400 must not use live inventory state."
+    },
+    {
+      "path": "packages/sensors/src/inventory-body-inputs.ts",
+      "listed": false,
+      "sha256_before": "7f7359fa29fee73258f8cbd3201c232b24d6d47f5ac2d25eb321ff960ab070ae",
+      "reason": "Default resolveBodyInput chooses live regenerated state41; bootstrap must use explicit current-run inputs and forbid fallback."
+    },
+    {
+      "path": "packages/sensors/src/declared-surfaces.ts",
+      "listed": false,
+      "sha256_before": "31bc7f1db8165de7826488b3c986d71f3cc04982d580565494767f42170e945a",
+      "reason": "readJson172,readRegisteredActionIds180+,referencedActionIds199+ read live registry/use-cases; reader must include named configuration inputs."
+    },
+    {
+      "path": "packages/sensors/src/index.ts",
+      "listed": false,
+      "sha256_before": "19a959d3296b2b65f94d386c2a5eae65eef71e5d80ac3e1d05cff5ccd156a80a",
+      "reason": "Export shared reader type/API for typed CLI bootstrap wiring without private import or module-global monkeypatch."
+    }
+  ],
+  "conditional_effect_ledger_paths": [
+    {
+      "path": "law/schemas/effect-authorization-event.schema.json",
+      "evidence": "resource.kind110 and operations125 exclude proof-index/compare-and-swap",
+      "decision_required": "Include only if B1 uses this exact-effect ledger. If B1 uses existing actual-policy harness-write authority instead, explicitly document exclusion and prove no fabricated Owner grant/ledger bypass."
+    },
+    {
+      "path": "packages/authority/src/runtime/effect-authorization-types.ts",
+      "evidence": "EffectAuthorizationResource.kind6 and operations9-11 exclude new kind/operation",
+      "decision_required": "Same ledger decision; this is not a blanket requirement to widen unrelated release authorizations."
+    }
+  ],
+  "already_in_inventory": [
+    "packages/authority/src/types.ts",
+    "packages/authority/src/decision-plan.ts",
+    "packages/authority/src/runtime/policy-resolver.ts",
+    "packages/authority/src/boundaries/resource-classification.ts",
+    "packages/authority/src/boundaries/boundary-runtime.ts",
+    "packages/authority/src/boundaries/boundary-runtime-targets.ts",
+    "law/schemas/action-registry.schema.json",
+    "law/schemas/authority-policy.schema.json"
+  ],
+  "read_only_no_change_expected": [
+    {
+      "path": "packages/authority/src/adapters.ts",
+      "reason": "target_kind derives ResourceTarget[\"kind\"]; generic interface needs tests, not speculative edit."
+    },
+    {
+      "path": "packages/sensors/src/inventory-data-model-pii.ts",
+      "reason": "Pure SQL-string parser; no filesystem read discovered."
+    }
+  ],
+  "recommended_reader_seam": "Export readonly InventorySourceReader type from sensors inventory-walker/index. Thread optional explicit reader through all seven typed options and walkers/parsers/config/body loaders. With reader supplied, enumerate/read/stat only its immutable manifest plus same-run in-memory body overlay; no live fallback. Default absent-reader behavior retains ordinary semantics. Loop snapshot and CLI admission create the reader from actual validated stage0 blobs; neither fake checkout nor module-global fs override qualifies.",
+  "additional_test_path_proposed": "packages/sensors/tests/unit/staged-inventory-readers.test.ts",
+  "required_counterexamples": [
+    "For each of seven producers stage byteA then put byteB at identical live path; output must derive A only.",
+    "A staged file absent from live directory must still be enumerated and parsed; live untracked file must never appear.",
+    "Stage different sensor-inputs/framework/migrationDirs/surfaces/registry/use-cases and schema input bytes; live config drift cannot affect staged result.",
+    "Dependent model/API/routes bodies come only from immutable same-run overlay; poison all old state bodies and prove they are unread.",
+    "Missing/malformed/unresolved staged input fails; no catch-and-skip that produces incomplete PASS or live fallback.",
+    "Swap source/index/HEAD/config during generation; final witness refuses publication and leaves no partial readiness.",
+    "Source reader is invocation-local and immutable; caller cannot substitute physical paths, clone capabilities, alter maps or escape lease.",
+    "Seven exact body populations/hashes and explicit diagnostic-only provenance; source_kind never reports clean or integrated.",
+    "Ordinary clean-mode outputs and live filesystem semantics remain byte-for-byte unchanged with no reader supplied.",
+    "Typed proof-index capability and target accepted only on registered stage-proof action; fs/git-ref/unknown spelling cannot substitute.",
+    "Actual linked-worktree real index.lock contention, semanticCAS, supported index format/extensions, exact other-entry preservation, object side effects and post-rename uncertainty."
+  ],
+  "remaining_architect_freeze_gaps": [
+    "Exact fixed schema fields and supported binary index versions/extensions not yet frozen.",
+    "Every phase/custody/epoch/object/temp/lease/lock filename recipe and parent permission not yet enumerated as a machine effects table.",
+    "Distinct canonical-selection machine-event payload schema/normal writer and archival verification semantics need concrete field/consumer closure.",
+    "Complete exact-source schema/roster/generated action/error outputs and installed public routes remain execution gates."
+  ],
+  "limitations": "Read-only source design review, not implementation or GREEN. Source Graft answers used primary-repo graph; every cited missing reader/union was verified against actual task-worktree files. No DETRAN writes.",
+  "owner_approval_custody": {
+    "standing": "BLOCKING_NO_TURNKEY_TRUSTED_OWNER_APPROVAL_INTAKE_FOUND",
+    "four_current_actions_sufficient": false,
+    "existing_reusable_kernels": [
+      {
+        "path": "packages/authority/src/runtime/effect-authorization-ledger.ts",
+        "spans": "97-240;242-300;386-421",
+        "properties": [
+          "schema and hash-chain/event identity verification",
+          "exact action/effect/resource/repository/candidate/subject/consent equality",
+          "expiry/revoked/consumed refusal",
+          "durable consume before effect adapter"
+        ],
+        "limit": "ledger and resolveEvent are caller-supplied inputs; valid digests and grantor labels do not establish protected Owner origin."
+      },
+      {
+        "path": "packages/authority/src/runtime/effect-authorization-types.ts",
+        "spans": "5-11;40-49",
+        "limit": "resource kind/operation exclude proof-index/CAS; grantor role/declaration are data fields, not an independently authenticated B1 source approval."
+      },
+      {
+        "path": "packages/loop/src/release-lifecycle/index.ts",
+        "spans": "164+",
+        "limit": "existing release-specific effect invocation is not an approval for B1 source selection."
+      }
+    ],
+    "registry_observation": "No current action_id contains approve/authorize; no existing registered B1 exact-source approval operation.",
+    "required_architect_decision": "Add explicit trusted Owner approval intake/issuer custody or a fifth registered Owner approval action. Define how later Inspector/Architect processes verify host-issued origin (not caller JSON), exact source manifest and plan digest, repository/worktree/HEAD/index/parents/selected prefix and effects/output bounds, expiry/revocation/one-use or phase-limited resumable consumption. This adds action/schema/source/effect paths and cannot be hidden behind source-manifest-sha256.",
+    "required_counterexamples": [
+      "Self-authored well-formed source manifest/receipt with Owner role and all correct hashes still refuses without protected issuer custody.",
+      "A self-consistent fabricated authorization ledger with recomputed event chain never becomes trusted merely because generic resolver validates its structure.",
+      "Foreign repository/HEAD/index/selection/effect/output or stale/expired/revoked/consumed approval refuses before any custody/index/proof mutation.",
+      "Approval cannot be supplied through arbitrary caller file/--out/alternate index/environment override.",
+      "Two processes cannot double-consume; crash/resume preserves exact owner-approved phase bounds and cannot broaden replay."
+    ]
+  }
+}

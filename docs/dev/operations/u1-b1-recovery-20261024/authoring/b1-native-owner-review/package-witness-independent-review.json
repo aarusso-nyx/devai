@@ -1,0 +1,52 @@
+{
+  "review": "Independent Inspector bounded invocation-local package content memo and readonly FD lifetime",
+  "source": {
+    "path": "packages/cli/src/authority/reconciliation-package-witness.ts",
+    "sha256": "a023959170769b632a4e9d5712eec6b188ca05dfd234d6a1578d1549ff36b588"
+  },
+  "terminal": {
+    "tests": 15,
+    "passed": 15,
+    "log": "package-witness-review-pinned-fd-qualified.txt",
+    "sha256": "39c20679b9ac8d96d04ab391262ad6c0d0484b93d9a8bb79f6bdf3a3d31a1bd9"
+  },
+  "evidence": {
+    "package-witness-benchmark.json": "c8bc0fe4575f9731236823d35c53f366e4cc172e4a2c6eafd86faa994e1bdaa8",
+    "package-witness-pinned-scan-benchmark.json": "bc3d30579d214a5e677e60ea33a2eff9a5f7b952690de357dcc6943ce8317073",
+    "package-witness-review.test.ts": "b4eafc8eeedbdbb9eae07bd4b6a5dd52f1a7e92cdc877f90cffa7b83912e00a2"
+  },
+  "accepted_bounds": [
+    "Cold original bundle hashes independently re-read by NOFOLLOW FD with full witness and bodySHA; parent cold second original capture closes capture-pin gap.",
+    "Warm readonly FD fstat full ten-field witness; canonical package roots and full exact directory census/witness before and after scan bind namespace without perfile namedlstat.",
+    "All resolver candidate paths and candidate packageJSON witness checked, including unselected hoisted optional package manifest.",
+    "8192 retained readonlyFD maximum; all pins close on cold failure, observed drift or dispose; repeated dispose cannot close unrelated descriptors.",
+    "Policy and clock remain fresh outside memo; no new filesystem writes or runtime authority."
+  ],
+  "counterexamples": [
+    "samebytes inode replacement",
+    "content+originalbytes rewrite with exact original mtimeNs restored",
+    "chmod restored",
+    "extra hardlink",
+    "leaf symlink",
+    "parent symlink",
+    "extra package file",
+    "removed file",
+    "optional dependency emergence",
+    "existing wrong-name optional packageJSON rewrite without directory changes",
+    "cold SHA mismatch",
+    "dispose and failure no-revival",
+    "cold failure/dispose/stale descriptor cleanup",
+    "8193files bounded refusal+cleanup"
+  ],
+  "limitations": [
+    "Helper/source qualification on actual installednative10 closure only; candidate12/full broker/native phase deadline not qualified here.",
+    "5219 package-relative entries deduplicate to5116 actual named paths.",
+    "Pinned scan microbenchmark excludes directory/resolver scans; production helper benchmark includes them."
+  ],
+  "historical_failures_preserved": [
+    "package-witness-review-first.txt",
+    "package-witness-review-pinned-fd.txt"
+  ],
+  "finding_closed": "Unselected optional packageJSON in-place rewrite could alter resolution without directory metadata drift. Exact candidate packageJSON witness now pinned.",
+  "graft_tokens_saved_this_turn": 34029
+}

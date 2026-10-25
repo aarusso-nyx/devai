@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "1.0.0",
+  "project_type": "runtime-host",
+  "authority_enforcement": {
+    "mode": "cli-only"
+  },
+  "profile": "tier3",
+  "constitution": {
+    "version": "1.2.0",
+    "sha256": "d5dfdc972161e0f848dd859be7bbfa510973c5c9a449a0f9e6b8960e4f5ac96a"
+  },
+  "devai_version": "2.7.1",
+  "repo": {
+    "kind": "library"
+  },
+  "docs": {
+    "builder": "docusaurus"
+  }
+}

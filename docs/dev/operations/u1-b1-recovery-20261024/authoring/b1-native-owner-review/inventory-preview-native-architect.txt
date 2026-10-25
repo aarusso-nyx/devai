@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/inventory-preview-native-architect.txt","kind":"historical-transcript-custody-pointer","original_bytes":2440,"original_bytes_changed":false,"original_sha256":"ed65ffdbaf13d2bf67e5bb5b0b1856beef8c3c79bc4154044fd0b729cabba8b7"}

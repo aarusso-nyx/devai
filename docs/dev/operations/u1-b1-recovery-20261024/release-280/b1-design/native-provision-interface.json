@@ -1,0 +1,34 @@
+{
+  "create": "createReconciliationHostProvisionReview(repositoryRoot:string): ReconciliationHostProvisionReview; constructor performs readonly actual namespace/binding observation, no mutation. Frozen exact handle own methods start(),confirm(token:string),cancel(); each requires exact this and original actual ALS scope.",
+  "start": "Once. Returns READY for seed or issuer, or RESULT existing if whole issuer valid. Any replay/foreign/detached method throws RECONCILIATION_PROVISION_REVIEW_INVALID. Actual live scope/clock/identity/B5/namespace drift invalidates review. Constructor errors are closed safe provisioning codes.",
+  "ready": {
+    "kind": "reconciliation-provision-review",
+    "action_id": "init bind",
+    "stage": "seed|issuer",
+    "repository_id": "actual string",
+    "worktree_id": "actual string",
+    "host_identity_sha256": "actual SHA",
+    "binding_sha256": "actual B5 SHA",
+    "namespace_sha256": "SHA of exact private namespace witness, no raw paths/records",
+    "plan_sha256": "SHA256(JCS(all READY fields except this field and confirmation))",
+    "artifact": {"sha256": "fixed seed SHA or frozen whole issuer file SHA", "size_bytes": "integer"},
+    "effects": "array of exact {target,operation,mode}; target logical worktree-host/devai[/reconciliation[/admission.sqlite|/issuer.json]], operation create-directory|publish-seed|sync-precursor|publish-issuer, mode0700|0600. Seed preview lists only missing creates; issuer preview lists sync-precursor and publish-issuer.",
+    "confirmation": "PREPARE RECONCILIATION-HOST <plan_sha256> or BIND RECONCILIATION-HOST <plan_sha256>",
+    "lifetime_ms": 300000,
+    "grants_authority": false
+  },
+  "result": {
+    "kind": "reconciliation-provision-result",
+    "action_id": "init bind",
+    "outcome": "created|existing|cancelled|indeterminate",
+    "repository_id": "actual string",
+    "worktree_id": "actual string",
+    "issuer_sha256": "whole file SHA for created/existing; null otherwise",
+    "stage": "seed|issuer|null (null if cancellation before start or existing issuer)",
+    "owned": "readonly array exact {target,dev,ino,birthtime_ns}, all identity fields canonical strings, only identities actually observed as created; empty for ordinary cancellation/existing",
+    "grants_authority": false
+  },
+  "confirm": "Seed success returns issuer READY; issuer success RESULT created. Wrong token returns RESULT cancelled and terminally closes. Read-only/no-write scope cannot write; underlying real typed operation errors close handle with safe code. Publication/native uncertainty returns RESULT indeterminate, never retries.",
+  "cancel": "RESULT cancelled with no added effects, then terminal; second cancel or any other reuse refuses. No private artifact bytes/key/MAC/keydigest/physicalpaths/nativecause are returned.",
+  "diagnostics": ["RECONCILIATION_PROVISION_INVALID", "RECONCILIATION_PROVISION_STALE", "RECONCILIATION_PROVISION_UNSUPPORTED", "RECONCILIATION_PROVISION_REVIEW_INVALID"]
+}

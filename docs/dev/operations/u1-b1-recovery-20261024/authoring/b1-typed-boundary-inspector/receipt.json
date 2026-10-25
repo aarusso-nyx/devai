@@ -1,0 +1,104 @@
+{
+  "standing": "GENERIC_TYPED_BOUNDARY_AND_POLICY_VOCABULARY_GREEN_NOT_FINAL_HOST_OR_PUBLIC_AUTHORITY",
+  "results": {
+    "new_cases": 130,
+    "local_passed": 669,
+    "local_failed": 0,
+    "local_files": 13,
+    "rc_only_passed": 25,
+    "rc_only_failed": 0,
+    "rc_only_files": 1,
+    "total_passed": 694,
+    "total_files": 14,
+    "full_workspace_typecheck": "PASS (root session15663)",
+    "test_eslint": "PASS",
+    "test_prettier": "PASS",
+    "root_source_lint": "PASS (root session29537)",
+    "no_skips_or_timeout_threshold_changes": true
+  },
+  "typecheck": {
+    "path": "docs/dev/operations/u1-b1-recovery-20261024/release-280/typed-boundary/typecheck.txt",
+    "sha256": "3801203c7d9e4544ad471c57f0ab2386897e4413121a6c6be2a61c5af2fd37fb"
+  },
+  "source_manifest_sha256": "a98bcc2b3d39810a81b1d9cd96686be77285c24df4b9d17b066a321cfdbfdcdc",
+  "test_sha256": "b17e94917aade4663ab8e23c27224d99dbf2c2588efa119b8e545129bd6f2b50",
+  "authentic_authority_pipeline": "Actual declaration context, loaded owned deterministic policy, actual policy resolver resolution, genuine decision issuer receipt, actual registered plan and prepared-handle machinery. No fabricated resolutionRecords or positive fake receipt store. Deterministic trusted logical adapters prove only dispatch custody.",
+  "scope": [
+    "Both exact typed kinds require separately selected trusted dependency; no fs/git/remote/foreign logical fallback.",
+    "Configured admission true only, safe descriptor lookup, no getter/Proxy/revoked-Proxy execution on newly admitted paths.",
+    "Exact closed policy-only selector vocabulary and canonical staged schema validation; exported batch selector remains false for both kinds.",
+    "Snapshot descriptor-only canonical copy before receipt consumption; fresh and same-reference drift, late admission loss and one-use prepared handles.",
+    "Actual receipt/plan/subject/target/adapter bindings, foreign and cloned custody refusals; adapter ok:false propagates.",
+    "Generic bounded batches and execution units refuse, including invented selectors and applyAtomic."
+  ],
+  "preserved_historical_receipts": {
+    "authoring/b1-admission-inspector/receipt.json": "0952e1aa22d462e23f771fad5ff8cc1a6dfe52ce600f92215dcc30537fb0b9b5",
+    "authoring/b1-admission-inspector/error-census-green-receipt.json": "a9e6283fff96f1681a3c8113d0a307d2f5ac4920876a2538843f5cc00385b6b2",
+    "authoring/b1-clock-inspector/receipt.json": "a60f14928b1ebd097edba8be5fec58593973de87a4f1eef5240c4b89193b9ef8",
+    "authoring/b1-owner-record-inspector/receipt.json": "f38b19733d0dea9374855c8d1f21c88146a50f9ff9bf370b12d819a19c915436",
+    "authoring/b1-host-context-inspector/receipt.json": "2d5af14f7636c7376e0f1ebe3df88227395df4c6234de3df9fe3285091e3fa1d"
+  },
+  "preserved_historical_tests": {
+    "packages/authority/tests/unit/reconciliation-resource-kernel.test.ts": "da8a78cd5e4aca842ceaab29b38337f3662949c5c82525ceb89b71a28008898a",
+    "packages/authority/tests/unit/reconciliation-resources.test.ts": "87fa27e5c50865b484275baa242966f298e237c51ec903f62e5eb7ba7bb1b36c"
+  },
+  "historical_results": {
+    "structural-red.txt": "Authentic 2FAIL/2PASS missing configured classification.",
+    "policy-pipeline-red.txt": "Authentic30FAIL/22PASS policy seam gap. Later schema/matcher tests were additive.",
+    "independent-first.txt": "100PASS/2 fixture mistakes: attempted mutation of genuine issuer-frozen target. Corrected assertion proves TypeError, unchanged input and exact valid dispatch; separate mismatched-target refusal remains.",
+    "independent-green.txt": "102PASS before further defect probes.",
+    "late-admission-key-red.txt": "Authentic4FAIL/102PASS: pre-effect admission loss and lone-surrogate snapshot key.",
+    "independent-final.txt": "649PASS13files after first fixes; RC25PASS preserved separately.",
+    "dependency-getter-red.txt": "Authentic6FAIL/110PASS direct classifier and actual issuer prepare/apply dependency getter/raw sentinel.",
+    "reviewer_revoked_proxies": "Separate actual reviewer raw probes (hashes in source manifest) authenticate target/selector/nested operations/adapter revoked-Proxy ordering failure. Final130cases cover closure."
+  },
+  "error_reference": {
+    "codes": 1296,
+    "sha256": "d23aff4e8e26d0c3529c01c2eda72bda0ca17daa606000af05f864797d1c8418",
+    "removed_exact_new_rows": [
+      "| `AUTHORITY_TYPED_RESOURCE_ADAPTER_REQUIRED` | authority typed resource adapter required | Stable diagnostic for authority typed resource adapter required. | Follow the structured envelope remediation without widening the declared authority. | routing-authority / 2 (precondition / 5 for a dependency error) |",
+      "| `AUTHORITY_TYPED_RESOURCE_SNAPSHOT_INVALID` | authority typed resource snapshot invalid | Stable diagnostic for authority typed resource snapshot invalid. | Follow the structured envelope remediation without widening the declared authority. | contract-violation / 7 |"
+    ],
+    "prior1294_sha256": "254bcc6bbc7ab21005a57894e43f8648fef0ab50b10e39f85674f7c6767716cf"
+  },
+  "remaining": [
+    "Actual broker-issued opaque invocation and current argv/role/consent/package/policy bindings.",
+    "Trusted installed asset origin, protected namespace/key provenance and actual Owner approval custody.",
+    "Native SQLite admission descriptor-lifetime composition and real bootstrap/Owner/phase adapters.",
+    "Proof-index native CAS, public action/registry/core-policy rule installation and complete public workflow.",
+    "No installed/live candidate, native filesystem effect or release acceptance inferred from deterministic adapters."
+  ],
+  "inspector_writes_only": [
+    "packages/authority/tests/unit/reconciliation-typed-boundary.test.ts",
+    "authoring/b1-typed-boundary-inspector/"
+  ],
+  "graft": {
+    "calls_this_packet": 4,
+    "estimated_tokens_saved": 30486
+  },
+  "evidence_sha256": {
+    "README.md": "a79789bb4ee829b904d142221fca59e782e0f9d2329d1d9ef3f0a8a8edd345b6",
+    "dependency-getter-red-receipt.json": "98ea68abdb3b3c80200430c56c824ecc828801191250b32fdc9c26da2add77c6",
+    "dependency-getter-red.txt": "d3c5cbb9b3deca4d338b22d92e442058847b8bd60b768d2a452da47f215e36b7",
+    "expanded-format.txt": "44755bb560e7b41cd9cf67d693b168ca425560d7a05910287c3a2fe528614810",
+    "format-final-after-getter.txt": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20",
+    "format-final.txt": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20",
+    "independent-final-after-getter.txt": "71b56e4e0a0ef5ac758a860061ebb86e0d5bd41233c99cd5126ff0ccb758c42d",
+    "independent-final.txt": "8263f9d108140588ba7ccbecb17e46fa246e9cf78517896b4128668e7fb36f53",
+    "independent-first.txt": "6a389d1b1aeeca1fdb117e1f1af1f8636c39692cc70aca60b856155f692867db",
+    "independent-green.txt": "742b04bcba4d3f0f3f16e3f3e6b6f8eff85592a0ffff06c4c0b53c1a6f3cd41d",
+    "initial-format.txt": "b3f12af38f84f2f7155d77e23f231c24926879a752ba9ffe79f7ddb28567e4e5",
+    "late-admission-key-red-receipt.json": "cf346b834632468e385f63b47b0487c85ff39107a10389d070fbce4a09dedf1b",
+    "late-admission-key-red.txt": "28584fe2b046ec485ef2da40dfc7e6f4c90c7155ec4e9f40dcceba88ce49bac3",
+    "lint-final-after-getter.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "lint-final.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "lint-first.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "policy-amendment-review.json": "8f386f47bf3458f04c09de3e4fd63e20d7ac5fbaf00fe2e5565c695ef716651c",
+    "policy-pipeline-red.txt": "dbd31701dd1cf75c1d168fdc9db50ca0e9ada5746054baee133960a657efe9f9",
+    "source-manifest.json": "a98bcc2b3d39810a81b1d9cd96686be77285c24df4b9d17b066a321cfdbfdcdc",
+    "structural-red-receipt.json": "3411c1d4acec878f65a0bc9956e9db4309e2eeefa52f4478e7c4cd34468acd2b",
+    "structural-red.txt": "2db433d6a8346a8004439bb87cacd124ff22d06e28b9c9d0782cc3869b84375c",
+    "unchanged-rc-containment-after-getter.txt": "37e93edc67371383f9ba7c42263ed80a3738e3f6eab312c661f5c06efb2a561e",
+    "unchanged-rc-containment.txt": "dad58503a769f6fea55cba5e43856956a486ee36a97a3ff65170bd73b98ffec1"
+  }
+}

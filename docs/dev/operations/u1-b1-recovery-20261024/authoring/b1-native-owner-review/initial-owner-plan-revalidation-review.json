@@ -1,0 +1,24 @@
+{
+  "kind": "independent-bounded-interface-review",
+  "verdict": "accepted-before-implementation-with-invariants",
+  "scope": "Initial Owner approval native read-only exact saved-plan revalidation; no approval writes or tokens activated",
+  "requirements": [
+    "New optional plan_path is a closed opaque-control field, returned from already strict mutating B1 --plan parsing only. Own undefined or foreign action/operation fields refuse; legacy synthetic controls may omit path, but native initial reader cannot.",
+    "Only a scope-owned accessor can return sealed plan path, SHA256 and operation. No caller selectors/providers and no generic capture export.",
+    "Initial native reader requires exact Owner approve action, approve operation, write consent, live three TTY and no existing approval selector. Renew/partial phases are excluded.",
+    "Read contained canonical-parent regular NOFOLLOW bounded plan file. Preserve exact pathname identity, descriptor identity and bytes; re-open original pathname after native capture and compare.",
+    "Use strict duplicate-key-refusing JSON, closed packaged schema, exact canonical JCS plus LF bytes and SHA256 matching sealed plan-sha256. Original argv SHA remains a distinct binding.",
+    "Re-run unchanged fixed native source capture with plan selection and compare exact canonical plan bytes. Actual source/index/parents/remote advertisement/B5 checks remain active.",
+    "Freeze complete effect recipe/output bounds before activating any Owner writer. This bridge itself permits no writes or mutation tokens."
+  ],
+  "counterexamples": [
+    "Forged caller path, SHA, selectors or projection cannot replace sealed controls.",
+    "Wrong role/action/operation, approval-present initial attempt, renewal, missing write or TTY refuse.",
+    "Absolute/dot/backslash/foreign path, symlink parent or leaf and unsupported link count refuse according to frozen path contract.",
+    "Malformed/duplicate-key JSON, extra keys, noncanonical bytes, missing LF or trailing bytes refuse.",
+    "Forged selection, manifest digest, effect recipe or public evidence labels refuse actual recapture.",
+    "Plan pathname swap or in-place content change during capture refuses, even if original descriptor still points to old bytes.",
+    "Actual index, source, HEAD, MERGE_HEAD, package, policy or publication drift refuses."
+  ],
+  "qualification": "Design review only; no implemented or installed initial-approval qualification claimed."
+}

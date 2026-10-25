@@ -1,0 +1,31 @@
+{
+  "status": "ARCHITECT_CLOCK_REPLACEMENT_FOR_CONCRETE_SCHEMA_AND_HOST_TEST_FREEZE",
+  "parent": "owner-protocol-v3.json",
+  "replaces": "Only the v3 clock proposal's os.uptime source, uptime-ms encoding and review-clock rule. Original reviewed draft remains preserved. All other v3 and retained intent-authority requirements remain.",
+  "counterevidence": "Independent review inspected exact Node24.22.0 Darwin libuv os.uptime implementation: time(NULL) minus KERN_BOOTTIME, with whole-second granularity. Actual local/child127ms samples left uptime_ms unchanged while hrtime advanced. It is not admitted as the independent monotonic millisecond source proposed in v3.",
+  "qualified_source_direction": {
+    "api": "process.hrtime.bigint(), direct unsigned decimal nanoseconds, never process-start subtraction, Number coercion or wall-derived substitute",
+    "implementation": "Exact Node24.22.0 per_thread.js hrtime.bigint reads the native BigUint64 buffer; node_process_methods.cc stores uv_hrtime directly. Linux UV_CLOCK_PRECISE selects CLOCK_MONOTONIC; Darwin uses mach_continuous_time with the shared timebase.",
+    "cross_process": "Independent three fresh actual Darwin child observations all had the same boot and parent_before_ns <= child_ns <= parent_after_ns. This supports a shared epoch on that observed host/runtime, not every platform/runtime or container time namespace.",
+    "suspend": "Darwin continuous time includes suspend; Linux CLOCK_MONOTONIC excludes suspend. Do not assume equal suspend behavior. Dual wall/monotonic lifetime and discrepancy checks apply to review confirmation as well as grant start/resume.",
+    "host_gate": "Trusted final host must qualify its actual Node/libuv clock fingerprint and same-host/boot shared epoch, plus Linux time namespace when applicable. This turn does not qualify actual Linux execution. Unsupported/unknown runtime, namespace or boot source refuses the dependent operation, with no os.uptime, wall-only or caller-supplied clock fallback."
+  },
+  "closed_clock_fields": {
+    "clock_source": "node-uv-hrtime-ns-v1",
+    "boot_id": "Actual canonical lowercase UUID from fixed Linux boot_id or Darwin kern.bootsessionuuid source",
+    "monotonic_ns": "Canonical positive decimal string for uint64, at most20 digits and <=18446744073709551615, sampled directly from hrtime.bigint; zero is invalid because a native source failure may return zero. Refuse expiry arithmetic beyond uint64 rather than wrapping.",
+    "wall_ms": "Integer safe Unix milliseconds from trusted Date.now; no caller override"
+  },
+  "sampling": "Read wall-before, monotonic_ns, actual boot identity, wall-after; require same boot across the trusted host context, nondecreasing wall and wall sample width <=250ms. Store wall-after. Failed observation is refusal, never zero or inferred time.",
+  "eligibility": {
+    "grant_max_wall_ms": 900000,
+    "grant_max_monotonic_ns": "900000000000",
+    "review_max_wall_ms": 300000,
+    "review_max_monotonic_ns": "300000000000",
+    "elapsed_disagreement_max_ns": "2000000000",
+    "rule": "For both review confirmation and new/resumed domain writes: same actual boot/source/context; current wall and monotonic observations cannot precede issue or authenticated predecessor. Monotonic samples must be positive. Require elapsed wall milliseconds and monotonic nanoseconds strictly less than the respective lifetime bounds: equality is expired, preserving v3's before-expiry rule. Absolute elapsed disagreement must be <=2000000000ns after multiplying wall milliseconds by1000000. Compute decimal ns using BigInt only. A boundary/clock/boot failure refuses progression without auto-renewal or inferred completion.",
+    "sleep_behavior": "A long Darwin sleep advances both clocks and is caught by expiry as appropriate; it does not inherently cause disagreement. Linux suspend can produce disagreement because only wall advances. Neither behavior may extend a review/grant past its wall bound.",
+    "settlement": "Expired/revoked complete durable output still follows the retained completion-only matrix with fresh ordinary authority; a clock failure never authorizes new domain outputs or turns partial/uncertain output into completion."
+  },
+  "not_delivered": "This is a concrete source/encoding correction for independent schema and host implementation. The closed Owner schemas, actual trusted clock reader/namespace binding, review handles, MAC records and actual phase consumer tests remain required before runtime qualification."
+}

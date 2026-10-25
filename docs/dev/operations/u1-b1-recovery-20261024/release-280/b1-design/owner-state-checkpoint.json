@@ -1,0 +1,50 @@
+{
+  "standing": "EXACT_OWNER_STATE_REDUCER_PACKET_FOR_INDEPENDENT_REVIEW_AND_AUTHENTIC_RED",
+  "authority": "Accepted ADR-EVI-0007 and express full internal v2.8.0 authorization; preserves owner-protocol-v3.json and owner-intake-checkpoint.json intent_authority_matrix.",
+  "purpose": "Compose existing seven-record codec and clock checks into the authenticated approval/grant/intent/completion/lease graph required by the fixed native Owner and phase host. Data eligibility never issues authority or performs an effect.",
+  "source": "packages/authority/src/runtime/reconciliation-owner-state.ts",
+  "test": "packages/authority/tests/unit/reconciliation-owner-state.test.ts",
+  "preserved": [
+    "Existing Owner schema/codec/clock and every historical test remain unchanged",
+    "No root export, registry, capability, policy, filesystem, SQLite, process, public output or release effect in this component",
+    "Native host must acquire admission, supply its own actual namespace/clock/scope observations, revalidate outputs/durability and obtain fresh ordinary authority"
+  ],
+  "api": {
+    "readReconciliationOwnerState": "(input: unknown) => deeply frozen safe ReconciliationOwnerState; exact input fields issuer_bytes, approval_bytes, grant_bytes, intent_bytes, completion_bytes, lease_bytes. issuer/approval are canonical actual Uint8Array records; arrays of canonical actual Uint8Array records; lease null or bytes. No callbacks/providers/path inputs. Verify issuer self MAC and every other MAC with its canonical key, then validate the complete graph. No private key/bytes/MAC or original record escapes.",
+    "assessReconciliationOwnerPhase": "(state: unknown, phase: unknown, observedClock: unknown, outputs: unknown) => exact safe assessment; accepts ONLY a module-private WeakMap-branded state produced by readReconciliationOwnerState. phase01..04; outputs absent|partial-known|complete|unknown. Clock is validated data, never a trusted clock origin. Return phase, grant_status live|expired|revoked, disposition start|resume|settle|completed|held, intent_sha256, completion_sha256, grants_authority:false. Invalid graph/clock/phase throws closed safe code. Unknown output ->held. Partial without prior intent ->held. Completed phase returns same completion after clock validity checks without accepting new output claims as evidence.",
+    "error": "ReconciliationOwnerStateError with fixed name and code/message RECONCILIATION_OWNER_STATE_INVALID; no cause, raw values or nested errors."
+  },
+  "bounds": {
+    "max_grants": 4096,
+    "max_intents": 4,
+    "max_completions": 4,
+    "max_total_bytes": 33554432,
+    "max_file_bytes": 1048576,
+    "ingress": "Descriptor-safe exact plain/null object; ordinary/null dense array with enumerable data indices and intrinsic length only; no Proxy, symbols, getters, holes, overridden iterators/species. Copy byte views via intrinsic semantics as existing codec; reject shared/detached. Enforce aggregate bound before decoding. Never retain supplied mutable bytes."
+  },
+  "graph": [
+    "Issuer kind issuer; approval kind approval. Exact whole canonical JCS+LF byte SHA for every reference. Approval issuer_sha256 equals issuer bytes SHA; repository/worktree match issuer and scope.host_identity_sha256 equals issuer.host_identity_sha256. Approval scope digest already codec-checked. Fresh approval may occur after issuer installation boot/HEAD; installation observations do not freeze future current bindings.",
+    "Every linked record exactly matches approval_id, issuer_sha256, original approval_sha256, scope_sha256 and repository/worktree. Grant input order is sequence order: approval sequence1 then exact contiguous grant sequence2..N; exact previous raw digest. No fork, duplicate, gap or grant following terminal revocation. Grant clocks share approval boot/source and are nondecreasing in both wall/ns with <=2000ms elapsed disagreement; expiry itself does not invalidate immutable history.",
+    "Intent/completion arrays may be phase ordered or arbitrary input order; unique phase required. Each intent grant names approval or a prior renewal, never revocation; signed issue is within that grant exact declared wall/ns deadlines and fixed maximum. Its phase is permitted by that grant. Approval allows01..04; renewal permits its exact remaining_phases. At most one uncompleted intent and no phase gap. An intent for phaseN requires exactly phaseN-1 completion digest (null only01). Intent timestamp cannot precede that completion or its referenced grant.",
+    "Each completion names exact same-phase intent and exact predecessor completion; observed_grant_sha256 identifies a known grant event that may be revoked or expired. Completion clock cannot precede intent, referenced observed grant or predecessor. Completion authenticity is graph evidence only; durable literal and manifest hashes do not prove actual output or fsync.",
+    "Each renewal remaining_phases equals all phases not completed as of its signed issue, including at most one existing uncompleted intent. resumable_intent_sha256 names exactly that intent or is null if none. Simultaneous-clock ambiguity is resolved conservatively by immutable reference/order and must not infer that a record existed merely from a tied timestamp. Review must resolve an exact deterministic ordering before implementation if available fields cannot support this.",
+    "Lease, if present, names an existing uncompleted intent, exact phase/action/initiator and original_intent_sha256. Host identity equals original approval scope. Its grant is known and nonrevocation, its clock not before intent/grant. A retry lease may name same-scope renewal only if that renewal explicitly names original intent. Lease nonce/invocation need not equal original intent for owned retry. Graph cannot prove PID liveness, actual host or lease ownership; native host must do so."
+  ],
+  "eligibility": [
+    "Validate current observation against current grant clock and latest signed history observation: same boot/source, no rollback or >2000ms elapsed disagreement. Revocation remains terminal, expiry means observation >= either exact declared deadline; use BigInt ns. The maximum clock window remains900000ms even when smaller signed validity applies.",
+    "Live unstarted next phase with absent outputs ->start. Live exact existing intent with absent/partial-known ->resume only if current grant is its original grant or current renewal explicitly names it. Live complete existing intent ->settle. Any unknown/foreign/changed/indeterminate output classification ->held.",
+    "Expired/revoked absent/partial-known ->held; complete exact existing intent ->settle only. Renewal cannot revive revoked scope; a live renewal can resume only its named original intent and start allowed remaining phases. Completed returns original completion; no duplicate consumption. Future phase before predecessor completion ->held.",
+    "All ten retained intent matrix rows require independent explicit cases. Returned dispositions are eligibility data for fixed native host, never authorization, output attestation or a callable effect."
+  ],
+  "independent_acceptance": [
+    "Authentic absentmodule RED before product implementation",
+    "Independent canonical/HMAC records and raw SHA reference oracles; no mocked codec as proof",
+    "All grant sequence/fork/revocation/scope/issuer/identity/reference tampering and invalid phase graph refuse",
+    "Every retained ten-row matrix case plus small signed validity, exact boundary, boot change, rollback, drift, renewed exact-intent resumption and no phase double consumption",
+    "Leases original and retry; wrong host/grant/intent/role/phase/clock refuse; graph never tests or signals PID",
+    "Hostile descriptors/Proxy/byte views/arrays/cumulative bounds cannot invoke traps or retain mutable aliases",
+    "No key/private record/MAC in state, assessments or errors; no mutation or new authority; deep freeze and forged/cloned state refusal",
+    "Existing Owner codec, clock, diagnostic/reference tests remain unchanged"
+  ],
+  "remaining": "Native Owner review/publication, actual lease liveness/recovery, admitted phase execution, plan/source validation, canonical custody/selection, real index CAS, staged bodies, public/installed/integration/release remain required."
+}

@@ -1,0 +1,76 @@
+{
+  "standing": "AGREED_MINIMUM_END_TO_END_DELIVERY; implementation and installed qualification incomplete",
+  "human_request": "B1 is needed to unblock DETRAN within hours; coordinate Wait U1/B1 on minimal common ground",
+  "devai_thread": "01a16e18-f81a-7200-a510-012147a2ba43",
+  "detran_thread": "01a16ac2-2e50-7221-8379-2ffbe9aaf37d",
+  "handoff_inputs": [
+    {
+      "path": "/Volumes/Development/.codex/artifacts/detran/u1b1-shared-fixture-handoff-20261024/fixture-input-manifest.json",
+      "bytes": 17704,
+      "sha256": "5f5f5e9962eaba13fb6e194a84dc2a01c74ec52aa75d9f6b441bcbec53bf0b2a"
+    },
+    {
+      "path": "/Volumes/Development/.codex/artifacts/detran/u1b1-shared-fixture-handoff-20261024/exporter-acceptance-contract.json",
+      "bytes": 7287,
+      "sha256": "d4d040e27816cc9ab86e677038ed66678ecf72ebec98a2083a342a83e35eab1f"
+    }
+  ],
+  "required_vertical_slice": [
+    "read-only actual-parent/source/index/publication plan",
+    "exact Owner approval and complete immutable displaced/base/original custody",
+    "entire selected main prefix plus distinct normal-writer canonical-selection event",
+    "separate supported U1 and newest recovery with derived obligations and expected heads",
+    "verified one-entry proof-index compare-and-swap",
+    "all seven diagnostic inventory bodies from the exact staged snapshot",
+    "DETRAN explicit-input exporter consumption preserving shared controls and two S2-only routes"
+  ],
+  "deliverables": [
+    "one exact source and packaged tarball digest",
+    "one runnable installed-public disposable fixture entry point",
+    "end-to-end success and required refusal/retry/concurrency/crash evidence"
+  ],
+  "cases": {
+    "historical_regression": {
+      "s2": "9b2a190aa1276f4b15469b7079ed0d7c4c8c4c99",
+      "main": "7dfab8bdf61ffe935bca45578e0e65c09883f633",
+      "standing": "preserve original335-main fixture and exact archived resolution"
+    },
+    "current_parent": {
+      "s2": "9b2a190aa1276f4b15469b7079ed0d7c4c8c4c99",
+      "main": "7abe89cd3e7049fdcf38b33411d38a3442a0e1e1",
+      "standing": "449-record current main; genuine refreshed source resolution not yet available; never relabel historical fixture"
+    }
+  },
+  "parallel_work": {
+    "devai": "implement and qualify the bounded public workflow; maintain existing assurance/release gates",
+    "detran": "provide exact fixture inputs/exporter acceptance and determine refreshed disposable source-resolution proposal; inspect exact package before stable publication"
+  },
+  "deferred_extras": [
+    "generalized conflict resolution",
+    "additional recovery populations",
+    "dashboards",
+    "convenience automation"
+  ],
+  "not_granted": [
+    "live DETRAN adoption or recovery",
+    "PR211 merge hold release",
+    "C6 activation",
+    "S3 runtime"
+  ],
+  "known_input_distinctions": [
+    "archived index witness is git ls-files --stage -z output, not physical DIRC index",
+    "current proof-source-custody snapshot references6c953874, so verify actual7abe source bytes",
+    "fixture-only upgrade/binding must use supported installed commands and preserve predecessor bytes",
+    "frozen-v1 historical compatibility exception remains separate from bootstrap diagnostics"
+  ],
+  "timing": "target hours; no completion-time claim until full public rehearsal passes",
+  "implementation_progress": {
+    "readonly_plan_grammar": "Implemented exact original-argv selected-parent/published-ref custody; no mutation resource operation added",
+    "focused_parser_tests": "150 PASS (42 new plus108 existing; one explicitly reviewed malformed-plan recognition transition; predecessor test bytes preserved)",
+    "readonly_control_tests": "15 PASS including read-scope enforcement, no mutation, disposed invocation and forbidden own-undefined selectors",
+    "historical_chain_epoch_tests": "71 PASS unchanged after shared exact hash extraction",
+    "authority_types": "tsc -b packages/authority PASS",
+    "source_lint": "selected product paths PASS",
+    "installed_driver": "Inspector authored fixture driver and preparing actual construction; full public workflow not implemented/qualified"
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "qualification": "Independent native source qualification only. Actual Git/FS/private namespace/Owner state/typed receipt runtime; synthetic B5, policy origin, TTY. No installed/public/release/DETRAN-live claim.",
+  "first_run": {
+    "tests": 8,
+    "passed": 6,
+    "failed": 2,
+    "log": "index-phase-native-first.txt",
+    "log_sha256": "b5b4c48fa23ac8a3e1d872ac1ec6d65431cdfe11cdf86b86c7b28b6673ec3689",
+    "finding": "Exact object+index CAS succeeded; completion publisher guard rejected its own scratch; indeterminate retained lease. Retry held livelease. Preserved without rollback."
+  },
+  "native_dead_lease": {
+    "passed": 1,
+    "log": "index-phase-dead-lease-correct-env.txt",
+    "log_sha256": "e11989cf4c50414dedb1ebdbbc2ab0198eb56703d6c9fd1f4d8deca9d9e6ff79",
+    "result_sha256": "75622230f4d5ec18ceb1f4fe7f00c8e7c21aa8b2d339647b4a0adfe0c419db3a"
+  },
+  "post_fix_settlement": {
+    "passed": 2,
+    "duration_tests_seconds": 68.86,
+    "log": "index-phase-settlement.txt",
+    "log_sha256": "23fc92f49d2c0a3e26471247a921bc6cd8f2b1bd44af0c631eee7881978c258d",
+    "source_sha256": "49d78c4abffec04dbd369ea59e6683c9a5395c3219b6dddd96a6ad5ebff95bbe",
+    "results_sha256": "ce34e56e3cc088d5d667a89d9015adeed1c38d832d831dd30c4f6f79467c2b26",
+    "result": {
+      "kind": "reconciliation-index-result",
+      "phase": "03",
+      "outcome": "completed",
+      "approval_id": "24b3953e410a7654b1ecdbad8c03a512439a904d9ed90349b116d6685a761caf",
+      "plan_sha256": "5d55b291ae2e31c578ec2c064bd83c8471cda1afbd197734c946f7fd87f61141",
+      "intent_sha256": "6d9e291a346b5562c8a10be1fcf361f5a9c478b6d67a88263e9bee9416e840e5",
+      "completion_sha256": "662c54e2ef6088877e5300d9951691c6299c93615d08e08825638ae22b111bab",
+      "outputs_manifest_sha256": "8ccbae0f77c1b28edbce79598b5efb07422e0d9c3abeb19363477cc3f3d1ee32",
+      "owned": [
+        {
+          "target": "worktree-host/devai/reconciliation/approvals/24b3953e410a7654b1ecdbad8c03a512439a904d9ed90349b116d6685a761caf/phase-03.json",
+          "dev": "16777233",
+          "ino": "1124982548",
+          "birthtime_ns": "1792904590748238914"
+        }
+      ],
+      "grants_authority": false
+    },
+    "index_sha256": "a9ae42654e20e902c3d3e120478597bfd9a9a7f36d5d9bd073078581d26cd3ad",
+    "object_compressed_sha256": "8216b4606f55d2482eb150dd1cf27ec118bfb9b4e457f50fb6bb62753c263940",
+    "domain_witnesses_unchanged": true
+  },
+  "remaining_qualification_limit": "Current pinned source completed retry qualified; final source fresh CAS/completion path not repeated. Historical first6/8 + native deadlease + prior corrected settlement2/2 preserved. Public installed CLI and phase04 publication separate.",
+  "current_pinned_completed_retry": {
+    "passed": 1,
+    "duration_tests_seconds": 19.28,
+    "source_sha256": "42f2c694166b8b22042796d352da0c704bb8b04f847d4423d5926e2a1fd54765",
+    "log": "index-phase-pinned-retry.txt",
+    "log_sha256": "2217ec224a92a72c47df7bb80f8b310e825c7e531e0a50344428f60782470539",
+    "results_sha256": "ea52ff50128531a877d2b70433a2ac7762e47db65bfad154bb78dc1964ace28e",
+    "outcome": "existing",
+    "owned": [],
+    "domain_full_witnesses_unchanged": true
+  }
+}

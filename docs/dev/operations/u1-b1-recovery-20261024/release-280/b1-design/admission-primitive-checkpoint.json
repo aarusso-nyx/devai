@@ -1,0 +1,114 @@
+{
+  "status": "FROZEN_NATIVE_PRIMITIVE_FOR_INDEPENDENT_RED",
+  "scope": "Private lower host primitive only, analogous to host-publish steps. No authority barrel export, public action, role/approval grant, opaque host factory, generic DB capability or real B1 phase is added by this component.",
+  "sources": [
+    "packages/authority/src/boundaries/reconciliation-admission-seed.ts",
+    "packages/authority/src/boundaries/host-reconciliation-admission.ts"
+  ],
+  "test": "packages/authority/tests/unit/reconciliation-admission.test.ts",
+  "seed": {
+    "bytes": 8192,
+    "sha256": "3f6b742405bb199a11ed0952c9aa049285ef25dc69954e901d2e987cd15c4372",
+    "frozen_bytes": "admission-seed/seed.base64.txt",
+    "provenance": "admission-seed/provenance.json",
+    "exports": [
+      "RECONCILIATION_ADMISSION_SEED_SHA256",
+      "RECONCILIATION_ADMISSION_SEED_SIZE",
+      "reconciliationAdmissionSeedBytes(): Uint8Array"
+    ],
+    "copy": "Every seed call returns independent bytes; no file or database is created by reading the packaged seed."
+  },
+  "api": {
+    "readReconciliationAdmissionAnchor": "(root: string) => ReconciliationAdmissionAnchor; reads and validates an already existing exact private anchor only, never opens SQLite",
+    "withReconciliationAdmissionSteps": "<T>(root: string, expected: ReconciliationAdmissionAnchor, callback: () => T) => T; trusted synchronous internal callback only, never caller CLI data",
+    "ReconciliationAdmissionError": "Error with readonly code and optional readonly stage=rollback|close; native exception text/cause, SQL, file contents and callback values never become error diagnostics"
+  },
+  "anchor": {
+    "required_keys": [
+      "schemaVersion",
+      "kind",
+      "root",
+      "root_identity",
+      "seed_identity",
+      "seed_sha256"
+    ],
+    "schemaVersion": "1.0.0",
+    "kind": "reconciliation-admission-anchor",
+    "root": "Absolute canonical realpath of already existing owned0700 private directory. Trusted final host resolves this; no public command accepts a physical anchor path.",
+    "root_identity_keys": ["dev", "ino", "birthtime_ns", "uid", "mode"],
+    "seed_identity_keys": [
+      "dev",
+      "ino",
+      "birthtime_ns",
+      "uid",
+      "mode",
+      "size_bytes",
+      "mtime_ns",
+      "ctime_ns"
+    ],
+    "identity_encoding": "All IDs/times are lossless canonical unsigned decimal strings; root mode is0700, seed mode0600, size_bytes is number8192. Filesystem owner equals actual effective UID. Seed is regular and single-linked. Directory mtime is deliberately excluded: admitted child publication may change it.",
+    "data": "Deep-frozen public metadata only, no private key. Expected witness must have exact own enumerable data fields/plain or null prototypes; getter/Proxy/unknown fields refuse. It is a state witness, not authority."
+  },
+  "physical_paths": {
+    "anchor": "<trusted-private-root>/admission.sqlite",
+    "forbidden_sidecars": [
+      "admission.sqlite-journal",
+      "admission.sqlite-wal",
+      "admission.sqlite-shm"
+    ],
+    "namespace": "Other legitimate issuer/approval files may exist; this primitive neither reads nor rewrites them. Any existing forbidden sidecar, even empty or symlink, refuses; no hot-journal recovery permission."
+  },
+  "read_protocol": [
+    "Support darwin/linux effective-UID private namespace. Reject unsupported platform or missing effective UID before writable access.",
+    "Resolve and lstat root and seed, reject symlinks/noncanonical path/type/mode/owner/link count/size. Check process-local live anchor map by device+inode before any raw open or close, including aliases.",
+    "Use an O_RDONLY|O_NOFOLLOW descriptor for seed; verify descriptor identities against lstat, read exactly8192 bounded bytes, verify fixed SHA256, recheck descriptor/path metadata and sidecar absence. Close raw descriptor before any SQLite connection opens. No repair, file creation, SQL or directory creation."
+  ],
+  "lock_protocol": [
+    "Reject Proxy, async/generator or nonfunction callback before writable native access. Validate expected closed witness and freshly read actual anchor. Drift refuses before callback.",
+    "Reserve device+inode in module-private process-local map. Any nested/reentrant inspection or admission, including an alias, refuses before a raw descriptor or second SQLite connection can open/close. Keep reservation through SQLite close.",
+    "Open only the internally generated pathToFileURL(anchor)+?mode=rw URI with timeout0 and extension loading disabled. Never use rwc, immutable, nolock, caller URI/SQL, alternate VFS or a plain-path CREATE fallback. Missing file must remain absent. Runtime without this URI behavior refuses; final installed host qualification is still required.",
+    "BEGIN IMMEDIATE supplies kernel exclusion. SQLITE_BUSY/LOCKED is a bounded refusal, no retry/takeover. Validate fixed schema/row through constant read-only SQL and lstat metadata/sidecar checks only while connection lives. Never raw-read/open/close the DB or open another connection in this interval.",
+    "Run exactly one trusted synchronous callback, preserving its result or ordinary exception after cleanup. Reject Promise/thenable/Proxy result without invoking then/getters. Native async/generator callbacks are never invoked. This does not undo callback effects or prove arbitrary user JavaScript synchronous; production callbacks are fixed trusted host code, not caller functions.",
+    "Revalidate closed SQL schema/row and unchanged lstat metadata after normal callback completion. ROLLBACK and close always run; no SQL writes, PRAGMA mutations, journal recovery, fsync/rename/unlink, namespace cleanup or seed publication.",
+    "If rollback or close fails, return RELEASE_INDETERMINATE with only stage/code, retain module-private live reservation and connection custody, and refuse further same-process admission/inspection. Do not claim release, retry, completion or erase domain files. Process exit releases the OS lock; actual Owner lease recovery remains a separately authorized operation."
+  ],
+  "closed_sql": {
+    "control": ["BEGIN IMMEDIATE", "ROLLBACK"],
+    "schema": "SELECT type,name,tbl_name,rootpage,sql FROM sqlite_schema ORDER BY name",
+    "expected_schema_row": {
+      "type": "table",
+      "name": "admission_protocol",
+      "tbl_name": "admission_protocol",
+      "rootpage": 2,
+      "sql": "CREATE TABLE admission_protocol(singleton INTEGER PRIMARY KEY CHECK(singleton=1),version INTEGER NOT NULL CHECK(version=1))"
+    },
+    "rows": "SELECT singleton,version FROM admission_protocol ORDER BY singleton",
+    "expected_rows": [{ "singleton": 1, "version": 1 }]
+  },
+  "error_codes": [
+    "RECONCILIATION_ADMISSION_ANCHOR_INVALID",
+    "RECONCILIATION_ADMISSION_STALE",
+    "RECONCILIATION_ADMISSION_BUSY",
+    "RECONCILIATION_ADMISSION_REENTRANT",
+    "RECONCILIATION_ADMISSION_CALLBACK_INVALID",
+    "RECONCILIATION_ADMISSION_UNAVAILABLE",
+    "RECONCILIATION_ADMISSION_RELEASE_INDETERMINATE"
+  ],
+  "independent_tests": [
+    "Authentic absent-module RED; fixed seed bytes/hash/copy isolation and readonly inspection zero SQLite/file effects.",
+    "Actual already-existing private fixture, wrong seed/schema/size/mode/type/owner/symlink/hardlink/sidecar and stale witness refusal before callback or writable SQL. Expected getter/Proxy/malformed metadata never executes.",
+    "Actual native two-process contention and fixture-owned holder SIGKILL: successor enters without reaping a filesystem mutex; seed bytes/inode remain unchanged and no sidecars appear. External counter serializes under actual compiled primitive, not a hand-written stand-in.",
+    "Nested/alias inspection cannot open/close a DB descriptor and accidentally release a POSIX lock; foreign process remains refused until owner actually exits.",
+    "Actual URI rw behavior, encoded question/hash path handling, no CREATE fallback, closed SQL whitelist and mode/identity recheck. Do not set immutable=1: it disables SQLite locking.",
+    "Async/generator/thenable/Proxy callbacks/results reject, ordinary callback error releases lock, rollback/close faults retain exact indeterminate custody in disposable child processes; no raw native message/cause leakage."
+  ],
+  "fixture_execution": "Tests may transpile the exact two source modules with existing TypeScript into an external ESM fixture directory for real Node24 child execution, sealing source/output hashes. No new dependency or fake SQLite engine. This qualifies the lower component, not an installed public CLI.",
+  "trust_boundary": "Protects untrusted data and governed runtime participants on the same admitted local host. It does not claim isolation against arbitrary same-UID external filesystem replacement, compromised runtime/native VFS or OS administrator. Final adapter must bind trusted private namespace, actual host/worktree, package and policy, and qualify actual filesystem locking before any product use.",
+  "remaining_product_gates": [
+    "Two separately confirmed seed/issuer bootstrap and exact private issuer bytes",
+    "Owner schema/domain/MAC/clock/phase/lease contracts and actual runtime origin",
+    "Guarded typed host-effect registration/census and closed final operation handle",
+    "Actual public actions, policy/schema/registry consumers and final host/index adapters",
+    "Full B1 workflow, installed qualification, integration and protected release gates"
+  ]
+}

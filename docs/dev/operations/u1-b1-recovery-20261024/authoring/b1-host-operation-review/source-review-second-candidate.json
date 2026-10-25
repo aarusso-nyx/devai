@@ -1,0 +1,21 @@
+{
+  "standing": "FOUR_ORIGINAL_PROBES_GREEN_ONE_NEW_COMPATIBILITY_RED",
+  "source_hashes": {
+    "packages/authority/src/boundaries/reconciliation-host-operation.ts": "ce8dc730e1a6d92890a013e0471fe81d3d64212a77e987f2cb05ca99bd3d0be1",
+    "packages/cli/src/authority/reconciliation-host-input.ts": "61f7ef316ef5bc26abaacfe74793bc5197a55794d1c76f27a8b58c8cc404ca30"
+  },
+  "original_findings": "HO01/HO02 closed by descriptor-safe synchronous result refusal and closed currentBindings provider wrapper. Same4 original probes now pass.",
+  "new_finding": {
+    "id": "HO03",
+    "finding": "Ordinary init bind becomes reconciliation-special invocation when only target root pathname contains reconciliation-host. No special selector present. Actual existing canonical directory fixture; --after-constitution then incorrectly refused.",
+    "required": "Keep ordinary initbind undefined unless reconciliation selector option or malformed selector option exists; values must not activate special grammar. Preserve existing malformed alias/equals refusal."
+  },
+  "run": {
+    "pass": 4,
+    "fail": 1,
+    "log": "edge-probes-second-candidate.txt",
+    "probe_sha256": "c04a4ea7e486e787f5fb00dadd9a7e8c941655886a1223ff862a320c5cd4d90b"
+  },
+  "product_edits": false,
+  "installed_public_positive_claim": false
+}

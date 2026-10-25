@@ -1,0 +1,42 @@
+{
+  "standing": "EXISTING_REMOVER_DETERMINISTIC_REAL_FILESYSTEM_INTERLEAVING_ONLY_NOT_B1_KERNEL",
+  "source": "packages/authority/src/boundaries/host-remove.ts",
+  "schedule": [
+    "R2 prechecks old dead admission inode",
+    "R1 removes old and creates fresh successor A",
+    "R2 stale remover moves A into quarantine",
+    "B acquires absent admission name",
+    "R2 restoration refuses EEXIST; A retained in quarantine"
+  ],
+  "old_identity": {
+    "dev": "16777233",
+    "ino": "1117201191",
+    "birthtimeNs": "1792864294841936182"
+  },
+  "successor_a_identity": {
+    "dev": "16777233",
+    "ino": "1117201192",
+    "birthtimeNs": "1792864294842629703"
+  },
+  "contender_b_identity": {
+    "dev": "16777233",
+    "ino": "1117201193",
+    "birthtimeNs": "1792864294842849918"
+  },
+  "public_lock_content": "CONTENDER-B\n",
+  "quarantine_content": "LIVE-SUCCESSOR-A\n",
+  "quarantine_identity": {
+    "dev": "16777233",
+    "ino": "1117201192",
+    "birthtimeNs": "1792864294842629703"
+  },
+  "error": {
+    "name": "Error",
+    "code": "AUTHORITY_REMOVE_RESTORE_INCOMPLETE",
+    "message": "AUTHORITY_REMOVE_RESTORE_INCOMPLETE: /var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-admission-reaper-review-LNB1lA/admission.lock is at /var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-admission-reaper-review-LNB1lA/.admission.lock.44838-da99c257-53c8-4aec-af5b-2278b0abc192.remove-quarantine"
+  },
+  "files": [
+    ".admission.lock.44838-da99c257-53c8-4aec-af5b-2278b0abc192.remove-quarantine",
+    "admission.lock"
+  ]
+}

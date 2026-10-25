@@ -1,0 +1,44 @@
+{
+  "standing": "ISOLATED_PRIVATE_PUBLICATION_INDEPENDENT_GREEN_NOT_OWNER_INTAKE_ACCEPTANCE",
+  "recorded_at": "2026-10-24T18:04:52.239554+00:00",
+  "source_sha256": {
+    "packages/authority/src/boundaries/host-publish.ts": "8a0e2dda49b8d9d048683c612427dd2bc2304b9e583aedf5bb867c33bf46e53e",
+    "packages/authority/src/boundaries/host-effects.ts": "0c3c29acd49455bb879e6aeed0f265e40437480eca4a1bcc85bef0968e807dce",
+    "packages/authority/src/boundaries/index.ts": "799d2e9ada119f6d69aed3c51fea992626d05b68f7809a8de992598d64de227e"
+  },
+  "test_sha256": {
+    "packages/authority/tests/unit/private-publication.test.ts": "b25026dd339eb1b6ce38eb5209e7279010eff7ae186c83749cb3c803babb1589"
+  },
+  "command": "node scripts/process/validation-runner.mjs -- node_modules/.bin/vitest run --config tests/config/local.config.ts --maxWorkers 1 packages/authority/tests/unit/private-publication.test.ts packages/authority/tests/unit/host-publish-no-replace.test.ts packages/authority/tests/unit/host-remove-identity.test.ts",
+  "result": {
+    "passed": 41,
+    "failed": 0,
+    "new_private_cases": 17,
+    "unchanged_publication_cases": 12,
+    "unchanged_removal_cases": 12,
+    "duration_seconds": 2.29,
+    "raw_log": "private-publication-final-independent-green.txt",
+    "raw_log_sha256": "9bcfccb10a5741115137140db901140bda38b9e034ee709b204a771d11353aa2"
+  },
+  "checks": {
+    "prettier": "PASS",
+    "eslint": "PASS",
+    "git_diff_check_test_path": "PASS"
+  },
+  "independent_observations": [
+    "Ordinary publisher retains0644 baseline with isolated child umask022.",
+    "Private staged descriptor is0600 before first write, remains0600 at link and target; exact byte and inode identity checked.",
+    "Prelink write/open/fsync failures do not publish; foreign target is unchanged.",
+    "Initial fstat failure writes zero private bytes and retains only an empty0600 stage whose ownership could not be established.",
+    "Foreign staged replacement is preserved; whole private target and separately retained owned stage survive; actual publication uncertainty includes identity and staged_remaining.",
+    "Postlink unlink/directory-fsync failures remain indeterminate; actual child self-SIGKILL preserves whole target and owned stage.",
+    "Raw untrusted import is classified; legitimate guarded import remains allowed; unscoped and broker-denied calls have zero file effects."
+  ],
+  "red_correction": "The earlier static fixture imported the legitimate guarded authority barrel while expecting refusal. That expectation was invalid and is retracted. The corrected raw-untrusted-import fixture and guarded-allowed baseline passed independently; no historical raw-import RED is claimed. The original default0644 and absent-private-function RED remain genuine.",
+  "limitations": [
+    "Only isolated lower publication primitive and existing host custody are qualified.",
+    "No Owner issuer/MAC/parser/secret projection or native SQLite adapter is implemented/qualified by these tests.",
+    "No product private key generated; marker bytes are explicitly disposable public test data.",
+    "No live B1 effects, release qualification or DETRAN/downstream execution follows from this receipt."
+  ]
+}

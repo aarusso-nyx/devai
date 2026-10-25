@@ -1,0 +1,11 @@
+{
+  "original_source_path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/u1-inspector/custody-red.log",
+  "external_custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/u1-inspector/custody-red.log",
+  "sha256": "939f0101793e7a8dc2f0e7d4a96437e46ac8f011c07f02f282569bd5f7ceace3",
+  "bytes": 2445,
+  "dev": "16777245",
+  "ino": "77449608",
+  "mode": "0o644",
+  "historical_bytes_changed": false,
+  "standing": "historical diagnostic artifact; no authority or completion promotion"
+}

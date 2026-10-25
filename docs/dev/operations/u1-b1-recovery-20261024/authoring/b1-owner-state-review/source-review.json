@@ -1,0 +1,67 @@
+{
+  "standing": "BOUNDED_OWNER_STATE_SOURCE_REVIEW_ACCEPTED_NOT_FULL_SEMANTIC_OR_HOST_QUALIFICATION",
+  "source": "packages/authority/src/runtime/reconciliation-owner-state.ts",
+  "source_sha256": "b59cce447c545f2bcb8396d384dac39613ca87c1721d0f12e3e16345edb0d2b8",
+  "packet_sha256": {
+    "owner-state-checkpoint.json": "45fbde08e157a45d615cc26e885beac6197611fd64dc517dafd0348ee975703f",
+    "owner-state-order-amendment.json": "71f1dd131c023652cb4720310401216cee8f418d215502198b59a001621412ed",
+    "owner-state-interface.json": "44cc580bb6cc4586ca6ab4e4117d8a785ddc4ceb5fd8cef811acb76bb54aca7a"
+  },
+  "prior_review_sha256": "e3cdeb6ce5b94164fe41da6513a3bd265722a55a609f7973cc3a7b768a9de381",
+  "mapping_addendum_sha256": "711ff35813eaba00dc70bdde3fe7072c7605e7497024270997976930e01f9a0c",
+  "findings": [],
+  "source_review_conclusions": [
+    "Descriptor-safe exactsixfieldcopy, plain/null arrays with exactdense own enumerable dataindices, Proxy/symbol/getter/extra refusal, perfile/aggregate charge precede decode. Existingcodec owns intrinsiccopy/shared/detached refusal.",
+    "Actualcanonicaldecode/MACverification followed by rawwhole JCS+LFdigest references. Approval ties issuer/repo/worktree/host; allother linkedrecords exactoriginalapproval/scope/issuer digests. Issuerinstallationclock excluded.",
+    "Grantsequence contiguous andexactprevioushash; revocationterminal. Grantcurrentness fences on intents/completions/lease close stalegrant gaps; everyedge enforces sameapprovalboot/source, nondecreasingwall/ns and<=2s disagreement.",
+    "Renewal suffix/remaining/completion/resumable assertions add exactbeforeedges, and bounded topological walk refuses cycles. Uniquephase/no gaps and atmostoneuncompletedintent hold independent inputorder.",
+    "Samegrant newintent/retry leases permitted; crossgrant only exactrenewalresumable. Leasegrantcreation must be permitted andbefore both signeddeadlines; completedlease remnant has lease<completion edge, proves noPIDownership.",
+    "Assessment compares observedclock to everylinkedhistoryclock, classifies signedshortdeadline expiry/revocation asstatus, unknownfirstheld, completedonlycomplete, exactintentsettlementunderexpired/revoked and no duplicateconsumption.",
+    "Frozenstate/phaseentries and exactassessmentfields expose safehashes/metadata only. PrivateWeakMap retains nonissuer immutableverifiedrecords and graph, never issuerkey/rawbytes. Inputaliases cannot alter storedstate; forgedstateProxy refuses untouched.",
+    "No filesystem, SQLite, process, callerprovider, actualclockorigin, rootexport or effectauthority added by newmodule. Returnedgrants_authority alwaysfalse."
+  ],
+  "verification": {
+    "pass": 7,
+    "fail": 0,
+    "runner": "pnpm exec node scripts/process/validation-runner.mjs -- vitest run --config docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-owner-state-review/probe.config.mts --maxWorkers 1",
+    "log": "source-probes-final.txt",
+    "coverage": [
+      "Actualtiedrenewal/completion graph dispositions and no privateprojection",
+      "Newintentoriginallyunder null-resumable renewal with distinctsamegrant retrylease",
+      "Contradictory oldgrant intent+nullresumable renewal refuses even tied",
+      "Priorlease+completedintent crashremnant safe graph",
+      "Actualexistingschema+newreducer wrongphase/action refusal",
+      "Byteviewshadowgetter and forgedstateProxy touchzero; suppliedbytes mutation isolation",
+      "Currentobservation beforelatestlease refused"
+    ],
+    "oracle": "Existing independently authored codecfixture forms reused, with separately computed nativeHMAC/JCS+LF rawhash references for graph; actualproduction codec/state executed, no mockedvalidator. Puredata fixtures authenticate no host/namespace/installedorigin.",
+    "initial_harness_assumption": "6pass/1failed rejected enumonly hypothesis preserved as such, not productRED.",
+    "limits": "Bounded review probes only; does not discharge independentfullTENmatrix, alladversarial/bounds/clock scenarios or complete RC."
+  },
+  "remaining_gates": [
+    "P1Inspector independent fullstate graph/clock/hostileingress/TENretainedmatrix suite and unchangedcodec/clock regressions.",
+    "Root declaredsource tsc/lint/format gates separately; no build performed in reviewlane.",
+    "Native Ownerpublication/admission/leaseownership/liveness/recovery/currentactualscope+B5/outputdurability/ordinaryeffectauthority remain mandatory.",
+    "Actualpublic/installed/phase/index/staged/integration/release acceptance not claimed."
+  ],
+  "edits": "Ownedreviewevidence only. Originalsealeddesignreceipt, nativeprovision sources/receipts and all product/tests unchanged. No build/newagents.",
+  "evidence_sha256": {
+    "partial-order-probes.first-10.mjs.snapshot": "81c283e6b0e929616e270a670b645d9bd12d258bfaa93b6c1f8d3b8821c837fc",
+    "probe.config.mts": "9e1376d1ce94eb7795215fd897fa78b177c6ffc859f5fd2dac4c21d69e93b92b",
+    "source-probes-final.txt": "3543c2f8f64749ded9b85a950cecd49f36b21bbc494a4a0a5abe04cc9d9d8d0e",
+    "partial-order-results.json": "89bea7abeb87e74be3ed137c1fcb34a187a46fc68fa264710e4e07b84f20f24c",
+    "partial-order-probes.mjs": "2978faada42baa5babffc888d15b0891a751cb31441dc6f1167467737316e892",
+    "source-probes.initial-premise.test.ts.snapshot": "7e9190ac4bd3826b56f0da3ab7820e48492ef58a719676cdf177c987d4c49941",
+    "partial-order-results.first-10.json.snapshot": "25f656246c95fa5f96892ad750eb723c85055189c4ea902f3c4617e0f9828b56",
+    "mapping-addendum.json": "711ff35813eaba00dc70bdde3fe7072c7605e7497024270997976930e01f9a0c",
+    "source-probes.txt": "5d9122bde6916e3cde8d9fc02236c1c5cb61a8b0e8bf36bc26aabc2d53b4f9a7",
+    "review.json": "e3cdeb6ce5b94164fe41da6513a3bd265722a55a609f7973cc3a7b768a9de381",
+    "source-probes.test.ts": "38485bf17a089d9371eefd6f3ae73df1a046453a9d384c9df5d65163c40772d1"
+  },
+  "graft": {
+    "current_calls": 1,
+    "current_estimated_tokens_saved": 4153,
+    "cumulative_successful_calls": 24,
+    "cumulative_estimated_tokens_saved": 507589
+  }
+}

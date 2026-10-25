@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-host-context-inspector/dangling-namespace-red.txt","kind":"historical-transcript-custody-pointer","original_bytes":274,"original_bytes_changed":false,"original_sha256":"d2ae0a8a2e50c1eb3e8900a2d28f6aa5e256645a0e7717ba7bb595a25d53a63c"}

@@ -1,0 +1,22 @@
+{
+  "standing": "ACTUAL_TASK_LINKED_WORKTREE_READONLY_OBSERVATION_NOT_ACTION_AUTHORITY",
+  "source_sha256": "7cfcf6a1f504698a11ec40d1cf08fde86038ec389e5df3964caa5c7b61d3a54d",
+  "dist_sha256": "605ac8cb6e76343fd4bd17ef2f0de1e7a0659b2bdd4c25112624999d8638b1a7",
+  "identity": {
+    "schemaVersion": "1.0.0",
+    "kind": "reconciliation-host-context",
+    "repository_id": "devai",
+    "worktree_id": "wt-04eb841b17dfc63bdb241a2d3a7d053523918e6f4e4c9242",
+    "host_identity_sha256": "e9b593be3a1ae64726bdab7e7f1a0f01a1396144bea43c3040d959048b5d070f",
+    "head": "2df84159caabf869b866fb2a05e5b06be83295fb",
+    "object_format": "sha1",
+    "merge_heads": []
+  },
+  "clock": {
+    "clock_source": "node-uv-hrtime-ns-v1",
+    "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+    "monotonic_ns": "592576830542291",
+    "wall_ms": 1792871738626
+  },
+  "disposed_code": "RECONCILIATION_HOST_CONTEXT_UNKNOWN"
+}

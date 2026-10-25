@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/public-reconciliation-contracts-first.txt","kind":"historical-transcript-custody-pointer","original_bytes":1823,"original_bytes_changed":false,"original_sha256":"bcee48bde0b5e4ef9359ac0106015fa848df871f7309897d534804ba213c537a"}

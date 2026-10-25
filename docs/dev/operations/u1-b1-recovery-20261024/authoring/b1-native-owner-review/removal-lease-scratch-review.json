@@ -1,0 +1,23 @@
+{
+  "kind": "independent-bounded-design-review",
+  "verdict": "accepted-subject-to-deterministic-name-and-ownership-invariants",
+  "scope": "Explicit quarantine removal effects and per-attempt scratch derivation using existing signed lease fields; no Owner schema mutation",
+  "requirements": [
+    "Removal contract freezes exact same-directory quarantine grammar, count one, parent checks, rename/recheck/owned unlink or no-replace restore, uncertainty preservation and directory fsync. Existing ordinary remover behavior stays unchanged.",
+    "Attempt scratch/quarantine names are a domain-separated deterministic function of existing signed lease pid, 64-hex nonce, phase, logical target and purpose; exact algorithm is frozen in effect recipe.",
+    "If names retain UUIDv4 grammar, explicitly derive its bytes and force version/variant bits from authenticated fields. Arbitrary per-attempt extra metadata cannot be added to the closed lease schema.",
+    "New lease pid equals actual native process pid before writes; retained old authenticated lease bytes/hash allow old-attempt name reconstruction after ESRCH recovery.",
+    "Immutable output-plan hash continues binding domain output bytes and paths; a new lease may change only its deterministic per-attempt scratch addresses.",
+    "Authenticated intended name is not entry ownership. Cleanup still requires exact dev/ino/birth identity from trustworthy native/durable evidence; unknown crashed entries are preserved/refused, not inferred owned by pid, age, ESRCH or contents.",
+    "Removal of the actual authenticated lease file uses its observed verified file identity; this does not authorize removing other entries derived from that lease."
+  ],
+  "counterexamples": [
+    "Changed nonce/pid/target/purpose yields different bounded name and cannot retarget another attempt.",
+    "New lease with caller or dead pid refuses actual-process checks.",
+    "Valid authenticated old lease plus a foreign inode at derived scratch path never authorizes unlink.",
+    "Rename race preserves/restores foreign entries or reports uncertainty.",
+    "Resume retains original output-plan hash despite a new attempt lease.",
+    "Closed Owner lease schema rejects attempted extra scratch metadata fields."
+  ],
+  "qualification": "Design and existing schema/remover source inspection only; no new implementation or runtime qualification claimed."
+}

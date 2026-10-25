@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "1.0.0",
+  "status": "AUTHORIZED_INCOMPLETE",
+  "authorization_source": "Direct user instruction and active thread goal",
+  "authorization_text": "Thus, I GRANT YOU EXPRESS AUTHORIZATION TO PROCEED WITH ALL INTERNAL WORK AS LISTED. YOUR GOAL IS TO FINISH ALL SUCH FEATURES AND CHECKS AND IMPROVEMENTS AND PUBLISH THEM AS v2.8.0",
+  "release_version": "2.8.0",
+  "implementation_base": "2df84159caabf869b866fb2a05e5b06be83295fb",
+  "included": [
+    "DEVAI REC-B1-A contract and source-only catalogue companion",
+    "DEVAI REC-B1-A-P1 exact authority-policy preview and output boundary",
+    "DEVAI REC-U1 divergent-anchor recovery and independent assurance",
+    "DEVAI B1 reconciliation typed boundaries and staged admission",
+    "DEVAI internal build, binding, installed-package qualification and required validation",
+    "DEVAI source integration and v2.8.0 protected release process"
+  ],
+  "excluded": [
+    "DETRAN repository or operational effects",
+    "Downstream U1/B1 execution or adoption"
+  ],
+  "preservation": "Earlier packets, manifests and checks remain historical and unchanged. This additive authorization supersedes their DEVAI-only effect holds; it is not a validation receipt or proof of delivery.",
+  "publication_completion": "Requires exact candidate review and CI, protected RC and rehearsal, signed tag, immutable release and matching registry artifact readback."
+}

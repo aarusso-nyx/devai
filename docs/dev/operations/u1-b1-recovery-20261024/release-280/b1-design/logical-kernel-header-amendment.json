@@ -1,0 +1,17 @@
+{
+  "status": "INDEPENDENT300_TEST_DATA_KERNEL_GREEN_NO_EFFECT_AUTHORITY",
+  "checkpoint": "logical-kernel-checkpoint.json",
+  "sources": [
+    "packages/authority/src/types.ts",
+    "packages/authority/src/decision-plan.ts",
+    "packages/authority/src/runtime/policy-resolver.ts"
+  ],
+  "reproduced_findings": [
+    "A rejected new-kind id getter was still read by duplicate ID collection and legacy resourceValid fallback; four genuine regression failures preserved.",
+    "A rejected kind getter or Proxy could execute during dispatch before the qualified validator, including downstream duplicate/batch/publication traversal; eight genuine regression failures preserved."
+  ],
+  "fix": "Use a non-Proxy own data-property kind header before dispatch or downstream field reads. New-kind ID collection is guarded by its full qualified shape validator, and resourceValid returns that validator result immediately instead of falling through to legacy payload handling.",
+  "legacy_scope": "Ordinary JSON targets of all four historical kinds keep their behavior and original regression expectations. A Proxy, inherited or accessor kind header is refused as invalid data; it is not a fifth legacy resource form or a permission. No old assertion is removed or weakened.",
+  "authority": "No action, policy permission, selector kind, classifier branch, adapter dispatch or host/index effect is added. Continued classifier refusal and selector nonmatch remain mandatory.",
+  "evidence": "../../authoring/b1-kernel-inspector/"
+}

@@ -1,0 +1,93 @@
+{
+  "standing": "NATIVE_PROVISIONING_SOURCE_COMPONENT_VERIFIED_FULL_V280_GOAL_INCOMPLETE",
+  "recorded_at": "2026-10-24T21:47:34.254312+00:00",
+  "base_commit": "2df84159caabf869b866fb2a05e5b06be83295fb",
+  "scope": "Two-stage actual native reconciliation namespace/seed/whole-issuer provisioning through opaque operation bridge and ordinary authority receipts. Four product source paths, exact bounded namespace census, private publisher freshness guard; no public activation claimed.",
+  "inputs": {
+    "packages/authority/src/boundaries/reconciliation-host-provision.ts": "8c439589cdc0265681ed00a732e6ac0b4c2ab2ad6a520b87e57d2238e1a140b0",
+    "packages/authority/src/boundaries/reconciliation-host-namespace.ts": "44e2abbeb68f0b771e8f82e34d745bfc0435bf532cd2ae710118978339588484",
+    "packages/authority/src/boundaries/host-publish.ts": "b2aa704c775009240b624b4581339cebaec8bcd6f7f95fbf7e71eabf296e054a",
+    "packages/authority/src/index.ts": "9d665d51e73c550819c4c223b34e0d110eb3b5305e02758a754977d46359272c",
+    "packages/authority/tests/unit/reconciliation-host-provision.test.ts": "fd799ff4080ff7bc44963489aa288c0e5faeef164d36bd33e52f7a1073d79dc8",
+    "packages/authority/dist/boundaries/reconciliation-host-provision.js": "8a0fb0e261adc68c7cb7260149eb3f7bf5bd1ff19ab5dde69d0e24d2b8b3bcc3",
+    "packages/authority/dist/boundaries/reconciliation-host-namespace.js": "3bf6c37dc107d60defb2c892bbdda3363e5e25bd601621b3901f22eecf5029d6",
+    "packages/authority/dist/boundaries/host-publish.js": "4a2d5b90657212c33c2d25fd098b5e4e75415c4d04e37c7f38ba46340ff32cbc",
+    "packages/authority/dist/index.js": "95225e1cf8ca8b8c83ad9c3de3414bd09a3eee1ae6d837f0f6b0d29ede036bcc",
+    "docs/reference/error-codes.md": "970def534b24124e54d79673692824af7690ed46d07459ee6745f32b07415667",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/native-provision-checkpoint.json": "b5781dc107baee06410015fc031cd3372022ccd1c2234a1449a3115419dd149d",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/native-provision-interface.json": "1062f7f05db0d88505bac87fd0fc63d685bca53ba2e72003561a6dc2e485de0e",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/native-provision-namespace.json": "168d8bb1b1a438b7418c855213731ab1f7c472804dc72d143c7a53f46b811d81",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/native-provision-freshness-amendment.json": "029fbb5f8c487e1551e65ff4ea41b7ddeb30cf2bef0583184b0a697725af9a76",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/native-provision-census-amendment.json": "8ce2c612ead389a451ff537f53c684fe48d620e2ec10fd336c0b62839d9cc6e0"
+  },
+  "verification": {
+    "unique_passing_cases": 420,
+    "new_provisioning_cases": 42,
+    "unchanged_regression_cases": 378,
+    "qualification_runs": {
+      "broader_run": {
+        "pass": 413,
+        "fail": 1,
+        "files": 8,
+        "failure": "Resume test wrapper destructuring oracle, not product failure; historical log preserved."
+      },
+      "follow_on": {
+        "pass": 7,
+        "fail": 0,
+        "scope": "Corrected existing resume test plus six new signed census cases.35 passed provision cases and378 regressions not rerun."
+      }
+    },
+    "full_workspace_typecheck": "PASS",
+    "source_test_eslint": "PASS",
+    "source_test_prettier": "PASS",
+    "root_private_and_ordinary_publication_regression": {
+      "passed": 41,
+      "files": 3
+    },
+    "actual_native_process_contention_and_self_sigkill": "PASS; no raw anchor open/close inside successful lock window; exact seed unchanged",
+    "late_HEAD_and_B5_fsync_drift": "PASS exact terminal indeterminate; no issuer link; original precursor preserved",
+    "current_bounded_census_review": {
+      "passed": 2,
+      "failed": 0
+    },
+    "frozen_input_hashes_verified": 15,
+    "independent_evidence_hashes_verified": 30,
+    "current_review_evidence_hashes_verified": 4,
+    "prior_sealed_receipts_byte_exact": 6,
+    "old_regression_test_hashes_byte_exact": 7,
+    "ordinary_publisher_and_hooks": "AST getText SHA identical to HEAD; private publisher intentionally adds fixed verifyPrepared guard",
+    "error_reference": {
+      "current_count": 1303,
+      "sha256": "970def534b24124e54d79673692824af7690ed46d07459ee6745f32b07415667",
+      "remove_exact_four_new_rows_reconstructs_1299_sha256": "4e944a0c52bf8d0ea1594f68a882ff5f9699e902e0b3849cad1eb23fd5099955"
+    },
+    "independent_public_index_artifacts_verified": 31
+  },
+  "artifacts": {
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-inspector/receipt.json": "2c2e28976692f76c26967924802b3186e9e083fa56044b7ef7e75e7ae6499e1f",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-inspector/final-input-verification.json": "f525a7fbeaddff2e8e8fa15539e690df9a4ddc76e27114e15d1429fa27729dc3",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-review/source-review-census-final.json": "cec5c09146922a686361d1911e52698800e810ac1ed8221ca00a41e1e8ace86e",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-review/source-review.json": "0077d31c767da4488ad25c78b27cd57c3642f3646deffe7fe08aaaed1d126ee5",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-review/census-review.json": "decb97f289454d8e244365fa6aac8a07bd7109cc9b4fb766a3e91f2c3ce8bc49",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/provision/root-input-verification.json": "ac8c48fda7367412a6eb408eead94ef722fda5a100caaeb29b4ac7ecf97ff088",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/provision/ordinary-publication-identity.json": "f03391984479154d085b624d58fd44dfbd313d72c770bea90426ed8ae45c2092",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/provision/private-publication-regression.txt": "b6c919e2ae2a294779862f1a9d140218b5959dbfa4223e671e1216a8034923b8",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/provision/graft-build.txt": "22f6fcee5de958afd7993dc9b19ba9016f282454fb167a4c5fb0dc9665b7c5e1",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-inspector/index.json": "cf3dd37fd23d39289fda1c9b2bf97fd6b6e3f60b2754e4aaa51f66443e8281c7"
+  },
+  "historical_evidence": "Authentic late-drift RED, enumeration observation and earlier test-oracle failures preserved with their exact original scope/hashes. Final native census source is current44e2; older4probe review historicalnamespace and separate current provision tests are distinguished.",
+  "private_artifacts": "Original first failure rawlog contains disposable fixture issuer material; preserved0600,gitignored,excluded from public evidence map. Public redacted view retained. Product READY/results did not emit private material.",
+  "qualification_limits": [
+    "Actual Darwin arm64 Node24.22/libuv1.52.1 filesystemtype26 only",
+    "B5 and TTY synthetic fixture origin; actual installed/public originalargv/TTY/B5 qualification remains required",
+    "Native lock/process and owned crash fixture evidence is not general VFS/power-loss qualification",
+    "Signed census verifies structural/MAC consistency only, not Owner grant or phase eligibility"
+  ],
+  "remaining": [
+    "Owner lifecycle/review, exact grant graph/phase intent matrix, native admitted lease/recovery and phase custody",
+    "Readonly plan/source contracts, full preserved histories/canonical selection, real one-entry index CAS, seven-body staged integration",
+    "Public action/output/registry/capability/defaultpolicy activation, actual installed/runtime qualification and supported bindings refresh",
+    "Clean candidate, affected checks, independent integration review/exact-head CI, protected RC/rehearsal/signing/immutable publication and release/registry readback"
+  ],
+  "authorization": "Express full internal v2.8.0 goal remains active; DETRAN/downstream effects excluded."
+}

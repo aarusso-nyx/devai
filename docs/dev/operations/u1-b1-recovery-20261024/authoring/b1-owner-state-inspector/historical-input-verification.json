@@ -1,0 +1,18 @@
+{
+  "seven_sealed_receipts_unchanged": {
+    "b1-admission-inspector/receipt.json": "0952e1aa22d462e23f771fad5ff8cc1a6dfe52ce600f92215dcc30537fb0b9b5",
+    "b1-clock-inspector/receipt.json": "a60f14928b1ebd097edba8be5fec58593973de87a4f1eef5240c4b89193b9ef8",
+    "b1-owner-record-inspector/receipt.json": "f38b19733d0dea9374855c8d1f21c88146a50f9ff9bf370b12d819a19c915436",
+    "b1-host-context-inspector/receipt.json": "2d5af14f7636c7376e0f1ebe3df88227395df4c6234de3df9fe3285091e3fa1d",
+    "b1-typed-boundary-inspector/receipt.json": "240d44807b3e8df351dc3f25ac1f9cb3070f4d31b935aa7c12bb035ab6ec4b1f",
+    "b1-host-operation-inspector/receipt.json": "ab95cc5580904ef80de5ab7af57683fa8bcb97433f4dd9204cbc348cf1cc0f4a",
+    "b1-provision-inspector/receipt.json": "2c2e28976692f76c26967924802b3186e9e083fa56044b7ef7e75e7ae6499e1f"
+  },
+  "selected_unchanged_test_sha256": {
+    "packages/authority/tests/unit/reconciliation-owner-record.test.ts": "201be15666d9235268feafc446ecdf9c6facb39f2e91da99ca211f836c07e31b",
+    "packages/authority/tests/unit/reconciliation-clock.test.ts": "4d11893a95b7fec182794892df3b3fd737ff23da3b7dcfef8dcbd369dcf4689b",
+    "packages/cli/tests/unit/reconciliation-error-codes.test.ts": "0da439cf541f019cb07ce795c133020bcfd88f5d38c86e97e4768a5ce1397ac3",
+    "packages/cli/tests/unit/error-code-reference.test.ts": "55135e318935a28fe1722fb099e14d90aded8e1e445ba5616844a726c22ceb0f"
+  },
+  "authority_root_export_unchanged_from_native_provision_packet": true
+}

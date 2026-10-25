@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/inspector/constitutional-transition-tests.txt","kind":"historical-transcript-custody-pointer","original_bytes":2752,"original_bytes_changed":false,"original_sha256":"70d300de659b28bfbe92ed9ca39a3be89ddc1fd5d3d39b8e46554f6334430848"}

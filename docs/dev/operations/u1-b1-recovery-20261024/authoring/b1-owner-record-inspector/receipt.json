@@ -1,0 +1,121 @@
+{
+  "standing": "OWNER_RECORD_CODEC_INDEPENDENT_GREEN_NOT_TRUSTED_HOST_OR_AUTHORITY",
+  "recorded_at": "2026-10-24T19:29:29.528624+00:00",
+  "result": {
+    "passed": 255,
+    "failed": 0,
+    "owner_record_cases": 145,
+    "unchanged_clock_cases": 86,
+    "unchanged_error_reference_cases": 24,
+    "raw_log": "independent-final.txt",
+    "duration_seconds": 3.95,
+    "command": "node scripts/process/validation-runner.mjs -- node_modules/.bin/vitest run --config tests/config/local.config.ts --maxWorkers 1 packages/authority/tests/unit/reconciliation-owner-record.test.ts packages/authority/tests/unit/reconciliation-clock.test.ts packages/cli/tests/unit/reconciliation-error-codes.test.ts packages/cli/tests/unit/error-code-reference.test.ts"
+  },
+  "checks": {
+    "fullworkspace_typecheck": "PASS",
+    "typecheck_command": "pnpm run typecheck",
+    "typecheck_log": "typecheck-final.txt",
+    "test_eslint": "PASS",
+    "test_prettier": "PASS",
+    "test_diff_check": "PASS",
+    "no_skips_timeouts_thresholds_or_assertions_relaxed": true,
+    "live_process_handles": []
+  },
+  "sha256": {
+    "packages/authority/src/runtime/reconciliation-owner-record.ts": "fd7d944ce09f640ff4040abeae090ad8b694b55e3e285feb46ea59650735cbda",
+    "packages/authority/tests/unit/reconciliation-owner-record.test.ts": "201be15666d9235268feafc446ecdf9c6facb39f2e91da99ca211f836c07e31b",
+    "law/schemas/reconciliation-owner.schema.json": "39002520c0ffa410ef41a9caf34d16af123b9bc88f0ab1e426deaf70af284344",
+    "packages/schemas/src/roster.ts": "45602a26e54b0240a29eca0e52c6e7254cd4508f79990ee1298194deb07e2e4b",
+    "packages/schemas/dist/schemas/reconciliation-owner.schema.json": "39002520c0ffa410ef41a9caf34d16af123b9bc88f0ab1e426deaf70af284344",
+    "docs/reference/error-codes.md": "542a8002916715801dec36c4894e9e9444e6e44ed4db9f088c815b2861c54ab6"
+  },
+  "contract_sha256": {
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/owner-schema.candidate.json": "39002520c0ffa410ef41a9caf34d16af123b9bc88f0ab1e426deaf70af284344",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/owner-record-codec-checkpoint.json": "40fcc553a75e9d625e381520d8a8fc7c5c139ced901f6dd697f9b79ebc2b2b1f"
+  },
+  "actual_schema": "Actual fixed getValidator registry and built/staged schema are exercised by codec calls. No caller-injected validator/schema or stand-in crypto. Law schema bytes equal independently reviewed candidate39002520... exactly. Independent schema/meta/population tests belong to separate Inspector lane and are not counted here.",
+  "crypto_oracles": {
+    "seven_variants": "Locally authored fixtures use independent native Node crypto HMAC over trusted UTF8(domain)+NUL+locally ordered fixture JSON; no product canonicalJson/codec result supplies expected MAC/bytes.",
+    "known_vector": "independent-revocation-vector.json generated with Python stdlib hashlib/hmac and sorted compact ASCII-key JSON, literal MAC/rawSHA/size pinned in test.",
+    "fixed_revocation_mac": "74f491ee2d51dc4e5532e48bd2db7392c16b76bf98bc0f6d5bcacf20e81566c1",
+    "fixed_revocation_raw_sha256": "31ad4d18a68ce12c83f8e78c491459db1cbfa8681bcbf0822ed5567852dcb5bb",
+    "fixed_revocation_size_bytes": 834,
+    "key_note": "Deterministic public disposable32-byte fixture key only; no product private key generated."
+  },
+  "qualified_cases": [
+    "All seven concrete variants independently signed, verified, encoded/decoded and summarized; HMAC domain/NUL framing and wrong key/MAC refusal.",
+    "Issuer own canonical key digest and acyclic provision context exact anchor/bindings/head bindings; unsigned mac omission; approval scope repository/worktree/phase/digest checks.",
+    "Exact declared1..900000ms deadlines, beyond2^53 nanosecond arithmetic,1ns disagreement and uint64 overflow refusal; ordered renewal remaining phases and phase-action-role/predecessor rules.",
+    "Canonical UTF8 JCS+LF ingress rejects duplicate keys, key order/whitespace/BOM/LF/exponent/decimal/escaped aliases, trailing data, invalid UTF8 and lone surrogates. NonASCII scalar UTF8 remains unnormalized.",
+    "Descriptors/Proxy/prototypes/toJSON/coercion/symbol/nonenumerable/__proto__/cycles, numeric aliases, array holes/extras and wrong data classes refuse without executing traps.",
+    "Actual typedarray/Buffer and subclass/subarray copying bypasses shadowed metadata, constructor/species and iterator hooks. Proxy/fake/nonUint8/shared/detached buffers refuse.",
+    "String/key/property/array/depth/node/cumulative byte budgets reject overlimits before schema; string/key/property/array/depth at-limit malformed records are INVALID rather than falsely LIMIT_EXCEEDED.",
+    "Deep frozen records and exact private-safe summary; nested input objects/arrays remain unfrozen and independently mutable; encoded views and decoded record do not retain mutable caller bytes.",
+    "Safe errors contain only closed codes and no cause/raw schema/parser/key/payload diagnostics. Summary includes no key/key digest/MAC/clock/physical path/private bytes and grants_authority=false."
+  ],
+  "review_clarifications": [
+    "verify valid issuer using a different canonical key is MAC_INVALID like other kinds; only signing an issuer with mismatched supplied key is INVALID.",
+    "Byte-view prototype is not restricted like JSON records; actual nonProxy Uint8Array subclasses are accepted through captured intrinsics.",
+    "JSON parse yielding invalid data (e.g. negative zero or lone surrogate) is INVALID; canonical aliases of otherwise valid shape are ENCODING_INVALID.",
+    "Limit budgets apply during descriptor copy before schema, so oversized unknown-field data is LIMIT_EXCEEDED."
+  ],
+  "source_review": "Reviewed actual copy/byte ingress/semantic/HMAC/safe projection functions after independent145-case execution. No source defect found. Native admission is TYPE-only import; clock validation is runtime data validation. Fixed getValidator may lazily load packaged schema assets in development, so zero indirect IO or trusted asset origin is not claimed.",
+  "error_reference": {
+    "rows_before": 1284,
+    "rows_after": 1288,
+    "added_rows": [
+      "| `RECONCILIATION_OWNER_ENCODING_INVALID` | reconciliation owner encoding invalid | Stable diagnostic for reconciliation owner encoding invalid. | Follow the structured envelope remediation and retry only after its condition is satisfied. | per action: set by the surfacing envelope |",
+      "| `RECONCILIATION_OWNER_INVALID` | reconciliation owner invalid | Stable diagnostic for reconciliation owner invalid. | Follow the structured envelope remediation and retry only after its condition is satisfied. | per action: set by the surfacing envelope |",
+      "| `RECONCILIATION_OWNER_LIMIT_EXCEEDED` | reconciliation owner limit exceeded | Stable diagnostic for reconciliation owner limit exceeded. | Follow the structured envelope remediation and retry only after its condition is satisfied. | per action: set by the surfacing envelope |",
+      "| `RECONCILIATION_OWNER_MAC_INVALID` | reconciliation owner mac invalid | Stable diagnostic for reconciliation owner mac invalid. | Follow the structured envelope remediation and retry only after its condition is satisfied. | per action: set by the surfacing envelope |"
+    ],
+    "exact_delta_proof": "Removing exactly four OWNER rows reconstructs complete prior1284-row document hash.",
+    "reconstructed_prior_sha256": "5e9022868e703e0d65f33fa15522498008f47be0e2327d121c0afebb56e1c5d4",
+    "prefix_changes": false
+  },
+  "historical_receipts_verified_unchanged": {
+    "authoring/b1-admission-inspector/receipt.json": "0952e1aa22d462e23f771fad5ff8cc1a6dfe52ce600f92215dcc30537fb0b9b5",
+    "authoring/b1-admission-inspector/error-census-green-receipt.json": "a9e6283fff96f1681a3c8113d0a307d2f5ac4920876a2538843f5cc00385b6b2",
+    "authoring/b1-clock-inspector/receipt.json": "a60f14928b1ebd097edba8be5fec58593973de87a4f1eef5240c4b89193b9ef8"
+  },
+  "history": [
+    {
+      "log": "structural-red.txt",
+      "passed": 1,
+      "failed": 1,
+      "meaning": "Actual runtime module absent before implementation; seven candidate variants independently retained."
+    },
+    {
+      "log": "independent-first.txt",
+      "passed": 139,
+      "failed": 0,
+      "meaning": "First actual frozen source behavior; no product defect found."
+    },
+    {
+      "log": "independent-expanded.txt",
+      "passed": 145,
+      "failed": 0,
+      "meaning": "Added source nonfreezing/deep-copy and at-limit budget classification cases, same frozen source."
+    }
+  ],
+  "limitations": [
+    "A valid schema, signature or safe summary does not establish admitted key/namespace/package/asset origin, live clocks or action authority.",
+    "No OS clock read, native lock/exclusion, lease death/liveness, actual durable output or fsync is qualified by this isolated codec.",
+    "Actual trusted host bootstrap/operation handle, Owner lifecycle, immutable phase chain, real index/staged workflow and all action/policy/effect consumers remain required.",
+    "No installed public CLI, full B1 integration or protected release publication qualification.",
+    "DETRAN and downstream execution excluded."
+  ],
+  "graft": {
+    "calls": 1,
+    "tokens_saved_estimate": 47254
+  },
+  "evidence_sha256": {
+    "independent-expanded.txt": "7021152c35bde2516a393e0af919fe339923ac025b2226083b570abcd7eb7c2d",
+    "independent-final.txt": "01596a014eb281c17d32d7fa8b9e961c7f1e00e7bed1c56c920f7c2af9e14959",
+    "independent-first.txt": "3072e8a2436cd02bc8fed1d988a303834cf8920ef27bc1aaf4d9e514be72a02b",
+    "independent-revocation-vector.json": "f0b13c26d79b9a6b397a6bb0a3d3ca366a66ad642285f536d0807a5b9e6cb6cf",
+    "structural-red-receipt.json": "3bd6ec03d45a16d07a8a99f705cb330e5143b13f50079194202003c9e4ccd896",
+    "structural-red.txt": "f998e5c30cf99eb4b103d65d0452010d503435c904f3d5a6c80c1cee0037bbe1",
+    "typecheck-final.txt": "3801203c7d9e4544ad471c57f0ab2386897e4413121a6c6be2a61c5af2fd37fb"
+  }
+}

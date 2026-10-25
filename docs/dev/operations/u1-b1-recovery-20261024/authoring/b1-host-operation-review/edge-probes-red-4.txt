@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-host-operation-review/edge-probes-red-4.txt","kind":"historical-transcript-custody-pointer","original_bytes":4397,"original_bytes_changed":false,"original_sha256":"14df1448c323371fce7ea2a36de69ee82d0dfdd263a20575b92ab5966d6d12af"}
