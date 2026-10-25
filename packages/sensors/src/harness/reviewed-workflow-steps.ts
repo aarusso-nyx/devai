@@ -1039,12 +1039,12 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
     files: [],
   },
   {
-    sha256: '85f06d044c4d7796cb563905a972ec1a822a1337c7d05caa8cab0d8fc0d1ce7b',
+    sha256: 'a591f99b475a04387ff1a3f2bc8773b2a46e1bf63fe8d9c4ff2e2e20bc081534',
     effect: 'read-only',
     workflow: 'pull-request-checks.yml#native-apfs[2]',
     step: 'Compile the native qualification dependencies',
     review:
-      'ADR-CHK-0010: exact native test qualification only; frozen install, dependency build, actual Darwin/APFS preflight and unchanged disposable provisioning/Owner tests, or runner report upload. No protected environment, adopter operation, repository mutation or publication.',
+      'ADR-CHK-0010: exact native test qualification only; logs the default system Git capability, selects the installed Xcode 26.3 toolchain only on the disposable runner, and requires the exact stripped-environment native Git flags to succeed before frozen install and dependency build. No protected environment, adopter operation, source mutation or publication.',
     files: [
       {
         path: 'package.json',
