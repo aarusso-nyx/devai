@@ -59,10 +59,11 @@ export default defineConfig({
     passWithNoTests: false,
     // A full 2.6 RC took 20.4 minutes on an eight-core, 16 GB host with 9.54 GB of swap;
     // unrelated late TypeScript scans slowed 6-10x during shared-host memory pressure.
-    // Cap this lane at three workers to bound concurrent compiler and subprocess pressure.
-    // The fresh full RC validates this resource choice against the unchanged 30-minute
-    // task guard, complete test population, and coverage thresholds.
-    maxWorkers: Math.min(MAX_TEST_WORKERS, 3),
+    // The full B1 RC used 5,162 of three workers' 5,400 available worker-seconds
+    // before its 30-minute task guard, with the suite still unfinished.
+    // Permit at most four workers, retaining the existing shared host-size bound.
+    // A fresh full RC must validate this choice with every test and threshold.
+    maxWorkers: Math.min(MAX_TEST_WORKERS, 4),
     coverage: {
       provider: 'custom',
       customProviderModule: resolve('tests/config/subprocess-v8-coverage-provider.ts'),
