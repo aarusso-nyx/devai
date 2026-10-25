@@ -26,6 +26,20 @@ inspector_acceptance:
 
 # Required native APFS qualification supplements the two Linux check partitions
 
+## Status
+
+Accepted for the bounded DEVAI maintainer qualification change on 2026-10-25.
+This record supplements ADR-CHK-0007 and preserves all earlier record bytes.
+Qualification does not establish publication or authorize DETRAN adoption.
+
+## Context
+
+The protected reconciliation namespace is qualified only on Darwin/APFS. Running its
+positive fixtures on the two Ubuntu partitions produces the intended unsupported-host
+refusal rather than a native qualification. The existing workflow shape, analyzer and
+economy rules must agree on the exact supplemental native job while preserving their
+ordinary refusals and both original Linux partitions.
+
 ## Decision
 
 ADR-CHK-0007 retains the two disjoint Linux plan partitions and their report ownership.
@@ -63,3 +77,34 @@ change, an adopter configuration option, or proof of repository identity. A work
 or executed-file edit needs a fresh exact review and pin update. Every other macOS
 reference on a pull request retains the existing hard refusal. The analyzer also
 binds the actual workflow path; an identical copy elsewhere gains no native admission.
+
+## Alternatives Considered
+
+Expanding the production filesystem guard to Linux would change the qualified runtime
+contract and is outside this correction. Skipping native positives without a required
+qualified job would remove evidence. A configurable macOS exemption would permit
+unreviewed jobs; the exact reviewed workflow and executed-file pins are narrower.
+
+## Affected Rules
+
+- `.github/workflows/pull-request-checks.yml`
+- `scripts/check-workflows.mjs`
+- `scripts/run-native-apfs-tests.mjs`
+- `packages/sensors/src/harness/workflow-parser.ts`
+- `packages/cli/src/commands/check/ci-economy.ts`
+- `docs/adopters/ci-economy.md`
+
+## Inspector Adversarial Acceptance
+
+- IA-001: retain both Linux partitions, every historical native assertion and their
+  original report ownership.
+- IA-002: require the exact candidate on the real Darwin/APFS host, supported Node/libuv,
+  successful native execution and a report with zero skipped cases.
+- IA-003: reject absent, optional, conditional or softened qualification, bypass shells,
+  missing native success guards and incomplete original partition reports.
+- IA-004: unsupported hosts refuse without typed effects or changed fixture inventory;
+  the Linux stale-boot fixture faults the actual read.
+- IA-005: economy rejects copied paths, altered workflow bytes and missing, changed or
+  symlinked executed files. The analyzer keeps its historical same-byte, contained-file
+  realpath closure; its workflow source is physically bound and may refuse without a
+  sensor reading. Preserve the general lexical economy rule and historical ADR records.

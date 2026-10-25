@@ -234,7 +234,7 @@
     "digest_algorithm": "sha256",
     "canonical_form": "utf8-rfc8785-jcs-of-entries-array-in-utf8-path-order",
     "ordering": "utf8-bytes-ascending-by-path",
-    "catalog_digest_sha256": "d3683e5601dd61553d7a13e63708d51cfd2cb5fbe2d825f4daf436d7d1a07b4f",
+    "catalog_digest_sha256": "0bea69ee6554bd22f74a450c2660db3db4bf50593d566ce1632816cfe102553a",
     "entries": [
       {
         "path": "ADR-014-release-verification-profiles.md",
@@ -296,7 +296,7 @@
       },
       {
         "path": "README.md",
-        "sha256": "1b8971917f74470fc643b65f1032e62ee15a6a22c7f16dd1e36d00906c620474",
+        "sha256": "968b61601de5639c274845b8d984443a707e14feb5bd650812ce79ed608abc6d",
         "disposition": "non-record",
         "reason": "Generated decision catalogue rendered by renderDecisionIndex from the record frontmatter (ADR-GOV-0021). It is not a decision record and carries no identity; each regeneration re-pins this digest."
       }
