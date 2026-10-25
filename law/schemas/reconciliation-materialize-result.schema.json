@@ -237,5 +237,28 @@
     "grants_authority": {
       "const": false
     }
-  }
+  },
+  "examples": [
+    {
+      "kind": "reconciliation-materialize-result",
+      "approval_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "plan_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "outcome": "indeterminate",
+      "custody": {
+        "approval_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "plan_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "owned": [],
+        "grants_authority": false,
+        "outcome": "indeterminate",
+        "intent_sha256": null,
+        "completion_sha256": null,
+        "outputs_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "kind": "reconciliation-custody-result",
+        "phase": "01",
+        "object_count": 1
+      },
+      "selection": null,
+      "grants_authority": false
+    }
+  ]
 }

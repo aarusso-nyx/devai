@@ -100,5 +100,19 @@
     "phase": {
       "const": "03"
     }
-  }
+  },
+  "examples": [
+    {
+      "approval_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "plan_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "owned": [],
+      "grants_authority": false,
+      "outcome": "indeterminate",
+      "intent_sha256": null,
+      "completion_sha256": null,
+      "outputs_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "kind": "reconciliation-index-result",
+      "phase": "03"
+    }
+  ]
 }

@@ -137,5 +137,65 @@
     "grants_readiness": {
       "const": false
     }
-  }
+  },
+  "examples": [
+    {
+      "approval_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "plan_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "owned": [],
+      "grants_authority": false,
+      "outcome": "indeterminate",
+      "intent_sha256": null,
+      "completion_sha256": null,
+      "outputs_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "kind": "reconciliation-inventory-result",
+      "phase": "04",
+      "outputs": [
+        {
+          "path": "diagnostic/0.json",
+          "schema": "api-map.schema.json",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "bytes": 1
+        },
+        {
+          "path": "diagnostic/1.json",
+          "schema": "routes-inventory.schema.json",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "bytes": 1
+        },
+        {
+          "path": "diagnostic/2.json",
+          "schema": "routes-inventory.schema.json",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "bytes": 1
+        },
+        {
+          "path": "diagnostic/3.json",
+          "schema": "data-model-inventory.schema.json",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "bytes": 1
+        },
+        {
+          "path": "diagnostic/4.json",
+          "schema": "rbac-inventory.schema.json",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "bytes": 1
+        },
+        {
+          "path": "diagnostic/5.json",
+          "schema": "dep-graph.schema.json",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "bytes": 1
+        },
+        {
+          "path": "diagnostic/6.json",
+          "schema": "coverage-matrix.schema.json",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "bytes": 1
+        }
+      ],
+      "publishes_readings": false,
+      "grants_readiness": false
+    }
+  ]
 }

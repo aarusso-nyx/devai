@@ -491,5 +491,16 @@
         }
       }
     }
+  ],
+  "examples": [
+    {
+      "kind": "reconciliation-dead-lease-result",
+      "approval_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "plan_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "outcome": "cancelled",
+      "expected_lease_sha256": "ABSENT",
+      "lease_witness": null,
+      "grants_authority": false
+    }
   ]
 }
