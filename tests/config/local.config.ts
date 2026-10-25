@@ -53,6 +53,8 @@ export const RC_ONLY = [
  * complete-file quiet diagnostics passed without increasing a timeout or dropping a case.
  */
 export const SERIAL_LANE = [
+  'packages/authority/tests/unit/reconciliation-host-owner.test.ts',
+  'packages/authority/tests/unit/reconciliation-host-provision.test.ts',
   'packages/cli/tests/unit/authority-policy-review.test.ts',
   'packages/cli/tests/unit/check-adapters-acceptance.test.ts',
   'packages/cli/tests/unit/release-export-store-bundled-depth.test.ts',
