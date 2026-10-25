@@ -158,7 +158,7 @@ describe('check --affected plans test:sensors for a change to a pinned file alon
     return plan.tasks.map((task) => task.nodeId);
   }
 
-  it.each(['docs/site/package.json', 'package.json'])(
+  it.each(['docs/site/package.json', 'package.json', 'scripts/run-native-apfs-tests.mjs'])(
     'plans test:sensors when only %s changes',
     (path) => {
       expect(plannedFor(path)).toContain(NODE);

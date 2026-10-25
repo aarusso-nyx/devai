@@ -963,9 +963,21 @@ describe('remote preflight workflow', () => {
     expect(CHECKED_IN_PREFLIGHT).not.toContain('secrets.');
     expect(CHECKED_IN_PREFLIGHT).not.toContain('environment:');
     expect(CHECKED_IN_PREFLIGHT).not.toContain(LEDGER_ENVIRONMENT);
-    // ADR-CHK-0007 rule 11: the only uploads are the two partition reports the aggregator
-    // reads, artifacts of the same run; the lane uploads no evidence.
-    expect(CHECKED_IN_PREFLIGHT.match(/uses: actions\/upload-artifact@/gu)).toHaveLength(2);
+    // ADR-CHK-0007 retains exactly two partition reports. ADR-CHK-0010 adds one
+    // separately named native qualification report; none is release evidence.
+    const uploadJobs = (
+      parse(CHECKED_IN_PREFLIGHT) as {
+        jobs: Record<string, { steps?: { uses?: string; with?: { name?: string } }[] }>;
+      }
+    ).jobs;
+    const uploads = (job: string) =>
+      (uploadJobs[job]?.steps ?? []).filter((step) =>
+        /^actions\/upload-artifact@/u.test(step.uses ?? ''),
+      );
+    expect(['gate-cli', 'gate-rest', 'gate'].flatMap(uploads)).toHaveLength(2);
+    expect(uploads('native-apfs')).toHaveLength(1);
+    expect(uploads('native-apfs')[0]?.with?.name).toBe('devai-native-apfs-qualification');
+    expect(CHECKED_IN_PREFLIGHT.match(/uses: actions\/upload-artifact@/gu)).toHaveLength(3);
     expect(CHECKED_IN_PREFLIGHT.match(/^\s+name: devai-gate-report-(?:cli|rest)$/gmu)).toHaveLength(
       2,
     );
@@ -1040,8 +1052,8 @@ describe('remote preflight workflow', () => {
       name: 'optional required job if: false',
       mutate: (source: string) =>
         source.replace(
-          '    name: devai-release-gate\n    needs: [gate-cli, gate-rest]\n    if: always()\n',
-          '    name: devai-release-gate\n    needs: [gate-cli, gate-rest]\n    if: false\n',
+          '    name: devai-release-gate\n    needs: [gate-cli, gate-rest, native-apfs]\n    if: always()\n',
+          '    name: devai-release-gate\n    needs: [gate-cli, gate-rest, native-apfs]\n    if: false\n',
         ),
       diagnostic: 'CI_PREFLIGHT_GATE_INVALID',
     },
