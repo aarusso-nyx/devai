@@ -16,6 +16,7 @@ triggers:
 jobs:
   - gate-cli
   - gate-rest
+  - native-apfs
   - gate
 ```
 
@@ -33,23 +34,25 @@ as `DEVAI_PREFLIGHT_BASE` and check out the same candidate.
 
 The concurrency group is `<workflow name>-pr-<pull-request number>` under
 `pull_request` and `<workflow name>-mq-<queue head sha>` under `merge_group`, with
-`cancel-in-progress: true`. It covers all three jobs of a run. A new head of the same
+`cancel-in-progress: true`. It covers all four jobs of a run. A new head of the same
 pull request cancels the previous head's run, and no queue entry cancels another
 (ADR-CHK-0004).
 
 ## Jobs and their order
 
 The affected plan of one head is split across two partition jobs, and a third job
-aggregates their reports (ADR-CHK-0007 rule 11).
+aggregates their reports (ADR-CHK-0007 rule 11). The required native APFS qualification
+of ADR-CHK-0010 supplements those partitions without taking ownership of a plan node.
 
-| Job         | Check name           | Needs                   | Condition  | Runner          | Timeout    |
-| ----------- | -------------------- | ----------------------- | ---------- | --------------- | ---------- |
-| `gate-cli`  | `gate-cli`           | none                    | always     | `ubuntu-latest` | 20 minutes |
-| `gate-rest` | `gate-rest`          | none                    | always     | `ubuntu-latest` | 20 minutes |
-| `gate`      | `devai-release-gate` | `gate-cli`, `gate-rest` | `always()` | `ubuntu-latest` | 10 minutes |
+| Job           | Check name           | Needs                                  | Condition  | Runner          | Timeout    |
+| ------------- | -------------------- | -------------------------------------- | ---------- | --------------- | ---------- |
+| `gate-cli`    | `gate-cli`           | none                                   | always     | `ubuntu-latest` | 20 minutes |
+| `gate-rest`   | `gate-rest`          | none                                   | always     | `ubuntu-latest` | 20 minutes |
+| `native-apfs` | `native-apfs`        | none                                   | always     | `macos-15`      | 15 minutes |
+| `gate`        | `devai-release-gate` | `gate-cli`, `gate-rest`, `native-apfs` | `always()` | `ubuntu-latest` | 10 minutes |
 
 - `gate-cli` and `gate-rest` start together.
-- `gate` starts when both have finished, whatever their result, so a failed or
+- `gate` starts when all three have finished, whatever their result, so a failed or
   cancelled partition still reaches the aggregator and fails the required check.
 - Branch protection requires only `devai-release-gate`.
 
@@ -64,14 +67,25 @@ the same run.
 
 ## Secrets and variables each job reads
 
-| Job         | Secrets | Variables | Token                                                                                |
-| ----------- | ------- | --------- | ------------------------------------------------------------------------------------ |
-| `gate-cli`  | none    | none      | the job-scoped `GITHUB_TOKEN` is not read by any step                                |
-| `gate-rest` | none    | none      | the job-scoped `GITHUB_TOKEN` is not read by any step                                |
-| `gate`      | none    | none      | the job-scoped `GITHUB_TOKEN`, used only by `actions/download-artifact` for this run |
+| Job           | Secrets | Variables | Token                                                                                |
+| ------------- | ------- | --------- | ------------------------------------------------------------------------------------ |
+| `gate-cli`    | none    | none      | the job-scoped `GITHUB_TOKEN` is not read by any step                                |
+| `gate-rest`   | none    | none      | the job-scoped `GITHUB_TOKEN` is not read by any step                                |
+| `native-apfs` | none    | none      | the job-scoped token is not read by the native test command                          |
+| `gate`        | none    | none      | the job-scoped `GITHUB_TOKEN`, used only by `actions/download-artifact` for this run |
 
 Every checkout uses `persist-credentials: false`, so no credential survives the checkout
 step.
+
+## Native APFS qualification
+
+`native-apfs` checks out the exact candidate, installs the frozen dependencies and
+compiles the runner. It requires actual Darwin/APFS with the supported pinned Node
+and libuv runtime, then runs the full provisioning and Owner native test files. Its
+JSON report must contain both files, passing cases and zero skipped cases. The
+aggregator explicitly requires its result to be `success`; a skipped, failed or
+cancelled native job blocks the required check. It uses no protected environment.
+Linux still runs the portable population and the actual unsupported-host refusal.
 
 ## What each job runs
 
