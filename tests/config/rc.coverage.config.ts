@@ -7,7 +7,13 @@ if (process.env.DEVAI_DB_TESTS !== '1') {
     'CHECK_RC_DB_TESTS_REQUIRED: set DEVAI_DB_TESTS=1 and provide a reachable test database before running the RC gate',
   );
 }
-import { LOCAL_INCLUDE, MAX_TEST_WORKERS } from './local.config.js';
+import {
+  LOCAL_INCLUDE,
+  MAX_TEST_WORKERS,
+  NATIVE_HOST_LANE,
+  SERIAL_LANE,
+  commandLineExcludes,
+} from './local.config.js';
 
 interface ThresholdPolicy {
   coverage: {
@@ -35,6 +41,14 @@ if (reachable.schemaVersion !== '1.0.0' || reachable.sources.length === 0) {
 
 process.env['DEVAI_V8_SUBPROCESS_COVERAGE_DIR'] = resolve('scratch/coverage/rc-child-v8');
 
+const INCLUDE = [...LOCAL_INCLUDE, 'tests/e2e/**/*.test.ts', 'tests/regression/**/*.test.ts'];
+const EXCLUDE = [
+  '**/node_modules/**',
+  '**/dist/**',
+  'tests/regression/xref-resolver-performance.regression.test.ts',
+  ...commandLineExcludes(),
+];
+
 export default defineConfig({
   resolve: {
     alias: { '#runtime-core': resolve('packages/cli/src/runtime-core.ts') },
@@ -46,16 +60,11 @@ export default defineConfig({
     // Cases measured at 5-7 s alone (the bundled export-store lifecycle, newest-line evidence
     // recovery, release-intent receipt export) timed out at the former 15 s across three 2.2.0
     // certification attempts. 60 s matches the per-case hang guards of #330 and #346 (#246), and
-    // a genuine hang still surfaces far inside the 30-minute certification task limit. Only this
+    // a genuine hang still surfaces inside the certification task limit. Only this
     // lane changes; the local and other RC lanes keep their defaults.
     testTimeout: 60_000,
     hookTimeout: 60_000,
-    include: [...LOCAL_INCLUDE, 'tests/e2e/**/*.test.ts', 'tests/regression/**/*.test.ts'],
-    exclude: [
-      '**/node_modules/**',
-      '**/dist/**',
-      'tests/regression/xref-resolver-performance.regression.test.ts',
-    ],
+    exclude: EXCLUDE,
     passWithNoTests: false,
     // A full 2.6 RC took 20.4 minutes on an eight-core, 16 GB host with 9.54 GB of swap;
     // unrelated late TypeScript scans slowed 6-10x during shared-host memory pressure.
@@ -64,6 +73,42 @@ export default defineConfig({
     // Permit at most four workers, retaining the existing shared host-size bound.
     // A fresh full RC must validate this choice with every test and threshold.
     maxWorkers: Math.min(MAX_TEST_WORKERS, 4),
+    // Four mixed workers also exhausted that task guard and timed out nine native
+    // cases and one P1 process. Keep the same complete population and case guards,
+    // applying the already qualified local isolation before and after the parallel files.
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: 'RC coverage native host',
+          include: [...NATIVE_HOST_LANE],
+          exclude: EXCLUDE,
+          maxWorkers: 2,
+          fileParallelism: true,
+          sequence: { groupOrder: 0 },
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'RC coverage',
+          include: INCLUDE,
+          exclude: [...EXCLUDE, ...NATIVE_HOST_LANE, ...SERIAL_LANE],
+          maxWorkers: Math.min(MAX_TEST_WORKERS, 4),
+          sequence: { groupOrder: 1 },
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'RC coverage serial',
+          include: [...SERIAL_LANE],
+          exclude: EXCLUDE,
+          fileParallelism: false,
+          sequence: { groupOrder: 2 },
+        },
+      },
+    ],
     coverage: {
       provider: 'custom',
       customProviderModule: resolve('tests/config/subprocess-v8-coverage-provider.ts'),
