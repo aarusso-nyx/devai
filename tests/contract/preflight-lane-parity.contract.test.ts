@@ -374,9 +374,17 @@ describe('preflight lane parity (ADR-CHK-0001 IA-003)', () => {
     },
   );
 
-  it('runs only the two partition lanes and an aggregator that runs no check', () => {
+  it('retains only two partition lanes and the aggregator alongside exact native qualification', () => {
     const workflow = parse(readFileSync(WORKFLOW, 'utf8')) as Workflow;
-    const others = Object.keys(workflow.jobs ?? {}).filter((key) => !(key in PARTITION_JOBS));
+    expect(Object.keys(workflow.jobs ?? {})).toEqual([
+      'gate-cli',
+      'gate-rest',
+      'native-apfs',
+      'gate',
+    ]);
+    const others = Object.keys(workflow.jobs ?? {}).filter(
+      (key) => !(key in PARTITION_JOBS) && key !== 'native-apfs',
+    );
     expect(others).toHaveLength(1);
     expect(laneRunSteps(others[0]).map((step) => step.kind)).toEqual(['other']);
   });
