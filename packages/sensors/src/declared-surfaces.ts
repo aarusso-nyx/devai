@@ -220,6 +220,7 @@ function referencedActionIds(
   sourceReader?: InventorySourceReader,
 ): Set<string> {
   const referenced = new Set<string>();
+  if (sourceReader !== undefined && !sourceReader.exists(useCasesDir)) return referenced;
   let names: string[];
   try {
     names = (
