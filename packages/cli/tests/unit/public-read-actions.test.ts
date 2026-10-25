@@ -1,3 +1,4 @@
+import { expectCurrentActionIds } from './historical-action-catalogue.js';
 // Invariants: INV-DEVAI-001, INV-DEVAI-015, INV-DEVAI-017, INV-DEVAI-020
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ACTION_REGISTRY } from '../../src/generated/action-registry.js';
@@ -55,8 +56,8 @@ const expectedCatalog = ACTION_REGISTRY.map((entry) => ({
 }));
 
 describe('public read-action runtime seams', () => {
-  it('catalog actions returns the exact 69 current actions in canonical registry order', async () => {
-    expect(ACTION_REGISTRY).toHaveLength(69);
+  it('catalog actions returns the exact 74 current actions in canonical registry order', async () => {
+    expectCurrentActionIds(ACTION_REGISTRY.map((entry) => entry.action_id));
 
     const result = await run(['catalog', 'actions']);
     expect(result.exit, result.stderr).toBe(0);

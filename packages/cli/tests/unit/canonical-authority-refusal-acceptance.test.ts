@@ -1,3 +1,4 @@
+import { expectCurrentActionIds } from './historical-action-catalogue.js';
 // Invariants: INV-DEVAI-001, INV-DEVAI-015, INV-DEVAI-017, INV-DEVAI-020
 // Inspector acceptance: every current action reaches the production authority
 // pre-dispatch boundary and exposes its required refusal in both output formats.
@@ -622,11 +623,11 @@ describe('canonical production authority refusal acceptance', () => {
   });
 
   it('requires no declaration for reads and a declaration for every write-capable action', () => {
-    expect(current).toHaveLength(69);
+    expectCurrentActionIds(current.map((entry) => entry.name));
     const unbound = mkdtempSync(join(tmpdir(), 'devai-authority-unbound-'));
     try {
       for (const format of ['human', 'json'] as const) {
-        for (const entry of current) {
+        for (const entry of current.filter((entry) => entry.name !== 'evidence reconcile plan')) {
           const result =
             entry.effects === 'read'
               ? refusal(entry, ['--as-role', 'owner'], format)
@@ -653,6 +654,15 @@ describe('canonical production authority refusal acceptance', () => {
       }
     } finally {
       rmSync(unbound, { recursive: true, force: true });
+    }
+  });
+
+  it('requires Architect initiation for the read-only reconciliation plan', () => {
+    const entry = current.find((entry) => entry.name === 'evidence reconcile plan');
+    expect(entry).toBeDefined();
+    if (entry === undefined) throw new Error('reconciliation plan action missing');
+    for (const format of ['human', 'json'] as const) {
+      expectCode(refusal(entry, ['--as-role', 'owner'], format), 'AUTHORITY_HUMAN_ROLE_DENIED');
     }
   });
 

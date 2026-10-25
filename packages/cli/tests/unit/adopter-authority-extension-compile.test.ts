@@ -259,7 +259,7 @@ describe('adopter authority extension compiler: constitution gate', () => {
     );
   });
 
-  it.each(['1.0.2', '1.0.10', '1.1.0', '2.0.0'])(
+  it.each(['1.0.2', '1.0.10', '1.1.0', '1.2.0', '2.0.0'])(
     'admits the block under constitution %s',
     (version) => {
       expect(compile(REFERENCE_AUTHORITY, { constitutionVersion: version }).rules).toHaveLength(48);
