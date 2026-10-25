@@ -41,6 +41,8 @@ const declaredCodes = new Map([
   ['ACTIONS_LIST_OUTPUT_INVALID', 'contract-violation / 7'],
   // packages/cli/src/action-output.ts errorCode()/errorClass(): the wrapper's normalized codes.
   ['ACTION_GATE_FAILED', 'gate-fail / 3'],
+  // Reconciliation phase, Owner and provisioning output constructors.
+  ['ACTION_INFRASTRUCTURE_FAILURE', 'infrastructure / 6'],
   ['ACTION_INVOCATION_REFUSED', 'routing-authority / 2 (invalid-input / 4, infrastructure / 6)'],
   ['ACTION_OUTPUT_CONTRACT_VIOLATION', 'contract-violation / 7'],
   ['ACTION_PRECONDITION_UNSATISFIED', 'precondition / 5'],
