@@ -112,6 +112,19 @@ vi.mock('../../src/commands/evidence/facade.js', () => ({
   evidenceRender: harness.command('evidenceRender'),
   evidenceVerify: harness.command('evidenceVerify'),
 }));
+vi.mock('../../src/commands/evidence/reconcile.js', () => ({
+  evidenceReconcilePlan: harness.command('evidenceReconcilePlan'),
+}));
+vi.mock('../../src/commands/evidence/reconciliation-approve.js', () => ({
+  evidenceReconcileApprove: harness.command('evidenceReconcileApprove'),
+}));
+vi.mock('../../src/commands/evidence/reconciliation-phases.js', () => ({
+  evidenceReconcileMaterialize: harness.command('evidenceReconcileMaterialize'),
+  evidenceReconcileStageProof: harness.command('evidenceReconcileStageProof'),
+}));
+vi.mock('../../src/commands/sense/bootstrap-inventory.js', () => ({
+  senseBootstrapInventory: harness.command('senseBootstrapInventory'),
+}));
 vi.mock('../../src/commands/init/index.js', () => ({
   initApplyArchitect: harness.command('initApplyArchitect'),
   initApplyHarness: harness.command('initApplyHarness'),

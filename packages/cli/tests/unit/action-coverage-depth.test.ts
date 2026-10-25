@@ -44,12 +44,12 @@ describe('action coverage scope and discovery boundaries', () => {
     expect(result).toMatchObject({
       ok: false,
       scope: 'self',
-      registeredCount: 69,
-      inScopeCount: 69,
+      registeredCount: 74,
+      inScopeCount: 74,
       claimedCount: 0,
       orphanClaims: [],
     });
-    expect(result.unclaimed).toHaveLength(69);
+    expect(result.unclaimed).toHaveLength(74);
     expect(result.unclaimed).toContain('release publish');
     expect(result.unclaimed).toContain('sense inventory');
     expect(result).not.toHaveProperty('adopterFacingAuthorities');
@@ -186,7 +186,7 @@ describe('action coverage through check evaluates the detected repository kind',
     const { result } = await dispatchCoverage(value.root);
 
     expect(result.status).toBe('fail');
-    expect(result.value).toMatchObject({ ok: false, scope: 'self', inScopeCount: 69 });
+    expect(result.value).toMatchObject({ ok: false, scope: 'self', inScopeCount: 74 });
   });
 
   it('passes an adopter whose referenced action is claimed by an invariant', async () => {

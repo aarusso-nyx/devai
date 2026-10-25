@@ -269,7 +269,7 @@ describe('#264: the adopter migration manifest', () => {
   });
 
   it('declares the released 2.7.0 constitution 1.1.0 move as an Architect decision (ADR-GOV-0026)', () => {
-    const next = manifest.releases.at(-1);
+    const next = manifest.releases.find((release) => release.version === '2.7.0');
     expect(next).toMatchObject({ version: '2.7.0', status: 'released', date: '2026-10-23' });
     expect(next?.changes).toEqual([
       expect.objectContaining({

@@ -12,8 +12,11 @@ import { afterAll, describe, expect, it } from 'vitest';
 import * as policySupport from '../../src/authority/policy-support.js';
 import { buildTrustedAuthoritySources } from '../../src/authority/policy.js';
 import { canonicalRegistry, type RegistryEntry } from '../../src/define-command.js';
+import { expectCurrentActionIds, B1_ACTION_IDS } from './historical-action-catalogue.js';
 
 const ROOT = resolve(import.meta.dirname, '../../../..');
+const HISTORICAL_ROOT = resolve(import.meta.dirname, '../fixtures/pre-b1-2df84159');
+const historicalBytes = (path: string) => readFileSync(join(HISTORICAL_ROOT, `${path}.txt`));
 
 type ClassName = 'root' | 'test' | 'architecture';
 type ClassVerbs = Record<ClassName, readonly string[]>;
@@ -188,6 +191,44 @@ describe('IA-004: the class verb sets derive from the registry and are frozen', 
 
 // IA-005: no registry subject is widened. The three verbs that decide the matrix admit
 // exactly the roles they admitted at the R-0502 head.
+const historicalRegistry = JSON.parse(
+  historicalBytes('law/policy/action-registry.json').toString('utf8'),
+) as {
+  entries: Array<{
+    action_id: string;
+    handler: string;
+    path: string[];
+    status: RegistryEntry['status'];
+    profiles: RegistryEntry['profiles'];
+    effect: RegistryEntry['effects'];
+    authority: RegistryEntry['authority'];
+    description: string;
+    authority_contract_version: '1.0.0';
+    authority_contract: RegistryEntry['authority_contract'];
+    output_contract: RegistryEntry['output_contract'];
+    error_contract: RegistryEntry['error_contract'];
+  }>;
+};
+const historicalEntries: readonly RegistryEntry[] = historicalRegistry.entries.map((entry) => {
+  const current = entries.find((value) => value.name === entry.action_id);
+  if (!current) throw new Error(`historical action missing: ${entry.action_id}`);
+  return {
+    ...current,
+    name: entry.action_id,
+    handler: entry.handler,
+    path: entry.path,
+    status: entry.status,
+    profiles: entry.profiles,
+    effects: entry.effect,
+    authority: entry.authority,
+    description: entry.description,
+    authority_contract_version: entry.authority_contract_version,
+    authority_contract: entry.authority_contract,
+    output_contract: entry.output_contract,
+    error_contract: entry.error_contract,
+  };
+});
+
 describe('IA-005: the registered subjects of the matrix verbs are unchanged', () => {
   it.each([
     ['check', harness(['inspector'])],
@@ -243,13 +284,36 @@ const R0502_FILE_DIGESTS: ReadonlyArray<readonly [string, string]> = [
 // and the package extension grants those three actions typed git-ref authority.
 // The backlog add description declared its round tracking write (#306, #307): only the registry
 // and its generated view changed.
+const CURRENT_B1_FILE_DIGESTS: ReadonlyArray<readonly [string, string]> = [
+  [
+    'law/policy/action-registry.json',
+    'a478ebfa1b3bb92044abcf5475b40e49dd0a9566ca21b357c99d0f395da5dace',
+  ],
+  [
+    'packages/cli/src/generated/action-registry.ts',
+    '1e93e6eb5b707a30d53c220fe26436547d25f397e36cde23fa0fa8ca2661131b',
+  ],
+  [
+    'packages/effects-check/src/generated/action-catalog.ts',
+    '7b36a21fa60dd0a2e8707a7658b84997e637848f58e20577e059d7a773da261e',
+  ],
+  [
+    'packages/sensors/src/generated/action-kinds.ts',
+    'f6b113b84d8356232a4fbf23013f73f8696b486e1f79d596004aaf1411bb18fe',
+  ],
+];
+
 const FIXED_REPOSITORY_ID = 'devai-ia-005';
 const R0502_CORE_SOURCE_DIGEST = '18884489d6f36d21ff09f5578a2ae5fc5e49879b4cce715eb0ac0704235a6aa0';
 const R0502_PACKAGE_EXTENSION_DIGEST =
   '83eee5dda73173720a9eab0ada9e1b3ddf79e2f5ce3d0fcf5dc546e296765fe2';
 
-describe('IA-005: the registry, its views, the core rules, and devai-adopter-authority are byte-identical to R-0502', () => {
-  it.each(R0502_FILE_DIGESTS)('%s is byte-identical to 38a0a5df', (path, digest) => {
+describe('IA-005: preserve pre-B1 bytes and bound the current reconciliation delta', () => {
+  it.each(R0502_FILE_DIGESTS)('%s preserves the pre-B1 R-0502 bytes', (path, digest) => {
+    expect(createHash('sha256').update(historicalBytes(path)).digest('hex')).toBe(digest);
+  });
+
+  it.each(CURRENT_B1_FILE_DIGESTS)('%s matches the exact approved B1 bytes', (path, digest) => {
     expect(
       createHash('sha256')
         .update(readFileSync(join(ROOT, path)))
@@ -271,11 +335,74 @@ describe('IA-005: the registry, its views, the core rules, and devai-adopter-aut
       `${JSON.stringify({ name: FIXED_REPOSITORY_ID })}\n`,
     );
     const sources = buildTrustedAuthoritySources(
+      historicalEntries,
+      repo,
+      '0.0.0-test',
+      historicalBytes('law/constitution.md').toString('utf8'),
+    );
+    const current = buildTrustedAuthoritySources(
       entries,
       repo,
       '0.0.0-test',
       readFileSync(join(ROOT, 'law/constitution.md'), 'utf8'),
     );
+    expectCurrentActionIds(entries.map((entry) => entry.name));
+    const addedRuleIds = [
+      'core-evidence-reconcile-approve',
+      'core-evidence-reconcile-materialize',
+      'core-evidence-reconcile-stage-proof',
+      'core-sense-bootstrap-inventory',
+      'core-reconciliation-host-provision',
+    ];
+    expect(
+      current.immutableCore.rules
+        .filter((rule) => addedRuleIds.includes(rule.rule_id))
+        .map((rule) => rule.rule_id)
+        .sort(),
+    ).toEqual([...addedRuleIds].sort());
+    const oldRules = current.immutableCore.rules.filter(
+      (rule) => !addedRuleIds.includes(rule.rule_id),
+    );
+    const b1Ids: readonly string[] = B1_ACTION_IDS;
+    expect(
+      oldRules.map((rule) => ({
+        ...rule,
+        action_ids: rule.action_ids.filter((id) => !b1Ids.includes(id)),
+      })),
+    ).toEqual(sources.immutableCore.rules);
+    const expectedGroupAdditions: Readonly<Record<string, readonly string[]>> = {
+      'core-owner-product-root': ['evidence reconcile approve'],
+      'core-owner-product': ['evidence reconcile approve'],
+      'core-joint-glossary-root': ['evidence reconcile approve'],
+      'core-joint-glossary': ['evidence reconcile approve'],
+      ...Object.fromEntries(
+        [
+          'core-harness-state',
+          'core-harness-state-root',
+          'core-harness-worktrees',
+          'core-harness-worktrees-root',
+          'core-harness-inventory',
+          'core-harness-proofs',
+          'core-harness-proofs-root',
+        ].map((id) => [
+          id,
+          [
+            'evidence reconcile materialize',
+            'evidence reconcile stage-proof',
+            'sense bootstrap-inventory',
+          ],
+        ]),
+      ),
+    };
+    expect(
+      Object.fromEntries(
+        oldRules
+          .filter((rule) => rule.action_ids.some((id) => b1Ids.includes(id)))
+          .map((rule) => [rule.rule_id, rule.action_ids.filter((id) => b1Ids.includes(id))]),
+      ),
+    ).toEqual(expectedGroupAdditions);
+    expect(B1_ACTION_IDS).toHaveLength(5);
+    expect(current.provenance.additive_extensions).toEqual(sources.provenance.additive_extensions);
     expect(sources.repository_id).toBe(FIXED_REPOSITORY_ID);
     expect(sources.provenance.source_policy.digest_sha256).toBe(R0502_CORE_SOURCE_DIGEST);
     expect(sources.provenance.additive_extensions).toEqual([
