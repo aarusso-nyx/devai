@@ -2220,7 +2220,14 @@ export function jobEffectFacts(
   const nativeSteps = jobFields.get('steps');
   if (name === 'native-apfs' && nativeSteps?.kind === 'list' && nativeSteps.items.length === 5) {
     try {
+      const canonicalWorkflow = resolve(repoRoot, '.github/workflows/pull-request-checks.yml');
+      const sourceFiles =
+        workflowFile === undefined
+          ? listWorkflowFiles(repoRoot).filter((file) => readFileSync(file, 'utf8') === content)
+          : [workflowFile];
       nativeReviewedJob =
+        sourceFiles.length === 1 &&
+        resolve(sourceFiles[0] ?? '') === canonicalWorkflow &&
         readCandidateFile(repoRoot, '.github/workflows/pull-request-checks.yml').toString(
           'utf8',
         ) === content &&

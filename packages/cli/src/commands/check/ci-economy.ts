@@ -1,5 +1,6 @@
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { createHash } from 'node:crypto';
 import type { CAC } from 'cac';
 import { EXIT_FAIL, EXIT_PASS } from '@devai-nyx/utils';
 import { defineCommand } from '../../define-command.js';
@@ -18,7 +19,8 @@ import { PLANNING_LANE_PROFILE } from '../../services/check-runner/policy.js';
  *      for pull-request events, which a workflow that also runs on push to a
  *      protected branch needs (remote workflow posture).
  *   2. ci-economy.no-macos-on-pr — no macOS runner reference in any
- *      pull_request-triggered workflow (macOS bills 10×).
+ *      pull_request-triggered workflow (macOS bills 10×), except the exact
+ *      reviewed DEVAI maintainer native qualification (ADR-CHK-0010).
  *   3. ci-economy.no-triple-trigger — no workflow triggered by all three
  *      of pull_request + push + schedule. The single remote verifier has
  *      no scheduled product-validation lane.
@@ -47,6 +49,60 @@ import { PLANNING_LANE_PROFILE } from '../../services/check-runner/policy.js';
 
 const DEFAULT_REPO_ROOT = '.';
 const DEFAULT_WORKFLOWS_DIR = '.github/workflows';
+
+// ADR-CHK-0010: an exact reviewed maintainer contract, not an adopter opt-in.
+// Whole-workflow identity binds the four jobs, only native macOS reference,
+// unconditional qualification and mandatory native-success aggregator guard.
+// The executed-file pins preserve the native job's reviewed closure. Any edit
+// needs a new explicit review; no filename, job-name or YAML-shape exemption.
+const NATIVE_QUALIFICATION_PINS = [
+  [
+    '.github/workflows/pull-request-checks.yml',
+    '65e4b0cc7f1e144fb0fcba450594bfe80a7d9f3bad1a64f6b7f39697b5a2a037',
+  ],
+  [
+    '.github/actions/setup-node-toolchain/action.yml',
+    '3e220549f47d2d5d345a647dc2d06e7ab532fdcf11946efc70ea32d1ccb8abab',
+  ],
+  ['package.json', '5eadba4e197d13dd87970b745ed8054379524fcf8d94cd6248a4a12b6a41179b'],
+  [
+    'scripts/process/bootstrap-check-runner.mjs',
+    'cc2e1f307390ba7db8c0666a0a2ea15780d19c4657d8d3cd656d796b6a63e4e6',
+  ],
+  [
+    'scripts/process/validation-runner.mjs',
+    '97e9cd12bc4d6c1844af10d4474111bdb54ff1467deadecea308ecbf74926368',
+  ],
+  [
+    'scripts/run-native-apfs-tests.mjs',
+    '9b3920bc49f4692907c30365f867fad18c90277203118b3dddfc0b84d6d0c967',
+  ],
+] as const;
+
+function reviewedNativeQualification(
+  repoRoot: string,
+  directory: string,
+  file: string,
+  text: string,
+): boolean {
+  if (directory !== DEFAULT_WORKFLOWS_DIR || file !== 'pull-request-checks.yml') return false;
+  const digest = (bytes: string | Buffer): string =>
+    createHash('sha256').update(bytes).digest('hex');
+  if (digest(text) !== NATIVE_QUALIFICATION_PINS[0][1]) return false;
+  try {
+    const root = realpathSync(repoRoot);
+    return NATIVE_QUALIFICATION_PINS.every(([path, expected]) => {
+      const absolute = resolve(root, path);
+      return (
+        lstatSync(absolute).isFile() &&
+        realpathSync(absolute) === absolute &&
+        digest(readFileSync(absolute)) === expected
+      );
+    });
+  } catch {
+    return false;
+  }
+}
 
 export interface CiEconomyFinding {
   readonly ruleId: string;
@@ -370,13 +426,29 @@ export function checkCiEconomy(opts: CheckCiEconomyOptions): CiEconomyReport {
   );
 
   // ── Rule 2 — ci-economy.no-macos-on-pr (hard) ────────────────────────
-  const macosOnPr = facts.filter((f) => hasPrTrigger(f) && f.referencesMacos);
+  const nativeQualification = facts.filter(
+    (f) =>
+      hasPrTrigger(f) &&
+      f.referencesMacos &&
+      reviewedNativeQualification(
+        opts.repoRoot,
+        opts.workflowsDir ?? DEFAULT_WORKFLOWS_DIR,
+        f.file,
+        f.text,
+      ),
+  );
+  const macosOnPr = facts.filter(
+    (f) => hasPrTrigger(f) && f.referencesMacos && !nativeQualification.includes(f),
+  );
   findings.push(
     macosOnPr.length === 0
       ? {
           ruleId: 'ci-economy.no-macos-on-pr',
           severity: 'pass',
-          message: 'no macOS runner reference in any pull_request-triggered workflow',
+          message:
+            nativeQualification.length === 0
+              ? 'no macOS runner reference in any pull_request-triggered workflow'
+              : 'only the exact reviewed DEVAI native APFS qualification uses macOS on pull requests (ADR-CHK-0010)',
         }
       : {
           ruleId: 'ci-economy.no-macos-on-pr',
