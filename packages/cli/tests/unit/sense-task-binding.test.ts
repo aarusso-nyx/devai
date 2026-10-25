@@ -23,7 +23,12 @@ import {
   type AuthorityHostEffectScope,
 } from '@devai-nyx/authority';
 import { canonicalJson } from '@devai-nyx/utils';
-import { appendRecord, initChain } from '../../../evidence/src/evidence/chain.js';
+import {
+  appendRecord,
+  initChain,
+  loadChain,
+  verifyLoadedChain,
+} from '../../../evidence/src/evidence/chain.js';
 import {
   senseHarnessInvariantAlignment,
   buildSensorReading,
@@ -41,6 +46,7 @@ import { resolveSenseSelection } from '../../src/commands/sense/facade.js';
 import {
   executeSensorTask,
   attestNativeTaskExecution,
+  assertNativeSensorFilesystemTarget,
   matchDeclaredSensorTaskProcess,
   resolveSensorTaskBinding,
   type SensorTaskBinding,
@@ -1539,6 +1545,117 @@ function alignObligations(root: string) {
 }
 
 describe('exact declared invariant subject execution standing', () => {
+  const appendLock = 'record/proofs/chain.json.append.lock';
+
+  function attestWithLockGuard(
+    root: string,
+    measured: SensorReading,
+    instance: SensorReading,
+    inspectOrigin?: () => void,
+  ): string[] {
+    const requests: string[] = [];
+    const issuer = createAuthorityDecisionIssuer({
+      issuer_id: 'inspector-native-lock',
+      issuer_version: '1.0.0',
+      invocation_id: 'native-lock-test',
+      canonicalSha256: () => 'a'.repeat(64),
+      randomId: () => 'native-lock-receipt',
+      now: () => new Date().toISOString(),
+      receipt_ttl_ms: 30_000,
+    });
+    try {
+      runWithAuthorityHostEffects(
+        {
+          action_id: 'sense run',
+          invocation_id: 'native-lock-test',
+          effect: 'local-write',
+          receipt_store: issuer,
+          apply_effect(request, apply) {
+            if (request.kind === 'filesystem' && request.arguments[0] === join(root, appendLock)) {
+              const operation =
+                request.symbol === 'removeEntryIfIdentitySync' ? 'delete' : 'create';
+              assertNativeSensorFilesystemTarget(
+                root,
+                appendLock,
+                operation,
+                undefined,
+                request.symbol,
+              );
+              if (operation === 'create') inspectOrigin?.();
+              requests.push(request.symbol);
+            }
+            return apply();
+          },
+        },
+        () => attestNativeTaskExecution(root, measured, instance),
+      );
+      return requests;
+    } finally {
+      issuer.dispose();
+    }
+  }
+
+  it('admits only the owned native origin append lock operations', () => {
+    const root = obligationFixture();
+    const otherRoot = fixture();
+    const measured = execute(binding(root, 'unit_test'), nativeOutput(root)).reading;
+    const instance = resolveSensorReadingInstance(root, measured);
+    const before = loadChain(join(root, 'record/proofs/chain.json'));
+    expect(() =>
+      assertNativeSensorFilesystemTarget(
+        root,
+        appendLock,
+        'create',
+        undefined,
+        'publishFileNoReplaceSync',
+      ),
+    ).toThrow('AUTHORITY_NATIVE_SENSOR_PATH_REFUSED');
+    const requests = attestWithLockGuard(root, measured, instance, () => {
+      for (const [path, operation, symbol] of [
+        [appendLock, 'update', 'writeFileSync'],
+        [appendLock, 'rename', 'renameSync'],
+        [appendLock, 'create', 'writeFileSync'],
+        [appendLock, 'delete', 'unlinkSync'],
+        ['record/proofs/other.json.append.lock', 'create', 'publishFileNoReplaceSync'],
+        ['record/proofs/chain.json', 'delete', 'removeEntryIfIdentitySync'],
+        [`record/proofs/chain.json.tmp.${process.pid}.1`, 'delete', 'removeEntryIfIdentitySync'],
+      ] as const) {
+        expect(() =>
+          assertNativeSensorFilesystemTarget(root, path, operation, undefined, symbol),
+        ).toThrow('AUTHORITY_NATIVE_SENSOR_PATH_REFUSED');
+      }
+      expect(() =>
+        assertNativeSensorFilesystemTarget(
+          otherRoot,
+          appendLock,
+          'create',
+          undefined,
+          'publishFileNoReplaceSync',
+        ),
+      ).toThrow('AUTHORITY_NATIVE_SENSOR_PATH_REFUSED');
+    });
+    expect(requests).toEqual(['publishFileNoReplaceSync', 'removeEntryIfIdentitySync']);
+    expect(existsSync(join(root, appendLock))).toBe(false);
+    const chain = loadChain(join(root, 'record/proofs/chain.json'));
+    expect(verifyLoadedChain(chain).valid).toBe(true);
+    expect(chain.records).toHaveLength(before.records.length + 1);
+    expect(chain.records.at(-1)?.action).toBe('sense.task.execute');
+  });
+
+  it('preserves a foreign append lock and the chain without taking over', () => {
+    const root = obligationFixture();
+    const measured = execute(binding(root, 'unit_test'), nativeOutput(root)).reading;
+    const instance = resolveSensorReadingInstance(root, measured);
+    const before = readFileSync(join(root, 'record/proofs/chain.json'));
+    const foreign = JSON.stringify({ operation: 'foreign-lock', pid: process.pid });
+    writeFileSync(join(root, appendLock), foreign);
+    expect(() => attestWithLockGuard(root, measured, instance)).toThrow(
+      /SENSE_NATIVE_EXECUTION_ORIGIN_APPEND_FAILED:PROOF_ANCHOR_RECOVERY_REFUSED/u,
+    );
+    expect(readFileSync(join(root, appendLock), 'utf8')).toBe(foreign);
+    expect(readFileSync(join(root, 'record/proofs/chain.json'))).toEqual(before);
+  });
+
   it('refuses an invented final instance identity before issuing execution origin', () => {
     const root = obligationFixture();
     const observed = execute(binding(root, 'unit_test'), nativeOutput(root)).reading;
