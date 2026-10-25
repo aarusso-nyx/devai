@@ -14,11 +14,14 @@ affected_rules:
   - scripts/check-workflows.mjs
   - scripts/run-native-apfs-tests.mjs
   - packages/sensors/src/harness/workflow-parser.ts
+  - packages/cli/src/commands/check/ci-economy.ts
+  - docs/adopters/ci-economy.md
 inspector_acceptance:
   - IA-001 -- Both original Linux partitions retain their ownership and historical checks; only protected namespace positives require their actual qualified Darwin APFS host.
   - IA-002 -- The exact native-apfs job checks out the exact candidate, fails on an unsupported host, runs every native positive assertion with zero skipped cases, and exposes no protected environment or publication permission.
   - IA-003 -- The required aggregator runs under always(), requires both original partition reports and native-apfs success, and refuses missing, skipped, failed or softened native qualification.
   - IA-004 -- Unsupported actual hosts refuse provisioning with the exact existing code, no typed operation and unchanged fixture inventory; portable Linux context and stale-boot checks remain effective.
+  - IA-005 -- CI economy retains its general hard macOS-on-PR refusal; only exact reviewed workflow bytes and all five executed-file pins at canonical physical paths qualify. Other paths, copies, edits, aliases, defaults, optional jobs and changed or missing executable bytes refuse.
 ---
 
 # Required native APFS qualification supplements the two Linux check partitions
@@ -52,3 +55,11 @@ Other jobs, runners, transplanted steps, defaults and adopter-supplied reviews k
 their existing admission rules. Qualification steps use the default shell or exact
 `bash`; custom shells, workflow/job defaults and conditional setup cannot turn the
 required native command into a successful no-op.
+
+CI economy recognizes only this exact reviewed workflow profile. The approved whole
+workflow SHA-256 and five executed-file SHA-256 values bind the actual canonical,
+regular, non-symlink files and the analyzed text. This is not a general macOS rule
+change, an adopter configuration option, or proof of repository identity. A workflow
+or executed-file edit needs a fresh exact review and pin update. Every other macOS
+reference on a pull request retains the existing hard refusal. The analyzer also
+binds the actual workflow path; an identical copy elsewhere gains no native admission.
