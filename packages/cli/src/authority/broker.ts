@@ -1342,6 +1342,7 @@ export function createAuthorityHostBroker(input: BrokerInput): {
     },
     target: JsonRecord,
     apply: () => unknown,
+    effectSymbol?: string,
   ): unknown => {
     assertProtectedReleasePrepareCapacityEffect(issuer);
     assertProtectedReleaseExportCapacityEffect(issuer);
@@ -1354,6 +1355,7 @@ export function createAuthorityHostBroker(input: BrokerInput): {
           canonicalPath,
           String(target.operation),
           target.rename_from_canonical_relative_path,
+          effectSymbol,
         );
       if (
         constitutionBootstrap &&
@@ -1829,6 +1831,7 @@ export function createAuthorityHostBroker(input: BrokerInput): {
           },
           removal,
           removalApply,
+          request.symbol,
         );
       } finally {
         removalContainment = undefined;
@@ -1845,6 +1848,7 @@ export function createAuthorityHostBroker(input: BrokerInput): {
           },
           target,
           apply,
+          request.symbol,
         );
       } finally {
         const descriptor = request.arguments[0];
@@ -1859,6 +1863,7 @@ export function createAuthorityHostBroker(input: BrokerInput): {
       },
       target,
       apply,
+      request.symbol,
     );
     if (request.symbol === 'openSync' && typeof result === 'number') {
       descriptorTargets.set(result, target);
