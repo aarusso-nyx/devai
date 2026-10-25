@@ -1,6 +1,21 @@
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { hostname } from 'node:os';
+import { createRequire } from 'node:module';
+import { createAuthorityPolicyReview } from './policy-review.js';
+import { parseReconciliationHostInput } from './reconciliation-host-input.js';
+import { reconciliationPackageWitness } from './reconciliation-package-witness.js';
+import { parseAdopterPolicyBinding } from '../services/adopter-policy-binding.js';
 import { randomUUID } from 'node:crypto';
-import { existsSync, lstatSync, readFileSync, realpathSync } from 'node:fs';
-import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
+import {
+  existsSync,
+  lstatSync,
+  readFileSync,
+  readlinkSync,
+  realpathSync,
+  readdirSync,
+} from 'node:fs';
+import { basename, dirname, isAbsolute, join, resolve, relative } from 'node:path';
 import {
   authorizePolicyMaterialization,
   createAuthorityDecisionIssuer,
@@ -9,6 +24,14 @@ import {
   materializeAuthorityPolicy,
   resolveAuthorityDeclaration,
   resolveAuthorityPolicy,
+  createReconciliationHostInvocation,
+  createReconciliationObservation,
+  disposeReconciliationObservation,
+  disposeReconciliationHostInvocation,
+  reconciliationHostOperation,
+  reconciliationHostOperationSnapshot,
+  type ReconciliationHostOperation,
+  type ReconciliationInstallationBindings,
 } from '@devai-nyx/authority';
 import { createAuthorityBoundaryRuntime } from '@devai-nyx/authority';
 import { assertAuthorityPathCapability } from '@devai-nyx/authority';
@@ -16,6 +39,7 @@ import {
   applyAuthorityHostEffectsAtomically,
   mkdirSync,
   writeFileSync,
+  publishFileNoReplaceSync,
   type AuthorityHostEffectRequest,
   type AuthorityHostEffectScope,
   type AtomicAuthorityHostEffect,
@@ -38,11 +62,13 @@ import {
   type EvidenceRecord,
 } from '#runtime-core';
 import { resolveCanonicalConstitution } from '@devai-nyx/skills';
-import { validators } from '@devai-nyx/schemas';
+import { getValidator, validators } from '@devai-nyx/schemas';
 import type { RegistryEntry } from '../define-command.js';
 import { describeDeclaredCheckTaskRefusal } from '../services/check-runner/authority-process.js';
 import {
   buildTrustedAuthoritySources,
+  repositoryIdFor,
+  buildProspectiveAuthoritySources,
   canonicalBytes,
   canonicalSha256,
   sha256Bytes,
@@ -615,8 +641,268 @@ function readOnlyProcess(
   if (executable === 'sh' && args[0] === '-lc') {
     return typeof args[1] === 'string' && /^command -v (claude|codex)$/u.test(args[1]);
   }
+  // Same existing readonly diff, with exactly the invocation-local setting
+  // that suppresses Git's otherwise implicit index stat-cache refresh.
+  if (
+    executable === 'git' &&
+    args.length >= 3 &&
+    args[0] === '-c' &&
+    args[1] === 'diff.autoRefreshIndex=false' &&
+    args[2] === 'diff'
+  )
+    return true;
   const allowed = READ_ONLY_PROCESS_COMMANDS[executable];
   return allowed?.includes(String(args[0])) === true;
+}
+
+// The review snapshot is deliberately stricter than ordinary policy loading. It
+// admits only real contained files and an installed, self-contained runtime bundle.
+function reviewFile(root: string, path: string): JsonRecord {
+  const absolute = resolve(root, path);
+  if (!within(root, absolute)) throw new Error('AUTHORITY_POLICY_REVIEW_INPUTS_UNSUPPORTED');
+  let stat;
+  try {
+    stat = lstatSync(absolute);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { present: false };
+    throw error;
+  }
+  if (!stat.isFile() || stat.isSymbolicLink() || realpathSync(absolute) !== absolute)
+    throw new Error('AUTHORITY_POLICY_REVIEW_INPUTS_UNSUPPORTED');
+  return { present: true, sha256: sha256Bytes(readFileSync(absolute)) };
+}
+
+// Source links are opaque watched metadata; they never supply authority inputs.
+function reviewSourceFile(root: string, path: string): JsonRecord {
+  const absolute = resolve(root, path);
+  if (!within(root, absolute)) throw new Error('AUTHORITY_POLICY_REVIEW_INPUTS_UNSUPPORTED');
+  let before;
+  try {
+    before = lstatSync(absolute, { bigint: true });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { present: false };
+    throw error;
+  }
+  if (!before.isSymbolicLink()) return reviewFile(root, path);
+  if (realpathSync(dirname(absolute)) !== dirname(absolute) || before.size > 16384n)
+    throw new Error('AUTHORITY_POLICY_REVIEW_INPUTS_UNSUPPORTED');
+  const bytes = readlinkSync(absolute, { encoding: 'buffer' });
+  const after = lstatSync(absolute, { bigint: true });
+  const fields = ['dev', 'ino', 'birthtimeNs', 'ctimeNs', 'mtimeNs', 'size', 'mode'] as const;
+  if (!after.isSymbolicLink() || fields.some((field) => before[field] !== after[field]))
+    throw new Error('AUTHORITY_POLICY_REVIEW_INPUTS_UNSUPPORTED');
+  return { present: true, kind: 'symlink', sha256: sha256Bytes(bytes) };
+}
+
+function reviewInstalledBundle(packageVersion: string) {
+  const modulePath = fileURLToPath(import.meta.url);
+  const marker = '/dist/runtime/index/';
+  const boundary = modulePath.lastIndexOf(marker);
+  if (boundary < 0) throw new Error('AUTHORITY_POLICY_REVIEW_INPUTS_UNSUPPORTED');
+  const packageRoot = realpathSync(modulePath.slice(0, boundary));
+  const document = JSON.parse(
+    readFileSync(join(packageRoot, 'package.json'), 'utf8'),
+  ) as JsonRecord;
+  if (document.name !== '@aarusso-nyx/devai' || document.version !== packageVersion)
+    throw new Error('AUTHORITY_POLICY_REVIEW_INPUTS_UNSUPPORTED');
+  const canonical = resolveCanonicalConstitution();
+  if (
+    canonical === null ||
+    canonical.version === null ||
+    canonical.source !== 'bundled' ||
+    !within(join(packageRoot, 'dist'), realpathSync(canonical.path))
+  )
+    throw new Error('AUTHORITY_POLICY_REVIEW_INPUTS_UNSUPPORTED');
+  const packages: Record<string, JsonRecord> = {};
+  const freezePackage = (root: string, metadata: JsonRecord): void => {
+    if (packages[root] !== undefined) return;
+    const files: Record<string, JsonRecord> = {};
+    const visit = (directory: string): void => {
+      for (const name of readdirSync(directory).sort()) {
+        const path = join(directory, name);
+        const stat = lstatSync(path);
+        if (stat.isSymbolicLink()) throw new Error('AUTHORITY_POLICY_REVIEW_INPUTS_UNSUPPORTED');
+        if (stat.isDirectory()) visit(path);
+        else files[relative(root, path)] = reviewFile(root, relative(root, path));
+      }
+    };
+    visit(root);
+    const dependencies: Record<string, unknown> = {};
+    packages[root] = { name: metadata.name, version: metadata.version, files, dependencies };
+    const required = {
+      ...(isRecord(metadata.dependencies) ? metadata.dependencies : {}),
+      ...(isRecord(metadata.peerDependencies) ? metadata.peerDependencies : {}),
+    };
+    const optional = isRecord(metadata.optionalDependencies) ? metadata.optionalDependencies : {};
+    const resolver = createRequire(join(root, 'package.json'));
+    for (const name of Object.keys({ ...required, ...optional }).sort()) {
+      let dependencyRoot: string | undefined;
+      try {
+        let entry: string;
+        try {
+          entry = resolver.resolve(`${name}/package.json`);
+        } catch {
+          entry = resolver.resolve(name);
+        }
+        let directory = dirname(realpathSync(entry));
+        while (directory !== dirname(directory)) {
+          const path = join(directory, 'package.json');
+          if (existsSync(path)) {
+            const candidate = JSON.parse(readFileSync(path, 'utf8')) as JsonRecord;
+            if (candidate.name === name) {
+              dependencyRoot = directory;
+              break;
+            }
+          }
+          directory = dirname(directory);
+        }
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'MODULE_NOT_FOUND') throw error;
+      }
+      if (dependencyRoot === undefined) {
+        const peers = isRecord(metadata.peerDependenciesMeta) ? metadata.peerDependenciesMeta : {};
+        const peer = peers[name];
+        if (!(name in optional) && !(isRecord(peer) && peer.optional === true))
+          throw new Error('AUTHORITY_POLICY_REVIEW_INPUTS_UNSUPPORTED');
+        dependencies[name] = { present: false };
+        continue;
+      }
+      // Installed dependencies may be hoisted, but a workspace source is never admitted.
+      if (!dependencyRoot.includes('/node_modules/'))
+        throw new Error('AUTHORITY_POLICY_REVIEW_INPUTS_UNSUPPORTED');
+      dependencies[name] = { present: true, physical_root: dependencyRoot };
+      freezePackage(
+        dependencyRoot,
+        JSON.parse(readFileSync(join(dependencyRoot, 'package.json'), 'utf8')) as JsonRecord,
+      );
+    }
+  };
+  freezePackage(packageRoot, document);
+  return {
+    package_root: packageRoot,
+    name: document.name,
+    version: document.version,
+    constitution: { version: canonical.version, sha256: canonical.sha256 },
+    packages,
+  };
+}
+
+function reviewInputs(root: string, packageVersion: string, entries: readonly RegistryEntry[]) {
+  try {
+    const directory = join(root, '.devai/config');
+    const directories: Record<string, JsonRecord> = {};
+    for (const path of [root, join(root, '.devai'), directory, join(root, '.devai/pin')]) {
+      if (!lstatSync(path).isDirectory() || realpathSync(path) !== path)
+        throw new Error('AUTHORITY_POLICY_REVIEW_INPUTS_UNSUPPORTED');
+      const stat = lstatSync(path);
+      directories[path] = { dev: stat.dev, ino: stat.ino };
+    }
+    const target = join(root, POLICY_PATH);
+    try {
+      lstatSync(target);
+      throw new Error('AUTHORITY_POLICY_REVIEW_TARGET_NOT_ABSENT');
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
+    try {
+      lstatSync(join(directory, 'upgrade.lock'));
+      throw new Error('AUTHORITY_POLICY_REVIEW_LOCKED');
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
+    const files: Record<string, JsonRecord> = {};
+    for (const path of [
+      '.devai/pin/constitution.md',
+      '.devai/config/project.json',
+      '.devai/constitution.md',
+      '.devai/config/adopter-policy-binding.json',
+    ])
+      files[path] = reviewFile(root, path);
+    if (
+      !files['.devai/pin/constitution.md']?.present ||
+      !files['.devai/config/project.json']?.present ||
+      !files['.devai/constitution.md']?.present
+    )
+      throw new Error('AUTHORITY_POLICY_REVIEW_INPUTS_UNSUPPORTED');
+    const project = JSON.parse(readFileSync(join(directory, 'project.json'), 'utf8')) as JsonRecord;
+    if (
+      !isRecord(project.authority_enforcement) ||
+      project.authority_enforcement.mode !== 'cli-only'
+    )
+      throw new Error('AUTHORITY_POLICY_REVIEW_INPUTS_UNSUPPORTED');
+    if (files['.devai/config/adopter-policy-binding.json']?.present) {
+      const parsed = parseAdopterPolicyBinding(
+        readFileSync(join(directory, 'adopter-policy-binding.json'), 'utf8'),
+      );
+      if (!('binding' in parsed) || parsed.binding.authority_extension !== undefined)
+        throw new Error('AUTHORITY_POLICY_REVIEW_INPUTS_UNSUPPORTED');
+      const sourcePath = parsed.binding.source_path;
+      files[sourcePath] = reviewFile(root, sourcePath);
+      if (!files[sourcePath]?.present)
+        throw new Error('AUTHORITY_POLICY_REVIEW_INPUTS_UNSUPPORTED');
+      const bytes = readFileSync(resolve(root, sourcePath));
+      const source: unknown = JSON.parse(bytes.toString('utf8'));
+      if (
+        !getValidator('adopter-policy.schema.json')(source) ||
+        !isRecord(source) ||
+        source.authority !== undefined ||
+        source.policy_id !== parsed.binding.policy_id ||
+        source.policy_version !== parsed.binding.policy_version ||
+        sha256Bytes(bytes) !== parsed.binding.source_digest_sha256
+      )
+        throw new Error('AUTHORITY_POLICY_REVIEW_INPUTS_UNSUPPORTED');
+    }
+    const git = (args: string[]) =>
+      execFileSync('git', args, {
+        cwd: root,
+        encoding: 'utf8',
+        maxBuffer: 8 * 1024 * 1024,
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }).trimEnd();
+    const indexPath = git(['rev-parse', '--path-format=absolute', '--git-path', 'index']);
+    const sourceFiles: Record<string, JsonRecord> = {};
+    for (const path of git(['ls-files', '--cached', '--others', '--exclude-standard', '-z'])
+      .split('\0')
+      .filter(Boolean)
+      .sort()) {
+      if (
+        path === '.devai/pin/constitution.md' ||
+        path === '.devai/config/project.json' ||
+        path === POLICY_PATH
+      )
+        continue;
+      sourceFiles[path] = reviewSourceFile(root, path);
+    }
+    const parent = lstatSync(directory);
+    return {
+      identity: {
+        host: hostname(),
+        directories,
+        logical_root: root,
+        physical_root: realpathSync(root),
+        repository_id: repositoryIdFor(root),
+        head: git(['rev-parse', 'HEAD']),
+        git_common_dir: git(['rev-parse', '--path-format=absolute', '--git-common-dir']),
+        index: { path: indexPath, ...reviewFile(dirname(indexPath), basename(indexPath)) },
+        parent: { dev: parent.dev, ino: parent.ino },
+      },
+      files,
+      source_files: sourceFiles,
+      target: { present: false },
+      lock: { present: false },
+      package: reviewInstalledBundle(packageVersion),
+      registry_sha256: canonicalSha256(
+        entries.map((entry) => ({
+          name: entry.name,
+          effects: entry.effects,
+          authority_contract: entry.authority_contract,
+        })),
+      ),
+    };
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('AUTHORITY_POLICY_REVIEW_')) throw error;
+    throw new Error('AUTHORITY_POLICY_REVIEW_INPUTS_UNSUPPORTED');
+  }
 }
 
 export function createAuthorityHostBroker(input: BrokerInput): {
@@ -636,7 +922,7 @@ export function createAuthorityHostBroker(input: BrokerInput): {
   const contracts = actionContractRegistry(
     input.entries.map((entry) => (entry.name === input.entry.name ? input.entry : entry)),
   );
-  const { policy, sources } = policyFor(input, now);
+  let { policy, sources } = policyFor(input, now);
   const constitutionBootstrap = isConstitutionBootstrap(input);
   const issuer = createAuthorityDecisionIssuer({
     issuer_id: 'devai-cli-authority',
@@ -651,6 +937,194 @@ export function createAuthorityHostBroker(input: BrokerInput): {
   let effectApply: (() => unknown) | undefined;
   let exactUnitApply: (() => unknown) | undefined;
   let effectResult: unknown;
+  const reconciliationInput = parseReconciliationHostInput(
+    input.entry.name,
+    input.argv,
+    repositoryRoot,
+    input.role,
+  );
+  const inputFingerprint = reconciliationInput === undefined ? undefined : canonicalSha256(input);
+  const verifyReconciliationInput = (): void => {
+    if (
+      disposed ||
+      inputFingerprint !== canonicalSha256(input) ||
+      canonicalSha256(process.argv) !== reconciliationInput?.original_argv_sha256 ||
+      realpathSync(input.repository_root) !== repositoryRoot ||
+      !('as_role' in input.declaration) ||
+      input.declaration.as_role !== input.role ||
+      canonicalSha256(
+        parseReconciliationHostInput(input.entry.name, input.argv, repositoryRoot, input.role),
+      ) !== canonicalSha256(reconciliationInput)
+    ) {
+      throw new Error('AUTHORITY_RECONCILIATION_INVOCATION_INVALID');
+    }
+  };
+  let installedReconciliationPackage:
+    | Readonly<{
+        bundle: ReturnType<typeof reviewInstalledBundle>;
+        package_sha256: string;
+        module_sha256: string;
+        registry_sha256: string;
+        witness: ReturnType<typeof reconciliationPackageWitness>;
+      }>
+    | undefined;
+  let reconciliationBindingsStale = false;
+  const collectReconciliationBindings = (): ReconciliationInstallationBindings => {
+    try {
+      if (disposed || reconciliationBindingsStale) throw new Error();
+      if (!installedReconciliationPackage) {
+        const bundle = reviewInstalledBundle(input.package_version);
+        const witness = reconciliationPackageWitness(
+          bundle as unknown as Parameters<typeof reconciliationPackageWitness>[0],
+        );
+        const own = bundle.packages[bundle.package_root];
+        const module = (own?.files as Record<string, JsonRecord> | undefined)?.[
+          relative(bundle.package_root, fileURLToPath(import.meta.url))
+        ];
+        if (typeof module?.sha256 !== 'string') {
+          witness.dispose();
+          throw new Error();
+        }
+        const package_sha256 = canonicalSha256(bundle);
+        // Close the capture-to-pin window, including previously unselected
+        // optional resolution inputs. Subsequent reads use fresh witnesses.
+        if (canonicalSha256(reviewInstalledBundle(input.package_version)) !== package_sha256) {
+          witness.dispose();
+          throw new Error();
+        }
+        installedReconciliationPackage = Object.freeze({
+          bundle,
+          witness,
+          package_sha256,
+          module_sha256: module.sha256,
+          registry_sha256: canonicalSha256(
+            input.entries.map((entry) => ({
+              name: entry.name,
+              effects: entry.effects,
+              authority_contract: entry.authority_contract,
+            })),
+          ),
+        });
+      }
+      const actual = policyFor({ ...input, bootstrap_policy: false }, new Date().toISOString());
+      if (actual.sources.repository_id !== sources.repository_id) throw new Error();
+      const { bundle, witness, package_sha256, module_sha256, registry_sha256 } =
+        installedReconciliationPackage;
+      witness.verify();
+      if (
+        sha256Bytes(readFileSync(resolve(repositoryRoot, '.devai/pin/constitution.md'))) !==
+        bundle.constitution.sha256
+      )
+        throw new Error();
+      return Object.freeze({
+        package_sha256,
+        module_sha256,
+        registry_sha256,
+        constitution_sha256: bundle.constitution.sha256,
+        policy_sha256: sha256Bytes(readFileSync(resolve(repositoryRoot, POLICY_PATH))),
+      });
+    } catch {
+      reconciliationBindingsStale = true;
+      installedReconciliationPackage?.witness.dispose();
+      throw new Error('AUTHORITY_RECONCILIATION_OPERATION_STALE');
+    }
+  };
+  const readReconciliationBindings = (): ReconciliationInstallationBindings => {
+    verifyReconciliationInput();
+    return collectReconciliationBindings();
+  };
+  const observationInputSha = canonicalSha256(input),
+    observationArgvSha = canonicalSha256(process.argv);
+  const verifyObservationInput = (): void => {
+    if (
+      disposed ||
+      canonicalSha256(input) !== observationInputSha ||
+      canonicalSha256(process.argv) !== observationArgvSha ||
+      realpathSync(input.repository_root) !== repositoryRoot
+    )
+      throw new Error('AUTHORITY_RECONCILIATION_OBSERVATION_INVALID');
+  };
+  const reconciliationObservation = ['check', 'evidence verify', 'evidence record'].includes(
+    input.entry.name,
+  )
+    ? createReconciliationObservation({
+        invocation_id: invocationId,
+        action_id: input.entry.name,
+        receipt_store: issuer,
+        repository_root: repositoryRoot,
+        repository_id: sources.repository_id,
+        original_argv_sha256: observationArgvSha,
+        verifyActual: verifyObservationInput,
+        readCurrentBindings: () => {
+          verifyObservationInput();
+          return collectReconciliationBindings();
+        },
+      })
+    : undefined;
+  const reconciliationInvocation =
+    reconciliationInput === undefined
+      ? undefined
+      : createReconciliationHostInvocation({
+          ...reconciliationInput,
+          initiator: reconciliationInput.initiator as 'architect' | 'owner' | 'inspector',
+          invocation_id: invocationId,
+          receipt_store: issuer,
+          repository_root: repositoryRoot,
+          repository_id: sources.repository_id,
+          readCurrentBindings: readReconciliationBindings,
+          verifyActual: verifyReconciliationInput,
+        });
+  let activeReconciliationOperation: ReconciliationHostOperation | undefined;
+  const reconciliationAdapter = (kind: 'reconciliation-host' | 'proof-index') =>
+    Object.freeze({
+      admit: (target: unknown): boolean => {
+        if (
+          !activeReconciliationOperation ||
+          !reconciliationInvocation ||
+          activeReconciliationOperation.target.kind !== kind
+        )
+          return false;
+        try {
+          reconciliationHostOperationSnapshot(
+            activeReconciliationOperation,
+            reconciliationInvocation,
+            target as ReconciliationHostOperation['target'],
+          );
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      snapshot: (target: unknown): Readonly<Record<string, unknown>> => {
+        if (
+          !activeReconciliationOperation ||
+          !reconciliationInvocation ||
+          activeReconciliationOperation.target.kind !== kind
+        )
+          throw new Error('AUTHORITY_RECONCILIATION_OPERATION_INVALID');
+        return reconciliationHostOperationSnapshot(
+          activeReconciliationOperation,
+          reconciliationInvocation,
+          target as ReconciliationHostOperation['target'],
+        );
+      },
+      apply: (target: unknown): string => {
+        if (
+          !activeReconciliationOperation ||
+          !reconciliationInvocation ||
+          activeReconciliationOperation.target.kind !== kind ||
+          !effectApply
+        )
+          throw new Error('AUTHORITY_RECONCILIATION_OPERATION_INVALID');
+        reconciliationHostOperationSnapshot(
+          activeReconciliationOperation,
+          reconciliationInvocation,
+          target as ReconciliationHostOperation['target'],
+        );
+        effectResult = effectApply();
+        return `authority-boundary:${invocationId}`;
+      },
+    });
   // #317: the canonical path of the identity-bound removal being authorized, if any. Such a
   // removal acts on the entry itself, so its containment resolves the parent and never a final
   // link. It is never admitted outside the repository.
@@ -660,6 +1134,8 @@ export function createAuthorityHostBroker(input: BrokerInput): {
     invocation_id: invocationId,
     canonicalSha256,
     repository_root: repositoryRoot,
+    reconciliation_host: reconciliationAdapter('reconciliation-host'),
+    proof_index: reconciliationAdapter('proof-index'),
     fs: {
       realpath: (path: string) => {
         if (removalContainment === path) {
@@ -736,7 +1212,7 @@ export function createAuthorityHostBroker(input: BrokerInput): {
     policy: (policy as JsonRecord).provenance as JsonRecord,
     now,
   });
-  const boundedPlan =
+  let boundedPlan =
     actionPlanner.kind === 'bounded-batches'
       ? {
           plan_id: `${actionPlanner.planner_id}-${invocationId}`,
@@ -750,7 +1226,7 @@ export function createAuthorityHostBroker(input: BrokerInput): {
           recovery: 'preserve-and-report',
         }
       : undefined;
-  const boundedPlanHandle =
+  let boundedPlanHandle =
     boundedPlan === undefined
       ? undefined
       : expectSuccess<JsonRecord>(
@@ -759,7 +1235,7 @@ export function createAuthorityHostBroker(input: BrokerInput): {
             invocation_id: invocationId,
           }),
         );
-  const boundedPlanDigest = boundedPlan === undefined ? undefined : canonicalSha256(boundedPlan);
+  let boundedPlanDigest = boundedPlan === undefined ? undefined : canonicalSha256(boundedPlan);
   let releaseRequestDigest: string | undefined;
   let exportBindingDigest: string | undefined;
   const readReleaseCapacity = (
@@ -1088,6 +1564,49 @@ export function createAuthorityHostBroker(input: BrokerInput): {
   const applyEffect = (request: AuthorityHostEffectRequest, apply: () => unknown): unknown => {
     assertProtectedReleasePrepareCapacityEffect(issuer);
     assertProtectedReleaseExportCapacityEffect(issuer);
+    if (request.kind === 'reconciliation-host' || request.kind === 'proof-index') {
+      const operation =
+        reconciliationInvocation === undefined
+          ? undefined
+          : reconciliationHostOperation(request, reconciliationInvocation);
+      const kind = request.kind;
+      if (
+        !operation ||
+        !reconciliationInput?.write ||
+        activeReconciliationOperation ||
+        input.entry.effects === 'read' ||
+        operation.action_id !== input.entry.name ||
+        operation.initiator !== input.role ||
+        actionPlanner.kind !== 'exact-plan' ||
+        !actionPlanner.target_kinds.some((targetKind) => String(targetKind) === kind) ||
+        !input.entry.authority_contract.capabilities.some(
+          (capability) => capability === `${kind}:write`,
+        ) ||
+        input.entry.authority_contract.boundary.kind !== 'mutation-adapters' ||
+        !input.entry.authority_contract.boundary.adapter_ids.includes(`${kind}-authority-boundary`)
+      )
+        throw new Error('AUTHORITY_RECONCILIATION_OPERATION_INVALID');
+      verifyReconciliationInput();
+      const actual = policyFor({ ...input, bootstrap_policy: false }, new Date().toISOString());
+      if (actual.sources.repository_id !== sources.repository_id)
+        throw new Error('AUTHORITY_RECONCILIATION_OPERATION_STALE');
+      policy = actual.policy;
+      sources = actual.sources;
+      activeReconciliationOperation = operation;
+      try {
+        return authorizeTarget(
+          {
+            name: input.entry.name,
+            effects: input.entry.effects,
+            authority_contract: input.entry.authority_contract,
+          },
+          operation.target as unknown as JsonRecord,
+          apply,
+        );
+      } finally {
+        activeReconciliationOperation = undefined;
+      }
+    }
     if (request.kind === 'protected-release') {
       const operation =
         protectedReleaseHostEffect(request) ??
@@ -1595,11 +2114,34 @@ export function createAuthorityHostBroker(input: BrokerInput): {
           // current init-bind invocation (for example adopter policy or a host
           // adapter declaration). Re-read every trusted source at commit time
           // so the materialized policy cannot lag the bytes just bound.
-          const currentSources = buildTrustedAuthoritySources(
-            input.entries,
-            repositoryRoot,
-            input.package_version,
-          );
+          const reviewing = input.argv.includes('--review-authority-policy');
+          if (
+            reviewing &&
+            (input.entry.name !== 'init bind' ||
+              input.role !== 'architect' ||
+              !('as_role' in input.declaration) ||
+              input.declaration.as_role !== 'architect' ||
+              !input.argv.includes('--after-constitution') ||
+              !input.argv.includes('--write'))
+          )
+            throw new Error('AUTHORITY_POLICY_REVIEW_SELECTION_INVALID');
+          if (
+            reviewing &&
+            (process.stdin.isTTY !== true ||
+              process.stdout.isTTY !== true ||
+              process.stderr.isTTY !== true)
+          )
+            throw new Error('AUTHORITY_POLICY_REVIEW_TERMINAL_REQUIRED');
+          const before = reviewing
+            ? reviewInputs(repositoryRoot, input.package_version, input.entries)
+            : undefined;
+          const projection = reviewing
+            ? buildProspectiveAuthoritySources(input.entries, repositoryRoot, input.package_version)
+            : undefined;
+          const currentSources =
+            projection?.sources ??
+            buildTrustedAuthoritySources(input.entries, repositoryRoot, input.package_version);
+
           const policyPath = resolve(repositoryRoot, POLICY_PATH);
           // The existing policy is never an authority for its own replacement.
           // An explicit Architect invocation authorizes the binding machine to
@@ -1716,6 +2258,123 @@ export function createAuthorityHostBroker(input: BrokerInput): {
           if (!(artifact.bytes instanceof Uint8Array)) {
             throw new Error('AUTHORITY_POLICY_ARTIFACT_INVALID');
           }
+          if (reviewing && before !== undefined && projection !== undefined) {
+            if (
+              projection.canonical.sha256 !== before.package.constitution.sha256 ||
+              projection.canonical.version !== before.package.constitution.version ||
+              canonicalSha256(
+                reviewInputs(repositoryRoot, input.package_version, input.entries),
+              ) !== canonicalSha256(before)
+            )
+              throw new Error('AUTHORITY_POLICY_REVIEW_STALE_INPUT');
+
+            const pinPath = '.devai/pin/constitution.md';
+            const projectPath = '.devai/config/project.json';
+            const afterFiles = {
+              ...before.files,
+              [pinPath]: { present: true, sha256: projection.canonical.sha256 },
+              [projectPath]: {
+                present: true,
+                sha256: sha256Bytes(Buffer.from(projection.projectBytes)),
+              },
+            };
+            const expected = { ...before, files: afterFiles };
+            const sourcesDigest = canonicalSha256(currentSources.provenance);
+            return createAuthorityPolicyReview({
+              bytes: artifact.bytes,
+              ready: {
+                kind: 'authority-policy-create-review',
+                schema_version: '1.0.0',
+                status: 'awaiting-exact-confirmation',
+                action: 'init bind',
+                selectors: ['--review-authority-policy', '--after-constitution'],
+                invocation_id: invocationId,
+                target: POLICY_PATH,
+                operation: 'create',
+                grants_authority: false,
+                inputs_before: before,
+                prospective_after: expected,
+                allowed_precursor_transition: [pinPath, projectPath],
+                materialization_digest_sha256: (
+                  (JSON.parse(Buffer.from(artifact.bytes).toString('utf8')) as JsonRecord)
+                    .materialization as JsonRecord
+                ).materialization_digest_sha256,
+                publisher: {
+                  primitive: 'publishFileNoReplaceSync',
+                  staged_recipe: '.devai/config/.authority-policy.json.<pid>-<uuid>.publish-staged',
+                  durable_outputs: [POLICY_PATH],
+                  crash_semantics: 'preserve-complete-linked-target',
+                },
+              },
+              verifyActual: () => {
+                if (disposed) throw new Error('AUTHORITY_POLICY_REVIEW_HANDLE_INVALID');
+                const actual = reviewInputs(repositoryRoot, input.package_version, input.entries);
+                const unchanged = {
+                  ...actual,
+                  files: {
+                    ...actual.files,
+                    [pinPath]: before.files[pinPath],
+                    [projectPath]: before.files[projectPath],
+                  },
+                };
+                if (canonicalSha256(unchanged) !== canonicalSha256(before))
+                  throw new Error('AUTHORITY_POLICY_REVIEW_STALE_INPUT');
+                if (canonicalSha256(actual) !== canonicalSha256(expected))
+                  throw new Error('AUTHORITY_POLICY_REVIEW_PRECURSOR_PENDING');
+                // Recompute ordinary actual bindings immediately before the fresh FS decision.
+                const actualSources = buildTrustedAuthoritySources(
+                  input.entries,
+                  repositoryRoot,
+                  input.package_version,
+                );
+                if (canonicalSha256(actualSources.provenance) !== sourcesDigest)
+                  throw new Error('AUTHORITY_POLICY_REVIEW_STALE_INPUT');
+                sources = actualSources;
+                policy = actualSources.virtualPolicy;
+                if (boundedPlan !== undefined) {
+                  boundedPlan = {
+                    ...boundedPlan,
+                    plan_id: `${boundedPlan.plan_id}-review-create`,
+                    envelope: makeEnvelope({
+                      invocationId,
+                      actionId: input.entry.name,
+                      effect: input.entry.effects,
+                      repositoryId: sources.repository_id,
+                      consent: actionConsent,
+                      policy: actualSources.provenance,
+                      now: new Date().toISOString(),
+                    }),
+                  };
+                  boundedPlanHandle = expectSuccess<JsonRecord>(
+                    (plannerRegistry.registerPlan as (value: unknown) => unknown)({
+                      subject: { plan: boundedPlan },
+                      invocation_id: invocationId,
+                    }),
+                  );
+                  boundedPlanDigest = canonicalSha256(boundedPlan);
+                }
+              },
+              publish: (bytes) => {
+                const identity = publishFileNoReplaceSync(policyPath, Buffer.from(bytes));
+                const observed = readFileSync(policyPath);
+                if (sha256Bytes(observed) !== artifact.digest_sha256)
+                  throw new Error('AUTHORITY_POLICY_REVIEW_ARTIFACT_MISMATCH');
+                return {
+                  status: 'created',
+                  binding_performed: true,
+                  path: POLICY_PATH,
+                  digest_sha256: sha256Bytes(observed),
+                  size_bytes: observed.byteLength,
+                  publication_identity: JSON.parse(
+                    JSON.stringify(identity, (_key, value: unknown) =>
+                      typeof value === 'bigint' ? value.toString() : value,
+                    ),
+                  ),
+                  published_at: new Date().toISOString(),
+                };
+              },
+            });
+          }
           const unchangedBytes = unchangedAuthorityPolicy(policyPath, artifact.bytes);
           if (unchangedBytes !== undefined) {
             return {
@@ -1741,6 +2400,12 @@ export function createAuthorityHostBroker(input: BrokerInput): {
       effect: input.entry.effects,
       receipt_store: issuer,
       apply_effect: applyEffect,
+      ...(reconciliationObservation === undefined
+        ? {}
+        : { reconciliation_observation: reconciliationObservation }),
+      ...(reconciliationInvocation === undefined
+        ? {}
+        : { reconciliation_invocation: reconciliationInvocation }),
       ...(input.entry.name === 'release prepare'
         ? { read_prepare_capacity: readReleaseCapacity }
         : {}),
@@ -1777,6 +2442,8 @@ export function createAuthorityHostBroker(input: BrokerInput): {
             if (readOnlyProcess(request)) return apply();
             throw new Error('AUTHORITY_HOST_PROCESS_ADAPTER_REQUIRED');
           }
+          if (request.kind !== 'filesystem')
+            throw new Error('AUTHORITY_RECONCILIATION_OPERATION_INVALID');
           if (
             request.symbol === 'mkdirSync' &&
             typeof request.arguments[0] === 'string' &&
@@ -1862,6 +2529,9 @@ export function createAuthorityHostBroker(input: BrokerInput): {
     },
     dispose: () => {
       disposed = true;
+      installedReconciliationPackage?.witness.dispose();
+      if (reconciliationInvocation) disposeReconciliationHostInvocation(reconciliationInvocation);
+      if (reconciliationObservation) disposeReconciliationObservation(reconciliationObservation);
       if (typeof runtime.dispose === 'function') runtime.dispose();
       else if (typeof issuer.dispose === 'function') issuer.dispose();
     },

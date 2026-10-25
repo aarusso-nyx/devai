@@ -50,6 +50,7 @@ export const ERROR_CODE_PREFIXES: ReadonlySet<string> = new Set([
   'RATIFICATION',
   'RECEIPT',
   'RECIPE',
+  'RECONCILIATION',
   'RELEASE',
   'ROUND',
   'ROUTE',

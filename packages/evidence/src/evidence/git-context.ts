@@ -18,6 +18,7 @@ export function gatherGitContext(cwd: string = process.cwd()): GitContext {
   try {
     head_sha = execFileSync('git', ['rev-parse', 'HEAD'], {
       cwd,
+      env: { ...process.env, GIT_OPTIONAL_LOCKS: '0' },
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
     }).trim();
@@ -31,6 +32,7 @@ export function gatherGitContext(cwd: string = process.cwd()): GitContext {
       ['status', '--porcelain=v1', '-z', '--untracked-files=all'],
       {
         cwd,
+        env: { ...process.env, GIT_OPTIONAL_LOCKS: '0' },
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'ignore'],
       },

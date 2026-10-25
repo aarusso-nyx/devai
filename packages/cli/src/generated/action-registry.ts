@@ -711,6 +711,234 @@ export const ACTION_REGISTRY = [
     },
   },
   {
+    action_id: 'evidence reconcile approve',
+    handler: 'evidence reconcile approve',
+    path: ['evidence', 'reconcile', 'approve'],
+    status: 'stable',
+    profiles: ['tier1', 'tier2', 'tier3'],
+    effect: 'local-write',
+    authority: 'mesh_controller',
+    description:
+      'Review and authorize one exact reconciliation scope, renew or revoke its grant, or recover one authenticated dead lease.',
+    output_contract: {
+      schemaVersion: '1.0.0',
+      mode: 'action-envelope',
+      envelope_schema: 'law/schemas/action-result.schema.json',
+      success_channel: 'stdout',
+      payload_schema: 'law/schemas/reconciliation-owner-action.schema.json',
+    },
+    error_contract: {
+      schemaVersion: '1.0.0',
+      mode: 'structured-error-envelope',
+      envelope_schema: 'law/schemas/action-result.schema.json',
+      error_schema: 'law/schemas/error.schema.json',
+      error_channel: 'stderr',
+    },
+    authority_contract_version: '1.0.0',
+    authority_contract: {
+      schemaVersion: '1.0.0',
+      action_id: 'evidence reconcile approve',
+      effect: 'local-write',
+      capabilities: ['proc:git', 'reconciliation-host:write'],
+      subject: {
+        kind: 'human',
+        allowed_roles: ['owner'],
+      },
+      consent: {
+        write: true,
+        allow_publish: false,
+        experimental: false,
+      },
+      planner: {
+        kind: 'exact-plan',
+        planner_id: 'evidence-reconcile-approve-exact-plan',
+        target_kinds: ['reconciliation-host'],
+        atomicity: 'whole-plan',
+      },
+      boundary: {
+        kind: 'mutation-adapters',
+        adapter_ids: ['reconciliation-host-authority-boundary'],
+        final_reverification: true,
+      },
+      readiness: {
+        requires_binding: true,
+        independent_acceptance_required: true,
+      },
+    },
+  },
+  {
+    action_id: 'evidence reconcile materialize',
+    handler: 'evidence reconcile materialize',
+    path: ['evidence', 'reconcile', 'materialize'],
+    status: 'stable',
+    profiles: ['tier1', 'tier2', 'tier3'],
+    effect: 'local-write',
+    authority: 'mesh_controller',
+    description:
+      'Preserve complete source histories and publish the approved canonical prefix with a distinct selection event.',
+    output_contract: {
+      schemaVersion: '1.0.0',
+      mode: 'action-envelope',
+      envelope_schema: 'law/schemas/action-result.schema.json',
+      success_channel: 'stdout',
+      payload_schema: 'law/schemas/reconciliation-materialize-result.schema.json',
+    },
+    error_contract: {
+      schemaVersion: '1.0.0',
+      mode: 'structured-error-envelope',
+      envelope_schema: 'law/schemas/action-result.schema.json',
+      error_schema: 'law/schemas/error.schema.json',
+      error_channel: 'stderr',
+    },
+    authority_contract_version: '1.0.0',
+    authority_contract: {
+      schemaVersion: '1.0.0',
+      action_id: 'evidence reconcile materialize',
+      effect: 'local-write',
+      capabilities: ['proc:git', 'reconciliation-host:write'],
+      subject: {
+        kind: 'derived-machine',
+        actor: 'harness',
+        transition: 'harness-write',
+        initiator: {
+          allowed_roles: ['inspector'],
+          preserve_in_context: true,
+        },
+      },
+      consent: {
+        write: true,
+        allow_publish: false,
+        experimental: false,
+      },
+      planner: {
+        kind: 'exact-plan',
+        planner_id: 'evidence-reconcile-materialize-exact-plan',
+        target_kinds: ['reconciliation-host'],
+        atomicity: 'whole-plan',
+      },
+      boundary: {
+        kind: 'mutation-adapters',
+        adapter_ids: ['reconciliation-host-authority-boundary'],
+        final_reverification: true,
+      },
+      readiness: {
+        requires_binding: true,
+        independent_acceptance_required: true,
+      },
+    },
+  },
+  {
+    action_id: 'evidence reconcile plan',
+    handler: 'evidence reconcile plan',
+    path: ['evidence', 'reconcile', 'plan'],
+    status: 'stable',
+    profiles: ['tier1', 'tier2', 'tier3'],
+    effect: 'read',
+    authority: 'mesh_controller',
+    description:
+      'Inspect exact merge histories, staged sources, published-parent origin and recovery obligations without writing.',
+    output_contract: {
+      schemaVersion: '1.0.0',
+      mode: 'action-envelope',
+      envelope_schema: 'law/schemas/action-result.schema.json',
+      success_channel: 'stdout',
+      payload_schema: 'law/schemas/evidence-reconciliation-plan.schema.json',
+    },
+    error_contract: {
+      schemaVersion: '1.0.0',
+      mode: 'structured-error-envelope',
+      envelope_schema: 'law/schemas/action-result.schema.json',
+      error_schema: 'law/schemas/error.schema.json',
+      error_channel: 'stderr',
+    },
+    authority_contract_version: '1.0.0',
+    authority_contract: {
+      schemaVersion: '1.0.0',
+      action_id: 'evidence reconcile plan',
+      effect: 'read',
+      capabilities: ['proc:git'],
+      subject: {
+        kind: 'none',
+      },
+      consent: {
+        write: false,
+        allow_publish: false,
+        experimental: false,
+      },
+      planner: {
+        kind: 'none',
+      },
+      boundary: {
+        kind: 'none',
+      },
+      readiness: {
+        requires_binding: false,
+        independent_acceptance_required: true,
+      },
+    },
+  },
+  {
+    action_id: 'evidence reconcile stage-proof',
+    handler: 'evidence reconcile stage-proof',
+    path: ['evidence', 'reconcile', 'stage-proof'],
+    status: 'stable',
+    profiles: ['tier1', 'tier2', 'tier3'],
+    effect: 'local-write',
+    authority: 'mesh_controller',
+    description:
+      'Stage the exact recovered canonical proof chain while preserving every other index entry.',
+    output_contract: {
+      schemaVersion: '1.0.0',
+      mode: 'action-envelope',
+      envelope_schema: 'law/schemas/action-result.schema.json',
+      success_channel: 'stdout',
+      payload_schema: 'law/schemas/reconciliation-proof-index-result.schema.json',
+    },
+    error_contract: {
+      schemaVersion: '1.0.0',
+      mode: 'structured-error-envelope',
+      envelope_schema: 'law/schemas/action-result.schema.json',
+      error_schema: 'law/schemas/error.schema.json',
+      error_channel: 'stderr',
+    },
+    authority_contract_version: '1.0.0',
+    authority_contract: {
+      schemaVersion: '1.0.0',
+      action_id: 'evidence reconcile stage-proof',
+      effect: 'local-write',
+      capabilities: ['proc:git', 'proof-index:write'],
+      subject: {
+        kind: 'derived-machine',
+        actor: 'harness',
+        transition: 'harness-write',
+        initiator: {
+          allowed_roles: ['inspector'],
+          preserve_in_context: true,
+        },
+      },
+      consent: {
+        write: true,
+        allow_publish: false,
+        experimental: false,
+      },
+      planner: {
+        kind: 'exact-plan',
+        planner_id: 'evidence-reconcile-stage-proof-exact-plan',
+        target_kinds: ['proof-index'],
+        atomicity: 'whole-plan',
+      },
+      boundary: {
+        kind: 'mutation-adapters',
+        adapter_ids: ['proof-index-authority-boundary'],
+        final_reverification: true,
+      },
+      readiness: {
+        requires_binding: true,
+        independent_acceptance_required: true,
+      },
+    },
+  },
+  {
     action_id: 'evidence record',
     handler: 'evidence record',
     path: ['evidence', 'record'],
@@ -1177,7 +1405,13 @@ export const ACTION_REGISTRY = [
       schemaVersion: '1.0.0',
       action_id: 'init bind',
       effect: 'local-write',
-      capabilities: ['fs:f5-config', 'fs:workspace', 'proc:dynamic', 'proc:git'],
+      capabilities: [
+        'fs:f5-config',
+        'fs:workspace',
+        'proc:dynamic',
+        'proc:git',
+        'reconciliation-host:write',
+      ],
       subject: {
         kind: 'derived-machine',
         actor: 'binding',
@@ -1195,7 +1429,7 @@ export const ACTION_REGISTRY = [
       planner: {
         kind: 'bounded-batches',
         planner_id: 'init-bind-bounded-plan',
-        target_kinds: ['fs'],
+        target_kinds: ['fs', 'reconciliation-host'],
         bounds: {
           max_batches: 128,
           max_targets_per_batch: 64,
@@ -1205,7 +1439,7 @@ export const ACTION_REGISTRY = [
       },
       boundary: {
         kind: 'mutation-adapters',
-        adapter_ids: ['fs-authority-boundary'],
+        adapter_ids: ['fs-authority-boundary', 'reconciliation-host-authority-boundary'],
         final_reverification: true,
       },
       readiness: {
@@ -3299,6 +3533,67 @@ export const ACTION_REGISTRY = [
       boundary: {
         kind: 'mutation-adapters',
         adapter_ids: ['fs-authority-boundary', 'remote-authority-boundary'],
+        final_reverification: true,
+      },
+      readiness: {
+        requires_binding: true,
+        independent_acceptance_required: true,
+      },
+    },
+  },
+  {
+    action_id: 'sense bootstrap-inventory',
+    handler: 'sense bootstrap-inventory',
+    path: ['sense', 'bootstrap-inventory'],
+    status: 'stable',
+    profiles: ['tier1', 'tier2', 'tier3'],
+    effect: 'local-write',
+    authority: 'mesh_controller',
+    description:
+      'Publish seven diagnostic inventory bodies from one exact approved staged snapshot.',
+    output_contract: {
+      schemaVersion: '1.0.0',
+      mode: 'action-envelope',
+      envelope_schema: 'law/schemas/action-result.schema.json',
+      success_channel: 'stdout',
+      payload_schema: 'law/schemas/reconciliation-inventory-result.schema.json',
+    },
+    error_contract: {
+      schemaVersion: '1.0.0',
+      mode: 'structured-error-envelope',
+      envelope_schema: 'law/schemas/action-result.schema.json',
+      error_schema: 'law/schemas/error.schema.json',
+      error_channel: 'stderr',
+    },
+    authority_contract_version: '1.0.0',
+    authority_contract: {
+      schemaVersion: '1.0.0',
+      action_id: 'sense bootstrap-inventory',
+      effect: 'local-write',
+      capabilities: ['proc:git', 'reconciliation-host:write'],
+      subject: {
+        kind: 'derived-machine',
+        actor: 'harness',
+        transition: 'harness-write',
+        initiator: {
+          allowed_roles: ['architect'],
+          preserve_in_context: true,
+        },
+      },
+      consent: {
+        write: true,
+        allow_publish: false,
+        experimental: false,
+      },
+      planner: {
+        kind: 'exact-plan',
+        planner_id: 'sense-bootstrap-inventory-exact-plan',
+        target_kinds: ['reconciliation-host'],
+        atomicity: 'whole-plan',
+      },
+      boundary: {
+        kind: 'mutation-adapters',
+        adapter_ids: ['reconciliation-host-authority-boundary'],
         final_reverification: true,
       },
       readiness: {

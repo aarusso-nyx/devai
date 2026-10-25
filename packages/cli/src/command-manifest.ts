@@ -18,6 +18,8 @@ export type ActionCapability =
   | 'db:write'
   | 'db:unclassified'
   | 'host-cache:write'
+  | 'reconciliation-host:write'
+  | 'proof-index:write'
   | 'artifact-sink:write'
   | 'protected-export-signer-v1:sign'
   | 'protected-certification-provider-v3:execute'
@@ -66,6 +68,8 @@ export type AuthorityTargetKind =
   | 'artifact-sink'
   | 'protected-export-signer'
   | 'protected-certification-provider'
+  | 'reconciliation-host'
+  | 'proof-index'
   | 'certification-evidence-sink';
 
 export interface AuthorityActionContract {
@@ -151,6 +155,8 @@ export function deriveActionEffectFromCapabilities(
         'db:write',
         'db:unclassified',
         'host-cache:write',
+        'reconciliation-host:write',
+        'proof-index:write',
         'artifact-sink:write',
         'protected-export-signer-v1:sign',
       ].includes(capability),

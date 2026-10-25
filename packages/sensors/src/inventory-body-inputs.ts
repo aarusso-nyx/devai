@@ -1,3 +1,4 @@
+import type { InventorySourceReader } from './inventory-walker.js';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -35,10 +36,12 @@ export function resolveBodyInput(
   repoRoot: string,
   explicit: string | null | undefined,
   kindFile: string,
+  sourceReader?: InventorySourceReader,
 ): string | null {
   if (explicit !== undefined) return explicit;
   const regenerated = join(repoRoot, REGENERATED_BODY_DIRECTORY, kindFile);
-  if (existsSync(regenerated)) return regenerated;
+  if (sourceReader === undefined ? existsSync(regenerated) : sourceReader.exists(regenerated))
+    return regenerated;
   return join(repoRoot, DIRECT_BODY_DIRECTORY, kindFile);
 }
 

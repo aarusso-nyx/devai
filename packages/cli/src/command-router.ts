@@ -156,6 +156,46 @@ function schemaAdmissionRefusal(
  * the ADR-SCR-0011 seam through which a caller supplies a registry-shaped fixture whose
  * entries carry `schema_admission`, without editing law.
  */
+/** Routing sees authority-stripped argv; only the output boundary may require the
+ * original direct declaration. This helper grants no authority in either mode. */
+export function isExactAuthorityPolicyReviewInvocation(
+  argv: readonly string[],
+  requireRole = true,
+): boolean {
+  const args = argv.slice(2);
+  if (args[0] !== 'init' || args[1] !== 'bind') return false;
+  const flags = new Map<string, number>();
+  let invalid = false;
+  for (let index = 2; index < args.length; index += 1) {
+    const flag = args[index] ?? '';
+    flags.set(flag, (flags.get(flag) ?? 0) + 1);
+    if (['--target', '--as-role', '--format'].includes(flag)) {
+      const value = args[++index];
+      if (
+        value === undefined ||
+        value.startsWith('-') ||
+        (flag === '--as-role' && value !== 'architect') ||
+        (flag === '--format' && value !== 'json')
+      )
+        invalid = true;
+    } else if (!['--review-authority-policy', '--after-constitution', '--write'].includes(flag))
+      invalid = true;
+  }
+  const required = [
+    '--target',
+    '--format',
+    '--review-authority-policy',
+    '--after-constitution',
+    '--write',
+    ...(requireRole ? ['--as-role'] : []),
+  ];
+  return (
+    !invalid &&
+    [...flags.values()].every((count) => count === 1) &&
+    required.every((flag) => flags.has(flag))
+  );
+}
+
 export function routeArgv(
   argv: readonly string[],
   entries: readonly RegistryEntry[],
@@ -182,6 +222,33 @@ export function routeArgv(
       return { kind: 'output', text: renderCliError(error, wantsJson(args)), exitCode: 2 };
     }
     // Canonical kinds remain positional values of the direct `sense run` facade.
+  }
+  if (
+    args[0] === 'init' &&
+    args[1] === 'bind' &&
+    args.some((argument) => {
+      // CAC accepts equals values and camelcase aliases. Detect those spellings
+      // for refusal; the closed grammar below still admits only exact tokens.
+      const name = argument
+        .split('=')[0]
+        ?.replace(/^--(?:no-)?/u, '')
+        .replaceAll('-', '')
+        .toLowerCase();
+      return (
+        argument.startsWith('--') &&
+        ['reviewauthoritypolicy', 'afterconstitution'].includes(name ?? '')
+      );
+    })
+  ) {
+    if (!isExactAuthorityPolicyReviewInvocation(argv, false)) {
+      return usageRefusal(
+        args,
+        'AUTHORITY_POLICY_REVIEW_SELECTION_INVALID',
+        'Exact authority-policy review selection is required.',
+        'Use both review selectors, exact target, Architect role, write consent and JSON format.',
+        {},
+      );
+    }
   }
   const admissionRefusal = schemaAdmissionRefusal(args, sensorRegistry);
   if (admissionRefusal !== undefined) return admissionRefusal;
@@ -369,7 +436,11 @@ export function routeArgv(
       }
     }
     try {
-      resolveInvocationEntry(exact, argv);
+      // Routing receives authority-stripped argv. The native provisioning
+      // projection requires the original declaration, so resolve it only at
+      // the subsequent ordinary authorization and final command boundaries.
+      if (!(exact.name === 'init bind' && remaining.includes('--reconciliation-host')))
+        resolveInvocationEntry(exact, argv);
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       const check = exact.name === 'check';

@@ -42,8 +42,20 @@ function measureInventoryCoverage(opts: InventoryCoverageOptions): InventoryCove
   const generatedAt = opts.now ?? new Date().toISOString();
   const admit = opts.admitFile ?? (() => true);
   // #382: an explicit input, then the regenerated state body, then the direct default.
-  const apiMapPath = resolveBodyInput(opts.repoRoot, opts.apiMapPath, API_MAP_FILE);
-  const routesResolution = resolveRoutesPath(opts.repoRoot, opts.routesPath, opts.framework, admit);
+  const apiMapPath = resolveBodyInput(
+    opts.repoRoot,
+    opts.apiMapPath,
+    API_MAP_FILE,
+    opts.sourceReader,
+  );
+  const routesResolution = resolveRoutesPath(
+    opts.repoRoot,
+    opts.routesPath,
+    opts.framework,
+    admit,
+    undefined,
+    opts.sourceReader,
+  );
 
   const findings: Array<{
     readonly severity: 'info' | 'warning' | 'error' | 'critical';
@@ -55,10 +67,26 @@ function measureInventoryCoverage(opts: InventoryCoverageOptions): InventoryCove
   let apiMap: ApiMapShape | null = null;
   let routesInventory: RoutesInventoryShape | null = null;
   const httpPresent = surfacePresent(opts.surfaces, 'http');
+  if (opts.sourceReader !== undefined && httpPresent) {
+    if (apiMapPath === null || !opts.sourceReader.exists(apiMapPath) || !admit(apiMapPath))
+      throw new Error('INVENTORY_SOURCE_REQUIRED_API_MAP_MISSING');
+    if (
+      routesResolution.kind !== 'resolved' ||
+      !opts.sourceReader.exists(routesResolution.path) ||
+      !admit(routesResolution.path)
+    )
+      throw new Error('INVENTORY_SOURCE_REQUIRED_ROUTES_MISSING');
+  }
 
   if (!httpPresent) {
     // ADR-SCR-0003: http declared absent; no HTTP inventory is demanded.
-  } else if (apiMapPath === null || !existsSync(apiMapPath) || !admit(apiMapPath)) {
+  } else if (
+    apiMapPath === null ||
+    !(opts.sourceReader === undefined
+      ? existsSync(apiMapPath)
+      : opts.sourceReader.exists(apiMapPath)) ||
+    !admit(apiMapPath)
+  ) {
     status = 'review';
     findings.push({
       severity: 'warning',
@@ -67,7 +95,13 @@ function measureInventoryCoverage(opts: InventoryCoverageOptions): InventoryCove
     });
   } else {
     try {
-      apiMap = JSON.parse(readFileSync(apiMapPath, 'utf8')) as ApiMapShape;
+      apiMap = JSON.parse(
+        opts.sourceReader === undefined
+          ? readFileSync(apiMapPath, 'utf8')
+          : opts.sourceReader.readFile(apiMapPath),
+      ) as ApiMapShape;
+      if (opts.sourceReader !== undefined && !validators.apiMap(apiMap))
+        throw new Error('INVENTORY_SOURCE_API_MAP_INVALID');
     } catch (err) {
       status = 'error';
       findings.push({
@@ -103,7 +137,12 @@ function measureInventoryCoverage(opts: InventoryCoverageOptions): InventoryCove
     });
   } else {
     const routesPath = routesResolution.path;
-    if (!existsSync(routesPath) || !admit(routesPath)) {
+    if (
+      !(opts.sourceReader === undefined
+        ? existsSync(routesPath)
+        : opts.sourceReader.exists(routesPath)) ||
+      !admit(routesPath)
+    ) {
       if (status === 'pass') status = 'review';
       findings.push({
         severity: 'warning',
@@ -112,7 +151,13 @@ function measureInventoryCoverage(opts: InventoryCoverageOptions): InventoryCove
       });
     } else {
       try {
-        routesInventory = JSON.parse(readFileSync(routesPath, 'utf8')) as RoutesInventoryShape;
+        routesInventory = JSON.parse(
+          opts.sourceReader === undefined
+            ? readFileSync(routesPath, 'utf8')
+            : opts.sourceReader.readFile(routesPath),
+        ) as RoutesInventoryShape;
+        if (opts.sourceReader !== undefined && !validators.routesInventory(routesInventory))
+          throw new Error('INVENTORY_SOURCE_ROUTES_INVALID');
       } catch (err) {
         status = 'error';
         findings.push({
@@ -136,7 +181,7 @@ function measureInventoryCoverage(opts: InventoryCoverageOptions): InventoryCove
   // (or pack-configured dir) for authored use-cases and
   // synthesize triads into the matrix's links[].
   const useCasesDir = opts.useCasesDir ?? join(opts.repoRoot, 'product/use-cases');
-  const loadedUseCases = loadUseCasesFromDir(useCasesDir, admit);
+  const loadedUseCases = loadUseCasesFromDir(useCasesDir, admit, opts.sourceReader);
   for (const f of loadedUseCases.findings) findings.push(f);
   const validRouteIds = new Set(routeIds);
   const validEndpointIds = new Set(endpointIds);
@@ -245,7 +290,7 @@ function measureInventoryCoverage(opts: InventoryCoverageOptions): InventoryCove
   // ADR-SCR-0003 IA-004: registered actions measured against their specification links,
   // the way unmapped routes and endpoints read review above.
   const linkage = surfacePresent(opts.surfaces, 'actions')
-    ? measureActionLinkage(opts.repoRoot, useCasesDir, admit)
+    ? measureActionLinkage(opts.repoRoot, useCasesDir, admit, opts.sourceReader)
     : null;
   if (linkage !== null && linkage.unlinkedIds.length > 0) {
     if (status === 'pass') status = 'review';
@@ -345,23 +390,43 @@ const BOUND_SURFACES: readonly PlantSurface[] = ['http', 'actions'];
 function httpEvidence(opts: InventoryCoverageOptions): SurfaceEvidence {
   const items: string[] = [];
   const admit = opts.admitFile ?? (() => true);
-  const apiMapPath = resolveBodyInput(opts.repoRoot, opts.apiMapPath, API_MAP_FILE);
+  const apiMapPath = resolveBodyInput(
+    opts.repoRoot,
+    opts.apiMapPath,
+    API_MAP_FILE,
+    opts.sourceReader,
+  );
   try {
     if (apiMapPath === null || !admit(apiMapPath)) throw new Error('input not admitted');
-    const apiMap = JSON.parse(readFileSync(apiMapPath, 'utf8')) as Partial<ApiMapShape>;
+    const apiMap = JSON.parse(
+      opts.sourceReader === undefined
+        ? readFileSync(apiMapPath, 'utf8')
+        : opts.sourceReader.readFile(apiMapPath),
+    ) as Partial<ApiMapShape>;
     for (const endpoint of apiMap.endpoints ?? []) items.push(endpointId(endpoint));
-  } catch {
+  } catch (error) {
+    if (opts.sourceReader !== undefined) throw error;
     // No readable api-map: no endpoint evidence.
   }
-  const routes = resolveRoutesPath(opts.repoRoot, opts.routesPath, opts.framework, admit);
+  const routes = resolveRoutesPath(
+    opts.repoRoot,
+    opts.routesPath,
+    opts.framework,
+    admit,
+    undefined,
+    opts.sourceReader,
+  );
   if (routes.kind === 'resolved') {
     try {
       if (!admit(routes.path)) throw new Error('input not admitted');
       const inventory = JSON.parse(
-        readFileSync(routes.path, 'utf8'),
+        opts.sourceReader === undefined
+          ? readFileSync(routes.path, 'utf8')
+          : opts.sourceReader.readFile(routes.path),
       ) as Partial<RoutesInventoryShape>;
       for (const route of inventory.routes ?? []) items.push(route.path);
-    } catch {
+    } catch (error) {
+      if (opts.sourceReader !== undefined) throw error;
       // No readable routes body: no route evidence.
     }
   }
@@ -376,7 +441,7 @@ export function senseInventoryCoverage(opts: InventoryCoverageOptions): Inventor
   const evidence: SurfaceEvidence[] = [];
   if (!surfacePresent(opts.surfaces, 'http')) evidence.push(httpEvidence(opts));
   if (!surfacePresent(opts.surfaces, 'actions'))
-    evidence.push(actionEvidence(opts.repoRoot, opts.admitFile));
+    evidence.push(actionEvidence(opts.repoRoot, opts.admitFile, opts.sourceReader));
   const reading = applySurfaceDeclaration(result.reading, opts.surfaces, BOUND_SURFACES, evidence);
   return { ...result, reading };
 }

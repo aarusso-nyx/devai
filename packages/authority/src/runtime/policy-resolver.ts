@@ -1,3 +1,4 @@
+import { types as nodeTypes } from 'node:util';
 import { minimatch } from 'minimatch';
 import {
   contextOwners,
@@ -9,6 +10,11 @@ import {
   type AnyRecord,
   type IssuerState,
 } from './contracts.js';
+
+import {
+  isProofIndexResourceTarget,
+  isReconciliationHostResourceTarget,
+} from '../boundaries/reconciliation-resources.js';
 
 const MATCH_OPTIONS = {
   dot: true,
@@ -51,7 +57,19 @@ export function targetOperation(resource: AnyRecord): unknown {
 }
 
 export function resourceValid(resource: unknown): resource is AnyRecord {
-  if (!isRecord(resource) || typeof resource.id !== 'string') return false;
+  if (
+    resource === null ||
+    typeof resource !== 'object' ||
+    nodeTypes.isProxy(resource) ||
+    !isRecord(resource)
+  )
+    return false;
+  const kind = Object.getOwnPropertyDescriptor(resource, 'kind');
+  if (kind === undefined || !Object.hasOwn(kind, 'value') || typeof kind.value !== 'string')
+    return false;
+  if (resource.kind === 'proof-index') return isProofIndexResourceTarget(resource);
+  if (resource.kind === 'reconciliation-host') return isReconciliationHostResourceTarget(resource);
+  if (typeof resource.id !== 'string') return false;
   if (resource.kind === 'fs') {
     if (
       !logical(resource.repository_id) ||
@@ -145,6 +163,68 @@ export function selectorMatches(
     return classifyOnly || selector.operation_ids?.includes(resource.operation_id);
   }
   return false;
+}
+
+/** Policy vocabulary only. Exact-plan/batch selector matching deliberately stays separate. */
+export function policySelectorMatches(
+  selector: unknown,
+  resource: AnyRecord,
+  classifyOnly = false,
+): boolean {
+  if (nodeTypes.isProxy(resource) || !isRecord(resource)) return false;
+  const kind = Object.getOwnPropertyDescriptor(resource, 'kind');
+  if (kind === undefined || !Object.hasOwn(kind, 'value')) return false;
+  if (kind.value !== 'proof-index' && kind.value !== 'reconciliation-host')
+    return selectorMatches(selector, resource, classifyOnly);
+  if (!resourceValid(resource) || nodeTypes.isProxy(selector) || !isRecord(selector)) return false;
+  const prototype: unknown = Object.getPrototypeOf(selector);
+  if (prototype !== Object.prototype && prototype !== null) return false;
+  const fields = ['kind', 'repository_id', 'operations'];
+  const keys = Reflect.ownKeys(selector);
+  if (
+    keys.length !== fields.length ||
+    !keys.every((key) => typeof key === 'string' && fields.includes(key))
+  )
+    return false;
+  const data = Object.create(null) as Record<string, unknown>;
+  for (const field of fields) {
+    const descriptor = Object.getOwnPropertyDescriptor(selector, field);
+    if (descriptor?.enumerable !== true || !Object.hasOwn(descriptor, 'value')) return false;
+    data[field] = descriptor.value;
+  }
+  if (
+    data.kind !== kind.value ||
+    data.repository_id !== resource.repository_id ||
+    nodeTypes.isProxy(data.operations) ||
+    !Array.isArray(data.operations) ||
+    Object.getPrototypeOf(data.operations) !== Array.prototype
+  )
+    return false;
+  const operations = data.operations;
+  const allowed =
+    kind.value === 'proof-index'
+      ? ['chain-cas']
+      : ['provision', 'approve', 'renew', 'revoke', 'recover-owned-lease', 'consume-phase'];
+  if (
+    operations.length === 0 ||
+    operations.length > allowed.length ||
+    Reflect.ownKeys(operations).length !== operations.length + 1
+  )
+    return false;
+  const selected: string[] = [];
+  for (let index = 0; index < operations.length; index++) {
+    const descriptor = Object.getOwnPropertyDescriptor(operations, String(index));
+    if (
+      descriptor?.enumerable !== true ||
+      !Object.hasOwn(descriptor, 'value') ||
+      typeof descriptor.value !== 'string' ||
+      !allowed.includes(descriptor.value) ||
+      selected.includes(descriptor.value)
+    )
+      return false;
+    selected.push(descriptor.value);
+  }
+  return classifyOnly || selected.includes(resource.operation);
 }
 
 function queryValid(query: AnyRecord): boolean {
@@ -252,7 +332,7 @@ function classification(rules: AnyRecord[], resource: AnyRecord): AnyRecord[] {
         ]
       : [resource];
   const matchedBySide = sides.map((side) =>
-    rules.filter((rule) => selectorMatches(rule.selector, side, true)),
+    rules.filter((rule) => policySelectorMatches(rule.selector, side, true)),
   );
   if (matchedBySide.some((items) => items.length === 0)) return [];
   const union = new Map<string, AnyRecord>();
@@ -364,7 +444,7 @@ export function resolveAuthorityPolicy(policy: unknown, queryValue: unknown, dep
       actionRules.map((rule) => rule.rule_id),
     );
   const operationRules = subjectRules.filter((rule) =>
-    selectorMatches(rule.selector, query.resource),
+    policySelectorMatches(rule.selector, query.resource),
   );
   if (operationRules.length === 0)
     return deny(

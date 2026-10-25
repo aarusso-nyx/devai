@@ -106,7 +106,22 @@ async function commandsFor(domain: CommandDomain): Promise<readonly CommandDefin
     case 'evidence': {
       const { evidenceCollect, evidenceRecord, evidenceRedact, evidenceRender, evidenceVerify } =
         await import('./commands/evidence/facade.js');
-      return [evidenceCollect, evidenceRecord, evidenceRedact, evidenceRender, evidenceVerify];
+      const { evidenceReconcilePlan } = await import('./commands/evidence/reconcile.js');
+      const { evidenceReconcileApprove } =
+        await import('./commands/evidence/reconciliation-approve.js');
+      const { evidenceReconcileMaterialize, evidenceReconcileStageProof } =
+        await import('./commands/evidence/reconciliation-phases.js');
+      return [
+        evidenceCollect,
+        evidenceReconcileApprove,
+        evidenceReconcileMaterialize,
+        evidenceReconcilePlan,
+        evidenceReconcileStageProof,
+        evidenceRecord,
+        evidenceRedact,
+        evidenceRender,
+        evidenceVerify,
+      ];
     }
     case 'init': {
       const {
@@ -217,7 +232,14 @@ async function commandsFor(domain: CommandDomain): Promise<readonly CommandDefin
           import('./commands/sense/record.js'),
           import('./commands/sense/run-set.js'),
         ]);
-      return [senseInventoryCmd, senseMigrateCmd, senseRecordCmd, senseRunSetCmd];
+      const { senseBootstrapInventory } = await import('./commands/sense/bootstrap-inventory.js');
+      return [
+        senseBootstrapInventory,
+        senseInventoryCmd,
+        senseMigrateCmd,
+        senseRecordCmd,
+        senseRunSetCmd,
+      ];
     }
     case 'task': {
       const {

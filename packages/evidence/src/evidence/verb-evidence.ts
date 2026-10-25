@@ -1,6 +1,15 @@
 import { lstatSync, readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
-import { appendRecord, initChain, loadChain, type EvidenceArtifact } from './chain.js';
+import {
+  appendRecord,
+  initChain,
+  loadChain,
+  verifyLoadedChain,
+  type EvidenceChain,
+  type RecoveredFrom,
+  type EvidenceArtifact,
+} from './chain.js';
 import { verifyProofAnchors } from './anchors.js';
 import { gatherGitContext } from './git-context.js';
 import { deriveEvidenceId } from './id-generator.js';
@@ -42,6 +51,11 @@ export interface VerbEvidenceInputs {
   readonly proofAnchor?: { readonly path: string; readonly sequence: number };
   /** ADR-EVI-0005: recover only an immutable newest line, with an exact retry as a no-op. */
   readonly recoverNewestLine?: boolean;
+  readonly recoverDivergentAnchor?: {
+    readonly sourceChain: string;
+    readonly sourceChainSha256: string;
+    readonly expectedHead: string;
+  };
 }
 
 export interface VerbEvidenceResult {
@@ -81,9 +95,11 @@ interface RecoverySnapshot {
   readonly baseline: Buffer | undefined;
   readonly anchor: { proof_path: string; proof_sequence: number; proof_sha256: string };
   readonly alreadyAnchored?: string;
+  readonly source?: { readonly path: string; readonly bytes: Buffer };
+  readonly recoveredFrom?: RecoveredFrom;
 }
 
-function newestLineRecovery(inputs: VerbEvidenceInputs): RecoverySnapshot {
+function newestLineRecovery(inputs: VerbEvidenceInputs, divergent = false): RecoverySnapshot {
   const root = resolve(inputs.repoRoot);
   const selected = inputs.proofAnchor;
   if (
@@ -104,7 +120,12 @@ function newestLineRecovery(inputs: VerbEvidenceInputs): RecoverySnapshot {
   }
   const proof = recoveryBytes(root, selected.path) as Buffer;
   const physical = splitProofEpochBytes(proof);
-  if (!physical.ok || physical.lines.length !== selected.sequence) {
+  if (
+    !physical.ok ||
+    (divergent
+      ? selected.sequence >= physical.lines.length
+      : physical.lines.length !== selected.sequence)
+  ) {
     throw new Error(
       `PROOF_ANCHOR_UNRESOLVED ${selected.path}:${String(selected.sequence)}: recovery requires the newest complete physical line`,
     );
@@ -204,12 +225,148 @@ function newestLineRecovery(inputs: VerbEvidenceInputs): RecoverySnapshot {
   };
 }
 
+function stable(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stable).join(',')}]`;
+  if (value !== null && typeof value === 'object') {
+    const object = value as Record<string, unknown>;
+    return `{${Object.keys(object)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${stable(object[key])}`)
+      .join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+/** Classify stale heads only from a verified regular canonical-chain snapshot. */
+function recoveryCanonicalChain(root: string): EvidenceChain {
+  const bytes = recoveryBytes(root, 'record/proofs/chain.json') as Buffer;
+  const canonical = JSON.parse(bytes.toString('utf8')) as EvidenceChain;
+  if (
+    canonical === null ||
+    typeof canonical !== 'object' ||
+    !Array.isArray(canonical.records) ||
+    !verifyLoadedChain(canonical).valid
+  )
+    throw new Error('PROOF_ANCHOR_RECOVERY_REFUSED: canonical chain verification failed');
+  return canonical;
+}
+
+function divergentAnchorRecovery(inputs: VerbEvidenceInputs): RecoverySnapshot {
+  try {
+    const request = inputs.recoverDivergentAnchor;
+    if (
+      request === undefined ||
+      inputs.recoverNewestLine === true ||
+      !/^[a-f0-9]{64}$/u.test(request.expectedHead) ||
+      !/^[a-f0-9]{64}$/u.test(request.sourceChainSha256) ||
+      request.sourceChain === 'record/proofs/chain.json' ||
+      request.sourceChain.includes('\\') ||
+      request.sourceChain.split('/').some((part) => part === '' || part === '.' || part === '..')
+    )
+      throw new Error('invalid or mixed divergent recovery selection');
+    const root = resolve(inputs.repoRoot);
+    const canonical = recoveryCanonicalChain(root);
+    if (canonical.head !== request.expectedHead)
+      throw new Error(
+        'PROOF_ANCHOR_RECOVERY_STALE_HEAD: expected head differs from canonical head',
+      );
+    const snapshot = newestLineRecovery(inputs, true);
+    if (snapshot.chain === undefined) throw new Error('canonical chain is missing');
+    const sourceBytes = recoveryBytes(root, request.sourceChain) as Buffer;
+    if (createHash('sha256').update(sourceBytes).digest('hex') !== request.sourceChainSha256)
+      throw new Error('source chain digest mismatch');
+    const source = JSON.parse(sourceBytes.toString('utf8')) as EvidenceChain;
+    if (
+      !Array.isArray(source.records) ||
+      source.records.length === 0 ||
+      !verifyLoadedChain(source).valid ||
+      !verifyLoadedChain(canonical).valid
+    )
+      throw new Error('source or canonical chain verification failed');
+    let fork = 0;
+    while (
+      fork < source.records.length &&
+      fork < canonical.records.length &&
+      stable(source.records[fork]) === stable(canonical.records[fork])
+    )
+      fork += 1;
+    if (fork < 1 || fork === source.records.length || fork === canonical.records.length)
+      throw new Error('chains do not have a divergent common prefix');
+    const physical = splitProofEpochBytes(snapshot.proof);
+    if (!physical.ok) throw new Error('proof epoch is incomplete');
+    const claims = source.records.filter(
+      (record) => record.proof_path === snapshot.anchor.proof_path,
+    );
+    const seenSequences = new Set<number>();
+    for (const claim of claims) {
+      if (
+        !Number.isSafeInteger(claim.proof_sequence) ||
+        (claim.proof_sequence ?? 0) < 1 ||
+        claim.proof_sequence === undefined ||
+        claim.proof_sequence > physical.lines.length ||
+        claim.proof_sha256 !== proofLineDigest(physical.lines[claim.proof_sequence - 1] as Buffer)
+      )
+        throw new Error('source anchor epoch prefix differs from physical proof bytes');
+      if (seenSequences.has(claim.proof_sequence))
+        throw new Error('source has duplicate epoch anchors');
+      seenSequences.add(claim.proof_sequence);
+    }
+    const matches = claims.filter(
+      (record) => record.proof_sequence === snapshot.anchor.proof_sequence,
+    );
+    const entry = matches[0];
+    if (
+      matches.length !== 1 ||
+      entry === undefined ||
+      entry.recovered_from !== undefined ||
+      entry.sequence === undefined ||
+      entry.sequence !== source.records.indexOf(entry) + 1 ||
+      entry.sequence <= fork ||
+      entry.action !== inputs.action
+    )
+      throw new Error('source requires exactly one original direct anchor after the fork');
+    const recoveredFrom: RecoveredFrom = {
+      source_chain_path: request.sourceChain,
+      source_chain_sha256: request.sourceChainSha256,
+      source_entry_id: entry.id,
+      source_entry_sequence: entry.sequence,
+      source_entry_manifest_hash: entry.manifest_hash,
+      fork_sequence: fork,
+    };
+    if (snapshot.alreadyAnchored !== undefined) {
+      const existing = canonical.records.find((record) => record.id === snapshot.alreadyAnchored);
+      if (
+        existing?.recovered_from === undefined ||
+        stable(existing.recovered_from) !== stable(recoveredFrom)
+      )
+        throw new Error('existing anchor has different or absent recovery provenance');
+    }
+    return {
+      ...snapshot,
+      source: { path: request.sourceChain, bytes: sourceBytes },
+      recoveredFrom,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.startsWith('PROOF_ANCHOR_RECOVERY_STALE_HEAD')) throw error;
+    throw new Error(`PROOF_ANCHOR_RECOVERY_REFUSED ${message}`);
+  }
+}
+
 function recheckRecovery(inputs: VerbEvidenceInputs, snapshot: RecoverySnapshot): void {
   const root = resolve(inputs.repoRoot);
+  if (
+    inputs.recoverDivergentAnchor !== undefined &&
+    recoveryCanonicalChain(root).head !== inputs.recoverDivergentAnchor.expectedHead
+  )
+    throw new Error('PROOF_ANCHOR_RECOVERY_STALE_HEAD: canonical head changed before append');
   for (const [path, before] of [
     [snapshot.anchor.proof_path, snapshot.proof],
     ['record/proofs/chain.json', snapshot.chain],
     ['record/proofs/anchor-baseline.json', snapshot.baseline],
+    ...(snapshot.source === undefined
+      ? []
+      : [[snapshot.source.path, snapshot.source.bytes] as const]),
   ] as const) {
     const now = recoveryBytes(root, path, before === undefined);
     if (before === undefined ? now !== undefined : now === undefined || !before.equals(now)) {
@@ -222,13 +379,18 @@ function recheckRecovery(inputs: VerbEvidenceInputs, snapshot: RecoverySnapshot)
 
 export function appendVerbEvidence(inputs: VerbEvidenceInputs): VerbEvidenceResult {
   if (inputs.automatic === true) {
-    return inputs.recoverNewestLine === true
+    return inputs.recoverNewestLine === true || inputs.recoverDivergentAnchor !== undefined
       ? { ok: false, error: 'PROOF_ANCHOR_UNRESOLVED: recovery must persist its anchor' }
       : { ok: true };
   }
   try {
     const chainPath = resolve(inputs.repoRoot, inputs.chainPath ?? 'record/proofs/chain.json');
-    const recovery = inputs.recoverNewestLine === true ? newestLineRecovery(inputs) : undefined;
+    const divergent = inputs.recoverDivergentAnchor !== undefined;
+    const recovery = divergent
+      ? divergentAnchorRecovery(inputs)
+      : inputs.recoverNewestLine === true
+        ? newestLineRecovery(inputs)
+        : undefined;
     if (recovery?.alreadyAnchored !== undefined) {
       recheckRecovery(inputs, recovery);
       return { ok: true, id: recovery.alreadyAnchored, alreadyAnchored: true };
@@ -258,46 +420,85 @@ export function appendVerbEvidence(inputs: VerbEvidenceInputs): VerbEvidenceResu
           : initChain(chainPath);
     const timestamp = new Date().toISOString();
     const git = gatherGitContext(inputs.repoRoot);
-    const artifacts = inputs.artifacts ? [...inputs.artifacts] : [];
-    const id = deriveEvidenceId({
-      timestamp,
-      actor: VERB_EVIDENCE_ACTOR,
-      actor_role: 'harness',
-      action: inputs.action,
-      status: inputs.status,
-      git_head_sha: git.head_sha,
-      artifact_sha256s: artifacts.map((artifact) => artifact.sha256),
-      previous_run_hash: chain.head,
-    });
-    // Keep the final immutable byte check adjacent to the only permitted persistence.
-    if (recovery !== undefined) {
-      recheckRecovery(inputs, recovery);
-      if (recovery.chain === undefined) initChain(chainPath);
-    }
-    const notes =
-      recovery === undefined
-        ? inputs.notes
+    const artifacts =
+      recovery?.source === undefined
+        ? inputs.artifacts
+          ? [...inputs.artifacts]
+          : []
         : [
-            `round_id=${recovery.anchor.proof_path.slice(recovery.anchor.proof_path.lastIndexOf('/') + 1, -6)}`,
-            `proof_sequence=${String(recovery.anchor.proof_sequence)}`,
+            {
+              path: recovery.source.path,
+              sha256: inputs.recoverDivergentAnchor?.sourceChainSha256 ?? null,
+            },
+            {
+              path: `${recovery.anchor.proof_path}:${String(recovery.anchor.proof_sequence)}`,
+              sha256: recovery.anchor.proof_sha256,
+            },
           ];
-    appendRecord(chainPath, {
-      id,
-      timestamp,
-      actor: VERB_EVIDENCE_ACTOR,
-      actor_role: 'harness',
-      action: inputs.action,
-      status: inputs.status,
-      context: { repo_root: inputs.repoRoot, git },
-      artifacts,
-      ...(notes === undefined ? {} : { notes }),
-      ...anchor,
-    });
+    const deriveIdForHead = (head: string | null) =>
+      deriveEvidenceId({
+        timestamp,
+        actor: VERB_EVIDENCE_ACTOR,
+        actor_role: 'harness',
+        action: inputs.action,
+        status: inputs.status,
+        git_head_sha: git.head_sha,
+        artifact_sha256s: artifacts.map((artifact) => artifact.sha256),
+        previous_run_hash: head,
+      });
+    let id = deriveIdForHead(chain.head);
+    {
+      // Keep the final immutable byte check adjacent to the only permitted persistence.
+      if (recovery !== undefined) {
+        recheckRecovery(inputs, recovery);
+        if (recovery.chain === undefined) initChain(chainPath);
+      }
+      const notes =
+        recovery === undefined
+          ? inputs.notes
+          : [
+              `round_id=${recovery.anchor.proof_path.slice(recovery.anchor.proof_path.lastIndexOf('/') + 1, -6)}`,
+              `proof_sequence=${String(recovery.anchor.proof_sequence)}`,
+            ];
+      const stored = appendRecord(
+        chainPath,
+        {
+          id,
+          timestamp,
+          actor: VERB_EVIDENCE_ACTOR,
+          actor_role: 'harness',
+          action: inputs.action,
+          status: inputs.status,
+          context: { repo_root: inputs.repoRoot, git },
+          artifacts,
+          ...(notes === undefined ? {} : { notes }),
+          ...anchor,
+          ...(recovery?.recoveredFrom === undefined
+            ? {}
+            : { recovered_from: recovery.recoveredFrom }),
+        },
+        inputs.recoverDivergentAnchor?.expectedHead,
+        inputs.recoverDivergentAnchor === undefined
+          ? undefined
+          : () => {
+              divergentAnchorRecovery(inputs);
+              if (recovery !== undefined) recheckRecovery(inputs, recovery);
+            },
+        deriveIdForHead,
+      );
+      id = stored.id;
+    }
     return { ok: true, id };
   } catch (error) {
     return {
       ok: false,
-      error: error instanceof Error ? error.message : String(error),
+      error:
+        inputs.recoverDivergentAnchor !== undefined &&
+        !(error instanceof Error && error.message.startsWith('PROOF_ANCHOR_RECOVERY_'))
+          ? `PROOF_ANCHOR_RECOVERY_REFUSED ${error instanceof Error ? error.message : String(error)}`
+          : error instanceof Error
+            ? error.message
+            : String(error),
     };
   }
 }

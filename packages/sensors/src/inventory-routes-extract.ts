@@ -1,3 +1,4 @@
+import type { InventorySourceReader } from './inventory-walker.js';
 import { createHash } from 'node:crypto';
 import { relative } from 'node:path';
 import ts from 'typescript';
@@ -68,6 +69,7 @@ export interface RoutesInventoryBody {
 }
 
 export interface InventoryRoutesOptions {
+  readonly sourceReader?: InventorySourceReader;
   readonly repoRoot: string;
   /**
    * Declared plant surfaces (ADR-SCR-0003). Omitted: every surface is presumed present.

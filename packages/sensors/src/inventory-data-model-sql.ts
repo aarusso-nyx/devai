@@ -1,3 +1,4 @@
+import type { InventorySourceReader } from './inventory-walker.js';
 import { readFileSync } from 'node:fs';
 import type {
   DataModelColumn,
@@ -342,11 +343,17 @@ function lineOf(source: string, offset: number): number {
   return line;
 }
 
-export function parseSqlFile(absPath: string, fileRel: string): ParsedSqlFile {
+export function parseSqlFile(
+  absPath: string,
+  fileRel: string,
+  sourceReader?: InventorySourceReader,
+): ParsedSqlFile {
   let text: string;
   try {
-    text = readFileSync(absPath, 'utf8');
-  } catch {
+    text =
+      sourceReader === undefined ? readFileSync(absPath, 'utf8') : sourceReader.readFile(absPath);
+  } catch (error) {
+    if (sourceReader !== undefined) throw error;
     return { tables: [], rawText: '' };
   }
   const out: DataModelTable[] = [];

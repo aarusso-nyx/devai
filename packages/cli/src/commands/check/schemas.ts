@@ -49,6 +49,7 @@ const SOURCE_ONLY_SCHEMAS = [
   'data-handling.schema.json',
   'documentation-information-architecture.schema.json',
   'inv-override.schema.json',
+  'proof-index-reconciliation-contract.schema.json',
   'targets.schema.json',
   'task-freshness.schema.json',
   'threat-model.schema.json',

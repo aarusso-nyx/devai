@@ -6,6 +6,7 @@ import {
   fstatSync as nodeFstatSync,
   fsyncSync as nodeFsyncSync,
   linkSync as nodeLinkSync,
+  lstatSync as nodeLstatSync,
   openSync as nodeOpenSync,
   unlinkSync as nodeUnlinkSync,
   writeSync as nodeWriteSync,
@@ -65,6 +66,11 @@ export interface PublishNoReplaceHooks {
   readonly crashAfterLink?: boolean;
   readonly unlinkStaged?: (staged: string) => void;
   readonly fsyncDirectory?: (directory: string) => void;
+}
+
+/** Fixed trusted admission guard for private bytes; ordinary publication is unchanged. */
+export interface PrivatePublishNoReplaceHooks extends PublishNoReplaceHooks {
+  readonly verifyPrepared?: () => void;
 }
 
 function fsyncDirectory(path: string): void {
@@ -138,6 +144,124 @@ export function publishNoReplaceSteps(
     (hooks.fsyncDirectory ?? fsyncDirectory)(directory);
   } catch (error) {
     throw new PublishIndeterminateError(path, removeIfPresent(staged), error, identity);
+  }
+  return identity;
+}
+
+function privateDescriptorStat(fd: number) {
+  return nodeFstatSync(fd, { bigint: true });
+}
+
+/** Private counterpart of the ordinary publisher; mode is fixed before the first write. */
+export function publishPrivateNoReplaceSteps(
+  path: string,
+  data: string | Uint8Array,
+  hooks: PrivatePublishNoReplaceHooks = {},
+): PublishedFileIdentity {
+  const staged = join(
+    dirname(path),
+    `.${basename(path)}.${String(process.pid)}-${randomUUID()}${PUBLISH_STAGED_SUFFIX}`,
+  );
+  return publishPrivateAtStagedPath(path, staged, data, hooks);
+}
+
+/** Internal native adapter primitive. The sealed preview/intent chooses this exact sibling. */
+export function publishPrivateNoReplacePreparedSteps(
+  path: string,
+  stagedName: string,
+  data: string | Uint8Array,
+  hooks: PrivatePublishNoReplaceHooks = {},
+): PublishedFileIdentity {
+  const prefix = `.${basename(path)}.${String(process.pid)}-`;
+  if (
+    typeof stagedName !== 'string' ||
+    !stagedName.startsWith(prefix) ||
+    !stagedName.endsWith(PUBLISH_STAGED_SUFFIX) ||
+    !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/u.test(
+      stagedName.slice(prefix.length, -PUBLISH_STAGED_SUFFIX.length),
+    )
+  )
+    throw new Error('AUTHORITY_PRIVATE_PUBLICATION_PREPARED_PATH_INVALID');
+  return publishPrivateAtStagedPath(path, join(dirname(path), stagedName), data, hooks);
+}
+
+function publishPrivateAtStagedPath(
+  path: string,
+  staged: string,
+  data: string | Uint8Array,
+  hooks: PrivatePublishNoReplaceHooks,
+): PublishedFileIdentity {
+  const bytes = typeof data === 'string' ? Buffer.from(data, 'utf8') : Buffer.from(data);
+  const directory = dirname(path);
+  hooks.verifyPrepared?.();
+  const fd = nodeOpenSync(staged, 'wx', 0o600);
+  let created: ReturnType<typeof privateDescriptorStat>;
+  try {
+    created = privateDescriptorStat(fd);
+  } catch (error) {
+    nodeCloseSync(fd);
+    // No secret bytes were written and no identity was established for removal.
+    throw error;
+  }
+  const identity = { dev: created.dev, ino: created.ino, birthtimeNs: created.birthtimeNs };
+  const isOwnedPrivate = (stat: typeof created): boolean =>
+    stat.isFile() &&
+    BigInt(stat.dev) === identity.dev &&
+    BigInt(stat.ino) === identity.ino &&
+    stat.birthtimeNs === identity.birthtimeNs &&
+    (BigInt(stat.mode) & 0o7777n) === 0o600n;
+  const assertOwnedPrivate = (): void => {
+    if (!isOwnedPrivate(nodeLstatSync(staged, { bigint: true })))
+      throw new Error('AUTHORITY_RESOURCE_CHANGED_AFTER_PREPARE');
+  };
+  const unlinkOwned = (): void => {
+    assertOwnedPrivate();
+    (hooks.unlinkStaged ?? nodeUnlinkSync)(staged);
+  };
+  try {
+    try {
+      if (!isOwnedPrivate(created)) throw new Error('AUTHORITY_RESOURCE_CHANGED_AFTER_PREPARE');
+      hooks.verifyPrepared?.();
+      let offset = 0;
+      while (offset < bytes.length) {
+        const written = nodeWriteSync(fd, bytes, offset, bytes.length - offset);
+        if (written <= 0) throw new Error('AUTHORITY_PUBLISH_WRITE_STALLED');
+        offset += written;
+      }
+      nodeFsyncSync(fd);
+      if (!isOwnedPrivate(nodeFstatSync(fd, { bigint: true })))
+        throw new Error('AUTHORITY_RESOURCE_CHANGED_AFTER_PREPARE');
+    } finally {
+      nodeCloseSync(fd);
+    }
+    assertOwnedPrivate();
+    hooks.verifyPrepared?.();
+    assertOwnedPrivate();
+    nodeLinkSync(staged, path);
+  } catch (error) {
+    // Check staged identity before cleanup; preserve any unexpected entry.
+    try {
+      assertOwnedPrivate();
+      nodeUnlinkSync(staged);
+    } catch {
+      // Preserve the original failure and any uncertain entry for inspection.
+    }
+    throw error;
+  }
+  if (hooks.crashAfterLink === true) throw new Error('AUTHORITY_PUBLISH_SIMULATED_CRASH');
+  try {
+    unlinkOwned();
+    (hooks.fsyncDirectory ?? fsyncDirectory)(directory);
+  } catch (error) {
+    let stagedRemaining = true;
+    try {
+      assertOwnedPrivate();
+      nodeUnlinkSync(staged);
+      stagedRemaining = false;
+    } catch (cleanupError) {
+      stagedRemaining = (cleanupError as NodeJS.ErrnoException).code !== 'ENOENT';
+    }
+    throw new PublishIndeterminateError(path, stagedRemaining, error, identity);
   }
   return identity;
 }

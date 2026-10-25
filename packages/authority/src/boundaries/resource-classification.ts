@@ -1,7 +1,54 @@
 import { resolve as resolvePath, sep } from 'node:path';
+import { types as nodeTypes } from 'node:util';
 import { deepFreeze, failure, isRecord, success, type AnyRecord } from '../runtime/contracts.js';
 import { captureProtectedReleaseRepositoryIdentity } from './release-repository-identity.js';
 import { captureProtectedReleaseExportBinding } from './release-export-binding.js';
+import {
+  isProofIndexResourceTarget,
+  isReconciliationHostResourceTarget,
+} from './reconciliation-resources.js';
+
+export function typedResourceKind(
+  value: unknown,
+): 'proof-index' | 'reconciliation-host' | undefined {
+  if (nodeTypes.isProxy(value) || !isRecord(value)) return undefined;
+  const descriptor = Object.getOwnPropertyDescriptor(value, 'kind');
+  if (descriptor === undefined || !Object.hasOwn(descriptor, 'value')) return undefined;
+  return descriptor.value === 'proof-index' || descriptor.value === 'reconciliation-host'
+    ? descriptor.value
+    : undefined;
+}
+
+/** Trusted constructor dependencies only; no method or permission is read from a target. */
+export function typedResourceAdapter(
+  target: AnyRecord,
+  dependencies: AnyRecord,
+): AnyRecord | undefined {
+  const kind = typedResourceKind(target);
+  if (kind === undefined) return undefined;
+  if (nodeTypes.isProxy(dependencies)) return undefined;
+  const descriptor = Object.getOwnPropertyDescriptor(
+    dependencies,
+    kind === 'proof-index' ? 'proof_index' : 'reconciliation_host',
+  );
+  if (descriptor === undefined || !Object.hasOwn(descriptor, 'value')) return undefined;
+  const candidate: unknown = descriptor.value;
+  if (nodeTypes.isProxy(candidate) || !isRecord(candidate)) return undefined;
+  for (const key of ['admit', 'snapshot', 'apply']) {
+    const descriptor = Object.getOwnPropertyDescriptor(candidate, key);
+    if (
+      descriptor === undefined ||
+      !Object.hasOwn(descriptor, 'value') ||
+      typeof descriptor.value !== 'function'
+    )
+      return undefined;
+  }
+  try {
+    return candidate.admit(target) === true ? candidate : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 export function logical(value: unknown): value is string {
   return (
@@ -127,8 +174,38 @@ export function protectedReleaseBoundaryAdapterId(
 }
 
 export function classifyAuthorityResource(input: unknown, deps: unknown = {}) {
-  if (!isRecord(input)) return failure('usage-error', 'AUTHORITY_RESOURCE_TARGET_INVALID');
-  const dependencies = isRecord(deps) ? deps : {};
+  if (nodeTypes.isProxy(input) || !isRecord(input))
+    return failure('usage-error', 'AUTHORITY_RESOURCE_TARGET_INVALID');
+  const kind = Object.getOwnPropertyDescriptor(input, 'kind');
+  if (kind === undefined || !Object.hasOwn(kind, 'value'))
+    return failure('usage-error', 'AUTHORITY_RESOURCE_TARGET_INVALID');
+  const dependencies = !nodeTypes.isProxy(deps) && isRecord(deps) ? deps : {};
+  const typedKind = typedResourceKind(input);
+  if (typedKind !== undefined) {
+    if (
+      !(typedKind === 'proof-index'
+        ? isProofIndexResourceTarget(input)
+        : isReconciliationHostResourceTarget(input))
+    )
+      return failure('usage-error', 'AUTHORITY_RESOURCE_TARGET_INVALID');
+    const dependency = typedKind === 'proof-index' ? 'proof_index' : 'reconciliation_host';
+    // Default classification still refuses: shapes cannot manufacture host admission.
+    const descriptor = Object.getOwnPropertyDescriptor(dependencies, dependency);
+    if (
+      descriptor === undefined ||
+      (Object.hasOwn(descriptor, 'value') && descriptor.value === undefined)
+    )
+      return failure('usage-error', 'AUTHORITY_RESOURCE_TARGET_INVALID');
+    if (typedResourceAdapter(input, dependencies) === undefined)
+      return failure('dependency-error', 'AUTHORITY_TYPED_RESOURCE_ADAPTER_REQUIRED');
+    return success(
+      deepFreeze({
+        target: input,
+        atomicity: 'whole-plan',
+        adapter_id: `${typedKind}-authority-boundary`,
+      }),
+    );
+  }
   if (input.kind === 'fs-rename') {
     if (
       !logical(input.repository_id) ||

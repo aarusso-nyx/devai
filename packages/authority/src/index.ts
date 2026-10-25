@@ -1,6 +1,19 @@
 export * from './adapters.js';
 export * from './boundaries/host-effects.js';
 export * from './boundaries/index.js';
+export * from './boundaries/reconciliation-host-operation.js';
+export {
+  readReconciliationPlan,
+  ReconciliationPlanError,
+  type ReconciliationPlan,
+} from './boundaries/reconciliation-plan.js';
+export {
+  createReconciliationHostProvisionReview,
+  interruptReconciliationHostProvisionReview,
+  type ReconciliationHostProvisionReview,
+  type ReconciliationHostProvisionReady,
+  type ReconciliationHostProvisionResult,
+} from './boundaries/reconciliation-host-provision.js';
 export {
   captureExportMutationUnitProjections,
   type ExportMutationUnitProjection,
@@ -16,3 +29,10 @@ export * from './paths.js';
 export * from './principals.js';
 export * from './runtime/index.js';
 export * from './types.js';
+
+export {
+  createReconciliationObservation,
+  disposeReconciliationObservation,
+} from './boundaries/reconciliation-observation.js';
+
+export { hasAuthenticatedReconciliationCheckpoint } from './boundaries/reconciliation-checkpoint.js';

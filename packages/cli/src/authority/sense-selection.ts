@@ -1,4 +1,6 @@
 import { resolve } from 'node:path';
+import { realpathSync } from 'node:fs';
+import { parseReconciliationHostInput } from './reconciliation-host-input.js';
 import { deriveActionEffectFromCapabilities, type ActionCapability } from '../command-manifest.js';
 import type { RegistryEntry } from '../define-command.js';
 import { resolveCheckPlan } from '../commands/check/contracts.js';
@@ -227,6 +229,34 @@ export function resolveInvocationEntry(
   entry: RegistryEntry,
   argv: readonly string[],
 ): RegistryEntry {
+  if (entry.name === 'init bind' && argv.includes('--reconciliation-host')) {
+    const root = realpathSync(resolve(flagValue(argv, '--target') ?? '.'));
+    const parsed = parseReconciliationHostInput('init bind', argv, root, 'architect');
+    if (
+      parsed?.operation !== 'provision' ||
+      !parsed.write ||
+      !entry.authority_contract.capabilities.includes('reconciliation-host:write')
+    )
+      throw new Error('AUTHORITY_RECONCILIATION_INVOCATION_INVALID');
+    return Object.freeze({
+      ...entry,
+      authority_contract: Object.freeze({
+        ...entry.authority_contract,
+        capabilities: Object.freeze(['reconciliation-host:write'] as const),
+        planner: Object.freeze({
+          kind: 'exact-plan' as const,
+          planner_id: 'init-bind-reconciliation-host-exact-plan',
+          target_kinds: Object.freeze(['reconciliation-host'] as const),
+          atomicity: 'whole-plan' as const,
+        }),
+        boundary: Object.freeze({
+          kind: 'mutation-adapters' as const,
+          adapter_ids: Object.freeze(['reconciliation-host-authority-boundary']),
+          final_reverification: true as const,
+        }),
+      }),
+    });
+  }
   if (entry.name === 'check') return resolveCheckEntry(entry, argv);
   return resolveSenseInvocation(entry, argv)?.entry ?? entry;
 }

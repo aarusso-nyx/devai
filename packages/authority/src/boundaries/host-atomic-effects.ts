@@ -13,7 +13,8 @@ import {
 } from 'node:fs';
 
 export interface AuthorityHostEffectRequest {
-  readonly kind: 'filesystem' | 'process' | 'protected-release';
+  readonly kind:
+    'filesystem' | 'process' | 'protected-release' | 'reconciliation-host' | 'proof-index';
   readonly symbol: string;
   readonly arguments: readonly unknown[];
 }

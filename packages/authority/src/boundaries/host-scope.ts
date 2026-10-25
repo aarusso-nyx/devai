@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { issuerState } from '../runtime/contracts.js';
+import { registerReconciliationObservationScope } from './reconciliation-observation.js';
 import type { AuthorityHostEffectRequest } from './host-atomic-effects.js';
 
 /**
@@ -15,6 +16,10 @@ export interface AuthorityHostEffectScope {
   readonly invocation_id: string;
   readonly effect: 'read' | 'harness-write' | 'local-write' | 'remote-write';
   readonly receipt_store: object;
+  /** Opaque reconciliation broker invocation; data copies convey no authority. */
+  readonly reconciliation_invocation?: object;
+  /** Separate readonly checkpoint observation; never accepted by effect dispatch. */
+  readonly reconciliation_observation?: object;
   readonly apply_effect: (request: AuthorityHostEffectRequest, apply: () => unknown) => unknown;
   /** Installed by the prepare broker only; reads its existing bounded-plan account. */
   readonly read_prepare_capacity?: (
@@ -66,5 +71,7 @@ export function runWithAuthorityHostEffects<T>(
   ) {
     throw new Error('AUTHORITY_HOST_SCOPE_INVALID');
   }
-  return scopes.run(Object.freeze({ ...scope }), callback);
+  const actual = Object.freeze({ ...scope });
+  registerReconciliationObservationScope(scope, actual);
+  return scopes.run(actual, callback);
 }

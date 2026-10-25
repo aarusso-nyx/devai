@@ -1,0 +1,525 @@
+import { randomBytes } from 'node:crypto';
+import { mkdirSync, realpathSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { checkReconciliationClockWindow } from '../runtime/reconciliation-clock.js';
+import {
+  encodeReconciliationOwnerRecord,
+  signReconciliationOwnerRecord,
+} from '../runtime/reconciliation-owner-record.js';
+import { withReconciliationAdmissionSteps } from './host-reconciliation-admission.js';
+import {
+  publishPrivateNoReplaceSteps,
+  PublishIndeterminateError,
+  type PublishedFileIdentity,
+} from './host-publish.js';
+import { requireScope } from './host-operation.js';
+import { scopes } from './host-scope.js';
+import {
+  reconciliationAdmissionSeedBytes,
+  RECONCILIATION_ADMISSION_SEED_SHA256,
+  RECONCILIATION_ADMISSION_SEED_SIZE,
+} from './reconciliation-admission-seed.js';
+import {
+  captureReconciliationHostContext,
+  disposeReconciliationHostContext,
+  readReconciliationHostIdentity,
+  readReconciliationHostPaths,
+} from './reconciliation-host-context.js';
+import {
+  invokeReconciliationHostOperation,
+  readReconciliationHostBinding,
+} from './reconciliation-host-operation.js';
+import {
+  provisionFail,
+  provisionSha,
+  provisionBytesSha,
+  ReconciliationProvisionError,
+  readNativeReconciliationNamespace,
+  readNativeDirectory,
+  readNativePrivateFile,
+  syncNativeDirectory,
+  syncNativePrecursor,
+  type NativeDirectoryIdentity,
+  type NativeReconciliationNamespace,
+  type NativeReconciliationPaths,
+} from './reconciliation-host-namespace.js';
+
+type Stage = 'seed' | 'issuer';
+interface ProvisionEffect {
+  readonly target: string;
+  readonly operation: 'create-directory' | 'publish-seed' | 'sync-precursor' | 'publish-issuer';
+  readonly mode: '0700' | '0600';
+}
+interface Owned {
+  readonly target: string;
+  readonly dev: string;
+  readonly ino: string;
+  readonly birthtime_ns: string;
+}
+export interface ReconciliationHostProvisionReady {
+  readonly kind: 'reconciliation-provision-review';
+  readonly action_id: 'init bind';
+  readonly stage: Stage;
+  readonly repository_id: string;
+  readonly worktree_id: string;
+  readonly host_identity_sha256: string;
+  readonly binding_sha256: string;
+  readonly namespace_sha256: string;
+  readonly plan_sha256: string;
+  readonly artifact: Readonly<{ sha256: string; size_bytes: number }>;
+  readonly effects: readonly ProvisionEffect[];
+  readonly confirmation: string;
+  readonly lifetime_ms: 300000;
+  readonly grants_authority: false;
+}
+export interface ReconciliationHostProvisionResult {
+  readonly kind: 'reconciliation-provision-result';
+  readonly action_id: 'init bind';
+  readonly outcome: 'created' | 'existing' | 'cancelled' | 'indeterminate';
+  readonly stage: Stage | null;
+  readonly repository_id: string;
+  readonly worktree_id: string;
+  readonly issuer_sha256: string | null;
+  readonly owned: readonly Owned[];
+  readonly grants_authority: false;
+}
+type Projection = ReconciliationHostProvisionReady | ReconciliationHostProvisionResult;
+export interface ReconciliationHostProvisionReview {
+  start(): Projection;
+  confirm(token: string): Projection;
+  cancel(): ReconciliationHostProvisionResult;
+}
+interface Observation {
+  readonly binding: ReturnType<typeof readReconciliationHostBinding>;
+  readonly paths: NativeReconciliationPaths;
+  readonly namespace: NativeReconciliationNamespace;
+}
+
+const interruptedReviews = new WeakMap<object, () => ReconciliationHostProvisionResult>();
+
+/** Preserve known custody after a failed public exchange; this performs no host effects. */
+export function interruptReconciliationHostProvisionReview(
+  review: ReconciliationHostProvisionReview,
+): ReconciliationHostProvisionResult {
+  const interrupt = interruptedReviews.get(review);
+  if (!interrupt) provisionFail('RECONCILIATION_PROVISION_REVIEW_INVALID');
+  return interrupt();
+}
+const LOGICAL = 'worktree-host/devai';
+function guarded<T>(callback: () => T): T {
+  try {
+    return callback();
+  } catch (error) {
+    if (error instanceof ReconciliationProvisionError) throw error;
+    provisionFail();
+  }
+}
+function observe(root: string): Observation {
+  return guarded(() => {
+    const binding = readReconciliationHostBinding();
+    const context = captureReconciliationHostContext(root, binding.identity.repository_id);
+    try {
+      if (provisionSha(readReconciliationHostIdentity(context)) !== provisionSha(binding.identity))
+        provisionFail('RECONCILIATION_PROVISION_STALE');
+      const paths = readReconciliationHostPaths(context);
+      const namespace = readNativeReconciliationNamespace(paths, binding.identity);
+      if (provisionSha(readReconciliationHostIdentity(context)) !== provisionSha(binding.identity))
+        provisionFail('RECONCILIATION_PROVISION_STALE');
+      return { binding, paths, namespace };
+    } finally {
+      disposeReconciliationHostContext(context);
+    }
+  });
+}
+function ownedDirectory(target: string, identity: NativeDirectoryIdentity): Owned {
+  return Object.freeze({
+    target,
+    dev: identity.dev,
+    ino: identity.ino,
+    birthtime_ns: identity.birthtime_ns,
+  });
+}
+function ownedFile(target: string, identity: PublishedFileIdentity): Owned {
+  return Object.freeze({
+    target,
+    dev: String(identity.dev),
+    ino: String(identity.ino),
+    birthtime_ns: String(identity.birthtimeNs),
+  });
+}
+
+/** A fixed native two-stage workflow. Serialized previews are never executable handles. */
+export function createReconciliationHostProvisionReview(
+  repositoryRoot: string,
+): ReconciliationHostProvisionReview {
+  return guarded(() => {
+    if (
+      typeof repositoryRoot !== 'string' ||
+      !repositoryRoot.startsWith('/') ||
+      realpathSync(repositoryRoot) !== repositoryRoot
+    )
+      provisionFail();
+    const scope = requireScope('process');
+    if (scope.action_id !== 'init bind') provisionFail('RECONCILIATION_PROVISION_REVIEW_INVALID');
+    let observation = observe(repositoryRoot);
+    let issued = observation.binding.clock;
+    let state: 'new' | 'ready' | 'terminal' = 'new';
+    let ready: ReconciliationHostProvisionReady | undefined;
+    let issuerBytes: Uint8Array | undefined;
+    let seedPlan: string | undefined;
+    const owned: Owned[] = [];
+    let uncertainEffect = false;
+    const member = (receiver: unknown): void => {
+      if (receiver !== handle || state === 'terminal' || scopes.getStore() !== scope)
+        provisionFail('RECONCILIATION_PROVISION_REVIEW_INVALID');
+    };
+    const close = (): void => {
+      state = 'terminal';
+      issuerBytes?.fill(0);
+      issuerBytes = undefined;
+      observation.namespace.issuer?.bytes.fill(0);
+      observation = { ...observation, namespace: { ...observation.namespace, issuer: null } };
+    };
+    const assertReviewHost = (): void => {
+      try {
+        if (scopes.getStore() !== scope) provisionFail('RECONCILIATION_PROVISION_STALE');
+        // This host-only observation never opens admission.sqlite, including
+        // when called by the fixed publisher guard while native admission is held.
+        const current = readReconciliationHostBinding();
+        checkReconciliationClockWindow(issued, current.clock, 'review');
+        if (
+          provisionSha(current.identity) !== provisionSha(observation.binding.identity) ||
+          current.binding_sha256 !== observation.binding.binding_sha256
+        )
+          provisionFail('RECONCILIATION_PROVISION_STALE');
+      } catch {
+        provisionFail('RECONCILIATION_PROVISION_STALE');
+      }
+    };
+    const fresh = (): Observation => {
+      let current: Observation;
+      try {
+        current = observe(repositoryRoot);
+      } catch {
+        provisionFail('RECONCILIATION_PROVISION_STALE');
+      }
+      try {
+        checkReconciliationClockWindow(issued, current.binding.clock, 'review');
+      } catch {
+        provisionFail('RECONCILIATION_PROVISION_STALE');
+      }
+      if (
+        provisionSha(current.binding.identity) !== provisionSha(observation.binding.identity) ||
+        current.binding.binding_sha256 !== observation.binding.binding_sha256 ||
+        current.namespace.sha256 !== observation.namespace.sha256
+      )
+        provisionFail('RECONCILIATION_PROVISION_STALE');
+      return current;
+    };
+    const result = (
+      outcome: ReconciliationHostProvisionResult['outcome'],
+      stage: Stage | null,
+      issuerSha: string | null = null,
+    ): ReconciliationHostProvisionResult =>
+      Object.freeze({
+        kind: 'reconciliation-provision-result',
+        action_id: 'init bind',
+        outcome,
+        stage,
+        repository_id: observation.binding.identity.repository_id,
+        worktree_id: observation.binding.identity.worktree_id,
+        issuer_sha256: issuerSha,
+        owned: Object.freeze(
+          outcome === 'created' || outcome === 'indeterminate' ? [...owned] : [],
+        ),
+        grants_authority: false,
+      });
+    const makeReady = (
+      stage: Stage,
+      artifact: { sha256: string; size_bytes: number },
+      effects: ProvisionEffect[],
+    ): ReconciliationHostProvisionReady => {
+      const basis = {
+        kind: 'reconciliation-provision-review' as const,
+        action_id: 'init bind' as const,
+        stage,
+        repository_id: observation.binding.identity.repository_id,
+        worktree_id: observation.binding.identity.worktree_id,
+        host_identity_sha256: observation.binding.identity.host_identity_sha256,
+        binding_sha256: observation.binding.binding_sha256,
+        namespace_sha256: observation.namespace.sha256,
+        artifact: Object.freeze(artifact),
+        effects: Object.freeze(effects.map((effect) => Object.freeze(effect))),
+        lifetime_ms: 300000 as const,
+        grants_authority: false as const,
+      };
+      const plan = provisionSha(basis);
+      return Object.freeze({
+        ...basis,
+        plan_sha256: plan,
+        confirmation: `${stage === 'seed' ? 'PREPARE' : 'BIND'} RECONCILIATION-HOST ${plan}`,
+      });
+    };
+    const issuerReady = (): ReconciliationHostProvisionReady => {
+      const anchor = observation.namespace.anchor;
+      if (!anchor || observation.namespace.issuer) provisionFail();
+      // A resumed precursor has no original in-memory first review. Bind its exact
+      // current validation plan, never invent the lost first-stage absence witness.
+      seedPlan ??= provisionSha({
+        kind: 'reconciliation-seed-resume',
+        host_identity: observation.binding.identity,
+        binding_sha256: observation.binding.binding_sha256,
+        namespace_sha256: observation.namespace.sha256,
+        seed_sha256: RECONCILIATION_ADMISSION_SEED_SHA256,
+      });
+      const rawKey = randomBytes(32);
+      try {
+        const key = rawKey.toString('base64');
+        const context = {
+          seed_plan_sha256: seedPlan,
+          host_identity_sha256: observation.binding.identity.host_identity_sha256,
+          admission_anchor_sha256: provisionSha(anchor),
+          installation_bindings_sha256: provisionSha(observation.binding.bindings),
+          installed_at_head: observation.binding.identity.head,
+        };
+        const record = signReconciliationOwnerRecord(
+          {
+            schemaVersion: '1.0.0',
+            kind: 'issuer',
+            domain: 'devai.reconciliation.owner.v1/issuer',
+            repository_id: observation.binding.identity.repository_id,
+            worktree_id: observation.binding.identity.worktree_id,
+            clock: observation.binding.clock,
+            adapter_id: 'reconciliation-host-authority-boundary',
+            host_identity_sha256: observation.binding.identity.host_identity_sha256,
+            key_sha256: provisionBytesSha(rawKey),
+            seed_plan_sha256: seedPlan,
+            provision_context_sha256: provisionSha(context),
+            admission_anchor: anchor,
+            private_key_base64: key,
+            installation_bindings: observation.binding.bindings,
+            installed_at_head: observation.binding.identity.head,
+          },
+          key,
+        );
+        issuerBytes = encodeReconciliationOwnerRecord(record);
+      } finally {
+        rawKey.fill(0);
+      }
+      return makeReady(
+        'issuer',
+        { sha256: provisionBytesSha(issuerBytes), size_bytes: issuerBytes.length },
+        [
+          {
+            target: `${LOGICAL}/reconciliation/admission.sqlite`,
+            operation: 'sync-precursor',
+            mode: '0600',
+          },
+          {
+            target: `${LOGICAL}/reconciliation/issuer.json`,
+            operation: 'publish-issuer',
+            mode: '0600',
+          },
+        ],
+      );
+    };
+    const publish = (path: string, bytes: Uint8Array, logical: string): PublishedFileIdentity => {
+      try {
+        const identity = publishPrivateNoReplaceSteps(path, bytes, {
+          verifyPrepared: assertReviewHost,
+        });
+        owned.push(ownedFile(logical, identity));
+        return identity;
+      } catch (error) {
+        if (error instanceof PublishIndeterminateError)
+          owned.push(ownedFile(logical, error.identity));
+        throw error;
+      }
+    };
+    const handle: ReconciliationHostProvisionReview = Object.freeze({
+      start: function (this: unknown): Projection {
+        member(this);
+        if (state !== 'new') provisionFail('RECONCILIATION_PROVISION_REVIEW_INVALID');
+        try {
+          fresh();
+          if (observation.namespace.issuer) {
+            const output = result('existing', null, observation.namespace.issuer.sha256);
+            close();
+            return output;
+          }
+          if (observation.namespace.anchor) ready = issuerReady();
+          else {
+            const effects: ProvisionEffect[] = [];
+            if (!observation.namespace.devai)
+              effects.push({ target: LOGICAL, operation: 'create-directory', mode: '0700' });
+            if (!observation.namespace.root)
+              effects.push({
+                target: `${LOGICAL}/reconciliation`,
+                operation: 'create-directory',
+                mode: '0700',
+              });
+            effects.push({
+              target: `${LOGICAL}/reconciliation/admission.sqlite`,
+              operation: 'publish-seed',
+              mode: '0600',
+            });
+            ready = makeReady(
+              'seed',
+              {
+                sha256: RECONCILIATION_ADMISSION_SEED_SHA256,
+                size_bytes: RECONCILIATION_ADMISSION_SEED_SIZE,
+              },
+              effects,
+            );
+          }
+          state = 'ready';
+          return ready;
+        } catch (error) {
+          close();
+          if (error instanceof ReconciliationProvisionError) throw error;
+          provisionFail();
+        }
+      },
+      confirm: function (this: unknown, token: string): Projection {
+        member(this);
+        if (state !== 'ready' || !ready) provisionFail('RECONCILIATION_PROVISION_REVIEW_INVALID');
+        const stage = ready.stage;
+        if (typeof token !== 'string' || token !== ready.confirmation) {
+          const output = result('cancelled', stage);
+          close();
+          return output;
+        }
+        let effectEntered = false;
+        try {
+          fresh();
+          const target = {
+            kind: 'reconciliation-host' as const,
+            id: `reconciliation-host:${observation.binding.identity.repository_id}:${observation.binding.identity.worktree_id}:provision`,
+            repository_id: observation.binding.identity.repository_id,
+            worktree_id: observation.binding.identity.worktree_id,
+            operation: 'provision' as const,
+            binding_sha256: observation.binding.binding_sha256,
+            plan_sha256: ready.plan_sha256,
+          };
+          invokeReconciliationHostOperation(target, (host) => {
+            if (
+              provisionSha(host.identity) !== provisionSha(observation.binding.identity) ||
+              provisionSha(host.bindings) !== provisionSha(observation.binding.bindings)
+            )
+              provisionFail('RECONCILIATION_PROVISION_STALE');
+            const actual = readNativeReconciliationNamespace(host.paths, host.identity);
+            if (actual.sha256 !== observation.namespace.sha256)
+              provisionFail('RECONCILIATION_PROVISION_STALE');
+            if (stage === 'seed') {
+              const directories = [
+                {
+                  path: dirname(host.paths.private_root),
+                  logical: LOGICAL,
+                  identity: actual.devai,
+                },
+                {
+                  path: host.paths.private_root,
+                  logical: `${LOGICAL}/reconciliation`,
+                  identity: actual.root,
+                },
+              ];
+              for (const directory of directories) {
+                if (directory.identity) continue;
+                assertReviewHost();
+                effectEntered = true;
+                mkdirSync(directory.path, { mode: 0o700 });
+                const identity = readNativeDirectory(directory.path);
+                if (!identity) provisionFail();
+                owned.push(ownedDirectory(directory.logical, identity));
+                syncNativeDirectory(directory.path);
+                syncNativeDirectory(dirname(directory.path));
+              }
+              assertReviewHost();
+              effectEntered = true;
+              publish(
+                join(host.paths.private_root, 'admission.sqlite'),
+                reconciliationAdmissionSeedBytes(),
+                `${LOGICAL}/reconciliation/admission.sqlite`,
+              );
+              const completed = readNativeReconciliationNamespace(host.paths, host.identity);
+              if (!completed.anchor || completed.issuer) provisionFail();
+            } else {
+              const anchor = actual.anchor;
+              const bytes = issuerBytes;
+              if (!anchor || !bytes) provisionFail();
+              effectEntered = true;
+              syncNativePrecursor(host.paths.private_root, anchor);
+              withReconciliationAdmissionSteps(host.paths.private_root, anchor, () => {
+                assertReviewHost();
+                const locked = readNativeReconciliationNamespace(host.paths, host.identity, anchor);
+                if (locked.sha256 !== observation.namespace.sha256)
+                  provisionFail('RECONCILIATION_PROVISION_STALE');
+                const identity = publish(
+                  join(host.paths.private_root, 'issuer.json'),
+                  bytes,
+                  `${LOGICAL}/reconciliation/issuer.json`,
+                );
+                const readback = readNativePrivateFile(
+                  join(host.paths.private_root, 'issuer.json'),
+                );
+                if (
+                  readback.sha256 !== ready?.artifact.sha256 ||
+                  readback.identity.dev !== String(identity.dev) ||
+                  readback.identity.ino !== String(identity.ino) ||
+                  readback.identity.birthtime_ns !== String(identity.birthtimeNs)
+                )
+                  provisionFail('RECONCILIATION_PROVISION_STALE');
+                syncNativeDirectory(host.paths.private_root);
+              });
+            }
+          });
+          assertReviewHost();
+          const completedObservation = observe(repositoryRoot);
+          assertReviewHost();
+          if (
+            provisionSha(completedObservation.binding.identity) !==
+              provisionSha(observation.binding.identity) ||
+            completedObservation.binding.binding_sha256 !== observation.binding.binding_sha256
+          )
+            provisionFail('RECONCILIATION_PROVISION_STALE');
+          observation = completedObservation;
+          issued = observation.binding.clock;
+          if (stage === 'seed') {
+            seedPlan = ready.plan_sha256;
+            ready = issuerReady();
+            return ready;
+          }
+          if (observation.namespace.issuer?.sha256 !== ready.artifact.sha256)
+            provisionFail('RECONCILIATION_PROVISION_STALE');
+          const output = result('created', 'issuer', observation.namespace.issuer.sha256);
+          close();
+          return output;
+        } catch (error) {
+          uncertainEffect ||= effectEntered;
+          const output = effectEntered ? result('indeterminate', stage) : undefined;
+          close();
+          if (output) return output;
+          if (error instanceof ReconciliationProvisionError) throw error;
+          provisionFail();
+        }
+      },
+      cancel: function (this: unknown): ReconciliationHostProvisionResult {
+        member(this);
+        const output = result('cancelled', ready?.stage ?? null);
+        close();
+        return output;
+      },
+    });
+    interruptedReviews.set(handle, () => {
+      if (scopes.getStore() !== scope) provisionFail('RECONCILIATION_PROVISION_REVIEW_INVALID');
+      interruptedReviews.delete(handle);
+      const output = result(
+        uncertainEffect || owned.length > 0 ? 'indeterminate' : 'cancelled',
+        ready?.stage ?? null,
+      );
+      close();
+      return output;
+    });
+    return handle;
+  });
+}

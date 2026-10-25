@@ -1,3 +1,4 @@
+import type { InventorySourceReader } from './inventory-walker.js';
 import { createHash } from 'node:crypto';
 import { existsSync, statSync } from 'node:fs';
 import { mkdirSync, writeFileSync } from '@devai-nyx/authority';
@@ -61,6 +62,7 @@ const PARAM_DECORATORS: Record<string, ParamLoc> = {
 };
 
 export interface InventoryApiOptions {
+  readonly sourceReader?: InventorySourceReader;
   readonly repoRoot: string;
   /**
    * Declared plant surfaces (ADR-SCR-0003). Omitted: every surface is presumed present.
@@ -99,7 +101,11 @@ export interface InventoryApiOptions {
 }
 
 /** Resolve configured scan directories to unique existing absolute paths. */
-function uniqueExistingApiDirs(raw: readonly string[], repoRoot: string): string[] {
+function uniqueExistingApiDirs(
+  raw: readonly string[],
+  repoRoot: string,
+  sourceReader?: InventorySourceReader,
+): string[] {
   if (raw.length === 0) return [repoRoot];
   const seen = new Set<string>();
   const out: string[] = [];
@@ -107,10 +113,14 @@ function uniqueExistingApiDirs(raw: readonly string[], repoRoot: string): string
     const abs = isAbsolute(d) ? d : resolve(repoRoot, d);
     if (seen.has(abs)) continue;
     seen.add(abs);
-    if (!existsSync(abs)) continue;
+    if (!(sourceReader === undefined ? existsSync(abs) : sourceReader.exists(abs))) continue;
     try {
-      if (!statSync(abs).isDirectory()) continue;
-    } catch {
+      if (
+        !(sourceReader === undefined ? statSync(abs).isDirectory() : sourceReader.isDirectory(abs))
+      )
+        continue;
+    } catch (error) {
+      if (sourceReader !== undefined) throw error;
       continue;
     }
     out.push(abs);
@@ -337,7 +347,7 @@ function sortEndpoints(endpoints: readonly ApiMapEndpoint[]): ApiMapEndpoint[] {
 function measureInventoryApi(opts: InventoryApiOptions): InventoryApiResult {
   const t0 = performance.now();
   const ignoreDirs = opts.ignoreDirs ?? DEFAULT_IGNORE_DIRS;
-  const scanDirs = uniqueExistingApiDirs(opts.scanDirs ?? [], opts.repoRoot);
+  const scanDirs = uniqueExistingApiDirs(opts.scanDirs ?? [], opts.repoRoot, opts.sourceReader);
   const generatedAt = opts.now ?? new Date().toISOString();
 
   const findings: Array<{
@@ -356,10 +366,12 @@ function measureInventoryApi(opts: InventoryApiOptions): InventoryApiResult {
   try {
     for (const scanDir of scanDirs) {
       const admit = opts.admitFile;
-      const files = walkTs(scanDir, ignoreDirs).filter((f) => admit === undefined || admit(f));
+      const files = walkTs(scanDir, ignoreDirs, opts.sourceReader).filter(
+        (f) => admit === undefined || admit(f),
+      );
       const controllerFiles = files.filter((f) => f.endsWith('.controller.ts'));
       for (const file of controllerFiles) {
-        const sf = parseSource(file);
+        const sf = parseSource(file, opts.sourceReader);
         if (sf === null) continue;
         endpoints.push(
           ...extractEndpointsFromFile(file, opts.repoRoot, sf, publicMarkerDecorators),

@@ -71,3 +71,5 @@ export { SENSOR_ACTION_KINDS } from './generated/action-kinds.js';
 export { isExecutableTestFile, executableTestPopulation } from './test-file-population.js';
 
 export { loadCandidateAuditProjection, readCandidateFile } from './audit-projection.js';
+
+export type { InventorySourceReader } from './inventory-walker.js';

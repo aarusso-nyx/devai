@@ -35,6 +35,39 @@ export type {
 function nativeBoundaryAdvisoryReason(relative: string, node: ts.Node): string | undefined {
   if (!ts.isCallExpression(node)) return undefined;
   const [target, receiver] = node.arguments;
+  // Captured intrinsics avoid caller getters, overridden methods and Proxy traps.
+  // Match the exact AST call shape in the audited codecs/admission boundary;
+  // unrelated reflection in these files remains a finding.
+  const intrinsicCalls: Readonly<Record<string, readonly (readonly [string, string, string])[]>> = {
+    'packages/authority/src/boundaries/host-reconciliation-admission.ts': [
+      ['nativePromiseThen', 'value', '[undefined, () => undefined]'],
+    ],
+    'packages/authority/src/runtime/reconciliation-owner-record.ts': [
+      ['byteLengthGetter', 'value', '[]'],
+      ['bufferGetter', 'value', '[]'],
+      ['byteSet', 'copy', '[value]'],
+    ],
+    'packages/authority/src/runtime/reconciliation-owner-state.ts': [['byteLength', 'input', '[]']],
+  };
+  const args = node.arguments[2];
+  if (
+    node.arguments.length === 3 &&
+    ts.isPropertyAccessExpression(node.expression) &&
+    ts.isIdentifier(node.expression.expression) &&
+    node.expression.expression.text === 'Reflect' &&
+    node.expression.name.text === 'apply' &&
+    target !== undefined &&
+    ts.isIdentifier(target) &&
+    receiver !== undefined &&
+    ts.isIdentifier(receiver) &&
+    args !== undefined &&
+    intrinsicCalls[relative]?.some(
+      ([fn, value, argv]) =>
+        target.text === fn && receiver.text === value && args.getText() === argv,
+    )
+  ) {
+    return 'The audited reconciliation boundary invokes only its captured Promise or typed-array intrinsic on a proxy-rejected value; parsing and synchronous rejection establish no execution authority.';
+  }
   if (
     relative === 'packages/cli/src/native-input-provenance.ts' &&
     node.arguments.length === 3 &&

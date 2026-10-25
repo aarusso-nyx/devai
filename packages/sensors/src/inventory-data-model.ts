@@ -1,3 +1,4 @@
+import type { InventorySourceReader } from './inventory-walker.js';
 import { createHash } from 'node:crypto';
 import { statSync } from 'node:fs';
 import { mkdirSync, writeFileSync } from '@devai-nyx/authority';
@@ -31,12 +32,20 @@ export type {
 
 const DEFAULT_MIGRATION_DIRS = ['migrations', 'db/migrations', 'db', 'database'];
 
-function existingDir(repoRoot: string, rel: string): string | null {
+function existingDir(
+  repoRoot: string,
+  rel: string,
+  sourceReader?: InventorySourceReader,
+): string | null {
   try {
     const full = join(repoRoot, rel);
-    const s = statSync(full);
-    return s.isDirectory() ? full : null;
-  } catch {
+    return (
+      sourceReader === undefined ? statSync(full).isDirectory() : sourceReader.isDirectory(full)
+    )
+      ? full
+      : null;
+  } catch (error) {
+    if (sourceReader !== undefined) throw error;
     return null;
   }
 }
@@ -56,12 +65,13 @@ function measureInventoryDataModel(opts: InventoryDataModelOptions): InventoryDa
   const dirs = opts.migrationDirs ?? DEFAULT_MIGRATION_DIRS;
   const discovered = new Set<string>();
   for (const d of dirs) {
-    const abs = existingDir(opts.repoRoot, d);
+    const abs = existingDir(opts.repoRoot, d, opts.sourceReader);
     if (abs === null) continue;
     for (const file of walkFiles(abs, {
       ignoreDirs,
       extensions: ['sql'],
       skipDeclarations: false,
+      ...(opts.sourceReader === undefined ? {} : { sourceReader: opts.sourceReader }),
     })) {
       if (opts.admitFile !== undefined && !opts.admitFile(file)) continue;
       discovered.add(file);
@@ -77,7 +87,7 @@ function measureInventoryDataModel(opts: InventoryDataModelOptions): InventoryDa
   let status: SensorStatus = 'pass';
   try {
     for (const file of scanned) {
-      const parsed = parseSqlFile(file, relative(opts.repoRoot, file));
+      const parsed = parseSqlFile(file, relative(opts.repoRoot, file), opts.sourceReader);
       tables.push(...parsed.tables);
       rawSqlByFile.push({ path: file, text: parsed.rawText });
     }

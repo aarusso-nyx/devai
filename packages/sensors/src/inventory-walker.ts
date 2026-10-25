@@ -12,6 +12,16 @@ import ts from 'typescript';
  * (.ts) and React (.tsx) needs without adding deps.
  */
 
+/** Immutable admitted source namespace; observation only, never mutation authority. */
+export interface InventorySourceReader {
+  readFile(absolutePath: string): string;
+  listDirectory(
+    absolutePath: string,
+  ): readonly { readonly name: string; readonly kind: 'file' | 'directory' }[];
+  exists(absolutePath: string): boolean;
+  isDirectory(absolutePath: string): boolean;
+}
+
 export const DEFAULT_IGNORE_DIRS: ReadonlySet<string> = new Set([
   'node_modules',
   'dist',
@@ -24,6 +34,7 @@ export const DEFAULT_IGNORE_DIRS: ReadonlySet<string> = new Set([
 ]);
 
 export interface WalkOptions {
+  readonly sourceReader?: InventorySourceReader;
   readonly ignoreDirs?: ReadonlySet<string>;
   /** Extensions to include (without dot). Defaults to ['ts']. */
   readonly extensions?: readonly string[];
@@ -43,6 +54,28 @@ export function walkFiles(dir: string, opts: WalkOptions = {}): string[] {
   const out: string[] = [];
 
   function recurse(current: string): void {
+    if (opts.sourceReader !== undefined) {
+      for (const entry of opts.sourceReader.listDirectory(current)) {
+        const { name, kind } = entry;
+        if (
+          !name ||
+          name === '.' ||
+          name === '..' ||
+          /[\\/]/u.test(name) ||
+          !['file', 'directory'].includes(kind)
+        )
+          throw new Error('INVENTORY_SOURCE_DIRECTORY_INVALID');
+        if (ignoreDirs.has(name)) continue;
+        const full = join(current, name);
+        if (kind === 'directory') recurse(full);
+        else if (
+          (!skipDeclarations || !name.endsWith('.d.ts')) &&
+          extensions.some((ext) => name.endsWith('.' + ext))
+        )
+          out.push(full);
+      }
+      return;
+    }
     let entries: readonly string[];
     try {
       entries = readdirSync(current);
@@ -80,11 +113,16 @@ export function walkFiles(dir: string, opts: WalkOptions = {}): string[] {
  * Walk TS sources (default: only `.ts`, skipping `.d.ts`).
  * Use {extensions: ['ts','tsx']} for JSX-bearing sources.
  */
-export function walkTs(dir: string, ignoreDirs?: ReadonlySet<string>): string[] {
+export function walkTs(
+  dir: string,
+  ignoreDirs?: ReadonlySet<string>,
+  sourceReader?: InventorySourceReader,
+): string[] {
   return walkFiles(dir, {
     ...(ignoreDirs !== undefined && { ignoreDirs }),
     extensions: ['ts'],
     skipDeclarations: true,
+    ...(sourceReader === undefined ? {} : { sourceReader }),
   });
 }
 
@@ -92,11 +130,16 @@ export function walkTs(dir: string, ignoreDirs?: ReadonlySet<string>): string[] 
  * Walk TS + TSX + JSX + JS sources. Used by the React routes adapter
  * which has to handle mixed-extension React projects.
  */
-export function walkTsxJsx(dir: string, ignoreDirs?: ReadonlySet<string>): string[] {
+export function walkTsxJsx(
+  dir: string,
+  ignoreDirs?: ReadonlySet<string>,
+  sourceReader?: InventorySourceReader,
+): string[] {
   return walkFiles(dir, {
     ...(ignoreDirs !== undefined && { ignoreDirs }),
     extensions: ['tsx', 'ts', 'jsx', 'js'],
     skipDeclarations: true,
+    ...(sourceReader === undefined ? {} : { sourceReader }),
   });
 }
 
@@ -107,11 +150,15 @@ export function walkTsxJsx(dir: string, ignoreDirs?: ReadonlySet<string>): strin
  * Preserve TypeScript parsing for `.ts`; React projects may carry JSX
  * in either `.jsx` or plain `.js` files, both discovered by the route walker.
  */
-export function parseSource(file: string): ts.SourceFile | null {
+export function parseSource(
+  file: string,
+  sourceReader?: InventorySourceReader,
+): ts.SourceFile | null {
   let text: string;
   try {
-    text = readFileSync(file, 'utf8');
-  } catch {
+    text = sourceReader === undefined ? readFileSync(file, 'utf8') : sourceReader.readFile(file);
+  } catch (error) {
+    if (sourceReader !== undefined) throw error;
     return null;
   }
   const kind = file.endsWith('.tsx')
@@ -121,7 +168,8 @@ export function parseSource(file: string): ts.SourceFile | null {
       : ts.ScriptKind.TS;
   try {
     return ts.createSourceFile(file, text, ts.ScriptTarget.Latest, /*setParents*/ false, kind);
-  } catch {
+  } catch (error) {
+    if (sourceReader !== undefined) throw error;
     return null;
   }
 }

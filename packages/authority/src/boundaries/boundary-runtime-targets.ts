@@ -1,4 +1,6 @@
 import { isRecord, type AnyRecord } from '../runtime/contracts.js';
+import { types as nodeTypes } from 'node:util';
+import { typedResourceAdapter, typedResourceKind } from './resource-classification.js';
 
 export interface PlanRecord {
   subject: AnyRecord;
@@ -21,6 +23,7 @@ export interface PreparedRecord {
   batch?: object;
   plan: object;
   targetDigest: string;
+  typedAdapter?: object;
   used: boolean;
 }
 
@@ -76,6 +79,7 @@ export function subjectMatchesPlan(
 }
 
 export function domainAdapter(target: AnyRecord, dependencies: AnyRecord): AnyRecord | undefined {
+  if (typedResourceKind(target) !== undefined) return typedResourceAdapter(target, dependencies);
   if (target.kind === 'fs' || target.kind === 'fs-rename') return dependencies.fs;
   if (target.kind === 'git-ref') return dependencies.git;
   if (target.kind === 'db') return dependencies.db;
@@ -83,7 +87,71 @@ export function domainAdapter(target: AnyRecord, dependencies: AnyRecord): AnyRe
   return undefined;
 }
 
-export function snapshotTarget(target: AnyRecord, fsAdapter: AnyRecord | undefined): unknown {
+/** Bounded descriptor-only copy; a mutable adapter snapshot cannot rewrite prepared history. */
+function snapshotCopy(value: unknown): unknown {
+  const seen = new Set<object>();
+  let nodes = 0,
+    textSize = 0;
+  const copy = (item: unknown, depth: number): unknown => {
+    if (++nodes > 16384 || depth > 32) throw new Error();
+    if (item === null || typeof item === 'boolean') return item;
+    if (typeof item === 'string') {
+      textSize += item.length;
+      if (
+        textSize > 1048576 ||
+        /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u.test(item)
+      )
+        throw new Error();
+      return item;
+    }
+    if (typeof item === 'number' && Number.isFinite(item) && !Object.is(item, -0)) return item;
+    if (typeof item !== 'object' || nodeTypes.isProxy(item) || seen.has(item)) throw new Error();
+    const array = Array.isArray(item);
+    const prototype: unknown = Object.getPrototypeOf(item);
+    if (
+      array ? prototype !== Array.prototype : prototype !== Object.prototype && prototype !== null
+    )
+      throw new Error();
+    seen.add(item);
+    const keys = Reflect.ownKeys(item);
+    const result: unknown[] | Record<string, unknown> = array ? [] : Object.create(null);
+    if (array && (item.length > 4096 || keys.length !== item.length + 1)) throw new Error();
+    if (!array && keys.length > 128) throw new Error();
+    const fields = array ? Array.from({ length: item.length }, (_, i) => String(i)) : keys;
+    for (const key of fields) {
+      if (
+        typeof key !== 'string' ||
+        key.length > 128 ||
+        /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u.test(key)
+      )
+        throw new Error();
+      textSize += key.length;
+      if (textSize > 1048576) throw new Error();
+      const descriptor = Object.getOwnPropertyDescriptor(item, key);
+      if (descriptor?.enumerable !== true || !Object.hasOwn(descriptor, 'value')) throw new Error();
+      Object.defineProperty(result, key, {
+        value: copy(descriptor.value, depth + 1),
+        enumerable: true,
+      });
+    }
+    seen.delete(item);
+    return Object.freeze(result);
+  };
+  if (nodeTypes.isProxy(value) || !isRecord(value) || Array.isArray(value)) throw new Error();
+  return copy(value, 0);
+}
+
+export function snapshotTarget(target: AnyRecord, dependencies: AnyRecord): unknown {
+  if (typedResourceKind(target) !== undefined) {
+    const adapter = typedResourceAdapter(target, dependencies);
+    if (adapter === undefined) throw new Error('AUTHORITY_TYPED_RESOURCE_ADAPTER_REQUIRED');
+    try {
+      return snapshotCopy(adapter.snapshot(target));
+    } catch {
+      throw new Error('AUTHORITY_TYPED_RESOURCE_SNAPSHOT_INVALID');
+    }
+  }
+  const fsAdapter = dependencies.fs;
   if (!fsAdapter || typeof fsAdapter.lstat !== 'function') return undefined;
   if (target.kind === 'fs') return fsAdapter.lstat(target.canonical_relative_path);
   if (target.kind === 'fs-rename') {

@@ -1,12 +1,22 @@
-import { createHash } from 'node:crypto';
+import {
+  computeEvidenceManifestHash,
+  buildEvidenceRecord,
+  type DraftEvidence,
+  type EvidenceRecord,
+} from '@devai-nyx/utils';
+import { performance } from 'node:perf_hooks';
+import { lstatSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import {
   existsSync,
   mkdirSync,
   readFileSync,
   renameSync,
   writeFileSync,
+  publishFileNoReplaceSync,
+  removeEntryIfIdentitySync,
 } from '@devai-nyx/authority';
-import { dirname } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { validators } from '@devai-nyx/schemas';
 
 // ADR-EVI-0002: the line-level cross-check lives beside the chain checks it extends.
@@ -19,71 +29,14 @@ export { proofLineDigest, resolveProofAnchor, type ProofAnchorResolution } from 
 
 const validateEvidence = validators.evidence;
 
-export interface EvidenceContext {
-  repo_root: string;
-  task_id?: string | null;
-  worktree_id?: string | null;
-  branch?: string | null;
-  git: {
-    head_sha: string | null;
-    dirty_files: string[];
-  };
-}
-
-export interface EvidenceArtifact {
-  path: string;
-  sha256: string | null;
-  kind?: string;
-}
-
-export interface FindingsSummary {
-  info?: number;
-  warning?: number;
-  error?: number;
-  critical?: number;
-}
-
-export interface EvidenceRecord {
-  schemaVersion: '1.0.0';
-  id: string;
-  timestamp: string;
-  actor: string;
-  actor_role: string;
-  action: string;
-  status: string;
-  context: EvidenceContext;
-  artifacts: EvidenceArtifact[];
-  findings_summary?: FindingsSummary;
-  notes?: string[];
-  previous_run_hash: string | null;
-  manifest_hash: string;
-  /** Canonical append ordinal for fresh adopter chains. */
-  sequence?: number;
-  /** Human-readable predecessor alias: GENESIS or the prior manifest hash. */
-  previous_hash?: string;
-  /** ADR-EVI-0002 anchor: the canonical path of the proof epoch file holding the line. */
-  proof_path?: string;
-  /** ADR-EVI-0002 anchor: the one-based position of the line within that file. */
-  proof_sequence?: number;
-  /** ADR-EVI-0002 anchor: the SHA-256 of the line bytes, exclusive of the newline. */
-  proof_sha256?: string;
-}
-
-export interface DraftEvidence {
-  readonly id: string;
-  readonly timestamp: string;
-  readonly actor: string;
-  readonly actor_role: string;
-  readonly action: string;
-  readonly status: string;
-  readonly context: EvidenceContext;
-  readonly artifacts?: readonly EvidenceArtifact[];
-  readonly findings_summary?: FindingsSummary;
-  readonly notes?: readonly string[];
-  readonly proof_path?: string;
-  readonly proof_sequence?: number;
-  readonly proof_sha256?: string;
-}
+export type {
+  EvidenceContext,
+  EvidenceArtifact,
+  FindingsSummary,
+  RecoveredFrom,
+  EvidenceRecord,
+  DraftEvidence,
+} from '@devai-nyx/utils';
 
 export interface EvidenceChain {
   head: string | null;
@@ -105,26 +58,7 @@ export interface ManifestHashInputs {
 const DOMAIN_SEPARATOR = 'GENESIS';
 
 export function computeManifestHash(inputs: ManifestHashInputs): string {
-  const sortedArtifacts = [...inputs.artifact_sha256s].sort((a, b) => {
-    const aa = a ?? '';
-    const bb = b ?? '';
-    if (aa < bb) return -1;
-    if (aa > bb) return 1;
-    return 0;
-  });
-  const canonical = JSON.stringify([
-    inputs.id,
-    inputs.timestamp,
-    inputs.actor,
-    inputs.actor_role,
-    inputs.action,
-    inputs.status,
-    inputs.git_head_sha,
-    sortedArtifacts,
-    inputs.previous_run_hash,
-    DOMAIN_SEPARATOR,
-  ]);
-  return createHash('sha256').update(canonical).digest('hex');
+  return computeEvidenceManifestHash(inputs);
 }
 
 export function extractManifestInputs(record: EvidenceRecord): ManifestHashInputs {
@@ -147,12 +81,90 @@ function atomicWriteFileSync(path: string, contents: string): void {
   renameSync(tmp, path);
 }
 
+/** Shared by every normal append, not only recovery requests. No stale lock takeover. */
+function withAppendLock<T>(chainPath: string, operation: () => T): T {
+  const canonical = resolve(chainPath);
+  const lockPath = `${canonical}.append.lock`;
+  const deadline = performance.now() + 10_000;
+  const owner = {
+    operation: 'evidence-chain-append',
+    chain_path: canonical,
+    pid: process.pid,
+    nonce: randomUUID(),
+  };
+  let identity: ReturnType<typeof publishFileNoReplaceSync>;
+  for (;;) {
+    // Refuse linked path components, including a symlink masquerading as a parent.
+    if (lstatSync(dirname(canonical)).isSymbolicLink())
+      throw new Error('PROOF_ANCHOR_RECOVERY_REFUSED: chain parent is a symlink');
+    if (existsSync(canonical) && !lstatSync(canonical).isFile())
+      throw new Error('PROOF_ANCHOR_RECOVERY_REFUSED: chain is not a regular file');
+    if (existsSync(canonical) && lstatSync(canonical).isSymbolicLink())
+      throw new Error('PROOF_ANCHOR_RECOVERY_REFUSED: chain is a symlink');
+    try {
+      identity = publishFileNoReplaceSync(lockPath, `${JSON.stringify(owner)}\n`);
+      break;
+    } catch (error) {
+      // A competitor can change this exact lock target between the guarded
+      // prepare and apply. Retry only this publication with a fresh guarded
+      // decision; never reinterpret an authority refusal as a stale chain.
+      const changedLock =
+        error instanceof Error && error.message === 'AUTHORITY_RESOURCE_CHANGED_AFTER_PREPARE';
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST' && !changedLock) throw error;
+      if (performance.now() >= deadline) throw error;
+      let held: Record<string, unknown>;
+      try {
+        const stat = lstatSync(lockPath);
+        if (!stat.isFile() || stat.isSymbolicLink()) throw new Error('foreign lock path');
+        held = JSON.parse(readFileSync(lockPath, 'utf8')) as Record<string, unknown>;
+      } catch (readError) {
+        if ((readError as NodeJS.ErrnoException).code === 'ENOENT') continue;
+        throw new Error(`PROOF_ANCHOR_RECOVERY_REFUSED: foreign append lock ${String(readError)}`);
+      }
+      if (
+        held['operation'] !== owner.operation ||
+        held['chain_path'] !== canonical ||
+        performance.now() >= deadline
+      )
+        throw new Error(
+          'PROOF_ANCHOR_RECOVERY_REFUSED: foreign or unavailable append serialization lock',
+        );
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
+    }
+  }
+  let failed = false;
+  let failure: unknown;
+  let result: T | undefined;
+  try {
+    result = operation();
+  } catch (error) {
+    failed = true;
+    failure = error;
+  }
+  try {
+    if (removeEntryIfIdentitySync(lockPath, identity) !== 'removed')
+      throw new Error('owned lock identity was not removed');
+  } catch (cleanup) {
+    const detail = JSON.stringify({ path: lockPath, identity }, (_key, value: unknown) =>
+      typeof value === 'bigint' ? value.toString() : value,
+    );
+    throw new Error(
+      `PROOF_ANCHOR_RECOVERY_REFUSED: append lock cleanup incomplete; inspect canonical head and ownership ${detail}; primary=${failed ? String(failure) : 'append completed'}; cleanup=${String(cleanup)}`,
+    );
+  }
+  if (failed) throw failure;
+  return result as T;
+}
+
 export function initChain(chainPath: string): EvidenceChain {
   if (existsSync(chainPath)) return loadChain(chainPath);
-  const empty: EvidenceChain = { head: null, records: [] };
   mkdirSync(dirname(chainPath), { recursive: true });
-  atomicWriteFileSync(chainPath, JSON.stringify(empty, null, 2) + '\n');
-  return empty;
+  return withAppendLock(chainPath, () => {
+    if (existsSync(chainPath)) return loadChain(chainPath);
+    const empty: EvidenceChain = { head: null, records: [] };
+    atomicWriteFileSync(chainPath, JSON.stringify(empty, null, 2) + '\n');
+    return empty;
+  });
 }
 
 export function loadChain(chainPath: string): EvidenceChain {
@@ -175,52 +187,35 @@ export function saveChain(chainPath: string, chain: EvidenceChain): void {
   atomicWriteFileSync(chainPath, JSON.stringify(chain, null, 2) + '\n');
 }
 
-export function appendRecord(chainPath: string, draft: DraftEvidence): EvidenceRecord {
-  const chain = loadChain(chainPath);
-  const previous_run_hash = chain.head;
-  const artifacts = draft.artifacts ? [...draft.artifacts] : [];
-  const inputs: ManifestHashInputs = {
-    id: draft.id,
-    timestamp: draft.timestamp,
-    actor: draft.actor,
-    actor_role: draft.actor_role,
-    action: draft.action,
-    status: draft.status,
-    git_head_sha: draft.context.git.head_sha,
-    artifact_sha256s: artifacts.map((a) => a.sha256),
-    previous_run_hash,
-  };
-  const manifest_hash = computeManifestHash(inputs);
-  const record: EvidenceRecord = {
-    schemaVersion: '1.0.0',
-    id: draft.id,
-    timestamp: draft.timestamp,
-    actor: draft.actor,
-    actor_role: draft.actor_role,
-    action: draft.action,
-    status: draft.status,
-    context: draft.context,
-    artifacts,
-    ...(draft.findings_summary !== undefined && { findings_summary: draft.findings_summary }),
-    ...(draft.notes !== undefined && { notes: [...draft.notes] }),
-    ...(draft.proof_path !== undefined && { proof_path: draft.proof_path }),
-    ...(draft.proof_sequence !== undefined && { proof_sequence: draft.proof_sequence }),
-    ...(draft.proof_sha256 !== undefined && { proof_sha256: draft.proof_sha256 }),
-    previous_run_hash,
-    manifest_hash,
-    sequence: chain.records.length + 1,
-    previous_hash: previous_run_hash ?? DOMAIN_SEPARATOR,
-  };
-  const ok = validateEvidence(record);
-  if (!ok) {
-    throw new Error(
-      `evidence record does not validate against schema: ${JSON.stringify(validateEvidence.errors)}`,
+export function appendRecord(
+  chainPath: string,
+  draft: DraftEvidence,
+  expectedHead?: string,
+  beforeAppend?: () => void,
+  deriveIdForHead?: (head: string | null) => string,
+): EvidenceRecord {
+  return withAppendLock(chainPath, () => {
+    beforeAppend?.();
+    const chain = loadChain(chainPath);
+    if (expectedHead !== undefined && chain.head !== expectedHead)
+      throw new Error('PROOF_ANCHOR_RECOVERY_STALE_HEAD: canonical head changed at append');
+    const record = buildEvidenceRecord(
+      draft,
+      chain.head,
+      chain.records.length + 1,
+      deriveIdForHead?.(chain.head) ?? draft.id,
     );
-  }
-  chain.records.push(record);
-  chain.head = manifest_hash;
-  saveChain(chainPath, chain);
-  return record;
+    const ok = validateEvidence(record);
+    if (!ok) {
+      throw new Error(
+        `evidence record does not validate against schema: ${JSON.stringify(validateEvidence.errors)}`,
+      );
+    }
+    chain.records.push(record);
+    chain.head = record.manifest_hash;
+    saveChain(chainPath, chain);
+    return record;
+  });
 }
 
 export interface VerifyResult {

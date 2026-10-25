@@ -1,3 +1,4 @@
+import type { InventorySourceReader } from './inventory-walker.js';
 import type { DeclaredSurfaces } from './declared-surfaces.js';
 import type { SensorReading } from './sensor-reading.js';
 
@@ -79,6 +80,7 @@ export interface DataModelBody {
 }
 
 export interface InventoryDataModelOptions {
+  readonly sourceReader?: InventorySourceReader;
   readonly repoRoot: string;
   /**
    * Declared plant surfaces (ADR-SCR-0003). Omitted: every surface is presumed present.

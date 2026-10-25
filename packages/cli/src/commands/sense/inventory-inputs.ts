@@ -1,3 +1,4 @@
+import type { InventorySourceReader } from '@devai-nyx/sensors';
 import type { InventoryDataModelOptions, InventoryRoutesOptions } from '@devai-nyx/sensors';
 import {
   resolveDeclaredSensorInputs,
@@ -8,25 +9,29 @@ import {
 export function resolveInventoryDataModelInputs(
   repoRoot: string,
   explicit?: SensorInputs,
+  sourceReader?: InventorySourceReader,
 ): Pick<InventoryDataModelOptions, 'migrationDirs'> {
   const inputs = resolveDeclaredSensorInputs({
     repoRoot,
+    ...(sourceReader === undefined ? {} : { sourceReader }),
     sensorKind: 'inventory_data_model',
     ...(explicit === undefined ? {} : { explicit }),
   });
   const migrationDirs = inputs['migrationDirs'];
   if (migrationDirs === undefined) return {};
   const options = { migrationDirs };
-  validateEffectiveSensorInputs(repoRoot, 'inventory_data_model', options);
+  validateEffectiveSensorInputs(repoRoot, 'inventory_data_model', options, sourceReader);
   return { migrationDirs: migrationDirs as string[] };
 }
 
 export function resolveInventoryRouteInputs(
   repoRoot: string,
   explicit?: SensorInputs,
+  sourceReader?: InventorySourceReader,
 ): Pick<InventoryRoutesOptions, 'framework' | 'scanDirs'> {
   const inputs = resolveDeclaredSensorInputs({
     repoRoot,
+    ...(sourceReader === undefined ? {} : { sourceReader }),
     sensorKind: 'inventory_routes',
     ...(explicit === undefined ? {} : { explicit }),
   });
@@ -46,6 +51,6 @@ export function resolveInventoryRouteInputs(
     ...(scanDirs === undefined ? {} : { scanDirs: scanDirs as string[] }),
   };
   if (Object.keys(options).length > 0)
-    validateEffectiveSensorInputs(repoRoot, 'inventory_routes', options);
+    validateEffectiveSensorInputs(repoRoot, 'inventory_routes', options, sourceReader);
   return options;
 }

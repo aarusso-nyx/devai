@@ -1,3 +1,4 @@
+import { types as nodeTypes } from 'node:util';
 import { minimatch } from 'minimatch';
 import type {
   MutationBatch,
@@ -5,6 +6,11 @@ import type {
   ResourceTarget,
   ResourceTargetSelector,
 } from './types.js';
+
+import {
+  isProofIndexResourceTarget,
+  isReconciliationHostResourceTarget,
+} from './boundaries/reconciliation-resources.js';
 
 function safeRepoRelative(path: string): boolean {
   if (
@@ -22,7 +28,36 @@ function safeRepoRelative(path: string): boolean {
   return segments.every((segment) => segment.length > 0 && segment !== '.' && segment !== '..');
 }
 
+const RESOURCE_KINDS = new Set([
+  'fs',
+  'git-ref',
+  'db',
+  'remote',
+  'proof-index',
+  'reconciliation-host',
+]);
+
+/** Read only an own data header; malformed input cannot execute dispatch accessors. */
+function targetKind(target: ResourceTarget): ResourceTarget['kind'] | undefined {
+  if (target === null || typeof target !== 'object' || nodeTypes.isProxy(target)) return undefined;
+  const descriptor = Object.getOwnPropertyDescriptor(target, 'kind');
+  return descriptor !== undefined &&
+    Object.hasOwn(descriptor, 'value') &&
+    typeof descriptor.value === 'string' &&
+    RESOURCE_KINDS.has(descriptor.value)
+    ? (descriptor.value as ResourceTarget['kind'])
+    : undefined;
+}
+
 function malformedTarget(target: ResourceTarget): string[] {
+  if (targetKind(target) === undefined)
+    return ['resource target kind must be a known own data property'];
+  if (target.kind === 'proof-index')
+    return isProofIndexResourceTarget(target) ? [] : ['proof-index target shape is invalid'];
+  if (target.kind === 'reconciliation-host')
+    return isReconciliationHostResourceTarget(target)
+      ? []
+      : ['reconciliation-host target shape is invalid'];
   const errors: string[] = [];
   if (target.id.trim().length === 0) errors.push('resource target id must not be empty');
   switch (target.kind) {
@@ -99,7 +134,18 @@ function malformedSelector(selector: ResourceTargetSelector): string[] {
 }
 
 function resourceIdentity(target: ResourceTarget): string {
+  if (targetKind(target) === undefined) return 'invalid-resource-kind';
   switch (target.kind) {
+    case 'proof-index':
+      return isProofIndexResourceTarget(target)
+        ? `proof-index|${target.repository_id}|${target.worktree_id}|${target.proof_path}`
+        : 'invalid-proof-index';
+    case 'reconciliation-host': {
+      if (!isReconciliationHostResourceTarget(target)) return 'invalid-reconciliation-host';
+      const prefix = `reconciliation-host|${target.repository_id}|${target.worktree_id}|${target.operation}`;
+      if (target.operation === 'provision') return prefix;
+      return `${prefix}|${target.approval_id}${target.operation === 'consume-phase' ? `|${target.phase}` : ''}`;
+    }
     case 'fs':
       return `fs|${target.repository_id}|${target.canonical_relative_path}`;
     case 'git-ref':
@@ -112,7 +158,16 @@ function resourceIdentity(target: ResourceTarget): string {
 }
 
 function duplicateTargetErrors(targets: readonly ResourceTarget[]): string[] {
-  const ids = targets.map((target) => target.id);
+  const ids = targets.map((target) => {
+    if (
+      targetKind(target) === undefined ||
+      (target.kind === 'proof-index' && !isProofIndexResourceTarget(target)) ||
+      (target.kind === 'reconciliation-host' && !isReconciliationHostResourceTarget(target))
+    ) {
+      return '<invalid reconciliation target>';
+    }
+    return target.id;
+  });
   const identities = targets.map(resourceIdentity);
   const errors: string[] = [];
   if (new Set(ids).size !== ids.length) errors.push('resource target IDs must be unique');
@@ -123,6 +178,9 @@ function duplicateTargetErrors(targets: readonly ResourceTarget[]): string[] {
 }
 
 function matchesSelector(target: ResourceTarget, selector: ResourceTargetSelector): boolean {
+  if (targetKind(target) === undefined) return false;
+  // These logical resources are exact-plan-only, even if a caller forges a selector.
+  if (target.kind === 'proof-index' || target.kind === 'reconciliation-host') return false;
   if (target.kind !== selector.kind) return false;
   switch (target.kind) {
     case 'fs':
@@ -205,7 +263,13 @@ export function malformedPlan(plan: MutationPlan, batch: MutationBatch | undefin
       );
       for (const target of batch.targets) {
         if (!plan.selectors.some((selector) => matchesSelector(target, selector))) {
-          errors.push(`batch target '${target.id}' is outside the pre-authorized selectors`);
+          const label =
+            targetKind(target) === undefined ||
+            (target.kind === 'proof-index' && !isProofIndexResourceTarget(target)) ||
+            (target.kind === 'reconciliation-host' && !isReconciliationHostResourceTarget(target))
+              ? '<invalid reconciliation target>'
+              : target.id;
+          errors.push(`batch target '${label}' is outside the pre-authorized selectors`);
         }
       }
     }
@@ -213,7 +277,10 @@ export function malformedPlan(plan: MutationPlan, batch: MutationBatch | undefin
 
   const targets = plan.strategy === 'exact-plan' ? plan.targets : (batch?.targets ?? []);
   if (
-    targets.some((target) => target.kind === 'remote' && target.publication) &&
+    targets.some(
+      (target) =>
+        targetKind(target) !== undefined && target.kind === 'remote' && target.publication,
+    ) &&
     !plan.envelope.request.consent.allow_publish
   ) {
     errors.push('publication targets require explicit publish consent');
