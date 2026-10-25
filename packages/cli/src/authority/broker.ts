@@ -722,6 +722,9 @@ function reviewInstalledBundle(packageVersion: string) {
         const path = join(directory, name);
         const stat = lstatSync(path);
         if (stat.isSymbolicLink()) throw new Error('AUTHORITY_POLICY_REVIEW_INPUTS_UNSUPPORTED');
+        // Resolve declared dependencies below, rather than walking the package
+        // manager's installation container (including its executable bin links).
+        if (directory === root && name === 'node_modules' && stat.isDirectory()) continue;
         if (stat.isDirectory()) visit(path);
         else files[relative(root, path)] = reviewFile(root, relative(root, path));
       }
