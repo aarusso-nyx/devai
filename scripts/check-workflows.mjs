@@ -238,6 +238,8 @@ const PREFLIGHT_PARTITION_JOBS = {
   },
 };
 const PREFLIGHT_AGGREGATOR_JOB = 'gate';
+const PREFLIGHT_NATIVE_JOB = 'native-apfs';
+const PREFLIGHT_NATIVE_RUNNER = 'macos-15';
 const PREFLIGHT_GATE_NAME = 'devai-release-gate';
 const PREFLIGHT_AGGREGATOR_STEP_ID = 'aggregate';
 const PREFLIGHT_AGGREGATOR_PERMISSIONS = { contents: 'read', actions: 'read' };
@@ -251,7 +253,11 @@ const PREFLIGHT_AGGREGATOR_COMMANDS = [
 // The aggregator step's whole script, line by line. Matched exactly after continuation
 // lines are joined and each line is trimmed, so no `||`, `;`, `&`, `set +e`, or added
 // command can soften the aggregator's exit status.
-const PREFLIGHT_AGGREGATOR_SCRIPT = ['set -euo pipefail', PREFLIGHT_AGGREGATOR_COMMANDS.join(' ')];
+const PREFLIGHT_AGGREGATOR_SCRIPT = [
+  'set -euo pipefail',
+  'test "${{ needs.native-apfs.result }}" = "success"',
+  PREFLIGHT_AGGREGATOR_COMMANDS.join(' '),
+];
 const PREFLIGHT_REPORT_PATTERN = 'devai-gate-report-*';
 // #247: the bootstrap cache restores the runner together with packages/*/dist, and a hit
 // counts only when every restored entry is present; any missing file rebuilds.
@@ -1325,7 +1331,11 @@ function checkPreflightWorkflow(file, workflow, source, findings, pins) {
       ),
     );
   }
-  const expectedJobs = [...Object.keys(PREFLIGHT_PARTITION_JOBS), PREFLIGHT_AGGREGATOR_JOB];
+  const expectedJobs = [
+    ...Object.keys(PREFLIGHT_PARTITION_JOBS),
+    PREFLIGHT_NATIVE_JOB,
+    PREFLIGHT_AGGREGATOR_JOB,
+  ];
   if (JSON.stringify(Object.keys(jobs)) !== JSON.stringify(expectedJobs))
     findings.push(
       finding(
@@ -1443,11 +1453,48 @@ function checkPreflightWorkflow(file, workflow, source, findings, pins) {
         ),
       );
   }
+  const native = object(jobs[PREFLIGHT_NATIVE_JOB]);
+  const nativeSteps = (Array.isArray(native.steps) ? native.steps : []).map(object);
+  if (
+    native.if !== undefined ||
+    workflow.defaults !== undefined ||
+    native.defaults !== undefined ||
+    nativeSteps.length !== 5 ||
+    JSON.stringify(native.permissions) !== JSON.stringify({ contents: 'read' }) ||
+    nativeSteps[0]?.uses !== 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' ||
+    object(nativeSteps[0]?.with).ref !== PREFLIGHT_CANDIDATE_REF ||
+    object(nativeSteps[0]?.with)['fetch-depth'] !== 0 ||
+    object(nativeSteps[0]?.with)['persist-credentials'] !== false ||
+    nativeSteps[1]?.uses !== SHARED_SETUP_ACTION ||
+    nativeSteps[0]?.if !== undefined ||
+    nativeSteps[1]?.if !== undefined ||
+    object(nativeSteps[1]?.with)['setup-pnpm'] !== 'true' ||
+    nativeSteps[2]?.if !== undefined ||
+    nativeSteps[3]?.if !== undefined ||
+    nativeSteps.slice(2, 4).some((step) => step.shell !== undefined && step.shell !== 'bash') ||
+    JSON.stringify(logicalScriptLines(nativeSteps[2]?.run ?? '')) !==
+      JSON.stringify(['pnpm install --frozen-lockfile', 'pnpm run release:bootstrap']) ||
+    nativeSteps[3]?.id !== 'native' ||
+    nativeSteps[3]?.run !==
+      'node scripts/process/validation-runner.mjs --exclusive -- node scripts/run-native-apfs-tests.mjs' ||
+    nativeSteps[4]?.if !== 'always()' ||
+    !String(nativeSteps[4]?.uses ?? '').startsWith('actions/upload-artifact@') ||
+    object(nativeSteps[4]?.with).path !== '${{ steps.native.outputs.report }}'
+  ) {
+    findings.push(
+      finding(
+        'CI_PREFLIGHT_GATE_INVALID',
+        file,
+        'native-apfs must qualify the exact candidate on the required native host without skipped or optional execution (ADR-CHK-0010)',
+      ),
+    );
+  }
   const gate = object(jobs[PREFLIGHT_AGGREGATOR_JOB]);
   const gateIf = typeof gate.if === 'string' ? gate.if.replace(/^\$\{\{\s*|\s*\}\}$/gu, '') : '';
   if (
     gate.name !== PREFLIGHT_GATE_NAME ||
-    JSON.stringify(gate.needs) !== JSON.stringify(Object.keys(PREFLIGHT_PARTITION_JOBS)) ||
+    JSON.stringify(gate.needs) !==
+      JSON.stringify([...Object.keys(PREFLIGHT_PARTITION_JOBS), PREFLIGHT_NATIVE_JOB]) ||
     gateIf.trim() !== 'always()' ||
     (gate['continue-on-error'] !== undefined && gate['continue-on-error'] !== false) ||
     JSON.stringify(gate.permissions) !== JSON.stringify(PREFLIGHT_AGGREGATOR_PERMISSIONS)
@@ -1479,7 +1526,11 @@ function checkPreflightWorkflow(file, workflow, source, findings, pins) {
       ),
     );
   // A gate job or step that may fail without failing the gate is refused outright.
-  for (const jobName of [...Object.keys(PREFLIGHT_PARTITION_JOBS), PREFLIGHT_AGGREGATOR_JOB]) {
+  for (const jobName of [
+    ...Object.keys(PREFLIGHT_PARTITION_JOBS),
+    PREFLIGHT_NATIVE_JOB,
+    PREFLIGHT_AGGREGATOR_JOB,
+  ]) {
     const job = object(jobs[jobName]);
     const steps = (Array.isArray(job.steps) ? job.steps : []).map(object);
     if (
@@ -1525,9 +1576,19 @@ function checkPreflightWorkflow(file, workflow, source, findings, pins) {
         ),
       );
     }
-    if (typeof job['runs-on'] !== 'string' || !job['runs-on'].startsWith('ubuntu-')) {
+    if (
+      name === PREFLIGHT_NATIVE_JOB
+        ? job['runs-on'] !== PREFLIGHT_NATIVE_RUNNER
+        : typeof job['runs-on'] !== 'string' || !job['runs-on'].startsWith('ubuntu-')
+    ) {
       findings.push(
-        finding('CI_PREFLIGHT_RUNNER_INVALID', file, `jobs.${name} must run on a Linux runner`),
+        finding(
+          'CI_PREFLIGHT_RUNNER_INVALID',
+          file,
+          name === PREFLIGHT_NATIVE_JOB
+            ? `jobs.${name} must run on ${PREFLIGHT_NATIVE_RUNNER}`
+            : `jobs.${name} must run on a Linux runner`,
+        ),
       );
     }
     if (typeof job['timeout-minutes'] !== 'number') {
@@ -1562,7 +1623,10 @@ function checkPreflightWorkflow(file, workflow, source, findings, pins) {
       }
       if (
         uses.startsWith('actions/upload-artifact@') &&
-        object(step.with).name !== PREFLIGHT_PARTITION_JOBS[name]?.artifact
+        object(step.with).name !==
+          (name === PREFLIGHT_NATIVE_JOB
+            ? 'devai-native-apfs-qualification'
+            : PREFLIGHT_PARTITION_JOBS[name]?.artifact)
       ) {
         findings.push(
           finding(
