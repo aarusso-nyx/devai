@@ -644,7 +644,7 @@ describe('live ledger-verification workflow', () => {
     expect(release).toContain('devai adopter espaço não-ASCII');
     expect(release).toContain('name: "devai-linux-adopter"');
     expect(release).not.toContain('npm init --yes');
-    expect(release).toContain('EXPECTED_ACTION_COUNT: 69');
+    expect(release).toContain('EXPECTED_ACTION_COUNT: 74');
     const verifierPolicy = JSON.parse(
       readFileSync(join(ROOT, 'law/policy/trusted-local-rc-verifier-package.json'), 'utf8'),
     ) as { package: { version: string } };
@@ -816,7 +816,7 @@ describe('live ledger-verification workflow', () => {
     {
       name: 'stale installed action count',
       mutate: (source: string) =>
-        source.replace('EXPECTED_ACTION_COUNT: 69', 'EXPECTED_ACTION_COUNT: 41'),
+        source.replace('EXPECTED_ACTION_COUNT: 74', 'EXPECTED_ACTION_COUNT: 41'),
       diagnostic: 'RELEASE_IDENTITY_INVALID',
     },
     {
