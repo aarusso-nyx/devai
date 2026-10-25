@@ -400,7 +400,7 @@ describe('#264 review: durability, decisions, exclusion and the measured receipt
   it('refuses an unreviewed constitution move until --constitution settles it', async () => {
     const repo = await stynxAt160(true);
     const pin = readFileSync(join(repo, '.devai/pin/constitution.md'), 'utf8').replaceAll(
-      '1.1.0',
+      '1.2.0',
       '1.0.2',
     );
     put(repo, '.devai/pin/constitution.md', pin);
@@ -415,16 +415,59 @@ describe('#264 review: durability, decisions, exclusion and the measured receipt
     expect((JSON.parse(refused.stderr) as { error: JsonObject }).error).toMatchObject({
       code: 'INIT_UPGRADE_DECISION_PENDING',
       context: expect.objectContaining({
-        refusals: [expect.objectContaining({ change: 'MIG-2.7.0-constitution-1-1-0' })],
+        refusals: expect.arrayContaining([
+          expect.objectContaining({ change: 'MIG-2.7.0-constitution-1-1-0' }),
+          expect.objectContaining({ change: 'MIG-2.8.0-constitution-1-2-0' }),
+        ]),
       }),
     });
 
     const applied = await runCli([...WRITE(repo), '--constitution']);
     expect(applied.exit, applied.stderr).toBe(0);
     expect(json(repo, '.devai/config/project.json')['constitution']).toMatchObject({
-      version: '1.1.0',
+      version: '1.2.0',
     });
-    expect(json(repo, RECEIPT)['constitution']).toEqual({ from: '1.0.2', to: '1.1.0' });
+    expect(json(repo, RECEIPT)['constitution']).toEqual({ from: '1.0.2', to: '1.2.0' });
+  }, 180_000);
+
+  it('plans the 2.7.1 to 2.8.0 amendment without writes and requires explicit constitution review', async () => {
+    const repo = await stynxAt160(true);
+    const pin = readFileSync(join(repo, '.devai/pin/constitution.md'), 'utf8').replaceAll(
+      '1.2.0',
+      '1.1.0',
+    );
+    put(repo, '.devai/pin/constitution.md', pin);
+    put(repo, '.devai/config/project.json', {
+      ...json(repo, '.devai/config/project.json'),
+      devai_version: '2.7.1',
+      constitution: { version: '1.1.0', sha256: createHash('sha256').update(pin).digest('hex') },
+    });
+    const before = snapshot(repo);
+    const plain = await runCli(PLAN(repo));
+    const plainPlan = value(plain)['plan'] as JsonObject;
+    expect(plainPlan['refusals']).toEqual(
+      expect.arrayContaining([expect.objectContaining({ change: 'MIG-2.8.0-constitution-1-2-0' })]),
+    );
+    expect(snapshot(repo)).toEqual(before);
+    const explicit = await runCli([...PLAN(repo), '--constitution']);
+    expect(explicit.exit, explicit.stderr).toBe(0);
+    const plan = value(explicit)['plan'] as JsonObject;
+    expect(plan['refusals']).toEqual([]);
+    expect(plan['changed_files']).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ path: '.devai/pin/constitution.md', segment: 'constitution' }),
+      ]),
+    );
+    expect(snapshot(repo)).toEqual(before);
+    const applied = await runCli([...WRITE(repo), '--constitution']);
+    expect(applied.exit, applied.stderr).toBe(0);
+    expect(json(repo, '.devai/config/project.json')['constitution']).toMatchObject({
+      version: '1.2.0',
+    });
+    expect(json(repo, RECEIPT)['migrations']).toContain('MIG-2.8.0-constitution-1-2-0');
+    const settled = snapshot(repo);
+    expect((await runCli(WRITE(repo))).exit).toBe(0);
+    expect(snapshot(repo)).toEqual(settled);
   }, 180_000);
 
   it('keeps an obligation the receipt left pending visible after the upgrade', async () => {

@@ -664,6 +664,32 @@ describe('post-merge host scope effect identity', () => {
     }
   };
 
+  it.each(['protected-release', 'reconciliation-host', 'proof-index', 'unknown'])(
+    'refuses %s even when its arguments resemble an allowed Git process',
+    (kind) => {
+      const fx = fixture(0);
+      const host = createPostMergeHostScope(fx.root, fx.mergeSha);
+      let applied = false;
+      try {
+        expect(() =>
+          host.scope.apply_effect(
+            {
+              kind,
+              symbol: 'spawnSync',
+              arguments: ['git', ['rev-parse', 'HEAD']],
+            } as AuthorityHostEffectRequest,
+            () => {
+              applied = true;
+            },
+          ),
+        ).toThrow('POST_MERGE_PROCESS_FORBIDDEN');
+        expect(applied).toBe(false);
+      } finally {
+        host.dispose();
+      }
+    },
+  );
+
   it('admits the observation worktree root and the runtime root themselves', () => {
     const fx = fixture(0);
     for (const path of [worktreeOf(fx), join(fx.root, '.git/devai')]) {

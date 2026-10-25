@@ -33,6 +33,7 @@ describe('binding action-effect CLI', () => {
       reading: { status: string };
       report: {
         findings: unknown[];
+        actions: Readonly<Record<string, unknown>>;
         metrics: {
           catalog_actions: number;
           extracted_actions: number;
@@ -42,9 +43,22 @@ describe('binding action-effect CLI', () => {
     };
     expect(output.reading.status).toBe('pass');
     expect(output.report.findings).toEqual([]);
+    const addedActions = [
+      'evidence reconcile plan',
+      'evidence reconcile approve',
+      'evidence reconcile materialize',
+      'evidence reconcile stage-proof',
+      'sense bootstrap-inventory',
+    ];
+    const liveActions = Object.keys(output.report.actions);
+    expect(liveActions.filter((action) => addedActions.includes(action)).sort()).toEqual(
+      addedActions.sort(),
+    );
+    // Preserve the original 69-action population alongside the five exact additions.
+    expect(liveActions.filter((action) => !addedActions.includes(action))).toHaveLength(69);
     expect(output.report.metrics).toMatchObject({
-      catalog_actions: 69,
-      extracted_actions: 69,
+      catalog_actions: 74,
+      extracted_actions: 74,
       unresolved_edges: 0,
     });
   });

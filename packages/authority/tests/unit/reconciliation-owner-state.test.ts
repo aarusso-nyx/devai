@@ -1,0 +1,1192 @@
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { expect, it } from 'vitest';
+
+it('requires the actual frozen Owner-state component before semantic qualification', () => {
+  expect(
+    existsSync(resolve(import.meta.dirname, '../../src/runtime/reconciliation-owner-state.ts')),
+    'actual required Owner-state source absent; no product graph or eligibility implementation',
+  ).toBe(true);
+});
+
+// Independent fixture signing/canonicalization. No production codec generates
+// expected bytes, MACs, graph references or eligibility outcomes.
+import { createHash, createHmac } from 'node:crypto';
+import { afterAll, describe } from 'vitest';
+import { mkdtempSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+type Data = Record<string, unknown>;
+type Clock = { clock_source: string; boot_id: string; wall_ms: number; monotonic_ns: string };
+interface Api {
+  readReconciliationOwnerState(input: unknown): Data;
+  assessReconciliationOwnerPhase(
+    state: unknown,
+    phase: unknown,
+    clock: unknown,
+    outputs: unknown,
+  ): Data;
+}
+const ROOT = resolve(import.meta.dirname, '../../../..');
+const EVIDENCE = realpathSync(mkdtempSync(resolve(tmpdir(), 'devai-owner-state-inspector-')));
+const SOURCE = '../../src/runtime/reconciliation-owner-state.js';
+const api = async (): Promise<Api> => (await import(SOURCE)) as Api;
+const INVALID = 'RECONCILIATION_OWNER_STATE_INVALID';
+const KEY_BYTES = Buffer.from(Array.from({ length: 32 }, (_, i) => i + 1));
+const KEY = KEY_BYTES.toString('base64');
+const WALL = 1792868400000;
+const NS = 9007199254740993123n;
+const PHASES = ['01', '02', '03', '04'];
+const observations: Data[] = [];
+const sha = (value: string | Uint8Array) => createHash('sha256').update(value).digest('hex');
+function canonical(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) return '[' + value.map(canonical).join(',') + ']';
+  const object = value as Data;
+  return (
+    '{' +
+    Object.keys(object)
+      .sort()
+      .map((key) => JSON.stringify(key) + ':' + canonical(object[key]))
+      .join(',') +
+    '}'
+  );
+}
+const bytes = (record: Data) => Buffer.from(canonical(record) + '\n');
+const digest = (record: Data) => sha(bytes(record));
+function clock(ms = 0, patch: Partial<Clock> = {}): Clock {
+  return {
+    clock_source: 'node-uv-hrtime-ns-v1',
+    boot_id: '11111111-2222-3333-4444-555555555555',
+    wall_ms: WALL + ms,
+    monotonic_ns: (NS + BigInt(ms) * 1000000n).toString(),
+    ...patch,
+  };
+}
+function sign(value: Data): Data {
+  const unsigned = { ...value };
+  delete unsigned.mac;
+  return {
+    ...unsigned,
+    mac: createHmac('sha256', KEY_BYTES)
+      .update(String(unsigned.domain))
+      .update(Buffer.from([0]))
+      .update(canonical(unsigned))
+      .digest('hex'),
+  };
+}
+function action(phase: string) {
+  return phase === '04'
+    ? 'sense bootstrap-inventory'
+    : phase === '03'
+      ? 'evidence reconcile stage-proof'
+      : 'evidence reconcile materialize';
+}
+const role = (phase: string) => (phase === '04' ? 'architect' : 'inspector');
+class Graph {
+  issuer: Data;
+  approval: Data;
+  grants: Data[] = [];
+  intents: Data[] = [];
+  completions: Data[] = [];
+  lease: Data | null = null;
+  constructor(validity = 900000, issuerClock: Clock = clock(-100)) {
+    const anchor = {
+      schemaVersion: '1.0.0',
+      kind: 'reconciliation-admission-anchor',
+      root: '/DISPOSABLE_PRIVATE_OWNER_STATE_FIXTURE',
+      root_identity: { dev: '1', ino: '2', birthtime_ns: '3', uid: '501', mode: '0700' },
+      seed_identity: {
+        dev: '1',
+        ino: '4',
+        birthtime_ns: '5',
+        uid: '501',
+        mode: '0600',
+        size_bytes: 8192,
+        mtime_ns: '6',
+        ctime_ns: '7',
+      },
+      seed_sha256: '3f6b742405bb199a11ed0952c9aa049285ef25dc69954e901d2e987cd15c4372',
+    };
+    const bindings = Object.fromEntries(
+      ['package', 'module', 'registry', 'constitution', 'policy'].map((name) => [
+        name + '_sha256',
+        sha(name),
+      ]),
+    );
+    const seedPlan = sha('seed-plan'),
+      host = sha('host'),
+      head = 'a'.repeat(40);
+    this.issuer = sign({
+      ...this.base('issuer', issuerClock),
+      adapter_id: 'reconciliation-host-authority-boundary',
+      host_identity_sha256: host,
+      key_sha256: sha(KEY_BYTES),
+      seed_plan_sha256: seedPlan,
+      provision_context_sha256: sha(
+        canonical({
+          seed_plan_sha256: seedPlan,
+          host_identity_sha256: host,
+          admission_anchor_sha256: sha(canonical(anchor)),
+          installation_bindings_sha256: sha(canonical(bindings)),
+          installed_at_head: head,
+        }),
+      ),
+      admission_anchor: anchor,
+      private_key_base64: KEY,
+      installation_bindings: bindings,
+      installed_at_head: head,
+    });
+    const scope = {
+      repository_id: 'fixture-repository',
+      worktree_id: 'fixture-worktree',
+      host_identity_sha256: host,
+      binding_sha256: sha(canonical(bindings)),
+      plan_sha256: sha('plan'),
+      source_manifest_sha256: sha('source'),
+      allowed_phases: PHASES,
+    };
+    this.approval = sign({
+      ...this.base('approval', clock()),
+      approval_id: sha('approval-id'),
+      issuer_sha256: digest(this.issuer),
+      scope_sha256: sha(canonical(scope)),
+      sequence: 1,
+      previous_grant_sha256: null,
+      scope,
+      ...this.deadlines(0, validity),
+    });
+  }
+  base(kind: string, observed: Clock): Data {
+    return {
+      schemaVersion: '1.0.0',
+      kind,
+      domain: 'devai.reconciliation.owner.v1/' + kind,
+      repository_id: 'fixture-repository',
+      worktree_id: 'fixture-worktree',
+      clock: observed,
+    };
+  }
+  deadlines(ms: number, validity = 900000): Data {
+    return {
+      validity_ms: validity,
+      expires_wall_ms: WALL + ms + validity,
+      expires_monotonic_ns: (NS + BigInt(ms + validity) * 1000000n).toString(),
+    };
+  }
+  current(): Data {
+    return this.grants.at(-1) ?? this.approval;
+  }
+  linked(kind: string, ms: number): Data {
+    return {
+      ...this.base(kind, clock(ms)),
+      approval_id: this.approval.approval_id,
+      issuer_sha256: digest(this.issuer),
+      approval_sha256: digest(this.approval),
+      scope_sha256: this.approval.scope_sha256,
+    };
+  }
+  renewal(ms: number, remaining = PHASES, resumable: Data | null = null, patch: Data = {}): Data {
+    const record = sign({
+      ...this.linked('renewal', ms),
+      sequence: Number(this.current().sequence) + 1,
+      previous_grant_sha256: digest(this.current()),
+      remaining_phases: remaining,
+      resumable_intent_sha256: resumable ? digest(resumable) : null,
+      ...this.deadlines(ms),
+      ...patch,
+    });
+    this.grants.push(record);
+    return record;
+  }
+  revoke(ms: number, patch: Data = {}): Data {
+    const record = sign({
+      ...this.linked('revocation', ms),
+      sequence: Number(this.current().sequence) + 1,
+      previous_grant_sha256: digest(this.current()),
+      ...patch,
+    });
+    this.grants.push(record);
+    return record;
+  }
+  intent(phase: string, ms: number, grant = this.current(), patch: Data = {}): Data {
+    const predecessor = this.completions.find(
+      (record) => record.phase === String(Number(phase) - 1).padStart(2, '0'),
+    );
+    const record = sign({
+      ...this.linked('phase-intent', ms),
+      grant_sha256: digest(grant),
+      before_witness_sha256: sha('before-' + phase),
+      output_plan_sha256: sha('outputs-' + phase),
+      lease_nonce: sha('nonce-' + phase),
+      invocation_id: sha('invocation-' + phase),
+      phase,
+      action_id: action(phase),
+      initiator: role(phase),
+      predecessor_completion_sha256: predecessor ? digest(predecessor) : null,
+      ...patch,
+    });
+    this.intents.push(record);
+    return record;
+  }
+  completion(phase: string, ms: number, grant = this.current(), patch: Data = {}): Data {
+    const intent = this.intents.find((record) => record.phase === phase);
+    if (!intent) throw new Error('test fixture intent missing');
+    const predecessor = this.completions.find(
+      (record) => record.phase === String(Number(phase) - 1).padStart(2, '0'),
+    );
+    const record = sign({
+      ...this.linked('phase-completion', ms),
+      intent_sha256: digest(intent),
+      observed_grant_sha256: digest(grant),
+      final_witness_sha256: sha('final-' + phase),
+      outputs_manifest_sha256: sha('outputs-' + phase),
+      phase,
+      predecessor_completion_sha256: predecessor ? digest(predecessor) : null,
+      durability: 'durable',
+      ...patch,
+    });
+    this.completions.push(record);
+    return record;
+  }
+  addLease(phase: string, ms: number, grant = this.current(), patch: Data = {}): Data {
+    const intent = this.intents.find((record) => record.phase === phase);
+    if (!intent) throw new Error('test fixture lease intent missing');
+    this.lease = sign({
+      ...this.linked('lease', ms),
+      grant_sha256: digest(grant),
+      original_intent_sha256: digest(intent),
+      invocation_id: intent.invocation_id,
+      nonce: intent.lease_nonce,
+      host_identity_sha256: (this.approval.scope as Data).host_identity_sha256,
+      phase,
+      action_id: intent.action_id,
+      initiator: intent.initiator,
+      pid: 123,
+      hostname: 'PRIVATE_FIXTURE_HOST',
+      ...patch,
+    });
+    return this.lease;
+  }
+  input(): Data {
+    return {
+      issuer_bytes: bytes(this.issuer),
+      approval_bytes: bytes(this.approval),
+      grant_bytes: this.grants.map(bytes),
+      intent_bytes: this.intents.map(bytes),
+      completion_bytes: this.completions.map(bytes),
+      lease_bytes: this.lease ? bytes(this.lease) : null,
+    };
+  }
+}
+function invalid(callback: () => unknown): void {
+  let caught: unknown;
+  try {
+    callback();
+  } catch (error) {
+    caught = error;
+  }
+  expect(caught instanceof Error).toBe(true);
+  const error = caught as Error & { code?: string };
+  expect(error.name === 'ReconciliationOwnerStateError').toBe(true);
+  expect(error.code === INVALID).toBe(true);
+  expect(error.message === INVALID).toBe(true);
+  expect(Object.hasOwn(error, 'cause')).toBe(false);
+}
+function frozen(value: unknown): boolean {
+  return (
+    value === null ||
+    typeof value !== 'object' ||
+    (Object.isFrozen(value) && Object.values(value).every(frozen))
+  );
+}
+function assessment(
+  a: Api,
+  state: Data,
+  phase: string,
+  at: Clock,
+  outputs: string,
+  disposition: string,
+  grantStatus = 'live',
+): Data {
+  const result = a.assessReconciliationOwnerPhase(state, phase, at, outputs);
+  const phaseState = (state.phases as Data[]).find((entry) => entry.phase === phase);
+  expect(result).toEqual({
+    phase,
+    grant_status: grantStatus,
+    disposition,
+    intent_sha256: phaseState?.intent_sha256 ?? null,
+    completion_sha256: phaseState?.completion_sha256 ?? null,
+    grants_authority: false,
+  });
+  expect(frozen(result)).toBe(true);
+  return result;
+}
+
+it('projects exactly verified raw-file SHA references, immutable safe fields and no private record', async () => {
+  const a = await api(),
+    g = new Graph();
+  const state = a.readReconciliationOwnerState(g.input());
+  const scope = g.approval.scope as Data;
+  expect(state).toEqual({
+    kind: 'reconciliation-owner-state',
+    repository_id: 'fixture-repository',
+    worktree_id: 'fixture-worktree',
+    host_identity_sha256: scope.host_identity_sha256,
+    binding_sha256: scope.binding_sha256,
+    plan_sha256: scope.plan_sha256,
+    source_manifest_sha256: scope.source_manifest_sha256,
+    approval_id: g.approval.approval_id,
+    issuer_sha256: digest(g.issuer),
+    approval_sha256: digest(g.approval),
+    scope_sha256: g.approval.scope_sha256,
+    grant_sha256: digest(g.approval),
+    grant_sequence: 1,
+    grant_kind: 'approval',
+    lease_sha256: null,
+    phases: PHASES.map((phase) => ({ phase, intent_sha256: null, completion_sha256: null })),
+    grants_authority: false,
+  });
+  expect(digest(g.issuer) !== sha(canonical(g.issuer))).toBe(true);
+  expect(frozen(state)).toBe(true);
+  const text = JSON.stringify(state);
+  for (const privateValue of [
+    KEY,
+    String(g.issuer.key_sha256),
+    String(g.issuer.mac),
+    '/DISPOSABLE_PRIVATE_OWNER_STATE_FIXTURE',
+  ])
+    expect(text.includes(privateValue)).toBe(false);
+  observations.push({
+    kind: 'empty-state',
+    state,
+    assessment: assessment(a, state, '01', clock(1), 'absent', 'start'),
+  });
+});
+
+describe('ten retained intent-authority matrix rows', () => {
+  const rows = [
+    ['01 live absent unconsumed', 'live', 'absent', 'start'],
+    ['02 live partial exactintent', 'live', 'partial-known', 'resume'],
+    ['03 live complete exactintent', 'live', 'complete', 'settle'],
+    ['04 expired absent or partial', 'expired', 'partial-known', 'held'],
+    ['05 expired complete exactintent', 'expired', 'complete', 'settle'],
+    ['06 renewed-live partial exactintent', 'renewed', 'partial-known', 'resume'],
+    ['07 renewed-live complete exactintent', 'renewed', 'complete', 'settle'],
+    ['08 revoked absent or partial', 'revoked', 'partial-known', 'held'],
+    ['09 revoked complete exactintent', 'revoked', 'complete', 'settle'],
+    ['10 unknown independent ofgrant', 'live', 'unknown', 'held'],
+  ] as const;
+  it.each(rows)('%s', async (_label, grant, outputs, disposition) => {
+    const a = await api(),
+      g = new Graph(100);
+    let at = clock(30);
+    if (disposition !== 'start') {
+      const intent = g.intent('01', 10);
+      if (grant === 'renewed') g.renewal(20, PHASES, intent);
+    }
+    if (grant === 'expired') at = clock(100);
+    if (grant === 'revoked') g.revoke(20);
+    const state = a.readReconciliationOwnerState(g.input());
+    assessment(a, state, '01', at, outputs, disposition, grant === 'renewed' ? 'live' : grant);
+  });
+});
+it.each(['absent', 'partial-known', 'complete', 'unknown'])(
+  'no prior intent with %s output has exact safe disposition',
+  async (outputs) => {
+    const a = await api(),
+      state = a.readReconciliationOwnerState(new Graph().input());
+    assessment(a, state, '01', clock(1), outputs, outputs === 'absent' ? 'start' : 'held');
+    assessment(a, state, '02', clock(1), outputs, 'held');
+  },
+);
+it.each(['absent', 'partial-known', 'complete', 'unknown'])(
+  'completed phase %s never duplicates consumption or repairs output claims',
+  async (outputs) => {
+    const a = await api(),
+      g = new Graph();
+    g.intent('01', 1);
+    const completion = g.completion('01', 2);
+    const state = a.readReconciliationOwnerState(g.input());
+    for (let n = 0; n < 2; n++) {
+      const result = assessment(
+        a,
+        state,
+        '01',
+        clock(3),
+        outputs,
+        outputs === 'complete' ? 'completed' : 'held',
+      );
+      expect(result.completion_sha256).toBe(digest(completion));
+    }
+  },
+);
+it('accepts arbitrary phase array order while retaining the exact contiguous completion chain', async () => {
+  const a = await api(),
+    g = new Graph();
+  for (let n = 1; n <= 4; n++) {
+    const p = String(n).padStart(2, '0');
+    g.intent(p, n * 2);
+    g.completion(p, n * 2 + 1);
+  }
+  g.intents.reverse();
+  g.completions.reverse();
+  const state = a.readReconciliationOwnerState(g.input());
+  for (const p of PHASES) assessment(a, state, p, clock(10), 'complete', 'completed');
+});
+
+it.each(['completion-before-renewal', 'renewal-before-completion', 'renewal-new-intent-lease'])(
+  'accepts tied-clock immutable order %s without timestamp sorting',
+  async (kind) => {
+    const a = await api(),
+      g = new Graph();
+    if (kind === 'completion-before-renewal') {
+      g.intent('01', 0);
+      g.completion('01', 0);
+      g.renewal(0, ['02', '03', '04']);
+    } else if (kind === 'renewal-before-completion') {
+      const i = g.intent('01', 0);
+      g.renewal(0, PHASES, i);
+      g.completion('01', 0);
+    } else {
+      g.renewal(0);
+      g.intent('01', 0);
+      g.addLease('01', 0, undefined, {
+        nonce: sha('retry'),
+        invocation_id: sha('retry-invocation'),
+      });
+    }
+    const state = a.readReconciliationOwnerState(g.input());
+    assessment(
+      a,
+      state,
+      '01',
+      clock(1),
+      kind === 'renewal-new-intent-lease' ? 'partial-known' : 'complete',
+      kind === 'renewal-new-intent-lease' ? 'resume' : 'completed',
+    );
+  },
+);
+it.each([
+  'null-resumable-old-intent',
+  'wrong-resumable',
+  'excluded-missing-completion',
+  'nonsuffix',
+  'future-observed-grant-cycle',
+  'oldgrant-intent',
+  'oldgrant-completion',
+  'oldgrant-lease',
+])('refuses authentic signed contradictory order %s', async (kind) => {
+  const a = await api(),
+    g = new Graph();
+  if (kind === 'null-resumable-old-intent') {
+    g.intent('01', 0);
+    g.renewal(0);
+  } else if (kind === 'wrong-resumable') {
+    const i = g.intent('01', 0);
+    g.renewal(0, PHASES, i, { resumable_intent_sha256: sha('unknown-intent') });
+  } else if (kind === 'excluded-missing-completion') g.renewal(0, ['02', '03', '04']);
+  else if (kind === 'nonsuffix') {
+    g.intent('01', 1);
+    g.completion('01', 2);
+    g.intent('02', 3);
+    g.completion('02', 4);
+    g.renewal(5, ['01', '03', '04']);
+  } else if (kind === 'future-observed-grant-cycle') {
+    g.intent('01', 0);
+    const r = g.renewal(0, ['02', '03', '04']);
+    g.completion('01', 0, r);
+  } else if (kind === 'oldgrant-intent') {
+    const i = g.intent('01', 20);
+    g.renewal(10, PHASES, i);
+  } else {
+    const i = g.intent('01', 1);
+    g.renewal(10, PHASES, i);
+    if (kind === 'oldgrant-completion') g.completion('01', 20, g.approval);
+    else g.addLease('01', 20, g.approval);
+  }
+  invalid(() => a.readReconciliationOwnerState(g.input()));
+});
+it.each([
+  'gap',
+  'previous-digest',
+  'duplicate',
+  'fork',
+  'input-order',
+  'after-revocation',
+  'grant-boot',
+  'grant-wall-rollback',
+  'grant-ns-rollback',
+  'grant-drift',
+])('rejects malformed grant chain %s with valid independent signatures', async (kind) => {
+  const a = await api(),
+    g = new Graph();
+  if (kind === 'gap') g.renewal(10, PHASES, null, { sequence: 3 });
+  else if (kind === 'previous-digest')
+    g.renewal(10, PHASES, null, { previous_grant_sha256: sha('foreign') });
+  else if (kind === 'duplicate') {
+    const r = g.renewal(10);
+    g.grants.push(r);
+  } else if (kind === 'fork') {
+    g.renewal(10);
+    g.renewal(20, PHASES, null, { sequence: 2, previous_grant_sha256: digest(g.approval) });
+  } else if (kind === 'input-order') {
+    g.renewal(10);
+    g.renewal(20);
+    g.grants.reverse();
+  } else if (kind === 'after-revocation') {
+    g.revoke(10);
+    g.renewal(20);
+  } else if (kind === 'grant-boot')
+    g.renewal(10, PHASES, null, {
+      clock: clock(10, { boot_id: '22222222-3333-4444-5555-666666666666' }),
+    });
+  else if (kind === 'grant-wall-rollback')
+    g.renewal(10, PHASES, null, { clock: clock(10, { wall_ms: WALL - 1 }) });
+  else if (kind === 'grant-ns-rollback')
+    g.renewal(10, PHASES, null, { clock: clock(10, { monotonic_ns: (NS - 1n).toString() }) });
+  else g.renewal(10, PHASES, null, { clock: clock(10, { wall_ms: WALL + 2011 }) });
+  invalid(() => a.readReconciliationOwnerState(g.input()));
+});
+it.each([
+  'approval-issuer',
+  'approval-repository',
+  'approval-worktree',
+  'approval-host',
+  'linked-repository',
+  'linked-worktree',
+  'linked-approval',
+  'linked-issuer',
+  'linked-scope',
+  'linked-original-approval',
+  'issuer-MAC',
+  'record-MAC',
+])('rejects authenticated scope/identity mismatch %s', async (kind) => {
+  const a = await api(),
+    g = new Graph();
+  if (kind === 'issuer-MAC') g.issuer = { ...g.issuer, mac: '0'.repeat(64) };
+  else if (kind === 'approval-issuer')
+    g.approval = sign({ ...g.approval, issuer_sha256: sha('foreign') });
+  else if (
+    kind === 'approval-repository' ||
+    kind === 'approval-worktree' ||
+    kind === 'approval-host'
+  ) {
+    const scope = { ...(g.approval.scope as Data) };
+    const field =
+      kind === 'approval-host'
+        ? 'host_identity_sha256'
+        : kind === 'approval-repository'
+          ? 'repository_id'
+          : 'worktree_id';
+    scope[field] = kind === 'approval-host' ? sha('foreign-host') : 'foreign-fixture';
+    g.approval = sign({
+      ...g.approval,
+      ...(field === 'host_identity_sha256' ? {} : { [field]: 'foreign-fixture' }),
+      scope,
+      scope_sha256: sha(canonical(scope)),
+    });
+  } else {
+    const names: Record<string, string> = {
+      'linked-repository': 'repository_id',
+      'linked-worktree': 'worktree_id',
+      'linked-approval': 'approval_id',
+      'linked-issuer': 'issuer_sha256',
+      'linked-scope': 'scope_sha256',
+      'linked-original-approval': 'approval_sha256',
+    };
+    if (kind === 'record-MAC') {
+      const i = g.intent('01', 1);
+      g.intents[0] = { ...i, mac: '0'.repeat(64) };
+    } else {
+      const field = names[kind];
+      if (!field) throw new Error('unknown fixture variant');
+      g.intent('01', 1, undefined, {
+        [field]:
+          field.endsWith('_id') && !field.startsWith('approval')
+            ? 'foreign-fixture'
+            : sha('foreign'),
+      });
+    }
+  }
+  invalid(() => a.readReconciliationOwnerState(g.input()));
+});
+it.each([
+  'duplicate-intent',
+  'duplicate-completion',
+  'two-uncompleted',
+  'phase-gap',
+  'missing-intent',
+  'wrong-predecessor-intent',
+  'wrong-predecessor-completion',
+  'revocation-intent',
+  'intent-at-expiry',
+  'intent-after-completion-clock',
+  'completion-before-intent',
+  'intent-unknown-grant',
+  'completion-unknown-grant',
+])('rejects phase/reference graph %s', async (kind) => {
+  const a = await api(),
+    g = new Graph(100);
+  if (kind === 'duplicate-intent') {
+    g.intent('01', 1);
+    g.intent('01', 2, undefined, { invocation_id: sha('duplicate') });
+  } else if (kind === 'duplicate-completion') {
+    g.intent('01', 1);
+    g.completion('01', 2);
+    g.completion('01', 3);
+  } else if (kind === 'two-uncompleted') {
+    g.intent('01', 1);
+    g.intent('02', 2);
+  } else if (kind === 'phase-gap') g.intent('02', 1);
+  else if (kind === 'missing-intent') {
+    g.intent('01', 1);
+    g.completion('01', 2);
+    g.intents = [];
+  } else if (kind === 'wrong-predecessor-intent') {
+    g.intent('01', 1);
+    g.completion('01', 2);
+    g.intent('02', 3, undefined, { predecessor_completion_sha256: sha('foreign') });
+  } else if (kind === 'wrong-predecessor-completion') {
+    g.intent('01', 1);
+    g.completion('01', 2, undefined, { predecessor_completion_sha256: sha('foreign') });
+  } else if (kind === 'revocation-intent') {
+    g.revoke(1);
+    g.intent('01', 2);
+  } else if (kind === 'intent-at-expiry') g.intent('01', 100);
+  else if (kind === 'intent-after-completion-clock') {
+    g.intent('01', 1);
+    g.completion('01', 3);
+    g.intent('02', 2);
+  } else if (kind === 'completion-before-intent') {
+    g.intent('01', 2);
+    g.completion('01', 1);
+  } else if (kind === 'intent-unknown-grant')
+    g.intent('01', 1, undefined, { grant_sha256: sha('unknown') });
+  else {
+    g.intent('01', 1);
+    g.completion('01', 2, undefined, { observed_grant_sha256: sha('unknown') });
+  }
+  invalid(() => a.readReconciliationOwnerState(g.input()));
+});
+it.each(PHASES)(
+  'preserves exact ADR phase%s action and initiator in both existing codec and reducer',
+  async (phase) => {
+    const a = await api();
+    for (const field of ['action_id', 'initiator']) {
+      const g = new Graph();
+      for (let n = 1; n < Number(phase); n++) {
+        const p = String(n).padStart(2, '0');
+        g.intent(p, n * 2);
+        g.completion(p, n * 2 + 1);
+      }
+      const i = g.intent(phase, Number(phase) * 2);
+      const valid = a.readReconciliationOwnerState(g.input());
+      expect(valid.grants_authority).toBe(false);
+      g.intents[g.intents.length - 1] = sign({
+        ...i,
+        [field]:
+          field === 'initiator'
+            ? role(phase) === 'architect'
+              ? 'inspector'
+              : 'architect'
+            : action(phase) === 'sense bootstrap-inventory'
+              ? 'evidence reconcile materialize'
+              : 'sense bootstrap-inventory',
+      });
+      const codec = await import('../../src/runtime/reconciliation-owner-record.js');
+      expect(() =>
+        codec.validateReconciliationOwnerRecord(g.intents[g.intents.length - 1]),
+      ).toThrow('RECONCILIATION_OWNER_INVALID');
+      invalid(() => a.readReconciliationOwnerState(g.input()));
+    }
+  },
+);
+it.each([
+  'original',
+  'samegrant-retry',
+  'renewal-retry',
+  'renewal-new-intent',
+  'completed-remnant',
+])('accepts exact lease %s without implying liveness or ownership', async (kind) => {
+  const a = await api(),
+    g = new Graph();
+  if (kind === 'renewal-new-intent') {
+    g.renewal(10);
+    g.intent('01', 20);
+    g.addLease('01', 30);
+  } else {
+    const i = g.intent('01', 1);
+    if (kind === 'renewal-retry') g.renewal(2, PHASES, i);
+    g.addLease(
+      '01',
+      3,
+      undefined,
+      kind === 'samegrant-retry' || kind === 'renewal-retry'
+        ? { nonce: sha('owned-retry'), invocation_id: sha('retry-invocation') }
+        : {},
+    );
+    if (kind === 'completed-remnant') g.completion('01', 4);
+  }
+  const state = a.readReconciliationOwnerState(g.input());
+  expect(state.lease_sha256).toBe(digest(g.lease as Data));
+  assessment(
+    a,
+    state,
+    '01',
+    clock(40),
+    kind === 'completed-remnant' ? 'complete' : 'partial-known',
+    kind === 'completed-remnant' ? 'completed' : 'resume',
+  );
+});
+it.each([
+  'host',
+  'phase',
+  'action',
+  'initiator',
+  'intent',
+  'grant',
+  'clock',
+  'expiry',
+  'after-completion',
+  'crossgrant-not-resumable',
+])('rejects valid-MAC lease mismatch %s', async (kind) => {
+  const a = await api(),
+    g = new Graph(100),
+    i = g.intent('01', 1);
+  if (kind === 'crossgrant-not-resumable') {
+    g.renewal(2, PHASES, null);
+    g.addLease('01', 3);
+  } else if (kind === 'after-completion') {
+    g.completion('01', 2);
+    g.addLease('01', 3);
+  } else if (kind === 'clock') g.addLease('01', 0);
+  else if (kind === 'expiry') g.addLease('01', 100);
+  else {
+    const patch: Data =
+      kind === 'host'
+        ? { host_identity_sha256: sha('foreign') }
+        : kind === 'phase'
+          ? { phase: '02' }
+          : kind === 'action'
+            ? { action_id: 'sense bootstrap-inventory' }
+            : kind === 'initiator'
+              ? { initiator: 'architect' }
+              : kind === 'intent'
+                ? { original_intent_sha256: sha('foreign') }
+                : { grant_sha256: sha('foreign') };
+    g.addLease('01', 2, undefined, patch);
+  }
+  expect(digest(i).length).toBe(64);
+  invalid(() => a.readReconciliationOwnerState(g.input()));
+});
+it('permits expired or revoked current grant completion settlement with exact old intent', async () => {
+  const a = await api();
+  for (const revoked of [false, true]) {
+    const g = new Graph(5);
+    g.intent('01', 1);
+    if (revoked) g.revoke(6);
+    const c = g.completion('01', 10);
+    const state = a.readReconciliationOwnerState(g.input());
+    const v = assessment(
+      a,
+      state,
+      '01',
+      clock(11),
+      'complete',
+      'completed',
+      revoked ? 'revoked' : 'expired',
+    );
+    expect(v.completion_sha256).toBe(digest(c));
+  }
+});
+it('issuer installation boot and arbitrarily old installation clock do not freeze fresh approval history', async () => {
+  const a = await api(),
+    g = new Graph(900000, clock(-100000000, { boot_id: '22222222-3333-4444-5555-666666666666' }));
+  assessment(
+    a,
+    a.readReconciliationOwnerState(g.input()),
+    '01',
+    clock(900001),
+    'absent',
+    'held',
+    'expired',
+  );
+});
+it.each(['wall-equal', 'ns-equal', 'one-ns-before', 'one-ms-before'])(
+  'uses exact short signed expiry and uint64 beyond2^53 at%s',
+  async (kind) => {
+    const a = await api(),
+      g = new Graph(1);
+    let at = clock();
+    let status = 'live';
+    if (kind === 'wall-equal') {
+      at = clock(0, { wall_ms: WALL + 1 });
+      status = 'expired';
+    } else if (kind === 'ns-equal') {
+      at = clock(0, { monotonic_ns: (NS + 1000000n).toString() });
+      status = 'expired';
+    } else if (kind === 'one-ns-before') at = clock(0, { monotonic_ns: (NS + 999999n).toString() });
+    assessment(
+      a,
+      a.readReconciliationOwnerState(g.input()),
+      '01',
+      at,
+      'absent',
+      status === 'live' ? 'start' : 'held',
+      status,
+    );
+  },
+);
+it('accepts one-nanosecond-before grant issue deadline, rejects exact signed deadline for intent', async () => {
+  const a = await api(),
+    g = new Graph(1);
+  g.intent('01', 0, undefined, { clock: clock(0, { monotonic_ns: (NS + 999999n).toString() }) });
+  assessment(
+    a,
+    a.readReconciliationOwnerState(g.input()),
+    '01',
+    clock(0, { monotonic_ns: (NS + 999999n).toString() }),
+    'absent',
+    'resume',
+  );
+  const bad = new Graph(1);
+  bad.intent('01', 0, undefined, { clock: clock(0, { monotonic_ns: (NS + 1000000n).toString() }) });
+  invalid(() => a.readReconciliationOwnerState(bad.input()));
+});
+it.each(['boot', 'source', 'wall-rollback', 'ns-rollback', 'drift2001', 'latest-lease'])(
+  'rejects current clock%s against all linked history',
+  async (kind) => {
+    const a = await api(),
+      g = new Graph();
+    let at = clock(1);
+    if (kind === 'boot') at = clock(1, { boot_id: '22222222-3333-4444-5555-666666666666' });
+    else if (kind === 'source') at = clock(1, { clock_source: 'caller-clock' });
+    else if (kind === 'wall-rollback') at = clock(1, { wall_ms: WALL - 1 });
+    else if (kind === 'ns-rollback') at = clock(1, { monotonic_ns: (NS - 1n).toString() });
+    else if (kind === 'drift2001') at = clock(1, { wall_ms: WALL + 2002 });
+    else {
+      g.intent('01', 1);
+      g.addLease('01', 10);
+      at = clock(9);
+    }
+    const state = a.readReconciliationOwnerState(g.input());
+    invalid(() => a.assessReconciliationOwnerPhase(state, '01', at, 'absent'));
+  },
+);
+it('accepts exact2000ms elapsed disagreement without weakening rollback or expiry checks', async () => {
+  const a = await api(),
+    g = new Graph();
+  assessment(
+    a,
+    a.readReconciliationOwnerState(g.input()),
+    '01',
+    clock(1, { wall_ms: WALL + 2001 }),
+    'absent',
+    'start',
+  );
+});
+it.each(['foreign', 'changed', 'indeterminate', 'COMPLETE', '', null, {}, 0])(
+  'rejects output classification%j without coercion',
+  async (outputs) => {
+    const a = await api(),
+      state = a.readReconciliationOwnerState(new Graph().input());
+    invalid(() => a.assessReconciliationOwnerPhase(state, '01', clock(1), outputs));
+  },
+);
+
+it.each(['missing', 'extra', 'symbol', 'hidden', 'getter', 'prototype', 'proxy', 'revoked'])(
+  'rejects root input%s with zero caller traps',
+  async (kind) => {
+    const a = await api();
+    let input: unknown = new Graph().input(),
+      touches = 0;
+    const trap = (): never => {
+      touches++;
+      throw new Error('PRIVATE_INPUT_SENTINEL');
+    };
+    const object = input as Data;
+    if (kind === 'missing') delete object.lease_bytes;
+    else if (kind === 'extra') object.extra = true;
+    else if (kind === 'symbol') Object.defineProperty(object, Symbol('extra'), { value: true });
+    else if (kind === 'hidden')
+      Object.defineProperty(object, 'approval_bytes', {
+        value: object.approval_bytes,
+        enumerable: false,
+      });
+    else if (kind === 'getter')
+      Object.defineProperty(object, 'approval_bytes', { get: trap, enumerable: true });
+    else if (kind === 'prototype') Object.setPrototypeOf(object, { extra: true });
+    else {
+      const pair = Proxy.revocable(object, {
+        get: trap,
+        ownKeys: trap,
+        getPrototypeOf: trap,
+        getOwnPropertyDescriptor: trap,
+      });
+      if (kind === 'revoked') pair.revoke();
+      input = pair.proxy;
+    }
+    invalid(() => a.readReconciliationOwnerState(input));
+    expect(touches).toBe(0);
+  },
+);
+it.each([
+  'hole',
+  'hidden-index',
+  'getter-index',
+  'iterator',
+  'constructor',
+  'subclass',
+  'proxy',
+  'revoked',
+])('rejects hostile grant array%s without invoking caller hooks', async (kind) => {
+  const a = await api(),
+    g = new Graph();
+  g.renewal(1);
+  const input = g.input();
+  let array = input.grant_bytes as unknown[];
+  let touches = 0;
+  const trap = (): never => {
+    touches++;
+    throw new Error('PRIVATE_ARRAY_SENTINEL');
+  };
+  if (kind === 'hole') delete array[0];
+  else if (kind === 'hidden-index')
+    Object.defineProperty(array, '0', { value: array[0], enumerable: false });
+  else if (kind === 'getter-index')
+    Object.defineProperty(array, '0', { get: trap, enumerable: true });
+  else if (kind === 'iterator') Object.defineProperty(array, Symbol.iterator, { get: trap });
+  else if (kind === 'constructor') Object.defineProperty(array, 'constructor', { get: trap });
+  else if (kind === 'subclass') {
+    class Foreign extends Array<unknown> {
+      static override get [Symbol.species](): ArrayConstructor {
+        return trap();
+      }
+    }
+    array = new Foreign(...array);
+  } else {
+    const pair = Proxy.revocable(array, {
+      get: trap,
+      ownKeys: trap,
+      getPrototypeOf: trap,
+      getOwnPropertyDescriptor: trap,
+    });
+    if (kind === 'revoked') pair.revoke();
+    array = pair.proxy;
+  }
+  input.grant_bytes = array;
+  invalid(() => a.readReconciliationOwnerState(input));
+  expect(touches).toBe(0);
+});
+it('accepts exact null-prototype input/arrays and detached caller mutations cannot change branded state', async () => {
+  const a = await api(),
+    g = new Graph(),
+    input = g.input();
+  Object.setPrototypeOf(input, null);
+  for (const name of ['grant_bytes', 'intent_bytes', 'completion_bytes'])
+    Object.setPrototypeOf(input[name] as object, null);
+  const state = a.readReconciliationOwnerState(input),
+    before = JSON.stringify(state);
+  (input.approval_bytes as Uint8Array).fill(0);
+  (input.issuer_bytes as Uint8Array).fill(0);
+  input.lease_bytes = new Uint8Array();
+  assessment(a, state, '01', clock(1), 'absent', 'start');
+  expect(JSON.stringify(state)).toBe(before);
+  expect(() => (((state.phases as Data[])[0] as Data).phase = '04')).toThrow();
+  expect(JSON.stringify(state)).toBe(before);
+});
+it('copies actual Uint8Array subclass views through intrinsics without buffer/length/species/iterator hooks', async () => {
+  const a = await api(),
+    g = new Graph(),
+    input = g.input();
+  let touches = 0;
+  const trap = (): never => {
+    touches++;
+    throw new Error('PRIVATE_VIEW_SENTINEL');
+  };
+  class View extends Uint8Array {
+    static get [Symbol.species](): Uint8ArrayConstructor {
+      return trap();
+    }
+  }
+  for (const name of ['issuer_bytes', 'approval_bytes']) {
+    const raw = input[name] as Uint8Array,
+      v = new View(raw);
+    for (const key of ['buffer', 'byteLength', 'byteOffset', 'length', 'constructor'])
+      Object.defineProperty(v, key, { get: trap });
+    Object.defineProperty(v, Symbol.iterator, { get: trap });
+    input[name] = v;
+  }
+  const state = a.readReconciliationOwnerState(input);
+  assessment(a, state, '01', clock(1), 'absent', 'start');
+  expect(touches).toBe(0);
+});
+it.each(['shared', 'detached', 'proxy', 'revoked', 'data-view', 'array-buffer', 'plain-array'])(
+  'rejects unsupported issuer byte view%s safely',
+  async (kind) => {
+    const a = await api(),
+      input = new Graph().input();
+    let touches = 0;
+    const raw = input.issuer_bytes as Uint8Array;
+    if (kind === 'shared') {
+      const v = new Uint8Array(new SharedArrayBuffer(raw.length));
+      v.set(raw);
+      input.issuer_bytes = v;
+    } else if (kind === 'detached') {
+      const v = new Uint8Array(raw);
+      structuredClone(v, { transfer: [v.buffer] });
+      input.issuer_bytes = v;
+    } else if (kind === 'data-view') input.issuer_bytes = new DataView(new Uint8Array(raw).buffer);
+    else if (kind === 'array-buffer') input.issuer_bytes = new Uint8Array(raw).buffer;
+    else if (kind === 'plain-array') input.issuer_bytes = Array.from(raw);
+    else {
+      const trap = (): never => {
+        touches++;
+        throw new Error('PRIVATE_PROXY_VIEW');
+      };
+      const pair = Proxy.revocable(raw, {
+        get: trap,
+        ownKeys: trap,
+        getPrototypeOf: trap,
+        getOwnPropertyDescriptor: trap,
+      });
+      if (kind === 'revoked') pair.revoke();
+      input.issuer_bytes = pair.proxy;
+    }
+    invalid(() => a.readReconciliationOwnerState(input));
+    expect(touches).toBe(0);
+  },
+);
+it.each(['grant-count', 'intent-count', 'completion-count', 'file-bytes', 'aggregate-bytes'])(
+  'enforces bounded ingress%s before unbounded record work',
+  async (kind) => {
+    const a = await api(),
+      input = new Graph().input();
+    if (kind === 'grant-count')
+      input.grant_bytes = Array.from({ length: 4097 }, () => input.approval_bytes);
+    else if (kind === 'intent-count')
+      input.intent_bytes = Array.from({ length: 5 }, () => input.approval_bytes);
+    else if (kind === 'completion-count')
+      input.completion_bytes = Array.from({ length: 5 }, () => input.approval_bytes);
+    else if (kind === 'file-bytes') input.issuer_bytes = new Uint8Array(1048577);
+    else input.grant_bytes = Array.from({ length: 33 }, () => new Uint8Array(1048576));
+    invalid(() => a.readReconciliationOwnerState(input));
+  },
+);
+it.each([
+  'no-LF',
+  'extra-LF',
+  'spaces',
+  'BOM',
+  'duplicate-key',
+  'bad-UTF8',
+  'alternate-number',
+  'wrong-kind',
+])('rejects noncanonical or wrongkind signed record%s', async (kind) => {
+  const a = await api(),
+    g = new Graph(),
+    input = g.input(),
+    text = bytes(g.approval).toString();
+  if (kind === 'no-LF') input.approval_bytes = Buffer.from(text.trimEnd());
+  else if (kind === 'extra-LF') input.approval_bytes = Buffer.from(text + '\n');
+  else if (kind === 'spaces')
+    input.approval_bytes = Buffer.from(JSON.stringify(g.approval, null, 2) + '\n');
+  else if (kind === 'BOM')
+    input.approval_bytes = Buffer.concat([Buffer.from([239, 187, 191]), bytes(g.approval)]);
+  else if (kind === 'duplicate-key')
+    input.approval_bytes = Buffer.from(text.replace('{', '{"kind":"approval",'));
+  else if (kind === 'bad-UTF8') input.approval_bytes = Buffer.from([0xc0, 0xaf]);
+  else if (kind === 'alternate-number')
+    input.approval_bytes = Buffer.from(text.replace('"sequence":1', '"sequence":1.0'));
+  else input.approval_bytes = bytes(g.issuer);
+  invalid(() => a.readReconciliationOwnerState(input));
+});
+it.each(['clone', 'JSON', 'inherited', 'proxy', 'revoked', 'plain', 'function'])(
+  'assessment rejects%s counterfeit state before descriptor inspection',
+  async (kind) => {
+    const a = await api(),
+      state = a.readReconciliationOwnerState(new Graph().input());
+    let value: unknown = state,
+      touches = 0;
+    const trap = (): never => {
+      touches++;
+      throw new Error('PRIVATE_STATE_SENTINEL');
+    };
+    if (kind === 'clone') value = { ...state };
+    else if (kind === 'JSON') value = JSON.parse(JSON.stringify(state));
+    else if (kind === 'inherited') value = Object.create(state);
+    else if (kind === 'plain') {
+      value = {};
+      Object.defineProperty(value, 'kind', { get: trap });
+    } else if (kind === 'function') value = () => undefined;
+    else {
+      const pair = Proxy.revocable(state, {
+        get: trap,
+        ownKeys: trap,
+        getPrototypeOf: trap,
+        getOwnPropertyDescriptor: trap,
+      });
+      if (kind === 'revoked') pair.revoke();
+      value = pair.proxy;
+    }
+    invalid(() => a.assessReconciliationOwnerPhase(value, '01', clock(1), 'absent'));
+    expect(touches).toBe(0);
+  },
+);
+it.each([
+  'phase-getter',
+  'phase-symbol',
+  'phase-number',
+  'phase-invalid',
+  'clock-getter',
+  'output-getter',
+])('assessment rejects malformed%s without coercion or caller getters', async (kind) => {
+  const a = await api(),
+    state = a.readReconciliationOwnerState(new Graph().input());
+  let touches = 0;
+  const trap = (): never => {
+    touches++;
+    throw new Error('PRIVATE_ASSESSMENT_SENTINEL');
+  };
+  let phase: unknown = '01',
+    at: unknown = clock(1),
+    outputs: unknown = 'absent';
+  if (kind === 'phase-getter') {
+    phase = {};
+    Object.defineProperty(phase, 'toString', { get: trap });
+  } else if (kind === 'phase-symbol') phase = Symbol('01');
+  else if (kind === 'phase-number') phase = 1;
+  else if (kind === 'phase-invalid') phase = '1';
+  else if (kind === 'clock-getter') {
+    at = { ...clock(1) };
+    Object.defineProperty(at, 'wall_ms', { get: trap, enumerable: true });
+  } else {
+    outputs = {};
+    Object.defineProperty(outputs, 'toString', { get: trap });
+  }
+  invalid(() => a.assessReconciliationOwnerPhase(state, phase, at, outputs));
+  expect(touches).toBe(0);
+});
+afterAll(() => {
+  const paths = [
+    'packages/authority/src/runtime/reconciliation-owner-state.ts',
+    'packages/authority/tests/unit/reconciliation-owner-state.test.ts',
+  ];
+  writeFileSync(
+    resolve(EVIDENCE, 'public-oracle-observations.json'),
+    JSON.stringify(
+      {
+        scope: 'Pure independently signed graph fixtures; no native origin or effect authority',
+        private_key_or_records_logged: false,
+        observations,
+        sha256: Object.fromEntries(
+          paths
+            .filter((path) => existsSync(resolve(ROOT, path)))
+            .map((path) => [path, sha(readFileSync(resolve(ROOT, path)))]),
+        ),
+      },
+      null,
+      2,
+    ) + '\n',
+  );
+});

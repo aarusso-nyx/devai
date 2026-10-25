@@ -596,11 +596,45 @@ describe('ADR-v3 public result and semantic authority', () => {
     ]);
   });
 
-  it('freezes the current accepted-record authority graph and complete result instance', () => {
+  it('ratifies only the two approved proposal records while preserving their exact subjects and historical population', () => {
+    const historical = readJson<{ readonly records: AdrRecordFixture[] }>(
+      'packages/schemas/tests/fixtures/adr-pre-280-ratification.json',
+    );
     const policy = readJson<AdrPolicy>('law/policy/adr-validation.json');
     const adrRoot = resolve(ROOT, 'law/adr');
     const records = currentRecordFixtures(policy, adrRoot);
     const result = resolveAdrFixture(records, markdownFiles(adrRoot).length);
+    const ratified = ['ADR-GOV-0027', 'ADR-AUT-0008'];
+    for (const previous of historical.records) {
+      const current = records.find((row) => row.adr_id === previous.adr_id);
+      expect(current).toEqual({
+        ...previous,
+        status: ratified.includes(previous.adr_id) ? 'accepted' : previous.status,
+      });
+    }
+    for (const id of ratified) {
+      const previous = historical.records.find((row) => row.adr_id === id);
+      expect(previous?.status).toBe('proposed');
+      expect(result.adrs.find((row) => row.adr_id === id)).toMatchObject({
+        status: 'accepted',
+        supersedes: [],
+        effective: true,
+        effective_affected_rules: [...(previous?.affected_rules ?? [])].sort(),
+      });
+    }
+  });
+
+  it('preserves the complete pre-ratification proposal population and authority graph', () => {
+    const adrRoot = resolve(ROOT, 'law/adr');
+    const fixturePath = 'packages/schemas/tests/fixtures/adr-pre-280-ratification.json';
+    const raw = readFileSync(resolve(ROOT, fixturePath), 'utf8');
+    expect(sha256(raw)).toBe('05c776122fd5e4a939f446b5343943db03ef51a6e0051deaaa2099797f75fc0e');
+    const historical = JSON.parse(raw) as {
+      readonly records: AdrRecordFixture[];
+      readonly files_scanned: number;
+    };
+    const records = historical.records;
+    const result = resolveAdrFixture(records, historical.files_scanned);
     expect(records.map((record) => record.adr_id)).toEqual([
       'ADR-014',
       'ADR-AUT-0001',
@@ -610,6 +644,7 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-AUT-0005',
       'ADR-AUT-0006',
       'ADR-AUT-0007',
+      'ADR-AUT-0008',
       'ADR-CFG-0001',
       'ADR-CFG-0002',
       'ADR-CHK-0001',
@@ -653,6 +688,7 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-GOV-0024',
       'ADR-GOV-0025',
       'ADR-GOV-0026',
+      'ADR-GOV-0027',
       'ADR-MDL-0001',
       'ADR-MDL-0002',
       'ADR-MDL-0003',
@@ -734,12 +770,57 @@ describe('ADR-v3 public result and semantic authority', () => {
       'ADR-SCR-0022',
       'ADR-SEC-0001',
     ]);
-    expect(records).toHaveLength(131);
+    expect(records).toHaveLength(133);
+    // Preserve the prior 132-record population and its original 131-record baseline.
+    const beforeP1 = records.filter((row) => row.adr_id !== 'ADR-AUT-0008');
+    expect(beforeP1).toHaveLength(132);
+    expect(beforeP1.filter((row) => row.adr_id !== 'ADR-GOV-0027')).toHaveLength(131);
+    const p1Proposal = records.find((row) => row.adr_id === 'ADR-AUT-0008');
+    expect(p1Proposal).toMatchObject({
+      status: 'proposed',
+      supersedes: [],
+      affected_rules: [
+        'packages/cli/src/action-output.ts',
+        'packages/cli/src/command-router.ts',
+        'packages/cli/src/commands/init/index.ts',
+        'packages/cli/src/commands/init/shared.ts',
+        'packages/cli/src/commands/init/review-authority-policy.ts',
+        'packages/cli/src/authority/command-capabilities.ts',
+        'packages/cli/src/authority/broker.ts',
+        'packages/cli/src/authority/policy-review.ts',
+        'packages/cli/src/authority/policy.ts',
+        'packages/cli/src/authority/policy-support.ts',
+        'docs/reference/cli/index.md',
+      ],
+    });
+    expect(result.adrs.find((row) => row.adr_id === 'ADR-AUT-0008')).toMatchObject({
+      effective: false,
+      effective_affected_rules: [],
+    });
+    expect(
+      result.subject_authorities.some((row) => row.lineage_members.includes('ADR-AUT-0008')),
+    ).toBe(false);
+    const proposal = records.find((row) => row.adr_id === 'ADR-GOV-0027');
+    expect(proposal).toMatchObject({
+      status: 'proposed',
+      supersedes: [],
+      affected_rules: [
+        'law/constitution.md',
+        'law/schemas/proof-index-reconciliation-contract.schema.json',
+      ],
+    });
+    expect(result.adrs.find((row) => row.adr_id === 'ADR-GOV-0027')).toMatchObject({
+      effective: false,
+      effective_affected_rules: [],
+    });
+    expect(
+      result.subject_authorities.some((row) => row.lineage_members.includes('ADR-GOV-0027')),
+    ).toBe(false);
     expect(
       records.filter((record) => record.format === 'legacy-catalog').map((record) => record.adr_id),
     ).toEqual(['ADR-014', 'ADR-MUT-0005', 'ADR-REL-0017']);
     expect(records.filter((record) => record.adr_id === 'ADR-014')).toHaveLength(1);
-    expect(result.files_scanned).toBe(132);
+    expect(result.files_scanned).toBe(134);
     expect(result.subject_authorities).toHaveLength(642);
     expect(
       result.subject_authorities.find(
@@ -1202,6 +1283,6 @@ describe('ADR-v3 public result and semantic authority', () => {
         .sort(),
     ).toEqual(['ADR-AUT-0003', 'ADR-AUT-0004']);
     expect(validateAdrResult(result), JSON.stringify(validateAdrResult.errors)).toBe(true);
-    expect(matchesAdrSemantics(records, result, markdownFiles(adrRoot).length)).toBe(true);
+    expect(matchesAdrSemantics(records, result, historical.files_scanned)).toBe(true);
   });
 });

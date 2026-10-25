@@ -17,6 +17,8 @@ async function governedCommand(
     disposeFailure?: boolean;
     scopeAction?: string;
     scopeEffect?: 'read' | 'harness-write' | 'local-write' | 'remote-write';
+    bindReview?: boolean;
+    reviewOutput?: boolean;
   }> = {},
 ) {
   vi.resetModules();
@@ -46,6 +48,16 @@ async function governedCommand(
             receipt_store: issuer,
             apply_effect: (_request: unknown, apply: () => unknown) => apply(),
           }),
+          policy_materialization: () => ({
+            start: () => {
+              events.push('review-ready');
+              return {};
+            },
+            confirm: () => {
+              events.push('review-confirm');
+              return {};
+            },
+          }),
           commit_exact: () => events.push('commit'),
           dispose: () => {
             events.push('dispose');
@@ -64,7 +76,12 @@ async function governedCommand(
   const { attachAuthorityCommandBoundaries, authorizeCliArgv, disposeCliInvocationAuthority } =
     await import('../../src/authority/index.js');
   const { canonicalRegistry } = await import('../../src/define-command.js');
-  const actionName = options.dryRun === true ? 'sense run' : 'round plan';
+  const actionName =
+    options.bindReview === true
+      ? 'init bind'
+      : options.dryRun === true
+        ? 'sense run'
+        : 'round plan';
   const canonical = canonicalRegistry();
   const selected = canonical.find((candidate) => candidate.name === actionName);
   const entry =
@@ -84,30 +101,50 @@ async function governedCommand(
   if (command?.commandAction === undefined) throw new Error('governed command action missing');
 
   process.argv =
-    options.dryRun === true
+    options.bindReview === true
       ? [
           process.execPath,
           'devai',
-          'sense',
-          'run',
-          'runtime_probe_data',
-          '--as-role',
-          'auditor',
-          '--write',
-          '--dry-run',
-        ]
-      : [
-          process.execPath,
-          'devai',
-          'round',
-          'plan',
-          '--documents',
-          'cli',
+          'init',
+          'bind',
+          '--review-authority-policy',
+          '--after-constitution',
+          '--target',
+          '.',
           '--as-role',
           'architect',
           '--write',
-        ];
+          '--format',
+          'json',
+        ]
+      : options.dryRun === true
+        ? [
+            process.execPath,
+            'devai',
+            'sense',
+            'run',
+            'runtime_probe_data',
+            '--as-role',
+            'auditor',
+            '--write',
+            '--dry-run',
+          ]
+        : [
+            process.execPath,
+            'devai',
+            'round',
+            'plan',
+            '--documents',
+            'cli',
+            '--as-role',
+            'architect',
+            '--write',
+          ];
   expect(authorizeCliArgv(process.argv, entries)).toBeUndefined();
+  if (options.reviewOutput) {
+    const { attachActionOutputBoundaries } = await import('../../src/action-output.js');
+    attachActionOutputBoundaries(cli.commands, entries);
+  }
   return {
     disposeInvocation: disposeCliInvocationAuthority,
     invoke: () => command.commandAction?.(),
@@ -180,5 +217,110 @@ describe('public authority command finalization', () => {
     expect(governed.disposeInvocation).toThrow('authority disposal failure');
     expect(governed.disposeInvocation).toThrow('AUTHORITY_INVOCATION_DISPOSAL_FAILED');
     expect(governed.events).toEqual(['dispose']);
+  });
+});
+
+describe('REC-B1-A-P1 async review authority scope', () => {
+  it('P1-06/P1-07/P1-15 retains invocation-local operation through wait and clears it after confirmation', async () => {
+    let resume: (() => void) | undefined;
+    const waiting = new Promise<void>((done) => {
+      resume = done;
+    });
+    let escaped: (() => unknown) | undefined;
+    const governed = await governedCommand(
+      async () => {
+        const { executeAuthorityPolicyMaterialization } =
+          await import('../../src/authority/command-capabilities.js');
+        escaped = executeAuthorityPolicyMaterialization;
+        const handle = executeAuthorityPolicyMaterialization() as {
+          start(): unknown;
+          confirm(): unknown;
+        };
+        handle.start();
+        await waiting;
+        // The same operation remains reachable only in this live async invocation.
+        executeAuthorityPolicyMaterialization();
+        handle.confirm();
+        return 'review-complete';
+      },
+      { bindReview: true },
+    );
+    const result = governed.invoke();
+    await new Promise<void>((done) => setImmediate(done));
+    expect(governed.events).toEqual(['review-ready']);
+    resume?.();
+    await expect(result).resolves.toBe('review-complete');
+    expect(governed.events).toEqual(['review-ready', 'review-confirm', 'commit', 'dispose']);
+    expect(() => escaped?.()).toThrow('AUTHORITY_POLICY_MATERIALIZATION_REQUIRED');
+  });
+});
+
+describe('output transport waits for actual authority finalization', () => {
+  it('nested authority disposal failure replaces a pending success with one failure and restores streams', async () => {
+    const tty = [process.stdin, process.stdout, process.stderr].map((stream) => ({
+      stream,
+      descriptor: Object.getOwnPropertyDescriptor(stream, 'isTTY'),
+    }));
+    for (const { stream } of tty)
+      Object.defineProperty(stream, 'isTTY', { configurable: true, value: true });
+    let stdout = '';
+    let stderr = '';
+    const out = vi.spyOn(process.stdout, 'write').mockImplementation(((chunk: unknown) => {
+      stdout += String(chunk);
+      return true;
+    }) as typeof process.stdout.write);
+    const err = vi.spyOn(process.stderr, 'write').mockImplementation(((chunk: unknown) => {
+      stderr += String(chunk);
+      return true;
+    }) as typeof process.stderr.write);
+    const streams = {
+      stdout: process.stdout.write,
+      stderr: process.stderr.write,
+      exit: process.exit,
+    };
+    try {
+      const governed = await governedCommand(
+        async () => {
+          const { requireAuthorityPolicyReviewOutput } = await import('../../src/action-output.js');
+          const transport = requireAuthorityPolicyReviewOutput();
+          transport.ready({
+            kind: 'authority-policy-create-review',
+            schema_version: '1.0.0',
+            status: 'awaiting-exact-confirmation',
+            grants_authority: false,
+            target: '.devai/config/authority-policy.json',
+            operation: 'create',
+          });
+          transport.prompt('prompt\n');
+          transport.complete({ status: 'created', binding_performed: true });
+        },
+        { bindReview: true, disposeFailure: true, reviewOutput: true },
+      );
+      await governed.invoke();
+      const success = stdout
+        .split('\n')
+        .filter((line) => line.startsWith('{'))
+        .map((line) => JSON.parse(line));
+      const failure = stderr
+        .split('\n')
+        .filter((line) => line.startsWith('{'))
+        .map((line) => JSON.parse(line));
+      expect(success).toHaveLength(1);
+      expect(success[0]).toMatchObject({ result: { verdict: 'review' } });
+      expect(failure).toHaveLength(1);
+      expect(failure[0]).toMatchObject({ ok: false });
+      expect(JSON.stringify(failure[0])).toContain('authority disposal failure');
+      expect(governed.events).toEqual(['commit', 'dispose']);
+      expect(process.stdout.write).toBe(streams.stdout);
+      expect(process.stderr.write).toBe(streams.stderr);
+      expect(process.exit).toBe(streams.exit);
+    } finally {
+      out.mockRestore();
+      err.mockRestore();
+      for (const { stream, descriptor } of tty) {
+        if (descriptor) Object.defineProperty(stream, 'isTTY', descriptor);
+        else delete (stream as { isTTY?: boolean }).isTTY;
+      }
+    }
   });
 });

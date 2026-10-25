@@ -405,6 +405,7 @@ const SOURCE_ONLY_SCHEMAS = [
   'data-handling.schema.json',
   'documentation-information-architecture.schema.json',
   'inv-override.schema.json',
+  'proof-index-reconciliation-contract.schema.json',
   'targets.schema.json',
   'task-freshness.schema.json',
   'threat-model.schema.json',
@@ -440,7 +441,7 @@ describe('S06-A schema canon and dispatch residuals', () => {
 
     expect(checkSchemaCanon(root)).toEqual({
       ok: true,
-      canonical_total: 16,
+      canonical_total: 17,
       rules: [
         'recursive-closed-complete-objects',
         'predicate-fragments-valid',
@@ -515,7 +516,7 @@ describe('S06-A schema canon and dispatch residuals', () => {
     put(source, 'packages/schemas/src/roster.ts', 'source roster');
     expect(checkSchemasForRepository(source)).toEqual({
       ok: true,
-      canonical_total: 16,
+      canonical_total: 17,
       rules: [
         'recursive-closed-complete-objects',
         'predicate-fragments-valid',
