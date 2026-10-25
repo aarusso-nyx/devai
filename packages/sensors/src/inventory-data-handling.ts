@@ -1,3 +1,4 @@
+import type { InventorySourceReader } from './inventory-walker.js';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { mkdirSync, writeFileSync } from '@devai-nyx/authority';
@@ -151,6 +152,7 @@ function classifyColumn(col: DataModelColumn): string | null {
 }
 
 export interface InventoryDataHandlingOptions {
+  readonly sourceReader?: InventorySourceReader;
   readonly repoRoot: string;
   /**
    * Declared plant surfaces (ADR-SCR-0003). Omitted: every surface is presumed present.
@@ -179,8 +181,14 @@ function measureInventoryDataHandling(
     opts.repoRoot,
     opts.dataModelPath,
     DATA_MODEL_FILE,
+    opts.sourceReader,
   ) as string;
 
+  if (
+    opts.sourceReader !== undefined &&
+    (dataModelPath === null || !opts.sourceReader.exists(dataModelPath))
+  )
+    throw new Error('INVENTORY_SOURCE_REQUIRED_DATA_MODEL_MISSING');
   const findings: Array<{
     readonly severity: 'info' | 'warning' | 'error' | 'critical';
     readonly code: string;
@@ -190,7 +198,11 @@ function measureInventoryDataHandling(
   let status: SensorStatus = 'pass';
   let dataModel: DataModelBody | null = null;
 
-  if (!existsSync(dataModelPath)) {
+  if (
+    !(opts.sourceReader === undefined
+      ? existsSync(dataModelPath)
+      : opts.sourceReader.exists(dataModelPath))
+  ) {
     status = 'review';
     findings.push({
       severity: 'warning',
@@ -199,7 +211,13 @@ function measureInventoryDataHandling(
     });
   } else {
     try {
-      dataModel = JSON.parse(readFileSync(dataModelPath, 'utf8')) as DataModelBody;
+      dataModel = JSON.parse(
+        opts.sourceReader === undefined
+          ? readFileSync(dataModelPath, 'utf8')
+          : opts.sourceReader.readFile(dataModelPath),
+      ) as DataModelBody;
+      if (opts.sourceReader !== undefined && !validators.dataModelInventory(dataModel))
+        throw new Error('INVENTORY_SOURCE_DATA_MODEL_INVALID');
     } catch (err) {
       status = 'error';
       findings.push({

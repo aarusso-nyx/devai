@@ -7,6 +7,15 @@
  * `.devai/config/`, not DEVAI's source documentation.
  */
 
+import type {
+  ProofIndexResourceTarget,
+  ReconciliationHostResourceTarget,
+} from './boundaries/reconciliation-resources.js';
+export type {
+  ProofIndexResourceTarget,
+  ReconciliationHostResourceTarget,
+} from './boundaries/reconciliation-resources.js';
+
 export const HUMAN_ROLES = ['owner', 'architect', 'inspector', 'engineer', 'auditor'] as const;
 export type HumanRole = (typeof HUMAN_ROLES)[number];
 
@@ -145,7 +154,12 @@ export interface RemoteResourceTarget extends ResourceTargetBase {
 }
 
 export type ResourceTarget =
-  FsResourceTarget | GitRefResourceTarget | DbResourceTarget | RemoteResourceTarget;
+  | FsResourceTarget
+  | GitRefResourceTarget
+  | DbResourceTarget
+  | RemoteResourceTarget
+  | ProofIndexResourceTarget
+  | ReconciliationHostResourceTarget;
 
 export type ResourceTargetSelector =
   | {

@@ -1,3 +1,4 @@
+import type { InventorySourceReader } from './inventory-walker.js';
 import { createHash } from 'node:crypto';
 import { existsSync, statSync } from 'node:fs';
 import { mkdirSync, writeFileSync } from '@devai-nyx/authority';
@@ -36,7 +37,11 @@ export type {
  * Resolve configured scan directories to unique existing absolute paths.
  * An empty list scans `repoRoot`.
  */
-function uniqueExistingDirs(raw: readonly string[], repoRoot: string): string[] {
+function uniqueExistingDirs(
+  raw: readonly string[],
+  repoRoot: string,
+  sourceReader?: InventorySourceReader,
+): string[] {
   if (raw.length === 0) return [repoRoot];
   const seen = new Set<string>();
   const out: string[] = [];
@@ -44,10 +49,14 @@ function uniqueExistingDirs(raw: readonly string[], repoRoot: string): string[] 
     const abs = isAbsolute(d) ? d : resolve(repoRoot, d);
     if (seen.has(abs)) continue;
     seen.add(abs);
-    if (!existsSync(abs)) continue;
+    if (!(sourceReader === undefined ? existsSync(abs) : sourceReader.exists(abs))) continue;
     try {
-      if (!statSync(abs).isDirectory()) continue;
-    } catch {
+      if (
+        !(sourceReader === undefined ? statSync(abs).isDirectory() : sourceReader.isDirectory(abs))
+      )
+        continue;
+    } catch (error) {
+      if (sourceReader !== undefined) throw error;
       continue;
     }
     out.push(abs);
@@ -71,7 +80,7 @@ function sortRoutes(routes: readonly RoutesInventoryRoute[]): RoutesInventoryRou
 function measureInventoryRoutes(opts: InventoryRoutesOptions): InventoryRoutesResult {
   const t0 = performance.now();
   const ignoreDirs = opts.ignoreDirs ?? DEFAULT_IGNORE_DIRS;
-  const scanDirs = uniqueExistingDirs(opts.scanDirs ?? [], opts.repoRoot);
+  const scanDirs = uniqueExistingDirs(opts.scanDirs ?? [], opts.repoRoot, opts.sourceReader);
   const generatedAt = opts.now ?? new Date().toISOString();
   const framework: RoutesFramework = opts.framework ?? 'react';
 
@@ -88,9 +97,11 @@ function measureInventoryRoutes(opts: InventoryRoutesOptions): InventoryRoutesRe
     const collected: RawRoute[] = [];
     for (const scanDir of scanDirs) {
       const admit = opts.admitFile;
-      const files = walkTsxJsx(scanDir, ignoreDirs).filter((f) => admit === undefined || admit(f));
+      const files = walkTsxJsx(scanDir, ignoreDirs, opts.sourceReader).filter(
+        (f) => admit === undefined || admit(f),
+      );
       for (const file of files) {
-        const sf = parseSource(file);
+        const sf = parseSource(file, opts.sourceReader);
         if (sf === null) continue;
         const extracted =
           framework === 'angular'

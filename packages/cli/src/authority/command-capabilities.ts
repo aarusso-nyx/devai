@@ -28,3 +28,6 @@ export function executeAuthorityPolicyMaterialization(): unknown {
   if (!operation) throw new Error('AUTHORITY_POLICY_MATERIALIZATION_REQUIRED');
   return operation();
 }
+
+/** The operation remains invocation-local; review handles have no serialized apply form. */
+export type { AuthorityPolicyReview } from './policy-review.js';

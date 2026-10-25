@@ -1,3 +1,4 @@
+import type { InventorySourceReader } from '@devai-nyx/sensors';
 import { mkdirSync, writeFileSync } from '@devai-nyx/authority';
 import { existsSync, readFileSync, readdirSync, realpathSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
@@ -330,9 +331,15 @@ function nearestRealPath(target: string): string {
   }
 }
 
-function assertInsideRoot(roots: RepositoryRoots, kind: string, key: string, value: string): void {
+function assertInsideRoot(
+  roots: RepositoryRoots,
+  kind: string,
+  key: string,
+  value: string,
+  sourceReader?: InventorySourceReader,
+): void {
   const target = isAbsolute(value) ? value : resolve(roots.lexical, value);
-  if (!isInside(roots.real, nearestRealPath(target))) {
+  if (!isInside(roots.real, sourceReader === undefined ? nearestRealPath(target) : target)) {
     throw new SenseInputsError(
       'SENSE_INPUTS_PATH_ESCAPES_ROOT',
       `${kind}.${key} '${value}' resolves outside the repository root`,
@@ -345,26 +352,32 @@ function assertGlobInsideRoot(
   kind: string,
   key: string,
   glob: string,
+  sourceReader?: InventorySourceReader,
 ): void {
   const parts = glob.split('/');
   const wildcard = parts.findIndex((part) => part.includes('*'));
   if (wildcard < 0) {
-    assertInsideRoot(roots, kind, key, glob);
+    assertInsideRoot(roots, kind, key, glob, sourceReader);
     return;
   }
   const before = parts.slice(0, wildcard).join('/');
   const after = parts.slice(wildcard + 1).join('/');
-  assertInsideRoot(roots, kind, key, before === '' ? '.' : before);
+  assertInsideRoot(roots, kind, key, before === '' ? '.' : before, sourceReader);
   let entries: string[];
   try {
-    entries = readdirSync(isAbsolute(before) ? before : resolve(roots.lexical, before));
-  } catch {
+    const path = isAbsolute(before) ? before : resolve(roots.lexical, before);
+    entries =
+      sourceReader === undefined
+        ? readdirSync(path)
+        : sourceReader.listDirectory(path).map((entry) => entry.name);
+  } catch (error) {
+    if (sourceReader !== undefined) throw error;
     return;
   }
   // Each expansion is compared on real paths, so a symlinked entry cannot lead out.
   for (const entry of entries) {
     const expanded = [before, entry, after].filter((segment) => segment !== '').join('/');
-    assertInsideRoot(roots, kind, key, expanded);
+    assertInsideRoot(roots, kind, key, expanded, sourceReader);
   }
 }
 
@@ -395,17 +408,24 @@ function assertDeclaredKeys(schema: SensorInputsSchema, inputs: Record<string, u
   }
 }
 
-function assertPathsInsideRoot(repoRoot: string, inputs: Record<string, unknown>): void {
+function assertPathsInsideRoot(
+  repoRoot: string,
+  inputs: Record<string, unknown>,
+  sourceReader?: InventorySourceReader,
+): void {
   const lexical = resolve(repoRoot);
-  const roots: RepositoryRoots = { lexical, real: nearestRealPath(lexical) };
+  const roots: RepositoryRoots = {
+    lexical,
+    real: sourceReader === undefined ? nearestRealPath(lexical) : lexical,
+  };
   for (const [kind, entry] of Object.entries(inputs)) {
     if (!isRecord(entry)) continue;
     for (const [key, value] of Object.entries(entry)) {
       if (DECLARED_PATH_KEYS.has(key) && typeof value === 'string') {
-        assertInsideRoot(roots, kind, key, value);
+        assertInsideRoot(roots, kind, key, value, sourceReader);
       } else if (DECLARED_GLOB_KEYS.has(key) && Array.isArray(value)) {
         for (const glob of value) {
-          if (typeof glob === 'string') assertGlobInsideRoot(roots, kind, key, glob);
+          if (typeof glob === 'string') assertGlobInsideRoot(roots, kind, key, glob, sourceReader);
         }
       }
     }
@@ -415,6 +435,7 @@ function assertPathsInsideRoot(repoRoot: string, inputs: Record<string, unknown>
 function validateDeclaration(
   repoRoot: string,
   declaration: unknown,
+  sourceReader?: InventorySourceReader,
 ): Readonly<Record<string, SensorInputs>> {
   const schema = loadSensorInputsSchema();
   const inputs = isRecord(declaration) ? declaration['inputs'] : undefined;
@@ -422,7 +443,7 @@ function validateDeclaration(
     // Specific refusals first, so the code names the defect; the schema pass then
     // covers every remaining shape rule of the whole file.
     assertDeclaredKeys(schema, inputs);
-    assertPathsInsideRoot(repoRoot, inputs);
+    assertPathsInsideRoot(repoRoot, inputs, sourceReader);
   }
   if (!schema.validate(declaration)) {
     const [first] = schema.validate.errors ?? [];
@@ -440,8 +461,13 @@ export function validateEffectiveSensorInputs(
   repoRoot: string,
   kind: string,
   inputs: SensorInputs,
+  sourceReader?: InventorySourceReader,
 ): void {
-  validateDeclaration(repoRoot, { schemaVersion: '1.0.0', inputs: { [kind]: inputs } });
+  validateDeclaration(
+    repoRoot,
+    { schemaVersion: '1.0.0', inputs: { [kind]: inputs } },
+    sourceReader,
+  );
 }
 
 /**
@@ -461,6 +487,7 @@ export function resolveDeclaredSensorInputs(args: {
   readonly repoRoot: string;
   readonly sensorKind: string;
   readonly explicit?: SensorInputs;
+  readonly sourceReader?: InventorySourceReader;
 }): SensorInputs {
   if (!isSensorKind(args.sensorKind)) {
     throw new SenseInputsError(
@@ -469,17 +496,23 @@ export function resolveDeclaredSensorInputs(args: {
     );
   }
   const path = join(args.repoRoot, SENSOR_INPUTS_DECLARATION_PATH);
-  if (!existsSync(path)) return Object.freeze({ ...(args.explicit ?? {}) });
+  if (!(args.sourceReader === undefined ? existsSync(path) : args.sourceReader.exists(path)))
+    return Object.freeze({ ...(args.explicit ?? {}) });
   let declaration: unknown;
   try {
-    declaration = JSON.parse(readFileSync(path, 'utf8'));
+    declaration = JSON.parse(
+      args.sourceReader === undefined
+        ? readFileSync(path, 'utf8')
+        : args.sourceReader.readFile(path),
+    );
   } catch (error) {
     throw new SenseInputsError(
       'SENSE_INPUTS_INVALID',
       `${SENSOR_INPUTS_DECLARATION_PATH} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
-  const declared = validateDeclaration(args.repoRoot, declaration)[args.sensorKind] ?? {};
+  const declared =
+    validateDeclaration(args.repoRoot, declaration, args.sourceReader)[args.sensorKind] ?? {};
   // The schema pass above has validated `surfaces` when present.
   const surfaces = isRecord(declaration) ? declaration['surfaces'] : undefined;
   const bound =

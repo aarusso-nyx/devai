@@ -329,6 +329,9 @@ export function boundedSelectors(
   repositoryId: string,
   actionName: string,
 ): JsonRecord[] {
+  // These catalogued upper bounds are usable only through an exact native plan.
+  // Never map a protected resource to the legacy remote fallback selector.
+  if (kind === 'reconciliation-host' || kind === 'proof-index') return [];
   if (
     actionName === 'release export' &&
     (kind === 'artifact-sink' || kind === 'protected-export-signer')

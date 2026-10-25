@@ -8,3 +8,5 @@ export * from './profile/index.js';
 export * from './redact.js';
 export * from './repository-target.js';
 export * from './templates/index.js';
+export * from './evidence-integrity.js';
+export * from './evidence-record.js';

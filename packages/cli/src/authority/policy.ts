@@ -1,6 +1,7 @@
 import type { RegistryEntry } from '../define-command.js';
 import {
   authorityBindings,
+  prospectiveAuthorityBindings,
   classWriteVerbs,
   subjectGroups,
   POLICY_VERSION,
@@ -26,7 +27,32 @@ export function buildTrustedAuthoritySources(
   packageVersion: string,
   installedConstitutionText?: string,
 ) {
-  const bindings = authorityBindings(root, packageVersion, installedConstitutionText);
+  return buildFromBindings(
+    entries,
+    root,
+    packageVersion,
+    authorityBindings(root, packageVersion, installedConstitutionText),
+  );
+}
+
+export function buildProspectiveAuthoritySources(
+  entries: readonly RegistryEntry[],
+  root: string,
+  packageVersion: string,
+) {
+  const projection = prospectiveAuthorityBindings(root, packageVersion);
+  return {
+    ...projection,
+    sources: buildFromBindings(entries, root, packageVersion, projection.bindings),
+  };
+}
+
+function buildFromBindings(
+  entries: readonly RegistryEntry[],
+  root: string,
+  packageVersion: string,
+  bindings: ReturnType<typeof authorityBindings>,
+) {
   const repositoryId = bindings.repository_id;
   const groups = subjectGroups(entries);
   const human = (role: string) => [{ kind: 'human', roles: [role] }];

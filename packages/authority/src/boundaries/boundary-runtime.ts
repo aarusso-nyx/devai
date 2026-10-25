@@ -7,7 +7,12 @@ import {
   type AnyRecord,
 } from '../runtime/contracts.js';
 import { selectorMatches } from '../runtime/policy-resolver.js';
-import { adapterId, classifyAuthorityResource, logical } from './resource-classification.js';
+import {
+  adapterId,
+  classifyAuthorityResource,
+  logical,
+  typedResourceKind,
+} from './resource-classification.js';
 import {
   domainAdapter,
   exactTargets,
@@ -29,6 +34,21 @@ export function createAuthorityBoundaryRuntime(deps: unknown) {
   const preparedRecords = new WeakMap<object, PreparedRecord>();
   const preparedUnitRecords = new WeakMap<object, PreparedUnitRecord>();
   let closed = false;
+
+  function classificationDependencies(consent: unknown): AnyRecord {
+    const selected: AnyRecord = {
+      repository_root: dependencies.repository_root,
+      realpath: dependencies.fs?.realpath,
+      consent,
+    };
+    // Preserve new dependency descriptors without executing accessor providers.
+    // Classification admits only own data values; malformed providers refuse.
+    for (const key of ['reconciliation_host', 'proof_index']) {
+      const descriptor = Object.getOwnPropertyDescriptor(dependencies, key);
+      if (descriptor !== undefined) Object.defineProperty(selected, key, descriptor);
+    }
+    return selected;
+  }
 
   const plannerRegistry = {
     registerPlan(input: unknown) {
@@ -88,6 +108,7 @@ export function createAuthorityBoundaryRuntime(deps: unknown) {
         !input.batch.targets.every(
           (target: unknown) =>
             isRecord(target) &&
+            typedResourceKind(target) === undefined &&
             selectors.some((selector: unknown) => selectorMatches(selector, target)),
         ) ||
         targetIds.length > bounds.max_targets_per_batch
@@ -197,15 +218,27 @@ export function createAuthorityBoundaryRuntime(deps: unknown) {
     ) {
       return failure('refused', 'AUTHORITY_PLAN_TARGET_BINDING_MISMATCH');
     }
-    const classified = classifyAuthorityResource(input.target, {
-      repository_root: dependencies.repository_root,
-      realpath: dependencies.fs?.realpath,
-      consent: plan.subject.plan.envelope?.request?.consent,
-    });
+    const classified = classifyAuthorityResource(
+      input.target,
+      classificationDependencies(plan.subject.plan.envelope?.request?.consent),
+    );
     if (classified.ok !== true) return classified;
     const expectedAdapter = adapterId(input.target);
     if (input.adapter_id !== expectedAdapter) {
       return failure('refused', 'AUTHORITY_DECISION_RECEIPT_BINDING_MISMATCH');
+    }
+    let typedSnapshot: unknown;
+    let typedAdapter: AnyRecord | undefined;
+    if (typedResourceKind(input.target) !== undefined) {
+      typedAdapter = domainAdapter(input.target, dependencies);
+      if (typedAdapter === undefined)
+        return failure('dependency-error', 'AUTHORITY_TYPED_RESOURCE_ADAPTER_REQUIRED');
+      try {
+        typedSnapshot = snapshotTarget(input.target, dependencies);
+        dependencies.canonicalSha256(typedSnapshot);
+      } catch {
+        return failure('dependency-error', 'AUTHORITY_TYPED_RESOURCE_SNAPSHOT_INVALID');
+      }
     }
     const consumed = dependencies.receiptStore.consume({
       receipt: input.decision_receipt,
@@ -215,7 +248,8 @@ export function createAuthorityBoundaryRuntime(deps: unknown) {
     });
     if (consumed.ok !== true) return consumed;
     const prepared = opaque();
-    const snapshot = snapshotTarget(input.target, dependencies.fs);
+    const snapshot =
+      typedAdapter === undefined ? snapshotTarget(input.target, dependencies) : typedSnapshot;
     preparedRecords.set(prepared, {
       target: input.target,
       snapshot,
@@ -223,6 +257,7 @@ export function createAuthorityBoundaryRuntime(deps: unknown) {
       plan: input.plan_handle,
       targetDigest: dependencies.canonicalSha256(input.target),
       used: false,
+      ...(typedAdapter === undefined ? {} : { typedAdapter }),
     });
     return success(prepared);
   }
@@ -269,6 +304,8 @@ export function createAuthorityBoundaryRuntime(deps: unknown) {
       return failure('refused', 'AUTHORITY_EXECUTION_UNIT_TARGET_MISMATCH');
     }
     const adapterIds = new Set(targets.map(adapterId));
+    if (targets.some((target) => typedResourceKind(target) !== undefined))
+      return failure('dependency-error', 'AUTHORITY_ATOMIC_UNIT_ADAPTER_REQUIRED');
     if (adapterIds.size !== 1 || !adapterIds.has(String(input.adapter_id))) {
       return failure('refused', 'AUTHORITY_EXECUTION_UNIT_ADAPTER_MISMATCH');
     }
@@ -280,13 +317,12 @@ export function createAuthorityBoundaryRuntime(deps: unknown) {
     }
     const snapshots: unknown[] = [];
     for (const target of targets) {
-      const classified = classifyAuthorityResource(target, {
-        repository_root: dependencies.repository_root,
-        realpath: dependencies.fs?.realpath,
-        consent: plan.subject.plan.envelope?.request?.consent,
-      });
+      const classified = classifyAuthorityResource(
+        target,
+        classificationDependencies(plan.subject.plan.envelope?.request?.consent),
+      );
       if (classified.ok !== true) return classified;
-      snapshots.push(snapshotTarget(target, dependencies.fs));
+      snapshots.push(snapshotTarget(target, dependencies));
     }
     const consumed = dependencies.receiptStore.consume({
       receipt: input.decision_receipt,
@@ -322,13 +358,22 @@ export function createAuthorityBoundaryRuntime(deps: unknown) {
       return failure('refused', 'AUTHORITY_RESOURCE_CHANGED_AFTER_PREPARE');
     }
     const plan = plans.get(record.plan);
-    const classified = classifyAuthorityResource(target, {
-      repository_root: dependencies.repository_root,
-      realpath: dependencies.fs?.realpath,
-      consent: plan?.subject.plan.envelope?.request?.consent,
-    });
+    const classified = classifyAuthorityResource(
+      target,
+      classificationDependencies(plan?.subject.plan.envelope?.request?.consent),
+    );
     if (classified.ok !== true) return classified;
-    const currentSnapshot = snapshotTarget(target, dependencies.fs);
+    const typed = typedResourceKind(target) !== undefined;
+    const typedAdapter = typed ? domainAdapter(target, dependencies) : undefined;
+    if (typed && (typedAdapter === undefined || typedAdapter !== record.typedAdapter))
+      return failure('dependency-error', 'AUTHORITY_TYPED_RESOURCE_ADAPTER_REQUIRED');
+    let currentSnapshot: unknown;
+    try {
+      currentSnapshot = snapshotTarget(target, dependencies);
+    } catch (error) {
+      if (!typed) throw error;
+      return failure('dependency-error', 'AUTHORITY_TYPED_RESOURCE_SNAPSHOT_INVALID');
+    }
     if (
       dependencies.canonicalSha256(currentSnapshot) !==
       dependencies.canonicalSha256(record.snapshot)
@@ -336,7 +381,14 @@ export function createAuthorityBoundaryRuntime(deps: unknown) {
       return failure('refused', 'AUTHORITY_RESOURCE_CHANGED_AFTER_PREPARE');
     }
     let effectResult: unknown;
-    if (target.kind === 'fs')
+    if (typedAdapter !== undefined) {
+      // Snapshot acquisition can observe a changed host operation. Admission is
+      // checked again at the final dispatch, after the snapshot comparison.
+      if (domainAdapter(target, dependencies) !== typedAdapter)
+        return failure('dependency-error', 'AUTHORITY_TYPED_RESOURCE_ADAPTER_REQUIRED');
+      effectResult = typedAdapter.apply(target);
+      if (isRecord(effectResult) && effectResult.ok === false) return effectResult;
+    } else if (target.kind === 'fs')
       effectResult = dependencies.fs.writeAtomic(target.canonical_relative_path);
     else if (target.kind === 'fs-rename')
       effectResult = dependencies.fs.renameAtomic(
@@ -396,14 +448,13 @@ export function createAuthorityBoundaryRuntime(deps: unknown) {
     }
     const plan = plans.get(record.plan);
     for (const [index, target] of record.targets.entries()) {
-      const classified = classifyAuthorityResource(target, {
-        repository_root: dependencies.repository_root,
-        realpath: dependencies.fs?.realpath,
-        consent: plan?.subject.plan.envelope?.request?.consent,
-      });
+      const classified = classifyAuthorityResource(
+        target,
+        classificationDependencies(plan?.subject.plan.envelope?.request?.consent),
+      );
       if (classified.ok !== true) return classified;
       if (
-        dependencies.canonicalSha256(snapshotTarget(target, dependencies.fs)) !==
+        dependencies.canonicalSha256(snapshotTarget(target, dependencies)) !==
         dependencies.canonicalSha256(record.snapshots[index])
       ) {
         return failure('refused', 'AUTHORITY_RESOURCE_CHANGED_AFTER_PREPARE');
@@ -411,6 +462,8 @@ export function createAuthorityBoundaryRuntime(deps: unknown) {
     }
     const firstTarget = record.targets[0];
     if (!firstTarget) return failure('refused', 'AUTHORITY_EXECUTION_UNIT_TARGET_MISMATCH');
+    if (record.targets.some((target) => typedResourceKind(target) !== undefined))
+      return failure('dependency-error', 'AUTHORITY_ATOMIC_UNIT_ADAPTER_REQUIRED');
     if (adapterId(firstTarget) !== record.adapterId) {
       return failure('refused', 'AUTHORITY_EXECUTION_UNIT_ADAPTER_MISMATCH');
     }

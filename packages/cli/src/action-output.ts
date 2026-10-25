@@ -1,8 +1,112 @@
+import {
+  isReconciliationOwnerOutputInvocation,
+  runReconciliationOwnerOutput,
+} from './reconciliation-owner-output.js';
+import { AsyncLocalStorage } from 'node:async_hooks';
+import {
+  isReconciliationPhaseOutputInvocation,
+  runReconciliationPhaseOutput,
+} from './reconciliation-phase-output.js';
+import {
+  isReconciliationProvisionOutputInvocation,
+  runReconciliationProvisionOutput,
+} from './reconciliation-provision-output.js';
+import { isExactAuthorityPolicyReviewInvocation } from './command-router.js';
 import type { Command } from 'cac';
 import { getValidator, type SchemaName, validators } from '@devai-nyx/schemas';
 import { basename } from 'node:path';
 import { cliError, type CliError } from './cli-error.js';
 import type { RegistryEntry } from './define-command.js';
+
+interface AuthorityPolicyReviewOutput {
+  ready(payload: Readonly<Record<string, unknown>>): void;
+  prompt(text: string): void;
+  complete(payload: Readonly<Record<string, unknown>>): void;
+  refuse(error: CliError): void;
+  publicationFailure(error: unknown): boolean;
+}
+
+const reviewOutput = new AsyncLocalStorage<AuthorityPolicyReviewOutput>();
+const reviewInvocations = new WeakMap<AuthorityPolicyReviewOutput, readonly string[]>();
+
+/** No constructor or serialized token: only an admitted live boundary owns this transport. */
+export function requireAuthorityPolicyReviewOutput(): AuthorityPolicyReviewOutput {
+  const transport = reviewOutput.getStore();
+  const argv = transport === undefined ? undefined : reviewInvocations.get(transport);
+  if (
+    transport === undefined ||
+    argv === undefined ||
+    argv.length !== process.argv.length ||
+    !argv.every((value, index) => value === process.argv[index]) ||
+    process.stdin.isTTY !== true ||
+    process.stdout.isTTY !== true ||
+    process.stderr.isTTY !== true
+  )
+    throw new Error(
+      'AUTHORITY_POLICY_REVIEW_INPUTS_UNSUPPORTED:an admitted live output boundary is required',
+    );
+  return transport;
+}
+
+/** Preserve the existing publisher's post-link uncertainty without a new exit class. */
+function publicationFailure(error: unknown): CliError | undefined {
+  if (!(error instanceof Error)) return undefined;
+  const failure = error as Error & {
+    code?: unknown;
+    path?: unknown;
+    staged_remaining?: unknown;
+    identity?: unknown;
+  };
+  if (
+    failure.code !== 'AUTHORITY_PUBLISH_CLEANUP_INCOMPLETE' ||
+    typeof failure.path !== 'string' ||
+    typeof failure.staged_remaining !== 'boolean' ||
+    failure.identity === null ||
+    typeof failure.identity !== 'object'
+  )
+    return undefined;
+  const identity = failure.identity as Record<string, unknown>;
+  if (
+    typeof identity.dev !== 'bigint' ||
+    typeof identity.ino !== 'bigint' ||
+    typeof identity.birthtimeNs !== 'bigint'
+  )
+    return undefined;
+  return cliError({
+    code: errorCode(6),
+    class: errorClass(6),
+    exit: 6,
+    message: failure.message,
+    remediation:
+      'Inspect the preserved target and publisher-owned staged entry before any separately authorized recovery.',
+    context: {
+      publication: {
+        code: failure.code,
+        path: failure.path,
+        staged_remaining: failure.staged_remaining,
+        identity: {
+          dev: identity.dev.toString(),
+          ino: identity.ino.toString(),
+          birthtimeNs: identity.birthtimeNs.toString(),
+        },
+        status: 'indeterminate',
+        durability: 'unknown',
+      },
+    },
+  });
+}
+
+function isPublicationFailure(error: CliError): boolean {
+  const publication = error.context?.['publication'];
+  return (
+    error.code === errorCode(6) &&
+    error.class === errorClass(6) &&
+    error.exit === 6 &&
+    publication !== null &&
+    typeof publication === 'object' &&
+    (publication as Record<string, unknown>)['code'] === 'AUTHORITY_PUBLISH_CLEANUP_INCOMPLETE'
+  );
+}
 
 type Write = typeof process.stdout.write;
 
@@ -285,6 +389,30 @@ export function attachActionOutputBoundaries(
     if (!command || !original) continue;
     command.commandAction = function actionOutputBoundary(...args: unknown[]) {
       if (!wantsMachineJson(process.argv)) return original(...args);
+      if (isReconciliationOwnerOutputInvocation(entry, command.name)) {
+        return runReconciliationOwnerOutput(
+          entry,
+          () => original.apply(command, args),
+          renderActionSuccess,
+          renderActionFailure,
+        );
+      }
+      if (isReconciliationPhaseOutputInvocation(entry, command.name)) {
+        return runReconciliationPhaseOutput(
+          entry,
+          () => original.apply(command, args),
+          renderActionSuccess,
+          renderActionFailure,
+        );
+      }
+      if (isReconciliationProvisionOutputInvocation(entry, command.name)) {
+        return runReconciliationProvisionOutput(
+          entry,
+          () => original(...args),
+          renderActionSuccess,
+          renderActionFailure,
+        );
+      }
       let stdout = '';
       let stderr = '';
       let explicitExit: number | undefined;
@@ -307,36 +435,190 @@ export function attachActionOutputBoundaries(
         throw new CommandExit(explicitExit);
       }) as typeof process.exit;
 
+      const streaming =
+        entry.name === 'init bind' &&
+        command.name === entry.internal_name &&
+        isExactAuthorityPolicyReviewInvocation(process.argv) &&
+        process.stdin.isTTY === true &&
+        process.stdout.isTTY === true &&
+        process.stderr.isTTY === true;
+      let phase: 'initial' | 'ready' | 'prompted' | 'terminal' | 'closed' = 'initial';
+      let finalizationException: string | undefined;
+      let terminal:
+        | { kind: 'complete'; payload: Readonly<Record<string, unknown>> }
+        | { kind: 'refused'; error: CliError }
+        | undefined;
+      const assertOwned = (receiver: unknown): void => {
+        if (receiver !== transport || reviewOutput.getStore() !== transport || phase === 'closed')
+          throw new Error('AUTHORITY_POLICY_REVIEW_HANDLE_INVALID');
+        try {
+          requireAuthorityPolicyReviewOutput();
+        } catch {
+          throw new Error('AUTHORITY_POLICY_REVIEW_HANDLE_INVALID');
+        }
+      };
+      const transport: AuthorityPolicyReviewOutput = Object.freeze({
+        ready(payload: Readonly<Record<string, unknown>>): void {
+          assertOwned(this);
+          if (
+            phase !== 'initial' ||
+            payload.kind !== 'authority-policy-create-review' ||
+            payload.schema_version !== '1.0.0' ||
+            payload.status !== 'awaiting-exact-confirmation' ||
+            payload.grants_authority !== false ||
+            payload.target !== '.devai/config/authority-policy.json' ||
+            payload.operation !== 'create'
+          )
+            throw new Error('AUTHORITY_POLICY_REVIEW_HANDLE_INVALID');
+          const output = renderActionSuccess(entry, JSON.stringify(payload), 'review');
+          phase = 'ready';
+          originalStdout.call(process.stdout, output);
+        },
+        prompt(text: string): void {
+          assertOwned(this);
+          if (phase !== 'ready') throw new Error('AUTHORITY_POLICY_REVIEW_HANDLE_INVALID');
+          phase = 'prompted';
+          originalStderr.call(process.stderr, text);
+        },
+        complete(payload: Readonly<Record<string, unknown>>): void {
+          assertOwned(this);
+          if (phase !== 'prompted' || !['created', 'cancelled'].includes(String(payload.status)))
+            throw new Error('AUTHORITY_POLICY_REVIEW_HANDLE_INVALID');
+          terminal = {
+            kind: 'complete',
+            payload: JSON.parse(JSON.stringify(payload)) as Record<string, unknown>,
+          };
+          phase = 'terminal';
+        },
+        publicationFailure(error: unknown): boolean {
+          assertOwned(this);
+          if (phase === 'terminal') throw new Error('AUTHORITY_POLICY_REVIEW_HANDLE_INVALID');
+          const failure = publicationFailure(error);
+          if (failure === undefined) return false;
+          terminal = { kind: 'refused', error: failure };
+          phase = 'terminal';
+          return true;
+        },
+        refuse(error: CliError): void {
+          assertOwned(this);
+          if (
+            phase === 'terminal' ||
+            !validators.error(error) ||
+            error.exit !== 2 ||
+            error.class !== 'routing-authority'
+          )
+            throw new Error('AUTHORITY_POLICY_REVIEW_HANDLE_INVALID');
+          terminal = { kind: 'refused', error: JSON.parse(JSON.stringify(error)) as CliError };
+          phase = 'terminal';
+        },
+      });
+      if (streaming) reviewInvocations.set(transport, Object.freeze([...process.argv]));
       const finish = (): void => {
         const exit = explicitExit ?? (typeof process.exitCode === 'number' ? process.exitCode : 0);
-        restoreAndEmit(entry, stdout, stderr, exit, originalStdout, originalStderr, originalExit);
+        if (!streaming) {
+          restoreAndEmit(entry, stdout, stderr, exit, originalStdout, originalStderr, originalExit);
+          return;
+        }
+        phase = 'closed';
+        reviewInvocations.delete(transport);
+        process.stdout.write = originalStdout;
+        process.stderr.write = originalStderr;
+        process.exit = originalExit;
+        // Once a linked publication is indeterminate, no later exit or diagnostic
+        // may erase its custody evidence or recast it as a clean refusal.
+        if (terminal?.kind === 'refused' && isPublicationFailure(terminal.error)) {
+          const pending = terminal.error;
+          const finalization =
+            exit !== 6 || stdout !== '' || stderr !== '' || finalizationException !== undefined;
+          const failure = finalization
+            ? cliError({
+                code: pending.code,
+                class: 'infrastructure',
+                exit: 6,
+                message: pending.message,
+                ...(pending.remediation === undefined ? {} : { remediation: pending.remediation }),
+                context: {
+                  ...pending.context,
+                  finalization_failure: {
+                    exit,
+                    ...(stdout === '' ? {} : { stdout }),
+                    ...(stderr === '' ? {} : { stderr }),
+                    ...(finalizationException === undefined
+                      ? {}
+                      : { message: finalizationException }),
+                  },
+                },
+              })
+            : pending;
+          originalStderr.call(
+            process.stderr,
+            renderActionFailure(entry, JSON.stringify(failure), 6),
+          );
+          process.exitCode = 6;
+          return;
+        }
+        if (exit === 0 && terminal?.kind === 'complete' && stdout === '' && stderr === '') {
+          originalStdout.call(
+            process.stdout,
+            renderActionSuccess(entry, JSON.stringify(terminal.payload)),
+          );
+          process.exitCode = 0;
+          return;
+        }
+        if (
+          terminal?.kind === 'refused' &&
+          exit === terminal.error.exit &&
+          stdout === '' &&
+          stderr === ''
+        ) {
+          originalStderr.call(
+            process.stderr,
+            renderActionFailure(entry, JSON.stringify(terminal.error), exit),
+          );
+          process.exitCode = exit;
+          return;
+        }
+        const failureExit = exit === 0 ? 7 : normalizeExit(exit);
+        const diagnostic = stderr || stdout || 'exact review did not produce one terminal outcome';
+        originalStderr.call(process.stderr, renderActionFailure(entry, diagnostic, failureExit));
+        process.exitCode = failureExit;
       };
       const fail = (error: unknown): void => {
         if (!(error instanceof CommandExit)) {
           const message = error instanceof Error ? error.message : String(error);
+          const pendingPublication =
+            streaming && terminal?.kind === 'refused' && isPublicationFailure(terminal.error)
+              ? terminal.error
+              : undefined;
+          if (pendingPublication !== undefined) finalizationException = message;
+          const publication = streaming ? publicationFailure(error) : undefined;
           const optionalDependency = /^OPTIONAL_DEPENDENCY_MISSING:([A-Za-z0-9@/._-]+)$/u.exec(
             message,
           );
-          explicitExit = optionalDependency === null ? 6 : 5;
+          explicitExit = publication !== undefined || optionalDependency === null ? 6 : 5;
           stderr =
-            optionalDependency === null
-              ? message
-              : JSON.stringify(
-                  cliError({
-                    code: 'SENSOR_OPTIONAL_DEPENDENCY_MISSING',
-                    class: 'precondition',
-                    exit: 5,
-                    message: `Optional dependency '${optionalDependency[1]}' is required for this feature.`,
-                    remediation: `Install '${optionalDependency[1]}' to use this feature: pnpm add ${optionalDependency[1]}`,
-                    context: { package: optionalDependency[1], stage: 'handler-dispatch' },
-                  }),
-                );
+            publication !== undefined
+              ? JSON.stringify(publication)
+              : optionalDependency === null
+                ? message
+                : JSON.stringify(
+                    cliError({
+                      code: 'SENSOR_OPTIONAL_DEPENDENCY_MISSING',
+                      class: 'precondition',
+                      exit: 5,
+                      message: `Optional dependency '${optionalDependency[1]}' is required for this feature.`,
+                      remediation: `Install '${optionalDependency[1]}' to use this feature: pnpm add ${optionalDependency[1]}`,
+                      context: { package: optionalDependency[1], stage: 'handler-dispatch' },
+                    }),
+                  );
         }
         finish();
       };
 
       try {
-        const value = original(...args);
+        const value = streaming
+          ? reviewOutput.run(transport, () => original(...args))
+          : original(...args);
         if (value && typeof (value as PromiseLike<unknown>).then === 'function') {
           return Promise.resolve(value).then(finish, fail);
         }

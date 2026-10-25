@@ -1,3 +1,4 @@
+import type { InventorySourceReader } from './inventory-walker.js';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { validators } from '@devai-nyx/schemas';
@@ -50,6 +51,7 @@ export interface ApiMapShape {
 }
 
 export interface InventoryCoverageOptions {
+  readonly sourceReader?: InventorySourceReader;
   readonly repoRoot: string;
   /**
    * Declared plant surfaces (ADR-SCR-0003). Omitted: every surface is presumed present.
@@ -157,27 +159,41 @@ interface LoadedUseCases {
 export function loadUseCasesFromDir(
   absDir: string,
   admit: (absolutePath: string) => boolean = () => true,
+  sourceReader?: InventorySourceReader,
 ): LoadedUseCases {
   const findings: Array<{ severity: 'info' | 'warning' | 'error'; code: string; message: string }> =
     [];
   const cases: UseCasesCase[] = [];
   let fileCount = 0;
-  if (!existsSync(absDir)) {
+  if (!(sourceReader === undefined ? existsSync(absDir) : sourceReader.exists(absDir))) {
     return { cases, fileCount: 0, findings };
   }
   try {
-    if (!statSync(absDir).isDirectory()) {
+    if (
+      !(sourceReader === undefined
+        ? statSync(absDir).isDirectory()
+        : sourceReader.isDirectory(absDir))
+    ) {
       return { cases, fileCount: 0, findings };
     }
-  } catch {
+  } catch (error) {
+    if (sourceReader !== undefined) throw error;
     return { cases, fileCount: 0, findings };
   }
   let entries: readonly string[];
   try {
-    entries = readdirSync(absDir)
+    entries = (
+      sourceReader === undefined
+        ? readdirSync(absDir)
+        : sourceReader
+            .listDirectory(absDir)
+            .filter((entry) => entry.kind === 'file')
+            .map((entry) => entry.name)
+    )
       .filter((n) => n.endsWith('.json') && admit(join(absDir, n)))
       .sort();
   } catch (err) {
+    if (sourceReader !== undefined) throw err;
     findings.push({
       severity: 'error',
       code: 'COVERAGE_USE_CASES_DIR_UNREADABLE',
@@ -189,8 +205,13 @@ export function loadUseCasesFromDir(
     const filePath = join(absDir, filename);
     let parsed: unknown;
     try {
-      parsed = JSON.parse(readFileSync(filePath, 'utf8'));
+      parsed = JSON.parse(
+        sourceReader === undefined
+          ? readFileSync(filePath, 'utf8')
+          : sourceReader.readFile(filePath),
+      );
     } catch (err) {
+      if (sourceReader !== undefined) throw err;
       findings.push({
         severity: 'warning',
         code: 'COVERAGE_USE_CASES_PARSE_FAILED',
@@ -199,6 +220,8 @@ export function loadUseCasesFromDir(
       continue;
     }
     if (!validators.useCases(parsed)) {
+      if (sourceReader !== undefined)
+        throw new Error(`INVENTORY_SOURCE_USE_CASES_INVALID: ${filename}`);
       findings.push({
         severity: 'warning',
         code: 'COVERAGE_USE_CASES_SCHEMA_INVALID',
@@ -378,6 +401,7 @@ export function resolveRoutesPath(
   framework: string | undefined,
   admit: (absolutePath: string) => boolean = () => true,
   directories: readonly string[] = ROUTES_BODY_DIRECTORIES,
+  sourceReader?: InventorySourceReader,
 ): RoutesPathResolution {
   if (explicit === null) return { kind: 'missing', directory: '' };
   if (explicit !== undefined) return { kind: 'resolved', path: explicit };
@@ -386,16 +410,25 @@ export function resolveRoutesPath(
     if (framework !== undefined) {
       // A present body is the input, admitted or not: the consumer refuses it, never skips it.
       const path = join(dir, `routes-${framework}.json`);
-      if (existsSync(path)) return { kind: 'resolved', path };
+      if (sourceReader === undefined ? existsSync(path) : sourceReader.exists(path))
+        return { kind: 'resolved', path };
       continue;
     }
-    if (!existsSync(dir)) continue;
+    if (!(sourceReader === undefined ? existsSync(dir) : sourceReader.exists(dir))) continue;
     let candidates: string[];
     try {
-      candidates = readdirSync(dir)
+      candidates = (
+        sourceReader === undefined
+          ? readdirSync(dir)
+          : sourceReader
+              .listDirectory(dir)
+              .filter((entry) => entry.kind === 'file')
+              .map((entry) => entry.name)
+      )
         .filter((name) => ROUTES_BODY_NAME.test(name) && admit(join(dir, name)))
         .sort();
     } catch (error) {
+      if (sourceReader !== undefined) throw error;
       // A present higher-priority directory that cannot be listed is an input error, never
       // a fall-through to a lower-priority directory. The last directory keeps reading as
       // missing, as it always has.

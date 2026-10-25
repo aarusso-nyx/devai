@@ -200,6 +200,8 @@ export function createTrackingReconcileScope(
     receipt_ttl_ms: 30_000,
   });
   const applyEffect = (request: AuthorityHostEffectRequest, apply: () => unknown): unknown => {
+    if (request.kind !== 'filesystem' && request.kind !== 'process')
+      throw new Error('TRACKING_RECONCILE_PROCESS_FORBIDDEN');
     const permitted =
       request.kind === 'filesystem'
         ? reconcileEffectPermitted({

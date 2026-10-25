@@ -1,3 +1,4 @@
+import type { InventorySourceReader } from './inventory-walker.js';
 import { mkdirSync, writeFileSync } from '@devai-nyx/authority';
 import { join, relative, resolve as pathResolve, dirname } from 'node:path';
 import ts from 'typescript';
@@ -22,6 +23,7 @@ import { DEFAULT_IGNORE_DIRS, parseSource, walkTs } from './inventory-walker.js'
  */
 
 export interface InventoryDepGraphOptions {
+  readonly sourceReader?: InventorySourceReader;
   readonly repoRoot: string;
   /** Directory under repoRoot to scan (default: repoRoot itself). */
   readonly scanDir?: string;
@@ -69,10 +71,14 @@ function importSpecifier(node: ts.Statement): string | null {
  * source is .ts). External imports are stored verbatim (e.g. 'node:fs',
  * '@devai-nyx/utils', 'pg').
  */
-function buildBody(repoRoot: string, files: readonly string[]): DepGraphBody {
+function buildBody(
+  repoRoot: string,
+  files: readonly string[],
+  sourceReader?: InventorySourceReader,
+): DepGraphBody {
   const graph: Record<string, string[]> = {};
   for (const file of files) {
-    const sf = parseSource(file);
+    const sf = parseSource(file, sourceReader);
     if (sf === null) continue;
     const fromRel = relative(repoRoot, file);
     const targets: string[] = graph[fromRel] ?? [];
@@ -116,8 +122,10 @@ export function senseInventoryDepGraph(opts: InventoryDepGraphOptions): Inventor
 
   try {
     const admit = opts.admitFile;
-    const files = walkTs(scanDir, ignoreDirs).filter((file) => admit === undefined || admit(file));
-    body = buildBody(opts.repoRoot, files);
+    const files = walkTs(scanDir, ignoreDirs, opts.sourceReader).filter(
+      (file) => admit === undefined || admit(file),
+    );
+    body = buildBody(opts.repoRoot, files, opts.sourceReader);
   } catch (err) {
     status = 'error';
     findings.push({

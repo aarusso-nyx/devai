@@ -26,6 +26,9 @@ export interface InitOptions {
 }
 
 export interface InitBindOptions {
+  readonly reconciliationHost?: boolean;
+  readonly reviewAuthorityPolicy?: boolean;
+  readonly afterConstitution?: boolean;
   readonly target?: string;
   readonly full?: boolean;
   readonly constitution?: boolean;

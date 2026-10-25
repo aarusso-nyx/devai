@@ -208,6 +208,10 @@ export const evidenceCollect = defineCommand({
 
 interface RecordOptions {
   readonly recoverNewestLine?: boolean;
+  readonly recoverDivergentAnchor?: boolean;
+  readonly sourceChain?: string;
+  readonly sourceChainSha256?: string;
+  readonly expectedHead?: string;
   readonly proofPath?: string;
   readonly proofSequence?: string | number;
   readonly kind?: string;
@@ -334,6 +338,16 @@ export const evidenceRecord = defineCommand({
         'Append only the missing anchor of an immutable newest proof line',
       )
       .option(
+        '--recover-divergent-anchor',
+        'Recover one custody-proven non-newest divergent anchor',
+      )
+      .option(
+        '--source-chain <repository-relative-path>',
+        'Preserved original divergent direct-anchor chain',
+      )
+      .option('--source-chain-sha256 <hex>', 'Exact source chain SHA-256')
+      .option('--expected-head <manifest-hash>', 'Exact canonical head before recovery append')
+      .option(
         '--proof-path <canonical-path>',
         'Existing canonical proof epoch path (recovery only)',
       )
@@ -365,7 +379,25 @@ export const evidenceRecord = defineCommand({
       .option('--no-git', 'Use the RTD zero integration-head sentinel')
       .option('--human', 'Human-readable summary')
       .action(async (options: RecordOptions) => {
-        if (options.recoverNewestLine === true) {
+        if (options.recoverNewestLine === true || options.recoverDivergentAnchor === true) {
+          const divergent = options.recoverDivergentAnchor === true;
+          const roleAt = process.argv.indexOf('--as-role');
+          if (
+            divergent &&
+            (options.recoverNewestLine === true ||
+              roleAt < 0 ||
+              process.argv[roleAt + 1] !== 'inspector' ||
+              !process.argv.includes('--write') ||
+              options.sourceChain === undefined ||
+              !/^[a-f0-9]{64}$/u.test(options.sourceChainSha256 ?? '') ||
+              !/^[a-f0-9]{64}$/u.test(options.expectedHead ?? ''))
+          ) {
+            usage(
+              'evidence record',
+              'PROOF_ANCHOR_RECOVERY_REFUSED: divergent recovery requires Inspector/write, exact source chain digest and expected head; recovery modes are exclusive',
+            );
+            return;
+          }
           const sequence = Number(options.proofSequence);
           if (
             options.proofPath === undefined ||
@@ -383,6 +415,9 @@ export const evidenceRecord = defineCommand({
             ([key, value]) =>
               ![
                 'recoverNewestLine',
+                ...(divergent
+                  ? ['recoverDivergentAnchor', 'sourceChain', 'sourceChainSha256', 'expectedHead']
+                  : []),
                 'proofPath',
                 'proofSequence',
                 'repoRoot',
@@ -405,7 +440,15 @@ export const evidenceRecord = defineCommand({
             action: `evidence.record.${kind}`,
             status: 'completed',
             proofAnchor: { path: options.proofPath, sequence },
-            recoverNewestLine: true,
+            ...(divergent
+              ? {
+                  recoverDivergentAnchor: {
+                    sourceChain: options.sourceChain as string,
+                    sourceChainSha256: options.sourceChainSha256 as string,
+                    expectedHead: options.expectedHead as string,
+                  },
+                }
+              : { recoverNewestLine: true }),
           });
           if (!chain.ok) {
             process.stderr.write(
@@ -416,16 +459,22 @@ export const evidenceRecord = defineCommand({
           }
           process.stdout.write(
             options.human === true
-              ? `evidence record: ${chain.alreadyAnchored === true ? 'already anchored' : 'recovered newest line'} ${options.proofPath}:${String(sequence)}\n`
+              ? `evidence record: ${chain.alreadyAnchored === true ? 'already anchored' : divergent ? 'recovered divergent anchor' : 'recovered newest line'} ${options.proofPath}:${String(sequence)}\n`
               : `${JSON.stringify({ recovery: true, proof_path: options.proofPath, proof_sequence: sequence, chain })}\n`,
           );
           process.exitCode = EXIT_PASS;
           return;
         }
-        if (options.proofPath !== undefined || options.proofSequence !== undefined) {
+        if (
+          options.proofPath !== undefined ||
+          options.proofSequence !== undefined ||
+          options.sourceChain !== undefined ||
+          options.sourceChainSha256 !== undefined ||
+          options.expectedHead !== undefined
+        ) {
           usage(
             'evidence record',
-            '--proof-path and --proof-sequence require --recover-newest-line',
+            '--proof-path/--proof-sequence and custody options require a supported recovery mode',
           );
           return;
         }

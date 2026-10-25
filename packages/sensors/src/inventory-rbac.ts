@@ -1,3 +1,4 @@
+import type { InventorySourceReader } from './inventory-walker.js';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { mkdirSync, writeFileSync } from '@devai-nyx/authority';
@@ -73,6 +74,7 @@ const RBAC_JOIN_PATTERNS = [
 ];
 
 export interface InventoryRbacOptions {
+  readonly sourceReader?: InventorySourceReader;
   readonly repoRoot: string;
   /**
    * Declared plant surfaces (ADR-SCR-0003). Omitted: every surface is presumed present.
@@ -156,9 +158,20 @@ function measureInventoryRbac(opts: InventoryRbacOptions): InventoryRbacResult {
     opts.repoRoot,
     opts.dataModelPath,
     DATA_MODEL_FILE,
+    opts.sourceReader,
   ) as string;
-  const apiMapPath = resolveBodyInput(opts.repoRoot, opts.apiMapPath, API_MAP_FILE);
+  const apiMapPath = resolveBodyInput(
+    opts.repoRoot,
+    opts.apiMapPath,
+    API_MAP_FILE,
+    opts.sourceReader,
+  );
 
+  if (
+    opts.sourceReader !== undefined &&
+    (dataModelPath === null || !opts.sourceReader.exists(dataModelPath))
+  )
+    throw new Error('INVENTORY_SOURCE_REQUIRED_DATA_MODEL_MISSING');
   const findings: Array<{
     readonly severity: 'info' | 'warning' | 'error' | 'critical';
     readonly code: string;
@@ -169,7 +182,11 @@ function measureInventoryRbac(opts: InventoryRbacOptions): InventoryRbacResult {
   let apiMap: ApiMapBodyShape | null = null;
   let status: SensorStatus = 'pass';
 
-  if (!existsSync(dataModelPath)) {
+  if (
+    !(opts.sourceReader === undefined
+      ? existsSync(dataModelPath)
+      : opts.sourceReader.exists(dataModelPath))
+  ) {
     // R18.C.7 (D-133; INV-DEVAI-012): a required input being absent means
     // nothing was measured — status 'unknown', not 'review'. The prior
     // 'review' (exit 1) made this sensor unusable in CI on fresh checkouts
@@ -183,7 +200,13 @@ function measureInventoryRbac(opts: InventoryRbacOptions): InventoryRbacResult {
     });
   } else {
     try {
-      dataModel = JSON.parse(readFileSync(dataModelPath, 'utf8')) as DataModelBody;
+      dataModel = JSON.parse(
+        opts.sourceReader === undefined
+          ? readFileSync(dataModelPath, 'utf8')
+          : opts.sourceReader.readFile(dataModelPath),
+      ) as DataModelBody;
+      if (opts.sourceReader !== undefined && !validators.dataModelInventory(dataModel))
+        throw new Error('INVENTORY_SOURCE_DATA_MODEL_INVALID');
     } catch (err) {
       status = 'error';
       findings.push({
@@ -197,10 +220,22 @@ function measureInventoryRbac(opts: InventoryRbacOptions): InventoryRbacResult {
   // Load api-map body opportunistically. Absence is informational
   // (status stays at whatever data-model state implied) — adopters
   // may run sense rbac before sense api.
-  if (apiMapPath !== null && existsSync(apiMapPath)) {
+  if (
+    apiMapPath !== null &&
+    (opts.sourceReader === undefined
+      ? existsSync(apiMapPath)
+      : opts.sourceReader.exists(apiMapPath))
+  ) {
     try {
-      apiMap = JSON.parse(readFileSync(apiMapPath, 'utf8')) as ApiMapBodyShape;
+      apiMap = JSON.parse(
+        opts.sourceReader === undefined
+          ? readFileSync(apiMapPath, 'utf8')
+          : opts.sourceReader.readFile(apiMapPath),
+      ) as ApiMapBodyShape;
+      if (opts.sourceReader !== undefined && !validators.apiMap(apiMap))
+        throw new Error('INVENTORY_SOURCE_API_MAP_INVALID');
     } catch (err) {
+      if (opts.sourceReader !== undefined) throw err;
       findings.push({
         severity: 'warning',
         code: 'RBAC_API_MAP_INVALID',
@@ -208,6 +243,13 @@ function measureInventoryRbac(opts: InventoryRbacOptions): InventoryRbacResult {
       });
     }
   }
+
+  if (
+    opts.sourceReader !== undefined &&
+    apiMapPath !== null &&
+    !opts.sourceReader.exists(apiMapPath)
+  )
+    throw new Error('INVENTORY_SOURCE_REQUIRED_API_MAP_MISSING');
 
   const roleTables: DataModelTable[] = [];
   const permTables: DataModelTable[] = [];

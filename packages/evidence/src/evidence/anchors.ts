@@ -1,3 +1,4 @@
+import { hasAuthenticatedReconciliationCheckpoint } from '@devai-nyx/authority';
 // ADR-EVI-0002: the line-level cross-check of `record/proofs/chain.json` against every physical
 // proof line under `record/proofs/work`, the append-only anchor baseline, the governed historical
 // declaration, and the crash-recovery rule. The contract is docs/reference/cli/evidence-verify.md.
@@ -239,8 +240,11 @@ interface GitResult {
 }
 
 function git(root: string, args: readonly string[]): GitResult {
-  const result = spawnSync('git', [...args], {
+  const readonlyArgs =
+    args[0] === 'diff' ? ['-c', 'diff.autoRefreshIndex=false', ...args] : [...args];
+  const result = spawnSync('git', readonlyArgs, {
     cwd: root,
+    env: { ...process.env, GIT_OPTIONAL_LOCKS: '0' },
     encoding: 'utf8',
     maxBuffer: 1024 * 1024 * 1024,
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -334,6 +338,7 @@ function proofHistoryModifications(root: string, chainPath: string): string[] {
       }
       const current = existsSync(chainPath) ? loadChain(chainPath).records : [];
       if (committedRecords !== undefined) {
+        const priorFindings = findings.length;
         if (current.length < committedRecords.length) {
           findings.push(
             `PROOF_HISTORY_MODIFIED ${name}: committed chain entries were removed; restore the committed chain`,
@@ -349,6 +354,14 @@ function proofHistoryModifications(root: string, chainPath: string): string[] {
             );
           }
         });
+        // Epoch history above is always enforced. Only actual canonical-chain
+        // replacement findings may use this native local checkpoint exception.
+        if (
+          findings.length > priorFindings &&
+          name === 'record/proofs/chain.json' &&
+          hasAuthenticatedReconciliationCheckpoint(root, chainPath)
+        )
+          findings.splice(priorFindings);
       }
     }
   }
@@ -665,8 +678,12 @@ export function verifyProofAnchors(inputs: ProofAnchorVerificationInputs): Proof
       errors.push(`UNANCHORED_NEWEST_LINE ${key}: ${UNANCHORED_NEWEST_REMEDIATION}`);
     } else {
       findings.push({ ...base, label: 'orphan' });
+      const custodyRemediation =
+        baselineEntries.get(key)?.observed_at === cutoff
+          ? ''
+          : '; preserve the original divergent chain and inspect evidence record --recover-divergent-anchor custody requirements; no historical-gap waiver applies to post-cutoff lines';
       errors.push(
-        `PROOF_LINE_ORPHAN ${key}: no direct anchor and no accepted historical declaration`,
+        `PROOF_LINE_ORPHAN ${key}: no direct anchor and no accepted historical declaration${custodyRemediation}`,
       );
     }
   }

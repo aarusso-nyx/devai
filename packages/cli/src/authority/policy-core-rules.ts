@@ -25,6 +25,73 @@ export function buildCoreAuthorityRules(input: {
   const coreRules = defined([
     ...[
       {
+        action: 'evidence reconcile approve',
+        kind: 'reconciliation-host',
+        operations: ['approve', 'renew', 'revoke', 'recover-owned-lease'],
+        subjects: human('owner'),
+      },
+      {
+        action: 'evidence reconcile materialize',
+        kind: 'reconciliation-host',
+        operations: ['consume-phase'],
+        subjects: [harnessSubject(['inspector'])],
+      },
+      {
+        action: 'evidence reconcile stage-proof',
+        kind: 'proof-index',
+        operations: ['chain-cas'],
+        subjects: [harnessSubject(['inspector'])],
+      },
+      {
+        action: 'sense bootstrap-inventory',
+        kind: 'reconciliation-host',
+        operations: ['consume-phase'],
+        subjects: [harnessSubject(['architect'])],
+      },
+    ].map((adapter) =>
+      rule({
+        id: `core-${adapter.action.replaceAll(' ', '-')}`,
+        origin: 'immutable-core',
+        precedence: 750,
+        actionIds: actionIds(
+          entries,
+          (entry) =>
+            entry.name === adapter.action &&
+            entry.authority_contract.capabilities.includes(
+              `${adapter.kind}:write` as 'reconciliation-host:write' | 'proof-index:write',
+            ),
+        ),
+        selector: {
+          kind: adapter.kind,
+          repository_id: repositoryId,
+          operations: adapter.operations,
+        },
+        subjects: adapter.subjects,
+        rationale:
+          'ADR-EVI-0007 and Article6: exact native reconciliation operation only. Sealed original argv, actual role/consent/B5, authenticated Owner state and invocation-local typed boundary remain mandatory; no generic filesystem or Git administration grant.',
+      }),
+    ),
+    rule({
+      id: 'core-reconciliation-host-provision',
+      origin: 'immutable-core',
+      precedence: 750,
+      actionIds: actionIds(
+        entries,
+        (entry) =>
+          entry.name === 'init bind' &&
+          entry.authority_contract.capabilities.includes('reconciliation-host:write'),
+      ),
+      selector: {
+        kind: 'reconciliation-host',
+        repository_id: repositoryId,
+        operations: ['provision'],
+      },
+      subjects: [machineSubject('binding')],
+      rationale:
+        'ADR-EVI-0007: exact Architect-initiated native provisioning only; the sealed invocation and host boundary bind the actual worktree, package, policy and two confirmed stages. No filesystem path grant.',
+    }),
+    ...[
+      {
         kind: 'export-sink',
         capability: 'artifact-sink:write',
         system: 'trusted-export-artifact-sink-v1',

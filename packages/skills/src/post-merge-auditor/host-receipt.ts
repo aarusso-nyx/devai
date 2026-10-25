@@ -201,6 +201,7 @@ export function createPostMergeHostScope(
       }
       return apply();
     }
+    if (request.kind !== 'process') throw new Error('POST_MERGE_PROCESS_FORBIDDEN');
     const executable = request.arguments[0];
     const args = request.arguments[1];
     if (basename(String(executable)) !== 'git' || !Array.isArray(args)) {

@@ -1,3 +1,4 @@
+import { computeEvidenceEpochLineHash } from '@devai-nyx/utils';
 import { createHash } from 'node:crypto';
 import {
   appendFileSync,
@@ -62,22 +63,8 @@ export interface VerifyProofEpochResult {
 
 type UnsignedProofEpochLine = Omit<ProofEpochLine, 'line_hash'>;
 
-function stable(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(stable);
-  if (value !== null && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>)
-        .sort(([left], [right]) => left.localeCompare(right))
-        .map(([key, member]) => [key, stable(member)]),
-    );
-  }
-  return value;
-}
-
 export function computeProofEpochLineHash(line: UnsignedProofEpochLine): string {
-  return createHash('sha256')
-    .update(JSON.stringify(stable(line)))
-    .digest('hex');
+  return computeEvidenceEpochLineHash(line);
 }
 
 export function proofEpochPath(repoRoot: string, roundId: string, kind: string): string {

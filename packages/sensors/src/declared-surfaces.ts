@@ -1,3 +1,5 @@
+import { validators } from '@devai-nyx/schemas';
+import type { InventorySourceReader } from './inventory-walker.js';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
@@ -167,10 +169,13 @@ interface UseCaseFileShape {
   }>;
 }
 
-function readJson(path: string): unknown {
+function readJson(path: string, sourceReader?: InventorySourceReader): unknown {
   try {
-    return JSON.parse(readFileSync(path, 'utf8')) as unknown;
-  } catch {
+    return JSON.parse(
+      sourceReader === undefined ? readFileSync(path, 'utf8') : sourceReader.readFile(path),
+    ) as unknown;
+  } catch (error) {
+    if (sourceReader !== undefined) throw error;
     return undefined;
   }
 }
@@ -179,13 +184,30 @@ function readJson(path: string): unknown {
 export function readRegisteredActionIds(
   repoRoot: string,
   admit: (absolutePath: string) => boolean = () => true,
+  sourceReader?: InventorySourceReader,
 ): readonly string[] | null {
   const path = join(repoRoot, ACTION_REGISTRY_PATH);
-  const registry = (admit(path) ? readJson(path) : undefined) as RegistryShape | undefined;
+  const admitted = admit(path);
+  if (sourceReader !== undefined && admitted && !sourceReader.exists(path)) return null;
+  const registry = (admitted ? readJson(path, sourceReader) : undefined) as
+    RegistryShape | undefined;
   if (typeof registry !== 'object' || registry === null || !Array.isArray(registry.entries)) {
+    if (sourceReader !== undefined) throw new Error('INVENTORY_SOURCE_ACTION_REGISTRY_INVALID');
     return null;
   }
   const entries: NonNullable<RegistryShape['entries']> = registry.entries;
+  if (
+    sourceReader !== undefined &&
+    entries.some(
+      (entry) =>
+        entry === null ||
+        typeof entry !== 'object' ||
+        typeof entry.action_id !== 'string' ||
+        entry.action_id.length === 0,
+    )
+  )
+    throw new Error('INVENTORY_SOURCE_ACTION_REGISTRY_ENTRY_INVALID');
+
   return entries
     .map((entry) => entry.action_id)
     .filter((id): id is string => typeof id === 'string' && id.length > 0);
@@ -195,18 +217,29 @@ export function readRegisteredActionIds(
 function referencedActionIds(
   useCasesDir: string,
   admit: (absolutePath: string) => boolean,
+  sourceReader?: InventorySourceReader,
 ): Set<string> {
   const referenced = new Set<string>();
   let names: string[];
   try {
-    names = readdirSync(useCasesDir)
+    names = (
+      sourceReader === undefined
+        ? readdirSync(useCasesDir)
+        : sourceReader
+            .listDirectory(useCasesDir)
+            .filter((entry) => entry.kind === 'file')
+            .map((entry) => entry.name)
+    )
       .filter((name) => name.endsWith('.json') && admit(join(useCasesDir, name)))
       .sort();
-  } catch {
+  } catch (error) {
+    if (sourceReader !== undefined) throw error;
     return referenced;
   }
   for (const name of names) {
-    const file = readJson(join(useCasesDir, name)) as UseCaseFileShape | undefined;
+    const file = readJson(join(useCasesDir, name), sourceReader) as UseCaseFileShape | undefined;
+    if (sourceReader !== undefined && !validators.useCases(file))
+      throw new Error(`INVENTORY_SOURCE_USE_CASES_INVALID: ${name}`);
     if (typeof file !== 'object' || file === null) continue;
     const cases: NonNullable<UseCaseFileShape['cases']> = Array.isArray(file.cases)
       ? file.cases
@@ -235,10 +268,11 @@ export function measureActionLinkage(
   repoRoot: string,
   useCasesDir: string = join(repoRoot, 'product/use-cases'),
   admit: (absolutePath: string) => boolean = () => true,
+  sourceReader?: InventorySourceReader,
 ): ActionLinkage | null {
-  const actionIds = readRegisteredActionIds(repoRoot, admit);
+  const actionIds = readRegisteredActionIds(repoRoot, admit, sourceReader);
   if (actionIds === null) return null;
-  const referenced = referencedActionIds(useCasesDir, admit);
+  const referenced = referencedActionIds(useCasesDir, admit, sourceReader);
   const linkedIds = new Set(actionIds.filter((id) => referenced.has(id)));
   const unlinkedIds = actionIds.filter((id) => !linkedIds.has(id));
   const pct = actionIds.length === 0 ? 100 : (linkedIds.size / actionIds.length) * 100;
@@ -271,8 +305,9 @@ export function unlinkedActionFindings(
 export function actionEvidence(
   repoRoot: string,
   admit: (absolutePath: string) => boolean = () => true,
+  sourceReader?: InventorySourceReader,
 ): SurfaceEvidence {
-  const ids = readRegisteredActionIds(repoRoot, admit);
+  const ids = readRegisteredActionIds(repoRoot, admit, sourceReader);
   return {
     surface: 'actions',
     items: ids === null || ids.length === 0 ? [] : [ACTION_REGISTRY_PATH, ...ids],

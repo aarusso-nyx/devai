@@ -87,6 +87,30 @@ export const ACTION_EFFECT_CONTRACTS = [
     capabilities: ['fs:f5-state', 'fs:proofs', 'proc:git'],
   },
   {
+    action_id: 'evidence reconcile approve',
+    public_action_id: 'evidence reconcile approve',
+    effect: 'local-write',
+    capabilities: ['proc:git', 'reconciliation-host:write'],
+  },
+  {
+    action_id: 'evidence reconcile materialize',
+    public_action_id: 'evidence reconcile materialize',
+    effect: 'local-write',
+    capabilities: ['proc:git', 'reconciliation-host:write'],
+  },
+  {
+    action_id: 'evidence reconcile plan',
+    public_action_id: 'evidence reconcile plan',
+    effect: 'read',
+    capabilities: ['proc:git'],
+  },
+  {
+    action_id: 'evidence reconcile stage-proof',
+    public_action_id: 'evidence reconcile stage-proof',
+    effect: 'local-write',
+    capabilities: ['proc:git', 'proof-index:write'],
+  },
+  {
     action_id: 'evidence record',
     public_action_id: 'evidence record',
     effect: 'harness-write',
@@ -139,7 +163,13 @@ export const ACTION_EFFECT_CONTRACTS = [
     action_id: 'init bind',
     public_action_id: 'init bind',
     effect: 'local-write',
-    capabilities: ['fs:f5-config', 'fs:workspace', 'proc:dynamic', 'proc:git'],
+    capabilities: [
+      'fs:f5-config',
+      'fs:workspace',
+      'proc:dynamic',
+      'proc:git',
+      'reconciliation-host:write',
+    ],
   },
   {
     action_id: 'init plan',
@@ -369,6 +399,12 @@ export const ACTION_EFFECT_CONTRACTS = [
     public_action_id: 'round tracking sync',
     effect: 'remote-write',
     capabilities: ['fs:f5-state', 'fs:proofs', 'proc:gh', 'net:github-issues'],
+  },
+  {
+    action_id: 'sense bootstrap-inventory',
+    public_action_id: 'sense bootstrap-inventory',
+    effect: 'local-write',
+    capabilities: ['proc:git', 'reconciliation-host:write'],
   },
   {
     action_id: 'sense inventory',

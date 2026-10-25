@@ -34,7 +34,11 @@ import type { ProtectedReleaseRepositoryIdentity } from './release-repository-id
 import type { AuthorityHostEffectRequest } from './host-atomic-effects.js';
 import { scopes, type AuthorityHostEffectScope } from './host-scope.js';
 import { runSinkUnit } from './host-sink-filesystem.js';
-import { publishNoReplaceSteps, type PublishedFileIdentity } from './host-publish.js';
+import {
+  publishNoReplaceSteps,
+  publishPrivateNoReplaceSteps,
+  type PublishedFileIdentity,
+} from './host-publish.js';
 import {
   entryIdentityKey,
   parseEntryIdentityKey,
@@ -332,6 +336,13 @@ export const publishFileNoReplaceSync = guarded(
   'publishFileNoReplaceSync',
   (path: string, data: string | Uint8Array): PublishedFileIdentity =>
     publishNoReplaceSteps(path, data),
+  'mutation',
+);
+/** Fixed-mode private publication; ordinary host-effect authorization is required. */
+export const publishPrivateFileNoReplaceSync = guarded(
+  'publishPrivateFileNoReplaceSync',
+  (path: string, data: string | Uint8Array): PublishedFileIdentity =>
+    publishPrivateNoReplaceSteps(path, data),
   'mutation',
 );
 export { PUBLISH_INDETERMINATE, type PublishedFileIdentity } from './host-publish.js';

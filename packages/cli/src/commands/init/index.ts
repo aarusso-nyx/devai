@@ -1,3 +1,5 @@
+import { reviewAuthorityPolicy } from './review-authority-policy.js';
+import { bindReconciliationHost } from './reconciliation-host.js';
 import type { CAC } from 'cac';
 import { EXIT_PASS, EXIT_USAGE } from '@devai-nyx/utils';
 import { defineCommand } from '../../define-command.js';
@@ -30,6 +32,10 @@ export const initBind = defineCommand({
       )
       .option('--constitution', 'Bind the installed Constitution text and digest pin.')
       .option(
+        '--reconciliation-host',
+        'Review and provision the protected native reconciliation host.',
+      )
+      .option(
         '--subprocess-effects',
         'Bind subprocess-effects policy into .devai/config with byte identity.',
       )
@@ -53,9 +59,18 @@ export const initBind = defineCommand({
         '--tracking-repository <owner/name>',
         'Exact remote repository the tracking binding authorizes',
       )
+      .option(
+        '--review-authority-policy',
+        'Review exact absent authority policy bytes before create.',
+      )
+      .option('--after-constitution', 'Project the installed Constitution binding for review.')
       .option('--write', 'Materialize the selected binding.')
       .option('--human', 'Human-readable output')
       .action((options: InitBindOptions) => {
+        if (options.reconciliationHost === true) return bindReconciliationHost(options);
+        if (options.reviewAuthorityPolicy === true || options.afterConstitution === true) {
+          return reviewAuthorityPolicy(options);
+        }
         validateInitTier(options);
         const modes = [
           options.full === true,

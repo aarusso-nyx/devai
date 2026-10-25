@@ -15,6 +15,7 @@ import type { RegistryEntry } from '../define-command.js';
 import { invocationIsNonMutating } from '../command-router.js';
 import { createAuthorityHostBroker } from './broker.js';
 import { resolveInvocationEntry } from './sense-selection.js';
+import { parseReconciliationHostInput } from './reconciliation-host-input.js';
 import {
   runWithAuthorityPolicyMaterialization,
   runWithAuthoritySessionOperation,
@@ -192,6 +193,10 @@ function stageHostScope(
   declaration: Readonly<{ as_role: HumanRole } | { authority_session: string }>,
   dryRun = false,
 ): void {
+  const invocationEntry =
+    entry.name === 'init bind' && argv.includes('--reconciliation-host')
+      ? resolveInvocationEntry(entry, argv)
+      : entry;
   const root = targetRoot(entry, argv);
   const bootstrapPolicy =
     dryRun ||
@@ -202,7 +207,7 @@ function stageHostScope(
     entry.name === 'init bind' ||
     entry.name === 'init upgrade';
   const broker = createAuthorityHostBroker({
-    entry,
+    entry: invocationEntry,
     entries,
     argv,
     role,
@@ -334,7 +339,12 @@ export function authorizeCliArgv(
   }
   const registeredEntry = entryForArgv(argv, entries);
   if (!registeredEntry) return undefined;
-  const entry = resolveInvocationEntry(registeredEntry, argv);
+  // This exact selector still needs ordinary role/consent refusals first. Its
+  // full original-argv projection is resolved inside the guarded stageHostScope.
+  const entry =
+    registeredEntry.name === 'init bind' && argv.includes('--reconciliation-host')
+      ? registeredEntry
+      : resolveInvocationEntry(registeredEntry, argv);
   if (entry.name === 'round close' && argv.includes('--post-merge-receipt')) {
     const format = formatFor(argv);
     if (
@@ -499,6 +509,30 @@ export function authorizeCliArgv(
     }
     return undefined;
   }
+  // ADR-EVI-0007 requires explicit Architect initiation for this exact read-only
+  // source review. It receives no write consent or mutating authority context.
+  if (entry.name === 'evidence reconcile plan' && entry.effects === 'read') {
+    const refusal = readDeclarationRefusal(argv, entry, undefined, sessionId, format);
+    if (refusal !== undefined) return refusal;
+    if (asRole !== 'architect') {
+      return renderAuthorityResult(
+        taggedFailure('refused', 'AUTHORITY_HUMAN_ROLE_DENIED', {
+          action_id: entry.name,
+          allowed_roles: ['architect'],
+          supplied_role: asRole ?? null,
+        }),
+        format,
+      );
+    }
+    try {
+      stageHostScope(entry, entries, argv, 'architect', { as_role: 'architect' });
+    } catch (error) {
+      const code = authorityErrorCode(error);
+      if (code === undefined) throw error;
+      return renderAuthorityResult(taggedAuthorityFailure('refused', code, entry, argv), format);
+    }
+    return undefined;
+  }
   if (entry.effects === 'read') {
     const refusal = readDeclarationRefusal(argv, entry, asRole, sessionId, format);
     if (refusal !== undefined) return refusal;
@@ -522,10 +556,41 @@ export function authorizeCliArgv(
     asRole === undefined ? (resolvedSession as { role: HumanRole } | undefined)?.role : asRole;
   const roleRefusal = declaredRoleConsentRefusal(argv, entry, asRole, sessionId, format, role);
   if (roleRefusal !== undefined) return roleRefusal;
+  const savedReconciliationPlan = [
+    'evidence reconcile approve',
+    'evidence reconcile materialize',
+    'evidence reconcile stage-proof',
+    'sense bootstrap-inventory',
+  ].includes(entry.name);
+  if (savedReconciliationPlan) {
+    // These four commands consume a valued saved-plan argument. Validate their
+    // closed grammar before the ordinary boolean planning shortcut below.
+    try {
+      parseReconciliationHostInput(entry.name, argv, targetRoot(entry, argv), role as HumanRole);
+    } catch (error) {
+      const code = authorityErrorCode(error);
+      if (code === undefined) throw error;
+      return renderAuthorityResult(taggedAuthorityFailure('refused', code, entry, argv), format);
+    }
+  }
+  if (entry.name === 'init bind' && argv.includes('--reconciliation-host')) {
+    // Preserve ordinary declaration diagnostics, then enforce the exact native
+    // grammar before any generic --plan/--dry-run success shortcut can return.
+    try {
+      resolveInvocationEntry(entry, argv);
+    } catch (error) {
+      const code = authorityErrorCode(error);
+      if (code === undefined) throw error;
+      return renderAuthorityResult(taggedAuthorityFailure('refused', code, entry, argv), format);
+    }
+  }
   const handlerSupportsDryRun = entry.runtime_options?.some(
     (option) => option.flags === '--dry-run',
   );
-  if (argv.includes('--plan') || (argv.includes('--dry-run') && !handlerSupportsDryRun)) {
+  if (
+    (!savedReconciliationPlan && argv.includes('--plan')) ||
+    (argv.includes('--dry-run') && !handlerSupportsDryRun)
+  ) {
     return renderAuthorityResult(planOnlyAuthorityAllow(role as string, sessionId), format);
   }
   if (argv.includes('--dry-run')) {
