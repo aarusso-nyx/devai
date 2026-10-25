@@ -1,0 +1,1185 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/evidence-reconciliation-plan.schema.json",
+  "title": "Exact read-only evidence reconciliation plan",
+  "description": "Closed diagnostic data from native Git and host observations. Schema validity and printed digests grant no authority. source_manifest_sha256 hashes exact UTF8 canonical JSON of source_manifest; a saved plan digest hashes UTF8 canonical JSON of the whole plan plus LF.",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "kind",
+    "identity",
+    "binding_sha256",
+    "selection",
+    "bases",
+    "source_manifest",
+    "source_manifest_sha256",
+    "grants_authority",
+    "effect_plan",
+    "effect_plan_sha256"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "kind": {
+      "const": "evidence-reconciliation-plan"
+    },
+    "identity": {
+      "$ref": "#/$defs/identity"
+    },
+    "binding_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "parent",
+        "published_ref",
+        "published_tip",
+        "origin_config_sha256",
+        "effective_origin_sha256"
+      ],
+      "properties": {
+        "parent": {
+          "type": "string",
+          "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+        },
+        "published_ref": {
+          "type": "string",
+          "pattern": "^refs/heads/",
+          "maxLength": 1024
+        },
+        "published_tip": {
+          "type": "string",
+          "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+        },
+        "origin_config_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "effective_origin_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "bases": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "type": "string",
+        "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+      },
+      "minItems": 1
+    },
+    "source_manifest": {
+      "$ref": "#/$defs/manifest"
+    },
+    "source_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "grants_authority": {
+      "const": false
+    },
+    "effect_plan": {
+      "$ref": "#/$defs/effectPlan"
+    },
+    "effect_plan_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  },
+  "$defs": {
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "repository_id",
+        "worktree_id",
+        "host_identity_sha256",
+        "head",
+        "object_format",
+        "merge_heads"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0.0"
+        },
+        "kind": {
+          "const": "reconciliation-host-context"
+        },
+        "repository_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "worktree_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "host_identity_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "head": {
+          "type": "string",
+          "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+        },
+        "object_format": {
+          "enum": ["sha1", "sha256"]
+        },
+        "merge_heads": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "string",
+            "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+          },
+          "minItems": 1
+        }
+      }
+    },
+    "indexEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "mode", "oid", "stage", "assume_valid"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "mode": {
+          "enum": ["100644", "100755", "120000", "160000"]
+        },
+        "oid": {
+          "type": "string",
+          "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+        },
+        "stage": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "assume_valid": {
+          "type": "boolean"
+        }
+      }
+    },
+    "index": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "object_format",
+        "raw_sha256",
+        "semantic_sha256",
+        "other_entries_sha256",
+        "entries",
+        "has_tree_extension"
+      ],
+      "properties": {
+        "version": {
+          "const": 2
+        },
+        "object_format": {
+          "enum": ["sha1", "sha256"]
+        },
+        "raw_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "semantic_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "other_entries_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "entries": {
+          "type": "array",
+          "maxItems": 100000,
+          "items": {
+            "$ref": "#/$defs/indexEntry"
+          },
+          "minItems": 1
+        },
+        "has_tree_extension": {
+          "type": "boolean"
+        }
+      }
+    },
+    "sourceFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commit", "path", "mode", "blob_oid", "sha256", "bytes", "kind"],
+      "properties": {
+        "commit": {
+          "type": "string",
+          "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+        },
+        "path": {
+          "type": "string",
+          "maxLength": 4096
+        },
+        "mode": {
+          "enum": ["100644", "100755", "commit"]
+        },
+        "blob_oid": {
+          "type": "string",
+          "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 33554432
+        },
+        "kind": {
+          "enum": ["chain", "epoch", "ancestry", "baseline"]
+        }
+      }
+    },
+    "stagedFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "stage", "mode", "blob_oid", "sha256", "bytes"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "stage": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "mode": {
+          "enum": ["100644", "100755", "120000"]
+        },
+        "blob_oid": {
+          "type": "string",
+          "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 33554432
+        }
+      }
+    },
+    "recovery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "proof_path",
+        "proof_sequence",
+        "proof_sha256",
+        "source_commit",
+        "source_chain_sha256",
+        "source_entry_manifest_hash",
+        "mode"
+      ],
+      "properties": {
+        "proof_path": {
+          "type": "string",
+          "pattern": "^record/proofs/work/[a-z0-9][a-z0-9_-]*/R-[0-9]{4}\\.jsonl$"
+        },
+        "proof_sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "proof_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "source_commit": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source_chain_sha256": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source_entry_manifest_hash": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mode": {
+          "enum": ["divergent", "newest"]
+        }
+      }
+    },
+    "manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["files", "index", "staged_files", "recovery_obligations"],
+      "properties": {
+        "files": {
+          "type": "array",
+          "maxItems": 100000,
+          "items": {
+            "$ref": "#/$defs/sourceFile"
+          },
+          "minItems": 1
+        },
+        "index": {
+          "$ref": "#/$defs/index"
+        },
+        "staged_files": {
+          "type": "array",
+          "maxItems": 100000,
+          "items": {
+            "$ref": "#/$defs/stagedFile"
+          },
+          "minItems": 1
+        },
+        "recovery_obligations": {
+          "type": "array",
+          "maxItems": 100000,
+          "items": {
+            "$ref": "#/$defs/recovery"
+          }
+        }
+      }
+    },
+    "effectPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "namespace",
+        "private_state",
+        "custody",
+        "selection",
+        "recovery",
+        "proof_index",
+        "inventory",
+        "publication_contract",
+        "phase_scratch_derivation",
+        "removal_contract",
+        "settlement_scratch_derivation"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0.0"
+        },
+        "kind": {
+          "const": "reconciliation-effect-plan"
+        },
+        "namespace": {
+          "type": "string",
+          "pattern": "^record/proofs/reconciliation/[a-f0-9]{64}$"
+        },
+        "private_state": {
+          "const": {
+            "resolver": "trusted-worktree-host-only",
+            "approval_directory": "approvals/<approval_id>",
+            "immutable_files": [
+              "approval.json",
+              "grant-<six-digit-sequence>.json",
+              "intent-<phase>.json",
+              "phase-<phase>.json"
+            ],
+            "lease_file": "lease.json",
+            "mode": "0600",
+            "max_record_bytes": 1048576,
+            "max_records": 4096,
+            "publication": "exclusive-no-replace-owned-identity",
+            "directories": ["approvals", "approvals/<approval_id>"],
+            "lease_lifecycle": "exclusive-create-identity-guarded-remove-no-age-takeover"
+          }
+        },
+        "custody": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "phase",
+            "publication",
+            "object_count_limit",
+            "object_bytes_limit",
+            "aggregate_bytes_limit",
+            "objects",
+            "manifest",
+            "overwrite",
+            "directories"
+          ],
+          "properties": {
+            "phase": {
+              "const": "01"
+            },
+            "publication": {
+              "const": "exclusive-no-replace-owned-identity"
+            },
+            "object_count_limit": {
+              "const": 100000
+            },
+            "object_bytes_limit": {
+              "const": 33554432
+            },
+            "aggregate_bytes_limit": {
+              "const": 536870912
+            },
+            "objects": {
+              "type": "array",
+              "maxItems": 100000,
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["path", "sha256", "bytes"],
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "pattern": "^record/proofs/reconciliation/[a-f0-9]{64}/objects/[a-f0-9]{64}$"
+                  },
+                  "sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "bytes": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 33554432
+                  }
+                }
+              }
+            },
+            "manifest": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["path", "sha256", "bytes"],
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "pattern": "^record/proofs/reconciliation/[a-f0-9]{64}/custody\\.json$"
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "bytes": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 33554432
+                }
+              }
+            },
+            "overwrite": {
+              "const": false
+            },
+            "directories": {
+              "type": "array",
+              "minItems": 3,
+              "maxItems": 3,
+              "items": false,
+              "prefixItems": [
+                {
+                  "const": "record/proofs/reconciliation"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^record/proofs/reconciliation/[a-f0-9]{64}$"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^record/proofs/reconciliation/[a-f0-9]{64}/objects$"
+                }
+              ]
+            }
+          }
+        },
+        "selection": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "phase",
+            "selected_parent",
+            "selected_chain_sha256",
+            "selected_object_path",
+            "active_path",
+            "append_lock_path",
+            "candidate_path",
+            "receipt_path",
+            "record_construction",
+            "event_action",
+            "hashed_artifacts",
+            "publication",
+            "candidate_bytes_limit",
+            "receipt_bytes_limit",
+            "intent_freezes",
+            "stale_lock_takeover",
+            "candidate_publication",
+            "append_lock_record",
+            "append_lock_cleanup"
+          ],
+          "properties": {
+            "phase": {
+              "const": "02"
+            },
+            "selected_parent": {
+              "type": "string",
+              "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+            },
+            "selected_chain_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "selected_object_path": {
+              "type": "string",
+              "pattern": "^record/proofs/reconciliation/[a-f0-9]{64}/objects/[a-f0-9]{64}$"
+            },
+            "active_path": {
+              "const": "record/proofs/chain.json"
+            },
+            "append_lock_path": {
+              "const": "record/proofs/chain.json.append.lock"
+            },
+            "candidate_path": {
+              "const": "record/proofs/chain.json.reconciliation.tmp"
+            },
+            "receipt_path": {
+              "type": "string",
+              "pattern": "^record/proofs/reconciliation/[a-f0-9]{64}/selection\\.json$"
+            },
+            "record_construction": {
+              "const": "shared-normal-evidence-record-kernel-v1"
+            },
+            "event_action": {
+              "const": "evidence.reconcile.canonical-selection"
+            },
+            "hashed_artifacts": {
+              "const": ["custody-manifest", "selected-original-chain", "selection-receipt"]
+            },
+            "publication": {
+              "const": "complete-candidate-atomic-replace-under-normal-append-lock"
+            },
+            "candidate_bytes_limit": {
+              "const": 33554432
+            },
+            "receipt_bytes_limit": {
+              "const": 1048576
+            },
+            "intent_freezes": {
+              "const": [
+                "receipt-sha256-and-bytes",
+                "event-and-final-chain-sha256-and-bytes",
+                "before-chain-sha256-and-identity"
+              ]
+            },
+            "stale_lock_takeover": {
+              "const": false
+            },
+            "candidate_publication": {
+              "const": "exclusive-0600-write-fsync-revalidate-before-chain-rename-fsync-parent"
+            },
+            "append_lock_record": {
+              "const": "normal-evidence-chain-append-path-pid-nonce"
+            },
+            "append_lock_cleanup": {
+              "const": "owned-dev-ino-birthtime-only"
+            }
+          }
+        },
+        "recovery": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["separate_events", "current_expected_head_each", "obligations"],
+          "properties": {
+            "separate_events": {
+              "const": true
+            },
+            "current_expected_head_each": {
+              "const": true
+            },
+            "obligations": {
+              "type": "array",
+              "maxItems": 100000,
+              "minItems": 0,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "proof_path",
+                  "proof_sequence",
+                  "proof_sha256",
+                  "source_commit",
+                  "source_chain_sha256",
+                  "source_entry_manifest_hash",
+                  "mode",
+                  "source_chain_path",
+                  "command"
+                ],
+                "properties": {
+                  "proof_path": {
+                    "type": "string",
+                    "pattern": "^record/proofs/work/[a-z0-9][a-z0-9_-]*/R-[0-9]{4}\\.jsonl$"
+                  },
+                  "proof_sequence": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "proof_sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "source_commit": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "source_chain_sha256": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "source_entry_manifest_hash": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "mode": {
+                    "enum": ["divergent", "newest"]
+                  },
+                  "source_chain_path": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^record/proofs/reconciliation/[a-f0-9]{64}/objects/[a-f0-9]{64}$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "command": {
+                    "enum": [
+                      "evidence record --recover-divergent-anchor",
+                      "evidence record --recover-newest-line"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "proof_index": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "phase",
+            "proof_path",
+            "operation",
+            "before_index_sha256",
+            "unchanged_other_entries_sha256",
+            "lock",
+            "object_publication",
+            "intent_freezes",
+            "other_entry_changes",
+            "index_publication",
+            "index_mode",
+            "object_path",
+            "object_directory",
+            "object_scratch",
+            "object_scratch_count",
+            "object_bytes_limit",
+            "object_publication_steps",
+            "object_existing",
+            "object_format"
+          ],
+          "properties": {
+            "phase": {
+              "const": "03"
+            },
+            "proof_path": {
+              "const": "record/proofs/chain.json"
+            },
+            "operation": {
+              "const": "chain-cas"
+            },
+            "before_index_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "unchanged_other_entries_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "lock": {
+              "const": "trusted-worktree-index.lock"
+            },
+            "object_publication": {
+              "const": "trusted-common-objects-content-addressed-verified-blob"
+            },
+            "intent_freezes": {
+              "const": [
+                "verified-final-chain-sha256-and-bytes",
+                "blob-oid-and-loose-object-bytes",
+                "after-index-sha256-and-bytes"
+              ]
+            },
+            "other_entry_changes": {
+              "const": false
+            },
+            "index_publication": {
+              "const": "exclusive-index.lock-write-fsync-revalidate-rename-index-fsync-parent"
+            },
+            "index_mode": {
+              "const": "preserve-before-index-mode"
+            },
+            "object_path": {
+              "const": "trusted-common-dir/objects/<oid[0:2]>/<oid[2:]>"
+            },
+            "object_directory": {
+              "const": "trusted-common-dir/objects/<oid[0:2]>"
+            },
+            "object_scratch": {
+              "const": "trusted-common-dir/objects/<oid[0:2]>/.<oid[2:]>.reconciliation.tmp"
+            },
+            "object_scratch_count": {
+              "const": 1
+            },
+            "object_bytes_limit": {
+              "const": 33619968
+            },
+            "object_publication_steps": {
+              "const": "exclusive-0600-scratch-write-fsync-verify-object-chmod0444-link-no-replace-owned-unlink-fsync-shard"
+            },
+            "object_existing": {
+              "const": "inflate-type-size-and-full-oid-verify-or-refuse"
+            },
+            "object_format": {
+              "enum": ["sha1", "sha256"]
+            }
+          }
+        },
+        "inventory": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "phase",
+            "source_projection",
+            "excluded_paths",
+            "stage",
+            "source_sha256",
+            "unchanged_other_entries_sha256",
+            "publication",
+            "output_count",
+            "body_bytes_limit",
+            "aggregate_bytes_limit",
+            "routes_framework",
+            "outputs",
+            "intent_freezes",
+            "grants_readiness",
+            "publishes_readings",
+            "publishes_canonical_pointer",
+            "directories"
+          ],
+          "properties": {
+            "phase": {
+              "const": "04"
+            },
+            "source_projection": {
+              "const": "sha256-json-utf8-index-entry-keys-assume_valid-mode-oid-path-stage-in-git-order-v1"
+            },
+            "excluded_paths": {
+              "const": ["record/proofs/chain.json", "law/security/authorization.json"]
+            },
+            "stage": {
+              "const": 0
+            },
+            "source_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "unchanged_other_entries_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "publication": {
+              "const": "exclusive-no-replace-owned-identity"
+            },
+            "output_count": {
+              "const": 7
+            },
+            "body_bytes_limit": {
+              "const": 33554432
+            },
+            "aggregate_bytes_limit": {
+              "const": 134217728
+            },
+            "routes_framework": {
+              "const": "angular"
+            },
+            "outputs": {
+              "type": "array",
+              "minItems": 7,
+              "maxItems": 7,
+              "items": false,
+              "prefixItems": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["path", "producer", "schema"],
+                  "properties": {
+                    "path": {
+                      "type": "string",
+                      "pattern": "^\\.devai/state/reconciliation/[a-f0-9]{64}/inventory/inventory_api/api-map\\.json$"
+                    },
+                    "producer": {
+                      "const": "senseInventoryApi"
+                    },
+                    "schema": {
+                      "const": "api-map.schema.json"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["path", "producer", "schema"],
+                  "properties": {
+                    "path": {
+                      "type": "string",
+                      "pattern": "^\\.devai/state/reconciliation/[a-f0-9]{64}/inventory/inventory_routes/routes-angular\\.json$"
+                    },
+                    "producer": {
+                      "const": "senseInventoryRoutes"
+                    },
+                    "schema": {
+                      "const": "routes-inventory.schema.json"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["path", "producer", "schema"],
+                  "properties": {
+                    "path": {
+                      "type": "string",
+                      "pattern": "^\\.devai/state/reconciliation/[a-f0-9]{64}/inventory/inventory_data_model/data-model\\.json$"
+                    },
+                    "producer": {
+                      "const": "senseInventoryDataModel"
+                    },
+                    "schema": {
+                      "const": "data-model-inventory.schema.json"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["path", "producer", "schema"],
+                  "properties": {
+                    "path": {
+                      "type": "string",
+                      "pattern": "^\\.devai/state/reconciliation/[a-f0-9]{64}/inventory/inventory_data_handling/data-model-pii\\.json$"
+                    },
+                    "producer": {
+                      "const": "senseInventoryDataHandling"
+                    },
+                    "schema": {
+                      "const": "data-model-inventory.schema.json"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["path", "producer", "schema"],
+                  "properties": {
+                    "path": {
+                      "type": "string",
+                      "pattern": "^\\.devai/state/reconciliation/[a-f0-9]{64}/inventory/inventory_rbac/rbac\\.json$"
+                    },
+                    "producer": {
+                      "const": "senseInventoryRbac"
+                    },
+                    "schema": {
+                      "const": "rbac-inventory.schema.json"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["path", "producer", "schema"],
+                  "properties": {
+                    "path": {
+                      "type": "string",
+                      "pattern": "^\\.devai/state/reconciliation/[a-f0-9]{64}/inventory/inventory_dep_graph/dep-graph\\.json$"
+                    },
+                    "producer": {
+                      "const": "senseInventoryDepGraph"
+                    },
+                    "schema": {
+                      "const": "dep-graph.schema.json"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["path", "producer", "schema"],
+                  "properties": {
+                    "path": {
+                      "type": "string",
+                      "pattern": "^\\.devai/state/reconciliation/[a-f0-9]{64}/inventory/inventory_coverage/coverage-matrix\\.json$"
+                    },
+                    "producer": {
+                      "const": "senseInventoryCoverage"
+                    },
+                    "schema": {
+                      "const": "coverage-matrix.schema.json"
+                    }
+                  }
+                }
+              ]
+            },
+            "intent_freezes": {
+              "const": ["all-seven-body-sha256-and-bytes", "actual-stage0-source-projection"]
+            },
+            "grants_readiness": {
+              "const": false
+            },
+            "publishes_readings": {
+              "const": false
+            },
+            "publishes_canonical_pointer": {
+              "const": false
+            },
+            "directories": {
+              "type": "array",
+              "minItems": 11,
+              "maxItems": 11,
+              "items": false,
+              "prefixItems": [
+                {
+                  "const": ".devai/state"
+                },
+                {
+                  "const": ".devai/state/reconciliation"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^\\.devai/state/reconciliation/[a-f0-9]{64}$"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^\\.devai/state/reconciliation/[a-f0-9]{64}/inventory$"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^\\.devai/state/reconciliation/[a-f0-9]{64}/inventory/inventory_api$"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^\\.devai/state/reconciliation/[a-f0-9]{64}/inventory/inventory_routes$"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^\\.devai/state/reconciliation/[a-f0-9]{64}/inventory/inventory_data_model$"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^\\.devai/state/reconciliation/[a-f0-9]{64}/inventory/inventory_data_handling$"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^\\.devai/state/reconciliation/[a-f0-9]{64}/inventory/inventory_rbac$"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^\\.devai/state/reconciliation/[a-f0-9]{64}/inventory/inventory_dep_graph$"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^\\.devai/state/reconciliation/[a-f0-9]{64}/inventory/inventory_coverage$"
+                }
+              ]
+            }
+          }
+        },
+        "publication_contract": {
+          "const": {
+            "directory_mode": "0700",
+            "directory_creation": "one-level-exclusive-no-symlink-no-existing-chmod",
+            "directory_durability": "fsync-created-directory-and-parent",
+            "file_mode": "0600-before-first-byte",
+            "scratch_name": ".<exact-target-basename>.<actual-pid>-<uuid-v4>.publish-staged",
+            "scratch_count_per_target": 1,
+            "scratch_bytes_limit": 33554432,
+            "scratch_preparation": "owner-preview-or-authenticated-live-lease-derived-name-before-create",
+            "file_publication": "exclusive-scratch-write-fsync-link-no-replace-unlink-scratch-fsync-parent",
+            "existing_target": "exact-complete-bytes-and-approved-custody-or-refuse",
+            "cleanup": "owned-dev-ino-birthtime-only-preserve-foreign-or-uncertain",
+            "partial_failure": "indeterminate-no-new-domain-effect"
+          }
+        },
+        "phase_scratch_derivation": {
+          "const": {
+            "domain": "devai.reconciliation.phase-scratch.v1",
+            "hash": "sha256-jcs-utf8-object-domain-lease_sha256-target-purpose",
+            "lease_sha256": "sha256-exact-authenticated-lease-record-bytes",
+            "uuid": "first16-digest-bytes-set-byte6-high-nibble4-byte8-high-bits10-lowercase-rfc4122",
+            "pid": "authenticated-live-lease-pid-equals-actual-process-pid",
+            "purpose": "publication",
+            "target": "exact-recipe-file-target-only",
+            "old_attempt_cleanup": "requires-authenticated-owned-dev-ino-birthtime-otherwise-preserve-refuse",
+            "output_plan": "domain-output-paths-bytes-and-digests-independent-of-attempt-scratch"
+          }
+        },
+        "removal_contract": {
+          "const": {
+            "target": "exact-authenticated-owned-lease-or-normal-append-lock-only",
+            "quarantine_name": ".<exact-target-basename>.<actual-pid>-<fresh-uuid-v4>.remove-quarantine",
+            "quarantine_count": 1,
+            "nonce_policy": "fresh-native-unexposed-until-rename-not-prepared-or-caller-selected",
+            "operations": "identity-precheck-rename-recheck-owned-unlink-or-no-replace-restore-fsync-parent",
+            "collision_bound": "cryptographic-freshness-not-atomic-no-replace-destination",
+            "unknown_or_crashed_quarantine": "preserve-and-report-indeterminate-no-automatic-resume-or-prune"
+          }
+        },
+        "settlement_scratch_derivation": {
+          "const": {
+            "domain": "devai.reconciliation.settlement-scratch.v1",
+            "hash": "sha256-jcs-utf8-object-domain-completion_sha256-target-purpose",
+            "completion_sha256": "sha256-exact-native-signed-completion-record-bytes",
+            "uuid": "first16-digest-bytes-set-byte6-high-nibble4-byte8-high-bits10-lowercase-rfc4122",
+            "pid": "actual-process-pid",
+            "purpose": "private-completion-publication",
+            "target": "exact-private-phase-completion-file-only",
+            "domain_output_creation": false
+          }
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "kind": "evidence-reconciliation-plan",
+      "identity": {
+        "schemaVersion": "1.0.0",
+        "kind": "reconciliation-host-context",
+        "repository_id": "shape-example",
+        "worktree_id": "shape-example",
+        "host_identity_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "object_format": "sha1",
+        "merge_heads": ["bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"]
+      },
+      "binding_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "selection": {
+        "parent": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "published_ref": "refs/heads/main",
+        "published_tip": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "origin_config_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "effective_origin_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "bases": ["cccccccccccccccccccccccccccccccccccccccc"],
+      "source_manifest": {
+        "files": [
+          {
+            "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "path": "record/proofs/chain.json",
+            "mode": "100644",
+            "blob_oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "bytes": 1,
+            "kind": "chain"
+          }
+        ],
+        "index": {
+          "version": 2,
+          "object_format": "sha1",
+          "raw_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "semantic_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "other_entries_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "entries": [
+            {
+              "path": "record/proofs/chain.json",
+              "mode": "100644",
+              "oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "stage": 0,
+              "assume_valid": false
+            }
+          ],
+          "has_tree_extension": false
+        },
+        "staged_files": [
+          {
+            "path": "record/proofs/chain.json",
+            "mode": "100644",
+            "blob_oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "bytes": 1,
+            "stage": 0
+          }
+        ],
+        "recovery_obligations": []
+      },
+      "source_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "grants_authority": false
+    }
+  ]
+}

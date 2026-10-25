@@ -661,7 +661,9 @@
                   "fixture:reference-web",
                   "protected-certification-provider-v3:execute",
                   "certification-evidence-sink:write",
-                  "protected-export-signer-v1:sign"
+                  "protected-export-signer-v1:sign",
+                  "reconciliation-host:write",
+                  "proof-index:write"
                 ]
               },
               {
@@ -861,7 +863,9 @@
                       "artifact-sink",
                       "protected-certification-provider",
                       "certification-evidence-sink",
-                      "protected-export-signer"
+                      "protected-export-signer",
+                      "reconciliation-host",
+                      "proof-index"
                     ]
                   }
                 },
@@ -895,7 +899,9 @@
                       "artifact-sink",
                       "protected-certification-provider",
                       "certification-evidence-sink",
-                      "protected-export-signer"
+                      "protected-export-signer",
+                      "reconciliation-host",
+                      "proof-index"
                     ]
                   }
                 },

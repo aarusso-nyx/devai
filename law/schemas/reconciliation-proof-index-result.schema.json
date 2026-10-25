@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/reconciliation-proof-index-result.schema.json",
+  "title": "Exact one-entry proof index result",
+  "description": "Closed machine output only. Schema validity, previews and hash strings confer no authority or readiness.",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "approval_id",
+    "plan_sha256",
+    "owned",
+    "grants_authority",
+    "outcome",
+    "intent_sha256",
+    "completion_sha256",
+    "outputs_manifest_sha256",
+    "phase"
+  ],
+  "properties": {
+    "kind": {
+      "const": "reconciliation-index-result"
+    },
+    "approval_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "plan_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "owned": {
+      "type": "array",
+      "minItems": 0,
+      "maxItems": 100000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["target", "dev", "ino", "birthtime_ns"],
+        "properties": {
+          "target": {
+            "type": "string",
+            "minLength": 1
+          },
+          "dev": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "ino": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "birthtime_ns": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          }
+        }
+      }
+    },
+    "grants_authority": {
+      "const": false
+    },
+    "outcome": {
+      "enum": ["completed", "existing", "indeterminate"]
+    },
+    "intent_sha256": {
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "completion_sha256": {
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "outputs_manifest_sha256": {
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "phase": {
+      "const": "03"
+    }
+  }
+}
