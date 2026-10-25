@@ -1,0 +1,241 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/reconciliation-materialize-result.schema.json",
+  "title": "Bounded custody and canonical selection result",
+  "description": "Closed machine output only. Schema validity, previews and hash strings confer no authority or readiness.",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "approval_id",
+    "plan_sha256",
+    "outcome",
+    "custody",
+    "selection",
+    "grants_authority"
+  ],
+  "properties": {
+    "kind": {
+      "const": "reconciliation-materialize-result"
+    },
+    "approval_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "plan_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "outcome": {
+      "enum": ["completed", "existing", "indeterminate"]
+    },
+    "custody": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "approval_id",
+        "plan_sha256",
+        "owned",
+        "grants_authority",
+        "outcome",
+        "intent_sha256",
+        "completion_sha256",
+        "outputs_manifest_sha256",
+        "phase",
+        "object_count"
+      ],
+      "properties": {
+        "kind": {
+          "const": "reconciliation-custody-result"
+        },
+        "approval_id": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "plan_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "owned": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 100000,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["target", "dev", "ino", "birthtime_ns"],
+            "properties": {
+              "target": {
+                "type": "string",
+                "minLength": 1
+              },
+              "dev": {
+                "type": "string",
+                "pattern": "^[0-9]+$"
+              },
+              "ino": {
+                "type": "string",
+                "pattern": "^[0-9]+$"
+              },
+              "birthtime_ns": {
+                "type": "string",
+                "pattern": "^[0-9]+$"
+              }
+            }
+          }
+        },
+        "grants_authority": {
+          "const": false
+        },
+        "outcome": {
+          "enum": ["completed", "existing", "indeterminate"]
+        },
+        "intent_sha256": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "completion_sha256": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "outputs_manifest_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "phase": {
+          "const": "01"
+        },
+        "object_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000
+        }
+      }
+    },
+    "selection": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "approval_id",
+            "plan_sha256",
+            "owned",
+            "grants_authority",
+            "outcome",
+            "intent_sha256",
+            "completion_sha256",
+            "outputs_manifest_sha256",
+            "phase"
+          ],
+          "properties": {
+            "kind": {
+              "const": "reconciliation-selection-result"
+            },
+            "approval_id": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "plan_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "owned": {
+              "type": "array",
+              "minItems": 0,
+              "maxItems": 100000,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["target", "dev", "ino", "birthtime_ns"],
+                "properties": {
+                  "target": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "dev": {
+                    "type": "string",
+                    "pattern": "^[0-9]+$"
+                  },
+                  "ino": {
+                    "type": "string",
+                    "pattern": "^[0-9]+$"
+                  },
+                  "birthtime_ns": {
+                    "type": "string",
+                    "pattern": "^[0-9]+$"
+                  }
+                }
+              }
+            },
+            "grants_authority": {
+              "const": false
+            },
+            "outcome": {
+              "enum": ["completed", "existing", "indeterminate"]
+            },
+            "intent_sha256": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "completion_sha256": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "outputs_manifest_sha256": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "phase": {
+              "const": "02"
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "grants_authority": {
+      "const": false
+    }
+  }
+}

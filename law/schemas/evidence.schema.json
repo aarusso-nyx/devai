@@ -219,6 +219,48 @@
       "pattern": "^[a-f0-9]{64}$",
       "description": "ADR-EVI-0002 anchor: the SHA-256 of the anchored line bytes, exclusive of the terminating newline."
     },
+    "recovered_from": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "ADR-EVI-0006 custody for one non-newest direct anchor recovered from a verified divergent source chain. The source and physical-line digests are also manifest-bound artifacts.",
+      "required": [
+        "source_chain_path",
+        "source_chain_sha256",
+        "source_entry_id",
+        "source_entry_sequence",
+        "source_entry_manifest_hash",
+        "fork_sequence"
+      ],
+      "properties": {
+        "source_chain_path": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!record/proofs/chain\\.json$)(?!.*(?:^|/)\\.{1,2}(?:/|$))[^/\\\\\\u0000-\\u001f\\u007f]+(?:/[^/\\\\\\u0000-\\u001f\\u007f]+)*$",
+          "description": "Repository-relative regular source chain path; runtime rejects escapes, symlink components and the active canonical chain."
+        },
+        "source_chain_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "source_entry_id": {
+          "type": "string",
+          "pattern": "^EV-[a-f0-9]{16}$"
+        },
+        "source_entry_sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "source_entry_manifest_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "fork_sequence": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Number of identical canonical entries in the common prefix; source_entry_sequence must be later."
+        }
+      }
+    },
     "manifest_hash": {
       "type": "string",
       "pattern": "^[a-f0-9]{64}$",

@@ -1,0 +1,1076 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/reconciliation-owner.schema.json",
+  "title": "Protected reconciliation Owner records",
+  "description": "Closed authenticated host records for exact Owner-approved merge reconciliation. Shape or a valid MAC is eligibility data, never action authority. Private issuer bytes are never public output.",
+  "schema_version": "1.0.0",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/issuer"
+    },
+    {
+      "$ref": "#/$defs/approval"
+    },
+    {
+      "$ref": "#/$defs/renewal"
+    },
+    {
+      "$ref": "#/$defs/revocation"
+    },
+    {
+      "$ref": "#/$defs/phase-intent"
+    },
+    {
+      "$ref": "#/$defs/phase-completion"
+    },
+    {
+      "$ref": "#/$defs/lease"
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "minLength": 64,
+      "maxLength": 64
+    },
+    "logical": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
+      "maxLength": 128
+    },
+    "decimal": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,29})$",
+      "maxLength": 30
+    },
+    "ns": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]{0,19}$",
+      "maxLength": 20,
+      "description": "Runtime additionally enforces uint64 maximum18446744073709551615."
+    },
+    "ms": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "clock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["clock_source", "boot_id", "monotonic_ns", "wall_ms"],
+      "properties": {
+        "clock_source": {
+          "const": "node-uv-hrtime-ns-v1"
+        },
+        "boot_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "minLength": 36,
+          "maxLength": 36
+        },
+        "monotonic_ns": {
+          "$ref": "#/$defs/ns"
+        },
+        "wall_ms": {
+          "$ref": "#/$defs/ms"
+        }
+      }
+    },
+    "rootIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dev", "ino", "birthtime_ns", "uid", "mode"],
+      "properties": {
+        "dev": {
+          "$ref": "#/$defs/decimal"
+        },
+        "ino": {
+          "$ref": "#/$defs/decimal"
+        },
+        "birthtime_ns": {
+          "$ref": "#/$defs/decimal"
+        },
+        "uid": {
+          "$ref": "#/$defs/decimal"
+        },
+        "mode": {
+          "const": "0700"
+        }
+      }
+    },
+    "seedIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dev",
+        "ino",
+        "birthtime_ns",
+        "uid",
+        "mode",
+        "size_bytes",
+        "mtime_ns",
+        "ctime_ns"
+      ],
+      "properties": {
+        "dev": {
+          "$ref": "#/$defs/decimal"
+        },
+        "ino": {
+          "$ref": "#/$defs/decimal"
+        },
+        "birthtime_ns": {
+          "$ref": "#/$defs/decimal"
+        },
+        "uid": {
+          "$ref": "#/$defs/decimal"
+        },
+        "mode": {
+          "const": "0600"
+        },
+        "size_bytes": {
+          "const": 8192
+        },
+        "mtime_ns": {
+          "$ref": "#/$defs/decimal"
+        },
+        "ctime_ns": {
+          "$ref": "#/$defs/decimal"
+        }
+      }
+    },
+    "anchor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "root",
+        "root_identity",
+        "seed_identity",
+        "seed_sha256"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0.0"
+        },
+        "kind": {
+          "const": "reconciliation-admission-anchor"
+        },
+        "root": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096,
+          "pattern": "^/[^\u0000]*$"
+        },
+        "root_identity": {
+          "$ref": "#/$defs/rootIdentity"
+        },
+        "seed_identity": {
+          "$ref": "#/$defs/seedIdentity"
+        },
+        "seed_sha256": {
+          "const": "3f6b742405bb199a11ed0952c9aa049285ef25dc69954e901d2e987cd15c4372"
+        }
+      }
+    },
+    "bindings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "package_sha256",
+        "module_sha256",
+        "registry_sha256",
+        "constitution_sha256",
+        "policy_sha256"
+      ],
+      "properties": {
+        "package_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "module_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "registry_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "constitution_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "policy_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository_id",
+        "worktree_id",
+        "host_identity_sha256",
+        "binding_sha256",
+        "plan_sha256",
+        "source_manifest_sha256",
+        "allowed_phases"
+      ],
+      "properties": {
+        "repository_id": {
+          "$ref": "#/$defs/logical"
+        },
+        "worktree_id": {
+          "$ref": "#/$defs/logical"
+        },
+        "host_identity_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "binding_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "plan_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "source_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "allowed_phases": {
+          "const": ["01", "02", "03", "04"]
+        }
+      }
+    },
+    "issuer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "domain",
+        "repository_id",
+        "worktree_id",
+        "clock",
+        "adapter_id",
+        "host_identity_sha256",
+        "key_sha256",
+        "seed_plan_sha256",
+        "provision_context_sha256",
+        "admission_anchor",
+        "private_key_base64",
+        "installation_bindings",
+        "installed_at_head",
+        "mac"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0.0"
+        },
+        "kind": {
+          "const": "issuer"
+        },
+        "domain": {
+          "const": "devai.reconciliation.owner.v1/issuer"
+        },
+        "repository_id": {
+          "$ref": "#/$defs/logical"
+        },
+        "worktree_id": {
+          "$ref": "#/$defs/logical"
+        },
+        "clock": {
+          "$ref": "#/$defs/clock"
+        },
+        "adapter_id": {
+          "const": "reconciliation-host-authority-boundary"
+        },
+        "host_identity_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "key_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "seed_plan_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "provision_context_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "admission_anchor": {
+          "$ref": "#/$defs/anchor"
+        },
+        "private_key_base64": {
+          "type": "string",
+          "minLength": 44,
+          "maxLength": 44,
+          "pattern": "^[A-Za-z0-9+/]{43}=$",
+          "writeOnly": true
+        },
+        "installation_bindings": {
+          "$ref": "#/$defs/bindings"
+        },
+        "installed_at_head": {
+          "type": "string",
+          "pattern": "^([0-9a-f]{40}|[0-9a-f]{64})$",
+          "maxLength": 64
+        },
+        "mac": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "domain",
+        "repository_id",
+        "worktree_id",
+        "clock",
+        "approval_id",
+        "issuer_sha256",
+        "scope_sha256",
+        "sequence",
+        "previous_grant_sha256",
+        "scope",
+        "validity_ms",
+        "expires_wall_ms",
+        "expires_monotonic_ns",
+        "mac"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0.0"
+        },
+        "kind": {
+          "const": "approval"
+        },
+        "domain": {
+          "const": "devai.reconciliation.owner.v1/approval"
+        },
+        "repository_id": {
+          "$ref": "#/$defs/logical"
+        },
+        "worktree_id": {
+          "$ref": "#/$defs/logical"
+        },
+        "clock": {
+          "$ref": "#/$defs/clock"
+        },
+        "approval_id": {
+          "$ref": "#/$defs/sha256"
+        },
+        "issuer_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "scope_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "sequence": {
+          "const": 1
+        },
+        "previous_grant_sha256": {
+          "type": "null"
+        },
+        "scope": {
+          "$ref": "#/$defs/scope"
+        },
+        "validity_ms": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 900000
+        },
+        "expires_wall_ms": {
+          "$ref": "#/$defs/ms"
+        },
+        "expires_monotonic_ns": {
+          "$ref": "#/$defs/ns"
+        },
+        "mac": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "renewal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "domain",
+        "repository_id",
+        "worktree_id",
+        "clock",
+        "approval_id",
+        "issuer_sha256",
+        "approval_sha256",
+        "scope_sha256",
+        "sequence",
+        "previous_grant_sha256",
+        "remaining_phases",
+        "resumable_intent_sha256",
+        "validity_ms",
+        "expires_wall_ms",
+        "expires_monotonic_ns",
+        "mac"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0.0"
+        },
+        "kind": {
+          "const": "renewal"
+        },
+        "domain": {
+          "const": "devai.reconciliation.owner.v1/renewal"
+        },
+        "repository_id": {
+          "$ref": "#/$defs/logical"
+        },
+        "worktree_id": {
+          "$ref": "#/$defs/logical"
+        },
+        "clock": {
+          "$ref": "#/$defs/clock"
+        },
+        "approval_id": {
+          "$ref": "#/$defs/sha256"
+        },
+        "issuer_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "approval_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "scope_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 999999
+        },
+        "previous_grant_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "remaining_phases": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": {
+            "enum": ["01", "02", "03", "04"]
+          }
+        },
+        "resumable_intent_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "validity_ms": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 900000
+        },
+        "expires_wall_ms": {
+          "$ref": "#/$defs/ms"
+        },
+        "expires_monotonic_ns": {
+          "$ref": "#/$defs/ns"
+        },
+        "mac": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "revocation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "domain",
+        "repository_id",
+        "worktree_id",
+        "clock",
+        "approval_id",
+        "issuer_sha256",
+        "approval_sha256",
+        "scope_sha256",
+        "sequence",
+        "previous_grant_sha256",
+        "mac"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0.0"
+        },
+        "kind": {
+          "const": "revocation"
+        },
+        "domain": {
+          "const": "devai.reconciliation.owner.v1/revocation"
+        },
+        "repository_id": {
+          "$ref": "#/$defs/logical"
+        },
+        "worktree_id": {
+          "$ref": "#/$defs/logical"
+        },
+        "clock": {
+          "$ref": "#/$defs/clock"
+        },
+        "approval_id": {
+          "$ref": "#/$defs/sha256"
+        },
+        "issuer_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "approval_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "scope_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 999999
+        },
+        "previous_grant_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "mac": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "phase-intent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "domain",
+        "repository_id",
+        "worktree_id",
+        "clock",
+        "approval_id",
+        "issuer_sha256",
+        "approval_sha256",
+        "scope_sha256",
+        "grant_sha256",
+        "before_witness_sha256",
+        "output_plan_sha256",
+        "lease_nonce",
+        "invocation_id",
+        "phase",
+        "action_id",
+        "initiator",
+        "predecessor_completion_sha256",
+        "mac"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0.0"
+        },
+        "kind": {
+          "const": "phase-intent"
+        },
+        "domain": {
+          "const": "devai.reconciliation.owner.v1/phase-intent"
+        },
+        "repository_id": {
+          "$ref": "#/$defs/logical"
+        },
+        "worktree_id": {
+          "$ref": "#/$defs/logical"
+        },
+        "clock": {
+          "$ref": "#/$defs/clock"
+        },
+        "approval_id": {
+          "$ref": "#/$defs/sha256"
+        },
+        "issuer_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "approval_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "scope_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "grant_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "before_witness_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "output_plan_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "lease_nonce": {
+          "$ref": "#/$defs/sha256"
+        },
+        "invocation_id": {
+          "$ref": "#/$defs/sha256"
+        },
+        "phase": {
+          "enum": ["01", "02", "03", "04"]
+        },
+        "action_id": {
+          "enum": [
+            "evidence reconcile materialize",
+            "evidence reconcile stage-proof",
+            "sense bootstrap-inventory"
+          ]
+        },
+        "initiator": {
+          "$ref": "common-defs.schema.json#/$defs/role"
+        },
+        "predecessor_completion_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mac": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "01"
+              }
+            },
+            "required": ["phase"]
+          },
+          "then": {
+            "properties": {
+              "action_id": {
+                "const": "evidence reconcile materialize"
+              },
+              "initiator": {
+                "const": "inspector"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "02"
+              }
+            },
+            "required": ["phase"]
+          },
+          "then": {
+            "properties": {
+              "action_id": {
+                "const": "evidence reconcile materialize"
+              },
+              "initiator": {
+                "const": "inspector"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "03"
+              }
+            },
+            "required": ["phase"]
+          },
+          "then": {
+            "properties": {
+              "action_id": {
+                "const": "evidence reconcile stage-proof"
+              },
+              "initiator": {
+                "const": "inspector"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "04"
+              }
+            },
+            "required": ["phase"]
+          },
+          "then": {
+            "properties": {
+              "action_id": {
+                "const": "sense bootstrap-inventory"
+              },
+              "initiator": {
+                "const": "architect"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "01"
+              }
+            },
+            "required": ["phase"]
+          },
+          "then": {
+            "properties": {
+              "predecessor_completion_sha256": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "predecessor_completion_sha256": {
+                "$ref": "#/$defs/sha256"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "phase-completion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "domain",
+        "repository_id",
+        "worktree_id",
+        "clock",
+        "approval_id",
+        "issuer_sha256",
+        "approval_sha256",
+        "scope_sha256",
+        "intent_sha256",
+        "observed_grant_sha256",
+        "final_witness_sha256",
+        "outputs_manifest_sha256",
+        "phase",
+        "predecessor_completion_sha256",
+        "durability",
+        "mac"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0.0"
+        },
+        "kind": {
+          "const": "phase-completion"
+        },
+        "domain": {
+          "const": "devai.reconciliation.owner.v1/phase-completion"
+        },
+        "repository_id": {
+          "$ref": "#/$defs/logical"
+        },
+        "worktree_id": {
+          "$ref": "#/$defs/logical"
+        },
+        "clock": {
+          "$ref": "#/$defs/clock"
+        },
+        "approval_id": {
+          "$ref": "#/$defs/sha256"
+        },
+        "issuer_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "approval_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "scope_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "intent_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "observed_grant_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "final_witness_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "outputs_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "phase": {
+          "enum": ["01", "02", "03", "04"]
+        },
+        "predecessor_completion_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "durability": {
+          "const": "durable"
+        },
+        "mac": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "01"
+              }
+            },
+            "required": ["phase"]
+          },
+          "then": {
+            "properties": {
+              "predecessor_completion_sha256": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "predecessor_completion_sha256": {
+                "$ref": "#/$defs/sha256"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "lease": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "domain",
+        "repository_id",
+        "worktree_id",
+        "clock",
+        "approval_id",
+        "issuer_sha256",
+        "approval_sha256",
+        "scope_sha256",
+        "grant_sha256",
+        "original_intent_sha256",
+        "invocation_id",
+        "nonce",
+        "host_identity_sha256",
+        "phase",
+        "action_id",
+        "initiator",
+        "pid",
+        "hostname",
+        "mac"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0.0"
+        },
+        "kind": {
+          "const": "lease"
+        },
+        "domain": {
+          "const": "devai.reconciliation.owner.v1/lease"
+        },
+        "repository_id": {
+          "$ref": "#/$defs/logical"
+        },
+        "worktree_id": {
+          "$ref": "#/$defs/logical"
+        },
+        "clock": {
+          "$ref": "#/$defs/clock"
+        },
+        "approval_id": {
+          "$ref": "#/$defs/sha256"
+        },
+        "issuer_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "approval_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "scope_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "grant_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "original_intent_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "invocation_id": {
+          "$ref": "#/$defs/sha256"
+        },
+        "nonce": {
+          "$ref": "#/$defs/sha256"
+        },
+        "host_identity_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "phase": {
+          "enum": ["01", "02", "03", "04"]
+        },
+        "action_id": {
+          "enum": [
+            "evidence reconcile materialize",
+            "evidence reconcile stage-proof",
+            "sense bootstrap-inventory"
+          ]
+        },
+        "initiator": {
+          "$ref": "common-defs.schema.json#/$defs/role"
+        },
+        "pid": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        },
+        "hostname": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253,
+          "pattern": "^[^\u0000\r\n]+$"
+        },
+        "mac": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "01"
+              }
+            },
+            "required": ["phase"]
+          },
+          "then": {
+            "properties": {
+              "action_id": {
+                "const": "evidence reconcile materialize"
+              },
+              "initiator": {
+                "const": "inspector"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "02"
+              }
+            },
+            "required": ["phase"]
+          },
+          "then": {
+            "properties": {
+              "action_id": {
+                "const": "evidence reconcile materialize"
+              },
+              "initiator": {
+                "const": "inspector"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "03"
+              }
+            },
+            "required": ["phase"]
+          },
+          "then": {
+            "properties": {
+              "action_id": {
+                "const": "evidence reconcile stage-proof"
+              },
+              "initiator": {
+                "const": "inspector"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "04"
+              }
+            },
+            "required": ["phase"]
+          },
+          "then": {
+            "properties": {
+              "action_id": {
+                "const": "sense bootstrap-inventory"
+              },
+              "initiator": {
+                "const": "architect"
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "kind": "revocation",
+      "domain": "devai.reconciliation.owner.v1/revocation",
+      "repository_id": "fixture-repository",
+      "worktree_id": "fixture-worktree",
+      "clock": {
+        "clock_source": "node-uv-hrtime-ns-v1",
+        "boot_id": "11111111-2222-3333-4444-555555555555",
+        "monotonic_ns": "1000000000000",
+        "wall_ms": 1792868400000
+      },
+      "approval_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "issuer_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "approval_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "scope_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "sequence": 2,
+      "previous_grant_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "mac": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    }
+  ]
+}

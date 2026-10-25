@@ -1,0 +1,348 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/proof-index-reconciliation-contract.schema.json",
+  "title": "Proof index reconciliation reference contract",
+  "description": "Proposed source-only shape; no runtime action or capability. Trusted-host semantic verification is mandatory.",
+  "schema_version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "contract_kind": {
+      "const": "proof-index-reconciliation-reference"
+    },
+    "repository_id": {
+      "$ref": "#/$defs/logicalId"
+    },
+    "worktree_id": {
+      "$ref": "#/$defs/logicalId"
+    },
+    "proof_path": {
+      "const": "record/proofs/chain.json"
+    },
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "human"
+        },
+        "role": {
+          "const": "inspector"
+        },
+        "write_consent": {
+          "const": true
+        }
+      },
+      "required": ["kind", "role", "write_consent"]
+    },
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "constitution_source_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "phase_token_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "required": ["receipt_sha256", "constitution_source_sha256", "phase_token_sha256"]
+    },
+    "sources": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "head": {
+          "$ref": "#/$defs/gitObject"
+        },
+        "merge_head": {
+          "$ref": "#/$defs/gitObject"
+        },
+        "common_base": {
+          "$ref": "#/$defs/gitObject"
+        },
+        "selected_published_parent": {
+          "$ref": "#/$defs/gitObject"
+        },
+        "resolved_source_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "selected_chain_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "proof_epochs_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "custody": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/custody"
+          }
+        }
+      },
+      "required": [
+        "head",
+        "merge_head",
+        "common_base",
+        "selected_published_parent",
+        "resolved_source_manifest_sha256",
+        "selected_chain_sha256",
+        "proof_epochs_manifest_sha256",
+        "custody"
+      ]
+    },
+    "before": {
+      "$ref": "#/$defs/indexWitness"
+    },
+    "after": {
+      "$ref": "#/$defs/indexWitness"
+    },
+    "effect": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "git-index-one-entry-cas"
+        },
+        "entry": {
+          "const": "record/proofs/chain.json"
+        },
+        "lock": {
+          "const": "trusted-host-real-index-lock"
+        },
+        "publication": {
+          "const": "compare-and-swap"
+        },
+        "selection_evidence_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "verified_result_chain_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "required": [
+        "kind",
+        "entry",
+        "lock",
+        "publication",
+        "selection_evidence_manifest_sha256",
+        "verified_result_chain_sha256"
+      ]
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "contract_kind",
+    "repository_id",
+    "worktree_id",
+    "proof_path",
+    "actor",
+    "approval",
+    "sources",
+    "before",
+    "after",
+    "effect"
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "gitObject": {
+      "type": "string",
+      "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+    },
+    "logicalId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$"
+    },
+    "indexEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "enum": ["100644", "100755"]
+        },
+        "oid": {
+          "$ref": "#/$defs/gitObject"
+        },
+        "stage": {
+          "type": "integer",
+          "enum": [0, 1, 2, 3]
+        }
+      },
+      "required": ["mode", "oid", "stage"]
+    },
+    "indexWitness": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "semantic_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "other_entries_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "proof_entries": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/indexEntry"
+          }
+        }
+      },
+      "required": ["semantic_sha256", "other_entries_sha256", "proof_entries"]
+    },
+    "custody": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "origin": {
+          "enum": ["selected-parent", "displaced-parent", "common-base", "original-direct-anchor"]
+        },
+        "commit": {
+          "$ref": "#/$defs/gitObject"
+        },
+        "chain_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "complete_epochs_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "ancestry_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "durable": {
+          "const": true
+        }
+      },
+      "required": [
+        "origin",
+        "commit",
+        "chain_sha256",
+        "complete_epochs_manifest_sha256",
+        "ancestry_manifest_sha256",
+        "receipt_sha256",
+        "durable"
+      ]
+    }
+  },
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "contract_kind": "proof-index-reconciliation-reference",
+      "repository_id": "example-repo",
+      "worktree_id": "example-worktree",
+      "proof_path": "record/proofs/chain.json",
+      "actor": {
+        "kind": "human",
+        "role": "inspector",
+        "write_consent": true
+      },
+      "approval": {
+        "receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "constitution_source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "phase_token_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "sources": {
+        "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "merge_head": "cccccccccccccccccccccccccccccccccccccccc",
+        "common_base": "dddddddddddddddddddddddddddddddddddddddd",
+        "selected_published_parent": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "resolved_source_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "selected_chain_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "proof_epochs_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "custody": [
+          {
+            "origin": "selected-parent",
+            "commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "chain_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "complete_epochs_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "ancestry_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "durable": true
+          },
+          {
+            "origin": "displaced-parent",
+            "commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "chain_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "complete_epochs_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "ancestry_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "durable": true
+          },
+          {
+            "origin": "common-base",
+            "commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "chain_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "complete_epochs_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "ancestry_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "durable": true
+          },
+          {
+            "origin": "original-direct-anchor",
+            "commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "chain_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "complete_epochs_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "ancestry_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "durable": true
+          }
+        ]
+      },
+      "before": {
+        "semantic_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "other_entries_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "proof_entries": [
+          {
+            "mode": "100644",
+            "oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "stage": 1
+          },
+          {
+            "mode": "100644",
+            "oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "stage": 2
+          },
+          {
+            "mode": "100644",
+            "oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "stage": 3
+          }
+        ]
+      },
+      "after": {
+        "semantic_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "other_entries_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "proof_entries": [
+          {
+            "mode": "100644",
+            "oid": "ffffffffffffffffffffffffffffffffffffffff",
+            "stage": 0
+          }
+        ]
+      },
+      "effect": {
+        "kind": "git-index-one-entry-cas",
+        "entry": "record/proofs/chain.json",
+        "lock": "trusted-host-real-index-lock",
+        "publication": "compare-and-swap",
+        "selection_evidence_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "verified_result_chain_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    }
+  ]
+}
