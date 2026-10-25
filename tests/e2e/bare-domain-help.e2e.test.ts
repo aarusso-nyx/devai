@@ -70,7 +70,13 @@ describe('bare domain/group paths render help instead of the suggester', () => {
           groups.set(key, (groups.get(key) ?? 0) + 1);
         }
       }
-      expect(groups.size).toBe(4);
+      expect([...groups.keys()].sort()).toEqual([
+        'evidence reconcile',
+        'init apply',
+        'round gap',
+        'round tracking',
+        'task queue',
+      ]);
       for (const key of groups.keys()) {
         const parts = key.split(' ');
         const r = run(parts);

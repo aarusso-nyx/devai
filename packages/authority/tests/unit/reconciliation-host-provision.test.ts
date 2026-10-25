@@ -1515,6 +1515,9 @@ nativeIt(
           item.child.kill('SIGKILL');
     }
   },
+  // This case coordinates several real native processes; each checkpoint still has its 20 s guard.
+  // Coverage adds parent-process work between checkpoints, so allow the complete sequence to finish.
+  180_000,
 );
 nativeIt(
   'own native child killed immediately after real issuer link leaves exact remnant and future bootstrap refuses without cleanup',
@@ -1554,6 +1557,8 @@ nativeIt(
         child.child.kill('SIGKILL');
     }
   },
+  // Keep the child checkpoints at 20 s while covering precursor creation and post-crash inventories.
+  180_000,
 );
 
 afterAll(() => {
