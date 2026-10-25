@@ -42,14 +42,16 @@
         "anchor": "decision"
       }
     ],
-    "decisions": ["ADR-GOV-0012", "ADR-GOV-0013", "ADR-REL-0022"]
+    "decisions": ["ADR-GOV-0012", "ADR-GOV-0013", "ADR-REL-0022", "ADR-GOV-0027", "ADR-EVI-0007"]
   },
   "scope": {
     "components": ["evidence", "proof-chain", "round-seal"],
     "code_areas": [
       "packages/evidence/src/**",
       "packages/cli/src/commands/evidence/**",
-      "packages/cli/src/commands/record/**"
+      "packages/cli/src/commands/record/**",
+      "packages/cli/src/commands/sense/bootstrap-inventory.ts",
+      "packages/authority/src/boundaries/reconciliation-*.ts"
     ]
   },
   "change_policy": {
@@ -64,7 +66,16 @@
     "human_approval_required": true
   },
   "tags": ["evidence", "hash-chain", "append-only", "article-41", "article-6"],
-  "measurable_via": ["evidence record", "evidence verify", "round seal"],
+  "measurable_via": [
+    "evidence record",
+    "evidence verify",
+    "round seal",
+    "evidence reconcile plan",
+    "evidence reconcile approve",
+    "evidence reconcile materialize",
+    "evidence reconcile stage-proof",
+    "sense bootstrap-inventory"
+  ],
   "provenance": ["ADR-SCR-0004", "CMP-0002:R-0203:TASK-0231"],
   "supersedes": null,
   "superseded_by": null
