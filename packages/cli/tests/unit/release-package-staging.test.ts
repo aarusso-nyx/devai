@@ -17,6 +17,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 const root = resolve(import.meta.dirname, '../../../..');
 const output = mkdtempSync(join(tmpdir(), 'devai-release-stage-test-'));
 const SELECTED_RELEASE_VERSION = '2.7.1';
+const CURRENT_PACKAGE_VERSION = '2.8.0';
 const TRUSTED_VERIFIER_PACKAGE_VERSION = '2.4.0';
 const TRUSTED_VERIFIER_POLICY = JSON.parse(
   readFileSync(join(root, 'law/policy/trusted-local-rc-verifier-package.json'), 'utf8'),
@@ -225,14 +226,14 @@ describe('normalized release package staging', () => {
         version: string;
       };
       expect(staged.reproductions).toBe(2);
-      expect(staged.version).toBe(SELECTED_RELEASE_VERSION);
+      expect(staged.version).toBe(CURRENT_PACKAGE_VERSION);
       expect(staged.sha256).toMatch(/^[0-9a-f]{64}$/u);
       expect(staged.sbom_subject_sha256).toBe(staged.sha256);
       const sbom = JSON.parse(readFileSync(staged.sbom, 'utf8')) as {
         metadata: { component: { hashes: Array<{ alg: string; content: string }> } };
       };
       expect(staged.sbom).toMatch(
-        new RegExp(`devai-${SELECTED_RELEASE_VERSION.replaceAll('.', '\\.')}\\.cdx\\.json$`, 'u'),
+        new RegExp(`devai-${CURRENT_PACKAGE_VERSION.replaceAll('.', '\\.')}\\.cdx\\.json$`, 'u'),
       );
       expect(sbom.metadata.component.hashes).toContainEqual({
         alg: 'SHA-256',
@@ -244,7 +245,7 @@ describe('normalized release package staging', () => {
       ) as Record<string, unknown>;
       expect(manifest).toMatchObject({
         name: '@aarusso-nyx/devai',
-        version: SELECTED_RELEASE_VERSION,
+        version: CURRENT_PACKAGE_VERSION,
       });
       expect(manifest).not.toHaveProperty('devDependencies');
       expect(JSON.stringify(manifest)).not.toMatch(/workspace:|@devai-nyx\//u);
@@ -280,8 +281,8 @@ describe('normalized release package staging', () => {
       }
     ).version;
     const landingPage = readFileSync(join(root, 'docs/site/src/pages/index.tsx'), 'utf8');
-    expect(packageVersion).toBe(SELECTED_RELEASE_VERSION);
-    expect(landingPage).toContain(`@aarusso-nyx/devai@${SELECTED_RELEASE_VERSION}`);
+    expect(packageVersion).toBe(CURRENT_PACKAGE_VERSION);
+    expect(landingPage).toContain(`@aarusso-nyx/devai@${packageVersion}`);
   });
 
   it('records a stable release and latest dist-tag for version 2.7.1', () => {
@@ -379,7 +380,7 @@ describe('normalized release package staging', () => {
           limit,
         );
       expect(JSON.parse(await check()).package).toBe(
-        `@aarusso-nyx/devai@${SELECTED_RELEASE_VERSION}`,
+        `@aarusso-nyx/devai@${CURRENT_PACKAGE_VERSION}`,
       );
       writeFileSync(join(archive, 'docs/stale-package.md'), '@devai-nyx/cli');
       await expect(check()).rejects.toThrow(
@@ -407,6 +408,6 @@ describe('normalized release package staging', () => {
         encoding: 'utf8',
       }),
     ) as { package: string };
-    expect(closure.package).toBe(`@aarusso-nyx/devai@${SELECTED_RELEASE_VERSION}`);
+    expect(closure.package).toBe(`@aarusso-nyx/devai@${CURRENT_PACKAGE_VERSION}`);
   });
 });
