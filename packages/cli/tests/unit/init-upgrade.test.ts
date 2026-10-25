@@ -937,7 +937,7 @@ describe('#390: init upgrade rebinds a 2.3.1 observation workflow to the script-
   }, 180_000);
 });
 
-describe('ADR-SCR-0015/0017: init upgrade from 2.3.2 through 2.7.1', () => {
+describe('ADR-SCR-0015/0017: init upgrade from 2.3.2 through 2.8.0', () => {
   it('projects opted-in sensor inputs, rebinds the task template, and repeats without a byte change', async () => {
     const repo = await stynxAt160(true);
     expect((await runCli(WRITE(repo))).exit).toBe(0);
@@ -973,7 +973,7 @@ describe('ADR-SCR-0015/0017: init upgrade from 2.3.2 through 2.7.1', () => {
     expect(planned.exit, planned.stderr).toBe(0);
     expect(snapshot(repo)).toEqual(before);
     const plan = value(planned)['plan'] as JsonObject;
-    expect(plan).toMatchObject({ from: '2.3.2', to: '2.7.1', status: 'ready' });
+    expect(plan).toMatchObject({ from: '2.3.2', to: '2.8.0', status: 'ready' });
     expect((plan['releases'] as JsonObject[]).map((release) => release['version'])).toEqual([
       '2.4.0',
       '2.5.0',
@@ -983,6 +983,7 @@ describe('ADR-SCR-0015/0017: init upgrade from 2.3.2 through 2.7.1', () => {
       '2.6.3',
       '2.6.4',
       '2.7.0',
+      '2.8.0',
     ]);
     expect(plan['changed_files']).toEqual(
       expect.arrayContaining([
@@ -1019,7 +1020,7 @@ describe('ADR-SCR-0015/0017: init upgrade from 2.3.2 through 2.7.1', () => {
     ]);
     expect(json(repo, RECEIPT)).toMatchObject({
       from: '2.3.2',
-      to: '2.7.1',
+      to: '2.8.0',
       migrations: [
         'MIG-2.4.0-sensor-inputs-projection',
         'MIG-2.4.0-declared-sensor-task-template',
@@ -1033,6 +1034,7 @@ describe('ADR-SCR-0015/0017: init upgrade from 2.3.2 through 2.7.1', () => {
         'MIG-2.6.3-measurement-repair-identity-refresh',
         'MIG-2.6.4-native-reporter-identity-refresh',
         'MIG-2.7.0-constitution-1-1-0',
+        'MIG-2.8.0-constitution-1-2-0',
       ],
       postchecks: [
         { name: 'policy-materialization-current', ok: true },
