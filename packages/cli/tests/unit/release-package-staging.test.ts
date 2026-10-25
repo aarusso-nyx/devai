@@ -27,6 +27,19 @@ const TRUSTED_VERIFIER_POLICY = JSON.parse(
 const TRUSTED_VERIFIER_SOURCE_COMMIT = TRUSTED_VERIFIER_POLICY.verifier.source_commit;
 const TRUSTED_VERIFIER_PROVENANCE_SHA256 = TRUSTED_VERIFIER_POLICY.verifier.provenance_sha256;
 
+// Historical manifest cases run the real writer against their isolated selected package.
+const historicalManifestRoot = join(output, 'historical-manifest-repository');
+mkdirSync(join(historicalManifestRoot, 'packages/cli'), { recursive: true });
+writeFileSync(
+  join(historicalManifestRoot, 'packages/cli/package.json'),
+  JSON.stringify({ name: '@aarusso-nyx/devai', version: SELECTED_RELEASE_VERSION }),
+);
+mkdirSync(join(historicalManifestRoot, 'law/policy'), { recursive: true });
+cpSync(
+  join(root, 'law/policy/trusted-local-rc-verifier-package.json'),
+  join(historicalManifestRoot, 'law/policy/trusted-local-rc-verifier-package.json'),
+);
+
 function manifestEnvironment(input: {
   readonly workspace: string;
   readonly output: string;
@@ -294,7 +307,7 @@ describe('normalized release package staging', () => {
     writeFileSync(siteArchive, 'site');
     writeFileSync(sbom, '{}');
     execFileSync(process.execPath, [join(root, 'scripts/create-release-manifest.mjs')], {
-      cwd: root,
+      cwd: historicalManifestRoot,
       env: manifestEnvironment({ workspace: output, output: manifest }),
     });
     const value = JSON.parse(readFileSync(manifest, 'utf8')) as {
@@ -316,13 +329,46 @@ describe('normalized release package staging', () => {
     });
   });
 
+  it('records the current 2.8.0 package as stable with the latest dist-tag', () => {
+    const manifest = join(output, 'current-release-manifest.json');
+    execFileSync(process.execPath, [join(root, 'scripts/create-release-manifest.mjs')], {
+      cwd: root,
+      env: {
+        ...manifestEnvironment({ workspace: output, output: manifest }),
+        RELEASE_TAG: `v${CURRENT_PACKAGE_VERSION}`,
+      },
+    });
+    const value = JSON.parse(readFileSync(manifest, 'utf8')) as {
+      release: Record<string, unknown>;
+    };
+    expect(value.release).toMatchObject({
+      tag: `v${CURRENT_PACKAGE_VERSION}`,
+      version: CURRENT_PACKAGE_VERSION,
+      release_type: 'stable',
+      prerelease: false,
+      dist_tag: 'latest',
+    });
+  });
+
+  it('refuses a historical tag for the current package before writing a manifest', () => {
+    const manifest = join(output, 'mismatched-release-manifest.json');
+    expect(() =>
+      execFileSync(process.execPath, [join(root, 'scripts/create-release-manifest.mjs')], {
+        cwd: root,
+        env: manifestEnvironment({ workspace: output, output: manifest }),
+        stdio: 'pipe',
+      }),
+    ).toThrow('RELEASE_MANIFEST_PACKAGE_IDENTITY_INVALID');
+    expect(existsSync(manifest)).toBe(false);
+  });
+
   it.each(['LEDGER_INSTALLED_CONTROL_SHA256', 'LEDGER_INSTALLED_OFFLINE_RECEIPT_SHA256'])(
     'ignores retired installed verification input: %s',
     (name) => {
       for (const value of ['', 'not-a-digest']) {
         const manifest = join(output, `missing-${name}-${value}.json`);
         execFileSync(process.execPath, [join(root, 'scripts/create-release-manifest.mjs')], {
-          cwd: root,
+          cwd: historicalManifestRoot,
           env: { ...manifestEnvironment({ workspace: output, output: manifest }), [name]: value },
           stdio: 'pipe',
         });
@@ -343,7 +389,7 @@ describe('normalized release package staging', () => {
     const manifest = join(output, `release-manifest-invalid-${_name.replaceAll(' ', '-')}.json`);
     expect(() =>
       execFileSync(process.execPath, [join(root, 'scripts/create-release-manifest.mjs')], {
-        cwd: root,
+        cwd: historicalManifestRoot,
         env: manifestEnvironment({ workspace: output, output: manifest, ...identity }),
         stdio: 'pipe',
       }),
