@@ -93,6 +93,14 @@ function processIsAllowed(
   if (executable === 'sh' && args[0] === '-lc') {
     return typeof args[1] === 'string' && /^command -v (claude|codex)$/u.test(args[1]);
   }
+  if (
+    executable === 'git' &&
+    args.length >= 3 &&
+    args[0] === '-c' &&
+    args[1] === 'diff.autoRefreshIndex=false' &&
+    args[2] === 'diff'
+  )
+    return true;
   return READ_PROCESS_VERBS[executable]?.includes(String(args[0])) === true;
 }
 

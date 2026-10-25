@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterEach, aroundEach, describe, expect, it } from 'vitest';
 import { appendVerbEvidence } from '../../src/evidence/verb-evidence.js';
 import { loadChain } from '../../src/evidence/chain.js';
+import { appendProofEpochRecord } from '../../src/evidence/proof-epoch.js';
 import { deriveEvidenceId } from '../../src/evidence/id-generator.js';
 import { withAuthorityHostTestScope } from '../../../authority/tests/unit/authority-host-test-scope.js';
 
@@ -114,4 +115,28 @@ it('records explicit automatic=false and preserves an explicitly empty notes pop
   const chain = JSON.parse(readFileSync(join(root, 'record/proofs/chain.json'), 'utf8'));
   expect(chain.records).toHaveLength(1);
   expect(chain.records[0].notes).toEqual([]);
+});
+
+it('ADR-EVI-0006 leaves newest-line recovery newest-only for an older physical line', () => {
+  const root = mkdtempSync(join(tmpdir(), 'devai-newest-boundary-'));
+  roots.push(root);
+  for (const note of ['older', 'newest'])
+    appendProofEpochRecord({
+      repoRoot: root,
+      roundId: 'R-0007',
+      kind: 'generic',
+      payload: { note },
+    });
+  const proof = readFileSync(join(root, 'record/proofs/work/generic/R-0007.jsonl'));
+  const result = appendVerbEvidence({
+    repoRoot: root,
+    action: 'evidence.record.generic',
+    status: 'completed',
+    proofAnchor: { path: 'record/proofs/work/generic/R-0007.jsonl', sequence: 1 },
+    recoverNewestLine: true,
+  });
+  expect(result).toMatchObject({ ok: false });
+  expect(result.error).toContain('newest');
+  expect(existsSync(join(root, 'record/proofs/chain.json'))).toBe(false);
+  expect(readFileSync(join(root, 'record/proofs/work/generic/R-0007.jsonl'))).toEqual(proof);
 });

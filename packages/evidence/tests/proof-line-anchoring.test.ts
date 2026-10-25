@@ -1043,3 +1043,52 @@ describe('IA-005 canonical paths and the epoch namespace never match loosely', (
     expect(labelled(result, 'anchored')).toEqual([]);
   });
 });
+
+it('ADR-EVI-0006 preserves an accepted historical-gap declaration rather than recovering its acknowledged line', () => {
+  const root = detranCopy();
+  verify(root, T0);
+  const target = contractOrphans().find(
+    (orphan) => orphan.sequence < physicalLines(root, orphan.path).length,
+  );
+  if (target === undefined) throw new Error('historical fixture missing non-newest orphan');
+  const source = 'record/proofs/original-held-chain.json';
+  writeFileSync(join(root, source), readFileSync(join(root, CHAIN)));
+  const kind = target.path.split('/')[3];
+  expect(
+    verbModule.appendVerbEvidence({
+      repoRoot: root,
+      chainPath: source,
+      action: `evidence.record.${kind}`,
+      status: 'completed',
+      proofAnchor: { path: target.path, sequence: target.sequence },
+    }).ok,
+  ).toBe(true);
+  declare(root, declarationPayload({ cutoff: T0.toISOString(), orphans: contractOrphans() }));
+  expect(
+    verifyReadOnly(root, T2).lines.find(
+      (line) => line.path === target.path && line.sequence === target.sequence,
+    )?.label,
+  ).toBe(ACKNOWLEDGED);
+  const before = [CHAIN, BASELINE, source, target.path].map((path) =>
+    readFileSync(join(root, path)),
+  );
+  const input = {
+    repoRoot: root,
+    action: `evidence.record.${kind}`,
+    status: 'completed' as const,
+    proofAnchor: { path: target.path, sequence: target.sequence },
+    recoverDivergentAnchor: {
+      sourceChain: source,
+      sourceChainSha256: createHash('sha256')
+        .update(readFileSync(join(root, source)))
+        .digest('hex'),
+      expectedHead: loadChain(join(root, CHAIN)).head ?? '',
+    },
+  };
+  const result = verbModule.appendVerbEvidence(input);
+  expect(result).toMatchObject({ ok: false });
+  expect(result.error).toContain('PROOF_ANCHOR_RECOVERY_REFUSED');
+  expect(
+    [CHAIN, BASELINE, source, target.path].map((path) => readFileSync(join(root, path))),
+  ).toEqual(before);
+});

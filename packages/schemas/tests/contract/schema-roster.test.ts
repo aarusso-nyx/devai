@@ -20,10 +20,12 @@ const ROOT = resolve(import.meta.dirname, '../../../..');
 // ever resolve. ADR-CHK-0007 adds test-task-exclusivity.schema.json, which the check runner
 // validates its scheduling declarations against. ADR-SCR-0015 promotes the reviewed task
 // descriptor and its preflight-probe reference closure. ADR-SCR-0017 adds the declared
-// invariant/workflow producers and complete native result population. ADR-SCR-0018 adds the opt-in workflow inventory schema. ADR-SCR-0020 adds the three owned native service schemas. The count is 121.
+// invariant/workflow producers and complete native result population. ADR-SCR-0018 adds the opt-in workflow inventory schema. ADR-SCR-0020 adds the three owned native service schemas.
+// ADR-EVI-0007 adds the closed Owner record schema. The read-only B1 plan adds one runtime schema; four bounded B1 action-output schemas bring the current count to 127.
 describe('schema roster', () => {
   it('holds the previous roster and the reviewed sensor task descriptor reference closure', () => {
-    expect(ROSTER).toHaveLength(121);
+    expect(ROSTER).toHaveLength(127);
+    expect(ROSTER).toContain('reconciliation-owner.schema.json');
     expect(ROSTER).toContain('test-task-descriptor.schema.json');
     expect(ROSTER).toContain('preflight-probe.schema.json');
     expect(ROSTER).toContain('invariant-producers.schema.json');

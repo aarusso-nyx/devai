@@ -227,6 +227,9 @@ export default defineConfig({
   resolve: {
     alias: {
       '#runtime-core': resolve('packages/cli/src/runtime-core.ts'),
+      '@devai-nyx/authority/reconciliation-native': resolve(
+        'packages/authority/src/reconciliation-native.ts',
+      ),
       '@devai-nyx/authority': resolve('packages/authority/src/index.ts'),
     },
     conditions: ['development'],

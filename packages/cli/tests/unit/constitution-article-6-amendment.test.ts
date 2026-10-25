@@ -6,7 +6,7 @@ import { parseConstitutionVersion } from '@devai-nyx/skills';
 
 // ADR-GOV-0026: the constitution advances to 1.1.0 by amending the Article 6 test row and
 // extension paragraph, the Article 7 Inspector and Engineer bullets, and Article 10, and the
-// framework's own pin equals the source. Successor of the ADR-GOV-0024 1.0.2 test.
+// framework's historical pin equals the byte-bound predecessor. Successor of the ADR-GOV-0024 1.0.2 test.
 const ROOT = resolve(import.meta.dirname, '../../../..');
 const SOURCE = 'law/constitution.md';
 const PIN = '.devai/pin/constitution.md';
@@ -85,17 +85,43 @@ function section(text: string, from: string, to: string): string {
   return text.slice(start, end);
 }
 
+// Reconstruct only the approved successor delta; historical assertions below still
+// prove ADR-GOV-0026 against its original predecessor and immutable 1.1.0 digest.
+function historicalSource(text = read(SOURCE)): string {
+  let source = text;
+  if (parseConstitutionVersion(source) === '1.2.0') {
+    source = source.replace(`\n${SUCCESSOR_INSERTIONS[0]}\n\n`, '');
+    source = source.replace(`\n${SUCCESSOR_INSERTIONS[1]}\n`, '');
+    source = source
+      .replace('title: DEVAI Constitution 1.2.0', 'title: DEVAI Constitution 1.1.0')
+      .replace('# DEVAI Constitution — 1.2.0', '# DEVAI Constitution — 1.1.0')
+      .replace('**Version:** 1.2.0', '**Version:** 1.1.0')
+      .replace('date: 2026-10-24', 'date: 2026-10-21');
+  }
+  expect(sha256(source)).toBe('8353c3b81d38e0f9b913cbeb6762bc149605989c1b16f52d2c63ba9892f71270');
+  return source;
+}
+
+const SUCCESSOR_INSERTIONS = [
+  'At an explicitly Owner-approved unresolved Git merge, a registered machine evidence-reconciliation verb may materialize the complete canonical chain of one exact published parent as the active merge result only after it has durably preserved and hash-verified the complete chains, proof epochs and ancestry of every displaced parent and the common base. This is a narrowly declared canonical-selection exception to append-only storage, not permission to edit, truncate, reorder, resequence, splice or re-record any source history or proof epoch. The Inspector-initiated verb must bind the exact parents, semantic index, source manifests, selected canonical prefix and immutable custody receipts, refuse every unapproved delta, and append a distinct canonical-selection evidence entry to the selected prefix through the normal machine writer before publishing the result. Every displaced active event remains explicitly archival; missing proof anchors require their separately authorized supported recovery. No human or client extension may exercise or widen this exception.',
+  'Git index mutation is permitted only through a registered machine index boundary for an exact approved reconciliation. The boundary addresses a host-bound repository/worktree identity and one declared proof-chain entry, verifies all other semantic index entries are unchanged, and performs compare-and-swap publication under the real Git index lock. It grants no general filesystem access to Git administration directories, no ref update, commit, push, force operation or business-source staging. Inspector initiation and explicit write consent are required. Linked-worktree administration paths must be resolved and bound by the trusted host; caller-supplied physical paths cannot authorize them.',
+] as const;
+
 describe('constitution 1.1.0 Articles 6, 7 and 10 amendment (ADR-GOV-0026)', () => {
-  it('parses the source and the pin as 1.1.0 and keeps them byte-identical', () => {
-    const source = read(SOURCE);
-    const pin = read(PIN);
+  it('reconstructs the byte-bound historical source and held or successor pin as identical 1.1.0', () => {
+    const source = historicalSource();
+    const actualPin = read(PIN);
+    const version = parseConstitutionVersion(actualPin);
+    expect(['1.1.0', '1.2.0']).toContain(version);
+    if (version === '1.2.0') expect(actualPin).toBe(read(SOURCE));
+    const pin = historicalSource(actualPin);
     expect(parseConstitutionVersion(source)).toBe('1.1.0');
     expect(parseConstitutionVersion(pin)).toBe('1.1.0');
     expect(pin).toBe(source);
   });
 
   it('carries 1.1.0 in the frontmatter title, the heading, and the Status block', () => {
-    const source = read(SOURCE);
+    const source = historicalSource();
     expect(source).toContain('\ntitle: DEVAI Constitution 1.1.0\n');
     expect(source).toContain('\n# DEVAI Constitution — 1.1.0\n');
     expect(source).toContain('\n**Version:** 1.1.0\n');
@@ -103,7 +129,7 @@ describe('constitution 1.1.0 Articles 6, 7 and 10 amendment (ADR-GOV-0026)', () 
   });
 
   it('carries every Article 6 core row verbatim and in order, changing only the test row', () => {
-    const article = section(read(SOURCE), '### Article 6.', '### Article 7.');
+    const article = section(historicalSource(), '### Article 6.', '### Article 7.');
     const rows = article.split('\n').filter((line) => line.startsWith('- '));
     expect(rows).toEqual([...CORE_ROWS]);
     expect(rows).not.toContain(TEST_ROW_1_0_2);
@@ -112,7 +138,7 @@ describe('constitution 1.1.0 Articles 6, 7 and 10 amendment (ADR-GOV-0026)', () 
   it('carries the amended passages of ADR-GOV-0026 verbatim in place of the 1.0.2 text', () => {
     const [oldRow, newRow, oldClass, newClass, inspector, engineer, article10] = quotes();
     expect(oldRow).toBe(TEST_ROW_1_0_2);
-    const source = read(SOURCE);
+    const source = historicalSource();
     const article6 = section(source, '### Article 6.', '### Article 7.');
     expect(article6.split('\n')).toContain(newRow);
     expect(article6.split('\n')).not.toContain(oldRow);
@@ -139,7 +165,7 @@ describe('constitution 1.1.0 Articles 6, 7 and 10 amendment (ADR-GOV-0026)', () 
 
   it('differs from 1.0.2 only in the version markers, the date, and the amended passages', () => {
     const [oldRow, newRow, oldClass, newClass, inspector, engineer, article10] = quotes();
-    const reverted = read(SOURCE)
+    const reverted = historicalSource()
       .replace('\ntitle: DEVAI Constitution 1.1.0\n', '\ntitle: DEVAI Constitution 1.0.2\n')
       .replace('\ndate: 2026-10-21\n', '\ndate: 2026-09-30\n')
       .replace('\n# DEVAI Constitution — 1.1.0\n', '\n# DEVAI Constitution — 1.0.2\n')
@@ -152,13 +178,18 @@ describe('constitution 1.1.0 Articles 6, 7 and 10 amendment (ADR-GOV-0026)', () 
     expect(sha256(reverted)).toBe(CONSTITUTION_1_0_2_SHA256);
   });
 
-  it('binds the framework authority policy to the 1.1.0 pin digest', () => {
+  it('binds the real framework authority policy to the exact held or successor pin', () => {
     const policy = JSON.parse(read('.devai/config/authority-policy.json')) as {
       constitution: { version: string; digest_sha256: string };
     };
+    const pin = read(PIN);
+    const version = parseConstitutionVersion(pin);
+    expect(['1.1.0', '1.2.0']).toContain(version);
+    expect(historicalSource(pin)).toBe(historicalSource());
+    if (version === '1.2.0') expect(pin).toBe(read(SOURCE));
     expect(policy.constitution).toEqual({
-      version: '1.1.0',
-      digest_sha256: sha256(read(PIN)),
+      version,
+      digest_sha256: sha256(pin),
     });
   });
 });

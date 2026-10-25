@@ -81,6 +81,7 @@ describe('#264: the adopter migration manifest', () => {
       '2.6.3',
       '2.6.4',
       '2.7.0',
+      '2.8.0',
     ]);
     expect(manifest.releases.find((release) => release.version === '2.3.0')).toMatchObject({
       version: '2.3.0',
@@ -131,6 +132,24 @@ describe('#264: the adopter migration manifest', () => {
         segments: ['subprocess-effects'],
         files: ['.devai/config/subprocess-effects.json'],
       }),
+    ]);
+  });
+
+  it('requires explicit constitution 1.2.0 review for the bounded 2.8.0 recovery capability', () => {
+    const release = manifest.releases.find((entry) => entry.version === '2.8.0');
+    expect(release?.changes).toEqual([
+      expect.objectContaining({
+        id: 'MIG-2.8.0-constitution-1-2-0',
+        kind: 'constitution',
+        decision_records: ['ADR-GOV-0027', 'ADR-EVI-0007'],
+        segments: ['constitution', 'authority'],
+        decision_required: true,
+        constitution: { from: '1.1.0', to: '1.2.0' },
+        obligation: expect.objectContaining({ check: 'constitution-version' }),
+      }),
+    ]);
+    expect(releasesInRange(manifest, '2.7.1', '2.8.0').map((entry) => entry.version)).toEqual([
+      '2.8.0',
     ]);
   });
 

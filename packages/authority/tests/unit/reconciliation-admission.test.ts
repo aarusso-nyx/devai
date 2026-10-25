@@ -1,0 +1,598 @@
+import {
+  existsSync,
+  readFileSync,
+  mkdtempSync,
+  writeFileSync,
+  mkdirSync,
+  chmodSync,
+  rmSync,
+  symlinkSync,
+  linkSync,
+  realpathSync,
+  lstatSync,
+  readdirSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
+import { transpileModule, ModuleKind, ScriptTarget } from 'typescript';
+import { createHash } from 'node:crypto';
+import { resolve } from 'node:path';
+import { afterAll, describe, expect, it } from 'vitest';
+
+const root = resolve(import.meta.dirname, '../../../..');
+const seedPath = resolve(
+  root,
+  'packages/authority/src/boundaries/reconciliation-admission-seed.ts',
+);
+const admissionPath = resolve(
+  root,
+  'packages/authority/src/boundaries/host-reconciliation-admission.ts',
+);
+const frozenSeed = resolve(
+  root,
+  'docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/admission-seed/seed.base64.txt',
+);
+const digest = (bytes: Uint8Array | string): string =>
+  createHash('sha256').update(bytes).digest('hex');
+
+describe('lower reconciliation native admission', () => {
+  it('has the actual private seed module required by the frozen contract', () => {
+    expect(existsSync(seedPath), 'actual private seed module is absent').toBe(true);
+  });
+  it('has the actual native admission implementation required by the frozen contract', () => {
+    expect(existsSync(admissionPath), 'actual native admission module is absent').toBe(true);
+  });
+  it('anchors the inert public seed to exact8192 bytes and the frozen digest', () => {
+    const bytes = Buffer.from(readFileSync(frozenSeed, 'utf8').trim(), 'base64');
+    expect(bytes).toHaveLength(8192);
+    expect(digest(bytes)).toBe('3f6b742405bb199a11ed0952c9aa049285ef25dc69954e901d2e987cd15c4372');
+  });
+});
+
+// Real Node children load transpilation of exactly the two actual source files.
+// Native SQLite remains real; prototype patches below inject narrowly bounded faults only.
+const external = realpathSync(mkdtempSync(resolve(tmpdir(), 'devai-native-admission-inspector-')));
+const children = new Set<ChildProcess>();
+let compiled = false;
+const childReceipts: unknown[] = [];
+const worker = resolve(external, 'worker.mjs');
+function compile(): void {
+  if (compiled) return;
+  const manifest: Record<string, { source_sha256: string; output_sha256: string }> = {};
+  for (const path of [seedPath, admissionPath]) {
+    const source = readFileSync(path, 'utf8');
+    const output = transpileModule(source, {
+      compilerOptions: { module: ModuleKind.ESNext, target: ScriptTarget.ES2023 },
+    }).outputText;
+    const name = path.split('/').at(-1)?.replace(/\.ts$/u, '.js');
+    if (!name) throw new Error('fixture module name missing');
+    writeFileSync(resolve(external, name), output);
+    manifest[path.slice(root.length + 1)] = {
+      source_sha256: digest(source),
+      output_sha256: digest(output),
+    };
+  }
+  writeFileSync(resolve(external, 'package.json'), '{"type":"module"}\n');
+  writeFileSync(worker, workerSource);
+  writeFileSync(
+    resolve(external, 'transpilation-manifest.json'),
+    JSON.stringify(manifest, null, 2),
+  );
+  compiled = true;
+}
+function fixture(name = 'anchor'): string {
+  const dir = resolve(external, `${name}-${Math.random().toString(16).slice(2)}`);
+  mkdirSync(dir, { mode: 0o700 });
+  const seed = resolve(dir, 'admission.sqlite');
+  writeFileSync(seed, Buffer.from(readFileSync(frozenSeed, 'utf8').trim(), 'base64'), {
+    mode: 0o600,
+  });
+  return dir;
+}
+interface WorkerReply {
+  error: { code: string; stage?: string; cause: boolean };
+  value: { before: number; after: number; acquired?: boolean };
+  next: WorkerReply;
+  nested: WorkerReply;
+  alias: WorkerReply;
+  foreign: WorkerReply;
+  witness: { root: string };
+  queries: string[];
+  descriptorEffects: string[];
+  acquired: boolean;
+  signal: string;
+  busy: number;
+  sql: number;
+  mutations: number;
+  frozen: boolean;
+  unchanged: boolean;
+  inodeSame: boolean;
+  entries: string[];
+  touches: number;
+  callbacks: number;
+  opens: number;
+  closes: number;
+  hash: string;
+  exists: boolean;
+  held: boolean;
+  calls: number;
+}
+function run(mode: string, dir = fixture(), variant = ''): WorkerReply {
+  compile();
+  const result = spawnSync(process.execPath, [worker, mode, dir, variant], { encoding: 'utf8' });
+  childReceipts.push({
+    mode,
+    root: dir,
+    variant,
+    pid: result.pid,
+    exit: result.status,
+    signal: result.signal,
+    stdout: result.stdout,
+    stderr: result.stderr,
+  });
+  expect(result.signal, result.stderr).toBeNull();
+  expect(result.status, result.stderr).toBe(0);
+  return JSON.parse(result.stdout.trim().split('\n').at(-1) ?? '') as WorkerReply;
+}
+function child(
+  mode: string,
+  dir: string,
+): {
+  process: ChildProcess;
+  first: Promise<WorkerReply>;
+  done: Promise<WorkerReply>;
+} {
+  compile();
+  const proc = spawn(process.execPath, [worker, mode, dir], { stdio: ['pipe', 'pipe', 'pipe'] });
+  children.add(proc);
+  let output = '';
+  let errors = '';
+  let firstResolve: (value: WorkerReply) => void = () => {};
+  const first = new Promise<WorkerReply>((resolve) => {
+    firstResolve = resolve;
+  });
+  proc.stdout?.on('data', (chunk: Buffer) => {
+    output += chunk.toString();
+    if (output.includes('\n')) firstResolve(JSON.parse(output.split('\n')[0] ?? '{}'));
+  });
+  proc.stderr?.on('data', (chunk: Buffer) => {
+    errors += chunk.toString();
+  });
+  const done = new Promise<WorkerReply>((resolve, reject) => {
+    proc.on('error', reject);
+    proc.on('exit', (code, signal) => {
+      children.delete(proc);
+      childReceipts.push({
+        mode,
+        root: dir,
+        pid: proc.pid,
+        exit: code,
+        signal,
+        stdout: output,
+        stderr: errors,
+      });
+      if (signal === 'SIGKILL') {
+        resolve({ signal } as WorkerReply);
+        return;
+      }
+      if (code !== 0) {
+        reject(new Error(`fixture child ${String(code)} ${errors}`));
+        return;
+      }
+      try {
+        resolve(JSON.parse(output.trim().split('\n').at(-1) ?? '{}'));
+      } catch (error) {
+        reject(error);
+      }
+    });
+  });
+  return { process: proc, first, done };
+}
+afterAll(() => {
+  for (const proc of children) proc.kill('SIGKILL');
+  // Keep external source/output/native fixtures for exact evidence custody.
+  if (compiled) {
+    const evidence = external;
+    const name = external.split('/').at(-1) ?? 'native-fixture';
+    writeFileSync(
+      resolve(evidence, `${name}.json`),
+      JSON.stringify(
+        {
+          external_fixture: external,
+          worker_sha256: digest(workerSource),
+          child_receipts: childReceipts,
+          sources: JSON.parse(
+            readFileSync(resolve(external, 'transpilation-manifest.json'), 'utf8'),
+          ),
+        },
+        null,
+        2,
+      ) + '\n',
+    );
+  }
+});
+
+const workerSource = String.raw`
+import fs from 'node:fs';
+import { syncBuiltinESMExports } from 'node:module';
+import { resolve } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { DatabaseSync } from 'node:sqlite';
+import { createHash } from 'node:crypto';
+import { types } from 'node:util';
+import * as seed from './reconciliation-admission-seed.js';
+import * as admission from './host-reconciliation-admission.js';
+const [mode, root, variant] = process.argv.slice(2);
+const path = resolve(root, 'admission.sqlite');
+const hash = () => createHash('sha256').update(fs.readFileSync(path)).digest('hex');
+const print = (value) => process.stdout.write(JSON.stringify(value)+'\n');
+const error = (value) => ({code:value?.code,message:value?.message,stage:value?.stage,cause:!!value?.cause,diagnostic:String(value?.stack)});
+const capture = (fn) => { try { return {value:fn()}; } catch (e) { return {error:error(e)}; } };
+const inspect = () => admission.readReconciliationAdmissionAnchor(root);
+const invoke = (expected, fn) => admission.withReconciliationAdmissionSteps(root, expected, fn);
+if (mode === 'seed') {
+ const a=seed.reconciliationAdmissionSeedBytes(), b=seed.reconciliationAdmissionSeedBytes(); a[0]^=255;
+ print({size:seed.RECONCILIATION_ADMISSION_SEED_SIZE,sha:seed.RECONCILIATION_ADMISSION_SEED_SHA256,copy:a[0]!==b[0],hash:createHash('sha256').update(b).digest('hex')});
+} else if (mode === 'physical') {
+ print(capture(inspect));
+} else if (mode === 'basic') {
+ const before=hash(), inode=String(fs.lstatSync(path,{bigint:true}).ino); const witness=inspect();
+ const value=invoke(witness,()=>({opaque:'callback-result'}));
+ print({witness,frozen:Object.isFrozen(witness)&&Object.isFrozen(witness.root_identity)&&Object.isFrozen(witness.seed_identity),value,unchanged:hash()===before,inodeSame:String(fs.lstatSync(path,{bigint:true}).ino)===inode,entries:fs.readdirSync(root)});
+} else if (mode === 'inspect-no-native') {
+ const original=DatabaseSync.prototype.exec; let sql=0;DatabaseSync.prototype.exec=function(...args){sql++;return original.apply(this,args)};
+ let mutations=0; for(const name of ['writeFileSync','mkdirSync','unlinkSync','renameSync','chmodSync','fsyncSync']){ const old=fs[name];fs[name]=(...args)=>{mutations++;return old(...args)}; } syncBuiltinESMExports();
+ const witness=inspect(); print({sql,mutations,witness});
+} else if (mode === 'expected') {
+ const witness=inspect(); let touches=0; let expected={...witness};
+ if(variant==='unknown')expected.extra='caller';
+ if(variant==='nested-getter')expected.seed_identity=Object.defineProperty({...witness.seed_identity},'ino',{enumerable:true,get(){touches++;throw Error('SECRET_NESTED')}});
+ if(variant==='nested-proxy')expected.seed_identity=new Proxy(witness.seed_identity,{ownKeys(){touches++;throw Error('SECRET_NESTED_PROXY')}});
+ if(variant==='symbol')expected[Symbol('caller')]=1;
+ if(variant==='nonenumerable')Object.defineProperty(expected,'seed_sha256',{value:witness.seed_sha256,enumerable:false});
+ if(variant==='getter')Object.defineProperty(expected,'seed_sha256',{enumerable:true,get(){touches++;throw Error('SECRET_GETTER')}});
+ if(variant==='proxy')expected=new Proxy(witness,{ownKeys(){touches++;throw Error('SECRET_PROXY')}});
+ if(variant==='decimal')expected.root_identity={...witness.root_identity,ino:'01'};
+ if(variant==='mode')expected.seed_identity={...witness.seed_identity,mode:'0644'};
+ if(variant==='stale')expected.seed_identity={...witness.seed_identity,ino:String(BigInt(witness.seed_identity.ino)+1n)};
+ let callbacks=0;const result=capture(()=>invoke(expected,()=>{callbacks++;return 1}));print({...result,touches,callbacks});
+} else if (mode === 'callback') {
+ const witness=inspect();let touches=0,callbacks=0;let fn;
+ if(variant==='async')fn=async()=>{callbacks++};
+ if(variant==='generator')fn=function*(){callbacks++};
+ if(variant==='async-generator')fn=async function*(){callbacks++};
+ if(variant==='proxy')fn=new Proxy(()=>{callbacks++},{apply(){touches++;throw Error('SECRET_PROXY')}});
+ if(variant==='nonfunction')fn=3;
+ if(variant==='promise')fn=()=>{callbacks++;return Promise.resolve(1)};
+ if(variant==='rejected-promise')fn=()=>{callbacks++;return Promise.reject(Error('SECRET_REJECTED_CALLBACK'))};
+ // Unsupported custom Promise cases are explicitly pre-handled by the fixture before adding the hostile accessor.
+ // This tests refusal/touch-zero only and does not claim the product drains unsupported rejection shapes.
+ if(variant==='promise-constructor-getter')fn=()=>{callbacks++;const p=Promise.reject(Error('FIXTURE_PREHANDLED_CUSTOM_PROMISE'));Promise.prototype.then.call(p,undefined,()=>{});Object.defineProperty(p,'constructor',{get(){touches++;throw Error('SECRET_PROMISE_CONSTRUCTOR')}});return p};
+ if(variant==='promise-species-getter')fn=()=>{callbacks++;const p=Promise.reject(Error('FIXTURE_PREHANDLED_CUSTOM_SPECIES'));Promise.prototype.then.call(p,undefined,()=>{});Object.defineProperty(p,'constructor',{value:{get [Symbol.species](){touches++;throw Error('SECRET_PROMISE_SPECIES')}}});return p};
+ if(variant==='thenable')fn=()=>{callbacks++;return Object.defineProperty({},'then',{get(){touches++;throw Error('SECRET_THEN')}})};
+ if(variant==='result-proxy')fn=()=>{callbacks++;return new Proxy({},{get(){touches++;throw Error('SECRET_RESULT')}})};
+ const result=capture(()=>invoke(witness,fn));const next=capture(()=>invoke(inspect(),()=>7));print({...result,touches,callbacks,next});
+} else if (mode === 'ordinary-error') {
+ const witness=inspect();const original=Error('ordinary callback failure');let same=false;try{invoke(witness,()=>{throw original})}catch(e){same=e===original} print({same,next:invoke(inspect(),()=>7),entries:fs.readdirSync(root)});
+} else if (mode === 'throw-value') {
+ const expected=variant==='undefined'?undefined:null;let caught=false,same=false;
+ try{invoke(inspect(),()=>{throw expected})}catch(e){caught=true;same=e===expected}
+ print({caught,same,next:invoke(inspect(),()=>6)});
+} else if (mode === 'reentrant') {
+ const witness=inspect();let opens=0,closes=0;let nested,alias,foreign;
+ invoke(witness,()=>{
+  const oldOpen=fs.openSync,oldClose=fs.closeSync;
+  fs.openSync=(...args)=>{opens++;return oldOpen(...args)};fs.closeSync=(...args)=>{closes++;return oldClose(...args)};syncBuiltinESMExports();
+  try{nested=capture(inspect);alias=capture(()=>admission.readReconciliationAdmissionAnchor(root+'/../'+root.split('/').at(-1)));}finally{fs.openSync=oldOpen;fs.closeSync=oldClose;syncBuiltinESMExports()}
+  foreign=spawnSync(process.execPath,[process.argv[1],'probe',root],{encoding:'utf8'});foreign=JSON.parse(foreign.stdout.trim());
+ });print({nested,alias,opens,closes,foreign,next:invoke(inspect(),()=>8)});
+} else if (mode === 'fault') {
+ const witness=inspect();let sql=[]; const oldExec=DatabaseSync.prototype.exec,oldClose=DatabaseSync.prototype.close;
+ DatabaseSync.prototype.exec=function(statement){sql.push(statement);if((variant==='begin'&&statement==='BEGIN IMMEDIATE')||(variant==='rollback'&&statement==='ROLLBACK'))throw Error('SECRET_NATIVE_SQL_PATH');return oldExec.call(this,statement)};
+ DatabaseSync.prototype.close=function(){if(variant==='close')throw Error('SECRET_NATIVE_CLOSE');return oldClose.call(this)};
+ const result=capture(()=>invoke(witness,()=>9));DatabaseSync.prototype.exec=oldExec;DatabaseSync.prototype.close=oldClose;
+ const next=capture(inspect); print({...result,next,sql});
+} else if (mode === 'sql') {
+ let queries=[],descriptorEffects=[],active=false;const oldExec=DatabaseSync.prototype.exec,oldPrepare=DatabaseSync.prototype.prepare,oldClose=DatabaseSync.prototype.close;
+ for(const name of ['openSync','readSync','closeSync','readFileSync']){const old=fs[name];fs[name]=(...args)=>{if(active)descriptorEffects.push(name);return old(...args)}}syncBuiltinESMExports();
+ DatabaseSync.prototype.close=function(){const value=oldClose.call(this);active=false;return value};
+ DatabaseSync.prototype.exec=function(sql){queries.push(sql);const value=oldExec.call(this,sql);if(sql==='BEGIN IMMEDIATE')active=true;return value};
+ DatabaseSync.prototype.prepare=function(sql){queries.push(sql);return oldPrepare.call(this,sql)};
+ const witness=inspect();invoke(witness,()=>17);print({queries,descriptorEffects,hash:hash(),entries:fs.readdirSync(root)});
+} else if (mode === 'native-getter') {
+ const witness=inspect();let touches=0;const old=DatabaseSync.prototype.exec;
+ DatabaseSync.prototype.exec=function(sql){if(sql==='BEGIN IMMEDIATE')throw Object.defineProperty({},'errcode',{get(){touches++;throw Error('SECRET_ERRCODE_GETTER')}});return old.call(this,sql)};
+ const result=capture(()=>invoke(witness,()=>1));DatabaseSync.prototype.exec=old;print({...result,touches,next:capture(inspect)});
+} else if (mode === 'raw-close-fault') {
+ const original=fs.closeSync;let calls=0;fs.closeSync=(fd)=>{calls++;throw Error('SECRET_RAW_CLOSE')};syncBuiltinESMExports();
+ const result=capture(inspect);fs.closeSync=original;syncBuiltinESMExports();const next=capture(inspect);print({...result,next,calls});
+} else if (mode === 'missing-at-open') {
+ const witness=inspect(); const oldClose=fs.closeSync;let moved=false,callbacks=0;
+ fs.closeSync=(fd)=>{const result=oldClose(fd);if(!moved){moved=true;fs.renameSync(path,path+'.held-owned')}return result};syncBuiltinESMExports();
+ const result=capture(()=>invoke(witness,()=>{callbacks++;return 1}));fs.closeSync=oldClose;syncBuiltinESMExports();
+ print({...result,callbacks,exists:fs.existsSync(path),held:fs.existsSync(path+'.held-owned'),entries:fs.readdirSync(root)});
+} else if (mode === 'legitimate-child') {
+ const witness=inspect();const result=invoke(witness,()=>{fs.writeFileSync(resolve(root,'ordinary-owned-child'),'fixture',{mode:0o600});return 3});print({result,next:invoke(witness,()=>4),entries:fs.readdirSync(root)});
+} else if (mode === 'post-callback-drift') {
+ const witness=inspect();const result=capture(()=>invoke(witness,()=>{fs.chmodSync(path,0o644);return 9}));fs.chmodSync(path,0o600);print({...result,next:capture(()=>invoke(inspect(),()=>5))});
+} else if (mode === 'owner') {
+ const original=process.geteuid;process.geteuid=()=>original()+1;print(capture(inspect));
+} else if (mode === 'holder') {
+ const witness=inspect();invoke(witness,()=>{print({acquired:true,pid:process.pid});fs.readSync(0,Buffer.alloc(1),0,1,null)});print({released:true});
+} else if (mode === 'probe') {
+ print(capture(()=>invoke(inspect(),()=>({acquired:true}))));
+} else if (mode === 'increment') {
+ print({ready:true,pid:process.pid});fs.readSync(0,Buffer.alloc(1),0,1,null);
+ let busy=0; const start=Date.now();let result;
+ while(true){result=capture(()=>invoke(inspect(),()=>{const target=resolve(root,'counter');const before=Number(fs.readFileSync(target,'utf8'));const until=Date.now()+1200;if(before===0){while(!fs.existsSync(resolve(root,'contender-observed-busy'))&&Date.now()<until){Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,5)}}fs.writeFileSync(target,String(before+1));return{before,after:before+1}}));if(!result.error)break;if(result.error.code!=='RECONCILIATION_ADMISSION_BUSY'||Date.now()-start>1500)break;busy++;fs.writeFileSync(resolve(root,'contender-observed-busy'),'fixture-only');await new Promise(r=>setTimeout(r,10));}
+ print({...result,busy});
+}
+`;
+
+describe('actual transpiled native admission behavior', () => {
+  it('exports independent fixed seed bytes', () => {
+    const value = run('seed');
+    expect(value).toEqual({
+      size: 8192,
+      sha: '3f6b742405bb199a11ed0952c9aa049285ef25dc69954e901d2e987cd15c4372',
+      copy: true,
+      hash: '3f6b742405bb199a11ed0952c9aa049285ef25dc69954e901d2e987cd15c4372',
+    });
+  });
+  it('inspects without SQL or mutators and preserves seed/inode/no-sidecar on real lock', () => {
+    const dir = fixture('question?#');
+    const read = run('inspect-no-native', dir);
+    expect(read.sql).toBe(0);
+    expect(read.mutations).toBe(0);
+    const value = run('basic', dir);
+    expect(value.frozen).toBe(true);
+    expect(value.value).toEqual({ opaque: 'callback-result' });
+    expect(value.unchanged).toBe(true);
+    expect(value.inodeSame).toBe(true);
+    expect(value.entries).toEqual(['admission.sqlite']);
+    expect(Object.keys(value.witness).sort()).toEqual(
+      ['schemaVersion', 'kind', 'root', 'root_identity', 'seed_identity', 'seed_sha256'].sort(),
+    );
+    expect(value.witness.root).toBe(dir);
+  });
+  for (const variant of [
+    'unknown',
+    'getter',
+    'proxy',
+    'nested-getter',
+    'nested-proxy',
+    'symbol',
+    'nonenumerable',
+    'decimal',
+    'mode',
+    'stale',
+  ])
+    it(`refuses ${variant} expected witness without getter/proxy/callback effects`, () => {
+      const value = run('expected', undefined, variant);
+      expect(value.error.code).toMatch(/^RECONCILIATION_ADMISSION_(?:ANCHOR_INVALID|STALE)$/u);
+      expect(value.touches).toBe(0);
+      expect(value.callbacks).toBe(0);
+    });
+  for (const variant of [
+    'async',
+    'generator',
+    'async-generator',
+    'proxy',
+    'nonfunction',
+    'promise',
+    'rejected-promise',
+    'promise-constructor-getter',
+    'promise-species-getter',
+    'thenable',
+    'result-proxy',
+  ])
+    it(`refuses ${variant} callback/result and releases native custody`, () => {
+      const value = run('callback', undefined, variant);
+      expect(value.error.code).toBe('RECONCILIATION_ADMISSION_CALLBACK_INVALID');
+      expect(value.touches).toBe(0);
+      expect(value.callbacks).toBe(
+        [
+          'promise',
+          'rejected-promise',
+          'promise-constructor-getter',
+          'promise-species-getter',
+          'thenable',
+          'result-proxy',
+        ].includes(variant)
+          ? 1
+          : 0,
+      );
+      expect(value.next.value).toBe(7);
+    });
+  it('preserves ordinary callback exception identity and releases native lock', () => {
+    expect(run('ordinary-error')).toMatchObject({
+      same: true,
+      next: 7,
+      entries: ['admission.sqlite'],
+    });
+  });
+  it('blocks nested and alias inspection before raw descriptor open/close while another process remains BUSY', () => {
+    const value = run('reentrant');
+    expect(value.nested.error.code).toBe('RECONCILIATION_ADMISSION_REENTRANT');
+    expect([
+      'RECONCILIATION_ADMISSION_REENTRANT',
+      'RECONCILIATION_ADMISSION_ANCHOR_INVALID',
+    ]).toContain(value.alias.error.code);
+    expect(value.opens).toBe(0);
+    expect(value.closes).toBe(0);
+    expect(value.foreign.error.code).toBe('RECONCILIATION_ADMISSION_BUSY');
+    expect(value.next).toBe(8);
+  });
+  for (const variant of ['begin', 'rollback', 'close'])
+    it(`native ${variant} fault has closed diagnostic and exact release standing`, () => {
+      const value = run('fault', undefined, variant);
+      expect(JSON.stringify(value)).not.toContain('SECRET_NATIVE');
+      expect(value.error.cause).toBe(false);
+      if (variant === 'begin') {
+        expect(value.error.code).toBe('RECONCILIATION_ADMISSION_UNAVAILABLE');
+        expect(value.next.value).toBeDefined();
+      } else {
+        expect(value.error.code).toBe('RECONCILIATION_ADMISSION_RELEASE_INDETERMINATE');
+        expect(value.error.stage).toBe(variant);
+        expect(value.next.error.code).toBe('RECONCILIATION_ADMISSION_REENTRANT');
+      }
+    });
+  it('executes only closed control and readonly validation SQL', () => {
+    const value = run('sql');
+    const allowed = [
+      'BEGIN IMMEDIATE',
+      'ROLLBACK',
+      'SELECT type,name,tbl_name,rootpage,sql FROM sqlite_schema ORDER BY name',
+      'SELECT singleton,version FROM admission_protocol ORDER BY singleton',
+    ];
+    expect(value.queries.length).toBeGreaterThanOrEqual(6);
+    expect(value.descriptorEffects).toEqual([]);
+    for (const query of value.queries) expect(allowed).toContain(query);
+    expect(value.hash).toBe('3f6b742405bb199a11ed0952c9aa049285ef25dc69954e901d2e987cd15c4372');
+    expect(value.entries).toEqual(['admission.sqlite']);
+  });
+  it('actual independent processes serialize an external counter under the compiled primitive', async () => {
+    const dir = fixture();
+    writeFileSync(resolve(dir, 'counter'), '0');
+    const first = child('increment', dir),
+      second = child('increment', dir);
+    await Promise.all([first.first, second.first]);
+    first.process.stdin?.write('x');
+    second.process.stdin?.write('x');
+    const values = await Promise.all([first.done, second.done]);
+    expect(values.map((v) => v.value.before).sort()).toEqual([0, 1]);
+    expect(readFileSync(resolve(dir, 'counter'), 'utf8')).toBe('2');
+    expect(values.reduce((n, v) => n + v.busy, 0)).toBeGreaterThan(0);
+    expect(readdirSync(dir).sort()).toEqual([
+      'admission.sqlite',
+      'contender-observed-busy',
+      'counter',
+    ]);
+  });
+  it('only fixture-owned holder SIGKILL releases kernel lock without mutex reaping or seed/sidecar changes', async () => {
+    const dir = fixture();
+    const before = readFileSync(resolve(dir, 'admission.sqlite'));
+    const inode = lstatSync(resolve(dir, 'admission.sqlite'), { bigint: true }).ino;
+    const holder = child('holder', dir);
+    expect((await holder.first).acquired).toBe(true);
+    expect(run('probe', dir).error.code).toBe('RECONCILIATION_ADMISSION_BUSY');
+    expect(readdirSync(dir)).toEqual(['admission.sqlite']);
+    holder.process.kill('SIGKILL');
+    expect((await holder.done).signal).toBe('SIGKILL');
+    expect(run('probe', dir).value).toEqual({ acquired: true });
+    expect(readFileSync(resolve(dir, 'admission.sqlite'))).toEqual(before);
+    expect(lstatSync(resolve(dir, 'admission.sqlite'), { bigint: true }).ino).toBe(inode);
+    expect(readdirSync(dir)).toEqual(['admission.sqlite']);
+  });
+});
+
+describe('actual admission physical namespace refusal', () => {
+  for (const variant of [
+    'root-mode',
+    'seed-mode',
+    'readonly',
+    'size',
+    'bytes',
+    'missing',
+    'seed-link',
+    'root-link',
+    'hardlink',
+    'journal',
+    'wal',
+    'shm',
+    'sidecar-link',
+    'directory',
+  ])
+    it(`refuses ${variant} without repair, recovery or SQLite file creation`, () => {
+      let dir = fixture();
+      const path = resolve(dir, 'admission.sqlite');
+      if (variant === 'root-mode') chmodSync(dir, 0o755);
+      if (variant === 'seed-mode') chmodSync(path, 0o644);
+      if (variant === 'readonly') chmodSync(path, 0o400);
+      if (variant === 'size') writeFileSync(path, Buffer.alloc(8191));
+      if (variant === 'bytes') {
+        const bytes = readFileSync(path);
+        bytes[8191] = (bytes[8191] ?? 0) ^ 1;
+        writeFileSync(path, bytes);
+      }
+      if (variant === 'missing') rmSync(path);
+      if (variant === 'seed-link') {
+        rmSync(path);
+        const other = fixture();
+        symlinkSync(resolve(other, 'admission.sqlite'), path);
+      }
+      if (variant === 'root-link') {
+        const alias = dir + '-link';
+        symlinkSync(dir, alias);
+        dir = alias;
+      }
+      if (variant === 'hardlink') linkSync(path, resolve(dir, 'second-link'));
+      if (['journal', 'wal', 'shm'].includes(variant))
+        writeFileSync(path + '-' + variant, '', { mode: 0o600 });
+      if (variant === 'sidecar-link')
+        symlinkSync('/nonexistent-inspector-sidecar', path + '-journal');
+      if (variant === 'directory') {
+        rmSync(path);
+        mkdirSync(path, { mode: 0o700 });
+      }
+      const before = readdirSync(dir).sort();
+      const value = run('physical', dir);
+      expect(value.error.code).toBe('RECONCILIATION_ADMISSION_ANCHOR_INVALID');
+      expect(readdirSync(dir).sort()).toEqual(before);
+      if (variant === 'missing') expect(existsSync(path)).toBe(false);
+    });
+});
+
+describe('native custody edges', () => {
+  it('read-only descriptor close uncertainty retains exact local custody before any later SQLite admission', () => {
+    const value = run('raw-close-fault');
+    expect(value.error.code).toBe('RECONCILIATION_ADMISSION_RELEASE_INDETERMINATE');
+    expect(value.error.stage).toBe('close');
+    expect(value.calls).toBe(1);
+    expect(value.next.error.code).toBe('RECONCILIATION_ADMISSION_REENTRANT');
+    expect(JSON.stringify(value)).not.toContain('SECRET_RAW_CLOSE');
+  });
+  it('missing-at-native-open refuses without CREATE fallback or callback effects', () => {
+    const value = run('missing-at-open');
+    expect(value.error.code).toMatch(
+      /^RECONCILIATION_ADMISSION_(?:ANCHOR_INVALID|STALE|UNAVAILABLE)$/u,
+    );
+    expect(value.callbacks).toBe(0);
+    expect(value.exists).toBe(false);
+    expect(value.held).toBe(true);
+    expect(value.entries).toEqual(['admission.sqlite.held-owned']);
+  });
+  it('legitimate child publication changes directory mtime without invalidating fixed directory identity', () => {
+    const value = run('legitimate-child');
+    expect(value).toMatchObject({
+      result: 3,
+      next: 4,
+      entries: ['admission.sqlite', 'ordinary-owned-child'],
+    });
+  });
+  it('postcallback metadata drift refuses completion and still releases native lock', () => {
+    const value = run('post-callback-drift');
+    expect(value.error.code).toBe('RECONCILIATION_ADMISSION_STALE');
+    expect(value.next.value).toBe(5);
+  });
+  it('actual effective UID mismatch refuses owned namespace inspection', () => {
+    expect(run('owner').error.code).toBe('RECONCILIATION_ADMISSION_ANCHOR_INVALID');
+  });
+});
+
+it('sanitizes a native fault errcode accessor without executing it or leaking its exception', () => {
+  const value = run('native-getter');
+  expect(value.error.code).toBe('RECONCILIATION_ADMISSION_UNAVAILABLE');
+  expect(value.touches).toBe(0);
+  expect(JSON.stringify(value)).not.toContain('SECRET_ERRCODE_GETTER');
+  expect(value.next.value).toBeDefined();
+});
+
+for (const variant of ['undefined', 'null'])
+  it(`preserves ordinary thrown ${variant} after unconditional native cleanup`, () => {
+    expect(run('throw-value', undefined, variant)).toMatchObject({
+      caught: true,
+      same: true,
+      next: 6,
+    });
+  });

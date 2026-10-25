@@ -1,0 +1,2301 @@
+{
+  "standing": "FROZEN_PRE_RATIFICATION_PROPOSAL_POPULATION",
+  "files_scanned": 134,
+  "records": [
+    {
+      "file": "law/adr/ADR-014-release-verification-profiles.md",
+      "adr_id": "ADR-014",
+      "title": "Capability-based release verification profiles",
+      "status": "accepted",
+      "date": "2026-08-29",
+      "format": "legacy-catalog",
+      "supersedes": [],
+      "affected_rules": [
+        "law/policy/release-verification.json",
+        "law/schemas/release-verification-profile.schema.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-AUT-0001-exact-effect-authorization-ledger.md",
+      "adr_id": "ADR-AUT-0001",
+      "title": "Append-only exact effect authorization",
+      "status": "accepted",
+      "date": "2026-09-03",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/schemas/effect-authorization-event.schema.json",
+        "law/schemas/effect-authorization-ledger.schema.json",
+        "law/policy/release-lifecycle.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-AUT-0002-sensing-process-admission.md",
+      "adr_id": "ADR-AUT-0002",
+      "title": "Exact admission of the build sensor process and the Pages journal reads",
+      "status": "accepted",
+      "date": "2026-09-28",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "packages/cli/src/authority/broker.ts",
+        "law/policy/subprocess-effects.json",
+        "packages/sensors/src/build.ts",
+        "packages/sensors/src/site-drift.ts",
+        "packages/sensors/src/harness/gh-api.ts",
+        "law/schemas/sensor-inputs.schema.json",
+        ".devai/config/sensor-inputs.json",
+        "law/policy/sensor-notes/build.md",
+        "law/policy/sensor-notes/site_drift.md"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-AUT-0003-governed-adopter-path-authority.md",
+      "adr_id": "ADR-AUT-0003",
+      "title": "Governed adopter path authority by declared roots and path classes",
+      "status": "accepted",
+      "date": "2026-09-30",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/schemas/adopter-policy.schema.json",
+        "law/policy/adopter-defaults/path-authority-classes.json",
+        "law/schemas/path-authority-classes.schema.json",
+        "packages/cli/src/authority/policy-adopter-extension.ts",
+        "packages/cli/src/authority/policy.ts",
+        "packages/cli/src/services/adopter-policy.ts",
+        "packages/cli/src/services/adopter-policy-binding.ts",
+        "packages/cli/src/commands/init/bind-adapters.ts",
+        "packages/authority/src/runtime/policy-resolver.ts",
+        "packages/cli/src/commands/doctor-policy-checks.ts",
+        "packages/cli/src/commands/doctor-install-checks.ts",
+        "packages/cli/scripts/installed-tarball-smoke.mjs",
+        "docs/adopters/path-authority.md",
+        "docs/adopters/install.md",
+        "docs/reference/error-codes.md"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-AUT-0004-class-write-verbs-for-adopter-path-authority.md",
+      "adr_id": "ADR-AUT-0004",
+      "title": "Registered write verbs per path class for adopter path authority",
+      "status": "accepted",
+      "date": "2026-09-30",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "packages/cli/src/authority/policy-support.ts",
+        "packages/cli/src/authority/policy-adopter-extension.ts",
+        "packages/cli/src/authority/policy.ts",
+        "packages/cli/src/services/adopter-policy.ts",
+        "packages/cli/scripts/installed-tarball-smoke.mjs",
+        "docs/adopters/path-authority.md"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-AUT-0005-atomic-no-replace-publication.md",
+      "adr_id": "ADR-AUT-0005",
+      "title": "A governed atomic no-replace publication among the authority effects",
+      "status": "accepted",
+      "date": "2026-10-05",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "packages/authority/src/boundaries/host-publish.ts",
+        "packages/authority/src/boundaries/host-effects.ts",
+        "packages/authority/src/boundaries/index.ts",
+        "packages/effects-check/src/program.ts",
+        "packages/cli/src/authority/broker-paths.ts",
+        "packages/loop/src/loop/durable-files.ts",
+        "packages/loop/src/loop/worktrees.ts",
+        "packages/loop/src/loop/experimental-activation.ts",
+        "packages/loop/src/loop/state-root.ts",
+        "packages/cli/src/commands/init/apply.ts",
+        "packages/cli/src/commands/round/dispatch-agents.ts",
+        "docs/reference/cli/round-task-executors.md"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-AUT-0006-pnpm-sensor-process-shapes.md",
+      "adr_id": "ADR-AUT-0006",
+      "title": "Exact admission of the pnpm type-check and performance sensor processes",
+      "status": "accepted",
+      "date": "2026-10-09",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "packages/cli/src/authority/broker.ts",
+        "law/policy/subprocess-effects.json",
+        "packages/sensors/src/type-check.ts",
+        "packages/sensors/src/perf-test.ts",
+        "law/schemas/sensor-inputs.schema.json",
+        "law/policy/sensor-notes/type_check.md",
+        "law/policy/sensor-notes/perf_test.md",
+        "docs/adopters/sensor-inputs.md"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-AUT-0007-selected-post-merge-hook.md",
+      "adr_id": "ADR-AUT-0007",
+      "title": "Invoke the checkout-local merge hook only for its selected adapter",
+      "status": "accepted",
+      "date": "2026-10-11",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "packages/cli/src/services/hooks-install/index.ts",
+        "packages/cli/src/commands/init/apply.ts",
+        "law/policy/adopter-migrations.json",
+        "docs/adopters/install.md"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-AUT-0008-exact-authority-policy-create-review.md",
+      "adr_id": "ADR-AUT-0008",
+      "title": "Exact authority-policy create review in one live invocation",
+      "status": "proposed",
+      "date": "2026-10-24",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "packages/cli/src/action-output.ts",
+        "packages/cli/src/command-router.ts",
+        "packages/cli/src/commands/init/index.ts",
+        "packages/cli/src/commands/init/shared.ts",
+        "packages/cli/src/commands/init/review-authority-policy.ts",
+        "packages/cli/src/authority/command-capabilities.ts",
+        "packages/cli/src/authority/broker.ts",
+        "packages/cli/src/authority/policy-review.ts",
+        "packages/cli/src/authority/policy.ts",
+        "packages/cli/src/authority/policy-support.ts",
+        "docs/reference/cli/index.md"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-CFG-0001-schema-driven-interactive-configuration.md",
+      "adr_id": "ADR-CFG-0001",
+      "title": "Offer schema-driven interactive configuration that replays as existing actions",
+      "status": "accepted",
+      "date": "2026-09-26",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "packages/cli/src/commands/init/index.ts",
+        "packages/cli/src/services/interactive-config.ts",
+        "docs/adopters/install.md"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-CFG-0002-owned-configuration-projection.md",
+      "adr_id": "ADR-CFG-0002",
+      "title": "Owned configuration projection retires absent blocks under an ownership matrix",
+      "status": "accepted",
+      "date": "2026-09-28",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "packages/cli/src/services/adopter-policy.ts",
+        "packages/cli/src/services/adopter-policy-binding.ts",
+        "packages/cli/src/commands/init/bind-adapters.ts",
+        "packages/cli/src/commands/init/bind-package.ts",
+        "packages/skills/src/bootstrap/index.ts",
+        "packages/cli/tests/unit/adopter-policy-ci-economy-boundary.test.ts",
+        "packages/cli/tests/unit/adopter-policy-materialization-depth.test.ts",
+        ".devai/config/adopter-policy-binding.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-CHK-0001-preflight-probes-as-dag-nodes.md",
+      "adr_id": "ADR-CHK-0001",
+      "title": "Execute preflight probes as task DAG nodes with a blocked outcome",
+      "status": "accepted",
+      "date": "2026-09-26",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/schemas/preflight-probe.schema.json",
+        "law/schemas/test-task-descriptor.schema.json",
+        "test-tasks.json",
+        "packages/cli/src/services/check-runner/types.ts",
+        "packages/cli/src/services/check-runner/runner.ts",
+        "packages/cli/src/services/check-runner/cache.ts",
+        ".github/workflows/pull-request-checks.yml",
+        "scripts/run-pr-release-gate.mjs",
+        "docs/adopters/test-tasks.md",
+        "AGENTS.md"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-CHK-0002-toolchain-manifest.md",
+      "adr_id": "ADR-CHK-0002",
+      "title": "Declare toolchain identity in one manifest that workflows and probes consume",
+      "status": "accepted",
+      "date": "2026-09-26",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/schemas/toolchain-manifest.schema.json",
+        "law/policy/adopter-defaults/toolchain.json",
+        ".devai/config/toolchain.json",
+        "scripts/check-workflows.mjs",
+        "scripts/release-host/provision-toolchain.mjs",
+        ".github/workflows/pull-request-checks.yml",
+        ".github/workflows/release.yml",
+        ".github/workflows/devai-ledger-verify.yml",
+        "packages/cli/src/services/check-runner/runner.ts"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-CHK-0003-planning-lane-and-semantic-validation.md",
+      "adr_id": "ADR-CHK-0003",
+      "title": "Select a planning lane from the change taxonomy and validate plans semantically",
+      "status": "accepted",
+      "date": "2026-09-28",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "test-tasks.json",
+        ".github/workflows/pull-request-checks.yml",
+        "scripts/run-pr-release-gate.mjs",
+        "scripts/check-campaign.mjs",
+        "law/policy/campaign-execution.json",
+        "law/policy/adopter-defaults/change-taxonomy-binding.json",
+        ".devai/config/change-taxonomy-binding.json",
+        ".devai/config/project.json",
+        "packages/cli/src/commands/check/docs-governance-publish-checks.ts",
+        "docs/adopters/docs-layout.md",
+        "docs/dev/operations/workflow-economy-proposals.md"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-CHK-0004-serialized-integration.md",
+      "adr_id": "ADR-CHK-0004",
+      "title": "Serialize integration through a merge queue gated on the queue candidate",
+      "status": "accepted",
+      "date": "2026-09-28",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        ".github/workflows/pull-request-checks.yml",
+        "scripts/check-workflows.mjs",
+        "scripts/run-pr-release-gate.mjs",
+        "law/policy/campaign-execution.json",
+        "docs/dev/operations/remote-preflight-contract.md"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-CHK-0005-check-member-applicability.md",
+      "adr_id": "ADR-CHK-0005",
+      "title": "Every check member declares where it applies and a framework-only member reports not-applicable in an adopter",
+      "status": "accepted",
+      "date": "2026-09-29",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/policy/check-suites.json",
+        "law/schemas/check-suites.schema.json",
+        "packages/cli/src/commands/check/adapters-reports.ts",
+        "packages/cli/src/commands/check/adapters.ts",
+        "packages/cli/src/commands/check/action-effects.ts",
+        "packages/cli/src/commands/check/contracts.ts",
+        "packages/cli/src/commands/check/facade.ts",
+        "packages/cli/src/commands/spec/validate-action-coverage.ts",
+        "docs/reference/cli/check-suites.md",
+        "docs/adopters/install.md",
+        "docs/adopters/ci-economy.md",
+        "docs/reference/error-codes.md"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-CHK-0006-descriptor-selector-kinds-trail-the-trusted-verifier.md",
+      "adr_id": "ADR-CHK-0006",
+      "title": "The committed descriptor uses only the selector kinds the pinned trusted verifier admits",
+      "status": "accepted",
+      "date": "2026-09-30",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "test-tasks.json",
+        "law/policy/trusted-local-rc-verifier-package.json",
+        "scripts/check-test-task-workspace-selectors.mjs",
+        "packages/cli/src/services/check-runner/policy-descriptor.ts",
+        "docs/dev/operations/release-discipline.md"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-CHK-0007-bounded-parallel-check-plan-execution.md",
+      "adr_id": "ADR-CHK-0007",
+      "title": "Check plan nodes run on bounded parallel workers in plan order, and the gate may partition a plan",
+      "status": "accepted",
+      "date": "2026-10-07",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "packages/cli/src/services/check-runner/runner.ts",
+        "packages/cli/src/services/check-runner/runner-execution.ts",
+        "packages/cli/src/services/check-runner/types.ts",
+        "packages/cli/src/commands/check/facade.ts",
+        "law/schemas/test-task-descriptor.schema.json",
+        "law/schemas/test-task-exclusivity.schema.json",
+        "docs/adopters/test-tasks.md",
+        ".github/workflows/pull-request-checks.yml",
+        "scripts/check-workflows.mjs",
+        "packages/sensors/src/harness-invariant-alignment-workflow.ts"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-CHK-0008-rebase-update-branch.md",
+      "adr_id": "ADR-CHK-0008",
+      "title": "Admit the update branch with the rebase method only, driven by a rebase-update workflow when main moves",
+      "status": "accepted",
+      "date": "2026-10-08",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        ".github/workflows/update-pull-request-branches.yml",
+        "scripts/check-workflows.mjs",
+        "docs/dev/operations/remote-preflight-contract.md",
+        "packages/sensors/src/harness-coherence.ts",
+        "packages/sensors/src/harness/reviewed-workflow-steps.ts",
+        "law/policy/credential-requirements.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-CHK-0009-commit-range-admits-engineer-focused-regression-tests.md",
+      "adr_id": "ADR-CHK-0009",
+      "title": "The commit-range author-path table admits the Engineer's focused regression tests",
+      "status": "accepted",
+      "date": "2026-10-21",
+      "format": "v2",
+      "supersedes": ["ADR-CHK-0008"],
+      "affected_rules": ["scripts/check-commit-range.mjs"]
+    },
+    {
+      "file": "law/adr/ADR-EVI-0001-canonical-closure-index.md",
+      "adr_id": "ADR-EVI-0001",
+      "title": "The rounds index is rendered from phase closures and the seal checks exact membership",
+      "status": "accepted",
+      "date": "2026-09-28",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "packages/loop/src/governance-ledger/render.ts",
+        "packages/evidence/src/closure/index.ts",
+        "packages/loop/src/round-lifecycle/index.ts",
+        "packages/cli/src/commands/evidence/facade.ts",
+        "record/derived/indexes/rounds.md"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-EVI-0002-proof-line-anchoring.md",
+      "adr_id": "ADR-EVI-0002",
+      "title": "Chain verification cross-checks every proof line and historical gaps are declared, never restored",
+      "status": "accepted",
+      "date": "2026-09-28",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "packages/evidence/src/evidence/chain.ts",
+        "packages/evidence/src/evidence/proof-epoch.ts",
+        "packages/evidence/src/evidence/verb-evidence.ts",
+        "packages/cli/src/commands/evidence/facade.ts",
+        "packages/cli/src/commands/evidence/facade-collect-record.ts",
+        "law/schemas/proof-anchor-baseline.schema.json",
+        "record/proofs/anchor-baseline.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-EVI-0003-sealed-round-lifecycle-read.md",
+      "adr_id": "ADR-EVI-0003",
+      "title": "round status reads the governed lifecycle without an active task round",
+      "status": "accepted",
+      "date": "2026-09-29",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "packages/cli/src/commands/round/workflow.ts",
+        "packages/loop/src/round-lifecycle/index.ts",
+        "packages/loop/src/loop/task-services.ts",
+        "docs/reference/cli.md",
+        "docs/adopters/governance-tracking.md"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-EVI-0004-canonical-closure-acceptance-amendment.md",
+      "adr_id": "ADR-EVI-0004",
+      "title": "Canonical closure acceptance preserves rows and sealing rather than workaround bytes",
+      "status": "accepted",
+      "date": "2026-10-01",
+      "format": "v2",
+      "supersedes": ["ADR-EVI-0001"],
+      "affected_rules": [
+        "packages/loop/src/governance-ledger/render.ts",
+        "packages/evidence/src/closure/index.ts",
+        "packages/loop/src/round-lifecycle/index.ts",
+        "packages/cli/src/commands/evidence/facade.ts",
+        "record/derived/indexes/rounds.md"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-EVI-0005-newest-line-recovery-cli.md",
+      "adr_id": "ADR-EVI-0005",
+      "title": "Evidence record exposes bounded newest-line crash recovery",
+      "status": "accepted",
+      "date": "2026-10-01",
+      "format": "v2",
+      "supersedes": ["ADR-EVI-0002"],
+      "affected_rules": [
+        "packages/evidence/src/evidence/chain.ts",
+        "packages/evidence/src/evidence/proof-epoch.ts",
+        "packages/evidence/src/evidence/verb-evidence.ts",
+        "packages/cli/src/commands/evidence/facade.ts",
+        "packages/cli/src/commands/evidence/facade-collect-record.ts",
+        "law/schemas/proof-anchor-baseline.schema.json",
+        "record/proofs/anchor-baseline.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-EVI-0006-custody-proven-divergent-anchor-recovery.md",
+      "adr_id": "ADR-EVI-0006",
+      "title": "Evidence record recovers one custody-proven non-newest anchor lost in a chain divergence",
+      "status": "accepted",
+      "date": "2026-10-21",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "packages/evidence/src/evidence/verb-evidence.ts",
+        "packages/evidence/src/evidence/anchors.ts",
+        "packages/cli/src/commands/evidence/facade.ts",
+        "packages/cli/src/commands/evidence/facade-collect-record.ts",
+        "law/schemas/evidence.schema.json",
+        "docs/reference/cli/evidence-verify.md"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-GOV-0001-adr-identity-and-fail-closed-validation.md",
+      "adr_id": "ADR-GOV-0001",
+      "title": "Scoped ADR identity and fail-closed recursive validation",
+      "status": "accepted",
+      "date": "2026-09-03",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/schemas/adr-v2.schema.json",
+        "law/schemas/adr-validation-policy.schema.json",
+        "law/policy/adr-validation.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-GOV-0002-constrained-self-dogfood.md",
+      "adr_id": "ADR-GOV-0002",
+      "title": "Constrained self-dogfood and the role and effect matrix",
+      "status": "accepted",
+      "date": "2026-09-03",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/policy/self-dogfood.json",
+        "law/schemas/self-dogfood-policy.schema.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-GOV-0003-mandatory-semantic-kernels.md",
+      "adr_id": "ADR-GOV-0003",
+      "title": "Mandatory fail-closed semantic kernels",
+      "status": "accepted",
+      "date": "2026-09-03",
+      "format": "v2",
+      "supersedes": ["ADR-GOV-0001", "ADR-GOV-0002", "ADR-MUT-0001", "ADR-REL-0002"],
+      "affected_rules": [
+        "law/policy/adr-validation.json",
+        "law/policy/mutation-assurance-v2.json",
+        "law/policy/release-lifecycle.json",
+        "law/schemas/adr-validation-policy.schema.json",
+        "law/schemas/effect-authorization-event.schema.json",
+        "law/schemas/effect-authorization-ledger.schema.json",
+        "law/schemas/mutation-assurance-policy-v2.schema.json",
+        "law/schemas/mutation-assurance-v2.schema.json",
+        "law/schemas/release-lifecycle-observation.schema.json",
+        "law/schemas/release-lifecycle-policy.schema.json",
+        "law/schemas/release-offline-verification-receipt.schema.json",
+        "law/schemas/release-plan-receipt.schema.json",
+        "law/schemas/release-publication-receipt.schema.json",
+        "law/schemas/self-dogfood-policy.schema.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-GOV-0004-exact-semantic-kernel-closure.md",
+      "adr_id": "ADR-GOV-0004",
+      "title": "Exact semantic-kernel closure",
+      "status": "accepted",
+      "date": "2026-09-03",
+      "format": "v2",
+      "supersedes": ["ADR-GOV-0003"],
+      "affected_rules": [
+        "law/policy/mutation-assurance-v2.json",
+        "law/policy/release-lifecycle.json",
+        "law/policy/self-dogfood.json",
+        "law/schemas/effect-authorization-event.schema.json",
+        "law/schemas/effect-authorization-ledger.schema.json",
+        "law/schemas/mutation-assurance-policy-v2.schema.json",
+        "law/schemas/mutation-assurance-v2.schema.json",
+        "law/schemas/release-lifecycle-observation.schema.json",
+        "law/schemas/release-lifecycle-policy.schema.json",
+        "law/schemas/release-lifecycle-state.schema.json",
+        "law/schemas/release-offline-verification-receipt.schema.json",
+        "law/schemas/release-plan-receipt.schema.json",
+        "law/schemas/release-publication-receipt.schema.json",
+        "law/schemas/self-dogfood-policy.schema.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-GOV-0005-binary64-mutation-score-semantics.md",
+      "adr_id": "ADR-GOV-0005",
+      "title": "Binary64 mutation score semantics",
+      "status": "accepted",
+      "date": "2026-09-03",
+      "format": "v2",
+      "supersedes": ["ADR-GOV-0004"],
+      "affected_rules": [
+        "law/policy/mutation-assurance-v2.json",
+        "law/schemas/mutation-assurance-policy-v2.schema.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-GOV-0006-catalogued-legacy-adr-visibility.md",
+      "adr_id": "ADR-GOV-0006",
+      "title": "Digest-bound catalog metadata preserves legacy ADR visibility",
+      "status": "accepted",
+      "date": "2026-09-03",
+      "format": "v2",
+      "supersedes": ["ADR-GOV-0001"],
+      "affected_rules": [
+        "law/schemas/adr-v2.schema.json",
+        "law/schemas/adr-validation-policy.schema.json",
+        "law/policy/adr-validation.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-GOV-0007-subject-scoped-effective-authority.md",
+      "adr_id": "ADR-GOV-0007",
+      "title": "Subject-scoped effective ADR authority",
+      "status": "accepted",
+      "date": "2026-09-03",
+      "format": "v2",
+      "supersedes": ["ADR-GOV-0003", "ADR-GOV-0004", "ADR-GOV-0006", "ADR-REL-0003"],
+      "affected_rules": [
+        "law/policy/adr-validation.json",
+        "law/policy/release-lifecycle.json",
+        "law/schemas/adr-v2.schema.json",
+        "law/schemas/adr-validation-policy.schema.json",
+        "law/schemas/release-lifecycle-policy.schema.json",
+        "law/schemas/release-lifecycle-state.schema.json",
+        "law/schemas/release-plan-receipt.schema.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-GOV-0008-canonical-subject-projections.md",
+      "adr_id": "ADR-GOV-0008",
+      "title": "Canonical subject projections and global supersession safety",
+      "status": "accepted",
+      "date": "2026-09-03",
+      "format": "v2",
+      "supersedes": ["ADR-GOV-0007"],
+      "affected_rules": [
+        "law/policy/adr-validation.json",
+        "law/schemas/adr-v2.schema.json",
+        "law/schemas/adr-validation-policy.schema.json",
+        "scripts/check-workflows.mjs"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-GOV-0009-instance-validatable-adr-results.md",
+      "adr_id": "ADR-GOV-0009",
+      "title": "Instance-validatable ADR results and pure subject syntax",
+      "status": "accepted",
+      "date": "2026-09-03",
+      "format": "v2",
+      "supersedes": ["ADR-GOV-0008"],
+      "affected_rules": [
+        "law/policy/adr-validation.json",
+        "law/schemas/adr-v2.schema.json",
+        "law/schemas/adr-validation-policy.schema.json",
+        "scripts/check-workflows.mjs"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-GOV-0010-complete-adr-validation-result.md",
+      "adr_id": "ADR-GOV-0010",
+      "title": "Complete instance-validatable ADR validation result",
+      "status": "accepted",
+      "date": "2026-09-03",
+      "format": "v2",
+      "supersedes": ["ADR-GOV-0009"],
+      "affected_rules": [
+        "law/policy/adr-validation.json",
+        "law/schemas/adr-v2.schema.json",
+        "law/schemas/adr-validation-policy.schema.json",
+        "scripts/check-workflows.mjs"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-GOV-0011-fail-closed-adr-result-state.md",
+      "adr_id": "ADR-GOV-0011",
+      "title": "Fail-closed ADR validation result state",
+      "status": "accepted",
+      "date": "2026-09-03",
+      "format": "v2",
+      "supersedes": ["ADR-GOV-0010"],
+      "affected_rules": [
+        "law/policy/adr-validation.json",
+        "law/schemas/adr-v2.schema.json",
+        "law/schemas/adr-validation-policy.schema.json",
+        "scripts/check-workflows.mjs"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-GOV-0012-release-execution-seams.md",
+      "adr_id": "ADR-GOV-0012",
+      "title": "Fail-closed release execution seams",
+      "status": "accepted",
+      "date": "2026-09-03",
+      "format": "v2",
+      "supersedes": ["ADR-GOV-0007", "ADR-AUT-0001"],
+      "affected_rules": [
+        "law/policy/release-lifecycle.json",
+        "law/schemas/release-lifecycle-policy.schema.json",
+        "law/schemas/release-lifecycle-state.schema.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-GOV-0013-executable-release-lifecycle-contract.md",
+      "adr_id": "ADR-GOV-0013",
+      "title": "Executable fail-closed release lifecycle contract",
+      "status": "accepted",
+      "date": "2026-09-03",
+      "format": "v2",
+      "supersedes": ["ADR-GOV-0012"],
+      "affected_rules": [
+        "law/policy/release-lifecycle.json",
+        "law/schemas/release-lifecycle-policy.schema.json",
+        "law/schemas/release-lifecycle-state.schema.json",
+        "law/schemas/release-lifecycle-observation.schema.json",
+        "law/schemas/release-lifecycle-request.schema.json",
+        "law/schemas/release-lifecycle-store-record.schema.json",
+        "packages/schemas/src/roster.ts"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-GOV-0014-durable-v2-remote-execution.md",
+      "adr_id": "ADR-GOV-0014",
+      "title": "Durable v2 remote execution and package-trust bindings",
+      "status": "accepted",
+      "date": "2026-09-03",
+      "format": "v2",
+      "supersedes": ["ADR-GOV-0013"],
+      "affected_rules": [
+        "law/policy/release-lifecycle.json",
+        "law/schemas/effect-authorization-event.schema.json",
+        "law/schemas/release-lifecycle-policy.schema.json",
+        "law/schemas/release-lifecycle-store-head.schema.json",
+        "law/schemas/release-lifecycle-store-record.schema.json",
+        "law/schemas/release-offline-verification-receipt.schema.json",
+        "packages/schemas/src/roster.ts"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-GOV-0015-lifecycle-kernel-closure.md",
+      "adr_id": "ADR-GOV-0015",
+      "title": "Lifecycle kernel closure and callable schema reachability",
+      "status": "accepted",
+      "date": "2026-09-03",
+      "format": "v2",
+      "supersedes": ["ADR-GOV-0014"],
+      "affected_rules": [
+        "law/policy/release-lifecycle.json",
+        "law/schemas/effect-authorization-ledger.schema.json",
+        "law/schemas/release-lifecycle-policy.schema.json",
+        "law/schemas/release-lifecycle-store-record.schema.json",
+        "law/schemas/release-offline-verification-receipt.schema.json",
+        "packages/schemas/src/roster.ts"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-GOV-0016-preserved-invalid-accepted-history.md",
+      "adr_id": "ADR-GOV-0016",
+      "title": "Preserve one invalid accepted ADR through a digest-bound classification",
+      "status": "accepted",
+      "date": "2026-09-03",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/adr/ADR-MUT-0005-unambiguous-mutation-digest-boundaries.md",
+        "law/policy/adr-validation.json",
+        "law/schemas/adr-validation-policy.schema.json",
+        "packages/spec/src/adr/index.ts"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-GOV-0017-change-class-taxonomy.md",
+      "adr_id": "ADR-GOV-0017",
+      "title": "Classify every tracked path into one change class declared in law",
+      "status": "accepted",
+      "date": "2026-09-26",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/policy/change-taxonomy.json",
+        "law/schemas/change-taxonomy.schema.json",
+        "law/policy/adopter-defaults/change-taxonomy-binding.json",
+        "test-tasks.json",
+        "packages/cli/src/services/check-runner/policy.ts",
+        "scripts/run-pr-release-gate.mjs",
+        "scripts/check-policy-materialization.mjs"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-GOV-0018-commit-grammar-and-single-family-commits.md",
+      "adr_id": "ADR-GOV-0018",
+      "title": "Require semantic commit messages and forbid cross-family commits",
+      "status": "accepted",
+      "date": "2026-09-26",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/policy/commit-grammar.json",
+        "law/schemas/commit-grammar.schema.json",
+        ".githooks/commit-msg",
+        ".githooks/pre-commit",
+        "scripts/check-change-hygiene.mjs",
+        "scripts/run-pr-release-gate.mjs",
+        "AGENTS.md"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-GOV-0019-backlog-action-family.md",
+      "adr_id": "ADR-GOV-0019",
+      "title": "Add a repository backlog action family with an opt-in issue projection",
+      "status": "accepted",
+      "date": "2026-09-26",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/policy/action-registry.json",
+        "law/schemas/backlog-item.schema.json",
+        "law/policy/github-issues-tracking.json",
+        "law/schemas/github-issues-tracking-policy.schema.json",
+        "packages/cli/src/commands/doctor.ts",
+        "docs/adopters/governance-tracking.md"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-GOV-0020-canonical-instructions-and-host-projections.md",
+      "adr_id": "ADR-GOV-0020",
+      "title": "AGENTS.md is the canonical instruction contract and hosts receive generated projections",
+      "status": "accepted",
+      "date": "2026-09-28",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "AGENTS.md",
+        "CLAUDE.md",
+        "packages/skills/src/bootstrap/index.ts",
+        "packages/skills/src/recipes/adapters.ts",
+        "packages/cli/src/commands/init/apply.ts",
+        "packages/cli/src/commands/doctor-environment-checks.ts",
+        "packages/skills/tests/unit/bootstrap.test.ts",
+        "packages/skills/tests/unit/adopter-bootstrap-contract.test.ts"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-GOV-0021-workflow-reference-pages.md",
+      "adr_id": "ADR-GOV-0021",
+      "title": "One reference page per admitted workflow, a generated decision catalogue, and documented recovery paths",
+      "status": "accepted",
+      "date": "2026-09-28",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/policy/documentation-information-architecture.json",
+        "docs/dev/operations/workflows/README.md",
+        "docs/dev/operations/workflows/pull-request-checks.md",
+        "docs/dev/operations/workflows/release.md",
+        "docs/dev/operations/workflows/site-publish.md",
+        "docs/dev/operations/workflows/devai-ledger-verify.md",
+        "law/adr/README.md",
+        "packages/loop/src/governance-ledger/render.ts",
+        "law/policy/adr-validation.json",
+        "docs/dev/operations/README.md",
+        "docs/adopters/sensor-inputs.md",
+        "docs/dev/operations/remote-preflight-contract.md",
+        "docs/adopters/docs-layout.md"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-GOV-0022-authorization-registry-maintenance.md",
+      "adr_id": "ADR-GOV-0022",
+      "title": "Validated append-only authorization registry maintenance is not an invariant mutation",
+      "status": "accepted",
+      "date": "2026-09-28",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "packages/skills/src/forbidden-actions/scan.ts",
+        "packages/skills/src/forbidden-actions/authorizations.ts",
+        "packages/skills/tests/unit/forbidden-registry-boundaries.test.ts",
+        "packages/skills/tests/unit/forbidden-authorization-boundaries.test.ts",
+        "packages/skills/tests/unit/forbidden-git-paths.test.ts"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-GOV-0023-review-boundaries.md",
+      "adr_id": "ADR-GOV-0023",
+      "title": "Delegate model evaluation of task pull requests and keep ratification, merge, and dispatch human",
+      "status": "accepted",
+      "date": "2026-09-28",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/schemas/campaign.schema.json",
+        "law/policy/campaign-execution.json",
+        "scripts/check-campaign.mjs"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-GOV-0024-article-6-client-extensions-by-root-and-class.md",
+      "adr_id": "ADR-GOV-0024",
+      "title": "Article 6 admits client path extensions by declared root and path class",
+      "status": "accepted",
+      "date": "2026-09-30",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/constitution.md",
+        ".devai/pin/constitution.md",
+        "law/schemas/adopter-policy.schema.json",
+        "docs/adopters/path-authority.md"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-GOV-0025-governed-campaign-controller.md",
+      "adr_id": "ADR-GOV-0025",
+      "title": "Campaigns reach the runtime through one projection, one materializer, and human ratification",
+      "status": "accepted",
+      "date": "2026-10-04",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/policy/campaign-execution.json",
+        "law/policy/action-registry.json",
+        "packages/loop/src/campaign/index.ts",
+        "packages/cli/src/commands/campaign/index.ts",
+        "packages/cli/src/commands/round/ratify.ts",
+        "packages/loop/src/loop/ratification.ts",
+        "packages/schemas/src/roster.ts",
+        "law/invariants/INV-CORE-006.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-GOV-0026-engineer-authors-focused-regression-tests.md",
+      "adr_id": "ADR-GOV-0026",
+      "title": "The Engineer authors focused regression tests for its own change; designated assurance stays independent",
+      "status": "accepted",
+      "date": "2026-10-14",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/constitution.md",
+        "packages/skills/resources/roles/engineer.md",
+        "packages/skills/resources/roles/inspector.md",
+        "packages/authority/src/capabilities/path-domains.ts",
+        "packages/authority/src/runtime/policy-resolver.ts",
+        "scripts/check-commit-range.mjs",
+        "law/schemas/campaign.schema.json",
+        "law/schemas/task.schema.json",
+        "packages/cli/src/services/experimental-dispatch/index.ts"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-GOV-0027-source-bound-canonical-selection-and-proof-index.md",
+      "adr_id": "ADR-GOV-0027",
+      "title": "Source-bound canonical selection and a typed one-entry proof index contract",
+      "status": "proposed",
+      "date": "2026-10-24",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/constitution.md",
+        "law/schemas/proof-index-reconciliation-contract.schema.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-MDL-0001-structured-review-contracts.md",
+      "adr_id": "ADR-MDL-0001",
+      "title": "Structured review contracts with consumer-specific schemas and one shared extractor",
+      "status": "accepted",
+      "date": "2026-09-28",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/schemas/review-verdict.schema.json",
+        "law/schemas/triage-breaker.schema.json",
+        "packages/schemas/src/index.ts",
+        "packages/skills/src/model-bridge/index.ts",
+        "packages/sensors/src/judge.ts",
+        "packages/loop/src/loop/triage.ts",
+        "packages/skills/resources/recipes/devai-verify/SKILL.md",
+        "packages/skills/resources/recipes/devai-verify/devai.recipe.json",
+        "law/policy/sensor-notes/llm_judge.md"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-MDL-0002-versioned-model-defaults.md",
+      "adr_id": "ADR-MDL-0002",
+      "title": "A versioned repository default for model tiers, overridden by reference and pinned at task start",
+      "status": "accepted",
+      "date": "2026-09-28",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/policy/model-tiers.json",
+        "law/schemas/model-tiers.schema.json",
+        "law/schemas/campaign.schema.json",
+        "law/policy/campaign-execution.json",
+        "scripts/check-campaign.mjs",
+        "law/policy/model-runtime-registry.json",
+        "docs/reference/cli/model-runtime.md",
+        "docs/reference/cli/round-task-executors.md"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-MDL-0003-live-review-envelope-contract.md",
+      "adr_id": "ADR-MDL-0003",
+      "title": "Live reviews isolate host tools and declare exact envelope and verdict bytes",
+      "status": "accepted",
+      "date": "2026-10-01",
+      "format": "v2",
+      "supersedes": ["ADR-MDL-0001"],
+      "affected_rules": [
+        "law/schemas/review-verdict.schema.json",
+        "law/schemas/triage-breaker.schema.json",
+        "packages/schemas/src/index.ts",
+        "packages/skills/src/model-bridge/index.ts",
+        "packages/sensors/src/judge.ts",
+        "packages/loop/src/loop/triage.ts",
+        "packages/skills/resources/recipes/devai-verify/SKILL.md",
+        "packages/skills/resources/recipes/devai-verify/devai.recipe.json",
+        "law/policy/sensor-notes/llm_judge.md"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-MDL-0004-scored-soft-gate.md",
+      "adr_id": "ADR-MDL-0004",
+      "title": "Independent scored soft gate evidence preserves generic review contracts",
+      "status": "accepted",
+      "date": "2026-10-02",
+      "format": "v2",
+      "supersedes": ["ADR-MDL-0003"],
+      "affected_rules": [
+        "law/schemas/soft-gate-score.schema.json",
+        "law/schemas/soft-gate-rubric.schema.json",
+        "law/schemas/soft-gate-evidence.schema.json",
+        "law/schemas/soft-gate-trust.schema.json",
+        "law/schemas/thresholds.schema.json",
+        "law/policy/soft-gate-rubric.json",
+        "law/policy/thresholds.json",
+        "law/policy/sensor-notes/llm_judge.md",
+        "packages/sensors/src/judge.ts",
+        "packages/sensors/src/ci-invariant-gate.ts",
+        "packages/skills/src/model-bridge/index.ts",
+        "packages/skills/src/model-bridge/soft-gate-observation.ts",
+        "packages/schemas/src/roster.ts",
+        "packages/schemas/src/reply-extract.ts",
+        "scripts/process/produce-ci-invariant-evidence.mjs",
+        "scripts/process/fetch-ci-invariant-evidence.mjs",
+        "scripts/process/check-ci-invariant-gate.mjs"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-MDL-0005-opt-in-experimental-agent-execution.md",
+      "adr_id": "ADR-MDL-0005",
+      "title": "Opt-in experimental agent execution through host CLI providers",
+      "status": "accepted",
+      "date": "2026-10-04",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/policy/experimental-execution.json",
+        "law/schemas/experimental-execution.schema.json",
+        "law/schemas/experimental-activation.schema.json",
+        "law/schemas/dispatch-journal-event.schema.json",
+        "law/schemas/task-execution-evidence.schema.json",
+        "law/schemas/action-registry.schema.json",
+        "law/policy/action-registry.json",
+        "law/policy/model-runtime-registry.json",
+        "packages/authority/src/boundaries/host-effects.ts",
+        "packages/loop/src/loop/agent-executor.ts",
+        "packages/loop/src/loop/round-runner.ts",
+        "packages/cli/src/commands/round/dispatch.ts",
+        "packages/skills/src/model-bridge/index.ts"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-MDL-0006-owner-action-writes-experimental-activation.md",
+      "adr_id": "ADR-MDL-0006",
+      "title": "An Owner-only action writes the experimental activation record into runtime state",
+      "status": "accepted",
+      "date": "2026-10-04",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/policy/experimental-execution.json",
+        "law/schemas/experimental-execution.schema.json",
+        "law/policy/action-registry.json",
+        "law/invariants/INV-AUTH-002.json",
+        "packages/cli/src/authority/authority-declarations.ts",
+        "packages/cli/src/commands/round/dispatch-activate.ts"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-MDL-0007-experimental-completion-recovery-and-capacity.md",
+      "adr_id": "ADR-MDL-0007",
+      "title": "Agent work completes, recovers and fits capacity through registered actions",
+      "status": "accepted",
+      "date": "2026-10-05",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/policy/experimental-execution.json",
+        "law/schemas/experimental-execution.schema.json",
+        "law/schemas/dispatch-journal-event.schema.json",
+        "law/policy/action-registry.json",
+        "law/invariants/INV-AUTH-002.json",
+        "packages/loop/src/loop/dispatch-journal.ts",
+        "packages/loop/src/loop/dispatch-disposition.ts",
+        "packages/loop/src/loop/task-services.ts",
+        "packages/loop/src/loop/ratification.ts",
+        "packages/loop/src/loop/worktrees.ts",
+        "packages/cli/src/services/experimental-dispatch/index.ts",
+        "packages/cli/src/commands/round/dispatch-deactivate.ts",
+        "packages/cli/src/commands/round/dispatch-dispose.ts"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-MDL-0008-provider-enforced-attempt-write-boundary.md",
+      "adr_id": "ADR-MDL-0008",
+      "title": "The provider's own sandbox enforces the experimental attempt write boundary",
+      "status": "accepted",
+      "date": "2026-10-05",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/policy/experimental-execution.json",
+        "law/schemas/experimental-execution.schema.json",
+        "law/schemas/task-execution-evidence.schema.json",
+        "packages/skills/src/agent-cli/index.ts",
+        "packages/cli/src/services/experimental-dispatch/authority-process.ts",
+        "packages/cli/src/services/experimental-dispatch/index.ts",
+        "packages/evidence/src/task-execution/index.ts"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-MDL-0009-review-reserve-and-campaign-agent-materialization.md",
+      "adr_id": "ADR-MDL-0009",
+      "title": "Review work keeps reserved capacity and campaigns can materialize agent tasks",
+      "status": "accepted",
+      "date": "2026-10-05",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/policy/round-execution.json",
+        "law/schemas/round-execution.schema.json",
+        "law/policy/campaign-execution.json",
+        "law/schemas/campaign.schema.json",
+        "law/schemas/task.schema.json",
+        "packages/loop/src/loop/round-task-admission.ts",
+        "packages/loop/src/campaign/index.ts",
+        "packages/skills/src/prompt-composer/index.ts",
+        "packages/cli/src/services/experimental-dispatch/index.ts",
+        "packages/cli/src/commands/campaign/index.ts"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-MUT-0001-mutation-assurance-v2.md",
+      "adr_id": "ADR-MUT-0001",
+      "title": "Additive mutation assurance v2 with exact identity binding",
+      "status": "accepted",
+      "date": "2026-09-03",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/policy/mutation-assurance-v2.json",
+        "law/schemas/mutation-assurance-v2.schema.json",
+        "law/schemas/mutation-assurance-policy-v2.schema.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-MUT-0002-canonical-verifier-v2-alignment.md",
+      "adr_id": "ADR-MUT-0002",
+      "title": "Canonical verifier owns mutation v2 composition",
+      "status": "accepted",
+      "date": "2026-09-03",
+      "format": "v2",
+      "supersedes": ["ADR-MUT-0001"],
+      "affected_rules": [
+        "law/policy/mutation-assurance-v2.json",
+        "law/schemas/mutation-assurance-policy-v2.schema.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-MUT-0003-complete-mutation-evidence-v2-contract.md",
+      "adr_id": "ADR-MUT-0003",
+      "title": "Canonical package evidence and candidate composition for mutation v2",
+      "status": "accepted",
+      "date": "2026-09-03",
+      "format": "v2",
+      "supersedes": ["ADR-MUT-0002", "ADR-MUT-0001", "ADR-GOV-0005"],
+      "affected_rules": [
+        "law/policy/mutation-assurance-v2.json",
+        "law/policy/mutation-evidence-v2.json",
+        "law/schemas/mutation-assurance-v2.schema.json",
+        "law/schemas/mutation-assurance-policy-v2.schema.json",
+        "law/schemas/mutation-evidence-policy-v2.schema.json",
+        "law/schemas/mutation-report-set-v2.schema.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-MUT-0004-complete-verifiable-mutation-evidence-v2.md",
+      "adr_id": "ADR-MUT-0004",
+      "title": "Complete verifiable mutation evidence v2",
+      "status": "accepted",
+      "date": "2026-09-03",
+      "format": "v2",
+      "supersedes": ["ADR-MUT-0003", "ADR-GOV-0004"],
+      "affected_rules": [
+        "law/policy/mutation-assurance-v2.json",
+        "law/policy/mutation-evidence-v2.json",
+        "law/schemas/mutation-assurance-v2.schema.json",
+        "law/schemas/mutation-assurance-policy-v2.schema.json",
+        "law/schemas/mutation-evidence-policy-v2.schema.json",
+        "law/schemas/mutation-report-set-v2.schema.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-MUT-0005-unambiguous-mutation-digest-boundaries.md",
+      "adr_id": "ADR-MUT-0005",
+      "title": "Unambiguous mutation digest and verification boundaries",
+      "status": "accepted",
+      "date": "2026-09-03",
+      "format": "legacy-catalog",
+      "supersedes": ["ADR-MUT-0004"],
+      "affected_rules": [
+        "law/policy/mutation-evidence-v2.json",
+        "law/schemas/mutation-evidence-policy-v2.schema.json",
+        "law/schemas/mutation-report-set-v2.schema.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-MUT-0006-measured-aggregation-and-activation-closure.md",
+      "adr_id": "ADR-MUT-0006",
+      "title": "Measured mutation aggregation and activation closure",
+      "status": "accepted",
+      "date": "2026-09-03",
+      "format": "v2",
+      "supersedes": ["ADR-MUT-0005"],
+      "affected_rules": [
+        "law/policy/mutation-evidence-v2.json",
+        "law/schemas/mutation-evidence-policy-v2.schema.json",
+        "law/schemas/mutation-report-set-v2.schema.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-MUT-0007-activate-source-pinned-mutation-v21.md",
+      "adr_id": "ADR-MUT-0007",
+      "title": "Activate the source-pinned mutation v2.1 verifier",
+      "status": "accepted",
+      "date": "2026-09-03",
+      "format": "v2",
+      "supersedes": ["ADR-MUT-0006"],
+      "affected_rules": [
+        "law/policy/mutation-evidence-v2.json",
+        "law/schemas/mutation-evidence-policy-v2.schema.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-MUT-0008-unit-mutation-evidence-closure.md",
+      "adr_id": "ADR-MUT-0008",
+      "title": "Retain one protected unit mutation evidence closure",
+      "status": "accepted",
+      "date": "2026-09-04",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/policy/devai-adoption.json",
+        "law/schemas/release-verification-profile.schema.json",
+        "law/schemas/release-lifecycle-state.schema.json",
+        "law/schemas/release-offline-verification-receipt.schema.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-MUT-0009-resumable-protected-package-execution-origins.md",
+      "adr_id": "ADR-MUT-0009",
+      "title": "Resume protected mutation packages through exact execution origins",
+      "status": "accepted",
+      "date": "2026-09-04",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/policy/mutation-evidence-v2.json",
+        "law/schemas/mutation-evidence-policy-v2.schema.json",
+        "law/schemas/mutation-report-set-v2.schema.json",
+        "law/policy/devai-adoption.json",
+        "law/schemas/release-verification-profile.schema.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-MUT-0010-pin-canonical-verifier-v22-source.md",
+      "adr_id": "ADR-MUT-0010",
+      "title": "Pin canonical verifier v2.2 source provenance",
+      "status": "accepted",
+      "date": "2026-09-04",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/policy/mutation-evidence-v2.json",
+        "law/schemas/mutation-evidence-policy-v2.schema.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-MUT-0011-disable-survivor-count-acceptance.md",
+      "adr_id": "ADR-MUT-0011",
+      "title": "Disable survivor-count mutation acceptance",
+      "status": "accepted",
+      "date": "2026-09-12",
+      "format": "v2",
+      "supersedes": ["ADR-MUT-0004", "ADR-GOV-0004", "ADR-GOV-0005"],
+      "affected_rules": [
+        "law/policy/thresholds.json",
+        "law/policy/mutation-strength.json",
+        "law/policy/release-verification.json",
+        "law/policy/devai-adoption.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-MUT-0012-external-hardening-without-delivery-gates.md",
+      "adr_id": "ADR-MUT-0012",
+      "title": "Extract mutation testing to Bedel and remove every delivery dependency",
+      "status": "accepted",
+      "date": "2026-09-14",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/constitution.md",
+        "law/policy/release-lifecycle.json",
+        "law/policy/release-verification.json",
+        "law/policy/devai-adoption.json",
+        "law/policy/mutation-strength.json",
+        "law/schemas/release-verification-profile.schema.json",
+        "law/schemas/release-lifecycle-policy.schema.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-MUT-0013-advance-mutation-evidence-source-to-the-intent-export-verifier.md",
+      "adr_id": "ADR-MUT-0013",
+      "title": "Advance the mutation-evidence approved source to the intent-export verifier",
+      "status": "accepted",
+      "date": "2026-10-01",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/policy/mutation-evidence-v2.json",
+        "law/schemas/mutation-evidence-policy-v2.schema.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-MUT-0014-advance-approved-source-for-sensor-task-descriptors.md",
+      "adr_id": "ADR-MUT-0014",
+      "title": "Advance the approved verifier source for exact sensor task descriptors",
+      "status": "accepted",
+      "date": "2026-10-10",
+      "format": "v2",
+      "supersedes": ["ADR-MUT-0013"],
+      "affected_rules": [
+        "law/policy/mutation-evidence-v2.json",
+        "law/schemas/mutation-evidence-policy-v2.schema.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-REL-0001-release-lifecycle-actions-and-state.md",
+      "adr_id": "ADR-REL-0001",
+      "title": "Release lifecycle actions, states, and separated publication",
+      "status": "accepted",
+      "date": "2026-09-03",
+      "format": "v2",
+      "supersedes": ["ADR-014"],
+      "affected_rules": [
+        "law/policy/action-registry.json",
+        "law/policy/release-lifecycle.json",
+        "law/schemas/release-lifecycle-policy.schema.json",
+        "law/schemas/release-lifecycle-state.schema.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-REL-0002-nine-state-release-lifecycle-and-observed-publication.md",
+      "adr_id": "ADR-REL-0002",
+      "title": "Nine-state release lifecycle with pure reads and observed publication",
+      "status": "accepted",
+      "date": "2026-09-03",
+      "format": "v2",
+      "supersedes": ["ADR-REL-0001"],
+      "affected_rules": [
+        "law/policy/action-registry.json",
+        "law/policy/release-lifecycle.json",
+        "law/schemas/release-lifecycle-policy.schema.json",
+        "law/schemas/release-lifecycle-state.schema.json",
+        "law/schemas/release-plan-receipt.schema.json",
+        "law/schemas/release-offline-verification-receipt.schema.json",
+        "law/schemas/release-publication-receipt.schema.json",
+        "law/schemas/release-lifecycle-observation.schema.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-REL-0003-blocked-plan-receipts.md",
+      "adr_id": "ADR-REL-0003",
+      "title": "Blocked release plans are deterministic non-transitions",
+      "status": "accepted",
+      "date": "2026-09-03",
+      "format": "v2",
+      "supersedes": ["ADR-REL-0002"],
+      "affected_rules": [
+        "law/policy/release-lifecycle.json",
+        "law/schemas/release-lifecycle-policy.schema.json",
+        "law/schemas/release-lifecycle-state.schema.json",
+        "law/schemas/release-plan-receipt.schema.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-REL-0004-separate-release-log-tail-and-state-head.md",
+      "adr_id": "ADR-REL-0004",
+      "title": "Separate release append-log tail from completed-state head",
+      "status": "accepted",
+      "date": "2026-09-03",
+      "format": "v2",
+      "supersedes": ["ADR-REL-0003", "ADR-GOV-0015"],
+      "affected_rules": [
+        "law/policy/release-lifecycle.json",
+        "law/schemas/release-lifecycle-policy.schema.json",
+        "law/schemas/release-lifecycle-store-record.schema.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-REL-0005-separate-legacy-seams-state-generation-and-log-sequence.md",
+      "adr_id": "ADR-REL-0005",
+      "title": "Separate legacy seams, state generation, and log sequence",
+      "status": "accepted",
+      "date": "2026-09-03",
+      "format": "v2",
+      "supersedes": ["ADR-REL-0004"],
+      "affected_rules": [
+        "law/policy/release-lifecycle.json",
+        "law/schemas/release-lifecycle-policy.schema.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-REL-0006-blocked-retry-observation-requirement.md",
+      "adr_id": "ADR-REL-0006",
+      "title": "Report blocked remote retries with their fresh-authorization requirement",
+      "status": "accepted",
+      "date": "2026-09-03",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/policy/release-lifecycle.json",
+        "law/schemas/release-lifecycle-policy.schema.json",
+        "law/schemas/release-lifecycle-observation.schema.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-REL-0007-pure-sink-mediated-prepare.md",
+      "adr_id": "ADR-REL-0007",
+      "title": "Make release prepare pure and sink-mediated",
+      "status": "accepted",
+      "date": "2026-09-03",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/policy/release-lifecycle.json",
+        "law/policy/action-registry.json",
+        "law/schemas/release-lifecycle-policy.schema.json",
+        "law/schemas/release-lifecycle-request.schema.json",
+        "law/schemas/release-lifecycle-state.schema.json",
+        "law/schemas/action-registry.schema.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-REL-0008-handle-based-prepared-state-and-complete-pack-spec.md",
+      "adr_id": "ADR-REL-0008",
+      "title": "Bind v3 prepared state to sink handles and a complete pack specification",
+      "status": "accepted",
+      "date": "2026-09-03",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/policy/release-lifecycle.json",
+        "law/policy/action-registry.json",
+        "law/schemas/release-lifecycle-policy.schema.json",
+        "law/schemas/release-lifecycle-state.schema.json",
+        "law/schemas/action-registry.schema.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-REL-0009-complete-spdx-and-stored-deflate-byte-rules.md",
+      "adr_id": "ADR-REL-0009",
+      "title": "Complete SPDX and stored DEFLATE byte rules",
+      "status": "accepted",
+      "date": "2026-09-03",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/policy/release-lifecycle.json",
+        "law/schemas/release-lifecycle-policy.schema.json",
+        "law/schemas/release-lifecycle-state.schema.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-REL-0010-finalize-spdx-checksum-semantics.md",
+      "adr_id": "ADR-REL-0010",
+      "title": "Finalize SPDX checksum and document semantics",
+      "status": "accepted",
+      "date": "2026-09-03",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/policy/release-lifecycle.json",
+        "law/schemas/release-lifecycle-policy.schema.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-REL-0011-finalize-spdx-document-vocabulary.md",
+      "adr_id": "ADR-REL-0011",
+      "title": "Finalize SPDX document vocabulary",
+      "status": "accepted",
+      "date": "2026-09-03",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/policy/release-lifecycle.json",
+        "law/schemas/release-lifecycle-policy.schema.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-REL-0012-close-offline-receipt-sink-continuity.md",
+      "adr_id": "ADR-REL-0012",
+      "title": "Close offline receipt ArtifactSink continuity",
+      "status": "accepted",
+      "date": "2026-09-03",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/schemas/release-offline-verification-receipt.schema.json",
+        "law/policy/release-lifecycle.json",
+        "law/schemas/release-lifecycle-policy.schema.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-REL-0013-canonical-v3-artifact-projection-vocabulary.md",
+      "adr_id": "ADR-REL-0013",
+      "title": "Canonical v3 artifact projection vocabulary",
+      "status": "accepted",
+      "date": "2026-09-03",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/schemas/release-lifecycle-state.schema.json",
+        "law/schemas/release-offline-verification-receipt.schema.json",
+        "law/policy/release-lifecycle.json",
+        "law/schemas/release-lifecycle-policy.schema.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-REL-0014-repin-offline-receipt-example-digest.md",
+      "adr_id": "ADR-REL-0014",
+      "title": "Repin offline receipt example digest",
+      "status": "accepted",
+      "date": "2026-09-03",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": ["law/schemas/release-offline-verification-receipt.schema.json"]
+    },
+    {
+      "file": "law/adr/ADR-REL-0015-close-certification-provenance-and-sink-ambiguity.md",
+      "adr_id": "ADR-REL-0015",
+      "title": "Close v3 certification provenance and sink-commit ambiguity",
+      "status": "accepted",
+      "date": "2026-09-03",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/policy/release-lifecycle.json",
+        "law/policy/action-registry.json",
+        "law/schemas/release-lifecycle-policy.schema.json",
+        "law/schemas/release-lifecycle-state.schema.json",
+        "law/schemas/action-registry.schema.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-REL-0016-protected-preflight-execution-authority.md",
+      "adr_id": "ADR-REL-0016",
+      "title": "Bind protected preflight to execution-only host authority",
+      "status": "accepted",
+      "date": "2026-09-03",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/policy/action-registry.json",
+        "law/schemas/action-registry.schema.json",
+        "law/policy/release-lifecycle.json",
+        "law/schemas/release-lifecycle-policy.schema.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-REL-0017-package-owned-release-policy-resolution.md",
+      "adr_id": "ADR-REL-0017",
+      "title": "Bind release planning to installed policy and declarative adoption",
+      "status": "accepted",
+      "date": "2026-09-03",
+      "format": "legacy-catalog",
+      "supersedes": [],
+      "affected_rules": [
+        "law/policy/action-registry.json",
+        "law/policy/release-lifecycle.json",
+        "law/schemas/release-lifecycle-policy.schema.json",
+        "law/schemas/release-plan-receipt-v2.schema.json",
+        "law/schemas/release-policy-resolution.schema.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-REL-0018-bounded-ustar-prefix-prepare.md",
+      "adr_id": "ADR-REL-0018",
+      "title": "Support deterministic USTAR prefixes and bounded multi-package prepare",
+      "status": "accepted",
+      "date": "2026-09-03",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/policy/release-lifecycle.json",
+        "law/schemas/release-lifecycle-policy.schema.json",
+        "law/policy/action-registry.json",
+        "law/schemas/action-registry.schema.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-REL-0019-preserve-and-restate-installed-release-policy.md",
+      "adr_id": "ADR-REL-0019",
+      "title": "Preserve and restate installed release policy binding",
+      "status": "accepted",
+      "date": "2026-09-03",
+      "format": "v2",
+      "supersedes": ["ADR-REL-0017"],
+      "affected_rules": [
+        "law/policy/adr-validation.json",
+        "law/schemas/adr-validation-policy.schema.json",
+        "law/policy/action-registry.json",
+        "law/policy/release-lifecycle.json",
+        "law/schemas/release-lifecycle-policy.schema.json",
+        "law/schemas/release-plan-receipt-v2.schema.json",
+        "law/schemas/release-policy-resolution.schema.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-REL-0020-explicit-historical-resume-observation.md",
+      "adr_id": "ADR-REL-0020",
+      "title": "Explicit historical resume observation",
+      "status": "accepted",
+      "date": "2026-09-03",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/policy/release-lifecycle.json",
+        "law/schemas/release-lifecycle-policy.schema.json",
+        "law/schemas/release-lifecycle-observation.schema.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-REL-0021-append-only-export-artifact-sink-extension.md",
+      "adr_id": "ADR-REL-0021",
+      "title": "Add an append-only protected export ArtifactSink extension",
+      "status": "accepted",
+      "date": "2026-09-03",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/policy/action-registry.json",
+        "law/schemas/action-registry.schema.json",
+        "law/policy/release-lifecycle.json",
+        "law/schemas/release-lifecycle-policy.schema.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-REL-0022-signed-portable-export-closure.md",
+      "adr_id": "ADR-REL-0022",
+      "title": "Bind portable export closure and acyclic aggregate signature",
+      "status": "accepted",
+      "date": "2026-09-03",
+      "format": "v2",
+      "supersedes": ["ADR-REL-0021"],
+      "affected_rules": [
+        "law/policy/release-lifecycle.json",
+        "law/schemas/release-lifecycle-policy.schema.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-REL-0023-separate-authority-and-release-repository-identity.md",
+      "adr_id": "ADR-REL-0023",
+      "title": "Separate local authority and canonical release repository identity",
+      "status": "accepted",
+      "date": "2026-09-03",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/policy/release-lifecycle.json",
+        "law/schemas/release-lifecycle-policy.schema.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-REL-0024-host-git-environment-isolation.md",
+      "adr_id": "ADR-REL-0024",
+      "title": "Host Git environment isolation for canonical repository identity",
+      "status": "accepted",
+      "date": "2026-09-04",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/policy/release-lifecycle.json",
+        "law/schemas/release-lifecycle-policy.schema.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-REL-0025-portable-certified-offline-bundle.md",
+      "adr_id": "ADR-REL-0025",
+      "title": "Bind portable certified evidence to the aggregate export signature",
+      "status": "proposed",
+      "date": "2026-09-04",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/policy/release-lifecycle.json",
+        "law/schemas/release-lifecycle-policy.schema.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-REL-0026-current-offline-mutation-check.md",
+      "adr_id": "ADR-REL-0026",
+      "title": "Bind the current offline mutation check to verified unit plans and closures",
+      "status": "proposed",
+      "date": "2026-09-06",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": ["law/schemas/release-offline-verification-receipt.schema.json"]
+    },
+    {
+      "file": "law/adr/ADR-REL-0027-retire-changesets-version-intent-from-commits.md",
+      "adr_id": "ADR-REL-0027",
+      "title": "Retire changesets and derive the minimum version bump from commit types",
+      "status": "accepted",
+      "date": "2026-09-26",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        ".changeset/config.json",
+        "scripts/check-changesets.mjs",
+        "packages/cli/src/commands/check/adapters.ts",
+        "docs/reference/scripts.md",
+        "scripts/run-pr-release-gate.mjs"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-REL-0028-prerelease-channel-ladder.md",
+      "adr_id": "ADR-REL-0028",
+      "title": "Declare a prerelease channel ladder with per-rung verification capabilities",
+      "status": "accepted",
+      "date": "2026-09-26",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/policy/release-lifecycle.json",
+        "law/schemas/release-lifecycle-policy.schema.json",
+        "law/schemas/release-intent.schema.json",
+        "scripts/release-channel.mjs"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-REL-0029-site-only-pages-publication.md",
+      "adr_id": "ADR-REL-0029",
+      "title": "Publish the documentation site from main without a release through the Pages journal",
+      "status": "accepted",
+      "date": "2026-09-27",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        ".github/workflows/site-publish.yml",
+        "scripts/process/publish-site.mjs",
+        "scripts/process/pages-publication.mjs",
+        "scripts/process/github-pages-journal.mjs",
+        "scripts/check-workflows.mjs",
+        "law/policy/credential-requirements.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-REL-0030-release-approval-topology.md",
+      "adr_id": "ADR-REL-0030",
+      "title": "One approval stop per environment per run from a complete job and credential matrix",
+      "status": "accepted",
+      "date": "2026-09-28",
+      "format": "v2",
+      "supersedes": ["ADR-REL-0029"],
+      "affected_rules": [
+        ".github/workflows/release.yml",
+        ".github/workflows/site-publish.yml",
+        "scripts/process/publish-site.mjs",
+        "scripts/process/pages-publication.mjs",
+        "scripts/process/github-pages-journal.mjs",
+        "scripts/check-workflows.mjs",
+        "law/policy/credential-requirements.json",
+        "docs/dev/operations/release-discipline.md"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-REL-0031-export-reconstructs-intent-policy.md",
+      "adr_id": "ADR-REL-0031",
+      "title": "The evidence exporter reconstructs the expected task policy from the pinned release intent",
+      "status": "accepted",
+      "date": "2026-09-28",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "packages/cli/vendor/evidence-verification/src/policy-builder.js",
+        "packages/cli/vendor/evidence-verification/src/export.js",
+        "packages/cli/vendor/evidence-verification/src/export-cli.js",
+        "packages/cli/vendor/evidence-verification/test/policy-builder.test.js",
+        "packages/cli/vendor/evidence-verification/test/export.test.js",
+        "packages/cli/vendor/evidence-verification/provenance.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-REL-0032-pages-rerun-identity.md",
+      "adr_id": "ADR-REL-0032",
+      "title": "A site-only Pages re-run resumes its own journal record and refuses an unknown submission",
+      "status": "accepted",
+      "date": "2026-09-28",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "scripts/process/publish-site.mjs",
+        "scripts/process/pages-publication.mjs",
+        "scripts/process/github-pages-journal.mjs",
+        "tests/contract/site-publication-cli.test.ts",
+        "tests/contract/pages-publication.test.ts",
+        "tests/contract/github-pages-journal.test.ts",
+        "docs/dev/operations/release-discipline.md"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-REL-0033-scorecard-store-publication-proof.md",
+      "adr_id": "ADR-REL-0033",
+      "title": "A release that changes the readings store is proven from the packed artifact in a disposable adopter",
+      "status": "accepted",
+      "date": "2026-09-29",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "docs/adopters/pack-resolution.md",
+        "scripts/rehearse-packed-adopter.mjs",
+        "package.json",
+        "packages/cli/src/commands/audit/scorecard.ts",
+        "packages/loop/src/scorecard/inputs.ts",
+        "docs/reference/scripts.md"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-REL-0034-staged-pages-preparation.md",
+      "adr_id": "ADR-REL-0034",
+      "title": "Cancellable read-only Pages preparation precedes serialized publication",
+      "status": "accepted",
+      "date": "2026-10-02",
+      "format": "v2",
+      "supersedes": ["ADR-REL-0030"],
+      "affected_rules": [
+        ".github/workflows/site-publish.yml",
+        "scripts/check-workflows.mjs",
+        "scripts/process/verify-site-preparation-artifact.mjs",
+        "law/policy/credential-requirements.json",
+        "docs/dev/operations/release-discipline.md",
+        "docs/dev/operations/workflows/site-publish.md",
+        "packages/sensors/src/harness-coherence.ts",
+        "packages/sensors/src/harness/workflow-parser.ts",
+        "packages/sensors/src/ci-invariant-gate.ts"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-REL-0035-trust-published-verifier-2-4.md",
+      "adr_id": "ADR-REL-0035",
+      "title": "Trust the independently verified published 2.4.0 verifier",
+      "status": "accepted",
+      "date": "2026-10-10",
+      "format": "v2",
+      "supersedes": ["ADR-CHK-0006", "ADR-CHK-0002"],
+      "affected_rules": [
+        "law/policy/trusted-local-rc-verifier-package.json",
+        "law/policy/adopter-defaults/toolchain.json",
+        ".devai/config/toolchain.json",
+        "law/schemas/toolchain-manifest.schema.json",
+        "law/policy/adopter-migrations.json",
+        "docs/dev/operations/release-discipline.md"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-SCR-0001-self-sensing-under-declared-roles.md",
+      "adr_id": "ADR-SCR-0001",
+      "title": "Admit sensing and recording on the framework repository under declared roles",
+      "status": "accepted",
+      "date": "2026-09-27",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/policy/self-dogfood.json",
+        "law/schemas/self-dogfood-policy.schema.json",
+        "packages/cli/src/services/self-dogfood.ts"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-SCR-0002-one-readings-store-and-the-na-ledger.md",
+      "adr_id": "ADR-SCR-0002",
+      "title": "One readings store for the scorecard and one ledger for N/A cells",
+      "status": "accepted",
+      "date": "2026-09-27",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "packages/cli/src/commands/audit/scorecard.ts",
+        "packages/loop/src/scorecard/inputs.ts",
+        "packages/loop/src/loop/scorecard.ts",
+        "law/policy/scorecard-na.json",
+        "law/policy/adopter-defaults/scorecard-na.json",
+        ".devai/config/scorecard-na.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-SCR-0003-declared-plant-surfaces.md",
+      "adr_id": "ADR-SCR-0003",
+      "title": "Declared plant surfaces and the skipped-reading rule for absent surfaces",
+      "status": "accepted",
+      "date": "2026-09-27",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/schemas/sensor-inputs.schema.json",
+        ".devai/config/sensor-inputs.json",
+        "packages/loop/src/loop/scorecard.ts",
+        "packages/sensors/src/plant-coverage.ts",
+        "packages/sensors/src/inventory-coverage.ts"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-SCR-0004-framework-specification-substrate.md",
+      "adr_id": "ADR-SCR-0004",
+      "title": "The framework carries its own specification substrate as records",
+      "status": "accepted",
+      "date": "2026-09-27",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/invariants",
+        "law/security/threat-model.json",
+        "law/security/data-handling.json",
+        "law/targets/performance.json",
+        "law/targets/robustness.json",
+        "law/trace.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-SCR-0005-declared-sensor-inputs.md",
+      "adr_id": "ADR-SCR-0005",
+      "title": "Sensor inputs are adopter declarations, including read-only host processes",
+      "status": "accepted",
+      "date": "2026-09-27",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/schemas/sensor-inputs.schema.json",
+        ".devai/config/sensor-inputs.json",
+        "law/policy/adopter-defaults/sensor-inputs.json",
+        "packages/cli/src/commands/sense/shared.ts",
+        "law/policy/authority-policy.json",
+        "packages/cli/src/authority/broker.ts"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-SCR-0006-governance-ledger-sensors-on-adr-v2.md",
+      "adr_id": "ADR-SCR-0006",
+      "title": "The governance ledger sensors validate second-generation decision records",
+      "status": "accepted",
+      "date": "2026-09-27",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "packages/loop/src/governance-ledger/index.ts",
+        "law/schemas/adr.schema.json",
+        "law/schemas/invariant.schema.json",
+        "packages/loop/src/loop/scorecard.ts"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-SCR-0007-e2e-and-bounded-coverage.md",
+      "adr_id": "ADR-SCR-0007",
+      "title": "The governed e2e configuration and a database-free coverage producer with a declared denominator",
+      "status": "accepted",
+      "date": "2026-09-28",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        ".devai/config/sensor-inputs.json",
+        "law/schemas/sensor-inputs.schema.json",
+        "packages/cli/src/authority/broker.ts",
+        "law/policy/subprocess-effects.json",
+        "tests/config/rc.e2e.config.ts",
+        "tests/config/local.coverage.config.ts",
+        "packages/sensors/src/test.ts",
+        "packages/sensors/src/test-coverage-depth.ts",
+        "package.json",
+        "law/policy/sensor-notes/e2e_test.md",
+        "law/policy/sensor-notes/test_coverage_depth.md"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-SCR-0008-immutable-readings-and-recording-order.md",
+      "adr_id": "ADR-SCR-0008",
+      "title": "Immutable readings, supersession by instance, recording order, and cell applicability",
+      "status": "accepted",
+      "date": "2026-09-28",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "packages/sensors/src/sensor-reading.ts",
+        "law/schemas/sensor-reading.schema.json",
+        "packages/cli/src/commands/sense/record.ts",
+        "packages/loop/src/scorecard/inputs.ts",
+        "law/policy/sense-presets.json",
+        "law/policy/self-dogfood.json",
+        "packages/sensors/src/harness-invariant-alignment-evidence.ts",
+        "law/schemas/observation-backlog.schema.json",
+        "packages/skills/src/operations/backlog.ts",
+        "packages/skills/src/post-merge-auditor/observation-bundle.ts",
+        "packages/sensors/src/inventory-performance.ts",
+        "packages/cli/src/commands/sense/readings-rebuild.ts",
+        "packages/sensors/src/inventory-adherence.ts",
+        "law/policy/scorecard-na.json",
+        ".devai/config/scorecard-na.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-SCR-0010-ci-sampling-contract.md",
+      "adr_id": "ADR-SCR-0010",
+      "title": "The harness sensors declare their CI sample and read UNKNOWN below the minimum",
+      "status": "accepted",
+      "date": "2026-09-28",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "packages/sensors/src/harness-green-main.ts",
+        "packages/sensors/src/harness-performance.ts",
+        "packages/sensors/src/harness-robustness.ts",
+        "packages/sensors/src/harness/gh-api.ts",
+        "law/schemas/sensor-inputs.schema.json",
+        ".devai/config/sensor-inputs.json",
+        "packages/cli/src/authority/broker.ts",
+        "law/policy/subprocess-effects.json",
+        "law/policy/sensor-notes/harness_green_main.md",
+        "law/policy/sensor-notes/harness_performance.md",
+        "law/policy/sensor-notes/harness_robustness.md"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-SCR-0011-sweep-kinds-admitted-by-the-packaged-schema.md",
+      "adr_id": "ADR-SCR-0011",
+      "title": "Every sweep read kind is admitted by the packaged SensorReading schema",
+      "status": "accepted",
+      "date": "2026-09-29",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/schemas/sensor-reading.schema.json",
+        "law/policy/sensor-registry.json",
+        "law/policy/sense-presets.json",
+        "packages/sensors/src/sensor-reading.ts",
+        "packages/schemas/src/index.ts",
+        "docs/reference/cli/sensor-kinds.md",
+        "docs/adopters/sensor-inputs.md"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-SCR-0012-inventory-cell-naming-amendment.md",
+      "adr_id": "ADR-SCR-0012",
+      "title": "Inventory cell names follow the sensor registry without changing applicability",
+      "status": "accepted",
+      "date": "2026-10-01",
+      "format": "v2",
+      "supersedes": ["ADR-SCR-0008"],
+      "affected_rules": [
+        "packages/sensors/src/sensor-reading.ts",
+        "law/schemas/sensor-reading.schema.json",
+        "packages/cli/src/commands/sense/record.ts",
+        "packages/loop/src/scorecard/inputs.ts",
+        "law/policy/sense-presets.json",
+        "law/policy/self-dogfood.json",
+        "packages/sensors/src/harness-invariant-alignment-evidence.ts",
+        "law/schemas/observation-backlog.schema.json",
+        "packages/skills/src/operations/backlog.ts",
+        "packages/skills/src/post-merge-auditor/observation-bundle.ts",
+        "packages/sensors/src/inventory-performance.ts",
+        "packages/cli/src/commands/sense/readings-rebuild.ts",
+        "packages/sensors/src/inventory-adherence.ts",
+        "law/policy/scorecard-na.json",
+        ".devai/config/scorecard-na.json"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-SCR-0013-gate-invariant-producers-in-the-preflight-lane.md",
+      "adr_id": "ADR-SCR-0013",
+      "title": "Gate invariant producers run in the preflight step, and audit scorecard is observed in process",
+      "status": "accepted",
+      "date": "2026-10-05",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        ".github/workflows/pull-request-checks.yml",
+        "packages/sensors/src/harness-invariant-alignment-workflow.ts",
+        "packages/sensors/src/harness-invariant-alignment.ts",
+        "packages/sensors/src/harness-invariant-alignment-evidence.ts",
+        "packages/cli/src/commands/sense/record.ts",
+        "packages/cli/src/commands/sense/adapter-readers.ts",
+        "packages/cli/src/commands/sense/adapters.ts",
+        "packages/cli/src/commands/audit/scorecard.ts"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-SCR-0014-green-main-counts-final-heads.md",
+      "adr_id": "ADR-SCR-0014",
+      "title": "harness_green_main counts one gate outcome per pull request, on its final head",
+      "status": "accepted",
+      "date": "2026-10-08",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "packages/sensors/src/harness-green-main.ts",
+        "packages/sensors/src/harness/gh-api.ts",
+        "law/schemas/sensor-inputs.schema.json",
+        ".devai/config/sensor-inputs.json",
+        "packages/cli/src/authority/broker.ts",
+        "law/policy/subprocess-effects.json",
+        "law/policy/sensor-notes/harness_green_main.md",
+        "docs/adopters/sensor-inputs.md"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-SCR-0015-candidate-bound-sensor-inputs-and-instances.md",
+      "adr_id": "ADR-SCR-0015",
+      "title": "Candidate-bound sensor instances and policy-owned task and route inputs",
+      "status": "accepted",
+      "date": "2026-10-10",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/schemas/adopter-policy.schema.json",
+        "law/schemas/sensor-inputs.schema.json",
+        "law/schemas/test-task-descriptor.schema.json",
+        "law/policy/adopter-migrations.json",
+        "law/policy/subprocess-effects.json",
+        "packages/cli/src/services/adopter-policy.ts",
+        "packages/cli/src/services/adopter-policy-binding.ts",
+        "packages/cli/src/commands/init/bind-adapters.ts",
+        "packages/cli/src/commands/doctor-execution-readiness.ts",
+        "packages/cli/src/commands/sense/task-binding.ts",
+        "packages/cli/src/commands/sense/task-selection.ts",
+        "packages/cli/src/commands/sense/run-set.ts",
+        "packages/cli/src/commands/sense/reading-instance.ts",
+        "packages/cli/src/commands/sense/readings-rebuild.ts",
+        "packages/cli/src/authority/broker.ts",
+        "packages/sensors/src/docs-drift.ts"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-SCR-0016-lossless-endpoint-observation-identity.md",
+      "adr_id": "ADR-SCR-0016",
+      "title": "Lossless endpoint observation identity and explicit legacy resolution",
+      "status": "accepted",
+      "date": "2026-10-10",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/schemas/api-map.schema.json",
+        "law/schemas/coverage-matrix.schema.json",
+        "law/schemas/use-cases.schema.json",
+        "law/policy/sensor-notes/inventory_api.md",
+        "law/policy/sensor-notes/inventory_rbac.md",
+        "packages/sensors/src/inventory-endpoint-identity.ts",
+        "packages/sensors/src/inventory-api.ts",
+        "packages/sensors/src/inventory-coverage-inputs.ts",
+        "packages/sensors/src/inventory-coverage.ts",
+        "packages/sensors/src/inventory-rbac.ts",
+        "packages/cli/src/commands/sense/readings-rebuild.ts"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-SCR-0017-declared-audit-producers-and-complete-results.md",
+      "adr_id": "ADR-SCR-0017",
+      "title": "Declared audit producers, reviewed effects and complete executable results",
+      "status": "accepted",
+      "date": "2026-10-10",
+      "format": "v2",
+      "supersedes": ["ADR-SCR-0012", "ADR-SCR-0015", "ADR-SCR-0013"],
+      "affected_rules": [
+        "law/schemas/adopter-policy.schema.json",
+        "law/schemas/test-task-descriptor.schema.json",
+        "law/schemas/invariant-producers.schema.json",
+        "law/schemas/reviewed-workflow-steps.schema.json",
+        "law/schemas/test-result-population.schema.json",
+        "law/policy/subprocess-effects.json",
+        "law/policy/adopter-defaults/invariant-producers.json",
+        "law/policy/adopter-defaults/reviewed-workflow-steps.json",
+        "law/policy/sensor-notes/test_idiomaticity.md",
+        "law/policy/sensor-notes/harness_coherence.md",
+        "packages/cli/src/services/adopter-policy.ts",
+        "packages/cli/src/services/adopter-policy-binding.ts",
+        "packages/cli/src/commands/init/bind-adapters.ts",
+        "packages/cli/src/commands/sense/adapter-readers.ts",
+        "packages/cli/src/commands/sense/task-selection.ts",
+        "packages/cli/src/authority/broker.ts",
+        "packages/cli/src/commands/sense/task-binding.ts",
+        "packages/cli/src/commands/sense/reading-instance.ts",
+        "packages/cli/src/commands/sense/record.ts",
+        "packages/cli/src/commands/sense/declared-invariant-producers.ts",
+        "packages/loop/src/scorecard/latest.ts",
+        "packages/loop/src/scorecard/inputs.ts",
+        "packages/loop/src/loop/scorecard.ts",
+        "packages/sensors/src/harness-invariant-alignment.ts",
+        "packages/sensors/src/harness-invariant-alignment-evidence.ts",
+        "packages/sensors/src/harness/reviewed-workflow-steps.ts",
+        "packages/sensors/src/test-idiomaticity.ts"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-SCR-0018-read-only-workflow-step-inventory.md",
+      "adr_id": "ADR-SCR-0018",
+      "title": "Installed read-only workflow step review inventory",
+      "status": "accepted",
+      "date": "2026-10-11",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/policy/round-execution.json",
+        "law/schemas/round-execution.schema.json",
+        "law/schemas/workflow-step-inventory.schema.json",
+        "law/policy/adopter-migrations.json",
+        "packages/sensors/src/harness/workflow-parser.ts",
+        "packages/cli/src/commands/sense/inventory.ts",
+        "docs/reference/cli/render-generated-reference.mjs"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-SCR-0019-package-owned-native-coverage-adapter.md",
+      "adr_id": "ADR-SCR-0019",
+      "title": "Package-owned finite native coverage helper adapter",
+      "status": "accepted",
+      "date": "2026-10-11",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "packages/cli/src/native-coverage-adapter.ts",
+        "packages/cli/src/commands/sense/native-config-capabilities.ts",
+        "packages/cli/src/commands/sense/native-runner-selection.ts",
+        "packages/cli/src/native-input-provenance.ts",
+        "packages/cli/scripts/assemble-package.mjs",
+        "packages/cli/package.json",
+        "docs/dev/operations/adopter-audit-interfaces.md"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-SCR-0020-owned-native-service-fixtures.md",
+      "adr_id": "ADR-SCR-0020",
+      "title": "Finite owned service fixtures for native test populations",
+      "status": "accepted",
+      "date": "2026-10-11",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/policy/native-service-profiles.json",
+        "law/policy/native-service-backends.json",
+        "law/schemas/native-service-backends-policy.schema.json",
+        "law/schemas/native-service-profile.schema.json",
+        "law/schemas/native-service-profiles-policy.schema.json",
+        "law/schemas/test-result-population.schema.json",
+        "law/schemas/action-registry.schema.json",
+        "law/schemas/subprocess-effects.schema.json",
+        "law/policy/subprocess-effects.json",
+        "packages/cli/src/command-manifest.ts",
+        "packages/cli/src/authority/sense-selection.ts",
+        "packages/cli/src/commands/sense/task-selection.ts",
+        "packages/cli/src/commands/sense/task-binding.ts",
+        "packages/cli/src/native-input-provenance.ts",
+        "packages/cli/src/commands/sense/native-input-provenance.ts",
+        "docs/dev/operations/adopter-audit-interfaces.md"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-SCR-0021-unconsumed-native-directory-link-metadata.md",
+      "adr_id": "ADR-SCR-0021",
+      "title": "Bound unconsumed directory links as native candidate metadata",
+      "status": "accepted",
+      "date": "2026-10-19",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "packages/cli/src/commands/sense/native-candidate-links.ts",
+        "packages/cli/src/commands/sense/native-runner-selection.ts"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-SCR-0022-static-json-data-aliases.md",
+      "adr_id": "ADR-SCR-0022",
+      "title": "Classify bounded JSON data aliases in read-only static test observations",
+      "status": "accepted",
+      "date": "2026-10-22",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "packages/sensors/src/json-data-alias.ts",
+        "packages/sensors/src/test-file-population.ts"
+      ]
+    },
+    {
+      "file": "law/adr/ADR-SEC-0001-credential-requirements-manifest.md",
+      "adr_id": "ADR-SEC-0001",
+      "title": "Declare credential requirements per effect and probe presence without reading values",
+      "status": "accepted",
+      "date": "2026-09-26",
+      "format": "v2",
+      "supersedes": [],
+      "affected_rules": [
+        "law/schemas/credential-requirements.schema.json",
+        "law/policy/credential-requirements.json",
+        "law/policy/adopter-defaults/credential-requirements-binding.json",
+        "scripts/check-workflows.mjs",
+        "packages/cli/src/commands/doctor.ts",
+        "scripts/process/release-prerequisites.mjs",
+        ".github/workflows/release.yml",
+        ".github/workflows/devai-ledger-verify.yml",
+        "docs/adopters/install.md"
+      ]
+    }
+  ]
+}

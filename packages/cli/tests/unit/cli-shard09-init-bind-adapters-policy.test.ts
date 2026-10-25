@@ -445,3 +445,30 @@ describe('CLI shard 09 init bind adapter and policy boundaries', () => {
     }
   });
 });
+
+describe('REC-B1-A-P1 opt-in review preserves bind branches', () => {
+  it('P1-23 leaves ordinary no-write advisory exact after adding review selectors', async () => {
+    const root = repository('devai-p1-legacy-advisory');
+    const before = readFileSync(join(root, '.devai/config/project.json'), 'utf8');
+    expect(await invoke(root, [])).toEqual({
+      exit: 0,
+      stderr: '',
+      stdout: `${JSON.stringify({ plan: 'authority-policy' })}\n`,
+    });
+    expect(readFileSync(join(root, '.devai/config/project.json'), 'utf8')).toBe(before);
+    expect(existsSync(join(root, '.devai/config/authority-policy.json'))).toBe(false);
+  });
+
+  it('P1-03 refuses opted-in non-terminal invocation before using the legacy materialization capability', async () => {
+    const root = repository('devai-p1-nonterminal');
+    const result = await invoke(root, [
+      '--review-authority-policy',
+      '--after-constitution',
+      '--write',
+    ]);
+    expect(result.exit).toBe(2);
+    expect(result.stdout).toContain('AUTHORITY_POLICY_REVIEW_TERMINAL_REQUIRED');
+    expect(result.stdout).not.toContain('"artifact"');
+    expect(existsSync(join(root, '.devai/config/authority-policy.json'))).toBe(false);
+  });
+});

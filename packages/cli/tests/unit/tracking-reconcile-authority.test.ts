@@ -420,4 +420,27 @@ describe('the derived effect scope is narrower than an Owner session', () => {
       'AUTHORITY_HOST_SCOPE_INVALID',
     );
   });
+
+  it.each(['protected-release', 'reconciliation-host', 'proof-index', 'unknown'])(
+    'refuses %s even when its arguments resemble an allowed tracking process',
+    (kind) => {
+      const { scope, dispose } = createTrackingReconcileScope('/repo', ROUND);
+      const apply = vi.fn(() => 'must not apply');
+      try {
+        expect(() =>
+          scope.apply_effect(
+            {
+              kind,
+              symbol: 'spawnSync',
+              arguments: ['gh', ['api', 'repos/example/adopter/issues/123']],
+            } as AuthorityHostEffectRequest,
+            apply,
+          ),
+        ).toThrow('TRACKING_RECONCILE_PROCESS_FORBIDDEN');
+        expect(apply).not.toHaveBeenCalled();
+      } finally {
+        dispose();
+      }
+    },
+  );
 });
