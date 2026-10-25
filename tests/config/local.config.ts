@@ -30,6 +30,15 @@ export const SUBPROCESS_TEST_TIMEOUT_MS = 30_000;
  */
 export const MAX_TEST_WORKERS = Math.max(2, Math.floor(availableParallelism() / 2));
 
+// These real native fixtures exceeded 30s even in an isolated serial run. Keep
+// their full assertions and give only these two files the existing native CI
+// and RC 60s case ceiling, with two workers before unrelated local tests.
+export const NATIVE_HOST_LANE = [
+  'packages/authority/tests/unit/reconciliation-host-owner.test.ts',
+  'packages/authority/tests/unit/reconciliation-host-provision.test.ts',
+] as const;
+export const NATIVE_HOST_TEST_TIMEOUT_MS = 60_000;
+
 export const RC_ONLY = [
   'packages/authority/tests/unit/authority-resource-boundaries.red.test.ts',
   'packages/skills/tests/recipes/adapters.test.ts',
@@ -53,8 +62,6 @@ export const RC_ONLY = [
  * complete-file quiet diagnostics passed without increasing a timeout or dropping a case.
  */
 export const SERIAL_LANE = [
-  'packages/authority/tests/unit/reconciliation-host-owner.test.ts',
-  'packages/authority/tests/unit/reconciliation-host-provision.test.ts',
   'packages/cli/tests/unit/authority-policy-review.test.ts',
   'packages/cli/tests/unit/check-adapters-acceptance.test.ts',
   'packages/cli/tests/unit/release-export-store-bundled-depth.test.ts',
@@ -106,9 +113,22 @@ export default defineConfig({
         test: {
           name: 'local',
           include: [...LOCAL_INCLUDE],
-          exclude: [...EXCLUDE, ...SERIAL_LANE],
+          exclude: [...EXCLUDE, ...SERIAL_LANE, ...NATIVE_HOST_LANE],
           maxWorkers: MAX_TEST_WORKERS,
           sequence: { groupOrder: 0 },
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'local-native-host',
+          include: [...NATIVE_HOST_LANE],
+          exclude: [...EXCLUDE],
+          maxWorkers: 2,
+          fileParallelism: true,
+          testTimeout: NATIVE_HOST_TEST_TIMEOUT_MS,
+          hookTimeout: SUBPROCESS_TEST_TIMEOUT_MS,
+          sequence: { groupOrder: -1 },
         },
       },
       {
