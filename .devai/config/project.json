@@ -6,10 +6,10 @@
   },
   "profile": "tier3",
   "constitution": {
-    "version": "1.1.0",
-    "sha256": "8353c3b81d38e0f9b913cbeb6762bc149605989c1b16f52d2c63ba9892f71270"
+    "version": "1.2.0",
+    "sha256": "d5dfdc972161e0f848dd859be7bbfa510973c5c9a449a0f9e6b8960e4f5ac96a"
   },
-  "devai_version": "2.6.4",
+  "devai_version": "2.8.0",
   "repo": {
     "kind": "library"
   },
