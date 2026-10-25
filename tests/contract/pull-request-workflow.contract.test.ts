@@ -784,6 +784,8 @@ describe('two partitions and required native qualification (ADR-CHK-0010)', () =
   });
 
   it.each([
+    'missing-toolchain-selection',
+    'optional-git-capability',
     'missing',
     'conditional',
     'optional',
@@ -798,6 +800,21 @@ describe('two partitions and required native qualification (ADR-CHK-0010)', () =
   ])('refuses %s native qualification in the exact workflow', (variant) => {
     const root = workflowTree();
     mutateWorkflow(root, (document) => {
+      if (variant === 'missing-toolchain-selection' || variant === 'optional-git-capability') {
+        const run = String(document.getIn(['jobs', 'native-apfs', 'steps', 2, 'run']));
+        document.setIn(
+          ['jobs', 'native-apfs', 'steps', 2, 'run'],
+          variant === 'missing-toolchain-selection'
+            ? run.replace(
+                'sudo /usr/bin/xcode-select --switch /Applications/Xcode_26.3.app/Contents/Developer\n',
+                '',
+              )
+            : run.replace(
+                'rev-parse --verify HEAD\npnpm install',
+                'rev-parse --verify HEAD || true\npnpm install',
+              ),
+        );
+      }
       if (variant === 'missing') document.deleteIn(['jobs', 'native-apfs']);
       if (variant === 'conditional') document.setIn(['jobs', 'native-apfs', 'if'], 'false');
       if (variant === 'custom-shell' || variant === 'install-shell')
