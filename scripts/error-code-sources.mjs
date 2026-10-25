@@ -6,7 +6,26 @@
  * Quoted names that match a code prefix but are not codes; RELEASE_TAG is a workflow data variable
  * the harness effect analysis admits (#325).
  */
-export const NOT_CODES = new Set(['ACTION_EFFECTS', 'GITHUB_TOKEN', 'POST_CUTOFF', 'RELEASE_TAG']);
+export const NOT_CODES = new Set([
+  'ACTION_EFFECTS',
+  // Git environment variable names inspected by the readonly host probe, not diagnostics.
+  'GIT_ALTERNATE_OBJECT_DIRECTORIES',
+  'GIT_COMMON_DIR',
+  'GIT_CONFIG_COUNT',
+  'GIT_CONFIG_PARAMETERS',
+  'GIT_DIR',
+  'GIT_INDEX_FILE',
+  'GIT_NAMESPACE',
+  'GIT_OBJECT_DIRECTORY',
+  'GIT_REPLACE_REF_BASE',
+  'GIT_SHALLOW_FILE',
+  'GIT_WORK_TREE',
+  'GITHUB_TOKEN',
+  'POST_CUTOFF',
+  'RECONCILIATION_ADMISSION_SEED_SHA256',
+  'RECONCILIATION_ADMISSION_SEED_SIZE',
+  'RELEASE_TAG',
+]);
 
 /** The first segment of every DEVAI diagnostic code the reference lists. */
 export const ERROR_CODE_PREFIXES = new Set([
@@ -55,6 +74,7 @@ export const ERROR_CODE_PREFIXES = new Set([
   'RATIFICATION',
   'RECEIPT',
   'RECIPE',
+  'RECONCILIATION',
   'RELEASE',
   'ROUND',
   'ROUTE',
