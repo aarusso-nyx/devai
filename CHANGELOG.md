@@ -5,6 +5,9 @@
 This minor release adds bounded recovery of a historical proof anchor and
 Owner-approved merge reconciliation under constitution 1.2.0.
 
+The protected release verifier remains the exact trusted `@aarusso-nyx/devai@2.4.0`
+package and provenance; this release does not rotate that trust pin.
+
 - Recover a specified historical physical line from an explicitly preserved
   divergent source, with exact source digests and current-head guards. Newest-line
   recovery remains a separate operation.
