@@ -85,7 +85,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
     sha256: '54bb87f679c366459df5f782319b69e3db5d2ff2677be044bf89198efaa1a992',
     effect: 'read-only',
     workflow:
-      'devai-ledger-verify.yml#verify-ledger[4], release.yml#verify-ledger[4], release.yml#build-release[9], release.yml#finalize-release[1]',
+      'devai-ledger-verify.yml#verify-ledger[4], release.yml#build-release[9], release.yml#finalize-release[1], release.yml#verify-ledger[4]',
     step: 'Check out approved process controls',
     review:
       'Checks out ${{ vars.DEVAI_PROCESS_CONTROL_COMMIT }} into release-control without persisted credentials; selects source, publishes nothing.',
@@ -95,7 +95,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
     sha256: '5fef52e1debe90acd745e6cc496632a31687d39d0d2e38d6d4d53396ea1084e2',
     effect: 'read-only',
     workflow:
-      'devai-ledger-verify.yml#verify-ledger[5], release.yml#verify-ledger[5], release.yml#build-release[10], release.yml#finalize-release[2]',
+      'devai-ledger-verify.yml#verify-ledger[5], release.yml#build-release[10], release.yml#finalize-release[2], release.yml#verify-ledger[5]',
     step: 'Bind approved process controls',
     review:
       'Local verification, build, or binding step: writes only the workspace, runner files, or step outputs, and makes no external write.',
@@ -136,7 +136,8 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
   {
     sha256: 'a5a7ea3605608cc3fd140e071d6fb7270542636ea3a80ca33a6c04484976a6c0',
     effect: 'read-only',
-    workflow: 'pull-request-checks.yml#gate-cli[0], pull-request-checks.yml#gate-rest[0]',
+    workflow:
+      'pull-request-checks.yml#gate-cli[0], pull-request-checks.yml#gate-rest[0], pull-request-checks.yml#native-apfs[0]',
     step: 'Check out exact candidate',
     review:
       "Checks out ${{ github.event_name == 'merge_group' && github.event.merge_group.head_sha || github.event.pull_request.head.sha }} into the workspace without persisted credentials; selects source, publishes nothing.",
@@ -145,7 +146,8 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
   {
     sha256: 'b7ed7ae3efcf18f796d7496b73aa9531724d8c844932e1d114d38937fa9b7018',
     effect: 'read-only',
-    workflow: 'pull-request-checks.yml#gate-cli[1], pull-request-checks.yml#gate-rest[1]',
+    workflow:
+      'pull-request-checks.yml#gate-cli[1], pull-request-checks.yml#gate-rest[1], pull-request-checks.yml#native-apfs[1]',
     step: 'Set up pnpm and Node',
     review:
       'Repository toolchain action with declared inputs: installs Node and optionally pnpm and a registry scope; publishes nothing.',
@@ -282,12 +284,12 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
     files: [],
   },
   {
-    sha256: '5e9f0dd12c5ae611711a2a29c8667fea0ef3802731af48e7a75353d19559278d',
+    sha256: '8a88a06d9bfc59cd58bc2b4f97711f400eba0b73a9a2f28ff15627b4ec710212',
     effect: 'read-only',
     workflow: 'pull-request-checks.yml#gate[3]',
     step: 'Aggregate the partition reports',
     review:
-      'Runs scripts/aggregate-gate-partitions.mjs over the two downloaded partition reports; reads them, runs no check node, and prints one JSON line; makes no external write.',
+      'ADR-CHK-0010: requires successful native APFS qualification before the unchanged exact two-partition report aggregation; reads runner reports and publishes nothing.',
     files: [
       {
         path: 'scripts/aggregate-gate-partitions.mjs',
@@ -1034,6 +1036,51 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
     step: 'Rebase each open pull request behind main',
     review:
       "Runs only when both credentials are present; on push it rebases each open, non-draft, same-repository pull request behind main, and on pull_request_target only the event pull request (the job guard has required it same-repository and non-draft), through PUT pulls/{n}/update-branch with update_method rebase and the expected head sha, authenticated by the App token. Event values arrive only through env and the script checks out and runs no pull-request content. It changes only this repository's pull-request branches, never a fork and never a release surface, and reports a pull request it cannot compare or update without failing the others.",
+    files: [],
+  },
+  {
+    sha256: '85f06d044c4d7796cb563905a972ec1a822a1337c7d05caa8cab0d8fc0d1ce7b',
+    effect: 'read-only',
+    workflow: 'pull-request-checks.yml#native-apfs[2]',
+    step: 'Compile the native qualification dependencies',
+    review:
+      'ADR-CHK-0010: exact native test qualification only; frozen install, dependency build, actual Darwin/APFS preflight and unchanged disposable provisioning/Owner tests, or runner report upload. No protected environment, adopter operation, repository mutation or publication.',
+    files: [
+      {
+        path: 'package.json',
+        sha256: '5eadba4e197d13dd87970b745ed8054379524fcf8d94cd6248a4a12b6a41179b',
+      },
+      {
+        path: 'scripts/process/bootstrap-check-runner.mjs',
+        sha256: 'cc2e1f307390ba7db8c0666a0a2ea15780d19c4657d8d3cd656d796b6a63e4e6',
+      },
+    ],
+  },
+  {
+    sha256: 'ecfe5647752d6d638c912d3dd9118ccdf992a4c7d5818d28c61a8d623afdf991',
+    effect: 'read-only',
+    workflow: 'pull-request-checks.yml#native-apfs[3]',
+    step: 'Qualify actual native APFS contracts',
+    review:
+      'ADR-CHK-0010: exact native test qualification only; frozen install, dependency build, actual Darwin/APFS preflight and unchanged disposable provisioning/Owner tests, or runner report upload. No protected environment, adopter operation, repository mutation or publication.',
+    files: [
+      {
+        path: 'scripts/process/validation-runner.mjs',
+        sha256: '97e9cd12bc4d6c1844af10d4474111bdb54ff1467deadecea308ecbf74926368',
+      },
+      {
+        path: 'scripts/run-native-apfs-tests.mjs',
+        sha256: '9b3920bc49f4692907c30365f867fad18c90277203118b3dddfc0b84d6d0c967',
+      },
+    ],
+  },
+  {
+    sha256: 'c74cbd31ec8ca436206aaab75af4ffd9dd07b8ad200bffd334662ec5f824e7fc',
+    effect: 'read-only',
+    workflow: 'pull-request-checks.yml#native-apfs[4]',
+    step: 'Upload native qualification report',
+    review:
+      'ADR-CHK-0010: exact native test qualification only; frozen install, dependency build, actual Darwin/APFS preflight and unchanged disposable provisioning/Owner tests, or runner report upload. No protected environment, adopter operation, repository mutation or publication.',
     files: [],
   },
 ];

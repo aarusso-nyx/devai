@@ -1902,7 +1902,10 @@ export function jobEffectFacts(
   function loaderVariable(key: string): boolean {
     return !inertEnvironment.has(key);
   }
-  function executionMetadata(fields: Map<string, ExecutionYaml>): boolean {
+  function executionMetadata(
+    fields: Map<string, ExecutionYaml>,
+    allowNativeRunner = false,
+  ): boolean {
     const environment = fields.get('env');
     if (environment !== undefined) {
       const entries = yamlMap(environment);
@@ -1927,7 +1930,11 @@ export function jobEffectFacts(
     const cwd = fields.get('working-directory');
     if (cwd !== undefined && !['.', './'].includes(yamlString(cwd) ?? '')) return false;
     const runner = fields.get('runs-on');
-    if (runner !== undefined && !/^ubuntu-(?:latest|\d{2}\.\d{2})$/u.test(yamlString(runner) ?? ''))
+    if (
+      runner !== undefined &&
+      !/^ubuntu-(?:latest|\d{2}\.\d{2})$/u.test(yamlString(runner) ?? '') &&
+      !(allowNativeRunner && yamlString(runner) === 'macos-15')
+    )
       return false;
     const defaults = fields.get('defaults');
     if (defaults !== undefined) {
@@ -2207,7 +2214,30 @@ export function jobEffectFacts(
       return unsafeControls();
   }
   let executions: Executions | undefined;
-  if (executionMetadata(workflowFields) && executionMetadata(jobFields)) {
+  // ADR-CHK-0010: only the exact built-in reviewed native qualification job admits
+  // this runner. Adopter reviews, defaults and transplanted reviewed steps do not.
+  let nativeReviewedJob = false;
+  const nativeSteps = jobFields.get('steps');
+  if (name === 'native-apfs' && nativeSteps?.kind === 'list' && nativeSteps.items.length === 5) {
+    try {
+      nativeReviewedJob =
+        readCandidateFile(repoRoot, '.github/workflows/pull-request-checks.yml').toString(
+          'utf8',
+        ) === content &&
+        nativeSteps.items.every((step, index) => {
+          const entry = reviewedStep(step);
+          return (
+            entry?.effect === 'read-only' &&
+            entry.workflow
+              .split(', ')
+              .includes(`pull-request-checks.yml#native-apfs[${String(index)}]`)
+          );
+        });
+    } catch {
+      nativeReviewedJob = false;
+    }
+  }
+  if (executionMetadata(workflowFields) && executionMetadata(jobFields, nativeReviewedJob)) {
     if (jobFields.has('uses')) {
       const reference = yamlString(jobFields.get('uses'));
       // R5 / WHOLE19-REV-003: a reusable call forwarding with: or secrets: (including
