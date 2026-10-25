@@ -86,7 +86,9 @@ installing the frozen dependencies and compiling the runner. It requires actual 
 and libuv runtime, then runs the full provisioning and Owner native test files. Its
 JSON report must contain both files, passing cases and zero skipped cases. This native
 invocation explicitly sets a 60-second per-case hang ceiling, matching the RC coverage
-value. Local test and hook defaults remain unchanged. The
+value. The same two native files run in an isolated two-worker local project with
+that 60-second case ceiling before the portable tests. Portable and serial local
+test defaults and local hook defaults remain 30 seconds. The
 aggregator explicitly requires its result to be `success`; a skipped, failed or
 cancelled native job blocks the required check. It uses no protected environment.
 Linux still runs the portable population and the actual unsupported-host refusal.
