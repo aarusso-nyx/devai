@@ -79,8 +79,10 @@ step.
 
 ## Native APFS qualification
 
-`native-apfs` checks out the exact candidate, installs the frozen dependencies and
-compiles the runner. It requires actual Darwin/APFS with the supported pinned Node
+`native-apfs` checks out the exact candidate. On its disposable runner it logs the
+default system Git capability, selects the installed Xcode 26.3 toolchain and requires
+`/usr/bin/git` with the unchanged native flags in the stripped environment before
+installing the frozen dependencies and compiling the runner. It requires actual Darwin/APFS with the supported pinned Node
 and libuv runtime, then runs the full provisioning and Owner native test files. Its
 JSON report must contain both files, passing cases and zero skipped cases. The
 aggregator explicitly requires its result to be `success`; a skipped, failed or
