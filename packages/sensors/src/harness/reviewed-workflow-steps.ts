@@ -571,7 +571,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
       },
       {
         path: 'scripts/generate-error-code-reference.mjs',
-        sha256: '3b5f04790e8bf7933ff668790c48df3ef65126b59c5602b8d947eb6dea71686f',
+        sha256: '1d2ce5a391d2ca6f0cfdc28b8c24bde7b25c6ea5b8ab480678901892fde9482e',
       },
       {
         path: 'scripts/generate-scorecard-page.mjs',
