@@ -22,3 +22,6 @@ scripts/process/__pycache__/
 
 # Locally regenerated context graph; not release candidate inputs.
 graft/
+
+# Repository-local installed-package driver bytecode.
+packages/cli/tests/installed/__pycache__/

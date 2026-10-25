@@ -26,3 +26,7 @@ packages/cli/tests/fixtures/mutation-toolchain/
 
 # Third-party site dependency; preserve the separately reviewed upstream patch.
 docs/site/vendor/
+
+# Frozen U1/B1 approval packets, captured receipts and independent review probes.
+# Their exact bytes are preserved by the packet/provenance manifests.
+docs/dev/operations/u1-b1-recovery-20261024/
