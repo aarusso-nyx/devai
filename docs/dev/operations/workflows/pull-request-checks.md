@@ -84,7 +84,9 @@ default system Git capability, selects the installed Xcode 26.3 toolchain and re
 `/usr/bin/git` with the unchanged native flags in the stripped environment before
 installing the frozen dependencies and compiling the runner. It requires actual Darwin/APFS with the supported pinned Node
 and libuv runtime, then runs the full provisioning and Owner native test files. Its
-JSON report must contain both files, passing cases and zero skipped cases. The
+JSON report must contain both files, passing cases and zero skipped cases. This native
+invocation explicitly sets a 60-second per-case hang ceiling, matching the RC coverage
+value. Local test and hook defaults remain unchanged. The
 aggregator explicitly requires its result to be `success`; a skipped, failed or
 cancelled native job blocks the required check. It uses no protected environment.
 Linux still runs the portable population and the actual unsupported-host refusal.
