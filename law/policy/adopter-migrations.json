@@ -477,6 +477,34 @@
           }
         }
       ]
+    },
+    {
+      "version": "2.8.0",
+      "status": "released",
+      "changes": [
+        {
+          "id": "MIG-2.8.0-constitution-1-2-0",
+          "kind": "constitution",
+          "summary": "Constitution 1.2.0 adds the bounded source-bound canonical-selection and one-proof-entry Git index machine exceptions in Article 6, preserving historical authority rows and role safeguards. Architect review and explicit constitution binding are required. Ordinary upgrade does not provision a reconciliation host, approve a plan, recover proofs, stage the proof index, publish inventory or grant DETRAN execution authority.",
+          "decision_records": ["ADR-GOV-0027", "ADR-EVI-0007"],
+          "segments": ["constitution", "authority"],
+          "files": [
+            ".devai/pin/constitution.md",
+            ".devai/config/project.json",
+            ".devai/config/authority-policy.json"
+          ],
+          "decision_required": true,
+          "constitution": {
+            "from": "1.1.0",
+            "to": "1.2.0"
+          },
+          "obligation": {
+            "check": "constitution-version",
+            "requirement": "Review ADR-GOV-0027 and the exact installed Constitution 1.2.0 bytes and digest, then explicitly request init upgrade --constitution (or init bind --constitution). This does not authorize reconciliation or DETRAN runtime effects."
+          }
+        }
+      ],
+      "date": "2026-10-25"
     }
   ]
 }

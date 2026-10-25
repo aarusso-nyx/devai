@@ -1,19 +1,19 @@
 ---
 id: CONSTITUTION
-title: DEVAI Constitution 1.1.0
+title: DEVAI Constitution 1.2.0
 type: constitution
 status: active
-date: 2026-10-21
+date: 2026-10-24
 authority: Architect
 supersedes: null
 superseded_by: null
 ---
 
-# DEVAI Constitution — 1.1.0
+# DEVAI Constitution — 1.2.0
 
 ## Status and scope
 
-**Version:** 1.1.0
+**Version:** 1.2.0
 **Status:** active
 
 This is the immutable axiom set for DEVAI. Every other artifact in the framework — contracts, charters, skills, bootstrap layout, scorecard — derives from these axioms and may not contradict them.
@@ -90,6 +90,9 @@ Core authority is decided by a fixed path prefix of at most two segments — a t
 - `.devai/local/rounds/` — role-bounded runtime round state; each role writes only its declared task or audit output through an authorized action.
 - `docs/` — Architect (published human documentation).
 - `record/` — machine only: `record/derived/` (F4) is written only by the regeneration subsystem; `record/proofs/` is appended only by executing verbs, hash-linked, attributed to the verb and committed by the session that produced it. A human edit under `record/` is an authority violation regardless of role.
+
+At an explicitly Owner-approved unresolved Git merge, a registered machine evidence-reconciliation verb may materialize the complete canonical chain of one exact published parent as the active merge result only after it has durably preserved and hash-verified the complete chains, proof epochs and ancestry of every displaced parent and the common base. This is a narrowly declared canonical-selection exception to append-only storage, not permission to edit, truncate, reorder, resequence, splice or re-record any source history or proof epoch. The Inspector-initiated verb must bind the exact parents, semantic index, source manifests, selected canonical prefix and immutable custody receipts, refuse every unapproved delta, and append a distinct canonical-selection evidence entry to the selected prefix through the normal machine writer before publishing the result. Every displaced active event remains explicitly archival; missing proof anchors require their separately authorized supported recovery. No human or client extension may exercise or widen this exception.
+
 - `.devai/pin/` and `.devai/config/` — modified only through registered `init apply` or `init bind` actions, materialized from canonical package or policy sources; a checker never writes its own inputs.
 - `.devai/state/` — mutable head state written by executing verbs; never hand-edited.
 - `packages/` and root workspace configuration — Engineer (F2).
@@ -99,6 +102,8 @@ Core authority is decided by a fixed path prefix of at most two segments — a t
 - Host-tool configuration directories (`.changeset/`, `.claude/`, and peers) — path fixed by the toolchain; contents classified by this table per content class (agent permission policy is F5-host under Architect authority; runtime directories are scratch-class).
 
 Clients may extend the path mapping for client-specific disciplines through a declared, versioned, and bound extension. An extension names its roots explicitly; no root is inferred from a directory's existence, and a root never equals or contains a core-table prefix. Under a declared root, authority is decided by path class in a fixed order: the architecture class (schema definitions, blueprints, and the architectural specifications the extension names) is Architect; the test class (test directories and colocated test files) is Inspector, with the Engineer's focused-regression verb of Article 7; every remaining path under the root, including local implementation documentation, is Engineer. A class rule takes precedence over the root grant, the architecture class over the test class, and two extension rules that would grant different roles at the same precedence are ambiguous: the write is refused. Extensions are additive: they never alter, narrow, or shadow a core row, and the core mapping is immutable at a given constitution version. An extension is materialized only through a registered binding action from a validated, digest-bound source and is verified at every write; an extension whose source is absent, invalid, or unbound fails closed, and no grant survives it.
+
+Git index mutation is permitted only through a registered machine index boundary for an exact approved reconciliation. The boundary addresses a host-bound repository/worktree identity and one declared proof-chain entry, verifies all other semantic index entries are unchanged, and performs compare-and-swap publication under the real Git index lock. It grants no general filesystem access to Git administration directories, no ref update, commit, push, force operation or business-source staging. Inspector initiation and explicit write consent are required. Linked-worktree administration paths must be resolved and bound by the trusted host; caller-supplied physical paths cannot authorize them.
 
 ---
 
