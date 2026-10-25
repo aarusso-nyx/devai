@@ -357,11 +357,46 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  # ADR-CHK-0010: supplemental qualification of the unchanged APFS-only namespace.
+  # Linux retains the portable population and actual unsupported-host refusal.
+  native-apfs:
+    runs-on: macos-15
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event_name == 'merge_group' && github.event.merge_group.head_sha || github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up pnpm and Node
+        uses: ./.github/actions/setup-node-toolchain
+        with:
+          setup-pnpm: 'true'
+          cache: pnpm
+      - name: Compile the native qualification dependencies
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm run release:bootstrap
+      - name: Qualify actual native APFS contracts
+        id: native
+        run: node scripts/process/validation-runner.mjs --exclusive -- node scripts/run-native-apfs-tests.mjs
+      - name: Upload native qualification report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: devai-native-apfs-qualification
+          path: ${{ steps.native.outputs.report }}
+          if-no-files-found: warn
+          retention-days: 7
+
   # The required check (ADR-CHK-0007 rule 11): it runs no check node and passes only when both
   # partition jobs succeeded and their reports own every planned node exactly once, as PASS.
   gate:
     name: devai-release-gate
-    needs: [gate-cli, gate-rest]
+    needs: [gate-cli, gate-rest, native-apfs]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -390,4 +425,5 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          test "${{ needs.native-apfs.result }}" = "success"
           node scripts/aggregate-gate-partitions.mjs --include-report "$RUNNER_TEMP/gate-reports/devai-gate-report-cli" --exclude-report "$RUNNER_TEMP/gate-reports/devai-gate-report-rest" --include-result "${{ needs.gate-cli.result }}" --exclude-result "${{ needs.gate-rest.result }}"
