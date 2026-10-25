@@ -3,10 +3,14 @@ import { createHash, randomUUID } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { execFileSync, spawn } from 'node:child_process';
 import {
+  closeSync,
+  constants,
   existsSync,
+  fstatSync,
   lstatSync,
   mkdirSync,
   mkdtempSync,
+  openSync,
   readFileSync,
   readdirSync,
   realpathSync,
@@ -671,6 +675,7 @@ describe('REC-B1-A-P1 production broker with isolated synthetic bundle fixture',
     'dependency',
   ])('P1-12/P1-14/P1-21 refuses changed %s inputs', async (changed) => {
     const f = await productionFixture(true);
+    let heldParent: number | undefined;
     try {
       const handle = f.prepare();
       const report = start(handle);
@@ -697,9 +702,20 @@ describe('REC-B1-A-P1 production broker with isolated synthetic bundle fixture',
         const files = readdirSync(directory).map(
           (name) => [name, readFileSync(join(directory, name))] as const,
         );
+        // Keep the original directory inode allocated: unlink/recreate alone
+        // can reuse it immediately on Linux and never create the intended fault.
+        heldParent = openSync(
+          directory,
+          constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW,
+        );
+        const original = fstatSync(heldParent, { bigint: true });
         rmSync(directory, { recursive: true });
         mkdirSync(directory);
         for (const [name, bytes] of files) writeFileSync(join(directory, name), bytes);
+        const replacement = lstatSync(directory, { bigint: true });
+        expect([replacement.dev, replacement.ino]).not.toEqual([original.dev, original.ino]);
+        const held = fstatSync(heldParent, { bigint: true });
+        expect([held.dev, held.ino]).toEqual([original.dev, original.ino]);
       }
       if (changed === 'index') f.git(['add', '.devai/pin/constitution.md']);
       if (changed === 'head')
@@ -756,7 +772,11 @@ describe('REC-B1-A-P1 production broker with isolated synthetic bundle fixture',
       expect(inventory(f.root)).toEqual(before);
       expect(existsSync(join(f.root, '.devai/config/authority-policy.json'))).toBe(false);
     } finally {
-      f.host.dispose();
+      try {
+        if (heldParent !== undefined) closeSync(heldParent);
+      } finally {
+        f.host.dispose();
+      }
     }
   });
 
