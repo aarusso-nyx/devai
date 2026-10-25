@@ -679,6 +679,10 @@
         {
           "kind": "exact",
           "pattern": "scripts/process/docs-build.mjs"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/run-native-apfs-tests.mjs"
         }
       ],
       "toolchainKeys": ["node", "pnpm", "vitest"],
