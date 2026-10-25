@@ -33,6 +33,8 @@ import localConfig, {
   MAX_TEST_WORKERS,
   RC_ONLY,
   SERIAL_LANE,
+  NATIVE_HOST_LANE,
+  NATIVE_HOST_TEST_TIMEOUT_MS,
   SUBPROCESS_TEST_TIMEOUT_MS,
 } from '../config/local.config.js';
 import localCoverageConfig, {
@@ -296,6 +298,7 @@ describe('local subprocess scheduling preserves the complete population', () => 
   );
   const parallel = lanes.find((lane) => lane.name === 'local');
   const serial = lanes.find((lane) => lane.name === 'local-serial');
+  const native = lanes.find((lane) => lane.name === 'local-native-host');
   const invocationExcludes = commandLineExcludes();
   const selected = (file: string, lane: (typeof lanes)[number]): boolean =>
     (lane.include ?? []).some((glob) => matchesGlob(file, glob)) &&
@@ -328,7 +331,31 @@ describe('local subprocess scheduling preserves the complete population', () => 
     expect(SUBPROCESS_TEST_TIMEOUT_MS).toBe(30_000);
   });
 
-  it('selects every tracked local test exactly once across both lanes without promoting RC-only cases', () => {
+  it('isolates the complete native fixture files with bounded parallelism and case budget', () => {
+    expect(native).toBeDefined();
+    if (native === undefined || parallel === undefined || serial === undefined)
+      throw new Error('local lanes are missing');
+    expect(NATIVE_HOST_LANE).toEqual([
+      'packages/authority/tests/unit/reconciliation-host-owner.test.ts',
+      'packages/authority/tests/unit/reconciliation-host-provision.test.ts',
+    ]);
+    for (const file of NATIVE_HOST_LANE) {
+      expect(selected(file, parallel), file).toBe(false);
+      expect(selected(file, serial), file).toBe(false);
+      expect(selected(file, native), file).toBe(
+        !invocationExcludes.some((glob) => matchesGlob(file, glob)),
+      );
+    }
+    expect(native.maxWorkers).toBe(2);
+    expect(native.fileParallelism).toBe(true);
+    expect(native.testTimeout).toBe(NATIVE_HOST_TEST_TIMEOUT_MS);
+    expect(NATIVE_HOST_TEST_TIMEOUT_MS).toBe(60_000);
+    expect(native.hookTimeout).toBe(SUBPROCESS_TEST_TIMEOUT_MS);
+    expect(native.sequence?.groupOrder).toBe(-1);
+    expect(native.sequence?.groupOrder).toBeLessThan(parallel.sequence?.groupOrder ?? 0);
+  });
+
+  it('selects every tracked local test exactly once across configured lanes without promoting RC-only cases', () => {
     const tracked = execFileSync('git', ['ls-files', '-z'], {
       cwd: ROOT,
       encoding: 'utf8',
