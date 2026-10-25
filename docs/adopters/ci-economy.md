@@ -134,6 +134,13 @@ a human and signer-operational decision.
 
 ## Remote workflow posture
 
+DEVAI's maintainer source has one exact reviewed native APFS qualification exception
+([ADR-CHK-0010](../../law/adr/ADR-CHK-0010-required-native-apfs-qualification.md)). Its
+whole workflow and five executed files are pinned at canonical physical paths; both
+Linux partitions and the native success prerequisite remain required. Any edit or
+missing file loses the exception until reviewed again. This profile grants no
+adopter opt-in, binding or publication authority; the general rule below remains.
+
 Pull-request workflows cancel superseded runs and use Linux runners. A workflow that
 also runs on push to a protected branch conditions the cancellation on the event —
 `cancel-in-progress: ${{ github.event_name == 'pull_request' }}` — so superseded
