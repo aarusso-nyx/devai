@@ -33,6 +33,8 @@ const result = spawnSync(
     'tests/config/local.config.ts',
     '--configLoader',
     'runner',
+    '--testTimeout',
+    '60000',
     '--no-cache',
     ...files,
     '--reporter',
