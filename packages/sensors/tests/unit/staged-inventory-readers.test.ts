@@ -391,6 +391,22 @@ describe('declared configuration, registry/use-cases and body overlay use the sa
 });
 
 describe('independent reader edge review', () => {
+  it('preserves zero linkage when staged optional use cases are absent despite live files', () => {
+    populate('staged');
+    const files = snapshot();
+    const directory = join(root, 'product/use-cases');
+    for (const path of files.keys()) if (path.startsWith(`${directory}/`)) files.delete(path);
+    const staged = reader(files);
+    const linkage = measureActionLinkage(root, directory, () => true, staged.sourceReader);
+    expect(linkage?.metrics).toEqual({
+      action_count: 1,
+      linked_action_count: 0,
+      action_coverage_pct: 0,
+    });
+    expect(staged.calls).not.toContain('list:product/use-cases');
+    expect(measureActionLinkage(root)?.metrics.linked_action_count).toBe(1);
+  });
+
   it.each([{}, { action_id: 17 }, { action_id: '' }])(
     'rejects malformed required registry entries: %j',
     (entry) => {

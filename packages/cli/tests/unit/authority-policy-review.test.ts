@@ -557,6 +557,45 @@ async function productionFixture(
 }
 
 describe('REC-B1-A-P1 production broker with isolated synthetic bundle fixture', () => {
+  it('admits npm bin metadata while retaining declared dependency custody', async () => {
+    const f = await productionFixture();
+    try {
+      mkdirSync(join(f.packageRoot, 'node_modules/.bin'));
+      symlinkSync(
+        '../devai-p1-fixture-dependency/index.js',
+        join(f.packageRoot, 'node_modules/.bin/fixture'),
+      );
+      const handle = f.prepare();
+      const report = start(handle);
+      put(
+        f.packageRoot,
+        'node_modules/devai-p1-fixture-dependency/index.js',
+        '// changed dependency\n',
+      );
+      const before = inventory(f.root);
+      expect(() =>
+        f.runWithAuthorityHostEffects(f.host.scope, () => handle.confirm(confirmation(report))),
+      ).toThrow(/AUTHORITY_POLICY_REVIEW_(?:STALE_INPUT|INPUTS_UNSUPPORTED)/u);
+      expect(inventory(f.root)).toEqual(before);
+      expect(existsSync(join(f.root, '.devai/config/authority-policy.json'))).toBe(false);
+    } finally {
+      f.host.dispose();
+    }
+  });
+
+  it('still rejects links within declared dependency content', async () => {
+    const f = await productionFixture();
+    try {
+      symlinkSync(
+        'index.js',
+        join(f.packageRoot, 'node_modules/devai-p1-fixture-dependency/linked.js'),
+      );
+      expect(f.prepare).toThrow('AUTHORITY_POLICY_REVIEW_INPUTS_UNSUPPORTED');
+    } finally {
+      f.host.dispose();
+    }
+  });
+
   it('P1-11 refuses source checkout as installed authority without the test-only synthetic bundle seam', async () => {
     const f = await productionFixture(false, false);
     try {
