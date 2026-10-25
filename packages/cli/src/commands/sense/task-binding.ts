@@ -94,11 +94,22 @@ export function assertNativeSensorFilesystemTarget(
   path: string,
   operation: string,
   renameFrom?: unknown,
+  effectSymbol?: string,
 ): void {
   if (!path.startsWith('record/proofs') && !path.startsWith('.devai/state/native-config-traces'))
     return;
   const context = nativeFilesystemContext.getStore();
-  if (context?.root !== realpathSync(root) || !['create', 'update', 'rename'].includes(operation))
+  if (context?.root !== realpathSync(root)) throw new Error('AUTHORITY_NATIVE_SENSOR_PATH_REFUSED');
+  // The normal append writer serializes native origin receipts with this one lock.
+  // Its publication is no-replace; cleanup retains the host's owned-identity guard.
+  if (
+    context.kind === 'origin' &&
+    path === 'record/proofs/chain.json.append.lock' &&
+    ((operation === 'create' && effectSymbol === 'publishFileNoReplaceSync') ||
+      (operation === 'delete' && effectSymbol === 'removeEntryIfIdentitySync'))
+  )
+    return;
+  if (!['create', 'update', 'rename'].includes(operation))
     throw new Error('AUTHORITY_NATIVE_SENSOR_PATH_REFUSED');
   const temporary = new RegExp(`^record/proofs/chain\\.json\\.tmp\\.${process.pid}\\.[0-9]+$`, 'u');
   if (operation === 'rename') {
