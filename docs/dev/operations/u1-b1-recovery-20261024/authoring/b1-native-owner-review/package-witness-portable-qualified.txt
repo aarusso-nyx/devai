@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/package-witness-portable-qualified.txt","kind":"historical-transcript-custody-pointer","original_bytes":634,"original_bytes_changed":false,"original_sha256":"818b95d92c6fe2ccbf464d10b7af677bb58bba757db5f59f5cf7851c2f1fb746"}

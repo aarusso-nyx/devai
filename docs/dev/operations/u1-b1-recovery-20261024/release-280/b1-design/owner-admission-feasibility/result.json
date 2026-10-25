@@ -1,0 +1,38 @@
+{
+  "scope": "disposable SQLite kernel-admission feasibility only; not B1 host acceptance",
+  "node": "v24.22.0",
+  "sqlite": "3.53.4",
+  "held": {
+    "acquired": true,
+    "uncommitted": 99
+  },
+  "private_modes_while_transaction_live": {
+    "admission.sqlite": "0o600",
+    "admission.sqlite-journal": "0o600"
+  },
+  "live_contender": {
+    "acquired": false,
+    "code": "ERR_SQLITE_ERROR",
+    "errcode": 5
+  },
+  "holder_exit": -9,
+  "crash_recovery": {
+    "acquired": true,
+    "before": 0,
+    "after": 1
+  },
+  "serialized_pair": [
+    {
+      "acquired": true,
+      "before": 1,
+      "after": 2
+    },
+    {
+      "acquired": true,
+      "before": 2,
+      "after": 3
+    }
+  ],
+  "db_retained": "/private/tmp/devai-release-280-01a16e18/owner-admission-probe/sqlite-admission-kauwjt7i/admission.sqlite",
+  "result": "PASS"
+}

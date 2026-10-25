@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/index-phase-pinned-retry.txt","kind":"historical-transcript-custody-pointer","original_bytes":636,"original_bytes_changed":false,"original_sha256":"2217ec224a92a72c47df7bb80f8b310e825c7e531e0a50344428f60782470539"}

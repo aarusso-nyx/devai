@@ -1,0 +1,232 @@
+{
+  "upstream_main": "ff8accd83c912d02d17df80eccbe147aafd082e3",
+  "files": [
+    {
+      "path": ".devai/pin/constitution.md",
+      "sha256": "8353c3b81d38e0f9b913cbeb6762bc149605989c1b16f52d2c63ba9892f71270",
+      "git_blob": "199cf2787904f64599abd0828620d903a9cb2368"
+    },
+    {
+      "path": "law/constitution.md",
+      "sha256": "8353c3b81d38e0f9b913cbeb6762bc149605989c1b16f52d2c63ba9892f71270",
+      "git_blob": "199cf2787904f64599abd0828620d903a9cb2368"
+    },
+    {
+      "path": "law/policy/action-registry.json",
+      "sha256": "59deac2d823e80058a8223799c31653d7c8fc14dcc7a0ad49ca295545f01de27",
+      "git_blob": "458cf72aba6120c71851809436a85b3d6b799258"
+    },
+    {
+      "path": "packages/authority/src/adapters.ts",
+      "sha256": "5d5ab8e019440ed6c721f8d16b17bb6c3aeeb2c61f36a9057eb01f2cef046f0a",
+      "git_blob": "31bf4fa969eaf60883ab2d57b8eda3258069b172"
+    },
+    {
+      "path": "packages/authority/src/boundaries/boundary-runtime.ts",
+      "sha256": "e5f3b77a63d54e924e530736b5ba2e0c4969344e8f5e8bc40c4210c438fab099",
+      "git_blob": "a7e9ea222dc507e746a4821017fe169170c95932"
+    },
+    {
+      "path": "packages/authority/src/boundaries/boundary-runtime-targets.ts",
+      "sha256": "ea6af1fcc1c8861b2f226326aa36455428bc3e69a56f50e7349a661a99f85fe0",
+      "git_blob": "1a6b847d7fbf4fdc312485a751ea1684efdf4380"
+    },
+    {
+      "path": "packages/evidence/src/evidence/verb-evidence.ts",
+      "sha256": "b15e3d9c9e7b40a17df188f72f97a266010b8460c01d6f24e77a345a3024de00",
+      "git_blob": "4941e2e39f1ccd0d714b68c4a701ce86f1c69a03"
+    },
+    {
+      "path": "packages/evidence/src/evidence/anchors.ts",
+      "sha256": "b999fa0003219b6374e37613935818efd082b1c12a74289cea606b684662552f",
+      "git_blob": "1a33ed8f3ec72c5795720c494d4dd59a9b3d0a32"
+    },
+    {
+      "path": "packages/loop/src/inventory/regen.ts",
+      "sha256": "9e08e4ed0ea29d2b836dfebfd9b8d26f3daba125c20ff88671c7de2d839793af",
+      "git_blob": "2ee678e99be860c7bb001aed5aa25a1ea9053945"
+    },
+    {
+      "path": "packages/loop/src/inventory/regen-checker.ts",
+      "sha256": "b9787147f7309d50493755dab631ac6cb46ee4e669ff0fe49b4f9e895752feaa",
+      "git_blob": "9d07b59b752c6c67175369a81e475c835f3b4069"
+    },
+    {
+      "path": "packages/loop/src/inventory/walker.ts",
+      "sha256": "d3dbe20129bf8985e515b7215cc9e5e47cbaf9473d21da662285283b7fad44c5",
+      "git_blob": "fccbdf9951ed201c2254e79d4cc8d95df5dad780"
+    },
+    {
+      "path": "packages/cli/src/commands/evidence/facade-collect-record.ts",
+      "sha256": "4930315197a1430a83d82fd3c021fd0a203ec9630a0af0cd155ad06d9a84c309",
+      "git_blob": "d8bdb5c9719ec49caaf1c37b558d6d319d48a5f3"
+    },
+    {
+      "path": "packages/cli/src/commands/sense/inventory.ts",
+      "sha256": "643bda1e2b949878b41291ca656338d9b79c15462c2a012f74b72b387a5ce147",
+      "git_blob": "3efb79eff2e2aef6a93c4210ca2a9f9d20335bbc"
+    },
+    {
+      "path": "packages/cli/src/authority/policy-core-rules.ts",
+      "sha256": "792533e69a9a6eff519811e25ab2d38d169d8ea87d018e990f488a1e44322d33",
+      "git_blob": "f4b7ac4becdb1af69e00b592d645d3379085e9b0"
+    },
+    {
+      "path": "packages/cli/src/authority/command-capabilities.ts",
+      "sha256": "741390d45c13586d6e3ea3ffcaa00e3e2c46da3d5a2ed7e0469b4b294cddced7",
+      "git_blob": "31431ef5e95c26220190c14295514699b266f392"
+    },
+    {
+      "path": "law/adr/ADR-EVI-0006-custody-proven-divergent-anchor-recovery.md",
+      "sha256": "89e4bebfc1147662efc3d779b490e71339a838bfe8531cbd6907e2fb073eea09",
+      "git_blob": "91702f2d152903308367f06f306c52da744904b6"
+    },
+    {
+      "path": "docs/reference/cli/evidence-verify.md",
+      "sha256": "56e735c06f4454962350298e8c1284577e3fe14cb497255ab2118dd4aed9244d",
+      "git_blob": "f1535cf92e06cd4c7d2d56d175e2fec9d3bf69cc"
+    },
+    {
+      "path": "packages/cli/package.json",
+      "sha256": "16580db0df5fd26bc6ac44c671aab01a19de28fc46ee26ee73a91c2f8710db39",
+      "git_blob": "79494e6fd4c04b8183320d41deb08e425ca3f91b"
+    },
+    {
+      "path": "packages/authority/src/types.ts",
+      "sha256": "30ba693bf29b350fbd491b94884da2462ad34b1361a0b70ae02d6a61996e298d",
+      "git_blob": "3c2e17f727d0e56d966a13283424cf8e675df8cd"
+    },
+    {
+      "path": "packages/authority/src/paths.ts",
+      "sha256": "93bcd18b0882d635973983676295ae275cab54a507fad624481bd138741359bb",
+      "git_blob": "2a805194690b75561c18be9c3201ae8205e3f005"
+    },
+    {
+      "path": "packages/authority/src/capabilities/path-domains.ts",
+      "sha256": "507070751c129f20a4bc62106b73c5983a26b26cca046885f393a62fd96a31e4",
+      "git_blob": "86e316930acd5c1b859ef270dfe50e0a3d1a2566"
+    },
+    {
+      "path": "packages/authority/src/boundaries/host-sink-filesystem.ts",
+      "sha256": "1e211fa111d8807f6edb35086eef14ca36d555105fd9e0990630cf6b32f8e003",
+      "git_blob": "f699b9711d6c4c91ae313de1649ce9d80be90f07"
+    },
+    {
+      "path": "packages/authority/src/boundaries/host-sink-adapters.ts",
+      "sha256": "886c392cdc8c1902d26d20e64854c2eb2261e1ce47045ace7a04984a6c64b707",
+      "git_blob": "1dbdfc5c31daa94485d59a442db0fe69177132b4"
+    },
+    {
+      "path": "packages/authority/src/boundaries/resource-classification.ts",
+      "sha256": "f611eb182ad2b0714c7f08bb42e4b0eb4b87419ef944f4f3cc3685516600b3de",
+      "git_blob": "acaf916a9b3a979f5fdc4af1561e727bde6b50fb"
+    },
+    {
+      "path": "packages/authority/src/boundaries/host-repository-context.ts",
+      "sha256": "88b375719336668f31ce0d6e0bf0f31bc158bd1843d4410982f50cc768025988",
+      "git_blob": "250067b71a5e634042e54d607a22543e46edb0ba"
+    },
+    {
+      "path": "packages/authority/src/boundaries/host-effects.ts",
+      "sha256": "2344545ce0650a7242d75134e913336d83be63914e66058d0d381c988f09db91",
+      "git_blob": "81d7bf3623c60a84e7b88f3623204758dc8dfa6f"
+    },
+    {
+      "path": "packages/authority/src/runtime/effect-authorization-types.ts",
+      "sha256": "b6b530ef5e7527384c0e354cc8107521904368f69f693d648d303dcb55931bea",
+      "git_blob": "0aea5072ecc4aaf6992fbafa74ffe828489fdbb2"
+    },
+    {
+      "path": "packages/cli/tests/unit/constitution-article-6-amendment.test.ts",
+      "sha256": "d23f29d9cf8d8f009adffdffab1717d637ed11f787fa440c190e4ca2c611d899",
+      "git_blob": "413733c2d1b214f27a45a9daa7f61467c17e1698"
+    },
+    {
+      "path": "packages/utils/src/constitution-version.ts",
+      "sha256": "faea825b371fc5f05f8dbfcfc69a206229b80b944a1514c75431a9a73f4514b0",
+      "git_blob": "cf9af4e6f228f962f89ded1738af6036d037bf65"
+    },
+    {
+      "path": "packages/skills/scripts/copy-constitution.mjs",
+      "sha256": "63d4dcaee5b8c9e1ca70f187c43af8f875d8a91bb358855e4797dbbdf97fb1bc",
+      "git_blob": "0c200a11ebfd3985b7b42575038629526692958b"
+    },
+    {
+      "path": "packages/skills/src/constitution/index.ts",
+      "sha256": "f371ab246bb29f8b427fc5202ddf897870548695485a62c9b559bbe292c53399",
+      "git_blob": "12babdb192b3d010fcdef4d2759edf3313aa69d7"
+    },
+    {
+      "path": "packages/schemas/tests/contract/governance-v15-adr.test.ts",
+      "sha256": "d175e57624aa789e4b10a8f3cea605a6585fede4c4d85ae5a9b4629abaad9ff1",
+      "git_blob": "e8d70250d340d49135aa379754f991e67ffffbb8"
+    },
+    {
+      "path": "law/schemas/authority-policy.schema.json",
+      "sha256": "1c11d6e9c1d106462cae2c248c7c7c0d5bf3d6c848e4d0fa72e3454c8628a45f",
+      "git_blob": "b5b8e03cecd7292775fcb780269c7296aff5fce6"
+    },
+    {
+      "path": "law/schemas/action-registry.schema.json",
+      "sha256": "ccca64510ef8431f86d4cde4fcc2a3a1a4944b2ec1b3130cd01cf8b8ed094759",
+      "git_blob": "cde06555f26a5542ab933c87bb4f835c84f7ffd4"
+    },
+    {
+      "path": "law/schemas/targets.schema.json",
+      "sha256": "27891572a04c095e8373110e170d9bde36baace3033b57e8fd4c3b4f97960734",
+      "git_blob": "dcf8e3c24f5b69f4021485ea2024dbefd7b8d30c"
+    },
+    {
+      "path": "packages/authority/src/decision-plan.ts",
+      "sha256": "98ae5194eb79be234b607860fddad4f80688615cd28744005d263209af7c16e8",
+      "git_blob": "084e20995d0f42d210cb2d47a8c24dbf327418b7"
+    },
+    {
+      "path": "packages/authority/src/runtime/policy-resolver.ts",
+      "sha256": "c2117f59e62164b7b41cd902fa65408a75a4da98270dbebc27bee83787b5510f",
+      "git_blob": "e477150e2920c75acc4d9d462f5832e72abfafd9"
+    },
+    {
+      "path": "packages/cli/src/command-manifest.ts",
+      "sha256": "5e112ae6785431ae33799bba66b12c7c00959014448d8501de551c734bddfc73",
+      "git_blob": "66dcad72d346d49d61571863b0e60d7aa1e19612"
+    },
+    {
+      "path": "packages/sensors/src/inventory-body-inputs.ts",
+      "sha256": "7f7359fa29fee73258f8cbd3201c232b24d6d47f5ac2d25eb321ff960ab070ae",
+      "git_blob": "ac7d16e012a83f45bd2c5c67ebf4259e338308cd"
+    }
+  ],
+  "detran_sources": [
+    {
+      "path": "tools/security/prepare-security-inventories.mjs",
+      "sha256": "584e99bd6bb8b9899aedb7715fbd92f47a863a414997304871e62c39789bafbe",
+      "scope": "DETRAN actual integration working bytes, read only",
+      "head": "9b2a190aa1276f4b15469b7079ed0d7c4c8c4c99"
+    },
+    {
+      "path": "tools/security/export-authorization.ts",
+      "sha256": "765a515c1f3a28122345b20e48f99fc96b7f3514d267d582aa5466894eafb2b4",
+      "scope": "DETRAN actual integration working bytes, read only",
+      "head": "9b2a190aa1276f4b15469b7079ed0d7c4c8c4c99"
+    },
+    {
+      "path": "tools/security/check-security-exports.mjs",
+      "sha256": "7e851bd9412faa655fb20151b01994290bca4344f4e1134c94ffb1fda87ecb6c",
+      "scope": "DETRAN actual integration working bytes, read only",
+      "head": "9b2a190aa1276f4b15469b7079ed0d7c4c8c4c99"
+    },
+    {
+      "path": "tools/security/export-pii.ts",
+      "sha256": "bfd1cc2315a29490315c8e83453f8c109701835307e995aa3acc41bdc333e7e2",
+      "scope": "DETRAN actual integration working bytes, read only",
+      "head": "9b2a190aa1276f4b15469b7079ed0d7c4c8c4c99"
+    }
+  ],
+  "released_tag": {
+    "name": "v2.7.0",
+    "annotated_tag_object": "1aa4cc761d3ba92c07af61b0655e4a769daebc21",
+    "peeled_commit": "ff8accd83c912d02d17df80eccbe147aafd082e3",
+    "published_at": "2026-10-23T19:33:16Z"
+  }
+}

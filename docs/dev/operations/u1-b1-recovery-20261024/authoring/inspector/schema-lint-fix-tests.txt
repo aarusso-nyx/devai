@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/inspector/schema-lint-fix-tests.txt","kind":"historical-transcript-custody-pointer","original_bytes":633,"original_bytes_changed":false,"original_sha256":"828b47e234e9d8da2bbe80d55e15acc8e7c7b1ca3d94824cb84410e00bfdef15"}

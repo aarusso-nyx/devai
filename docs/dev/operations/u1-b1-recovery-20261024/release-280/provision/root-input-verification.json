@@ -1,0 +1,8 @@
+{
+  "source_dist_test_doc_packet_hashes_verified": 15,
+  "historical_receipts_verified": 6,
+  "unchanged_regression_test_hashes_verified": 7,
+  "private_raw_preserved_0600": true,
+  "error_reference_count": 1303,
+  "error_reference_inverse_1299_verified": true
+}

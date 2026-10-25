@@ -1,0 +1,54 @@
+{
+  "standing": "OWNER_STATE_EXACT_INTERFACE_AND_PARTIAL_ORDER_AMENDMENT_FOR_INDEPENDENT_REVIEW",
+  "base_checkpoint_sha256": "45fbde08e157a45d615cc26e885beac6197611fd64dc517dafd0348ee975703f",
+  "state_exact_fields": {
+    "kind": "reconciliation-owner-state",
+    "repository_id": "approval repository",
+    "worktree_id": "approval worktree",
+    "host_identity_sha256": "approval scope host",
+    "binding_sha256": "approval scope bindings",
+    "plan_sha256": "approval scope plan",
+    "source_manifest_sha256": "approval scope source",
+    "approval_id": "host-generated approval ID",
+    "issuer_sha256": "whole issuer SHA",
+    "approval_sha256": "whole original approval SHA",
+    "scope_sha256": "scope digest",
+    "grant_sha256": "latest whole grant raw SHA",
+    "grant_sequence": "latest contiguous sequence",
+    "grant_kind": "approval|renewal|revocation",
+    "lease_sha256": "null or whole lease SHA",
+    "phases": "frozen4element array in01..04 order, each exact {phase,intent_sha256,completion_sha256}; digests null when absent",
+    "grants_authority": false
+  },
+  "state_custody": "Deeply frozen non-Proxy safe projection; private WeakMap retains verified nonissuer immutable records and digest graph, never issuer key/bytes. read input copying and MAC verification finish synchronously before branding. assess uses WeakMap identity without inspecting forged descriptors. Clone/JSON roundtrip returns no callable state authority; no handle can authorize effects.",
+  "assessment_exact_fields": [
+    "phase",
+    "grant_status",
+    "disposition",
+    "intent_sha256",
+    "completion_sha256",
+    "grants_authority"
+  ],
+  "record_nodes": "One node per exact signed canonical whole-file digest; issuer excluded from operation timeline. Nodeclock ordering is same approval boot/source, nondecreasing wall/ns on every edge, <=2000ms elapsed wall/ns disagreement. Missing references and duplicate nodes/phases refuse. Reject cycle using bounded deterministic topological walk; never sort timestamps to invent an order.",
+  "edges": [
+    "Approval < grant2 < ... contiguous grants, with current-grant fence for every other record: namedGrant < record < nextGrant(namedGrant) when successor exists. Intent names grant_sha256, completion names observed_grant_sha256, lease names grant_sha256. This forbids oldgrant use after latergrant even when timestamps tie; old durable lease may remain after a latergrant if its creation precedes it.",
+    "Intent < its completion, preceding phase completion < next phase intent; matching predecessor raw digests required. Lease original intent < lease. Completion cannot name a futuregrant; current-grant fence/cycle rejects it.",
+    "For each renewal R, completed_before_R is exactly phases excluded from R.remaining_phases; each such completion must exist and completion < R. Every phase included and eventually completed adds R < completion. Missing phases cannot be claimed completed. Included phases remain a suffix of01..04 after the contiguous completed prefix.",
+    "R.resumable_intent_sha256 names exactly one existing included-phase intent: intent < R; that intent is not completed before R. Every other included-phase intent adds R < intent. Excluded-phase intent precedes its completion and R. Null means every included-phase intent is after R. At most one uncompleted intent in the final state. References plus renewal fields state a partial order, with cycle rejecting contradictory snapshots.",
+    "Referenced grant must permit intent or lease phase and intent/lease creation is strictly before BOTH signed declared expiry bounds, within maximum900000ms. A lease naming renewal must reference the exact resumable original intent. Current samegrant first lease matches original intent nonce/invocation; a distinct owned retry lease identity is not proof of PID/ownership and requires final nativehost checks. Completion may use expired/revoked current observedgrant, because it only settles prior durable outputs."
+  ],
+  "clock_and_eligibility_clarification": [
+    "Current observation must be same boot/source and not precede ANY linked record clock, including lease; elapsed wall/ns disagreement<=2000ms to each. Exclude issuer installationclock. Expired immutable history remains valid. No age limit is imposed on storing/reading history. Current grant status expired when observed>=either exact deadline; status revoked if terminal latest eventrevocation. Both are eligibility statuses, not decode failures.",
+    "Output precedence: unknown alwaysheld, including completed phases. Existing completion with outputs complete ->completed and original digest; absent/partial-known ->held while retaining its completion digest. No claimed completion repairs deleted/changed outputs or causes another consumption.",
+    "For uncompleted requested phase, earlier required completion must exist and no later-phase progress can be bypassed. No intent plus complete/partial ->held. No intent plus absent and live permitted currentgrant ->start. Existing intent plus complete ->settle even expired/revoked; actualhost must independently verify exact outputs/durability. Existing intent absent/partial ->resume only under live originalgrant or live same-scope renewal expressly naming exactintent; otherwiseheld.",
+    "Actual lease owner/liveness/recovery, admission, current actual scope/B5, outputs and ordinary effectauthority remain fixed nativehost gates; these pure dispositions establish none of them."
+  ],
+  "codes": "Exactly existing proposed RECONCILIATION_OWNER_STATE_INVALID for this component; generatederrorreference row deliberate after authenticRED and productimplementation. No schema/protocol field changes.",
+  "independent_tests_add": [
+    "Tiedclock valid partialorder with renewal before/after completion; no timestamp total-order assumption",
+    "Strict-time stalegrant intent, completion, lease and tiedclock contradictory cycles refuse",
+    "Null/wrong resumable intent, excludedmissingcompletion and nonsuffix remainingphases refuse",
+    "Unknown precedence with completion; deleted/partial completedoutput held; exactcomplete returnssamecompletion",
+    "Currentclock comparison to latestlease/history, short signed expiry and excludedinstallationboot"
+  ]
+}

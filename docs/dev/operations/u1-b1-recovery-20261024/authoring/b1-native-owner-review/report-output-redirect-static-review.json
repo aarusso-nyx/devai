@@ -1,0 +1,68 @@
+{
+  "scope": "Test-only generated evidence output paths; no tests executed during DETRAN exclusive window",
+  "results": [
+    {
+      "file": "packages/authority/tests/unit/reconciliation-admission.test.ts",
+      "before_sha256": "c8cc48aa2d28e9c8ef96df1fd5689c5e88f710e6042e8ce25e535dc25a87ad76",
+      "after_sha256": "54be2b4e4e189f3b9ff7952867c10a26f15c36ad5552ac19f6d073045940ca23",
+      "unchanged_expect_calls": 76,
+      "unchanged_test_calls": 21,
+      "unchanged_fixture_read_calls": 8,
+      "output": "Existing external mkdtemp fixture; exact prior reportbasename preserved",
+      "parse_errors": 0
+    },
+    {
+      "file": "packages/authority/tests/unit/reconciliation-host-context.test.ts",
+      "before_sha256": "37d9580db1513fa39bc84f1323b35f2931d3ec3815f37ac1eae4eb005de699cb",
+      "after_sha256": "2d60e2af0157a8130a343961e32fe0236562c829a76961ba2ecf3cd6f439d5e6",
+      "unchanged_expect_calls": 94,
+      "unchanged_test_calls": 32,
+      "unchanged_fixture_read_calls": 7,
+      "output": "Existing external mkdtemp fixture; exact prior reportbasename preserved",
+      "parse_errors": 0
+    },
+    {
+      "file": "packages/authority/tests/unit/reconciliation-host-operation.test.ts",
+      "before_sha256": "f422dcf36893d6e7b014063eff0f948daea5575a72b644f1b5325ea10c398a54",
+      "after_sha256": "e02643f66f68c022fb2f2f8a5ecb49e94f3be89e0a8676956c5ddf39768bd7d8",
+      "unchanged_expect_calls": 102,
+      "unchanged_test_calls": 26,
+      "unchanged_fixture_read_calls": 2,
+      "output": "Existing external mkdtemp fixture; exact prior reportbasename preserved",
+      "parse_errors": 0
+    },
+    {
+      "file": "packages/authority/tests/unit/reconciliation-host-owner.test.ts",
+      "before_sha256": "bbf5d41c311b4513fdd2a3c9d13d6b358c65af0116b67a9167db50cb778dfbd0",
+      "after_sha256": "d5814af2a56810deffd329130a9a82ad7569b8e45fd87b64ab10d04d895251d1",
+      "unchanged_expect_calls": 63,
+      "unchanged_test_calls": 10,
+      "unchanged_fixture_read_calls": 5,
+      "output": "Existing external mkdtemp fixture; exact prior reportbasename preserved",
+      "parse_errors": 0
+    },
+    {
+      "file": "packages/authority/tests/unit/reconciliation-host-provision.test.ts",
+      "before_sha256": "ee8863c72e656c26a66759603c1adc925737d6d9f819052ef8a1d0a439fefdd6",
+      "after_sha256": "2aba22b54db8d796f911b31fbe739bee11d67f34aec01f6a3a8a53d869bb859a",
+      "unchanged_expect_calls": 147,
+      "unchanged_test_calls": 24,
+      "unchanged_fixture_read_calls": 17,
+      "output": "Existing external mkdtemp fixture; exact prior reportbasename preserved",
+      "parse_errors": 0
+    },
+    {
+      "file": "packages/authority/tests/unit/reconciliation-owner-state.test.ts",
+      "before_sha256": "7c6b161141797656b738eea0192666cf7f660eb68d3ecf508493095416c85196",
+      "after_sha256": "14bb0f94a82b4b934d026cb2e581b07d3cdd3b0afcec560b0f365dc0c51d2579",
+      "unchanged_expect_calls": 27,
+      "unchanged_test_calls": 30,
+      "unchanged_fixture_read_calls": 1,
+      "output": "<os.tmpdir>/devai-owner-state-inspector-<unique>/public-oracle-observations.json",
+      "parse_errors": 0
+    }
+  ],
+  "lint": "PASS report-output-redirect-lint.txt",
+  "preservation": "Original six testsource byte snapshots retained in this reviewdir; existing historical docs reports untouched; newly generated evidence retained externally, not cleaned. Fixture input paths/bytes and every test/assertion/read AST call unchanged.",
+  "graft_tokens_saved_this_turn": 84053
+}

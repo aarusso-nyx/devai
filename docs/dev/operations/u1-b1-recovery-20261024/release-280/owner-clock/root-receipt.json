@@ -1,0 +1,26 @@
+{
+  "status": "PURE_CLOCK_ELIGIBILITY_QUALIFIED_NOT_OWNER_RUNTIME_ACCEPTANCE",
+  "independent_receipt": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-clock-inspector/receipt.json",
+  "independent_receipt_sha256": "a60f14928b1ebd097edba8be5fec58593973de87a4f1eef5240c4b89193b9ef8",
+  "root_current_hash_checks": 16,
+  "source_sha256": "d9ab0faba163f45a7d7caf13e2cae5307ccb0ad2be7cb5b7565e1054f1844dd3",
+  "test_sha256": "4d11893a95b7fec182794892df3b3fd737ff23da3b7dcfef8dcbd369dcf4689b",
+  "result": {
+    "passed": 110,
+    "failed": 0,
+    "pure_clock_cases": 86,
+    "unchanged_diagnostic_reference_cases": 24,
+    "raw_log": "independent-after-types.txt",
+    "duration_seconds": 4.84,
+    "command": "node scripts/process/validation-runner.mjs -- node_modules/.bin/vitest run --config tests/config/local.config.ts --maxWorkers 1 packages/authority/tests/unit/reconciliation-clock.test.ts packages/cli/tests/unit/reconciliation-error-codes.test.ts packages/cli/tests/unit/error-code-reference.test.ts"
+  },
+  "root_checks": {
+    "source_eslint": "PASS",
+    "authority_build": "PASS",
+    "full_workspace_typecheck": "PASS independent final raw log sealed",
+    "error_reference": "1284 PASS current generated reference",
+    "diff_and_source_format": "PASS"
+  },
+  "scope": "Pure deterministic data eligibility only; no OS clock sampling, host trust, authority, public callers, typed effects, grant lifecycle or release qualified.",
+  "next": "Exact closed Owner schemas and acyclic issuer/plan digest graph, canonical ingest, typed final host operation/effect census and public action/review integration."
+}

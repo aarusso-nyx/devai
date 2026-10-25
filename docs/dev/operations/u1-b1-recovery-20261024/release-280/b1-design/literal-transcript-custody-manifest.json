@@ -1,0 +1,2167 @@
+{
+  "kind": "lossless-literal-transcript-custody",
+  "reason": "Keep original diagnostic transcript whitespace and hashes in private custody without a new root author-table exception or changing the existing whitespace check.",
+  "files": [
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-admission-inspector/error-census-green.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "14e000d45f2abe27307689acea932d3cd8ca955cbcf61e5571b96d6b8cf2ada0",
+      "original_bytes": 274,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-admission-inspector/error-census-green.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-admission-inspector/error-census-red.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "13e334aa5969310b7ec5b24d6043d6d37778947c70d3a7dc63ee9bcf713b432f",
+      "original_bytes": 19246,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-admission-inspector/error-census-red.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-admission-inspector/native-expanded.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "e1236f399f77734690c5f3c9e4587362a011cb171acc07248774f636eab12167",
+      "original_bytes": 273,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-admission-inspector/native-expanded.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-admission-inspector/native-fault-counterexamples.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "4fbf34463428ce7f0e42b45593f995f847baf7aa470ec63b35fc68cc0a41e2c5",
+      "original_bytes": 4730,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-admission-inspector/native-fault-counterexamples.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-admission-inspector/native-final-after-types.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "be53e4bf54db847fe2876391b41b746a1392ae9ae7a616f277190ea15b1b4178",
+      "original_bytes": 273,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-admission-inspector/native-final-after-types.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-admission-inspector/native-final-frozen.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "521e3c103ef2305cdc524cbe99b8405df8746850ef3a1599acaad35d3d0790b1",
+      "original_bytes": 274,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-admission-inspector/native-final-frozen.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-admission-inspector/native-final.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "28e9e925b26d14371447a88e9a8cae3eba6c9b44088a675f2ccf416ee7008dac",
+      "original_bytes": 274,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-admission-inspector/native-final.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-admission-inspector/native-first.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "a735d60f336d113c05f91afcbf2cd46a77f8fe4cc9558980d3ade5c77be46aff",
+      "original_bytes": 1529,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-admission-inspector/native-first.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-admission-inspector/structural-red.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "ba3b3a6ddf7b089025e8b61b4f380f683997dcec98ddc362a71550c7a96d3796",
+      "original_bytes": 2386,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-admission-inspector/structural-red.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-admission-inspector/typecheck-final.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "3801203c7d9e4544ad471c57f0ab2386897e4413121a6c6be2a61c5af2fd37fb",
+      "original_bytes": 573,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-admission-inspector/typecheck-final.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-adr-inspector/independent-final.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "d12dafce8bc4ebded32e8a4c4dfaac66dc8ef9567689491854f969796fa99564",
+      "original_bytes": 274,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-adr-inspector/independent-final.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-adr-inspector/independent-first.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "7d217e505e8e797eacc862b9bf11dfd796c6244d4b21773fda9013130be5c566",
+      "original_bytes": 6005,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-adr-inspector/independent-first.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-adr-inspector/projection-correction-incomplete.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "00f9ce2306ef7384b9a1c53d17aceb71719645366ceeb5ac11c737fa39fd7f0a",
+      "original_bytes": 1221,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-adr-inspector/projection-correction-incomplete.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-clock-inspector/independent-after-types.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "e3f5c0a953bbab859e2be5d72f845db02837508a173b24f9c9f81d3146d59b68",
+      "original_bytes": 276,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-clock-inspector/independent-after-types.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-clock-inspector/independent-final.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "0785ae821d5a039b76fe645beb85ff57e41857dadcf4ae3e3155b0a68c62894a",
+      "original_bytes": 276,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-clock-inspector/independent-final.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-clock-inspector/independent-first.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "1fdb1ae6013ddcc64eac23b07a941072dadcbd7bafbb10617cc2b60b5eebd42c",
+      "original_bytes": 275,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-clock-inspector/independent-first.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-clock-inspector/structural-red.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "9972e66749fbf5c6419ae8728be60037956796c48a122c6efb8efac1a5e611cf",
+      "original_bytes": 1392,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-clock-inspector/structural-red.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-clock-inspector/typecheck-final.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "3801203c7d9e4544ad471c57f0ab2386897e4413121a6c6be2a61c5af2fd37fb",
+      "original_bytes": 573,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-clock-inspector/typecheck-final.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-detran-inspector/installed06-initial-red.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "35fc761f6eeeca42d5b22d014e1778d577bdfb252f267382d46ec28bfc15d768",
+      "original_bytes": 1669,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-detran-inspector/installed06-initial-red.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-host-context-inspector/dangling-namespace-red.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "d2ae0a8a2e50c1eb3e8900a2d28f6aa5e256645a0e7717ba7bb595a25d53a63c",
+      "original_bytes": 274,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-host-context-inspector/dangling-namespace-red.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-host-context-inspector/expanded-fault-format.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "16b9fd651ed50f4756649e4363ec02838cfe6e663f5dd91c228c75c997aaa398",
+      "original_bytes": 274,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-host-context-inspector/expanded-fault-format.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-host-context-inspector/independent-final.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "2d0efe925037f5c06963c5a42110b839fd6c1233374d29605715e6feb8b4d1dd",
+      "original_bytes": 278,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-host-context-inspector/independent-final.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-host-context-inspector/independent-first.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "aa705af38d59ab03f8c8fc52eac61c0ea412b36c9cdcf31f9ac5f2a6138fde38",
+      "original_bytes": 274,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-host-context-inspector/independent-first.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-host-context-inspector/structural-red.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "a5e4da5ac96e27cbfe09dc8b5dc1609ce033153331c89e8e0823279d4b5b2108",
+      "original_bytes": 1448,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-host-context-inspector/structural-red.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-host-context-inspector/typecheck-final.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "3801203c7d9e4544ad471c57f0ab2386897e4413121a6c6be2a61c5af2fd37fb",
+      "original_bytes": 573,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-host-context-inspector/typecheck-final.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-host-context-review/custom-scopes-independent-green.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "923ad813138f81306d8dfa7e99efdb0afe56220ed9e1e5f14a2ae9000f3b4ad0",
+      "original_bytes": 872,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-host-context-review/custom-scopes-independent-green.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-host-operation-inspector/independent-final.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "bb72e48be7f2cda11c81a12d99675dfd123660b85397aa915ac6b72371d06cbd",
+      "original_bytes": 280,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-host-operation-inspector/independent-final.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-host-operation-inspector/independent-first.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "64d6548f2d967547f43dd9838cf6a6b708c77f8eee87638303e2c432f4851f31",
+      "original_bytes": 4710,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-host-operation-inspector/independent-first.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-host-operation-inspector/independent-fixed.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "7162f2b9d59fc46b2048b60413aea887209613a9fba31568e156de0e0c8dae4c",
+      "original_bytes": 278,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-host-operation-inspector/independent-fixed.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-host-operation-inspector/independent-second.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "68457eb3111e5a9857150f3c40c3c079b2038cf4d50f3af1ba4770d77d0bce76",
+      "original_bytes": 1898,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-host-operation-inspector/independent-second.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-host-operation-inspector/lint-draft.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "999cb6afda08d02608d70f2a406afbe7ab14811318ae7ac0c59a1b71ded45730",
+      "original_bytes": 536,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-host-operation-inspector/lint-draft.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-host-operation-inspector/lint-draft2.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "0c7e77e026325e4682e4df8c4c50745e9b5f39c5871cf226271e9b0137b59086",
+      "original_bytes": 422,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-host-operation-inspector/lint-draft2.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-host-operation-inspector/lint-draft3.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "e9949804e656ce41e3d6810c58263a352e962c7336caf385c3ec7a2ae139043f",
+      "original_bytes": 270,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-host-operation-inspector/lint-draft3.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-host-operation-inspector/structural-red.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "2d03e00f77de70cdee60c212b2af5c59ec76a7ae223a7d6e536e64ba30ac2062",
+      "original_bytes": 2544,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-host-operation-inspector/structural-red.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-host-operation-inspector/typecheck-final.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "3801203c7d9e4544ad471c57f0ab2386897e4413121a6c6be2a61c5af2fd37fb",
+      "original_bytes": 573,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-host-operation-inspector/typecheck-final.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-host-operation-review/edge-probes-final-green.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "fbdc7ba843d4d6fe43cbef22d04e15730d2f241c9e281568b5124d9254d96f44",
+      "original_bytes": 634,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-host-operation-review/edge-probes-final-green.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-host-operation-review/edge-probes-red-4.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "14df1448c323371fce7ea2a36de69ee82d0dfdd263a20575b92ab5966d6d12af",
+      "original_bytes": 4397,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-host-operation-review/edge-probes-red-4.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-host-operation-review/edge-probes-red.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "36be1a976b2442198d3173078fca9faa338537a52b8043f71cffc5ba87e011a3",
+      "original_bytes": 3532,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-host-operation-review/edge-probes-red.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-host-operation-review/edge-probes-second-candidate.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "8c939b4857c08f9a225e18c0eec66e8326abdc1a096d2619e94bb8561f1173a0",
+      "original_bytes": 1701,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-host-operation-review/edge-probes-second-candidate.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-inspector/first-behavior.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "303a72fe185031712df16b64323e26a83e59cd5bd7af0c3b1c7b197cd868673e",
+      "original_bytes": 4858,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-inspector/first-behavior.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-inspector/fixture-corrected-focused.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "952739c8a9d5526c660da091896d3a708d9020bc59ad23fe50ae7187183063b4",
+      "original_bytes": 290,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-inspector/fixture-corrected-focused.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-inspector/lint-draft-2.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "dca4992634dfd4a1e5925d7e33f7d9f95795c608a9d598f6bc2f6e3655c83d4e",
+      "original_bytes": 678,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-inspector/lint-draft-2.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-inspector/lint-draft.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "5002370df9d83a14cf4dc0dd5e4e2a7f4a7c07a09351539ddd66ada44ae02d5a",
+      "original_bytes": 597,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-inspector/lint-draft.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-inspector/structural-red.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "73c050d705a2c7d5a520f831cf52895df16f922d09197ccd704b4f7a9cbe1039",
+      "original_bytes": 1177,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-inspector/structural-red.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/approval-native-first.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "74fe4be46d88ec7fef52196f6d0baac290e5dbcd3104007274cfbd13119f2d2b",
+      "original_bytes": 1493,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/approval-native-first.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/approval-native-split.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "997c2254a79dee1f911dd3d3003335b8646fb70b04d0e3012b3c4c5a35a9e688",
+      "original_bytes": 638,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/approval-native-split.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/checkpoint-native-child-guards.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "63617700f5d4dd88b053a2140eeb00d776e7be8f9bb183d1e330b44f2a5b37be",
+      "original_bytes": 638,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/checkpoint-native-child-guards.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/checkpoint-native-epoch-guard.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "0b7fc400f81f571cc75083f9a27246628780dce7f6203d45ddcb3a9909655c05",
+      "original_bytes": 1658,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/checkpoint-native-epoch-guard.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/checkpoint-native-first.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "0771d8ab197d4fba77b52219970ca9d3029ccbd6b7f5b063e2429c89b310d40b",
+      "original_bytes": 3063,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/checkpoint-native-first.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/checkpoint-native-qualified.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "e36cb7d67f6861c76f60f0476f75ee8f7351b09a5660dc2ea8f829336acbe4ab",
+      "original_bytes": 1644,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/checkpoint-native-qualified.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/checkpoint-native-smoke.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "093346594502b41b3142f1341d0d7d56afb812d2b44cc91c464762078a9786ee",
+      "original_bytes": 634,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/checkpoint-native-smoke.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/checkpoint-no-client-plan.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "06c1f3dc7ddc0386a0a3d7489146d9bb70c2e82db508a8472c13e62bb06f4d21",
+      "original_bytes": 636,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/checkpoint-no-client-plan.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/custody-binding-benchmark.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "cb5dc8da50104e725ff5edb778d4621698c232023e18073c430ce4d909d5538a",
+      "original_bytes": 634,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/custody-binding-benchmark.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/custody-binding-reusable-first.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "8ab50bc0da59cd98c850c9f38a2b7c109becd1a88f7bbe662cb954c51d3a2471",
+      "original_bytes": 2343,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/custody-binding-reusable-first.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/custody-binding-reusable-framing.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "ab9cbfe9e388fb8c1fe2ceba477ad6d0ff2e51649a778c3f7cc6e4bacf95c34c",
+      "original_bytes": 636,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/custody-binding-reusable-framing.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/custody-binding-reusable-qualified.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "3324898a773cdeb7c22d35f65dbb8a157b85f812d97b5749f8350b559e794fd5",
+      "original_bytes": 636,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/custody-binding-reusable-qualified.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/custody-input-native-first.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "bd4a8d2cf4dce9b5cdd6c62d8d3061bc0674dd9e7a9808efd379358247a11888",
+      "original_bytes": 4049,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/custody-input-native-first.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/custody-input-native-qualified.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "66582651b9aea824a5e4f6a7d2fbecd8b2f42d4e17617769a0cf2484462b18d6",
+      "original_bytes": 636,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/custody-input-native-qualified.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/custody-phase-initial.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "c87763ab416c874f8c1a4b9adae2676ef3e8efad57b57cc033d0c25729e02a82",
+      "original_bytes": 636,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/custody-phase-initial.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/custody-phase-native-first.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "0501e26853b58613985ad052b2817296ddf2459be684a79b1e6b70804e991b70",
+      "original_bytes": 4104,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/custody-phase-native-first.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/custody-phase-native-target-fixed.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "d8dcdd288d5c7940868e7e5d464133e6bf2dc59abd51abc66584b43fb877c2f5",
+      "original_bytes": 638,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/custody-phase-native-target-fixed.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/custody-phase-refusals.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "451b6b1c20ca4a8723108e3a713d76a0b0378999db79100153f51db7b520da0d",
+      "original_bytes": 636,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/custody-phase-refusals.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/dead-lease-initial.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "f13aab2113fd5f8e04f378fd18013065a6062fea97ec47d671dfdddbb783ed08",
+      "original_bytes": 636,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/dead-lease-initial.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/dead-lease-native-first.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "660c14a5741398d412117613c00b1eca7c6631c45c05128546e2e11d40c804e8",
+      "original_bytes": 636,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/dead-lease-native-first.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/effect-plan-counterexamples-first.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "4d486c91b8973f1ebcf0536e92b8363fe2dc30d60cb2eb5101fbf7c0c8d58ded",
+      "original_bytes": 634,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/effect-plan-counterexamples-first.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/effect-plan-kernel-review-first.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "bbcf21af9f6838d1a9c8208d342f80ecc23d796dc86453c9df7cd6ea3bcf70df",
+      "original_bytes": 636,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/effect-plan-kernel-review-first.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/grant-native-first.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "359b92bcc98e0c68c68be9933a0d4e259f0aca2ef3c7741f4d8eb2e52ba1dd46",
+      "original_bytes": 636,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/grant-native-first.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/index-phase-dead-lease-correct-env.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "e11989cf4c50414dedb1ebdbbc2ab0198eb56703d6c9fd1f4d8deca9d9e6ff79",
+      "original_bytes": 636,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/index-phase-dead-lease-correct-env.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/index-phase-dead-lease.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "e0c6105ea0cfa25cfef8b7fd3f66b77b49074410ca8e26ada3d387218f877467",
+      "original_bytes": 1276,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/index-phase-dead-lease.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/index-phase-native-first.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "b5b4c48fa23ac8a3e1d872ac1ec6d65431cdfe11cdf86b86c7b28b6673ec3689",
+      "original_bytes": 3021,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/index-phase-native-first.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/index-phase-pinned-retry.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "2217ec224a92a72c47df7bb80f8b310e825c7e531e0a50344428f60782470539",
+      "original_bytes": 636,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/index-phase-pinned-retry.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/index-phase-postCAS-admitted.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "048f42099b716f8ad6d6e3dcea2d428a527a7e21d56b2537cbf8a76ffbb79b59",
+      "original_bytes": 636,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/index-phase-postCAS-admitted.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/index-phase-postCAS-durable-settle.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "11bfa3f10d14db9a4ffbfa124b7d5f354d3a728e0f233468557ff87aae2dd276",
+      "original_bytes": 636,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/index-phase-postCAS-durable-settle.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/index-phase-postCAS.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "55ad78ff9531ae4d1de3464922729868e227fddbbd90d3894c35f01d6e9b9386",
+      "original_bytes": 634,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/index-phase-postCAS.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/index-phase-renew.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "fe876a3dd96e5811265cbef480d2823e5975a207febc847f81d7b05800d9b47f",
+      "original_bytes": 636,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/index-phase-renew.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/index-phase-settlement.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "23fc92f49d2c0a3e26471247a921bc6cd8f2b1bd44af0c631eee7881978c258d",
+      "original_bytes": 636,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/index-phase-settlement.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/initial-plan-native-first.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "448cc65861137d940f87c3027f0be159f658b7ecc8b6ba3744fa673045bd0130",
+      "original_bytes": 636,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/initial-plan-native-first.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/inventory-phase-native-first.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "74cb6f899739d434238ef9bd74f18ba4e3c2460a9d1a216092405b5f7ed9356d",
+      "original_bytes": 636,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/inventory-phase-native-first.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/inventory-phase-renew-correct-env.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "f089cffb754e16ac73e76b0f375f483650445ab4ad16466dff15f445e059edd6",
+      "original_bytes": 636,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/inventory-phase-renew-correct-env.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/inventory-phase-renew.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "1f4548ea51e89e597950d264ca129d275fbf71a9195d53cdef066305e3525e15",
+      "original_bytes": 1272,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/inventory-phase-renew.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/inventory-preview-native-architect.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "ed65ffdbaf13d2bf67e5bb5b0b1856beef8c3c79bc4154044fd0b729cabba8b7",
+      "original_bytes": 2440,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/inventory-preview-native-architect.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/inventory-preview-native-first.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "c41fa9b4f83d2c32f2899e73e181917346757bed02bb9881472e01c56c0ddcae",
+      "original_bytes": 2591,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/inventory-preview-native-first.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/inventory-preview-native-optional-registry.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "20ac442bf89e2f3ca4e652372d209966861c694c36862b65e378c4d6cffb6f1c",
+      "original_bytes": 636,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/inventory-preview-native-optional-registry.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/native-plan-after-byte-comparison.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "215930fcce17a22a83f107bf7005f0ed0203df96723477d0a48502af8b59755d",
+      "original_bytes": 1983,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/native-plan-after-byte-comparison.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/native-plan-after-historical-anchor-parity.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "c24288a5f84624bc5d83bb12d920d78d63dbad4249534fcbded30f5963022558",
+      "original_bytes": 1983,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/native-plan-after-historical-anchor-parity.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/native-plan-after-stdin-fix.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "1e36cb0ad3d155fd5cffeb2007f2b7aa3902399e5a230ae3380538f8d560f9cd",
+      "original_bytes": 1982,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/native-plan-after-stdin-fix.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/native-plan-diagnostic-resolved.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "7fbd0ea2e74b32fba566b90cb7f6953e9f11577055182bfa66c2ffa5a775cc63",
+      "original_bytes": 2901,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/native-plan-diagnostic-resolved.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/native-plan-diagnostic.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "bab3411d3812fa2b1cf5c71be00a593d7ae5feec7a2ef219fd7b4bd8cde8f427",
+      "original_bytes": 1491,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/native-plan-diagnostic.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/native-plan-first-actual.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "218638171e9675da294743621bface5ddb12c4385cc98dc17fa2190cf9a169f7",
+      "original_bytes": 1804,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/native-plan-first-actual.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/native-plan-independent-exact-335.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "995755de6e68cef48831414b88f3a81acff4e7ae9d9c6e8e2b9800597b73a1f4",
+      "original_bytes": 636,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/native-plan-independent-exact-335.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/native-plan-staged-history-closure.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "c1ecc365654c391ee67ea50a5c693019b720f2d9dbcd462c8e6b380432c81598",
+      "original_bytes": 636,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/native-plan-staged-history-closure.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/package-witness-directory-witness-benchmark.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "7769e5ea3675e79d69e9b103ba41589532ad6cae5ee89432a57bc1c99239bfcf",
+      "original_bytes": 646,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/package-witness-directory-witness-benchmark.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/package-witness-directory-witness-qualified.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "cb4df7809a34bb8aa63899cb7dd4c4c4afaef77f228bd1acf98c67c33537db55",
+      "original_bytes": 635,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/package-witness-directory-witness-qualified.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/package-witness-portable-qualified.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "818b95d92c6fe2ccbf464d10b7af677bb58bba757db5f59f5cf7851c2f1fb746",
+      "original_bytes": 634,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/package-witness-portable-qualified.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/package-witness-review-canonical-fixture.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "59b4abbaed3949c357092fe9e9f12780deb78a148f52999e8647e67436a2cf65",
+      "original_bytes": 634,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/package-witness-review-canonical-fixture.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/package-witness-review-first.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "e3fa58b526ff83dac1bb83c14f51bc33f71e2de502437427844dd7c773b83da9",
+      "original_bytes": 5453,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/package-witness-review-first.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/package-witness-review-pinned-fd-qualified.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "39c20679b9ac8d96d04ab391262ad6c0d0484b93d9a8bb79f6bdf3a3d31a1bd9",
+      "original_bytes": 634,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/package-witness-review-pinned-fd-qualified.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/package-witness-review-pinned-fd.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "ac898afe1d6f8fae9f12f7c673a54cf3d64730f547ab555f6eabc2fc48f2f4d0",
+      "original_bytes": 1437,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/package-witness-review-pinned-fd.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/plan-control-current-replay.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "ca12107b6af84ab680373720bdd4ef03dbc04d04c4ee28de7d5fc12115f57987",
+      "original_bytes": 633,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/plan-control-current-replay.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/plan-control-expanded.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "fef4240f8e601d27f231d752643ee1c060849f30dac71ad986539586482ae6a6",
+      "original_bytes": 2372,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/plan-control-expanded.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/plan-control-final.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "4591e321f77a4f58091bc3351744ad697e40b144cc42424b44f251b8a227d23a",
+      "original_bytes": 632,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/plan-control-final.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/plan-control-presence-red.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "2b10354e8107926ca8af93b3380f276f7f2e89302cf80683c948c14158088b79",
+      "original_bytes": 1724,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/plan-control-presence-red.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/proof-index-pure-native-split.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "1f9f3967adfee01e48b91f0cc5c060334118ae8c88b478e226dd187717e6064c",
+      "original_bytes": 634,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/proof-index-pure-native-split.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/proof-index-pure-native.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "1aa47567ae068c59f99d6882866a797ded4a877ca9ca8552e7e93bb8a7b47aa6",
+      "original_bytes": 1524,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/proof-index-pure-native.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/proof-index-pure-provenance.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "593dee67f594b6836e76704810f86fdfa5b849de51a61bc42b4e1a88c75624a7",
+      "original_bytes": 636,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/proof-index-pure-provenance.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/provision-output-counterexamples-diagnostic.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "92d5730180d01e3a45fd16480027c97e5cd6abc12a3ac36dc0bb9aac18d84b24",
+      "original_bytes": 3102,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/provision-output-counterexamples-diagnostic.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/provision-output-counterexamples-diagnostic2.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "d7fdec956b3fb18ee0dc309b67e5f496fe08969929680a598aa61d1eb48915dd",
+      "original_bytes": 3174,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/provision-output-counterexamples-diagnostic2.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/provision-output-counterexamples-diagnostic3.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "518bf93f77d878ba7d3937adf23fc789d62e3329bb6393859985b8ba0afeeb8d",
+      "original_bytes": 3318,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/provision-output-counterexamples-diagnostic3.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/provision-output-counterexamples-final.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "fc565d1762169831ee47f0d83fcabddd4f298e4c7b39d266125b946cb59a54bc",
+      "original_bytes": 633,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/provision-output-counterexamples-final.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/provision-output-counterexamples-first.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "a1c18445ce0f27592ea49186a3aea15c25554af5dcf08585e0c659bc4b94347e",
+      "original_bytes": 2529,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/provision-output-counterexamples-first.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/provision-output-counterexamples-resolved.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "e1aa08191757abc16730231b267ae4788f65958279e5d1ced2c3d2dd159ee5f3",
+      "original_bytes": 632,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/provision-output-counterexamples-resolved.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/public-owner-preview-schema.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "08af2d9456be78ba95d461fba4538f393e073773bfc365a285e69d10c970b9fd",
+      "original_bytes": 634,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/public-owner-preview-schema.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/public-reconciliation-contracts-core-rules.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "25c17ee9d89484d9ff2df85069e302bca4eabbd7025a1b22034de061f8dcc480",
+      "original_bytes": 636,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/public-reconciliation-contracts-core-rules.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/public-reconciliation-contracts-first.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "bcee48bde0b5e4ef9359ac0106015fa848df871f7309897d534804ba213c537a",
+      "original_bytes": 1823,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/public-reconciliation-contracts-first.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/public-reconciliation-contracts-runtime-alias.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "1fc0a3df1178d8531a67d867a9c3a504b86d87f0a240c6bb8856ca70d8c82c5d",
+      "original_bytes": 635,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/public-reconciliation-contracts-runtime-alias.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/public-reconciliation-output-fault-cac-alias.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "6f857aee5bec6b8915b817531fb3cae2e71f0b7f7fc4128a325e6435d4d82c3a",
+      "original_bytes": 1718,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/public-reconciliation-output-fault-cac-alias.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/public-reconciliation-output-fault-diagnostic.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "e5e404a6c633e7a2b023a132aef8b119da549ee86b58be6453457d5643614156",
+      "original_bytes": 101514,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/public-reconciliation-output-fault-diagnostic.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/public-reconciliation-output-fault-first.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "a617e51364348cfe27a71bc700b3774df6ac92dec5cf07ee9d2131d8c70e5663",
+      "original_bytes": 1538,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/public-reconciliation-output-fault-first.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/public-reconciliation-output-fault-fixed.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "a8dc3c40c3c12e561eae651f30aada9169ec69c20cd6490990c6c82f675293a5",
+      "original_bytes": 633,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/public-reconciliation-output-fault-fixed.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/public-reconciliation-output-fault-matrix.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "f019e5aa9b1bd3c4dd71fec2d7897a7024c072f2059b088f0bd3c1695bdaeb0f",
+      "original_bytes": 101514,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/public-reconciliation-output-fault-matrix.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/public-reconciliation-output-fault-qualified.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "3b968973772873b1e787c8f85d43ccf55db6f04bad0bb1e4c64eae01f6d6e984",
+      "original_bytes": 633,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/public-reconciliation-output-fault-qualified.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/public-reconciliation-output-renamed-qualified.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "7f9526c0af35a94566c2b56fb8e7b95da41eb186dd000a0dff5b131fe444cfa2",
+      "original_bytes": 633,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/public-reconciliation-output-renamed-qualified.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/public-reconciliation-owner-phase-renamed-envelope-qualified.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "66ff8cf76a4d8cbfc3e32d7eaee2ae9033fd458d5592afb217aacb274203fe6d",
+      "original_bytes": 634,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/public-reconciliation-owner-phase-renamed-envelope-qualified.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/public-reconciliation-owner-phase-renamed-qualified.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "ee9b53ee20c6757199e0dc5c773ae67fbda43d575bd0b31fb66e19fcf9e4f74a",
+      "original_bytes": 1938,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/public-reconciliation-owner-phase-renamed-qualified.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/public-reconciliation-valued-plan-first.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "6d9a8885c17a3be6a4d38604d8ed6add8cfbf27e32bc629ad093db5ede1f6fdb",
+      "original_bytes": 636,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/public-reconciliation-valued-plan-first.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/public-reconciliation-valued-plan-qualified.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "40736be5d3c32fdf7efd040f5322b691096db3ea81765292ad72ad49e460a638",
+      "original_bytes": 636,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/public-reconciliation-valued-plan-qualified.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/reconciliation-intrinsic-advisory-eval-qualified.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "b1b4956319f1ed697996f069fd07e250d504e6bbba10ae9cca90442960b8d8e0",
+      "original_bytes": 636,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/reconciliation-intrinsic-advisory-eval-qualified.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/reconciliation-intrinsic-advisory-first.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "938d8aec06511521e8a63a51ba58ea323801b33b89178c5861d58f5232ef1ac1",
+      "original_bytes": 1929,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/reconciliation-intrinsic-advisory-first.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/reconciliation-intrinsic-advisory-qualified.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "dfaf5a5d29bc43e86a24ed616897157ca0955aadec046f99c48c30ced4a95a28",
+      "original_bytes": 636,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/reconciliation-intrinsic-advisory-qualified.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/reconciliation-intrinsic-portable-qualified.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "c5261f8cfa377daf4a77b87964e78839969d6ed87018933d828ab9e15c32645e",
+      "original_bytes": 634,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/reconciliation-intrinsic-portable-qualified.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/selection-builder-native.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "4b1be8a4b17ef24d042f9bccc6a22999add577c5e1eab2cc5b3ac5d24044de5e",
+      "original_bytes": 634,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/selection-builder-native.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/selection-phase-native-first.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "7c0b789ca6de4b574af0a7ebe228ae8fdd952e6aa21ec02b8027bd5d147b2051",
+      "original_bytes": 638,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/selection-phase-native-first.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/selection-phase-renew.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "29b8546c56ce597ae397021302fca00c17c594b3215d894ac7745e42f9458b69",
+      "original_bytes": 636,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/selection-phase-renew.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/u1-native-recovery-first.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "254b7b0a07632faa7c63e652e43f15db5d0f54032737dd4ee2ae59f9ed0f1863",
+      "original_bytes": 636,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/u1-native-recovery-first.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-owner-record-inspector/independent-expanded.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "7021152c35bde2516a393e0af919fe339923ac025b2226083b570abcd7eb7c2d",
+      "original_bytes": 275,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-owner-record-inspector/independent-expanded.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-owner-record-inspector/independent-final.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "01596a014eb281c17d32d7fa8b9e961c7f1e00e7bed1c56c920f7c2af9e14959",
+      "original_bytes": 276,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-owner-record-inspector/independent-final.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-owner-record-inspector/independent-first.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "3072e8a2436cd02bc8fed1d988a303834cf8920ef27bc1aaf4d9e514be72a02b",
+      "original_bytes": 275,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-owner-record-inspector/independent-first.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-owner-record-inspector/structural-red.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "f998e5c30cf99eb4b103d65d0452010d503435c904f3d5a6c80c1cee0037bbe1",
+      "original_bytes": 1433,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-owner-record-inspector/structural-red.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-owner-record-inspector/typecheck-final.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "3801203c7d9e4544ad471c57f0ab2386897e4413121a6c6be2a61c5af2fd37fb",
+      "original_bytes": 573,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-owner-record-inspector/typecheck-final.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-owner-state-inspector/first-behavior.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "282f6e01f4da0a3d3dbc2e729fcb37ad5d1610eecb1a61026026751e99ee9bb9",
+      "original_bytes": 275,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-owner-state-inspector/first-behavior.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-owner-state-inspector/species-final.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "ad92f202ddfe3740d3e00880c4355556025c6d6757b3566b759c0e04f7831331",
+      "original_bytes": 286,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-owner-state-inspector/species-final.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-owner-state-inspector/species-typing-verification.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "20ad97cfda4b90ce27c67abdab07b40b4d6c7c52faa31b4ae9fe8dbf7ea05e24",
+      "original_bytes": 287,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-owner-state-inspector/species-typing-verification.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-owner-state-inspector/structural-red.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "d6780d23010bbcba4cf024a7d59dbfe4235f14df0099780d4026a579f2b899f8",
+      "original_bytes": 1261,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-owner-state-inspector/structural-red.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-owner-state-inspector/typecheck-final.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "3801203c7d9e4544ad471c57f0ab2386897e4413121a6c6be2a61c5af2fd37fb",
+      "original_bytes": 573,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-owner-state-inspector/typecheck-final.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-owner-state-inspector/unchanged-regressions.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "011f76040bb3c5231dceca4c3b856bd847d45c244793a71be7f95a024d4c2735",
+      "original_bytes": 276,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-owner-state-inspector/unchanged-regressions.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-owner-state-review/source-probes-final.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "3543c2f8f64749ded9b85a950cecd49f36b21bbc494a4a0a5abe04cc9d9d8d0e",
+      "original_bytes": 632,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-owner-state-review/source-probes-final.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-owner-state-review/source-probes.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "5d9122bde6916e3cde8d9fc02236c1c5cb61a8b0e8bf36bc26aabc2d53b4f9a7",
+      "original_bytes": 2201,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-owner-state-review/source-probes.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-inspector/final-behavior.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "faab3950ccbbaf40d4aa8ff14f075ba37252b24d669e48946e895e9994388abe",
+      "original_bytes": 1770,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-provision-inspector/final-behavior.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-inspector/final-census-and-resume.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "e516bf71c326b914a28811f54f7072e5577877734fdeffa4376c61f49ee6b81b",
+      "original_bytes": 290,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-provision-inspector/final-census-and-resume.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-inspector/independent-first.redacted.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "43b93f46aa7d22ed7a775ebdfd6888311a0835e68a32d219d6126e4d44182367",
+      "original_bytes": 4794,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-provision-inspector/independent-first.redacted.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-inspector/independent-second.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "43fad9623022877d3b30602b2579b93997a35fca1240ab78a135e2cf30a1bd5d",
+      "original_bytes": 1733,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-provision-inspector/independent-second.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-inspector/structural-red.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "f869c9b797be5054f34f94465ee19453fed791a4df10aeb9961b53767c7004d5",
+      "original_bytes": 1329,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-provision-inspector/structural-red.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-inspector/typecheck.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "3801203c7d9e4544ad471c57f0ab2386897e4413121a6c6be2a61c5af2fd37fb",
+      "original_bytes": 573,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-provision-inspector/typecheck.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-review/census-fixed-green.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "3b5f3a35f099ca623b7d99a962740520ba11b71434d6a11b153c467a6e562521",
+      "original_bytes": 632,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-provision-review/census-fixed-green.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-review/census-observation-final.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "071d32e42646626589f75c45de0e454d018223b21c5a839f5724ed7e6206b2c1",
+      "original_bytes": 633,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-provision-review/census-observation-final.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-review/census-observation.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "5438c03686832f336b3843f92c8f0f1156ecd08b776bd6d52d5c3349a1f735ac",
+      "original_bytes": 633,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-provision-review/census-observation.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-review/freshness-probes-final-4.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "97bb7616bee7d2c7e969eb99b1fce2606ff799638f168a1366f3eac2365ef01e",
+      "original_bytes": 636,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-provision-review/freshness-probes-final-4.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-review/freshness-probes-fixed-green.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "99b8a10cd9bccda24e46b55f793044bbc7545c52eb623922d695ad868467daf2",
+      "original_bytes": 636,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-provision-review/freshness-probes-fixed-green.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-review/freshness-probes-initial.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "3d6c57cc7b0f633cfcb4d7ee42a008568ba47c2819253269389024fac40e84c4",
+      "original_bytes": 1782,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-provision-review/freshness-probes-initial.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-review/freshness-probes-red.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "7e23647dcbf98c4bc88c34d34bbfa0fb98176d43774b3badc937daff4acb7b0d",
+      "original_bytes": 2434,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-provision-review/freshness-probes-red.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-typed-boundary-inspector/dependency-getter-red.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "d3c5cbb9b3deca4d338b22d92e442058847b8bd60b768d2a452da47f215e36b7",
+      "original_bytes": 3385,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-typed-boundary-inspector/dependency-getter-red.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-typed-boundary-inspector/independent-final-after-getter.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "71b56e4e0a0ef5ac758a860061ebb86e0d5bd41233c99cd5126ff0ccb758c42d",
+      "original_bytes": 278,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-typed-boundary-inspector/independent-final-after-getter.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-typed-boundary-inspector/independent-final.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "8263f9d108140588ba7ccbecb17e46fa246e9cf78517896b4128668e7fb36f53",
+      "original_bytes": 278,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-typed-boundary-inspector/independent-final.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-typed-boundary-inspector/independent-first.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "6a389d1b1aeeca1fdb117e1f1af1f8636c39692cc70aca60b856155f692867db",
+      "original_bytes": 1520,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-typed-boundary-inspector/independent-first.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-typed-boundary-inspector/independent-green.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "742b04bcba4d3f0f3f16e3f3e6b6f8eff85592a0ffff06c4c0b53c1a6f3cd41d",
+      "original_bytes": 276,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-typed-boundary-inspector/independent-green.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-typed-boundary-inspector/late-admission-key-red.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "28584fe2b046ec485ef2da40dfc7e6f4c90c7155ec4e9f40dcceba88ce49bac3",
+      "original_bytes": 2958,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-typed-boundary-inspector/late-admission-key-red.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-typed-boundary-inspector/policy-pipeline-red.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "dbd31701dd1cf75c1d168fdc9db50ca0e9ada5746054baee133960a657efe9f9",
+      "original_bytes": 17239,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-typed-boundary-inspector/policy-pipeline-red.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-typed-boundary-inspector/structural-red.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "2db433d6a8346a8004439bb87cacd124ff22d06e28b9c9d0782cc3869b84375c",
+      "original_bytes": 4130,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-typed-boundary-inspector/structural-red.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-typed-boundary-inspector/unchanged-rc-containment-after-getter.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "37e93edc67371383f9ba7c42263ed80a3738e3f6eab312c661f5c06efb2a561e",
+      "original_bytes": 273,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-typed-boundary-inspector/unchanged-rc-containment-after-getter.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-typed-boundary-inspector/unchanged-rc-containment.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "dad58503a769f6fea55cba5e43856956a486ee36a97a3ff65170bd73b98ffec1",
+      "original_bytes": 273,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-typed-boundary-inspector/unchanged-rc-containment.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/inspector/constitutional-transition-tests.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "70d300de659b28bfbe92ed9ca39a3be89ddc1fd5d3d39b8e46554f6334430848",
+      "original_bytes": 2752,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/inspector/constitutional-transition-tests.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/inspector/final-focused-tests.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "7dbef142dd94c9ca008f632e87f79c4f0a8e69171881e3dac08813501dcedaf0",
+      "original_bytes": 2737,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/inspector/final-focused-tests.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/inspector/schema-lint-fix-tests.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "828b47e234e9d8da2bbe80d55e15acc8e7c7b1ca3d94824cb84410e00bfdef15",
+      "original_bytes": 633,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/inspector/schema-lint-fix-tests.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authority-policy-preview-approval/output-boundary-implementation/historical-regressions.classification-red.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "ab3bcfa502a746f1841bc4f753e796a63d7eb1ec9d8b4815ae64fabcaa2e5a74",
+      "original_bytes": 3823,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authority-policy-preview-approval/output-boundary-implementation/historical-regressions.classification-red.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authority-policy-preview-approval/output-boundary-implementation/historical-regressions.pre-fidelity.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "42364b7243b675f277dcca11609ff8bd450db4ad39ff453485f6f3f163bfbf2c",
+      "original_bytes": 2770,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authority-policy-preview-approval/output-boundary-implementation/historical-regressions.pre-fidelity.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authority-policy-preview-approval/output-boundary-implementation/historical-regressions.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "caa0d3c76fba1c1ef04baf692f6ae66dd115d89bcb958f230649fd7ebf6c7363",
+      "original_bytes": 2770,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authority-policy-preview-approval/output-boundary-implementation/historical-regressions.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authority-policy-preview-approval/output-boundary-implementation/inspector/actual-broker-public-first.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "8abd21b26407002cbe61ddfa6c7bd9207931fce3f251e803c498aa99ec5190b9",
+      "original_bytes": 276,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authority-policy-preview-approval/output-boundary-implementation/inspector/actual-broker-public-first.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authority-policy-preview-approval/output-boundary-implementation/inspector/final-seven-paths-with-public-race.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "627e2c0ff571316a1fda0242ab10375c9d03c1f6dd673bb109b3563f2bb65244",
+      "original_bytes": 2566,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authority-policy-preview-approval/output-boundary-implementation/inspector/final-seven-paths-with-public-race.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authority-policy-preview-approval/output-boundary-implementation/inspector/final-seven-paths.pre-command-exit.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "af26dde3ca4c690bf8791a872377f1d6d5a3968e5837ebfa0fb5b8b257772859",
+      "original_bytes": 2567,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authority-policy-preview-approval/output-boundary-implementation/inspector/final-seven-paths.pre-command-exit.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authority-policy-preview-approval/output-boundary-implementation/inspector/final-seven-paths.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "36a54666754b697a56c2170e04611e57eb8b3f3a29d6bd519045b3e3f8c05bca",
+      "original_bytes": 2566,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authority-policy-preview-approval/output-boundary-implementation/inspector/final-seven-paths.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authority-policy-preview-approval/output-boundary-implementation/inspector/handler-wrapper-first.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "cf98a952d39cc488903c72660d62f4b90bf1afe4036a06beb5efcf694877fcd0",
+      "original_bytes": 274,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authority-policy-preview-approval/output-boundary-implementation/inspector/handler-wrapper-first.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authority-policy-preview-approval/output-boundary-implementation/inspector/integrated-indeterminate-red.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "57900b5ec9570b59f46f3a80b8226587bcb910fbf147e7c14f4b63ff7da50c73",
+      "original_bytes": 2059,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authority-policy-preview-approval/output-boundary-implementation/inspector/integrated-indeterminate-red.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authority-policy-preview-approval/output-boundary-implementation/inspector/p1-18-child-first.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "7b10e0b090d13e3eb59fddb896bb268c3ccdf124d8e3533d97a07a39bafe907a",
+      "original_bytes": 286,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authority-policy-preview-approval/output-boundary-implementation/inspector/p1-18-child-first.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authority-policy-preview-approval/output-boundary-implementation/inspector/p1-18-child-second.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "1512d15b7496c24c6b64d0eba4a94b7f0bff6d5f3e3146f6615f138e468d6912",
+      "original_bytes": 286,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authority-policy-preview-approval/output-boundary-implementation/inspector/p1-18-child-second.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authority-policy-preview-approval/output-boundary-implementation/inspector/p1-18-full-public-race-attempt.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "22c3db55430c5458f1b8016c5d12d474c1f0549d78052ef004228c89d40ade94",
+      "original_bytes": 286,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authority-policy-preview-approval/output-boundary-implementation/inspector/p1-18-full-public-race-attempt.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authority-policy-preview-approval/output-boundary-implementation/inspector/public-indeterminate-counterexample.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "bbc92fa5c3d528bc5fe68dddeb0d63fdf9d5d07f64458c71c02778a36ddc3f02",
+      "original_bytes": 1907,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authority-policy-preview-approval/output-boundary-implementation/inspector/public-indeterminate-counterexample.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authority-policy-preview-approval/output-boundary-implementation/inspector/publication-fidelity-green-attempt.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "664ee726de1136f67fcd4a7e9dfd1c427cf3eec18f46f3f6f559148fa6d5eff5",
+      "original_bytes": 278,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authority-policy-preview-approval/output-boundary-implementation/inspector/publication-fidelity-green-attempt.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authority-policy-preview-approval/output-boundary-implementation/inspector/queued-publication-command-exit-actual-diagnostic-red.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "14636cd6ae4cd10d6755a7919b3ed5a532627516d4c08d1d2e503aba911fbbdc",
+      "original_bytes": 1856,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authority-policy-preview-approval/output-boundary-implementation/inspector/queued-publication-command-exit-actual-diagnostic-red.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authority-policy-preview-approval/output-boundary-implementation/inspector/queued-publication-command-exit-diagnostic-red.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "8b727934d8de3f656759008d210ee2cc98ed3a72fe0ee29a56fbf1878a4d2a62",
+      "original_bytes": 1856,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authority-policy-preview-approval/output-boundary-implementation/inspector/queued-publication-command-exit-diagnostic-red.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authority-policy-preview-approval/output-boundary-implementation/inspector/queued-publication-command-exit-red.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "0cf12687affbf9993f843d04b5987ca561f241c482a4522f327cc40728cb7121",
+      "original_bytes": 1856,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authority-policy-preview-approval/output-boundary-implementation/inspector/queued-publication-command-exit-red.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authority-policy-preview-approval/output-boundary-implementation/inspector/real-output-wrapper-red.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "c88c77a845ad9331ed47a21c281388c846a599f621471541eb92a1e65e06807f",
+      "original_bytes": 1366,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authority-policy-preview-approval/output-boundary-implementation/inspector/real-output-wrapper-red.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authority-policy-preview-approval/output-boundary-implementation/inspector/transport-first.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "13185057c077c5f76cab89fe681760d527ed7644effb1de2ace34a07b40f7679",
+      "original_bytes": 10229,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authority-policy-preview-approval/output-boundary-implementation/inspector/transport-first.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authority-policy-preview-approval/output-boundary-implementation/inspector/transport-second.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "4d2ef723182d21b882a9bc686d146c58c3b33fa4f947d2ca99629be20128c0be",
+      "original_bytes": 273,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authority-policy-preview-approval/output-boundary-implementation/inspector/transport-second.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authority-policy-preview-approval/p1-implementation/existing-issuer-boundaries.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "f22c2f6ede7c08abe982250be98daae2738ca4fa7562a43b7d33f176f2c6ee86",
+      "original_bytes": 638,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authority-policy-preview-approval/p1-implementation/existing-issuer-boundaries.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authority-policy-preview-approval/p1-implementation/historical-lower-boundaries.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "c3697407b62a4adc51a4e55e1da3107bbd25bb2098a0e4119d49319644d002b7",
+      "original_bytes": 2769,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authority-policy-preview-approval/p1-implementation/historical-lower-boundaries.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authority-policy-preview-approval/p1-implementation/inspector/command-io-first.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "477d990cdb5379b3026fac820151d8e1fbb930104f2b19048a6363732f99e042",
+      "original_bytes": 274,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authority-policy-preview-approval/p1-implementation/inspector/command-io-first.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authority-policy-preview-approval/p1-implementation/inspector/extended-counterexamples-first.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "48fc0ed97227e10e34971315b5a8ecc6bb325b6148e2ea6ad88241ae40e31a23",
+      "original_bytes": 5824,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authority-policy-preview-approval/p1-implementation/inspector/extended-counterexamples-first.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authority-policy-preview-approval/p1-implementation/inspector/final-six-paths-extended.prelint.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "6d05134db8a3d82b69ef2f80854485cf67cd3334988b63792c2bf6f5ce0d91f6",
+      "original_bytes": 5680,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authority-policy-preview-approval/p1-implementation/inspector/final-six-paths-extended.prelint.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authority-policy-preview-approval/p1-implementation/inspector/final-six-paths-extended.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "aed5dabd2f0382684fdde7e8e06ed3b2f6311710c219a9ac3141448674fce65c",
+      "original_bytes": 5677,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authority-policy-preview-approval/p1-implementation/inspector/final-six-paths-extended.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authority-policy-preview-approval/p1-implementation/inspector/final-six-paths.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "c96c2e8a49b6b062dc2a416e267e0c49583d9227e8a01c79fac9e0bf81c67e9c",
+      "original_bytes": 5676,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authority-policy-preview-approval/p1-implementation/inspector/final-six-paths.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authority-policy-preview-approval/p1-implementation/inspector/first-production-green-attempt.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "ae6a40adeade6d46dd9bfd64fe73d7d3fedce0678feb39593c09d9c2b03e932a",
+      "original_bytes": 1796,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authority-policy-preview-approval/p1-implementation/inspector/first-production-green-attempt.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authority-policy-preview-approval/p1-implementation/inspector/inspector-eslint-extended.prelint.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "932beae910822a34a697b7e40ad958e320c59dc7bced10a1ac6a5cf7a35f281e",
+      "original_bytes": 271,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authority-policy-preview-approval/p1-implementation/inspector/inspector-eslint-extended.prelint.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authority-policy-preview-approval/p1-implementation/inspector/lifecycle-publication-first.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "ea5517b10ee503b4324768cb8c44398607ca7804e0e23765927db265fb3beb66",
+      "original_bytes": 1366,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authority-policy-preview-approval/p1-implementation/inspector/lifecycle-publication-first.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authority-policy-preview-approval/p1-implementation/inspector/private-guarded-fixture-verification.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "811f2e537cc81c0ceae1393b68edca62a088200286ac9453763b8abb9d99ea76",
+      "original_bytes": 2565,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authority-policy-preview-approval/p1-implementation/inspector/private-guarded-fixture-verification.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authority-policy-preview-approval/p1-implementation/inspector/public-boundary-held-red.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "9c4cfbb1fbf248d0626b845e90cbd7db77fb659c3bb4a341f6ee8189d34e3fb7",
+      "original_bytes": 3406,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authority-policy-preview-approval/p1-implementation/inspector/public-boundary-held-red.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authority-policy-preview-approval/p1-implementation/inspector/public-route-red.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "7ef36193802e9fa998f24612f67061ea1f839dbf8445789ecb90cfffe2a81d6e",
+      "original_bytes": 1501,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authority-policy-preview-approval/p1-implementation/inspector/public-route-red.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/release-280/host-operation/historical-p1-final.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "7ba284f73deb9dd110d295e793fcd1032598ce1d101eba292ae08aae09a8933d",
+      "original_bytes": 662,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/release-280/host-operation/historical-p1-final.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/release-280/host-operation/historical-p1-regression.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "3254edb5809f9a14bbff381c4db2efc9a16a2831c16e0ca44901f09fadd54b4a",
+      "original_bytes": 662,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/release-280/host-operation/historical-p1-regression.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/release-280/host-operation/protected-release-regression.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "198cf3ffccda749120046c4e5ce739ad4cab6c3354523c401b73bce59dc7f098",
+      "original_bytes": 636,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/release-280/host-operation/protected-release-regression.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/release-280/host-operation/regression.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "33db51b1c6236b44e579fe835565027ba7f0665d472355d37423c525a7a78e5c",
+      "original_bytes": 876,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/release-280/host-operation/regression.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/release-280/host-operation/typecheck.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "3801203c7d9e4544ad471c57f0ab2386897e4413121a6c6be2a61c5af2fd37fb",
+      "original_bytes": 573,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/release-280/host-operation/typecheck.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/release-280/owner-state/graft-build.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "247ba3d2e6e73f448d4c462285a5f1562e3060c50726c4c93921308168ee0da0",
+      "original_bytes": 118827,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/release-280/owner-state/graft-build.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/release-280/provision/graft-build.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "22f6fcee5de958afd7993dc9b19ba9016f282454fb167a4c5fb0dc9665b7c5e1",
+      "original_bytes": 118337,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/release-280/provision/graft-build.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/release-280/provision/private-publication-regression.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "b6c919e2ae2a294779862f1a9d140218b5959dbfa4223e671e1216a8034923b8",
+      "original_bytes": 636,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/release-280/provision/private-publication-regression.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/release-280/reader-engineer/targeted-regressions.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "e5d000f5f57b188b8e7885dcabb3313fbc6c3e38c05be09abcc80f7bc38fdc66",
+      "original_bytes": 638,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/release-280/reader-engineer/targeted-regressions.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/release-280/self-binding/pty.bin",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "4a3d3c93d090ee918db779cda2818ea28391af92f13cbebb97413f9add09ffa9",
+      "original_bytes": 319,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/release-280/self-binding/pty.bin",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/release-280/typed-boundary/graph-build.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "fbfe4907ed6db0089647d68fb00c821588d0f7a432d52f2bf0820146ead4951b",
+      "original_bytes": 117357,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/release-280/typed-boundary/graph-build.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/release-280/typed-boundary/typecheck.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "3801203c7d9e4544ad471c57f0ab2386897e4413121a6c6be2a61c5af2fd37fb",
+      "original_bytes": 573,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/release-280/typed-boundary/typecheck.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/release-280/typed-effect-closure/custom-scopes-green.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "293136a924fa3d16e0f1ae89788232507b79eac46d6eae23300121aca26f6604",
+      "original_bytes": 872,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/release-280/typed-effect-closure/custom-scopes-green.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/release-280/typed-effect-closure/custom-scopes-red.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "11a81c6366ef59c734133a69beaff6dac86462e219291e9096b7c92c14f68795",
+      "original_bytes": 4478,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/release-280/typed-effect-closure/custom-scopes-red.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/release-280/typed-effect-closure/typecheck.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "3801203c7d9e4544ad471c57f0ab2386897e4413121a6c6be2a61c5af2fd37fb",
+      "original_bytes": 573,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/release-280/typed-effect-closure/typecheck.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/v2.8.0-qualification/inspector/actual-binding-historical-contracts.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "7c997aaf5b356b0f38de8c2fa7e05556113de9058302941c90bb54188c0cbd1d",
+      "original_bytes": 273,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/v2.8.0-qualification/inspector/actual-binding-historical-contracts.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/v2.8.0-qualification/inspector/owner-installed-06-baseline-red.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "cdc521ee274994f41701ab88d10736c4ca0e56072c0811cef7620ca754ce62e8",
+      "original_bytes": 3349,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/v2.8.0-qualification/inspector/owner-installed-06-baseline-red.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/v2.8.0-qualification/inspector/private-publication-before-source-red.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "a7d885159e1237f8e873c94fab842ca4d1a41f54703ac56a3af13fdf04e7bfdf",
+      "original_bytes": 8559,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/v2.8.0-qualification/inspector/private-publication-before-source-red.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/v2.8.0-qualification/inspector/private-publication-final-independent-green.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "9bcfccb10a5741115137140db901140bda38b9e034ee709b204a771d11353aa2",
+      "original_bytes": 274,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/v2.8.0-qualification/inspector/private-publication-final-independent-green.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/v2.8.0-qualification/inspector/private-publication-final-red.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "df48723cbbc3422a483d84b03d517c23491c54028649e35280308c4e2188ac5f",
+      "original_bytes": 10391,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/v2.8.0-qualification/inspector/private-publication-final-red.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/v2.8.0-qualification/inspector/private-publication-independent-green.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "6bf67c01102b6ebc326a79737fe7e94fe900cd796bc9cb4b0085a9ed1da99d9d",
+      "original_bytes": 274,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/v2.8.0-qualification/inspector/private-publication-independent-green.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/v2.8.0-qualification/inspector/ratification-and-original-binding.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "d3c275af212c4565e89e0308d3a4fa1c9b9407798d6d8b16b1a9f5584e098947",
+      "original_bytes": 274,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/v2.8.0-qualification/inspector/ratification-and-original-binding.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/v2.8.0-qualification/inspector/ratification-before-source.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "0855d8986d58dc897d73e8ced5c7e96b50ea31953e60e7ebb455518943a64f7e",
+      "original_bytes": 1712,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/v2.8.0-qualification/inspector/ratification-before-source.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/v2.8.0-qualification/inspector/ratification-first-fixture-format-mismatch.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "a2e0861d26c57db16d82f485d1decbca0a3b5250446b88bce40bda2a7da8f788",
+      "original_bytes": 2837,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/v2.8.0-qualification/inspector/ratification-first-fixture-format-mismatch.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/v2.8.0-qualification/inspector/ratification-second-fixture-local-error.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "09cf3e3c906cb7e815d9b2b92f306ae468f789b062ca85cebdff1644f2019da4",
+      "original_bytes": 2425,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/v2.8.0-qualification/inspector/ratification-second-fixture-local-error.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/v2.8.0-qualification/inspector/staged-readers-before-source.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "8beb42bab4c17cd3f38e57dd0af0bf26473f1ec1d3cd367032780d56f7914d35",
+      "original_bytes": 27433,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/v2.8.0-qualification/inspector/staged-readers-before-source.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/v2.8.0-qualification/inspector/staged-readers-discriminated-red.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "b36d8f533df5eec5a66fcb8b4f963df0ef452535b4ca650313d05d5d2e113be5",
+      "original_bytes": 37726,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/v2.8.0-qualification/inspector/staged-readers-discriminated-red.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/v2.8.0-qualification/inspector/staged-readers-edge-counterexamples.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "889fb824e488f0136b25d2a4950547cbdc936980e25adc64d7f948335801f7dc",
+      "original_bytes": 1759,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/v2.8.0-qualification/inspector/staged-readers-edge-counterexamples.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/v2.8.0-qualification/inspector/staged-readers-final-independent-green.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "ae05700e8c7eb6e609035590a14c13d6970a68949e372e7574d1df6c751b7a70",
+      "original_bytes": 276,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/v2.8.0-qualification/inspector/staged-readers-final-independent-green.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/v2.8.0-qualification/inspector/staged-readers-final-red.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "6356993490e0aebde51c0763f70850f45b8581e407255176be640262853b9f4e",
+      "original_bytes": 40917,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/v2.8.0-qualification/inspector/staged-readers-final-red.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/v2.8.0-qualification/inspector/staged-readers-independent-green.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "a0c553d090fbfab33fa4e53bb346601b26d250a98461cbf8cea061f3d292dc44",
+      "original_bytes": 274,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/v2.8.0-qualification/inspector/staged-readers-independent-green.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/public-reconciliation-output-fault-epipe-fix.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "6b5e334b8519efc0d1c3f92f4fc48f5a8ba82f93cdbdcbcb1a13eb6f14bf3740",
+      "original_bytes": 633,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/public-reconciliation-output-fault-epipe-fix.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/reconciliation-native-write-errors-first.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "dcab08b99a5be3e4df3c7fcfb7da9c169c6b905a4683c1bb5cf71b04d41b25dd",
+      "original_bytes": 634,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/reconciliation-native-write-errors-first.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    },
+    {
+      "public_pointer": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/reconciliation-native-write-errors-types-refreshed.txt",
+      "kind": "historical-transcript-custody-pointer",
+      "original_sha256": "3801203c7d9e4544ad471c57f0ab2386897e4413121a6c6be2a61c5af2fd37fb",
+      "original_bytes": 573,
+      "custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/reconciliation-native-write-errors-types-refreshed.txt",
+      "original_bytes_changed": false,
+      "authority_granted": false
+    }
+  ],
+  "historical_assertions_changed": false
+}

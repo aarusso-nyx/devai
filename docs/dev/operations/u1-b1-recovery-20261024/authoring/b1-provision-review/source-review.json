@@ -1,0 +1,79 @@
+{
+  "standing": "BOUNDED_FOUR_PATH_SOURCE_REVIEW_ACCEPTED_AFTER_AUTHENTIC_FRESHNESS_FIX_NOT_FULL_NATIVE_OR_PUBLIC_QUALIFICATION",
+  "source_sha256": {
+    "packages/authority/src/boundaries/reconciliation-host-provision.ts": "8c439589cdc0265681ed00a732e6ac0b4c2ab2ad6a520b87e57d2238e1a140b0",
+    "packages/authority/src/boundaries/reconciliation-host-namespace.ts": "b64fd3338e31c5c72e264a26f015d97850c7aeff254f5bb6c775ef770f735f32",
+    "packages/authority/src/boundaries/host-publish.ts": "b2aa704c775009240b624b4581339cebaec8bcd6f7f95fbf7e71eabf296e054a",
+    "packages/authority/src/index.ts": "9d665d51e73c550819c4c223b34e0d110eb3b5305e02758a754977d46359272c"
+  },
+  "packet_sha256": {
+    "native-provision-checkpoint.json": "b5781dc107baee06410015fc031cd3372022ccd1c2234a1449a3115419dd149d",
+    "native-provision-interface.json": "1062f7f05db0d88505bac87fd0fc63d685bca53ba2e72003561a6dc2e485de0e",
+    "native-provision-namespace.json": "168d8bb1b1a438b7418c855213731ab1f7c472804dc72d143c7a53f46b811d81",
+    "native-provision-freshness-amendment.json": "029fbb5f8c487e1551e65ff4ea41b7ddeb30cf2bef0583184b0a697725af9a76"
+  },
+  "finding": {
+    "id": "NP01",
+    "disposition": "FIXED_AND_REPLAYED",
+    "history": "Initial real B5/HEAD drift after delegated precursor fsync both published issuer; original0pass/2fail log, exactsource snapshots and initialreceipt immutable.",
+    "fix": "Fixed assertReviewHost compares actual scoped fresh host identity/current B5 and qualified dual-clock window to original review. Used before directory effects, private staged creation/first byte/afterstaged fsync+close beforelink, insideadmission beforepublish and aftereffect before replacing observation. No default observe/rawanchor reader is called insideadmission.",
+    "qualification": "Same original2probes now2pass; expanded unchanged originalbodies plus2late stagedissuer-fsync probes all4pass. Late B5/realHEAD drift returns terminal indeterminate, noissuerlink/stagedfile remains, exactseedhash unchanged and reviewreplay refuses."
+  },
+  "verification": {
+    "runner": "pnpm exec node scripts/process/validation-runner.mjs -- vitest run --config docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-review/probe.config.mts --maxWorkers 1",
+    "original_replay": {
+      "pass": 2,
+      "fail": 0,
+      "log": "freshness-probes-fixed-green.txt"
+    },
+    "expanded_final": {
+      "pass": 4,
+      "fail": 0,
+      "log": "freshness-probes-final-4.txt",
+      "duration_seconds": 54.53
+    },
+    "probe_hash": "8c889dc63f7dd4248bae1aad465340495273965aa647afe72610fe91e55b0c6b",
+    "ordinary_publisher_function_byte_equal_HEAD": true,
+    "ordinary_publisher_function_sha256": "37b787ab61aec23de3397fc8df1d2db66a48919aa8e21505f42635369da25ee5",
+    "instrumentation": "Evidence-only fsync wrapper delegates actual fsync and injects a single synchronous state transition immediately after chosen fsync boundary; real owned Git, real native SQLite/admission/private publisher and actual issuer-backed ordinary resolver/receipt/prepare/apply. Synthetic B5 values explicitly do not attest installed package origin."
+  },
+  "source_conclusions": [
+    "Actual rootexports expose only publicinternal review API/types; namespace/lower writer are not authority-root exports.",
+    "Namespace exact canonical owned dirs/files,0700 protectedleaf and0600 singlelinkfiles, actualDarwin type26 gate and devai non-group/worldwrite ancestor exception match accepted packet.",
+    "Seed stage and frozen whole issuer stage each invoke distinct actual typed provision permission with exact plan target.",
+    "No raw admission anchor open/close from locked namespace reader: lockedAnchor goes through lstat seedMetadata; lower primitive owns native descriptors/SQL. Precursor descriptor fsync completes+closes before connection.",
+    "Private-only verification hook used only by fixed provisioning guard; no arbitrary caller callback or new permission. Ordinary publisher function byte-identical toHEAD.",
+    "Sameprocess seed_plan retains confirmed originalplan; resumedprecursor binds explicit exactcurrentvalidationplan per frozen namespace addendum, without fabricated historical absence proof.",
+    "Preexisting wholeissuer installationHEAD/B5 are immutableobservations; validation binds actual issuerMAC/namespace/root/seed/repo/worktree/host, current review context is separately fresh.",
+    "Preexistingapprovals census remains closed/bounded structuralMAC/name/issuer/root binding only; no grantgraph or phaseeligibility authority inferred.",
+    "Whole privateissuer canonicalbytes/MAC/key remain internal; safe projections/errors stay approvedfields and terminal close clears bytebuffers/references.",
+    "Post-entry failures return heldindeterminate rather than retry/rotate; unknown publication/removal remnants refuse and survive."
+  ],
+  "required_remaining": [
+    "Independent full provision, native publisher/admission historical and ordinaryhost regressions remain separate Inspector gate.",
+    "Actual installed package/module/registry/constitution/materializedpolicy+B5 and real terminal/public two-prompt custody remain required.",
+    "No generic filesystem/Linux/nativeVFS qualification, no Ownergrant/phase/index/staged/public workflow or release qualification claimed."
+  ],
+  "edits": "Only owned evidence files. No product/test/schema/registry edits, no build or newagents. Graft auto-refreshed indexed context beforeanswer; no trackedgraph changes observed.",
+  "graft": {
+    "current_calls": 1,
+    "current_estimated_tokens_saved": 13038,
+    "cumulative_successful_calls": 20,
+    "cumulative_estimated_tokens_saved": 385376
+  },
+  "evidence_sha256": {
+    "freshness-probes-final-4.txt": "97bb7616bee7d2c7e969eb99b1fce2606ff799638f168a1366f3eac2365ef01e",
+    "readonly-filesystem-observation.json": "1ef7e87c3b77192d137531e3fb6d4c09af15f5d71e381184d9bdb4985fd7b11c",
+    "freshness-probes-red.txt": "7e23647dcbf98c4bc88c34d34bbfa0fb98176d43774b3badc937daff4acb7b0d",
+    "freshness-probes-original-2.test.ts.snapshot": "c2e7d6f6529caef0f91e7e3e6b7497397e09e4759d8a6b4b989b842f02e4f400",
+    "probe.config.mts": "462033b6822b87306be3b802f987cdbad24096eba72c5b8facdfdf87e46b6500",
+    "freshness-probes-fixed-green.txt": "99b8a10cd9bccda24e46b55f793044bbc7545c52eb623922d695ad868467daf2",
+    "index.ts.initial-source.snapshot": "9d665d51e73c550819c4c223b34e0d110eb3b5305e02758a754977d46359272c",
+    "source-review-initial.json": "9d727e1331ae6cde713ab900ed6426239e29e6e99891a1a0a1d6d44c4d0cd126",
+    "reconciliation-host-provision.ts.initial-source.snapshot": "8697c0570322e4e9fd047bf1a860c9b12bf97493b70db2aea560b5236fa04cfa",
+    "freshness-probes-initial.txt": "3d6c57cc7b0f633cfcb4d7ee42a008568ba47c2819253269389024fac40e84c4",
+    "reconciliation-host-namespace.ts.initial-source.snapshot": "b64fd3338e31c5c72e264a26f015d97850c7aeff254f5bb6c775ef770f735f32",
+    "freshness-probes.test.ts": "8c889dc63f7dd4248bae1aad465340495273965aa647afe72610fe91e55b0c6b",
+    "checkpoint-review.json": "98bd60161ea4108e7f54baafadc4217896baac88a4c0a6cd6b47fe6833d3f8e8"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "review": "Independent source review exact Node24.20.0/libuv1.52.1 compatibility alongside Node24.22.0/libuv1.52.1",
+  "source": "packages/authority/src/boundaries/reconciliation-host-context.ts",
+  "sha256": "972e49e042720bc054c25254fa9537aa31065a51b5318585041cfd19cd29c24b",
+  "scope": "Source review only; parent separately running real pinned24.20 nativehost/Owner tests. No duplicate native qualification.",
+  "findings": [],
+  "retained_guards": [
+    "Only darwin/linux; exact two Node patches and exact1.52.1 libuv",
+    "Canonical executable regular file, allowed owner, no group/otherwrite, executable bits, captured full identity",
+    "Three child monotonic samples exact runtime/platform/arch/boot with before/after range and final runtime/boot recheck",
+    "Every revalidation compares full runtime+boot+repository and permanently latches drift",
+    "Clock observation250ms wallwindow and fresh runtime/boot equality",
+    "No change to effect grants,roles,lease/grant bounds or clock eligibility beyond exact admitted runtime pair"
+  ],
+  "typing_fixes": {
+    "reason": "no-non-null-assertion lint disallows initial TS-only !. Replaced with const lookup+explicit undefined fixture errors, then same assertions/spread.",
+    "checks": [
+      "test-type-guards-lint.txt",
+      "test-type-guards-tsc.txt"
+    ],
+    "passed": true,
+    "original_owner_snapshot": "reconciliation-host-owner.before-scope-type-narrowing.ts.txt"
+  },
+  "graft_tokens_saved_this_turn": 23752
+}

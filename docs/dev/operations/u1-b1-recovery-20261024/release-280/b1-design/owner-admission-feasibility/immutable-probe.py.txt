@@ -1,0 +1,34 @@
+import hashlib, json, os, pathlib, select, signal, subprocess, tempfile
+here = pathlib.Path(__file__).resolve().parent
+root = pathlib.Path(tempfile.mkdtemp(prefix='immutable-sqlite-admission-', dir=here))
+root.chmod(0o700)
+db = root/'admission.sqlite'
+counter = root/'external-fixture-counter.txt'
+counter.write_text('0'); counter.chmod(0o600)
+fd = os.open(db, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600); os.close(fd)
+node='/Users/aarusso/.nvm/versions/node/v24.22.0/bin/node'
+subprocess.run([node,'--input-type=module','-e',"import{DatabaseSync}from'node:sqlite';const d=new DatabaseSync(process.argv[1]);d.exec('PRAGMA journal_mode=DELETE;CREATE TABLE admission_protocol(singleton INTEGER PRIMARY KEY CHECK(singleton=1),version INTEGER NOT NULL CHECK(version=1));INSERT INTO admission_protocol VALUES(1,1)');d.close()",str(db)],check=True)
+before_bytes=db.read_bytes(); initial=db.stat()
+def start(mode):
+    return subprocess.Popen([node,str(here/'immutable-worker.mjs'),str(db),str(counter),mode],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+holder=start('holder')
+try:
+    assert select.select([holder.stdout],[],[],5)[0]
+    assert json.loads(holder.stdout.readline()) == {'acquired':True}
+    while_held=sorted(p.name for p in root.iterdir())
+    assert while_held == ['admission.sqlite','external-fixture-counter.txt'],while_held
+    assert db.read_bytes()==before_bytes
+    contender=start('contender');busy=json.loads(contender.communicate(timeout=5)[0]);assert busy=={'acquired':False,'errcode':5},busy
+    holder.kill();holder.communicate(timeout=5);assert holder.returncode==-signal.SIGKILL
+    pair=[start('normal'),start('normal')]
+    serial=[json.loads(p.communicate(timeout=5)[0]) for p in pair]
+    assert sorted(x['before'] for x in serial)==[0,1],serial
+    assert sorted(x['after'] for x in serial)==[1,2],serial
+    assert counter.read_text()=='2'
+    assert db.read_bytes()==before_bytes
+    assert (initial.st_dev,initial.st_ino)==(db.stat().st_dev,db.stat().st_ino)
+    assert sorted(p.name for p in root.iterdir())==while_held
+    result={'result':'PASS','scope':'immutable SQLite kernel-lock anchor feasibility only; not B1 adapter acceptance','node':'v24.22.0','seed_sha256':hashlib.sha256(before_bytes).hexdigest(),'seed_bytes':len(before_bytes),'seed_unchanged':True,'seed_inode_unchanged':True,'no_sidecars_during_or_after_lock':True,'live_contender':busy,'holder_exit':holder.returncode,'serialized_external_counter':serial,'db_mode':oct(db.stat().st_mode & 0o777),'fixture_retained':str(root)}
+    (here/'immutable-result.json').write_text(json.dumps(result,indent=2)+'\n');print(json.dumps(result,indent=2))
+finally:
+    if holder.poll() is None: holder.kill();holder.communicate(timeout=5)

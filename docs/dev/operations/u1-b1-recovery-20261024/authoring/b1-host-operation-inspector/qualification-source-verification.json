@@ -1,0 +1,21 @@
+{
+  "source_test_document_unchanged_during_final_run": true,
+  "inputs": {
+    "packages/authority/src/boundaries/reconciliation-host-operation.ts": "ce8dc730e1a6d92890a013e0471fe81d3d64212a77e987f2cb05ca99bd3d0be1",
+    "packages/authority/src/boundaries/host-scope.ts": "20120a6084a077999738e3652135457dc988430b1c3530d9a46621701c1840aa",
+    "packages/authority/src/boundaries/host-atomic-effects.ts": "92d3be45f4d9e541252f16c44d55bb9fb7f009aa583d57bb54d5a3a6c76ffd6c",
+    "packages/authority/src/index.ts": "7acc1feb7a4cd9a7585b737feaccad8ef6344624f2c118c0feb9a23b3a7eae4d",
+    "packages/cli/src/authority/reconciliation-host-input.ts": "c26435b615eede984973fc1f9d247742c3dbbced43c538d1e171976ce06f8185",
+    "packages/cli/src/authority/broker.ts": "7fd4df9c746a8ab1979f4bd7aa7f26c68ccf7f947ed1df3ff1157f4a4b39c5d1",
+    "packages/authority/tests/unit/reconciliation-host-operation.test.ts": "f422dcf36893d6e7b014063eff0f948daea5575a72b644f1b5325ea10c398a54",
+    "packages/cli/tests/unit/reconciliation-host-input.test.ts": "f8adc6856a938e0db3ed4afcde20c1d65959413754b08d173e009612ccb2e147",
+    "docs/reference/error-codes.md": "4e944a0c52bf8d0ea1594f68a882ff5f9699e902e0b3849cad1eb23fd5099955"
+  },
+  "result": {
+    "passed": 623,
+    "failed": 0,
+    "files": 15,
+    "new_cases": 158
+  },
+  "raw_sha256": "bb72e48be7f2cda11c81a12d99675dfd123660b85397aa915ac6b72371d06cbd"
+}

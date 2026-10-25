@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-owner-state-inspector/species-final.txt","kind":"historical-transcript-custody-pointer","original_bytes":286,"original_bytes_changed":false,"original_sha256":"ad92f202ddfe3740d3e00880c4355556025c6d6757b3566b759c0e04f7831331"}

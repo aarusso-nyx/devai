@@ -1,0 +1,46 @@
+{
+  "standing": "BOUNDED_READONLY_CONTEXT_REVIEW_REGISTERED_LINKED_ORIGIN_AMENDMENT_REQUIRED",
+  "reviewed_input_sha256": {
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/host-context-checkpoint.json": "9fe2c38674fd4fcdf5e0f314d536eeb13c7299d1122f3352a70b825ded4b54f5",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/owner-clock-amendment.json": "63da78eb95e638d1ba8d5317a4e81e4030d204593f107a7a5344bba3642d5e2c",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-owner-v3-inspector/receipt.json": "845d0dc1ffb092da69444d04efe707d24323297aba050879352aac9c3fe9da4b",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-clock-inspector/receipt.json": "a60f14928b1ebd097edba8be5fec58593973de87a4f1eef5240c4b89193b9ef8",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-admission-inspector/receipt.json": "0952e1aa22d462e23f771fad5ff8cc1a6dfe52ce600f92215dcc30537fb0b9b5",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-owner-schema-inspector/receipt.json": "ecbb9dc6472e6597e1b753c60f75b4f5698e6884fa4227a79d9f0d2eb5fb650e",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-owner-record-inspector/receipt.json": "f38b19733d0dea9374855c8d1f21c88146a50f9ff9bf370b12d819a19c915436",
+    "law/adr/ADR-EVI-0007-owner-approved-merge-reconciliation.md": "1bfaa9703fa5cd667de523c74a3d8f4b584b7c630290f1c2400a71a871a53bd4"
+  },
+  "accepted_direction": [
+    "Root .git distinction is correct: owned directory for direct or owned single-linked bounded regular pointer for linked; no symlink. Git/admin dirs need no group/world-write, not0700. Private reconciliation root alone requires0700.",
+    "Exact runtime Node24.22.0/UV1.52.1 gate and pinned actual executable plus fixed readonly bounded crossprocess boot/time-namespace/bracket probes are coherent; version strings or context data grant no action authority. No Linux execution qualification inferred from Darwin review.",
+    "Persistent identity excludes HEAD/merge/runtime/boot. Active branded context pins those and namespace state; HEAD/bootstrap changes invalidate old context and require recapture. Fresh context can preserve persistent identity without migrating approvals.",
+    "Mode is normative permission bits stat.mode&07777 decimal (493directory,420pointer); full-mode initial observation retained as alternative only. masked-mode-derivation recomputes exact final rule independently.",
+    "No raw admission anchor read/open in this helper. No private namespace creation, SQLite, key/approval/operation permission. Final broker must supply actual verified repository ID and full authority."
+  ],
+  "actual_positive_evidence": {
+    "direct-linked-observation.json": "987068dcb4bc3ad38c759ef9c9c41fe0cdaa51e39f830b47c674a136e5ec2a26",
+    "masked-mode-derivation.json": "6eda50c193ffbae89de69c8888f35efe09bdb8999b0a4b5c14e6ecc37488c8db",
+    "result": "Actual external disposable direct+linked repo, all frozen Git flags/commands succeed, exact Unicode/space/question/hash paths, separate gitdir/private roots/worktree IDs, same common-dir, HEAD update keeps persistent identities. Fixtures removed. Initial raw full-mode formula was recomputed under normative masked rule."
+  },
+  "findings": [
+    {
+      "id": "HC-01",
+      "classification": "ACTUAL_GIT_ORIGIN_DESIGN_GAP_NOT_PRODUCT_RUNTIME_FAILURE",
+      "severity": "preimplementation-origin-blocker",
+      "evidence": "copied-pointer-observation.json",
+      "evidence_sha256": "c4636436aaeb83a2db45023efed53f6df3c07440d1de06c53203a041cfe1d13a",
+      "observation": "Copied legitimate linked .git pointer into another canonical owned directory. All7frozen Git commands succeed and --show-toplevel equals copiedroot. Both roots resolve to same linked admin/private namespace while <gitdir>/gitdir backlink still names originalroot/.git.",
+      "implication": "Forward pointer+Git discovery commands alone do not prove actual registered linked-worktree root. Distinct apparent roots can share the same protected namespace; this contradicts the strong actual linked origin/distinct private namespace claim if accepted without reciprocal validation. No absent product module was run.",
+      "narrow_required_resolution": "Bounded owned single-linked nofollow read/pin of linked admin gitdir backlink; canonical resolved backlink must equal exact root/.git entry, and admin commondir must agree with actual admitted common_dir. Reject copied/foreign registration and backlink drift. Integrate into capture/revalidation and independent tests before final context acceptance.",
+      "trust_scope": "This is malformed preexisting Git layout in disposable fixtures, not claim of arbitrary same-UID adversary isolation."
+    }
+  ],
+  "read_only_scope": "Only external disposable fixtures and owned review evidence created; no product source/test/schema edits. No final host/clock/adapter/public action acceptance.",
+  "preserve": "All reviewed Owner record/clock/native receipts unchanged; hashes sealed.",
+  "graft": {
+    "calls_this_review": 1,
+    "tokens_saved_estimate": 52805,
+    "cumulative_calls": 9,
+    "cumulative_tokens_saved_estimate": 183936
+  }
+}

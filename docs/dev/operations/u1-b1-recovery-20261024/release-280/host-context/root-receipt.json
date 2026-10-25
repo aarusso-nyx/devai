@@ -1,0 +1,35 @@
+{
+  "standing": "READONLY_HOST_CONTEXT_VERIFIED_NOT_FINAL_OWNER_RUNTIME_OR_RELEASE_ACCEPTANCE",
+  "results": {
+    "host_cases": 88,
+    "final_tests_passed": 412,
+    "final_tests_failed": 0,
+    "final_files": 8,
+    "duration_seconds": 27.43,
+    "full_workspace_typecheck": "PASS",
+    "targeted_eslint": "PASS",
+    "targeted_prettier": "PASS",
+    "default_timeouts_and_assertions_preserved": true
+  },
+  "platform": "darwin",
+  "source_sha256": "7cfcf6a1f504698a11ec40d1cf08fde86038ec389e5df3964caa5c7b61d3a54d",
+  "dist_sha256": "605ac8cb6e76343fd4bd17ef2f0de1e7a0659b2bdd4c25112624999d8638b1a7",
+  "test_sha256": "f0ecd47fc8cc7b7f575ba8225febfca09e76bebcd2b8893be6b9ae7b0925a120",
+  "independent_inspector_receipt_sha256": "2d5af14f7636c7376e0f1ebe3df88227395df4c6234de3df9fe3285091e3fa1d",
+  "independent_artifact_index_sha256": "4f1981b4230afa2052518180e364098cd0c46aa97c9b747a5b938f1e4384697b",
+  "independent_design_review_sha256": "c423e824531920c50cad91752db1388d21867a8299373e558300f9dde8f70ca8",
+  "independent_source_review_sha256": "6d1e309a60f95a06af969d052c911e38f36da812a4c6d6e1f98af3d79e6d1ac2",
+  "root_verification": {
+    "all_inspector_inputs_current": 22,
+    "all_inspector_evidence_verified": 14,
+    "artifact_index_entries_verified": 15,
+    "historical_receipts_verified": 4,
+    "prior_input_verification_sha256": "54b1b6ac666878e86324449be4e39c5108e04b663e8cf522a98652fe26dbf007",
+    "actual_task_worktree_observation_sha256": "40ce22b173e64c367a8d624a35112a9e8f631569d26f320d6ac3654a9a3a3df8",
+    "source_review_resolutions_sha256": "423cfd520673cb9309243a516ae50f8a9e25926989155b945dd9f010a01b67e5",
+    "error_reference_count": 1294,
+    "six_row_removal_reconstructs_prior_1288": true
+  },
+  "preserved_failures": "Original missing-source RED, copied-pointer design counterexample, initial dangling-namespace defect and intermediate stale-restoration defect retained. Inspector filename dangling-namespace-red.txt actually contains GREEN; authentic pre-fix counterexamples are distinct reviewer records.",
+  "next_required": "Install actual broker invocation-bound opaque operation and typed effects; implement bootstrap/issuer/Owner and phase workflows, actual native-admission composition, canonical/index/staged public integration, final installed qualification and integration/CI/RC/publication. No Linux execution, trusted key or action authority follows from this context."
+}

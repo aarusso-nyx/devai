@@ -1,0 +1,78 @@
+{
+  "standing": "BOUNDED_OPAQUE_INVOCATION_BROKER_CHECKPOINT_DESIGN_ACCEPTED_IMPLEMENTATION_AND_ACTUAL_INSTALLED_NATIVE_QUALIFICATION_PENDING",
+  "reviewed_sha256": {
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/host-operation-checkpoint.json": "7e21ad1550c123b633a9af72d8e90f3a37d31ddeee6ee835abc0c8566fc41912",
+    "law/adr/ADR-EVI-0007-owner-approved-merge-reconciliation.md": "1bfaa9703fa5cd667de523c74a3d8f4b584b7c630290f1c2400a71a871a53bd4",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/owner-clock-amendment.json": "63da78eb95e638d1ba8d5317a4e81e4030d204593f107a7a5344bba3642d5e2c",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/host-context-checkpoint.json": "9fe2c38674fd4fcdf5e0f314d536eeb13c7299d1122f3352a70b825ded4b54f5",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/host-context-pointer-amendment.json": "e935aebb794981973c46c8c7c49b6e179e87b456f3a195255bafdd500a04d961",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-typed-boundary-review/source-review.json": "107b5144472bbfef3f59895a39ec898fdfeaf70a778b8dd35e8628b8de70ca6a",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-host-context-review/source-review.json": "6d1e309a60f95a06af969d052c911e38f36da812a4c6d6e1f98af3d79e6d1ac2"
+  },
+  "observed_existing_sources_sha256": {
+    "packages/cli/src/authority/broker.ts": "50721c2d784e8849cbf50ad7a07daa7d2b3513a5618ecd81ac0ec8040b2f7735",
+    "packages/authority/src/boundaries/host-scope.ts": "1f994229fc70eecab71964b3197359485e5db99835c0339d85ef0319f93f1d51",
+    "packages/authority/src/boundaries/host-atomic-effects.ts": "bde337e567f1cb0e818df5dd8bdc757e0a85244446fcb46b323ca598b84d8e80",
+    "packages/authority/src/runtime/reconciliation-clock.ts": "d9ab0faba163f45a7d7caf13e2cae5307ccb0ad2be7cb5b7565e1054f1844dd3"
+  },
+  "confirmed_design_blockers": [],
+  "accepted_contract": [
+    "New request kinds are distinguished explicitly, one fixed symbol/one frozen opaque token argument, private membership for invocation/token/view and exact actual ALS/receiptstore/owningbroker identity. Cloned/printed labels or target fields cannot serve as an operation.",
+    "Actual root/hostcontext/clock, originalargv digest, action/role/write/TTY and closed operation/approval/plan/phase constraints are bound before broker preparation and rechecked immediately before one final callback. Token is invalidated before callback and all contexts/tokens are disposed on every exit.",
+    "Current B5 bindings are observations of actual installed inventory/module/registry/Constitution/policy bytes; hosttarget binding must match and proofindex exact target is bound through private operation snapshot. No provider supplied by CLI/JSON.",
+    "New logical requests force policyFor bootstrap_policy=false and a fresh materialized-policy load through normal resolver/declaration/issuer/prepare/apply. No virtual-policy shortcut for init bind --reconciliation-host. Default registry/capability/policy absence must still deny.",
+    "Read-only preview grants_authority=false, omits physicalpaths and opaque handles; final audited callback alone gets trusted resolved internalpaths. No seed/issuer/key/nativeSQLite/index effect implemented by this packet.",
+    "Native callback is fixed synchronous trusted code. Promise return cannot be accepted as completion; no claim isolation from arbitrary hostile JS or cancellation of effects already performed by a bad callback.",
+    "Custom/record-init scopes must explicitly refuse new kinds rather than interpret them as process/filesystem; existing ordinary/protected/P1 behavior remains regression-qualified separately."
+  ],
+  "source_verified_facts": [
+    {
+      "source": "packages/cli/src/authority/broker.ts",
+      "span": "278-312",
+      "fact": "Current policyFor bootstrap=true returns virtualPolicy; false follows actual boundpolicy file+loadAuthorityPolicy expectedbindings checks. Explicit false typedbranch is therefore necessary and present in design."
+    },
+    {
+      "source": "packages/cli/src/authority/broker.ts",
+      "span": "648-748",
+      "fact": "Existing reviewInstalledBundle requires actual dist/runtime/index module origin, installedpackage metadata and bundledConstitution. It recursively hashes real installed package/dependency files and captures physical roots. It includes no clock/random field; package_sha is named inventory digest, not tarball SHA."
+    },
+    {
+      "source": "packages/cli/src/authority/broker.ts",
+      "span": "843-851",
+      "fact": "Registry observation uses actual entry name/effects/authority_contract projections. Their canonical installed origin must come from actualCLI broker; test-owned entries cannot attest installed registry."
+    },
+    {
+      "source": "packages/authority/src/runtime/reconciliation-clock.ts",
+      "span": "90-130",
+      "fact": "Existing review-window helper enforces BOTH strict300000ms wall and300000000000ns monotonic, sameboot, rollback, overflow and <=2000000000ns disagreement. Packet shorthand monotonic reviewwindow must use this complete accepted contract."
+    },
+    {
+      "source": "packages/cli/src/authority/broker.ts",
+      "span": "2140-2182 preimplementation",
+      "fact": "Existing record_init treats nonprocess asfilesystem. New typed integration must add explicitkind refusal here; checkpoint names this requirement rather than silently widening the internal recorder."
+    }
+  ],
+  "installer_binding_assessment": [
+    "Digest graph is acyclic: package/module/registry/policy/Constitution observations are read, then exact5tuple JCS digest computed at runtime. No new signed file or module includes its own future B5digest.",
+    "Installation physical root contributes to inventory digest deliberately; reinstall/move changes binding and cannot silently migrate an existing approval. Persistent host identity remains separate from runtime/boot/HEAD/currentB5.",
+    "Development-source execution must not be relabelled as installed attestation: existing helper correctly rejects absence of dist/runtime/index origin. Deterministic owned callbacks can test token/receipt machinery only, exactly as packet states.",
+    "Actual installed/public positive needs new actual package artifact and canonical registry/currentmaterializedpolicy integration; no env/path/provider override or mock allow should substitute."
+  ],
+  "implementation_acceptance_obligations_not_design_blockers": [
+    "Use existing complete dualclock reviewhelper, not monotonic-only comparison; stable snapshots exclude sampletime but revalidate currentB5/context/controls before effect.",
+    "Preserve exact closed argv grammar and role/session/TTY matrix. Validating expectedgrant/lease/plan flags and binding originalargvSHA in this step does not prove referenced plan bytes, grant eligibility, exact expectedlease state or nativeconfirmation. Actual nativehandlers must verify those before their effects.",
+    "Safely reject unknown/cloned/Proxy/revoked invocation/token/view before property/coercion access. Require exact live actualscope+owninginvocation+receiptstore and refuse deferred/replayed/nested typedcallback.",
+    "Ensure all6source consumers distinguish newkind; no genericfilesystem/process/protectedrelease fallback or prepared-unit rollback. Force boundpolicy false at every newtypedwrite path, including init bind.",
+    "Final actualnativeadapter must compose context/B5 verification with nativeadmission without reopening/closing admission.sqlite descriptors, must independently enforce approved phase/intent lifecycle and exactchild effects. This packet does not qualify that composition.",
+    "Keep safe outputs/errors and private provider inventory/path data unexposed. Callbackthrow/Promise/indeterminate effects cannot be falsely reported as completed; later nativeoperation outcomes must preserve custody."
+  ],
+  "preservation": "Existing accepted context/clock/Owner/native/schema/typed receipts and historical58+99 remain immutable. Existing policy/currentregistry/materializedbindings are not changed by design acceptance.",
+  "reviewer_product_or_test_edits": false,
+  "writes_only": "authoring/b1-host-operation-review/",
+  "graft": {
+    "calls_this_review": 1,
+    "tokens_saved_estimate": 27115,
+    "cumulative_calls": 16,
+    "cumulative_tokens_saved_estimate": 323360
+  }
+}

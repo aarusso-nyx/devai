@@ -1,0 +1,18 @@
+{
+  "standing": "AUTHENTIC_TWO_DEFECT_COUNTEREXAMPLE_RED",
+  "passed": 102,
+  "failed": 4,
+  "findings": [
+    "Both kinds apply succeeds after snapshot callback revokes admission; expected refusal before effect.",
+    "Both kinds prepare accepts lone-surrogate snapshot key; expected canonical snapshot invalid refusal."
+  ],
+  "hashes": {
+    "packages/authority/src/boundaries/resource-classification.ts": "841ccdb072d9c0ba9f0b7c59c0a2e86c4824a74c623331922e386d62fcaf2791",
+    "packages/authority/src/boundaries/boundary-runtime-targets.ts": "c44a4bc187fee488be8309c6b711f2da62463b99e9be64071df74948b2461aaa",
+    "packages/authority/src/boundaries/boundary-runtime.ts": "2624903658e59678727fabb1f1f1f0bb9f11b6a5183168b3866fc8bd4d108eb3",
+    "packages/authority/src/runtime/policy-resolver.ts": "0d3a0cb31a62a9f0687fbe5a9dab36ad9db7174baff15d724661e90008fe6ab3",
+    "law/schemas/authority-policy.schema.json": "2cbda030144afe417d25cd1fb3c0e7799b8d7c80e67742567a94a66c0a67bf9d",
+    "packages/authority/tests/unit/reconciliation-typed-boundary.test.ts": "bf6a7769a4c15a596ae16142a2d13e4e6b44285549421ee247208611dd6b217d"
+  },
+  "raw_sha256": "28584fe2b046ec485ef2da40dfc7e6f4c90c7155ec4e9f40dcceba88ce49bac3"
+}

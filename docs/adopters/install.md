@@ -236,6 +236,10 @@ An obligation that needs a decision blocks the write the same way while it is `p
 - constitution 1.1.0 (`MIG-2.7.0-constitution-1-1-0`): the same rebind, after the Architect has
   reviewed the amendment of Articles 6, 7 and 10 that gives the Engineer the focused-regression
   test verb;
+- constitution 1.2.0 (`MIG-2.8.0-constitution-1-2-0`): review ADR-GOV-0027 and the exact
+  installed constitution bytes and digest before requesting `--constitution`. The amendment
+  adds bounded reconciliation machine exceptions in Article 6. Ordinary upgrade does not
+  provision a reconciliation host, approve its plan, recover proofs or publish inventory;
 - the proof-anchor baseline (`MIG-1.9.0-proof-anchor-baseline`), when `record/proofs/work` holds
   proof lines and no `record/proofs/anchor-baseline.json` exists yet: run
   `pnpm exec devai evidence verify --scope chain --write`, and have the Architect record a

@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-owner-state-inspector/first-behavior.txt","kind":"historical-transcript-custody-pointer","original_bytes":275,"original_bytes_changed":false,"original_sha256":"282f6e01f4da0a3d3dbc2e729fcb37ad5d1610eecb1a61026026751e99ee9bb9"}

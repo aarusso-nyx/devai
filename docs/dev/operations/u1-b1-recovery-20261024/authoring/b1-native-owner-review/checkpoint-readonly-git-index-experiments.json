@@ -1,0 +1,59 @@
+[
+  {
+    "argv": [
+      "--no-optional-locks",
+      "diff",
+      "--no-ext-diff",
+      "--no-color",
+      "--no-renames",
+      "--unified=0",
+      "HEAD",
+      "--",
+      "record/proofs/work"
+    ],
+    "optional_locks": "0",
+    "status": 0,
+    "before_sha256": "542553c911bcd2f5e65dd8a27b66f0f1dbcb703278477cb27df920ede95eadce",
+    "after_sha256": "f7487203c744b38c4242d06223fd076c0da1aa2a3bc2d41b751f00eee33f39e3",
+    "stdout_sha256": "7ba4da6fa08ed32f3954267319b28162b9686804e6ed6eb41850a92aa550ad41"
+  },
+  {
+    "argv": [
+      "-c",
+      "diff.autoRefreshIndex=false",
+      "diff",
+      "--no-ext-diff",
+      "--no-color",
+      "--no-renames",
+      "--unified=0",
+      "HEAD",
+      "--",
+      "record/proofs/work"
+    ],
+    "optional_locks": "0",
+    "status": 0,
+    "before_sha256": "542553c911bcd2f5e65dd8a27b66f0f1dbcb703278477cb27df920ede95eadce",
+    "after_sha256": "542553c911bcd2f5e65dd8a27b66f0f1dbcb703278477cb27df920ede95eadce",
+    "stdout_sha256": "7ba4da6fa08ed32f3954267319b28162b9686804e6ed6eb41850a92aa550ad41"
+  },
+  {
+    "argv": [
+      "--no-optional-locks",
+      "-c",
+      "diff.autoRefreshIndex=false",
+      "diff",
+      "--no-ext-diff",
+      "--no-color",
+      "--no-renames",
+      "--unified=0",
+      "HEAD",
+      "--",
+      "record/proofs/work"
+    ],
+    "optional_locks": "0",
+    "status": 0,
+    "before_sha256": "542553c911bcd2f5e65dd8a27b66f0f1dbcb703278477cb27df920ede95eadce",
+    "after_sha256": "542553c911bcd2f5e65dd8a27b66f0f1dbcb703278477cb27df920ede95eadce",
+    "stdout_sha256": "7ba4da6fa08ed32f3954267319b28162b9686804e6ed6eb41850a92aa550ad41"
+  }
+]

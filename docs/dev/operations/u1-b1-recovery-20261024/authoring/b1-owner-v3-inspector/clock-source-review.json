@@ -1,0 +1,61 @@
+{
+  "standing": "PRIMARY_SOURCE_VERIFIED_HRTIME_REPLACEMENT_DIRECTION_CONDITIONALLY_COHERENT_NOT_RUNTIME_QUALIFICATION",
+  "original_v3_sha256": "ed7b6ff199ece13c841e457258468303f8d87ffc3d67b96cebaed0e42015030c",
+  "prior_review_addendum_sha256": "c7272288e799ece195d9674e05dbf260bc46abc141dfd6605a4abf8673b3d11e",
+  "proposal": {
+    "monotonic_ns": "Direct process.hrtime.bigint() canonical unsigned decimal string; no Number or millisecond conversion and no fabricated per-process offset",
+    "grant_max_ns": "900000000000",
+    "grant_max_wall_ms": 900000,
+    "review_max_ns": "300000000000",
+    "elapsed_disagreement_max_ns": "2000000000",
+    "same_boot_required": true
+  },
+  "primary_chain": [
+    {
+      "url": "https://github.com/nodejs/node/blob/v24.22.0/lib/internal/process/per_thread.js#L64-L95",
+      "finding": "hrtime.bigint invokes native hrtimeBigInt then reads BigUint64 buffer directly."
+    },
+    {
+      "url": "https://github.com/nodejs/node/blob/v24.22.0/src/node_process_methods.cc#L651-L658",
+      "finding": "HrtimeBigIntImpl stores uv_hrtime directly; no process-start or process-specific epoch subtraction."
+    },
+    {
+      "url": "https://github.com/nodejs/node/blob/v24.22.0/deps/uv/src/unix/core.c#L141-L143",
+      "finding": "uv_hrtime delegates to UV_CLOCK_PRECISE."
+    },
+    {
+      "url": "https://github.com/nodejs/node/blob/v24.22.0/deps/uv/src/unix/linux.c#L1508-L1539",
+      "finding": "PRECISE calls clock_gettime(CLOCK_MONOTONIC); no process offset; returns seconds*1e9+nanoseconds. On native error returns0."
+    },
+    {
+      "url": "https://github.com/nodejs/node/blob/v24.22.0/deps/uv/src/unix/darwin.c#L50-L58",
+      "finding": "Calls mach_continuous_time with machine timebase conversion; no process-specific subtraction."
+    },
+    {
+      "url": "https://github.com/apple-oss-distributions/xnu/blob/main/osfmk/mach/mach_time.h#L57-L63",
+      "finding": "Apple declares continuous clock advances during sleep."
+    },
+    {
+      "url": "https://man7.org/linux/man-pages/man3/clock_gettime.3.html",
+      "finding": "Linux CLOCK_MONOTONIC is system-wide, no backward jumps, excludes suspended time; NTP rate adjustments may affect rate."
+    }
+  ],
+  "shared_epoch_conclusion": "For exact examined Node24.22.0 platform implementations, hrtime.bigint passes the host OS clock through without a per-process origin. Values are comparable across processes in the same host/boot and OS time namespace. Public documentation arbitrary-time wording alone was not used to infer this. Unknown runtimes/platforms/namespaces need actual qualification or refusal.",
+  "actual_evidence": {
+    "file": "hrtime-cross-process.json",
+    "sha256": "e1ca842153bfa1b33968a5f5e98a7ce7ed929947de5409856080821252585ccc",
+    "result": "3 independent actual Darwin Nodev24.22.0 children, same boot, child monotonic sample lies within parent before/after bracket in every case.",
+    "limit": "No Linux actual execution, clock adjustment, suspend/reboot or namespace crossing performed. Shared epoch inference combines actual bracket checks with primary implementation, not bracket checks alone."
+  },
+  "required_amendment_details": [
+    "Linux monotonic excludes suspend; enforce the wall-versus-monotonic disagreement guard at review confirmation as well as every grant/phase continuation, not only persisted grants. Otherwise a review handle using only hrtime can pause during suspend. Consider explicit wall review maximum as a conservative additional bound, but do not claim it already exists.",
+    "Darwin continuous time includes suspend. Long suspend does not inherently create clock disagreement there; ordinary monotonic and wall expiry limits still expire sufficiently old handles/grants. Do not promise every suspend produces refusal independent of elapsed bounds.",
+    "Compare exact BigInt elapsed ns with exact wall delta*1000000n; abs difference>2000000000n refuses. Reject observation-before-issue, backward wall/monotonic, changed boot, unsupported/failed observations. Eligibility must be strictly before BOTH expiry bounds; equality is expired.",
+    "Reject0/invalid hrtime observations rather than treating native Linux clock failure as real epoch0. Never derive persisted clocks from process.uptime or Date.now offsets. Wire format should bound uint64 values and canonical decimal syntax without Number coercion.",
+    "Freeze sampling order and250ms width, direct trusted boot UUID normalization/observation, and same installed runtime/platform/time namespace. Preserve metadata-only exact completion settlement after expiry/revocation while forbidding new domain outputs.",
+    "Keep actual cross-process, equality/rollback/drift/reboot/suspend-policy and installed host tests as later implementation acceptance. Primary source verification does not qualify final host adapter or authorize effects."
+  ],
+  "original_v3_unchanged": true,
+  "product_sources_modified": false,
+  "next_gate": "Root clock amendment plus concrete closed schemas/consumer census/argv-output/typed effects freeze; review-addendum SF02\u2013QF01 remain open."
+}

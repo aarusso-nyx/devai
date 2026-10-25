@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/inspector/final-focused-tests.txt","kind":"historical-transcript-custody-pointer","original_bytes":2737,"original_bytes_changed":false,"original_sha256":"7dbef142dd94c9ca008f632e87f79c4f0a8e69171881e3dac08813501dcedaf0"}

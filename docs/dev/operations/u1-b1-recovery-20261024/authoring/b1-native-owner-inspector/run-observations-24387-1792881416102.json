@@ -1,0 +1,599 @@
+{
+  "scope": "Actual disposable native source composition; synthetic B5/TTY, not installed/public/Owner publication authority",
+  "environment": {
+    "node": "24.22.0",
+    "uv": "1.52.1",
+    "platform": "darwin"
+  },
+  "external_fixture": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-owner-inspector-YYJNTZ",
+  "observations": [
+    {
+      "kind": "actual-readonly-snapshot",
+      "linked": false,
+      "action": "evidence reconcile approve",
+      "snapshot": {
+        "kind": "reconciliation-host-approval-snapshot",
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-cdd97b1c11dbd9140fefe30c7ce078b8ec598b80055e817e",
+          "host_identity_sha256": "15547edc2354054d412ea3d9be005f6a253402021d82c53dab69aeafbb1a8386",
+          "head": "20ed5964c11e244cfd873713fb25c29aeb4a7e10",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "current_binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "namespace_sha256": "3944935ed5e59b902b629731ad7e1462dfc727d982f4d27df13fe0041d525588",
+        "approval_namespace_sha256": "756ef9ac034ee6f77b0b2bd0ce1c7a5da40f4100207785bb36d10bb011b6bae6",
+        "binding_matches_approval": true,
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "602144669971125",
+          "wall_ms": 1792881306541
+        },
+        "state": {
+          "kind": "reconciliation-owner-state",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-cdd97b1c11dbd9140fefe30c7ce078b8ec598b80055e817e",
+          "host_identity_sha256": "15547edc2354054d412ea3d9be005f6a253402021d82c53dab69aeafbb1a8386",
+          "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+          "plan_sha256": "03b2e6ecaf3f7fc0c56484c1b066943cea04319de16bab23f706c243a732e5a9",
+          "source_manifest_sha256": "098789f94966ec7be2def76648802b7dee707721dc5d892e57ad6e9bfbc4033a",
+          "approval_id": "e6dd1a811da0931c9549f9c45f121cf648fdf5708155f169c268316b04c4ddfc",
+          "issuer_sha256": "11cf3f5c148befdddf903873bb9d9983d6b146ed5ccbfc5126801dd1b8e7f3e6",
+          "approval_sha256": "75e1787ca789f513d47b3fc52bb416260bacfab8632d39013e4126911f6fec90",
+          "scope_sha256": "0775289735c480d83f2ae6a6c39b980763f8a0f91bf0c87b0f141b3f89051efa",
+          "grant_sha256": "407e20f8c42b6f5fb519b6c902ad271350314cb121292cbee29e1fffaf7ee450",
+          "grant_sequence": 3,
+          "grant_kind": "revocation",
+          "lease_sha256": "5de55c25036ac0ecab89b53f8af2ae27c33360bede7cc35ed38915e1e256bd5d",
+          "phases": [
+            {
+              "phase": "01",
+              "intent_sha256": "0c3c536d4cdab98f424f4a72c6f900ac0c792e10781be5f858043ca0bb524321",
+              "completion_sha256": "671defb72789a0946b108b44e58267159be5e658d40f99645a49c5bcd761e1c1"
+            },
+            {
+              "phase": "02",
+              "intent_sha256": null,
+              "completion_sha256": null
+            },
+            {
+              "phase": "03",
+              "intent_sha256": null,
+              "completion_sha256": null
+            },
+            {
+              "phase": "04",
+              "intent_sha256": null,
+              "completion_sha256": null
+            }
+          ],
+          "grants_authority": false
+        },
+        "grants_authority": false
+      },
+      "parent_fs_mutations": 0,
+      "new_sqlite_connections": 0,
+      "captured_buffers_zeroed": true,
+      "synthetic_B5_TTY": true
+    },
+    {
+      "kind": "actual-readonly-snapshot",
+      "linked": false,
+      "action": "evidence reconcile materialize",
+      "snapshot": {
+        "kind": "reconciliation-host-approval-snapshot",
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-cdd97b1c11dbd9140fefe30c7ce078b8ec598b80055e817e",
+          "host_identity_sha256": "15547edc2354054d412ea3d9be005f6a253402021d82c53dab69aeafbb1a8386",
+          "head": "20ed5964c11e244cfd873713fb25c29aeb4a7e10",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "current_binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "namespace_sha256": "3944935ed5e59b902b629731ad7e1462dfc727d982f4d27df13fe0041d525588",
+        "approval_namespace_sha256": "756ef9ac034ee6f77b0b2bd0ce1c7a5da40f4100207785bb36d10bb011b6bae6",
+        "binding_matches_approval": true,
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "602146231906458",
+          "wall_ms": 1792881308103
+        },
+        "state": {
+          "kind": "reconciliation-owner-state",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-cdd97b1c11dbd9140fefe30c7ce078b8ec598b80055e817e",
+          "host_identity_sha256": "15547edc2354054d412ea3d9be005f6a253402021d82c53dab69aeafbb1a8386",
+          "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+          "plan_sha256": "03b2e6ecaf3f7fc0c56484c1b066943cea04319de16bab23f706c243a732e5a9",
+          "source_manifest_sha256": "098789f94966ec7be2def76648802b7dee707721dc5d892e57ad6e9bfbc4033a",
+          "approval_id": "e6dd1a811da0931c9549f9c45f121cf648fdf5708155f169c268316b04c4ddfc",
+          "issuer_sha256": "11cf3f5c148befdddf903873bb9d9983d6b146ed5ccbfc5126801dd1b8e7f3e6",
+          "approval_sha256": "75e1787ca789f513d47b3fc52bb416260bacfab8632d39013e4126911f6fec90",
+          "scope_sha256": "0775289735c480d83f2ae6a6c39b980763f8a0f91bf0c87b0f141b3f89051efa",
+          "grant_sha256": "407e20f8c42b6f5fb519b6c902ad271350314cb121292cbee29e1fffaf7ee450",
+          "grant_sequence": 3,
+          "grant_kind": "revocation",
+          "lease_sha256": "5de55c25036ac0ecab89b53f8af2ae27c33360bede7cc35ed38915e1e256bd5d",
+          "phases": [
+            {
+              "phase": "01",
+              "intent_sha256": "0c3c536d4cdab98f424f4a72c6f900ac0c792e10781be5f858043ca0bb524321",
+              "completion_sha256": "671defb72789a0946b108b44e58267159be5e658d40f99645a49c5bcd761e1c1"
+            },
+            {
+              "phase": "02",
+              "intent_sha256": null,
+              "completion_sha256": null
+            },
+            {
+              "phase": "03",
+              "intent_sha256": null,
+              "completion_sha256": null
+            },
+            {
+              "phase": "04",
+              "intent_sha256": null,
+              "completion_sha256": null
+            }
+          ],
+          "grants_authority": false
+        },
+        "grants_authority": false
+      },
+      "parent_fs_mutations": 0,
+      "new_sqlite_connections": 0,
+      "captured_buffers_zeroed": true,
+      "synthetic_B5_TTY": true
+    },
+    {
+      "kind": "actual-readonly-snapshot",
+      "linked": false,
+      "action": "evidence reconcile stage-proof",
+      "snapshot": {
+        "kind": "reconciliation-host-approval-snapshot",
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-cdd97b1c11dbd9140fefe30c7ce078b8ec598b80055e817e",
+          "host_identity_sha256": "15547edc2354054d412ea3d9be005f6a253402021d82c53dab69aeafbb1a8386",
+          "head": "20ed5964c11e244cfd873713fb25c29aeb4a7e10",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "current_binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "namespace_sha256": "3944935ed5e59b902b629731ad7e1462dfc727d982f4d27df13fe0041d525588",
+        "approval_namespace_sha256": "756ef9ac034ee6f77b0b2bd0ce1c7a5da40f4100207785bb36d10bb011b6bae6",
+        "binding_matches_approval": true,
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "602147844965208",
+          "wall_ms": 1792881309716
+        },
+        "state": {
+          "kind": "reconciliation-owner-state",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-cdd97b1c11dbd9140fefe30c7ce078b8ec598b80055e817e",
+          "host_identity_sha256": "15547edc2354054d412ea3d9be005f6a253402021d82c53dab69aeafbb1a8386",
+          "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+          "plan_sha256": "03b2e6ecaf3f7fc0c56484c1b066943cea04319de16bab23f706c243a732e5a9",
+          "source_manifest_sha256": "098789f94966ec7be2def76648802b7dee707721dc5d892e57ad6e9bfbc4033a",
+          "approval_id": "e6dd1a811da0931c9549f9c45f121cf648fdf5708155f169c268316b04c4ddfc",
+          "issuer_sha256": "11cf3f5c148befdddf903873bb9d9983d6b146ed5ccbfc5126801dd1b8e7f3e6",
+          "approval_sha256": "75e1787ca789f513d47b3fc52bb416260bacfab8632d39013e4126911f6fec90",
+          "scope_sha256": "0775289735c480d83f2ae6a6c39b980763f8a0f91bf0c87b0f141b3f89051efa",
+          "grant_sha256": "407e20f8c42b6f5fb519b6c902ad271350314cb121292cbee29e1fffaf7ee450",
+          "grant_sequence": 3,
+          "grant_kind": "revocation",
+          "lease_sha256": "5de55c25036ac0ecab89b53f8af2ae27c33360bede7cc35ed38915e1e256bd5d",
+          "phases": [
+            {
+              "phase": "01",
+              "intent_sha256": "0c3c536d4cdab98f424f4a72c6f900ac0c792e10781be5f858043ca0bb524321",
+              "completion_sha256": "671defb72789a0946b108b44e58267159be5e658d40f99645a49c5bcd761e1c1"
+            },
+            {
+              "phase": "02",
+              "intent_sha256": null,
+              "completion_sha256": null
+            },
+            {
+              "phase": "03",
+              "intent_sha256": null,
+              "completion_sha256": null
+            },
+            {
+              "phase": "04",
+              "intent_sha256": null,
+              "completion_sha256": null
+            }
+          ],
+          "grants_authority": false
+        },
+        "grants_authority": false
+      },
+      "parent_fs_mutations": 0,
+      "new_sqlite_connections": 0,
+      "captured_buffers_zeroed": true,
+      "synthetic_B5_TTY": true
+    },
+    {
+      "kind": "actual-readonly-snapshot",
+      "linked": false,
+      "action": "sense bootstrap-inventory",
+      "snapshot": {
+        "kind": "reconciliation-host-approval-snapshot",
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-cdd97b1c11dbd9140fefe30c7ce078b8ec598b80055e817e",
+          "host_identity_sha256": "15547edc2354054d412ea3d9be005f6a253402021d82c53dab69aeafbb1a8386",
+          "head": "20ed5964c11e244cfd873713fb25c29aeb4a7e10",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "current_binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "namespace_sha256": "3944935ed5e59b902b629731ad7e1462dfc727d982f4d27df13fe0041d525588",
+        "approval_namespace_sha256": "756ef9ac034ee6f77b0b2bd0ce1c7a5da40f4100207785bb36d10bb011b6bae6",
+        "binding_matches_approval": true,
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "602149444330291",
+          "wall_ms": 1792881311316
+        },
+        "state": {
+          "kind": "reconciliation-owner-state",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-cdd97b1c11dbd9140fefe30c7ce078b8ec598b80055e817e",
+          "host_identity_sha256": "15547edc2354054d412ea3d9be005f6a253402021d82c53dab69aeafbb1a8386",
+          "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+          "plan_sha256": "03b2e6ecaf3f7fc0c56484c1b066943cea04319de16bab23f706c243a732e5a9",
+          "source_manifest_sha256": "098789f94966ec7be2def76648802b7dee707721dc5d892e57ad6e9bfbc4033a",
+          "approval_id": "e6dd1a811da0931c9549f9c45f121cf648fdf5708155f169c268316b04c4ddfc",
+          "issuer_sha256": "11cf3f5c148befdddf903873bb9d9983d6b146ed5ccbfc5126801dd1b8e7f3e6",
+          "approval_sha256": "75e1787ca789f513d47b3fc52bb416260bacfab8632d39013e4126911f6fec90",
+          "scope_sha256": "0775289735c480d83f2ae6a6c39b980763f8a0f91bf0c87b0f141b3f89051efa",
+          "grant_sha256": "407e20f8c42b6f5fb519b6c902ad271350314cb121292cbee29e1fffaf7ee450",
+          "grant_sequence": 3,
+          "grant_kind": "revocation",
+          "lease_sha256": "5de55c25036ac0ecab89b53f8af2ae27c33360bede7cc35ed38915e1e256bd5d",
+          "phases": [
+            {
+              "phase": "01",
+              "intent_sha256": "0c3c536d4cdab98f424f4a72c6f900ac0c792e10781be5f858043ca0bb524321",
+              "completion_sha256": "671defb72789a0946b108b44e58267159be5e658d40f99645a49c5bcd761e1c1"
+            },
+            {
+              "phase": "02",
+              "intent_sha256": null,
+              "completion_sha256": null
+            },
+            {
+              "phase": "03",
+              "intent_sha256": null,
+              "completion_sha256": null
+            },
+            {
+              "phase": "04",
+              "intent_sha256": null,
+              "completion_sha256": null
+            }
+          ],
+          "grants_authority": false
+        },
+        "grants_authority": false
+      },
+      "parent_fs_mutations": 0,
+      "new_sqlite_connections": 0,
+      "captured_buffers_zeroed": true,
+      "synthetic_B5_TTY": true
+    },
+    {
+      "kind": "actual-readonly-snapshot",
+      "linked": true,
+      "action": "evidence reconcile approve",
+      "snapshot": {
+        "kind": "reconciliation-host-approval-snapshot",
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-e2ce98e7043b823982037ab29ce823d08d146bfd89e1aa05",
+          "host_identity_sha256": "a56433c7d72e819720ff92e754b23db5fa85b147be408f010557af85872aed90",
+          "head": "e199a1de5da9419b1238b93e0615d9717f8e3c02",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "current_binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "namespace_sha256": "2424754af20e92c5b7c9421036baec5985645517cf565aaa629a800a79e1d1ca",
+        "approval_namespace_sha256": "4def23103694dad85f207f2dfd034a89ef9e42576d137d29e293b15f05eac79c",
+        "binding_matches_approval": true,
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "602170318228666",
+          "wall_ms": 1792881332190
+        },
+        "state": {
+          "kind": "reconciliation-owner-state",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-e2ce98e7043b823982037ab29ce823d08d146bfd89e1aa05",
+          "host_identity_sha256": "a56433c7d72e819720ff92e754b23db5fa85b147be408f010557af85872aed90",
+          "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+          "plan_sha256": "03b2e6ecaf3f7fc0c56484c1b066943cea04319de16bab23f706c243a732e5a9",
+          "source_manifest_sha256": "098789f94966ec7be2def76648802b7dee707721dc5d892e57ad6e9bfbc4033a",
+          "approval_id": "e6dd1a811da0931c9549f9c45f121cf648fdf5708155f169c268316b04c4ddfc",
+          "issuer_sha256": "260cfcc6d60b37c07ac1950620866bc3db25c79e2114d23d2c607336a63ba65b",
+          "approval_sha256": "b5afda0eceb5c92b983ce9ff530a2ee4c37c81b05f4f3c9468d15101ded02227",
+          "scope_sha256": "4476f0843639c7484cc5d4557d4afe13337e2c76a59eed94615b896d0184f240",
+          "grant_sha256": "4c8a2013ec5a0b07cfe12004d9dc37be7bc5ec8fb5e4613170717bbd0e7bc2d2",
+          "grant_sequence": 3,
+          "grant_kind": "revocation",
+          "lease_sha256": "501e2e858951479f5882741da605b4b69c8bb3d2b122ad8f5db8e0f276be4abb",
+          "phases": [
+            {
+              "phase": "01",
+              "intent_sha256": "ffc184e92a2f0070eb2eec60b312816a76cc5f2a3ff7923e6970445c21ad027b",
+              "completion_sha256": "0497bbf2c6cd3f79df3cafec623bf0cce47960a0d327adb13a7dfb892230f99b"
+            },
+            {
+              "phase": "02",
+              "intent_sha256": null,
+              "completion_sha256": null
+            },
+            {
+              "phase": "03",
+              "intent_sha256": null,
+              "completion_sha256": null
+            },
+            {
+              "phase": "04",
+              "intent_sha256": null,
+              "completion_sha256": null
+            }
+          ],
+          "grants_authority": false
+        },
+        "grants_authority": false
+      },
+      "parent_fs_mutations": 0,
+      "new_sqlite_connections": 0,
+      "captured_buffers_zeroed": true,
+      "synthetic_B5_TTY": true
+    },
+    {
+      "kind": "actual-readonly-snapshot",
+      "linked": true,
+      "action": "evidence reconcile materialize",
+      "snapshot": {
+        "kind": "reconciliation-host-approval-snapshot",
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-e2ce98e7043b823982037ab29ce823d08d146bfd89e1aa05",
+          "host_identity_sha256": "a56433c7d72e819720ff92e754b23db5fa85b147be408f010557af85872aed90",
+          "head": "e199a1de5da9419b1238b93e0615d9717f8e3c02",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "current_binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "namespace_sha256": "2424754af20e92c5b7c9421036baec5985645517cf565aaa629a800a79e1d1ca",
+        "approval_namespace_sha256": "4def23103694dad85f207f2dfd034a89ef9e42576d137d29e293b15f05eac79c",
+        "binding_matches_approval": true,
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "602172010554875",
+          "wall_ms": 1792881333882
+        },
+        "state": {
+          "kind": "reconciliation-owner-state",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-e2ce98e7043b823982037ab29ce823d08d146bfd89e1aa05",
+          "host_identity_sha256": "a56433c7d72e819720ff92e754b23db5fa85b147be408f010557af85872aed90",
+          "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+          "plan_sha256": "03b2e6ecaf3f7fc0c56484c1b066943cea04319de16bab23f706c243a732e5a9",
+          "source_manifest_sha256": "098789f94966ec7be2def76648802b7dee707721dc5d892e57ad6e9bfbc4033a",
+          "approval_id": "e6dd1a811da0931c9549f9c45f121cf648fdf5708155f169c268316b04c4ddfc",
+          "issuer_sha256": "260cfcc6d60b37c07ac1950620866bc3db25c79e2114d23d2c607336a63ba65b",
+          "approval_sha256": "b5afda0eceb5c92b983ce9ff530a2ee4c37c81b05f4f3c9468d15101ded02227",
+          "scope_sha256": "4476f0843639c7484cc5d4557d4afe13337e2c76a59eed94615b896d0184f240",
+          "grant_sha256": "4c8a2013ec5a0b07cfe12004d9dc37be7bc5ec8fb5e4613170717bbd0e7bc2d2",
+          "grant_sequence": 3,
+          "grant_kind": "revocation",
+          "lease_sha256": "501e2e858951479f5882741da605b4b69c8bb3d2b122ad8f5db8e0f276be4abb",
+          "phases": [
+            {
+              "phase": "01",
+              "intent_sha256": "ffc184e92a2f0070eb2eec60b312816a76cc5f2a3ff7923e6970445c21ad027b",
+              "completion_sha256": "0497bbf2c6cd3f79df3cafec623bf0cce47960a0d327adb13a7dfb892230f99b"
+            },
+            {
+              "phase": "02",
+              "intent_sha256": null,
+              "completion_sha256": null
+            },
+            {
+              "phase": "03",
+              "intent_sha256": null,
+              "completion_sha256": null
+            },
+            {
+              "phase": "04",
+              "intent_sha256": null,
+              "completion_sha256": null
+            }
+          ],
+          "grants_authority": false
+        },
+        "grants_authority": false
+      },
+      "parent_fs_mutations": 0,
+      "new_sqlite_connections": 0,
+      "captured_buffers_zeroed": true,
+      "synthetic_B5_TTY": true
+    },
+    {
+      "kind": "actual-readonly-snapshot",
+      "linked": true,
+      "action": "evidence reconcile stage-proof",
+      "snapshot": {
+        "kind": "reconciliation-host-approval-snapshot",
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-e2ce98e7043b823982037ab29ce823d08d146bfd89e1aa05",
+          "host_identity_sha256": "a56433c7d72e819720ff92e754b23db5fa85b147be408f010557af85872aed90",
+          "head": "e199a1de5da9419b1238b93e0615d9717f8e3c02",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "current_binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "namespace_sha256": "2424754af20e92c5b7c9421036baec5985645517cf565aaa629a800a79e1d1ca",
+        "approval_namespace_sha256": "4def23103694dad85f207f2dfd034a89ef9e42576d137d29e293b15f05eac79c",
+        "binding_matches_approval": true,
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "602174867857458",
+          "wall_ms": 1792881336739
+        },
+        "state": {
+          "kind": "reconciliation-owner-state",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-e2ce98e7043b823982037ab29ce823d08d146bfd89e1aa05",
+          "host_identity_sha256": "a56433c7d72e819720ff92e754b23db5fa85b147be408f010557af85872aed90",
+          "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+          "plan_sha256": "03b2e6ecaf3f7fc0c56484c1b066943cea04319de16bab23f706c243a732e5a9",
+          "source_manifest_sha256": "098789f94966ec7be2def76648802b7dee707721dc5d892e57ad6e9bfbc4033a",
+          "approval_id": "e6dd1a811da0931c9549f9c45f121cf648fdf5708155f169c268316b04c4ddfc",
+          "issuer_sha256": "260cfcc6d60b37c07ac1950620866bc3db25c79e2114d23d2c607336a63ba65b",
+          "approval_sha256": "b5afda0eceb5c92b983ce9ff530a2ee4c37c81b05f4f3c9468d15101ded02227",
+          "scope_sha256": "4476f0843639c7484cc5d4557d4afe13337e2c76a59eed94615b896d0184f240",
+          "grant_sha256": "4c8a2013ec5a0b07cfe12004d9dc37be7bc5ec8fb5e4613170717bbd0e7bc2d2",
+          "grant_sequence": 3,
+          "grant_kind": "revocation",
+          "lease_sha256": "501e2e858951479f5882741da605b4b69c8bb3d2b122ad8f5db8e0f276be4abb",
+          "phases": [
+            {
+              "phase": "01",
+              "intent_sha256": "ffc184e92a2f0070eb2eec60b312816a76cc5f2a3ff7923e6970445c21ad027b",
+              "completion_sha256": "0497bbf2c6cd3f79df3cafec623bf0cce47960a0d327adb13a7dfb892230f99b"
+            },
+            {
+              "phase": "02",
+              "intent_sha256": null,
+              "completion_sha256": null
+            },
+            {
+              "phase": "03",
+              "intent_sha256": null,
+              "completion_sha256": null
+            },
+            {
+              "phase": "04",
+              "intent_sha256": null,
+              "completion_sha256": null
+            }
+          ],
+          "grants_authority": false
+        },
+        "grants_authority": false
+      },
+      "parent_fs_mutations": 0,
+      "new_sqlite_connections": 0,
+      "captured_buffers_zeroed": true,
+      "synthetic_B5_TTY": true
+    },
+    {
+      "kind": "actual-readonly-snapshot",
+      "linked": true,
+      "action": "sense bootstrap-inventory",
+      "snapshot": {
+        "kind": "reconciliation-host-approval-snapshot",
+        "identity": {
+          "schemaVersion": "1.0.0",
+          "kind": "reconciliation-host-context",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-e2ce98e7043b823982037ab29ce823d08d146bfd89e1aa05",
+          "host_identity_sha256": "a56433c7d72e819720ff92e754b23db5fa85b147be408f010557af85872aed90",
+          "head": "e199a1de5da9419b1238b93e0615d9717f8e3c02",
+          "object_format": "sha1",
+          "merge_heads": []
+        },
+        "current_binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+        "namespace_sha256": "2424754af20e92c5b7c9421036baec5985645517cf565aaa629a800a79e1d1ca",
+        "approval_namespace_sha256": "4def23103694dad85f207f2dfd034a89ef9e42576d137d29e293b15f05eac79c",
+        "binding_matches_approval": true,
+        "clock": {
+          "clock_source": "node-uv-hrtime-ns-v1",
+          "boot_id": "bb4143df-40c6-43b7-a2c7-c88c606a2559",
+          "monotonic_ns": "602177301680916",
+          "wall_ms": 1792881339173
+        },
+        "state": {
+          "kind": "reconciliation-owner-state",
+          "repository_id": "example-repository",
+          "worktree_id": "wt-e2ce98e7043b823982037ab29ce823d08d146bfd89e1aa05",
+          "host_identity_sha256": "a56433c7d72e819720ff92e754b23db5fa85b147be408f010557af85872aed90",
+          "binding_sha256": "3e2d7f83f7bf02e5fb1b70ff21b16240ed07634caafe7972a858d90bd5721cd5",
+          "plan_sha256": "03b2e6ecaf3f7fc0c56484c1b066943cea04319de16bab23f706c243a732e5a9",
+          "source_manifest_sha256": "098789f94966ec7be2def76648802b7dee707721dc5d892e57ad6e9bfbc4033a",
+          "approval_id": "e6dd1a811da0931c9549f9c45f121cf648fdf5708155f169c268316b04c4ddfc",
+          "issuer_sha256": "260cfcc6d60b37c07ac1950620866bc3db25c79e2114d23d2c607336a63ba65b",
+          "approval_sha256": "b5afda0eceb5c92b983ce9ff530a2ee4c37c81b05f4f3c9468d15101ded02227",
+          "scope_sha256": "4476f0843639c7484cc5d4557d4afe13337e2c76a59eed94615b896d0184f240",
+          "grant_sha256": "4c8a2013ec5a0b07cfe12004d9dc37be7bc5ec8fb5e4613170717bbd0e7bc2d2",
+          "grant_sequence": 3,
+          "grant_kind": "revocation",
+          "lease_sha256": "501e2e858951479f5882741da605b4b69c8bb3d2b122ad8f5db8e0f276be4abb",
+          "phases": [
+            {
+              "phase": "01",
+              "intent_sha256": "ffc184e92a2f0070eb2eec60b312816a76cc5f2a3ff7923e6970445c21ad027b",
+              "completion_sha256": "0497bbf2c6cd3f79df3cafec623bf0cce47960a0d327adb13a7dfb892230f99b"
+            },
+            {
+              "phase": "02",
+              "intent_sha256": null,
+              "completion_sha256": null
+            },
+            {
+              "phase": "03",
+              "intent_sha256": null,
+              "completion_sha256": null
+            },
+            {
+              "phase": "04",
+              "intent_sha256": null,
+              "completion_sha256": null
+            }
+          ],
+          "grants_authority": false
+        },
+        "grants_authority": false
+      },
+      "parent_fs_mutations": 0,
+      "new_sqlite_connections": 0,
+      "captured_buffers_zeroed": true,
+      "synthetic_B5_TTY": true
+    }
+  ],
+  "sha256": {
+    "packages/authority/src/boundaries/reconciliation-host-owner.ts": "d2ea3a0b345ffc48f809e819807c3f738bd9cddaf91673387bd310b8e05456c3",
+    "packages/authority/tests/unit/reconciliation-host-owner.test.ts": "f774494ad8aae3279d15cc0f26b00869098d8c7ee122e157b13528f89fbb8fa4"
+  }
+}

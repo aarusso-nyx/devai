@@ -1,0 +1,11 @@
+{
+  "original_source_path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/checkpoint-native-index-after-readonly-git.bin",
+  "external_custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/checkpoint-native-index-after-readonly-git.bin",
+  "sha256": "65825be099e39e491894e46fb2a11ce5dd82471f2fd4647cbb967292297fd34c",
+  "bytes": 2115246,
+  "dev": "16777245",
+  "ino": "78186122",
+  "mode": "0o644",
+  "historical_bytes_changed": false,
+  "standing": "historical diagnostic artifact; no authority or completion promotion"
+}

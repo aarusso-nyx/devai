@@ -1,0 +1,160 @@
+{
+  "result": "PURE_INDEX_CODEC_INDEPENDENT_GREEN_ONLY",
+  "checkpoint": "release-280/b1-design/index-codec-checkpoint.json",
+  "source": "packages/authority/src/boundaries/proof-index-codec.ts",
+  "source_sha256": "ba41c862f95c8c0a7e0c54eb1434c98a57182af0f58bb4c61983c6b4d67a3fb4",
+  "test": "packages/authority/tests/unit/proof-index-codec.test.ts",
+  "test_sha256": "d28cbf1695fe735aee69dc9284add76163cab84573513e4f8e3ae9469ba590a5",
+  "final": {
+    "passed": 29,
+    "failed": 0,
+    "log": "codec-first-green.log"
+  },
+  "authentic_red": {
+    "phase": "STRUCTURAL missingmodule only; not public/host capability RED",
+    "log": "codec-corrected-red.log",
+    "failed": 25,
+    "fixture_selfchecks_passed": 3
+  },
+  "fixture_corrections": [
+    "Const-tuples and erroneously copied branches were Inspector harnesserrors, not productdefects.",
+    "Statcache zeros exclude mandatorymodebytes24..27; actual Git independently proved expectedplannedindex in all4format/worktree combinations.",
+    "Actual Git force-removal emitsREUC; parser correctly refuses it. Test retains explicit REUC refusal then uses Git clear-resolve-undo ONLYon disposable copied index to isolate absentproof refusal. No production extension support widened."
+  ],
+  "actual_git_fixtures": "SHA1/SHA256, regular/linked-worktree, merged/unmerged two-path entries; normal/executable/symlink/gitlink modes, assumevalid; saturated nameflags independently proven by Git. Four verified historybundles and binaryindices preserve custody.",
+  "pure_contract": "Byte parse/plan; all nonproof raw bytes retained, checksum and semantic digests verified, TREE dropped only after validation, unknown extensions refused, outputs frozen and no observed filesystem effects.",
+  "limits": "No host repository identity, Owner approval, lock, CAS capability, publication durability or runtime B1 acceptance established. REUC and non-TREE extensions unsupported by frozen contract.",
+  "fixture_manifest": {
+    "fixtures-r4-reuc/sha1-linked/fixture.json": {
+      "size": 2228,
+      "sha256": "53fccc5e5fbb9781a21dcf22cd3641df021bff7cba639f683a3ee373781a921a"
+    },
+    "fixtures-r4-reuc/sha1-linked/git-expected-planned.index": {
+      "size": 884,
+      "sha256": "f57ba2d6e0a132670ab82463a0a6ed11e60646d931c480320564bda80e590d43"
+    },
+    "fixtures-r4-reuc/sha1-linked/history.bundle": {
+      "size": 1947,
+      "sha256": "221f50d341c2c79adee41f8217753a53eb7ce68efc5525e43ad6dd3d127e2a28"
+    },
+    "fixtures-r4-reuc/sha1-linked/merged.index": {
+      "size": 670,
+      "sha256": "f69e1786f078341e2b06545c6c7eafd414473785c2d0e37d04452ea1b774eed4"
+    },
+    "fixtures-r4-reuc/sha1-linked/replacement-blob.txt": {
+      "size": 28,
+      "sha256": "ff4e07803a669379a9b53a02021ce5353ec2aa1f9b74fb8f60c72061691ba4de"
+    },
+    "fixtures-r4-reuc/sha1-linked/saturated-name.index": {
+      "size": 5210,
+      "sha256": "d1a0f007d39c27066f42900c2554d6c8c873eb2851b984de57c355ecf8b4f2c6"
+    },
+    "fixtures-r4-reuc/sha1-linked/unmerged.index": {
+      "size": 946,
+      "sha256": "5d4ecd5a7d70213ade6b65d6e95f8306401964c1baffef3a674de6af203bff52"
+    },
+    "fixtures-r4-reuc/sha1-regular/absent-with-REUC.index": {
+      "size": 796,
+      "sha256": "756b3ca596fc4175d71a492e294a3763ddceebf2db0bd11fb90d99e199b6d4da"
+    },
+    "fixtures-r4-reuc/sha1-regular/absent-without-REUC.index": {
+      "size": 682,
+      "sha256": "ddab05cab9d86f8ccc96931bed993b7ab82002a5b15536cd276bc560b6979137"
+    },
+    "fixtures-r4-reuc/sha1-regular/fixture.json": {
+      "size": 2229,
+      "sha256": "b1d77f4ea88e51cf0fdeaa31e8f9e5f59ec023771eeb224ca2f2af4b96f9ea92"
+    },
+    "fixtures-r4-reuc/sha1-regular/git-expected-planned.index": {
+      "size": 884,
+      "sha256": "cf772fe664869fe5a97b6ae1d555e8709b8ec358cac508c3bc1bfa8720a281ea"
+    },
+    "fixtures-r4-reuc/sha1-regular/history.bundle": {
+      "size": 1877,
+      "sha256": "cdefb86465bb7cee7b54beeb116c5d4ea8ca5250fd19cb46619bb9b36c92e102"
+    },
+    "fixtures-r4-reuc/sha1-regular/merged.index": {
+      "size": 670,
+      "sha256": "35b74d3984fea544c14e8c37353f265a6ec5a305e5652ef6a4633fefc8ce5879"
+    },
+    "fixtures-r4-reuc/sha1-regular/replacement-blob.txt": {
+      "size": 28,
+      "sha256": "ff4e07803a669379a9b53a02021ce5353ec2aa1f9b74fb8f60c72061691ba4de"
+    },
+    "fixtures-r4-reuc/sha1-regular/saturated-name.index": {
+      "size": 5210,
+      "sha256": "88b8bdd30a3bdb764f26a0247506485253b32363d77924d8bf9a27f1a7c77b00"
+    },
+    "fixtures-r4-reuc/sha1-regular/unmerged.index": {
+      "size": 946,
+      "sha256": "360dc4f1142087c0494e91b4acc9e536731af0c9e63bfcc2d0f5746746503923"
+    },
+    "fixtures-r4-reuc/sha256-linked/fixture.json": {
+      "size": 2494,
+      "sha256": "d313a5347e7739b202bb47ef23ed14b22aebec83b96518a8e359f6fda28ea390"
+    },
+    "fixtures-r4-reuc/sha256-linked/git-expected-planned.index": {
+      "size": 1012,
+      "sha256": "d017759e442f46e6fd87734cfb9a3d6845dcdc8f083887f24b97e432efb9d23e"
+    },
+    "fixtures-r4-reuc/sha256-linked/history.bundle": {
+      "size": 2545,
+      "sha256": "7acafd6535eb4df54d6b04e8ab35f2ac881f132f8957b4d9bb582a5d43053757"
+    },
+    "fixtures-r4-reuc/sha256-linked/merged.index": {
+      "size": 794,
+      "sha256": "5cd7741834312a5a74f13fa3f6dd856b355a000a846f1f89db15313364d769ed"
+    },
+    "fixtures-r4-reuc/sha256-linked/replacement-blob.txt": {
+      "size": 28,
+      "sha256": "ff4e07803a669379a9b53a02021ce5353ec2aa1f9b74fb8f60c72061691ba4de"
+    },
+    "fixtures-r4-reuc/sha256-linked/saturated-name.index": {
+      "size": 5350,
+      "sha256": "2cd5e37eb492a03f15271e65000a154467b92ea1528820e9f1584b6b6e0b2a17"
+    },
+    "fixtures-r4-reuc/sha256-linked/unmerged.index": {
+      "size": 1070,
+      "sha256": "ab36d8ec1c475085d60459b3e091bee7326e4de5f4419d0c4107f75353a66f27"
+    },
+    "fixtures-r4-reuc/sha256-regular/fixture.json": {
+      "size": 2495,
+      "sha256": "934e66bac71082318f6ed80c71e602fd67fd17585554d29fd4760347259c554f"
+    },
+    "fixtures-r4-reuc/sha256-regular/git-expected-planned.index": {
+      "size": 1012,
+      "sha256": "155d9f557e2d6458a432f5b2f13d1ea78f8eade75bfe93cdfc4e46ea69fa3bf5"
+    },
+    "fixtures-r4-reuc/sha256-regular/history.bundle": {
+      "size": 2369,
+      "sha256": "ff00382cda5e0e4bc52a355938e2bbe605b5a1f2376920cd1c965ce1b2426a68"
+    },
+    "fixtures-r4-reuc/sha256-regular/merged.index": {
+      "size": 794,
+      "sha256": "18b51849551747d4d902783d9bc88ff6c0e9a836344997f692dadfd7082486be"
+    },
+    "fixtures-r4-reuc/sha256-regular/replacement-blob.txt": {
+      "size": 28,
+      "sha256": "ff4e07803a669379a9b53a02021ce5353ec2aa1f9b74fb8f60c72061691ba4de"
+    },
+    "fixtures-r4-reuc/sha256-regular/saturated-name.index": {
+      "size": 5350,
+      "sha256": "13d030c5a4a303d0679ffe82a7b88e0785cf674210f2cdd3e35d666b22e5da31"
+    },
+    "fixtures-r4-reuc/sha256-regular/unmerged.index": {
+      "size": 1070,
+      "sha256": "57c395b358d5b2b76fac2604ac7bb5ca2704b09ad768b51f1290e0e8d565952d"
+    }
+  },
+  "log_sha256": {
+    "codec-red-with-custody.log": "ea8a9fdffe12190f7a0f3544014abb748e42c499d2a8453ea2c23d55b72dd7c5",
+    "saturated-fixture-selfcheck.log": "0e1faae54dcd6ac4a154de72f53bd2a448118a03811b7a8663b64571e7d7d59f",
+    "codec-harness-fix-eslint.log": "689d370e8c06bdc4d786c596f733e4fd11d13ae585434f61cc90eeeaf5155785",
+    "codec-red.log": "7a53446306a88ec98454e2b89c0ae05306834f78dd9b7a66d415c956fa3327ad",
+    "codec-corrected-red.log": "43742a9460f7a3b419a82f8a575c3dde7771de01ec05a895737a26a32ee78c0e",
+    "final-inspector-eslint.log": "689d370e8c06bdc4d786c596f733e4fd11d13ae585434f61cc90eeeaf5155785",
+    "codec-first-green.log": "26550d841baa08ff096c847ff1e1243cd2fce71f06a9a1184b7bf9999780091b",
+    "git-expected-plan-selfcheck.log": "3f8971c62c81f07797f12e340d6eabf85d101bda25640cb60db90538508b23d8",
+    "codec-eslint.log": "689d370e8c06bdc4d786c596f733e4fd11d13ae585434f61cc90eeeaf5155785"
+  }
+}

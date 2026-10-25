@@ -1,0 +1,155 @@
+{
+  "status": "PREPARATION_ONLY_NOT_APPROVAL",
+  "baseline": "2df84159caabf869b866fb2a05e5b06be83295fb",
+  "files": [
+    {
+      "path": "README.preparation-original.md.txt",
+      "bytes": 6356,
+      "sha256": "46e4c583c39a22183eaad18cdadad41301fd73170a2c12acdc44d95c2ebe708c",
+      "original_local_path": "README.md"
+    },
+    {
+      "path": "REC-B1-A-approval.md",
+      "bytes": 12500,
+      "sha256": "9e6b77e84a44cddec5eb69d4e315269b7576d50098beca84fb1bdd95c9a04095"
+    },
+    {
+      "path": "REC-B1-A-path-inventory.proposed.json",
+      "bytes": 3409,
+      "sha256": "eb2fb36e1f9bbc14ab4b9ae803dbe26dcb0e666a35a7ddfbd9b58a1505de394a"
+    },
+    {
+      "path": "baseline-observation.json",
+      "bytes": 7744,
+      "sha256": "5e3bf06fb718248352e957a7b086c4253cfd978b866b3dc0911614ed2f31527a"
+    },
+    {
+      "path": "consumer-census.txt",
+      "bytes": 3925,
+      "sha256": "459ec2648f0eb5130a15c9d5565610d059aaac44afa7506e4a5f35499fc1a68f"
+    },
+    {
+      "path": "implementation-release-plan.md",
+      "bytes": 27091,
+      "sha256": "0d1d5bfb3963db77298318e20c2f34a2813c34576a5084ff35f2f4a4a1620b14"
+    },
+    {
+      "path": "proof-index-reconciliation-contract.schema.proposed.json",
+      "bytes": 11384,
+      "sha256": "ff6c0ac4cb331f71ad206a931a2c14b8fcb2cf79d3fd54928124ae7e6e9d5e63"
+    },
+    {
+      "path": "reference/README.md.txt",
+      "bytes": 10834,
+      "sha256": "e5cb381436920b50f1fd40ba4863afb9288746062e54b9151b7fdd41cebdac78",
+      "original_local_path": "reference/README.md"
+    },
+    {
+      "path": "reference/devai271-recovery-capability-addendum.json",
+      "bytes": 5788,
+      "sha256": "8dbf439230b93914beeb5f1776a217353557ebe75863ca06673f4334d24aa716"
+    },
+    {
+      "path": "reference/engineer-inventory.json",
+      "bytes": 4640,
+      "sha256": "63f940434559a79610dea90e85be1e5579dfc528525187b9ab1a8e4ed0cd46e8"
+    },
+    {
+      "path": "reference/preserved-packets/B1-I-proposed-implementation-packet.md",
+      "bytes": 13532,
+      "sha256": "07768b045f6f81d6e667bf9c58006ef020fe7a7f6e38b2c38bbf19467143a850"
+    },
+    {
+      "path": "reference/preserved-packets/B1-design-draft-ADR-EVI-0007.md",
+      "bytes": 6444,
+      "sha256": "662b61bdd8708f56ce3a4c0dea4ee3c72c741d0c2d9c5c8380057fc2b9b5b7f7"
+    },
+    {
+      "path": "reference/preserved-packets/D1-owner-approval.md",
+      "bytes": 707,
+      "sha256": "f62fd8715cffff7a435a379cb788b1c31083c1fc5b205c708228fc101f8eaf49"
+    },
+    {
+      "path": "reference/preserved-packets/D1-release-binding.json",
+      "bytes": 1072,
+      "sha256": "7b7a6516e7b07f8b271af0284a153e4975f308846c783418b3f90ef8e79690c9"
+    },
+    {
+      "path": "reference/preserved-packets/HC-01-eight-line-compatibility.md",
+      "bytes": 5458,
+      "sha256": "c67a38923f78f152c0704996a3546f5fb7f5992294ea9ae8bca2728055389f14"
+    },
+    {
+      "path": "reference/preserved-packets/REC-B1-A-contract-only-approval.md",
+      "bytes": 8079,
+      "sha256": "c2d6b50177451e0c2a2ded87469db5951253a8b07e3276b79ed212940f0bdcb7"
+    },
+    {
+      "path": "reference/preserved-packets/REC-B1-A-path-inventory.json",
+      "bytes": 1904,
+      "sha256": "94969b4121eb2a5702baa883799f286c1cb74759f08608caa18d33b1f21658c7"
+    },
+    {
+      "path": "reference/preserved-packets/REC-B1-canonical-bootstrap-design.md",
+      "bytes": 5943,
+      "sha256": "35133cbcbad7bed680c803c64af8ae79f5d7d182b4dd6f9bc9847cb831384514"
+    },
+    {
+      "path": "reference/preserved-packets/REC-D1-adoption-and-execution-gates.md",
+      "bytes": 6930,
+      "sha256": "8d1ed4804a68b2d01604b8896423842ec3ec95789c076dbd5de5c61737388111"
+    },
+    {
+      "path": "reference/preserved-packets/REC-U1-handoff-prepared.md",
+      "bytes": 3273,
+      "sha256": "a20365a8d4559295949e751f90fdad5b296d8f5e461513f3a3208931135a25ef"
+    },
+    {
+      "path": "reference/preserved-packets/REC-U1-upstream-recovery.md",
+      "bytes": 5126,
+      "sha256": "f198bde3bea26c776f91709217320beaf1b20c20e6b2890a17a36d38e5ca222d"
+    },
+    {
+      "path": "reference/preserved-packets/approval-manifest.json",
+      "bytes": 2501,
+      "sha256": "2d2b36ea4e7f48679c3debaeb112f00ff1cb37368a62f219d4d2d50f20278370"
+    },
+    {
+      "path": "reference/preserved-packets/authority-review.md",
+      "bytes": 16951,
+      "sha256": "ff87c62ad9705f7039d6dd2a086d703db421210dd3466cf9d46296813526d7f1"
+    },
+    {
+      "path": "reference/preserved-packets/authority-snapshot.md.txt",
+      "bytes": 26399,
+      "sha256": "6afa7c2332edf0b1273e8abbd64b7f4943722d1eb07eb97447ec17f7dc26cb08",
+      "original_local_path": "reference/preserved-packets/authority-snapshot.md"
+    },
+    {
+      "path": "reference/preserved-packets/reference-ADR-EVI-0006.md",
+      "bytes": 13401,
+      "sha256": "89e4bebfc1147662efc3d779b490e71339a838bfe8531cbd6907e2fb073eea09"
+    },
+    {
+      "path": "reference/preserved-packets/source-manifest.json",
+      "bytes": 10056,
+      "sha256": "307b242e7795d25b0109e12c7ec32d5be7e8a4f4a39ecd0915966397db682458"
+    },
+    {
+      "path": "reference/preserved-packets-manifest.json",
+      "bytes": 7280,
+      "sha256": "b3b18259435afc4baaf622e82737f60b4b4e27de947d336bc355abb9994a1d31"
+    },
+    {
+      "path": "reference/recovery-capability-authority-audit.json",
+      "bytes": 15480,
+      "sha256": "189cc803d4c063cdcd1fc59e4fa8428d77804a5f1a2f02c96f9a9b6a898de27e"
+    },
+    {
+      "path": "verification.md",
+      "bytes": 2997,
+      "sha256": "2e405813dfe95f83a7f7f854e73ab8fd94067221de9949222ce370480317a262"
+    }
+  ],
+  "archive_relocation_note": "Only local archive locations changed. Original source bytes, hashes and pre-relocation manifests are preserved; source-relative links are not DEVAI documentation links."
+}

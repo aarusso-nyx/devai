@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/native-plan-after-stdin-fix.txt","kind":"historical-transcript-custody-pointer","original_bytes":1982,"original_bytes_changed":false,"original_sha256":"1e36cb0ad3d155fd5cffeb2007f2b7aa3902399e5a230ae3380538f8d560f9cd"}

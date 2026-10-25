@@ -1,0 +1,51 @@
+{
+  "status": "LOWER_NATIVE_COMPONENT_VERIFIED_NOT_OWNER_OR_RELEASE_ACCEPTANCE",
+  "independent_receipt": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-admission-inspector/receipt.json",
+  "independent_receipt_sha256": "0952e1aa22d462e23f771fad5ff8cc1a6dfe52ce600f92215dcc30537fb0b9b5",
+  "root_verified_current_hashes": [
+    "packages/authority/src/boundaries/reconciliation-admission-seed.ts",
+    "packages/authority/src/boundaries/host-reconciliation-admission.ts",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-admission-inspector/devai-native-admission-inspector-0Dbruz.json",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-admission-inspector/devai-native-admission-inspector-N3s07C.json",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-admission-inspector/devai-native-admission-inspector-YJyHjj.json",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-admission-inspector/devai-native-admission-inspector-ougKxB.json",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-admission-inspector/devai-native-admission-inspector-thvrma.json",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-admission-inspector/final-native-proof-after-types.json",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-admission-inspector/final-native-proof.json",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-admission-inspector/native-expanded.txt",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-admission-inspector/native-fault-counterexamples.txt",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-admission-inspector/native-final-after-types.txt",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-admission-inspector/native-final-frozen.txt",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-admission-inspector/native-final.txt",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-admission-inspector/native-first.txt",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-admission-inspector/native-getter-pre-fix.json",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-admission-inspector/receipt-before-test-typing.json",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-admission-inspector/rejected-promise-pre-fix.json",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-admission-inspector/structural-red-receipt.json",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-admission-inspector/structural-red.txt",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-admission-inspector/typecheck-final.txt",
+    "packages/authority/tests/unit/reconciliation-admission.test.ts",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/admission-primitive-checkpoint.json",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/admission-callback-amendment.json"
+  ],
+  "result": {
+    "passed": 56,
+    "failed": 0,
+    "raw_log": "native-final-after-types.txt",
+    "duration_seconds": 3.29,
+    "checks": "Targeted ESLint/Prettier/test-path diff PASS; fullworkspace pnpm run typecheck PASS; no timeouts/skips/thresholds relaxed"
+  },
+  "source_sha256": {
+    "packages/authority/src/boundaries/reconciliation-admission-seed.ts": "d912846ddb518a132ed1e2484dfa56f23b8ff2c7a7bc25b2157fb379f25490fe",
+    "packages/authority/src/boundaries/host-reconciliation-admission.ts": "318c52a0f5de908e549e79ace095a4720acb190c7389e88a41a673fd2fa60a91"
+  },
+  "root_checks": {
+    "source_eslint": "PASS",
+    "authority_build": "PASS",
+    "full_workspace_typecheck": "PASS independently rerun after two test-only typing corrections",
+    "error_reference": "1279 generated codes PASS; seven new native codes recognized by actual CLI refusal and scanner, two seed metadata constants excluded;24 independent tests PASS including8 unchanged checks"
+  },
+  "unchanged_scope": "No product caller, typed effect permission, public route, Owner grant, final adapter, integration, publication or downstream effect qualified.",
+  "next": "Review Owner protocol v3 and clock amendment; concrete schema/effect/argv closure then full trusted host implementation.",
+  "diagnostic_census_receipt_sha256": "a9e6283fff96f1681a3c8113d0a307d2f5ac4920876a2538843f5cc00385b6b2"
+}

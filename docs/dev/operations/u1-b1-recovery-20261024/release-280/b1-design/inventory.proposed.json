@@ -1,0 +1,307 @@
+{
+  "status": "PROPOSED_ARCHITECT_CHECKPOINT_REQUIRED",
+  "candidate_path_count": 50,
+  "note": "Complete candidate implementation inventory for the proposed explicit logical proof-index resource design. Not an assertion that all schema-consumer effects are closed; Architect must verify target-kind schema consumers and generated manifest before RED. No runtime edit authorized by this document itself.",
+  "paths": [
+    {
+      "role": "Engineer",
+      "path": "packages/cli/src/cli-runtime.ts",
+      "exists": true,
+      "sha256_before": "c3d37d9dcce464ac5608aee2aa362a0c94cf2b3baf912f16dafdbc32e088c79b"
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/cli/src/command-router.ts",
+      "exists": true,
+      "sha256_before": "acf7248533415695cce0d9258bf7c942886f842276c7cdb979e9e79c3b86f98f"
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/cli/src/commands/evidence/facade.ts",
+      "exists": true,
+      "sha256_before": "26527bd1a83a947908edbd4797a1c7ab564a90a05f0909847802b028e73f8f98"
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/cli/src/commands/evidence/reconcile.ts",
+      "exists": false,
+      "sha256_before": null
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/cli/src/commands/sense/bootstrap-inventory.ts",
+      "exists": false,
+      "sha256_before": null
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/cli/src/commands/sense/readings-rebuild.ts",
+      "exists": true,
+      "sha256_before": "aec03556b68551fa7857072601da67652bcc003e3c9265c55c02195db0a952e0"
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/cli/src/authority/broker.ts",
+      "exists": true,
+      "sha256_before": "50721c2d784e8849cbf50ad7a07daa7d2b3513a5618ecd81ac0ec8040b2f7735"
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/cli/src/authority/broker-targets.ts",
+      "exists": true,
+      "sha256_before": "3c82a87c78ec486cff9b113deee207790d7fe2fc9b2d6155c5ecc6dd3bcc8adc"
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/cli/src/authority/command-capabilities.ts",
+      "exists": true,
+      "sha256_before": "f29ca8306a798c2842d8e4a7138f37331e9b16d926e06925985b330f779232d2"
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/cli/src/authority/policy-core-rules.ts",
+      "exists": true,
+      "sha256_before": "792533e69a9a6eff519811e25ab2d38d169d8ea87d018e990f488a1e44322d33"
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/cli/src/runtime-core.ts",
+      "exists": true,
+      "sha256_before": "4fb2a156691098a0e4dea03611d21851015e35cd0f617ceb7562567e2127a62d"
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/evidence/src/evidence/reconciliation-bootstrap.ts",
+      "exists": false,
+      "sha256_before": null
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/evidence/src/evidence/index.ts",
+      "exists": true,
+      "sha256_before": "a8e50867573b3029099457f5c57c902323a5eca34aec13e6b6503bffc345b1e2"
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/loop/src/inventory/staged-snapshot.ts",
+      "exists": false,
+      "sha256_before": null
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/loop/src/inventory/walker.ts",
+      "exists": true,
+      "sha256_before": "d3dbe20129bf8985e515b7215cc9e5e47cbaf9473d21da662285283b7fad44c5"
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/loop/src/inventory/regen.ts",
+      "exists": true,
+      "sha256_before": "9e08e4ed0ea29d2b836dfebfd9b8d26f3daba125c20ff88671c7de2d839793af"
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/loop/src/index.ts",
+      "exists": true,
+      "sha256_before": "fefbef40f9e5c4f003616a4e58ff3c3cf91ec400b2ccb099eba50b3f241f1b49"
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/authority/src/boundaries/proof-index.ts",
+      "exists": false,
+      "sha256_before": null
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/authority/src/boundaries/host-effects.ts",
+      "exists": true,
+      "sha256_before": "2344545ce0650a7242d75134e913336d83be63914e66058d0d381c988f09db91"
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/authority/src/boundaries/host-atomic-effects.ts",
+      "exists": true,
+      "sha256_before": "bde337e567f1cb0e818df5dd8bdc757e0a85244446fcb46b323ca598b84d8e80"
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/authority/src/boundaries/resource-classification.ts",
+      "exists": true,
+      "sha256_before": "f611eb182ad2b0714c7f08bb42e4b0eb4b87419ef944f4f3cc3685516600b3de"
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/authority/src/boundaries/boundary-runtime.ts",
+      "exists": true,
+      "sha256_before": "e5f3b77a63d54e924e530736b5ba2e0c4969344e8f5e8bc40c4210c438fab099"
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/authority/src/boundaries/boundary-runtime-targets.ts",
+      "exists": true,
+      "sha256_before": "ea6af1fcc1c8861b2f226326aa36455428bc3e69a56f50e7349a661a99f85fe0"
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/authority/src/types.ts",
+      "exists": true,
+      "sha256_before": "30ba693bf29b350fbd491b94884da2462ad34b1361a0b70ae02d6a61996e298d"
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/authority/src/decision-plan.ts",
+      "exists": true,
+      "sha256_before": "98ae5194eb79be234b607860fddad4f80688615cd28744005d263209af7c16e8"
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/authority/src/runtime/policy-resolver.ts",
+      "exists": true,
+      "sha256_before": "c2117f59e62164b7b41cd902fa65408a75a4da98270dbebc27bee83787b5510f"
+    },
+    {
+      "role": "Architect",
+      "path": "law/adr/ADR-EVI-0007-canonical-reconciliation-and-staged-bootstrap.md",
+      "exists": false,
+      "sha256_before": null
+    },
+    {
+      "role": "Architect",
+      "path": "law/adr/README.md",
+      "exists": true,
+      "sha256_before": "747bac356abc80705305cbb50daeae41d1ae2dd54ee1a1942d73481e7523afd8"
+    },
+    {
+      "role": "Architect",
+      "path": "law/policy/adr-validation.json",
+      "exists": true,
+      "sha256_before": "dd3a312e0f52676481abf05ccbc1ae6fb5da5e22a96afdcbd2dd0581e75a5d21"
+    },
+    {
+      "role": "Architect",
+      "path": "law/policy/action-registry.json",
+      "exists": true,
+      "sha256_before": "59deac2d823e80058a8223799c31653d7c8fc14dcc7a0ad49ca295545f01de27"
+    },
+    {
+      "role": "Architect",
+      "path": "law/schemas/action-registry.schema.json",
+      "exists": true,
+      "sha256_before": "ccca64510ef8431f86d4cde4fcc2a3a1a4944b2ec1b3130cd01cf8b8ed094759"
+    },
+    {
+      "role": "Architect",
+      "path": "law/schemas/authority-policy.schema.json",
+      "exists": true,
+      "sha256_before": "1c11d6e9c1d106462cae2c248c7c7c0d5bf3d6c848e4d0fa72e3454c8628a45f"
+    },
+    {
+      "role": "Architect",
+      "path": "law/schemas/evidence-reconciliation-plan.schema.json",
+      "exists": false,
+      "sha256_before": null
+    },
+    {
+      "role": "Architect",
+      "path": "law/schemas/evidence-reconciliation-phase.schema.json",
+      "exists": false,
+      "sha256_before": null
+    },
+    {
+      "role": "Architect",
+      "path": "law/schemas/staged-inventory-bootstrap.schema.json",
+      "exists": false,
+      "sha256_before": null
+    },
+    {
+      "role": "Architect",
+      "path": "packages/schemas/src/roster.ts",
+      "exists": true,
+      "sha256_before": "4172904e8d8570c567d181965c7d9f80b7642614456c15115a6cb63dac8275bd"
+    },
+    {
+      "role": "Architect",
+      "path": "docs/reference/cli/evidence-reconcile.md",
+      "exists": false,
+      "sha256_before": null
+    },
+    {
+      "role": "Architect",
+      "path": "docs/reference/cli/inventory-bootstrap.md",
+      "exists": false,
+      "sha256_before": null
+    },
+    {
+      "role": "Inspector",
+      "path": "packages/authority/tests/unit/proof-index-cas.test.ts",
+      "exists": false,
+      "sha256_before": null
+    },
+    {
+      "role": "Inspector",
+      "path": "packages/authority/tests/unit/authority-proof-index-boundary.test.ts",
+      "exists": false,
+      "sha256_before": null
+    },
+    {
+      "role": "Inspector",
+      "path": "packages/evidence/tests/unit/reconciliation-bootstrap.test.ts",
+      "exists": false,
+      "sha256_before": null
+    },
+    {
+      "role": "Inspector",
+      "path": "packages/loop/tests/unit/staged-inventory-bootstrap.test.ts",
+      "exists": false,
+      "sha256_before": null
+    },
+    {
+      "role": "Inspector",
+      "path": "packages/cli/tests/unit/evidence-reconcile-bootstrap.test.ts",
+      "exists": false,
+      "sha256_before": null
+    },
+    {
+      "role": "Inspector",
+      "path": "packages/cli/tests/unit/staged-inventory-bootstrap.test.ts",
+      "exists": false,
+      "sha256_before": null
+    },
+    {
+      "role": "Inspector",
+      "path": "packages/schemas/tests/contract/reconciliation-bootstrap-schemas.test.ts",
+      "exists": false,
+      "sha256_before": null
+    },
+    {
+      "role": "Inspector",
+      "path": "packages/schemas/tests/contract/action-registry-schema.test.ts",
+      "exists": true,
+      "sha256_before": "c35a546f722eec0cb21455c021dfad85bc60ae43033db01cc39caa07a76f24dc"
+    },
+    {
+      "role": "Inspector",
+      "path": "packages/schemas/tests/contract/schema-roster.test.ts",
+      "exists": true,
+      "sha256_before": "1f38958ae67f454bcf017c80a37cfc0dacd09a385de31994c31d71c46bc2066f"
+    },
+    {
+      "role": "Generated",
+      "path": "packages/cli/src/generated/action-registry.ts",
+      "exists": true,
+      "sha256_before": "e0b037c48a817d471453a99894e230a2c4e43a1c913b0d8d6b7b4dc6b85523de"
+    },
+    {
+      "role": "Generated",
+      "path": "packages/effects-check/src/generated/action-catalog.ts",
+      "exists": true,
+      "sha256_before": "9b9ca8ac70a5da13b206b097094e5c53e738ae13c848322e75f49dab2897935c"
+    },
+    {
+      "role": "Generated",
+      "path": "docs/reference/error-codes.md",
+      "exists": true,
+      "sha256_before": "b5bbc2493d4cb427790081c01e42f2f087071febd223a3d0aba58d83f70eebfd"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "status": "SYNTHETIC_DISPOSABLE_FIXTURE_ONLY_NOT_PUBLIC_OR_LIVE",
+  "fixture_plan_sha256": "8f98f972a6b07c3cd3844bda2c27f7e2e6a1eb4ac1b4c22496410118b10fe089",
+  "artifact_sha256": "a7e34dcecf57943cff34583fdd48345575c20d41a29fb24237f1b3d6d5d964d9",
+  "artifact_size_bytes": 69922,
+  "materialization_digest_sha256": "c480c651123be99f4eba263609097f78b90968e610bf658640eae0f2afb37997",
+  "candidate_constitution": {
+    "version": "1.2.0",
+    "sha256": "d5dfdc972161e0f848dd859be7bbfa510973c5c9a449a0f9e6b8960e4f5ac96a"
+  },
+  "exact_checks": {
+    "size_exact": true,
+    "byte_sha256_exact": true,
+    "whole_plan_sha256_exact": true,
+    "completion_byte_hash_equal": true,
+    "completion_size_equal": true,
+    "grants_authority_false": true
+  },
+  "public_ready_emitted": false,
+  "live_use_authorized": false,
+  "fixture_only_confirmation": "CREATE 8f98f972a6b07c3cd3844bda2c27f7e2e6a1eb4ac1b4c22496410118b10fe089 a7e34dcecf57943cff34583fdd48345575c20d41a29fb24237f1b3d6d5d964d9",
+  "note": "Historical invocation data only; single-use in-memory handle is gone. This token cannot authorize any later action."
+}

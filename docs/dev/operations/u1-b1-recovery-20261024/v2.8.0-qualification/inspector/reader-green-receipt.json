@@ -1,0 +1,87 @@
+{
+  "standing": "INDEPENDENT_PURE_READER_GREEN_HOST_ADMISSION_AND_WRITERS_NOT_QUALIFIED",
+  "recorded_at": "2026-10-24T17:29:15.969230+00:00",
+  "validation": {
+    "files": 6,
+    "passed": 188,
+    "failed": 0,
+    "skipped": 0,
+    "raw_log": "staged-readers-final-independent-green.txt",
+    "runner": "node scripts/process/validation-runner.mjs -- node_modules/.bin/vitest run --config tests/config/local.config.ts --maxWorkers 1",
+    "selected_paths": [
+      "packages/sensors/tests/unit/staged-inventory-readers.test.ts",
+      "packages/sensors/tests/declared-surfaces.test.ts",
+      "packages/sensors/tests/declared-inputs.test.ts",
+      "packages/sensors/tests/unit/inventory-coverage-link-population.test.ts",
+      "packages/sensors/tests/unit/data-model-default-discovery.test.ts",
+      "packages/cli/tests/unit/sense-inputs-declaration.test.ts"
+    ],
+    "elapsed_seconds": 4.35,
+    "reader_cases": 57,
+    "unchanged_ordinary_config_cases": 131,
+    "timeout_or_assertion_relaxation": false,
+    "lint_log": "reader-final-lint.txt",
+    "format_log": "reader-final-format.txt",
+    "diff_check_exit": 0
+  },
+  "test_sha256": "ba7ac6de8afc65e72658439c9daedf35a56b3490666dd10fcd790c4f97d36c9b",
+  "source_path_count": 17,
+  "source_sha256": {
+    "packages/cli/src/commands/sense/inventory-inputs.ts": "bb4184e116f275f360793ebfc62e884ccad5964f371ed80c2752c68b6a65ac6b",
+    "packages/cli/src/commands/sense/shared.ts": "3d434e13af46c361df5431d6d9f0f827cd82bdc6d7e1f2916a2b8933a87c6a45",
+    "packages/sensors/src/inventory-walker.ts": "8f010951aefc2c328a78fcc311fedfe906eb6462b22182808d6c215b886506ba",
+    "packages/sensors/src/inventory-api.ts": "be5693af833137e40d416977acc3af2d259094b69d64d3176c5254dc0b37d4fd",
+    "packages/sensors/src/inventory-routes.ts": "048ddfce97ae5ddbb823039672f7351329d597300d1177ca908872998660422e",
+    "packages/sensors/src/inventory-routes-extract.ts": "ed43bbf8b9aa44361d2fa4b49ccc9d5970ab2d83e5c24af2685625e5313be4af",
+    "packages/sensors/src/inventory-data-model.ts": "0d970840beeeb090396ac557db4c04b8009574c683f7c1377eedbdefba1d045b",
+    "packages/sensors/src/inventory-data-model-types.ts": "4b6850446ed002af26cd616cc99ec65a3fa58b1ffd9f36edeef3d7604df03457",
+    "packages/sensors/src/inventory-data-model-sql.ts": "e6c4c7bd1a028652f105c99ebc163d4a6a2fe1e5bd4ed6c37ddd34e88f3777d4",
+    "packages/sensors/src/inventory-rbac.ts": "84526ec0ecf603f31165257b42e9d114db1d828d42ae9f0ad8fc186ad968ede6",
+    "packages/sensors/src/inventory-data-handling.ts": "816d7d6ce696b16a4df9444acc0c9306293a54ba7705a847dab7c34d22903b78",
+    "packages/sensors/src/inventory-dep-graph.ts": "8c070825e1bac7d9d33a7279e10e2f2538bb7120b2f4b01609b9a0939ae661e0",
+    "packages/sensors/src/inventory-coverage.ts": "8d63ba0d2b99070d98bec83bdc7539f986e58ef8fda60a2ed34be16328c07f70",
+    "packages/sensors/src/inventory-coverage-inputs.ts": "9d5bf285ac1d009c6ae8c218afd1a48134b571157c3d41ffbf8fe186a619ff82",
+    "packages/sensors/src/inventory-body-inputs.ts": "0cd6845ceacc27ff0b136870974f32e16b9591a169ac5c5e8772747a71b2da52",
+    "packages/sensors/src/declared-surfaces.ts": "ca9c6270625aaae9b75db9f3e70206d717ad6d870a47ffc6afe29d24183edded",
+    "packages/sensors/src/index.ts": "68dbed13fc29df8f16b1a63e7ccad08cca4825e6f223ba431d07caa7e1998b5f"
+  },
+  "authentic_reds": [
+    {
+      "raw_log": "staged-readers-final-red.txt",
+      "passed": 7,
+      "failed": 36,
+      "meaning": "Original exact-reader checkpoint, runtime unchanged; ordinary no-reader baseline passes."
+    },
+    {
+      "raw_log": "staged-readers-edge-counterexamples.txt",
+      "passed": 54,
+      "failed": 3,
+      "meaning": "Independent candidate review found malformed required staged registry entries silently filtered."
+    }
+  ],
+  "edge_fix": {
+    "path": "packages/sensors/src/declared-surfaces.ts",
+    "sha256_before": "e5ef439eb7124cf96dcc60ffbde45c51a1e1be172b790f8418e5b7a45dcb24f2",
+    "sha256_after": "ca9c6270625aaae9b75db9f3e70206d717ad6d870a47ffc6afe29d24183edded",
+    "effect": "Validate non-null object and nonempty string action_id only when sourceReader is supplied; ordinary branch retains previous projection/filter.",
+    "other_16_files_unchanged": true
+  },
+  "review_scope": [
+    "All seven actual producer bodies derive stagedA despite liveB and snapshot-only/live-only file populations.",
+    "Required body malformed/missing/read/list failures block; ordinary pure observation remains unchanged and does not write.",
+    "Config declaration, route/model options, surfaces, registry/usecases, default body membership and discovery failures use explicit reader.",
+    "Malformed registry entry negative fixed; malformed usecase shape/syntax and traversal directory-entry negatives pass.",
+    "Exported InventorySourceReader and seven producer option types manually verified against source."
+  ],
+  "limitations": [
+    "No production host-admitted stage0 snapshot or same-run overlay issuer exists in this pure-reader verdict.",
+    "No B1 Owner grant/intake, custody, canonical proof, index CAS, phase/lease or bootstrap writer is authorized by this result.",
+    "No final built-distributable/U1/B1 release qualification or exact-head CI claim.",
+    "CLI declaration/build typechecks remain root-owned after U1 validation lane settles."
+  ],
+  "source_edits_by_inspector": false,
+  "graft_this_green_turn": {
+    "calls": 0,
+    "tokens_saved_estimate": 0
+  }
+}

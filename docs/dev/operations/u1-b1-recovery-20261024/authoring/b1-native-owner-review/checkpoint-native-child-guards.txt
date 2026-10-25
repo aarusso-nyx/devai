@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/checkpoint-native-child-guards.txt","kind":"historical-transcript-custody-pointer","original_bytes":638,"original_bytes_changed":false,"original_sha256":"63617700f5d4dd88b053a2140eeb00d776e7be8f9bb183d1e330b44f2a5b37be"}

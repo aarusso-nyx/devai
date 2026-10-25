@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/v2.8.0-qualification/inspector/staged-readers-before-source.txt","kind":"historical-transcript-custody-pointer","original_bytes":27433,"original_bytes_changed":false,"original_sha256":"8beb42bab4c17cd3f38e57dd0af0bf26473f1ec1d3cd367032780d56f7914d35"}

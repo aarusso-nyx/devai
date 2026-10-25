@@ -1,0 +1,778 @@
+{
+  "baseline_commit": "2df84159caabf869b866fb2a05e5b06be83295fb",
+  "observed_at_utc": "2026-10-24T14:53:57.321114+00:00",
+  "protected_sources": [
+    {
+      "path": "law/constitution.md",
+      "sha256": "d5dfdc972161e0f848dd859be7bbfa510973c5c9a449a0f9e6b8960e4f5ac96a"
+    },
+    {
+      "path": "law/adr/ADR-GOV-0027-source-bound-canonical-selection-and-proof-index.md",
+      "sha256": "053137f13deae10ace08a8606e882fd67458d8a2ca1ffb7f3856b38984b3583b"
+    },
+    {
+      "path": "law/schemas/proof-index-reconciliation-contract.schema.json",
+      "sha256": "21844d42ded67cff9d96df372688d8a7759ad414568892e5a4b84735f417fff9"
+    },
+    {
+      "path": "law/policy/action-registry.json",
+      "sha256": "59deac2d823e80058a8223799c31653d7c8fc14dcc7a0ad49ca295545f01de27"
+    },
+    {
+      "path": "law/schemas/authority-policy.schema.json",
+      "sha256": "1c11d6e9c1d106462cae2c248c7c7c0d5bf3d6c848e4d0fa72e3454c8628a45f"
+    },
+    {
+      "path": "packages/schemas/src/roster.ts",
+      "sha256": "4172904e8d8570c567d181965c7d9f80b7642614456c15115a6cb63dac8275bd"
+    },
+    {
+      "path": "package.json",
+      "sha256": "35f7b31086defa4e51081c2ed5e1da904a01d69f7928f504060e25f5d6bf26c1"
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "sha256": "35d5d3450ed3c394ba60bfd7521d7d95364cf502c57cb0d2baeee47454902903"
+    },
+    {
+      "path": "packages/cli/package.json",
+      "sha256": "bb8dcd98d359c4709e55cf1bd4d01578c31403b88a63e86dd6afd19d40c4c3ef"
+    },
+    {
+      "path": "law/adr/ADR-REL-0014-repin-offline-receipt-example-digest.md",
+      "sha256": "5ed27e9c42af4654278d994f68c05a937cac88350fba52e6820f75729e6aafb3"
+    },
+    {
+      "path": "law/adr/ADR-EVI-0005-newest-line-recovery-cli.md",
+      "sha256": "958cf1a4a2363298e8a810a9572cc1a1e515481b705c0e12fdbd917ce42b0583"
+    },
+    {
+      "path": "law/adr/ADR-REL-0006-blocked-retry-observation-requirement.md",
+      "sha256": "83b6f45e2c30c53aac24cf632fe6fbdd76194e8c9fa3a2521d8c34948341e958"
+    },
+    {
+      "path": "law/adr/ADR-GOV-0022-authorization-registry-maintenance.md",
+      "sha256": "9bc85e8eb05eaed54ac8cf5ee6c431721cff4c17763c18ddf68dd4a247344a2e"
+    },
+    {
+      "path": "law/adr/ADR-REL-0018-bounded-ustar-prefix-prepare.md",
+      "sha256": "e631acdfe15548e9aacc6259f9f1ded7b13dc0fdd518766284d547b064dd849e"
+    },
+    {
+      "path": "law/adr/ADR-GOV-0010-complete-adr-validation-result.md",
+      "sha256": "25db6e396d2c611519852cdb57e8472d413d9f2482e13d64d06f8ec5e6a5d722"
+    },
+    {
+      "path": "law/adr/ADR-GOV-0019-backlog-action-family.md",
+      "sha256": "671b706a72ed0682c3aeef735dc9dc5de82a1a29b9bad9544302300620896c1b"
+    },
+    {
+      "path": "law/adr/ADR-MUT-0005-unambiguous-mutation-digest-boundaries.md",
+      "sha256": "9329c112b76028340cabacf9e9499586e4bb0d34465f8f94152c3353bfe2e13b"
+    },
+    {
+      "path": "law/adr/ADR-REL-0013-canonical-v3-artifact-projection-vocabulary.md",
+      "sha256": "aae6b75d4d9e9d4d222cb8380c1111431dd0a5bf10eb2d1292f8fe87d1ce9825"
+    },
+    {
+      "path": "law/adr/ADR-REL-0004-separate-release-log-tail-and-state-head.md",
+      "sha256": "6207681187b40daa0e2ba09c1cd0a8f321f99f3a9bfb3f860cfd9cf992e10445"
+    },
+    {
+      "path": "law/adr/ADR-SCR-0021-unconsumed-native-directory-link-metadata.md",
+      "sha256": "4f65e59ca43e134599facf3217724a0a832dfffc51edc850c5d79c2ad53c4552"
+    },
+    {
+      "path": "law/adr/ADR-GOV-0002-constrained-self-dogfood.md",
+      "sha256": "c3825eacb7d06eb0cec232c1b6953c80129c2742b6c8330c872d58ba48866ad0"
+    },
+    {
+      "path": "law/adr/ADR-CHK-0009-commit-range-admits-engineer-focused-regression-tests.md",
+      "sha256": "b2cc98826dd30e2162bf609d0519977ca8ff4fffe017f7b610ecdf575fb0117e"
+    },
+    {
+      "path": "law/adr/ADR-MUT-0013-advance-mutation-evidence-source-to-the-intent-export-verifier.md",
+      "sha256": "a2d4d746d22ef68eec6ff06d22a9616aa23d9fd9c402764e233e95ef0b899e77"
+    },
+    {
+      "path": "law/adr/ADR-MUT-0007-activate-source-pinned-mutation-v21.md",
+      "sha256": "75af46ecfdf08bddd4548f58c38088ddaceb9eaa18c74b89d3664dd264506737"
+    },
+    {
+      "path": "law/adr/ADR-AUT-0005-atomic-no-replace-publication.md",
+      "sha256": "039e82a176fa26f84eae1112776f6b91a681529eee1f4facd720ea4c1622aa28"
+    },
+    {
+      "path": "law/adr/ADR-REL-0032-pages-rerun-identity.md",
+      "sha256": "632be421712d385f8a54bb80128e79b31462384e47ef634de3f5b95cb671c302"
+    },
+    {
+      "path": "law/adr/ADR-SCR-0008-immutable-readings-and-recording-order.md",
+      "sha256": "d1de9942214ee65ad25fcd3da5b76257139e1053358e932d377e597023df11a4"
+    },
+    {
+      "path": "law/adr/ADR-SCR-0020-owned-native-service-fixtures.md",
+      "sha256": "a24990f1010471fea3b58ad31e3cddc0be41f4b2009af5910cff57607c7999df"
+    },
+    {
+      "path": "law/adr/ADR-REL-0024-host-git-environment-isolation.md",
+      "sha256": "55cf81f8071df395443dbfd0c271e1f18a4118c4b8153dea0e27ac476d8fbe18"
+    },
+    {
+      "path": "law/adr/ADR-CHK-0002-toolchain-manifest.md",
+      "sha256": "1c793311a13bcbb9bb7f363893a6fd9ecaecba3b699be571cf1fa795cdfe08fe"
+    },
+    {
+      "path": "law/adr/ADR-GOV-0013-executable-release-lifecycle-contract.md",
+      "sha256": "209fefecfa914b4c72bb6be580b2ca7fc21b3f3c1de00d110c0ea348438cd6e7"
+    },
+    {
+      "path": "law/adr/ADR-MDL-0009-review-reserve-and-campaign-agent-materialization.md",
+      "sha256": "175b0d08bb8dd0c2addcb1b780c6aea4fd47db4dec1a743a8222c2c10e592c06"
+    },
+    {
+      "path": "law/adr/ADR-CHK-0004-serialized-integration.md",
+      "sha256": "c818af8547120652b6099de1ec5444914819d274dc199f381625643970e634c2"
+    },
+    {
+      "path": "law/adr/ADR-MUT-0009-resumable-protected-package-execution-origins.md",
+      "sha256": "5be201ed0f11e3cc9e2164c42c975ff1067982f704612ec966bbca12d56aedfc"
+    },
+    {
+      "path": "law/adr/ADR-EVI-0001-canonical-closure-index.md",
+      "sha256": "33218bd08d6e04cd85ae35def410cad98bfc76cdce5dd29ab4e257b899fcfa38"
+    },
+    {
+      "path": "law/adr/ADR-MUT-0003-complete-mutation-evidence-v2-contract.md",
+      "sha256": "150390fa611f87c2f82bc865866191e4a3d99c2dffd9588b41011da96dc0cdd5"
+    },
+    {
+      "path": "law/adr/ADR-GOV-0021-workflow-reference-pages.md",
+      "sha256": "e305a2309629d43a486248894175660fd3e6adabc3e7ad0dd164c4249c54046e"
+    },
+    {
+      "path": "law/adr/ADR-CHK-0005-check-member-applicability.md",
+      "sha256": "ac8669c539912f653d5e41ededef7039e4b2338ff574aef8a874b8b0b55b3f84"
+    },
+    {
+      "path": "law/adr/ADR-REL-0035-trust-published-verifier-2-4.md",
+      "sha256": "9c54169eab48ef6d4175ed1889961685de0cc4a42757a4f9bb9b5384cbc100a6"
+    },
+    {
+      "path": "law/adr/ADR-EVI-0004-canonical-closure-acceptance-amendment.md",
+      "sha256": "c886f0b2ca2a31961f592fc09044e12cc9a82894cf1cec28dbddb13c4cc5ecea"
+    },
+    {
+      "path": "law/adr/ADR-CHK-0006-descriptor-selector-kinds-trail-the-trusted-verifier.md",
+      "sha256": "32ec132fcf9826324b92d2941c4b92618476a57865527e297491c8ab312b03f2"
+    },
+    {
+      "path": "law/adr/ADR-REL-0016-protected-preflight-execution-authority.md",
+      "sha256": "4a7216c8d34e9408e23d7c485b695e8e55214406177be4521aa9620a9aa62aae"
+    },
+    {
+      "path": "law/adr/ADR-SCR-0010-ci-sampling-contract.md",
+      "sha256": "dd59ef438c3795051794480f6fdd7667153d84e130222bc44d7bdebf4da8d203"
+    },
+    {
+      "path": "law/adr/ADR-MUT-0012-external-hardening-without-delivery-gates.md",
+      "sha256": "a559b1a0969c3b6f293a6167b16381d529d2ae5b4366ece462a05086874e1740"
+    },
+    {
+      "path": "law/adr/ADR-SCR-0006-governance-ledger-sensors-on-adr-v2.md",
+      "sha256": "bc1a711b13b02a89a0fcb73c70f62d9f59b18a6b853aedd42ee26fd15169824e"
+    },
+    {
+      "path": "law/adr/ADR-EVI-0002-proof-line-anchoring.md",
+      "sha256": "925d133ab29b315217a2e9faecfbb5d8aa361be2f2acb7c1b6120902e1193e26"
+    },
+    {
+      "path": "law/adr/ADR-AUT-0004-class-write-verbs-for-adopter-path-authority.md",
+      "sha256": "7b2c9bfbeacc72eeb12b73038c8686c1ec6c1d719d3269f547d04b1892052953"
+    },
+    {
+      "path": "law/adr/ADR-REL-0030-release-approval-topology.md",
+      "sha256": "647dca64ba54cb1662c0bfcaaef2368a9651cb650f5e1c5e67a5a799e78afd27"
+    },
+    {
+      "path": "law/adr/ADR-REL-0011-finalize-spdx-document-vocabulary.md",
+      "sha256": "c19fe4f62e5e54861bd0c0f91e2e047488e709f7e306a8ec84e2c414eb8c75fc"
+    },
+    {
+      "path": "law/adr/ADR-REL-0009-complete-spdx-and-stored-deflate-byte-rules.md",
+      "sha256": "b10042142b1d73f1f4858f4f55320d011bc7a2c7ea372762662abec581a00b97"
+    },
+    {
+      "path": "law/adr/ADR-REL-0010-finalize-spdx-checksum-semantics.md",
+      "sha256": "fe12337b1ad90ace416f74b9687744ba7a593ef5910fa8ca75ca1a77a6486785"
+    },
+    {
+      "path": "law/adr/ADR-SCR-0001-self-sensing-under-declared-roles.md",
+      "sha256": "e9bcf6187cd69a3473fb0a77e2a9d75a474b260d5869c8dbb0e0e198ae67a289"
+    },
+    {
+      "path": "law/adr/ADR-MDL-0004-scored-soft-gate.md",
+      "sha256": "4340d9d3f422603532237afd9823adf2b289844231011089efb59cfa6e872779"
+    },
+    {
+      "path": "law/adr/ADR-REL-0031-export-reconstructs-intent-policy.md",
+      "sha256": "33fe5b0b70574d73cf37b6e6e260f493187899c5a4b6ab0802496f7b71d6431e"
+    },
+    {
+      "path": "law/adr/ADR-SCR-0004-framework-specification-substrate.md",
+      "sha256": "8a9d436821f5133fcb6b840a1ece4b0e2ae53273c684bbcd77ec16ad89b4a60c"
+    },
+    {
+      "path": "law/adr/ADR-REL-0026-current-offline-mutation-check.md",
+      "sha256": "17c10e09566fced34f19d11d4cb63438489cc5aa999bbcc99b138010c2c5e405"
+    },
+    {
+      "path": "law/adr/ADR-GOV-0011-fail-closed-adr-result-state.md",
+      "sha256": "d88582357848763140e04f1fc10d5989560104e065683094a0b06ecfcdd357b4"
+    },
+    {
+      "path": "law/adr/ADR-SCR-0022-static-json-data-aliases.md",
+      "sha256": "c74800b307ea3f980b11b51d4ae11dbd0e65536a4762678ffa6cc56dc2739480"
+    },
+    {
+      "path": "law/adr/ADR-REL-0015-close-certification-provenance-and-sink-ambiguity.md",
+      "sha256": "258cdadfaad8eee05922fe786e5857cfe3693551f291261961f1da79b016dde6"
+    },
+    {
+      "path": "law/adr/ADR-SCR-0015-candidate-bound-sensor-inputs-and-instances.md",
+      "sha256": "c63d57dcdec580b5ffd355edc5d461858058016fa78d366c128cbb58e790ae1a"
+    },
+    {
+      "path": "law/adr/ADR-GOV-0014-durable-v2-remote-execution.md",
+      "sha256": "a5b38d96aed822bc9d4d3c3058579d178ee8fe345d21509e937b2a22d0920205"
+    },
+    {
+      "path": "law/adr/ADR-REL-0019-preserve-and-restate-installed-release-policy.md",
+      "sha256": "cd785a1c2c4f41d499efc117da2e61d2d5e39a71864144bedc6a9b88a5ddd3f7"
+    },
+    {
+      "path": "law/adr/ADR-MDL-0006-owner-action-writes-experimental-activation.md",
+      "sha256": "10392a5f9348a9ea10db47937d8eb99112e9aa8133149dfde38eb62208694d01"
+    },
+    {
+      "path": "law/adr/ADR-GOV-0005-binary64-mutation-score-semantics.md",
+      "sha256": "f2f16fd591f0acb3e29e12f298e0a45610f6d01b5f6e8091cfcdd045353cabba"
+    },
+    {
+      "path": "law/adr/ADR-REL-0020-explicit-historical-resume-observation.md",
+      "sha256": "1586820fbfa8952c3ff6befce399176e915b8c23dfa77a0a81ec6ae8a842d63e"
+    },
+    {
+      "path": "law/adr/ADR-CHK-0001-preflight-probes-as-dag-nodes.md",
+      "sha256": "dadbfdfcf2259f9b5f492b0baffeb8606c1bb0ac42617953fec84a60e137216c"
+    },
+    {
+      "path": "law/adr/ADR-AUT-0007-selected-post-merge-hook.md",
+      "sha256": "15025a83ccdbd290e6e7ad90b22c89bade1da845ac416b0a093ab1cc0c57d40e"
+    },
+    {
+      "path": "law/adr/ADR-GOV-0007-subject-scoped-effective-authority.md",
+      "sha256": "717a9c898a11050fa14a2f76714b4fc595b506e29390403fae7cb57c38c5ae1d"
+    },
+    {
+      "path": "law/adr/ADR-REL-0003-blocked-plan-receipts.md",
+      "sha256": "b12d0dd944d325dbc7da24eea29e12e1ce51425259c5394b20012715a8322639"
+    },
+    {
+      "path": "law/adr/ADR-CHK-0007-bounded-parallel-check-plan-execution.md",
+      "sha256": "7d819139d35bf4d8c11276d5daa281c57f7f8bb80b57be5dd827d1b863e6ad0a"
+    },
+    {
+      "path": "law/adr/ADR-EVI-0003-sealed-round-lifecycle-read.md",
+      "sha256": "df48f9a82bb931a167bd8f121a17c3f8d87e9ae1efd6453b0320665820594eff"
+    },
+    {
+      "path": "law/adr/ADR-SCR-0012-inventory-cell-naming-amendment.md",
+      "sha256": "7c4bf5c6a0417e4d488e2aeaa9e2b20c7f9121931d9bf815c1fb77eb02fb28be"
+    },
+    {
+      "path": "law/adr/ADR-REL-0029-site-only-pages-publication.md",
+      "sha256": "3056e8ce32e4bcf9c8263eefec8363e70100b903416083adc8304b715ff5bad6"
+    },
+    {
+      "path": "law/adr/ADR-GOV-0020-canonical-instructions-and-host-projections.md",
+      "sha256": "6ff3b5043a75dc33ced1f4baef8e5536e3fa66568f36af5587e164afcbeffe8f"
+    },
+    {
+      "path": "law/adr/ADR-SCR-0003-declared-plant-surfaces.md",
+      "sha256": "abe78112ec2e8edd23e61a174e13afa3a1cbec83820d293ab83fa749ce2c82cd"
+    },
+    {
+      "path": "law/adr/ADR-SCR-0002-one-readings-store-and-the-na-ledger.md",
+      "sha256": "053c46a88173b068ed03ab438fcfb103b1fdbcab3e929041417b9bb42b241172"
+    },
+    {
+      "path": "law/adr/ADR-MUT-0014-advance-approved-source-for-sensor-task-descriptors.md",
+      "sha256": "755e72e0bd6a35bde31501433fa931ac4cf17fdd8a2b209992e10bc7d6594ce9"
+    },
+    {
+      "path": "law/adr/ADR-GOV-0012-release-execution-seams.md",
+      "sha256": "936efe739f1008213a9f8063b21fb552cf2cc8e1cb7ff31d2f577ce56b013a54"
+    },
+    {
+      "path": "law/adr/ADR-SEC-0001-credential-requirements-manifest.md",
+      "sha256": "716d983a56e125fda91b536438f522c736fc21ffe14dd742d4049f754763e4d8"
+    },
+    {
+      "path": "law/adr/ADR-MUT-0006-measured-aggregation-and-activation-closure.md",
+      "sha256": "5757f6ed4f2e1ddc8cd614496347621b3f1e92697f92785303746636cd6227e2"
+    },
+    {
+      "path": "law/adr/ADR-MUT-0001-mutation-assurance-v2.md",
+      "sha256": "e533fd4ecd3f9e1b2f7235af27bbd38e1c9f60338c16d7c6678f25ece9379a1b"
+    },
+    {
+      "path": "law/adr/ADR-SCR-0007-e2e-and-bounded-coverage.md",
+      "sha256": "eef787b0300f8a1f084f81ae1aa7ca1aefa814da91b48b0679dbda7b51a983b1"
+    },
+    {
+      "path": "law/adr/ADR-GOV-0006-catalogued-legacy-adr-visibility.md",
+      "sha256": "4ee22e7a168c044eb7256eaa24b9f67b3b561c01fba65b7543a3a6b6c3ea357c"
+    },
+    {
+      "path": "law/adr/ADR-AUT-0002-sensing-process-admission.md",
+      "sha256": "103caf8fa6684f920f61039183c37f90fe7da0b9985d0cc22fdf28db95022ba6"
+    },
+    {
+      "path": "law/adr/ADR-REL-0005-separate-legacy-seams-state-generation-and-log-sequence.md",
+      "sha256": "dd5149c0e6d43452ca0617aba14c65fe6d232011275440b3bc28915e951338e3"
+    },
+    {
+      "path": "law/adr/ADR-GOV-0017-change-class-taxonomy.md",
+      "sha256": "169cbd7fe1e9fed014cfe213c86c2f2274287d6952d0af8df33bd2a21160adc7"
+    },
+    {
+      "path": "law/adr/ADR-MDL-0008-provider-enforced-attempt-write-boundary.md",
+      "sha256": "669bfa56023a47b09b71a822c4a863157ebd16126d2e9b23a91380d58042acc5"
+    },
+    {
+      "path": "law/adr/ADR-AUT-0001-exact-effect-authorization-ledger.md",
+      "sha256": "b813376a4535bba347d9587a5f077d674aa0d0ad9574a8fa5b956d8860d12c15"
+    },
+    {
+      "path": "law/adr/ADR-014-release-verification-profiles.md",
+      "sha256": "1d644d0221dab66332d24366f12aeaf454444db1876e0c38a58247d6639ea440"
+    },
+    {
+      "path": "law/adr/ADR-SCR-0017-declared-audit-producers-and-complete-results.md",
+      "sha256": "4667a39b60cd1e4413c73076c5f2ae483c1aa9554e70ebe8146f2923cb3f6f9c"
+    },
+    {
+      "path": "law/adr/ADR-REL-0023-separate-authority-and-release-repository-identity.md",
+      "sha256": "07e82c3e8db67bb9155d521e2da8d512fbf6db969d2058747ad222a418e261ee"
+    },
+    {
+      "path": "law/adr/ADR-GOV-0024-article-6-client-extensions-by-root-and-class.md",
+      "sha256": "0392556f626ab1c4c7fb6c8056c6d3d95c21b9e75d181f7d0d1c90058c10db9d"
+    },
+    {
+      "path": "law/adr/ADR-GOV-0025-governed-campaign-controller.md",
+      "sha256": "3d013f3f304419568dc60fe9fa96400f1c4cd08dd921743d7f9f97b2935137a7"
+    },
+    {
+      "path": "law/adr/ADR-SCR-0005-declared-sensor-inputs.md",
+      "sha256": "3ade32d800e775334eba01aea0afa2632a80565e0f18bf5c1566f2119be338ec"
+    },
+    {
+      "path": "law/adr/ADR-REL-0007-pure-sink-mediated-prepare.md",
+      "sha256": "612145397e6658f079485f6c7836a2474624521c32626f2ea1d284475a293cc2"
+    },
+    {
+      "path": "law/adr/ADR-MUT-0011-disable-survivor-count-acceptance.md",
+      "sha256": "59c13e138043f30649a2864d1f0a931fe66b78c4aa7023c8797b9500f1066c64"
+    },
+    {
+      "path": "law/adr/ADR-SCR-0011-sweep-kinds-admitted-by-the-packaged-schema.md",
+      "sha256": "e8afd42e358636b87f6093f155313a6b436ceadf980d76230f34bee73198d50e"
+    },
+    {
+      "path": "law/adr/ADR-GOV-0004-exact-semantic-kernel-closure.md",
+      "sha256": "a0cca9fafa1ebdfdef2b1d560305b3c388d2286bfcc707afc74b9df6445e01ec"
+    },
+    {
+      "path": "law/adr/ADR-MDL-0001-structured-review-contracts.md",
+      "sha256": "fd17bed7b9b85bc2926669febdede3b4615886c122972d6c371b03603fef878e"
+    },
+    {
+      "path": "law/adr/ADR-MDL-0005-opt-in-experimental-agent-execution.md",
+      "sha256": "a73b301d7bf3f33e09aa0a1d7d236deadbfcbe8be11b633c64655fa42fe85894"
+    },
+    {
+      "path": "law/adr/ADR-GOV-0016-preserved-invalid-accepted-history.md",
+      "sha256": "a6eebb15aa8c4057172d8b25f435f14475d0b54aae8420ce63f8dd26a7ae2a43"
+    },
+    {
+      "path": "law/adr/ADR-REL-0017-package-owned-release-policy-resolution.md",
+      "sha256": "07f1d17f88d8c48f25b51cff7e882cb2c7c23a3d529098c51b8c19431a946e19"
+    },
+    {
+      "path": "law/adr/ADR-CHK-0003-planning-lane-and-semantic-validation.md",
+      "sha256": "df741db9f44abbeff0d404877460ac63496a04eedc6eb7c6727928d4ae7d2e08"
+    },
+    {
+      "path": "law/adr/ADR-AUT-0006-pnpm-sensor-process-shapes.md",
+      "sha256": "0fdbbbeb2c0531c9defff25792f840d175898ddfc3425bc50417610a6accaf8f"
+    },
+    {
+      "path": "law/adr/ADR-REL-0008-handle-based-prepared-state-and-complete-pack-spec.md",
+      "sha256": "7f8f56f0c295854c9486f0fe4b9d7c133c5c5c6aa80184478678155d0d641621"
+    },
+    {
+      "path": "law/adr/ADR-GOV-0009-instance-validatable-adr-results.md",
+      "sha256": "f6548a1e8e975f29c85e10b1ed1904024113030f0c3960d4b1e0dd041d3c65ef"
+    },
+    {
+      "path": "law/adr/ADR-AUT-0003-governed-adopter-path-authority.md",
+      "sha256": "74323ff7cba5bfc6baddc522af66be25a290f5f1c524d8f5d3ed917cf1d64072"
+    },
+    {
+      "path": "law/adr/ADR-MDL-0007-experimental-completion-recovery-and-capacity.md",
+      "sha256": "11663f074932a81f71bc8cccac6cdf5643c8bef4dab0c3a315cdda256de5d0cd"
+    },
+    {
+      "path": "law/adr/ADR-REL-0034-staged-pages-preparation.md",
+      "sha256": "c07eaf765b9e3cfada5a3e01ecc8cb948307a98ed321fab09a0155e1e0a35538"
+    },
+    {
+      "path": "law/adr/ADR-MUT-0008-unit-mutation-evidence-closure.md",
+      "sha256": "9ece7cd7a49366ee2c874906fdb32fe07791c99270beb62df6ca80b261a5d8b7"
+    },
+    {
+      "path": "law/adr/ADR-REL-0033-scorecard-store-publication-proof.md",
+      "sha256": "1fb8a8503b1aba433d0f211e792a1dd10617dddb7f93bca27a4dbf701738b959"
+    },
+    {
+      "path": "law/adr/ADR-GOV-0001-adr-identity-and-fail-closed-validation.md",
+      "sha256": "4aec54180bf59f54c23917619e8070385f47f2d64b4f339090c5d9057c39d342"
+    },
+    {
+      "path": "law/adr/ADR-SCR-0016-lossless-endpoint-observation-identity.md",
+      "sha256": "effb0193e2b02288008289db4addab849925113c0b20f67b136a9d2652724c25"
+    },
+    {
+      "path": "law/adr/ADR-MUT-0010-pin-canonical-verifier-v22-source.md",
+      "sha256": "b4eef890ca929b3f51ac345387675e3f47486b7baa20671cf1b4d08ecd588c86"
+    },
+    {
+      "path": "law/adr/ADR-GOV-0018-commit-grammar-and-single-family-commits.md",
+      "sha256": "e00137cb446c22084a4c5152f23f3bda4a6690c3a23bb50e0d652f9fbe1e6dd6"
+    },
+    {
+      "path": "law/adr/ADR-CFG-0002-owned-configuration-projection.md",
+      "sha256": "a543bfa975d8785b43d9cc8f07d3313ba7e73c010e18f76191ccb952d9a273c7"
+    },
+    {
+      "path": "law/adr/ADR-REL-0021-append-only-export-artifact-sink-extension.md",
+      "sha256": "78f31e9ea5a9e7c663f2765dd1e3734d2f138f463761c79d6b4bbf368dbdfb30"
+    },
+    {
+      "path": "law/adr/ADR-EVI-0006-custody-proven-divergent-anchor-recovery.md",
+      "sha256": "89e4bebfc1147662efc3d779b490e71339a838bfe8531cbd6907e2fb073eea09"
+    },
+    {
+      "path": "law/adr/ADR-SCR-0019-package-owned-native-coverage-adapter.md",
+      "sha256": "c31238ae6fbf529160587569e3199e1eb958110fa5c2800aff574c33c6197c2a"
+    },
+    {
+      "path": "law/adr/ADR-MUT-0002-canonical-verifier-v2-alignment.md",
+      "sha256": "4ff99fd40bfb6d4aa066312b2382497852211cbb5620b9318e2cf91dc7659a24"
+    },
+    {
+      "path": "law/adr/ADR-GOV-0015-lifecycle-kernel-closure.md",
+      "sha256": "1d885fab7e50a316f7c573e4621d6753de08e20e0166fbc23d0fba264de6bae0"
+    },
+    {
+      "path": "law/adr/ADR-REL-0001-release-lifecycle-actions-and-state.md",
+      "sha256": "9f3d82d6f58efb7ea0d2c8ece7810705e71ccc568736b4c78efb4e84f57caebe"
+    },
+    {
+      "path": "law/adr/ADR-SCR-0014-green-main-counts-final-heads.md",
+      "sha256": "57104b23df20ea0e1dbf55351559d256d400a4f197f196d120e9e3e7860affad"
+    },
+    {
+      "path": "law/adr/ADR-MDL-0002-versioned-model-defaults.md",
+      "sha256": "0b316f06293544107b4b89bc9e400a90b38dc002575866606a3e9f2e7669c9e3"
+    },
+    {
+      "path": "law/adr/ADR-REL-0028-prerelease-channel-ladder.md",
+      "sha256": "683943b200cee9381f1e2a185b440b5028276def53922f45496ae566e9d84c73"
+    },
+    {
+      "path": "law/adr/ADR-REL-0027-retire-changesets-version-intent-from-commits.md",
+      "sha256": "18cb2ab80d7068ee245334434942ea7291c86ee0e3e1dc1a14dd9e718ff0a21f"
+    },
+    {
+      "path": "law/adr/ADR-SCR-0013-gate-invariant-producers-in-the-preflight-lane.md",
+      "sha256": "e90739c37b484da65ab6bf36bc6d9f279a3e957e34b97dd8ad6c099a644f84bd"
+    },
+    {
+      "path": "law/adr/ADR-GOV-0026-engineer-authors-focused-regression-tests.md",
+      "sha256": "88a530a7d0b565968e4cac39773b9b46f8c3e705988373996ff71831c7c5585f"
+    },
+    {
+      "path": "law/adr/ADR-MDL-0003-live-review-envelope-contract.md",
+      "sha256": "9b5769fd52a2b255f7b0885460a3f771d6ba737d3cc3a49f5052948a06e436d1"
+    },
+    {
+      "path": "law/adr/ADR-SCR-0018-read-only-workflow-step-inventory.md",
+      "sha256": "cc83ee30ea3088766c5fc86ff04565156e75c04a8c96d444445234bdf7bd5bd6"
+    },
+    {
+      "path": "law/adr/ADR-CFG-0001-schema-driven-interactive-configuration.md",
+      "sha256": "6459b21f4e93f7965c36a51b7489eb0c0e33173164a2f90986697802d63dde5d"
+    },
+    {
+      "path": "law/adr/ADR-GOV-0023-review-boundaries.md",
+      "sha256": "ce46b9cbc27628c1f0b7117f28439a147aaa1be72b7a29b01dd974b70fa0363c"
+    },
+    {
+      "path": "law/adr/ADR-REL-0002-nine-state-release-lifecycle-and-observed-publication.md",
+      "sha256": "5e3007f07a5b5b33642fb0012ac4b25e4e5bce6f117a3a3d289766fab11e4f52"
+    },
+    {
+      "path": "law/adr/ADR-CHK-0008-rebase-update-branch.md",
+      "sha256": "76aa1388b5a5916349954f4968d0769207be16cd111a0e10239c8057e9c62cea"
+    },
+    {
+      "path": "law/adr/ADR-REL-0025-portable-certified-offline-bundle.md",
+      "sha256": "65d793df1af52fee92c7eaa9574579e4cae31f260dae102f13eec4b1e38e61da"
+    },
+    {
+      "path": "law/adr/ADR-GOV-0003-mandatory-semantic-kernels.md",
+      "sha256": "5cd61052c4ed38b1bdbbd5c5d6aefddc268b0cfe6a9e39b2b08d9d9ddd35b206"
+    },
+    {
+      "path": "law/adr/ADR-REL-0012-close-offline-receipt-sink-continuity.md",
+      "sha256": "049d4aefd8ec20555578137e332eba1f73f5eaede8b52dec307e0f96dd7171ba"
+    },
+    {
+      "path": "law/adr/ADR-MUT-0004-complete-verifiable-mutation-evidence-v2.md",
+      "sha256": "52fd43920c77067b9ac36e825ddca644d8ecbb8ff85e0cf64390e7592404feb4"
+    },
+    {
+      "path": "law/adr/ADR-REL-0022-signed-portable-export-closure.md",
+      "sha256": "39db8f3e491c24cea812a0f6bd6e93c1923450c0523ad38799393cfa3c8e9769"
+    },
+    {
+      "path": "law/adr/ADR-GOV-0008-canonical-subject-projections.md",
+      "sha256": "8c39be9acbf8a7ad5b01fa1fd10ef0be8cb7112ee266c1eb881757fc10074477"
+    }
+  ],
+  "live_machine_state": [
+    {
+      "path": ".devai/config",
+      "exists": true,
+      "files": [
+        {
+          "path": ".devai/config/adopter-policy-binding.json",
+          "sha256": "a752edc51e4627f2f4cfd345b7051a6692f2f08e35b4f63764d4c8f6b59822fc"
+        },
+        {
+          "path": ".devai/config/change-taxonomy-binding.json",
+          "sha256": "717814100e5abd5b03e7f2f29f13a6ae454eea9007d677a2080263079bd90a93"
+        },
+        {
+          "path": ".devai/config/change-taxonomy.json",
+          "sha256": "81a5142754fd575747e84c2c036baa9d0d70460e959ace80b42ce16c9a0e9f54"
+        },
+        {
+          "path": ".devai/config/domains.json",
+          "sha256": "9539eb0e6679d423fa83b98726136eb369202edb042fce68eae92b19f543f6fd"
+        },
+        {
+          "path": ".devai/config/forbidden-actions.json",
+          "sha256": "1b7dbdda65108802ebfb86344ded1f34c73ee737c00544b3e7b1a2c2922f07db"
+        },
+        {
+          "path": ".devai/config/glob-guards.json",
+          "sha256": "a444e9fb4113e15e2810c4ac6e29fe4b967bf4951b78cd20f66658e9983da761"
+        },
+        {
+          "path": ".devai/config/preflight-probes.json",
+          "sha256": "0c737111c37960ff93fa855e609788006c6dd3cdd2f302530f0e1c0a6a8fb7d4"
+        },
+        {
+          "path": ".devai/config/project.json",
+          "sha256": "dce97394bf34f17bd02793e9e0d07f0cee041174bb53f7211a77845a2e7560c8"
+        },
+        {
+          "path": ".devai/config/release-verification.json",
+          "sha256": "1c167d7f10c58228cc68805d55ab25a074dd03d71f5392c90e7feba9f3e6d332"
+        },
+        {
+          "path": ".devai/config/scorecard-na.json",
+          "sha256": "a7eeaecd4147efab2a6a40621cf2d87955c947d0739a13093d2baa93096488a2"
+        },
+        {
+          "path": ".devai/config/sensor-inputs.json",
+          "sha256": "e536e99c087265a382b5db7739142fd5274e228eb96334793b8bd0440d2a065f"
+        },
+        {
+          "path": ".devai/config/subprocess-effects.json",
+          "sha256": "2686563fc019b169fb5a66e3abd35e5d564a59ba35fb3ba5de5bfecfac2e110a"
+        },
+        {
+          "path": ".devai/config/thresholds.json",
+          "sha256": "4662c41fbbce00db9e887be3f44f7f799e9bee587cb74dccb86e68eca3e4e9f4"
+        },
+        {
+          "path": ".devai/config/toolchain.json",
+          "sha256": "23473aa2a7bc0b3d421794623b9d4f7b78e23152f4e6c57e81fd0373f40317e0"
+        }
+      ]
+    },
+    {
+      "path": ".devai/pin",
+      "exists": true,
+      "files": [
+        {
+          "path": ".devai/pin/constitution.md",
+          "sha256": "8353c3b81d38e0f9b913cbeb6762bc149605989c1b16f52d2c63ba9892f71270"
+        }
+      ]
+    },
+    {
+      "path": ".devai/state",
+      "exists": true,
+      "files": [
+        {
+          "path": ".devai/state/.gitkeep",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "path": "record/proofs",
+      "exists": true,
+      "files": [
+        {
+          "path": "record/proofs/README.md",
+          "sha256": "24595fdc95cf09ffaab25223afdff3f01f43d76c2e60ec8e1be3db015ad661ca"
+        },
+        {
+          "path": "record/proofs/chain.json",
+          "sha256": "42cc938f9437a34a713396a1d867c284d5702588afd95e7ea68eb8ef387072e5"
+        },
+        {
+          "path": "record/proofs/compliance/closures/.gitkeep",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "record/proofs/compliance/releases/.gitkeep",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "record/proofs/compliance/scorecards/.gitkeep",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "record/proofs/compliance/scorecards/SC-20260927T205906-001.assessment.json",
+          "sha256": "f9f24879cf19b46221ef450bd78504fc40b3f919547ee1a6d0a7198db3c09f57"
+        },
+        {
+          "path": "record/proofs/compliance/scorecards/SC-20260927T205906-001.backlog.json",
+          "sha256": "d2324772396f5093ab92743978e365cc63dae1f08454c198a48a4270494616fd"
+        },
+        {
+          "path": "record/proofs/compliance/scorecards/SC-20260927T205906-001.json",
+          "sha256": "846e324b723b9401caab90127973f14e56308dc11ea34ebc432e0b229d40bd79"
+        },
+        {
+          "path": "record/proofs/compliance/scorecards/SC-20261001T194346-001.assessment.json",
+          "sha256": "f169d53ff4e49c186d278b8e1eb85c63a2d25b0245b1fea9fa1ce887d51c9f1f"
+        },
+        {
+          "path": "record/proofs/compliance/scorecards/SC-20261001T194346-001.backlog.json",
+          "sha256": "3c437313e87a1c8912a2667c8924320f901f3ee3d127851678b148b62d512c5b"
+        },
+        {
+          "path": "record/proofs/compliance/scorecards/SC-20261001T194346-001.json",
+          "sha256": "d7683a234e24be89d49d415a77a0e1017adab6b34133a2854f2a62a16c8d276b"
+        },
+        {
+          "path": "record/proofs/compliance/scorecards/SC-20261006T141503-001.assessment.json",
+          "sha256": "f6bb88c06b16d86df4a3d96882c9bc60b6e167c47de384933f779d635daefc4f"
+        },
+        {
+          "path": "record/proofs/compliance/scorecards/SC-20261006T141503-001.backlog.json",
+          "sha256": "58e1928960c50d5048ea0db8792de933e9e0d75f353248847b0366c4e71eda59"
+        },
+        {
+          "path": "record/proofs/compliance/scorecards/SC-20261006T141503-001.json",
+          "sha256": "219df9948a39d5f5cbe126a2f6e56bab649cf957613c3986102e182f24fec4b7"
+        },
+        {
+          "path": "record/proofs/compliance/scorecards/SC-20261006T215814-001.assessment.json",
+          "sha256": "4d7b21d1e7d04a9fa184a80c2f164c9aa8112e2d2431ba0fb4cbd4ce5e59fd17"
+        },
+        {
+          "path": "record/proofs/compliance/scorecards/SC-20261006T215814-001.backlog.json",
+          "sha256": "2e2b6a6c015957ee09bc494723b89b4e001ece9de728539efbb4a01775993a6a"
+        },
+        {
+          "path": "record/proofs/compliance/scorecards/SC-20261006T215814-001.json",
+          "sha256": "b7cb88de91a9bcf7ac7a279a28be5eaac89ef4079003eca265da138ab9cf50a4"
+        },
+        {
+          "path": "record/proofs/compliance/scorecards/SC-20261007T203104-001.assessment.json",
+          "sha256": "c6d26129f865c19c9c5d155f8723698bf63df15a6a860cdef6cc86463240f342"
+        },
+        {
+          "path": "record/proofs/compliance/scorecards/SC-20261007T203104-001.backlog.json",
+          "sha256": "83528fd211e93bd7e01daa911886c69758eb46c495db95116be70a3b1ba896e8"
+        },
+        {
+          "path": "record/proofs/compliance/scorecards/SC-20261007T203104-001.json",
+          "sha256": "5a8bf7d6cbbf66d797c907733ee6db9b19eda297c7c87441e0ee5077f0641937"
+        },
+        {
+          "path": "record/proofs/compliance/verdicts/.gitkeep",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "record/proofs/freshness/baselines/.gitkeep",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "record/proofs/freshness/readings/.gitkeep",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "record/proofs/work/agent-runs/.gitkeep",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "record/proofs/work/coverage/.gitkeep",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "record/proofs/work/test-results/.gitkeep",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "path": ".devai/constitution.md",
+      "exists": true,
+      "files": [
+        {
+          "path": ".devai/constitution.md",
+          "sha256": "e89b59e3d6daed5f7c4b20cf200c3b1b9c87ee52d84f7727dc2f9b296445b999"
+        }
+      ]
+    }
+  ],
+  "held_effects": [
+    "live preview",
+    "binding",
+    "source publication/integration",
+    "U1/B1 operations",
+    "release",
+    "DETRAN"
+  ]
+}

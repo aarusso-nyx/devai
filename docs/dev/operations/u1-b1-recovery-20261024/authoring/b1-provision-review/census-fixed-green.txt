@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-provision-review/census-fixed-green.txt","kind":"historical-transcript-custody-pointer","original_bytes":632,"original_bytes_changed":false,"original_sha256":"3b5f3a35f099ca623b7d99a962740520ba11b71434d6a11b153c467a6e562521"}

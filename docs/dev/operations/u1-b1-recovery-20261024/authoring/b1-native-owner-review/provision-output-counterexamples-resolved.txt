@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/provision-output-counterexamples-resolved.txt","kind":"historical-transcript-custody-pointer","original_bytes":632,"original_bytes_changed":false,"original_sha256":"e1aa08191757abc16730231b267ae4788f65958279e5d1ced2c3d2dd159ee5f3"}

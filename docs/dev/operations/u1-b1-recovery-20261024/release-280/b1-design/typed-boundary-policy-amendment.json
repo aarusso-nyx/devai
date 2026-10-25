@@ -1,0 +1,43 @@
+{
+  "standing": "EXPLICIT_POLICY_CONSUMER_AMENDMENT_FOR_REAL_ISSUER_TESTS_NO_FAKE_RESOLUTION_CUSTODY",
+  "original_checkpoint_sha256": "a1fb4f25f5f4c06e096c968b13c3bd167a676884c92ff5ae8288dec0d5b0b29f",
+  "trigger": "Independent test author correctly proved current policy matching rejects both typed kinds, so genuine issuer.issueAllow cannot produce a typed receipt. Do not manufacture resolutionRecords or inject fake receipt stores as positive authority evidence. Close actual policy/schema consumer seam in the same bounded implementation.",
+  "additional_source_paths": [
+    "packages/authority/src/runtime/policy-resolver.ts",
+    "law/schemas/authority-policy.schema.json"
+  ],
+  "schema_consumers": "Existing registered authority-policy.schema.json, roster, doctor/check schema validation and P1 policy review validation remain normal consumers; stage updated canonical schema assets for tests/build. No new schema population count or source-only reference promotion.",
+  "policy_only_selector": {
+    "keys": [
+      "kind",
+      "repository_id",
+      "operations"
+    ],
+    "additionalProperties": false,
+    "kind": [
+      "reconciliation-host",
+      "proof-index"
+    ],
+    "repository_id": "Exact existing typed-resource logical ASCII ID: firstalphanumeric then alphanumeric/underscore/hyphen,1..128 characters. No glob/wildcard/path or physical admin selector. Actual worktree/plan/approval/current binding and action authority remain separately required by exact target, issuer and final host adapter.",
+    "operations": {
+      "reconciliation-host": [
+        "provision",
+        "approve",
+        "renew",
+        "revoke",
+        "recover-owned-lease",
+        "consume-phase"
+      ],
+      "proof-index": [
+        "chain-cas"
+      ]
+    },
+    "operations_shape": "Required nonempty unique finite array of permitted strings; no unknown/wildcard/alias/accessor/proxy/sparse array."
+  },
+  "resolver": "Add policySelectorMatches(selector,resource,classifyOnly=false), descriptor-safe for the two typed target/selector kinds. It uses closed typed validators and exact repo match, allowed finite operations and no wildcard. For ordinary kinds delegate unchanged selectorMatches. Use new matcher ONLY in policy classification and operation matching. Existing exported selectorMatches, ResourceTargetSelector, decision-plan bounded matching, issuer exactTargets and boundary registerBatch retain typed refusal.",
+  "schema": "Append two closed selector oneOf variants matching exact3field contract. No existing variant or example removed/changed. Existing schemaVersion/populations unchanged. Valid old policy/schema bytes remain accepted. No default rule, materialized binding, adopter policy or action registry is altered. This admits policy vocabulary; runtime decisions still need explicit owned rules and authentic invocation/context/receipt.",
+  "tests": "Independent complete owned valid policy fixture for each target, actual resolver declaration/context/allow receipt, actual boundary plan prepare/apply. No forgedresolutionRecords, mockissuer or permissionbypass. Both selectors schema-valid; malformed/wildcard/unknown/duplicate/extra/getter/Proxy variants refuse; crossrepo/kind/op match cannotbroaden. Existing58data+99shape+ordinarypolicy/classifier suites remain unchanged.",
+  "snapshot_clarification": "Store an independent descriptor-safe JSON snapshot copy or immutable prepare-time digest before consuming typed receipt; same mutable source object changed between prepare/apply must not erase drift. No raw adapter native diagnostic is exposed on new dependency checks.",
+  "diagnostics": "Original2newtypedcodes retained; real adapter apply exceptions may propagate to the normal caller boundary as existing adapters do, but new classify/snapshot validation failures are fixed safe codes. No broad native exception-handling rewrite.",
+  "remaining": "Actual CLIbroker-issued invocation token/currentargv/role/consent/package+policy bindings, real native Owner/bootstrap and proofindex adapters, public workflow/action/registry/corepolicy rule installation remain REQUIRED. This amended component cannot authorize public writes on its own."
+}

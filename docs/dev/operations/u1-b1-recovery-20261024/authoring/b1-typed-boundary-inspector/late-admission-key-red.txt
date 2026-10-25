@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-typed-boundary-inspector/late-admission-key-red.txt","kind":"historical-transcript-custody-pointer","original_bytes":2958,"original_bytes_changed":false,"original_sha256":"28584fe2b046ec485ef2da40dfc7e6f4c90c7155ec4e9f40dcceba88ce49bac3"}

@@ -1,0 +1,43 @@
+{
+  "kind": "installed-native14-functional-and-output-failure-checkpoint",
+  "tarball_sha256": "295e19d6835802a59b2be31580ba914485018ab9171a9380a77ce730791d0e37",
+  "whole_public_workflows": {
+    "335": "passed",
+    "449": "passed"
+  },
+  "actual_closed_stdout": {
+    "exit": 1,
+    "custody_envelope": false,
+    "protected_bytes_and_outputs_unchanged": true,
+    "disposition": "candidate not safe for live use; superseding output-helper fix requires exact-package qualification"
+  },
+  "files": {
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/native14-335-result.json": {
+      "sha256": "798cb352809adcc5e457e80f4b80c23206d45c856295e60e53f4c346ec6b034d",
+      "bytes": 10134
+    },
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/native14-335-final-witness-verification.json": {
+      "sha256": "432761ae008236e626562857c73e59a685a559bf90353be7512c0431d6d44f97",
+      "bytes": 313
+    },
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/native14-449-reviewed-result.json": {
+      "sha256": "a25f41fdfd0b20276eaf83f6cf0456a4fe3927a5b39c0ad6a1415997efef5caf",
+      "bytes": 10144
+    },
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/native14-449-reviewed-final-witness-verification.json": {
+      "sha256": "0c2508115a529cd51b4c5dc3514484277491f0137712e7fe8219b0d13ba4f205",
+      "bytes": 313
+    },
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/native14-335-inventory-retry-closed-stdout.json": {
+      "sha256": "f723925e4fa92f03ba7dab228ac00c3eedc8640449f642f1baba99fcd4269a40",
+      "bytes": 6645
+    },
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/native14-335-inventory-retry-closed-stdout.stderr": {
+      "sha256": "70ef576ed9d339423acaa0447f5dca7c95490d700ad050529f5d3b53b653dcbb",
+      "bytes": 1142
+    }
+  },
+  "integration": false,
+  "publication": false,
+  "live_detran_effects": false
+}

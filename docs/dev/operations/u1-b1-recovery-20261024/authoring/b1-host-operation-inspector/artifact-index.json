@@ -1,0 +1,118 @@
+{
+  "README.md": {
+    "sha256": "e8ed20e5bd218d687702bcabeb43383dfdc19b64bb2f0ab928ad8e0d5d168f35",
+    "size_bytes": 3439
+  },
+  "devai-host-operation-inspector-2h6c92.json": {
+    "sha256": "600a90d359fe39047b70857664b232662af6a6402cd5f9ec5f57aa441b00f253",
+    "size_bytes": 125834
+  },
+  "devai-host-operation-inspector-iK485Q.json": {
+    "sha256": "213b992c501047c47dc1131a339b51774915d6a48e1e1cbed3f1799a901128cd",
+    "size_bytes": 125834
+  },
+  "final-run-before.json": {
+    "sha256": "c88386b998678a473e18712998132055d1d1f6672979a24b51eeef57953c08fd",
+    "size_bytes": 1010
+  },
+  "fixed-run-receipt.json": {
+    "sha256": "353880acff7cc9e19267f00de55ac0ff2af67e3086e12941981b7f6dd27d7861",
+    "size_bytes": 2382
+  },
+  "format-final.txt": {
+    "sha256": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20",
+    "size_bytes": 66
+  },
+  "independent-final.txt": {
+    "sha256": "bb72e48be7f2cda11c81a12d99675dfd123660b85397aa915ac6b72371d06cbd",
+    "size_bytes": 280
+  },
+  "independent-first-receipt.json": {
+    "sha256": "a3e3b85e376df102d7c08bf06e07d15445773b383f87d560899187cc1a707246",
+    "size_bytes": 1180
+  },
+  "independent-first.txt": {
+    "sha256": "64d6548f2d967547f43dd9838cf6a6b708c77f8eee87638303e2c432f4851f31",
+    "size_bytes": 4710
+  },
+  "independent-fixed.txt": {
+    "sha256": "7162f2b9d59fc46b2048b60413aea887209613a9fba31568e156de0e0c8dae4c",
+    "size_bytes": 278
+  },
+  "independent-second.txt": {
+    "sha256": "68457eb3111e5a9857150f3c40c3c079b2038cf4d50f3af1ba4770d77d0bce76",
+    "size_bytes": 1898
+  },
+  "input-format.txt": {
+    "sha256": "3fb912717602f6fbef17c816ac60b734c9c13340b0d92d5591af647d7c391cf6",
+    "size_bytes": 63
+  },
+  "interface-format.txt": {
+    "sha256": "b5ca27d28d36dc67c64d7c67caed526cf41aef12773e73318040dfe06131a007",
+    "size_bytes": 148
+  },
+  "latest-format.txt": {
+    "sha256": "7ddeec8d2755e83bf658592a57a3f9a0f050985425f02999e300ae92ad9d0a7e",
+    "size_bytes": 149
+  },
+  "lint-draft.txt": {
+    "sha256": "999cb6afda08d02608d70f2a406afbe7ab14811318ae7ac0c59a1b71ded45730",
+    "size_bytes": 536
+  },
+  "lint-draft2.txt": {
+    "sha256": "0c7e77e026325e4682e4df8c4c50745e9b5f39c5871cf226271e9b0137b59086",
+    "size_bytes": 422
+  },
+  "lint-draft3.txt": {
+    "sha256": "e9949804e656ce41e3d6810c58263a352e962c7336caf385c3ec7a2ae139043f",
+    "size_bytes": 270
+  },
+  "lint-draft4.txt": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "size_bytes": 0
+  },
+  "lint-final.txt": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "size_bytes": 0
+  },
+  "operation-format.txt": {
+    "sha256": "9dcb526d0ab253bc1f9144ba73ec6374a4aace6365f71c157854ee814e8e6f2d",
+    "size_bytes": 73
+  },
+  "qualification-before.json": {
+    "sha256": "571a6c9f9e4be32fa766a4c94b00944005838afdf44bff107ee2f7067c11a4b8",
+    "size_bytes": 1113
+  },
+  "qualification-source-verification.json": {
+    "sha256": "d8d4325a1e7b4bf2091b4569749dcb37192820dd952a0afff04906bd9153e641",
+    "size_bytes": 1385
+  },
+  "receipt.json": {
+    "sha256": "ab95cc5580904ef80de5ab7af57683fa8bcb97433f4dd9204cbc348cf1cc0f4a",
+    "size_bytes": 10333
+  },
+  "second-run-before.json": {
+    "sha256": "7b20b2e981e58386606dfaa689f3a138ffb727338777eb747c3090b013d41ec1",
+    "size_bytes": 1010
+  },
+  "second-run-receipt.json": {
+    "sha256": "243198572826a899dff393758045804aab3ece29aeaaaad415d0b251ca0bc2f1",
+    "size_bytes": 2542
+  },
+  "source-and-input-manifest.json": {
+    "sha256": "d96720383024fb87a6b2840750f2b7f24056c95fb7a120d31ace3f3459ced73e",
+    "size_bytes": 6441
+  },
+  "structural-red-receipt.json": {
+    "sha256": "a96577b8730f4d92b4d9e77a0facb03d132a00996e725c2f528f434f3e7c5d99",
+    "size_bytes": 1257
+  },
+  "structural-red.txt": {
+    "sha256": "2d03e00f77de70cdee60c212b2af5c59ec76a7ae223a7d6e536e64ba30ac2062",
+    "size_bytes": 2544
+  },
+  "typecheck-final.txt": {
+    "sha256": "3801203c7d9e4544ad471c57f0ab2386897e4413121a6c6be2a61c5af2fd37fb",
+    "size_bytes": 573
+  }
+}

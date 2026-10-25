@@ -1,0 +1,143 @@
+{
+  "standing": "OPAQUE_INVOCATION_PARSER_AND_BROKER_REFUSAL_COMPONENT_GREEN_NOT_NATIVE_OR_INSTALLED_PUBLIC_QUALIFICATION",
+  "results": {
+    "passed": 623,
+    "failed": 0,
+    "files": 15,
+    "new_cases": 158,
+    "new_operation_cases": 50,
+    "new_parser_and_broker_cases": 108,
+    "duration_seconds": 70.21,
+    "full_workspace_typecheck": "PASS session61526",
+    "source_and_test_eslint": "PASS session45944",
+    "source_and_test_prettier": "PASS session45944",
+    "unchanged_default_test_thresholds_and_no_skips": true
+  },
+  "selected_tests": [
+    "packages/authority/tests/unit/reconciliation-host-operation.test.ts",
+    "packages/cli/tests/unit/reconciliation-host-input.test.ts",
+    "packages/authority/tests/unit/reconciliation-typed-boundary.test.ts",
+    "packages/authority/tests/unit/reconciliation-resource-kernel.test.ts",
+    "packages/authority/tests/unit/reconciliation-resources.test.ts",
+    "packages/authority/tests/unit/host-effect-scope-validation.test.ts",
+    "packages/authority/tests/unit/host-process.test.ts",
+    "packages/authority/tests/unit/protected-host-adapters.sec.test.ts",
+    "packages/cli/tests/unit/authority-broker-depth.test.ts",
+    "packages/cli/tests/unit/authority-broker-init-record.test.ts",
+    "packages/cli/tests/unit/authority-command-boundary-finalization.test.ts",
+    "packages/cli/tests/unit/tracking-reconcile-authority.test.ts",
+    "packages/cli/tests/unit/post-merge-hook-selection.test.ts",
+    "packages/cli/tests/unit/reconciliation-error-codes.test.ts",
+    "packages/cli/tests/unit/error-code-reference.test.ts"
+  ],
+  "source_and_input_manifest_sha256": "d96720383024fb87a6b2840750f2b7f24056c95fb7a120d31ace3f3459ced73e",
+  "qualified_source_and_tests": {
+    "packages/authority/src/boundaries/reconciliation-host-operation.ts": "ce8dc730e1a6d92890a013e0471fe81d3d64212a77e987f2cb05ca99bd3d0be1",
+    "packages/authority/src/boundaries/host-scope.ts": "20120a6084a077999738e3652135457dc988430b1c3530d9a46621701c1840aa",
+    "packages/authority/src/boundaries/host-atomic-effects.ts": "92d3be45f4d9e541252f16c44d55bb9fb7f009aa583d57bb54d5a3a6c76ffd6c",
+    "packages/authority/src/index.ts": "7acc1feb7a4cd9a7585b737feaccad8ef6344624f2c118c0feb9a23b3a7eae4d",
+    "packages/cli/src/authority/reconciliation-host-input.ts": "c26435b615eede984973fc1f9d247742c3dbbced43c538d1e171976ce06f8185",
+    "packages/cli/src/authority/broker.ts": "7fd4df9c746a8ab1979f4bd7aa7f26c68ccf7f947ed1df3ff1157f4a4b39c5d1",
+    "packages/authority/tests/unit/reconciliation-host-operation.test.ts": "f422dcf36893d6e7b014063eff0f948daea5575a72b644f1b5325ea10c398a54",
+    "packages/cli/tests/unit/reconciliation-host-input.test.ts": "f8adc6856a938e0db3ed4afcde20c1d65959413754b08d173e009612ccb2e147",
+    "docs/reference/error-codes.md": "4e944a0c52bf8d0ea1594f68a882ff5f9699e902e0b3849cad1eb23fd5099955"
+  },
+  "actual_environment": {
+    "node": "24.22.0",
+    "uv": "1.52.1",
+    "platform": "darwin"
+  },
+  "latest_fixture_manifest": "devai-host-operation-inspector-iK485Q.json",
+  "latest_fixture_manifest_sha256": "213b992c501047c47dc1131a339b51774915d6a48e1e1cbed3f1799a901128cd",
+  "fixture_observations": 49,
+  "actual_pipeline": "Owned deterministic policy validated against canonical staged schema, actual declaration/context, policy resolver, genuine issuer receipts and ordinary registered-plan/prepare/apply machinery for positive logical callback dispatch. No forged resolution custody or positive mock receipt store.",
+  "synthetic_limits": [
+    "B5 tuple values are owned deterministic test values, not installed package/module attestation.",
+    "TTY flags are synthetic within disposable test processes; no actual PTY/public consent qualification.",
+    "Some negative lifecycle fault seams hold/replay a scope thunk before any handler; no effects are claimed as native writes.",
+    "Read-only preview is observation only; a later operation captures fresh HEAD. Native exact plan/source eligibility remains required."
+  ],
+  "refusal_scope": "Real default broker/record_init forged request tests prove zero effects and missing canonical capability; they do not independently qualify a positive private-view capability or materialized typed policy branch.",
+  "source_review": {
+    "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-host-operation-review/source-review.json",
+    "sha256": "014b1e7344e5dcc3ed75ad1662092df8857a1002986af6deaddfe6006922fea8",
+    "reviewer_final_passed": 5,
+    "reviewer_results_not_added_to623": true
+  },
+  "historical_p1_compatibility": {
+    "standing": "DISPOSABLE_HISTORICAL_ADOPTER_SOURCE_REGRESSION_ONLY",
+    "passed": 63,
+    "historical_metadata_baseline": "2df84159caabf869b866fb2a05e5b06be83295fb",
+    "manifest_sha256": "6854b1d18e5fd37b7c262ff26cb50e87c2f6ef6d6478d8e6068bbf4314f47980",
+    "all_six_current_product_sources_verified_in_fixture": true,
+    "unchanged_historical_test_sha256": "0b2e35671ca2097b207e48bc56e1254d05278a245c1e4dc71f8e994845f5e69e",
+    "results_not_added_to623": true,
+    "not_current_installed_qualification": true
+  },
+  "historical_receipts_preserved": {
+    "authoring/b1-admission-inspector/receipt.json": "0952e1aa22d462e23f771fad5ff8cc1a6dfe52ce600f92215dcc30537fb0b9b5",
+    "authoring/b1-admission-inspector/error-census-green-receipt.json": "a9e6283fff96f1681a3c8113d0a307d2f5ac4920876a2538843f5cc00385b6b2",
+    "authoring/b1-clock-inspector/receipt.json": "a60f14928b1ebd097edba8be5fec58593973de87a4f1eef5240c4b89193b9ef8",
+    "authoring/b1-owner-record-inspector/receipt.json": "f38b19733d0dea9374855c8d1f21c88146a50f9ff9bf370b12d819a19c915436",
+    "authoring/b1-host-context-inspector/receipt.json": "2d5af14f7636c7376e0f1ebe3df88227395df4c6234de3df9fe3285091e3fa1d",
+    "authoring/b1-typed-boundary-inspector/receipt.json": "240d44807b3e8df351dc3f25ac1f9cb3070f4d31b935aa7c12bb035ab6ec4b1f"
+  },
+  "diagnostic_reference": {
+    "codes": 1299,
+    "sha256": "4e944a0c52bf8d0ea1594f68a882ff5f9699e902e0b3849cad1eb23fd5099955",
+    "exact_three_new_rows_removed_reconstruct_prior1296": "d23aff4e8e26d0c3529c01c2eda72bda0ca17daa606000af05f864797d1c8418"
+  },
+  "historical_runs": {
+    "structural-red.txt": "Authentic absent module2FAIL.",
+    "independent-first.txt": "124PASS7FAIL: five B5 codes + nested gap fixed; preview/HEAD assertion corrected to stated timing contract.",
+    "independent-second.txt": "151PASS1fixture mistake: intentionally terminal-STALE operation was then wrongly dispatched. Split negative cases retain latch.",
+    "independent-fixed.txt": "157PASS with parser predicate changed during run, explicitly disclosed by fixed-run-receipt.json.",
+    "independent-final.txt": "623PASS15files with all source/test/doc before/after hashes exact."
+  },
+  "remaining": [
+    "Actual installed bundle/dependency/module/B5 origin positive qualification.",
+    "Native bootstrap/issuer/key/grant/lease/phase/proof-index writers and protected namespace/admission descriptor composition.",
+    "Public command/action registry/default grants and exact user confirmations.",
+    "Exact plan/current source/grant/lease eligibility and complete installed public end-to-end qualification.",
+    "No whole-v2.8-release or DETRAN/downstream completion claim."
+  ],
+  "inspector_writes_only": [
+    "packages/authority/tests/unit/reconciliation-host-operation.test.ts",
+    "packages/cli/tests/unit/reconciliation-host-input.test.ts",
+    "authoring/b1-host-operation-inspector/"
+  ],
+  "graft": {
+    "calls_this_packet": 7,
+    "estimated_tokens_saved": 47439
+  },
+  "evidence_sha256": {
+    "README.md": "e8ed20e5bd218d687702bcabeb43383dfdc19b64bb2f0ab928ad8e0d5d168f35",
+    "devai-host-operation-inspector-2h6c92.json": "600a90d359fe39047b70857664b232662af6a6402cd5f9ec5f57aa441b00f253",
+    "devai-host-operation-inspector-iK485Q.json": "213b992c501047c47dc1131a339b51774915d6a48e1e1cbed3f1799a901128cd",
+    "final-run-before.json": "c88386b998678a473e18712998132055d1d1f6672979a24b51eeef57953c08fd",
+    "fixed-run-receipt.json": "353880acff7cc9e19267f00de55ac0ff2af67e3086e12941981b7f6dd27d7861",
+    "format-final.txt": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20",
+    "independent-final.txt": "bb72e48be7f2cda11c81a12d99675dfd123660b85397aa915ac6b72371d06cbd",
+    "independent-first-receipt.json": "a3e3b85e376df102d7c08bf06e07d15445773b383f87d560899187cc1a707246",
+    "independent-first.txt": "64d6548f2d967547f43dd9838cf6a6b708c77f8eee87638303e2c432f4851f31",
+    "independent-fixed.txt": "7162f2b9d59fc46b2048b60413aea887209613a9fba31568e156de0e0c8dae4c",
+    "independent-second.txt": "68457eb3111e5a9857150f3c40c3c079b2038cf4d50f3af1ba4770d77d0bce76",
+    "input-format.txt": "3fb912717602f6fbef17c816ac60b734c9c13340b0d92d5591af647d7c391cf6",
+    "interface-format.txt": "b5ca27d28d36dc67c64d7c67caed526cf41aef12773e73318040dfe06131a007",
+    "latest-format.txt": "7ddeec8d2755e83bf658592a57a3f9a0f050985425f02999e300ae92ad9d0a7e",
+    "lint-draft.txt": "999cb6afda08d02608d70f2a406afbe7ab14811318ae7ac0c59a1b71ded45730",
+    "lint-draft2.txt": "0c7e77e026325e4682e4df8c4c50745e9b5f39c5871cf226271e9b0137b59086",
+    "lint-draft3.txt": "e9949804e656ce41e3d6810c58263a352e962c7336caf385c3ec7a2ae139043f",
+    "lint-draft4.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "lint-final.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "operation-format.txt": "9dcb526d0ab253bc1f9144ba73ec6374a4aace6365f71c157854ee814e8e6f2d",
+    "qualification-before.json": "571a6c9f9e4be32fa766a4c94b00944005838afdf44bff107ee2f7067c11a4b8",
+    "qualification-source-verification.json": "d8d4325a1e7b4bf2091b4569749dcb37192820dd952a0afff04906bd9153e641",
+    "second-run-before.json": "7b20b2e981e58386606dfaa689f3a138ffb727338777eb747c3090b013d41ec1",
+    "second-run-receipt.json": "243198572826a899dff393758045804aab3ece29aeaaaad415d0b251ca0bc2f1",
+    "source-and-input-manifest.json": "d96720383024fb87a6b2840750f2b7f24056c95fb7a120d31ace3f3459ced73e",
+    "structural-red-receipt.json": "a96577b8730f4d92b4d9e77a0facb03d132a00996e725c2f528f434f3e7c5d99",
+    "structural-red.txt": "2d03e00f77de70cdee60c212b2af5c59ec76a7ae223a7d6e536e64ba30ac2062",
+    "typecheck-final.txt": "3801203c7d9e4544ad471c57f0ab2386897e4413121a6c6be2a61c5af2fd37fb"
+  }
+}

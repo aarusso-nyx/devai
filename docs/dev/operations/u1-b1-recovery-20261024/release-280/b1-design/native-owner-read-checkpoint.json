@@ -1,0 +1,68 @@
+{
+  "standing": "EXACT_READONLY_NATIVE_OWNER_ORIGIN_PACKET_FOR_INDEPENDENT_REVIEW_AND_RED",
+  "authority": "Accepted ADR-EVI-0007 and express fullinternalv2.8.0 goal. Necessary actualhost origin composition for native Owner/phase lifecycle, not substitute for that lifecycle or for actual verified plan/source before publication.",
+  "sources": [
+    "packages/authority/src/boundaries/reconciliation-host-owner.ts"
+  ],
+  "tests": [
+    "packages/authority/tests/unit/reconciliation-host-owner.test.ts"
+  ],
+  "generated": [
+    "docs/reference/error-codes.md (exact two new code rows; prior1304 rows byte-exact by inverse)"
+  ],
+  "api": {
+    "readReconciliationHostApproval": "(repositoryRoot: string, approvalId: string) => ReconciliationHostApprovalSnapshot. One fixed synchronous readonly host reader; no callbacks/providers/clock/key/namespace/physical adminpath args; no root package export until fullhost integration. Root selector absolutecanonical and must match actualsealedscoped identity; ID exactly64lowerhex. Missing actualsealed invocation/scopedaction/issuer/approval refuses.",
+    "snapshot_exact_fields": {
+      "kind": "reconciliation-host-approval-snapshot",
+      "identity": "frozen exact actual ReconciliationHostIdentity from scoped readBinding (schemaVersion/kind/repo/worktree/host/head/objectformat/mergeheads)",
+      "current_binding_sha256": "actualcurrentB5 digest",
+      "namespace_sha256": "whole admitted private namespace witness",
+      "approval_namespace_sha256": "shaJCS selected {identity,files} witness exactly as captured by existing namespace census",
+      "binding_matches_approval": "boolean exact original approval scope.binding_sha256 equals current B5; false is readable historicaldata, never migrated or renewed",
+      "clock": "actual final readBinding clock observation",
+      "state": "original branded deeplyfrozen safe ReconciliationOwnerState from exact actual files",
+      "grants_authority": false
+    }
+  },
+  "allowed_scoped_actions": [
+    "evidence reconcile approve",
+    "evidence reconcile materialize",
+    "evidence reconcile stage-proof",
+    "sense bootstrap-inventory"
+  ],
+  "protocol": [
+    "Before private namespace reads, require actual original processscope and opaque invocation through readReconciliationHostBinding; capture root context with its repository ID and require full identity equals actual sealed identity, including HEAD/mergeparents. Foreign canonical root refusesSTALE before private namespace read. No callerrepository ID.",
+    "Resolve protected namespace ONLY from actual context paths. Existing readNativeReconciliationNamespace qualifies actualDarwin filesystemtype26, protected0700/0600 effectiveUID/nofollow/nlink identities, exactseed bytes and MAC/file/name census. Existing namespace/provision functions and sealedtests remain unchanged; this reader grants no general Git path access.",
+    "Select only exact witnessed approvals/ID entry. Re-read its approval/grant/intent/completion/optionallease bytes through existing bounded privatefile reader; each file identity+SHA must equal first namespace witness. Order grants by canonical filename/sequence; intent/completion by exact names. No new filesystemenumeration or alternatepath selection. Aggregate byte sum must not exceed existing purestate32MiB; refuse while reading, not after retaining unbounded selecteddata.",
+    "Pass actualissuer bytes and exact selectedfile bytes to fixed readReconciliationOwnerState. It verifies graph/currentgrant/order/clock/links and produces safe branded data. No suppliedrecord/MAC/handle can replace actual privatefile source. Explicit state repo/worktree/host equals actualbindingidentity.",
+    "Reread complete namespace and require exact whole witness equality to first. Revalidate originalcontext identity and actual current sealed readBinding identity+B5 to first. Require same actual ALSscope object; apply existing300000ms reviewclockwindow from first to final observations. Native readers never open writable SQLite/acquire admission, create, chmod, unlink, sync or publish. No rawanchor access while a native connection lives: this exported readonly call is forbidden from live admission by existing lower primitive, and final in-lock writer must use its own private metadata-only path, never call this wrapper.",
+    "All captured actualfile bytebuffers, including both issuerobservations and selectedfiles, zeroed in finally on success/refusal. No issuer record, key/rawbytes/MAC/paths/physical identities returned except already safe opaque host identity; drop all private localreferences after synchronous call. State privatebrand retains only original nonissuer immutable records as already qualified.",
+    "Reader observes/rechecks a bounded readonly snapshot; no transaction/linearizability, currentplan/source eligibility, leasePID/liveness, outputdurability or ordinary authority grant inferred. Any later nativewrite must obtain fresh actual authority/admission, actualplan/source revalidation and its own exact beforewitness. Snapshot is not a future applyhandle. Original grant binding mismatch is reported as false for readonlyinspection; nativewriter never migrates/renews oldscope implicitly."
+  ],
+  "errors": {
+    "class": "ReconciliationOwnerHostError",
+    "codes": [
+      "RECONCILIATION_OWNER_HOST_INVALID",
+      "RECONCILIATION_OWNER_HOST_STALE"
+    ],
+    "meaning": "Invalid selector/shape/origin/missing/malformed namespace or graph usesINVALID; valid foreignroot or observed midread identity/B5/namespace/clock/scope drift usesSTALE. Message=code only, no rawcause/path/key/record/nativeexception."
+  },
+  "independent_acceptance": [
+    "Authentic missingmoduleRED before productimplementation",
+    "Actual disposable direct and registered linked Git contexts, actual private native provisioned issuer and independently signed complete approvalgraph; real ordinary issuer-backed ALS/B5 fixture custody, explicit syntheticB5/TTY limits",
+    "Exact frozen safe projection/hash/clock/boolean and purebrand can feed existing assessment as data; no privatekey/issuerbundle/MAC/path/errorcause leaks",
+    "Missing/canonicalforeignroot/foreignID/forgedscope/wrongaction/noinvocation/origin mismatches refuse before mutation; malformed IDs touch no namespace",
+    "Readonly before/after inventories and observed filesystemmutators remain zero; no writableSQLite/nativeadmission",
+    "Correctly MACsigned invalid graph refused even if structuralnamespace census passes",
+    "Actual HEAD/B5/filebytes/inode/mode/remnant/symlink/name changes during selectedread/finalrecheck refuseSTALE, preserve allchangedstate, no outputprojection/handle",
+    "Caller-supplied data cannot choose an adminroot or substitute key/clock/provider; snapshotclones grant no effect authority",
+    "Actual original scope/namespace/readfiles/issuer remain unchanged; buffer zeroization observation uses safe boolean probes, no secretvalues in logs",
+    "Unchanged provision/Ownerstate/codec/clock/operation/diagnostic focused regressions; fulltypes/lint/format and exact hashes"
+  ],
+  "remaining_full_goal": [
+    "Actualplan/source/wholehistory/publishedparent verifier before approvalpublication",
+    "NativeOwner initial/renew/revoke/deadlease and admitted phase/domain lifecycle",
+    "Canonicalselection/indexCAS/stagedbodies/public/installed integration/exactheadCI/protectedv2.8.0publication"
+  ],
+  "excluded": "No DETRAN/downstream effects; no write/binding/policy/action activation in this reader component."
+}

@@ -1,0 +1,193 @@
+import {createHash,createHmac} from 'node:crypto';
+import {it,expect} from 'vitest';
+import {readReconciliationOwnerState as read,assessReconciliationOwnerPhase as assess} from '/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/src/runtime/reconciliation-owner-state.ts';
+import {decodeReconciliationOwnerRecord as decode} from '/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/src/runtime/reconciliation-owner-record.ts';
+type Json = null|boolean|number|string|Json[]|{[key:string]:Json};type RecordData = {[key:string]:Json};
+const KEY_BYTES = Buffer.from(Array.from({ length: 32 }, (_, i) => (11 + i * 7) % 256));
+const KEY = KEY_BYTES.toString('base64');
+const OTHER_KEY = Buffer.alloc(32, 91).toString('base64');
+const INVALID = 'RECONCILIATION_OWNER_INVALID',
+  MAC_INVALID = 'RECONCILIATION_OWNER_MAC_INVALID',
+  ENCODING = 'RECONCILIATION_OWNER_ENCODING_INVALID',
+  LIMIT = 'RECONCILIATION_OWNER_LIMIT_EXCEEDED';
+const sha = (bytes: string | Uint8Array): string =>
+  createHash('sha256').update(bytes).digest('hex');
+// Independent oracle is only used on locally authored trusted fixtures, not candidate copies.
+// No shared canonicalJson/schema/codec helper supplies expected bytes or HMACs.
+function canonical(value: Json): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) return '[' + value.map(canonical).join(',') + ']';
+  return (
+    '{' +
+    Object.keys(value)
+      .sort()
+      .map((key) => JSON.stringify(key) + ':' + canonical(value[key] ?? null))
+      .join(',') +
+    '}'
+  );
+}
+const h = (label: string): string => sha(label);
+const clock = (): RecordData => ({
+  clock_source: 'node-uv-hrtime-ns-v1',
+  boot_id: '11111111-2222-3333-4444-555555555555',
+  monotonic_ns: '9007199254740993123',
+  wall_ms: 1792868400000,
+});
+const base = (kind: string): RecordData => ({
+  schemaVersion: '1.0.0',
+  kind,
+  domain: `devai.reconciliation.owner.v1/${kind}`,
+  repository_id: 'fixture-repository',
+  worktree_id: 'fixture-worktree',
+  clock: clock(),
+});
+const scope = (): RecordData => ({
+  repository_id: 'fixture-repository',
+  worktree_id: 'fixture-worktree',
+  host_identity_sha256: h('host'),
+  binding_sha256: h('binding'),
+  plan_sha256: h('plan'),
+  source_manifest_sha256: h('source'),
+  allowed_phases: ['01', '02', '03', '04'],
+});
+function unsigned(kind: string): RecordData {
+  const common = {
+    ...base(kind),
+    approval_id: h('approval-id'),
+    issuer_sha256: h('issuer'),
+    approval_sha256: h('approval'),
+    scope_sha256: sha(canonical(scope())),
+  };
+  const deadlines = {
+    validity_ms: 900000,
+    expires_wall_ms: 1792869300000,
+    expires_monotonic_ns: '9007200154740993123',
+  };
+  if (kind === 'issuer') {
+    const anchor: RecordData = {
+      schemaVersion: '1.0.0',
+      kind: 'reconciliation-admission-anchor',
+      root: '/PRIVATE_PAYLOAD_SENTINEL_ROOT',
+      root_identity: { dev: '1', ino: '2', birthtime_ns: '3', uid: '501', mode: '0700' },
+      seed_identity: {
+        dev: '1',
+        ino: '4',
+        birthtime_ns: '5',
+        uid: '501',
+        mode: '0600',
+        size_bytes: 8192,
+        mtime_ns: '6',
+        ctime_ns: '7',
+      },
+      seed_sha256: '3f6b742405bb199a11ed0952c9aa049285ef25dc69954e901d2e987cd15c4372',
+    };
+    const bindings: RecordData = {
+      package_sha256: h('package'),
+      module_sha256: h('module'),
+      registry_sha256: h('registry'),
+      constitution_sha256: h('constitution'),
+      policy_sha256: h('policy'),
+    };
+    const seed_plan_sha256 = h('seed-plan'),
+      host_identity_sha256 = h('host'),
+      installed_at_head = 'a'.repeat(40);
+    const context = {
+      seed_plan_sha256,
+      host_identity_sha256,
+      admission_anchor_sha256: sha(canonical(anchor)),
+      installation_bindings_sha256: sha(canonical(bindings)),
+      installed_at_head,
+    };
+    return {
+      ...base(kind),
+      adapter_id: 'reconciliation-host-authority-boundary',
+      host_identity_sha256,
+      key_sha256: sha(KEY_BYTES),
+      seed_plan_sha256,
+      provision_context_sha256: sha(canonical(context)),
+      admission_anchor: anchor,
+      private_key_base64: KEY,
+      installation_bindings: bindings,
+      installed_at_head,
+    };
+  }
+  if (kind === 'approval') {
+    const { approval_sha256: _omitted, ...rest } = common;
+    return { ...rest, sequence: 1, previous_grant_sha256: null, scope: scope(), ...deadlines };
+  }
+  if (kind === 'renewal')
+    return {
+      ...common,
+      sequence: 2,
+      previous_grant_sha256: h('grant'),
+      remaining_phases: ['02', '04'],
+      resumable_intent_sha256: null,
+      ...deadlines,
+    };
+  if (kind === 'revocation') return { ...common, sequence: 2, previous_grant_sha256: h('grant') };
+  if (kind === 'phase-intent')
+    return {
+      ...common,
+      grant_sha256: h('grant'),
+      before_witness_sha256: h('before'),
+      output_plan_sha256: h('outputs'),
+      lease_nonce: h('nonce'),
+      invocation_id: h('invocation'),
+      phase: '01',
+      action_id: 'evidence reconcile materialize',
+      initiator: 'inspector',
+      predecessor_completion_sha256: null,
+    };
+  if (kind === 'phase-completion')
+    return {
+      ...common,
+      intent_sha256: h('intent'),
+      observed_grant_sha256: h('grant'),
+      final_witness_sha256: h('final'),
+      outputs_manifest_sha256: h('outputs'),
+      phase: '01',
+      predecessor_completion_sha256: null,
+      durability: 'durable',
+    };
+  return {
+    ...common,
+    grant_sha256: h('grant'),
+    original_intent_sha256: h('intent'),
+    invocation_id: h('invocation'),
+    nonce: h('nonce'),
+    host_identity_sha256: h('host'),
+    phase: '01',
+    action_id: 'evidence reconcile materialize',
+    initiator: 'inspector',
+    pid: 123,
+    hostname: 'PRIVATE_PAYLOAD_SENTINEL_HOST',
+  };
+}
+function signed(kind: string): RecordData {
+  const record = unsigned(kind);
+  const mac = createHmac('sha256', KEY_BYTES)
+    .update(Buffer.from(String(record.domain), 'utf8'))
+    .update(Buffer.from([0]))
+    .update(canonical(record), 'utf8')
+    .digest('hex');
+  return { ...record, mac };
+}
+const bytes = (value: RecordData): Buffer => Buffer.from(canonical(value) + '\n', 'utf8');
+
+const seal=(record:RecordData):RecordData=>({...record,mac:createHmac('sha256',KEY_BYTES).update(String(record.domain)).update(Buffer.from([0])).update(canonical(record)).digest('hex')});
+function fixture(){
+ const issuer=signed('issuer'), issuerHash=sha(bytes(issuer));const a=seal({...unsigned('approval'),issuer_sha256:issuerHash});const aHash=sha(bytes(a));
+ const linked=(kind:string)=>({...unsigned(kind),issuer_sha256:issuerHash,approval_sha256:aHash});
+ const i=seal({...linked('phase-intent'),grant_sha256:aHash});const iHash=sha(bytes(i));
+ const r=seal({...linked('renewal'),previous_grant_sha256:aHash,remaining_phases:['01','02','03','04'],resumable_intent_sha256:iHash});
+ const c=seal({...linked('phase-completion'),intent_sha256:iHash,observed_grant_sha256:sha(bytes(r))});
+ const l=seal({...linked('lease'),grant_sha256:aHash,original_intent_sha256:iHash});
+ const input={issuer_bytes:bytes(issuer),approval_bytes:bytes(a),grant_bytes:[bytes(r)],intent_bytes:[bytes(i)],completion_bytes:[bytes(c)],lease_bytes:null as Buffer|null};return{issuer,a,aHash,i,iHash,r,c,l,linked,input};
+}
+it('actual tied reference graph gives completed/unknown-held/nextphase-start with no secretprojection',()=>{const f=fixture(),state=read(f.input);expect(assess(state,'01',clock(),'complete')).toMatchObject({disposition:'completed',completion_sha256:sha(bytes(f.c)),grants_authority:false});expect(assess(state,'01',clock(),'unknown')).toMatchObject({disposition:'held'});expect(assess(state,'02',clock(),'absent')).toMatchObject({disposition:'start'});for(const secret of [KEY,'private_key_base64','PRIVATE_PAYLOAD_SENTINEL'])expect(JSON.stringify(state)).not.toContain(secret);});
+it('samegrant newintent under null-resumable renewal permits distinct retry lease nonce/invocation',()=>{const f=fixture();const r=seal({...f.linked('renewal'),previous_grant_sha256:f.aHash,remaining_phases:['01','02','03','04'],resumable_intent_sha256:null}),rHash=sha(bytes(r));const i=seal({...f.linked('phase-intent'),grant_sha256:rHash}),iHash=sha(bytes(i));const l=seal({...f.linked('lease'),grant_sha256:rHash,original_intent_sha256:iHash,nonce:h('different-retry-nonce'),invocation_id:h('different-retry-invocation')});const state=read({...f.input,grant_bytes:[bytes(r)],intent_bytes:[bytes(i)],completion_bytes:[],lease_bytes:bytes(l)});expect(assess(state,'01',clock(),'partial-known')).toMatchObject({disposition:'resume',grants_authority:false});});
+it('oldgrant intent contradicting null-resumable renewal is invalid even tied',()=>{const f=fixture(),r=seal({...f.linked('renewal'),previous_grant_sha256:f.aHash,remaining_phases:['01','02','03','04'],resumable_intent_sha256:null});expect(()=>read({...f.input,grant_bytes:[bytes(r)],completion_bytes:[]})).toThrow('RECONCILIATION_OWNER_STATE_INVALID');});
+it('prior lease with completedintent remains safe graph evidence',()=>{const f=fixture(),c=seal({...f.linked('phase-completion'),intent_sha256:f.iHash,observed_grant_sha256:f.aHash});const state=read({...f.input,grant_bytes:[],completion_bytes:[bytes(c)],lease_bytes:bytes(f.l)});expect(state.lease_sha256).toBe(sha(bytes(f.l)));expect(assess(state,'01',clock(),'complete')).toMatchObject({disposition:'completed'});expect(assess(state,'01',clock(),'absent')).toMatchObject({disposition:'held'});});
+it('existing schema rejects wrongphase mapping and reducer projects closed error',()=>{const f=fixture(),wrong=seal({...f.linked('phase-intent'),grant_sha256:f.aHash,action_id:'evidence reconcile stage-proof'});expect(()=>decode(bytes(wrong))).toThrow('RECONCILIATION_OWNER_INVALID');expect(()=>read({...f.input,grant_bytes:[],intent_bytes:[bytes(wrong)],completion_bytes:[]})).toThrow('RECONCILIATION_OWNER_STATE_INVALID');});
+it('byte shadow getters and forgedstate proxy traps remain untouched',()=>{const f=fixture();let touched=0;Object.defineProperty(f.input.approval_bytes,'byteLength',{get(){touched++;throw new Error('PRIVATE_GETTER');}});const state=read(f.input);expect(assess(state,'01',clock(),'complete').disposition).toBe('completed');expect(()=>assess(new Proxy(state,{get(){touched++;throw new Error('PRIVATE_TRAP');}}),'01',clock(),'complete')).toThrow('RECONCILIATION_OWNER_STATE_INVALID');expect(touched).toBe(0);f.input.approval_bytes.fill(0);expect(assess(state,'01',clock(),'complete').disposition).toBe('completed');});
+it('current observation cannot precede latestlease even with validgrant',()=>{const f=fixture(),future={...clock(),wall_ms:1792868400001,monotonic_ns:'9007199254741993123'},l=seal({...f.linked('lease'),grant_sha256:f.aHash,original_intent_sha256:f.iHash,clock:future});const state=read({...f.input,grant_bytes:[],completion_bytes:[],lease_bytes:bytes(l)});expect(()=>assess(state,'01',clock(),'absent')).toThrow('RECONCILIATION_OWNER_STATE_INVALID');});

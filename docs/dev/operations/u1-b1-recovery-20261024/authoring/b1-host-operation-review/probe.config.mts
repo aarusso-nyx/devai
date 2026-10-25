@@ -1,0 +1,2 @@
+import {defineConfig} from 'vitest/config';
+export default defineConfig({resolve:{conditions:['development'],alias:{'@devai-nyx/authority':'/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/src/index.ts'}},test:{environment:'node',include:['/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-host-operation-review/edge-probes.test.ts'],maxWorkers:1,testTimeout:30000}});

@@ -1,0 +1,24 @@
+{
+  "status": "ROOT_CHECKS_PASS_INDEPENDENT_REVIEW_PENDING",
+  "source_sha256": {
+    "packages/authority/src/boundaries/host-publish.ts": "8a0e2dda49b8d9d048683c612427dd2bc2304b9e583aedf5bb867c33bf46e53e",
+    "packages/authority/src/boundaries/host-effects.ts": "0c3c29acd49455bb879e6aeed0f265e40437480eca4a1bcc85bef0968e807dce",
+    "packages/authority/src/boundaries/index.ts": "799d2e9ada119f6d69aed3c51fea992626d05b68f7809a8de992598d64de227e",
+    "packages/authority/tests/unit/private-publication.test.ts": "430cba950573a8968621e286c95ba2a63f85031d3d4fb7a385c6894b2ecdc035"
+  },
+  "ordinary_publisher_function_exact_to_HEAD": true,
+  "ordinary_function_sha256": "a310ace36e669268cf56ac5f2889080984bb917ae4e94b7db3bc6aa6e088521b",
+  "checks": {
+    "root_private_and_unchanged_default_tests": "PASS; private-publication-root-final-green.log",
+    "full_workspace_typecheck": "PASS; typecheck-current.log",
+    "authority_package_build": "PASS; authority-private-build.log",
+    "exact_source_eslint": "PASS",
+    "git_diff_check": "PASS"
+  },
+  "initial_failure": "Initial root run26PASS1FAIL preserved; static test incorrectly imported guarded authority module and expected refusal. Independent Inspector corrected it to untrusted raw import and separately preserved guarded-import admission. No product static custody rule weakened.",
+  "not_proved": [
+    "B1 issuer, trusted host operation or live private key custody",
+    "B1 public commands, canonical selection or real proof index publication",
+    "v2.8.0 release or downstream adoption"
+  ]
+}

@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/reconciliation-intrinsic-advisory-first.txt","kind":"historical-transcript-custody-pointer","original_bytes":1929,"original_bytes_changed":false,"original_sha256":"938d8aec06511521e8a63a51ba58ea323801b33b89178c5861d58f5232ef1ac1"}

@@ -1,0 +1,11 @@
+{
+  "original_source_path": "docs/dev/operations/u1-b1-recovery-20261024/release-280/self-binding-success/terminal.json",
+  "external_custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/release-280/self-binding-success/terminal.json",
+  "sha256": "e6a5fceb628d1dadc820ee1790cc1043c77975e08b96b2643bff0d9eb372d2d2",
+  "bytes": 3814158,
+  "dev": "16777245",
+  "ino": "77460195",
+  "mode": "0o644",
+  "historical_bytes_changed": false,
+  "standing": "historical diagnostic artifact; no authority or completion promotion"
+}

@@ -1,0 +1,143 @@
+{
+  "kind": "independent-native-phase04-handoff",
+  "qualification": "Actualnative04 sourceinput+fixed existingproducers, typed authority/Owner admission and exclusive sevenbody publication. SyntheticB5/TTY/policy; no publicinstalled/release/DETRANliveclaim.",
+  "fixture": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-initial-owner-plan-jJqJW9/repository",
+  "approval_id": "24b3953e410a7654b1ecdbad8c03a512439a904d9ed90349b116d6685a761caf",
+  "plan_sha256": "5d55b291ae2e31c578ec2c064bd83c8471cda1afbd197734c946f7fd87f61141",
+  "intent_sha256": "b1715b8c59d34f24ae21ebb849bae6bb1fe1e59067ea37aedac82c0b72da05a6",
+  "completion_sha256": "d069ded03ae40cbac528976f4113ce0594045c351d3bba05ccd80959a3ba84ff",
+  "outputs_manifest_sha256": "775aaccb8785bef806cfd5e944b7284ae37c7cb1444894cafc2bcc0f005e8332",
+  "aggregate_bytes": 4387554,
+  "artifacts": [
+    {
+      "path": ".devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory/inventory_api/api-map.json",
+      "schema": "api-map.schema.json",
+      "sha256": "adb2e2ad7421f9752479c16b865dfd0245a34ce238921af1cb36bf2df106bf42",
+      "bytes": 1017827,
+      "fixture_file": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-initial-owner-plan-jJqJW9/repository/.devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory/inventory_api/api-map.json",
+      "mode": "0600",
+      "nlink": 1,
+      "owned_identity": {
+        "target": ".devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory/inventory_api/api-map.json",
+        "dev": "16777233",
+        "ino": "1124989570",
+        "birthtime_ns": "1792905790238801984"
+      }
+    },
+    {
+      "path": ".devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory/inventory_routes/routes-angular.json",
+      "schema": "routes-inventory.schema.json",
+      "sha256": "125f2dec9fd5c1c56168f963b66b1d4d6f02650314d2b0d32f633673fbaba6c8",
+      "bytes": 14737,
+      "fixture_file": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-initial-owner-plan-jJqJW9/repository/.devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory/inventory_routes/routes-angular.json",
+      "mode": "0600",
+      "nlink": 1,
+      "owned_identity": {
+        "target": ".devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory/inventory_routes/routes-angular.json",
+        "dev": "16777233",
+        "ino": "1124989573",
+        "birthtime_ns": "1792905790405421898"
+      }
+    },
+    {
+      "path": ".devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory/inventory_data_model/data-model.json",
+      "schema": "data-model-inventory.schema.json",
+      "sha256": "5b18b470c1d9877b6d871a4a2db4368318366ccb3a20899c68539c4daff49a16",
+      "bytes": 355980,
+      "fixture_file": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-initial-owner-plan-jJqJW9/repository/.devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory/inventory_data_model/data-model.json",
+      "mode": "0600",
+      "nlink": 1,
+      "owned_identity": {
+        "target": ".devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory/inventory_data_model/data-model.json",
+        "dev": "16777233",
+        "ino": "1124989576",
+        "birthtime_ns": "1792905790570208805"
+      }
+    },
+    {
+      "path": ".devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory/inventory_data_handling/data-model-pii.json",
+      "schema": "data-model-inventory.schema.json",
+      "sha256": "3ed6c93074ab25d7a0a095b206f1a76307814b359bb94370decbf5dc66769083",
+      "bytes": 357568,
+      "fixture_file": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-initial-owner-plan-jJqJW9/repository/.devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory/inventory_data_handling/data-model-pii.json",
+      "mode": "0600",
+      "nlink": 1,
+      "owned_identity": {
+        "target": ".devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory/inventory_data_handling/data-model-pii.json",
+        "dev": "16777233",
+        "ino": "1124989579",
+        "birthtime_ns": "1792905790742140576"
+      }
+    },
+    {
+      "path": ".devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory/inventory_rbac/rbac.json",
+      "schema": "rbac-inventory.schema.json",
+      "sha256": "fc4a5b4e4be692ea3a4ae5a87f4f10c17fef511f7d4e3f027d8233757ce872fe",
+      "bytes": 550946,
+      "fixture_file": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-initial-owner-plan-jJqJW9/repository/.devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory/inventory_rbac/rbac.json",
+      "mode": "0600",
+      "nlink": 1,
+      "owned_identity": {
+        "target": ".devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory/inventory_rbac/rbac.json",
+        "dev": "16777233",
+        "ino": "1124989582",
+        "birthtime_ns": "1792905790910147705"
+      }
+    },
+    {
+      "path": ".devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory/inventory_dep_graph/dep-graph.json",
+      "schema": "dep-graph.schema.json",
+      "sha256": "c5cc8b4d13b787d2a577432656bd5bad383beb7cd465e962ef53cf1b4181d77d",
+      "bytes": 982247,
+      "fixture_file": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-initial-owner-plan-jJqJW9/repository/.devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory/inventory_dep_graph/dep-graph.json",
+      "mode": "0600",
+      "nlink": 1,
+      "owned_identity": {
+        "target": ".devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory/inventory_dep_graph/dep-graph.json",
+        "dev": "16777233",
+        "ino": "1124989585",
+        "birthtime_ns": "1792905791081463598"
+      }
+    },
+    {
+      "path": ".devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory/inventory_coverage/coverage-matrix.json",
+      "schema": "coverage-matrix.schema.json",
+      "sha256": "565563df80d745ec41615a4f4f18813a15ce0e0a82db784eb64f5669c9626a16",
+      "bytes": 1108249,
+      "fixture_file": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-initial-owner-plan-jJqJW9/repository/.devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory/inventory_coverage/coverage-matrix.json",
+      "mode": "0600",
+      "nlink": 1,
+      "owned_identity": {
+        "target": ".devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory/inventory_coverage/coverage-matrix.json",
+        "dev": "16777233",
+        "ino": "1124989588",
+        "birthtime_ns": "1792905791250089855"
+      }
+    }
+  ],
+  "checks": {
+    "tests_passed": 3,
+    "tests_seconds": 94.24,
+    "positive_ms": 40529.41558300001,
+    "log": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/inventory-phase-native-first.txt",
+    "log_sha256": "74cb6f899739d434238ef9bd74f18ba4e3c2460a9d1a216092405b5f7ed9356d",
+    "results_sha256": "2d0ce900b70a66db4d6a98b8422c3b75743a40bd769a0b74e4aab30555129c67",
+    "forged_input_retarget_noncanonical_schema_overlimit_staleplan_refused": true,
+    "historical_index_chain_object_full_witnesses_unchanged": true,
+    "historical_epochs_unchanged": true,
+    "native_lease_absent": true,
+    "completed_retry_same_intent_clock_and_body_bytes": true,
+    "completed_retry_owned": []
+  },
+  "source_sha256": {
+    "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/src/boundaries/reconciliation-inventory-input.ts": "f308e3549b18557f629146bb3c4e5986643dfb89d1c8103304f99ee8e5fab5d0",
+    "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/src/boundaries/reconciliation-inventory-phase.ts": "f2fc422a2e553fb11fa17e5285d24e207ba57b901d5e556216577e2796ba8a5f",
+    "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/cli/src/commands/evidence/reconciliation-inventory-bodies.ts": "25bfa7b827c2f5ff4d665152e70a33011adf5112482f2f5053e6473551e45828",
+    "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/sensors/src/declared-surfaces.ts": "a1f2efc22677e9dac519f1ef2a6ac4259ffe9cee9d5d83e535d4f9b83111621e"
+  },
+  "prior_readonly_preview_handoff": {
+    "file": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/inventory-preview-native-handoff.json",
+    "sha256": "e6ff2a324c09cc60deeec23ab8be7db3f0c4293aa9379d67c2ebcef160980c63",
+    "note": "Earlier read-only preview used its own observation clock; retained separately. Native04 exact bodies above bind actual signed04intent clock."
+  }
+}

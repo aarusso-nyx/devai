@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-admission-inspector/native-final.txt","kind":"historical-transcript-custody-pointer","original_bytes":274,"original_bytes_changed":false,"original_sha256":"28e9e925b26d14371447a88e9a8cae3eba6c9b44088a675f2ccf416ee7008dac"}

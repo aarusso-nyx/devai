@@ -1,0 +1,107 @@
+{
+  "status": "EXACT_PUBLIC_SOURCE_FIXTURE_EVIDENCE_LIVE_USE_HELD",
+  "scenarios": [
+    {
+      "scenario": "create",
+      "public_plan_sha256": "8458308b5f8ab8ba6f72936c87a7e865b31c02d8f0029ddd6a8d6b6d085389e2",
+      "artifact_sha256": "77a497cebc7ec194c0b305aa20b1394e4f926ba98897c6cba8d736520dbac714",
+      "size_bytes": 69922,
+      "constitution": {
+        "digest_sha256": "d5dfdc972161e0f848dd859be7bbfa510973c5c9a449a0f9e6b8960e4f5ac96a",
+        "version": "1.2.0"
+      },
+      "source_package": {
+        "name": "@aarusso-nyx/devai",
+        "version": "2.7.1"
+      },
+      "checks": {
+        "input_not_delivered_at_ready": true,
+        "ready_verdict_review": true,
+        "ready_grants_no_authority": true,
+        "size_exact": true,
+        "sha256_exact": true,
+        "whole_plan_sha256_exact": true,
+        "two_envelopes": true,
+        "ready_matches_first_envelope": true,
+        "completion_artifact_equal": true,
+        "only_policy_added_after_precursor": true,
+        "published_on_disk_hash_equal": true,
+        "exact_prompt": true,
+        "candidate_constitution_1_2_0": true,
+        "terminal_created": true,
+        "terminal_digest_equal": true,
+        "precursor_transition_exact": true
+      },
+      "note": "Synthetic disposable source-public fixture only; invocation is gone; no replay or live authority."
+    },
+    {
+      "scenario": "successor",
+      "public_plan_sha256": "ece82c457a5e39eab5d979a261d3e5248429822ee07dfe56cbec68e413e7cad8",
+      "artifact_sha256": "85aee6403f1624a7f1e8a1817716dea5e5df7ec9741cedacd41f06e1ff74d904",
+      "size_bytes": 69922,
+      "constitution": {
+        "digest_sha256": "d5dfdc972161e0f848dd859be7bbfa510973c5c9a449a0f9e6b8960e4f5ac96a",
+        "version": "1.2.0"
+      },
+      "source_package": {
+        "name": "@aarusso-nyx/devai",
+        "version": "2.7.1"
+      },
+      "checks": {
+        "input_not_delivered_at_ready": true,
+        "ready_verdict_review": true,
+        "ready_grants_no_authority": true,
+        "size_exact": true,
+        "sha256_exact": true,
+        "whole_plan_sha256_exact": true,
+        "two_envelopes": true,
+        "ready_matches_first_envelope": true,
+        "completion_artifact_equal": true,
+        "only_policy_added_after_precursor": true,
+        "published_on_disk_hash_equal": true,
+        "exact_prompt": true,
+        "candidate_constitution_1_2_0": true,
+        "terminal_created": true,
+        "terminal_digest_equal": true,
+        "precursor_transition_exact": true
+      },
+      "note": "Synthetic disposable source-public fixture only; invocation is gone; no replay or live authority."
+    },
+    {
+      "scenario": "indeterminate",
+      "public_plan_sha256": "23e9b63f4f2b89f20973c10f9a646bfabd939b9d876994b378eed1f279effbf8",
+      "artifact_sha256": "811393621d230bb12c6ee2a68a1e9eb7bf2cc76c5a0fc2f2c241821bb41fe9cf",
+      "size_bytes": 69922,
+      "constitution": {
+        "digest_sha256": "d5dfdc972161e0f848dd859be7bbfa510973c5c9a449a0f9e6b8960e4f5ac96a",
+        "version": "1.2.0"
+      },
+      "source_package": {
+        "name": "@aarusso-nyx/devai",
+        "version": "2.7.1"
+      },
+      "checks": {
+        "input_not_delivered_at_ready": true,
+        "ready_verdict_review": true,
+        "ready_grants_no_authority": true,
+        "size_exact": true,
+        "sha256_exact": true,
+        "whole_plan_sha256_exact": true,
+        "two_envelopes": true,
+        "ready_matches_first_envelope": true,
+        "completion_artifact_equal": true,
+        "only_policy_added_after_precursor": true,
+        "published_on_disk_hash_equal": true,
+        "exact_prompt": true,
+        "candidate_constitution_1_2_0": true,
+        "terminal_no_success": true,
+        "infra_exit_6": true,
+        "unknown_durability": true,
+        "lossless_owner_identity": true,
+        "staged_presence_retained": true,
+        "precursor_transition_exact": true
+      },
+      "note": "Synthetic disposable source-public fixture only; invocation is gone; no replay or live authority."
+    }
+  ]
+}

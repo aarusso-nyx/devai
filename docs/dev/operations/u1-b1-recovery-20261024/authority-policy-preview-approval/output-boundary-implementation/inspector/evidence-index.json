@@ -1,0 +1,336 @@
+{
+  "standing": "OUTPUT_BOUNDARY_IMPLEMENTED_FIXTURE_EVIDENCE_LIVE_USE_HELD",
+  "recorded_at": "2026-10-24T16:11:48.746787+00:00",
+  "validation": {
+    "argv": "node scripts/process/validation-runner.mjs -- node_modules/.bin/vitest run --config tests/config/local.config.ts --maxWorkers 1 packages/cli/tests/unit/action-output-authority-policy-review.test.ts packages/cli/tests/unit/authority-policy-review.test.ts packages/cli/tests/unit/init-authority-policy-review.test.ts packages/cli/tests/unit/authority-command-boundary-finalization.test.ts packages/cli/tests/unit/authority-policy-review-publication.test.ts packages/cli/tests/unit/cli-shard09-init-bind-adapters-policy.test.ts packages/schemas/tests/contract/governance-v15-adr.test.ts",
+    "passed": 201,
+    "failed": 2,
+    "remaining_failures": "unchanged legacy shard09 tests lack resolvable installed canonical Constitution assets",
+    "skipped": 0,
+    "lint_exit": 0,
+    "prettier_exit": 0,
+    "raw_log": "final-seven-paths-with-public-race.txt"
+  },
+  "test_path_sha256": {
+    "packages/cli/tests/unit/action-output-authority-policy-review.test.ts": "5a3e7a3a25f02459b24245907702b69a3408c4a33e9aa15b2dcc355f020cacfa",
+    "packages/cli/tests/unit/authority-policy-review.test.ts": "0b2e35671ca2097b207e48bc56e1254d05278a245c1e4dc71f8e994845f5e69e",
+    "packages/cli/tests/unit/init-authority-policy-review.test.ts": "deeca8962afb4b8a7cf4db60443dcc6dfe29e3b4bee2a9bc5d4cbc897377402f",
+    "packages/cli/tests/unit/authority-command-boundary-finalization.test.ts": "1af7f1aaa84b5a51e5e12b27d3ced8151f492565bef84e8c6d943fea7105d294",
+    "packages/cli/tests/unit/authority-policy-review-publication.test.ts": "39dcb82ef3b4b56982a15138e4b4c45f14ba6e30ab094d2387aede3dfb25b34e",
+    "packages/cli/tests/unit/cli-shard09-init-bind-adapters-policy.test.ts": "c5f9aa4c11455cdf712273ad98d626ed5656d413587bdc3c2c7e0cdf1e75e9e6",
+    "packages/schemas/tests/contract/governance-v15-adr.test.ts": "f179ec821f92015a3fd3251f42fdb3937f716a0c33c23c9a7780cecd83d08443"
+  },
+  "engineer_source_sha256": {
+    "packages/cli/src/action-output.ts": "84023b4a893d7d0102a4d0f6c6e8537624415dc11d20cf408cbcfe3444d86f54",
+    "packages/cli/src/command-router.ts": "acf7248533415695cce0d9258bf7c942886f842276c7cdb979e9e79c3b86f98f",
+    "packages/cli/src/commands/init/index.ts": "984da375d7f480413f043341e33f797ab517dc07eb22cfb2d2f3b5c1f3d86bc3",
+    "packages/cli/src/commands/init/shared.ts": "ddb802c8ad36b2f80ef225934af541934f86e852805aaa2a25e313ddc67393c3",
+    "packages/cli/src/commands/init/review-authority-policy.ts": "3fa00b86fbad04ba4fa5b8a1078af7f28eeed3aaea03e6cac75383fbb7661f7e",
+    "packages/cli/src/authority/command-capabilities.ts": "f29ca8306a798c2842d8e4a7138f37331e9b16d926e06925985b330f779232d2",
+    "packages/cli/src/authority/broker.ts": "50721c2d784e8849cbf50ad7a07daa7d2b3513a5618ecd81ac0ec8040b2f7735",
+    "packages/cli/src/authority/policy-review.ts": "5235d957e108596cc550b48297091c5d3be530515fc60ecbbe999ca0b7e80de4",
+    "packages/cli/src/authority/policy.ts": "3b32792eed1c482009a3cb217074fc642b95808e806b41859f485e2ddf533bee",
+    "packages/cli/src/authority/policy-support.ts": "156b296bf26a87816c9f8206843b9c0a79414fa698dc1829a6dccd6860ede739"
+  },
+  "scope_holds": [
+    "live candidate admission",
+    "live preview",
+    "binding",
+    "integration",
+    "U1/B1 runtime",
+    "release",
+    "DETRAN effects"
+  ],
+  "unexecuted_qualification": [
+    "exhaustive integrated grant/registry/validator fault combinations",
+    "actual admitted package and installed PTY/help/export qualification",
+    "live precursor custody and host enforcement"
+  ],
+  "evidence_sha256": {
+    "README.md": "92aebb1381eb1c704330bb2864817010ef13f0b490cece91f8d0e7b7cf71a173",
+    "actual-broker-public-first.txt": "8abd21b26407002cbe61ddfa6c7bd9207931fce3f251e803c498aa99ec5190b9",
+    "final-eslint.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "final-prettier.txt": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20",
+    "final-race-eslint.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "final-race-prettier.txt": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20",
+    "final-seven-paths-with-public-race.txt": "627e2c0ff571316a1fda0242ab10375c9d03c1f6dd673bb109b3563f2bb65244",
+    "final-seven-paths.pre-command-exit.txt": "af26dde3ca4c690bf8791a872377f1d6d5a3968e5837ebfa0fb5b8b257772859",
+    "final-seven-paths.txt": "36a54666754b697a56c2170e04611e57eb8b3f3a29d6bd519045b3e3f8c05bca",
+    "handler-wrapper-first.txt": "cf98a952d39cc488903c72660d62f4b90bf1afe4036a06beb5efcf694877fcd0",
+    "initial-red-test-source.txt": "110a53769981b85e3612c0113d7fdab78cb86c510b89af1c2f2361f41b9c1e78",
+    "integrated-indeterminate-red.txt": "57900b5ec9570b59f46f3a80b8226587bcb910fbf147e7c14f4b63ff7da50c73",
+    "lint-first.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "lint-second.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "normalized-public/public-completion.json": "6af212f2571370f1aeb6fa4583f8c150f82af724addd80c0f2c1213d648e0d18",
+    "normalized-public/public-indeterminate-completion.json": "ad3ce07771998ee9bc4cfe78bb81adb867f00726f93bd8d992244c4ea1f15d4d",
+    "normalized-public/public-indeterminate-ready-before-input.json": "4707612cfcabcae3d4c355d3624266b517681c401a221f65b790e1f6ae1131ec",
+    "normalized-public/public-ready-before-input.json": "64e9d0b680bf17fb72459b33f7ddd0cc1b2ee64c25491420c173a083d243ef1f",
+    "normalized-public/public-successor-completion.json": "b70c2ca643ff51e62430180ad986b96e787f75941cf0e60acd98da7bd3b7be51",
+    "normalized-public/public-successor-ready-before-input.json": "bdec40eae3ec6ea0ed19b0a106846b1318c40b9fd895b334615f176da07e8068",
+    "p1-18-both-ready-before-precursor.json": "cc41f6d7fc5d1b85af89defcb9f131db3c4962d863020f9adf5ea070f8ac49ef",
+    "p1-18-child-first.txt": "7b10e0b090d13e3eb59fddb896bb268c3ccdf124d8e3533d97a07a39bafe907a",
+    "p1-18-child-second.txt": "1512d15b7496c24c6b64d0eba4a94b7f0bff6d5f3e3146f6615f138e468d6912",
+    "p1-18-full-public-race-attempt.txt": "22c3db55430c5458f1b8016c5d12d474c1f0549d78052ef004228c89d40ade94",
+    "p1-18-race-completion.json": "8fe43b306da538886d272e2ff303f868fda407f8f6a45af672450cccf126b316",
+    "public-completion.json": "0f8cb3fdf8e4e41709d00133355acd05bcd1dd1d7dd6ff075982e028bcfc40f5",
+    "public-indeterminate-completion.json": "e61e1cae0d1b50d721ab51ac5d13e510466dae29232693e0560156547ea2d629",
+    "public-indeterminate-counterexample.txt": "bbc92fa5c3d528bc5fe68dddeb0d63fdf9d5d07f64458c71c02778a36ddc3f02",
+    "public-indeterminate-ready-before-input.json": "6315da7e58c2b21d38ad5e55973ecdee9c029e0cc4f0aba1e2abf50a2a1aee1a",
+    "public-ready-before-input.json": "762c39065352d58f550c51dd96522eaa98920f0171d5bfd2ef4ab95aa728cb2b",
+    "public-successor-completion.json": "bccba569c0b6c6dbb706e903558db629d273b3e186f0217c9d1e1bf68c9fd16e",
+    "public-successor-ready-before-input.json": "6e50b2231073cda01d0ca06eb70f20e9e1ee845cdc18476d86edb542836b9b3b",
+    "publication-fidelity-green-attempt.txt": "664ee726de1136f67fcd4a7e9dfd1c427cf3eec18f46f3f6f559148fa6d5eff5",
+    "queued-publication-command-exit-actual-diagnostic-red.txt": "14636cd6ae4cd10d6755a7919b3ed5a532627516d4c08d1d2e503aba911fbbdc",
+    "queued-publication-command-exit-diagnostic-red.txt": "8b727934d8de3f656759008d210ee2cc98ed3a72fe0ee29a56fbf1878a4d2a62",
+    "queued-publication-command-exit-red.txt": "0cf12687affbf9993f843d04b5987ca561f241c482a4522f327cc40728cb7121",
+    "real-output-wrapper-red.txt": "c88c77a845ad9331ed47a21c281388c846a599f621471541eb92a1e65e06807f",
+    "red-source-checkpoint.json": "bd2a391d5760955e059871d64876978b2603d0a7d2a1bd9508404eb94b8cf50c",
+    "transport-first.txt": "13185057c077c5f76cab89fe681760d527ed7644effb1de2ace34a07b40f7679",
+    "transport-second.txt": "4d2ef723182d21b882a9bc686d146c58c3b33fa4f947d2ca99629be20128c0be"
+  },
+  "historical_public_observations": {
+    "created": {
+      "standing": "SYNTHETIC_DISPOSABLE_PUBLIC_FIXTURE_ONLY",
+      "plan_sha256": "8458308b5f8ab8ba6f72936c87a7e865b31c02d8f0029ddd6a8d6b6d085389e2",
+      "artifact_sha256": "77a497cebc7ec194c0b305aa20b1394e4f926ba98897c6cba8d736520dbac714",
+      "size_bytes": 69922,
+      "constitution": {
+        "digest_sha256": "d5dfdc972161e0f848dd859be7bbfa510973c5c9a449a0f9e6b8960e4f5ac96a",
+        "version": "1.2.0"
+      },
+      "invocation_id": "cli-58791-59c70e54-35d9-4d59-90ee-fb0eacb3c699",
+      "input_delivered_at_ready": false,
+      "terminal": {
+        "schemaVersion": "1.0.0",
+        "action_id": "init bind",
+        "ok": true,
+        "result": {
+          "verdict": "pass",
+          "media_type": "application/json",
+          "value": {
+            "status": "created",
+            "binding_performed": true,
+            "path": ".devai/config/authority-policy.json",
+            "digest_sha256": "77a497cebc7ec194c0b305aa20b1394e4f926ba98897c6cba8d736520dbac714",
+            "size_bytes": 69922,
+            "publication_identity": {
+              "dev": "16777233",
+              "ino": "1116123093",
+              "birthtimeNs": "1792857303571797269"
+            },
+            "published_at": "2026-10-24T15:55:03.584Z"
+          }
+        }
+      },
+      "independent_digest_recomputation": true,
+      "nonpolicy_targets_unchanged": true
+    },
+    "indeterminate-": {
+      "standing": "SYNTHETIC_DISPOSABLE_PUBLIC_FIXTURE_ONLY",
+      "plan_sha256": "23e9b63f4f2b89f20973c10f9a646bfabd939b9d876994b378eed1f279effbf8",
+      "artifact_sha256": "811393621d230bb12c6ee2a68a1e9eb7bf2cc76c5a0fc2f2c241821bb41fe9cf",
+      "size_bytes": 69922,
+      "constitution": {
+        "digest_sha256": "d5dfdc972161e0f848dd859be7bbfa510973c5c9a449a0f9e6b8960e4f5ac96a",
+        "version": "1.2.0"
+      },
+      "invocation_id": "cli-58791-20358428-a3d3-4486-a0ad-732ad8f555cd",
+      "input_delivered_at_ready": false,
+      "terminal": {
+        "schemaVersion": "1.0.0",
+        "action_id": "init bind",
+        "ok": false,
+        "error": {
+          "schemaVersion": "1.0.0",
+          "code": "AUTHORITY_PUBLISH_CLEANUP_INCOMPLETE",
+          "class": "infrastructure",
+          "exit": 6,
+          "message": "AUTHORITY_PUBLISH_CLEANUP_INCOMPLETE",
+          "remediation": "Inspect the preserved target and publisher-owned staged entry before any separately authorized recovery.",
+          "context": {
+            "publication": {
+              "code": "AUTHORITY_PUBLISH_CLEANUP_INCOMPLETE",
+              "path": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-p1-synthetic-RCjSt3/repository/.devai/config/authority-policy.json",
+              "staged_remaining": false,
+              "identity": {
+                "dev": "16777233",
+                "ino": "1116123222",
+                "birthtimeNs": "1792857304091564487"
+              },
+              "status": "indeterminate",
+              "durability": "unknown"
+            }
+          }
+        }
+      },
+      "independent_digest_recomputation": true,
+      "nonpolicy_targets_unchanged": true
+    },
+    "successor-": {
+      "standing": "SYNTHETIC_DISPOSABLE_PUBLIC_FIXTURE_ONLY",
+      "plan_sha256": "ece82c457a5e39eab5d979a261d3e5248429822ee07dfe56cbec68e413e7cad8",
+      "artifact_sha256": "85aee6403f1624a7f1e8a1817716dea5e5df7ec9741cedacd41f06e1ff74d904",
+      "size_bytes": 69922,
+      "constitution": {
+        "digest_sha256": "d5dfdc972161e0f848dd859be7bbfa510973c5c9a449a0f9e6b8960e4f5ac96a",
+        "version": "1.2.0"
+      },
+      "invocation_id": "cli-58791-9b34a6ef-07bf-4452-ba2f-7c2db94ae141",
+      "input_delivered_at_ready": false,
+      "terminal": {
+        "schemaVersion": "1.0.0",
+        "action_id": "init bind",
+        "ok": true,
+        "result": {
+          "verdict": "pass",
+          "media_type": "application/json",
+          "value": {
+            "status": "created",
+            "binding_performed": true,
+            "path": ".devai/config/authority-policy.json",
+            "digest_sha256": "85aee6403f1624a7f1e8a1817716dea5e5df7ec9741cedacd41f06e1ff74d904",
+            "size_bytes": 69922,
+            "publication_identity": {
+              "dev": "16777233",
+              "ino": "1116123351",
+              "birthtimeNs": "1792857304614725180"
+            },
+            "published_at": "2026-10-24T15:55:04.625Z"
+          }
+        }
+      },
+      "independent_digest_recomputation": true,
+      "nonpolicy_targets_unchanged": true
+    }
+  },
+  "public_observations": {
+    "created": {
+      "standing": "SYNTHETIC_DISPOSABLE_PUBLIC_FIXTURE_ONLY",
+      "plan_sha256": "3104a5fe71a283e534b1a4f1e167801fa985daa067a7152136eb83dc8c10c6b3",
+      "artifact_sha256": "5a87c40f80f9aab847037853b1ed45074968f4ce03d1295ce34b13b2f330b0a8",
+      "size_bytes": 69922,
+      "input_delivered_at_ready": false,
+      "terminal": {
+        "schemaVersion": "1.0.0",
+        "action_id": "init bind",
+        "ok": true,
+        "result": {
+          "verdict": "pass",
+          "media_type": "application/json",
+          "value": {
+            "status": "created",
+            "binding_performed": true,
+            "path": ".devai/config/authority-policy.json",
+            "digest_sha256": "5a87c40f80f9aab847037853b1ed45074968f4ce03d1295ce34b13b2f330b0a8",
+            "size_bytes": 69922,
+            "publication_identity": {
+              "dev": "16777233",
+              "ino": "1116329585",
+              "birthtimeNs": "1792858277376463253"
+            },
+            "published_at": "2026-10-24T16:11:17.386Z"
+          }
+        }
+      },
+      "independent_digest_recomputation": true
+    },
+    "indeterminate": {
+      "standing": "SYNTHETIC_DISPOSABLE_PUBLIC_FIXTURE_ONLY",
+      "plan_sha256": "d63973a8f6ac93b1be7452d3df6c00531af1cd672ac6bdbcd025fcf9c4b543b9",
+      "artifact_sha256": "0cf58c794b821f9e9a3e3e5bc502f098df8d7b35da8213e98190833238d0aae6",
+      "size_bytes": 69922,
+      "input_delivered_at_ready": false,
+      "terminal": {
+        "schemaVersion": "1.0.0",
+        "action_id": "init bind",
+        "ok": false,
+        "error": {
+          "schemaVersion": "1.0.0",
+          "code": "ACTION_INVOCATION_REFUSED",
+          "class": "infrastructure",
+          "exit": 6,
+          "message": "AUTHORITY_PUBLISH_CLEANUP_INCOMPLETE",
+          "remediation": "Inspect the preserved target and publisher-owned staged entry before any separately authorized recovery.",
+          "context": {
+            "publication": {
+              "code": "AUTHORITY_PUBLISH_CLEANUP_INCOMPLETE",
+              "path": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-p1-synthetic-mzokrE/repository/.devai/config/authority-policy.json",
+              "staged_remaining": false,
+              "identity": {
+                "dev": "16777233",
+                "ino": "1116329714",
+                "birthtimeNs": "1792858277861138125"
+              },
+              "status": "indeterminate",
+              "durability": "unknown"
+            }
+          }
+        }
+      },
+      "independent_digest_recomputation": true
+    },
+    "successor": {
+      "standing": "SYNTHETIC_DISPOSABLE_PUBLIC_FIXTURE_ONLY",
+      "plan_sha256": "353b297df087877c305b9884b0b6decfbf001c83ba4579633c0bc92a7df1d753",
+      "artifact_sha256": "350d0319039e66e9bc2657ce1d97b5358787b55b21bacff426687c8ac3e649bf",
+      "size_bytes": 69922,
+      "input_delivered_at_ready": false,
+      "terminal": {
+        "schemaVersion": "1.0.0",
+        "action_id": "init bind",
+        "ok": true,
+        "result": {
+          "verdict": "pass",
+          "media_type": "application/json",
+          "value": {
+            "status": "created",
+            "binding_performed": true,
+            "path": ".devai/config/authority-policy.json",
+            "digest_sha256": "350d0319039e66e9bc2657ce1d97b5358787b55b21bacff426687c8ac3e649bf",
+            "size_bytes": 69922,
+            "publication_identity": {
+              "dev": "16777233",
+              "ino": "1116329843",
+              "birthtimeNs": "1792858278381043472"
+            },
+            "published_at": "2026-10-24T16:11:18.390Z"
+          }
+        }
+      },
+      "independent_digest_recomputation": true
+    }
+  },
+  "historical_validation": {
+    "argv": "node scripts/process/validation-runner.mjs -- node_modules/.bin/vitest run --config tests/config/local.config.ts --maxWorkers 1 packages/cli/tests/unit/action-output-authority-policy-review.test.ts packages/cli/tests/unit/authority-policy-review.test.ts packages/cli/tests/unit/init-authority-policy-review.test.ts packages/cli/tests/unit/authority-command-boundary-finalization.test.ts packages/cli/tests/unit/authority-policy-review-publication.test.ts packages/cli/tests/unit/cli-shard09-init-bind-adapters-policy.test.ts packages/schemas/tests/contract/governance-v15-adr.test.ts",
+    "passed": 200,
+    "failed": 2,
+    "remaining_failures": "unchanged legacy shard09 tests lack resolvable installed canonical Constitution assets",
+    "skipped": 0,
+    "lint_exit": 0,
+    "prettier_exit": 0,
+    "raw_log": "final-seven-paths.txt"
+  },
+  "public_race": {
+    "standing": "SYNTHETIC_DISPOSABLE_FULL_PUBLIC_TWO_PROCESS_PASS",
+    "pids": [
+      80325,
+      80324
+    ],
+    "precursor_performed_at_ready": false,
+    "winner": "second",
+    "loser": "first",
+    "winner_identity": {
+      "dev": "16777233",
+      "ino": "1116319746",
+      "birthtimeNs": "1792858031863531210"
+    },
+    "artifact_sha256": "540f814b1b876dc39ef0fadcadc4772680c2f8955a2198db6d9beb3072a2e08d",
+    "independent_plan_and_artifact_recomputation": true,
+    "targeted_unselected_cases": "Each targeted child selects only the race endpoint; final parent seven-path run has zero skipped tests."
+  },
+  "orchestrator_historical_validation": {
+    "passed": 156,
+    "held_failed": 2,
+    "intermediate_classification_red": "historical-regressions.classification-red.txt (155 PASS/3 FAIL)"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "standing": "AUTHENTIC_ABSENT_TWO_MODULE_STRUCTURAL_RED",
+  "passed": 1,
+  "failed": 2,
+  "raw_log": "structural-red.txt",
+  "raw_sha256": "ba3b3a6ddf7b089025e8b61b4f380f683997dcec98ddc362a71550c7a96d3796",
+  "test_sha256": "a04180adff04378c6be5b74b42356aa94f7cd1d7435cce612dcbeec75df5dd69",
+  "source_files_present": false,
+  "checkpoint_sha256": "2d7957218249db895228123dac4c33f71878ba2c895df02f91b40255d91ff73c",
+  "meaning": "Two actual implementation modules absent; exact public frozen8192-byte seed digest independently passes. Native behavior not yet tested or claimed."
+}

@@ -1,0 +1,10 @@
+{
+  "standing": "AUTHENTIC_ABSENT_OWNER_RECORD_MODULE_RED",
+  "passed": 1,
+  "failed": 1,
+  "test_sha256": "bc8efa839d6b8c636f3bc0e3267cfb56931c9490afe4f6d4b3ee2d60eddf1be0",
+  "raw_sha256": "f998e5c30cf99eb4b103d65d0452010d503435c904f3d5a6c80c1cee0037bbe1",
+  "checkpoint_sha256": "40fcc553a75e9d625e381520d8a8fc7c5c139ced901f6dd697f9b79ebc2b2b1f",
+  "candidate_sha256": "39002520c0ffa410ef41a9caf34d16af123b9bc88f0ab1e426deaf70af284344",
+  "meaning": "Actual runtime codec absent; independent seven-variant normative candidate census passes. No schema lane or host-origin qualification claimed."
+}

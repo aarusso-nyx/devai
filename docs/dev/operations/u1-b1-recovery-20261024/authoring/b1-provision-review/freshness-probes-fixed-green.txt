@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-provision-review/freshness-probes-fixed-green.txt","kind":"historical-transcript-custody-pointer","original_bytes":636,"original_bytes_changed":false,"original_sha256":"99b8a10cd9bccda24e46b55f793044bbc7545c52eb623922d695ad868467daf2"}

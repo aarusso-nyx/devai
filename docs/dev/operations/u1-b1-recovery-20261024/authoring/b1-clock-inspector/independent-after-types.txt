@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-clock-inspector/independent-after-types.txt","kind":"historical-transcript-custody-pointer","original_bytes":276,"original_bytes_changed":false,"original_sha256":"e3f5c0a953bbab859e2be5d72f845db02837508a173b24f9c9f81d3146d59b68"}

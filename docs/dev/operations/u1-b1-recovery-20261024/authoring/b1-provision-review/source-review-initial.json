@@ -1,0 +1,45 @@
+{
+  "standing": "AUTHENTIC_SOURCE_FRESHNESS_RED_NOT_QUALIFIED",
+  "source_sha256": {
+    "packages/authority/src/boundaries/reconciliation-host-provision.ts": "8697c0570322e4e9fd047bf1a860c9b12bf97493b70db2aea560b5236fa04cfa",
+    "packages/authority/src/boundaries/reconciliation-host-namespace.ts": "b64fd3338e31c5c72e264a26f015d97850c7aeff254f5bb6c775ef770f735f32",
+    "packages/authority/src/index.ts": "9d665d51e73c550819c4c223b34e0d110eb3b5305e02758a754977d46359272c"
+  },
+  "finding": {
+    "id": "NP01",
+    "finding": "Current B5 or HEAD may drift after prelock precursor fsync and before issuer publication; locked callback rechecks only namespace witness and publishes frozen issuer without fresh action bindings/HEAD/dual-clock comparison.",
+    "actual_evidence": "Both source-native probes inject a single drift immediately after delegated real fsync. One changes deterministic policy digest in trusted fixture provider; other commits a real Git HEAD transition. In both cases issuer.json exists despite stale reviewed action context.",
+    "required": "Fresh binding/context/dual-clock check immediately before fixed child effects and inside admission before issuer publication, using no raw anchor opens. After effects, compare expected allowed namespace transition and original current action witnesses before reporting created/new READY.",
+    "authority_limit": "This tests governed runtime freshness, not arbitrary same-UID filesystem attacker isolation."
+  },
+  "run": {
+    "pass": 0,
+    "fail": 2,
+    "log": "freshness-probes-red.txt",
+    "harness": "Derived p1 actual Git/issuer-policy/receipt/ALS/native source harness; deterministic B5 explicitly not installed attestation. fsync wrapper delegates real fsync unchanged, then executes test-owned one-time boundary hook. Actual source namespace/admission/publisher/codec paths execute.",
+    "harness_setup_failure": "freshness-probes-initial.txt: schemas package resolution from evidence directory initially absent; 0tests, not productRED. Corrected only evidence config alias to actual built workspace schema package."
+  },
+  "resume_semantics": "No original first-stage plan persists with fixed seed. Same-process retains actual first plan; precursor resume uses exact current readonly seed-validation plan hash. Root has stated explicit packet addendum pending; source comment is honest, not recovery of lost absence witness.",
+  "positive_source_observations": [
+    "Named rootexports expose only provision review/types; no private namespace readers exported at root.",
+    "Namespace immutable issuer codec/MAC validates real root/seed/repository/worktree/host identity, immutable installation metadata not currentHEAD/B5 equality.",
+    "Existing approval namespace closed+bounded census uses canonical codec/MAC and exact approval/kind/phase/sequence/issuer references.",
+    "Locked namespace call receives frozen actual anchor and seedMetadata uses lstat only; lower primitive remains anchor descriptor owner.",
+    "syncNativePrecursor performs descriptor fsync and close before native admission begins.",
+    "Each seed and issuer stage calls actual invokeReconciliationHostOperation with separate plan target.",
+    "Rawkey buffer zeroed; whole canonical issuer bytes frozen in memory and cleared at terminal close; safe projections contain only approved fields.",
+    "Private directory/seed/issuer effects occur inside fixed sealed native callback; no arbitrary caller callback argument.",
+    "Darwin type26 check present; existingdevai ancestor preserves no-group/worldwrite, privateleaf0700 and files0600/singlelink enforced."
+  ],
+  "limitations": [
+    "First full independent provision tests remain separate.",
+    "No installed/public qualification, no generic filesystem qualification.",
+    "Two observed freshness cases only; no unobserved transient detection claim."
+  ],
+  "graft": {
+    "current_calls": 2,
+    "current_estimated_tokens_saved": 6737,
+    "cumulative_successful_calls": 19,
+    "cumulative_estimated_tokens_saved": 372338
+  }
+}

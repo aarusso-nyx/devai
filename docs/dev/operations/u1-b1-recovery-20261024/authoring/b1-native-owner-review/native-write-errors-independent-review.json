@@ -1,0 +1,32 @@
+{
+  "review": "Independent native Writable callback-before-error ordering and listener-lifetime regression",
+  "test": "packages/cli/tests/unit/reconciliation-output-native-write-errors.test.ts",
+  "test_sha256": "f525692ffe17adcd7b4b274b402a6e9c6224a27fdf11514109dbe65c4747b10d",
+  "source_sha256": {
+    "packages/cli/src/reconciliation-phase-output.ts": "c28518ed5d52597fb4b8224b95dc4d91a6785fa321f6a1a047305d3b00120edc",
+    "packages/cli/src/reconciliation-owner-output.ts": "48bb2bf62fd042fc6992d573a25a471baaf4cdfae4148c6d1cc80d4d7e1eadc6",
+    "packages/cli/src/reconciliation-provision-output.ts": "c6d802b4f49df13bded357618542be5a61b4faca354246bc124fe4870ec92479"
+  },
+  "native_order_regressions": {
+    "passed": 14,
+    "log": "reconciliation-native-write-errors-first.txt",
+    "runtime": "Actual Node Writable _write callback(error) invokes user callback then emits nextTick error; forwarded to actualprocessstream without added masking listener. Synthetic native binding fixture; no filesystem effects."
+  },
+  "previous_fault_regressions": {
+    "passed": 8,
+    "log": "public-reconciliation-output-fault-epipe-fix.txt"
+  },
+  "checks": {
+    "lint": "PASS reconciliation-native-write-errors-lint.txt",
+    "root_test_types": "Current2errors from stale scratch/typecheck/cli declarations still exposing complete(); actualsource/runtime uses renamedfinish methods. Needs normal typecheck firstbuildstep before noEmit. Log preserved."
+  },
+  "cases": [
+    "Allthree transports nativecallback\u2192error event order, ordinarysuccess,syncthrow,bothchannelsfail",
+    "Phase/Owner callback-only errors cleanup nextcheckphase",
+    "Exact original receiptSHA and indeterminateexit6 on deliveryfailure",
+    "Errorlistener counts restorebaseline after actualevent and cleanupfallback"
+  ],
+  "review_findings": [],
+  "constraints": "Onlyphase+Owner sourcehelpers changed. Provision historical callbackfailure retains listener until nativeerror .once removesit; callback-onlyneveremits historicalcase not newlypromised. No permission/role/authority/clock or protectedeffect changes; not installednative15qualification.",
+  "graft_tokens_saved_this_turn": 13553
+}

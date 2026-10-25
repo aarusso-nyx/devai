@@ -1,0 +1,94 @@
+{
+  "standing": "BOUNDED_OPAQUE_INVOCATION_BROKER_COMPONENT_VERIFIED_FULL_V280_GOAL_INCOMPLETE",
+  "recorded_at": "2026-10-24T21:01:01.838817+00:00",
+  "base_commit": "2df84159caabf869b866fb2a05e5b06be83295fb",
+  "scope": "Six source paths implement opaque invocation/request custody, actual readonly host/clock capture, exact B5 binding and trusted broker dispatch through ordinary authority receipts. Public registry/default grants and native domain writers are separate required work.",
+  "inputs": {
+    "packages/authority/src/boundaries/reconciliation-host-operation.ts": "ce8dc730e1a6d92890a013e0471fe81d3d64212a77e987f2cb05ca99bd3d0be1",
+    "packages/authority/src/boundaries/host-scope.ts": "20120a6084a077999738e3652135457dc988430b1c3530d9a46621701c1840aa",
+    "packages/authority/src/boundaries/host-atomic-effects.ts": "92d3be45f4d9e541252f16c44d55bb9fb7f009aa583d57bb54d5a3a6c76ffd6c",
+    "packages/authority/src/index.ts": "7acc1feb7a4cd9a7585b737feaccad8ef6344624f2c118c0feb9a23b3a7eae4d",
+    "packages/cli/src/authority/reconciliation-host-input.ts": "c26435b615eede984973fc1f9d247742c3dbbced43c538d1e171976ce06f8185",
+    "packages/cli/src/authority/broker.ts": "7fd4df9c746a8ab1979f4bd7aa7f26c68ccf7f947ed1df3ff1157f4a4b39c5d1",
+    "packages/authority/tests/unit/reconciliation-host-operation.test.ts": "f422dcf36893d6e7b014063eff0f948daea5575a72b644f1b5325ea10c398a54",
+    "packages/cli/tests/unit/reconciliation-host-input.test.ts": "f8adc6856a938e0db3ed4afcde20c1d65959413754b08d173e009612ccb2e147",
+    "docs/reference/error-codes.md": "4e944a0c52bf8d0ea1594f68a882ff5f9699e902e0b3849cad1eb23fd5099955"
+  },
+  "verification": {
+    "independent_frozen_behavior": {
+      "passed": 623,
+      "failed": 0,
+      "files": 15,
+      "new_cases": 158
+    },
+    "independent_review_edge_probes": {
+      "passed": 5,
+      "failed": 0
+    },
+    "full_workspace_typecheck": "PASS terminal61526, sealed independent receipt",
+    "source_and_test_lint": "PASS",
+    "source_and_test_format": "PASS",
+    "root_ordinary_regressions": {
+      "passed": 326,
+      "files": 7
+    },
+    "root_protected_capacity_export_regressions": {
+      "passed": 10,
+      "files": 2
+    },
+    "historical_p1_regression": {
+      "passed": 63,
+      "files": 1,
+      "qualification": "Unchanged historical tests and six exact candidate source copies, disposable baseline Constitution1.1/adopter metadata and2.7.1 fixture version. Not installed/public qualification."
+    },
+    "prior_component_inputs_verified_unchanged": 13,
+    "error_reference": {
+      "current_count": 1299,
+      "sha256": "4e944a0c52bf8d0ea1594f68a882ff5f9699e902e0b3849cad1eb23fd5099955",
+      "remove_exact_three_new_rows_reconstructs_prior_1296_sha256": "d23aff4e8e26d0c3529c01c2eda72bda0ca17daa606000af05f864797d1c8418"
+    },
+    "graft_refresh": {
+      "files": 1692,
+      "nodes": 14067,
+      "edges": 40696,
+      "parsed": 7,
+      "generated_helper_removed": true
+    },
+    "independent_sealed_artifacts_verified": 29,
+    "independent_historical_receipts_verified": 6
+  },
+  "authenticated_fixes": [
+    "Nested operation admission before broker entry",
+    "Pending binding/target stale state cannot revive after observed failure",
+    "Immutable target copy before trusted providers",
+    "Descriptor-safe thenable rejection",
+    "Closed binding provider failure projection",
+    "Ordinary init-bind path does not activate reconciliation grammar"
+  ],
+  "artifacts": {
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-host-operation-inspector/qualification-source-verification.json": "d8d4325a1e7b4bf2091b4569749dcb37192820dd952a0afff04906bd9153e641",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-host-operation-inspector/independent-final.txt": "bb72e48be7f2cda11c81a12d99675dfd123660b85397aa915ac6b72371d06cbd",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-host-operation-inspector/typecheck-final.txt": "3801203c7d9e4544ad471c57f0ab2386897e4413121a6c6be2a61c5af2fd37fb",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-host-operation-inspector/lint-final.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-host-operation-inspector/format-final.txt": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-host-operation-review/source-review.json": "014b1e7344e5dcc3ed75ad1662092df8857a1002986af6deaddfe6006922fea8",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/host-operation/regression.txt": "33db51b1c6236b44e579fe835565027ba7f0665d472355d37423c525a7a78e5c",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/host-operation/protected-release-regression.txt": "198cf3ffccda749120046c4e5ce739ad4cab6c3354523c401b73bce59dc7f098",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/host-operation/historical-p1-final.txt": "7ba284f73deb9dd110d295e793fcd1032598ce1d101eba292ae08aae09a8933d",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/host-operation/historical-fixture-manifest.json": "6854b1d18e5fd37b7c262ff26cb50e87c2f6ef6d6478d8e6068bbf4314f47980",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/host-operation/prepare-historical-fixture.py": "60e858ff6a8ab729861c952a891c935152d02504805264de687f6ce9891a7ba4",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/host-operation/source-manifest.json": "571a6c9f9e4be32fa766a4c94b00944005838afdf44bff107ee2f7067c11a4b8",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-host-operation-inspector/receipt.json": "ab95cc5580904ef80de5ab7af57683fa8bcb97433f4dd9204cbc348cf1cc0f4a",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-host-operation-inspector/artifact-index.json": "7b59f25ac262eda6ca028baa6e9c49c6333bf7c5a8abf153e87e7bd04040e2a6",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-host-operation-inspector/source-and-input-manifest.json": "d96720383024fb87a6b2840750f2b7f24056c95fb7a120d31ace3f3459ced73e"
+  },
+  "remaining": [
+    "Actual installed/public B5 qualification after public activation",
+    "Fixed native provisioning with two explicit confirmations and private seed/issuer/key origin",
+    "Owner grant/renew/revoke/dead-lease and durable phase custody",
+    "Whole-chain canonical selection, actual index CAS and seven-body staged integration",
+    "Public action/registry/capability/default-policy wiring and supported binding refresh",
+    "Clean candidate, affected checks, independent final review/integration/exact-head CI, protected RC/rehearsal/signing/publication/readback"
+  ],
+  "effects": "Local source and disposable fixture tests only in this checkpoint; no release, downstream adoption or DETRAN effects."
+}

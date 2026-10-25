@@ -1,0 +1,174 @@
+{
+  "scope": "Independent native provisioning Inspector evidence only",
+  "files": [
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-inspector/.gitignore",
+      "sha256": "b70261272e803438b612e3496d0f285f72a3e7ed15530ebbbd05e6154aa9e906",
+      "size_bytes": 23
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-inspector/README.md",
+      "sha256": "849acb717cd69ac72fe04b141ddbc94c42c494f978aaa0c932606fc95255745c",
+      "size_bytes": 4285
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-inspector/devai-native-provision-inspector-7bAVNP.json",
+      "sha256": "f9a118b5a6b57f5fcf62fc6bd9ee49326bbf63e179271217d28e9d32d04b6136",
+      "size_bytes": 3556
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-inspector/devai-native-provision-inspector-Y8cI1s.json",
+      "sha256": "341c3b464cb444bd523465832d5e68659de3aaf4b564a429be79165c45b2be19",
+      "size_bytes": 12844
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-inspector/devai-native-provision-inspector-pcM4oz.json",
+      "sha256": "a9cb78fa993bcd9316d944c3482937d0bb19f7e26a938229d590789b4a91a5f1",
+      "size_bytes": 13364
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-inspector/diagnostic-private-material-scan.json",
+      "sha256": "74a6f350e71e657da7f56aa2577d1cc940a94e2472f9a14508554b5b17778bca",
+      "size_bytes": 372
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-inspector/diagnostic-reference-delta.json",
+      "sha256": "f9ab87598155deaf31b0fe0231cb11e8ffb98b7752f235034765d7e411db9314",
+      "size_bytes": 535
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-inspector/final-behavior.txt",
+      "sha256": "faab3950ccbbaf40d4aa8ff14f075ba37252b24d669e48946e895e9994388abe",
+      "size_bytes": 1770
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-inspector/final-census-and-resume.txt",
+      "sha256": "e516bf71c326b914a28811f54f7072e5577877734fdeffa4376c61f49ee6b81b",
+      "size_bytes": 290
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-inspector/final-input-verification.json",
+      "sha256": "f525a7fbeaddff2e8e8fa15539e690df9a4ddc76e27114e15d1429fa27729dc3",
+      "size_bytes": 2281
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-inspector/final-run-inputs.json",
+      "sha256": "47f8856ba27ed3fa194f9c6cbbc70ecfba9ca40ccce0dc4d01095a0aad0cc8d3",
+      "size_bytes": 2140
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-inspector/first-run-inputs.json",
+      "sha256": "8013e2731f2557c832a5e0f964b633cbdb5b147a7895702d41dcdc1d16be5784",
+      "size_bytes": 872
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-inspector/follow-on-inputs.json",
+      "sha256": "09ffaa7817e5f37486a4c1dcb63a2997c106445c5bcc659c82f45698f17f574c",
+      "size_bytes": 2472
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-inspector/format-draft.txt",
+      "sha256": "030a472d2b76c7ea85d621734ca39b500abaa34042f63e3216c73ca5e8f97495",
+      "size_bytes": 73
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-inspector/format-draft2.txt",
+      "sha256": "f1e47678d049983f3b46db63cb1ad252fe47c2b3a79c831e214acca8fddf2d91",
+      "size_bytes": 73
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-inspector/format-draft3.txt",
+      "sha256": "14e44606c6d7b5ed4f176466584be586c819e92fb655c03f9dd3fac4e584b158",
+      "size_bytes": 74
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-inspector/format-final.txt",
+      "sha256": "9a047bca19390f90234e566131a549fefdde204b2f6b6173253d4d68013d7ea8",
+      "size_bytes": 428
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-inspector/historical-input-verification.json",
+      "sha256": "2e069897b58ed0ae3a51c89528ac05b0f49c3f1abcfcf5c867064c56f3ffb52c",
+      "size_bytes": 2581
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-inspector/independent-first-receipt.json",
+      "sha256": "040f750b731bef50a5dcdd14dd69e7ae1811efb71e52f166bf83f970d6962c47",
+      "size_bytes": 2506
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-inspector/independent-first.redacted.txt",
+      "sha256": "43b93f46aa7d22ed7a775ebdfd6888311a0835e68a32d219d6126e4d44182367",
+      "size_bytes": 4794
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-inspector/independent-second.txt",
+      "sha256": "43fad9623022877d3b30602b2579b93997a35fca1240ab78a135e2cf30a1bd5d",
+      "size_bytes": 1733
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-inspector/lint-draft.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-inspector/lint-final.txt",
+      "sha256": "689d370e8c06bdc4d786c596f733e4fd11d13ae585434f61cc90eeeaf5155785",
+      "size_bytes": 362
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-inspector/receipt.json",
+      "sha256": "2c2e28976692f76c26967924802b3186e9e083fa56044b7ef7e75e7ae6499e1f",
+      "size_bytes": 12995
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-inspector/runtime-fingerprint.json",
+      "sha256": "42b6fad4eec9f155360b5b99b881510f1372d78a8c12c319e41dff7080db0f8c",
+      "size_bytes": 215
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-inspector/second-run-inputs.json",
+      "sha256": "4e2613345c0a7290aa80ff755f2ddeaa34c1e4f2f6bc16e3411f4f3db3d672c1",
+      "size_bytes": 652
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-inspector/structural-red-receipt.json",
+      "sha256": "ff1079530bb40e683449ad5b8d0a2f0dbddd165816dc69e9a17f8f58fd978d6f",
+      "size_bytes": 778
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-inspector/structural-red.txt",
+      "sha256": "f869c9b797be5054f34f94465ee19453fed791a4df10aeb9961b53767c7004d5",
+      "size_bytes": 1329
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-inspector/test-eslint-draft-2.txt",
+      "sha256": "689d370e8c06bdc4d786c596f733e4fd11d13ae585434f61cc90eeeaf5155785",
+      "size_bytes": 362
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-inspector/test-eslint-draft.txt",
+      "sha256": "689d370e8c06bdc4d786c596f733e4fd11d13ae585434f61cc90eeeaf5155785",
+      "size_bytes": 362
+    },
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-inspector/typecheck.txt",
+      "sha256": "3801203c7d9e4544ad471c57f0ab2386897e4413121a6c6be2a61c5af2fd37fb",
+      "size_bytes": 573
+    }
+  ],
+  "owned_test": {
+    "path": "packages/authority/tests/unit/reconciliation-host-provision.test.ts",
+    "sha256": "fd799ff4080ff7bc44963489aa288c0e5faeef164d36bd33e52f7a1073d79dc8"
+  },
+  "excluded_private_artifacts": [
+    {
+      "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-inspector/independent-first.txt",
+      "sha256": "68d353c5c3255172d738bbc7915583cd38f0c7236ceda67c52043c88c9bcccf6",
+      "mode": "0o600",
+      "reason": "Original failure diff contains disposable private issuer keys/MACs; retain local audit bytes only, never public index payload or source publication",
+      "public_redacted_view": "independent-first.redacted.txt",
+      "gitignored": true
+    }
+  ]
+}

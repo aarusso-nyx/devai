@@ -1,0 +1,56 @@
+{
+  "standing": "INTERIM_SOURCE_REVIEW_CONFIRMED_SAFE_REFUSAL_FINDINGS_PENDING_REPAIR",
+  "checkpoint_sha256": "a1fb4f25f5f4c06e096c968b13c3bd167a676884c92ff5ae8288dec0d5b0b29f",
+  "policy_amendment_sha256": "398e48045200fab3c0b49186184299987dd171687fb9c81d93c2d0cceab2993c",
+  "initial_candidate_sha256": {
+    "classification": "841ccdb072d9c0ba9f0b7c59c0a2e86c4824a74c623331922e386d62fcaf2791",
+    "targets": "c44a4bc187fee488be8309c6b711f2da62463b99e9be64071df74948b2461aaa",
+    "runtime": "2624903658e59678727fabb1f1f1f0bb9f11b6a5183168b3866fc8bd4d108eb3",
+    "resolver": "0d3a0cb31a62a9f0687fbe5a9dab36ad9db7174baff15d724661e90008fe6ab3",
+    "schema": "2cbda030144afe417d25cd1fb3c0e7799b8d7c80e67742567a94a66c0a67bf9d"
+  },
+  "later_observed_repair_sha256": {
+    "targets": "92f5aea392599a5b2be65ffe171e3a8fd1970dcae6fd8d8f106260d07097a30c",
+    "runtime": "870d24c6fa5437988de6b1e848b53be53fa7eb40d307cead6aaa21138912df9a"
+  },
+  "p1_authenticated_findings": "P1 owns102PASS4FAIL RED for late snapshot admission revocation and lone-surrogate snapshot key. Source review confirms finaldispatch admission and keyUnicode checks added; this report does not claim P1fullsuite GREEN.",
+  "reviewer_findings": [
+    {
+      "id": "TB-SRC-01",
+      "evidence": "dependency-property-probe.json",
+      "sha256": "ba11d7284b30529b7aa7ac514cf0378e6016bd3dbebe65ef88a9248118043671",
+      "confirmed": "Actual compiled classifier forwards raw thrown Error/message when selected dependency property getter throws. Missing dependency and admitthrow controls refuse correctly. Candidate extraction occurs outside guarded new-admission projection; runtime prepare/apply also evaluate typed dependency properties while constructing classification args.",
+      "scope": "Malformed trusted-constructor dependency fixture, not arbitrary hostile JavaScript program isolation. Contract explicitly requires fixedsafe newdependency failure diagnostics."
+    },
+    {
+      "id": "TB-SRC-02",
+      "evidence": [
+        {
+          "path": "revoked-proxy-probe.json",
+          "sha256": "a3da634a05126dd4f5ef45077289aa59646fcb0f1fbcbeca149dea15d6e0be22"
+        },
+        {
+          "path": "revoked-proxy-nested-probe.json",
+          "sha256": "e9df3e61a7b04eb731f3cd5e093e3380ccd5ba2d9e350ec51aefeb72e98e630f"
+        }
+      ],
+      "confirmed": "Six actual compiled entry/guard paths throw native TypeError for revokedProxy: classifier target, typedkind target, policy target, policy selector, policy operations array, typedadapter candidate. isRecord/Array.isArray is invoked before nodeutil.isProxy, so revokedProxy fails before refusal guard.",
+      "required": "Guard Proxy before any potentially throwing IsArray/isRecord operation on new typed data/dependency paths. Preserve legacy exported matcher and unrelated behavior."
+    }
+  ],
+  "preservation_checks_file": "source-preservation-checks.json",
+  "preservation_checks_sha256": "df8ace12fef72ec591458c963c0e1bd39bf4c82a1d49853c841fe9cf7f28e6c3",
+  "positive_review": [
+    "Independent bounded frozen snapshot copy before typed receipt.consume is present, avoids mutable snapshot alias history; originalFS snapshot timing preserved.",
+    "Stored matching adapter identity, consumed receipt, exacttarget digest, used-beforelatechecks and selected apply dispatch present; okfalse propagates.",
+    "Explicit typed batch/unit refusal present; no protected release/fs/git/remote fallback; no public broker authority added.",
+    "Schema sixalternatives = unchangedfirst4 + twoexact3fieldselectors; examplesunchanged, exportedlegacyselector function byte-identical, only2internalpolicy matcher calls, kernel58/prior99hashes unchanged."
+  ],
+  "reviewer_product_or_test_edits": false,
+  "graft": {
+    "calls_this_source_review": 1,
+    "tokens_saved_estimate": 25760,
+    "cumulative_calls": 15,
+    "cumulative_tokens_saved_estimate": 296245
+  }
+}

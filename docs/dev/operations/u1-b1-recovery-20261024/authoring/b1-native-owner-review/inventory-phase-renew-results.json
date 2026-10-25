@@ -1,0 +1,25 @@
+{
+  "fixture": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-initial-owner-plan-jJqJW9/repository",
+  "approval_id": "24b3953e410a7654b1ecdbad8c03a512439a904d9ed90349b116d6685a761caf",
+  "prior_grant_sha256": "995acb89dea8b2521315ce330cf8539e2f1533a47e5005e1490bb57037392a25",
+  "result": {
+    "kind": "reconciliation-grant-result",
+    "operation": "renew",
+    "outcome": "renewed",
+    "approval_id": "24b3953e410a7654b1ecdbad8c03a512439a904d9ed90349b116d6685a761caf",
+    "plan_sha256": "5d55b291ae2e31c578ec2c064bd83c8471cda1afbd197734c946f7fd87f61141",
+    "record_sha256": "348fb37362e821841e0b29ebc32059e811758719ce9b5c59c15ba5129f8cbe52",
+    "sequence": 4,
+    "owned": [
+      {
+        "target": "worktree-host/devai/reconciliation/approvals/24b3953e410a7654b1ecdbad8c03a512439a904d9ed90349b116d6685a761caf/grant-000004.json",
+        "dev": "16777233",
+        "ino": "1124988510",
+        "birthtime_ns": "1792905641127294834"
+      }
+    ],
+    "grants_authority": false
+  },
+  "index_sha256": "a9ae42654e20e902c3d3e120478597bfd9a9a7f36d5d9bd073078581d26cd3ad",
+  "qualification": "Actualnative04remaining Ownerrenewal; syntheticB5/policy/TTY; noinstalledpublicclaim."
+}

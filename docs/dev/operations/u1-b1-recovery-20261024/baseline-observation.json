@@ -1,0 +1,192 @@
+{
+  "standing": "Maintainer static preparation observation; no proof, approval or F4 standing",
+  "observed_at_utc": "2026-10-24T13:31:02.118718+00:00",
+  "source_commit": "2df84159caabf869b866fb2a05e5b06be83295fb",
+  "source_tree": "4e6f5dec3de2595f4598d3b8232bf0d43e6e7cc4",
+  "primary_head": "4289ff51d1095485a10503cb7502e5b09cd78592",
+  "constitution_version": "1.1.0",
+  "sources": [
+    {
+      "path": "AGENTS.md",
+      "sha256": "30d5b294a198f46a6fec9eece3a76cfe62eaa84d9d8e75517a836b1f3772d982",
+      "git_blob": "8c018a490b755fbda9f4fa1c7cf691e5bd221610"
+    },
+    {
+      "path": "law/constitution.md",
+      "sha256": "8353c3b81d38e0f9b913cbeb6762bc149605989c1b16f52d2c63ba9892f71270",
+      "git_blob": "199cf2787904f64599abd0828620d903a9cb2368"
+    },
+    {
+      "path": "law/policy/adr-validation.json",
+      "sha256": "3e99c32e0a3dc0e88a1ebd3a31a6e9144c1b257b4958992aac56b72591691c3a",
+      "git_blob": "2c36a8f85770c4057a7070ae5fcb921116707893"
+    },
+    {
+      "path": "law/policy/action-registry.json",
+      "sha256": "59deac2d823e80058a8223799c31653d7c8fc14dcc7a0ad49ca295545f01de27",
+      "git_blob": "458cf72aba6120c71851809436a85b3d6b799258"
+    },
+    {
+      "path": "law/policy/release-verification.json",
+      "sha256": "1c167d7f10c58228cc68805d55ab25a074dd03d71f5392c90e7feba9f3e6d332",
+      "git_blob": "a7da015134674ac08c59719c01a1062bcf3d2484"
+    },
+    {
+      "path": "law/policy/release-lifecycle.json",
+      "sha256": "7f9b24a11c002645273b354e4caacc12ed234c50bb7fe41d8d2d0ba64fb6a730",
+      "git_blob": "72ccc5748e3383b928a1b00b57c291d8adfac500"
+    },
+    {
+      "path": "law/policy/documentation-information-architecture.json",
+      "sha256": "2edc4e4dfe325d09fe7c56cd9d3fc7b0960d5ab5aaf26ad22f61d920afa13f87",
+      "git_blob": "01439327e5fd3fe284a5584cfc8e253d90df0629"
+    },
+    {
+      "path": "law/adr/ADR-EVI-0006-custody-proven-divergent-anchor-recovery.md",
+      "sha256": "89e4bebfc1147662efc3d779b490e71339a838bfe8531cbd6907e2fb073eea09",
+      "git_blob": "91702f2d152903308367f06f306c52da744904b6"
+    },
+    {
+      "path": "law/adr/ADR-GOV-0026-engineer-authors-focused-regression-tests.md",
+      "sha256": "88a530a7d0b565968e4cac39773b9b46f8c3e705988373996ff71831c7c5585f",
+      "git_blob": "46f87049d216f92ecf0dde7d40f30d907fc8dbd6"
+    },
+    {
+      "path": "law/schemas/evidence.schema.json",
+      "sha256": "591886e0bd2cd23775de825d82270e30f10f742461d68abc98554db39bc5e173",
+      "git_blob": "14767ea854f9aa4af85570011b2fbb98b42d5d57"
+    },
+    {
+      "path": "packages/evidence/src/evidence/verb-evidence.ts",
+      "sha256": "b15e3d9c9e7b40a17df188f72f97a266010b8460c01d6f24e77a345a3024de00",
+      "git_blob": "4941e2e39f1ccd0d714b68c4a701ce86f1c69a03"
+    },
+    {
+      "path": "packages/evidence/src/evidence/anchors.ts",
+      "sha256": "b999fa0003219b6374e37613935818efd082b1c12a74289cea606b684662552f",
+      "git_blob": "1a33ed8f3ec72c5795720c494d4dd59a9b3d0a32"
+    },
+    {
+      "path": "packages/cli/src/commands/evidence/facade-collect-record.ts",
+      "sha256": "4930315197a1430a83d82fd3c021fd0a203ec9630a0af0cd155ad06d9a84c309",
+      "git_blob": "d8bdb5c9719ec49caaf1c37b558d6d319d48a5f3"
+    },
+    {
+      "path": "packages/cli/src/commands/evidence/facade.ts",
+      "sha256": "26527bd1a83a947908edbd4797a1c7ab564a90a05f0909847802b028e73f8f98",
+      "git_blob": "ff4b2ead4a638f538b197136d2792fbf891a12cb"
+    },
+    {
+      "path": "packages/authority/src/types.ts",
+      "sha256": "30ba693bf29b350fbd491b94884da2462ad34b1361a0b70ae02d6a61996e298d",
+      "git_blob": "3c2e17f727d0e56d966a13283424cf8e675df8cd"
+    },
+    {
+      "path": "packages/schemas/src/roster.ts",
+      "sha256": "4172904e8d8570c567d181965c7d9f80b7642614456c15115a6cb63dac8275bd",
+      "git_blob": "7af85337235bd16b5f32085ef45e329ddd13e631"
+    },
+    {
+      "path": "packages/schemas/src/index.ts",
+      "sha256": "f4cc09a1d5c6c67e8ee8b779b8b39e954251de2e902c080b93d486be728dc7b0",
+      "git_blob": "8b688dc131fd040bd3c8791bb11143527ad94f84"
+    },
+    {
+      "path": "packages/cli/src/commands/check/schemas.ts",
+      "sha256": "727d24ba51c50c4fbc3fb719a8e5e04f06ad6a86f707c2f53f15db334d289dc0",
+      "git_blob": "7302d640cce9933fb6a84aff3970aac32d335af2"
+    },
+    {
+      "path": "packages/cli/scripts/assemble-package.mjs",
+      "sha256": "a92decdcdb25a5786d61e69646169f06047af8b8b7087f6b2d4bdcb29022816c",
+      "git_blob": "deba97c227172df212c99c5196ffcc1d028fa1ae"
+    },
+    {
+      "path": "packages/schemas/scripts/copy-law.mjs",
+      "sha256": "a5e6cc4332f91d67026fa554c610372c1bfb2e5ce20b4e8673578f1537f0f6f3",
+      "git_blob": "41dfdc26d919933123f1a024875c89e2ce8c5771"
+    },
+    {
+      "path": "packages/skills/scripts/copy-constitution.mjs",
+      "sha256": "63d4dcaee5b8c9e1ca70f187c43af8f875d8a91bb358855e4797dbbdf97fb1bc",
+      "git_blob": "0c200a11ebfd3985b7b42575038629526692958b"
+    }
+  ],
+  "release_addendum_source_hash_matches": {
+    "package.json": true,
+    "packages/evidence/src/evidence/verb-evidence.ts": true,
+    "packages/cli/src/commands/evidence/facade-collect-record.ts": true,
+    "packages/cli/src/commands/evidence/facade.ts": true,
+    "law/schemas/evidence.schema.json": true,
+    "law/policy/action-registry.json": true,
+    "law/adr/ADR-EVI-0006-custody-proven-divergent-anchor-recovery.md": true
+  },
+  "preserved_packet_count": 16,
+  "all_reference_hashes_verified": true,
+  "runtime_executed": false,
+  "registry_tarball_revalidated_this_session": false,
+  "original_nine_path_drift": [
+    {
+      "path": "law/constitution.md",
+      "old_blob": "199cf2787904f64599abd0828620d903a9cb2368",
+      "current_blob": "199cf2787904f64599abd0828620d903a9cb2368"
+    },
+    {
+      "path": "law/adr/ADR-GOV-0027-source-bound-canonical-selection-and-proof-index.md",
+      "old_blob": null,
+      "current_blob": null
+    },
+    {
+      "path": "law/adr/README.md",
+      "old_blob": "ad1a89c7773cf708aa731923cb77b02cb8729a35",
+      "current_blob": "ad1a89c7773cf708aa731923cb77b02cb8729a35"
+    },
+    {
+      "path": "law/policy/adr-validation.json",
+      "old_blob": "2c36a8f85770c4057a7070ae5fcb921116707893",
+      "current_blob": "2c36a8f85770c4057a7070ae5fcb921116707893"
+    },
+    {
+      "path": "law/schemas/proof-index-reconciliation-contract.schema.json",
+      "old_blob": null,
+      "current_blob": null
+    },
+    {
+      "path": "packages/cli/tests/unit/constitution-article-6-amendment.test.ts",
+      "old_blob": "413733c2d1b214f27a45a9daa7f61467c17e1698",
+      "current_blob": "413733c2d1b214f27a45a9daa7f61467c17e1698"
+    },
+    {
+      "path": "packages/cli/tests/unit/canonical-selection-constitution-amendment.test.ts",
+      "old_blob": null,
+      "current_blob": null
+    },
+    {
+      "path": "packages/schemas/tests/contract/governance-v15-adr.test.ts",
+      "old_blob": "e8d70250d340d49135aa379754f991e67ffffbb8",
+      "current_blob": "e8d70250d340d49135aa379754f991e67ffffbb8"
+    },
+    {
+      "path": "packages/schemas/tests/contract/proof-index-reconciliation-contract.test.ts",
+      "old_blob": null,
+      "current_blob": null
+    }
+  ],
+  "current_canonical_schema_count": 133,
+  "release_live_recheck": {
+    "tag_name": "v2.7.1",
+    "published_at": "2026-10-24T07:48:53Z",
+    "html_url": "https://github.com/aarusso-nyx/devai/releases/tag/v2.7.1",
+    "target_commitish": "main"
+  },
+  "remote_refs_live_recheck": [
+    "2df84159caabf869b866fb2a05e5b06be83295fb\trefs/heads/main",
+    "40b6f706cd07e81125a586beacb8020019a29b2e\trefs/tags/v2.7.1",
+    "2df84159caabf869b866fb2a05e5b06be83295fb\trefs/tags/v2.7.1^{}"
+  ],
+  "detran_pr211_live_recheck": {
+    "state": "open",
+    "merged": false,
+    "head": "9b2a190aa1276f4b15469b7079ed0d7c4c8c4c99"
+  }
+}

@@ -1,0 +1,683 @@
+{
+  "meaning": "Independent small design constraint models; no product RED or cryptographic/host qualification.",
+  "pass": 14,
+  "fail": 0,
+  "cases": [
+    {
+      "id": "T01",
+      "meaning": "All clocks tie; renewal names existing I and completion observes renewal.",
+      "clock": {
+        "A": 0,
+        "I": 0,
+        "R": 0,
+        "C": 0
+      },
+      "edges": [
+        [
+          "A",
+          "R"
+        ],
+        [
+          "A",
+          "I"
+        ],
+        [
+          "I",
+          "R"
+        ],
+        [
+          "I",
+          "C"
+        ],
+        [
+          "R",
+          "C"
+        ]
+      ],
+      "fences": [
+        [
+          "I",
+          "R"
+        ]
+      ],
+      "expected": 1,
+      "consistentOrders": [
+        [
+          "A",
+          "I",
+          "R",
+          "C"
+        ]
+      ],
+      "weakerKnownGrantOnlyOrders": [
+        [
+          "A",
+          "I",
+          "R",
+          "C"
+        ]
+      ]
+    },
+    {
+      "id": "T02",
+      "meaning": "All clocks tie; renewal null asserts no existing I and I references renewal.",
+      "clock": {
+        "A": 0,
+        "R": 0,
+        "I": 0,
+        "C": 0
+      },
+      "edges": [
+        [
+          "A",
+          "R"
+        ],
+        [
+          "R",
+          "I"
+        ],
+        [
+          "I",
+          "C"
+        ],
+        [
+          "R",
+          "C"
+        ]
+      ],
+      "fences": [],
+      "expected": 1,
+      "consistentOrders": [
+        [
+          "A",
+          "R",
+          "I",
+          "C"
+        ]
+      ],
+      "weakerKnownGrantOnlyOrders": [
+        [
+          "A",
+          "R",
+          "I",
+          "C"
+        ]
+      ]
+    },
+    {
+      "id": "T03",
+      "meaning": "Renewal names I but I references that same renewal: impossible mutual-before.",
+      "clock": {
+        "A": 0,
+        "R": 0,
+        "I": 0
+      },
+      "edges": [
+        [
+          "A",
+          "R"
+        ],
+        [
+          "R",
+          "I"
+        ],
+        [
+          "I",
+          "R"
+        ]
+      ],
+      "fences": [],
+      "expected": 0,
+      "consistentOrders": [],
+      "weakerKnownGrantOnlyOrders": []
+    },
+    {
+      "id": "T04",
+      "meaning": "Renewal excludes phase01, but C01 observes renewal: impossible mutual-before.",
+      "clock": {
+        "A": 0,
+        "I": 0,
+        "R": 0,
+        "C": 0
+      },
+      "edges": [
+        [
+          "A",
+          "I"
+        ],
+        [
+          "I",
+          "C"
+        ],
+        [
+          "A",
+          "R"
+        ],
+        [
+          "R",
+          "C"
+        ],
+        [
+          "C",
+          "R"
+        ]
+      ],
+      "fences": [],
+      "expected": 0,
+      "consistentOrders": [],
+      "weakerKnownGrantOnlyOrders": []
+    },
+    {
+      "id": "T05",
+      "meaning": "Renewal null+remaining01 means R before I; I names old A. Current-grant fence rejects.",
+      "clock": {
+        "A": 0,
+        "R": 0,
+        "I": 0
+      },
+      "edges": [
+        [
+          "A",
+          "R"
+        ],
+        [
+          "A",
+          "I"
+        ],
+        [
+          "R",
+          "I"
+        ]
+      ],
+      "fences": [
+        [
+          "I",
+          "R"
+        ]
+      ],
+      "expected": 0,
+      "weakMustAccept": true,
+      "consistentOrders": [],
+      "weakerKnownGrantOnlyOrders": [
+        [
+          "A",
+          "R",
+          "I"
+        ]
+      ]
+    },
+    {
+      "id": "T06",
+      "meaning": "Strict-time intent after terminal revocation names still-unexpired A. Current-grant fence rejects.",
+      "clock": {
+        "A": 0,
+        "V": 10,
+        "I": 20
+      },
+      "edges": [
+        [
+          "A",
+          "V"
+        ],
+        [
+          "A",
+          "I"
+        ]
+      ],
+      "fences": [
+        [
+          "I",
+          "V"
+        ]
+      ],
+      "expected": 0,
+      "weakMustAccept": true,
+      "consistentOrders": [],
+      "weakerKnownGrantOnlyOrders": [
+        [
+          "A",
+          "V",
+          "I"
+        ]
+      ]
+    },
+    {
+      "id": "T07",
+      "meaning": "Preexisting I before V may settle C observing V; terminal revocation does not erase I.",
+      "clock": {
+        "A": 0,
+        "I": 10,
+        "V": 20,
+        "C": 30
+      },
+      "edges": [
+        [
+          "A",
+          "I"
+        ],
+        [
+          "A",
+          "V"
+        ],
+        [
+          "I",
+          "C"
+        ],
+        [
+          "V",
+          "C"
+        ]
+      ],
+      "fences": [
+        [
+          "I",
+          "V"
+        ]
+      ],
+      "expected": 1,
+      "consistentOrders": [
+        [
+          "A",
+          "I",
+          "V",
+          "C"
+        ]
+      ],
+      "weakerKnownGrantOnlyOrders": [
+        [
+          "A",
+          "I",
+          "V",
+          "C"
+        ]
+      ]
+    },
+    {
+      "id": "T08",
+      "meaning": "C issued after R still observes old A; current-observation fence rejects.",
+      "clock": {
+        "A": 0,
+        "I": 5,
+        "R": 10,
+        "C": 20
+      },
+      "edges": [
+        [
+          "A",
+          "I"
+        ],
+        [
+          "A",
+          "R"
+        ],
+        [
+          "I",
+          "R"
+        ],
+        [
+          "I",
+          "C"
+        ],
+        [
+          "A",
+          "C"
+        ],
+        [
+          "R",
+          "C"
+        ]
+      ],
+      "fences": [
+        [
+          "I",
+          "R"
+        ],
+        [
+          "C",
+          "R"
+        ]
+      ],
+      "expected": 0,
+      "weakMustAccept": true,
+      "consistentOrders": [],
+      "weakerKnownGrantOnlyOrders": [
+        [
+          "A",
+          "I",
+          "R",
+          "C"
+        ]
+      ]
+    },
+    {
+      "id": "T09",
+      "meaning": "Retry lease after R names original A; current-grant creation fence rejects.",
+      "clock": {
+        "A": 0,
+        "I": 5,
+        "R": 10,
+        "L": 20
+      },
+      "edges": [
+        [
+          "A",
+          "I"
+        ],
+        [
+          "A",
+          "R"
+        ],
+        [
+          "I",
+          "R"
+        ],
+        [
+          "I",
+          "L"
+        ],
+        [
+          "A",
+          "L"
+        ]
+      ],
+      "fences": [
+        [
+          "I",
+          "R"
+        ],
+        [
+          "L",
+          "R"
+        ]
+      ],
+      "expected": 0,
+      "weakMustAccept": true,
+      "consistentOrders": [],
+      "weakerKnownGrantOnlyOrders": [
+        [
+          "A",
+          "I",
+          "R",
+          "L"
+        ]
+      ]
+    },
+    {
+      "id": "T10",
+      "meaning": "Original lease created before renewal may remain; it is not retrospectively required to name R.",
+      "clock": {
+        "A": 0,
+        "I": 5,
+        "L": 7,
+        "R": 10
+      },
+      "edges": [
+        [
+          "A",
+          "I"
+        ],
+        [
+          "A",
+          "R"
+        ],
+        [
+          "I",
+          "R"
+        ],
+        [
+          "I",
+          "L"
+        ],
+        [
+          "A",
+          "L"
+        ]
+      ],
+      "fences": [
+        [
+          "I",
+          "R"
+        ],
+        [
+          "L",
+          "R"
+        ]
+      ],
+      "expected": 1,
+      "consistentOrders": [
+        [
+          "A",
+          "I",
+          "L",
+          "R"
+        ]
+      ],
+      "weakerKnownGrantOnlyOrders": [
+        [
+          "A",
+          "I",
+          "L",
+          "R"
+        ]
+      ]
+    },
+    {
+      "id": "T11",
+      "meaning": "New phase02 intent originally under renewal with resumable null: samegrant lease must be valid.",
+      "clock": {
+        "A": 0,
+        "I1": 1,
+        "C1": 2,
+        "R": 3,
+        "I2": 4,
+        "L2": 5
+      },
+      "edges": [
+        [
+          "A",
+          "I1"
+        ],
+        [
+          "I1",
+          "C1"
+        ],
+        [
+          "A",
+          "R"
+        ],
+        [
+          "C1",
+          "R"
+        ],
+        [
+          "R",
+          "I2"
+        ],
+        [
+          "I2",
+          "L2"
+        ],
+        [
+          "R",
+          "L2"
+        ]
+      ],
+      "fences": [
+        [
+          "I1",
+          "R"
+        ]
+      ],
+      "expected": 1,
+      "consistentOrders": [
+        [
+          "A",
+          "I1",
+          "C1",
+          "R",
+          "I2",
+          "L2"
+        ]
+      ],
+      "weakerKnownGrantOnlyOrders": [
+        [
+          "A",
+          "I1",
+          "C1",
+          "R",
+          "I2",
+          "L2"
+        ]
+      ]
+    },
+    {
+      "id": "T12",
+      "meaning": "Crossgrant retry lease uses renewal explicitly naming older intent.",
+      "clock": {
+        "A": 0,
+        "I": 1,
+        "R": 2,
+        "L": 3
+      },
+      "edges": [
+        [
+          "A",
+          "I"
+        ],
+        [
+          "A",
+          "R"
+        ],
+        [
+          "I",
+          "R"
+        ],
+        [
+          "R",
+          "L"
+        ],
+        [
+          "I",
+          "L"
+        ]
+      ],
+      "fences": [
+        [
+          "I",
+          "R"
+        ]
+      ],
+      "expected": 1,
+      "consistentOrders": [
+        [
+          "A",
+          "I",
+          "R",
+          "L"
+        ]
+      ],
+      "weakerKnownGrantOnlyOrders": [
+        [
+          "A",
+          "I",
+          "R",
+          "L"
+        ]
+      ]
+    },
+    {
+      "id": "T13",
+      "meaning": "Completion-before-leasecleanup crash remnant is valid when retained lease was issued before completion.",
+      "clock": {
+        "A": 0,
+        "I": 1,
+        "L": 2,
+        "C": 3
+      },
+      "edges": [
+        [
+          "A",
+          "I"
+        ],
+        [
+          "A",
+          "L"
+        ],
+        [
+          "A",
+          "C"
+        ],
+        [
+          "I",
+          "L"
+        ],
+        [
+          "I",
+          "C"
+        ],
+        [
+          "L",
+          "C"
+        ]
+      ],
+      "fences": [],
+      "expected": 1,
+      "consistentOrders": [
+        [
+          "A",
+          "I",
+          "L",
+          "C"
+        ]
+      ],
+      "weakerKnownGrantOnlyOrders": [
+        [
+          "A",
+          "I",
+          "L",
+          "C"
+        ]
+      ]
+    },
+    {
+      "id": "T14",
+      "meaning": "Lease issued after completed intent contradicts mandatory lease-before-completion edge.",
+      "clock": {
+        "A": 0,
+        "I": 1,
+        "C": 3,
+        "L": 4
+      },
+      "edges": [
+        [
+          "A",
+          "I"
+        ],
+        [
+          "A",
+          "L"
+        ],
+        [
+          "A",
+          "C"
+        ],
+        [
+          "I",
+          "L"
+        ],
+        [
+          "I",
+          "C"
+        ],
+        [
+          "L",
+          "C"
+        ]
+      ],
+      "fences": [],
+      "expected": 0,
+      "consistentOrders": [],
+      "weakerKnownGrantOnlyOrders": []
+    }
+  ]
+}

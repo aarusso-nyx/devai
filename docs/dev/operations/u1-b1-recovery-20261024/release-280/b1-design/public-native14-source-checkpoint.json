@@ -1,0 +1,37 @@
+{
+  "kind": "public-native-pre-release-source-checkpoint",
+  "package_sha256": "295e19d6835802a59b2be31580ba914485018ab9171a9380a77ce730791d0e37",
+  "runtime": {
+    "node": "24.20.0",
+    "uv": "1.52.1",
+    "platform": "darwin",
+    "arch": "arm64"
+  },
+  "checks": {
+    "native_host_owner_pinned_runtime": {
+      "tests": 107,
+      "passed": 107,
+      "log_sha256": "771689ee81fadd22405564dcef809713279232172b1e5304d057b717c5338bbd"
+    },
+    "effects_binding": {
+      "tests": 7,
+      "passed": 7,
+      "actions": 74,
+      "findings": 0,
+      "unresolved_edges": 0
+    },
+    "lint": {
+      "errors": 0,
+      "warnings": 0
+    },
+    "typecheck_exit": 0,
+    "docs_links": {
+      "broken": 0
+    },
+    "formatting": "pass; immutable execution receipts and approval source bytes preserved, source files checked"
+  },
+  "whole_workflow": "running; do not infer complete qualification",
+  "integration": false,
+  "publication": false,
+  "live_detran_effects": false
+}

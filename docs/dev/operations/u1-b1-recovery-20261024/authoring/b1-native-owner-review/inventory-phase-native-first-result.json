@@ -1,0 +1,183 @@
+{
+  "fixture": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-initial-owner-plan-jJqJW9/repository",
+  "result": {
+    "kind": "reconciliation-inventory-result",
+    "phase": "04",
+    "outcome": "completed",
+    "approval_id": "24b3953e410a7654b1ecdbad8c03a512439a904d9ed90349b116d6685a761caf",
+    "plan_sha256": "5d55b291ae2e31c578ec2c064bd83c8471cda1afbd197734c946f7fd87f61141",
+    "intent_sha256": "b1715b8c59d34f24ae21ebb849bae6bb1fe1e59067ea37aedac82c0b72da05a6",
+    "completion_sha256": "d069ded03ae40cbac528976f4113ce0594045c351d3bba05ccd80959a3ba84ff",
+    "outputs_manifest_sha256": "775aaccb8785bef806cfd5e944b7284ae37c7cb1444894cafc2bcc0f005e8332",
+    "outputs": [
+      {
+        "path": ".devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory/inventory_api/api-map.json",
+        "schema": "api-map.schema.json",
+        "sha256": "adb2e2ad7421f9752479c16b865dfd0245a34ce238921af1cb36bf2df106bf42",
+        "bytes": 1017827
+      },
+      {
+        "path": ".devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory/inventory_routes/routes-angular.json",
+        "schema": "routes-inventory.schema.json",
+        "sha256": "125f2dec9fd5c1c56168f963b66b1d4d6f02650314d2b0d32f633673fbaba6c8",
+        "bytes": 14737
+      },
+      {
+        "path": ".devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory/inventory_data_model/data-model.json",
+        "schema": "data-model-inventory.schema.json",
+        "sha256": "5b18b470c1d9877b6d871a4a2db4368318366ccb3a20899c68539c4daff49a16",
+        "bytes": 355980
+      },
+      {
+        "path": ".devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory/inventory_data_handling/data-model-pii.json",
+        "schema": "data-model-inventory.schema.json",
+        "sha256": "3ed6c93074ab25d7a0a095b206f1a76307814b359bb94370decbf5dc66769083",
+        "bytes": 357568
+      },
+      {
+        "path": ".devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory/inventory_rbac/rbac.json",
+        "schema": "rbac-inventory.schema.json",
+        "sha256": "fc4a5b4e4be692ea3a4ae5a87f4f10c17fef511f7d4e3f027d8233757ce872fe",
+        "bytes": 550946
+      },
+      {
+        "path": ".devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory/inventory_dep_graph/dep-graph.json",
+        "schema": "dep-graph.schema.json",
+        "sha256": "c5cc8b4d13b787d2a577432656bd5bad383beb7cd465e962ef53cf1b4181d77d",
+        "bytes": 982247
+      },
+      {
+        "path": ".devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory/inventory_coverage/coverage-matrix.json",
+        "schema": "coverage-matrix.schema.json",
+        "sha256": "565563df80d745ec41615a4f4f18813a15ce0e0a82db784eb64f5669c9626a16",
+        "bytes": 1108249
+      }
+    ],
+    "owned": [
+      {
+        "target": "worktree-host/devai/reconciliation/approvals/24b3953e410a7654b1ecdbad8c03a512439a904d9ed90349b116d6685a761caf/intent-04.json",
+        "dev": "16777233",
+        "ino": "1124989554",
+        "birthtime_ns": "1792905789530377430"
+      },
+      {
+        "target": "worktree-host/devai/reconciliation/approvals/24b3953e410a7654b1ecdbad8c03a512439a904d9ed90349b116d6685a761caf/lease.json",
+        "dev": "16777233",
+        "ino": "1124989557",
+        "birthtime_ns": "1792905789677295506"
+      },
+      {
+        "target": ".devai/state/reconciliation",
+        "dev": "16777233",
+        "ino": "1124989560",
+        "birthtime_ns": "1792905789815117666"
+      },
+      {
+        "target": ".devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5",
+        "dev": "16777233",
+        "ino": "1124989561",
+        "birthtime_ns": "1792905789852472959"
+      },
+      {
+        "target": ".devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory",
+        "dev": "16777233",
+        "ino": "1124989562",
+        "birthtime_ns": "1792905789888611079"
+      },
+      {
+        "target": ".devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory/inventory_api",
+        "dev": "16777233",
+        "ino": "1124989563",
+        "birthtime_ns": "1792905789928416800"
+      },
+      {
+        "target": ".devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory/inventory_routes",
+        "dev": "16777233",
+        "ino": "1124989564",
+        "birthtime_ns": "1792905789962506869"
+      },
+      {
+        "target": ".devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory/inventory_data_model",
+        "dev": "16777233",
+        "ino": "1124989565",
+        "birthtime_ns": "1792905789998429031"
+      },
+      {
+        "target": ".devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory/inventory_data_handling",
+        "dev": "16777233",
+        "ino": "1124989566",
+        "birthtime_ns": "1792905790033446771"
+      },
+      {
+        "target": ".devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory/inventory_rbac",
+        "dev": "16777233",
+        "ino": "1124989567",
+        "birthtime_ns": "1792905790069503641"
+      },
+      {
+        "target": ".devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory/inventory_dep_graph",
+        "dev": "16777233",
+        "ino": "1124989568",
+        "birthtime_ns": "1792905790103374960"
+      },
+      {
+        "target": ".devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory/inventory_coverage",
+        "dev": "16777233",
+        "ino": "1124989569",
+        "birthtime_ns": "1792905790143264889"
+      },
+      {
+        "target": ".devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory/inventory_api/api-map.json",
+        "dev": "16777233",
+        "ino": "1124989570",
+        "birthtime_ns": "1792905790238801984"
+      },
+      {
+        "target": ".devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory/inventory_routes/routes-angular.json",
+        "dev": "16777233",
+        "ino": "1124989573",
+        "birthtime_ns": "1792905790405421898"
+      },
+      {
+        "target": ".devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory/inventory_data_model/data-model.json",
+        "dev": "16777233",
+        "ino": "1124989576",
+        "birthtime_ns": "1792905790570208805"
+      },
+      {
+        "target": ".devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory/inventory_data_handling/data-model-pii.json",
+        "dev": "16777233",
+        "ino": "1124989579",
+        "birthtime_ns": "1792905790742140576"
+      },
+      {
+        "target": ".devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory/inventory_rbac/rbac.json",
+        "dev": "16777233",
+        "ino": "1124989582",
+        "birthtime_ns": "1792905790910147705"
+      },
+      {
+        "target": ".devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory/inventory_dep_graph/dep-graph.json",
+        "dev": "16777233",
+        "ino": "1124989585",
+        "birthtime_ns": "1792905791081463598"
+      },
+      {
+        "target": ".devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory/inventory_coverage/coverage-matrix.json",
+        "dev": "16777233",
+        "ino": "1124989588",
+        "birthtime_ns": "1792905791250089855"
+      },
+      {
+        "target": "worktree-host/devai/reconciliation/approvals/24b3953e410a7654b1ecdbad8c03a512439a904d9ed90349b116d6685a761caf/phase-04.json",
+        "dev": "16777233",
+        "ino": "1124989591",
+        "birthtime_ns": "1792905796614777568"
+      }
+    ],
+    "grants_authority": false,
+    "publishes_readings": false,
+    "grants_readiness": false
+  },
+  "expected_manifest_sha256": "775aaccb8785bef806cfd5e944b7284ae37c7cb1444894cafc2bcc0f005e8332"
+}

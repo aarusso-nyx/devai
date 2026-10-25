@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/custody-phase-initial.txt","kind":"historical-transcript-custody-pointer","original_bytes":636,"original_bytes_changed":false,"original_sha256":"c87763ab416c874f8c1a4b9adae2676ef3e8efad57b57cc033d0c25729e02a82"}

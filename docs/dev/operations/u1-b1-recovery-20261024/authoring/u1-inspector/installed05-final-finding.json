@@ -1,0 +1,20 @@
+{
+  "result": "FAILED; publication/integration qualification for U1 not established by this run",
+  "candidate": "installed05 and officialbootstrap05, U1 source frozen",
+  "tarball_sha256": "aff56e17ada145967ec0a32719d29fd48edbf893491b126d0de9382d922301d1",
+  "public_bin": "/private/tmp/devai-release-280-01a16e18/installed-05/node_modules/@aarusso-nyx/devai/dist/runtime/index/bin.js",
+  "public_bin_sha256": "8ad61056af95fa44d9019619dbb1cd2d20ae879d813f1dddd5b464737b6e49a2",
+  "files": 8,
+  "tests": {
+    "passed": 174,
+    "failed": 1,
+    "total": 175
+  },
+  "failed_test": "serializes two real public subprocess requests and exact retry without replay",
+  "actual": "Exactly one request succeeded; loser refused with PROOF_ANCHOR_RECOVERY_REFUSED AUTHORITY_RESOURCE_CHANGED_AFTER_PREPARE",
+  "required": "Loser must refuse with PROOF_ANCHOR_RECOVERY_STALE_HEAD, then exact retry against current head returns existing entry without append.",
+  "standing": "Strict assertion unchanged; sent defect to Engineer and root. No relaxed guard, permission widening, arbitrary authority-error rewrite, skipped test or claimed overall GREEN.",
+  "log": "final-eight-paths-installed05.log",
+  "log_sha256": "e4d0b557c4585ecb0d8b1d155769f7c221e2793b3202c657f29219b806c2f545",
+  "protected_history": "All source35cases and historical regression paths passed; no Inspector runtime or adopter mutation."
+}

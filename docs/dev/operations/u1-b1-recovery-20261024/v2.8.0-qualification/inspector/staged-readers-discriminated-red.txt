@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/v2.8.0-qualification/inspector/staged-readers-discriminated-red.txt","kind":"historical-transcript-custody-pointer","original_bytes":37726,"original_bytes_changed":false,"original_sha256":"b36d8f533df5eec5a66fcb8b4f963df0ef452535b4ca650313d05d5d2e113be5"}

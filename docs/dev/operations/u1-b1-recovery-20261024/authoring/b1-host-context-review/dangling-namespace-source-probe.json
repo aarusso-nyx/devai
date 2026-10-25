@@ -1,0 +1,28 @@
+{
+  "source_sha256": "765a46387e2efdf63519b4d6988c63489c3663ded5a0773158e8a985c53d769e",
+  "dist_sha256": "ae9502f30d896cc185b4be975ff2cb83b9624cc81d2b6a1bd3e69cca77dea932",
+  "source_unchanged": true,
+  "dist_unchanged": true,
+  "node": "v24.22.0",
+  "uv": "1.52.1",
+  "platform": "darwin",
+  "clean": {
+    "label": "clean missing namespace",
+    "captured": true,
+    "read_paths_succeeded": true
+  },
+  "ancestor_lstat_is_symlink": true,
+  "ancestor": {
+    "label": "dangling devai ancestor",
+    "captured": true,
+    "read_paths_succeeded": true
+  },
+  "private_root_lstat_is_symlink": true,
+  "child": {
+    "label": "dangling reconciliation root",
+    "captured": true,
+    "read_paths_succeeded": true
+  },
+  "scope": "Actual built product read-only context module against own disposable fixture; no effect authority/namespace write executed by product. Inspector creates only fixture layouts.",
+  "fixture_removed": true
+}

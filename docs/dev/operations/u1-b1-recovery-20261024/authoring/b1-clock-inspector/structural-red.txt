@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-clock-inspector/structural-red.txt","kind":"historical-transcript-custody-pointer","original_bytes":1392,"original_bytes_changed":false,"original_sha256":"9972e66749fbf5c6419ae8728be60037956796c48a122c6efb8efac1a5e611cf"}

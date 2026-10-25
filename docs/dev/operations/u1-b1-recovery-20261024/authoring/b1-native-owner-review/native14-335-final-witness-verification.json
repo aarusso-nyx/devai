@@ -1,0 +1,8 @@
+{
+  "standing": "INDEPENDENT_READ_ONLY_FINAL_WITNESSES_PASS",
+  "result_sha256": "798cb352809adcc5e457e80f4b80c23206d45c856295e60e53f4c346ec6b034d",
+  "all_non_proof_index_entries_unchanged": true,
+  "seven_output_bytes_sha256_match": true,
+  "epoch_and_parents_unchanged": true,
+  "live_detran_effects": false
+}

@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/dead-lease-native-first.txt","kind":"historical-transcript-custody-pointer","original_bytes":636,"original_bytes_changed":false,"original_sha256":"660c14a5741398d412117613c00b1eca7c6631c45c05128546e2e11d40c804e8"}

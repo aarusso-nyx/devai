@@ -1,0 +1,31 @@
+{
+  "status": "PROPOSED_PREPARATION_ONLY_NOT_APPROVAL",
+  "baseline_commit": "2df84159caabf869b866fb2a05e5b06be83295fb",
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 3013,
+      "sha256": "21eb647ff1b576edd32cd8b674da69175ec3129238165328b66c434b4d8c4df7"
+    },
+    {
+      "path": "REC-B1-A-P1-approval.md",
+      "bytes": 21149,
+      "sha256": "d41ed988ae3cbad90312da4312e20eaa9537f1a3eb00eaad2c569133dcb9c22f"
+    },
+    {
+      "path": "acceptance-matrix.md",
+      "bytes": 19442,
+      "sha256": "f8384f3e757b3b1c895242fbf8171f38c8c2518717fbb020685bd8ee2dd60f20"
+    },
+    {
+      "path": "path-inventory.proposed.json",
+      "bytes": 8721,
+      "sha256": "07ac3cbf65b2cf24b31ba53475605098cf9221a44ade7f5a45592617d5bee37a"
+    },
+    {
+      "path": "source-observation.json",
+      "bytes": 11227,
+      "sha256": "18a18d999e93ca314b89be137608611fed4ed1edecbdbe3ade6a6d2ca65cf140"
+    }
+  ]
+}

@@ -1,0 +1,187 @@
+{
+  "status": "BOUNDED_OUTPUT_PROTOCOL_VERIFIED_IN_SOURCE_FIXTURES_LIVE_USE_HELD",
+  "baseline_commit": "2df84159caabf869b866fb2a05e5b06be83295fb",
+  "human_authored_path_count": 21,
+  "distinct_paths_with_generated_output": 22,
+  "paths": [
+    {
+      "role": "Architect",
+      "path": "law/adr/ADR-AUT-0008-exact-authority-policy-create-review.md",
+      "before_amendment_sha256": "1b84ae5b6699003db62f2a917925dd17f848f0a40c13caafed5ab89ecd731082",
+      "after_sha256": "2f9c6beac8ad5ac2914d661b05627c8904fdaedbc6e6b11c25a8ea934a57a7c5",
+      "after_bytes": 13283,
+      "changed_by_amendment": true
+    },
+    {
+      "role": "Architect",
+      "path": "law/adr/README.md",
+      "before_amendment_sha256": "747bac356abc80705305cbb50daeae41d1ae2dd54ee1a1942d73481e7523afd8",
+      "after_sha256": "747bac356abc80705305cbb50daeae41d1ae2dd54ee1a1942d73481e7523afd8",
+      "after_bytes": 33395,
+      "changed_by_amendment": false
+    },
+    {
+      "role": "Architect",
+      "path": "law/policy/adr-validation.json",
+      "before_amendment_sha256": "dd3a312e0f52676481abf05ccbc1ae6fb5da5e22a96afdcbd2dd0581e75a5d21",
+      "after_sha256": "dd3a312e0f52676481abf05ccbc1ae6fb5da5e22a96afdcbd2dd0581e75a5d21",
+      "after_bytes": 16030,
+      "changed_by_amendment": false
+    },
+    {
+      "role": "Architect",
+      "path": "docs/reference/cli/index.md",
+      "before_amendment_sha256": "6f178aa1d571b750accdd43332a7500bbaf006066840badd8693e5c25a9f7e0c",
+      "after_sha256": "a1a7e1f8cf9a0e533a4cb113af6cd9ad886775248a79680e9e1858da4c9cdb14",
+      "after_bytes": 32095,
+      "changed_by_amendment": true
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/cli/src/command-router.ts",
+      "before_amendment_sha256": "af2cf5df04006d049c6e269cf30d44ceaef650fb8cb9c563dc03c6e00d90837a",
+      "after_sha256": "acf7248533415695cce0d9258bf7c942886f842276c7cdb979e9e79c3b86f98f",
+      "after_bytes": 18863,
+      "changed_by_amendment": true
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/cli/src/commands/init/index.ts",
+      "before_amendment_sha256": "984da375d7f480413f043341e33f797ab517dc07eb22cfb2d2f3b5c1f3d86bc3",
+      "after_sha256": "984da375d7f480413f043341e33f797ab517dc07eb22cfb2d2f3b5c1f3d86bc3",
+      "after_bytes": 5111,
+      "changed_by_amendment": false
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/cli/src/commands/init/shared.ts",
+      "before_amendment_sha256": "ddb802c8ad36b2f80ef225934af541934f86e852805aaa2a25e313ddc67393c3",
+      "after_sha256": "ddb802c8ad36b2f80ef225934af541934f86e852805aaa2a25e313ddc67393c3",
+      "after_bytes": 3852,
+      "changed_by_amendment": false
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/cli/src/commands/init/review-authority-policy.ts",
+      "before_amendment_sha256": "398ef75f3bdd5105e1f5d9ee6f6ae2faaffd718005a3a07d63999bb16ffa1efc",
+      "after_sha256": "3fa00b86fbad04ba4fa5b8a1078af7f28eeed3aaea03e6cac75383fbb7661f7e",
+      "after_bytes": 4068,
+      "changed_by_amendment": true
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/cli/src/authority/command-capabilities.ts",
+      "before_amendment_sha256": "f29ca8306a798c2842d8e4a7138f37331e9b16d926e06925985b330f779232d2",
+      "after_sha256": "f29ca8306a798c2842d8e4a7138f37331e9b16d926e06925985b330f779232d2",
+      "after_bytes": 1236,
+      "changed_by_amendment": false
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/cli/src/authority/broker.ts",
+      "before_amendment_sha256": "50721c2d784e8849cbf50ad7a07daa7d2b3513a5618ecd81ac0ec8040b2f7735",
+      "after_sha256": "50721c2d784e8849cbf50ad7a07daa7d2b3513a5618ecd81ac0ec8040b2f7735",
+      "after_bytes": 87451,
+      "changed_by_amendment": false
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/cli/src/authority/policy-review.ts",
+      "before_amendment_sha256": "5235d957e108596cc550b48297091c5d3be530515fc60ecbbe999ca0b7e80de4",
+      "after_sha256": "5235d957e108596cc550b48297091c5d3be530515fc60ecbbe999ca0b7e80de4",
+      "after_bytes": 3095,
+      "changed_by_amendment": false
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/cli/src/authority/policy.ts",
+      "before_amendment_sha256": "3b32792eed1c482009a3cb217074fc642b95808e806b41859f485e2ddf533bee",
+      "after_sha256": "3b32792eed1c482009a3cb217074fc642b95808e806b41859f485e2ddf533bee",
+      "after_bytes": 5634,
+      "changed_by_amendment": false
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/cli/src/authority/policy-support.ts",
+      "before_amendment_sha256": "156b296bf26a87816c9f8206843b9c0a79414fa698dc1829a6dccd6860ede739",
+      "after_sha256": "156b296bf26a87816c9f8206843b9c0a79414fa698dc1829a6dccd6860ede739",
+      "after_bytes": 10045,
+      "changed_by_amendment": false
+    },
+    {
+      "role": "Inspector",
+      "path": "packages/cli/tests/unit/authority-policy-review.test.ts",
+      "before_amendment_sha256": "d18e4f6c22b098fc9aba685022e92276a66d2f5006df0c600412f983076c56ae",
+      "after_sha256": "0b2e35671ca2097b207e48bc56e1254d05278a245c1e4dc71f8e994845f5e69e",
+      "after_bytes": 58613,
+      "changed_by_amendment": true
+    },
+    {
+      "role": "Inspector",
+      "path": "packages/cli/tests/unit/init-authority-policy-review.test.ts",
+      "before_amendment_sha256": "5dd184e04a93f3ead5b122636d2296daf66cabefc1c145c21ba28c2fd0c2f4f7",
+      "after_sha256": "deeca8962afb4b8a7cf4db60443dcc6dfe29e3b4bee2a9bc5d4cbc897377402f",
+      "after_bytes": 18084,
+      "changed_by_amendment": true
+    },
+    {
+      "role": "Inspector",
+      "path": "packages/cli/tests/unit/authority-policy-review-publication.test.ts",
+      "before_amendment_sha256": "39dcb82ef3b4b56982a15138e4b4c45f14ba6e30ab094d2387aede3dfb25b34e",
+      "after_sha256": "39dcb82ef3b4b56982a15138e4b4c45f14ba6e30ab094d2387aede3dfb25b34e",
+      "after_bytes": 8843,
+      "changed_by_amendment": false
+    },
+    {
+      "role": "Inspector",
+      "path": "packages/cli/tests/unit/authority-command-boundary-finalization.test.ts",
+      "before_amendment_sha256": "728990fcd1b31e03272d19fe01cd785b0030b6ba70cb1e311ff2942386f521d4",
+      "after_sha256": "1af7f1aaa84b5a51e5e12b27d3ced8151f492565bef84e8c6d943fea7105d294",
+      "after_bytes": 12358,
+      "changed_by_amendment": true
+    },
+    {
+      "role": "Inspector",
+      "path": "packages/cli/tests/unit/cli-shard09-init-bind-adapters-policy.test.ts",
+      "before_amendment_sha256": "c5f9aa4c11455cdf712273ad98d626ed5656d413587bdc3c2c7e0cdf1e75e9e6",
+      "after_sha256": "c5f9aa4c11455cdf712273ad98d626ed5656d413587bdc3c2c7e0cdf1e75e9e6",
+      "after_bytes": 19741,
+      "changed_by_amendment": false
+    },
+    {
+      "role": "Inspector",
+      "path": "packages/schemas/tests/contract/governance-v15-adr.test.ts",
+      "before_amendment_sha256": "7df5916d5fcee90419767ae44fd579e8e7a96bd1c1e1f66cc3246a5338146afb",
+      "after_sha256": "f179ec821f92015a3fd3251f42fdb3937f716a0c33c23c9a7780cecd83d08443",
+      "after_bytes": 44147,
+      "changed_by_amendment": true
+    },
+    {
+      "role": "Generated",
+      "path": "docs/reference/error-codes.md",
+      "before_amendment_sha256": "b5bbc2493d4cb427790081c01e42f2f087071febd223a3d0aba58d83f70eebfd",
+      "after_sha256": "b5bbc2493d4cb427790081c01e42f2f087071febd223a3d0aba58d83f70eebfd",
+      "after_bytes": 331240,
+      "changed_by_amendment": false
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/cli/src/action-output.ts",
+      "before_amendment_sha256": "11da5e163aa687ce01130367bf8b2715c19f56c5e8ef50bbc4e9c18459791c8d",
+      "after_sha256": "84023b4a893d7d0102a4d0f6c6e8537624415dc11d20cf408cbcfe3444d86f54",
+      "after_bytes": 22389,
+      "changed_by_amendment": true
+    },
+    {
+      "role": "Inspector",
+      "path": "packages/cli/tests/unit/action-output-authority-policy-review.test.ts",
+      "before_amendment_sha256": null,
+      "after_sha256": "5a3e7a3a25f02459b24245907702b69a3408c4a33e9aa15b2dcc355f020cacfa",
+      "after_bytes": 20484,
+      "changed_by_amendment": true
+    }
+  ],
+  "unexpected_source_paths": [],
+  "real_policy_created": false,
+  "runtime_schema_roster_or_action_permissions_changed": false
+}

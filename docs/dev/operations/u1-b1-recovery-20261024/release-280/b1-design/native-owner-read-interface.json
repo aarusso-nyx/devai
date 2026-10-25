@@ -1,0 +1,16 @@
+{
+  "standing": "NATIVE_OWNER_READ_EXACT_INTERFACE_CLARIFICATIONS_FOR_INDEPENDENT_RED",
+  "base_checkpoint_sha256": "2ce67c333acafb3d86eb07e3a743e3fa9a90a3ea9260c11dbafc519d532a7ffc",
+  "selector_scope": "Readonly approvalId may select any actual witnessed matching approval in the sealed repo/worktree private namespace under one of the four allowed actualaction scopes. It need not equal opaqueinvocation approval_id. No existingmodule getter/seam/export or control widening. Snapshot proves no write/phase permission; later fixedwriter must independently enforce exact target/plan/approval against original invocation via existing eligible() and fresh ordinary authority.",
+  "failure_classification": "Initial malformed/missing/foreign namespace or invalid stable captured graph usesHOST_INVALID. Valid canonical foreignroot usesHOST_STALE before privatefile namespace census. After first admitted namespace, selectedfile read/check failures and final namespace/context/B5/scope/clock recheck failures useHOST_STALE; stable captured graph decode/reduction failure usesHOST_INVALID. Rechecks observe bounded readonly data only, no claim to classify unobserved concurrent mutation or to provide transaction linearizability.",
+  "zeroization_scope": "Only private bytebuffers actuallyreturned/owned by thisreader: first/final namespace issuer.bytes and selectedprivatefile bytes registered immediately on return. Zero these in finally on every path, success or refusal. Existing namespace helper internal file buffers, codec temporarycopies and immutable keystrings are not accessible for explicitzeroing and make no all-memory zeroization promise; they are not returned or retained in snapshot. Existing sealedhelpers remain unchanged.",
+  "selected_memory_bound": "Charge witnessed file sizes +issuer bytes against32MiB before each selectedread. Each existing fixedreader independently caps1MiB and validates identities. Compare actual size/identity/SHA immediately; refuse drift before building purestate. At most one independently bounded in-flight file allocation may precede drift refusal; no assertion about whole-V8 heap/GC or existing fullnamespacehelper transientallocations. Matching retained selectedbytes submitted to reducer total<=32MiB.",
+  "exact_fields": "Snapshotexactfields unchanged; identity/state/clock/phaseentries all frozen. No physicalnamespace/file identity, rawrecord, key, MAC, arbitrarymetadata or invocation controls leak. binding_matches_approval is a digest comparison, not actualplan/source/output/authority eligibility.",
+  "required_added_cases": [
+    "A different actualsame-repoapproval from sealedcontrolselector can be readonlyinspected; cannot be used to dispatch foreigntarget through existing operationeligibility",
+    "Initial invalidsignedgraph INVALID; midselected/final failures STALE with unchanged foreign/changed bytes retained",
+    "Pass-through observation of returnedcapturedprivatebuffers shows zeroing aftersuccess/failure; no scan/allhelper-memory erasure claim",
+    "Inside actualnativeadmission kernel callback, readerrefuses before rawseedopen/close; owning lock not dropped"
+  ],
+  "preservation": "No old source/test/schema/receipt changes; current1304 reference preserved by exacttwo-row inverse after generation."
+}

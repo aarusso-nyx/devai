@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/v2.8.0-qualification/inspector/private-publication-before-source-red.txt","kind":"historical-transcript-custody-pointer","original_bytes":8559,"original_bytes_changed":false,"original_sha256":"a7d885159e1237f8e873c94fab842ca4d1a41f54703ac56a3af13fdf04e7bfdf"}

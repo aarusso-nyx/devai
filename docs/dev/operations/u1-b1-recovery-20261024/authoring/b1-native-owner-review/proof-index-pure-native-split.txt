@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/proof-index-pure-native-split.txt","kind":"historical-transcript-custody-pointer","original_bytes":634,"original_bytes_changed":false,"original_sha256":"1f9f3967adfee01e48b91f0cc5c060334118ae8c88b478e226dd187717e6064c"}

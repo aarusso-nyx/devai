@@ -1,0 +1,78 @@
+{
+  "kind": "independent-seven-inventory-source-preview-handoff",
+  "qualification": "Actual sealed native04 readonly source input authenticated by completed03; existing seven bundled producers. Synthetic B5/TTY/policy. Preview files exist ONLY in independent review directory, not adopter output paths. No04intent/lease/completion/publication/readiness or installedpublicclaim.",
+  "fixture": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-initial-owner-plan-jJqJW9/repository",
+  "plan_sha256": "5d55b291ae2e31c578ec2c064bd83c8471cda1afbd197734c946f7fd87f61141",
+  "index_sha256": "a9ae42654e20e902c3d3e120478597bfd9a9a7f36d5d9bd073078581d26cd3ad",
+  "predecessor_completion_sha256": "662c54e2ef6088877e5300d9951691c6299c93615d08e08825638ae22b111bab",
+  "verified_git_blobs": 14472,
+  "outputs_manifest_sha256": "4be35f8e9656c04b74aa7215208df571a065fed29391d8c31106c2c86dc30d83",
+  "aggregate_bytes": 4387554,
+  "artifacts": [
+    {
+      "preview_file": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/inventory-preview-1.json",
+      "planned_output_path": ".devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory/inventory_api/api-map.json",
+      "schema": "api-map.schema.json",
+      "sha256": "1335d9800e69062e69fbc282498d167d9176fecd3c44abefbdf01a4bbf60647f",
+      "bytes": 1017827
+    },
+    {
+      "preview_file": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/inventory-preview-2.json",
+      "planned_output_path": ".devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory/inventory_routes/routes-angular.json",
+      "schema": "routes-inventory.schema.json",
+      "sha256": "ae716869525a27eea6d3fc4a2351596ac3cea1676a3091059e3d3430e3241174",
+      "bytes": 14737
+    },
+    {
+      "preview_file": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/inventory-preview-3.json",
+      "planned_output_path": ".devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory/inventory_data_model/data-model.json",
+      "schema": "data-model-inventory.schema.json",
+      "sha256": "b56a5956372ae8588dd2efcad11021f728c83acf04703e484af3d2ab90386f71",
+      "bytes": 355980
+    },
+    {
+      "preview_file": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/inventory-preview-4.json",
+      "planned_output_path": ".devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory/inventory_data_handling/data-model-pii.json",
+      "schema": "data-model-inventory.schema.json",
+      "sha256": "39c712a3fa67abc1036d94c478151dc80f158ba7cf61bba2f78fe9d58aaf8f1c",
+      "bytes": 357568
+    },
+    {
+      "preview_file": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/inventory-preview-5.json",
+      "planned_output_path": ".devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory/inventory_rbac/rbac.json",
+      "schema": "rbac-inventory.schema.json",
+      "sha256": "a753a5267aaf28916377409c8aaa207c138d7fea31d064cd1d759e724591adc6",
+      "bytes": 550946
+    },
+    {
+      "preview_file": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/inventory-preview-6.json",
+      "planned_output_path": ".devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory/inventory_dep_graph/dep-graph.json",
+      "schema": "dep-graph.schema.json",
+      "sha256": "c5cc8b4d13b787d2a577432656bd5bad383beb7cd465e962ef53cf1b4181d77d",
+      "bytes": 982247
+    },
+    {
+      "preview_file": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/inventory-preview-7.json",
+      "planned_output_path": ".devai/state/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/inventory/inventory_coverage/coverage-matrix.json",
+      "schema": "coverage-matrix.schema.json",
+      "sha256": "5c7ee5c01218613331e7968788a904f25b16727221a8a412c8defac13e952f1b",
+      "bytes": 1108249
+    }
+  ],
+  "checks": {
+    "tests_passed": 2,
+    "log": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/inventory-preview-native-optional-registry.txt",
+    "log_sha256": "20ac442bf89e2f3ca4e652372d209966861c694c36862b65e378c4d6cffb6f1c",
+    "results_sha256": "1fbee66d97e5ef8c6e864a17eae75220569abcae077e47448a78a8983f8f6e61",
+    "sameclock_repeat_identical": true,
+    "corrupt_blob_foreign_scope_no_scope_refused": true,
+    "domain_effect_callbacks": 0,
+    "private_namespace_unchanged": true,
+    "index_and_historical_epochs_unchanged": true
+  },
+  "source_sha256": {
+    "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/src/boundaries/reconciliation-inventory-input.ts": "2f8b33aa44b97b47703846bad0f48fb526876c88b44ea816b1c9f0339ea3e68b",
+    "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/cli/src/commands/evidence/reconciliation-inventory-bodies.ts": "25bfa7b827c2f5ff4d665152e70a33011adf5112482f2f5053e6473551e45828",
+    "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/sensors/src/declared-surfaces.ts": "a1f2efc22677e9dac519f1ef2a6ac4259ffe9cee9d5d83e535d4f9b83111621e"
+  }
+}

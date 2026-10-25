@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/checkpoint-native-epoch-guard.txt","kind":"historical-transcript-custody-pointer","original_bytes":1658,"original_bytes_changed":false,"original_sha256":"0b7fc400f81f571cc75083f9a27246628780dce7f6203d45ddcb3a9909655c05"}

@@ -1,0 +1,196 @@
+{
+  "status": "BOUNDED_IMPLEMENTATION_PUBLIC_PREVIEW_BLOCKED_NO_LIVE_USE",
+  "source_package": {
+    "name": "@aarusso-nyx/devai",
+    "version": "2.7.1",
+    "installed_candidate_qualified": false
+  },
+  "constitution": {
+    "version": "1.2.0",
+    "sha256": "d5dfdc972161e0f848dd859be7bbfa510973c5c9a449a0f9e6b8960e4f5ac96a"
+  },
+  "baseline_commit": "2df84159caabf869b866fb2a05e5b06be83295fb",
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 5626,
+      "sha256": "9daf09705b88d5cb92904be1c3d8931034c4a080d24282fec148819cb862a0a3"
+    },
+    {
+      "path": "approval-receipt.md",
+      "bytes": 1165,
+      "sha256": "714a64614940b01d92722a9b912b8f63799d98c2138ee1e73b2a1dda0ffa26d0"
+    },
+    {
+      "path": "engineer/README.md",
+      "bytes": 3969,
+      "sha256": "6c0cb6de193c7d7c064ef04c74a3c91ee51c84467815ccb0921150f50d8dd077"
+    },
+    {
+      "path": "engineer/format-check.txt",
+      "bytes": 504,
+      "sha256": "76ef6e597da3f1f4a42e3c43a0d62891bbb1e8595566966adb41b33055336289"
+    },
+    {
+      "path": "engineer/source-manifest.json",
+      "bytes": 1890,
+      "sha256": "ffebaf5d9113671f098ce727f62f6af0d6260424ab96a891d4031d5a7d6eac33"
+    },
+    {
+      "path": "engineer/targeted-lint.txt",
+      "bytes": 428,
+      "sha256": "8a8af2be7e639108488f89e5c65cd35c696a51e65e18c6f62a8399d04128fd8f"
+    },
+    {
+      "path": "engineer/typecheck-blocked.txt",
+      "bytes": 636,
+      "sha256": "ace254fcf1d572eafd0cc2d34f6092e89124b5ac3ca503f41788297e585cb44c"
+    },
+    {
+      "path": "entry-preservation.json",
+      "bytes": 32178,
+      "sha256": "c9797b07c2f7b91a357490d1ddaa31bdba3353dbfa6071ec5e4e8715a30f0306"
+    },
+    {
+      "path": "existing-issuer-boundaries.txt",
+      "bytes": 638,
+      "sha256": "f22c2f6ede7c08abe982250be98daae2738ca4fa7562a43b7d33f176f2c6ee86"
+    },
+    {
+      "path": "final-format.txt",
+      "bytes": 428,
+      "sha256": "9a047bca19390f90234e566131a549fefdde204b2f6b6173253d4d68013d7ea8"
+    },
+    {
+      "path": "fixture-byte-verification.json",
+      "bytes": 1120,
+      "sha256": "9551e4a6df0198d85acb55905281b8416e44d5c2783f90d652d0d0539e36a550"
+    },
+    {
+      "path": "historical-lower-boundaries.txt",
+      "bytes": 2769,
+      "sha256": "c3697407b62a4adc51a4e55e1da3107bbd25bb2098a0e4119d49319644d002b7"
+    },
+    {
+      "path": "inspector/README.md",
+      "bytes": 17313,
+      "sha256": "768d917ab6d04dcbdbcd68c1884c63c9dbe6d747a09dcb06b736d2fdf48c84ab"
+    },
+    {
+      "path": "inspector/command-io-first.txt",
+      "bytes": 274,
+      "sha256": "477d990cdb5379b3026fac820151d8e1fbb930104f2b19048a6363732f99e042"
+    },
+    {
+      "path": "inspector/evidence-index.json",
+      "bytes": 7432,
+      "sha256": "f71e2a927f87c6bec767d68bbc26b0f95dc3e3e164de937fb2cdfb4ae439986e"
+    },
+    {
+      "path": "inspector/extended-counterexamples-first.txt",
+      "bytes": 5824,
+      "sha256": "48fc0ed97227e10e34971315b5a8ecc6bb325b6148e2ea6ad88241ae40e31a23"
+    },
+    {
+      "path": "inspector/final-six-paths-extended.prelint.txt",
+      "bytes": 5680,
+      "sha256": "6d05134db8a3d82b69ef2f80854485cf67cd3334988b63792c2bf6f5ce0d91f6"
+    },
+    {
+      "path": "inspector/final-six-paths-extended.txt",
+      "bytes": 5677,
+      "sha256": "aed5dabd2f0382684fdde7e8e06ed3b2f6311710c219a9ac3141448674fce65c"
+    },
+    {
+      "path": "inspector/final-six-paths.txt",
+      "bytes": 5676,
+      "sha256": "c96c2e8a49b6b062dc2a416e267e0c49583d9227e8a01c79fac9e0bf81c67e9c"
+    },
+    {
+      "path": "inspector/first-production-green-attempt.txt",
+      "bytes": 1796,
+      "sha256": "ae6a40adeade6d46dd9bfd64fe73d7d3fedce0678feb39593c09d9c2b03e932a"
+    },
+    {
+      "path": "inspector/inspector-eslint-extended.prelint.txt",
+      "bytes": 271,
+      "sha256": "932beae910822a34a697b7e40ad958e320c59dc7bced10a1ac6a5cf7a35f281e"
+    },
+    {
+      "path": "inspector/inspector-eslint-extended.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "inspector/inspector-eslint.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "inspector/inspector-prettier-extended.txt",
+      "bytes": 66,
+      "sha256": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20"
+    },
+    {
+      "path": "inspector/inspector-prettier.txt",
+      "bytes": 66,
+      "sha256": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20"
+    },
+    {
+      "path": "inspector/lifecycle-publication-first.txt",
+      "bytes": 1366,
+      "sha256": "ea5517b10ee503b4324768cb8c44398607ca7804e0e23765927db265fb3beb66"
+    },
+    {
+      "path": "inspector/private-guarded-fixture-verification.txt",
+      "bytes": 2565,
+      "sha256": "811f2e537cc81c0ceae1393b68edca62a088200286ac9453763b8abb9d99ea76"
+    },
+    {
+      "path": "inspector/public-boundary-held-red.txt",
+      "bytes": 3406,
+      "sha256": "9c4cfbb1fbf248d0626b845e90cbd7db77fb659c3bb4a341f6ee8189d34e3fb7"
+    },
+    {
+      "path": "inspector/public-route-red.txt",
+      "bytes": 1501,
+      "sha256": "7ef36193802e9fa998f24612f67061ea1f839dbf8445789ecb90cfffe2a81d6e"
+    },
+    {
+      "path": "inspector/synthetic-fixture-completion.initial.json",
+      "bytes": 9904,
+      "sha256": "63115a5d6507872b4687a5b9426ea0ab6a93527a513053e7a43a4ac93cc77810"
+    },
+    {
+      "path": "inspector/synthetic-fixture-completion.json",
+      "bytes": 9904,
+      "sha256": "b8eebdc22dac6695862055a153766acdd85606cdc3fa83d646fe9e514d2b0a02"
+    },
+    {
+      "path": "inspector/synthetic-fixture-ready.initial.json",
+      "bytes": 104034,
+      "sha256": "566e718d5360491887f954350aa284dfd355751a58c8efa1ab45b26ab22b743c"
+    },
+    {
+      "path": "inspector/synthetic-fixture-ready.json",
+      "bytes": 106801,
+      "sha256": "810a4b0778c866d32b67976dd95525d7f344706cae66925694bea830c09007a7"
+    },
+    {
+      "path": "output-boundary-amendment.proposed.md",
+      "bytes": 4349,
+      "sha256": "9bd102b135d6ceb704ac3f6e30faf3b2d1181cb510d17c822c50cffd631a8d62"
+    },
+    {
+      "path": "source-effects-manifest.json",
+      "bytes": 6382,
+      "sha256": "820c32acecf5018da1096a42ac93b472f9805dc6032bb4343523dd0826b94a15"
+    },
+    {
+      "path": "verification.json",
+      "bytes": 2284,
+      "sha256": "0f1f3b06f4010d2b283c2c51ced6d2abd2a3f0de6bf77d7ac7358caf54fc8cdd"
+    }
+  ],
+  "binding_integration_runtime_release_detran": "HELD"
+}

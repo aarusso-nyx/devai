@@ -1,0 +1,82 @@
+{
+  "external_fixture": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-provision-inspector-7bAVNP",
+  "environment": {
+    "node": "24.22.0",
+    "uv": "1.52.1",
+    "platform": "darwin"
+  },
+  "source_sha256": {
+    "packages/authority/src/boundaries/reconciliation-host-provision.ts": "8c439589cdc0265681ed00a732e6ac0b4c2ab2ad6a520b87e57d2238e1a140b0",
+    "packages/authority/src/boundaries/reconciliation-host-namespace.ts": "44e2abbeb68f0b771e8f82e34d745bfc0435bf532cd2ae710118978339588484",
+    "packages/authority/src/boundaries/host-publish.ts": "b2aa704c775009240b624b4581339cebaec8bcd6f7f95fbf7e71eabf296e054a",
+    "packages/authority/src/index.ts": "9d665d51e73c550819c4c223b34e0d110eb3b5305e02758a754977d46359272c",
+    "packages/authority/dist/boundaries/reconciliation-host-provision.js": "8a0fb0e261adc68c7cb7260149eb3f7bf5bd1ff19ab5dde69d0e24d2b8b3bcc3",
+    "packages/authority/dist/boundaries/reconciliation-host-namespace.js": "3bf6c37dc107d60defb2c892bbdda3363e5e25bd601621b3901f22eecf5029d6",
+    "packages/authority/dist/boundaries/host-publish.js": "4a2d5b90657212c33c2d25fd098b5e4e75415c4d04e37c7f38ba46340ff32cbc",
+    "packages/authority/dist/index.js": "95225e1cf8ca8b8c83ad9c3de3414bd09a3eee1ae6d837f0f6b0d29ede036bcc"
+  },
+  "synthetic_B5_and_TTY_not_installed_origin": true,
+  "private_issuer_or_keys_logged": false,
+  "observations": [
+    {
+      "kind": "authenticated-source-census",
+      "variant": "valid",
+      "record_kinds": 6,
+      "namespace_preserved": true,
+      "issuer_sha256": "60346f2405d31a9e83818d9b8966591741eb53f2cb245b650dfe360f593acf17",
+      "additional_effects": 0,
+      "grants_authority": false,
+      "not_owner_grant_or_phase_eligibility": true
+    },
+    {
+      "kind": "authenticated-source-census",
+      "variant": "wrong-filename-kind",
+      "record_kinds": 6,
+      "namespace_preserved": true,
+      "issuer_sha256": "eedfe5ffe373bd15ab300bd230db8317504f92830de7fedabeb3556aac0115c9",
+      "additional_effects": 0,
+      "grants_authority": false,
+      "not_owner_grant_or_phase_eligibility": true
+    },
+    {
+      "kind": "authenticated-source-census",
+      "variant": "tampered-MAC",
+      "record_kinds": 6,
+      "namespace_preserved": true,
+      "issuer_sha256": "4d7022ceec78bc3b2a8ba1d033a54fcee26caa7f967c103e7470c1fd473117a8",
+      "additional_effects": 0,
+      "grants_authority": false,
+      "not_owner_grant_or_phase_eligibility": true
+    },
+    {
+      "kind": "authenticated-source-census",
+      "variant": "foreign-repository",
+      "record_kinds": 6,
+      "namespace_preserved": true,
+      "issuer_sha256": "f7e16bd58d9f9b6a4c44c1327e70f4273b37052a7d0e5162ebd8e293363137eb",
+      "additional_effects": 0,
+      "grants_authority": false,
+      "not_owner_grant_or_phase_eligibility": true
+    },
+    {
+      "kind": "authenticated-source-census",
+      "variant": "foreign-worktree",
+      "record_kinds": 6,
+      "namespace_preserved": true,
+      "issuer_sha256": "cf70ce69ed3179f12fcf641032013f33e0b435b9f6f6506df489db6357813ba8",
+      "additional_effects": 0,
+      "grants_authority": false,
+      "not_owner_grant_or_phase_eligibility": true
+    },
+    {
+      "kind": "authenticated-source-census",
+      "variant": "foreign-approval-ID",
+      "record_kinds": 6,
+      "namespace_preserved": true,
+      "issuer_sha256": "c36006df4aad42b0562a98afeb1999d465637135b5b696837eb2c9b1c8032db4",
+      "additional_effects": 0,
+      "grants_authority": false,
+      "not_owner_grant_or_phase_eligibility": true
+    }
+  ]
+}

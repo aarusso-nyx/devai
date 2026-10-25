@@ -1,0 +1,29 @@
+{
+  "standing": "CUSTOM_SCOPE_EFFECT_KIND_CONFUSION_FIXED_VERIFIED_NOT_NEW_TYPED_ADAPTER_ACCEPTANCE",
+  "result": {
+    "root_tests_passed": 78,
+    "independent_tests_passed": 78,
+    "historical_tests_unchanged": 70,
+    "new_negative_cases": 8,
+    "full_workspace_types": "PASS",
+    "targeted_lint": "PASS",
+    "targeted_format": "PASS",
+    "diff_check": "PASS"
+  },
+  "before": "8 authentic failing rejection cases with70 originalPASS; original custom scopes reinterpreted nonfilesystem kinds as process requests.",
+  "after": "Both scopes accept only their original filesystem/process kinds. Unsupported discriminants refuse before process argument inspection, using existing diagnostic codes. No capability or logical/physical path permission widened.",
+  "sha256": {
+    "packages/cli/src/services/github-issues-tracking/reconcile-authority.ts": "67550c8d496b5d2dda13b6a980b1550b8541a47772cedde78f48afa4b880b4c1",
+    "packages/skills/src/post-merge-auditor/host-receipt.ts": "00d4f2cb1bc2ba52b6803b10f74f47779200ed9ca9c560807653a8b34c5d56bc",
+    "packages/cli/tests/unit/tracking-reconcile-authority.test.ts": "cac12a4e08282eec4421c21d7678a3b4992aceba5b64ee4a2681ce848e4ebe82",
+    "packages/skills/tests/unit/post-merge-boundaries.test.ts": "864a97f152fa459af8c78eeedf81b6f3b620c57c7f976b426f20c3debae43fe7",
+    "custom-scopes-red.json": "5468307a2506fde5e07fe1e80d94dc479848982b6522b45f5347385975b84f24",
+    "custom-scopes-red.txt": "11a81c6366ef59c734133a69beaff6dac86462e219291e9096b7c92c14f68795",
+    "custom-scopes-green.txt": "293136a924fa3d16e0f1ae89788232507b79eac46d6eae23300121aca26f6604",
+    "typecheck.txt": "3801203c7d9e4544ad471c57f0ab2386897e4413121a6c6be2a61c5af2fd37fb",
+    "inverse-preservation.json": "8c3892f78e5640f9685c269035ade8e0635ceae759bb95cbc8882eb00180b9d6"
+  },
+  "independent_review_sha256": "9790dbc0c765f6439150842f64af6097c30e471ecd6e9ab75ba53146933e114f",
+  "preservation": "Inverse deletion of2guard insertions recovers exact original source bytes; removing8newcases and inserted blanklines recovers exact original test bytes. Original RED/evidence retained.",
+  "remaining": "New reconciliation-host/proof-index request kinds, invocation-bound opaque final adapters, broker/classification/policy/schema consumers and actual public workflows not yet implemented by these guards."
+}

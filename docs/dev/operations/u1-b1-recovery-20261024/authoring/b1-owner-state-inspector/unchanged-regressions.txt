@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-owner-state-inspector/unchanged-regressions.txt","kind":"historical-transcript-custody-pointer","original_bytes":276,"original_bytes_changed":false,"original_sha256":"011f76040bb3c5231dceca4c3b856bd847d45c244793a71be7f95a024d4c2735"}

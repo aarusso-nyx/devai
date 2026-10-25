@@ -1,0 +1,49 @@
+{
+  "standing": "BOUNDED_DESIGN_ACCEPTED_SOURCE_IMPLEMENTATION_NOT_YET_REVIEWED",
+  "reviewed_sha256": {
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/native-provision-checkpoint.json": "b5781dc107baee06410015fc031cd3372022ccd1c2234a1449a3115419dd149d",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/owner-protocol-v3.json": "ed7b6ff199ece13c841e457258468303f8d87ffc3d67b96cebaed0e42015030c",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/owner-clock-amendment.json": "63da78eb95e638d1ba8d5317a4e81e4030d204593f107a7a5344bba3642d5e2c",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/owner-record-codec-checkpoint.json": "40fcc553a75e9d625e381520d8a8fc7c5c139ced901f6dd697f9b79ebc2b2b1f",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/admission-primitive-checkpoint.json": "2d7957218249db895228123dac4c33f71878ba2c895df02f91b40255d91ff73c",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/admission-callback-amendment.json": "f1bdfd732e11a9c0431e06e53a77eac5b3f996df758b75cbf78b275b6beb0eaf",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-admission-inspector/receipt.json": "0952e1aa22d462e23f771fad5ff8cc1a6dfe52ce600f92215dcc30537fb0b9b5",
+    "packages/authority/src/boundaries/reconciliation-host-context.ts": "7cfcf6a1f504698a11ec40d1cf08fde86038ec389e5df3964caa5c7b61d3a54d",
+    "packages/authority/src/runtime/reconciliation-owner-record.ts": "fd7d944ce09f640ff4040abeae090ad8b694b55e3e285feb46ea59650735cbda"
+  },
+  "findings": [],
+  "design_acceptance": [
+    "Existing owned canonical devai ancestor with no group/world write matches actual qualified context directory(path,false); private reconciliation leaf exact0700 and newdirectories0700 remain mandatory. No chmod or normalization of existing entries.",
+    "First seed stage and second issuer stage each require their own fresh typed provision receipt and exact confirmation. First review cannot assert future inode identity; second review freezes actual precursor identities and exact whole issuer bytes after existence.",
+    "In-lock metadata-only anchor use and lower-primitive exclusive descriptor ownership are consistent. Resume fsync of exact precursor must finish before native connection. No raw anchor read/open/close through namespace or helper callbacks while admission lives.",
+    "Issuer raw digest includes canonical signed JCS+LF; acyclic seed/provision_context/issuer/secondREADY graph matches frozen codec. Private key/key digest/MAC/bytes stay private.",
+    "Existing complete issuer preserves original installationB5/HEAD observations; fresh invocation B5/HEAD may differ. No implicit rotation/migration or grant authority follows existing issuer recognition.",
+    "Preexisting closed approval namespace must authenticate records with the admitted issuer key and exact names/IDs; it is neither blindly ignored nor deleted. Unknown/remnant entries refuse and survive.",
+    "Darwin type26 runtime envelope is explicit and narrow. Actual readonly statfs observation agrees for development and temporary roots; this is not generic filesystem, Linux, installedpackage or finaladapter qualification.",
+    "Review handle exact member/this/ALS custody, terminal wrongtoken/cancel/expiry/drift and safe error projection preserve opaque operation and qualified ns dual-clock contracts."
+  ],
+  "implementation_review_requirements": [
+    "Verify namespace inspection never invokes raw anchor reader inside admission and no helper opens/closes admission.sqlite while locked; preserve lower SQL/metadata ownership.",
+    "Verify fresh context recapture after the first authorized namespace creation rather than retaining an expected-to-be-stale precreation context; recheck frozen currentHEAD/B5/clock and exact planned successor state.",
+    "Verify actual durable0600 seed/issuer create-only publication, exact precursor fsync before admission, fsync newly created dirs and parents, owned post-entry uncertainty and no retry/key rotation.",
+    "Verify exact two separate operation receipts, fixed private callbacks only, no raw native cause/key/payload/physical path in public values/errors.",
+    "Verify closed bounded preexisting approvals census and MAC/name/root/seed/identity binding without comparing immutable installationHEAD/B5 to fresh action observations.",
+    "Independent actual direct/linked contention/crash/durability tests and full historical suite remain separate Inspector gate."
+  ],
+  "source_absence_at_review": {
+    "packages/authority/src/boundaries/reconciliation-host-provision.ts": true,
+    "packages/authority/src/boundaries/reconciliation-host-namespace.ts": true
+  },
+  "evidence": {
+    "filesystem_probe": "readonly-filesystem-observation.json",
+    "filesystem_probe_sha256": "1ef7e87c3b77192d137531e3fb6d4c09af15f5d71e381184d9bdb4985fd7b11c",
+    "native_receipt_interpretation": "56 lower-admission tests recorded in immutable prior receipt; not rerun and not final host-adapter qualification."
+  },
+  "scope": "Evidence only. No source/test/schema/registry edits, no build, no newagent or downstream actions.",
+  "graft": {
+    "current_calls": 1,
+    "current_estimated_tokens_saved": 42241,
+    "cumulative_successful_calls": 17,
+    "cumulative_estimated_tokens_saved": 365601
+  }
+}

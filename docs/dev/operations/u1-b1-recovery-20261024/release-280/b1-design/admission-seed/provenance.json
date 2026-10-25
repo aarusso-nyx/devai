@@ -1,0 +1,20 @@
+{
+  "status": "FROZEN_PUBLIC_INERT_SEED_NOT_AUTHORITY",
+  "node": "v24.22.0",
+  "sqlite": "3.53.4",
+  "size_bytes": 8192,
+  "sha256": "3f6b742405bb199a11ed0952c9aa049285ef25dc69954e901d2e987cd15c4372",
+  "independent_generation_hashes": [
+    "3f6b742405bb199a11ed0952c9aa049285ef25dc69954e901d2e987cd15c4372",
+    "3f6b742405bb199a11ed0952c9aa049285ef25dc69954e901d2e987cd15c4372"
+  ],
+  "schema_sql": "CREATE TABLE admission_protocol(singleton INTEGER PRIMARY KEY CHECK(singleton=1),version INTEGER NOT NULL CHECK(version=1))",
+  "rows": [
+    {
+      "singleton": 1,
+      "version": 1
+    }
+  ],
+  "fixture_root": "/private/tmp/devai-release-280-01a16e18/canonical-admission-seed-F6tiY9",
+  "permissions": "Generated0600; runtime publisher must independently retain0600. No private key or approval in seed."
+}

@@ -1,0 +1,117 @@
+{
+  "standing": "Architect custody observation, not native F4 inventory or governed proof",
+  "files": [
+    {
+      "path": "preserved-packets/REC-U1-upstream-recovery.md",
+      "origin": "/Volumes/Development/.codex/artifacts/detran/pr211-approved-preparation-20261023/prepared-packets/REC-U1-upstream-recovery.md",
+      "bytes": 5126,
+      "sha256": "f198bde3bea26c776f91709217320beaf1b20c20e6b2890a17a36d38e5ca222d",
+      "standing": "Lossless historical source copy; no new authority, binding or executable output."
+    },
+    {
+      "path": "preserved-packets/REC-B1-canonical-bootstrap-design.md",
+      "origin": "/Volumes/Development/.codex/artifacts/detran/pr211-approved-preparation-20261023/prepared-packets/REC-B1-canonical-bootstrap-design.md",
+      "bytes": 5943,
+      "sha256": "35133cbcbad7bed680c803c64af8ae79f5d7d182b4dd6f9bc9847cb831384514",
+      "standing": "Lossless historical source copy; no new authority, binding or executable output."
+    },
+    {
+      "path": "preserved-packets/REC-D1-adoption-and-execution-gates.md",
+      "origin": "/Volumes/Development/.codex/artifacts/detran/pr211-approved-preparation-20261023/prepared-packets/REC-D1-adoption-and-execution-gates.md",
+      "bytes": 6930,
+      "sha256": "8d1ed4804a68b2d01604b8896423842ec3ec95789c076dbd5de5c61737388111",
+      "standing": "Lossless historical source copy; no new authority, binding or executable output."
+    },
+    {
+      "path": "preserved-packets/HC-01-eight-line-compatibility.md",
+      "origin": "/Volumes/Development/.codex/artifacts/detran/pr211-approved-preparation-20261023/prepared-packets/HC-01-eight-line-compatibility.md",
+      "bytes": 5458,
+      "sha256": "c67a38923f78f152c0704996a3546f5fb7f5992294ea9ae8bca2728055389f14",
+      "standing": "Lossless historical source copy; no new authority, binding or executable output."
+    },
+    {
+      "path": "preserved-packets/REC-U1-handoff-prepared.md",
+      "origin": "/Volumes/Development/.codex/artifacts/detran/pr211-approved-preparation-20261023/prepared-packets/REC-U1-handoff-prepared.md",
+      "bytes": 3273,
+      "sha256": "a20365a8d4559295949e751f90fdad5b296d8f5e461513f3a3208931135a25ef",
+      "standing": "Lossless historical source copy; no new authority, binding or executable output."
+    },
+    {
+      "path": "preserved-packets/B1-design-draft-ADR-EVI-0007.md",
+      "origin": "/Volumes/Development/.codex/artifacts/detran/pr211-approved-preparation-20261023/prepared-packets/B1-design-draft-ADR-EVI-0007.md",
+      "bytes": 6444,
+      "sha256": "662b61bdd8708f56ce3a4c0dea4ee3c72c741d0c2d9c5c8380057fc2b9b5b7f7",
+      "standing": "Lossless historical source copy; no new authority, binding or executable output."
+    },
+    {
+      "path": "preserved-packets/B1-I-proposed-implementation-packet.md",
+      "origin": "/Volumes/Development/.codex/artifacts/detran/pr211-approved-preparation-20261023/prepared-packets/B1-I-proposed-implementation-packet.md",
+      "bytes": 13532,
+      "sha256": "07768b045f6f81d6e667bf9c58006ef020fe7a7f6e38b2c38bbf19467143a850",
+      "standing": "Lossless historical source copy; no new authority, binding or executable output."
+    },
+    {
+      "path": "preserved-packets/D1-release-binding.json",
+      "origin": "/Volumes/Development/.codex/artifacts/detran/pr211-approved-preparation-20261023/prepared-packets/D1-release-binding.json",
+      "bytes": 1072,
+      "sha256": "7b7a6516e7b07f8b271af0284a153e4975f308846c783418b3f90ef8e79690c9",
+      "standing": "Lossless historical source copy; no new authority, binding or executable output."
+    },
+    {
+      "path": "preserved-packets/D1-owner-approval.md",
+      "origin": "/Volumes/Development/.codex/artifacts/detran/pr211-approved-preparation-20261023/prepared-packets/D1-owner-approval.md",
+      "bytes": 707,
+      "sha256": "f62fd8715cffff7a435a379cb788b1c31083c1fc5b205c708228fc101f8eaf49",
+      "standing": "Lossless historical source copy; no new authority, binding or executable output."
+    },
+    {
+      "path": "preserved-packets/approval-manifest.json",
+      "origin": "/Volumes/Development/.codex/artifacts/detran/pr211-approved-preparation-20261023/prepared-packets/approval-manifest.json",
+      "bytes": 2501,
+      "sha256": "2d2b36ea4e7f48679c3debaeb112f00ff1cb37368a62f219d4d2d50f20278370",
+      "standing": "Lossless historical source copy; no new authority, binding or executable output."
+    },
+    {
+      "path": "preserved-packets/reference-ADR-EVI-0006.md",
+      "origin": "/Volumes/Development/.codex/artifacts/detran/pr211-approved-preparation-20261023/prepared-packets/reference-ADR-EVI-0006.md",
+      "bytes": 13401,
+      "sha256": "89e4bebfc1147662efc3d779b490e71339a838bfe8531cbd6907e2fb073eea09",
+      "standing": "Lossless historical source copy; no new authority, binding or executable output."
+    },
+    {
+      "path": "preserved-packets/REC-B1-A-contract-only-approval.md",
+      "origin": "/Volumes/Development/.codex/artifacts/detran/pr211-binding-authority-refresh-20261023/reviewed-annexes/REC-B1-A-contract-only-approval.md",
+      "bytes": 8079,
+      "sha256": "c2d6b50177451e0c2a2ded87469db5951253a8b07e3276b79ed212940f0bdcb7",
+      "standing": "Lossless historical source copy; no new authority, binding or executable output."
+    },
+    {
+      "path": "preserved-packets/REC-B1-A-path-inventory.json",
+      "origin": "/Volumes/Development/.codex/artifacts/detran/pr211-binding-authority-refresh-20261023/reviewed-annexes/REC-B1-A-path-inventory.json",
+      "bytes": 1904,
+      "sha256": "94969b4121eb2a5702baa883799f286c1cb74759f08608caa18d33b1f21658c7",
+      "standing": "Lossless historical source copy; no new authority, binding or executable output."
+    },
+    {
+      "path": "preserved-packets/authority-review.md",
+      "origin": "/Volumes/Development/.codex/artifacts/detran/pr211-binding-authority-refresh-20261023/reviewed-annexes/authority-review.md",
+      "bytes": 16951,
+      "sha256": "ff87c62ad9705f7039d6dd2a086d703db421210dd3466cf9d46296813526d7f1",
+      "standing": "Lossless historical source copy; no new authority, binding or executable output."
+    },
+    {
+      "path": "preserved-packets/source-manifest.json",
+      "origin": "/Volumes/Development/.codex/artifacts/detran/pr211-binding-authority-refresh-20261023/reviewed-annexes/source-manifest.json",
+      "bytes": 10056,
+      "sha256": "307b242e7795d25b0109e12c7ec32d5be7e8a4f4a39ecd0915966397db682458",
+      "standing": "Lossless historical source copy; no new authority, binding or executable output."
+    },
+    {
+      "path": "preserved-packets/authority-snapshot.md",
+      "origin": "/Volumes/Development/.codex/artifacts/detran/pr211-approved-preparation-20261023/working-tree-snapshot/work/rounds/R-0025/AUTHORIZATION.md",
+      "bytes": 26399,
+      "sha256": "6afa7c2332edf0b1273e8abbd64b7f4943722d1eb07eb97447ec17f7dc26cb08",
+      "standing": "Lossless historical source copy; no new authority, binding or executable output."
+    }
+  ]
+}

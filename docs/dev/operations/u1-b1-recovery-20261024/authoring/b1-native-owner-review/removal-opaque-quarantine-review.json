@@ -1,0 +1,20 @@
+{
+  "kind": "independent-bounded-design-review-followup",
+  "verdict": "accept-existing-opaque-native-quarantine; reject-prepared-public-rename-target",
+  "supersedes_only": "Earlier deterministic-name suggestion for removal quarantine; publication scratch derivation remains separate.",
+  "decision": [
+    "Keep existing trusted native remover with fresh cryptographic UUID not exposed before rename. Do not add a prepared public quarantine-name variant using overwriting POSIX rename.",
+    "Freeze exact same-directory grammar, at most one quarantine, fixed native rename/recheck/owned-unlink or no-replace restore, parent fsync and uncertainty preservation in explicit removal recipe.",
+    "The logical removal target remains exact and identity-bound; only native code chooses the transient quarantine. No caller destination or generic filesystem grant.",
+    "Describe freshness/unexposure honestly, not as an atomic no-replace destination guarantee. An OS no-replace primitive would be required for preselected/exposed destinations or a stronger collision guarantee.",
+    "Crash after rename may leave an unknown opaque quarantine. Preserve it and fail closed; a new lease cannot reconstruct that old quarantine from its nonce/pid, and cannot infer ownership from name or contents.",
+    "Publication scratch may still derive from existing authenticated lease fields and use exclusive creation/no-replace link. Its deterministic naming does not transfer to rename quarantine."
+  ],
+  "counterexamples": [
+    "Known/precreated prepared quarantine must never be accepted as an overwrite destination.",
+    "Foreign source entry swapped before rename is restored without replacement or preserved with uncertainty.",
+    "Unknown crash quarantine remains untouched and blocks dependent unsafe continuation.",
+    "Extra scratch destinations supplied by caller are rejected."
+  ],
+  "qualification": "Independent design judgment from existing remover/source/schema inspection; no prepared-remover or dead-lease runtime activation claimed."
+}

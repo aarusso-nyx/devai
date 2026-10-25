@@ -1,0 +1,129 @@
+{
+  "schemaVersion": "1.0.0",
+  "kind": "bounded-internal-owner-source-milestone",
+  "candidate_version": "2.8.0",
+  "base_head": "2df84159caabf869b866fb2a05e5b06be83295fb",
+  "committed": false,
+  "installed_current_sources": false,
+  "source_witnesses": [
+    {
+      "path": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/src/boundaries/reconciliation-effect-plan.ts",
+      "sha256": "d4a2b06fa31258d241a663ed307c6eb63a0c4270a927c7eef48406890bdc5273",
+      "bytes": 12548
+    },
+    {
+      "path": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/law/schemas/evidence-reconciliation-plan.schema.json",
+      "sha256": "2ca7f5a6ab93b374f0a861ca8ac902dddc882523314256399abcebfaab2096f5",
+      "bytes": 37754
+    },
+    {
+      "path": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/utils/src/evidence-record.ts",
+      "sha256": "4180bee5665bc2cf0dbd5352ac02b87425c1b375337e179562089fc5a4d21708",
+      "bytes": 3831
+    },
+    {
+      "path": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/evidence/src/evidence/chain.ts",
+      "sha256": "b7924bc0ede322c1d5afb47522bbe88f0574581e11ac1258c03aaea3970415e1",
+      "bytes": 9540
+    },
+    {
+      "path": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/src/boundaries/host-publish.ts",
+      "sha256": "b762526eb9a6127f31fbe0cdc134aba4281321a34c5ab2e62bd6baa4d75e061a",
+      "bytes": 9701
+    },
+    {
+      "path": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/src/boundaries/reconciliation-host-approve.ts",
+      "sha256": "0903d778f1c8c1a6c1c378dca7a3ed878b5f09a2a5a5a7eb507c336b845e5307",
+      "bytes": 14846
+    },
+    {
+      "path": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/src/boundaries/reconciliation-host-grant.ts",
+      "sha256": "321d107e2d66d104a1a9779cac8700e8f62f9269e1fe2028802d7e670d40dd81",
+      "bytes": 15201
+    },
+    {
+      "path": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/src/boundaries/reconciliation-custody-input.ts",
+      "sha256": "d120a2472b4d052dfc54214c9a8cf05db11fc3a475070aa026ae58cf0cbdaf9d",
+      "bytes": 5322
+    },
+    {
+      "path": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/src/boundaries/reconciliation-plan.ts",
+      "sha256": "4d917df65bc84d377ce370651c9342cafc50afe272276cb1fb2d5a6715ed2d6f",
+      "bytes": 47974
+    },
+    {
+      "path": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/src/boundaries/reconciliation-host-operation.ts",
+      "sha256": "b1b7860596bd1257a07040ba46ce444f66a2ab7b741b4ca0c7941b2c0f3c8071",
+      "bytes": 22081
+    },
+    {
+      "path": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/cli/src/authority/reconciliation-host-input.ts",
+      "sha256": "7a7bbae9464546ea0511d7cd326bdd10aa3f9a8440d54dfdf842fa35c38bdf69",
+      "bytes": 8153
+    }
+  ],
+  "independent_evidence": [
+    {
+      "path": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/initial-plan-native-results.json",
+      "sha256": "5e704b70f224c037a6a05440558fa13bf03a4ba28661ad9235d32b17da5f882d",
+      "bytes": 1044
+    },
+    {
+      "path": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/initial-owner-plan-revalidation-review.json",
+      "sha256": "e38959bccae9c928b457fd5db1c3e6de8ca837bb6d00db64aab585fcf37b0e1e",
+      "bytes": 2482
+    },
+    {
+      "path": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/approval-native-split-results.json",
+      "sha256": "b8dfe7bc9bf5ac2e8435336e91053b7f987ec6a10ae6cad784619f332410ecca",
+      "bytes": 1673
+    },
+    {
+      "path": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/custody-input-native-results.json",
+      "sha256": "63fc403108a78a8a2250a62ed8450c4c72ef8e6d24783525e6aa660519cda5fb",
+      "bytes": 498
+    },
+    {
+      "path": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/grant-native-results.json",
+      "sha256": "75bf607c9841906cd8fcc9cdefe1a46bd7873e2276b0e48e830eef74967377dd",
+      "bytes": 2272
+    },
+    {
+      "path": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/removal-opaque-quarantine-review.json",
+      "sha256": "a1bcebebf84dd7fcb0339811d02e9feb3c280525ff5f6ae5dc49d56f656b6ed7",
+      "bytes": 2047
+    }
+  ],
+  "verified_checks": {
+    "historical_chain_epoch_recovery": 157,
+    "prepared_and_historical_private_publication": 41,
+    "portable_effect_recipe": 13,
+    "historical_and_new_sealed_input_controls": 199,
+    "independent_recipe_and_old_writer_kernel_parity": 17,
+    "native_initial_owner": 4,
+    "native_raw_custody_reader": 6,
+    "native_renewal_revocation": 7
+  },
+  "limits": [
+    "Native fixtures use synthetic B5 and policy origin; not installed public Owner route qualification.",
+    "Aggregate initial native Owner scenario timed out at 180 seconds; all assertions retained in split cases which passed. Original timeout evidence preserved.",
+    "Effect recipe gained explicit opaque-removal and per-live-lease scratch bounds after the native approval/grant fixture runs; those old approvals are not authority for the new recipe. Fresh exact plan/Owner approval required before phase effects.",
+    "Saved plan reader refactoring and expected-grant/lease sealing are newer than initial Owner fixture; included in subsequent grant/input qualification."
+  ],
+  "held_effects": [
+    "binding and integration outside disposable qualification",
+    "DETRAN live adoption and #211/C6 changes",
+    "release and registry publication"
+  ],
+  "remaining": [
+    "native exact ESRCH dead-lease adapter",
+    "phase01 custody effects",
+    "phase02 normal-kernel canonical selection plus authenticated historical-checker acceptance",
+    "separate existing divergent7 and newest8 recoveries",
+    "real one-entry proof index CAS adapter",
+    "seven native immutable-source diagnostic bodies",
+    "remaining public actions, effect/error/registry/output consumers",
+    "installed negative/concurrency/crash/retry qualification",
+    "maintainer integration and protected RC/release/publication/readback"
+  ]
+}

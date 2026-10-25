@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-host-context-inspector/expanded-fault-format.txt","kind":"historical-transcript-custody-pointer","original_bytes":274,"original_bytes_changed":false,"original_sha256":"16b9fd651ed50f4756649e4363ec02838cfe6e663f5dd91c228c75c997aaa398"}

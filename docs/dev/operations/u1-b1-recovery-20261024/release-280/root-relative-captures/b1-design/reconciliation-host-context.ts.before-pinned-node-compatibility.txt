@@ -1,0 +1,685 @@
+import { createHash } from 'node:crypto';
+import {
+  closeSync,
+  constants,
+  fstatSync,
+  lstatSync,
+  openSync,
+  readlinkSync,
+  readSync,
+  realpathSync,
+  type BigIntStats,
+} from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { dirname, isAbsolute, resolve } from 'node:path';
+import { canonicalJson } from '@devai-nyx/utils';
+import {
+  validateReconciliationClockObservation,
+  type ReconciliationClockObservation,
+} from '../runtime/reconciliation-clock.js';
+
+type HostCode =
+  | 'RECONCILIATION_HOST_INVALID'
+  | 'RECONCILIATION_HOST_ENVIRONMENT_INVALID'
+  | 'RECONCILIATION_HOST_UNAVAILABLE'
+  | 'RECONCILIATION_HOST_CONTEXT_UNKNOWN'
+  | 'RECONCILIATION_HOST_STALE'
+  | 'RECONCILIATION_HOST_CLOCK_UNAVAILABLE';
+
+export class ReconciliationHostContextError extends Error {
+  readonly code: HostCode;
+  constructor(code: HostCode) {
+    super(code);
+    this.name = 'ReconciliationHostContextError';
+    this.code = code;
+  }
+}
+
+export interface ReconciliationHostIdentity {
+  readonly schemaVersion: '1.0.0';
+  readonly kind: 'reconciliation-host-context';
+  readonly repository_id: string;
+  readonly worktree_id: string;
+  readonly host_identity_sha256: string;
+  readonly head: string;
+  readonly object_format: 'sha1' | 'sha256';
+  readonly merge_heads: readonly string[];
+}
+
+/** Readonly observations; membership conveys no authority to execute an action. */
+export interface ReconciliationHostContext {
+  readonly identity: ReconciliationHostIdentity;
+}
+
+interface HostPaths {
+  readonly repository_root: string;
+  readonly git_dir: string;
+  readonly common_dir: string;
+  readonly private_root: string;
+}
+type Identity = Readonly<Record<string, string>>;
+interface PinnedFile {
+  readonly identity: Identity;
+  readonly sha256: string;
+  readonly text: string;
+}
+interface Layout {
+  readonly paths: HostPaths;
+  readonly projection: Readonly<Record<string, unknown>>;
+  readonly registry_parent_identity: Identity | null;
+  readonly namespace: readonly (Identity | null)[];
+}
+interface RepositorySnapshot extends Layout {
+  readonly head: string;
+  readonly object_format: 'sha1' | 'sha256';
+  readonly merge_heads: readonly string[];
+  readonly merge_file: PinnedFile | null;
+}
+interface RuntimeSnapshot {
+  readonly node: string;
+  readonly uv: string;
+  readonly platform: string;
+  readonly arch: string;
+  readonly exec_path: string;
+  readonly executable: string;
+  readonly identity: Identity;
+}
+interface BootSnapshot {
+  readonly boot_id: string;
+  readonly time_namespace: string;
+}
+interface ContextState {
+  readonly root: string;
+  readonly repositoryId: string;
+  readonly repository: RepositorySnapshot;
+  readonly runtime: RuntimeSnapshot;
+  readonly boot: BootSnapshot;
+}
+
+const contexts = new WeakMap<ReconciliationHostContext, ContextState>();
+const staleContexts = new WeakSet<ReconciliationHostContext>();
+const ENVIRONMENT = Object.freeze({
+  PATH: '/usr/bin:/bin',
+  LC_ALL: 'C',
+  GIT_CONFIG_NOSYSTEM: '1',
+  GIT_CONFIG_SYSTEM: '/dev/null',
+  GIT_CONFIG_GLOBAL: '/dev/null',
+});
+const FORBIDDEN_ENVIRONMENT = [
+  'GIT_DIR',
+  'GIT_WORK_TREE',
+  'GIT_INDEX_FILE',
+  'GIT_COMMON_DIR',
+  'GIT_OBJECT_DIRECTORY',
+  'GIT_ALTERNATE_OBJECT_DIRECTORIES',
+  'GIT_NAMESPACE',
+  'GIT_CONFIG_COUNT',
+  'GIT_CONFIG_PARAMETERS',
+  'GIT_REPLACE_REF_BASE',
+  'GIT_SHALLOW_FILE',
+];
+const UUID_LINE =
+  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\n$/u;
+const MAX_NS = 18446744073709551615n;
+
+function fail(code: HostCode = 'RECONCILIATION_HOST_INVALID'): never {
+  throw new ReconciliationHostContextError(code);
+}
+function same(a: unknown, b: unknown): boolean {
+  return canonicalJson(a) === canonicalJson(b);
+}
+function sha256(value: string | Uint8Array): string {
+  return createHash('sha256').update(value).digest('hex');
+}
+function environment(): void {
+  if (FORBIDDEN_ENVIRONMENT.some((key) => Object.hasOwn(process.env, key)))
+    fail('RECONCILIATION_HOST_ENVIRONMENT_INVALID');
+}
+function uid(): bigint {
+  if (process.geteuid === undefined) fail('RECONCILIATION_HOST_UNAVAILABLE');
+  return BigInt(process.geteuid());
+}
+function permissionMode(stat: BigIntStats): bigint {
+  return stat.mode & 0o7777n;
+}
+function directoryIdentity(stat: BigIntStats): Identity {
+  return Object.freeze({
+    dev: String(stat.dev),
+    ino: String(stat.ino),
+    birthtime_ns: String(stat.birthtimeNs),
+    uid: String(stat.uid),
+    mode: String(permissionMode(stat)),
+  });
+}
+function fileIdentity(stat: BigIntStats): Identity {
+  return Object.freeze({
+    ...directoryIdentity(stat),
+    size_bytes: String(stat.size),
+    mtime_ns: String(stat.mtimeNs),
+    ctime_ns: String(stat.ctimeNs),
+  });
+}
+function canonicalPath(path: string): void {
+  if (
+    typeof path !== 'string' ||
+    !isAbsolute(path) ||
+    /[\p{Cc}\p{Cs}]/u.test(path) ||
+    resolve(path) !== path ||
+    realpathSync(path) !== path
+  )
+    fail();
+}
+function directory(path: string, privateRoot = false): Identity {
+  canonicalPath(path);
+  const stat = lstatSync(path, { bigint: true });
+  if (
+    !stat.isDirectory() ||
+    stat.uid !== uid() ||
+    (stat.mode & 0o022n) !== 0n ||
+    (privateRoot && permissionMode(stat) !== 0o700n)
+  )
+    fail();
+  return directoryIdentity(stat);
+}
+function ownedFile(stat: BigIntStats, limit: number): void {
+  if (
+    !stat.isFile() ||
+    stat.uid !== uid() ||
+    stat.nlink !== 1n ||
+    (stat.mode & 0o022n) !== 0n ||
+    stat.size < 0n ||
+    stat.size > BigInt(limit)
+  )
+    fail();
+}
+function decode(bytes: Uint8Array): string {
+  return new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
+}
+
+/** Never follows a final symlink or reads beyond the declared file bound. */
+function pinnedFile(path: string, limit: number): PinnedFile {
+  const before = lstatSync(path, { bigint: true });
+  ownedFile(before, limit);
+  const expected = fileIdentity(before);
+  const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+  let bytes: Buffer;
+  try {
+    const opened = fstatSync(fd, { bigint: true });
+    ownedFile(opened, limit);
+    if (!same(expected, fileIdentity(opened))) fail();
+    const buffer = Buffer.alloc(limit + 1);
+    let offset = 0;
+    while (offset <= limit) {
+      const count = readSync(fd, buffer, offset, limit + 1 - offset, null);
+      if (count === 0) break;
+      offset += count;
+    }
+    if (
+      offset > limit ||
+      BigInt(offset) !== before.size ||
+      !same(expected, fileIdentity(fstatSync(fd, { bigint: true })))
+    )
+      fail();
+    bytes = buffer.subarray(0, offset);
+  } finally {
+    closeSync(fd);
+  }
+  if (!same(expected, fileIdentity(lstatSync(path, { bigint: true })))) fail();
+  return Object.freeze({ identity: expected, sha256: sha256(bytes), text: decode(bytes) });
+}
+function absent(error: unknown): boolean {
+  return (
+    error instanceof Error && Object.getOwnPropertyDescriptor(error, 'code')?.value === 'ENOENT'
+  );
+}
+function optionalDirectory(path: string, privateRoot = false): Identity | null {
+  try {
+    // Only an absent directory entry is absence. In particular, realpath on an
+    // existing dangling symlink must never turn that malformed entry into null.
+    lstatSync(path, { bigint: true });
+  } catch (error) {
+    if (absent(error)) return null;
+    throw error;
+  }
+  return directory(path, privateRoot);
+}
+function pathLine(text: string): string {
+  if (!text.endsWith('\n')) fail();
+  const value = text.slice(0, -1);
+  if (value.length === 0 || /[\p{Cc}\p{Cs}]/u.test(value)) fail();
+  return value;
+}
+function layout(root: string, repositoryId: string): Layout {
+  const rootIdentity = directory(root);
+  const entry = resolve(root, '.git');
+  const entryStat = lstatSync(entry, { bigint: true });
+  let gitDir: string, commonDir: string, entryIdentity: Identity;
+  let entryHash: string | null = null;
+  let backlink: PinnedFile | null = null,
+    commonFile: PinnedFile | null = null;
+  let registryIdentity: Identity | null = null;
+  if (entryStat.isDirectory()) {
+    entryIdentity = directory(entry);
+    gitDir = commonDir = entry;
+  } else {
+    const pointer = pinnedFile(entry, 4096);
+    if (!pointer.text.startsWith('gitdir: ')) fail();
+    const target = pathLine(pointer.text.slice(8));
+    gitDir = realpathSync(resolve(root, target));
+    directory(gitDir);
+    backlink = pinnedFile(resolve(gitDir, 'gitdir'), 4096);
+    const reverse = resolve(gitDir, pathLine(backlink.text));
+    if (reverse !== entry || realpathSync(reverse) !== entry) fail();
+    commonFile = pinnedFile(resolve(gitDir, 'commondir'), 4096);
+    commonDir = realpathSync(resolve(gitDir, pathLine(commonFile.text)));
+    if (gitDir === commonDir || dirname(gitDir) !== resolve(commonDir, 'worktrees')) fail();
+    registryIdentity = directory(resolve(commonDir, 'worktrees'));
+    entryIdentity = pointer.identity;
+    entryHash = pointer.sha256;
+  }
+  const gitIdentity = directory(gitDir),
+    commonIdentity = directory(commonDir);
+  const privateRoot = resolve(gitDir, 'devai', 'reconciliation');
+  const ancestor = optionalDirectory(resolve(gitDir, 'devai'));
+  const privateIdentity = ancestor === null ? null : optionalDirectory(privateRoot, true);
+  return Object.freeze({
+    paths: Object.freeze({
+      repository_root: root,
+      git_dir: gitDir,
+      common_dir: commonDir,
+      private_root: privateRoot,
+    }),
+    projection: Object.freeze({
+      repository_id: repositoryId,
+      repository_root: root,
+      git_dir: gitDir,
+      common_dir: commonDir,
+      root_identity: rootIdentity,
+      git_dir_identity: gitIdentity,
+      common_dir_identity: commonIdentity,
+      git_entry_identity: entryIdentity,
+      git_entry_sha256: entryHash,
+      git_backlink_identity: backlink?.identity ?? null,
+      git_backlink_sha256: backlink?.sha256 ?? null,
+      commondir_identity: commonFile?.identity ?? null,
+      commondir_sha256: commonFile?.sha256 ?? null,
+    }),
+    registry_parent_identity: registryIdentity,
+    namespace: Object.freeze([ancestor, privateIdentity]),
+  });
+}
+function command(
+  program: string,
+  args: readonly string[],
+  cwd: string | undefined,
+  timeout: number,
+  maxBuffer: number,
+): string {
+  const result = spawnSync(program, [...args], {
+    cwd,
+    env: ENVIRONMENT,
+    timeout,
+    maxBuffer,
+    encoding: 'buffer',
+    stdio: ['ignore', 'pipe', 'pipe'],
+    shell: false,
+  });
+  if (
+    result.error !== undefined ||
+    result.signal !== null ||
+    result.status !== 0 ||
+    !Buffer.isBuffer(result.stdout) ||
+    result.stdout.length > maxBuffer
+  )
+    fail();
+  return decode(result.stdout);
+}
+function git(root: string, args: readonly string[]): string {
+  return command(
+    '/usr/bin/git',
+    [
+      '--no-optional-locks',
+      '--no-replace-objects',
+      '--no-lazy-fetch',
+      '-c',
+      'core.fsmonitor=false',
+      'rev-parse',
+      ...args,
+    ],
+    root,
+    10000,
+    65536,
+  );
+}
+function optionalMerge(gitDir: string): PinnedFile | null {
+  try {
+    return pinnedFile(resolve(gitDir, 'MERGE_HEAD'), 4096);
+  } catch (error) {
+    if (absent(error)) return null;
+    throw error;
+  }
+}
+function repositorySnapshot(
+  root: string,
+  repositoryId: string,
+  batched = false,
+): RepositorySnapshot {
+  const before = layout(root, repositoryId);
+  const merge = optionalMerge(before.paths.git_dir);
+  // The scoped reader batches the same seven native observations. Historical
+  // readers retain their original individual probes. Both use exact framing.
+  const queries = [
+    '--is-bare-repository',
+    '--show-toplevel',
+    '--absolute-git-dir',
+    '--path-format=absolute',
+    '--git-common-dir',
+    '--show-superproject-working-tree',
+    '--show-object-format',
+    '--verify',
+    'HEAD',
+  ];
+  const lines = (
+    batched
+      ? git(root, queries)
+      : [
+          git(root, ['--is-bare-repository']),
+          git(root, ['--show-toplevel']),
+          git(root, ['--absolute-git-dir']),
+          git(root, ['--path-format=absolute', '--git-common-dir']),
+          git(root, ['--show-superproject-working-tree']),
+          git(root, ['--show-object-format']),
+          git(root, ['--verify', 'HEAD']),
+        ].join('')
+  ).split('\n');
+  if (
+    lines.length !== 7 ||
+    lines[0] !== 'false' ||
+    lines[1] !== root ||
+    lines[2] !== before.paths.git_dir ||
+    lines[3] !== before.paths.common_dir ||
+    lines[6] !== '' ||
+    (lines[4] !== 'sha1' && lines[4] !== 'sha256') ||
+    lines[5] === undefined
+  )
+    fail();
+  const objectFormat = lines[4];
+  const headLine = lines[5] + '\n';
+  const oidLength = objectFormat === 'sha1' ? 40 : 64;
+  if (headLine.length !== oidLength + 1 || !headLine.endsWith('\n')) fail();
+  const head = headLine.slice(0, -1);
+  if (/[^0-9a-f]/u.test(head)) fail();
+  const parents = merge === null ? [] : merge.text.slice(0, -1).split('\n');
+  if (
+    merge !== null &&
+    (!merge.text.endsWith('\n') ||
+      parents.length > 32 ||
+      parents.some((oid) => oid.length !== oidLength || /[^0-9a-f]/u.test(oid) || oid === head) ||
+      new Set(parents).size !== parents.length)
+  )
+    fail();
+  if (
+    !same(before, layout(root, repositoryId)) ||
+    !same(merge, optionalMerge(before.paths.git_dir))
+  )
+    fail();
+  return Object.freeze({
+    ...before,
+    head,
+    object_format: objectFormat,
+    merge_heads: Object.freeze(parents),
+    merge_file: merge,
+  });
+}
+function runtimeSnapshot(): RuntimeSnapshot {
+  if (
+    (process.platform !== 'darwin' && process.platform !== 'linux') ||
+    process.versions.node !== '24.22.0' ||
+    process.versions.uv !== '1.52.1'
+  )
+    fail('RECONCILIATION_HOST_UNAVAILABLE');
+  const executable = realpathSync(process.execPath);
+  canonicalPath(executable);
+  const stat = lstatSync(executable, { bigint: true });
+  if (
+    !stat.isFile() ||
+    (stat.uid !== 0n && stat.uid !== uid()) ||
+    (stat.mode & 0o022n) !== 0n ||
+    (stat.mode & 0o111n) === 0n
+  )
+    fail('RECONCILIATION_HOST_UNAVAILABLE');
+  return Object.freeze({
+    node: process.versions.node,
+    uv: process.versions.uv,
+    platform: process.platform,
+    arch: process.arch,
+    exec_path: process.execPath,
+    executable,
+    identity: fileIdentity(stat),
+  });
+}
+function linuxBoot(): string {
+  // procfs reports size zero: enforce the read bound rather than a regular-file size equality.
+  const fd = openSync(
+    '/proc/sys/kernel/random/boot_id',
+    constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
+  );
+  try {
+    if (!fstatSync(fd).isFile()) fail();
+    const buffer = Buffer.alloc(129);
+    let offset = 0;
+    while (offset < buffer.length) {
+      const count = readSync(fd, buffer, offset, buffer.length - offset, null);
+      if (count === 0) break;
+      offset += count;
+    }
+    if (offset > 128) fail();
+    return decode(buffer.subarray(0, offset));
+  } finally {
+    closeSync(fd);
+  }
+}
+function bootSnapshot(): BootSnapshot {
+  const line =
+    process.platform === 'darwin'
+      ? command('/usr/sbin/sysctl', ['-n', 'kern.bootsessionuuid'], undefined, 1000, 128)
+      : linuxBoot();
+  if (line.length !== 37 || !UUID_LINE.test(line)) fail();
+  const namespace =
+    process.platform === 'darwin' ? 'darwin-host' : readlinkSync('/proc/self/ns/time');
+  if (process.platform === 'linux' && !/^time:\[[0-9]+\]$/u.test(namespace)) fail();
+  return Object.freeze({ boot_id: line.slice(0, -1).toLowerCase(), time_namespace: namespace });
+}
+function monotonic(): bigint {
+  const value = process.hrtime.bigint();
+  if (value <= 0n || value > MAX_NS) fail();
+  return value;
+}
+
+// Fixed builtin-only child program. No candidate data, executable, preload or source provider.
+const CLOCK_CHILD = String.raw`
+const fs=require('node:fs'),cp=require('node:child_process');
+let line;
+if(process.platform==='darwin'){
+ const r=cp.spawnSync('/usr/sbin/sysctl',['-n','kern.bootsessionuuid'],{env:{PATH:'/usr/bin:/bin',LC_ALL:'C'},timeout:1000,maxBuffer:128,encoding:'buffer',stdio:['ignore','pipe','pipe'],shell:false});
+ if(r.error||r.status!==0||r.signal!==null||!Buffer.isBuffer(r.stdout))process.exit(2);
+ line=new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(r.stdout);
+}else if(process.platform==='linux'){
+ const fd=fs.openSync('/proc/sys/kernel/random/boot_id',fs.constants.O_RDONLY|fs.constants.O_NOFOLLOW|fs.constants.O_NONBLOCK);
+ try{if(!fs.fstatSync(fd).isFile())process.exit(2);const b=Buffer.alloc(129);let n=0;
+ while(n<b.length){const k=fs.readSync(fd,b,n,b.length-n,null);if(k===0)break;n+=k;}
+ if(n>128)process.exit(2);line=new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(b.subarray(0,n));}finally{fs.closeSync(fd);}
+}else process.exit(2);
+if(line.length!==37||!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\n$/.test(line))process.exit(2);
+const ns=process.platform==='darwin'?'darwin-host':fs.readlinkSync('/proc/self/ns/time');
+if(process.platform==='linux'&&!/^time:\[[0-9]+\]$/.test(ns))process.exit(2);
+process.stdout.write(JSON.stringify({node:process.versions.node,uv:process.versions.uv,platform:process.platform,arch:process.arch,boot_id:line.slice(0,-1).toLowerCase(),time_namespace:ns,monotonic_ns:String(process.hrtime.bigint())}));
+`;
+
+function qualifyClock(runtime: RuntimeSnapshot, boot: BootSnapshot): void {
+  for (let index = 0; index < 3; index++) {
+    const before = monotonic();
+    const text = command(runtime.executable, ['-e', CLOCK_CHILD], undefined, 3000, 4096);
+    const after = monotonic();
+    const child: unknown = JSON.parse(text);
+    if (child === null || typeof child !== 'object' || Array.isArray(child)) fail();
+    const record = child as Record<string, unknown>;
+    const expected = {
+      node: runtime.node,
+      uv: runtime.uv,
+      platform: runtime.platform,
+      arch: runtime.arch,
+      ...boot,
+      monotonic_ns: record.monotonic_ns,
+    };
+    if (
+      !same(child, expected) ||
+      typeof record.monotonic_ns !== 'string' ||
+      record.monotonic_ns.length > 20 ||
+      !/^[1-9][0-9]*$/u.test(record.monotonic_ns) ||
+      /[^0-9]/u.test(record.monotonic_ns)
+    )
+      fail();
+    const childTime = BigInt(record.monotonic_ns);
+    if (childTime > MAX_NS || childTime < before || childTime > after) fail();
+  }
+  if (!same(runtime, runtimeSnapshot()) || !same(boot, bootSnapshot())) fail();
+}
+
+export function captureReconciliationHostContext(
+  root: string,
+  repositoryId: string,
+): ReconciliationHostContext {
+  environment();
+  let runtime: RuntimeSnapshot;
+  try {
+    runtime = runtimeSnapshot();
+  } catch {
+    return fail('RECONCILIATION_HOST_UNAVAILABLE');
+  }
+  let repository: RepositorySnapshot;
+  try {
+    if (
+      typeof repositoryId !== 'string' ||
+      repositoryId.length === 0 ||
+      repositoryId.length > 128 ||
+      !/^[A-Za-z0-9][A-Za-z0-9._-]*$/u.test(repositoryId) ||
+      /[^A-Za-z0-9._-]/u.test(repositoryId)
+    )
+      fail();
+    canonicalPath(root);
+    repository = repositorySnapshot(root, repositoryId);
+  } catch {
+    return fail();
+  }
+  let boot: BootSnapshot;
+  try {
+    boot = bootSnapshot();
+    qualifyClock(runtime, boot);
+  } catch {
+    return fail('RECONCILIATION_HOST_CLOCK_UNAVAILABLE');
+  }
+  try {
+    if (!same(repository, repositorySnapshot(root, repositoryId))) fail();
+  } catch {
+    return fail();
+  }
+  const worktreeId = 'wt-' + sha256(canonicalJson(repository.projection)).slice(0, 48);
+  const identity: ReconciliationHostIdentity = Object.freeze({
+    schemaVersion: '1.0.0',
+    kind: 'reconciliation-host-context',
+    repository_id: repositoryId,
+    worktree_id: worktreeId,
+    host_identity_sha256: sha256(
+      canonicalJson({ ...repository.projection, worktree_id: worktreeId }),
+    ),
+    head: repository.head,
+    object_format: repository.object_format,
+    merge_heads: repository.merge_heads,
+  });
+  const context = Object.freeze({ identity });
+  contexts.set(context, Object.freeze({ root, repositoryId, repository, runtime, boot }));
+  return context;
+}
+
+function revalidate(context: ReconciliationHostContext, batched = false): ContextState {
+  const state = contexts.get(context);
+  if (state === undefined) fail('RECONCILIATION_HOST_CONTEXT_UNKNOWN');
+  environment();
+  if (staleContexts.has(context)) fail('RECONCILIATION_HOST_STALE');
+  try {
+    if (
+      !same(state.repository, repositorySnapshot(state.root, state.repositoryId, batched)) ||
+      !same(state.runtime, runtimeSnapshot()) ||
+      !same(state.boot, bootSnapshot())
+    )
+      fail();
+  } catch {
+    // Observed drift terminates this captured context. Restoring an old HEAD
+    // cannot revive it; the caller must capture and authorize fresh context.
+    staleContexts.add(context);
+    return fail('RECONCILIATION_HOST_STALE');
+  }
+  return state;
+}
+
+export function readReconciliationHostIdentity(
+  context: ReconciliationHostContext,
+): ReconciliationHostIdentity {
+  revalidate(context);
+  return context.identity;
+}
+
+export function readReconciliationHostPaths(context: ReconciliationHostContext): HostPaths {
+  return revalidate(context).repository.paths;
+}
+
+export function readReconciliationHostClock(
+  context: ReconciliationHostContext,
+): ReconciliationClockObservation {
+  const state = revalidate(context);
+  return clockObservation(state);
+}
+
+/** One full native revalidation supplies both observations; no identity cache. */
+export function readReconciliationHostObservation(context: ReconciliationHostContext): Readonly<{
+  identity: ReconciliationHostIdentity;
+  clock: ReconciliationClockObservation;
+}> {
+  const state = revalidate(context, true);
+  return Object.freeze({ identity: context.identity, clock: clockObservation(state) });
+}
+
+function clockObservation(state: ContextState): ReconciliationClockObservation {
+  try {
+    const before = Date.now();
+    const ns = monotonic();
+    const boot = bootSnapshot();
+    const after = Date.now();
+    if (
+      !Number.isSafeInteger(before) ||
+      !Number.isSafeInteger(after) ||
+      before < 0 ||
+      after < before ||
+      after - before > 250 ||
+      Object.is(before, -0) ||
+      Object.is(after, -0) ||
+      !same(state.boot, boot) ||
+      !same(state.runtime, runtimeSnapshot())
+    )
+      fail();
+    return validateReconciliationClockObservation({
+      clock_source: 'node-uv-hrtime-ns-v1',
+      boot_id: boot.boot_id,
+      monotonic_ns: String(ns),
+      wall_ms: after,
+    });
+  } catch {
+    return fail('RECONCILIATION_HOST_CLOCK_UNAVAILABLE');
+  }
+}
+
+export function disposeReconciliationHostContext(context: ReconciliationHostContext): void {
+  contexts.delete(context);
+  staleContexts.delete(context);
+}

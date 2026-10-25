@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/release-280/typed-boundary/graph-build.txt","kind":"historical-transcript-custody-pointer","original_bytes":117357,"original_bytes_changed":false,"original_sha256":"fbfe4907ed6db0089647d68fb00c821588d0f7a432d52f2bf0820146ead4951b"}

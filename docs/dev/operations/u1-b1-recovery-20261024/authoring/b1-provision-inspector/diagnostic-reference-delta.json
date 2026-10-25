@@ -1,0 +1,13 @@
+{
+  "current_sha256": "970def534b24124e54d79673692824af7690ed46d07459ee6745f32b07415667",
+  "new_codes": [
+    "RECONCILIATION_PROVISION_INVALID",
+    "RECONCILIATION_PROVISION_STALE",
+    "RECONCILIATION_PROVISION_UNSUPPORTED",
+    "RECONCILIATION_PROVISION_REVIEW_INVALID"
+  ],
+  "exact_new_rows": 4,
+  "without_new_rows_sha256": "4e944a0c52bf8d0ea1594f68a882ff5f9699e902e0b3849cad1eb23fd5099955",
+  "historical_1299_sha256": "4e944a0c52bf8d0ea1594f68a882ff5f9699e902e0b3849cad1eb23fd5099955",
+  "inverse_matches_historical": true
+}

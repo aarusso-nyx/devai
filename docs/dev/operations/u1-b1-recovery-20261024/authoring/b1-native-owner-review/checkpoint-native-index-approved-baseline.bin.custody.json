@@ -1,0 +1,11 @@
+{
+  "original_source_path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/checkpoint-native-index-approved-baseline.bin",
+  "external_custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/checkpoint-native-index-approved-baseline.bin",
+  "sha256": "542553c911bcd2f5e65dd8a27b66f0f1dbcb703278477cb27df920ede95eadce",
+  "bytes": 2115246,
+  "dev": "16777245",
+  "ino": "78186123",
+  "mode": "0o644",
+  "historical_bytes_changed": false,
+  "standing": "historical diagnostic artifact; no authority or completion promotion"
+}

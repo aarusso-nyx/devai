@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/plan-control-expanded.txt","kind":"historical-transcript-custody-pointer","original_bytes":2372,"original_bytes_changed":false,"original_sha256":"fef4240f8e601d27f231d752643ee1c060849f30dac71ad986539586482ae6a6"}

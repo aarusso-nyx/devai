@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/release-280/typed-boundary/typecheck.txt","kind":"historical-transcript-custody-pointer","original_bytes":573,"original_bytes_changed":false,"original_sha256":"3801203c7d9e4544ad471c57f0ab2386897e4413121a6c6be2a61c5af2fd37fb"}

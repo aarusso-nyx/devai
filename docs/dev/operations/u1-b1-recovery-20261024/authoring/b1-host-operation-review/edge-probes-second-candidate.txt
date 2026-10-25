@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-host-operation-review/edge-probes-second-candidate.txt","kind":"historical-transcript-custody-pointer","original_bytes":1701,"original_bytes_changed":false,"original_sha256":"8c939b4857c08f9a225e18c0eec66e8326abdc1a096d2619e94bb8561f1173a0"}

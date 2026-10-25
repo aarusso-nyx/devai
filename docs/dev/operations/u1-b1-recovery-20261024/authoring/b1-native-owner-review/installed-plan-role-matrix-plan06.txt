@@ -1,0 +1,4 @@
+{
+  "report": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-installed-plan-role-6_gnye0z/results.json",
+  "cases": 12
+}

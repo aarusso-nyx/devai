@@ -1,0 +1,8 @@
+{
+  "kind": "refreshed-type-declaration-verification",
+  "command": "pnpm run typecheck",
+  "node": "24.20.0",
+  "exit": 0,
+  "log_sha256": "3801203c7d9e4544ad471c57f0ab2386897e4413121a6c6be2a61c5af2fd37fb",
+  "supersedes_limitation_only": "prior independent review reported stale emitted declarations; no test assertion or product contract weakened"
+}

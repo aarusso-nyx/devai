@@ -1,0 +1,92 @@
+{
+  "standing": "EXACT_THREE_PACKET_DESIGN_ACCEPTED_FOR_INDEPENDENT_RED_NOT_IMPLEMENTATION_OR_RUNTIME_QUALIFICATION",
+  "packet_sha256": {
+    "owner-state-checkpoint.json": "45fbde08e157a45d615cc26e885beac6197611fd64dc517dafd0348ee975703f",
+    "owner-state-order-amendment.json": "71f1dd131c023652cb4720310401216cee8f418d215502198b59a001621412ed",
+    "owner-state-interface.json": "bbd8012e8e01089592837218af1cb16a3509369881f5cd39c7f62ced35973494"
+  },
+  "precedence": "owner-state-interface expressly replaces identified statements in initialcheckpoint/orderamendment; remaining contracts unchanged. Interface references exactbase/amendment hashes.",
+  "reviewed_contract_sha256": {
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/owner-intake-checkpoint.json": "9d65240da6c4b92c1bcbfdfd3ceb19839c45197bc5b6e5bb0b8db351593f94a4",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/owner-protocol-v3.json": "ed7b6ff199ece13c841e457258468303f8d87ffc3d67b96cebaed0e42015030c",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/owner-clock-amendment.json": "63da78eb95e638d1ba8d5317a4e81e4030d204593f107a7a5344bba3642d5e2c",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/owner-record-codec-checkpoint.json": "40fcc553a75e9d625e381520d8a8fc7c5c139ced901f6dd697f9b79ebc2b2b1f",
+    "law/schemas/reconciliation-owner.schema.json": "39002520c0ffa410ef41a9caf34d16af123b9bc88f0ab1e426deaf70af284344",
+    "packages/authority/src/runtime/reconciliation-owner-record.ts": "fd7d944ce09f640ff4040abeae090ad8b694b55e3e285feb46ea59650735cbda",
+    "packages/authority/src/runtime/reconciliation-clock.ts": "d9ab0faba163f45a7d7caf13e2cae5307ccb0ad2be7cb5b7565e1054f1844dd3",
+    "law/adr/ADR-EVI-0007-owner-approved-merge-reconciliation.md": "1bfaa9703fa5cd667de523c74a3d8f4b584b7c630290f1c2400a71a871a53bd4"
+  },
+  "resolved_findings": [
+    {
+      "id": "OS01",
+      "problem": "Tied clock values alone cannot establish which phases/intent existed at renewal issue.",
+      "resolution": "Grantsequence references, phase/intention/completion predecessors and renewal remaining/resumable assertions add exact beforeedges. Sameclock nodes remain distinct. Acyclic bounded ordering validates assertions; no timestamp sort, newfield or guessed historicalevent."
+    },
+    {
+      "id": "OS02",
+      "problem": "Known priorgrant reference alone permits newintent afterrevocation/renewal or staleobservedgrant completion/lease.",
+      "resolution": "Namedgrant < record < nextgrant fence for intent/completion/lease; edgeclocks nondecreasing sameboot/source and driftbounded. Expired/revoked grants may be observed by completion only when they were current at that event."
+    },
+    {
+      "id": "OS03",
+      "problem": "Lease noncestatement cannot distinguish first lease from samegrant ownedretry using one retained record.",
+      "resolution": "Allow samegrant distinctnonce/invocation with full graph/clock/deadline/phase/hostrefs. Actual firstlease/ownedretry/PID/liveness/admission remains nativehost responsibility."
+    },
+    {
+      "id": "OS04",
+      "problem": "Unconditional resumable match for every lease under renewal incorrectly rejects a NEW intent originally created under that renewal, including resumable null.",
+      "resolution": "Exact interface applies resumable-intent requirement ONLY crossgrant lease retry. Samegrant original/newintent initial/retry lease is valid regardless renewal priorresumable field; nativeownership remains separately unproven."
+    },
+    {
+      "id": "OS05",
+      "problem": "Uncompleted-intent-only lease rule cannot represent completionpublication-before-leasecleanup crash state.",
+      "resolution": "Interface admits lease for completed intent, requires lease < completion, retains lease digest and proves no ownership/death or automaticcleanup. Nativehost must handle any extant lease under admission before replacing it/another phaseownedlease."
+    },
+    {
+      "id": "OS06",
+      "problem": "Unknown outputs versus historical completion precedence and observed expiredhistory age were ambiguous.",
+      "resolution": "Unknown first->held. Historical completion returns completed only completeoutputs; absent/partial held and digestretained. Exactshort signeddeadline expiry returns eligibilitystatus; sameboot/source/rollback/drift compared to ALL linkedrecord clocks excluding immutableissuerinstallationclock. History not invalidated merely by age."
+    },
+    {
+      "id": "OS07",
+      "problem": "Safe state shape, assessment digest nullability and ingress literals needed exactfreeze.",
+      "resolution": "Amendment/interface specify exactstatefields,4phaseentries,privateWeakMapnonissuerdata,exact6assessmentfields and4outputsstrings; nullable digests present on everydisposition. No extrascope/statehash/authority."
+    }
+  ],
+  "deterministic_rules_summary": [
+    "Each renewal excludedphase requires existingcompletion beforeR; includedphase eventualcompletion addsR<completion. Remainingphases must suffix of contiguouscompletedprefix.",
+    "NamedresumableI must be included, I<R and R<eventualcompletion; everyotherincludedintent is afterR. Null means allincludedintents afterR. Missingclaimedcompletion, contradictoryreference or cycle refuses.",
+    "Grant/intent/completion/lease rawreferences are exactwhole canonical JCS+LF hashes; no rawpayload-digest substitution. All grantsequence/order/phasegap/duplicate/MAC/scope rules remain.",
+    "Intent and lease creation strictly before BOTH referencedgrant signeddeadlines and fixedmaximum; completionmay settle priordurableoutputs afterexpiry/revocation without domaincontinuation.",
+    "Currentobservation validates against everylinkedrecordclock, not a guessed latesttie winner. Sameapprovalboot/source required, issuerinstallationboot independent."
+  ],
+  "design_models": {
+    "script": "partial-order-probes.mjs",
+    "results": "partial-order-results.json",
+    "pass": 14,
+    "fail": 0,
+    "meaning": "Small independent labelednode constraint models only; NOT producttests, actualHMAC/namespace/host origin, or the ten retained intentmatrix acceptance cases.",
+    "coverage": "Validtiedorder and contradictioncycles; stalegrant intent/completion/lease; validintentbeforerevocation settlement; originalleasebeforelatergrant; newintentunder renewal+samegrantlease; crossgrantrenewalretry; retainedcompletedlease and impossibleaftercompletion lease."
+  },
+  "remaining_blockers": [],
+  "required_implementation_gates": [
+    "Authentic absentmodule RED and actualindependent canonical/HMAC/codec/boundedcopy/WeakMap/privateprojection tests, allTEN retainedintentmatrix rows separately.",
+    "Preserve originalcodec/clock tests and historicalfixtures; generatederrorcensus change deliberatelybounded as interface states; no inferred final test count.",
+    "Nativeadmission/Ownerreview/clockorigin/currentB5/scope/outputdurability/leaseownership/PID/recovery/effectauthority still required; pure dispositions grantnone.",
+    "Actualpublic/installed/B1phase/index/staged/integration/release qualification remain required."
+  ],
+  "source_absent_at_seal": false,
+  "edits": "Only ownedreviewevidence. No product/tests/schema/registry/build/newagents. Frozen nativeprovision source/receipts untouched.",
+  "evidence_sha256": {
+    "partial-order-probes.first-10.mjs.snapshot": "81c283e6b0e929616e270a670b645d9bd12d258bfaa93b6c1f8d3b8821c837fc",
+    "partial-order-results.json": "89bea7abeb87e74be3ed137c1fcb34a187a46fc68fa264710e4e07b84f20f24c",
+    "partial-order-probes.mjs": "2978faada42baa5babffc888d15b0891a751cb31441dc6f1167467737316e892",
+    "partial-order-results.first-10.json.snapshot": "25f656246c95fa5f96892ad750eb723c85055189c4ea902f3c4617e0f9828b56"
+  },
+  "graft": {
+    "current_calls": 1,
+    "current_estimated_tokens_saved": 26402,
+    "cumulative_successful_calls": 23,
+    "cumulative_estimated_tokens_saved": 503436
+  }
+}

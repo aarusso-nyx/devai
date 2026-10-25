@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-admission-inspector/native-final-frozen.txt","kind":"historical-transcript-custody-pointer","original_bytes":274,"original_bytes_changed":false,"original_sha256":"521e3c103ef2305cdc524cbe99b8405df8746850ef3a1599acaad35d3d0790b1"}

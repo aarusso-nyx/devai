@@ -1,0 +1,34 @@
+{
+  "kind": "independent-bounded-interface-review",
+  "verdict": "accepted-subject-to-indeterminate-latch-invariant",
+  "scope": "Public init bind reconciliation-host transport, native failure custody projection, exact selector contract projection and provision-only policy activation",
+  "native_failure_projection": [
+    "Module-private WeakMap keyed only by actual branded handle, same live authority scope, one-use deletion.",
+    "Exported interrupt accepts no caller identity/provider/effect data, performs no reads/writes, closes and zeros private state, and may retain custody after ordinary handle terminal.",
+    "Known owned identity list contains only identities observed by native publisher.",
+    "Never infer no effects from empty owned list: retain native indeterminate standing when effect entered before identity capture.",
+    "EOF/wrong token after seed must retain seed custody and report indeterminate exit6, without rollback or cleanup claims; historical cancel API stays unchanged."
+  ],
+  "transport": [
+    "Separate native-provision transport with exact original argv, exact selector, live three-TTY, actual init bind/local-write scope and Architect/write/json controls.",
+    "At most seed READY, issuer READY, one terminal; issuer-existing or seed-existing paths use native result state.",
+    "No issuer/seed/private bytes, no raw private documents, no generic resource or write callback.",
+    "Authority finalizer failure cannot erase previously captured created/indeterminate owned identities or downgrade uncertainty.",
+    "P1 output transport unchanged; unrelated commands unchanged."
+  ],
+  "activation": [
+    "Canonical init bind local-write upper bound explicitly catalogs reconciliation-host cap/target/adapter.",
+    "Exact sealed reconciliation-host selector alone narrows to reconciliation-host-only exact-plan contract. Ordinary init bind retains historical bounded filesystem planner.",
+    "Immutable rule restricted to init bind, derived binding actor, Architect initiator and provision operation; actual native repository/worktree and B5 remain enforced.",
+    "No filesystem private-root write rule."
+  ],
+  "counterexamples": [
+    "After seed success, second READY/prompt output fails: known custody retained, exit6.",
+    "Indeterminate native terminal with empty owned list followed by output/finalizer failure remains indeterminate.",
+    "Borrowed/cloned/used handle, changed scope or argv, missing TTY refuses.",
+    "EOF/wrong confirmation before effects cancels; after seed retains partial custody.",
+    "Mixed selectors, P1 or ordinary init bind cannot use provision capability.",
+    "Wrong action/actor/role/operation/repository/worktree or filesystem-only grants refuse."
+  ],
+  "qualification": "Preimplementation review only; no installed/public success, refusal, concurrency or crash qualification claimed."
+}

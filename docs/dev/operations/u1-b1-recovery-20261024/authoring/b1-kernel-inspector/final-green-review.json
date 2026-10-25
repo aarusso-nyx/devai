@@ -1,0 +1,48 @@
+{
+  "status": "INDEPENDENT_TYPED_DATA_KERNEL_GREEN_NO_EFFECT_AUTHORITY",
+  "tests": {
+    "files": 6,
+    "total": 292,
+    "passed": 292,
+    "failed": 0,
+    "kernel": 50,
+    "prior_shape": 99,
+    "unchanged_original_decision_policy": 143
+  },
+  "source_and_test_sha256": {
+    "packages/authority/src/types.ts": "1b2c122d0c4a8139b5a8b012fe5a7d3583ef8f372e7ce052536c794aad8393a2",
+    "packages/authority/src/decision-plan.ts": "c138aec62af0cb49845acb6e6ce2cd22cdc048f4c6eec6b5c936f1bf52f88dcf",
+    "packages/authority/src/runtime/policy-resolver.ts": "8a76763ea1312bba0c1b1f4530ff0fcbe31867fe3f04d49d2d6a59bf8b23d393",
+    "packages/authority/src/boundaries/reconciliation-resources.ts": "864cb540fda9ac911d88d4972da8923f7caffa4b02a7b9a3ec01a98ead75ae62",
+    "packages/authority/tests/unit/reconciliation-resource-kernel.test.ts": "3552381c4c87f0981509c44084673d6c5fbcea03b0e36cafc32f710604dc3a30",
+    "packages/authority/tests/unit/reconciliation-resources.test.ts": "87fa27e5c50865b484275baa242966f298e237c51ec903f62e5eb7ba7bb1b36c"
+  },
+  "command": "pnpm exec node scripts/process/validation-runner.mjs -- vitest run --config tests/config/local.config.ts --maxWorkers 1 packages/authority/tests/unit/reconciliation-resource-kernel.test.ts packages/authority/tests/unit/reconciliation-resources.test.ts packages/authority/tests/unit/authority-decision-contracts.test.ts packages/authority/tests/unit/authority-decision-derivation-contracts.test.ts packages/authority/tests/unit/authority-decision-issuer.red.robust.test.ts packages/authority/tests/unit/authority-policy-resolver-contracts.test.ts",
+  "log_sha256": "7809a3f533f4e26c4f79715289f40c9c3d0428f8d1a181a96acc27574ff7b48e",
+  "independent_defect": {
+    "reproduced": "Four own-id-accessor cases failed after initial288PASS. Rejected payload getter executed by duplicate ID extraction or legacy query fallback.",
+    "fixed": "Invalid new-kind ID extraction now uses fixed placeholder; resourceValid recognized new kinds return qualified validator result immediately. All original46 and added4 assertions retained."
+  },
+  "review": [
+    "types.ts imports/reexports exactly two data types and extends ResourceTarget; selector union unchanged",
+    "malformedTarget validates complete new shapes before id.trim; safe fixed invalid identities and diagnostic labels",
+    "proof identity fixes repository/worktree/proof_path; host identity fixes operation, approval when applicable, phase for consumption; witnesses do not create new resource identities",
+    "new kinds remain unconditionally excluded from bounded selector matching",
+    "resourceValid data-only admission does not add selectors or policy permission",
+    "no classifier branch, dispatcher, adapter, registry, CLI, schema or authority function-barrel export added in kernel change",
+    "original four decision/policy test files unchanged; prior99 shape test hash unchanged",
+    "existing boundaries/index.ts one-line mutator census change is prior U1 work, not a kernel export"
+  ],
+  "limits": [
+    "No host ID origin, role, physical resource scope, operation-handle custody or actual adapter permission claimed",
+    "No prepared/apply capability or public B1 workflow qualification claimed",
+    "No repository-wide build/typecheck/release conclusion; parent owns those gates"
+  ],
+  "eslint_test_exit_code": 0,
+  "inspector_writes_only": [
+    "packages/authority/tests/unit/reconciliation-resource-kernel.test.ts",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-kernel-inspector/"
+  ],
+  "graft_reported_saved_tokens_cumulative": 68712,
+  "graft_calls_cumulative": 6
+}

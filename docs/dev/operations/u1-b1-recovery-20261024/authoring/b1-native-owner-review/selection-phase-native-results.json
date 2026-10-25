@@ -1,0 +1,65 @@
+{
+  "fixture": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-initial-owner-plan-jJqJW9/repository",
+  "approval_id": "24b3953e410a7654b1ecdbad8c03a512439a904d9ed90349b116d6685a761caf",
+  "prior_chain_sha256": "fdc8a9fd4b77500aa6388ad20ccd9f3329e057229bc1369869428a1ef2ddc5b9",
+  "current_chain_sha256": "a2d1ad5b56b24457c952fdc72635f7f220283ee44608cf711c402b4e36c26dd1",
+  "receipt_sha256": "258006e8b18113144fc3a7612a86e82c6b8bb3b56849050d5d74b0535be73e90",
+  "index_sha256": "542553c911bcd2f5e65dd8a27b66f0f1dbcb703278477cb27df920ede95eadce",
+  "duration_ms": 42749.222582999995,
+  "result": {
+    "kind": "reconciliation-selection-result",
+    "phase": "02",
+    "outcome": "completed",
+    "approval_id": "24b3953e410a7654b1ecdbad8c03a512439a904d9ed90349b116d6685a761caf",
+    "plan_sha256": "5d55b291ae2e31c578ec2c064bd83c8471cda1afbd197734c946f7fd87f61141",
+    "intent_sha256": "c38a1a1b1779b033858e783cc569f91d4f232bea24ebc3031935013fe28807ed",
+    "completion_sha256": "542b22209ab6a98e6927a1d25bb2c30721ea133ddfbcf20f1cdb3947970729e9",
+    "outputs_manifest_sha256": "dee6ee41ae642a79ce599ebacc0ecd12e16e115809c9c057e526d38f64c533ad",
+    "owned": [
+      {
+        "target": "worktree-host/devai/reconciliation/approvals/24b3953e410a7654b1ecdbad8c03a512439a904d9ed90349b116d6685a761caf/intent-02.json",
+        "dev": "16777233",
+        "ino": "1124941885",
+        "birthtime_ns": "1792901776691346825"
+      },
+      {
+        "target": "worktree-host/devai/reconciliation/approvals/24b3953e410a7654b1ecdbad8c03a512439a904d9ed90349b116d6685a761caf/lease.json",
+        "dev": "16777233",
+        "ino": "1124941888",
+        "birthtime_ns": "1792901776786866140"
+      },
+      {
+        "target": "record/proofs/chain.json.append.lock",
+        "dev": "16777233",
+        "ino": "1124941891",
+        "birthtime_ns": "1792901776876282425"
+      },
+      {
+        "target": "record/proofs/reconciliation/204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5/selection.json",
+        "dev": "16777233",
+        "ino": "1124941894",
+        "birthtime_ns": "1792901776963214723"
+      },
+      {
+        "target": "record/proofs/chain.json.reconciliation.tmp",
+        "dev": "16777233",
+        "ino": "1124941897",
+        "birthtime_ns": "1792901777033545121"
+      },
+      {
+        "target": "record/proofs/chain.json",
+        "dev": "16777233",
+        "ino": "1124941897",
+        "birthtime_ns": "1792901777033545121"
+      },
+      {
+        "target": "worktree-host/devai/reconciliation/approvals/24b3953e410a7654b1ecdbad8c03a512439a904d9ed90349b116d6685a761caf/phase-02.json",
+        "dev": "16777233",
+        "ino": "1124941925",
+        "birthtime_ns": "1792901800137288776"
+      }
+    ],
+    "grants_authority": false
+  },
+  "qualification": "Actual native phase01-completed335 fixture, real renewal, native intent/lease/append-lock/candidate/rename/completion; exact original335prefix+one normal event, epochs/index preserved. Synthetic B5/policy/TTY. No installed/public checkpoint or recovery completion claim."
+}

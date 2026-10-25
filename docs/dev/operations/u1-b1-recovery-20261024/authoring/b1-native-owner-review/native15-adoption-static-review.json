@@ -1,0 +1,178 @@
+{
+  "review": "Independent static adoption review; no commands executed on DETRAN, no feature/policy edit, no competing validation",
+  "frozen_package": {
+    "version": "2.8.0",
+    "tar_sha256": "8133477cb170f613798cc6e6a4d2dcc41a8a4a1c2ab4b0517fe7913e0176fb2a",
+    "installed_root": "/private/tmp/devai-release-280-01a16e18/installed-native-15/node_modules/@aarusso-nyx/devai",
+    "constitution_version": "1.2.0",
+    "constitution_bytes": 34899,
+    "constitution_sha256": "d5dfdc972161e0f848dd859be7bbfa510973c5c9a449a0f9e6b8960e4f5ac96a",
+    "runtime_constitution_same": true,
+    "source_constitution_same": true,
+    "migration_sha256": "7a551a80340337a3810e3093f5560ca540951b5247dc2915bd1a604b7dd07fdb",
+    "last_migration": "2.7.0"
+  },
+  "conclusion": "Missing2.8migration does not prevent explicit --constitution dryplan: installedcanonical independently supplies1.2.0. It is a real release metadata/decision-obligation gap:2.7.1\u21922.8.0 lacks amendment release/ADR/constitution-version obligation, contrary to existing schema and installedversion coverage test. Existing planner/consumer already handles the required entry; no new runtime interface needed.",
+  "registered_action": "init upgrade",
+  "not_registered": "adopt upgrade",
+  "dry_argv": [
+    "pnpm",
+    "exec",
+    "devai",
+    "init",
+    "upgrade",
+    "--target",
+    ".",
+    "--constitution",
+    "--as-role",
+    "architect",
+    "--format",
+    "json"
+  ],
+  "apply_argv_after_separate_review_only": [
+    "pnpm",
+    "exec",
+    "devai",
+    "init",
+    "upgrade",
+    "--target",
+    ".",
+    "--constitution",
+    "--as-role",
+    "architect",
+    "--write",
+    "--format",
+    "json"
+  ],
+  "argv_note": "Do not append generic --plan or --dry-run: authority layer may return plan-only permission shortcut instead of executing actual upgrade planner. No --write invokes handler planner under existing read scope.",
+  "amendment_review": [
+    "law/constitution.md Articles6/9 exact installed1.2.0SHA d5dfdc972161e0f848dd859be7bbfa510973c5c9a449a0f9e6b8960e4f5ac96a",
+    "ADR-GOV-0027 bounded two-paragraph amendment, all1.1.0 rows/safeguards preserved",
+    "ADR-EVI-0007 whole bounded reconciliation and separate owner/runtime gates",
+    "docs/adopters/install.md Upgrading DEVAI existing explicit Architect amendment review then --constitution path"
+  ],
+  "dry_effects": {
+    "filesystem_writes": 0,
+    "lock": 0,
+    "journal": 0,
+    "receipt": 0,
+    "proof_index_runtime_release_DETRAN": 0,
+    "stdout": "Existing action envelope with plan: constitution bound/installed/rebind_requested, releases/decision_records, segments, changed_files, retirements, obligations/refusals, stale stamps and receipt status. It lists paths/operations, not complete prospective file bytes/digests or timed receipt."
+  },
+  "apply_effect_bounds": {
+    "constitution": [
+      ".devai/pin/constitution.md",
+      ".devai/constitution.md",
+      ".devai/config/project.json constitution.version+sha256 and devai_version"
+    ],
+    "always_compared_package_materializations": [
+      ".devai/config/domains.json",
+      ".devai/config/forbidden-actions.json",
+      ".devai/config/glob-guards.json",
+      ".devai/config/scorecard-na.json",
+      ".devai/config/thresholds.json",
+      ".devai/config/subprocess-effects.json"
+    ],
+    "conditional_adopter_projection": [
+      ".devai/config/project.json",
+      ".devai/config/domains.json",
+      ".devai/config/thresholds.json",
+      ".devai/config/scorecard-na.json",
+      ".devai/config/glob-guards.json",
+      ".devai/config/release-verification.json",
+      ".devai/config/sensor-inputs.json",
+      ".devai/config/invariant-producers.json",
+      ".devai/config/reviewed-workflow-steps.json",
+      ".devai/config/adopter-policy-binding.json"
+    ],
+    "authority": [
+      ".devai/config/authority-policy.json"
+    ],
+    "conditional_already_bound_adapters": [
+      ".devai/config/github-actions-host-adapter.json",
+      ".github/workflows/devai-main-observation.yml",
+      ".devai/config/post-merge-host-adapter.json",
+      "<trusted resolved Git admin>/devai/post-merge-host-adapter.json",
+      "<trusted resolved Git admin>/devai/issue-post-merge-receipt.cjs",
+      "<trusted resolved Git admin>/devai/post-merge.key if absent",
+      "<trusted current Git hooks directory>/post-merge (resolved by existing adapter planner)"
+    ],
+    "conditional_CI": [
+      ".github/workflows/devai-local-rc-verify.yml",
+      ".github/workflows/devai-ledger-verify.yml"
+    ],
+    "transaction": [
+      ".devai/config/upgrade.lock exclusive owner-token create/removal",
+      ".devai/config/adopter-policy-binding.journal.json durable before-image journal",
+      "<closed journal target>.devai-bind-staged siblings+fsync+rename+owned journal cleanup",
+      ".devai/config/upgrade-receipt.json last, measured changed digests+timestamp+postchecks"
+    ],
+    "postchecks": [
+      "policy-materialization-current",
+      "authority-enforcement",
+      "constitution-binding"
+    ],
+    "no_domain_effects": [
+      "No proofchain/epoch/index change",
+      "No hostprovision/reconciliationapproval/phases merely from upgrade",
+      "No release/publish/ref/commit/business-source operation"
+    ]
+  },
+  "minimal_proposed_policy_entry": {
+    "version": "2.8.0",
+    "status": "unreleased",
+    "changes": [
+      {
+        "id": "MIG-2.8.0-constitution-1-2-0",
+        "kind": "constitution",
+        "summary": "Constitution1.2.0 adds only the bounded source-bound canonical-selection and one-proof-entry Git index machine exceptions in Article6, preserving every historical authority row and role safeguard. Architect review and explicit constitution binding are required; ordinary upgrade does not provision a reconciliation host, approve a plan, recover proofs, stage the proof index, publish inventory or grant DETRAN execution authority. Binding replaces the vendored constitution and project pin and refreshes compiled framework authority through the existing transaction.",
+        "decision_records": [
+          "ADR-GOV-0027",
+          "ADR-EVI-0007"
+        ],
+        "segments": [
+          "constitution",
+          "authority"
+        ],
+        "files": [
+          ".devai/pin/constitution.md",
+          ".devai/config/project.json",
+          ".devai/config/authority-policy.json"
+        ],
+        "decision_required": true,
+        "constitution": {
+          "from": "1.1.0",
+          "to": "1.2.0"
+        },
+        "obligation": {
+          "check": "constitution-version",
+          "requirement": "Review ADR-GOV-0027 and exact installed Constitution1.2.0 bytes/digest, then explicitly request init upgrade --constitution (or registered init bind --constitution); this does not authorize reconciliation or DETRAN runtime effects."
+        }
+      }
+    ]
+  },
+  "entry_status_note": "Prepared unreleased entry is handled in-range at installed2.8.0. Finalstable release should mark released with matching changelog date; do not label2.8 configuration-neutral. Existing entries remain unchanged.",
+  "minimal_consumers": [
+    "law/policy/adopter-migrations.json append one2.8entry; existing closed schema/parseAdopterMigrations/plannedReleases/prepareAdopterUpgrade/evaluate require no code change",
+    "docs/adopters/install.md existing amendment list add1.2/ADR-GOV0027 explicit opt-in paragraph",
+    "Existing release metadata/changelog/status consistency at normal stable gate; packaged law includes exact updatedmanifest; rebuild newcandidate, do not silently mutate frozen15"
+  ],
+  "necessary_tests_not_run_during_exclusive_window": [
+    "Existing adopter-migrations-manifest tests preserve all historicalcounts/expectedrelease ranges; installed2.8coverage must includeentry and refs valid",
+    "New isolated from2.7.1/pin1.1 dryplan without--constitution:2.8 amendment with decision_required pending/refused; zero writes",
+    "Same fixture explicit--constitution:canonical1.2SHA, amendment satisfied-by-upgrade, exactchangedpath inventory, zero writes",
+    "Disposable registered apply:exact reviewed changedset,1.2pin/projecthash, updatedauthority+receipt migrationid, allthreepostchecks; repeat no-op and oldrollback/lock/retirement tests unchanged",
+    "Rawindex/chain/epoch/7inventory bodies/protectednativehost state unchanged by dryplan and ordinary upgrade except explicitly reviewed existingadapterprivateeffects",
+    "Installedcandidate manifest+bothconstitutioncopies exactsourcebytes; no DETRAN adoption until its separate reviewed boundary"
+  ],
+  "source_spans": [
+    "packages/cli/src/commands/init/upgrade.ts:339-368",
+    "packages/cli/src/commands/init/upgrade.ts:661-761",
+    "packages/cli/src/commands/init/upgrade.ts:1007-1040",
+    "packages/cli/src/services/adopter-migrations.ts:130-142",
+    "packages/cli/src/authority/index.ts:449-460",
+    "packages/cli/src/command-router.ts:93-105",
+    "law/schemas/adopter-migrations.schema.json:1-6"
+  ],
+  "graft_tokens_saved_this_turn": 329075
+}

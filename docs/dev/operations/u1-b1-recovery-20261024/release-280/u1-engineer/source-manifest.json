@@ -1,0 +1,26 @@
+{
+  "status": "REAL_COUNTEREXAMPLE_FIX_AWAITING_INDEPENDENT_GREEN",
+  "paths": [
+    {
+      "path": "packages/evidence/src/evidence/verb-evidence.ts",
+      "sha256": "cc21da6460e4e57f37572d1f015826bb785d78abef90222d375256e265e7eed0"
+    },
+    {
+      "path": "packages/evidence/src/evidence/anchors.ts",
+      "sha256": "ea332646c2de48642a88e08d3402cdda1137f78a0c7d5fb8e456d8545535b1de"
+    },
+    {
+      "path": "packages/cli/src/commands/evidence/facade-collect-record.ts",
+      "sha256": "5bbe9d4517ea7d92b671ecff638a9146161c3188ed62cca79ec33d255bae920c"
+    },
+    {
+      "path": "packages/cli/src/commands/evidence/facade.ts",
+      "sha256": "26527bd1a83a947908edbd4797a1c7ab564a90a05f0909847802b028e73f8f98"
+    },
+    {
+      "path": "packages/evidence/src/evidence/chain.ts",
+      "sha256": "d99cbfd74969e8688bb84392725a8b8f068c84076d95bd7bb5c7a7c21d9a2626"
+    }
+  ],
+  "identity_race": "Authentic ordinary-id-race-red.log fixed by derivation from actual serialized predecessor under shared append lock; independent green-final-source.log 103PASS."
+}

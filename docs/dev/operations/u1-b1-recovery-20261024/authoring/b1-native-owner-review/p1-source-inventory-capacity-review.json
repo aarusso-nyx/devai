@@ -1,0 +1,18 @@
+{
+  "kind": "independent-readonly-process-buffer-capacity-review",
+  "verdict": "accepted",
+  "bound_bytes": 8388608,
+  "actual_fixture_listing_bytes": 1873061,
+  "default_bound_refusal": "ENOBUFS",
+  "below_bound_complete_bytes": 1873061,
+  "above_bound_refusal": "ENOBUFS",
+  "invariants": [
+    "Only reviewInputs fixed local Git helper maxBuffer changes.",
+    "Same Git argv, actual repository and exact complete snapshot.",
+    "Above bound errors must propagate to existing INPUTS_UNSUPPORTED; truncated stdout never accepted."
+  ],
+  "limitations": [
+    "Capacity behavior tested against actual Node execFileSync pipe transport, not full real source inventory.",
+    "Installed full335 public preview/apply remains root qualification."
+  ]
+}

@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/v2.8.0-qualification/inspector/ratification-before-source.txt","kind":"historical-transcript-custody-pointer","original_bytes":1712,"original_bytes_changed":false,"original_sha256":"0855d8986d58dc897d73e8ced5c7e96b50ea31953e60e7ebb455518943a64f7e"}

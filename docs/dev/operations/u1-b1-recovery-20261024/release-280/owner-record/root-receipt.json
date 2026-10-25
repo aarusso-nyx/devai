@@ -1,0 +1,51 @@
+{
+  "status": "OWNER_RECORD_SCHEMA_AND_CODEC_VERIFIED_NOT_OWNER_RUNTIME_ACCEPTANCE",
+  "schema_receipt": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-owner-schema-inspector/receipt.json",
+  "schema_receipt_sha256": "ecbb9dc6472e6597e1b753c60f75b4f5698e6884fa4227a79d9f0d2eb5fb650e",
+  "verified_current_input_hashes": 12,
+  "schema_result": {
+    "passed": 216,
+    "failed": 0,
+    "files": 7,
+    "owner_schema": 22,
+    "three_existing_population_suites": 71,
+    "canon_reference_and_snapshot_suites": 123
+  },
+  "census": {
+    "runtime_roster": 122,
+    "canonical_schemas": 135,
+    "source_only_schemas": 13
+  },
+  "preservation": {
+    "proof_index_only_count_changed": true,
+    "cli_only_reviewed_count_and_membership_changes": true,
+    "schema_roster_only_reviewed_body_change": true,
+    "historical_adr_fixture_sha256": "05c776122fd5e4a939f446b5343943db03ef51a6e0051deaaa2099797f75fc0e",
+    "historical_adr_fixture_unchanged": true,
+    "synthetic_shard06_unchanged": true
+  },
+  "root_checks": {
+    "schema_build_and_staging": "PASS",
+    "authority_build": "PASS",
+    "source_and_amended_test_eslint": "PASS",
+    "workspace_typecheck": "PASS root and independent final source/test set",
+    "error_reference": "1288 generated codes PASS",
+    "graph": "graft build PASS current ignored worktree cache1682 files"
+  },
+  "remaining": "Trusted worktree/key/clock origin and opaque host operation/effect census, direct human bootstrap/Owner lifecycle, full B1 canonical materialization/index/staged public workflow, installed qualification, integration/CI and protected v2.8.0 publication.",
+  "codec_receipt": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-owner-record-inspector/receipt.json",
+  "codec_receipt_sha256": "f38b19733d0dea9374855c8d1f21c88146a50f9ff9bf370b12d819a19c915436",
+  "codec_verified_current_hashes": 18,
+  "codec_result": {
+    "passed": 255,
+    "failed": 0,
+    "owner_record_cases": 145,
+    "unchanged_clock_cases": 86,
+    "unchanged_error_reference_cases": 24,
+    "raw_log": "independent-final.txt",
+    "duration_seconds": 3.95,
+    "command": "node scripts/process/validation-runner.mjs -- node_modules/.bin/vitest run --config tests/config/local.config.ts --maxWorkers 1 packages/authority/tests/unit/reconciliation-owner-record.test.ts packages/authority/tests/unit/reconciliation-clock.test.ts packages/cli/tests/unit/reconciliation-error-codes.test.ts packages/cli/tests/unit/error-code-reference.test.ts"
+  },
+  "source_sha256": "fd7d944ce09f640ff4040abeae090ad8b694b55e3e285feb46ea59650735cbda",
+  "test_sha256": "201be15666d9235268feafc446ecdf9c6facb39f2e91da99ca211f836c07e31b"
+}

@@ -1,0 +1,11 @@
+{
+  "original_source_path": "docs/dev/operations/u1-b1-recovery-20261024/release-280/self-binding-success/pty.bin",
+  "external_custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/release-280/self-binding-success/pty.bin",
+  "sha256": "4827a15a25891c8eca64084ae8a08a47f5d2973c65d3b17f74bb88c929e40085",
+  "bytes": 2407396,
+  "dev": "16777245",
+  "ino": "77460197",
+  "mode": "0o644",
+  "historical_bytes_changed": false,
+  "standing": "historical diagnostic artifact; no authority or completion promotion"
+}

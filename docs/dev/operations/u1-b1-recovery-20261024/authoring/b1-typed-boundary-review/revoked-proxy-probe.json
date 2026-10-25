@@ -1,0 +1,37 @@
+{
+  "source_sha256": {
+    "classification": "841ccdb072d9c0ba9f0b7c59c0a2e86c4824a74c623331922e386d62fcaf2791",
+    "resolver": "0d3a0cb31a62a9f0687fbe5a9dab36ad9db7174baff15d724661e90008fe6ab3"
+  },
+  "dist_sha256": {
+    "classification": "a7c9b9ef0e385f0ab4fce60f6762453121a9b5a7d60c0bfe9101f64aef13a502",
+    "resolver": "67adcab5f52d4e6ea4b1ad3973394efcc6c86905337358431af15f0ae7f9e0df"
+  },
+  "results": [
+    {
+      "label": "classify revoked target",
+      "threw": true,
+      "name": "TypeError",
+      "message": "Cannot perform 'IsArray' on a proxy that has been revoked"
+    },
+    {
+      "label": "typedkind revoked target",
+      "threw": true,
+      "name": "TypeError",
+      "message": "Cannot perform 'IsArray' on a proxy that has been revoked"
+    },
+    {
+      "label": "policy revoked target",
+      "threw": true,
+      "name": "TypeError",
+      "message": "Cannot perform 'IsArray' on a proxy that has been revoked"
+    },
+    {
+      "label": "policy revoked selector",
+      "threw": true,
+      "name": "TypeError",
+      "message": "Cannot perform 'IsArray' on a proxy that has been revoked"
+    }
+  ],
+  "scope": "Actual compiled entrypoints, revoked Proxy untrusted data only; no adapter callbacks or effects."
+}

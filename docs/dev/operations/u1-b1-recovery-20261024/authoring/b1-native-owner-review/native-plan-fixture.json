@@ -1,0 +1,11 @@
+{
+  "fixture_root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-inspector-native-plan-tlwq6uxw/repository",
+  "source_root": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-detran-historical-WwmCPH/repository",
+  "selected_parent": "7dfab8bdf61ffe935bca45578e0e65c09883f633",
+  "merge_heads": [
+    "7dfab8bdf61ffe935bca45578e0e65c09883f633"
+  ],
+  "published_ref": "refs/heads/inspector-selected",
+  "origin": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-inspector-native-plan-tlwq6uxw/origin.git",
+  "qualification": "Disposable byte-preserving APFS clone copy of original historical fixture; real local bare publication, synthetic B5 only in test harness."
+}

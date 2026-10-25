@@ -1,0 +1,14 @@
+{
+  "fixture": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-initial-owner-plan-jJqJW9/repository",
+  "temporary_indexes": "/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-proof-index-pure-GR4I7T",
+  "chain_records": 338,
+  "chain_sha256": "ca6d4fbf83d268875b45c150bf2314c49fb8f6ac274c849fb43236987b0163c8",
+  "blob_oid": "308d1b5b1960f8c9c7ef7ef4cf173804c598dc16",
+  "before_index_sha256": "542553c911bcd2f5e65dd8a27b66f0f1dbcb703278477cb27df920ede95eadce",
+  "planned_index_sha256": "a9ae42654e20e902c3d3e120478597bfd9a9a7f36d5d9bd073078581d26cd3ad",
+  "before_entries": 15804,
+  "after_entries": 15802,
+  "unchanged_other_entries_sha256": "e9762da9d93658eb2a42a570707f67413beddbdb5b138bed56bb3f87f42c2cd3",
+  "outputs_manifest_sha256": "8ccbae0f77c1b28edbce79598b5efb07422e0d9c3abeb19363477cc3f3d1ee32",
+  "qualification": "Actual recovered335-prefix338-chain and approved15804-entry rawindex; independent Git hash-object and Git ls-files against separate temporary index files only. No actual index/object mutation or phase03 authority claim."
+}

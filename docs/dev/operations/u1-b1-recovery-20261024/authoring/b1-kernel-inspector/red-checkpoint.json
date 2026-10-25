@@ -1,0 +1,28 @@
+{
+  "status": "AUTHENTIC_BEHAVIOR_RED_BEFORE_IMPLEMENTATION",
+  "counts": {
+    "total": 46,
+    "failed": 32,
+    "passed": 14
+  },
+  "command": "pnpm exec node scripts/process/validation-runner.mjs -- vitest run --config tests/config/local.config.ts --maxWorkers 1 packages/authority/tests/unit/reconciliation-resource-kernel.test.ts",
+  "test_sha256": "4a7aa40029bec66784f8038d2a32f0e973603e026c10f7b8618f86b007519ad2",
+  "preimplementation_sources_sha256": {
+    "packages/authority/src/types.ts": "30ba693bf29b350fbd491b94884da2462ad34b1361a0b70ae02d6a61996e298d",
+    "packages/authority/src/decision-plan.ts": "98ae5194eb79be234b607860fddad4f80688615cd28744005d263209af7c16e8",
+    "packages/authority/src/runtime/policy-resolver.ts": "c2117f59e62164b7b41cd902fa65408a75a4da98270dbebc27bee83787b5510f"
+  },
+  "failure_meaning": [
+    "resourceValid rejects every qualified new target",
+    "malformedPlan accepts malformed new target fields or throws before guarded validation",
+    "distinct valid logical targets share undefined identity"
+  ],
+  "already_passing": [
+    "actual classifier refusal for every accepted shape",
+    "bounded generic and forged selectors cannot admit new kinds",
+    "policy selectorMatches false in normal and classifyOnly modes"
+  ],
+  "scope": "Data shape and identity only; no prepared/apply, host origin, role, scope, handle custody or policy permission proven. structural-red.log filename contains behavioral RED, not missing-module structural failure.",
+  "lint_exit_code": 0,
+  "raw_log_sha256": "990b4738f701613b3c9f977cb3fcf8f4c341fb76220779ff720fcc36f93032dc"
+}

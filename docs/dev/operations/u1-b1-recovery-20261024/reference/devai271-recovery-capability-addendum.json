@@ -1,0 +1,75 @@
+{
+  "title": "ADDENDUM: official DEVAI2.7.1 release capability discovery",
+  "role": "Auditor",
+  "verdict": "2.7.1 release verified; U1/B1 capabilities still absent; D1-L recovery qualification remains blocked",
+  "original_audit_preserved": {
+    "path": "/Volumes/Development/.codex/artifacts/detran/milestone2-start-20261024/recovery-capability-authority-audit.json",
+    "sha256": "189cc803d4c063cdcd1fc59e4fa8428d77804a5f1a2f02c96f9a9b6a898de27e"
+  },
+  "official_release": {
+    "url": "https://github.com/aarusso-nyx/devai/releases/tag/v2.7.1",
+    "published_at": "2026-10-24T07:48:53Z",
+    "draft": false,
+    "prerelease": false,
+    "annotated_tag_object": "40b6f706cd07e81125a586beacb8020019a29b2e",
+    "dereferenced_source_commit": "2df84159caabf869b866fb2a05e5b06be83295fb",
+    "source_commit_tree": "4e6f5dec3de2595f4598d3b8232bf0d43e6e7cc4",
+    "registry_gitHead": "absent; actual source identity established by official tag dereference, not target_commitish=main"
+  },
+  "artifact": {
+    "name": "@aarusso-nyx/devai",
+    "version": "2.7.1",
+    "engines": {
+      "node": ">=24.0.0"
+    },
+    "url": "https://npm.pkg.github.com/download/@aarusso-nyx/devai/2.7.1/db18e2d4219f95acc12953b2e29fe1c4258263a6",
+    "registry_sri": "sha512-npTghsHBWW4A7IrcmFvpb0LwQmqa+xYuvM4y9gLLD/fv8Wf0lAyBgYtJscGsHKVYS51KoEfeVRv3nOPWmblU/g==",
+    "registry_sha1": "db18e2d4219f95acc12953b2e29fe1c4258263a6",
+    "tarball_sha256": "bdf03759e77a01880497c0c3b730a7226dbae350d968a377a42655fdc9dd0e2e",
+    "tarball_bytes": 7280427,
+    "verified_sha512_SRI_and_SHA1": true,
+    "safe_regular_members_extracted_externally": 436,
+    "package_file_hash_manifest_sha256": "278f32771e56449052d7f4eea39e823cf3a26f973bf9d90ca7ef2fbd0781d5e3"
+  },
+  "capability_checks": {
+    "newest_line": "Present in packaged public routing/static help and source, still newest complete physical line only. Not invoked.",
+    "newest_guard_packaged_lines": [
+      174649
+    ],
+    "newest_help_packaged_lines": [
+      234347,
+      234394,
+      234747
+    ],
+    "U1_divergent_anchor": "Absent: packaged/source CLI has no --recover-divergent-anchor, packaged evidence schema lacks recovered_from, runtime remains newest-only.",
+    "B1_multi_origin_reconcile_bootstrap": "Absent: no public evidence reconcile plan/materialize/stage-proof or sense bootstrap-inventory. No bypass via private exports is supported.",
+    "ADR_EVI_0006": "Present accepted contract in exact tagged source, byte-identical to prior approved reference89e4bebf; expressly does not report implementation or authorize release/adopter effects.",
+    "source_and_packaged_evidence_schema_byteequal": true,
+    "runtime_help": "Statically inspected packaged route/help declarations; no package code or --help process executed."
+  },
+  "release_notes": "Official2.7.1 notes describe prerequisite checks, host resource leases, external docs build, source-bound release resume/rehearsal/publication checks, serialized pre-push tasks and fast-uri/body-parser security updates. No U1/B1 recovery implementation is claimed there. Absence conclusion relies on actual runtime/schema/source, not notes alone.",
+  "limits": [
+    "2.7.1 is published but not adopted by this audit; installed DETRAN2.7.0 and every approved packet remain untouched.",
+    "SRI proves downloaded artifact matches registry metadata; tag/source binds stated release. No claim of exhaustive runtime assurance or negative test execution.",
+    "B1-I upstream Article6/implementation approval, U1/B1 implementation/assurance/review/CI/release and exact DETRAN D1-L version/diff/effects approval remain necessary.2.7.1 does not satisfy required capability entry gate.",
+    "No sibling Git fetch/ref update or file write, install/build/test/script/native command/qualification/upgrade/recovery/chain/index effect performed. Network API/package download and external static extraction only.",
+    "#211 remains held at9b2a190a; C6 blocked; all histories/local/staged work preserved."
+  ],
+  "sources_sha256": {
+    "registry-version271.json": "967037784da04dfbc6fff28a80443bf88f78050015ff153cba87f3f37ebc787e",
+    "github-release.json": "52491cbf837a3ae5dc765e65c55d280331cea1584f3432808795188755d92bec",
+    "github-tagref.json": "e26cf5318bc09f35dee2fb9b7afd6c928510b7323d72b5618c76b3c7b60bfbca",
+    "github-annotated-tag.json": "d3afad65ceb53ce2e1d9f11c9a5c812635e26c65336eaa74a71ea923f40d9198",
+    "github-release-source-commit.json": "818b49c2958cdb9f39849cf3870f7f13feb8aa52a1d98b4387e5a4a83d0e2afc",
+    "released-source/package.json": "35f7b31086defa4e51081c2ed5e1da904a01d69f7928f504060e25f5d6bf26c1",
+    "released-source/packages/evidence/src/evidence/verb-evidence.ts": "b15e3d9c9e7b40a17df188f72f97a266010b8460c01d6f24e77a345a3024de00",
+    "released-source/packages/cli/src/commands/evidence/facade-collect-record.ts": "4930315197a1430a83d82fd3c021fd0a203ec9630a0af0cd155ad06d9a84c309",
+    "released-source/packages/cli/src/commands/evidence/facade.ts": "26527bd1a83a947908edbd4797a1c7ab564a90a05f0909847802b028e73f8f98",
+    "released-source/law/schemas/evidence.schema.json": "591886e0bd2cd23775de825d82270e30f10f742461d68abc98554db39bc5e173",
+    "released-source/law/policy/action-registry.json": "59deac2d823e80058a8223799c31653d7c8fc14dcc7a0ad49ca295545f01de27",
+    "released-source/law/adr/ADR-EVI-0006-custody-proven-divergent-anchor-recovery.md": "89e4bebfc1147662efc3d779b490e71339a838bfe8531cbd6907e2fb073eea09",
+    "unpacked/package/dist/runtime/index/release-host.js": "43db28b2b26df0d8933c37f4b6f103124a183080bb5a0d5033214e854b6a4cd8",
+    "unpacked/package/dist/runtime/index/schemas/evidence.schema.json": "591886e0bd2cd23775de825d82270e30f10f742461d68abc98554db39bc5e173"
+  },
+  "custody": "Read custody RELEASED; addendum only."
+}

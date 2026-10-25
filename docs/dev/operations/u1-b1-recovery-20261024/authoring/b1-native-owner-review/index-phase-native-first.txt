@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/index-phase-native-first.txt","kind":"historical-transcript-custody-pointer","original_bytes":3021,"original_bytes_changed":false,"original_sha256":"b5b4c48fa23ac8a3e1d872ac1ec6d65431cdfe11cdf86b86c7b28b6673ec3689"}

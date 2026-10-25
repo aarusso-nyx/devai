@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/checkpoint-native-qualified.txt","kind":"historical-transcript-custody-pointer","original_bytes":1644,"original_bytes_changed":false,"original_sha256":"e36cb7d67f6861c76f60f0476f75ee8f7351b09a5660dc2ea8f829336acbe4ab"}

@@ -1,0 +1,12 @@
+{
+  "ordinary_publisher_and_hooks_unchanged": true,
+  "baseline": {
+    "PublishNoReplaceHooks": "af63ea3275af2e1f330c8678d743af87d5e519bd1ad23d975116ae8168dc5b54",
+    "publishNoReplaceSteps": "a310ace36e669268cf56ac5f2889080984bb917ae4e94b7db3bc6aa6e088521b"
+  },
+  "current": {
+    "PublishNoReplaceHooks": "af63ea3275af2e1f330c8678d743af87d5e519bd1ad23d975116ae8168dc5b54",
+    "publishNoReplaceSteps": "a310ace36e669268cf56ac5f2889080984bb917ae4e94b7db3bc6aa6e088521b"
+  },
+  "scope": "TypeScript AST declaration getText excludes leading trivia; private publisher intentionally changed."
+}

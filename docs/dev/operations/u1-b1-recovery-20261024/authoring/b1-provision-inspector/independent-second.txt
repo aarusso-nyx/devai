@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-provision-inspector/independent-second.txt","kind":"historical-transcript-custody-pointer","original_bytes":1733,"original_bytes_changed":false,"original_sha256":"43fad9623022877d3b30602b2579b93997a35fca1240ab78a135e2cf30a1bd5d"}

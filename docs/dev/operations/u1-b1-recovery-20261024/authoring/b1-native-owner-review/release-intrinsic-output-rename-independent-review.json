@@ -1,0 +1,36 @@
+{
+  "review": "Independent bounded release analyzer disposition and unique private output method rename",
+  "source_sha256": {
+    "packages/effects-check/src/analyze.ts": "fb1aafdc4778b395ee5a2185e8e3c2f158c85f989e9181c90cbdde2f828ccef4",
+    "packages/cli/src/reconciliation-owner-output.ts": "a497b5cecb71d7aee91235353012e7b966492f74ca828ac45fa003b3577f6835",
+    "packages/cli/src/reconciliation-phase-output.ts": "9a422faf0445a1a2c32e7d88c91e476a0ebf941a2bbe8b8ceed22805195ea322",
+    "packages/cli/src/commands/evidence/reconciliation-approve.ts": "1441af7de79a2f72aecd808423bc5f13ac994d28bb0f0c5b86b1df50d7ed39dd",
+    "packages/cli/src/commands/evidence/reconciliation-phases.ts": "27ad493d4dade651ab68f63a6b53528523022287a5a5337acfe1cea4f398b1a7",
+    "packages/cli/src/commands/sense/bootstrap-inventory.ts": "698d851028bfec3eb88723ef2791d8dd4c7691b9371f03b5975affc3bb1b1a20"
+  },
+  "tests": {
+    "advisory": {
+      "passed": 30,
+      "log": "reconciliation-intrinsic-advisory-eval-qualified.txt",
+      "details": "29 unchanged historical cases plus independent five exact accepted intrinsic calls and45 refusedlookalikes groupedcase"
+    },
+    "output": {
+      "passed": 8,
+      "log": "public-reconciliation-owner-phase-renamed-envelope-qualified.txt",
+      "details": "Five actualCAC phasehandler faultcases plus three Ownertransport cases under explicit mocknative/B5; actual recorded native receipt data, no native effects."
+    }
+  },
+  "review_findings": [],
+  "checked_bounds": [
+    "analyze.ts diff adds only exactpath/Reflect.apply/identifierreceiver/identifiercapturedtarget/arity3/exactargumentexpression disposition; fs/process inference unchanged",
+    "Wrong target/receiver/arguments/arity/construct/copyfile/eval remain advisoryfindings",
+    "Actual intrinsic definitions captured Promise.prototype.then,typedarray getters/set; existing proxy/species/sharedbuffer/size refusal guards preserved",
+    "Owner unique finishOwnerReconciliation and phase unique finishReconciliationPhase update exactconsumers; prevalidationcustody,ALS/receiver/closedguards and terminaldelivery/finalizer custodyretention preserved",
+    "No effectcatalogue/capability/role/permission widening. Native13 frozeninstalled package not qualified by these sourcechanges."
+  ],
+  "historical_failures_preserved": [
+    "reconciliation-intrinsic-advisory-first.txt (test relativeimport failure)",
+    "public-reconciliation-owner-phase-renamed-qualified.txt (directOwnerfailurecallback lacked action-output envelope; harness assertion corrected to exact directCliError shape)"
+  ],
+  "graft_tokens_saved_this_turn": 116273
+}

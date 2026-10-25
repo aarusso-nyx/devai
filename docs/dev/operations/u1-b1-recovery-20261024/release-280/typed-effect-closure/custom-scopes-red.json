@@ -1,0 +1,18 @@
+{
+  "standing": "AUTHENTIC_CUSTOM_SCOPE_KIND_CONFUSION_RED",
+  "result": {
+    "failed": 8,
+    "passed": 70,
+    "files": 2,
+    "exit": 1
+  },
+  "observation": "Actual derived scopes execute the supplied inert callback for protected-release/reconciliation-host/proof-index/unknown requests carrying allowed process-shaped arguments. No real process or domain mutation in those eight callback probes. Existing seventy checks pass.",
+  "sha256": {
+    "packages/cli/src/services/github-issues-tracking/reconcile-authority.ts": "95ccf96820e58ca6a827a7f1cec6cbdf8b5fc403b07fcfbece67e146e77c64d2",
+    "packages/skills/src/post-merge-auditor/host-receipt.ts": "cdd8ba192e6b7f8e40472e15b99bb19166ac7de45cce0b593254e5f9b178ab4d",
+    "packages/cli/tests/unit/tracking-reconcile-authority.test.ts": "cac12a4e08282eec4421c21d7678a3b4992aceba5b64ee4a2681ce848e4ebe82",
+    "packages/skills/tests/unit/post-merge-boundaries.test.ts": "864a97f152fa459af8c78eeedf81b6f3b620c57c7f976b426f20c3debae43fe7",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/typed-effect-closure/custom-scopes-red.txt": "11a81c6366ef59c734133a69beaff6dac86462e219291e9096b7c92c14f68795"
+  },
+  "scope": "Reject non-filesystem/non-process discriminants in these process/filesystem-only scopes before any interpretation of request arguments; preserve existing process policy and filesystem path policy. No new capability or publication effect."
+}

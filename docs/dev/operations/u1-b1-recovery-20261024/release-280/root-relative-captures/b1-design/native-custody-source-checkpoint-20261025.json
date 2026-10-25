@@ -1,0 +1,168 @@
+{
+  "schemaVersion": "1.0.0",
+  "kind": "native-custody-source-checkpoint",
+  "created_at": "2026-10-25T04:03:23.791Z",
+  "version": "2.8.0",
+  "standing": "INTERNAL_SOURCE_QUALIFICATION_ONLY_UNPUBLISHED",
+  "branch": "codex/u1-b1-approval-plan-20261024",
+  "base_head": "2df84159caabf869b866fb2a05e5b06be83295fb",
+  "source": [
+    {
+      "path": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/src/boundaries/reconciliation-host-context.ts",
+      "bytes": 22581,
+      "sha256": "a1f2b7b9ad63a8be55a2ccdedb112608006b4b17a9303e46e6305617c3573339"
+    },
+    {
+      "path": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/src/boundaries/reconciliation-host-operation.ts",
+      "bytes": 23408,
+      "sha256": "92fea363e62d8972ccc7f3c295e2d7b2cbfc40d26b59418527e168babc243808"
+    },
+    {
+      "path": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/src/boundaries/reconciliation-host-owner.ts",
+      "bytes": 8553,
+      "sha256": "aafd6368e9ba8fa2fec101311a563ffe0956d8a5168ea438b158d8b0d0f4f299"
+    },
+    {
+      "path": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/src/boundaries/reconciliation-plan.ts",
+      "bytes": 51353,
+      "sha256": "b731d5280ed4568f48a5a616ef18850b3635f675d8ec62b26fcedf135cf43309"
+    },
+    {
+      "path": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/src/boundaries/reconciliation-custody-input.ts",
+      "bytes": 5322,
+      "sha256": "d120a2472b4d052dfc54214c9a8cf05db11fc3a475070aa026ae58cf0cbdaf9d"
+    },
+    {
+      "path": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/src/boundaries/reconciliation-custody-phase.ts",
+      "bytes": 25705,
+      "sha256": "da2d0724398b801174585e523c4fb54f51b902c70baf104ed4700f3f812bb6df"
+    },
+    {
+      "path": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/src/boundaries/reconciliation-effect-plan.ts",
+      "bytes": 13153,
+      "sha256": "5f7c89d4f5eaf873006dc54a56f3c0895b9b8e2f034ec893fffb0325fc58b984"
+    },
+    {
+      "path": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/src/boundaries/reconciliation-selection.ts",
+      "bytes": 5194,
+      "sha256": "f8967b0337b4a912932af748714fe7f1268f21b735131078ec4cadfdbd405093"
+    }
+  ],
+  "shared_detran_minimum": [
+    "Immutable complete original custody",
+    "Whole selected published-parent prefix plus one attributable normal selection event",
+    "Separate existing U1 divergent-line7 and newest-line8 recovery with current expected heads",
+    "Exact one-entry proof-index CAS, preserving all other entries",
+    "Seven immutable native diagnostic bodies consumed by existing explicit-input exporters; preserve shared controls and both S2 routes"
+  ],
+  "native_phase01": {
+    "fixture": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-initial-owner-plan-jJqJW9/repository",
+    "approval_id": "24b3953e410a7654b1ecdbad8c03a512439a904d9ed90349b116d6685a761caf",
+    "plan_sha256": "5d55b291ae2e31c578ec2c064bd83c8471cda1afbd197734c946f7fd87f61141",
+    "source_manifest_sha256": "204b61be0d8add6cc582aa907e1b5036fc035ffdb1ff8076ca21fc9ea8eb3ca5",
+    "intent_sha256": "85ff44e02aea990c9f7ab0caaff4e000034b1352a839a19fa913fbdcce81f828",
+    "completion_sha256": "1ddb61f6aa2818d0bb030a646dba2a70311a7fa188aa29a0273c8eeea1bd606e",
+    "outputs_manifest_sha256": "6d0e97d2581f5f73c273b0d02d265a340719b181f1a8a3770545f41f2b491e4e",
+    "object_count": 1674,
+    "index_sha256": "542553c911bcd2f5e65dd8a27b66f0f1dbcb703278477cb27df920ede95eadce",
+    "positive_duration_ms": 201845.38158299998,
+    "pass_counts": {
+      "initial_positive_source_and_repeat": 3,
+      "custody_refusals": 4,
+      "reusable_native_observer_refusals": 13,
+      "historical_context_unchanged": 88,
+      "pure_selection_portable": 8,
+      "actual335_pure_selection": 1
+    },
+    "limitations": [
+      "Synthetic B5/TTY/policy origin; real Git/admission/filesystem/typed receipts",
+      "Pure selection candidates are not native phase02 publication or checkpoint qualification",
+      "No installed/public Owner or materialize claim"
+    ]
+  },
+  "evidence": [
+    {
+      "path": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/custody-phase-native-results.json",
+      "bytes": 516950,
+      "sha256": "96764ece18f80590d1e350233fb4a33ddf8a515ea4428076af2a2a18c72d0575"
+    },
+    {
+      "path": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/custody-phase-native-target-fixed.txt",
+      "bytes": 638,
+      "sha256": "d8dcdd288d5c7940868e7e5d464133e6bf2dc59abd51abc66584b43fb877c2f5"
+    },
+    {
+      "path": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/custody-phase-refusals.txt",
+      "bytes": 636,
+      "sha256": "451b6b1c20ca4a8723108e3a713d76a0b0378999db79100153f51db7b520da0d"
+    },
+    {
+      "path": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/custody-binding-reusable-benchmark.json",
+      "bytes": 407,
+      "sha256": "8008209aaeda91a489848f21c93f0d1da06a6f76edf5e8ed7c24001a41f6ccd5"
+    },
+    {
+      "path": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/custody-binding-reusable-framing.txt",
+      "bytes": 636,
+      "sha256": "ab9cbfe9e388fb8c1fe2ceba477ad6d0ff2e51649a778c3f7cc6e4bacf95c34c"
+    },
+    {
+      "path": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/selection-builder-native-results.json",
+      "bytes": 820,
+      "sha256": "64a2c79cb46d3d2a682f3a33cfab14fcd93d5f5cd3eb9d2d12474dc2307b0c03"
+    },
+    {
+      "path": "/private/tmp/devai-release-280-01a16e18/batched-host-context-history-qualified.log",
+      "bytes": 636,
+      "sha256": "e7507f997ec8b13b97d411b8980c9830026a3e01f6ba130b965da902d4d68ada"
+    },
+    {
+      "path": "/private/tmp/devai-release-280-01a16e18/selection-construction-portable.log",
+      "bytes": 633,
+      "sha256": "ba493642fd283f9264aa5b66034307209a66824dd280b18636664c6542726373"
+    },
+    {
+      "path": "/private/tmp/devai-release-280-01a16e18/selection-construction-335-449.json",
+      "bytes": 1933,
+      "sha256": "81929d8257f866c9666d877988181f8c8494861e746b53eeee48dc36f1b460ef"
+    },
+    {
+      "path": "/private/tmp/devai-release-280-01a16e18/custody-selection-milestone-lint.log",
+      "bytes": 362,
+      "sha256": "689d370e8c06bdc4d786c596f733e4fd11d13ae585434f61cc90eeeaf5155785"
+    },
+    {
+      "path": "/private/tmp/devai-release-280-01a16e18/custody-selection-milestone-cli-types.log",
+      "bytes": 362,
+      "sha256": "689d370e8c06bdc4d786c596f733e4fd11d13ae585434f61cc90eeeaf5155785"
+    }
+  ],
+  "preserved_first_failures": [
+    {
+      "path": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/custody-phase-native-first.txt",
+      "bytes": 4104,
+      "sha256": "0501e26853b58613985ad052b2817296ddf2459be684a79b1e6b70804e991b70"
+    },
+    {
+      "path": "/private/tmp/devai-release-280-01a16e18/batched-host-context-history.log",
+      "bytes": 1716,
+      "sha256": "d8ea670eecf71a7068e78703d808121e068681b60b1330e09f8313e32558445c"
+    }
+  ],
+  "remaining": [
+    "Native phase02 selection publication and local authenticated historical checkpoint",
+    "Native proof-index phase03 adapter",
+    "Native phase04 seven-body composition and publication",
+    "Exact installed335/449 positives/refusals/retry/stale/race/crash and clean-mode compatibility",
+    "Complete release verification and publish exact2.8.0"
+  ],
+  "binding_plan": [
+    "Complete fixed internal native phases and local checkpoint before public binding",
+    "Install only exact registered public actions through current typed authority broker; retain current action matrix and historical checks",
+    "Build a fresh distinct package and return exact public package/SBOM/source/plan/effect evidence",
+    "DETRAN inspects actual seven-body paths and digests on separate disposable execution copy before live adoption",
+    "Proceed through authorized DEVAI integration/RC/publication only after full B1 acceptance and required release gates"
+  ],
+  "new_public_preview": null,
+  "live_detran_effects": false
+}

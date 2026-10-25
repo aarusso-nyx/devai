@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-owner-record-inspector/independent-first.txt","kind":"historical-transcript-custody-pointer","original_bytes":275,"original_bytes_changed":false,"original_sha256":"3072e8a2436cd02bc8fed1d988a303834cf8920ef27bc1aaf4d9e514be72a02b"}

@@ -1,0 +1,48 @@
+{
+  "standing": "BOUNDED_PUBLIC_HOST_PROVISIONING_QUALIFIED_NOT_FULL_B1",
+  "package_sha256": "628860e43b763b180dbbc41815dfe30500281e4a88c540529bc434266389b886",
+  "sbom_sha256": "8558cfe8f782a8cf1e3f6a99a5e865d445857fbd8068a78b2a241cb6c38addc6",
+  "fixture_receipt": "/private/tmp/devai-detran-rehearsal-20261024/public449-provision09.json",
+  "independent_negative_report": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-provision08-refusals-p093r5yd/results.json",
+  "independent_negative_report_sha256": "e873291d6ce4be87f2430f277cc0b06114b26ca07e0a391644086fe61f6de374",
+  "tests": {
+    "new_native_interrupt": 3,
+    "independent_output_counterexamples": 7,
+    "selector": 23,
+    "authority_harness_plus_selector": 37,
+    "action_registry_schema": 5,
+    "old_policy_output_selection_native_run": {
+      "passed": 169,
+      "timed_out": 1,
+      "original_log": "/private/tmp/devai-release-280-01a16e18/provision-wiring-history.log",
+      "unchanged_isolated_concurrency_retry_passed": true,
+      "retry_seconds": 29.33,
+      "timeout_not_changed": true
+    },
+    "canonical_registry_constructor": 15,
+    "installed_negative_matrix": 13
+  },
+  "historical_checks_preserved": true,
+  "pending": [
+    "Owner approval native composition",
+    "materialization and normal machine canonical selection evidence",
+    "separate line7 divergent and line8 newest recovery",
+    "exact proof index CAS publication",
+    "seven immutable staged diagnostic bodies",
+    "explicit DETRAN exporter consumption",
+    "full installed refusal retry concurrency crash effect inventory",
+    "commit affected checks protected RC signing release publication readback"
+  ],
+  "live_detran_effects": false,
+  "published": false,
+  "public_evidence": [
+    {
+      "path": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-public-provision09-8phejlb2/evidence/provision09-eof-summary.json",
+      "sha256": "880cb41058dd79a99ca2e974eff69488eb46ff6374622624f2e5d98bb148de4f"
+    },
+    {
+      "path": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-public-provision09-8phejlb2/evidence/provision09-summary.json",
+      "sha256": "62c28aecedd57f686254559b69c297856849491c10718be8fc0459c6a09a4b0b"
+    }
+  ]
+}

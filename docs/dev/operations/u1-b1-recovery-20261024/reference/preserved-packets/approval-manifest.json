@@ -1,0 +1,47 @@
+{
+  "schemaVersion": "1.0.0",
+  "status": "PROPOSED_PENDING_OWNER_APPROVAL",
+  "date": "2026-10-23",
+  "pr": 211,
+  "s2_head": "9b2a190aa1276f4b15469b7079ed0d7c4c8c4c99",
+  "target_main": "7dfab8bdf61ffe935bca45578e0e65c09883f633",
+  "approval_units": [
+    {
+      "id": "REC-U1",
+      "file": "REC-U1-upstream-recovery.md",
+      "sha256": "f198bde3bea26c776f91709217320beaf1b20c20e6b2890a17a36d38e5ca222d",
+      "authority_requested": "upstream implementation handoff only; no release/adoption"
+    },
+    {
+      "id": "REC-B1",
+      "file": "REC-B1-canonical-bootstrap-design.md",
+      "sha256": "35133cbcbad7bed680c803c64af8ae79f5d7d182b4dd6f9bc9847cb831384514",
+      "authority_requested": "upstream design only; B1-I approval required before implementation"
+    },
+    {
+      "id": "REC-D1",
+      "file": "REC-D1-adoption-and-execution-gates.md",
+      "sha256": "8d1ed4804a68b2d01604b8896423842ec3ec95789c076dbd5de5c61737388111",
+      "authority_requested": "preparation and proposed disposition only; D1-L exact-release approval required before installation/recovery"
+    },
+    {
+      "id": "HC-01",
+      "file": "HC-01-eight-line-compatibility.md",
+      "sha256": "c67a38923f78f152c0704996a3546f5fb7f5992294ea9ae8bca2728055389f14",
+      "authority_requested": "finite five-path compatibility implementation only; independent native gates remain"
+    }
+  ],
+  "bound_files_sha256": {
+    "D1-release-binding.proposed.json": "bc2a1c36551f20d016fa0e92eefeaf437abe2c7287d97fbf92968bfce18a8dcd",
+    "HC-01-companion.proposed.json": "d016ea885f1430c06c929b42a435d4a6b1ae4b1b633aa90f3cfd453c38eadc91",
+    "HC-01-eight-line-compatibility.md": "c67a38923f78f152c0704996a3546f5fb7f5992294ea9ae8bca2728055389f14",
+    "README.md": "653bcbe366b3c7adbedb849a4b223bcbce33a9c80294a8b98765427e0749e5ae",
+    "REC-B1-canonical-bootstrap-design.md": "35133cbcbad7bed680c803c64af8ae79f5d7d182b4dd6f9bc9847cb831384514",
+    "REC-D1-adoption-and-execution-gates.md": "8d1ed4804a68b2d01604b8896423842ec3ec95789c076dbd5de5c61737388111",
+    "REC-U1-upstream-recovery.md": "f198bde3bea26c776f91709217320beaf1b20c20e6b2890a17a36d38e5ca222d",
+    "acceptance-vectors.json": "2da535dab6618368a0ab1f3aebb333c6de21124d84afd66a8f72e059d627fd46",
+    "reference-ADR-EVI-0006.md": "89e4bebfc1147662efc3d779b490e71339a838bfe8531cbd6907e2fb073eea09",
+    "source-custody.json": "0670e5663de3e1d81cf276595351a92de7bdc81f5dcd05441e2255899b309c22"
+  },
+  "no_install_recovery_or_merge_approval_recorded": true
+}

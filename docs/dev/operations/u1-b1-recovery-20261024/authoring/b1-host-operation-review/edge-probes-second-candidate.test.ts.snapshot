@@ -1,0 +1,452 @@
+import { execFileSync } from 'node:child_process';
+import {
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  readFileSync,
+  readdirSync,
+  lstatSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { afterEach } from 'vitest';
+import {
+  runWithAuthorityHostEffects,
+  type AuthorityHostEffectScope,
+} from '/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/src/boundaries/host-scope.js';
+import type { AuthorityHostEffectRequest } from '/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/src/boundaries/host-atomic-effects.js';
+import { createAuthorityBoundaryRuntime } from '/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/src/boundaries/boundary-runtime.js';
+import { computeMutationEnvelopeDigest, type MutationEnvelope } from '/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/src/index.js';
+import {
+  CONSENT,
+  actionDocumentWithId,
+  canonicalSha256,
+  createIssuer,
+  declarationDependencies,
+  exactSubject,
+  expectSuccess,
+  makePolicyPlant,
+  policyBindingFromPlant,
+  runtimeApi,
+  type AuthorityDecisionIssuer,
+} from '/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/tests/unit/authority-runtime-testkit.js';
+import { boundaryDependencies } from '/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/tests/unit/authority-boundary-testkit.js';
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
+
+type Data = Record<string, unknown>;
+type View = Readonly<{
+  target: Data;
+  action_id: string;
+  invocation_id: string;
+  original_argv_sha256: string;
+  initiator: unknown;
+}>;
+type Binding = Readonly<{
+  identity: { repository_id: string; worktree_id: string };
+  bindings: Data;
+  binding_sha256: string;
+  clock: unknown;
+  grants_authority: false;
+}>;
+type Host = {
+  paths: { repository_root: string; git_dir: string; common_dir: string; private_root: string };
+  identity: unknown;
+  bindings: Data;
+};
+interface OperationApi {
+  createReconciliationHostInvocation(controls: Data): object;
+  disposeReconciliationHostInvocation(invocation: object): void;
+  readReconciliationHostBinding(): Binding;
+  invokeReconciliationHostOperation<T>(target: Data, callback: (host: Host) => T): T;
+  reconciliationHostOperation(
+    request: AuthorityHostEffectRequest,
+    expectedInvocation: object,
+  ): View | undefined;
+  reconciliationHostOperationSnapshot(
+    view: unknown,
+    expectedInvocation: object,
+    target: Data,
+  ): Readonly<Data>;
+}
+async function operationApi(): Promise<OperationApi> {
+  return (await import('/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/src/boundaries/reconciliation-host-operation.js')) as unknown as OperationApi;
+}
+const external = realpathSync(mkdtempSync(resolve(tmpdir(), 'devai-host-operation-inspector-')));
+const cleanEnv = {
+  PATH: '/usr/bin:/bin',
+  LC_ALL: 'C',
+  HOME: external,
+  GIT_CONFIG_NOSYSTEM: '1',
+  GIT_CONFIG_SYSTEM: '/dev/null',
+  GIT_CONFIG_GLOBAL: '/dev/null',
+};
+const originalArgv = [...process.argv];
+const ttyDescriptors = [process.stdin, process.stdout, process.stderr].map(
+  (stream) => [stream, Object.getOwnPropertyDescriptor(stream, 'isTTY')] as const,
+);
+afterEach(() => {
+  process.argv = [...originalArgv];
+  for (const [stream, descriptor] of ttyDescriptors) {
+    if (descriptor) Object.defineProperty(stream, 'isTTY', descriptor);
+    else Reflect.deleteProperty(stream, 'isTTY');
+  }
+});
+function git(root: string, args: string[]): string {
+  return execFileSync('/usr/bin/git', ['-C', root, ...args], {
+    env: cleanEnv,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  }).trim();
+}
+function repository(linked = false) {
+  const base = realpathSync(mkdtempSync(resolve(external, 'fixture-')));
+  const primary = resolve(base, 'repository');
+  mkdirSync(primary, { mode: 0o700 });
+  git(primary, ['init', '--initial-branch=main']);
+  git(primary, [
+    '-c',
+    'user.name=Fixture',
+    '-c',
+    'user.email=fixture@example.invalid',
+    '-c',
+    'commit.gpgsign=false',
+    '-c',
+    'core.hooksPath=/dev/null',
+    'commit',
+    '--allow-empty',
+    '-m',
+    'fixture',
+  ]);
+  if (!linked) return { root: primary, primary };
+  const root = resolve(base, 'linked');
+  git(primary, ['worktree', 'add', '--detach', root, 'HEAD']);
+  return { root: realpathSync(root), primary };
+}
+function inventory(root: string): unknown {
+  const walk = (path: string): unknown => {
+    const stat = lstatSync(path, { bigint: true });
+    return stat.isDirectory()
+      ? {
+          mode: String(stat.mode),
+          ino: String(stat.ino),
+          entries: readdirSync(path)
+            .sort()
+            .map((name) => [name, walk(resolve(path, name))]),
+        }
+      : {
+          mode: String(stat.mode),
+          ino: String(stat.ino),
+          bytes: readFileSync(path).toString('base64'),
+        };
+  };
+  return walk(root);
+}
+async function genuineReceipt(
+  target: Data,
+  issuer: AuthorityDecisionIssuer,
+  action: string,
+  role: string,
+) {
+  const api = await runtimeApi();
+  const rule = {
+    rule_id: 'host-operation-fixture',
+    origin: 'additive-extension',
+    precedence: 500,
+    action_ids: [action],
+    selector: {
+      kind: target.kind,
+      repository_id: target.repository_id,
+      operations: [target.operation],
+    },
+    effect: 'allow',
+    subjects: [{ kind: 'human', roles: [role] }],
+    required_consent: CONSENT,
+    constitutional_anchors: [6],
+    rationale: 'Owned deterministic operation fixture; no installed origin claim.',
+  };
+  const plant = makePolicyPlant({ additiveRules: [rule] });
+  const context = expectSuccess<{ context_receipt: unknown }>(
+    api.resolveAuthorityDeclaration(
+      {
+        action_id: action,
+        invocation_id: 'invocation-1',
+        dry_run: false,
+        declaration: { as_role: role },
+        consent: CONSENT,
+      },
+      declarationDependencies(
+        issuer,
+        actionDocumentWithId(action, 'local-write', { kind: 'human', allowed_roles: [role] }),
+        undefined,
+        policyBindingFromPlant(plant),
+      ),
+    ),
+  );
+  const policy = expectSuccess(api.loadAuthorityPolicy({ document: plant.document }, plant.deps));
+  const resolution = api.resolveAuthorityPolicy(
+    policy,
+    {
+      action_id: action,
+      context_receipt: context.context_receipt,
+      consent: CONSENT,
+      resource: target,
+      operation: target.operation,
+    },
+    { receiptStore: issuer, canonicalSha256 },
+  );
+  expect(resolution).toMatchObject({ outcome: 'allow' });
+  const subject = exactSubject([target], plant) as { plan: { envelope: MutationEnvelope } };
+  const envelope = {
+    ...subject.plan.envelope,
+    request: { ...subject.plan.envelope.request, action_id: action },
+  } as MutationEnvelope;
+  const exact = {
+    plan: {
+      ...subject.plan,
+      envelope: {
+        ...envelope,
+        issued_by: {
+          ...envelope.issued_by,
+          envelope_digest_sha256: computeMutationEnvelopeDigest(envelope),
+        },
+      },
+    },
+  };
+  const decision = issuer.issueAllow({
+    resolutions: [resolution],
+    subject: exact,
+    context_receipt: context.context_receipt,
+    invocation_id: 'invocation-1',
+    boundary_adapter_id: `${String(target.kind)}-authority-boundary`,
+  }) as { issued: boolean; receipt: unknown };
+  expect(decision.issued).toBe(true);
+  return { subject: exact, receipt: decision.receipt };
+}
+
+async function harness(
+  options: {
+    linked?: boolean;
+    write?: boolean;
+    action?: string;
+    role?: string;
+    operation?: string;
+    phases?: string[];
+    proof?: boolean;
+    targetPhase?: string;
+    scopeApply?: (
+      request: AuthorityHostEffectRequest,
+      apply: () => unknown,
+      dispatch: () => unknown,
+    ) => unknown;
+  } = {},
+) {
+  const api = await operationApi();
+  const repo = repository(options.linked);
+  const issuer = createIssuer(await runtimeApi());
+  const action = options.action ?? 'init bind',
+    role = options.role ?? 'architect',
+    write = options.write ?? true,
+    operation = options.operation ?? 'provision',
+    phases = options.phases ?? [];
+  process.argv = [
+    process.execPath,
+    'devai',
+    ...action.split(' '),
+    ...(action === 'init bind'
+      ? ['--reconciliation-host', '--target', repo.root]
+      : [
+          '--repo-root',
+          repo.root,
+          '--plan',
+          'record/reconciliation/plan.json',
+          '--plan-sha256',
+          'f'.repeat(64),
+          ...(operation === 'approve' ? [] : ['--approval', '1'.repeat(64)]),
+          ...(operation === 'renew' || operation === 'revoke'
+            ? [`--${operation}`, '--expected-grant-sha256', '6'.repeat(64)]
+            : operation === 'recover-owned-lease'
+              ? ['--recover-owned-lease', '--expected-lease-sha256', 'ABSENT']
+              : []),
+        ]),
+    '--as-role',
+    role,
+    ...(write ? ['--write'] : []),
+    '--format',
+    'json',
+  ];
+  const argvHash = canonicalSha256(process.argv);
+  // Owned deterministic B5 provider. These values do NOT attest installed package/module origin.
+  const bindings: Data = {
+    package_sha256: 'a'.repeat(64),
+    module_sha256: 'b'.repeat(64),
+    registry_sha256: 'c'.repeat(64),
+    constitution_sha256: 'd'.repeat(64),
+    policy_sha256: 'e'.repeat(64),
+  };
+  let currentBindings = bindings;
+  let verified = 0;
+  for (const stream of [process.stdin, process.stdout, process.stderr])
+    Object.defineProperty(stream, 'isTTY', { value: true, configurable: true });
+  const controls: Data = {
+    invocation_id: 'invocation-1',
+    action_id: action,
+    receipt_store: issuer,
+    repository_root: repo.root,
+    repository_id: 'example-repository',
+    original_argv_sha256: argvHash,
+    initiator: role,
+    operation,
+    phases,
+    write,
+    require_tty: write && (action === 'init bind' || action === 'evidence reconcile approve'),
+    readCurrentBindings: () => currentBindings,
+    verifyActual: () => {
+      verified++;
+      if (canonicalSha256(process.argv) !== argvHash) throw new Error('actual argv drift');
+    },
+    ...(operation === 'provision'
+      ? {}
+      : {
+          ...(operation === 'approve' ? {} : { approval_id: '1'.repeat(64) }),
+          plan_sha256: 'f'.repeat(64),
+        }),
+  };
+  const invocation = api.createReconciliationHostInvocation(controls);
+  const requests: AuthorityHostEffectRequest[] = [];
+  const views: View[] = [];
+  const scope = {
+    action_id: action,
+    invocation_id: 'invocation-1',
+    effect: 'local-write' as const,
+    receipt_store: issuer,
+    reconciliation_invocation: invocation,
+    apply_effect: (request: AuthorityHostEffectRequest, apply: () => unknown) => {
+      requests.push(request);
+      const dispatch = () => {
+        const view = api.reconciliationHostOperation(request, invocation);
+        expect(view).toBeDefined();
+        if (!view || !grant) throw new Error('missing genuine operation/decision');
+        views.push(view);
+        let appliedResult: unknown;
+        const logicalAdapter = {
+          admit: (value: Data) =>
+            api.reconciliationHostOperation(request, invocation) === view &&
+            canonicalSha256(value) === canonicalSha256(target),
+          snapshot: (value: Data) =>
+            api.reconciliationHostOperationSnapshot(view, invocation, value),
+          apply: () => {
+            appliedResult = apply();
+            return appliedResult;
+          },
+        };
+        const runtime = createAuthorityBoundaryRuntime(
+          boundaryDependencies(issuer, [], {
+            [target.kind === 'proof-index' ? 'proof_index' : 'reconciliation_host']: logicalAdapter,
+          }),
+        );
+        const planHandle = expectSuccess(
+          runtime.plannerRegistry.registerPlan({
+            subject: grant.subject,
+            invocation_id: 'invocation-1',
+          }),
+        );
+        const prepared = expectSuccess(
+          runtime.prepare({
+            plan_handle: planHandle,
+            subject: grant.subject,
+            target,
+            decision_receipt: grant.receipt,
+            adapter_id: `${String(target.kind)}-authority-boundary`,
+          }),
+        );
+        expectSuccess(runtime.apply({ prepared }));
+        return appliedResult;
+      };
+      return options.scopeApply ? options.scopeApply(request, apply, dispatch) : dispatch();
+    },
+  };
+  const run = <T>(callback: () => T) =>
+    runWithAuthorityHostEffects(scope as AuthorityHostEffectScope, callback);
+  const preview = run(() => api.readReconciliationHostBinding());
+  const common = {
+    repository_id: preview.identity.repository_id,
+    worktree_id: preview.identity.worktree_id,
+    plan_sha256: 'f'.repeat(64),
+  };
+  const approval = '1'.repeat(64);
+  const target = options.proof
+    ? {
+        kind: 'proof-index',
+        id: `proof-index:${common.repository_id}:${common.worktree_id}:record/proofs/chain.json`,
+        ...common,
+        operation: 'chain-cas',
+        proof_path: 'record/proofs/chain.json',
+        approval_id: approval,
+        phase_sha256: '2'.repeat(64),
+        before_index_sha256: '3'.repeat(64),
+        other_entries_sha256: '4'.repeat(64),
+        verified_chain_sha256: '5'.repeat(64),
+      }
+    : {
+        kind: 'reconciliation-host',
+        id: `reconciliation-host:${common.repository_id}:${common.worktree_id}:${operation}${operation === 'provision' ? '' : `:${approval}${operation === 'consume-phase' ? `:${options.targetPhase ?? phases[0]}` : ''}`}`,
+        ...common,
+        operation,
+        binding_sha256: preview.binding_sha256,
+        ...(operation === 'provision' ? {} : { approval_id: approval }),
+        ...(operation === 'consume-phase' ? { phase: options.targetPhase ?? phases[0] } : {}),
+      };
+  const grant = await genuineReceipt(target, issuer, action, role);
+  return {
+    api,
+    repo,
+    issuer,
+    scope,
+    invocation,
+    controls,
+    target,
+    preview,
+    bindings,
+    requests,
+    views,
+    run,
+    replaceBindings: (value: Data) => {
+      currentBindings = value;
+    },
+    verified: () => verified,
+  };
+}
+
+
+it('thenable callback result refuses synchronous completion', async () => {
+ const f = await harness(); let getterCalls=0;
+ const result = Object.defineProperty({}, 'then', {get(){getterCalls++; return ()=>{};}});
+ expect(() => f.run(() => f.api.invokeReconciliationHostOperation(f.target, () => result))).toThrow('AUTHORITY_RECONCILIATION_OPERATION_INVALID');
+ expect(getterCalls).toBe(0);
+});
+it('throwing binding provider projects closed failure on preview', async () => {
+ const f=await harness();
+ const invocation=f.api.createReconciliationHostInvocation({...f.controls,readCurrentBindings:()=>{throw new Error('PRIVATE_PROVIDER_SENTINEL');}});
+ const scope={...f.scope,reconciliation_invocation:invocation};
+ expect(() => runWithAuthorityHostEffects(scope as AuthorityHostEffectScope,()=>f.api.readReconciliationHostBinding())).toThrow('AUTHORITY_RECONCILIATION_OPERATION_STALE');
+});
+it('throwing binding provider projects closed failure on invoke', async () => {
+ const f=await harness();
+ const invocation=f.api.createReconciliationHostInvocation({...f.controls,readCurrentBindings:()=>{throw new Error('PRIVATE_PROVIDER_SENTINEL');}});
+ const scope={...f.scope,reconciliation_invocation:invocation};
+ expect(() => runWithAuthorityHostEffects(scope as AuthorityHostEffectScope,()=>f.api.invokeReconciliationHostOperation(f.target,()=> 'unreachable'))).toThrow('AUTHORITY_RECONCILIATION_OPERATION_STALE');
+});
+
+it('ordinary own function thenable refuses synchronous completion', async () => {
+ const f=await harness(); let thenCalls=0;
+ const result={then(){thenCalls++;}};
+ expect(() => f.run(()=>f.api.invokeReconciliationHostOperation(f.target,()=>result))).toThrow('AUTHORITY_RECONCILIATION_OPERATION_INVALID');
+ expect(thenCalls).toBe(0);
+});
+
+it('ordinary init bind remains unrelated when only root value contains selector spelling', async () => {
+ const {parseReconciliationHostInput}=await import('/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/cli/src/authority/reconciliation-host-input.ts');
+ const root=realpathSync(mkdtempSync(resolve(external,'reconciliation-host-adopter-')));
+ expect(parseReconciliationHostInput('init bind',[process.execPath,'devai','init','bind','--target',root,'--after-constitution','--as-role','architect','--format','json'],root,'architect')).toBeUndefined();
+});

@@ -1,0 +1,5 @@
+$ node_modules/.bin/prettier --check packages/cli/src/command-router.ts packages/cli/src/commands/init/index.ts packages/cli/src/commands/init/shared.ts packages/cli/src/commands/init/review-authority-policy.ts packages/cli/src/authority/command-capabilities.ts packages/cli/src/authority/broker.ts packages/cli/src/authority/policy-review.ts packages/cli/src/authority/policy.ts packages/cli/src/authority/policy-support.ts packages/cli/src/action-output.ts
+Checking formatting...
+All matched files use Prettier code style!
+
+exit_code=0

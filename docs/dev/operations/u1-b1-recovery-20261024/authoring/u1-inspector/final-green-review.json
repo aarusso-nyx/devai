@@ -1,0 +1,74 @@
+{
+  "result": "U1_INDEPENDENT_GREEN_FOR_INSTALLED06_AND_OFFICIAL_BOOTSTRAP06",
+  "version": "2.8.0",
+  "tarball_sha256": "dc806a721e47fb69a141bae34dd1009ca08747c1a9472789374355605ef8b77b",
+  "bin": "/private/tmp/devai-release-280-01a16e18/installed-06/node_modules/@aarusso-nyx/devai/dist/runtime/index/bin.js",
+  "bin_sha256": "8ad61056af95fa44d9019619dbb1cd2d20ae879d813f1dddd5b464737b6e49a2",
+  "final": {
+    "files": 8,
+    "passed": 179,
+    "failed": 0,
+    "skipped": 0,
+    "single_worker": true,
+    "log": "final-eight-paths-installed06.log"
+  },
+  "targeted_public": {
+    "passed": 4,
+    "failed": 0,
+    "extra_identical_two_process_race_repeats": 3,
+    "repeat_passed": 3
+  },
+  "independent_findings_closed": [
+    {
+      "finding": "Ordinary writer stale-predecessor ID derivation",
+      "authentic_red": "ordinary-id-race-red.log",
+      "fix": "ID derives from actual serialized predecessor; actual stored ID returned",
+      "qualification": "Covered in final8path179tests"
+    },
+    {
+      "finding": "Public identical race returned authority-resource refusal instead of stale head",
+      "authentic_red": "final-eight-paths-installed05.log",
+      "fix": "Only exact append-lock publication resourcechange obtains fresh guarded retry; actual current head independently classified under lock. Unrelated guards and canonical publication errors preserved.",
+      "qualification": "Final8paths179 plus4public and3extra realrace repeats"
+    }
+  ],
+  "ia_coverage": {
+    "IA001": "Actual two-branch Git merge; eight-line epoch with7orphan/8anchored; one canonical append, all other bytes preserved",
+    "IA002_003": "Bad source digest/link/sequence/manifest/commonprefix and missing/duplicate/wrong anchors; other source-anchored epochdigest refused",
+    "IA004": "Newest/current/absent lines refused; genuinely accepted historical declaration remains acknowledged",
+    "IA005_006": "Expectedhead/source/proof rechecked; duplicate publicrace and ordinarywriter contention; exact/conflicting source retries",
+    "IA007": "Unsafe paths/symlinks/nonregular/tail/role/consent and mixed modes refused",
+    "IA008": "Source+line artifacts/provenance and canonical predecessor; digesttampering invalidates manifests"
+  },
+  "crash_scope": "Real normalwriter temporary-file boundary injection verified old canonical and complete temporary chain plus safe retry. No claim of hardware powerloss or processkill during atomicrename.",
+  "source_sha256": {
+    "packages/evidence/src/evidence/verb-evidence.ts": "cc21da6460e4e57f37572d1f015826bb785d78abef90222d375256e265e7eed0",
+    "packages/evidence/src/evidence/anchors.ts": "ea332646c2de48642a88e08d3402cdda1137f78a0c7d5fb8e456d8545535b1de",
+    "packages/evidence/src/evidence/chain.ts": "d99cbfd74969e8688bb84392725a8b8f068c84076d95bd7bb5c7a7c21d9a2626",
+    "packages/cli/src/commands/evidence/facade.ts": "26527bd1a83a947908edbd4797a1c7ab564a90a05f0909847802b028e73f8f98",
+    "packages/cli/src/commands/evidence/facade-collect-record.ts": "5bbe9d4517ea7d92b671ecff638a9146161c3188ed62cca79ec33d255bae920c",
+    "law/schemas/evidence.schema.json": "6bcb8e4f288ef01b633e2bfeb8bff568303a7023a47c1d18cb6549557d16182a",
+    "docs/reference/cli/evidence-verify.md": "fc0ef13a7252d7f3c3470fa3c2ceb9506e02402cc1300795062937c828192379"
+  },
+  "test_sha256": {
+    "packages/evidence/tests/unit/divergent-anchor-recovery.test.ts": "c160d6fdaf09346eb8182e0419f6cf4b37546cba76d9b67b31c300acbaf89fb4",
+    "packages/cli/tests/unit/divergent-anchor-recovery.test.ts": "d04131b10feab8ce0869827297d021d558a7aec7919493c83067cb92bfea5d06",
+    "packages/schemas/tests/contract/divergent-anchor-recovery-schema.test.ts": "b2e9ca884973bc36a71536d733d3bbfa5fefa697254490be4205d6118077ddfc",
+    "packages/evidence/tests/unit/verb-evidence.test.ts": "e7197acc3e7673fcfd6d161c527ae605f775cbb1f96d15317da8958ea3c0bcc5",
+    "packages/evidence/tests/proof-line-anchoring.test.ts": "de99330ccc3ccc3160aad5ac768faee9b110a114f45ed6a5080e990ec8f793d6",
+    "packages/cli/tests/unit/cmp0006-evidence-recovery.test.ts": "bca321dd85a183c7c0fd202264b91d2aadd59b37c08f0edd8c810f0f4c6255ac",
+    "packages/cli/tests/unit/evidence-facade-acceptance.test.ts": "d661e13c9f036206538899a2ccd99444996d9e69a41acc387cf0332652bceb71",
+    "packages/cli/tests/unit/evidence-verify-anchors.test.ts": "af91d317c9b7b327873626e931d6dd863f9626b24283cd1b75c511b81b1a5cb1"
+  },
+  "log_sha256": {
+    "installed06-public.log": "e85f18698e9a669d1ac44891f776b3b5dbaa92403965c4d6056204feecd25f6e",
+    "installed06-race-repeat-1.log": "965a1322c6c67477269ef7b81d05caff3c7fbc5a48c332895c936884b09597dc",
+    "installed06-race-repeat-2.log": "6284e36626851f31dde878a6f3d290208fa8b038acd646166954a8a1ffc1a477",
+    "installed06-race-repeat-3.log": "679bd5fcf678dd9bc5573e106ea162333f92ecf604aa45c496c036dd5ae6a280",
+    "final-eight-paths-installed06.log": "8d5571a19c711509f4c057c2cc8d58580d05917c4eb597537acdf2c531ebd57e",
+    "guard-classification-source.log": "21f4d29229b431d809b594785d901bc1b98db8e97a184333fffeac52d369b91e",
+    "ordinary-id-race-red.log": "083928cfa7a0001ca4d25135d0c6f9fbb3d63c8aeef9e6bb35fda1fd2909212e",
+    "final-eight-paths-installed05.log": "e4d0b557c4585ecb0d8b1d155769f7c221e2793b3202c657f29219b806c2f545"
+  },
+  "holds": "This qualifies U1 candidate only; does not establish B1 host adapter, release, publication, or downstream/adopter execution. Root owns later whole-candidate gates."
+}

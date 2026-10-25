@@ -1,6 +1,6 @@
 # CLI overview
 
-DEVAI presents 69 actions: 36 stable actions, 22 preview actions, and 11 internal plumbing
+DEVAI presents 74 actions: 41 stable actions, 22 preview actions, and 11 internal plumbing
 actions. Eleven workflow domains organize the public surface. Choose the domain from the outcome you need;
 then choose one leaf action, suite, preset, kind, slice, tier, round, or task selection inside
 that domain. The hidden `task` and `catalog` surfaces are plumbing, not additional workflows.
@@ -85,6 +85,23 @@ other. Preview or inspect whenever the leaf offers `--dry-run`, plan output, sta
   and writes, is mutually exclusive with `--include`, and rejects `--force`/`--command`.
   Existing `--include hooks` remains additive initialization. See the
   [selected-adapter hook contract](../../adopters/install.md#shared-hooks-with-a-github-primary-26-candidate).
+- **Candidate exact policy review:** `init bind --review-authority-policy --after-constitution`
+  is an opt-in local-write review for creating an absent authority-policy file. It needs
+  a real terminal, direct Architect identity, `--write` and JSON output. The review first shows
+  the exact candidate policy bytes/digest and the trusted canonical constitution/project
+  projection without writing a file. A separate exact
+  `CREATE <plan_sha256> <artifact_sha256>` confirmation is required within five minutes;
+  write consent alone never publishes in this mode. Any constitution precursor needs
+  its own explicit approval and registered execution. The final create uses actual
+  successor bindings and refuses changed inputs, existing targets, upgrade locks,
+  unsupported authority extensions and conflicting selectors. Cancellation/expiry
+  writes nothing; uncertain publication preserves completed bytes for inspection.
+  The invocation-owned action-output boundary emits one READY envelope with review
+  standing before terminal input and displays the exact confirmation prompt on stderr.
+  It emits one terminal completion/cancellation/refusal envelope after authority cleanup,
+  with streams and exit handling restored. Unowned, foreign or reused transport access
+  refuses; other actions retain ordinary output behavior. Disposable source fixtures
+  grant no installed-package or live-use standing. The ordinary advisory/default/full/upgrade branches stay unchanged.
 - **Upgrade:** `init upgrade` (preview, Architect-initiated) plans without `--write`: it reads the
   bound `devai_version`, selects the entries of the shipped
   [migration manifest](../../../law/policy/adopter-migrations.json) above it and at or below the

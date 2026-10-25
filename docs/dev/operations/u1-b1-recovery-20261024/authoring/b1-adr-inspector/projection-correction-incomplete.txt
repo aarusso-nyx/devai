@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-adr-inspector/projection-correction-incomplete.txt","kind":"historical-transcript-custody-pointer","original_bytes":1221,"original_bytes_changed":false,"original_sha256":"00f9ce2306ef7384b9a1c53d17aceb71719645366ceeb5ac11c737fa39fd7f0a"}

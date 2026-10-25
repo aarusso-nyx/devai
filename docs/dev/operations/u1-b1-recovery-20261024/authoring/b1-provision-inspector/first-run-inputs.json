@@ -1,0 +1,8 @@
+{
+  "packages/authority/src/boundaries/reconciliation-host-provision.ts": "8697c0570322e4e9fd047bf1a860c9b12bf97493b70db2aea560b5236fa04cfa",
+  "packages/authority/src/boundaries/reconciliation-host-namespace.ts": "b64fd3338e31c5c72e264a26f015d97850c7aeff254f5bb6c775ef770f735f32",
+  "packages/authority/src/index.ts": "9d665d51e73c550819c4c223b34e0d110eb3b5305e02758a754977d46359272c",
+  "packages/authority/tests/unit/reconciliation-host-provision.test.ts": "13cf63ec2b70d06a64ee85bb4b397019782ca65b41844428fabefd39e2d13abd",
+  "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/native-provision-checkpoint.json": "b5781dc107baee06410015fc031cd3372022ccd1c2234a1449a3115419dd149d",
+  "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/native-provision-interface.json": "1062f7f05db0d88505bac87fd0fc63d685bca53ba2e72003561a6dc2e485de0e"
+}

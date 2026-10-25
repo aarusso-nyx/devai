@@ -1,0 +1,9 @@
+{
+  "selector_alternative_count": 6,
+  "first4_unchanged": true,
+  "examples_unchanged": true,
+  "legacy_exported_selector_function_unchanged": true,
+  "new_policy_matcher_actual_internal_call_count": 2,
+  "kernel58_sha256": "da8a78cd5e4aca842ceaab29b38337f3662949c5c82525ceb89b71a28008898a",
+  "prior99_sha256": "87fa27e5c50865b484275baa242966f298e237c51ec903f62e5eb7ba7bb1b36c"
+}

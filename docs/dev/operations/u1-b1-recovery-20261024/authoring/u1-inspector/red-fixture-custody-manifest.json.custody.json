@@ -1,0 +1,11 @@
+{
+  "original_source_path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/u1-inspector/red-fixture-custody-manifest.json",
+  "external_custody_path": "/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/u1-inspector/red-fixture-custody-manifest.json",
+  "sha256": "ef55ae60d89507b7943c79c580d5e95785f8a9d10a03a834a1d7ed8db931a983",
+  "bytes": 9869,
+  "dev": "16777245",
+  "ino": "77459547",
+  "mode": "0o644",
+  "historical_bytes_changed": false,
+  "standing": "historical diagnostic artifact; no authority or completion promotion"
+}

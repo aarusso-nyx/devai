@@ -1,0 +1,84 @@
+{
+  "status": "CONCRETE_READONLY_HOST_ORIGIN_AND_CLOCK_PACKET_FOR_INDEPENDENT_REVIEW_AND_RED",
+  "authority": "Accepted ADR-EVI-0007 and full internal v2.8.0 authorization",
+  "source": "packages/authority/src/boundaries/reconciliation-host-context.ts",
+  "test": "packages/authority/tests/unit/reconciliation-host-context.test.ts",
+  "scope": "Actual direct/linked Git worktree and qualified host clock observations. No filesystem writes, namespace/seed/issuer creation, writable SQLite, key/MAC access, approval/operation handle, authority decision, public route or barrel export. A branded context proves actual captured read-only observations, never action authority.",
+  "api": {
+    "ReconciliationHostContext": "Frozen opaque module-WeakMap member with one own identity property; identity has exactly schemaVersion1.0.0,kind reconciliation-host-context,repository_id,worktree_id,host_identity_sha256,head,object_format,merge_heads. Every nested public value is frozen; no private physical paths or process data in identity.",
+    "captureReconciliationHostContext": "(root:string, repositoryId:string)=>ReconciliationHostContext; root must already be absolute canonical physical worktree root, repositoryId exact existing Owner logical-ID alphabet. The final trusted broker must supply its actual verified repository ID; this helper does not authenticate a caller label.",
+    "readReconciliationHostIdentity": "(context:ReconciliationHostContext)=>context.identity after fresh actual repository/pin/runtime/boot revalidation. Unknown, cloned, Proxy or disposed context refuses without executing property getters.",
+    "readReconciliationHostPaths": "(context:ReconciliationHostContext)=>fresh frozen exact repository_root,git_dir,common_dir,private_root paths after revalidation. Private internal final-adapter data only; never a resource target or generic filesystem grant.",
+    "readReconciliationHostClock": "(context:ReconciliationHostContext)=>validated frozen ReconciliationClockObservation after fresh revalidation and bounded wall-before/hrtime/boot/wall-after sampling. No caller clock provider or time override.",
+    "disposeReconciliationHostContext": "(context:ReconciliationHostContext)=>void; invalidate exact context membership. Every other call on it then refuses. Repeated disposal is harmless; clones/Proxy objects do not affect real members.",
+    "ReconciliationHostContextError": "Error with name ReconciliationHostContextError, message exactly one closed code below and no raw cause/native output/payload/path excerpts"
+  },
+  "repository_probe": {
+    "program": "Fixed /usr/bin/git via raw synchronous read-only host probe; no shell or caller executable/args. Clean environment PATH=/usr/bin:/bin, LC_ALL=C, GIT_CONFIG_NOSYSTEM=1, GIT_CONFIG_SYSTEM=/dev/null, GIT_CONFIG_GLOBAL=/dev/null; no inherited Git/Node/preload settings.",
+    "flags": [
+      "--no-optional-locks",
+      "--no-replace-objects",
+      "--no-lazy-fetch",
+      "-c",
+      "core.fsmonitor=false"
+    ],
+    "commands": [
+      "rev-parse --is-bare-repository (must false)",
+      "rev-parse --show-toplevel (must exact root)",
+      "rev-parse --absolute-git-dir",
+      "rev-parse --path-format=absolute --git-common-dir",
+      "rev-parse --show-superproject-working-tree (must empty)",
+      "rev-parse --show-object-format (sha1 or sha256)",
+      "rev-parse --verify HEAD (matching40/64lowerhex)"
+    ],
+    "bounds": "Each child timeout10000ms, stdout/stderr max65536bytes, no inherited stdin, bounded pipe output; any signal/nonzero/native failure returns a fixed code without raw text.",
+    "forbidden_environment": [
+      "GIT_DIR",
+      "GIT_WORK_TREE",
+      "GIT_INDEX_FILE",
+      "GIT_COMMON_DIR",
+      "GIT_OBJECT_DIRECTORY",
+      "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+      "GIT_NAMESPACE",
+      "GIT_CONFIG_COUNT",
+      "GIT_CONFIG_PARAMETERS",
+      "GIT_REPLACE_REF_BASE",
+      "GIT_SHALLOW_FILE"
+    ],
+    "pins": "Canonical owned effective-UID regular root/gitdir/common-dir directories, refusing symlinks and group/world write. Root .git is owned directory (direct) or owned single-linked regular bounded gitdir-pointer file (linked), never a symlink. Pointer bytes/type/identity and directory device/inode/birthtime/uid/mode are pinned and rechecked before/after probes; directory mtime/ctime are excluded because legitimate child publication changes them. Files include size/mtime/ctime and bounded descriptor O_RDONLY|O_NOFOLLOW read/hash. Reject bare, submodule, missing/unborn HEAD, bad paths/owner/mode and logical IDs.",
+    "merge_heads": "Read optional fixed <actual-gitdir>/MERGE_HEAD as a single-linked owned regular bounded4096-byte file using nofollow/fstat/lstat checks. LF-terminated lowercase same-format OIDs, no duplicates or HEAD itself, maximum32parents. Absence yields frozen empty list. Bind exact file bytes/identity plus actual HEAD; drift refuses. No source/merge ref or index mutation.",
+    "private_root": "join(actual worktree gitdir,'devai','reconciliation'), distinct for linked worktrees. No creation or admission seed read/open. Existing ancestor devai/root entries must be owned nonsymlink non-group/world-writable directories; an existing reconciliation root additionally requires0700. Missing entries are observed only. Namespace content/issuer origin/locking qualification remain separate final-host/bootstrap gates."
+  },
+  "identity_derivation": {
+    "worktree_id": "wt- plus first48hex of SHA256(canonicalJson({repository_id,repository_root,git_dir,common_dir,root_identity,git_dir_identity,common_dir_identity,git_entry_identity,git_entry_sha256})); git_entry_sha256=null for directory .git. Directory identity fields exactly dev,ino,birthtime_ns,uid,mode as lossless decimal strings; mode is permission bits stat.mode&07777, not file-type bits. Pointer identity additionally size_bytes,mtime_ns,ctime_ns decimal strings.",
+    "host_identity_sha256": "SHA256(canonicalJson(the same exact identity projection plus worktree_id)). HEAD/merge/runtime/boot are separately pinned observations; exclude them from persistent host identity so legitimate new HEAD or reboot can create a new context without silently migrating an old approval.",
+    "current_state": "Context pins actual captured HEAD, merge-head bytes, directory/pointer and namespace existence/identities, runtime fingerprint, boot and Linux time namespace for its lifetime. Any difference invalidates dependent reads with STALE. A fresh context can observe new HEAD, but its existence does not renew/migrate old approvals."
+  },
+  "clock_qualification": {
+    "source": "owner-clock-amendment.json plus exact reviewed Node24.22.0/libuv1.52.1 implementation chain. Permit only actual darwin/linux with process.versions.node=24.22.0 and uv=1.52.1; unknown fingerprints refuse rather than assume every Node24 source. This is an initial explicit support gate, not a change to general CLI engine support.",
+    "executable": "Realpath actual process.execPath; pin regular executable's device/inode/birthtime/uid/mode/size/mtime/ctime. Owner may be root or actual effective UID, no group/world write. Revalidate each context read. No arbitrary executable supplied by data.",
+    "boot": "Darwin fixed /usr/sbin/sysctl -n kern.bootsessionuuid, clean environment and bounded1000ms/128byte output. Linux fixed /proc/sys/kernel/random/boot_id bounded128byte nofollow read. Require exactly36ASCII hex/hyphen UUID plus one LF; normalize uppercase to lowercase. No leading/trailing whitespace, alternate lines or fallback UUID.",
+    "time_namespace": "Darwin literal darwin-host; Linux actual readlink('/proc/self/ns/time') matching time:[digits], no absent/unknown fallback. Pin exact namespace for context lifetime. Linux execution becomes qualified only when actual same-host probes below pass on that Linux host; current Darwin evidence alone is not Linux execution qualification.",
+    "cross_process_probe": "Three fresh actual process.execPath children, clean environment, fixed built-in-only -e program (no data-built source/args). Each returns exact node,uv,platform,arch,boot_id,time_namespace,monotonic_ns. Require exact parent fingerprint/boot/namespace and parent_before_ns <= child_ns <= parent_after_ns, all positive uint64 decimal. Each child <=3000ms/4096bytes. No caller probe provider. No child files, clocks, boot, suspend or environment are changed.",
+    "sampling": "After context revalidation: Date.now wall-before, process.hrtime.bigint positive uint64, actual boot/namespace read, Date.now wall-after. Both walls safe nonnegative integers, after>=before, width<=250ms; boot/namespace/fingerprint unchanged. Return existing validated clock shape with wall-after. No Number coercion of ns, zero/native failure fallback, process.uptime/os.uptime or caller time.",
+    "not_proved": "Read-only shared-clock probe does not prove filesystem locking, supply action authority, simulate suspend/reboot or attest a compromised OS/runtime. Native admission and actual final adapter tests remain required."
+  },
+  "codes": [
+    "RECONCILIATION_HOST_INVALID",
+    "RECONCILIATION_HOST_ENVIRONMENT_INVALID",
+    "RECONCILIATION_HOST_UNAVAILABLE",
+    "RECONCILIATION_HOST_CONTEXT_UNKNOWN",
+    "RECONCILIATION_HOST_STALE",
+    "RECONCILIATION_HOST_CLOCK_UNAVAILABLE"
+  ],
+  "trust_boundary": "Trusted OS account/runtime and governed participants; no isolation against arbitrary same-UID external filesystem replacement, compromised native tools/runtime or OS administrator. Branded observations are not an action receipt or a trusted package/key. Final broker/adapter must bind actual package/policy/original argv/role/consent and fresh ordinary authority before any write.",
+  "required_independent_tests": [
+    "Authentic absent module RED; real committed direct repo and actual linked Git worktree, correct actual administration paths and distinct worktree identity/private roots; all persistent identity/digest formulas independently computed",
+    "Real readonly inventory before/after capture/read/probes, zero directory/seed/issuer/index/ref/proof effects; no writable SQLite or caller source/SQL/key",
+    "Actual same-boot three-child clock brackets/fingerprint plus fresh clock sample; explicit unsupported platform/runtime/source/boot/namespace/timeout failure refuses without fallback or raw diagnostics",
+    "Bare/submodule/unborn/symlink/mode/owner/override/malformed pointer/merge-head, changed HEAD/admin pointer/namespace/executable/boot and disposed/cloned/Proxy/getter contexts refuse; only own disposable fixtures change",
+    "Head updates can produce a fresh context with same persistent host/worktree identity while old context is stale; new context never claims old grant eligibility",
+    "Bounded files/outputs/clock samples; Unicode/space/question/hash path handling, safe errors/private-path projection separation and no raw error/parser/tool output",
+    "Existing release repository-context, native admission, clock and Owner codec source/tests/receipts remain unchanged. Full actual adapter composition while native lock lives is a later required test."
+  ]
+}

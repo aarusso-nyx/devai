@@ -1,0 +1,14 @@
+{
+  "external_fixture": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-N3s07C",
+  "worker_sha256": "9a74bd08f18e4d57866f2b8839e1b34e844000c46ca984b6461df4ca795a0a47",
+  "sources": {
+    "packages/authority/src/boundaries/reconciliation-admission-seed.ts": {
+      "source_sha256": "d912846ddb518a132ed1e2484dfa56f23b8ff2c7a7bc25b2157fb379f25490fe",
+      "output_sha256": "05f4ab80ab653a5d1488f6bfc621c9a105ffca99380a963040a841f517954c40"
+    },
+    "packages/authority/src/boundaries/host-reconciliation-admission.ts": {
+      "source_sha256": "d6f238f4c22afcae3d4c3feeb3adf2e7faec8049c576ce182001bfce1d953631",
+      "output_sha256": "c1a6836e0a9f6b783f088927e92ade652e2b8be0bdde3a7afd18d9b57b1eaba5"
+    }
+  }
+}

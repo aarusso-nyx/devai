@@ -1,0 +1,12 @@
+ WARN  Issue while reading "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/.npmrc". Failed to replace env in config: ${NODE_AUTH_TOKEN}
+ WARN  Issue while reading "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/.npmrc". Failed to replace env in config: ${NODE_AUTH_TOKEN}
+
+> devai@2.8.0 typecheck /Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024
+> tsc -b packages/cli/tsconfig.typecheck.json --force && tsc --noEmit -p tsconfig.typecheck.json
+
+packages/authority/tests/unit/reconciliation-owner-state.test.ts(964,18): error TS2378: A 'get' accessor must return a value.
+packages/authority/tests/unit/reconciliation-owner-state.test.ts(964,18): error TS4114: This member must have an 'override' modifier because it overrides a member in the base class 'unknown[]'.
+packages/authority/tests/unit/reconciliation-owner-state.test.ts(964,38): error TS2355: A function whose declared type is neither 'undefined', 'void', nor 'any' must return a value.
+packages/authority/tests/unit/reconciliation-owner-state.test.ts(1010,16): error TS2378: A 'get' accessor must return a value.
+packages/authority/tests/unit/reconciliation-owner-state.test.ts(1010,36): error TS2355: A function whose declared type is neither 'undefined', 'void', nor 'any' must return a value.
+ ELIFECYCLE  Command failed with exit code 2.

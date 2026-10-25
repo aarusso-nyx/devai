@@ -1,0 +1,18 @@
+{
+  "standing": "AUTHENTIC_ERROR_CONSUMER_CENSUS_RED",
+  "passed": 0,
+  "failed": 16,
+  "findings": [
+    "Seven frozen native codes absent from generated reference",
+    "Actual commandRefusal maps seven leading native codes to fallback ACTION_INVOCATION_REFUSED/infrastructure6 instead of preserving exactcode/routing2",
+    "Two non-diagnostic seed metadata constants missing from NOT_CODES exclusion set"
+  ],
+  "test_sha256": "0da439cf541f019cb07ce795c133020bcfd88f5d38c86e97e4768a5ce1397ac3",
+  "raw_sha256": "13e334aa5969310b7ec5b24d6043d6d37778947c70d3a7dc63ee9bcf713b432f",
+  "before_sha256": {
+    "scripts/error-code-sources.mjs": "4eed494d0d3e2cf423d1872331e588305075ec26fffab307d3fe82b87dc4b79f",
+    "packages/cli/src/error-code-prefixes.ts": "02c633f0667ac7b0fe1ae10f068ed5724de3cbf9e7e845c7f662de86a93ea214",
+    "docs/reference/error-codes.md": "54d7d6053f2aa13a4e66686ff4d133e5d31a4779949850b1ecc9ece483b71370"
+  },
+  "effect_authority_added": false
+}

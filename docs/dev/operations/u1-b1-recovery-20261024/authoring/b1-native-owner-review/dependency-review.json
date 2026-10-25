@@ -1,0 +1,145 @@
+{
+  "standing": "BOUNDED_DEPENDENCY_AND_SOURCE_VERIFICATION_PROPOSAL_NOT_FROZEN_PRODUCT_PACKET",
+  "authority_limit": "Independent review/evidence only. No plan/schema/builder/Ownerwriter delivered; no product/tests/build/dependency/action/registry edits, no newagents. Earlier state/provision seals untouched.",
+  "inspected_sha256": {
+    "packages/authority/package.json": "18a1316615ca97e9e23d636901d5241d184764b42b8ce9ea98ebeaf41972ea3f",
+    "packages/authority/tsconfig.json": "3443758ab9851d9d262ff2af571bcc7f88eb5918a99ceceff2dc595ed3e22b38",
+    "packages/evidence/package.json": "ba2f37fd27b2d60449b56f6067991106314db0ef4303cc7c6456c0bae042461a",
+    "packages/evidence/tsconfig.json": "c722b112ce8981225bb297ae1fb65ea105ffcfea79af33f529c87b3a4435a6df",
+    "packages/utils/package.json": "80ee9be4c10802f8eb42895f04475d41298247f6a37790eee87dbd1eb3db51bd",
+    "packages/cli/package.json": "11f88150b37bfc5641be9db1c32c77655434cd2583d0aa5d8d20fa77b16d6183",
+    "packages/cli/tsconfig.json": "1499c894a976a027679f19c7b1b5a7b0e28977abc7c01081098e4a4907bf529a",
+    "packages/evidence/src/evidence/chain.ts": "d99cbfd74969e8688bb84392725a8b8f068c84076d95bd7bb5c7a7c21d9a2626",
+    "packages/evidence/src/evidence/proof-epoch.ts": "6cecb726f514481f70e01e0841f531038033b53634edb1227fd1189f17662f22",
+    "packages/evidence/src/evidence/verb-evidence.ts": "cc21da6460e4e57f37572d1f015826bb785d78abef90222d375256e265e7eed0",
+    "packages/evidence/src/evidence/anchors.ts": "ea332646c2de48642a88e08d3402cdda1137f78a0c7d5fb8e456d8545535b1de",
+    "packages/authority/src/boundaries/reconciliation-host-operation.ts": "ce8dc730e1a6d92890a013e0471fe81d3d64212a77e987f2cb05ca99bd3d0be1",
+    "packages/cli/src/authority/reconciliation-host-input.ts": "c26435b615eede984973fc1f9d247742c3dbbced43c538d1e171976ce06f8185",
+    "packages/authority/src/boundaries/proof-index-codec.ts": "ba41c862f95c8c0a7e0c54eb1434c98a57182af0f58bb4c61983c6b4d67a3fb4",
+    "law/schemas/proof-index-reconciliation-contract.schema.json": "21844d42ded67cff9d96df372688d8a7759ad414568892e5a4b84735f417fff9",
+    "law/schemas/reconciliation-owner.schema.json": "39002520c0ffa410ef41a9caf34d16af123b9bc88f0ab1e426deaf70af284344",
+    "law/adr/ADR-EVI-0007-owner-approved-merge-reconciliation.md": "1bfaa9703fa5cd667de523c74a3d8f4b584b7c630290f1c2400a71a871a53bd4"
+  },
+  "actual_dependencies": {
+    "utils": {
+      "minimatch": "^9.0.0"
+    },
+    "schemas": {
+      "ajv": "^8.17.0",
+      "ajv-formats": "^3.0.0"
+    },
+    "authority": {
+      "@devai-nyx/schemas": "workspace:*",
+      "@devai-nyx/utils": "workspace:*",
+      "minimatch": "^9.0.0",
+      "typescript": "^5.6.0"
+    },
+    "evidence": {
+      "@devai-nyx/authority": "workspace:*",
+      "@devai-nyx/schemas": "workspace:*",
+      "@devai-nyx/utils": "workspace:*"
+    },
+    "cli": {
+      "@types/node": "^24.0.0",
+      "ajv": "^8.17.0",
+      "ajv-formats": "^3.0.1",
+      "cac": "^6.7.0",
+      "import-meta-resolve": "4.2.0",
+      "minimatch": "^9.0.0",
+      "semver": "7.8.5",
+      "typescript": "^5.6.0",
+      "yaml": "^2.9.0"
+    }
+  },
+  "dependency_conclusion": {
+    "fact": "Evidence already imports authority and lists it in package.json+tsconfig references. Authority importing evidence (even deep readonly/subpath) would create package/project cycle. Utils is existing shared leaf and currently imports neither evidence nor authority nor schemas.",
+    "recommended_direction": "utils <- schemas-independent pure historical evidence integrity kernel; evidence -> utils+schemas+authority as today; authority -> utils+schemas as today. Caller fixed schema validation before kernel; no public caller callback/provider and no new dependency/package.",
+    "rejected_shortcuts": [
+      "authority imports evidence root, readonlysubpath or siblingrelative source",
+      "Copy diverging chain/epoch hash algorithms intoauthority",
+      "Use caller validate/provider callback or alreadyverified JSON as origin",
+      "Add schema import toutils silently; keep current graph unchanged."
+    ],
+    "alternative_considered": "Existing schemas leaf could own fixed pure verification (reply-extract precedent), but root preference is smaller utils byte/hash/link kernel with schema checks remaining respectivecallers; avoid needless schema-package domainsemantic expansion."
+  },
+  "exact_proposed_paths": {
+    "shared_pure": [
+      "packages/utils/src/evidence-integrity.ts (new, nofs/process/authority/schema import)",
+      "packages/utils/src/index.ts (explicit exports)",
+      "packages/evidence/src/evidence/chain.ts (delegate/reexport only exactpure functions, keepwriters/appendlock unchanged)",
+      "packages/evidence/src/evidence/proof-epoch.ts (delegate purehash/byte/link checks, keepfixed-schema wrapper andwriters)"
+    ],
+    "readonly_authority": [
+      "packages/authority/src/boundaries/reconciliation-git-source.ts (new privatefixed hostGit+boundedobject/index source reader)",
+      "packages/authority/src/runtime/reconciliation-plan.ts (new closed bytes/schema/acyclic source+plan semantics, noIO)",
+      "packages/authority/src/boundaries/reconciliation-host-plan.ts (new fixed capture/verify against actualscope/host+B5; no callerproviders/effectgrant)"
+    ],
+    "schema_and_consumers": [
+      "law/schemas/evidence-reconciliation-plan.schema.json (new canonical closed runtimeplan/source contract; embed source-manifest defs or explicitlyfreeze separate manifest schema if independentlystored)",
+      "packages/schemas/src/roster.ts (deliberate runtimeentry; build/staging/metacanon/currentcounts audited, source-onlyproofindex exclusion preserved)",
+      "packages/authority/src/boundaries/reconciliation-host-owner.ts (rootparallelreadonlyorigin snapshot; later fixedOwner constructor directlycalls actualplan verifier before approvalpublication)",
+      "packages/cli/src/authority/broker.ts and reconciliation-host-input.ts (explicitreadonlyplanning observation custody only if publicplan uses currentB5; do not alias provision)",
+      "packages/cli/src/commands/evidence/reconcile.ts (later registered plan read action delegatesfixed capture; no arbitrary outputwriter/provider)",
+      "packages/authority/src/index.ts (only later explicit named readonly planning API needed by package-root-only CLI consumer; not a new rootexport for pending private Ownerreader)"
+    ],
+    "tests_to_freeze_separately": [
+      "Historical chain/epoch vectors +delegate parity; full originalnegative checks/U1/append races preserved",
+      "Newpurekernel tests inutils; realdirect/linked fixedGit snapshot and plan-forgery/drift tests inauthority",
+      "Schema meta/canon/roster/stage/currentpopulation tests and publicplan readonlycapture tests. No testpath authorized/edited by this report."
+    ]
+  },
+  "historical_algorithm_constraints": [
+    "chain.computeManifestHash exactJSON array +GENESIS +sortedartifactdigests must remain byteidentical. It omits some record/proof/recovered/context fields; chainhead/manifest hash is NOT wholefile custody digest. Bind complete rawGitblob SHA and actualobjectID separately.",
+    "epoch stable recursion uses localeCompare andJSON.stringify; do not silently substituteJCS or reorder legacyhash inputs. Physical LF/truncation, sequence,prevhash,errata andterminal semantics remain.",
+    "verifyLoadedChain currently assumes alreadyloadedshape; newhost strictbounded byte/schema ingress must not silently alter historicalwrapper negative/error meanings. Fixedauthority schema validation plus sharedpure integrity required.",
+    "Current verifyProofEpoch/verifyProofAnchors read liveworkingtree and mayperform broaderbaseline/historychecks; cannot apply them as proof of several immutableparent snapshots by varying label. Use bounded exact commitblob byte snapshots and sharedpure kernel."
+  ],
+  "required_trusted_snapshot": [
+    "Actualcanonicaldirect/registeredlinked root/admin identities via qualifiedhostcontext; actualscopedrepository ID/currentB5, exact HEAD plusone MERGE_HEAD (refuseunsupported octopus), exact unique complete mergebase (refuseambiguous/missing/shallow history).",
+    "Actual index bytes through trustedresolvedpath and qualifiedproofindexcodec; raw+semantic before witness, everyotherentry witness, actualstage blob IDs/modes/flags, supportedobjectformat. Preserve qualifiedcodec representations and allunrelatedentries.",
+    "Read fullchain, required proofepochs, anchorbaseline/originaldirectanchor provenance and completeancestry/commit/tree/blob closure for BOTH originalparents and commonbase from immutableGitobjects. Record exacttype/size/rawSHA/objectID/mode/sourcecommit+relativepath and full commonprefix; no cherry-picked entries/truncatedparent suffix/payloadreplay.",
+    "Source manifest exactobjects/evidence closure plus explicit plannedcustody outputs; plannedfuturecustody is not alreadydurable. Phase01 later materializes+fsyncs+readbacks wholeclosure before any normal selection event.",
+    "Actual selected published parent must be one originalparent and whole approvedchainprefix, with trustedhost publication-origin observation; label/refexistence/hashmatch alone insufficient.",
+    "Bounded independent copies+readonly nofollow snapshots; command/output/bytes/objectcount/ancestrydepth/name limits; before/afterrevalidation of HEAD/MERGE/index/source/publication observation. Missingobject/unsupportedrepresentation/change refuses, no fetch/repair."
+  ],
+  "real_freeze_gates": [
+    {
+      "id": "NO01",
+      "gate": "Publishedselectedparent origin",
+      "reason": "Accepted ADR says actuallypublished trustedhost observation; no currentfixed publication observer identified. Localremotetrackingref can be stale or manually rewritten and is not proof by itself.",
+      "required_decision": "Freeze exact trusted remote/ref/publication provenance and fixed readonly observer/custody rules. No implicit network/fetch/remotehelper command or callerprovidedpublishedlabel. If unavailable, refuse approval, do not weaken to localexistence."
+    },
+    {
+      "id": "NO02",
+      "gate": "Readonly plan binding observation",
+      "reason": "Existing readReconciliationHostBinding requires sealedinvocation; currentparser/matrix intentionally exclude evidence reconcile plan.",
+      "required_decision": "Explicit readonly broker observation custody/currentB5 API or fixedprivate equivalent for publicplan. Must not construct mutation/provisioncapsule or returneffecttoken. Ownerapprove already has sealedcapsule and can independentlyreverify exactplan."
+    },
+    {
+      "id": "NO03",
+      "gate": "Exact new plan/source bytes and effect/output schema",
+      "reason": "Owner scope twoSHA fields alone cannot validate actual source, outputbounds or publicationeligibility. Existing proof-index reference schema source-only remains nontoken/data.",
+      "required_decision": "Freeze exactclosed plan/source fields, canonicalingress/bounds/hashrecipes/choices/outputs/effects and currentnewconsumer census before RED/implementation. Acyclicsource manifest excludesplanhash; plan binds manifestwholebyteSHA; signedapproval binds both. Avoid outputpath containing its own futureplanSHA unless explicitly symbolic recipe outside hashcycle."
+    },
+    {
+      "id": "NO04",
+      "gate": "Readonly Git command envelope",
+      "reason": "Fixedreadonly commandspelling alone cannot guarantee no ambientgit override/filter/replace/lazyfetch/protocol effect.",
+      "required_decision": "Freeze sanitizedenv and exactcommands/argv/outputlimits; disable replacementobjects/lazyfetch and refuse unsupported shallow/promisor/alternates/overrides unless deliberatelysupported. No unrestricted read subprocess/provider; no object/ref/index writes. Reusequalifiedcontext safeguards."
+    }
+  ],
+  "native_owner_consumption": "NativeOwner review receives only canonical root/actualargv relativeplan+expectedSHA selectors, opens boundednofollow exactplan bytes, checks rawhash/schema and recomputes fixedactualsnapshot. Store private frozen verifiedsnapshot/brand inside live review; printing/serializing/roundtrippingplan is data only. Revalidate currenthost/B5/HEAD/index/source/publication plusdualclock immediatelybefore actualapproval publication underadmission; no rawanchoropen by verification whileSQLiteheld. Actualfresh ordinary Ownerconsent/TTY/exactconfirmation/typedreceipt remain independent.",
+  "separate_future_effect_gaps": [
+    "Plan read stage has zero source/index/seed/issuer/approval mutation; stdoutonly. Custody/selection/normalwriter/U1/indexCAS/stagedbodies remain lateractualphase effects.",
+    "Moving purekernel does not solve future normalwriter dependency: authority cannot later import evidence appendVerbEvidence. Freeze phaseorchestration aboveauthority in evidence using fixed nativehost methods, or deliberate lowerwriter relocation, before thatwriter; no publicarbitrarycallback escape.",
+    "Exactregisteredaction/schema/roster/generatedcatalogue/packagebuild/staging/install/readiness consumers still required. Runtime schema addition/currentcount changes separate from immutablehistoricalfixtures.",
+    "NativeOwner approval cannot publish until actualplan/source verification gate qualified; rootparallelreadonly issuer/selectedfile snapshot is useful prerequisite, not planverification delivery."
+  ],
+  "graft": {
+    "current_successful_savings_calls": 5,
+    "current_nohit_skeleton_calls": 1,
+    "current_estimated_tokens_saved": 52904,
+    "cumulative_successful_calls": 29,
+    "cumulative_estimated_tokens_saved": 560493
+  }
+}

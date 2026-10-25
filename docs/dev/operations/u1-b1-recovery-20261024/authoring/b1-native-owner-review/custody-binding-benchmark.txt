@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/custody-binding-benchmark.txt","kind":"historical-transcript-custody-pointer","original_bytes":634,"original_bytes_changed":false,"original_sha256":"cb5dc8da50104e725ff5edb778d4621698c232023e18073c430ce4d909d5538a"}

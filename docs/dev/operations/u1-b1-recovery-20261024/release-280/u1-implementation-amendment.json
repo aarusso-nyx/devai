@@ -1,0 +1,62 @@
+{
+  "status": "AUTHORIZED_INTERNAL_ADDITIVE_AMENDMENT_BEFORE_IMPLEMENTATION",
+  "authority": "Direct user authorization recorded in release-280/authorization.json plus root assigned chain.ts amendment after independent authentic RED",
+  "runtime_paths": [
+    {
+      "path": "packages/evidence/src/evidence/verb-evidence.ts",
+      "sha256_before": "b15e3d9c9e7b40a17df188f72f97a266010b8460c01d6f24e77a345a3024de00"
+    },
+    {
+      "path": "packages/evidence/src/evidence/anchors.ts",
+      "sha256_before": "b999fa0003219b6374e37613935818efd082b1c12a74289cea606b684662552f"
+    },
+    {
+      "path": "packages/cli/src/commands/evidence/facade-collect-record.ts",
+      "sha256_before": "4930315197a1430a83d82fd3c021fd0a203ec9630a0af0cd155ad06d9a84c309"
+    },
+    {
+      "path": "packages/cli/src/commands/evidence/facade.ts",
+      "sha256_before": "26527bd1a83a947908edbd4797a1c7ab564a90a05f0909847802b028e73f8f98"
+    },
+    {
+      "path": "packages/evidence/src/evidence/chain.ts",
+      "sha256_before": "2e175710ef63d54e72f1a62bd95bfe8a47bc4ee2d099e416000fda5b9e47375e"
+    }
+  ],
+  "additional_path": "packages/evidence/src/evidence/chain.ts",
+  "permitted_delta": "Optional closed recovered_from types and append projection; optional exact expected-head check at normal append boundary. Existing manifest algorithm and prior records unchanged.",
+  "serialization": {
+    "target": "<exact-chain-path>.append.lock (canonical normal target record/proofs/chain.json.append.lock)",
+    "primitive": "Existing guarded publishFileNoReplaceSync, shared inside chain.ts for every normal appendRecord and first chain initialization. No stale/foreign lock takeover. Bounded10second contention reads only between exclusive no-replace attempts.",
+    "inside_lock": "Optional beforeAppend read-only U1 verifier revalidates entire source/path/epoch/common-prefix snapshot plus original bytes; expectedHead checked at normal append boundary before existing writer. Normal writers read latest chain only after acquiring same lock, preventing lost updates.",
+    "release": "Existing guarded removeEntryIfIdentitySync with publisher-returned inode identity; unknown identity or incomplete cleanup reports ownership and append standing, never deletes foreign entry.",
+    "intermediates": [
+      "<chain-parent>/.<chain-basename>.append.lock.<pid>-<uuid>.publish-staged",
+      "<chain-parent>/.<chain-basename>.append.lock.<pid>-<uuid>.remove-quarantine"
+    ],
+    "existing_chain_writer": "<exact-chain-path>.tmp.<pid>.<Date.now()> then atomic rename, unchanged",
+    "capabilities": "Existing declared fs:proofs (or existing explicit custom-chain scope) only; no new generic directory/Git authority. Caller-supplied custom chain roots remain subject to existing guards.",
+    "authority": "Root explicitly authorized shared normal append serialization and chain.ts beforeAppend seam after identifying noncooperative normal writer lost-update risk",
+    "preserved": "Original proposed recovery-only target is not emitted. Existing historical proposal retained above. No accepted ADR changed.",
+    "identity": "Optional deriveIdForHead callback derives normal verb evidence ID inside shared lock from actual persisted predecessor; append returns actual stored ID. Existing fixed-ID direct callers and manifest algorithm unchanged. Independent ordinary-id-race-red.log precedes fix.",
+    "guard_contention": "Exact AUTHORITY_RESOURCE_CHANGED_AFTER_PREPARE at lock publication only is retried through fresh guarded publication and recognized same-chain lock/absence, bounded10s; never remapped to stale. Inside-lock verified canonical snapshot + expectedHead performs actual stale classification. Invalid/linked canonical bytes refuse."
+  },
+  "unchanged": [
+    "accepted ADR-EVI-0006 bytes",
+    "newest-only contract",
+    "manifest hash algorithm",
+    "source/proof/baseline history",
+    "DETRAN repositories and runtime"
+  ],
+  "superseded_serialization_proposal": {
+    "target": "record/proofs/chain.json.recovery.lock",
+    "primitive": "Existing guarded publishFileNoReplaceSync; never replace an existing entry. Owner payload PID/nonce/request identity. Bounded contention wait only reads then rechecks expected canonical head. No stale/foreign takeover.",
+    "release": "Existing guarded removeEntryIfIdentitySync using exact publisher-returned inode identity. No unowned unlink.",
+    "intermediates": [
+      "record/proofs/.chain.json.recovery.lock.<pid>-<uuid>.publish-staged",
+      "record/proofs/.chain.json.recovery.lock.<pid>-<uuid>.remove-quarantine"
+    ],
+    "crash": "Existing no-replace semantics: after link whole owned lock retained without durability claim if cleanup/fsync fails; unknown/stale lock held for inspection, never auto stolen. Existing canonical writer temporary/rename remains unchanged.",
+    "capabilities": "evidence record already fs:proofs,fs:f5-state,proc:git,proc:sh; no registry relaxation. Host adapter insufficiency is a stop for an exact amendment."
+  }
+}

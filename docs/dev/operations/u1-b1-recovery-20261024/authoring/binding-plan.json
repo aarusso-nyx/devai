@@ -1,0 +1,181 @@
+{
+  "status": "RETURN_BIND_HELD_NOT_AUTHORIZATION",
+  "prepared_at_utc": "2026-10-24T14:07:47.710976+00:00",
+  "baseline_commit": "2df84159caabf869b866fb2a05e5b06be83295fb",
+  "target_root": "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024",
+  "constitution": {
+    "version": "1.2.0",
+    "sha256": "d5dfdc972161e0f848dd859be7bbfa510973c5c9a449a0f9e6b8960e4f5ac96a",
+    "predecessor_version": "1.1.0",
+    "predecessor_sha256": "8353c3b81d38e0f9b913cbeb6762bc149605989c1b16f52d2c63ba9892f71270"
+  },
+  "registered_cli_dry_plan_executed": false,
+  "derivation": "Static exact registered source inspection; no private binding execution, no fabricated supported-command receipt.",
+  "steps": [
+    {
+      "id": "BIND-CONSTITUTION",
+      "registered_action": "init bind",
+      "initiator": "human architect",
+      "write_consent_required": true,
+      "read_plan_argv": [
+        "init",
+        "bind",
+        "--constitution",
+        "--target",
+        "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024",
+        "--as-role",
+        "architect"
+      ],
+      "future_write_argv": [
+        "init",
+        "bind",
+        "--constitution",
+        "--target",
+        "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024",
+        "--as-role",
+        "architect",
+        "--write"
+      ],
+      "outputs": [
+        {
+          "path": ".devai/pin/constitution.md",
+          "operation": "update",
+          "before": {
+            "exists": true,
+            "bytes": 33124,
+            "sha256": "8353c3b81d38e0f9b913cbeb6762bc149605989c1b16f52d2c63ba9892f71270"
+          },
+          "after": {
+            "bytes": 34899,
+            "sha256": "d5dfdc972161e0f848dd859be7bbfa510973c5c9a449a0f9e6b8960e4f5ac96a",
+            "review_copy": "prospective-outputs/constitution.md"
+          }
+        },
+        {
+          "path": ".devai/constitution.md",
+          "operation": "unchanged-existing-pointer",
+          "before": {
+            "exists": true,
+            "bytes": 328,
+            "sha256": "e89b59e3d6daed5f7c4b20cf200c3b1b9c87ee52d84f7727dc2f9b296445b999"
+          },
+          "after": {
+            "exists": true,
+            "bytes": 328,
+            "sha256": "e89b59e3d6daed5f7c4b20cf200c3b1b9c87ee52d84f7727dc2f9b296445b999"
+          }
+        },
+        {
+          "path": ".devai/config/project.json",
+          "operation": "update",
+          "before": {
+            "exists": true,
+            "bytes": 386,
+            "sha256": "dce97394bf34f17bd02793e9e0d07f0cee041174bb53f7211a77845a2e7560c8"
+          },
+          "after": {
+            "bytes": 386,
+            "sha256": "e6c405d15131ffbad5be96ccf0597397b3c9d582dc7c020cee57043796500f87",
+            "review_copy": "prospective-outputs/project.json"
+          }
+        }
+      ],
+      "note": "Exact prospective bytes only if the subsequently admitted installed package contains the reviewed constitution and CLI version2.7.1, the current source version; no new release version is selected. Reject drift, missing pointer or changed prestate."
+    },
+    {
+      "id": "BIND-AUTHORITY-POLICY",
+      "registered_action": "init bind",
+      "initiator": "human architect",
+      "write_consent_required": true,
+      "after_step": "BIND-CONSTITUTION",
+      "read_plan_argv": [
+        "init",
+        "bind",
+        "--target",
+        "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024",
+        "--as-role",
+        "architect"
+      ],
+      "future_write_argv": [
+        "init",
+        "bind",
+        "--target",
+        "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024",
+        "--as-role",
+        "architect",
+        "--write"
+      ],
+      "outputs": [
+        {
+          "path": ".devai/config/authority-policy.json",
+          "operation": "create",
+          "before": {
+            "exists": false,
+            "bytes": null,
+            "sha256": null
+          },
+          "after": {
+            "sha256": null,
+            "bytes": null,
+            "status": "NOT_BYTE_COMPLETE_NOT_APPROVABLE",
+            "reason": "Registered materializer binds real invocation UUID/PID, context digest and actual materialized_at; existing no-write CLI emits only plan=authority-policy. No candidate installed bundle or exact runtime receipt exists under contract-authoring scope."
+          }
+        }
+      ],
+      "required_semantics": {
+        "constitution": {
+          "version": "1.2.0",
+          "digest_sha256": "d5dfdc972161e0f848dd859be7bbfa510973c5c9a449a0f9e6b8960e4f5ac96a"
+        },
+        "framework_package": {
+          "name": "@aarusso-nyx/devai",
+          "version": "2.7.1"
+        },
+        "repository_id": "devai",
+        "enforcement": {
+          "mode": "binding"
+        },
+        "host_enforcement": {
+          "mode": "cli-only"
+        },
+        "source_rules": "unchanged registered action registry and core/additive policy compilers; preserve any verified bound adopter extension",
+        "new_B1_authority_or_actions": false
+      }
+    }
+  ],
+  "approved_now": {
+    "contract_authoring": true,
+    "catalogue_companion": true,
+    "binding": false,
+    "integration": false,
+    "runtime": false,
+    "release": false,
+    "detran": false
+  },
+  "prohibited_effects": [
+    "--full selector and operational-law/subprocess-effects outputs",
+    "manual pin/config writes",
+    "authority-session state creation",
+    "record/proofs mutation",
+    "Git index/ref mutation",
+    "new actions/targets/adapters",
+    "source push/PR/merge",
+    "package/tag/release",
+    "DETRAN effects"
+  ],
+  "unresolved_return_gates": [
+    "Admitted candidate installed package with constitution SHA equal reviewed source and exact runtime/package identity; no build/packaging grant inferred.",
+    "Read-only registered CLI plans with verified no-write receipts and actual resolved effect inventory; current authority-policy dry-plan lacks final bytes/digest.",
+    "Concrete proposal closing authority-policy dynamic output receipt/digest before any binding, with exact supported host guarantee or separately approved planner amendment; no unknown digest grant.",
+    "Fresh target prestate/source/package guards and separate explicit binding approval; then independent real source/pin/policy parity and exact-head required checks before separately approved integration."
+  ],
+  "source_spans": [
+    "packages/cli/src/commands/init/index.ts:18-123",
+    "packages/cli/src/commands/init/bind-package.ts:274-342",
+    "packages/skills/src/constitution/index.ts:39-70",
+    "packages/skills/src/bootstrap/index.ts:73-101",
+    "packages/cli/src/authority/broker.ts:634-647",
+    "packages/cli/src/authority/broker.ts:1584-1735",
+    "packages/authority/src/runtime/policy-materializer.ts:175-245"
+  ]
+}

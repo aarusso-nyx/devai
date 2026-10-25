@@ -1,0 +1,37 @@
+{
+  "result": "AUTHENTIC_STRUCTURAL_RED_ONLY",
+  "source_expected_absent": "packages/authority/src/boundaries/reconciliation-resources.ts",
+  "test": "packages/authority/tests/unit/reconciliation-resources.test.ts",
+  "test_sha256": "2269ce2aac44ab2c6753e03c5ea2ef6d25206fe650be37e1f3fe3f9ccc847df6",
+  "count": {
+    "passed": 0,
+    "failed": 98,
+    "skipped": 0
+  },
+  "failure": "All98fail onlybecause expectednewmodule absent; no runtime/permission/hostfailure claim.",
+  "command": "pnpm exec node scripts/process/validation-runner.mjs -- vitest run --config tests/config/local.config.ts --maxWorkers 1 packages/authority/tests/unit/reconciliation-resources.test.ts",
+  "log": "structural-red-final.log",
+  "log_sha256": "0c058a2d14fa067c6bf0fce1daa914f4a667794eb53b71197d27f62fc0668b38",
+  "eslint": {
+    "exit_code": 0,
+    "log": "test-eslint-final.log",
+    "sha256": "689d370e8c06bdc4d786c596f733e4fd11d13ae585434f61cc90eeeaf5155785"
+  },
+  "checkpoint": "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/logical-resource-checkpoint.json",
+  "checkpoint_sha256": "9d5fbfc7bbf565d3dd0001618e10b853b13b1128ef93fbe5245098182585e81c",
+  "accepted_adr_sha256": "1bfaa9703fa5cd667de523c74a3d8f4b584b7c630290f1c2400a71a871a53bd4",
+  "covers": [
+    "Exactsupportedproof/hostshapes, nullprototype and frozenordinarydata, nonmutation",
+    "ExactIDs/logicalIDs and lowerhex64; matching-ID maliciouslogicalnames cannot hide behind simple IDmismatch",
+    "Allrequiredproperties, conditionalapproval/phase, unknownandnonenumerablefields",
+    "Getter/symbol/inherited/exotic/Proxy/revokedProxy refusal with zero getter/trap counts",
+    "Acceptedcaller-chosen64hexdigests explicitly prove onlyshape, not origin or authority"
+  ],
+  "excluded": [
+    "Actualroles/consent/originalargv",
+    "Hostorigin/privateissuer/opaquefreshhandles",
+    "Scope/policy/ResourceTargetunion/selector/actionregistry integration",
+    "Filesystem/SQL/realindex/lock/CAS/publicationeffects"
+  ],
+  "implementation_notice": "Root received finaltestcount/hash before authoring pure module; tests frozen pending implementation notice."
+}

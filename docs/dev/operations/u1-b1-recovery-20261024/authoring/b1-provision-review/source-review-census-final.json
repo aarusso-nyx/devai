@@ -1,0 +1,61 @@
+{
+  "standing": "BOUNDED_FINAL_FOUR_PATH_REVIEW_ACCEPTED_WITH_CENSUS_FIX_NOT_FULL_NATIVE_OR_INSTALLED_PUBLIC_QUALIFICATION",
+  "source_sha256": {
+    "packages/authority/src/boundaries/reconciliation-host-provision.ts": "8c439589cdc0265681ed00a732e6ac0b4c2ab2ad6a520b87e57d2238e1a140b0",
+    "packages/authority/src/boundaries/reconciliation-host-namespace.ts": "44e2abbeb68f0b771e8f82e34d745bfc0435bf532cd2ae710118978339588484",
+    "packages/authority/src/boundaries/host-publish.ts": "b2aa704c775009240b624b4581339cebaec8bcd6f7f95fbf7e71eabf296e054a",
+    "packages/authority/src/index.ts": "9d665d51e73c550819c4c223b34e0d110eb3b5305e02758a754977d46359272c"
+  },
+  "unchanged_since_freshness_review": {
+    "packages/authority/src/boundaries/reconciliation-host-provision.ts": true,
+    "packages/authority/src/boundaries/host-publish.ts": true,
+    "packages/authority/src/index.ts": true
+  },
+  "linked_historical_receipts": {
+    "source-review.json": "0077d31c767da4488ad25c78b27cd57c3642f3646deffe7fe08aaaed1d126ee5",
+    "census-review.json": "decb97f289454d8e244365fa6aac8a07bd7109cc9b4fb766a3e91f2c3ce8bc49",
+    "checkpoint-review.json": "98bd60161ea4108e7f54baafadc4217896baac88a4c0a6cd6b47fe6833d3f8e8"
+  },
+  "census_amendment_sha256": "8ce2c612ead389a451ff537f53c684fe48d620e2ec10fd336c0b62839d9cc6e0",
+  "NP02": {
+    "disposition": "FIXED_AND_OBSERVED",
+    "initial_observation": "Correct closedINVALID refusal after all10,000names materialized. Preserved observational evidence is1PASS, never mislabeled wrongacceptance or productRED.",
+    "current_observation": "SAME actual10,000entry directory now closes after4JSentry reads with bufferSize4; no productreaddirSync call. Emptyvalidprivate namespace initial+finalreread eachusebufferSize4, returnEOF andclose exactlyonce.",
+    "source_review": "One directoryEntries helper collects atmostlimit names, inspects overflowentry, refusesbefore retaining it, sorts onlyboundedarray and closes in finally. All6initial+reread callsites use root3 or approvals/perapproval4096; no readdirSync remains. Existing total16384file,1MiBbyte, exactname/MAC/kind/issuer/identity/witness checks unchanged.",
+    "refusal_meaning": "Early overflow uses closedINVALID peramendment; valid sortedwitness semantics remain. No broad claim that every diagnostic timing under concurrentinvalid growth is unchanged.",
+    "native_read_limit_caveat": "ObservedJSentrycount is4, bufferSize4root/32approval; boundednativeprefetch, not exactphysicalOSreadcount guarantee.",
+    "scope": "Private metadata shape/refusal fixtures only, no hostorigin/authority/publicpositive inferred."
+  },
+  "NP01": {
+    "disposition": "FIX_REMAINS_SOURCE_IDENTICAL",
+    "qualified_evidence": "Original2lateprelock +2latestagedfsync B5/realHEAD probes4PASS in freshness-probes-final-4.txt on previousnamespaceb64fd333...",
+    "current_source_inference": "Provision8c439589...,privatepublisherb2aa704c... andindex9d665d51... are exactsame bytes; newnamespace diffonlyreplaces enumeration with boundedhelper. No need to repeat unchanged4probe cases for this boundedsource audit.",
+    "limitation": "Old4probe log is historical namespacehash, not asserted as currentnamespace execution. Independent current36case suite belongs to P1Inspector/root."
+  },
+  "current_verification": {
+    "pass": 2,
+    "fail": 0,
+    "log": "census-fixed-green.txt",
+    "observation": "census-fixed-observation.json",
+    "runner": "pnpm exec node scripts/process/validation-runner.mjs -- vitest run --config docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-provision-review/census-fixed.config.mts --maxWorkers 1",
+    "duration_seconds": 0.293
+  },
+  "remaining_gates": [
+    "Independent full provision, native publisher/admission historical and ordinaryhost regressions remain separate Inspector gate.",
+    "Actual installed package/module/registry/constitution/materializedpolicy+B5 and real terminal/public two-prompt custody remain required.",
+    "No generic filesystem/Linux/nativeVFS qualification, no Ownergrant/phase/index/staged/public workflow or release qualification claimed."
+  ],
+  "scope": "Evidence only. No product/test edits, build or newagents. Earlier sealed receipts/logs/snapshots preserved unchanged.",
+  "evidence_sha256": {
+    "census-fixed-probes.test.ts": "eff1ddacf94ea86caadc479e6de7971e40ca245f495007585c788b58cd4f6275",
+    "census-fixed.config.mts": "bf478400ded373e1357ac3200c672b75cbf0a27a7a2c999142e6a436898b4738",
+    "census-fixed-green.txt": "3b5f3a35f099ca623b7d99a962740520ba11b71434d6a11b153c467a6e562521",
+    "census-fixed-observation.json": "6ba6935cf62189112e083b3a46e1bceffa5fc6b64274f024b9bbb6243e761855"
+  },
+  "graft": {
+    "current_calls": 1,
+    "current_estimated_tokens_saved": 69374,
+    "cumulative_successful_calls": 22,
+    "cumulative_estimated_tokens_saved": 477034
+  }
+}

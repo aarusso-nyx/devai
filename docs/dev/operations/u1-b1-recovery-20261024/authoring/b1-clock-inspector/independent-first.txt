@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-clock-inspector/independent-first.txt","kind":"historical-transcript-custody-pointer","original_bytes":275,"original_bytes_changed":false,"original_sha256":"1fdb1ae6013ddcc64eac23b07a941072dadcbd7bafbb10617cc2b60b5eebd42c"}

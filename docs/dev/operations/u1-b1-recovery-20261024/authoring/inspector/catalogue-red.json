@@ -1,0 +1,24 @@
+{
+  "kind": "authentic-inspector-red-summary",
+  "command": "pnpm exec node scripts/process/validation-runner.mjs -- vitest run --config tests/config/local.config.ts --maxWorkers 1 packages/cli/tests/unit/cli-shard06-contracts-schema-residual.test.ts",
+  "exit_code": 1,
+  "tests": {
+    "passed": 16,
+    "failed": 3,
+    "total": 19
+  },
+  "failure": "Canonical directory and explicit source schema catalogue differ.",
+  "cause": "Inspector fixture includes proof-index-reconciliation-contract.schema.json; production SOURCE_ONLY_SCHEMAS did not yet include it.",
+  "failed_cases": [
+    "ignores non-schema directory entries and returns the complete ordered clean report",
+    "retains every validator, vocabulary, and schema-canon finding in source order",
+    "dispatches exact source identity to canon and incomplete identity to adopter checks"
+  ],
+  "custody": "Summary transcribed from actual tool output before Engineer source-catalogue edit; raw output was displayed in this session and is not fabricated as an archived log.",
+  "fixture_sha256": "0550606142b2a492c4dc9179ca45532be17c749f26cf2a527999ab125730d5cb",
+  "holds": [
+    "No real binding",
+    "No runtime implementation",
+    "No release or adopter effects"
+  ]
+}

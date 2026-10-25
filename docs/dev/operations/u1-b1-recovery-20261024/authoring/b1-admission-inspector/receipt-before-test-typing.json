@@ -1,0 +1,106 @@
+{
+  "standing": "NATIVE_ADMISSION_PRIMITIVE_INDEPENDENT_GREEN_NOT_B1_RUNTIME_ACCEPTANCE",
+  "recorded_at": "2026-10-24T18:52:31.670674+00:00",
+  "result": {
+    "passed": 56,
+    "failed": 0,
+    "raw_log": "native-final-frozen.txt",
+    "duration_seconds": 5.27,
+    "checks": "Targeted ESLint/Prettier/test-path diff PASS; no timeouts/skips/thresholds relaxed"
+  },
+  "environment": {
+    "node": "v24.22.0",
+    "sqlite": "3.53.4"
+  },
+  "source_sha256": {
+    "packages/authority/src/boundaries/reconciliation-admission-seed.ts": "d912846ddb518a132ed1e2484dfa56f23b8ff2c7a7bc25b2157fb379f25490fe",
+    "packages/authority/src/boundaries/host-reconciliation-admission.ts": "318c52a0f5de908e549e79ace095a4720acb190c7389e88a41a673fd2fa60a91"
+  },
+  "test_sha256": "c30e381fe491ab60c11d2262e0eef151d6455ebd64141c5332d1219e88bde134",
+  "contract_sha256": "2d7957218249db895228123dac4c33f71878ba2c895df02f91b40255d91ff73c",
+  "callback_amendment_sha256": "f1bdfd732e11a9c0431e06e53a77eac5b3f996df758b75cbf78b275b6beb0eaf",
+  "native_execution": {
+    "manifest": "devai-native-admission-inspector-YJyHjj.json",
+    "manifest_sha256": "f31e86f2f929653c961ea55792afad8e986a930e77ad66a5a3e691cb7bd528e2",
+    "proof": "final-native-proof.json",
+    "proof_sha256": "dbe77911db109cd527d788cbda38aaf365759a0fcd9ed0c5be81a92c1cc6879a",
+    "actual_source_transpilation": "Exact two real source modules transpiled with existing TypeScript5.9.3 to external ESM; no bundler/new dependency/substitute native engine.",
+    "external_fixture": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-admission-inspector-YJyHjj",
+    "child_receipts": 57,
+    "no_live_child_handles": true
+  },
+  "qualified_cases": [
+    "Frozen8192-byte public seed digest and independent returned-copy mutation isolation.",
+    "Readonly exact private owned0700/root and0600/seed inspection; malformed witness/accessor/Proxy/symbol/nonenumerable fields fail without touching getters.",
+    "Wrong size/hash/mode/type/effective UID, missing seed, symlinks/hardlinks, journal/WAL/SHM including dangling sidecar all refuse without repair.",
+    "Real encoded question/hash directory URI path; seed disappearing after raw descriptor close does not create fallback or invoke callback.",
+    "Deep frozen public witness, unchanged seed bytes/inode, closed constant SQL, no sidecars; instrumentation sees no imported raw open/read/close/readFileSync between BEGIN and native close.",
+    "Nested same-path inspection and invalid alias refuse before raw opens/closes; actual independent contender remains BUSY; later local admission succeeds.",
+    "Both independent counter workers reach fixture barrier before entry; actual native contention observed; test-harness-only external counter serializes0->1->2 under real compiled primitive.",
+    "Only fixture-owned holder self-targeted SIGKILL; subsequent real process enters; seed bytes/inode and absence of sidecars unchanged.",
+    "Ordinary callback exceptions retain identity, including undefined/null; async/generator/Proxy/thenable/Promise results refuse; callbacks must remain trusted fixed synchronous code.",
+    "Native BEGIN error sanitized; native rollback/close and raw descriptor-close faults retain release-indeterminate standing and same-process reservation.",
+    "Actual errcode getter counterexample fixed: zero accessor touches, stable UNAVAILABLE; ordinary native rejected Promise refused with no child unhandled-rejection exit.",
+    "Ordinary child publication may change directory mtime; postcallback seed metadata drift refuses completion and still releases native lock."
+  ],
+  "counterexample_history": [
+    {
+      "log": "structural-red.txt",
+      "passed": 1,
+      "failed": 2,
+      "meaning": "Exact two source modules absent before implementation; fixed inert seed passed."
+    },
+    {
+      "log": "native-first.txt",
+      "passed": 40,
+      "failed": 1,
+      "meaning": "Test over-specified REENTRANT for noncanonical alias; contract permits ANCHOR_INVALID. Root agreed closed-code correction; zero descriptor effects/BUSY assertions unchanged."
+    },
+    {
+      "log": "native-expanded.txt",
+      "passed": 50,
+      "failed": 0,
+      "meaning": "Historical first expanded source baseline, before additional fault counterexamples."
+    },
+    {
+      "log": "native-fault-counterexamples.txt",
+      "passed": 50,
+      "failed": 2,
+      "meaning": "Authentic native errcode accessor escape and ordinary returned rejected-Promise unhandled rejection; full preserved pre-fix child receipts accompany logs."
+    },
+    {
+      "log": "native-final.txt",
+      "passed": 54,
+      "failed": 0,
+      "meaning": "After bounded amendment before final source lint refactor and thrown-null/undefined cases; exact separate source/output manifest retained."
+    }
+  ],
+  "amendment_limit": "Only ordinary native Promise with descriptor-proven original constructor/species path receives captured intrinsic rejection sink. Custom constructor/species Promises remain unsupported. Their getter-refusal test fixtures were explicitly pre-handled BEFORE adding hostile accessors; they establish touch-zero refusal only, not product rejection drainage.",
+  "limitations": [
+    "No arbitrary hostile JavaScript/native VFS/same-UID filesystem attacker isolation claimed.",
+    "Instrumented imported JavaScript fs calls plus source review are not a whole-process OS syscall trace or proof against unrelated raw closes from future product code.",
+    "Owner issuer bootstrap, actual worktree-host resolver, origin/MAC/clock/grant/phase/lease, typed effect capability and opaque final host operation remain unqualified.",
+    "No actual installed CLI, policy/registry/schema integration, real Git index, full B1 workflow, release or DETRAN/downstream effect qualified here.",
+    "Read-only0400 mode refusal was exercised; no read-only filesystem mount or alternate platform/VFS qualification performed."
+  ],
+  "graft": {
+    "calls": 1,
+    "tokens_saved_estimate": 24029
+  },
+  "evidence_sha256": {
+    "devai-native-admission-inspector-0Dbruz.json": "26705a4f8e29b522a0fd58461e0d0bc64cae0d3207b9ae80ece8fd2c9947a781",
+    "devai-native-admission-inspector-N3s07C.json": "8fadee8365db7405560c6509f3807e652bf250c99fb5b80ece23cdfe2c065eb9",
+    "devai-native-admission-inspector-YJyHjj.json": "f31e86f2f929653c961ea55792afad8e986a930e77ad66a5a3e691cb7bd528e2",
+    "devai-native-admission-inspector-ougKxB.json": "b17d9a990597d01f65f06342c4bea4d1589f222d9800f0a79362728fdaf9d4f6",
+    "final-native-proof.json": "dbe77911db109cd527d788cbda38aaf365759a0fcd9ed0c5be81a92c1cc6879a",
+    "native-expanded.txt": "e1236f399f77734690c5f3c9e4587362a011cb171acc07248774f636eab12167",
+    "native-fault-counterexamples.txt": "4fbf34463428ce7f0e42b45593f995f847baf7aa470ec63b35fc68cc0a41e2c5",
+    "native-final-frozen.txt": "521e3c103ef2305cdc524cbe99b8405df8746850ef3a1599acaad35d3d0790b1",
+    "native-final.txt": "28e9e925b26d14371447a88e9a8cae3eba6c9b44088a675f2ccf416ee7008dac",
+    "native-first.txt": "a735d60f336d113c05f91afcbf2cd46a77f8fe4cc9558980d3ade5c77be46aff",
+    "native-getter-pre-fix.json": "42806b7396f7002a8bdd99e319ba535f8e40a238793c0bc1a2df269295b08c3c",
+    "rejected-promise-pre-fix.json": "ddc228e18281c8bd9b67b8bc26eea82fca94ae683bfa50b15043801601e504ca",
+    "structural-red-receipt.json": "db56720cad87daa8661d599d726e258413de2ab52d1c379e44e6de2801c63ff4",
+    "structural-red.txt": "ba3b3a6ddf7b089025e8b61b4f380f683997dcec98ddc362a71550c7a96d3796"
+  }
+}

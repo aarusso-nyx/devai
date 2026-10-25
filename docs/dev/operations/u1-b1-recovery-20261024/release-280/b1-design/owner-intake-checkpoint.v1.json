@@ -1,0 +1,119 @@
+{
+  "status": "ARCHITECT_OWNER_INTAKE_CONTRACT_FOR_INDEPENDENT_RED",
+  "authorization": "../authorization.json",
+  "supersedes_proposals": ["owner-intake-decision.md", "owner-host-paths.proposed.md"],
+  "decision": "Use a distinct trusted worktree host issuer and a fifth registered Owner approval action. A manifest, digest, caller JSON, self-consistent ledger or printed receipt cannot grant canonical selection or index mutation.",
+  "provisioning": {
+    "command": "init bind --reconciliation-host --target ROOT --as-role architect --write --format json",
+    "initiator": "Direct human Architect, preserving the existing Architect-only init bind role boundary",
+    "no_write": "The exact selector without --write emits a read-only bounded plan. It creates no directory, key, issuer, policy, project, receipt or proof.",
+    "write_confirmation": "BIND RECONCILIATION-HOST <plan_sha256>",
+    "terminal": "All three streams must be real terminals; original argv custody, direct role, exact target and JSON selector are reverified. No authority session, alias/equal/negated spelling, alternate key/output/admin path or mixed selector.",
+    "artifact": "One mode0600 private issuer.json, atomically created through the existing guarded no-replace primitive. It contains the private32byte key and the closed domain-separated HMAC attestation together. The private key is never emitted, copied into public reports, source/config or evidence.",
+    "reason_for_single_bundle": "A two-file key/attestation transaction has unrecoverable key-only or intent-only crash states. One whole atomic private bundle leaves absence or one complete issuer; no hand-written recovery or key rotation is required.",
+    "root": "Trusted-host-resolved worktree gitdir/devai/reconciliation, mode0700 with owner/realpath/no-symlink and device/inode checks. Caller data never selects a physical target.",
+    "repeat": "Verify and return the original complete matching issuer. Existing foreign/malformed/stale/mode-invalid issuer refuses. Never overwrite or rotate it automatically.",
+    "partial": "Private directory creation is idempotent only for actual owned mode0700 regular directory components with an otherwise admitted namespace. Unknown files or foreign publisher remnants refuse. Exact publisher-owned uncertainty remains inspectable; no recursive deletion or age-based cleanup."
+  },
+  "approve": {
+    "command": "evidence reconcile approve --repo-root ROOT --plan REL --plan-sha256 SHA --as-role owner --write --format json",
+    "initiator": "Direct human Owner; fresh ordinary actual authority plus explicit write consent and all three real terminal streams",
+    "confirmation": "APPROVE RECONCILIATION <plan_sha256> <source_manifest_sha256>",
+    "review": "Emit exact closed plan/source/parents/semantic-index/selected-prefix/output/effect identities before input, with grants_authority=false. Freeze private immutable bytes and a single-use host-owned handle for300000ms monotonic time. Printed or cloned data is not an apply handle.",
+    "publication": "Reverify actual inputs, package, issuer and current authority after confirmation. Generate a random64lowercase-hex approval_id in the host; publish one authenticated immutable approval.json. No canonical chain/index/custody/diagnostic effect occurs in this action.",
+    "lifetime": "Maximum900000ms from issue, bound to actual host boot identity, monotonic expiry and wall-clock interval. Reboot, backwards observation relative to signed predecessor, future issue or expired grant refuses a new phase.",
+    "cancel": "EOF, SIGINT, wrong token, expired handle, unsupported grammar or drift settles with no approval or domain mutation; exact owned stream/scope cleanup is required."
+  },
+  "owner_followups": {
+    "renew": "Same approve action with --approval ID --renew --expected-grant-sha256 SHA and exact original --plan/--plan-sha256. Requires Owner/TTY/write and RENEW RECONCILIATION <ID> <current_grant_sha256>. Append an immutable next grant event, linked to its predecessor and identical original plan/scope; it permits only remaining unconsumed phases. No history rewrite or phase counter reset.",
+    "revoke": "Same approve action with --approval ID --revoke --expected-grant-sha256 SHA, Owner/TTY/write and REVOKE RECONCILIATION <ID> <current_grant_sha256>. Append one immutable terminal revocation event. No new phase may start; a previously signed intent may only settle its exact already-produced outputs.",
+    "recover_owned_lease": "Same approve action with --approval ID --recover-owned-lease --expected-lease-sha256 SHA, Owner/TTY/write and RECOVER RECONCILIATION-LEASE <ID> <lease_sha256>. Verify issuer MAC, exact approval/phase/nonce/inode/host, acquire the exclusive recovery.lock, and reverify the exact lease. Only an actual same-host process observation returning ESRCH for the recorded PID proves its owner has stopped; EPERM, a live/reused PID, a foreign host or ambiguous observation refuses. Remove only the authenticated exact dead owner's lease inode through guarded identity removal. Never kill a process, use age as proof, delete outputs, grant a new phase or change a receipt.",
+    "mutual_exclusion": "Initial approval, renew, revoke and recover-owned-lease are closed mutually exclusive modes. No bare --approval, unknown flag, arbitrary receipt/output path or inferred fallback is admitted.",
+    "races": "All followups use the same per-approval lease/serial grant chain; recovery uses its own exact create-only recovery.lock and cannot delete a successor lease. A revoked approval cannot be renewed."
+  },
+  "logical_resource": {
+    "kind": "reconciliation-host",
+    "adapter_id": "reconciliation-host-authority-boundary",
+    "operations": [
+      "provision",
+      "approve",
+      "consume-phase",
+      "renew",
+      "revoke",
+      "recover-owned-lease"
+    ],
+    "fields": [
+      "repository_id",
+      "worktree_id",
+      "operation",
+      "binding_sha256",
+      "approval_id when applicable",
+      "phase01..04 when applicable"
+    ],
+    "authority": "Provision only on init bind with Architect initiation; approve/renew/revoke/recover only on Owner approve action; consume-phase only on exact materialize/stage-proof/bootstrap action with its required initiator. No general filesystem or Git-directory authority follows.",
+    "host_custody": "The broker issues an invocation-local opaque operation handle after actual authority decision. The final adapter verifies its issuer, action, original argv, frozen target digest and current actual bindings. Caller-constructed resource/receipt objects cannot manufacture the handle."
+  },
+  "documents": {
+    "issuer": "Closed schemaVersion/kind/adapter/domain/repository/worktree/admin+directoryidentity/key_sha256/package+module+registry/constitution/policy/provision_plan_sha256/installed_at_head/private_key_base64/mac. Private key is writeOnly and never present in public attestation projection.",
+    "approval": "Closed immutable host-generated approval_id/issuer_sha256/plan_sha256/source_manifest_sha256/exact plan and source byte digests/repository+worktree/original parents+base+HEAD/semantic index/selected published parent+prefix/custody+epoch+ancestry manifests/allowed phases+effect/output bounds/package+constitution+policy/clock+expiry/domain/mac.",
+    "grant_event": "Closed immutable sequence/kind renewed|revoked/approval_id/original approval_sha256/previous_grant_sha256/identical plan_scope_sha256/remaining phases/actual times+boot+expiry/domain/mac. No event can alter the original scope or revive a revoked approval.",
+    "phase_intent": "Closed approval/grant/phase/action/initiator/predecessor_completion_sha256/exact before witness and intended output/effect inventory/owned lease nonce/clock/domain/mac. It is not completion.",
+    "phase_completion": "Closed phase-intent digest/predecessor/complete exact output bytes+hashes+identities/final state witness/durability/clock/domain/mac. Only verified durable whole outputs can produce completion.",
+    "lease": "Closed authenticated approval/phase/action/invocation/PID/hostname/boot/nonce/predecessor+grant+plan digests/issued time/domain/mac. No age-based takeover."
+  },
+  "exact_logical_paths": [
+    ".git/devai/reconciliation/issuer.json",
+    ".git/devai/reconciliation/approvals/<host-generated-64hex-ID>/approval.json",
+    ".git/devai/reconciliation/approvals/<ID>/grant-<six-digit-sequence-from-000002>.json",
+    ".git/devai/reconciliation/approvals/<ID>/intent-01.json",
+    ".git/devai/reconciliation/approvals/<ID>/intent-02.json",
+    ".git/devai/reconciliation/approvals/<ID>/intent-03.json",
+    ".git/devai/reconciliation/approvals/<ID>/intent-04.json",
+    ".git/devai/reconciliation/approvals/<ID>/phase-01.json",
+    ".git/devai/reconciliation/approvals/<ID>/phase-02.json",
+    ".git/devai/reconciliation/approvals/<ID>/phase-03.json",
+    ".git/devai/reconciliation/approvals/<ID>/phase-04.json",
+    ".git/devai/reconciliation/approvals/<ID>/lease.json",
+    ".git/devai/reconciliation/approvals/<ID>/recovery.lock"
+  ],
+  "intermediates": [
+    "In the exact target parent: .<basename>.<pid>-<uuid>.publish-staged from the existing guarded publisher",
+    "For exact owned removal only: .<basename>.<pid>-<uuid>.remove-quarantine from the existing guarded remover"
+  ],
+  "phase_protocol": [
+    "01 CUSTODY_DURABLE: publish and readback all complete parent/base/original chains, proof epochs and ancestry before any active selection.",
+    "02 CANONICAL_SELECTED: select the entire approved published-parent prefix and append one distinct canonical-selection event through the normal machine writer, binding the custody manifest. Preserve every source byte/event; displaced active events are archival.",
+    "Supported U1/newest recoveries execute separately with current exact source/head and existing role/consent/append serialization. They cannot replay payloads or replace history.",
+    "03 PROOF_INDEX_PUBLISHED: verify exact planned recovery obligations and native chain/history, then publish only the final proof entry through the separate logical proof-index CAS boundary under the real index.lock.",
+    "04 BOOTSTRAP_COMPLETE: publish complete seven-body diagnostic staged snapshot and admission receipts. No clean/native readiness or integration claim."
+  ],
+  "retry_and_failure": "Signed intent precedes each domain output. Exact complete-output/incomplete-completion retry settles that intent without duplicate selection or append. Partial known outputs are resumed only within the same authenticated intent and current actual authority; unknown/foreign outputs refuse. Owner lease recovery restores liveness only for cryptographically authenticated dead ownership. Expiry cannot authorize a new phase; explicit same-scope renewal supplies fresh Owner standing. Never roll back published proof history or replace a foreign inode.",
+  "generic_effect_ledger": "The existing general effect-authorization ledger remains unchanged; this B1 host verifies its distinct protected MAC origin and phase chain. Its data is an eligibility input to fresh ordinary policy/adapter decisions, not a generic grant bypass.",
+  "required_independent_tests": [
+    "Real direct and linked-worktree resolution and role/consent/TTY/original-argv refusal before effects.",
+    "Atomic issuer publication absence/whole-file behavior and no key leakage on success, cancellation, error or post-link uncertainty.",
+    "Forged JSON/ledger/Owner label, wrong issuer/domain/permissions/worktree/source/index/package/policy/constitution, cloned handle and replay refuse.",
+    "Exact confirmation, bounded monotonic handle, grant expiry/boot/wall-clock guards, same-scope renewal and terminal revocation.",
+    "Actual two-process approval/phase/recovery races and single consumption; no successor inode deletion.",
+    "Crash before intent, after intent, between outputs, after complete output before completion and after completion; exact retry and dead-owner recovery preserve history and phase identity.",
+    "Foreign/live/reused/permission-denied process owners and unknown lock files remain held; no process termination or age-based stealing."
+  ],
+  "private_publication_amendment": {
+    "finding": "Existing guarded publication opens a staged file with wx and no explicit mode. A normal022 umask therefore cannot satisfy the issuer's required0600-from-first-write mode.",
+    "required_primitive": "Add a narrowly scoped guarded publishPrivateFileNoReplaceSync(path, bytes) with explicit0600 descriptor creation before any secret bytes, descriptor/path mode verification before link, and the existing no-replace/fsync/identity/uncertainty semantics. Existing public/default publisher behavior remains unchanged. No process-global umask or post-link chmod substitute.",
+    "exact_additional_sources": [
+      "packages/authority/src/boundaries/host-publish.ts",
+      "packages/authority/src/boundaries/host-effects.ts",
+      "packages/authority/src/index.ts"
+    ],
+    "classification": "The private publisher is an exact registered child effect of the admitted reconciliation-host operation; it must not obtain a generic Git-administration filesystem grant or allow arbitrary mode/path selection.",
+    "test_path": "packages/authority/tests/unit/private-publication.test.ts",
+    "required_tests": [
+      "Under ordinary022 umask, stage and target are0600 from the first secret write; no public/default publisher mode changes.",
+      "Faults before write, before/after link, cleanup/fsync and foreign-inode replacement preserve private modes, ownership and existing indeterminate-publication evidence.",
+      "Malformed issuer/schema/MAC errors return stable codes and safe identities only; raw key bytes/base64/private bundle and parser excerpts never enter stdout/stderr or public error causes.",
+      "READY shows only the frozen private artifact's size/hash and exact targets; it never emits private bytes. Random key generation before READY has no filesystem effect."
+    ]
+  },
+  "implementation_standing": "Independent RED precedes implementation. New schemas, registry actions, generated views, exact source inventory and runtime authority consumers must be implemented and independently qualified; this contract is not a delivered capability or downstream authorization."
+}

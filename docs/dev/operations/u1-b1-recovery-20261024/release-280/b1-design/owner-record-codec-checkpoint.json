@@ -1,0 +1,82 @@
+{
+  "status": "CONCRETE_CLOSED_SCHEMA_AND_AUTHENTICATION_PACKET_FOR_INDEPENDENT_REVIEW_AND_RED",
+  "authority": "Accepted ADR-EVI-0007 and direct full internal v2.8.0 authorization. This is data/authentication implementation, not activation of a public action or adapter.",
+  "contracts": ["owner-protocol-v3.json", "owner-clock-amendment.json"],
+  "candidate": "owner-schema.candidate.json; exact seven signed variants and every required nested field/constraint are normative after independent review",
+  "sources": [
+    "law/schemas/reconciliation-owner.schema.json",
+    "packages/schemas/src/roster.ts",
+    "packages/authority/src/runtime/reconciliation-owner-record.ts"
+  ],
+  "generated": [
+    "packages/schemas/dist/schemas/reconciliation-owner.schema.json",
+    "docs/reference/error-codes.md"
+  ],
+  "tests": [
+    "packages/schemas/tests/contract/reconciliation-owner-schemas.test.ts",
+    "packages/authority/tests/unit/reconciliation-owner-record.test.ts"
+  ],
+  "census": "One runtime schema joins ROSTER deliberately; lazy validators/parsers and bundle staging already derive from roster. New codec uses fixed getValidator('reconciliation-owner.schema.json'), never caller schema/validator. Existing schema population assertions must change only current counts while preserving historical snapshots and all old source-only entries. No action/policy/capability/resource classifier/adapter permission change.",
+  "data_types": "Export readonly discriminated ReconciliationOwnerRecord union for seven concrete variants, and ReconciliationOwnerUnsignedRecord without mac. Reuse clock and admission-anchor TYPE imports only; runtime import of native SQLite from this pure codec is forbidden. Nested scope and installation bindings have the exact candidate fields.",
+  "api": {
+    "validateReconciliationOwnerRecord": "(value: unknown) => ReconciliationOwnerRecord; distinct deep-frozen descriptor-safe closed copy, schema and computable semantic checks, no MAC/clock eligibility/authority assertion",
+    "signReconciliationOwnerRecord": "(unsigned: unknown, privateKeyBase64: string) => ReconciliationOwnerRecord; unsigned must omit mac entirely. Produces exact domain-separated HMAC after schema/semantic checks. For issuer, supplied key must equal its canonical private_key_base64 and key_sha256. This exported internal helper is not a trusted issuer or authority capability.",
+    "verifyReconciliationOwnerRecord": "(value: unknown, privateKeyBase64: string) => ReconciliationOwnerRecord; schema/semantic checks plus timing-safe MAC equality. Returns frozen validated copy, not authority or an apply handle.",
+    "encodeReconciliationOwnerRecord": "(value: unknown) => Uint8Array; validate shape/semantics, serialize UTF8 JCS plus one LF. No MAC verification without a key, no public-output permission. Every result is independent mutable bytes.",
+    "decodeReconciliationOwnerRecord": "(bytes: Uint8Array) => ReconciliationOwnerRecord; bounded independent byte copy through typed-array intrinsics, fatal UTF8 decode, parse, validate and require exact canonical signed JCS+LF byte equality. No permissive whitespace/duplicate key/numeric alias/escaped alias accepted. This is canonical ingress, not MAC verification.",
+    "summarizeReconciliationOwnerRecord": "(value: unknown) => frozen exact safe summary: schemaVersion1.0.0, kind reconciliation-owner-record-summary, record_kind, repository_id, worktree_id, record_sha256, size_bytes, approval_id (null for issuer), scope_sha256 (null for issuer), grants_authority=false. No private key, key digest, MAC, issuer bytes, clock, physical path, raw payload or handle is returned. This is a projection of validated data; actual host must separately verify origin/MAC before claiming provenance.",
+    "ReconciliationOwnerRecordError": "Error name ReconciliationOwnerRecordError; message equals closed code, no cause or offending value"
+  },
+  "canonicalization": {
+    "implementation": "Reuse @devai-nyx/utils canonicalJson only AFTER descriptor-safe bounded copies, safe integer-only numbers and Unicode scalar string validation. That existing utility recursively sorts UTF16 keys, preserves array order and uses JSON.stringify scalars. Do not widen or replace shared utility behavior.",
+    "domain": "Exact candidate kind/domain pairs, seven literals devai.reconciliation.owner.v1/<kind>",
+    "mac_input": "UTF8(domain) + single NUL byte + UTF8(canonicalJson(record excluding ONLY top-level mac))",
+    "mac": "64 lowercase hex; verify decoded32-byte equality using timingSafeEqual after exact schema validation",
+    "key": "Exactly32 decoded bytes;44-character standard padded base64, re-encoding byte-identical. Canonical decoder is internal, never exports decoded key. No aliases, whitespace or alternate alphabet.",
+    "raw_digest": "SHA256 over complete canonical signed UTF8 file bytes INCLUDING trailing LF. Payload digests in formulas below explicitly exclude top-level mac when stated. Do not substitute raw and canonical payload digests."
+  },
+  "acyclic_issuer_digest_graph": {
+    "seed_plan_sha256": "Exact already-confirmed first-stage seed/directory plan bytes; excludes future key/issuer/second READY plan",
+    "provision_context_sha256": "SHA256(canonicalJson({seed_plan_sha256, host_identity_sha256, admission_anchor_sha256:SHA256(canonicalJson(admission_anchor)), installation_bindings_sha256:SHA256(canonicalJson(installation_bindings)), installed_at_head})). This is computed before key/issuer bytes and excludes them.",
+    "issuer": "Includes seed_plan_sha256 and provision_context_sha256, exact real anchor and immutable installation observations, canonical key/key digest and clock; MAC authenticates that complete unsigned issuer.",
+    "second_ready": "Final second-stage review plan may bind complete issuer raw bytes/hash and provision_context_sha256. It is NOT included in that issuer. No provision_plan_sha256 field or digest cycle exists."
+  },
+  "computable_semantics": [
+    "Every clock passes existing validateReconciliationClockObservation: positive canonical uint64 ns, safe wall and exact boot/source. This does not sample clocks or check live expiry.",
+    "Issuer key_sha256 equals SHA256(decoded raw32 key bytes); provision_context_sha256 matches the exact acyclic formula. Anchor mode/seed/hash/closed identities are shape constraints; physical root canonicality/ownership/inodes remain actual-host responsibilities.",
+    "Approval scope repository_id/worktree_id match root fields. scope_sha256 equals SHA256(canonicalJson(scope)); allowed_phases is exactly01,02,03,04. Scope binds exact complete reviewed plan/source bytes, host and current binding digest. Validating the referenced plan/source/host is a separate required actual-host gate.",
+    "Approval and renewal validity_ms is1..900000. expires_wall_ms equals clock.wall_ms+validity_ms exactly within safe integer range. expires_monotonic_ns equals BigInt(clock.monotonic_ns)+BigInt(validity_ms)*1000000n exactly within uint64, without Number coercion. These records cannot extend beyond their signed declared deadlines even though the pure clock helper also enforces full maximum windows.",
+    "Renewal remaining_phases must be strictly increasing canonical01..04 with no duplicates; resumable_intent_sha256 is explicit null or exact digest. Original scope/remaining phase eligibility/terminal revocation are verified against actual immutable chain by final host, never inferred by this isolated codec.",
+    "Phase/action/initiator and predecessor-null rules follow candidate schema:01/02 materialize inspector,03 stage-proof inspector,04 bootstrap-inventory architect; predecessor completion null only01. Completed durability literal is durable but schema alone cannot prove fsync/readback.",
+    "Lease signed PID/host/boot/nonce is eligibility input only. Exact original intent and current grant references require actual host verification. Live/reused/EPERM/foreign lease refusal and ESRCH-only exact removal remain native-admission host responsibilities."
+  ],
+  "input_limits": {
+    "max_canonical_bytes": 1048576,
+    "max_depth": 32,
+    "max_value_nodes": 16384,
+    "max_string_code_units": 262144,
+    "max_key_code_units": 128,
+    "max_object_properties": 128,
+    "max_array_items": 4096,
+    "copy_rules": "Plain/null object prototypes only; ordinary/null array prototypes only with exact dense own enumerable data indices plus intrinsic length. No symbols, accessors, extra/nonenumerable keys, holes, Proxy, cycles, undefined/functions/BigInt/nonfinite/unsafe/fractional/negative-zero numbers or lone surrogate strings. Copy to new null-prototype objects/ordinary arrays, deep freeze after schema validation. Charge cumulative serialized byte budget before building full canonical output.",
+    "byte_rules": "Actual non-Proxy Uint8Array/Buffer views only. Use captured typed-array intrinsic getters/copy to bypass caller overrides; refuse shared or detached buffers. Fatal UTF8; exact canonical byte equality rejects duplicates BEFORE provenance is accepted, even though JSON.parse is used internally. No result-defined getters, species, iterator, toJSON/valueOf/toString calls.",
+    "diagnostics": "All native/schema/parser/canonicalization errors become closed safe codes with no raw message/cause/payload/key. Resource bounds use LIMIT_EXCEEDED; invalid UTF8/byte format/noncanonical file uses ENCODING_INVALID; invalid data/key/semantic checks use INVALID; verified shape with wrong MAC uses MAC_INVALID."
+  },
+  "codes": [
+    "RECONCILIATION_OWNER_INVALID",
+    "RECONCILIATION_OWNER_MAC_INVALID",
+    "RECONCILIATION_OWNER_ENCODING_INVALID",
+    "RECONCILIATION_OWNER_LIMIT_EXCEEDED"
+  ],
+  "required_independent_tests": [
+    "Authentic absent schema/roster/runtime RED; all seven valid variants through actual fixed schema registry and codec",
+    "Missing/unknown/nested/variant-crossed fields, phase-action/role/predecessor/sequence/validity/domain/key and computable digest tampering refuse",
+    "Independent native crypto HMAC oracle and UTF8 JCS+LF/raw-digest known vectors; domain/kind/MAC/key/scope mismatch refuse; no shared helper oracle",
+    "Duplicate JSON keys, whitespace, key order, numeric/exponent/escaped string aliases, BOM/bad UTF8/trailing bytes/multiple LF, unsafe integers and lone surrogates refuse canonical ingress",
+    "Descriptor/Proxy/toJSON/coercion/array-hole/species/iterator/typed-array getter traps remain untouched; shared/detached byte input refuses; depth/node/string/size budgets remain bounded",
+    "Issuer digest graph is acyclic; exact private issuer roundtrip works while every safe summary/error contains no sentinel private base64/raw key/payload marker",
+    "Deep frozen record and summary copies, source and bytes independent; original inputs unchanged",
+    "Schema meta/canon/roster/staging and original historical fixtures/source-only schemas keep their meanings; current count changes only explicitly reviewed additional runtime schema"
+  ],
+  "remaining_full_goal": "This packet delivers concrete Owner record schema/authentication prerequisites. Trusted origin/clock/namespace and operation handle, action/policy/effect consumers, full Owner lifecycle and B1 real-index/staged public workflow, installed qualification and protected v2.8.0 publication remain required."
+}

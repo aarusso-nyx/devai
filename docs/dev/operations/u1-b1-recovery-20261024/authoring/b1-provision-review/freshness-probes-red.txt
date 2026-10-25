@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-provision-review/freshness-probes-red.txt","kind":"historical-transcript-custody-pointer","original_bytes":2434,"original_bytes_changed":false,"original_sha256":"7e23647dcbf98c4bc88c34d34bbfa0fb98176d43774b3badc937daff4acb7b0d"}

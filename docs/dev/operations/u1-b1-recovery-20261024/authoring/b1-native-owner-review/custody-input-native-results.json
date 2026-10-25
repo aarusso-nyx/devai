@@ -1,0 +1,10 @@
+{
+  "kind": "independent-native-custody-reader",
+  "fixture": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-initial-owner-plan-jJqJW9/repository",
+  "manifest_files": 1760,
+  "unique_objects": 1674,
+  "total_bytes": 4862633,
+  "index_sha256": "542553c911bcd2f5e65dd8a27b66f0f1dbcb703278477cb27df920ede95eadce",
+  "effects": 0,
+  "qualification": "Actual Git object bytes/full OID/type/SHA/size verified; synthetic sealed invocation and B5; map grants no publication authority."
+}

@@ -1,0 +1,31 @@
+{
+  "status": "UNAVAILABLE_RELEASE_NOT_EXECUTABLE",
+  "current_version": "2.6.3",
+  "proposed_target_version": null,
+  "release_source_commit": null,
+  "immutable_tag": null,
+  "registry_tarball_url": null,
+  "registry_sri": null,
+  "tarball_sha256": null,
+  "package_lock_diff_sha256": null,
+  "upgrade_plan_sha256": null,
+  "public_capability_manifest_sha256": null,
+  "owner_execution_approval": null,
+  "required_capabilities": [
+    "ADR-EVI-0006 divergent-anchor recovery",
+    "approved released canonical proof reconciliation/bootstrap mechanism"
+  ],
+  "preparation_approval_does_not_authorize_install_or_recovery": true,
+  "preparation_approved_on": "2026-10-23",
+  "latest_release_observation": {
+    "repository": "aarusso-nyx/devai",
+    "tag": "v2.6.3",
+    "published_at": "2026-10-19T02:45:26Z",
+    "method": "gh api repos/aarusso-nyx/devai/releases/latest"
+  },
+  "execution_allowed": false,
+  "release_qualification": null,
+  "public_help_and_schema_fingerprints": null,
+  "node24_pnpm9_qualification": null,
+  "transitive_and_peer_diff_review": null
+}

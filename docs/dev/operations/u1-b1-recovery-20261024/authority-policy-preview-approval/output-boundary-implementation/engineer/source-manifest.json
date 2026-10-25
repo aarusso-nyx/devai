@@ -1,0 +1,57 @@
+{
+  "status": "OUTPUT_TRANSPORT_AUTHORED_AWAITING_INDEPENDENT_FIXTURE_ASSURANCE",
+  "count": 10,
+  "paths": [
+    {
+      "path": "packages/cli/src/command-router.ts",
+      "sha256": "acf7248533415695cce0d9258bf7c942886f842276c7cdb979e9e79c3b86f98f",
+      "size_bytes": 18863
+    },
+    {
+      "path": "packages/cli/src/commands/init/index.ts",
+      "sha256": "984da375d7f480413f043341e33f797ab517dc07eb22cfb2d2f3b5c1f3d86bc3",
+      "size_bytes": 5111
+    },
+    {
+      "path": "packages/cli/src/commands/init/shared.ts",
+      "sha256": "ddb802c8ad36b2f80ef225934af541934f86e852805aaa2a25e313ddc67393c3",
+      "size_bytes": 3852
+    },
+    {
+      "path": "packages/cli/src/commands/init/review-authority-policy.ts",
+      "sha256": "3fa00b86fbad04ba4fa5b8a1078af7f28eeed3aaea03e6cac75383fbb7661f7e",
+      "size_bytes": 4068
+    },
+    {
+      "path": "packages/cli/src/authority/command-capabilities.ts",
+      "sha256": "f29ca8306a798c2842d8e4a7138f37331e9b16d926e06925985b330f779232d2",
+      "size_bytes": 1236
+    },
+    {
+      "path": "packages/cli/src/authority/broker.ts",
+      "sha256": "50721c2d784e8849cbf50ad7a07daa7d2b3513a5618ecd81ac0ec8040b2f7735",
+      "size_bytes": 87451
+    },
+    {
+      "path": "packages/cli/src/authority/policy-review.ts",
+      "sha256": "5235d957e108596cc550b48297091c5d3be530515fc60ecbbe999ca0b7e80de4",
+      "size_bytes": 3095
+    },
+    {
+      "path": "packages/cli/src/authority/policy.ts",
+      "sha256": "3b32792eed1c482009a3cb217074fc642b95808e806b41859f485e2ddf533bee",
+      "size_bytes": 5634
+    },
+    {
+      "path": "packages/cli/src/authority/policy-support.ts",
+      "sha256": "156b296bf26a87816c9f8206843b9c0a79414fa698dc1829a6dccd6860ede739",
+      "size_bytes": 10045
+    },
+    {
+      "path": "packages/cli/src/action-output.ts",
+      "sha256": "84023b4a893d7d0102a4d0f6c6e8537624415dc11d20cf408cbcfe3444d86f54",
+      "size_bytes": 22389
+    }
+  ],
+  "live_use_binding_integration_U1_B1_operational_release_DETRAN": "HELD"
+}

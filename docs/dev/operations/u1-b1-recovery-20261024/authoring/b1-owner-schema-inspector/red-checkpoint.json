@@ -1,0 +1,40 @@
+{
+  "status": "AUTHENTIC_ABSENT_LAW_ROSTER_REGISTRY_RED_CANDIDATE_REVIEW_ACCEPTED",
+  "candidate_sha256": "39002520c0ffa410ef41a9caf34d16af123b9bc88f0ab1e426deaf70af284344",
+  "checkpoint_sha256": "40fcc553a75e9d625e381520d8a8fc7c5c139ced901f6dd697f9b79ebc2b2b1f",
+  "test_sha256": "97084f8117035381eb530c3ccce11dd7bc766344730cdd331bd8cda688ef4354",
+  "result": {
+    "total": 22,
+    "failed": 21,
+    "passed": 1
+  },
+  "passing_meaning": "Exact candidate meta validation and strict Ajv compilation, all7 shape fixtures, actual checkSchema canon zero findings.",
+  "red_meaning": "Canonical law absent; runtime roster absent; actual getValidator refuses unregistered name; actual copy-law stage source population134 instead of135. No runtime/host effect qualification claimed.",
+  "log": "structural-red-corrected.log",
+  "log_sha256": "b1a105b425bce7a5839d2824970c392866a8fb49b1d3e43d80df6b9a72052b57",
+  "historical_harness_correction": "Original structural-red.log includes one fixture error: approval.previous_grant_sha256 defaulted to digest rather than required null. Corrected before authoritative RED; no candidate rule changed.",
+  "reviewer_hypothesis_correction": "Initial message prematurely claimed trailing-newline pattern hole. Actual Node/Ajv probe refutes it; candidate-review-probe.json retained unchanged and claim explicitly withdrawn before product mutation. No need to change regex.",
+  "census": {
+    "runtime_roster_before": 121,
+    "canonical_law_before": 134,
+    "runtime_roster_after": 122,
+    "canonical_law_after": 135
+  },
+  "exact_amendments": [
+    {
+      "path": "packages/schemas/tests/contract/schema-roster.test.ts",
+      "changes": "line23 count comment121->122; line26 current ROSTER121->122; add exact new Owner membership assertion. Preserve all existing named memberships."
+    },
+    {
+      "path": "packages/schemas/tests/contract/proof-index-reconciliation-contract.test.ts",
+      "changes": "line27 current ROSTER121->122; retain proof-index source-only exclusion and all historical negative shapes unchanged."
+    },
+    {
+      "path": "packages/cli/tests/unit/check-schemas-adopter-boundaries.test.ts",
+      "changes": "line187 ROSTER121->122; lines200/307 current canonical_total134->135; line219 insertion/deletion counts135/133->136/134; lines323/335 human output134->135; add Owner membership with all original memberships and negatives unchanged."
+    }
+  ],
+  "preserve": "No frozen ADR records/files counts or fixtures change. cli-shard06 synthetic17-count assertions unchanged. Every existing source-only schema stays source-only.",
+  "bounds": "Independent schema data review only; authentic MAC/clock semantics codec tested separately, no origin/action/adapter/effect permission.",
+  "eslint_exit_code": 0
+}

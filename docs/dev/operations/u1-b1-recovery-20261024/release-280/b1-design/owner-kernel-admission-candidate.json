@@ -1,0 +1,64 @@
+{
+  "status": "FEASIBILITY_VERIFIED_NOT_B1_ACCEPTANCE",
+  "replaces_candidate": "revision2 mutable admission.lock reaping",
+  "decision_pending": "Freeze complete bootstrap, identity, permission, durability and typed-effect closure before accepting or implementing. No unsafe filesystem mutex fallback.",
+  "candidate": "Preferred immutable private SQLite kernel-lock anchor described in preferred_refinement. The first mutable counter/hot-journal probe is retained only as preliminary feasibility evidence; it is not the proposed runtime protocol.",
+  "evidence": "owner-admission-feasibility/result.json",
+  "source_sha256": {
+    "worker.mjs.txt": "6be463b8885e51b2c35dd8629531ffc36425b64fa92a6b68abd791ffab9463dd",
+    "probe.py.txt": "87b370040027b5fad135c49e7f46dea010b311c5777d557ab21b35701858feb9",
+    "result.json": "7536c9cd055a4c8257c275c50dc446c69de34554250114efad926f32a3c6733d",
+    "immutable-worker.mjs.txt": "b994c1b6ed91070cc230a30cec9fd58e6b5311334de8fb530a0412d3119da71e",
+    "immutable-probe.py.txt": "ed379d6c8aeb283c899217c1e1ef7bec5b57605c1fb998fefc69f2af806153bf",
+    "immutable-result.json": "793fbbed1b9637856534aa423433872828bfe0984adb6d32d3b40d15e3c73531"
+  },
+  "observed": [
+    "Live transaction contender refused SQLITE_BUSY numeric5.",
+    "Only fixture-owned holder killed by SIGKILL; fresh process acquired and rolled back the uncommitted counter99 to0.",
+    "Two real processes then serialized counter1 to2 to3.",
+    "Actual database and rollback journal mode0600 while holder live in mode0700 fixture directory."
+  ],
+  "not_proved": [
+    "DEVAI host resource adapter, original argv/role/consent custody or permission decision.",
+    "Owner issuer bootstrap exact-byte preview and atomic publication across new directories/database/issuer.",
+    "Safe recovery of partially initialized/foreign database, fixed schema, extension refusal or tampered inode.",
+    "All real B1 commands, phase resumption and typed Git-index effects."
+  ],
+  "required_before_acceptance": [
+    "Freeze exact packaged seed bytes, closed schema and logical path .git/devai/reconciliation/admission.sqlite; all physical paths are trusted worktree-host resolved.",
+    "Resolve trusted physical host root; qualify supported local filesystem locking, SQLite/Node versions and both direct and linked worktrees. Refuse unsupported filesystem or locking behavior.",
+    "Publish the fixed private seed create-only with exact two-step bootstrap preview and cancellation/retry states. Bind actual database/directory identity in the issuer after the seed precursor; foreign state never inferred owned.",
+    "Verify exact seed bytes before opening any SQLite connection. After acquisition use closed SQL schema/row validation and lstat identities; no raw filesystem open/read/close helper may open/close the DB while SQLite holds its POSIX lock. Reject sidecars before writable connection; do not run writable SQLite at all in no-write planning. Any future held-readonly-descriptor byte verifier needs its own explicit lifetime proof and test before adoption.",
+    "Register only the fixed host kernel-lock operation and exact private publication child effects; never grant arbitrary database/filesystem access.",
+    "Require a synchronous non-reentrant callback and serialize same-process contenders; prevent another connection from closing while exclusion is held.",
+    "Retain the revision2 intent-authority matrix and MAC leases. Explicit Owner dead-lease recovery is inside the distinct kernel exclusion interval and removes only the exact authenticated dead lease.",
+    "Independent actual-adapter process contention, crash, stale-reaper, seed-substitution, mode/symlink/foreign state and public CLI tests precede runtime acceptance."
+  ],
+  "primary_sources": [
+    "https://nodejs.org/download/release/latest-v24.x/docs/api/sqlite.html",
+    "https://www.sqlite.org/lockingv3.html",
+    "https://www.sqlite.org/howtocorrupt.html",
+    "https://www.sqlite.org/howtocorrupt.html#_posix_advisory_locks_canceled_by_a_separate_thread_doing_close_"
+  ],
+  "fixture_source_note": "The .txt files preserve exact observed disposable scripts as inert evidence. Executed originals and database remain outside checkout at /private/tmp/devai-release-280-01a16e18/owner-admission-probe/.",
+  "preferred_refinement": {
+    "status": "IMMUTABLE_KERNEL_LOCK_ANCHOR_FEASIBILITY_PASS_PROTOCOL_REVIEW_PENDING",
+    "mechanism": "Use one fixed immutable private SQLite seed solely as an OS-managed lock anchor. Open read/write, issue only BEGIN IMMEDIATE and ROLLBACK for exclusion; never execute application SQL writes, journal-mode changes, schema updates, vacuum or checkpoint after publication. MAC approvals and phase evidence remain separate immutable files.",
+    "seed": "A packaged fixed closed-schema8192-byte seed may be published create-only. The disposable seed observed here is not yet the admitted packaged seed. Bind canonical seed SHA256, exact bytes, schema/version, owner/type/mode and its actual inode in the issuer. Reject any journal/WAL/SHM or changed seed; this protocol performs no SQL writes and has no journal recovery permission.",
+    "two_step_bootstrap": "Avoid unresolved inode identities in a supposedly exact issuer preview: first show an exact seed/directory precursor plan and PREPARE RECONCILIATION-HOST <seed_plan_sha256> confirmation; publish only the fixed private seed and admitted0700 directories. Then actual directory/database identities exist. Prepare the complete private issuer with those identities and new key; show only exact size/digest and BIND RECONCILIATION-HOST <issuer_plan_sha256> confirmation, then private no-replace publication under the kernel lock. Cancellation after the precursor leaves only a recognizable inert seed, no issuer/key/grant. A later invocation may resume only after exact seed/type/owner/mode/schema/inode and namespace validation; unknown state refuses.",
+    "effect_bounds": "No generic SQL/database capability or manually removed admission.lock. The typed reconciliation-host adapter owns only the fixed seed create, private read/write descriptor kernel lock and admitted issuer/approval/phase files. BEGIN IMMEDIATE holds until the synchronous guarded critical section ends; reject async callback, reentrancy and a second connection for the same host operation. Do not close another same-process connection while exclusion is held; serialize in-process admissions too.",
+    "recovery": "Kernel exclusion is released by process death. Explicit Owner recovery still verifies the exact MAC-authenticated dead lease while holding the immutable anchor lock; it may quarantine/remove that lease safely because every lease publisher participates in this distinct kernel exclusion. No shared filesystem mutex is reaped.",
+    "fixture": "owner-admission-feasibility/immutable-result.json",
+    "observed": [
+      "Live contender SQLITE_BUSY5.",
+      "Actual fixture-owned holder killed by SIGKILL; two later processes serialized updates to a separate external counter0->1->2.",
+      "All8192seedbytes and actual inode unchanged; no SQLite sidecar during or after held lock/crash/contention; seed mode0600."
+    ],
+    "not_proved": [
+      "Actual packaged seed compatibility across supported Node/platform/filesystem combinations.",
+      "Two-step public preview/confirmation, private issuer, trusted adapter or exact effect capability.",
+      "Host-only schema/MAC/phase crash or Owner authority qualification."
+    ],
+    "posix_lock_descriptor_rule": "Closing another raw descriptor for the same DB while SQLite holds its lock can drop POSIX advisory locks. Seed hash reads must precede opening the SQLite connection. During critical sections use exact closed SQL validation and metadata-only identity checks. Runtime/source-scan tests must catch readFileSync or other implicit open/close of the anchor while live. No second connection or closing alias is allowed. No-write planning is raw read-only and never opens SQLite writable or performs hot-journal recovery."
+  }
+}

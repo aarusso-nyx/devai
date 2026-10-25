@@ -1,0 +1,14 @@
+{
+  "scope": "Actual disposable native source composition; synthetic B5/TTY, not installed/public/Owner publication authority",
+  "environment": {
+    "node": "24.22.0",
+    "uv": "1.52.1",
+    "platform": "darwin"
+  },
+  "external_fixture": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-owner-inspector-x6OfKO",
+  "observations": [],
+  "sha256": {
+    "packages/authority/src/boundaries/reconciliation-host-owner.ts": "d2ea3a0b345ffc48f809e819807c3f738bd9cddaf91673387bd310b8e05456c3",
+    "packages/authority/tests/unit/reconciliation-host-owner.test.ts": "8af0ca4e124fa177936a14a2ce5cf36231cf3c6522e59b0851adacd22526d006"
+  }
+}

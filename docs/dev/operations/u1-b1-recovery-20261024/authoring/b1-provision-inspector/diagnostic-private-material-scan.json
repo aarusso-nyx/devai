@@ -1,0 +1,8 @@
+{
+  "known_disposable_issuer_records": 30,
+  "distinct_known_private_values": 90,
+  "public_artifacts_and_test_scanned": 31,
+  "private_values_found": false,
+  "private_raw_excluded": "independent-first.txt",
+  "scope": "Exact known disposable native issuer key/base64 digest/MAC values, no secret values printed or serialized; not a general data-loss prevention proof"
+}

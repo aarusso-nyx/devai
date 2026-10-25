@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/public-owner-preview-schema.txt","kind":"historical-transcript-custody-pointer","original_bytes":634,"original_bytes_changed":false,"original_sha256":"08af2d9456be78ba95d461fba4538f393e073773bfc365a285e69d10c970b9fd"}

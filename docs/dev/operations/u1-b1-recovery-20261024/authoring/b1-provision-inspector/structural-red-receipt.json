@@ -1,0 +1,15 @@
+{
+  "standing": "AUTHENTIC_MISSING_NATIVE_MODULE_RED",
+  "passed": 0,
+  "failed": 2,
+  "hashes": {
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/native-provision-checkpoint.json": "b5781dc107baee06410015fc031cd3372022ccd1c2234a1449a3115419dd149d",
+    "packages/authority/tests/unit/reconciliation-host-provision.test.ts": "e89e753695103c7041369f7375cc6337c31bfb921f037ebb91cda8a775ab2ab8",
+    "packages/authority/src/index.ts": "7acc1feb7a4cd9a7585b737feaccad8ef6344624f2c118c0feb9a23b3a7eae4d"
+  },
+  "raw_sha256": "f869c9b797be5054f34f94465ee19453fed791a4df10aeb9961b53767c7004d5",
+  "absent": [
+    "packages/authority/src/boundaries/reconciliation-host-provision.ts",
+    "packages/authority/src/boundaries/reconciliation-host-namespace.ts"
+  ]
+}

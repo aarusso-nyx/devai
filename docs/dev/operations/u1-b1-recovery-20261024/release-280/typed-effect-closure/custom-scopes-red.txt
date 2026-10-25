@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/release-280/typed-effect-closure/custom-scopes-red.txt","kind":"historical-transcript-custody-pointer","original_bytes":4478,"original_bytes_changed":false,"original_sha256":"11a81c6366ef59c734133a69beaff6dac86462e219291e9096b7c92c14f68795"}

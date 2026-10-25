@@ -1,0 +1,1276 @@
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { expect, it } from 'vitest';
+
+it('requires the actual native Owner reader before origin qualification', () => {
+  expect(
+    existsSync(resolve(import.meta.dirname, '../../src/boundaries/reconciliation-host-owner.ts')),
+    'required native Owner origin component is absent',
+  ).toBe(true);
+});
+
+import { vi, afterAll, afterEach } from 'vitest';
+import { execFileSync } from 'node:child_process';
+import { createHash, createHmac } from 'node:crypto';
+import {
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  readFileSync,
+  readdirSync,
+  lstatSync,
+  writeFileSync,
+  chmodSync,
+  symlinkSync,
+  renameSync,
+  unlinkSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { pathToFileURL } from 'node:url';
+import { getValidator } from '@devai-nyx/schemas';
+import { runWithAuthorityHostEffects, scopes } from '../../src/boundaries/host-scope.js';
+import type { AuthorityHostEffectRequest } from '../../src/boundaries/host-atomic-effects.js';
+import { createAuthorityBoundaryRuntime } from '../../src/boundaries/boundary-runtime.js';
+import {
+  createReconciliationHostInvocation,
+  disposeReconciliationHostInvocation,
+  reconciliationHostOperation,
+  reconciliationHostOperationSnapshot,
+  readReconciliationHostBinding,
+  invokeReconciliationHostOperation,
+} from '../../src/boundaries/reconciliation-host-operation.js';
+import {
+  readReconciliationAdmissionAnchor,
+  withReconciliationAdmissionSteps,
+} from '../../src/boundaries/host-reconciliation-admission.js';
+import { computeMutationEnvelopeDigest, type MutationEnvelope } from '../../src/index.js';
+import {
+  CONSENT,
+  actionDocumentWithId,
+  canonicalSha256,
+  createIssuer,
+  declarationDependencies,
+  exactSubject,
+  expectSuccess,
+  makePolicyPlant,
+  policyBindingFromPlant,
+  runtimeApi,
+  type RuntimeApi,
+  type AuthorityDecisionIssuer,
+} from './authority-runtime-testkit.js';
+import { boundaryDependencies } from './authority-boundary-testkit.js';
+const readHooks = vi.hoisted(() => ({
+  active: false,
+  observe: false,
+  namespaceCalls: 0,
+  selectedCalls: 0,
+  buffers: [] as Uint8Array[],
+  mutations: [] as string[],
+  seedOpens: 0,
+  seedCloses: 0,
+  seedFds: new Set<number>(),
+  databases: 0,
+  afterSelected: undefined as undefined | ((path: string) => void),
+  beforeSelected: undefined as undefined | ((path: string) => void),
+  afterNamespace: undefined as undefined | ((count: number) => void),
+}));
+function fault(callback: () => void) {
+  const before = readHooks.observe;
+  readHooks.observe = false;
+  try {
+    callback();
+  } finally {
+    readHooks.observe = before;
+  }
+}
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  const names = [
+    'mkdirSync',
+    'linkSync',
+    'unlinkSync',
+    'renameSync',
+    'writeFileSync',
+    'writeSync',
+    'ftruncateSync',
+    'chmodSync',
+    'fchmodSync',
+    'rmSync',
+    'rmdirSync',
+    'fsyncSync',
+  ] as const;
+  const mutators = Object.fromEntries(
+    names.map((name) => [
+      name,
+      (...args: unknown[]) => {
+        if (readHooks.observe) readHooks.mutations.push(name);
+        return Reflect.apply(actual[name], actual, args);
+      },
+    ]),
+  );
+  return {
+    ...actual,
+    ...mutators,
+    openSync: (...args: Parameters<typeof actual.openSync>) => {
+      const flags = args[1];
+      if (
+        readHooks.observe &&
+        (typeof flags === 'number'
+          ? (flags &
+              (actual.constants.O_WRONLY |
+                actual.constants.O_RDWR |
+                actual.constants.O_CREAT |
+                actual.constants.O_TRUNC |
+                actual.constants.O_APPEND)) !==
+            0
+          : !['r', 'rs', 'sr'].includes(flags))
+      )
+        readHooks.mutations.push('write-open');
+      const fd = actual.openSync(...args);
+      if (readHooks.active && String(args[0]).endsWith('/admission.sqlite')) {
+        readHooks.seedOpens++;
+        readHooks.seedFds.add(fd);
+      }
+      return fd;
+    },
+    closeSync: (fd: number) => {
+      if (readHooks.active && readHooks.seedFds.has(fd)) {
+        readHooks.seedCloses++;
+        readHooks.seedFds.delete(fd);
+      }
+      return actual.closeSync(fd);
+    },
+  };
+});
+vi.mock('node:sqlite', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:sqlite')>();
+  class ObservedDatabase extends actual.DatabaseSync {
+    constructor(...args: ConstructorParameters<typeof actual.DatabaseSync>) {
+      if (readHooks.active) readHooks.databases++;
+      super(...args);
+    }
+  }
+  return { ...actual, DatabaseSync: ObservedDatabase };
+});
+vi.mock('../../src/boundaries/reconciliation-host-namespace.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../../src/boundaries/reconciliation-host-namespace.js')>();
+  return {
+    ...actual,
+    readNativeReconciliationNamespace: (
+      ...args: Parameters<typeof actual.readNativeReconciliationNamespace>
+    ) => {
+      const value = actual.readNativeReconciliationNamespace(...args);
+      if (readHooks.active) {
+        readHooks.namespaceCalls++;
+        if (value.issuer) readHooks.buffers.push(value.issuer.bytes);
+        if (readHooks.afterNamespace)
+          fault(() => readHooks.afterNamespace?.(readHooks.namespaceCalls));
+      }
+      return value;
+    },
+    readNativePrivateFile: (...args: Parameters<typeof actual.readNativePrivateFile>) => {
+      if (readHooks.active && readHooks.beforeSelected)
+        fault(() => readHooks.beforeSelected?.(String(args[0])));
+      const value = actual.readNativePrivateFile(...args);
+      if (readHooks.active) {
+        readHooks.selectedCalls++;
+        readHooks.buffers.push(value.bytes);
+        if (readHooks.afterSelected) fault(() => readHooks.afterSelected?.(String(args[0])));
+      }
+      return value;
+    },
+  };
+});
+
+type Data = Record<string, unknown>;
+interface Ready {
+  kind: 'reconciliation-provision-review';
+  action_id: 'init bind';
+  stage: 'seed' | 'issuer';
+  repository_id: string;
+  worktree_id: string;
+  host_identity_sha256: string;
+  binding_sha256: string;
+  namespace_sha256: string;
+  plan_sha256: string;
+  artifact: { sha256: string; size_bytes: number };
+  effects: readonly { target: string; operation: string; mode: string }[];
+  confirmation: string;
+  lifetime_ms: number;
+  grants_authority: false;
+}
+interface Result {
+  kind: 'reconciliation-provision-result';
+  action_id: 'init bind';
+  outcome: 'created' | 'existing' | 'cancelled' | 'indeterminate';
+  repository_id: string;
+  worktree_id: string;
+  issuer_sha256: string | null;
+  stage: 'seed' | 'issuer' | null;
+  owned: readonly { target: string; dev: string; ino: string; birthtime_ns: string }[];
+  grants_authority: false;
+}
+interface Review {
+  start(): Ready | Result;
+  confirm(token: string): Ready | Result;
+  cancel(): Result;
+}
+async function provisionApi() {
+  return (await import('../../src/boundaries/reconciliation-host-provision.js')) as unknown as {
+    createReconciliationHostProvisionReview(root: string): Review;
+  };
+}
+const ROOT = resolve(import.meta.dirname, '../../../..');
+const external = realpathSync(mkdtempSync(resolve(tmpdir(), 'devai-native-owner-inspector-')));
+const cleanEnv = {
+  PATH: '/usr/bin:/bin',
+  LC_ALL: 'C',
+  HOME: external,
+  GIT_CONFIG_NOSYSTEM: '1',
+  GIT_CONFIG_SYSTEM: '/dev/null',
+  GIT_CONFIG_GLOBAL: '/dev/null',
+};
+const originalArgv = [...process.argv];
+const ttyDescriptors = [process.stdin, process.stdout, process.stderr].map(
+  (stream) => [stream, Object.getOwnPropertyDescriptor(stream, 'isTTY')] as const,
+);
+const observations: unknown[] = [];
+afterEach(() => {
+  readHooks.active = false;
+  readHooks.observe = false;
+  readHooks.afterSelected = undefined;
+  readHooks.beforeSelected = undefined;
+  readHooks.afterNamespace = undefined;
+  process.argv = [...originalArgv];
+  for (const [stream, descriptor] of ttyDescriptors) {
+    if (descriptor) Object.defineProperty(stream, 'isTTY', descriptor);
+    else Reflect.deleteProperty(stream, 'isTTY');
+  }
+});
+const hash = (bytes: string | Uint8Array) => createHash('sha256').update(bytes).digest('hex');
+function jcs(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) return '[' + value.map(jcs).join(',') + ']';
+  const object = value as Data;
+  return (
+    '{' +
+    Object.keys(object)
+      .sort()
+      .map((key) => JSON.stringify(key) + ':' + jcs(object[key]))
+      .join(',') +
+    '}'
+  );
+}
+function git(root: string, args: string[]): string {
+  return execFileSync('/usr/bin/git', ['-C', root, ...args], {
+    env: cleanEnv,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  }).trim();
+}
+function repository(linked = false) {
+  const base = realpathSync(mkdtempSync(resolve(external, 'fixture-')));
+  const primary = resolve(base, 'repository');
+  mkdirSync(primary, { mode: 0o700 });
+  git(primary, ['init', '--initial-branch=main']);
+  git(primary, [
+    '-c',
+    'user.name=Fixture',
+    '-c',
+    'user.email=fixture@example.invalid',
+    '-c',
+    'commit.gpgsign=false',
+    '-c',
+    'core.hooksPath=/dev/null',
+    'commit',
+    '--allow-empty',
+    '-m',
+    'fixture',
+  ]);
+  let root = primary;
+  if (linked) {
+    root = resolve(base, 'linked');
+    git(primary, ['worktree', 'add', '--detach', root, 'HEAD']);
+    root = realpathSync(root);
+  }
+  const gitDir = realpathSync(git(root, ['rev-parse', '--absolute-git-dir']));
+  return { base, root, primary, gitDir, namespace: resolve(gitDir, 'devai/reconciliation') };
+}
+function inventory(path: string): unknown {
+  if (!existsSync(path)) return null;
+  const s = lstatSync(path, { bigint: true });
+  if (s.isSymbolicLink()) return { kind: 'symlink', ino: String(s.ino), mode: String(s.mode) };
+  return s.isDirectory()
+    ? {
+        kind: 'directory',
+        ino: String(s.ino),
+        mode: String(s.mode),
+        entries: readdirSync(path)
+          .sort()
+          .map((name) => [name, inventory(resolve(path, name))]),
+      }
+    : {
+        kind: 'file',
+        ino: String(s.ino),
+        mode: String(s.mode),
+        size: String(s.size),
+        sha256: hash(readFileSync(path)),
+      };
+}
+function issue(api: RuntimeApi, issuer: AuthorityDecisionIssuer, target: Data) {
+  const action = 'init bind',
+    role = 'architect';
+  const rule = {
+    rule_id: 'native-provision-fixture',
+    origin: 'additive-extension',
+    precedence: 500,
+    action_ids: [action],
+    selector: {
+      kind: target.kind,
+      repository_id: target.repository_id,
+      operations: [target.operation],
+    },
+    effect: 'allow',
+    subjects: [{ kind: 'human', roles: [role] }],
+    required_consent: CONSENT,
+    constitutional_anchors: [6],
+    rationale: 'Owned actual native fixture; deterministic B5 is not installed origin.',
+  };
+  const plant = makePolicyPlant({ additiveRules: [rule] });
+  expect(getValidator('authority-policy.schema.json')(plant.document)).toBe(true);
+  const context = expectSuccess<{ context_receipt: unknown }>(
+    api.resolveAuthorityDeclaration(
+      {
+        action_id: action,
+        invocation_id: 'invocation-1',
+        dry_run: false,
+        declaration: { as_role: role },
+        consent: CONSENT,
+      },
+      declarationDependencies(
+        issuer,
+        actionDocumentWithId(action, 'local-write', { kind: 'human', allowed_roles: [role] }),
+        undefined,
+        policyBindingFromPlant(plant),
+      ),
+    ),
+  );
+  const policy = expectSuccess(api.loadAuthorityPolicy({ document: plant.document }, plant.deps));
+  const resolution = api.resolveAuthorityPolicy(
+    policy,
+    {
+      action_id: action,
+      context_receipt: context.context_receipt,
+      consent: CONSENT,
+      resource: target,
+      operation: target.operation,
+    },
+    { receiptStore: issuer, canonicalSha256 },
+  );
+  expect(resolution).toMatchObject({ outcome: 'allow' });
+  const base = exactSubject([target], plant) as { plan: { envelope: MutationEnvelope } };
+  const envelope = {
+    ...base.plan.envelope,
+    request: { ...base.plan.envelope.request, action_id: action },
+  } as MutationEnvelope;
+  const subject = {
+    plan: {
+      ...base.plan,
+      envelope: {
+        ...envelope,
+        issued_by: {
+          ...envelope.issued_by,
+          envelope_digest_sha256: computeMutationEnvelopeDigest(envelope),
+        },
+      },
+    },
+  };
+  const decision = issuer.issueAllow({
+    resolutions: [resolution],
+    subject,
+    context_receipt: context.context_receipt,
+    invocation_id: 'invocation-1',
+    boundary_adapter_id: 'reconciliation-host-authority-boundary',
+  }) as { issued: boolean; receipt: unknown };
+  expect(decision.issued).toBe(true);
+  return { subject, receipt: decision.receipt };
+}
+async function harness(
+  options: { linked?: boolean; write?: boolean; repo?: ReturnType<typeof repository> } = {},
+) {
+  const api = await runtimeApi();
+  const module = await provisionApi();
+  const repo = options.repo ?? repository(options.linked);
+  const issuer = createIssuer(api);
+  const write = options.write ?? true;
+  process.argv = [
+    process.execPath,
+    'devai',
+    'init',
+    'bind',
+    '--reconciliation-host',
+    '--target',
+    repo.root,
+    '--as-role',
+    'architect',
+    ...(write ? ['--write'] : []),
+    '--format',
+    'json',
+  ];
+  for (const stream of [process.stdin, process.stdout, process.stderr])
+    Object.defineProperty(stream, 'isTTY', { value: true, configurable: true });
+  const bindings = {
+    package_sha256: 'a'.repeat(64),
+    module_sha256: 'b'.repeat(64),
+    registry_sha256: 'c'.repeat(64),
+    constitution_sha256: 'd'.repeat(64),
+    policy_sha256: 'e'.repeat(64),
+  };
+  let currentBindings = bindings;
+  const argvSha = canonicalSha256(process.argv);
+  const invocation = createReconciliationHostInvocation({
+    invocation_id: 'invocation-1',
+    action_id: 'init bind',
+    receipt_store: issuer,
+    repository_root: repo.root,
+    repository_id: 'example-repository',
+    original_argv_sha256: argvSha,
+    initiator: 'architect',
+    operation: 'provision',
+    phases: [],
+    write,
+    require_tty: write,
+    readCurrentBindings: () => currentBindings,
+    verifyActual: () => {
+      if (canonicalSha256(process.argv) !== argvSha) throw new Error('argv drift');
+    },
+  });
+  const targets: Data[] = [];
+  const scope = {
+    action_id: 'init bind',
+    invocation_id: 'invocation-1',
+    effect: 'local-write' as const,
+    receipt_store: issuer,
+    reconciliation_invocation: invocation,
+    apply_effect: (request: AuthorityHostEffectRequest, apply: () => unknown) => {
+      const view = reconciliationHostOperation(request, invocation);
+      expect(view).toBeDefined();
+      if (!view) throw new Error('missing actual native operation');
+      const target = view.target as unknown as Data;
+      targets.push(target);
+      const grant = issue(api, issuer, target);
+      let result: unknown;
+      const adapter = {
+        admit: (candidate: Data) =>
+          reconciliationHostOperation(request, invocation) === view &&
+          canonicalSha256(candidate) === canonicalSha256(target),
+        snapshot: () => reconciliationHostOperationSnapshot(view, invocation, view.target),
+        apply: () => {
+          result = apply();
+          return result;
+        },
+      };
+      const runtime = createAuthorityBoundaryRuntime(
+        boundaryDependencies(issuer, [], { reconciliation_host: adapter }),
+      );
+      const handle = expectSuccess(
+        runtime.plannerRegistry.registerPlan({
+          subject: grant.subject,
+          invocation_id: 'invocation-1',
+        }),
+      );
+      const prepared = expectSuccess(
+        runtime.prepare({
+          subject: grant.subject,
+          plan_handle: handle,
+          target,
+          decision_receipt: grant.receipt,
+          adapter_id: 'reconciliation-host-authority-boundary',
+        }),
+      );
+      expectSuccess(runtime.apply({ prepared }));
+      return result;
+    },
+  };
+  return {
+    module,
+    repo,
+    scope,
+    targets,
+    bindings,
+    currentBindings: () => currentBindings,
+    run: <T>(callback: () => T) => runWithAuthorityHostEffects(scope, callback),
+    setBindings: (value: typeof bindings) => {
+      currentBindings = value;
+    },
+    dispose: () => {
+      disposeReconciliationHostInvocation(invocation);
+      issuer.dispose();
+    },
+  };
+}
+
+const OWNER_ID = hash('native-owner-approval');
+const PLAN = hash('native-owner-plan');
+const FOLDER = resolve(
+  ROOT,
+  'docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-inspector',
+);
+const ownerApi = async () =>
+  (await import('../../src/boundaries/reconciliation-host-owner.js')) as unknown as {
+    readReconciliationHostApproval(root: unknown, id: unknown): Data;
+  };
+function invalid(callback: () => unknown, code = 'RECONCILIATION_OWNER_HOST_INVALID') {
+  let error: unknown;
+  try {
+    callback();
+  } catch (value) {
+    error = value;
+  }
+  expect(error instanceof Error).toBe(true);
+  const e = error as Error & { code?: string };
+  expect(e.name === 'ReconciliationOwnerHostError').toBe(true);
+  expect(e.code === code).toBe(true);
+  expect(e.message === code).toBe(true);
+  expect(Object.hasOwn(e, 'cause')).toBe(false);
+}
+function observe<T>(callback: () => T): T {
+  readHooks.namespaceCalls = 0;
+  readHooks.selectedCalls = 0;
+  readHooks.buffers = [];
+  readHooks.mutations = [];
+  readHooks.seedOpens = 0;
+  readHooks.seedCloses = 0;
+  readHooks.seedFds.clear();
+  readHooks.databases = 0;
+  readHooks.active = true;
+  readHooks.observe = true;
+  try {
+    return callback();
+  } finally {
+    readHooks.active = false;
+    readHooks.observe = false;
+  }
+}
+function readonly() {
+  expect(readHooks.mutations).toEqual([]);
+  expect(readHooks.databases).toBe(0);
+  expect(readHooks.seedFds.size).toBe(0);
+}
+function zeroed() {
+  expect(readHooks.buffers.length > 0).toBe(true);
+  expect(readHooks.buffers.every((bytes) => bytes.every((byte) => byte === 0))).toBe(true);
+}
+function freezeData(value: unknown): boolean {
+  return (
+    value === null ||
+    typeof value !== 'object' ||
+    (Object.isFrozen(value) && Object.values(value).every(freezeData))
+  );
+}
+function safe(value: unknown, f: Awaited<ReturnType<typeof fixture>>) {
+  const walk = (item: unknown): boolean => {
+    if (item === null || ['string', 'number', 'boolean'].includes(typeof item)) return true;
+    if (typeof item !== 'object' || ArrayBuffer.isView(item) || item instanceof ArrayBuffer)
+      return false;
+    return Object.values(item).every(walk);
+  };
+  expect(walk(value)).toBe(true);
+  const text = JSON.stringify(value);
+  for (const token of [
+    f.key,
+    String(f.issuer.key_sha256),
+    String(f.issuer.mac),
+    f.repo.root,
+    f.repo.gitDir,
+    f.repo.namespace,
+  ])
+    expect(text.includes(token)).toBe(false);
+}
+async function fixture(linked = false) {
+  const f = await harness({ linked });
+  let binding: ReturnType<typeof readReconciliationHostBinding> | undefined;
+  f.run(() => {
+    const review = f.module.createReconciliationHostProvisionReview(f.repo.root),
+      first = review.start();
+    if (first.kind !== 'reconciliation-provision-review')
+      throw new Error('fixture requires seedREADY');
+    const second = review.confirm(first.confirmation);
+    if (second.kind !== 'reconciliation-provision-review')
+      throw new Error('fixture requires issuerREADY');
+    const result = review.confirm(second.confirmation);
+    expect(result).toMatchObject({ outcome: 'created' });
+    binding = readReconciliationHostBinding();
+  });
+  if (!binding) throw new Error('fixture binding missing');
+  const issuerBytes = readFileSync(resolve(f.repo.namespace, 'issuer.json')),
+    issuer = JSON.parse(issuerBytes.toString()) as Data,
+    key = String(issuer.private_key_base64),
+    keyBytes = Buffer.from(key, 'base64');
+  const signed = (record: Data): Data => {
+    const unsigned = { ...record };
+    delete unsigned.mac;
+    return {
+      ...unsigned,
+      mac: createHmac('sha256', keyBytes)
+        .update(String(unsigned.domain))
+        .update(Buffer.from([0]))
+        .update(jcs(unsigned))
+        .digest('hex'),
+    };
+  };
+  const encoded = (record: Data) => Buffer.from(jcs(record) + '\n');
+  const initial = binding;
+  const records = (id = OWNER_ID, graphInvalid = false) => {
+    const clock = (ms: number) => ({
+      ...initial.clock,
+      wall_ms: initial.clock.wall_ms + ms,
+      monotonic_ns: (BigInt(initial.clock.monotonic_ns) + BigInt(ms) * 1000000n).toString(),
+    });
+    const scope = {
+      repository_id: issuer.repository_id,
+      worktree_id: issuer.worktree_id,
+      host_identity_sha256: issuer.host_identity_sha256,
+      binding_sha256: initial.binding_sha256,
+      plan_sha256: PLAN,
+      source_manifest_sha256: hash('native-owner-source'),
+      allowed_phases: ['01', '02', '03', '04'],
+    };
+    const base = (kind: string, ms: number): Data => ({
+      schemaVersion: '1.0.0',
+      kind,
+      domain: 'devai.reconciliation.owner.v1/' + kind,
+      repository_id: issuer.repository_id,
+      worktree_id: issuer.worktree_id,
+      clock: clock(ms),
+      approval_id: id,
+      issuer_sha256: hash(issuerBytes),
+      scope_sha256: hash(jcs(scope)),
+    });
+    const deadlines = (ms: number) => ({
+      validity_ms: 900000,
+      expires_wall_ms: initial.clock.wall_ms + ms + 900000,
+      expires_monotonic_ns: (
+        BigInt(initial.clock.monotonic_ns) +
+        BigInt(ms + 900000) * 1000000n
+      ).toString(),
+    });
+    const approval = signed({
+        ...base('approval', 0),
+        sequence: 1,
+        previous_grant_sha256: null,
+        scope,
+        ...deadlines(0),
+      }),
+      approvalSha = hash(encoded(approval));
+    const linked = (kind: string, ms: number) => ({
+      ...base(kind, ms),
+      approval_sha256: approvalSha,
+    });
+    const intent = signed({
+      ...linked('phase-intent', 1),
+      grant_sha256: approvalSha,
+      before_witness_sha256: hash('before'),
+      output_plan_sha256: hash('outputs'),
+      lease_nonce: hash('nonce'),
+      invocation_id: hash('invocation'),
+      phase: '01',
+      action_id: 'evidence reconcile materialize',
+      initiator: 'inspector',
+      predecessor_completion_sha256: null,
+    });
+    const intentSha = hash(encoded(intent));
+    const renewal = signed({
+        ...linked('renewal', 3),
+        sequence: 2,
+        previous_grant_sha256: approvalSha,
+        remaining_phases: ['01', '02', '03', '04'],
+        resumable_intent_sha256: graphInvalid ? null : intentSha,
+        ...deadlines(3),
+      }),
+      renewalSha = hash(encoded(renewal));
+    const completion = signed({
+      ...linked('phase-completion', 4),
+      intent_sha256: intentSha,
+      observed_grant_sha256: renewalSha,
+      final_witness_sha256: hash('final'),
+      outputs_manifest_sha256: hash('outputs'),
+      phase: '01',
+      predecessor_completion_sha256: null,
+      durability: 'durable',
+    });
+    const revocation = signed({
+      ...linked('revocation', 5),
+      sequence: 3,
+      previous_grant_sha256: renewalSha,
+    });
+    const lease = signed({
+      ...linked('lease', 2),
+      grant_sha256: approvalSha,
+      original_intent_sha256: intentSha,
+      invocation_id: intent.invocation_id,
+      nonce: intent.lease_nonce,
+      host_identity_sha256: scope.host_identity_sha256,
+      phase: '01',
+      action_id: 'evidence reconcile materialize',
+      initiator: 'inspector',
+      pid: process.pid,
+      hostname: 'PRIVATE_NATIVE_OWNER_FIXTURE',
+    });
+    return new Map([
+      ['approval.json', approval],
+      ['grant-000002.json', renewal],
+      ['grant-000003.json', revocation],
+      ['intent-01.json', intent],
+      ['phase-01.json', completion],
+      ['lease.json', lease],
+    ]);
+  };
+  const install = (id = OWNER_ID, graphInvalid = false) => {
+    const parent = resolve(f.repo.namespace, 'approvals');
+    if (!existsSync(parent)) mkdirSync(parent, { mode: 0o700 });
+    const path = resolve(parent, id);
+    mkdirSync(path, { mode: 0o700 });
+    const map = records(id, graphInvalid);
+    for (const [name, record] of map) {
+      expect(getValidator('reconciliation-owner.schema.json')(record)).toBe(true);
+      writeFileSync(resolve(path, name), encoded(record), { mode: 0o600 });
+    }
+    return { path, map };
+  };
+  const selected = install();
+  return {
+    ...f,
+    issuer,
+    issuerBytes,
+    key,
+    keyBytes,
+    initial,
+    selected,
+    records,
+    install,
+    encoded,
+    signed,
+    dispose: () => {
+      keyBytes.fill(0);
+      issuerBytes.fill(0);
+      f.dispose();
+    },
+  };
+}
+function readScope(
+  f: Awaited<ReturnType<typeof fixture>>,
+  options: {
+    action?: string;
+    selector?: string;
+    write?: boolean;
+    noInvocation?: boolean;
+    forged?: boolean;
+  } = {},
+) {
+  const action = options.action ?? 'evidence reconcile approve',
+    selector = options.selector ?? OWNER_ID,
+    write = options.write ?? false;
+  const phaseAction = action !== 'evidence reconcile approve' && action !== 'init bind';
+  const initiator =
+    action === 'sense bootstrap-inventory' || action === 'init bind'
+      ? 'architect'
+      : action === 'evidence reconcile approve'
+        ? 'owner'
+        : 'inspector';
+  process.argv = [
+    process.execPath,
+    'devai',
+    ...action.split(' '),
+    '--approval',
+    selector,
+    '--plan-sha256',
+    PLAN,
+    '--as-role',
+    initiator,
+    ...(write ? ['--write'] : []),
+  ];
+  const argv = canonicalSha256(process.argv);
+  const invocation = createReconciliationHostInvocation({
+    action_id: action,
+    invocation_id: 'invocation-1',
+    receipt_store: f.scope.receipt_store,
+    repository_root: f.repo.root,
+    repository_id: 'example-repository',
+    original_argv_sha256: argv,
+    initiator,
+    operation: action === 'init bind' ? 'provision' : phaseAction ? 'consume-phase' : 'renew',
+    phases:
+      action === 'evidence reconcile materialize'
+        ? ['01', '02']
+        : action === 'evidence reconcile stage-proof'
+          ? ['03']
+          : action === 'sense bootstrap-inventory'
+            ? ['04']
+            : [],
+    write,
+    require_tty: write && !phaseAction,
+    ...(action === 'init bind' ? {} : { approval_id: selector, plan_sha256: PLAN }),
+    verifyActual: () => {
+      if (canonicalSha256(process.argv) !== argv) throw new Error('fixture argv drift');
+    },
+    readCurrentBindings: f.currentBindings,
+  });
+  let effects = 0;
+  const scope = {
+    action_id: action,
+    invocation_id: 'invocation-1',
+    effect: 'local-write' as const,
+    receipt_store: f.scope.receipt_store,
+    ...(options.noInvocation
+      ? {}
+      : { reconciliation_invocation: options.forged ? {} : invocation }),
+    apply_effect: () => {
+      effects++;
+      throw new Error('NO_FIXTURE_READ_EFFECT_AUTHORITY');
+    },
+  };
+  return {
+    scope,
+    invocation,
+    effects: () => effects,
+    run: <T>(callback: () => T) => runWithAuthorityHostEffects(scope, callback),
+    dispose: () => disposeReconciliationHostInvocation(invocation),
+  };
+}
+function expectSnapshot(
+  snapshot: Data,
+  f: Awaited<ReturnType<typeof fixture>>,
+  expectedNamespace: Data,
+  expectedApproval: Data,
+  matches = true,
+) {
+  safe(snapshot, f);
+  expect(Object.keys(snapshot).sort()).toEqual(
+    [
+      'kind',
+      'identity',
+      'current_binding_sha256',
+      'namespace_sha256',
+      'approval_namespace_sha256',
+      'binding_matches_approval',
+      'clock',
+      'state',
+      'grants_authority',
+    ].sort(),
+  );
+  expect(snapshot.kind).toBe('reconciliation-host-approval-snapshot');
+  expect(snapshot.identity).toEqual(f.initial.identity);
+  expect(snapshot.current_binding_sha256).toBe(hash(jcs(f.currentBindings())));
+  expect(snapshot.namespace_sha256).toBe(hash(jcs(expectedNamespace)));
+  expect(snapshot.approval_namespace_sha256).toBe(hash(jcs(expectedApproval)));
+  expect(snapshot.binding_matches_approval).toBe(matches);
+  expect(snapshot.grants_authority).toBe(false);
+  expect(freezeData(snapshot)).toBe(true);
+  const at = snapshot.clock as Data;
+  expect(at.clock_source).toBe(f.initial.clock.clock_source);
+  expect(at.boot_id).toBe(f.initial.clock.boot_id);
+  expect(Number(at.wall_ms) >= f.initial.clock.wall_ms).toBe(true);
+  expect(BigInt(String(at.monotonic_ns)) >= BigInt(f.initial.clock.monotonic_ns)).toBe(true);
+}
+
+it.each([false, true])(
+  'actual %s linked native approval snapshot is exact branded readonly data under all allowed actions',
+  async (linked) => {
+    const f = await fixture(linked),
+      api = await ownerApi();
+    const native = await import('../../src/boundaries/reconciliation-host-namespace.js');
+    const graph = await import('../../src/runtime/reconciliation-owner-state.js');
+    const initial = native.readNativeReconciliationNamespace(
+      {
+        repository_root: f.repo.root,
+        git_dir: f.repo.gitDir,
+        common_dir: realpathSync(
+          git(f.repo.root, ['rev-parse', '--path-format=absolute', '--git-common-dir']),
+        ),
+        private_root: f.repo.namespace,
+      },
+      f.initial.identity,
+    );
+    const expectedApproval = (initial.witness.approvals as { entries: Record<string, Data> })
+      .entries[OWNER_ID] as Data;
+    try {
+      for (const action of [
+        'evidence reconcile approve',
+        'evidence reconcile materialize',
+        'evidence reconcile stage-proof',
+        'sense bootstrap-inventory',
+      ]) {
+        const scope = readScope(f, { action });
+        try {
+          scope.run(() => {
+            const before = inventory(f.repo.base),
+              snapshot = observe(() => api.readReconciliationHostApproval(f.repo.root, OWNER_ID));
+            safe(snapshot, f);
+            readonly();
+            zeroed();
+            expect(scope.effects()).toBe(0);
+            expect(inventory(f.repo.base)).toEqual(before);
+            expectSnapshot(snapshot, f, initial.witness as Data, expectedApproval);
+            const assessed = graph.assessReconciliationOwnerPhase(
+              snapshot.state,
+              '01',
+              snapshot.clock,
+              'complete',
+            );
+            expect(assessed).toMatchObject({
+              phase: '01',
+              grant_status: 'revoked',
+              disposition: 'completed',
+              completion_sha256: hash(f.encoded(f.selected.map.get('phase-01.json') as Data)),
+              grants_authority: false,
+            });
+            observations.push({
+              kind: 'actual-readonly-snapshot',
+              linked,
+              action,
+              snapshot,
+              parent_fs_mutations: 0,
+              new_sqlite_connections: 0,
+              captured_buffers_zeroed: true,
+              synthetic_B5_TTY: true,
+            });
+          });
+        } finally {
+          scope.dispose();
+        }
+      }
+    } finally {
+      initial.issuer?.bytes.fill(0);
+      f.dispose();
+    }
+  },
+);
+it('historical approval binding mismatch remains readable false without migrating issuer or scope', async () => {
+  const f = await fixture(),
+    api = await ownerApi();
+  f.setBindings({ ...f.bindings, policy_sha256: '9'.repeat(64) });
+  const scope = readScope(f);
+  try {
+    scope.run(() => {
+      const before = inventory(f.repo.base),
+        snapshot = observe(() => api.readReconciliationHostApproval(f.repo.root, OWNER_ID));
+      safe(snapshot, f);
+      readonly();
+      zeroed();
+      expect(snapshot.binding_matches_approval).toBe(false);
+      expect(snapshot.current_binding_sha256).toBe(hash(jcs(f.currentBindings())));
+      expect((snapshot.state as Data).binding_sha256).toBe(f.initial.binding_sha256);
+      expect(scope.effects()).toBe(0);
+      expect(inventory(f.repo.base)).toEqual(before);
+    });
+  } finally {
+    scope.dispose();
+    f.dispose();
+  }
+});
+it('different actual same-repo approval may be read but cannot dispatch foreign approval through sealed phase eligibility', async () => {
+  const f = await fixture(),
+    api = await ownerApi(),
+    other = hash('second-owner-approval');
+  f.install(other);
+  const scope = readScope(f, { action: 'evidence reconcile materialize', write: true });
+  try {
+    scope.run(() => {
+      const before = inventory(f.repo.base),
+        snapshot = observe(() => api.readReconciliationHostApproval(f.repo.root, other));
+      safe(snapshot, f);
+      readonly();
+      zeroed();
+      expect((snapshot.state as Data).approval_id).toBe(other);
+      const identity = snapshot.identity as Data,
+        target = {
+          kind: 'reconciliation-host' as const,
+          id: `reconciliation-host:${String(identity.repository_id)}:${String(identity.worktree_id)}:consume-phase:${other}:01`,
+          repository_id: String(identity.repository_id),
+          worktree_id: String(identity.worktree_id),
+          plan_sha256: PLAN,
+          operation: 'consume-phase' as const,
+          binding_sha256: String(snapshot.current_binding_sha256),
+          approval_id: other,
+          phase: '01' as const,
+        };
+      expect(() =>
+        invokeReconciliationHostOperation(target, () => {
+          throw new Error('FOREIGN_CALLBACK_SHOULD_NOT_RUN');
+        }),
+      ).toThrow('AUTHORITY_RECONCILIATION_OPERATION_INVALID');
+      expect(scope.effects()).toBe(0);
+      expect(inventory(f.repo.base)).toEqual(before);
+    });
+  } finally {
+    scope.dispose();
+    f.dispose();
+  }
+});
+it('malformed selectors and missing/forged/wrongaction scope refuse without namespace census or effects', async () => {
+  const f = await fixture(),
+    api = await ownerApi();
+  let touches = 0;
+  const bad = {};
+  Object.defineProperty(bad, 'toString', {
+    get: () => {
+      touches++;
+      throw new Error('SELECTOR_SENTINEL');
+    },
+  });
+  try {
+    const scope = readScope(f);
+    try {
+      scope.run(() => {
+        for (const id of [
+          '',
+          'A'.repeat(64),
+          '0'.repeat(63),
+          '../escape',
+          '0'.repeat(64) + '\0',
+          null,
+          bad,
+        ]) {
+          observe(() => invalid(() => api.readReconciliationHostApproval(f.repo.root, id)));
+          expect(readHooks.namespaceCalls).toBe(0);
+          readonly();
+        }
+        for (const root of ['', '.', f.repo.root + '/', null, bad]) {
+          observe(() => invalid(() => api.readReconciliationHostApproval(root, OWNER_ID)));
+          expect(readHooks.namespaceCalls).toBe(0);
+          readonly();
+        }
+        expect(touches).toBe(0);
+      });
+    } finally {
+      scope.dispose();
+    }
+    for (const options of [{ noInvocation: true }, { forged: true }, { action: 'init bind' }]) {
+      const invalidScope = readScope(f, options);
+      try {
+        invalidScope.run(() => {
+          observe(() => invalid(() => api.readReconciliationHostApproval(f.repo.root, OWNER_ID)));
+          expect(readHooks.namespaceCalls).toBe(0);
+          readonly();
+          expect(invalidScope.effects()).toBe(0);
+        });
+      } finally {
+        invalidScope.dispose();
+      }
+    }
+    observe(() => invalid(() => api.readReconciliationHostApproval(f.repo.root, OWNER_ID)));
+    expect(readHooks.namespaceCalls).toBe(0);
+    readonly();
+  } finally {
+    f.dispose();
+  }
+});
+it('valid canonical foreign root refuses STALE before protected namespace census', async () => {
+  const f = await fixture(),
+    other = repository(),
+    api = await ownerApi(),
+    scope = readScope(f);
+  try {
+    scope.run(() => {
+      const before = [inventory(f.repo.base), inventory(other.base)];
+      observe(() =>
+        invalid(
+          () => api.readReconciliationHostApproval(other.root, OWNER_ID),
+          'RECONCILIATION_OWNER_HOST_STALE',
+        ),
+      );
+      expect(readHooks.namespaceCalls).toBe(0);
+      readonly();
+      expect([inventory(f.repo.base), inventory(other.base)]).toEqual(before);
+    });
+  } finally {
+    scope.dispose();
+    f.dispose();
+  }
+});
+it('stable valid-MAC but contradictory approval graph is INVALID and captured buffers are zeroed', async () => {
+  const f = await fixture(),
+    api = await ownerApi(),
+    bad = hash('bad-owner-graph');
+  f.install(bad, true);
+  const scope = readScope(f);
+  try {
+    scope.run(() => {
+      const before = inventory(f.repo.base);
+      observe(() => invalid(() => api.readReconciliationHostApproval(f.repo.root, bad)));
+      readonly();
+      zeroed();
+      expect(inventory(f.repo.base)).toEqual(before);
+      expect(scope.effects()).toBe(0);
+    });
+  } finally {
+    scope.dispose();
+    f.dispose();
+  }
+});
+it.each(['HEAD', 'B5', 'file-bytes', 'inode', 'mode', 'remnant', 'symlink', 'name', 'scope'])(
+  'actual midselected %s drift is STALE and preserves changed state without reader mutation',
+  async (kind) => {
+    const f = await fixture(),
+      api = await ownerApi(),
+      scope = readScope(f);
+    let changed: unknown;
+    const lease = resolve(f.selected.path, 'lease.json');
+    try {
+      scope.run(() => {
+        readHooks.afterSelected = () => {
+          readHooks.afterSelected = undefined;
+          if (kind === 'HEAD')
+            git(f.repo.root, [
+              '-c',
+              'user.name=Fixture',
+              '-c',
+              'user.email=fixture@example.invalid',
+              '-c',
+              'commit.gpgsign=false',
+              '-c',
+              'core.hooksPath=/dev/null',
+              'commit',
+              '--allow-empty',
+              '-m',
+              'during native owner read',
+            ]);
+          else if (kind === 'B5') f.setBindings({ ...f.bindings, policy_sha256: '9'.repeat(64) });
+          else if (kind === 'file-bytes') {
+            const record = f.selected.map.get('lease.json') as Data;
+            writeFileSync(
+              lease,
+              f.encoded(
+                f.signed({
+                  ...record,
+                  nonce: hash('retry-drift'),
+                  invocation_id: hash('retry-drift-invocation'),
+                }),
+              ),
+            );
+          } else if (kind === 'inode') {
+            const temp = resolve(external, 'replacement-' + kind + '-' + Date.now());
+            writeFileSync(temp, readFileSync(lease), { mode: 0o600 });
+            renameSync(temp, lease);
+          } else if (kind === 'mode') chmodSync(lease, 0o640);
+          else if (kind === 'remnant')
+            writeFileSync(resolve(f.selected.path, '.unexpected-remnant'), 'retained', {
+              mode: 0o600,
+            });
+          else if (kind === 'name') renameSync(lease, resolve(f.selected.path, '.held-lease'));
+          else if (kind === 'scope') scopes.enterWith(Object.freeze({ ...scopes.getStore() }));
+          else {
+            const outside = resolve(external, 'foreign-lease-' + Date.now());
+            writeFileSync(outside, readFileSync(lease), { mode: 0o600 });
+            unlinkSync(lease);
+            symlinkSync(outside, lease);
+          }
+          changed = inventory(f.repo.base);
+        };
+        observe(() =>
+          invalid(
+            () => api.readReconciliationHostApproval(f.repo.root, OWNER_ID),
+            'RECONCILIATION_OWNER_HOST_STALE',
+          ),
+        );
+        readonly();
+        zeroed();
+        expect(scope.effects()).toBe(0);
+        expect(changed).toBeDefined();
+        expect(inventory(f.repo.base)).toEqual(changed);
+      });
+    } finally {
+      scope.dispose();
+      f.dispose();
+    }
+  },
+);
+it('selected native read error projects closed STALE and erases every buffer actually returned before failure', async () => {
+  const f = await fixture(),
+    api = await ownerApi(),
+    scope = readScope(f);
+  try {
+    scope.run(() => {
+      const before = inventory(f.repo.base);
+      readHooks.beforeSelected = () => {
+        throw new Error('PRIVATE_NATIVE_CAUSE_WITH_PATH_' + f.repo.namespace);
+      };
+      observe(() =>
+        invalid(
+          () => api.readReconciliationHostApproval(f.repo.root, OWNER_ID),
+          'RECONCILIATION_OWNER_HOST_STALE',
+        ),
+      );
+      readonly();
+      zeroed();
+      expect(inventory(f.repo.base)).toEqual(before);
+    });
+  } finally {
+    scope.dispose();
+    f.dispose();
+  }
+});
+it('readonly entry during actual native admission refuses before raw seed open/close and does not drop owning lock', async () => {
+  const f = await fixture(),
+    api = await ownerApi(),
+    scope = readScope(f),
+    anchor = readReconciliationAdmissionAnchor(f.repo.namespace);
+  try {
+    scope.run(() => {
+      const before = inventory(f.repo.base);
+      withReconciliationAdmissionSteps(f.repo.namespace, anchor, () => {
+        observe(() => invalid(() => api.readReconciliationHostApproval(f.repo.root, OWNER_ID)));
+        readonly();
+        expect(readHooks.seedOpens).toBe(0);
+        expect(readHooks.seedCloses).toBe(0);
+        expect(readHooks.namespaceCalls).toBe(0);
+        const module = pathToFileURL(
+          resolve(ROOT, 'packages/authority/dist/boundaries/host-reconciliation-admission.js'),
+        ).href;
+        const code = `import {readReconciliationAdmissionAnchor,withReconciliationAdmissionSteps} from ${JSON.stringify(module)};try{const a=readReconciliationAdmissionAnchor(process.argv[1]);withReconciliationAdmissionSteps(process.argv[1],a,()=>{});process.stdout.write('UNEXPECTED_ADMISSION');}catch(e){process.stdout.write(e.code==='RECONCILIATION_ADMISSION_BUSY'?'BUSY':'OTHER');}`;
+        expect(
+          execFileSync(process.execPath, ['--input-type=module', '-e', code, f.repo.namespace], {
+            env: cleanEnv,
+            encoding: 'utf8',
+            stdio: ['ignore', 'pipe', 'pipe'],
+          }),
+        ).toBe('BUSY');
+      });
+      expect(inventory(f.repo.base)).toEqual(before);
+    });
+  } finally {
+    scope.dispose();
+    f.dispose();
+  }
+});
+afterAll(() => {
+  const paths = [
+    'packages/authority/src/boundaries/reconciliation-host-owner.ts',
+    'packages/authority/tests/unit/reconciliation-host-owner.test.ts',
+  ];
+  writeFileSync(
+    resolve(FOLDER, `run-observations-${process.pid}-${Date.now()}.json`),
+    JSON.stringify(
+      {
+        scope:
+          'Actual disposable native source composition; synthetic B5/TTY, not installed/public/Owner publication authority',
+        environment: {
+          node: process.versions.node,
+          uv: process.versions.uv,
+          platform: process.platform,
+        },
+        external_fixture: external,
+        observations,
+        sha256: Object.fromEntries(
+          paths
+            .filter((path) => existsSync(resolve(ROOT, path)))
+            .map((path) => [path, hash(readFileSync(resolve(ROOT, path)))]),
+        ),
+      },
+      null,
+      2,
+    ) + '\n',
+  );
+});

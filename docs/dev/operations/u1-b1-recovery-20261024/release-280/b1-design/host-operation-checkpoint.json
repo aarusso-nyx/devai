@@ -1,0 +1,126 @@
+{
+  "standing": "CONCRETE_OPAQUE_INVOCATION_AND_BROKER_BRIDGE_FOR_IMPLEMENTATION_AND_INDEPENDENT_RED",
+  "authority": "Full internal v2.8.0 authorization and accepted ADR-EVI-0007; generictypedboundary checkpoint+policyamendment694PASS already verified.",
+  "source_paths": [
+    "packages/authority/src/boundaries/reconciliation-host-operation.ts (new)",
+    "packages/authority/src/boundaries/host-scope.ts",
+    "packages/authority/src/boundaries/host-atomic-effects.ts",
+    "packages/authority/src/index.ts",
+    "packages/cli/src/authority/reconciliation-host-input.ts (new)",
+    "packages/cli/src/authority/broker.ts"
+  ],
+  "test_paths": [
+    "packages/authority/tests/unit/reconciliation-host-operation.test.ts (new)",
+    "packages/cli/tests/unit/reconciliation-host-input.test.ts (new)"
+  ],
+  "scope": "Actual opaque invocation and single synchronous typed request admission, actual readonly worktree/clock capture, current binding custody and real broker dependency/decision path. No native domain writer, bootstrap/issuer/key/grant/index publication implementation or public action/registry/defaultpolicy activation is claimed here; those remain REQUIRED. Real installed/public positive qualification remains required when the public workflow/corepolicy is installed. No fake actualpackage/host or issuer resolution custody.",
+  "request_kinds": [
+    "reconciliation-host",
+    "proof-index"
+  ],
+  "request": "Fixed symbol reconciliationHostOperation, exactly one empty frozen opaque token argument. Module-private WeakMap token and publicview membership, exact live ALS scope and receiptstore/invocation match, exact owning broker invocation object identity. Printed/cloned/foreign tokens or views are never operations. No caller physical admin target or package/key label authorizes it.",
+  "api": {
+    "createReconciliationHostInvocation": "Trusted broker only controls: actual invocation_id/action_id/receipt_store, actual canonicalroot/verifiedrepositoryID, originalargvSHA and actualinitiator, parsedclosed operation/approval/plan/phase constraints, writeconsent/directTTY requirement, fixed verifyActual callback and readCurrentBindings callback. Returns opaque frozenempty WeakMap member, no filesystem effects. Trusted callbacks are not caller CLI/JSON providers.",
+    "disposeReconciliationHostInvocation": "Invalidate exact member; idempotent and clones/Proxy cannotdispose actualmember. Issuerclosed/brokerdisposed/currentALS mismatch alwaysrefuses.",
+    "readReconciliationHostBinding": "Current actual scopedinvocation readonly observation for trusted implementation: capture+revalidate actual worktree/clock and exact5currentdigests, return immutable safe identity/binding/clock with grants_authority=false; physicalpaths not in this preview value. No nativewrites.",
+    "invokeReconciliationHostOperation": "(target, trusted synchronous callback)=>callback result. Require actual installed scope invocation, explicitwrite and exact operation/action/role/approval/plan/phase matrix; capture actualhostcontext/current5bindings; targetrepository/worktree andhosttargetbinding match. Create ephemeral module-private requesttoken, call actualscope.apply_effect, finalcallback canexecute once afterbroker/ordinaryreceipt preparation, and deletesmembership BEFORE trustedcallback. Alwaysdispose context/invalidate token on success/error/return; deferred/crossscope/replayedcallback refuses. Native handlers later supply only fixed audited synchronous callbacks, no arbitrarycaller JS isolation claimed.",
+    "reconciliationHostOperation": "Broker lookup(request,expectedInvocation) only returns private frozenview for exacttoken/liveactualscope/owninginvocation. Data view itself has no callback/key/path capability.",
+    "reconciliationHostOperationSnapshot": "Fresh actualhostidentity/current5binding equality, actualcontrols and sameboot/monotonic reviewwindow (max300000ms), exacttargetdigest and invocation/action/argv/role metadata. Stable snapshot excludes samplingtime. No seed/issuer/key/rawSQLiteopen.",
+    "finalcallback": "Reverify fresh admission immediately at callback; fixed trusted callback receives actual resolvedhostpaths/identity/bindings, never callerpath. Promise/thenable behavior is unsupported fixedsync contract; actual promise return must not claim successfulcompletion."
+  },
+  "binding_tuple": [
+    "package_sha256",
+    "module_sha256",
+    "registry_sha256",
+    "constitution_sha256",
+    "policy_sha256"
+  ],
+  "binding_algorithm": {
+    "package_sha256": "SHA256(JCS(existing reviewInstalledBundle actual complete installed package+dependency inventory)); includes actualinstallation physical resolution as captured by that existing trusted helper. This is a named installedinventory digest, not an npm tarball digest. No inventory/privatepath serialization to CLI.",
+    "module_sha256": "SHA256 actual broker import.meta.url file bytes, fixed installed module path through existing package bundle resolver.",
+    "registry_sha256": "SHA256(JCS(actual broker entry projections name/effects/authority_contract)); the actualpublicCLI gets entries from its canonical installedregistry, not caller labels.",
+    "constitution_sha256": "Actual bundledcanonicalConstitution SHA; require actual canonical pinnedfile bytes match before operation.",
+    "policy_sha256": "SHA256 exact actual bound .devai/config/authority-policy.json bytes, validate actual policy through fresh policyFor with bootstrap_policy=false. Never authorize newlogicalkind with virtual/bootstrap policy.",
+    "binding_sha256": "SHA256(JCS(exactfivefields)); hosttargetmustmatch; proofindextarget additionallybinds capturedfulltuple viaopaqueoperation snapshot."
+  },
+  "argv_matrix": {
+    "common": "Actual full originalargv commandprefix exactlymatchesaction. Closed separate-token flags only, no aliases/equals/duplicates/unknowns/session/machineactor flags. Exact formatjson and actualas-role; rootvalue must resolve canonically to actualbrokerroot; planrelativepath no absolute/dot/dotdot/backslash/control; allSHA/ID64lowerhex. No write flag isreadonly preview only.",
+    "init bind": "--reconciliation-host --target ROOT --as-role architect [--write] --format json; no mixedbindselector. Hostoperationprovision only; both public bootstrap confirmations remain laterrequired. DirectCLIrole and all3actualTTY forwrite.",
+    "evidence reconcile approve": "--repo-root ROOT --plan REL --plan-sha256 SHA --as-role owner [--write] --format json; initialapprove noapprovalflag. Mutuallyexclusive renew/revoke/recover-owned-lease modes add --approval ID and respective expected-grant-sha256 SHA or expected-lease-sha256 SHA|ABSENT. DirectCLIrole and all3actualTTY forwrite. Exactpublic confirmation remains laterrequired.",
+    "evidence reconcile materialize": "Common repo/plan/sha/approval/as-roleinspector/write/format; hostconsume-phase01|02 only.",
+    "evidence reconcile stage-proof": "Same Inspectorcommon; hostconsume-phase03 or proof-indexchain-cas only.",
+    "sense bootstrap-inventory": "Same common as-rolearchitect; hostconsume-phase04 only.",
+    "read plan": "Not a mutating invocation; no hostwrite bridge installed by that action."
+  },
+  "broker": "Install sealedinvocation in actualHostScope only when closedargvselector parsed. Keep exact owninginvocationprivateclosure, actualcontrols fingerprint andcurrentboundpolicy/package helper. TypedapplyEffect requires realtoken, matching action/effect/role/write, supportedexactplanner/kind/adapter/capability and matching actualroot/argv/currentbinding; typedlogicaltarget only. Fresh materializedpolicy load before authorizeTarget, actual resolver/declaration/issuer/prepare/apply unchanged. During that call set exact activeprivateview; matching runtime dependency admits/snapshots only thatview, applycallstheoriginal sealedcallbackthrough existingeffectApply/effectResult seam. Nestedtypedoperations refuse; finallyclearactiveview. Defaultordinarypolicy andregistry notmodified. Record-init/customscopes mustnotreinterpret typed requests asfiles/processes.",
+  "capabilities": [
+    "reconciliation-host:write",
+    "proof-index:write"
+  ],
+  "preserved": "Existing schemas/currentdefaultpolicy/registry/actions/materializedbindings unchanged; native/clock/Owner/logicalcontext/694test receipts and historicaldata tests immutable. Existingprotectedrelease/P1/ordinaryhostbehavior remains regressionchecked.",
+  "diagnostics": [
+    "AUTHORITY_RECONCILIATION_INVOCATION_INVALID",
+    "AUTHORITY_RECONCILIATION_OPERATION_INVALID",
+    "AUTHORITY_RECONCILIATION_OPERATION_STALE"
+  ],
+  "independent_cases": [
+    "Authentic absentmodulesRED and currentbrokerforgedtypedrequestrefusal evidence",
+    "Actual direct and registeredlinkedreadonlyhostcontext under actualissuer-backed ALS, owned deterministic5digestprovider explicitlynotinstalledpackageattestation; target/originalargv/role/plan/approval/phase binding and clock/root drift",
+    "Unknown/cloned/Proxy/revoked invocation/token/view, crossbroker/scope/receiptstore, readonlyconsent, nested/deferred/replayedcallbacks refuse; no handler effects",
+    "Exactbroker argv parser complete matrix role/aliases/duplicates/unknowns/paths/modes refusal, noTTY/publicinstalledpositiveclaim from injecteddata",
+    "Currentbindingschanged whilepending, callback throws/deferred and actualpromise return no successfulclaim; no rawsecret/erroroutputs in newclosederrors",
+    "Realbroker branch defaultregistry/capability/policy refusal beforeeffects; no virtualpolicy fallback; freshinstalledfingerprint positive remains mandatory publicworkflowqualification later",
+    "UnchangedpublicP1/protectedrelease/hostscope/customscope/typedboundary suites; original2typeddata tests retained byteforbyte"
+  ],
+  "exact_control_fields": {
+    "required": [
+      "invocation_id",
+      "action_id",
+      "receipt_store",
+      "repository_root",
+      "repository_id",
+      "original_argv_sha256",
+      "initiator",
+      "operation",
+      "phases",
+      "write",
+      "require_tty",
+      "readCurrentBindings",
+      "verifyActual"
+    ],
+    "optional": [
+      "approval_id",
+      "plan_sha256"
+    ],
+    "operation": "One of existing6host operations. A proof-index request uses consume-phase plus phase03 and exact stage-proof action; eachprivate target stillvalidates its distinctkind/operation.",
+    "phases": "readonlyarray of exact01..04; empty fornonphase actions",
+    "functions": "readCurrentBindings():ReconciliationInstallationBindings, verifyActual():void; trustedbrokerclosures, never callerJSON."
+  },
+  "exact_signatures": {
+    "createReconciliationHostInvocation": "(controls:ReconciliationInvocationControls)=>object",
+    "disposeReconciliationHostInvocation": "(invocation:object)=>void",
+    "readReconciliationHostBinding": "()=>Readonly<{identity:ReconciliationHostIdentity,bindings:ReconciliationInstallationBindings,binding_sha256:string,clock:ReconciliationClockObservation,grants_authority:false}>",
+    "invokeReconciliationHostOperation": "<T>(target:ReconciliationHostResourceTarget|ProofIndexResourceTarget, callback:(host:Readonly<{paths:{repository_root,git_dir,common_dir,private_root},identity:ReconciliationHostIdentity,bindings:ReconciliationInstallationBindings}>)=>T)=>T",
+    "reconciliationHostOperation": "(request:AuthorityHostEffectRequest,expectedInvocation:object)=>ReconciliationHostOperation|undefined",
+    "reconciliationHostOperationSnapshot": "(operation:ReconciliationHostOperation,expectedInvocation:object,target:ReconciliationHostResourceTarget|ProofIndexResourceTarget)=>Readonly<Record<string,unknown>>",
+    "parseReconciliationHostInput": "(actionId:string,argv:readonlystring[],root:string,role:HumanRole)=>ParsedReconciliationHostInput|undefined; undefined forunrelatedaction orordinaryinitbind without--reconciliation-host; relevantmalformedselector throws INVOCATION_INVALID",
+    "operation_view_fields": [
+      "target",
+      "action_id",
+      "invocation_id",
+      "original_argv_sha256",
+      "initiator"
+    ],
+    "parsed_fields": [
+      "action_id",
+      "initiator",
+      "operation",
+      "phases",
+      "write",
+      "require_tty",
+      "original_argv_sha256",
+      "approval_id whenapplicable",
+      "plan_sha256 whenapplicable"
+    ]
+  }
+}

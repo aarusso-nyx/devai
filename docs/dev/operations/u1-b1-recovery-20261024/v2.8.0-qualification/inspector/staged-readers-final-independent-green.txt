@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/v2.8.0-qualification/inspector/staged-readers-final-independent-green.txt","kind":"historical-transcript-custody-pointer","original_bytes":276,"original_bytes_changed":false,"original_sha256":"ae05700e8c7eb6e609035590a14c13d6970a68949e372e7574d1df6c751b7a70"}

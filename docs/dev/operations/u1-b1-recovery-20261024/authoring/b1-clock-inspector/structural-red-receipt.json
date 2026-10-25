@@ -1,0 +1,9 @@
+{
+  "standing": "AUTHENTIC_ABSENT_CLOCK_MODULE_STRUCTURAL_RED",
+  "passed": 1,
+  "failed": 1,
+  "test_sha256": "dbd6bda135e3c668d0290834ed9e2d0603e7b340e0d097851ad98ed9b04d1ac0",
+  "raw_sha256": "9972e66749fbf5c6419ae8728be60037956796c48a122c6efb8efac1a5e611cf",
+  "checkpoint_sha256": "d71357ad5868130c6597db6e0d8fcf7fc611279722785a601633014a722ee56c",
+  "meaning": "Actual source module absent before implementation; exact five frozen contract codes pass. No host clock or authority qualification."
+}

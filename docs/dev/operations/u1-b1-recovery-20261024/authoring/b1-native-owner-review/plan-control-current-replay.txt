@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-native-owner-review/plan-control-current-replay.txt","kind":"historical-transcript-custody-pointer","original_bytes":633,"original_bytes_changed":false,"original_sha256":"ca12107b6af84ab680373720bdd4ef03dbc04d04c4ee28de7d5fc12115f57987"}

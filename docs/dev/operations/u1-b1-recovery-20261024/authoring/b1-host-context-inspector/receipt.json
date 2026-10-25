@@ -1,0 +1,120 @@
+{
+  "standing": "READONLY_HOST_CONTEXT_COMPONENT_GREEN_NOT_FINAL_B1_OR_RELEASE_QUALIFICATION",
+  "environment": {
+    "platform": "darwin",
+    "node": "24.22.0",
+    "uv": "1.52.1",
+    "actual_linux_qualified": false
+  },
+  "results": {
+    "host_cases": 88,
+    "final_tests_passed": 412,
+    "final_tests_failed": 0,
+    "final_files": 8,
+    "duration_seconds": 27.43,
+    "full_workspace_typecheck": "PASS",
+    "targeted_eslint": "PASS",
+    "targeted_prettier": "PASS",
+    "default_timeouts_and_assertions_preserved": true
+  },
+  "selected_tests": [
+    "packages/authority/tests/unit/reconciliation-host-context.test.ts",
+    "packages/authority/tests/unit/release-repository-context.test.ts",
+    "packages/authority/tests/unit/release-repository-identity.test.ts",
+    "packages/authority/tests/unit/reconciliation-admission.test.ts",
+    "packages/authority/tests/unit/reconciliation-clock.test.ts",
+    "packages/authority/tests/unit/reconciliation-owner-record.test.ts",
+    "packages/cli/tests/unit/reconciliation-error-codes.test.ts",
+    "packages/cli/tests/unit/error-code-reference.test.ts"
+  ],
+  "latest_actual_child_manifest": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-host-context-inspector/devai-host-context-inspector-mleEXS.json",
+  "latest_child_count": 89,
+  "additive_native_manifest": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-admission-inspector/devai-native-admission-inspector-g5qkEq.json",
+  "source_and_input_sha256": {
+    "packages/authority/src/boundaries/reconciliation-host-context.ts": "7cfcf6a1f504698a11ec40d1cf08fde86038ec389e5df3964caa5c7b61d3a54d",
+    "packages/authority/dist/boundaries/reconciliation-host-context.js": "605ac8cb6e76343fd4bd17ef2f0de1e7a0659b2bdd4c25112624999d8638b1a7",
+    "packages/authority/tests/unit/reconciliation-host-context.test.ts": "f0ecd47fc8cc7b7f575ba8225febfca09e76bebcd2b8893be6b9ae7b0925a120",
+    "docs/reference/error-codes.md": "254bcc6bbc7ab21005a57894e43f8648fef0ab50b10e39f85674f7c6767716cf",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/host-context-checkpoint.json": "9fe2c38674fd4fcdf5e0f314d536eeb13c7299d1122f3352a70b825ded4b54f5",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/host-context-pointer-amendment.json": "e935aebb794981973c46c8c7c49b6e179e87b456f3a195255bafdd500a04d961",
+    "packages/authority/tests/unit/release-repository-context.test.ts": "103117d77da9d877dd14c58c0e06bbf9058b947bff1351fc5b81cf9066016d18",
+    "packages/authority/tests/unit/release-repository-identity.test.ts": "a42dc25e7732331aff32d4bd297a316adb8f5c4dbf4d2292c6ab25c3cc0259c2",
+    "packages/authority/tests/unit/reconciliation-admission.test.ts": "c8cc48aa2d28e9c8ef96df1fd5689c5e88f710e6042e8ce25e535dc25a87ad76",
+    "packages/authority/tests/unit/reconciliation-clock.test.ts": "4d11893a95b7fec182794892df3b3fd737ff23da3b7dcfef8dcbd369dcf4689b",
+    "packages/authority/tests/unit/reconciliation-owner-record.test.ts": "201be15666d9235268feafc446ecdf9c6facb39f2e91da99ca211f836c07e31b",
+    "packages/cli/tests/unit/reconciliation-error-codes.test.ts": "0da439cf541f019cb07ce795c133020bcfd88f5d38c86e97e4768a5ce1397ac3",
+    "packages/cli/tests/unit/error-code-reference.test.ts": "55135e318935a28fe1722fb099e14d90aded8e1e445ba5616844a726c22ceb0f",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-host-context-review/receipt.json": "c423e824531920c50cad91752db1388d21867a8299373e558300f9dde8f70ca8",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-host-context-review/dangling-namespace-source-probe.json": "3d5881f25377bb1c7ab11c4d3cc1d42343091d934cc51ce060931ae0b2a6fcc1",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-host-context-review/stale-restoration-source-probe.json": "526ccb5991e891b4f92019ab7b7b407371855c13f09b5f543c348f7879e42b37",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-host-context-review/final-source-counterexample-check.json": "adb749cbf1e2f3630af3931b5ed40b4fe5a31e84099fe1fbccc1080b0d9d2323",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-admission-inspector/devai-native-admission-inspector-g5qkEq.json": "418f7e330765aa03280e79b348d3a366acfbaf82ec2941ac3974f47cfc5baec0",
+    "packages/authority/dist/runtime/reconciliation-clock.js": "1c7b3faf1d52b9dc7b532bff0e8b865325bf722ba79b4b2b260c432c1f0ed406",
+    "packages/authority/dist/runtime/reconciliation-owner-record.js": "b6dd622520c48ae828d42fbe30c33c0665c10312b2136ed092897cd923ce7f01",
+    "packages/authority/dist/boundaries/host-reconciliation-admission.js": "8f02c57796e1ced476e55075fb553873f41ab9b99cda24342b2d8d47f1afef7a",
+    "packages/authority/dist/boundaries/reconciliation-admission-seed.js": "0e341775323a1d226b73e9e0cb0e268a3ee5297811e6c0fc0c03b12849a5f37e"
+  },
+  "historical_receipts_unchanged": {
+    "authoring/b1-admission-inspector/receipt.json": {
+      "sha256": "0952e1aa22d462e23f771fad5ff8cc1a6dfe52ce600f92215dcc30537fb0b9b5",
+      "unchanged": true
+    },
+    "authoring/b1-admission-inspector/error-census-green-receipt.json": {
+      "sha256": "a9e6283fff96f1681a3c8113d0a307d2f5ac4920876a2538843f5cc00385b6b2",
+      "unchanged": true
+    },
+    "authoring/b1-clock-inspector/receipt.json": {
+      "sha256": "a60f14928b1ebd097edba8be5fec58593973de87a4f1eef5240c4b89193b9ef8",
+      "unchanged": true
+    },
+    "authoring/b1-owner-record-inspector/receipt.json": {
+      "sha256": "f38b19733d0dea9374855c8d1f21c88146a50f9ff9bf370b12d819a19c915436",
+      "unchanged": true
+    }
+  },
+  "coverage": [
+    "Actual direct and registered linked committed Git repositories; absolute and relative reciprocal pointers; copied-pointer rejection",
+    "Independent thirteen-field identity JCS/SHA256 oracle; distinct worktrees; exact masked permission bits",
+    "Actual SHA-256 direct/linked repositories with 64-hex HEAD and merge parents; wrong-format rejection",
+    "Positive before/after inventory equality; absent namespace remains absent; existing private marker files not opened",
+    "Actual three fresh child-process monotonic brackets and recorded fixed bounded Git/clock producer options",
+    "Unknown/cloned/getter/Proxy/disposed membership and zero getter touches; immutable public identity copies",
+    "Actual HEAD, pointer, backlink, commondir, admin, namespace and executable-clone mode drift; observed STALE remains terminal after HEAD restoration",
+    "Actual dangling namespace links refused at capture and stale after capture",
+    "Explicit child-local negative producer/clock fault injection, separate from actual positive host observations"
+  ],
+  "historical_evidence_disclosure": {
+    "structural-red.txt": "Authentic absent-module RED: 1 passed, 1 failed.",
+    "independent-first.txt": "66/66 prior-source GREEN, before expanded regression coverage.",
+    "dangling-namespace-red.txt": "Filename misleading: actual fixed-source 70/70 GREEN. Not claimed authentic RED. Separate reviewer raw probe establishes pre-fix counterexample.",
+    "expanded-fault-format.txt": "88/88 final-source GREEN preceding unchanged final regression run.",
+    "reviewer_counterexamples": "Separate reviewer captured initial-source dangling symlinks and observed-HEAD restoration defects; exact raw evidence hashes included above."
+  },
+  "limits": [
+    "No actual Linux execution, OS clock/boot/suspend manipulation, or arbitrary transient-change detection.",
+    "Negative producer injections do not qualify real reboot/runtime replacement or unsupported platforms.",
+    "Read-only component identity is not Owner approval or authority; repository_id remains caller-labelled.",
+    "No trusted installed schema/key/namespace origin or final broker/CLI/admission/index/release integration claim.",
+    "No descriptor open/close composition guarantee with an active native SQLite connection; final host integration must enforce it."
+  ],
+  "graft": {
+    "calls_this_packet": 1,
+    "tokens_saved_estimate": 18688
+  },
+  "evidence_sha256": {
+    "README.md": "4dd9f96173e1b0b7d76a18a035f33e829f6db7fc00ecdc3aa1d007372cac0023",
+    "dangling-namespace-red.txt": "d2ae0a8a2e50c1eb3e8900a2d28f6aa5e256645a0e7717ba7bb595a25d53a63c",
+    "devai-host-context-inspector-BaOGaV.json": "7897eb5d9ee600fe423257b7b8e22425caa57cdeb31e45f4d7af9a8d7f1c7e17",
+    "devai-host-context-inspector-UYNosA.json": "4a7864302ae0a1a162a7bddea4f88403e7ccf7bfbf9d09bd8870ad89588f2ff9",
+    "devai-host-context-inspector-mleEXS.json": "d5112df457606e08154f5d550db97ad5a6ad818ea7ad09c87573513e2c9a0ba1",
+    "devai-host-context-inspector-n6rIpd.json": "99b4b4c99bba11cf2433ed593ecd4f036c9d0facc19831e5edaaf6128f1d228e",
+    "expanded-fault-format.txt": "16b9fd651ed50f4756649e4363ec02838cfe6e663f5dd91c228c75c997aaa398",
+    "format-final.txt": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20",
+    "independent-final.txt": "2d0efe925037f5c06963c5a42110b839fd6c1233374d29605715e6feb8b4d1dd",
+    "independent-first.txt": "aa705af38d59ab03f8c8fc52eac61c0ea412b36c9cdcf31f9ac5f2a6138fde38",
+    "lint-final.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "structural-red-receipt.json": "9ea20476acb56964c0e5f53576b4d993fb92f6989d9dbd34a43a7f2f9c87ec75",
+    "structural-red.txt": "a5e4da5ac96e27cbfe09dc8b5dc1609ce033153331c89e8e0823279d4b5b2108",
+    "typecheck-final.txt": "3801203c7d9e4544ad471c57f0ab2386897e4413121a6c6be2a61c5af2fd37fb"
+  }
+}

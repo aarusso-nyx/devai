@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/v2.8.0-qualification/inspector/ratification-second-fixture-local-error.txt","kind":"historical-transcript-custody-pointer","original_bytes":2425,"original_bytes_changed":false,"original_sha256":"09cf3e3c906cb7e815d9b2b92f306ae468f789b062ca85cebdff1644f2019da4"}

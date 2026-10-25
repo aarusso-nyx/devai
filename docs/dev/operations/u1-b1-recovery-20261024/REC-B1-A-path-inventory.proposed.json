@@ -1,0 +1,98 @@
+{
+  "status": "PROPOSED_NOT_APPROVED",
+  "baseline": "2df84159caabf869b866fb2a05e5b06be83295fb",
+  "original_contract_paths": 9,
+  "catalogue_companion_paths": 3,
+  "total": 12,
+  "paths": [
+    {
+      "role": "Architect",
+      "path": "law/constitution.md",
+      "new": false,
+      "baseline_git_blob": "199cf2787904f64599abd0828620d903a9cb2368",
+      "operation": "bounded amendment"
+    },
+    {
+      "role": "Architect",
+      "path": "law/adr/ADR-GOV-0027-source-bound-canonical-selection-and-proof-index.md",
+      "new": true,
+      "baseline_git_blob": null,
+      "operation": "new"
+    },
+    {
+      "role": "Architect",
+      "path": "law/adr/README.md",
+      "new": false,
+      "baseline_git_blob": "ad1a89c7773cf708aa731923cb77b02cb8729a35",
+      "operation": "bounded amendment"
+    },
+    {
+      "role": "Architect",
+      "path": "law/policy/adr-validation.json",
+      "new": false,
+      "baseline_git_blob": "2c36a8f85770c4057a7070ae5fcb921116707893",
+      "operation": "bounded amendment"
+    },
+    {
+      "role": "Architect",
+      "path": "law/schemas/proof-index-reconciliation-contract.schema.json",
+      "new": true,
+      "baseline_git_blob": null,
+      "operation": "new"
+    },
+    {
+      "role": "Inspector",
+      "path": "packages/cli/tests/unit/constitution-article-6-amendment.test.ts",
+      "new": false,
+      "baseline_git_blob": "413733c2d1b214f27a45a9daa7f61467c17e1698",
+      "operation": "bounded amendment"
+    },
+    {
+      "role": "Inspector",
+      "path": "packages/cli/tests/unit/canonical-selection-constitution-amendment.test.ts",
+      "new": true,
+      "baseline_git_blob": null,
+      "operation": "new"
+    },
+    {
+      "role": "Inspector",
+      "path": "packages/schemas/tests/contract/governance-v15-adr.test.ts",
+      "new": false,
+      "baseline_git_blob": "e8d70250d340d49135aa379754f991e67ffffbb8",
+      "operation": "bounded amendment"
+    },
+    {
+      "role": "Inspector",
+      "path": "packages/schemas/tests/contract/proof-index-reconciliation-contract.test.ts",
+      "new": true,
+      "baseline_git_blob": null,
+      "operation": "new"
+    },
+    {
+      "role": "Engineer",
+      "path": "packages/cli/src/commands/check/schemas.ts",
+      "new": false,
+      "baseline_git_blob": "7302d640cce9933fb6a84aff3970aac32d335af2",
+      "operation": "Add exactly the source-only contract name to SOURCE_ONLY_SCHEMAS; no action, authority, effect or adapter change.",
+      "gate": "separate B1-A-C catalogue-only companion approval"
+    },
+    {
+      "role": "Inspector",
+      "path": "packages/cli/tests/unit/check-schemas-adopter-boundaries.test.ts",
+      "new": false,
+      "baseline_git_blob": "e118de27237fa5b2b887f955d6f7e37e66f67c33",
+      "operation": "Update complete canonical census 133 to 134 and exact missing/unexpected cases, preserve failures.",
+      "gate": "separate B1-A-C catalogue-only companion approval"
+    },
+    {
+      "role": "Inspector",
+      "path": "packages/cli/tests/unit/cli-shard06-contracts-schema-residual.test.ts",
+      "new": false,
+      "baseline_git_blob": "51d14864db010a17fcea98e10ed698dfc9be117c",
+      "operation": "Add exact source-only fixture name; mock census 16 to 17; preserve all negatives.",
+      "gate": "separate B1-A-C catalogue-only companion approval"
+    }
+  ],
+  "runtime_implementation_authorized": false,
+  "machine_binding_authorized": false
+}

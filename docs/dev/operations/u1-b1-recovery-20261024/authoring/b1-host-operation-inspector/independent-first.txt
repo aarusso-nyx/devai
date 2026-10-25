@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-host-operation-inspector/independent-first.txt","kind":"historical-transcript-custody-pointer","original_bytes":4710,"original_bytes_changed":false,"original_sha256":"64d6548f2d967547f43dd9838cf6a6b708c77f8eee87638303e2c432f4851f31"}

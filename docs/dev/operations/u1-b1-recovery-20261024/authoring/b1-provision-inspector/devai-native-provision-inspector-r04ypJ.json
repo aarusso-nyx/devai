@@ -1,0 +1,21 @@
+{
+  "external_fixture": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-native-provision-inspector-r04ypJ",
+  "environment": {
+    "node": "24.22.0",
+    "uv": "1.52.1",
+    "platform": "darwin"
+  },
+  "source_sha256": {
+    "packages/authority/src/boundaries/reconciliation-host-provision.ts": "1416c8c51d6e64229e8adf496caf34628bc88861ef07779faec838afbd132651",
+    "packages/authority/src/boundaries/reconciliation-host-namespace.ts": "44e2abbeb68f0b771e8f82e34d745bfc0435bf532cd2ae710118978339588484",
+    "packages/authority/src/boundaries/host-publish.ts": "b2aa704c775009240b624b4581339cebaec8bcd6f7f95fbf7e71eabf296e054a",
+    "packages/authority/src/index.ts": "8336778c8f4302203d97bba29ed4121894b7adacfa4e80dcca06b7ee0bc600ff",
+    "packages/authority/dist/boundaries/reconciliation-host-provision.js": "0005e6829b43ca25e35ae2de5488a91279a139ced83a833d8c90c8077296a974",
+    "packages/authority/dist/boundaries/reconciliation-host-namespace.js": "3bf6c37dc107d60defb2c892bbdda3363e5e25bd601621b3901f22eecf5029d6",
+    "packages/authority/dist/boundaries/host-publish.js": "4a2d5b90657212c33c2d25fd098b5e4e75415c4d04e37c7f38ba46340ff32cbc",
+    "packages/authority/dist/index.js": "bd26da7710f3a14d70fc304b3bbdb375f8ced61763289a6d6e11b83883e1b54d"
+  },
+  "synthetic_B5_and_TTY_not_installed_origin": true,
+  "private_issuer_or_keys_logged": false,
+  "observations": []
+}

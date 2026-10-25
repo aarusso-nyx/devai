@@ -1,0 +1,155 @@
+{
+  "standing": "PURE_AUTHENTICATED_GRAPH_AND_ELIGIBILITY_QUALIFIED_NOT_NATIVE_OR_PUBLIC_AUTHORITY",
+  "results": {
+    "new_owner_state_cases": 159,
+    "unchanged_regression_cases": 255,
+    "combined_unique_passes": 414,
+    "focused_log": "first-behavior.txt",
+    "regressions_log": "unchanged-regressions.txt",
+    "typing_affected_cases_final_pass": 2,
+    "typing_log": "species-final.txt",
+    "full_workspace_typecheck": "typecheck-final.txt PASS",
+    "source_test_eslint": "lint-final.txt PASS",
+    "source_test_prettier": "format-final.txt PASS"
+  },
+  "sha256": {
+    "packages/authority/src/runtime/reconciliation-owner-state.ts": "b59cce447c545f2bcb8396d384dac39613ca87c1721d0f12e3e16345edb0d2b8",
+    "packages/authority/tests/unit/reconciliation-owner-state.test.ts": "7c6b161141797656b738eea0192666cf7f660eb68d3ecf508493095416c85196",
+    "packages/authority/src/runtime/reconciliation-owner-record.ts": "fd7d944ce09f640ff4040abeae090ad8b694b55e3e285feb46ea59650735cbda",
+    "packages/authority/src/runtime/reconciliation-clock.ts": "d9ab0faba163f45a7d7caf13e2cae5307ccb0ad2be7cb5b7565e1054f1844dd3",
+    "law/schemas/reconciliation-owner.schema.json": "39002520c0ffa410ef41a9caf34d16af123b9bc88f0ab1e426deaf70af284344",
+    "docs/reference/error-codes.md": "ed7c7205b733fb4e5e50fe1cded1c6dfa5cafe4a6aca2854454de04ecb55ac38",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/owner-state-checkpoint.json": "45fbde08e157a45d615cc26e885beac6197611fd64dc517dafd0348ee975703f",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/owner-state-order-amendment.json": "71f1dd131c023652cb4720310401216cee8f418d215502198b59a001621412ed",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/owner-state-interface.json": "44cc580bb6cc4586ca6ab4e4117d8a785ddc4ceb5fd8cef811acb76bb54aca7a",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/owner-state-interface.pre-phase-mapping.json": "bbd8012e8e01089592837218af1cb16a3509369881f5cd39c7f62ced35973494"
+  },
+  "test_revision_proof": {
+    "first_behavior_test_sha256": "88f9672f72e6f9f2a929a9d0497d2ad48da72fdc9c22c7240009639a62639e6d",
+    "final_test_sha256": "7c6b161141797656b738eea0192666cf7f660eb68d3ecf508493095416c85196",
+    "only_change": "Return never-returning trap() in two hostile species getters; Array static override modifier. All assertions/expectations unchanged.",
+    "inverse_matches_first_test": true,
+    "affected_cases_reexecuted": true
+  },
+  "independent_oracles": [
+    "Locally authored canonical JSON sort/encoding with mandatory LF; no production codec creates expected bytes",
+    "node:crypto HMAC-SHA256(domain UTF8 + NUL + independent JCS unsigned record) using fixed disposable test key",
+    "node:crypto raw whole-file SHA256 for issuer/approval/grants/intents/completions/lease and exact expected projection references",
+    "Hard-coded ten-row matrix expectations and graph relationship counterexamples from frozen packets, not implementation-derived state simulation"
+  ],
+  "qualified_cases": [
+    "all ten retained grant/output matrix rows",
+    "all four output classifications with and without existing completion; exact nullable raw digests and no duplicate consumption",
+    "arbitrary phase array order with exact contiguous four-phase chain",
+    "tied completion-before-renewal and renewal-before-completion and renewal-new-intent lease partial orders",
+    "null/wrong resumable, excluded missing completion, nonsuffix remaining phases and current-grant/cyclic contradictions",
+    "grant gap/fork/duplicate/order/previous digest/after-revocation and clock disagreement",
+    "issuer/self-MAC/record-MAC/scope/repository/worktree/host/original approval identity mismatches",
+    "phase uniqueness/gap/missing references/predecessors/grant permission and exact issue-time expiry",
+    "existing codec and new reducer both reject wrong per-phase action or initiator",
+    "original and samegrant distinct nonce/invocation retry leases; exact crossgrant renewal retry; new renewal intent with null resumable; priorlease completed remnant",
+    "lease host/phase/action/initiator/intent/grant/time/expiry/post-completion mismatch refusal",
+    "expired/revoked current grant may settle prior exact complete intent; no domain authority",
+    "issuer installation boot excluded; current observation checked against linked history including latest lease",
+    "short signed validity, exact wall/ns deadlines, one-ns-before and beyond2^53 arithmetic, exact2000ms disagreement",
+    "exact enumerable root fields, dense ordinary/null arrays, getters/symbols/Proxy/revoked/constructor/species/iterator refusal without touches",
+    "actual byte-view subclasses with shadowed intrinsics accepted, shared/detached/nonviews/Proxy refused",
+    "mutable caller byte/array alias isolation, deep frozen safe output, forged/cloned/proxy state refusal",
+    "per-file, aggregate and array-count overlimit refusals; independent source review confirms predecode charge order",
+    "canonical byte/UTF8/duplicate key/number alias/kind refusal and fixed private-safe errors"
+  ],
+  "scope_precision": [
+    "All fixture MAC authentication is relative to supplied issuer key; no admitted host/installed issuer origin is proven",
+    "Branded state is data custody only, never an effect capability; all outputs grants_authority:false",
+    "Clock observations/output classifications are supplied data, not trusted origin/output attestations",
+    "Fixed schema validator can lazily read package assets in development; no arbitrary caller filesystem/process/SQLite provider is added",
+    "Bounded adversarial cases and source review, not exhaustive Cartesian faults or compromised-runtime isolation",
+    "Resource-limit refusal tests are combined with source-review ordering evidence; they do not alone identify the internal rejecting branch",
+    "Latest public oracle snapshot is from filtered species-only run, not a replay or reconstruction of first focused output"
+  ],
+  "source_review": {
+    "path": "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-owner-state-review/source-review.json",
+    "sha256": "2a1ee60cbbc03e78e2e7b208650bc9f247f298c2ca49887cdb393ce205549a9d",
+    "source_matches": true,
+    "independent_additional_actual_probes_pass": 7,
+    "findings": []
+  },
+  "api_review_history": [
+    "Exact output projection/assessment/nullability and strict string classifications frozen in order/interface companions",
+    "Samegrant retained lease cannot identify first/retry; nativehost must prove custody; renewal resumable requirement applies crossgrant only",
+    "Completed intent may retain earlier valid lease remnant; lease-before-completion edge preserved, no removal authority",
+    "Existing schema already conditionally enforces phase mapping; erroneous earlier premise corrected without schema or codec edits; preserved bbd8012 interface snapshot"
+  ],
+  "history": [
+    {
+      "log": "structural-red.txt",
+      "pass": 0,
+      "fail": 1,
+      "standing": "Authentic absent source before implementation; semantic tests not yet qualified"
+    },
+    {
+      "log": "first-behavior.txt",
+      "pass": 159,
+      "fail": 0,
+      "standing": "Initial source behavior; first test typing version"
+    },
+    {
+      "log": "typecheck.txt",
+      "standing": "Test-only species return/override typing failure, corrected with no assertion changes"
+    },
+    {
+      "log": "species-typing-verification.txt",
+      "standing": "Intermediate two-case typing verification preserved"
+    },
+    {
+      "log": "species-final.txt",
+      "pass": 2,
+      "filtered": 157,
+      "standing": "Only two corrected hostile getter sites reexecuted; no broad repeat"
+    }
+  ],
+  "diagnostic_reference": {
+    "current_count": 1304,
+    "current_sha256": "ed7c7205b733fb4e5e50fe1cded1c6dfa5cafe4a6aca2854454de04ecb55ac38",
+    "new_code": "RECONCILIATION_OWNER_STATE_INVALID",
+    "new_rows": 1,
+    "remove_exact_new_row_restores_1303_sha256": "970def534b24124e54d79673692824af7690ed46d07459ee6745f32b07415667"
+  },
+  "historical_inputs": "historical-input-verification.json: seven sealed receipts and root export unchanged; selected historical test hashes recorded",
+  "remaining": [
+    "Fixed native Owner review/grant publication and actual fresh ordinary authority",
+    "Admitted real clock/scope/B5/issuer origin and namespace freshness",
+    "Actual lease owner/PID/liveness/dead-lease recovery and current extant lease gate",
+    "Admitted phase execution and exact output bytes/identities/fsync readback",
+    "Real plan/source eligibility, canonical custody/selection, index CAS and staged body workflow",
+    "Actual installed/public registry/default-policy/terminal integration and final release closure",
+    "DETRAN and downstream execution remain excluded"
+  ],
+  "inspector_writes_only": [
+    "packages/authority/tests/unit/reconciliation-owner-state.test.ts",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-owner-state-inspector/"
+  ],
+  "graft": {
+    "packet_calls": 3,
+    "packet_estimated_tokens_saved": 45997
+  },
+  "evidence_sha256": {
+    "README.md": "76cdb0caae395e98e8021ef757a3fc55813d50b347dccfca9d75492c40b3b1e3",
+    "diagnostic-reference-delta.json": "6d631819155487e018ac012227166c3fd92043031736bdae8c5bd89ed1e5bd9b",
+    "final-input-verification.json": "9d5ac23f79d0b7b0b9c9cb5bada5bbb33d8939b546a001d112c742671be83423",
+    "first-behavior.txt": "282f6e01f4da0a3d3dbc2e729fcb37ad5d1610eecb1a61026026751e99ee9bb9",
+    "first-inputs.json": "395997601efaba5ba281a7e28e8c34a39235683faa695d163963d932eff86341",
+    "format-final.txt": "9a047bca19390f90234e566131a549fefdde204b2f6b6173253d4d68013d7ea8",
+    "historical-input-verification.json": "fed4762754ff5228e2c37a1e8963e66aa6068d30ed38c20cf3b25e6629185e12",
+    "lint-draft.txt": "689d370e8c06bdc4d786c596f733e4fd11d13ae585434f61cc90eeeaf5155785",
+    "lint-final.txt": "689d370e8c06bdc4d786c596f733e4fd11d13ae585434f61cc90eeeaf5155785",
+    "public-oracle-observations.json": "5b1d1696126465a88fa8d0204693b215372662490221922d6fb7b61c702890f3",
+    "species-final.txt": "ad92f202ddfe3740d3e00880c4355556025c6d6757b3566b759c0e04f7831331",
+    "species-typing-verification.txt": "20ad97cfda4b90ce27c67abdab07b40b4d6c7c52faa31b4ae9fe8dbf7ea05e24",
+    "structural-red-receipt.json": "496f3487b4326ec7af1d04397254f9925068ff1b5a429da2b7ee0c2a2ced469b",
+    "structural-red.txt": "d6780d23010bbcba4cf024a7d59dbfe4235f14df0099780d4026a579f2b899f8",
+    "typecheck-final.txt": "3801203c7d9e4544ad471c57f0ab2386897e4413121a6c6be2a61c5af2fd37fb",
+    "typecheck.txt": "79d257d0933d05303beb1d8c0a4054cfa263cdbc266e3ed8e6554731c62149ea",
+    "unchanged-regressions.txt": "011f76040bb3c5231dceca4c3b856bd847d45c244793a71be7f95a024d4c2735"
+  }
+}

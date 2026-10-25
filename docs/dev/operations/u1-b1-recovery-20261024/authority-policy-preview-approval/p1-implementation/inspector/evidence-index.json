@@ -1,0 +1,103 @@
+{
+  "standing": "PARTIAL_IMPLEMENTATION_PUBLIC_ACCEPTANCE_RED_NO_LIVE_USE",
+  "recorded_at": "2026-10-24T12:14:31.423699-03:00",
+  "git_head": "2df84159caabf869b866fb2a05e5b06be83295fb",
+  "validation": {
+    "argv": "node scripts/process/validation-runner.mjs -- node_modules/.bin/vitest run --config tests/config/local.config.ts --maxWorkers 1 packages/cli/tests/unit/authority-policy-review.test.ts packages/cli/tests/unit/init-authority-policy-review.test.ts packages/cli/tests/unit/authority-policy-review-publication.test.ts packages/cli/tests/unit/authority-command-boundary-finalization.test.ts packages/cli/tests/unit/cli-shard09-init-bind-adapters-policy.test.ts packages/schemas/tests/contract/governance-v15-adr.test.ts",
+    "passed": 145,
+    "failed": 7,
+    "failures": {
+      "required_public_and_handler_READY_acceptance": 5,
+      "existing_constitution_tests_missing_installed_canonical_assets": 2
+    },
+    "lint_exit": 0,
+    "format_exit": 0,
+    "raw_log": "final-six-paths-extended.txt"
+  },
+  "fixture_preview": {
+    "label": "SYNTHETIC DISPOSABLE FIXTURE ONLY. Import-path and canonical-resolver mocks are test seams. No admitted distributable or live preview was produced.",
+    "plan_sha256": "8f98f972a6b07c3cd3844bda2c27f7e2e6a1eb4ac1b4c22496410118b10fe089",
+    "artifact_sha256": "a7e34dcecf57943cff34583fdd48345575c20d41a29fb24237f1b3d6d5d964d9",
+    "size_bytes": 69922,
+    "independent_digest_recomputation": true,
+    "constitution": {
+      "digest_sha256": "d5dfdc972161e0f848dd859be7bbfa510973c5c9a449a0f9e6b8960e4f5ac96a",
+      "version": "1.2.0"
+    },
+    "invocation_id": "cli-53288-032bf60d-4c21-4c3e-9a49-4e4e83098a16",
+    "materialized_at": "2026-10-24T15:12:51.672Z",
+    "publication_result": {
+      "status": "created",
+      "binding_performed": true,
+      "path": ".devai/config/authority-policy.json",
+      "digest_sha256": "a7e34dcecf57943cff34583fdd48345575c20d41a29fb24237f1b3d6d5d964d9",
+      "size_bytes": 69922,
+      "publication_identity": {
+        "dev": "16777233",
+        "ino": "1115509847",
+        "birthtimeNs": "1792854771888990183"
+      },
+      "published_at": "2026-10-24T15:12:51.899Z"
+    }
+  },
+  "current_source_sha256": {
+    "packages/cli/tests/unit/authority-policy-review.test.ts": "d18e4f6c22b098fc9aba685022e92276a66d2f5006df0c600412f983076c56ae",
+    "packages/cli/tests/unit/init-authority-policy-review.test.ts": "5dd184e04a93f3ead5b122636d2296daf66cabefc1c145c21ba28c2fd0c2f4f7",
+    "packages/cli/tests/unit/authority-policy-review-publication.test.ts": "39dcb82ef3b4b56982a15138e4b4c45f14ba6e30ab094d2387aede3dfb25b34e",
+    "packages/cli/tests/unit/authority-command-boundary-finalization.test.ts": "728990fcd1b31e03272d19fe01cd785b0030b6ba70cb1e311ff2942386f521d4",
+    "packages/cli/tests/unit/cli-shard09-init-bind-adapters-policy.test.ts": "c5f9aa4c11455cdf712273ad98d626ed5656d413587bdc3c2c7e0cdf1e75e9e6",
+    "packages/schemas/tests/contract/governance-v15-adr.test.ts": "7df5916d5fcee90419767ae44fd579e8e7a96bd1c1e1f66cc3246a5338146afb",
+    "packages/cli/src/command-router.ts": "af2cf5df04006d049c6e269cf30d44ceaef650fb8cb9c563dc03c6e00d90837a",
+    "packages/cli/src/commands/init/index.ts": "984da375d7f480413f043341e33f797ab517dc07eb22cfb2d2f3b5c1f3d86bc3",
+    "packages/cli/src/commands/init/shared.ts": "ddb802c8ad36b2f80ef225934af541934f86e852805aaa2a25e313ddc67393c3",
+    "packages/cli/src/commands/init/review-authority-policy.ts": "398ef75f3bdd5105e1f5d9ee6f6ae2faaffd718005a3a07d63999bb16ffa1efc",
+    "packages/cli/src/authority/command-capabilities.ts": "f29ca8306a798c2842d8e4a7138f37331e9b16d926e06925985b330f779232d2",
+    "packages/cli/src/authority/broker.ts": "50721c2d784e8849cbf50ad7a07daa7d2b3513a5618ecd81ac0ec8040b2f7735",
+    "packages/cli/src/authority/policy-review.ts": "5235d957e108596cc550b48297091c5d3be530515fc60ecbbe999ca0b7e80de4",
+    "packages/cli/src/authority/policy.ts": "3b32792eed1c482009a3cb217074fc642b95808e806b41859f485e2ddf533bee",
+    "packages/cli/src/authority/policy-support.ts": "156b296bf26a87816c9f8206843b9c0a79414fa698dc1829a6dccd6860ede739"
+  },
+  "evidence_sha256": {
+    "command-io-first.txt": "477d990cdb5379b3026fac820151d8e1fbb930104f2b19048a6363732f99e042",
+    "inspector-eslint-extended.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "inspector-eslint.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "lifecycle-publication-first.log": "ea5517b10ee503b4324768cb8c44398607ca7804e0e23765927db265fb3beb66",
+    "private-guarded-fixture-verification.log": "811f2e537cc81c0ceae1393b68edca62a088200286ac9453763b8abb9d99ea76",
+    "inspector-prettier.txt": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20",
+    "first-production-green-attempt.log": "ae6a40adeade6d46dd9bfd64fe73d7d3fedce0678feb39593c09d9c2b03e932a",
+    "public-route-red.log": "7ef36193802e9fa998f24612f67061ea1f839dbf8445789ecb90cfffe2a81d6e",
+    "public-boundary-held-red.log": "9c4cfbb1fbf248d0626b845e90cbd7db77fb659c3bb4a341f6ee8189d34e3fb7",
+    "synthetic-fixture-ready.initial.json": "566e718d5360491887f954350aa284dfd355751a58c8efa1ab45b26ab22b743c",
+    "final-six-paths-extended.txt": "aed5dabd2f0382684fdde7e8e06ed3b2f6311710c219a9ac3141448674fce65c",
+    "final-six-paths.txt": "c96c2e8a49b6b062dc2a416e267e0c49583d9227e8a01c79fac9e0bf81c67e9c",
+    "inspector-prettier-extended.txt": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20",
+    "synthetic-fixture-completion.json": "b8eebdc22dac6695862055a153766acdd85606cdc3fa83d646fe9e514d2b0a02",
+    "README.md": "768d917ab6d04dcbdbcd68c1884c63c9dbe6d747a09dcb06b736d2fdf48c84ab",
+    "inspector-eslint-extended.prelint.txt": "932beae910822a34a697b7e40ad958e320c59dc7bced10a1ac6a5cf7a35f281e",
+    "command-io-first.log": "477d990cdb5379b3026fac820151d8e1fbb930104f2b19048a6363732f99e042",
+    "inspector-eslint.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "lifecycle-publication-first.txt": "ea5517b10ee503b4324768cb8c44398607ca7804e0e23765927db265fb3beb66",
+    "inspector-prettier.log": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20",
+    "private-guarded-fixture-verification.txt": "811f2e537cc81c0ceae1393b68edca62a088200286ac9453763b8abb9d99ea76",
+    "public-route-red.txt": "7ef36193802e9fa998f24612f67061ea1f839dbf8445789ecb90cfffe2a81d6e",
+    "first-production-green-attempt.txt": "ae6a40adeade6d46dd9bfd64fe73d7d3fedce0678feb39593c09d9c2b03e932a",
+    "synthetic-fixture-completion.initial.json": "63115a5d6507872b4687a5b9426ea0ab6a93527a513053e7a43a4ac93cc77810",
+    "final-six-paths-extended.prelint.txt": "6d05134db8a3d82b69ef2f80854485cf67cd3334988b63792c2bf6f5ce0d91f6",
+    "extended-counterexamples-first.txt": "48fc0ed97227e10e34971315b5a8ecc6bb325b6148e2ea6ad88241ae40e31a23",
+    "public-boundary-held-red.txt": "9c4cfbb1fbf248d0626b845e90cbd7db77fb659c3bb4a341f6ee8189d34e3fb7",
+    "final-six-paths.log": "c96c2e8a49b6b062dc2a416e267e0c49583d9227e8a01c79fac9e0bf81c67e9c",
+    "synthetic-fixture-ready.json": "810a4b0778c866d32b67976dd95525d7f344706cae66925694bea830c09007a7"
+  },
+  "holds": [
+    "binding",
+    "integration",
+    "live review use",
+    "U1/B1 runtime",
+    "release",
+    "DETRAN effects"
+  ],
+  "missing_scope": [
+    "packages/cli/src/action-output.ts",
+    "packages/cli/tests/unit/action-output-authority-policy-review.test.ts"
+  ]
+}

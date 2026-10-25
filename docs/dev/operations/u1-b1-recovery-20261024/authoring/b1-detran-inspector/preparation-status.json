@@ -1,0 +1,55 @@
+{
+  "standing": "DISPOSABLE_SOURCE_FIXTURES_READY_PUBLIC_WORKFLOW_NOT_IMPLEMENTED_OR_QUALIFIED",
+  "historical": {
+    "selected_records": 335,
+    "source": "7dfab8bdf61ffe935bca45578e0e65c09883f633",
+    "two_conflicts": true,
+    "semantic_index_sha256": "73396fc09b63d8418e679b7be18f3941cd4367771c74ef31f24172acd34976ec",
+    "original_semantic_entries": 15804,
+    "authenticated_zip_members": 58
+  },
+  "refreshed": {
+    "selected_records": 449,
+    "source": "7abe89cd3e7049fdcf38b33411d38a3442a0e1e1",
+    "actual_conflicts": 45,
+    "old_resolution_reused": false
+  },
+  "derived_orphan_lines": [
+    7,
+    8
+  ],
+  "installed_baseline": {
+    "package_version": "2.8.0",
+    "qualification": "06 predates new B1 runtime",
+    "tarball_path": "/private/tmp/devai-release-280-01a16e18/qualification-06/aarusso-nyx-devai-2.8.0.tgz",
+    "tarball_sha256": "dc806a721e47fb69a141bae34dd1009ca08747c1a9472789374355605ef8b77b",
+    "tests_pass": 1,
+    "tests_fail": 1,
+    "public_failure": "ROUTE_UNKNOWN",
+    "negative_guards_qualified": false
+  },
+  "pending": [
+    "Actual current package and supported public upgrade/P1 policy binding recipe",
+    "Final canonical plan fields, artifact persistence and actual Owner confirmation transport",
+    "Public full plan/approve/materialize + separate U1line7/newestline8 + exact stage-proof CAS + seven bodies/exporters",
+    "Retry/concurrency/crash/tamper/extra-conflict/role/consent/partial-body negatives at actual installed handlers",
+    "Refreshed exact source-resolution packet; no historical resolution restamping",
+    "HC01 finite eight-line compatibility remains separate; preserve original manifest and expected historical refusal",
+    "Clean producer semantics regression and exact final candidate release gates"
+  ],
+  "limits": [
+    "No DETRAN live execution/adoption/merge/runtime mutation",
+    "Fixtures are full local independent Git copies, no shared alternates/hardlinks",
+    "No package-private module invocation substitutes for public success",
+    "No helper fulltype/regression seal cycle per orchestrator convergence priority"
+  ],
+  "files": {
+    "packages/cli/tests/installed/reconciliation-detran.test.ts": "4296597257a249656bd92f15cf2ae1548a3c2eb43c29393438cb0654a238c278",
+    "packages/cli/tests/installed/reconciliation-detran-driver.mjs": "35f47747ac7dd29d3bca8f50bf64ff23b08aac95748c658ca0486031d3b78c61",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-detran-inspector/installed06-initial-red.txt": "35fc761f6eeeca42d5b22d014e1778d577bdfb252f267382d46ec28bfc15d768",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-detran-inspector/draft-lint.txt": "689d370e8c06bdc4d786c596f733e4fd11d13ae585434f61cc90eeeaf5155785",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-detran-inspector/refreshed-fixture.json": "191153a2e71ae4fa243e3c958de72d665fb5ac71ee2ad8828aa4e804cac681ea",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-detran-inspector/historical-fixture.json": "a7789b4ddaf28cfbbbb18cfc67972bd58508c236b4f327bf58140ed0a0759325",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-detran-inspector/installed06-plan-baseline.json": "1a632c068d134358f827630fbcca265e99fe40ffe80726536d5c3fcc169e215a"
+  }
+}

@@ -1,0 +1,127 @@
+{
+  ".devai/pin/constitution.md": {
+    "sha256": "8353c3b81d38e0f9b913cbeb6762bc149605989c1b16f52d2c63ba9892f71270",
+    "size_bytes": 33124
+  },
+  ".devai/constitution.md": {
+    "sha256": "e89b59e3d6daed5f7c4b20cf200c3b1b9c87ee52d84f7727dc2f9b296445b999",
+    "size_bytes": 328
+  },
+  ".devai/config/project.json": {
+    "sha256": "dce97394bf34f17bd02793e9e0d07f0cee041174bb53f7211a77845a2e7560c8",
+    "size_bytes": 386
+  },
+  ".devai/config/authority-policy.json": null,
+  ".devai/config/adopter-policy-binding.json": {
+    "sha256": "a752edc51e4627f2f4cfd345b7051a6692f2f08e35b4f63764d4c8f6b59822fc",
+    "size_bytes": 927
+  },
+  "law/policy/devai-adoption.json": {
+    "sha256": "bea07d2450757501b04c652c9393f3595cc944eae880ea4286efce1b6594dab0",
+    "size_bytes": 2728
+  },
+  "record/proofs/README.md": {
+    "sha256": "24595fdc95cf09ffaab25223afdff3f01f43d76c2e60ec8e1be3db015ad661ca",
+    "size_bytes": 139
+  },
+  "record/proofs/chain.json": {
+    "sha256": "42cc938f9437a34a713396a1d867c284d5702588afd95e7ea68eb8ef387072e5",
+    "size_bytes": 290576
+  },
+  "record/proofs/freshness/readings/.gitkeep": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "size_bytes": 0
+  },
+  "record/proofs/freshness/baselines/.gitkeep": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "size_bytes": 0
+  },
+  "record/proofs/work/agent-runs/.gitkeep": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "size_bytes": 0
+  },
+  "record/proofs/work/test-results/.gitkeep": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "size_bytes": 0
+  },
+  "record/proofs/work/coverage/.gitkeep": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "size_bytes": 0
+  },
+  "record/proofs/compliance/releases/.gitkeep": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "size_bytes": 0
+  },
+  "record/proofs/compliance/verdicts/.gitkeep": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "size_bytes": 0
+  },
+  "record/proofs/compliance/closures/.gitkeep": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "size_bytes": 0
+  },
+  "record/proofs/compliance/scorecards/SC-20260927T205906-001.backlog.json": {
+    "sha256": "d2324772396f5093ab92743978e365cc63dae1f08454c198a48a4270494616fd",
+    "size_bytes": 2794
+  },
+  "record/proofs/compliance/scorecards/SC-20261006T215814-001.assessment.json": {
+    "sha256": "4d7b21d1e7d04a9fa184a80c2f164c9aa8112e2d2431ba0fb4cbd4ce5e59fd17",
+    "size_bytes": 968
+  },
+  "record/proofs/compliance/scorecards/SC-20261007T203104-001.json": {
+    "sha256": "5a8bf7d6cbbf66d797c907733ee6db9b19eda297c7c87441e0ee5077f0641937",
+    "size_bytes": 9243
+  },
+  "record/proofs/compliance/scorecards/SC-20261001T194346-001.assessment.json": {
+    "sha256": "f169d53ff4e49c186d278b8e1eb85c63a2d25b0245b1fea9fa1ce887d51c9f1f",
+    "size_bytes": 985
+  },
+  "record/proofs/compliance/scorecards/SC-20260927T205906-001.json": {
+    "sha256": "846e324b723b9401caab90127973f14e56308dc11ea34ebc432e0b229d40bd79",
+    "size_bytes": 9411
+  },
+  "record/proofs/compliance/scorecards/.gitkeep": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "size_bytes": 0
+  },
+  "record/proofs/compliance/scorecards/SC-20261001T194346-001.backlog.json": {
+    "sha256": "3c437313e87a1c8912a2667c8924320f901f3ee3d127851678b148b62d512c5b",
+    "size_bytes": 6046
+  },
+  "record/proofs/compliance/scorecards/SC-20261007T203104-001.assessment.json": {
+    "sha256": "c6d26129f865c19c9c5d155f8723698bf63df15a6a860cdef6cc86463240f342",
+    "size_bytes": 797
+  },
+  "record/proofs/compliance/scorecards/SC-20261001T194346-001.json": {
+    "sha256": "d7683a234e24be89d49d415a77a0e1017adab6b34133a2854f2a62a16c8d276b",
+    "size_bytes": 9315
+  },
+  "record/proofs/compliance/scorecards/SC-20260927T205906-001.assessment.json": {
+    "sha256": "f9f24879cf19b46221ef450bd78504fc40b3f919547ee1a6d0a7198db3c09f57",
+    "size_bytes": 1348
+  },
+  "record/proofs/compliance/scorecards/SC-20261006T141503-001.backlog.json": {
+    "sha256": "58e1928960c50d5048ea0db8792de933e9e0d75f353248847b0366c4e71eda59",
+    "size_bytes": 6047
+  },
+  "record/proofs/compliance/scorecards/SC-20261007T203104-001.backlog.json": {
+    "sha256": "83528fd211e93bd7e01daa911886c69758eb46c495db95116be70a3b1ba896e8",
+    "size_bytes": 6229
+  },
+  "record/proofs/compliance/scorecards/SC-20261006T141503-001.json": {
+    "sha256": "219df9948a39d5f5cbe126a2f6e56bab649cf957613c3986102e182f24fec4b7",
+    "size_bytes": 9401
+  },
+  "record/proofs/compliance/scorecards/SC-20261006T141503-001.assessment.json": {
+    "sha256": "f6bb88c06b16d86df4a3d96882c9bc60b6e167c47de384933f779d635daefc4f",
+    "size_bytes": 1200
+  },
+  "record/proofs/compliance/scorecards/SC-20261006T215814-001.json": {
+    "sha256": "b7cb88de91a9bcf7ac7a279a28be5eaac89ef4079003eca265da138ab9cf50a4",
+    "size_bytes": 9318
+  },
+  "record/proofs/compliance/scorecards/SC-20261006T215814-001.backlog.json": {
+    "sha256": "2e2b6a6c015957ee09bc494723b89b4e001ece9de728539efbb4a01775993a6a",
+    "size_bytes": 6043
+  }
+}

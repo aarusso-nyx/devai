@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-native-owner-review/installed-provision-refusals.py", line 23, in <module>
+    assert error['code']==expected,(name,error)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ('mixed-p1', {'schemaVersion': '1.0.0', 'code': 'AUTHORITY_POLICY_REVIEW_SELECTION_INVALID', 'class': 'routing-authority', 'exit': 2, 'message': 'Exact authority-policy review selection is required.', 'remediation': 'Use both review selectors, exact target, Architect role, write consent and JSON format.', 'context': {}})

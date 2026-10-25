@@ -1,0 +1,9 @@
+{
+  "standing":"CONCRETE_FIX_FOR_AUTHENTICATED_LATE_BINDING_AND_HEAD_DRIFT",
+  "source_paths_added":["packages/authority/src/boundaries/host-publish.ts (private publisher only)"],
+  "evidence":"authoring/b1-provision-review/source-review-initial.json; actual native precursor-fsync HEAD/B5 drift causes issuer publication, two authenticated failures.",
+  "native_guard":"A fixed trusted assertReviewHost calls actual scoped readReconciliationHostBinding, compares original complete host identity/current B5 and dual-clock review window. This observation opens no admission anchor. Use before every native directory/create/publish, after durability steps, and inside native admission immediately before issuer publication. Post-effect observation cannot silently replace the original reviewed HEAD/B5.",
+  "private_publisher_guard":"Add private-only hooks interface extending existing test-seam hooks with verifyPrepared?:()=>void. Ordinary publisher/type behavior stays unchanged. The fixed native provisioning caller passes only its closed assertReviewHost. Invoke before staged creation, before first byte and after staged fsync/close immediately before no-replace link. Guard failures before link retain existing exact owned cleanup semantics. No public CLI caller callback/provider is accepted.",
+  "scope_limit":"No arbitrary path/write/callback permission, policy/registry changes or ordinary publisher mode/behavior changes. Private publisher historical tests remain unchanged and rerun. This protects publication commit boundary as well as prelock entry; it makes no compromised-runtime or unobserved transient detection claim.",
+  "acceptance":"Original real precursor-fsync HEAD/B5 probes pass. Add real private-staged-file fsync drift probes to require no issuer link, safe terminal uncertainty and preserved precursor. Every in-lock guard must remain anchor-open-free. Fresh post-effect check required before created/new-READY result."
+}

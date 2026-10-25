@@ -1,0 +1,5 @@
+{
+  "report": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-provision08-refusals-2xs4vp40/results.json",
+  "cases": 2,
+  "sha256": "59ce0333ce4c274564c6ba9f9d41aa268592cec109ef082f680ee2fc3335dbe7"
+}

@@ -1,0 +1,73 @@
+{
+  "standing": "INDEPENDENT_OWNER_SCHEMA_REGISTRY_CANON_STAGING_GREEN_NOT_CODEC_OR_HOST_ACCEPTANCE",
+  "result": {
+    "passed": 216,
+    "failed": 0,
+    "files": 7,
+    "owner_schema": 22,
+    "three_existing_population_suites": 71,
+    "canon_reference_and_snapshot_suites": 123
+  },
+  "raw_logs": {
+    "final-green.log": "40ca60648acb807ee7a7b58cda0d154ef30c15aec9d4cbbfc6dd09d49999617c",
+    "meta-canon-snapshot-green.log": "39f3ce56feb34780ae691a05af9f3b98b2cfd5e5eb2f5240f5ee8825715c27fd"
+  },
+  "source_schema_roster_current_tests_sha256": {
+    "law/schemas/reconciliation-owner.schema.json": "39002520c0ffa410ef41a9caf34d16af123b9bc88f0ab1e426deaf70af284344",
+    "packages/schemas/dist/schemas/reconciliation-owner.schema.json": "39002520c0ffa410ef41a9caf34d16af123b9bc88f0ab1e426deaf70af284344",
+    "packages/schemas/src/roster.ts": "45602a26e54b0240a29eca0e52c6e7254cd4508f79990ee1298194deb07e2e4b",
+    "packages/authority/src/runtime/reconciliation-owner-record.ts": "fd7d944ce09f640ff4040abeae090ad8b694b55e3e285feb46ea59650735cbda",
+    "packages/schemas/tests/contract/reconciliation-owner-schemas.test.ts": "97084f8117035381eb530c3ccce11dd7bc766344730cdd331bd8cda688ef4354",
+    "packages/schemas/tests/contract/schema-roster.test.ts": "cc68bfb8d593361a6840bda6e507b06ff4269e2261cae1c0cef9a263052ca3e3",
+    "packages/schemas/tests/contract/proof-index-reconciliation-contract.test.ts": "6a83b251b4cc57a8220cb0984d3d6e45d4d09ebe3889c9643584a5f46ea05f63",
+    "packages/cli/tests/unit/check-schemas-adopter-boundaries.test.ts": "2e0d162104d6bd29c7cbf3171127efeca62b1e3ba2227cc46ffbc8fe17ec6fc1",
+    "packages/schemas/tests/fixtures/adr-pre-280-ratification.json": "05c776122fd5e4a939f446b5343943db03ef51a6e0051deaaa2099797f75fc0e",
+    "packages/cli/tests/unit/cli-shard06-contracts-schema-residual.test.ts": "0550606142b2a492c4dc9179ca45532be17c749f26cf2a527999ab125730d5cb",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/owner-schema.candidate.json": "39002520c0ffa410ef41a9caf34d16af123b9bc88f0ab1e426deaf70af284344",
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/owner-record-codec-checkpoint.json": "40fcc553a75e9d625e381520d8a8fc7c5c139ced901f6dd697f9b79ebc2b2b1f"
+  },
+  "census": {
+    "runtime_roster": 122,
+    "canonical_schemas": 135,
+    "source_only_schemas": 13
+  },
+  "preservation": {
+    "proof_index_only_count_changed": true,
+    "cli_only_reviewed_count_and_membership_changes": true,
+    "schema_roster_only_reviewed_body_change": true,
+    "historical_adr_fixture_sha256": "05c776122fd5e4a939f446b5343943db03ef51a6e0051deaaa2099797f75fc0e",
+    "historical_adr_fixture_unchanged": true,
+    "synthetic_shard06_unchanged": true
+  },
+  "qualifies": [
+    "Exact39002520 reviewed candidate copied unchanged to canonical law and actual staged package asset",
+    "One Owner runtime roster addition; no previous source-only promotion",
+    "All7closed shape fixtures plus every required field removal, unknown/nested lexical fields, issuer seed/modes/identities/bindings, validity bounds, phase/action/initiator/predecessor constraints",
+    "Actual fixed lazy registry accepts all7 variants and canon/meta compile succeeds",
+    "Real package copy-law script in disposable fixture preserves every135canonical schema byte, including source-only files",
+    "Actual installed schema snapshot binding suite/canon/reference suites preserve original checks",
+    "Current counts122/135 and insertion/deletion136/134 changed only in reviewed assertions; prior test bytes recover exactly by inverse amendment"
+  ],
+  "does_not_qualify": [
+    "Runtime codec source hash is observed only; independent other Inspector owns MAC/JCS/canonical-ingress/digest/deadline/copy/summary behavior.",
+    "Schema accepts some semantically forged digest/deadline witnesses intentionally; they grant no capability.",
+    "No actual host origin, trusted filesystem namespace, role/argv/consent/handle/policy/effects/lease lifecycle, installed public workflow, release or downstream authority qualified."
+  ],
+  "preserved_history": [
+    "structural-red.log includes corrected harness default-null issue, not counted product RED",
+    "structural-red-corrected.log authoritative21FAIL1PASS absentlaw/roster/registry/staging",
+    "candidate-review-probe.json refuted reviewer trailing-newline hypothesis; explicit correction retained in red-checkpoint.json",
+    "No historical receipts or frozen ADR fixture were rewritten"
+  ],
+  "test_eslint_exit_code": 0,
+  "inspector_writes_only": [
+    "packages/schemas/tests/contract/reconciliation-owner-schemas.test.ts",
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-owner-schema-inspector/"
+  ],
+  "graft": {
+    "calls_this_schema_review": 1,
+    "tokens_saved_estimate": 11473,
+    "cumulative_calls": 8,
+    "cumulative_tokens_saved_estimate": 131131
+  }
+}

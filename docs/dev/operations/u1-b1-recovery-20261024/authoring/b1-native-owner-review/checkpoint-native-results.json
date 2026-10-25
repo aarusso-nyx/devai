@@ -1,0 +1,88 @@
+{
+  "fixture": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-initial-owner-plan-jJqJW9/repository",
+  "index_sha256": "542553c911bcd2f5e65dd8a27b66f0f1dbcb703278477cb27df920ede95eadce",
+  "active_chain_sha256": "a2d1ad5b56b24457c952fdc72635f7f220283ee44608cf711c402b4e36c26dd1",
+  "effects": 0,
+  "process_reads": 6,
+  "process_audit": [
+    {
+      "argv": [
+        "rev-parse",
+        "--verify",
+        "--quiet",
+        "HEAD"
+      ],
+      "GIT_OPTIONAL_LOCKS": "0"
+    },
+    {
+      "argv": [
+        "-c",
+        "diff.autoRefreshIndex=false",
+        "diff",
+        "--no-ext-diff",
+        "--no-color",
+        "--no-renames",
+        "--unified=0",
+        "HEAD",
+        "--",
+        "record/proofs/work"
+      ],
+      "GIT_OPTIONAL_LOCKS": "0"
+    },
+    {
+      "argv": [
+        "-c",
+        "diff.autoRefreshIndex=false",
+        "diff",
+        "--no-ext-diff",
+        "--no-color",
+        "--no-renames",
+        "--unified=100000000",
+        "HEAD",
+        "--",
+        "record/proofs/chain.json"
+      ],
+      "GIT_OPTIONAL_LOCKS": "0"
+    },
+    {
+      "argv": [
+        "rev-parse",
+        "--verify",
+        "--quiet",
+        "HEAD"
+      ],
+      "GIT_OPTIONAL_LOCKS": "0"
+    },
+    {
+      "argv": [
+        "-c",
+        "diff.autoRefreshIndex=false",
+        "diff",
+        "--no-ext-diff",
+        "--no-color",
+        "--no-renames",
+        "--unified=0",
+        "HEAD",
+        "--",
+        "record/proofs/work"
+      ],
+      "GIT_OPTIONAL_LOCKS": "0"
+    },
+    {
+      "argv": [
+        "-c",
+        "diff.autoRefreshIndex=false",
+        "diff",
+        "--no-ext-diff",
+        "--no-color",
+        "--no-renames",
+        "--unified=100000000",
+        "HEAD",
+        "--",
+        "record/proofs/chain.json"
+      ],
+      "GIT_OPTIONAL_LOCKS": "0"
+    }
+  ],
+  "qualification": "Actual phase02-complete historical335 fixture and protected local Owner graph/custody; actual opaque read observation capsule/ALS activation, synthetic B5/broker fingerprint. Mutations are explicit disposable negative fixtures restored by tests. Valid suffix is constructed test fixture only. No installed/public broker or recovered-events claim."
+}

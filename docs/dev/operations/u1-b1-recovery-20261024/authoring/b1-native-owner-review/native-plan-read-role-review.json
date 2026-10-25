@@ -1,0 +1,23 @@
+{
+  "kind": "independent-bounded-interface-review",
+  "verdict": "accepted-before-implementation",
+  "source_before_sha256": "fe7b97b231ec4315909ad9f6946f34423bf839068088eaa59c9ef8468bcd835a",
+  "scope": "Exact evidence reconcile plan Architect-initiated read-only declaration path only, matching ADR-EVI-0007 and sealed parser",
+  "requirements": [
+    "Exact action name and read effect guard; no generic read role allowance.",
+    "Require explicit architect, refuse any authority session.",
+    "Reuse generic read refusal for write/publish/experimental, intentionally omit only already-validated asRole.",
+    "Stage ordinary read scope as Architect, preserving actual sealed invocation parser and all mutation denials."
+  ],
+  "counterexamples": [
+    "Missing, owner, inspector, unknown or wrong-case role refuses.",
+    "Authority session with or without Architect refuses.",
+    "write/publish/experimental refuse.",
+    "Duplicate/conflicting role tokens refuse through exact sealed argv parser.",
+    "Valid Architect plan retains read effect and cannot obtain host/index mutation effects.",
+    "Other read actions still refuse as-role."
+  ],
+  "limitations": [
+    "Preimplementation source/interface review only; actual public installed valid/refusal routes remain required."
+  ]
+}

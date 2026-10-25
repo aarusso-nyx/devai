@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-provision-inspector/final-behavior.txt","kind":"historical-transcript-custody-pointer","original_bytes":1770,"original_bytes_changed":false,"original_sha256":"faab3950ccbbaf40d4aa8ff14f075ba37252b24d669e48946e895e9994388abe"}

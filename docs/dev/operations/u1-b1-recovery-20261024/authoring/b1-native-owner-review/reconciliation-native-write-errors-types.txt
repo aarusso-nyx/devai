@@ -1,0 +1,4 @@
+ WARN  Issue while reading "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/.npmrc". Failed to replace env in config: ${NODE_AUTH_TOKEN}
+ WARN  Issue while reading "/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/.npmrc". Failed to replace env in config: ${NODE_AUTH_TOKEN}
+packages/cli/tests/unit/reconciliation-output-native-write-errors.test.ts(182,52): error TS2339: Property 'finishReconciliationPhase' does not exist on type 'PhaseOutput'.
+packages/cli/tests/unit/reconciliation-output-native-write-errors.test.ts(193,20): error TS2339: Property 'finishOwnerReconciliation' does not exist on type 'OwnerOutput'.

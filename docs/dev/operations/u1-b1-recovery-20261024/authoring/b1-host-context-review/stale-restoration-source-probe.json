@@ -1,0 +1,25 @@
+{
+  "source_sha256": "1d5f4ea0838636c961d6599c4b9239244ca238b777cde497c40cfd5ef5c98ce6",
+  "dist_sha256": "fda498e7f2734f7dd44f37451b3fbc2c7d5e67836a7aef90d579cd7a6fe470a0",
+  "source_unchanged": true,
+  "dist_unchanged": true,
+  "clean": {
+    "ok": true,
+    "head": "576a2afbb0629d28094395af0a3c85d1d6bb43fa"
+  },
+  "changed_head": "2bc632867d3ea294fd4e3a5c0c585819bbb97929",
+  "observed_stale": {
+    "ok": false,
+    "code": "RECONCILIATION_HOST_STALE"
+  },
+  "restored_old_context": {
+    "ok": true,
+    "head": "576a2afbb0629d28094395af0a3c85d1d6bb43fa"
+  },
+  "new_context": {
+    "ok": true,
+    "head": "576a2afbb0629d28094395af0a3c85d1d6bb43fa"
+  },
+  "scope": "Actual built product, own disposable empty-commit repository. Tests only observed staleness reversal; no claim of detecting unobserved arbitrary transient changes or action authority.",
+  "fixture_removed": true
+}

@@ -1,0 +1,10 @@
+{
+  "packages/authority/src/boundaries/reconciliation-host-owner.ts": "d2ea3a0b345ffc48f809e819807c3f738bd9cddaf91673387bd310b8e05456c3",
+  "packages/authority/tests/unit/reconciliation-host-owner.test.ts": "8af0ca4e124fa177936a14a2ce5cf36231cf3c6522e59b0851adacd22526d006",
+  "packages/authority/src/boundaries/reconciliation-host-namespace.ts": "44e2abbeb68f0b771e8f82e34d745bfc0435bf532cd2ae710118978339588484",
+  "packages/authority/src/boundaries/reconciliation-host-provision.ts": "8c439589cdc0265681ed00a732e6ac0b4c2ab2ad6a520b87e57d2238e1a140b0",
+  "packages/authority/src/runtime/reconciliation-owner-state.ts": "b59cce447c545f2bcb8396d384dac39613ca87c1721d0f12e3e16345edb0d2b8",
+  "docs/reference/error-codes.md": "c889b4ed526842ce2dd1b21145ccd902486332f0fcc57e83a3cc2ce883273d8a",
+  "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/native-owner-read-checkpoint.json": "2ce67c333acafb3d86eb07e3a743e3fa9a90a3ea9260c11dbafc519d532a7ffc",
+  "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/native-owner-read-interface.json": "066e8b03186c288fb600eb5dfaf2bf6cac7d37ad269fbab631019b897ab8c1f7"
+}

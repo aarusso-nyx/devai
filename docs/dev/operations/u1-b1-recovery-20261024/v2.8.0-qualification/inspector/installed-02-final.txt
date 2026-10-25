@@ -1,0 +1,13 @@
+test_cancel_preserves_all_files (__main__.InstalledReview.test_cancel_preserves_all_files) ... ok
+test_exact_precursor_then_exact_create (__main__.InstalledReview.test_exact_precursor_then_exact_create) ... ok
+test_existing_target_is_preserved (__main__.InstalledReview.test_existing_target_is_preserved) ... ok
+test_installed_version_matches_manifest (__main__.InstalledReview.test_installed_version_matches_manifest) ... ok
+test_legacy_dry_branches (__main__.InstalledReview.test_legacy_dry_branches) ... ok
+test_pipe_refuses_before_preparation (__main__.InstalledReview.test_pipe_refuses_before_preparation) ... ok
+test_public_help (__main__.InstalledReview.test_public_help) ... ok
+test_wrong_confirmation_preserves_all_files (__main__.InstalledReview.test_wrong_confirmation_preserves_all_files) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 20.773s
+
+OK

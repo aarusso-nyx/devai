@@ -1,0 +1,1 @@
+{"authority_granted":false,"custody_path":"/Volumes/Development/.codex/artifacts/devai/u1-b1-source-custody-20261025/authoring/b1-typed-boundary-inspector/independent-first.txt","kind":"historical-transcript-custody-pointer","original_bytes":1520,"original_bytes_changed":false,"original_sha256":"6a389d1b1aeeca1fdb117e1f1af1f8636c39692cc70aca60b856155f692867db"}

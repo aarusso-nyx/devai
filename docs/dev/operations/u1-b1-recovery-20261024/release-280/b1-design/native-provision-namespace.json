@@ -1,0 +1,21 @@
+{
+  "standing": "EXACT_NATIVE_PROVISION_NAMESPACE_AND_RESUMPTION_RULES",
+  "scope": "Structural and MAC census for safe provisioning/idempotence only. This does not approve a grant graph or domain phase; those require the later Owner/phase eligibility implementation and ordinary current authority.",
+  "root": {"mode":"0700","entries":["admission.sqlite","issuer.json","approvals"],"unknown":"refuse and preserve","precursor_only":"only admission.sqlite; no approvals without whole valid issuer"},
+  "approvals": {"optional":true,"mode":"0700","maximum_children":4096,"children":"64 lowercase hexadecimal directory names; each0700, canonical owned nonsymlink; a present child requires approval.json"},
+  "files": [
+    {"name":"approval.json","record_kind":"approval","sequence":1},
+    {"name":"grant-NNNNNN.json","record_kind":["renewal","revocation"],"sequence":"Exact six digits matching record.sequence, integer2..999999; initial sequence1 uses approval.json"},
+    {"name":"intent-0P.json","record_kind":"phase-intent","phase":"P exactly1..4; filename matches signed record.phase01..04"},
+    {"name":"phase-0P.json","record_kind":"phase-completion","phase":"P exactly1..4; filename matches signed record.phase01..04"},
+    {"name":"lease.json","record_kind":"lease"}
+  ],
+  "file_requirements": "Every file regular, single-linked, effective-UID-owned,0600 from creation; bounded nofollow descriptor read with before/after descriptor/path identity. Canonical whole signed codec bytes, valid MAC under actual admitted issuer key, matching repository/worktree/approval directory ID and exact whole issuer SHA. Unknown/staged/quarantine names refuse and survive; no cleanup inferred from name.",
+  "bounds": {"files_per_approval_directory":4096,"total_approval_files":16384,"maximum_file_bytes":1048576,"zero_length_files":"refuse"},
+  "idempotence": "Valid whole issuer may coexist with this authenticated closed census. Bootstrap reports only original issuer identity and confers no approval/phase authority; malformed/partial/foreign state refuses without rewriting it. Directory identities and sorted entry lists are reread after census.",
+  "resumed_seed_plan": {
+    "same_live_flow":"The actual confirmed seed READY plan_sha256 is retained privately and signed as issuer.seed_plan_sha256.",
+    "precursor_only_new_process":"No original first-review absence witness or token is persisted by the fixed-seed-only protocol. Use SHA256(JCS({kind:'reconciliation-seed-resume',host_identity:actual_identity,binding_sha256:actual_current_B5_digest,namespace_sha256:actual_precursor_witness_digest,seed_sha256:fixed_seed_digest})). This names the exact current validation plan, never a fabricated historical first review. The second READY artifact SHA binds this resumed plan and full actual anchor.",
+    "effect":"Second confirmation explicitly includes sync-precursor before native admission, then frozen issuer publication. The raw seed descriptor is closed before the native connection opens; no anchor descriptor is opened/closed inside its callback."
+  }
+}

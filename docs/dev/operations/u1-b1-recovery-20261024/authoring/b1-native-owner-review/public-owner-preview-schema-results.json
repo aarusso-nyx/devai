@@ -1,0 +1,43 @@
+{
+  "fixture": "/private/var/folders/5c/m4tbc9kj091cw8v71dnxtrt00000gn/T/devai-initial-owner-plan-jJqJW9/repository",
+  "preview": {
+    "kind": "reconciliation-grant-review",
+    "operation": "revoke",
+    "approval_id": "24b3953e410a7654b1ecdbad8c03a512439a904d9ed90349b116d6685a761caf",
+    "plan_sha256": "5d55b291ae2e31c578ec2c064bd83c8471cda1afbd197734c946f7fd87f61141",
+    "prior_grant_sha256": "348fb37362e821841e0b29ebc32059e811758719ce9b5c59c15ba5129f8cbe52",
+    "record_sha256": "b03d60968ec6988a4951176596d2eee488c41e4cb3e55b4cbc3e29a5ae0b7e3a",
+    "record_bytes": 879,
+    "sequence": 5,
+    "namespace_sha256": "adf0aa7c27af677efca409c555aa3a8e5abea930f0055e1bb14639909e0b1e6a",
+    "effects": [
+      {
+        "target": "worktree-host/devai/reconciliation/approvals/24b3953e410a7654b1ecdbad8c03a512439a904d9ed90349b116d6685a761caf/.grant-000005.json.27055-ec09587f-8eed-4ebb-ae79-2aeccd11847f.publish-staged",
+        "operation": "publish-private-scratch-and-owned-cleanup",
+        "mode": "0600"
+      },
+      {
+        "target": "worktree-host/devai/reconciliation/approvals/24b3953e410a7654b1ecdbad8c03a512439a904d9ed90349b116d6685a761caf/grant-000005.json",
+        "operation": "publish-grant-no-replace",
+        "mode": "0600"
+      }
+    ],
+    "confirmation": "REVOKE RECONCILIATION 24b3953e410a7654b1ecdbad8c03a512439a904d9ed90349b116d6685a761caf b03d60968ec6988a4951176596d2eee488c41e4cb3e55b4cbc3e29a5ae0b7e3a",
+    "lifetime_ms": 300000,
+    "grants_authority": false
+  },
+  "result": {
+    "kind": "reconciliation-grant-result",
+    "operation": "revoke",
+    "outcome": "cancelled",
+    "approval_id": "24b3953e410a7654b1ecdbad8c03a512439a904d9ed90349b116d6685a761caf",
+    "plan_sha256": "5d55b291ae2e31c578ec2c064bd83c8471cda1afbd197734c946f7fd87f61141",
+    "record_sha256": "b03d60968ec6988a4951176596d2eee488c41e4cb3e55b4cbc3e29a5ae0b7e3a",
+    "sequence": 5,
+    "owned": [],
+    "grants_authority": false
+  },
+  "preview_valid": true,
+  "result_valid": true,
+  "qualification": "ActualnativeOwnerrevoke preview+cancel only, all04complete; no nativewrites. SyntheticB5/TTY/policy; no publicinstalledclaim."
+}

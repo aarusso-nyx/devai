@@ -1,0 +1,18 @@
+import {vi,it,expect} from 'vitest';
+import {mkdtempSync,mkdirSync,writeFileSync,realpathSync,opendirSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+const seen=vi.hoisted(()=>({counts:[] as number[]}));
+vi.mock('node:fs',async(importOriginal)=>{const actual=await importOriginal<typeof import('node:fs')>();return {...actual,readdirSync:(...args:Parameters<typeof actual.readdirSync>)=>{const names=actual.readdirSync(...args);seen.counts.push(names.length);return names;}};});
+import {readNativeReconciliationNamespace} from '/Volumes/Development/projects/stech/devai/.devai/worktrees/u1-b1-approval-plan-20261024/packages/authority/src/boundaries/reconciliation-host-namespace.ts';
+it('records actual full-array enumeration before closed-root refusal and bounded cursor comparison',()=>{
+ const git=realpathSync(mkdtempSync(join(tmpdir(),'devai-census-observation-')));const devai=join(git,'devai'),root=join(devai,'reconciliation');mkdirSync(devai,{mode:0o700});mkdirSync(root,{mode:0o700});
+ for(let n=0;n<10000;n++)writeFileSync(join(root,'unknown-'+String(n).padStart(5,'0')),'',{mode:0o600});
+ seen.counts=[];
+ // Refusal-only private metadata fixture; no actual origin/authority is claimed.
+ expect(()=>readNativeReconciliationNamespace({repository_root:git,git_dir:git,common_dir:git,private_root:root},{} as never)).toThrow('RECONCILIATION_PROVISION_INVALID');
+ expect(seen.counts).toEqual([10000]);
+ const dir=opendirSync(root,{bufferSize:32});let cursorReadCount=0;try{while(cursorReadCount<4097 && dir.readSync()!==null)cursorReadCount++;}finally{dir.closeSync();}
+ expect(cursorReadCount).toBe(4097);
+ console.log(JSON.stringify({observation:'oversized-directory-resource-bound',actual_namespace_result:'closed INVALID refusal',actual_readdir_materialized_names:seen.counts[0],candidate_child_limit:4096,candidate_cursor_read_count:cursorReadCount,candidate_buffer_size:32,node:process.versions.node,uv:process.versions.uv,platform:process.platform,fixture:git}));
+});

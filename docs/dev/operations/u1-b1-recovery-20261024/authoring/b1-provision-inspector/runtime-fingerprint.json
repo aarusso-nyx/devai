@@ -1,0 +1,10 @@
+{
+  "node": "24.22.0",
+  "uv": "1.52.1",
+  "platform": "darwin",
+  "arch": "arm64",
+  "os_release": "27.0.0",
+  "fixture_filesystem_type": 26,
+  "claims_linux_qualification": false,
+  "synthetic_B5_and_TTY": true
+}

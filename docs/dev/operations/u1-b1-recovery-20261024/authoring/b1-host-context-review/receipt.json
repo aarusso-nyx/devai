@@ -1,0 +1,67 @@
+{
+  "standing": "NARROW_READONLY_HOST_CONTEXT_DESIGN_ACCEPTED_AFTER_RECIPROCAL_POINTER_AMENDMENT_NOT_RUNTIME_ACCEPTANCE",
+  "original_packet_sha256": "9fe2c38674fd4fcdf5e0f314d536eeb13c7299d1122f3352a70b825ded4b54f5",
+  "accepted_amendment_sha256": "e935aebb794981973c46c8c7c49b6e179e87b456f3a195255bafdd500a04d961",
+  "initial_review_sha256": "6cbb9d181374581586b17e33e00a6a6c2c5b8dea8632bca75e9ae635ab166a6d",
+  "actual_evidence": {
+    "reciprocal-registration-observation.json": "a982a4752cc67f7c24f83491ed4b327c21ba71b6dfa6c6f3f7da6f2ce0cfe36a",
+    "direct-linked-observation.json": "987068dcb4bc3ad38c759ef9c9c41fe0cdaa51e39f830b47c674a136e5ec2a26",
+    "masked-mode-derivation.json": "6eda50c193ffbae89de69c8888f35efe09bdb8999b0a4b5c14e6ecc37488c8db",
+    "copied-pointer-observation.json": "c4636436aaeb83a2db45023efed53f6df3c07440d1de06c53203a041cfe1d13a"
+  },
+  "actual_result": {
+    "passed_amendment_predicates": 8,
+    "failed": 0,
+    "git": "git version 2.54.0 (Apple Git-157)",
+    "node": "24.22.0",
+    "uv": "1.52.1",
+    "platform": "darwin",
+    "external_fixtures_removed": true
+  },
+  "finding_HC_01": "Design closure accepted: copied linked pointer cannot pass exact lexical/realpath reciprocal backlink equality. Immediate registered admin parent and pinned commondir complete the intended accepted-layout contract. Original copied-pointer outputs and rejected9fe2direction remain historical; this report does not claim absent/pending product module behavior.",
+  "accepted_semantics": [
+    "Direct layout requires git_dir=common_dir=root/.git directory; four backlink/commondir projection fields null. No separate-git-dir, bare or submodule acceptance inferred.",
+    "Linked layout requires canonical immediate registered child of common_dir/worktrees, actual bounded owned single-linked nofollow forward/backlink/commondir file pins and exact resolved association. Parent registry directory active-pinned only.",
+    "Actual Git --relative-paths emits forward pointer relative to root and backlink relative to admin gitdir; amended rules accept it without silently broadening path authority.",
+    "Amended persistent projection has exactly13fields and uses stat.mode&07777 decimal; independent hash derivation preserves distinct worktree identities. Runtime/boot/HEAD/merge remain active pins, never permanent identity or migrated approval.",
+    "Only read-only observations; namespace0700,SQLitedescriptor lifetime,key/MAC origin,opaque operation handle and role/argv/consent/policy/effect authority remain later final-host gates."
+  ],
+  "primary_sources": [
+    {
+      "url": "https://github.com/git/git/blob/v2.54.0/worktree.c#L1026-L1056",
+      "supports": "Exact native linking-file writer; relative backlink uses admin gitdir and relative forward pointer uses worktree root."
+    },
+    {
+      "url": "https://git-scm.com/docs/gitrepository-layout",
+      "supports": "Linked administration/common-directory layout."
+    },
+    {
+      "url": "https://git-scm.com/docs/git-worktree",
+      "supports": "Registered worktree link and relative-path semantics."
+    }
+  ],
+  "historical_inputs_unchanged": {
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/host-context-checkpoint.json": true,
+    "docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/owner-clock-amendment.json": true,
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-owner-v3-inspector/receipt.json": true,
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-clock-inspector/receipt.json": true,
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-admission-inspector/receipt.json": true,
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-owner-schema-inspector/receipt.json": true,
+    "docs/dev/operations/u1-b1-recovery-20261024/authoring/b1-owner-record-inspector/receipt.json": true,
+    "law/adr/ADR-EVI-0007-owner-approved-merge-reconciliation.md": true
+  },
+  "genuine_remaining_design_blockers": [],
+  "next_required_independent_acceptance": [
+    "Authentic product source/test RED and implementation against exactpacket+amendment; this review does not substitute for it.",
+    "Actual product capture/revalidation: absolute+relative registration, copied/foreign/missing/symlink/hardlink/malformed/oversize/rewrite/byte-drift files and active staleness.",
+    "Actual branded context/getter/Proxy/disposal, zero-write inventories, fixed bounded Git/env/runtime/boot/namespace and crossprocess clock sampling; no Linux execution qualification assumed here.",
+    "Separate full final host/broker action/effect/namespace/issuer/admission/operation-handle integration remains required."
+  ],
+  "inspector_product_or_test_edits": false,
+  "writes_only": "authoring/b1-host-context-review/",
+  "graft_cumulative": {
+    "calls": 9,
+    "tokens_saved_estimate": 183936
+  },
+  "no_new_graft_call_for_this_narrow_followup": true
+}
