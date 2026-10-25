@@ -1473,7 +1473,19 @@ function checkPreflightWorkflow(file, workflow, source, findings, pins) {
     nativeSteps[3]?.if !== undefined ||
     nativeSteps.slice(2, 4).some((step) => step.shell !== undefined && step.shell !== 'bash') ||
     JSON.stringify(logicalScriptLines(nativeSteps[2]?.run ?? '')) !==
-      JSON.stringify(['pnpm install --frozen-lockfile', 'pnpm run release:bootstrap']) ||
+      JSON.stringify([
+        '/usr/bin/git --version',
+        'if /usr/bin/env -i PATH=/usr/bin:/bin LC_ALL=C GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_SYSTEM=/dev/null GIT_CONFIG_GLOBAL=/dev/null /usr/bin/git --no-optional-locks --no-replace-objects --no-lazy-fetch -c core.fsmonitor=false rev-parse --verify HEAD; then',
+        'echo "Default system Git supports the native observation flags"',
+        'else',
+        'echo "Default system Git capability probe failed; selecting the qualified toolchain"',
+        'fi',
+        'sudo /usr/bin/xcode-select --switch /Applications/Xcode_26.3.app/Contents/Developer',
+        '/usr/bin/git --version',
+        '/usr/bin/env -i PATH=/usr/bin:/bin LC_ALL=C GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_SYSTEM=/dev/null GIT_CONFIG_GLOBAL=/dev/null /usr/bin/git --no-optional-locks --no-replace-objects --no-lazy-fetch -c core.fsmonitor=false rev-parse --verify HEAD',
+        'pnpm install --frozen-lockfile',
+        'pnpm run release:bootstrap',
+      ]) ||
     nativeSteps[3]?.id !== 'native' ||
     nativeSteps[3]?.run !==
       'node scripts/process/validation-runner.mjs --exclusive -- node scripts/run-native-apfs-tests.mjs' ||
