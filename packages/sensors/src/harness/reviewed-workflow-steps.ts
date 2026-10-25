@@ -1062,7 +1062,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
     workflow: 'pull-request-checks.yml#native-apfs[3]',
     step: 'Qualify actual native APFS contracts',
     review:
-      'ADR-CHK-0010: exact native test qualification only; frozen install, dependency build, actual Darwin/APFS preflight and unchanged disposable provisioning/Owner tests, or runner report upload. No protected environment, adopter operation, repository mutation or publication.',
+      'ADR-CHK-0010: exact native test qualification only; actual Darwin/APFS preflight and unchanged disposable provisioning/Owner assertions with a native-only 60-second per-case hang ceiling, matching RC coverage. Local defaults and protocol clocks remain unchanged; zero skipped cases and the existing 15-minute job ceiling remain mandatory. No protected environment, adopter operation, repository mutation or publication.',
     files: [
       {
         path: 'scripts/process/validation-runner.mjs',
@@ -1070,7 +1070,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
       },
       {
         path: 'scripts/run-native-apfs-tests.mjs',
-        sha256: '9b3920bc49f4692907c30365f867fad18c90277203118b3dddfc0b84d6d0c967',
+        sha256: '1f3df9673cb9d80b82c5f632ff4fbb1066aeca8e4b924c893f33a6e85b66ad07',
       },
     ],
   },
