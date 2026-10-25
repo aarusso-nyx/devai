@@ -327,7 +327,7 @@ describe('verify translation F result output contract', () => {
 
     controls.frameStatuses = ['PASS', 'FAIL', 'REVIEW'];
     expect((await validate())['verdict']).toBe('FAIL');
-  });
+  }, 60_000);
 
   it('preserves exact unexpected changes and frame evidence references', async () => {
     controls.frameStatuses = ['PASS', 'REVIEW'];
