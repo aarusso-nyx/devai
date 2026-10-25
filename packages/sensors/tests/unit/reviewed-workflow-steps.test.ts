@@ -142,6 +142,16 @@ describe('reviewed workflow step registry', () => {
     }
     writeFileSync(workflowPath, source);
     expect(jobEffectFacts(source, tree, 'native-apfs').effect).toBe('read-only');
+    const copiedPath = join(dirname(workflowPath), 'copied.yml');
+    writeFileSync(copiedPath, source);
+    expect(jobEffectFacts(source, tree, 'native-apfs', new Set(), copiedPath).effect).toBe(
+      'unknown',
+    );
+    expect(jobEffectFacts(source, tree, 'native-apfs').effect).toBe('unknown');
+    expect(jobEffectFacts(source, tree, 'native-apfs', new Set(), workflowPath).effect).toBe(
+      'read-only',
+    );
+    rmSync(copiedPath);
     for (const variant of [
       'runner',
       'expression',
