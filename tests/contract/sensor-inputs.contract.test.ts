@@ -323,8 +323,8 @@ describe('local subprocess scheduling preserves the complete population', () => 
       ).toBe(false);
     }
     expect(serial.fileParallelism).toBe(false);
-    expect(parallel.sequence?.groupOrder).toBe(0);
-    expect(serial.sequence?.groupOrder).toBe(1);
+    expect(parallel.sequence?.groupOrder).toBe(1);
+    expect(serial.sequence?.groupOrder).toBe(2);
     expect(parallel.maxWorkers).toBe(MAX_TEST_WORKERS);
     expect(localConfig.test?.testTimeout).toBe(SUBPROCESS_TEST_TIMEOUT_MS);
     expect(localConfig.test?.hookTimeout).toBe(SUBPROCESS_TEST_TIMEOUT_MS);
@@ -351,7 +351,7 @@ describe('local subprocess scheduling preserves the complete population', () => 
     expect(native.testTimeout).toBe(NATIVE_HOST_TEST_TIMEOUT_MS);
     expect(NATIVE_HOST_TEST_TIMEOUT_MS).toBe(60_000);
     expect(native.hookTimeout).toBe(SUBPROCESS_TEST_TIMEOUT_MS);
-    expect(native.sequence?.groupOrder).toBe(-1);
+    expect(native.sequence?.groupOrder).toBe(0);
     expect(native.sequence?.groupOrder).toBeLessThan(parallel.sequence?.groupOrder ?? 0);
   });
 

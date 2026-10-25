@@ -115,7 +115,7 @@ export default defineConfig({
           include: [...LOCAL_INCLUDE],
           exclude: [...EXCLUDE, ...SERIAL_LANE, ...NATIVE_HOST_LANE],
           maxWorkers: MAX_TEST_WORKERS,
-          sequence: { groupOrder: 0 },
+          sequence: { groupOrder: 1 },
         },
       },
       {
@@ -128,7 +128,7 @@ export default defineConfig({
           fileParallelism: true,
           testTimeout: NATIVE_HOST_TEST_TIMEOUT_MS,
           hookTimeout: SUBPROCESS_TEST_TIMEOUT_MS,
-          sequence: { groupOrder: -1 },
+          sequence: { groupOrder: 0 },
         },
       },
       {
@@ -138,7 +138,7 @@ export default defineConfig({
           include: [...SERIAL_LANE],
           exclude: [...EXCLUDE],
           fileParallelism: false,
-          sequence: { groupOrder: 1 },
+          sequence: { groupOrder: 2 },
         },
       },
     ],
