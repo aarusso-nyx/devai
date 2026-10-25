@@ -31,6 +31,7 @@ type Step = Readonly<{
   run?: string;
   with?: Readonly<Record<string, unknown>>;
   env?: Readonly<Record<string, unknown>>;
+  'continue-on-error'?: boolean;
 }>;
 type Workflow = Readonly<{
   on?: Readonly<Record<string, unknown>>;
@@ -669,6 +670,9 @@ describe('workflow checker pins the merge_group lane (ADR-CHK-0004 IA-004)', () 
 type GateJob = Job &
   Readonly<{
     needs?: string | readonly string[];
+    'runs-on'?: string;
+    'continue-on-error'?: boolean;
+    environment?: unknown;
     permissions?: Readonly<Record<string, unknown>> | string;
   }>;
 const RAW_JOBS = (fullWorkflow.jobs ?? {}) as Readonly<Record<string, GateJob>>;
@@ -699,10 +703,17 @@ function aggregator(): GateJob {
   return job;
 }
 
-describe('three gate jobs (ADR-CHK-0007 rule 11)', () => {
+describe('two partitions and required native qualification (ADR-CHK-0010)', () => {
   it('declares exactly the two partition jobs and the aggregator', () => {
     expect(AGGREGATOR_KEY).toBeDefined();
-    expect(Object.keys(RAW_JOBS).sort()).toEqual([...PARTITION_JOBS, AGGREGATOR_KEY ?? ''].sort());
+    expect(
+      Object.keys(RAW_JOBS)
+        .filter((job) => job !== 'native-apfs')
+        .sort(),
+    ).toEqual([...PARTITION_JOBS, AGGREGATOR_KEY ?? ''].sort());
+    expect(Object.keys(RAW_JOBS).sort()).toEqual(
+      [...PARTITION_JOBS, 'native-apfs', AGGREGATOR_KEY ?? ''].sort(),
+    );
     for (const job of PARTITION_JOBS) {
       expect(RAW_JOBS[job]?.name, `${job} never carries the required check name`).not.toBe(
         'devai-release-gate',
@@ -712,9 +723,9 @@ describe('three gate jobs (ADR-CHK-0007 rule 11)', () => {
 
   it('makes the aggregator need both partition jobs and run under always()', () => {
     const needs = aggregator().needs;
-    expect([...(typeof needs === 'string' ? [needs] : (needs ?? []))].sort()).toEqual([
-      ...PARTITION_JOBS,
-    ]);
+    expect([...(typeof needs === 'string' ? [needs] : (needs ?? []))].sort()).toEqual(
+      [...PARTITION_JOBS, 'native-apfs'].sort(),
+    );
     expect(String(aggregator().if ?? '')).toMatch(/\balways\(\s*\)/u);
   });
 
@@ -725,6 +736,7 @@ describe('three gate jobs (ADR-CHK-0007 rule 11)', () => {
     expect(run).toMatch(/--exclude-result\s+["']?\$\{\{\s*needs\.gate-rest\.result\s*\}\}/u);
     expect(run).toMatch(/--include-report\s+\S/u);
     expect(run).toMatch(/--exclude-report\s+\S/u);
+    expect(run).toContain('test "${{ needs.native-apfs.result }}" = "success"');
   });
 
   it('downloads the two report artifacts into the aggregator with one pinned step', () => {
@@ -741,7 +753,7 @@ describe('three gate jobs (ADR-CHK-0007 rule 11)', () => {
     }
   });
 
-  it('runs one step in the aggregator, and that step calls only the aggregator script', () => {
+  it('runs only the native success guard and exact partition aggregator in one step', () => {
     const runs = (aggregator().steps ?? []).filter((step) => typeof step.run === 'string');
     expect(runs).toHaveLength(1);
     const commands = (runs[0]?.run ?? '')
@@ -749,8 +761,75 @@ describe('three gate jobs (ADR-CHK-0007 rule 11)', () => {
       .map((line) => line.trim())
       .filter((line) => line !== '' && !line.startsWith('#') && !/^set\s+-/u.test(line));
     expect(commands.length).toBeGreaterThan(0);
-    expect(commands.join(' ')).toMatch(/^node\s+scripts\/aggregate-gate-partitions\.mjs\b/u);
+    expect(commands[0]).toBe('test "${{ needs.native-apfs.result }}" = "success"');
+    expect(commands.slice(1).join(' ')).toMatch(
+      /^node\s+scripts\/aggregate-gate-partitions\.mjs\b/u,
+    );
     expect(commands.join(' ').match(/\bnode\s/gu)).toHaveLength(1);
+  });
+
+  it('requires an exact-head native APFS job with no optional test execution', () => {
+    const native = RAW_JOBS['native-apfs'];
+    expect(native).toBeDefined();
+    expect(native?.['runs-on']).toBe('macos-15');
+    expect(native?.if).toBeUndefined();
+    expect(native?.environment).toBeUndefined();
+    expect(native?.['continue-on-error']).toBeUndefined();
+    const qualification = native?.steps?.find((step) => step.id === 'native');
+    expect(qualification?.run).toBe(
+      'node scripts/process/validation-runner.mjs --exclusive -- node scripts/run-native-apfs-tests.mjs',
+    );
+    expect(qualification?.if).toBeUndefined();
+    expect(qualification?.['continue-on-error']).toBeUndefined();
+  });
+
+  it.each([
+    'missing',
+    'conditional',
+    'optional',
+    'wrong-runner',
+    'unguarded',
+    'custom-shell',
+    'install-shell',
+    'job-default-shell',
+    'workflow-default-shell',
+    'conditional-checkout',
+    'conditional-setup',
+  ])('refuses %s native qualification in the exact workflow', (variant) => {
+    const root = workflowTree();
+    mutateWorkflow(root, (document) => {
+      if (variant === 'missing') document.deleteIn(['jobs', 'native-apfs']);
+      if (variant === 'conditional') document.setIn(['jobs', 'native-apfs', 'if'], 'false');
+      if (variant === 'custom-shell' || variant === 'install-shell')
+        document.setIn(
+          ['jobs', 'native-apfs', 'steps', variant === 'custom-shell' ? 3 : 2, 'shell'],
+          "bash -c 'true' {0}",
+        );
+      if (variant === 'job-default-shell')
+        document.setIn(['jobs', 'native-apfs', 'defaults', 'run', 'shell'], "bash -c 'true' {0}");
+      if (variant === 'workflow-default-shell')
+        document.setIn(['defaults', 'run', 'shell'], "bash -c 'true' {0}");
+      if (variant === 'conditional-checkout' || variant === 'conditional-setup')
+        document.setIn(
+          ['jobs', 'native-apfs', 'steps', variant === 'conditional-checkout' ? 0 : 1, 'if'],
+          'false',
+        );
+      if (variant === 'optional')
+        document.setIn(['jobs', 'native-apfs', 'steps', 3, 'continue-on-error'], true);
+      if (variant === 'wrong-runner')
+        document.setIn(['jobs', 'native-apfs', 'runs-on'], 'ubuntu-latest');
+      if (variant === 'unguarded')
+        document.setIn(
+          ['jobs', 'gate', 'steps', 3, 'run'],
+          runText(AGGREGATOR_KEY ?? '').replace(
+            'test "${{ needs.native-apfs.result }}" = "success"\n',
+            '',
+          ),
+        );
+    });
+    expect(preflightFindings(root).map((finding) => finding.code)).toContain(
+      variant === 'wrong-runner' ? 'CI_PREFLIGHT_RUNNER_INVALID' : 'CI_PREFLIGHT_GATE_INVALID',
+    );
   });
 
   it('keeps the aggregator from executing check nodes or holding write permissions', () => {

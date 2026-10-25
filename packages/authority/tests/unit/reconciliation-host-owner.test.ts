@@ -15,6 +15,7 @@ import { createHash, createHmac } from 'node:crypto';
 import {
   mkdirSync,
   mkdtempSync,
+  statfsSync,
   realpathSync,
   readFileSync,
   readdirSync,
@@ -223,6 +224,9 @@ async function provisionApi() {
 }
 const ROOT = resolve(import.meta.dirname, '../../../..');
 const external = realpathSync(mkdtempSync(resolve(tmpdir(), 'devai-native-owner-inspector-')));
+const qualifiedNativeFilesystem =
+  process.platform === 'darwin' && statfsSync(external, { bigint: true }).type === 26n;
+const nativeIt = it.runIf(qualifiedNativeFilesystem);
 const cleanEnv = {
   PATH: '/usr/bin:/bin',
   LC_ALL: 'C',
@@ -872,7 +876,7 @@ function expectSnapshot(
   expect(BigInt(String(at.monotonic_ns)) >= BigInt(f.initial.clock.monotonic_ns)).toBe(true);
 }
 
-it.each([false, true])(
+nativeIt.each([false, true])(
   'actual %s linked native approval snapshot is exact branded readonly data under all allowed actions',
   async (linked) => {
     const f = await fixture(linked),
@@ -944,170 +948,185 @@ it.each([false, true])(
     }
   },
 );
-it('historical approval binding mismatch remains readable false without migrating issuer or scope', async () => {
-  const f = await fixture(),
-    api = await ownerApi();
-  f.setBindings({ ...f.bindings, policy_sha256: '9'.repeat(64) });
-  const scope = readScope(f);
-  try {
-    scope.run(() => {
-      const before = inventory(f.repo.base),
-        snapshot = observe(() => api.readReconciliationHostApproval(f.repo.root, OWNER_ID));
-      safe(snapshot, f);
-      readonly();
-      zeroed();
-      expect(snapshot.binding_matches_approval).toBe(false);
-      expect(snapshot.current_binding_sha256).toBe(hash(jcs(f.currentBindings())));
-      expect((snapshot.state as Data).binding_sha256).toBe(f.initial.binding_sha256);
-      expect(scope.effects()).toBe(0);
-      expect(inventory(f.repo.base)).toEqual(before);
-    });
-  } finally {
-    scope.dispose();
-    f.dispose();
-  }
-});
-it('different actual same-repo approval may be read but cannot dispatch foreign approval through sealed phase eligibility', async () => {
-  const f = await fixture(),
-    api = await ownerApi(),
-    other = hash('second-owner-approval');
-  f.install(other);
-  const scope = readScope(f, { action: 'evidence reconcile materialize', write: true });
-  try {
-    scope.run(() => {
-      const before = inventory(f.repo.base),
-        snapshot = observe(() => api.readReconciliationHostApproval(f.repo.root, other));
-      safe(snapshot, f);
-      readonly();
-      zeroed();
-      expect((snapshot.state as Data).approval_id).toBe(other);
-      const identity = snapshot.identity as Data,
-        target = {
-          kind: 'reconciliation-host' as const,
-          id: `reconciliation-host:${String(identity.repository_id)}:${String(identity.worktree_id)}:consume-phase:${other}:01`,
-          repository_id: String(identity.repository_id),
-          worktree_id: String(identity.worktree_id),
-          plan_sha256: PLAN,
-          operation: 'consume-phase' as const,
-          binding_sha256: String(snapshot.current_binding_sha256),
-          approval_id: other,
-          phase: '01' as const,
-        };
-      expect(() =>
-        invokeReconciliationHostOperation(target, () => {
-          throw new Error('FOREIGN_CALLBACK_SHOULD_NOT_RUN');
-        }),
-      ).toThrow('AUTHORITY_RECONCILIATION_OPERATION_INVALID');
-      expect(scope.effects()).toBe(0);
-      expect(inventory(f.repo.base)).toEqual(before);
-    });
-  } finally {
-    scope.dispose();
-    f.dispose();
-  }
-});
-it('malformed selectors and missing/forged/wrongaction scope refuse without namespace census or effects', async () => {
-  const f = await fixture(),
-    api = await ownerApi();
-  let touches = 0;
-  const bad = {};
-  Object.defineProperty(bad, 'toString', {
-    get: () => {
-      touches++;
-      throw new Error('SELECTOR_SENTINEL');
-    },
-  });
-  try {
+nativeIt(
+  'historical approval binding mismatch remains readable false without migrating issuer or scope',
+  async () => {
+    const f = await fixture(),
+      api = await ownerApi();
+    f.setBindings({ ...f.bindings, policy_sha256: '9'.repeat(64) });
     const scope = readScope(f);
     try {
       scope.run(() => {
-        for (const id of [
-          '',
-          'A'.repeat(64),
-          '0'.repeat(63),
-          '../escape',
-          '0'.repeat(64) + '\0',
-          null,
-          bad,
-        ]) {
-          observe(() => invalid(() => api.readReconciliationHostApproval(f.repo.root, id)));
-          expect(readHooks.namespaceCalls).toBe(0);
-          readonly();
-        }
-        for (const root of ['', '.', f.repo.root + '/', null, bad]) {
-          observe(() => invalid(() => api.readReconciliationHostApproval(root, OWNER_ID)));
-          expect(readHooks.namespaceCalls).toBe(0);
-          readonly();
-        }
-        expect(touches).toBe(0);
+        const before = inventory(f.repo.base),
+          snapshot = observe(() => api.readReconciliationHostApproval(f.repo.root, OWNER_ID));
+        safe(snapshot, f);
+        readonly();
+        zeroed();
+        expect(snapshot.binding_matches_approval).toBe(false);
+        expect(snapshot.current_binding_sha256).toBe(hash(jcs(f.currentBindings())));
+        expect((snapshot.state as Data).binding_sha256).toBe(f.initial.binding_sha256);
+        expect(scope.effects()).toBe(0);
+        expect(inventory(f.repo.base)).toEqual(before);
       });
     } finally {
       scope.dispose();
+      f.dispose();
     }
-    for (const options of [{ noInvocation: true }, { forged: true }, { action: 'init bind' }]) {
-      const invalidScope = readScope(f, options);
+  },
+);
+nativeIt(
+  'different actual same-repo approval may be read but cannot dispatch foreign approval through sealed phase eligibility',
+  async () => {
+    const f = await fixture(),
+      api = await ownerApi(),
+      other = hash('second-owner-approval');
+    f.install(other);
+    const scope = readScope(f, { action: 'evidence reconcile materialize', write: true });
+    try {
+      scope.run(() => {
+        const before = inventory(f.repo.base),
+          snapshot = observe(() => api.readReconciliationHostApproval(f.repo.root, other));
+        safe(snapshot, f);
+        readonly();
+        zeroed();
+        expect((snapshot.state as Data).approval_id).toBe(other);
+        const identity = snapshot.identity as Data,
+          target = {
+            kind: 'reconciliation-host' as const,
+            id: `reconciliation-host:${String(identity.repository_id)}:${String(identity.worktree_id)}:consume-phase:${other}:01`,
+            repository_id: String(identity.repository_id),
+            worktree_id: String(identity.worktree_id),
+            plan_sha256: PLAN,
+            operation: 'consume-phase' as const,
+            binding_sha256: String(snapshot.current_binding_sha256),
+            approval_id: other,
+            phase: '01' as const,
+          };
+        expect(() =>
+          invokeReconciliationHostOperation(target, () => {
+            throw new Error('FOREIGN_CALLBACK_SHOULD_NOT_RUN');
+          }),
+        ).toThrow('AUTHORITY_RECONCILIATION_OPERATION_INVALID');
+        expect(scope.effects()).toBe(0);
+        expect(inventory(f.repo.base)).toEqual(before);
+      });
+    } finally {
+      scope.dispose();
+      f.dispose();
+    }
+  },
+);
+nativeIt(
+  'malformed selectors and missing/forged/wrongaction scope refuse without namespace census or effects',
+  async () => {
+    const f = await fixture(),
+      api = await ownerApi();
+    let touches = 0;
+    const bad = {};
+    Object.defineProperty(bad, 'toString', {
+      get: () => {
+        touches++;
+        throw new Error('SELECTOR_SENTINEL');
+      },
+    });
+    try {
+      const scope = readScope(f);
       try {
-        invalidScope.run(() => {
-          observe(() => invalid(() => api.readReconciliationHostApproval(f.repo.root, OWNER_ID)));
-          expect(readHooks.namespaceCalls).toBe(0);
-          readonly();
-          expect(invalidScope.effects()).toBe(0);
+        scope.run(() => {
+          for (const id of [
+            '',
+            'A'.repeat(64),
+            '0'.repeat(63),
+            '../escape',
+            '0'.repeat(64) + '\0',
+            null,
+            bad,
+          ]) {
+            observe(() => invalid(() => api.readReconciliationHostApproval(f.repo.root, id)));
+            expect(readHooks.namespaceCalls).toBe(0);
+            readonly();
+          }
+          for (const root of ['', '.', f.repo.root + '/', null, bad]) {
+            observe(() => invalid(() => api.readReconciliationHostApproval(root, OWNER_ID)));
+            expect(readHooks.namespaceCalls).toBe(0);
+            readonly();
+          }
+          expect(touches).toBe(0);
         });
       } finally {
-        invalidScope.dispose();
+        scope.dispose();
       }
-    }
-    observe(() => invalid(() => api.readReconciliationHostApproval(f.repo.root, OWNER_ID)));
-    expect(readHooks.namespaceCalls).toBe(0);
-    readonly();
-  } finally {
-    f.dispose();
-  }
-});
-it('valid canonical foreign root refuses STALE before protected namespace census', async () => {
-  const f = await fixture(),
-    other = repository(),
-    api = await ownerApi(),
-    scope = readScope(f);
-  try {
-    scope.run(() => {
-      const before = [inventory(f.repo.base), inventory(other.base)];
-      observe(() =>
-        invalid(
-          () => api.readReconciliationHostApproval(other.root, OWNER_ID),
-          'RECONCILIATION_OWNER_HOST_STALE',
-        ),
-      );
+      for (const options of [{ noInvocation: true }, { forged: true }, { action: 'init bind' }]) {
+        const invalidScope = readScope(f, options);
+        try {
+          invalidScope.run(() => {
+            observe(() => invalid(() => api.readReconciliationHostApproval(f.repo.root, OWNER_ID)));
+            expect(readHooks.namespaceCalls).toBe(0);
+            readonly();
+            expect(invalidScope.effects()).toBe(0);
+          });
+        } finally {
+          invalidScope.dispose();
+        }
+      }
+      observe(() => invalid(() => api.readReconciliationHostApproval(f.repo.root, OWNER_ID)));
       expect(readHooks.namespaceCalls).toBe(0);
       readonly();
-      expect([inventory(f.repo.base), inventory(other.base)]).toEqual(before);
-    });
-  } finally {
-    scope.dispose();
-    f.dispose();
-  }
-});
-it('stable valid-MAC but contradictory approval graph is INVALID and captured buffers are zeroed', async () => {
-  const f = await fixture(),
-    api = await ownerApi(),
-    bad = hash('bad-owner-graph');
-  f.install(bad, true);
-  const scope = readScope(f);
-  try {
-    scope.run(() => {
-      const before = inventory(f.repo.base);
-      observe(() => invalid(() => api.readReconciliationHostApproval(f.repo.root, bad)));
-      readonly();
-      zeroed();
-      expect(inventory(f.repo.base)).toEqual(before);
-      expect(scope.effects()).toBe(0);
-    });
-  } finally {
-    scope.dispose();
-    f.dispose();
-  }
-});
-it.each(['HEAD', 'B5', 'file-bytes', 'inode', 'mode', 'remnant', 'symlink', 'name', 'scope'])(
+    } finally {
+      f.dispose();
+    }
+  },
+);
+nativeIt(
+  'valid canonical foreign root refuses STALE before protected namespace census',
+  async () => {
+    const f = await fixture(),
+      other = repository(),
+      api = await ownerApi(),
+      scope = readScope(f);
+    try {
+      scope.run(() => {
+        const before = [inventory(f.repo.base), inventory(other.base)];
+        observe(() =>
+          invalid(
+            () => api.readReconciliationHostApproval(other.root, OWNER_ID),
+            'RECONCILIATION_OWNER_HOST_STALE',
+          ),
+        );
+        expect(readHooks.namespaceCalls).toBe(0);
+        readonly();
+        expect([inventory(f.repo.base), inventory(other.base)]).toEqual(before);
+      });
+    } finally {
+      scope.dispose();
+      f.dispose();
+    }
+  },
+);
+nativeIt(
+  'stable valid-MAC but contradictory approval graph is INVALID and captured buffers are zeroed',
+  async () => {
+    const f = await fixture(),
+      api = await ownerApi(),
+      bad = hash('bad-owner-graph');
+    f.install(bad, true);
+    const scope = readScope(f);
+    try {
+      scope.run(() => {
+        const before = inventory(f.repo.base);
+        observe(() => invalid(() => api.readReconciliationHostApproval(f.repo.root, bad)));
+        readonly();
+        zeroed();
+        expect(inventory(f.repo.base)).toEqual(before);
+        expect(scope.effects()).toBe(0);
+      });
+    } finally {
+      scope.dispose();
+      f.dispose();
+    }
+  },
+);
+nativeIt.each(['HEAD', 'B5', 'file-bytes', 'inode', 'mode', 'remnant', 'symlink', 'name', 'scope'])(
   'actual midselected %s drift is STALE and preserves changed state without reader mutation',
   async (kind) => {
     const f = await fixture(),
@@ -1187,64 +1206,70 @@ it.each(['HEAD', 'B5', 'file-bytes', 'inode', 'mode', 'remnant', 'symlink', 'nam
     }
   },
 );
-it('selected native read error projects closed STALE and erases every buffer actually returned before failure', async () => {
-  const f = await fixture(),
-    api = await ownerApi(),
-    scope = readScope(f);
-  try {
-    scope.run(() => {
-      const before = inventory(f.repo.base);
-      readHooks.beforeSelected = () => {
-        throw new Error('PRIVATE_NATIVE_CAUSE_WITH_PATH_' + f.repo.namespace);
-      };
-      observe(() =>
-        invalid(
-          () => api.readReconciliationHostApproval(f.repo.root, OWNER_ID),
-          'RECONCILIATION_OWNER_HOST_STALE',
-        ),
-      );
-      readonly();
-      zeroed();
-      expect(inventory(f.repo.base)).toEqual(before);
-    });
-  } finally {
-    scope.dispose();
-    f.dispose();
-  }
-});
-it('readonly entry during actual native admission refuses before raw seed open/close and does not drop owning lock', async () => {
-  const f = await fixture(),
-    api = await ownerApi(),
-    scope = readScope(f),
-    anchor = readReconciliationAdmissionAnchor(f.repo.namespace);
-  try {
-    scope.run(() => {
-      const before = inventory(f.repo.base);
-      withReconciliationAdmissionSteps(f.repo.namespace, anchor, () => {
-        observe(() => invalid(() => api.readReconciliationHostApproval(f.repo.root, OWNER_ID)));
+nativeIt(
+  'selected native read error projects closed STALE and erases every buffer actually returned before failure',
+  async () => {
+    const f = await fixture(),
+      api = await ownerApi(),
+      scope = readScope(f);
+    try {
+      scope.run(() => {
+        const before = inventory(f.repo.base);
+        readHooks.beforeSelected = () => {
+          throw new Error('PRIVATE_NATIVE_CAUSE_WITH_PATH_' + f.repo.namespace);
+        };
+        observe(() =>
+          invalid(
+            () => api.readReconciliationHostApproval(f.repo.root, OWNER_ID),
+            'RECONCILIATION_OWNER_HOST_STALE',
+          ),
+        );
         readonly();
-        expect(readHooks.seedOpens).toBe(0);
-        expect(readHooks.seedCloses).toBe(0);
-        expect(readHooks.namespaceCalls).toBe(0);
-        const module = pathToFileURL(
-          resolve(ROOT, 'packages/authority/dist/boundaries/host-reconciliation-admission.js'),
-        ).href;
-        const code = `import {readReconciliationAdmissionAnchor,withReconciliationAdmissionSteps} from ${JSON.stringify(module)};try{const a=readReconciliationAdmissionAnchor(process.argv[1]);withReconciliationAdmissionSteps(process.argv[1],a,()=>{});process.stdout.write('UNEXPECTED_ADMISSION');}catch(e){process.stdout.write(e.code==='RECONCILIATION_ADMISSION_BUSY'?'BUSY':'OTHER');}`;
-        expect(
-          execFileSync(process.execPath, ['--input-type=module', '-e', code, f.repo.namespace], {
-            env: cleanEnv,
-            encoding: 'utf8',
-            stdio: ['ignore', 'pipe', 'pipe'],
-          }),
-        ).toBe('BUSY');
+        zeroed();
+        expect(inventory(f.repo.base)).toEqual(before);
       });
-      expect(inventory(f.repo.base)).toEqual(before);
-    });
-  } finally {
-    scope.dispose();
-    f.dispose();
-  }
-});
+    } finally {
+      scope.dispose();
+      f.dispose();
+    }
+  },
+);
+nativeIt(
+  'readonly entry during actual native admission refuses before raw seed open/close and does not drop owning lock',
+  async () => {
+    const f = await fixture(),
+      api = await ownerApi(),
+      scope = readScope(f),
+      anchor = readReconciliationAdmissionAnchor(f.repo.namespace);
+    try {
+      scope.run(() => {
+        const before = inventory(f.repo.base);
+        withReconciliationAdmissionSteps(f.repo.namespace, anchor, () => {
+          observe(() => invalid(() => api.readReconciliationHostApproval(f.repo.root, OWNER_ID)));
+          readonly();
+          expect(readHooks.seedOpens).toBe(0);
+          expect(readHooks.seedCloses).toBe(0);
+          expect(readHooks.namespaceCalls).toBe(0);
+          const module = pathToFileURL(
+            resolve(ROOT, 'packages/authority/dist/boundaries/host-reconciliation-admission.js'),
+          ).href;
+          const code = `import {readReconciliationAdmissionAnchor,withReconciliationAdmissionSteps} from ${JSON.stringify(module)};try{const a=readReconciliationAdmissionAnchor(process.argv[1]);withReconciliationAdmissionSteps(process.argv[1],a,()=>{});process.stdout.write('UNEXPECTED_ADMISSION');}catch(e){process.stdout.write(e.code==='RECONCILIATION_ADMISSION_BUSY'?'BUSY':'OTHER');}`;
+          expect(
+            execFileSync(process.execPath, ['--input-type=module', '-e', code, f.repo.namespace], {
+              env: cleanEnv,
+              encoding: 'utf8',
+              stdio: ['ignore', 'pipe', 'pipe'],
+            }),
+          ).toBe('BUSY');
+        });
+        expect(inventory(f.repo.base)).toEqual(before);
+      });
+    } finally {
+      scope.dispose();
+      f.dispose();
+    }
+  },
+);
 afterAll(() => {
   const paths = [
     'packages/authority/src/boundaries/reconciliation-host-owner.ts',

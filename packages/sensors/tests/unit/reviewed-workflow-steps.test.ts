@@ -17,6 +17,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import { afterAll, describe, expect, it } from 'vitest';
+import { parse, stringify } from 'yaml';
 import { attestedRcVerificationWorkflow } from '../../../cli/src/services/ci-scaffold/index.js';
 import { buildGithubActionsAdapterPlan } from '../../../cli/src/services/github-actions-adapter/index.js';
 import { senseHarnessCoherence } from '../../src/harness-coherence.js';
@@ -125,6 +126,56 @@ describe('reviewed workflow step registry', () => {
         .map((job) => `${file}#${job}`),
     );
     expect(unknown).toEqual([]);
+  });
+
+  it('bounds native runner admission to actual source, exact reviewed occurrences and file bytes', () => {
+    const source = readFileSync(join(WORKFLOWS, 'pull-request-checks.yml'), 'utf8');
+    const tree = mkdtempSync(join(tmpdir(), 'devai-native-reviewed-workflow-'));
+    adopterTrees.push(tree);
+    const workflowPath = join(tree, '.github/workflows/pull-request-checks.yml');
+    mkdirSync(dirname(workflowPath), { recursive: true });
+    for (const path of new Set(
+      workflowStepInventory(source, ROOT).flatMap((step) => step.files ?? []),
+    )) {
+      mkdirSync(dirname(join(tree, path)), { recursive: true });
+      cpSync(join(ROOT, path), join(tree, path));
+    }
+    writeFileSync(workflowPath, source);
+    expect(jobEffectFacts(source, tree, 'native-apfs').effect).toBe('read-only');
+    for (const variant of [
+      'runner',
+      'expression',
+      'reordered',
+      'transplanted',
+      'renamed',
+      'workflow-runner',
+      'defaults-runner',
+    ]) {
+      const document = parse(source);
+      const native = document.jobs['native-apfs'];
+      let job = 'native-apfs';
+      if (variant === 'runner') native['runs-on'] = 'macos-latest';
+      if (variant === 'expression') native['runs-on'] = '${{ matrix.os }}';
+      if (variant === 'reordered')
+        [native.steps[0], native.steps[1]] = [native.steps[1], native.steps[0]];
+      if (variant === 'transplanted') native.steps[2] = document.jobs['gate-cli'].steps[2];
+      if (variant === 'renamed') {
+        document.jobs.other = native;
+        delete document.jobs['native-apfs'];
+        job = 'other';
+      }
+      if (variant === 'workflow-runner') document['runs-on'] = 'macos-15';
+      if (variant === 'defaults-runner') native.defaults = { run: { 'runs-on': 'macos-15' } };
+      const changed = stringify(document);
+      writeFileSync(workflowPath, changed);
+      expect(jobEffectFacts(changed, tree, job).effect, variant).toBe('unknown');
+    }
+    writeFileSync(workflowPath, `${source}# changed source\n`);
+    expect(jobEffectFacts(source, tree, 'native-apfs').effect).toBe('unknown');
+    writeFileSync(workflowPath, source);
+    const script = join(tree, 'scripts/run-native-apfs-tests.mjs');
+    writeFileSync(script, `${readFileSync(script, 'utf8')}# changed executable\n`);
+    expect(jobEffectFacts(source, tree, 'native-apfs').effect).toBe('unknown');
   });
 
   // #390: the generated adopter workflows are proved by step digest, never by file name.

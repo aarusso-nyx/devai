@@ -98,6 +98,7 @@ import { createHash, createHmac } from 'node:crypto';
 import {
   mkdirSync,
   mkdtempSync,
+  statfsSync,
   realpathSync,
   readFileSync,
   readdirSync,
@@ -193,6 +194,10 @@ async function provisionApi() {
 }
 const ROOT = resolve(import.meta.dirname, '../../../..');
 const external = realpathSync(mkdtempSync(resolve(tmpdir(), 'devai-native-provision-inspector-')));
+const qualifiedNativeFilesystem =
+  process.platform === 'darwin' && statfsSync(external, { bigint: true }).type === 26n;
+const nativeIt = it.runIf(qualifiedNativeFilesystem);
+const nativeDescribe = describe.runIf(qualifiedNativeFilesystem);
 const cleanEnv = {
   PATH: '/usr/bin:/bin',
   LC_ALL: 'C',
@@ -588,7 +593,30 @@ function complete(f: Awaited<ReturnType<typeof harness>>) {
   const c = result(review.confirm(b.confirmation), 'created');
   return { review, a, b, c };
 }
-describe('actual fixed native provisioning with synthetic B5/TTY custody', () => {
+it('qualifies actual native provisioning or refuses unsupported filesystems without writes', async () => {
+  const f = await harness();
+  try {
+    const before = inventory(f.repo.base);
+    fsHooks.mutations = [];
+    f.run(() => {
+      if (qualifiedNativeFilesystem) {
+        const review = f.module.createReconciliationHostProvisionReview(f.repo.root);
+        expect(review.cancel().outcome).toBe('cancelled');
+      } else {
+        expect(() => f.module.createReconciliationHostProvisionReview(f.repo.root)).toThrow(
+          'RECONCILIATION_PROVISION_UNSUPPORTED',
+        );
+      }
+    });
+    expect(f.targets).toEqual([]);
+    expect(fsHooks.mutations).toEqual([]);
+    expect(inventory(f.repo.base)).toEqual(before);
+  } finally {
+    f.dispose();
+  }
+});
+
+nativeDescribe('actual fixed native provisioning with synthetic B5/TTY custody', () => {
   for (const linked of [false, true])
     it(`${linked ? 'registered linked' : 'direct'} publishes exact private precursor then one authenticated issuer through distinct genuine receipts`, async () => {
       const f = await harness({ linked });
@@ -793,7 +821,7 @@ describe('actual fixed native provisioning with synthetic B5/TTY custody', () =>
   });
 });
 
-it.each([
+nativeIt.each([
   ['HEAD', 'precursor'],
   ['B5', 'precursor'],
   ['HEAD', 'staged'],
@@ -840,7 +868,7 @@ it.each([
     }
   },
 );
-it.each(['detached', 'clone', 'proxy', 'revoked', 'foreign-scope'])(
+nativeIt.each(['detached', 'clone', 'proxy', 'revoked', 'foreign-scope'])(
   'refuses %s review method custody before effects',
   async (form) => {
     const f = await harness();
@@ -891,7 +919,7 @@ it('foreign physical root is only a selector and cannot escape sealed invocation
   }
 });
 
-it.each(['unknown-entry', 'staged-remnant', 'private-mode', 'dangling-link'])(
+nativeIt.each(['unknown-entry', 'staged-remnant', 'private-mode', 'dangling-link'])(
   'foreign %s after READY is refused and preserved without cleanup',
   async (form) => {
     const f = await harness();
@@ -928,7 +956,7 @@ it.each(['unknown-entry', 'staged-remnant', 'private-mode', 'dangling-link'])(
     }
   },
 );
-it.each(['mode', 'bytes', 'hardlink'])(
+nativeIt.each(['mode', 'bytes', 'hardlink'])(
   'foreign seed %s drift between stages refuses issuer and preserves state',
   async (form) => {
     const f = await harness();
@@ -955,29 +983,32 @@ it.each(['mode', 'bytes', 'hardlink'])(
   },
 );
 
-it('readonly constructor READY and cancellation invoke no observed parent-process filesystem mutator', async () => {
-  const f = await harness();
-  try {
-    const before = inventory(f.repo.base);
-    const events: string[] = [];
-    f.run(() => {
-      fsHooks.mutations = events;
-      try {
-        const review = f.module.createReconciliationHostProvisionReview(f.repo.root);
-        ready(review.start(), 'seed');
-        result(review.cancel(), 'cancelled');
-      } finally {
-        fsHooks.mutations = undefined;
-      }
-    });
-    expect(events).toEqual([]);
-    expect(inventory(f.repo.base)).toEqual(before);
-    expect(f.targets).toEqual([]);
-  } finally {
-    f.dispose();
-  }
-});
-it.each(['HEAD', 'B5'])(
+nativeIt(
+  'readonly constructor READY and cancellation invoke no observed parent-process filesystem mutator',
+  async () => {
+    const f = await harness();
+    try {
+      const before = inventory(f.repo.base);
+      const events: string[] = [];
+      f.run(() => {
+        fsHooks.mutations = events;
+        try {
+          const review = f.module.createReconciliationHostProvisionReview(f.repo.root);
+          ready(review.start(), 'seed');
+          result(review.cancel(), 'cancelled');
+        } finally {
+          fsHooks.mutations = undefined;
+        }
+      });
+      expect(events).toEqual([]);
+      expect(inventory(f.repo.base)).toEqual(before);
+      expect(f.targets).toEqual([]);
+    } finally {
+      f.dispose();
+    }
+  },
+);
+nativeIt.each(['HEAD', 'B5'])(
   'pre-effect %s drift is terminal STALE with zero observed mutations',
   async (kind) => {
     const f = await harness();
@@ -1021,33 +1052,36 @@ it.each(['HEAD', 'B5'])(
     }
   },
 );
-it('native precursor fsync fault yields safe terminal indeterminate without issuer or retry', async () => {
-  const f = await harness();
-  try {
-    f.run(() => {
-      const review = f.module.createReconciliationHostProvisionReview(f.repo.root);
-      const a = ready(review.start(), 'seed'),
-        b = ready(review.confirm(a.confirmation), 'issuer');
-      const seed = inventory(resolve(f.repo.namespace, 'admission.sqlite'));
-      const marker = 'FIXTURE_PRIVATE_NATIVE_CAUSE_7dca';
-      fsHooks.syncSize = 8192;
-      fsHooks.afterSync = () => {
-        throw new Error(marker);
-      };
-      const c = result(review.confirm(b.confirmation), 'indeterminate');
-      expect(JSON.stringify(c).includes(marker)).toBe(false);
-      expect(existsSync(resolve(f.repo.namespace, 'issuer.json'))).toBe(false);
-      expect(inventory(resolve(f.repo.namespace, 'admission.sqlite'))).toEqual(seed);
-      expect(() => review.confirm(b.confirmation)).toThrow(
-        'RECONCILIATION_PROVISION_REVIEW_INVALID',
-      );
-    });
-  } finally {
-    f.dispose();
-  }
-});
+nativeIt(
+  'native precursor fsync fault yields safe terminal indeterminate without issuer or retry',
+  async () => {
+    const f = await harness();
+    try {
+      f.run(() => {
+        const review = f.module.createReconciliationHostProvisionReview(f.repo.root);
+        const a = ready(review.start(), 'seed'),
+          b = ready(review.confirm(a.confirmation), 'issuer');
+        const seed = inventory(resolve(f.repo.namespace, 'admission.sqlite'));
+        const marker = 'FIXTURE_PRIVATE_NATIVE_CAUSE_7dca';
+        fsHooks.syncSize = 8192;
+        fsHooks.afterSync = () => {
+          throw new Error(marker);
+        };
+        const c = result(review.confirm(b.confirmation), 'indeterminate');
+        expect(JSON.stringify(c).includes(marker)).toBe(false);
+        expect(existsSync(resolve(f.repo.namespace, 'issuer.json'))).toBe(false);
+        expect(inventory(resolve(f.repo.namespace, 'admission.sqlite'))).toEqual(seed);
+        expect(() => review.confirm(b.confirmation)).toThrow(
+          'RECONCILIATION_PROVISION_REVIEW_INVALID',
+        );
+      });
+    } finally {
+      f.dispose();
+    }
+  },
+);
 
-it.each(['closed-root', 'approval-directories'])(
+nativeIt.each(['closed-root', 'approval-directories'])(
   'bounded native %s census refuses oversized actual directory without bulk materialization and closes cursor',
   async (kind) => {
     const f = await harness();
@@ -1222,7 +1256,7 @@ function authenticatedCensus(
     writeFileSync(resolve(leaf, name), encoded(record), { mode: 0o600 });
   return { leaf, records, sign, encoded, dispose: () => key.fill(0) };
 }
-it.each([
+nativeIt.each([
   'valid',
   'wrong-filename-kind',
   'tampered-MAC',
@@ -1423,96 +1457,104 @@ async function precursorFixture() {
   f.dispose();
   return f.repo;
 }
-it('actual native adapter serializes against a live process and survives own lock-holder SIGKILL without changing seed', async () => {
-  const repo = await precursorFixture();
-  const seed = inventory(resolve(repo.namespace, 'admission.sqlite'));
-  const holder = startNativeChild(repo, 'hold');
-  const contender = startNativeChild(repo, 'normal');
-  let successor: ReturnType<typeof startNativeChild> | undefined;
-  try {
-    await Promise.all([
-      awaitFile(resolve(holder.control, 'ready.json'), holder.child),
-      awaitFile(resolve(contender.control, 'ready.json'), contender.child),
-    ]);
-    writeFileSync(resolve(holder.control, 'confirm'), '');
-    await awaitFile(resolve(holder.control, 'locked.json'), holder.child);
-    writeFileSync(resolve(contender.control, 'confirm'), '');
-    await awaitFile(resolve(contender.control, 'result.json'), contender.child);
-    const losing = JSON.parse(
-      readFileSync(resolve(contender.control, 'result.json'), 'utf8'),
-    ) as Data;
-    expect(losing).toMatchObject({
-      reply: { outcome: 'indeterminate' },
-      anchorOpenInLock: 0,
-      anchorCloseInLock: 0,
-    });
-    expect(existsSync(resolve(repo.namespace, 'issuer.json'))).toBe(false);
-    expect(readdirSync(repo.namespace)).toEqual(['admission.sqlite']);
-    expect(holder.child.kill('SIGKILL')).toBe(true);
-    expect((await holder.exit).signal).toBe('SIGKILL');
-    successor = startNativeChild(repo, 'normal');
-    await awaitFile(resolve(successor.control, 'ready.json'), successor.child);
-    writeFileSync(resolve(successor.control, 'confirm'), '');
-    await awaitFile(resolve(successor.control, 'result.json'), successor.child);
-    const won = JSON.parse(readFileSync(resolve(successor.control, 'result.json'), 'utf8')) as Data;
-    expect(won).toMatchObject({
-      reply: { outcome: 'created' },
-      anchorOpenInLock: 0,
-      anchorCloseInLock: 0,
-    });
-    expect(inventory(resolve(repo.namespace, 'admission.sqlite'))).toEqual(seed);
-    expect(readdirSync(repo.namespace).sort()).toEqual(['admission.sqlite', 'issuer.json']);
-    expect((await contender.exit).code).toBe(0);
-    expect((await successor.exit).code).toBe(0);
-    observations.push({
-      kind: 'actual-native-process-contention',
-      holder_signal: 'SIGKILL',
-      loser: losing,
-      successor: won,
-      seed_unchanged: true,
-    });
-  } finally {
-    for (const item of [holder, contender, successor])
-      if (item && item.child.exitCode === null && item.child.signalCode === null)
-        item.child.kill('SIGKILL');
-  }
-});
-it('own native child killed immediately after real issuer link leaves exact remnant and future bootstrap refuses without cleanup', async () => {
-  const repo = await precursorFixture();
-  const child = startNativeChild(repo, 'kill-after-link');
-  try {
-    await awaitFile(resolve(child.control, 'ready.json'), child.child);
-    writeFileSync(resolve(child.control, 'confirm'), '');
-    expect((await child.exit).signal).toBe('SIGKILL');
-    expect(existsSync(resolve(child.control, 'result.json'))).toBe(false);
-    const entries = readdirSync(repo.namespace).sort();
-    expect(entries).toContain('issuer.json');
-    expect(entries).toHaveLength(3);
-    expect(lstatSync(resolve(repo.namespace, 'issuer.json')).nlink).toBe(2);
-    const before = inventory(repo.base);
-    const f = await harness({ repo });
+nativeIt(
+  'actual native adapter serializes against a live process and survives own lock-holder SIGKILL without changing seed',
+  async () => {
+    const repo = await precursorFixture();
+    const seed = inventory(resolve(repo.namespace, 'admission.sqlite'));
+    const holder = startNativeChild(repo, 'hold');
+    const contender = startNativeChild(repo, 'normal');
+    let successor: ReturnType<typeof startNativeChild> | undefined;
     try {
-      f.run(() =>
-        expect(() => f.module.createReconciliationHostProvisionReview(repo.root)).toThrow(
-          'RECONCILIATION_PROVISION_INVALID',
-        ),
-      );
+      await Promise.all([
+        awaitFile(resolve(holder.control, 'ready.json'), holder.child),
+        awaitFile(resolve(contender.control, 'ready.json'), contender.child),
+      ]);
+      writeFileSync(resolve(holder.control, 'confirm'), '');
+      await awaitFile(resolve(holder.control, 'locked.json'), holder.child);
+      writeFileSync(resolve(contender.control, 'confirm'), '');
+      await awaitFile(resolve(contender.control, 'result.json'), contender.child);
+      const losing = JSON.parse(
+        readFileSync(resolve(contender.control, 'result.json'), 'utf8'),
+      ) as Data;
+      expect(losing).toMatchObject({
+        reply: { outcome: 'indeterminate' },
+        anchorOpenInLock: 0,
+        anchorCloseInLock: 0,
+      });
+      expect(existsSync(resolve(repo.namespace, 'issuer.json'))).toBe(false);
+      expect(readdirSync(repo.namespace)).toEqual(['admission.sqlite']);
+      expect(holder.child.kill('SIGKILL')).toBe(true);
+      expect((await holder.exit).signal).toBe('SIGKILL');
+      successor = startNativeChild(repo, 'normal');
+      await awaitFile(resolve(successor.control, 'ready.json'), successor.child);
+      writeFileSync(resolve(successor.control, 'confirm'), '');
+      await awaitFile(resolve(successor.control, 'result.json'), successor.child);
+      const won = JSON.parse(
+        readFileSync(resolve(successor.control, 'result.json'), 'utf8'),
+      ) as Data;
+      expect(won).toMatchObject({
+        reply: { outcome: 'created' },
+        anchorOpenInLock: 0,
+        anchorCloseInLock: 0,
+      });
+      expect(inventory(resolve(repo.namespace, 'admission.sqlite'))).toEqual(seed);
+      expect(readdirSync(repo.namespace).sort()).toEqual(['admission.sqlite', 'issuer.json']);
+      expect((await contender.exit).code).toBe(0);
+      expect((await successor.exit).code).toBe(0);
+      observations.push({
+        kind: 'actual-native-process-contention',
+        holder_signal: 'SIGKILL',
+        loser: losing,
+        successor: won,
+        seed_unchanged: true,
+      });
     } finally {
-      f.dispose();
+      for (const item of [holder, contender, successor])
+        if (item && item.child.exitCode === null && item.child.signalCode === null)
+          item.child.kill('SIGKILL');
     }
-    expect(inventory(repo.base)).toEqual(before);
-    observations.push({
-      kind: 'actual-native-link-crash',
-      signal: 'SIGKILL',
-      entries,
-      inventory_preserved: true,
-      terminal_success: false,
-    });
-  } finally {
-    if (child.child.exitCode === null && child.child.signalCode === null)
-      child.child.kill('SIGKILL');
-  }
-});
+  },
+);
+nativeIt(
+  'own native child killed immediately after real issuer link leaves exact remnant and future bootstrap refuses without cleanup',
+  async () => {
+    const repo = await precursorFixture();
+    const child = startNativeChild(repo, 'kill-after-link');
+    try {
+      await awaitFile(resolve(child.control, 'ready.json'), child.child);
+      writeFileSync(resolve(child.control, 'confirm'), '');
+      expect((await child.exit).signal).toBe('SIGKILL');
+      expect(existsSync(resolve(child.control, 'result.json'))).toBe(false);
+      const entries = readdirSync(repo.namespace).sort();
+      expect(entries).toContain('issuer.json');
+      expect(entries).toHaveLength(3);
+      expect(lstatSync(resolve(repo.namespace, 'issuer.json')).nlink).toBe(2);
+      const before = inventory(repo.base);
+      const f = await harness({ repo });
+      try {
+        f.run(() =>
+          expect(() => f.module.createReconciliationHostProvisionReview(repo.root)).toThrow(
+            'RECONCILIATION_PROVISION_INVALID',
+          ),
+        );
+      } finally {
+        f.dispose();
+      }
+      expect(inventory(repo.base)).toEqual(before);
+      observations.push({
+        kind: 'actual-native-link-crash',
+        signal: 'SIGKILL',
+        entries,
+        inventory_preserved: true,
+        terminal_success: false,
+      });
+    } finally {
+      if (child.child.exitCode === null && child.child.signalCode === null)
+        child.child.kill('SIGKILL');
+    }
+  },
+);
 
 afterAll(() => {
   const sources = [
@@ -1549,7 +1591,7 @@ afterAll(() => {
   );
 });
 
-describe('public interruption retains actual native custody without new effects', () => {
+nativeDescribe('public interruption retains actual native custody without new effects', () => {
   it('retains the actual seed identities and refuses borrowed, foreign-scope and repeated interruptions', async () => {
     const f = await harness();
     try {
