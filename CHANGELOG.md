@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.8.1 — candidate
+
+This patch candidate preserves validated Git resolve-undo (REUC) extension bytes
+when planning a proof-index update. It continues to reject malformed or unsupported
+extensions and protected path aliases, preserves non-proof index data, and recomputes
+the index checksum (#436). The successor checkpoint records the limits of its
+synthetic evidence.
+
+The protected release verifier remains the trusted `@aarusso-nyx/devai@2.4.0`
+package and provenance; this candidate does not rotate that trust pin.
+
 ## 2.8.0 — 2026-10-25
 
 This minor release adds bounded recovery of a historical proof anchor and
