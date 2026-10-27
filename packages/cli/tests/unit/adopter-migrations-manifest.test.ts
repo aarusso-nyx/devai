@@ -52,6 +52,19 @@ const CONFIGURATION_NEUTRAL_RELEASES: ReadonlyMap<string, { from: string; reason
     ],
   ]);
 
+// Candidate declarations remain separate until the changelog records a dated release.
+const CONFIGURATION_NEUTRAL_CANDIDATES: ReadonlyMap<string, { from: string; reason: string }> =
+  new Map([
+    [
+      '2.8.1',
+      {
+        from: '2.8.0',
+        reason:
+          'Proof-index resolve-undo preservation behavior only; no adopter-facing configuration changed.',
+      },
+    ],
+  ]);
+
 describe('#264: the adopter migration manifest', () => {
   it('validates against its schema with ascending releases and version-scoped change ids', () => {
     expect(manifest.baseline).toBe('1.6.0');
@@ -310,11 +323,24 @@ describe('#264: the adopter migration manifest', () => {
     }
   });
 
+  it('records configuration-neutral candidates without presenting them as released', () => {
+    const changelog = readFileSync(join(ROOT, 'CHANGELOG.md'), 'utf8');
+    for (const [version, { from, reason }] of CONFIGURATION_NEUTRAL_CANDIDATES) {
+      expect(reason).not.toEqual('');
+      expect(changelog).toContain(`## ${version} — candidate\n`);
+      expect(manifest.releases.find((release) => release.version === version)).toBeUndefined();
+      expect(plannedReleases(manifest, from, version)).toEqual([]);
+    }
+    expect(resolveCliVersion()).toBe('2.8.1');
+    expect(CONFIGURATION_NEUTRAL_CANDIDATES.has(resolveCliVersion())).toBe(true);
+  });
+
   it('covers the installed package version', () => {
     const installed = resolveCliVersion();
     if (
       compareVersions(installed, manifest.baseline) > 0 &&
-      !CONFIGURATION_NEUTRAL_RELEASES.has(installed)
+      !CONFIGURATION_NEUTRAL_RELEASES.has(installed) &&
+      !CONFIGURATION_NEUTRAL_CANDIDATES.has(installed)
     ) {
       expect(manifest.releases.map((release) => release.version)).toContain(installed);
     }
