@@ -17,7 +17,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 const root = resolve(import.meta.dirname, '../../../..');
 const output = mkdtempSync(join(tmpdir(), 'devai-release-stage-test-'));
 const SELECTED_RELEASE_VERSION = '2.7.1';
-const CURRENT_PACKAGE_VERSION = '2.8.0';
+const CURRENT_PACKAGE_VERSION = '2.8.1';
 const TRUSTED_VERIFIER_PACKAGE_VERSION = '2.4.0';
 const TRUSTED_VERIFIER_POLICY = JSON.parse(
   readFileSync(join(root, 'law/policy/trusted-local-rc-verifier-package.json'), 'utf8'),
@@ -329,7 +329,7 @@ describe('normalized release package staging', () => {
     });
   });
 
-  it('records the current 2.8.0 package as stable with the latest dist-tag', () => {
+  it('records the current 2.8.1 package as stable with the latest dist-tag', () => {
     const manifest = join(output, 'current-release-manifest.json');
     execFileSync(process.execPath, [join(root, 'scripts/create-release-manifest.mjs')], {
       cwd: root,
