@@ -270,8 +270,22 @@ function divergentAnchorRecovery(inputs: VerbEvidenceInputs): RecoverySnapshot {
       throw new Error(
         'PROOF_ANCHOR_RECOVERY_STALE_HEAD: expected head differs from canonical head',
       );
-    const snapshot = newestLineRecovery(inputs, true);
+    let snapshot: RecoverySnapshot;
+    try {
+      snapshot = newestLineRecovery(inputs, true);
+    } catch (error) {
+      // Snapshot collection may observe both sides of a concurrent append.
+      // Only a verified changed head permits the stale-head classification.
+      if (recoveryCanonicalChain(root).head !== request.expectedHead)
+        throw new Error('PROOF_ANCHOR_RECOVERY_STALE_HEAD: canonical head changed during snapshot');
+      throw error;
+    }
     if (snapshot.chain === undefined) throw new Error('canonical chain is missing');
+    // The chain can advance between the first head check and snapshot collection.
+    // Classify that race using a freshly verified canonical chain before comparing
+    // provenance from the two observations.
+    if (recoveryCanonicalChain(root).head !== request.expectedHead)
+      throw new Error('PROOF_ANCHOR_RECOVERY_STALE_HEAD: canonical head changed during snapshot');
     const sourceBytes = recoveryBytes(root, request.sourceChain) as Buffer;
     if (createHash('sha256').update(sourceBytes).digest('hex') !== request.sourceChainSha256)
       throw new Error('source chain digest mismatch');
