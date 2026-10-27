@@ -10,6 +10,10 @@ import {
   statSync,
   accessSync,
   constants,
+  openSync,
+  closeSync,
+  fstatSync,
+  readSync,
 } from 'node:fs';
 import { join, delimiter, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
@@ -29,6 +33,61 @@ const PIN = {
 const fail = () => {
   throw Error('REFUSED');
 };
+// Bind the installed executable itself, not only the version string. This detects
+// persistent replacement but is not a trust boundary against a same-UID process.
+function gitIdentity(path) {
+  const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+  try {
+    const before = fstatSync(fd);
+    const atPath = lstatSync(path);
+    if (
+      !before.isFile() ||
+      before.size > 128 * 1024 * 1024 ||
+      before.dev !== atPath.dev ||
+      before.ino !== atPath.ino
+    )
+      fail();
+    const hash = createHash('sha256');
+    const bytes = Buffer.allocUnsafe(65536);
+    let total = 0;
+    for (;;) {
+      const count = readSync(fd, bytes, 0, bytes.length, null);
+      if (count === 0) break;
+      total += count;
+      if (total > 128 * 1024 * 1024) fail();
+      hash.update(bytes.subarray(0, count));
+    }
+    const after = fstatSync(fd);
+    const pathAfter = lstatSync(path);
+    if (
+      before.dev !== after.dev ||
+      before.ino !== after.ino ||
+      before.size !== after.size ||
+      before.mtimeMs !== after.mtimeMs ||
+      before.ctimeMs !== after.ctimeMs ||
+      after.dev !== pathAfter.dev ||
+      after.ino !== pathAfter.ino ||
+      total !== after.size
+    )
+      fail();
+    return {
+      sha256: hash.digest('hex'),
+      dev: String(after.dev),
+      ino: String(after.ino),
+      size: after.size,
+    };
+  } finally {
+    closeSync(fd);
+  }
+}
+function sameGitIdentity(left, right) {
+  return (
+    left?.sha256 === right.sha256 &&
+    left?.dev === right.dev &&
+    left?.ino === right.ino &&
+    left?.size === right.size
+  );
+}
 // Resolve exactly the first executable selected by PATH without executing an untrusted `which`.
 function pathGit(path) {
   if (typeof path !== 'string' || !path || path.includes('\n') || path.includes('\r')) fail();
@@ -200,6 +259,7 @@ export async function provision({
       realpathSync(git) !== git
     )
       fail();
+    const gitBinding = gitIdentity(git);
     if ((await read(git, ['--version'], deadline)) !== `git version ${pin.version}`) fail();
     if ((await read(git, ['rev-parse', 'HEAD'], deadline)) !== identity.candidate) fail();
     const tree = await read(git, ['rev-parse', 'HEAD^{tree}'], deadline);
@@ -219,11 +279,16 @@ export async function provision({
       deadline - Date.now() > 2147483647
     )
       fail();
+    if (!sameGitIdentity(gitBinding, gitIdentity(git))) fail();
     const bindingPath = join(work, 'binding.json');
-    writeFileSync(bindingPath, JSON.stringify({ git, tree, ...identity }) + '\n', {
-      flag: 'wx',
-      mode: 0o600,
-    });
+    writeFileSync(
+      bindingPath,
+      JSON.stringify({ git, tree, gitIdentity: gitBinding, ...identity }) + '\n',
+      {
+        flag: 'wx',
+        mode: 0o600,
+      },
+    );
     if (deadline - Date.now() <= 0) fail();
     handoffStarted = true;
     writeFileSync(env.GITHUB_ENV, `DEVAI_BINDING_PATH=${bindingPath}\n`, { flag: 'a' });
@@ -282,6 +347,7 @@ export async function verifyPath({
     realpathSync(expectedGit) !== expectedGit
   )
     fail();
+  if (!sameGitIdentity(binding.gitIdentity, gitIdentity(expectedGit))) fail();
   const gitVersion = await read(expectedGit, ['--version'], deadline);
   if (
     pathGit(env.PATH) !== expectedGit ||
@@ -296,7 +362,8 @@ export async function verifyPath({
     (await read(expectedGit, ['status', '--porcelain', '--untracked-files=all'], deadline)) !== ''
   )
     fail();
-  if (binding.tree !== tree) fail();
+  if (binding.tree !== tree || !sameGitIdentity(binding.gitIdentity, gitIdentity(expectedGit)))
+    fail();
   return { candidate, base, tree, gitVersion };
 }
 if (process.argv[1] && fileURLToPath(import.meta.url) === realpathSync(process.argv[1])) {
