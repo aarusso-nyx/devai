@@ -1,0 +1,26 @@
+{
+  "status": "External revision2 prepared, NOT run or independently qualified",
+  "source": "packages/authority/src/boundaries/proof-index-codec.ts",
+  "originalSha256": "ba41c862f95c8c0a7e0c54eb1434c98a57182af0f58bb4c61983c6b4d67a3fb4",
+  "rejectedRevision1Sha256": "e68e9cc142a77a130419c13fc60422dc9b2eedff64365bed03823c29ea026141",
+  "candidateSha256": "13f3f76a84ce4916d3d2afdc67400f60c3fb2e4f105d428a024712272a1ad6d1",
+  "patchSha256": "cdcd87af0a25d37db3daa5cafab0466b9a37f646c3437e7fc313340b2147b645",
+  "admittedPathSubset": "Existing validPath plus printable ASCII U+0020..U+007E only, maximum4096 characters; protected exact proof/catalogue names rejected after ASCII case fold. Not general Git Unicode path support.",
+  "securityWitnesses": "reuc-upstream-independent-inspector-20261026 real APFS uppercase and long-s aliases; retained revision1 is rejected",
+  "unchanged": [
+    "REUC raw payload/header/order preservation",
+    "unknown-extension rejection",
+    "public snapshot schema and entry semantic digest",
+    "proof-only replacement admission",
+    "all filesystem CAS/lock implementation remains unchanged"
+  ],
+  "pending": [
+    "Independent native APFS alias negatives for proof and catalogue",
+    "Current43-entry admission and exact extension preservation",
+    "Full codec suite and actual owning typecheck",
+    "Real-lock CAS/flags/checksum/other-entry controls",
+    "Filesystem-equivalence review: no universal platform equivalence claim"
+  ],
+  "provenanceCorrection": "../gate-b-current-native-plan-20261026/codec-offset-correction.json; previous byte-offset failure retained",
+  "noLiveWrites": true
+}
