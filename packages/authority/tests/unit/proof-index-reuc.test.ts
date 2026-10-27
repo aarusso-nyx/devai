@@ -91,7 +91,7 @@ describe.each(['sha1', 'sha256'] as const)('resolve-undo custody with %s', (form
     for (const extensions of cases)
       expect(() => parseProofIndex(index(format, extensions), format)).toThrow();
     const corrupted = index(format, [extension(payload)]);
-    corrupted[corrupted.length - 1] ^= 1;
+    corrupted.writeUInt8(corrupted.readUInt8(corrupted.length - 1) ^ 1, corrupted.length - 1);
     expect(() => parseProofIndex(corrupted, format)).toThrow();
     expect(() =>
       planProofIndexUpdate(index(format, [extension(payload)]), format, {
