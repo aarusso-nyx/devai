@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import { syncBuiltinESMExports } from 'node:module';
 import { spawnSync } from 'node:child_process';
 import {
+  copyFileSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -117,6 +118,39 @@ describe('installer and handoff adversarial cases', () => {
         read: f.read,
       }),
     ).rejects.toThrow();
+  });
+  it('rejects an in-place substituted executable that reports the same version and delegates Git operations', async () => {
+    const f = installer();
+    const originalRun = f.run;
+    const run = async (exe: string, args: string[], options: { cwd?: string }) => {
+      await originalRun(exe, args, options);
+      if (exe === 'make' && args[0] === 'install') {
+        if (!options.cwd) throw Error('fixture build directory missing');
+        const git = join(options.cwd, '..', 'install', 'bin', 'git');
+        writeFileSync(
+          git,
+          `#!/bin/sh\ncase "$1:$2" in\n  --version:) printf '%s\\n' 'git version 2.47.3';;\n  rev-parse:HEAD) printf '%s\\n' '${candidate}';;\n  rev-parse:HEAD^{tree}) printf '%s\\n' '${tree}';;\n  merge-base:*) printf '%s\\n' '${base}';;\n  status:*) exit 0;;\n  *) exit 1;;\nesac\n`,
+          { mode: 0o700 },
+        );
+      }
+    };
+    const result = await provision({ ...f, run });
+    const environment = {
+      ...f.env,
+      DEVAI_BINDING_PATH: result.bindingPath,
+      PATH: join(result.work, 'install', 'bin'),
+    };
+    await expect(verifyPath({ manifest: f.manifest, env: environment })).resolves.toMatchObject({
+      candidate,
+    });
+    const delegate = join(f.dir, 'delegate');
+    copyFileSync(result.git, delegate);
+    writeFileSync(
+      result.git,
+      `#!/bin/sh\nif [ "$1" = "--version" ]; then printf '%s\\n' 'git version 2.47.3'; else exec "${delegate}" "$@"; fi\n`,
+      { mode: 0o700 },
+    );
+    await expect(verifyPath({ manifest: f.manifest, env: environment })).rejects.toThrow();
   });
   it('refuses manifest drift and PATH substitution after initial verification', async () => {
     const f = installer();
