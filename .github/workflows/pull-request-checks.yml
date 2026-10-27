@@ -28,7 +28,7 @@ jobs:
     # One side of the partitioned plan: test:cli and its planned descendants, with their
     # planned prerequisites (ADR-CHK-0007 rule 11).
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
       DEVAI_PREFLIGHT_BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || github.event.pull_request.base.sha }}
     steps:
@@ -44,6 +44,14 @@ jobs:
         with:
           setup-pnpm: 'true'
           cache: pnpm
+
+      - name: Provision manifest Git
+        id: provision-git
+        run: node scripts/process/ci-partition/integrated.mjs provision
+
+      - name: Verify manifest Git
+        id: verify-git
+        run: node scripts/process/ci-partition/integrated.mjs verify
 
       # The bootstrap output is keyed by the digest of the TypeScript inputs it
       # compiles, so a candidate that changes no source restores the runner
@@ -157,7 +165,12 @@ jobs:
           echo "version=1.5.1" >> "$GITHUB_OUTPUT"
           echo "provenance_sha256=$actual_provenance_sha256" >> "$GITHUB_OUTPUT"
           node .devai/state/pr-bootstrap/cli/bin.js init bind --target . --as-role architect --write --format json
+          node scripts/process/ci-partition/integrated.mjs verify
           node .devai/state/pr-bootstrap/cli/bin.js check --preflight --run --base "$DEVAI_PREFLIGHT_BASE" --as-role inspector --write --format json
+
+      - name: Verify Git before affected checks
+        id: verify-affected-git
+        run: node scripts/process/ci-partition/integrated.mjs verify
 
       - name: Affected checks owned by test:cli
         id: affected
@@ -190,7 +203,7 @@ jobs:
     # The other side: every planned node outside test:cli and its descendants, the gate
     # invariant producers (ADR-SCR-0013), and the release profile gate.
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
       DEVAI_PREFLIGHT_BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || github.event.pull_request.base.sha }}
     steps:
@@ -206,6 +219,14 @@ jobs:
         with:
           setup-pnpm: 'true'
           cache: pnpm
+
+      - name: Provision manifest Git
+        id: provision-git
+        run: node scripts/process/ci-partition/integrated.mjs provision
+
+      - name: Verify manifest Git
+        id: verify-git
+        run: node scripts/process/ci-partition/integrated.mjs verify
 
       # The bootstrap output is keyed by the digest of the TypeScript inputs it
       # compiles, so a candidate that changes no source restores the runner
@@ -319,6 +340,7 @@ jobs:
           echo "version=1.5.1" >> "$GITHUB_OUTPUT"
           echo "provenance_sha256=$actual_provenance_sha256" >> "$GITHUB_OUTPUT"
           node .devai/state/pr-bootstrap/cli/bin.js init bind --target . --as-role architect --write --format json
+          node scripts/process/ci-partition/integrated.mjs verify
           node .devai/state/pr-bootstrap/cli/bin.js check --preflight --run --base "$DEVAI_PREFLIGHT_BASE" --as-role inspector --write --format json
           # Gate invariant producers (ADR-SCR-0013): trace resolution for INV-DEVAI-002 and the
           # exact-head scorecard composition for INV-HARNESS-006, blueprint validation of the
@@ -329,6 +351,10 @@ jobs:
           node .devai/state/pr-bootstrap/cli/bin.js check --only blueprint --file packages/skills/tests/operations/fixtures/blueprint.json --format human
           node .devai/state/pr-bootstrap/cli/bin.js sense inventory --slice pack --packs-root packages/skills/tests/fixtures/pack-resolution --adopter-root packages/skills/tests/fixtures/pack-resolution --format human
 
+      - name: Verify Git before affected checks
+        id: verify-affected-git
+        run: node scripts/process/ci-partition/integrated.mjs verify
+
       - name: Affected checks and profile-selected candidate preflight
         id: affected
         shell: bash
@@ -338,6 +364,7 @@ jobs:
         run: |
           set -euo pipefail
           pnpm run release:pr-gate -- "$DEVAI_PREFLIGHT_BASE"
+          node scripts/process/ci-partition/integrated.mjs verify
           report="$RUNNER_TEMP/devai-gate-report-rest/report.json"
           mkdir -p "$RUNNER_TEMP/devai-gate-report-rest"
           status=0
