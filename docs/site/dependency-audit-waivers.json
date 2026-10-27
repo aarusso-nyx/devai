@@ -2,6 +2,6 @@
   "schemaVersion": "1.0.0",
   "baseline_release": "v1.4.5",
   "lockfile": "docs/site/package-lock.json",
-  "lockfile_sha256": "e565a9f359352245abb58c89748be1eaa670fe063204df4943217238c14d9da8",
+  "lockfile_sha256": "b20791bfed99937829bc600385fe256b9e8b8c8a04d7ecef9ae7e7bbbf50985a",
   "waivers": []
 }
