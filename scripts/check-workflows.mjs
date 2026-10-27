@@ -204,7 +204,14 @@ const PREFLIGHT_ALLOWED_SCRIPTS = [
 // The collapsed lane (ADR-CHK-0001): the step ids in order and the commands
 // each must carry.
 const PREFLIGHT_STEP_ID = 'preflight';
-const PREFLIGHT_LANE_STEP_IDS = ['install', PREFLIGHT_STEP_ID, 'affected'];
+const PREFLIGHT_LANE_STEP_IDS = [
+  'provision-git',
+  'verify-git',
+  'install',
+  PREFLIGHT_STEP_ID,
+  'verify-affected-git',
+  'affected',
+];
 // Per-event bindings (ADR-CHK-0004, remote-preflight-contract.md Queue
 // admission): the merge_group head and base under merge_group, the pull
 // request head and base otherwise; the job binds the base once and every base
@@ -1383,6 +1390,89 @@ function checkPreflightWorkflow(file, workflow, source, findings, pins) {
           ),
         );
     }
+    const gitSteps = [
+      ['provision-git', 'provision'],
+      ['verify-git', 'verify'],
+    ];
+    if (
+      !String(steps[0]?.uses ?? '').startsWith('actions/checkout@') ||
+      steps[1]?.uses !== SHARED_SETUP_ACTION ||
+      gitSteps.some(([id, command], index) => {
+        const step = steps[index + 2];
+        return (
+          step?.id !== id ||
+          step.run !== `node scripts/process/ci-partition/integrated.mjs ${command}` ||
+          Object.keys(step).some((key) => !['name', 'id', 'run'].includes(key))
+        );
+      })
+    )
+      findings.push(
+        finding(
+          'CI_PREFLIGHT_GATE_INVALID',
+          file,
+          `jobs.${jobName} must provision and verify Git immediately after checkout and setup`,
+        ),
+      );
+    const verify = 'node scripts/process/ci-partition/integrated.mjs verify';
+    const bind =
+      'node .devai/state/pr-bootstrap/cli/bin.js init bind --target . --as-role architect --write --format json';
+    const preflightCommand =
+      'node .devai/state/pr-bootstrap/cli/bin.js check --preflight --run --base "$DEVAI_PREFLIGHT_BASE" --as-role inspector --write --format json';
+    const preflight = laneSteps.find((step) => step.id === PREFLIGHT_STEP_ID);
+    const preflightLines = logicalScriptLines(preflight?.run ?? '');
+    const bindIndex = preflightLines.indexOf(bind);
+    if (
+      preflight?.shell !== 'bash' ||
+      preflightLines[0] !== 'set -euo pipefail' ||
+      bindIndex < 0 ||
+      preflightLines[bindIndex + 1] !== verify ||
+      preflightLines[bindIndex + 2] !== preflightCommand
+    ) {
+      findings.push(
+        finding(
+          'CI_PREFLIGHT_GATE_INVALID',
+          file,
+          `jobs.${jobName} must verify Git after binding and before preflight`,
+        ),
+      );
+    }
+    const verifyAffected = laneSteps.find((step) => step.id === 'verify-affected-git');
+    if (
+      verifyAffected?.run !== verify ||
+      Object.keys(verifyAffected).some((key) => !['name', 'id', 'run'].includes(key))
+    ) {
+      findings.push(
+        finding(
+          'CI_PREFLIGHT_GATE_INVALID',
+          file,
+          `jobs.${jobName} must verify Git before the affected step`,
+        ),
+      );
+    }
+    if (partition.releaseGate) {
+      const affected = laneSteps.find((step) => step.id === 'affected');
+      const lines = logicalScriptLines(affected?.run ?? '');
+      const release = 'pnpm run release:pr-gate -- "$DEVAI_PREFLIGHT_BASE"';
+      const releaseIndex = lines.indexOf(release);
+      const checkIndex = lines.findIndex((line) =>
+        line.includes(`check --affected --run ${PREFLIGHT_BASE} ${partition.partition}`),
+      );
+      if (
+        affected?.shell !== 'bash' ||
+        lines[0] !== 'set -euo pipefail' ||
+        releaseIndex < 0 ||
+        lines[releaseIndex + 1] !== verify ||
+        checkIndex <= releaseIndex + 1
+      ) {
+        findings.push(
+          finding(
+            'CI_PREFLIGHT_GATE_INVALID',
+            file,
+            `jobs.${jobName} must verify Git after the release gate before affected checks`,
+          ),
+        );
+      }
+    }
     if (object(job.env)[PREFLIGHT_BASE_VARIABLE] !== PREFLIGHT_BASE_BINDING)
       findings.push(
         finding(
@@ -1606,6 +1696,16 @@ function checkPreflightWorkflow(file, workflow, source, findings, pins) {
     if (typeof job['timeout-minutes'] !== 'number') {
       findings.push(
         finding('CI_PREFLIGHT_TIMEOUT_MISSING', file, `jobs.${name} must declare timeout-minutes`),
+      );
+    }
+    const jobBudgets = { 'gate-cli': 30, 'gate-rest': 30, 'native-apfs': 15, gate: 10 };
+    if (Object.hasOwn(jobBudgets, name) && job['timeout-minutes'] !== jobBudgets[name]) {
+      findings.push(
+        finding(
+          'CI_PREFLIGHT_TIMEOUT_INVALID',
+          file,
+          `jobs.${name} must retain its bounded job timeout`,
+        ),
       );
     }
 
