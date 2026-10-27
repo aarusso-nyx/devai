@@ -43,6 +43,7 @@ interface ParsedEntry {
 interface ParsedIndex {
   readonly snapshot: ProofIndexSnapshot;
   readonly entries: readonly ParsedEntry[];
+  readonly resolveUndo: Buffer | undefined;
 }
 
 function sha256(bytes: Uint8Array | string): string {
@@ -128,6 +129,43 @@ function validateTree(bytes: Buffer, oidSize: number, entryCount: number): void 
   if (root || offset !== bytes.length) throw new Error(INVALID);
 }
 
+/** Resolve-undo is opaque custody, never authority to restore a protected entry. */
+function validateResolveUndo(bytes: Buffer, oidSize: number): void {
+  let offset = 0;
+  const paths = new Set<string>();
+  while (offset < bytes.length) {
+    const nul = bytes.indexOf(0, offset);
+    if (nul < offset) throw new Error(INVALID);
+    const path = text(bytes.subarray(offset, nul));
+    if (!validPath(path) || paths.has(path)) throw new Error(INVALID);
+    // Deliberately bounded path support: Unicode filesystem equivalence is
+    // platform-dependent. Ordinary resolve-undo outside this subset is refused.
+    if (path.length > 4096 || !/^[\x20-\x7e]+$/u.test(path)) throw new Error(UNSUPPORTED);
+    const foldedPath = path.toLowerCase();
+    if (foldedPath === PROOF_PATH || foldedPath === 'law/security/authorization.json')
+      throw new Error(UNSUPPORTED);
+    paths.add(path);
+    offset = nul + 1;
+    const modes: string[] = [];
+    for (let stage = 0; stage < 3; stage += 1) {
+      const end = bytes.indexOf(0, offset);
+      if (end < offset) throw new Error(INVALID);
+      const mode = text(bytes.subarray(offset, end));
+      if (!['0', '100644', '100755', '120000', '160000'].includes(mode)) throw new Error(INVALID);
+      modes.push(mode);
+      offset = end + 1;
+    }
+    if (modes.every((mode) => mode === '0')) throw new Error(INVALID);
+    for (const mode of modes) {
+      if (mode === '0') continue;
+      if (offset + oidSize > bytes.length) throw new Error(INVALID);
+      if (bytes.subarray(offset, offset + oidSize).every((byte) => byte === 0))
+        throw new Error(INVALID);
+      offset += oidSize;
+    }
+  }
+}
+
 function parse(bytes: Uint8Array, objectFormat: ObjectFormat): ParsedIndex {
   if (!(bytes instanceof Uint8Array)) throw new Error(INVALID);
   if (objectFormat !== 'sha1' && objectFormat !== 'sha256') throw new Error(UNSUPPORTED);
@@ -180,21 +218,28 @@ function parse(bytes: Uint8Array, objectFormat: ObjectFormat): ParsedIndex {
     entries.push({ entry, pathBytes, raw: raw.subarray(start, offset) });
   }
   let hasTree = false;
+  let resolveUndo: Buffer | undefined;
   while (offset < limit) {
     if (offset + 8 > limit) throw new Error(INVALID);
     const signature = raw.subarray(offset, offset + 4);
     const size = raw.readUInt32BE(offset + 4);
     offset += 8;
     if (size > limit - offset) throw new Error(INVALID);
-    if (!signature.equals(Buffer.from('TREE'))) throw new Error(UNSUPPORTED);
-    if (hasTree) throw new Error(INVALID);
-    validateTree(raw.subarray(offset, offset + size), oidSize, count);
-    hasTree = true;
+    if (signature.equals(Buffer.from('TREE'))) {
+      if (hasTree) throw new Error(INVALID);
+      validateTree(raw.subarray(offset, offset + size), oidSize, count);
+      hasTree = true;
+    } else if (signature.equals(Buffer.from('REUC'))) {
+      if (resolveUndo !== undefined) throw new Error(INVALID);
+      validateResolveUndo(raw.subarray(offset, offset + size), oidSize);
+      resolveUndo = raw.subarray(offset - 8, offset + size);
+    } else throw new Error(UNSUPPORTED);
     offset += size;
   }
   const semanticEntries = Object.freeze(entries.map(({ entry }) => entry));
   return {
     entries,
+    resolveUndo,
     snapshot: Object.freeze({
       version: 2,
       object_format: objectFormat,
@@ -252,12 +297,17 @@ export function planProofIndexUpdate(
   header.write('DIRC', 0, 'ascii');
   header.writeUInt32BE(2, 4);
   header.writeUInt32BE(rawEntries.length, 8);
-  const body = Buffer.concat([header, ...rawEntries]);
+  const body = Buffer.concat([
+    header,
+    ...rawEntries,
+    ...(before.resolveUndo === undefined ? [] : [before.resolveUndo]),
+  ]);
   const output = Buffer.concat([body, createHash(objectFormat).update(body).digest()]);
   const after = parse(output, objectFormat);
   const priorOthers = before.entries.filter(({ entry }) => entry.path !== PROOF_PATH);
   const nextOthers = after.entries.filter(({ entry }) => entry.path !== PROOF_PATH);
   if (
+    !(before.resolveUndo ?? Buffer.alloc(0)).equals(after.resolveUndo ?? Buffer.alloc(0)) ||
     before.snapshot.other_entries_sha256 !== after.snapshot.other_entries_sha256 ||
     priorOthers.length !== nextOthers.length ||
     priorOthers.some((entry, index) => !entry.raw.equals(nextOthers[index]?.raw ?? Buffer.alloc(0)))
