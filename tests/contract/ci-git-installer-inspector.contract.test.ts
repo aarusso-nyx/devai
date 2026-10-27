@@ -11,7 +11,10 @@ import {
   realpathSync,
   readFileSync,
   readdirSync,
+  renameSync,
   rmSync,
+  symlinkSync,
+  unlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -151,6 +154,56 @@ describe('installer and handoff adversarial cases', () => {
       { mode: 0o700 },
     );
     await expect(verifyPath({ manifest: f.manifest, env: environment })).rejects.toThrow();
+  });
+  it('refuses executable content, inode, symlink and binding substitutions', async () => {
+    for (const kind of ['in-place', 'same-bytes-new-inode', 'symlink', 'binding-digest']) {
+      const f = installer();
+      const result = await provision(f);
+      const environment = {
+        ...f.env,
+        DEVAI_BINDING_PATH: result.bindingPath,
+        PATH: join(result.work, 'install', 'bin'),
+      };
+      await expect(
+        verifyPath({ manifest: f.manifest, env: environment, read: f.read }),
+      ).resolves.toMatchObject({ candidate });
+      if (kind === 'in-place') writeFileSync(result.git, '#!/bin/sh\n# changed\n', { mode: 0o700 });
+      if (kind === 'same-bytes-new-inode') {
+        const alternate = join(f.dir, 'alternate');
+        copyFileSync(result.git, alternate);
+        renameSync(alternate, result.git);
+      }
+      if (kind === 'symlink') {
+        const alternate = join(f.dir, 'alternate');
+        copyFileSync(result.git, alternate);
+        unlinkSync(result.git);
+        symlinkSync(alternate, result.git);
+      }
+      if (kind === 'binding-digest') {
+        const binding = JSON.parse(readFileSync(result.bindingPath, 'utf8'));
+        binding.gitIdentity.sha256 = '0'.repeat(64);
+        writeFileSync(result.bindingPath, JSON.stringify(binding));
+      }
+      await expect(
+        verifyPath({ manifest: f.manifest, env: environment, read: f.read }),
+      ).rejects.toThrow();
+    }
+  });
+  it('refuses an executable changed during version and identity probes', async () => {
+    const f = installer();
+    const result = await provision(f);
+    const environment = {
+      ...f.env,
+      DEVAI_BINDING_PATH: result.bindingPath,
+      PATH: join(result.work, 'install', 'bin'),
+    };
+    const read = async (exe: string, args: string[]) => {
+      const output = await f.read(exe, args);
+      if (args[0] === '--version')
+        writeFileSync(result.git, '#!/bin/sh\n# changed during probe\n', { mode: 0o700 });
+      return output;
+    };
+    await expect(verifyPath({ manifest: f.manifest, env: environment, read })).rejects.toThrow();
   });
   it('refuses manifest drift and PATH substitution after initial verification', async () => {
     const f = installer();
