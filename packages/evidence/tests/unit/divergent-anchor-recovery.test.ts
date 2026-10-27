@@ -8,6 +8,7 @@ import { afterEach, aroundEach, describe, expect, it, vi } from 'vitest';
 import * as authority from '@devai-nyx/authority';
 import { withAuthorityHostTestScope } from '../../../authority/tests/unit/authority-host-test-scope.js';
 import * as chainModule from '../../src/evidence/chain.js';
+import * as anchorsModule from '../../src/evidence/anchors.js';
 import { loadChain, saveChain, verifyChain, verifyProofAnchors } from '../../src/evidence/chain.js';
 import { appendProofEpochRecord } from '../../src/evidence/proof-epoch.js';
 import { deriveEvidenceId } from '../../src/evidence/id-generator.js';
@@ -180,6 +181,85 @@ function refused(
 }
 
 describe('ADR-EVI-0006 custody-proven divergent anchors', () => {
+  it('IA005: classifies a winner published during snapshot collection as stale head', () => {
+    const { root, prior } = fixture();
+    const input = request(root);
+    const proof = bytes(root, PROOF);
+    const source = bytes(root, SOURCE);
+    const baseline = bytes(root, BASELINE);
+    const original = anchorsModule.verifyProofAnchors;
+    let winner: ReturnType<typeof appendVerbEvidence> | undefined;
+    vi.spyOn(anchorsModule, 'verifyProofAnchors').mockImplementationOnce((options) => {
+      winner = appendVerbEvidence(input);
+      return original(options);
+    });
+    const loser = appendVerbEvidence(input);
+    expect(winner).toMatchObject({ ok: true });
+    expect(loser).toMatchObject({ ok: false });
+    expect(loser.error).toContain('PROOF_ANCHOR_RECOVERY_STALE_HEAD');
+    const after = loadChain(join(root, CHAIN));
+    expect(after.records).toHaveLength(prior.records.length + 1);
+    expect(after.records.slice(0, -1)).toEqual(prior.records);
+    expect(bytes(root, PROOF)).toEqual(proof);
+    expect(bytes(root, SOURCE)).toEqual(source);
+    expect(bytes(root, BASELINE)).toEqual(baseline);
+    const retry = appendVerbEvidence(request(root));
+    expect(retry).toMatchObject({ ok: true, alreadyAnchored: true, id: winner?.id });
+    expect(loadChain(join(root, CHAIN))).toEqual(after);
+  });
+
+  it.each(['corrupt', 'missing'] as const)('IA005: refuses %s chain during snapshot', (defect) => {
+    const { root } = fixture();
+    const input = request(root);
+    const proof = bytes(root, PROOF);
+    const source = bytes(root, SOURCE);
+    const baseline = bytes(root, BASELINE);
+    const original = anchorsModule.verifyProofAnchors;
+    vi.spyOn(anchorsModule, 'verifyProofAnchors').mockImplementationOnce((options) => {
+      if (defect === 'corrupt') fs.writeFileSync(join(root, CHAIN), '{invalid');
+      else fs.unlinkSync(join(root, CHAIN));
+      return original(options);
+    });
+    const result = appendVerbEvidence(input);
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('PROOF_ANCHOR_RECOVERY_REFUSED');
+    expect(result.error).not.toContain('PROOF_ANCHOR_RECOVERY_STALE_HEAD');
+    if (defect === 'corrupt') expect(fs.readFileSync(join(root, CHAIN), 'utf8')).toBe('{invalid');
+    else expect(fs.existsSync(join(root, CHAIN))).toBe(false);
+    expect(bytes(root, PROOF)).toEqual(proof);
+    expect(bytes(root, SOURCE)).toEqual(source);
+    expect(bytes(root, BASELINE)).toEqual(baseline);
+  });
+
+  it('IA005: classifies a winner after claims inspection as stale head', () => {
+    const { root, prior } = fixture();
+    const input = request(root);
+    const originalAnchors = anchorsModule.verifyProofAnchors;
+    const originalLoad = chainModule.loadChain;
+    let winner: ReturnType<typeof appendVerbEvidence> | undefined;
+    let loads = 0;
+    let insideWinner = false;
+    vi.spyOn(anchorsModule, 'verifyProofAnchors').mockImplementationOnce((options) => {
+      const result = originalAnchors(options);
+      vi.spyOn(chainModule, 'loadChain').mockImplementation((path) => {
+        if (!insideWinner && ++loads === 2) {
+          insideWinner = true;
+          winner = appendVerbEvidence(input);
+          insideWinner = false;
+        }
+        return originalLoad(path);
+      });
+      return result;
+    });
+    const loser = appendVerbEvidence(input);
+    expect(winner).toMatchObject({ ok: true });
+    expect(loser).toMatchObject({ ok: false });
+    expect(loser.error).toContain('PROOF_ANCHOR_RECOVERY_STALE_HEAD');
+    const after = originalLoad(join(root, CHAIN));
+    expect(after.records).toHaveLength(prior.records.length + 1);
+    expect(after.records.slice(0, -1)).toEqual(prior.records);
+  });
+
   it('IA001/008: restores orphan seven exactly once through a new canonical append without replaying payloads', () => {
     const { root, source, prior } = fixture();
     const before = protectedBytes(root);
