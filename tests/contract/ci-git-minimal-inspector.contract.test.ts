@@ -67,7 +67,68 @@ describe('Git-only partition workflow review', () => {
         );
       });
     }
-  it('retains existing affected steps and artifact configuration byte-for-byte', () => {
+  for (const job of ['gate-cli', 'gate-rest'])
+    for (const phase of job === 'gate-rest' ? ['preflight', 'affected'] : ['preflight'])
+      for (const mutation of ['missing', 'softened', 'moved']) {
+        it(`rejects ${mutation} ${phase} recheck in ${job}`, () => {
+          const p = fixture(),
+            file = join(p, workflow),
+            doc = parseDocument(readFileSync(file, 'utf8'));
+          const steps = doc.getIn(['jobs', job, 'steps'], true) as {
+            items: Array<{
+              get: (key: string) => unknown;
+              set: (key: string, value: unknown) => void;
+            }>;
+          };
+          const step = steps.items.find((s) => s.get('id') === phase);
+          if (!step) throw Error('missing phase');
+          const verify = 'node scripts/process/ci-partition/integrated.mjs verify';
+          const run = String(step.get('run'));
+          expect(run).toContain(verify);
+          let changed: string;
+          if (mutation === 'missing') changed = run.replace(`${verify}\n`, '');
+          else if (mutation === 'softened') changed = run.replace(verify, `${verify} || true`);
+          else changed = run.replace(`${verify}\n`, '') + `\n${verify}\n`;
+          step.set('run', changed);
+          writeFileSync(file, String(doc));
+          const findings = checkWorkflowTree(p).findings.filter(
+            (f: { file: string }) => f.file === 'pull-request-checks.yml',
+          );
+          expect(findings.map((f: { code: string }) => f.code)).toContain(
+            'CI_PREFLIGHT_GATE_INVALID',
+          );
+        });
+      }
+  for (const job of ['gate-cli', 'gate-rest'])
+    for (const mutation of ['missing', 'softened', 'moved']) {
+      it(`rejects ${mutation} pre-affected verification step in ${job}`, () => {
+        const p = fixture(),
+          file = join(p, workflow),
+          doc = parseDocument(readFileSync(file, 'utf8'));
+        const steps = doc.getIn(['jobs', job, 'steps'], true) as {
+          items: Array<{
+            get: (key: string) => unknown;
+            set: (key: string, value: unknown) => void;
+          }>;
+        };
+        const i = steps.items.findIndex((s) => s.get('id') === 'verify-affected-git');
+        const j = steps.items.findIndex((s) => s.get('id') === 'affected');
+        expect(i).toBeGreaterThanOrEqual(0);
+        expect(j).toBeGreaterThanOrEqual(0);
+        if (mutation === 'missing') steps.items[i].set('run', 'true');
+        if (mutation === 'softened') steps.items[i].set('continue-on-error', true);
+        if (mutation === 'moved')
+          [steps.items[i], steps.items[j]] = [steps.items[j], steps.items[i]];
+        writeFileSync(file, String(doc));
+        const findings = checkWorkflowTree(p).findings.filter(
+          (f: { file: string }) => f.file === 'pull-request-checks.yml',
+        );
+        expect(findings.map((f: { code: string }) => f.code)).toContain(
+          'CI_PREFLIGHT_GATE_INVALID',
+        );
+      });
+    }
+  it('preserves each original affected step except for the exact required Git rechecks', () => {
     const baseline = spawnSync(
       'git',
       ['show', '47e71896:.github/workflows/pull-request-checks.yml'],
@@ -77,16 +138,33 @@ describe('Git-only partition workflow review', () => {
     const old = parseDocument(baseline.stdout),
       current = parseDocument(readFileSync(join(root, workflow), 'utf8'));
     for (const job of ['gate-cli', 'gate-rest']) {
-      for (const id of ['affected']) {
-        const stepsOf = (doc: ReturnType<typeof parseDocument>) =>
-          (
-            doc.getIn(['jobs', job, 'steps'], true) as {
-              items: Array<{ get: (key: string) => unknown }>;
-            }
-          ).items;
-        expect(String(stepsOf(current).find((step) => step.get('id') === id))).toBe(
-          String(stepsOf(old).find((step) => step.get('id') === id)),
-        );
+      const stepsOf = (doc: ReturnType<typeof parseDocument>) =>
+        (
+          doc.getIn(['jobs', job, 'steps'], true) as {
+            items: Array<{ get: (key: string) => unknown; toJSON: () => Record<string, unknown> }>;
+          }
+        ).items;
+      const before = stepsOf(old)
+        .find((step) => step.get('id') === 'affected')
+        ?.toJSON();
+      const after = stepsOf(current)
+        .find((step) => step.get('id') === 'affected')
+        ?.toJSON();
+      expect(before).toBeDefined();
+      expect(after).toBeDefined();
+      if (!before || !after) throw Error('missing affected step');
+      const lines = String(after.run).split('\n');
+      const verify = 'node scripts/process/ci-partition/integrated.mjs verify';
+      expect(lines.filter((line) => line === verify)).toHaveLength(job === 'gate-rest' ? 1 : 0);
+      expect(lines.filter((line) => line !== verify).join('\n')).toBe(before.run);
+      const withoutRun = (step: Record<string, unknown>) =>
+        Object.fromEntries(Object.entries(step).filter(([key]) => key !== 'run'));
+      expect(withoutRun(after)).toEqual(withoutRun(before));
+      const affected = lines.findIndex((line) => line.includes('check --affected --run'));
+      if (job === 'gate-rest') {
+        const release = lines.findIndex((line) => line.includes('pnpm run release:pr-gate'));
+        expect(lines[release + 1]).toBe(verify);
+        expect(release).toBeLessThan(affected);
       }
     }
     for (const name of [
