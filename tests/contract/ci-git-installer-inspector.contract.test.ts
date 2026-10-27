@@ -118,6 +118,33 @@ describe('installer and handoff adversarial cases', () => {
       }),
     ).rejects.toThrow();
   });
+  it('refuses manifest drift and PATH substitution after initial verification', async () => {
+    const f = installer();
+    const result = await provision(f);
+    const environment = {
+      ...f.env,
+      DEVAI_BINDING_PATH: result.bindingPath,
+      PATH: join(result.work, 'install', 'bin'),
+    };
+    await expect(
+      verifyPath({ manifest: f.manifest, env: environment, read: f.read }),
+    ).resolves.toMatchObject({ candidate });
+    writeFileSync(f.manifest, JSON.stringify({ runtimes: { git: '9.9.9' } }));
+    await expect(
+      verifyPath({ manifest: f.manifest, env: environment, read: f.read }),
+    ).rejects.toThrow();
+    writeFileSync(f.manifest, JSON.stringify({ runtimes: { git: '2.47.3' } }));
+    const shadow = join(f.dir, 'substitution');
+    mkdirSync(shadow);
+    writeFileSync(join(shadow, 'git'), '#!/bin/sh\n', { mode: 0o700 });
+    await expect(
+      verifyPath({
+        manifest: f.manifest,
+        env: { ...environment, PATH: `${shadow}:${environment.PATH}` },
+        read: f.read,
+      }),
+    ).rejects.toThrow();
+  });
   it('refuses altered source and interrupted installation without publishing a path', async () => {
     for (const kind of ['source', 'signature', 'extract', 'build']) {
       const f = installer();
