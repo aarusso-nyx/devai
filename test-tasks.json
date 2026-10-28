@@ -470,6 +470,22 @@
         },
         {
           "kind": "exact",
+          "pattern": "scripts/process/ci-partition/bounded-process.mjs"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/process/ci-partition/guards.mjs"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/process/ci-partition/integrated.mjs"
+        },
+        {
+          "kind": "exact",
+          "pattern": "scripts/process/ci-partition/verified-buffer.mjs"
+        },
+        {
+          "kind": "exact",
           "pattern": "docs/site/package.json"
         },
         {
