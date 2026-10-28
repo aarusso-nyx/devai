@@ -176,7 +176,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
       },
       {
         path: 'scripts/process/ci-partition/integrated.mjs',
-        sha256: '779ac91a1c8abfb6878ad4d418eec44b16bda89282ebb9714e8c27c012f1619b',
+        sha256: '5287031f76ce555a46f77597c4f9b1a8c8764c2e73f8b6d6e75e1731e23a50e0',
       },
       {
         path: 'scripts/process/ci-partition/verified-buffer.mjs',
@@ -202,7 +202,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
       },
       {
         path: 'scripts/process/ci-partition/integrated.mjs',
-        sha256: '779ac91a1c8abfb6878ad4d418eec44b16bda89282ebb9714e8c27c012f1619b',
+        sha256: '5287031f76ce555a46f77597c4f9b1a8c8764c2e73f8b6d6e75e1731e23a50e0',
       },
       {
         path: 'scripts/process/ci-partition/verified-buffer.mjs',
@@ -228,7 +228,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
       },
       {
         path: 'scripts/process/ci-partition/integrated.mjs',
-        sha256: '779ac91a1c8abfb6878ad4d418eec44b16bda89282ebb9714e8c27c012f1619b',
+        sha256: '5287031f76ce555a46f77597c4f9b1a8c8764c2e73f8b6d6e75e1731e23a50e0',
       },
       {
         path: 'scripts/process/ci-partition/verified-buffer.mjs',
@@ -281,7 +281,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
       },
       {
         path: 'scripts/process/ci-partition/integrated.mjs',
-        sha256: '779ac91a1c8abfb6878ad4d418eec44b16bda89282ebb9714e8c27c012f1619b',
+        sha256: '5287031f76ce555a46f77597c4f9b1a8c8764c2e73f8b6d6e75e1731e23a50e0',
       },
       {
         path: 'scripts/process/ci-partition/verified-buffer.mjs',
@@ -330,7 +330,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
       },
       {
         path: 'scripts/process/ci-partition/integrated.mjs',
-        sha256: '779ac91a1c8abfb6878ad4d418eec44b16bda89282ebb9714e8c27c012f1619b',
+        sha256: '5287031f76ce555a46f77597c4f9b1a8c8764c2e73f8b6d6e75e1731e23a50e0',
       },
       {
         path: 'scripts/process/ci-partition/verified-buffer.mjs',
@@ -368,7 +368,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
       },
       {
         path: 'scripts/process/ci-partition/integrated.mjs',
-        sha256: '779ac91a1c8abfb6878ad4d418eec44b16bda89282ebb9714e8c27c012f1619b',
+        sha256: '5287031f76ce555a46f77597c4f9b1a8c8764c2e73f8b6d6e75e1731e23a50e0',
       },
       {
         path: 'scripts/process/ci-partition/verified-buffer.mjs',
