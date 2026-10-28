@@ -15,7 +15,10 @@ import {
   type TaskTarget,
 } from '../../services/check-runner/index.js';
 import { runCertificationCheckTasks } from '../../services/check-runner/runner.js';
-import { isDevaiRcCertification } from '../../services/check-runner/certification-context.js';
+import {
+  devaiRcCertificationCacheRoot,
+  isDevaiRcCertification,
+} from '../../services/check-runner/certification-context.js';
 import { executeCheckMember, type CheckExecutionOptions } from './adapters.js';
 import { resolveCheckPlan, runCheckPlan, type CheckRunReport } from './contracts.js';
 
@@ -246,6 +249,7 @@ export const checkCmd = defineCommand({
                 `CHECK_RUNNER_PARTITION: a partition applies only to --run with --affected or --local, not ${taskSelection.operation} ${taskSelection.target}`,
               );
             }
+            const certificationCacheRoot = devaiRcCertificationCacheRoot();
             const runnerOptions: CheckRunnerOptions = {
               repoRoot,
               ...taskSelection,
@@ -271,6 +275,7 @@ export const checkCmd = defineCommand({
                 }),
               }),
               ...(timeout !== undefined && { timeoutMs: timeout }),
+              ...(certificationCacheRoot !== undefined && { cacheRoot: certificationCacheRoot }),
               ...(partition !== undefined && { partition }),
             };
             // One worker is the sequential runner itself; more run independent nodes at once.
