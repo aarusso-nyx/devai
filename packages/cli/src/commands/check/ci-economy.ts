@@ -58,7 +58,7 @@ const DEFAULT_WORKFLOWS_DIR = '.github/workflows';
 const NATIVE_QUALIFICATION_PINS = [
   [
     '.github/workflows/pull-request-checks.yml',
-    '4ebb612077cba5468f555e903ac3dc42557b96a3124ee3adc6d124fccd9b4ac5',
+    '3bb7650c88d72a1239db7152369a4cbc461fb888d4ba256d7f1fdb75823f77d1',
   ],
   [
     '.github/actions/setup-node-toolchain/action.yml',
