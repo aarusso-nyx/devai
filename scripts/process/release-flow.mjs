@@ -17,6 +17,7 @@ import {
   assertFresh,
   certificationEnvironment,
   certifyCandidate,
+  candidateResultsDirectory,
   exportCandidate,
   inspectPrerequisites,
 } from './release-prerequisites.mjs';
@@ -164,7 +165,7 @@ function verifyRc(config, receipt, report, parent) {
         '--receipt',
         receipt,
         '--results-dir',
-        join(config.repo, '.devai/state/check-cache/v1/results'),
+        candidateResultsDirectory(config.repo, receipt),
         '--profile',
         'rc',
         '--commit',
