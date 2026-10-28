@@ -1,11 +1,19 @@
 import { createHash } from 'node:crypto';
-import { chmodSync, mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  mkdtempSync,
+  mkdirSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { afterEach, expect, it, vi } from 'vitest';
 
-const { certificationEnvironment, certifyCandidate } = await import(
+const { certificationEnvironment, certifyCandidate, candidateResultsDirectory } = await import(
   pathToFileURL(resolve('scripts/process/release-prerequisites.mjs')).href
 );
 const roots: string[] = [];
@@ -148,3 +156,26 @@ process.stdout.write(r.stdout); process.stderr.write(r.stderr); process.exitCode
     }
   },
 );
+
+it('binds an isolated receipt to its own results and preserves the legacy location', () => {
+  const f = fixture();
+  const base = join(realpathSync(f.config.repo), '.devai/state/check-cache/v1');
+  const aliasBase = join(f.config.repo, '.devai/state/check-cache/v1');
+  const cache = join(base, 'rc-certification-12345678-1234-4123-8123-123456789abc');
+  const receipt = join(cache, 'receipts', `${'a'.repeat(64)}.json`);
+  mkdirSync(join(cache, 'receipts'), { recursive: true });
+  mkdirSync(join(cache, 'results'));
+  writeFileSync(receipt, '{}');
+  const aliasReceipt = receipt.replace(base, aliasBase);
+  expect(candidateResultsDirectory(f.config.repo, aliasReceipt)).toBe(join(cache, 'results'));
+  expect(candidateResultsDirectory(f.config.repo, join(base, 'receipts', 'legacy.json'))).toBe(
+    join(base, 'results'),
+  );
+  expect(() =>
+    candidateResultsDirectory(f.config.repo, join(cache, 'receipts', 'invalid.json')),
+  ).toThrow('RC_CACHE_INVALID');
+  rmSync(join(cache, 'results'), { recursive: true });
+  symlinkSync(join(base, 'outside'), join(cache, 'results'));
+  mkdirSync(join(base, 'outside'));
+  expect(() => candidateResultsDirectory(f.config.repo, receipt)).toThrow('RC_CACHE_INVALID');
+});
