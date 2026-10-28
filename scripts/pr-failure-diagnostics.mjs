@@ -1,4 +1,4 @@
-import { lstatSync, readFileSync, realpathSync } from 'node:fs';
+import { closeSync, constants, fstatSync, openSync, readSync, realpathSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 // Token-shaped values and secret-named assignments. Mirrors the runner's
@@ -13,7 +13,7 @@ const SECRET_PATTERNS = [
   /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/gu,
   /\b(?:Bearer|Basic) [A-Za-z0-9._~+/=-]{8,}/gu,
   /_authToken=\S+/gu,
-  /\b[A-Z][A-Z0-9_]*(?:TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|API_KEY|PRIVATE_KEY|ACCESS_KEY)[A-Z0-9_]*=\S+/gu,
+  /\b[A-Z0-9_]*(?:TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|API_KEY|PRIVATE_KEY|ACCESS_KEY)[A-Z0-9_]*=\S+/gu,
 ];
 
 export function redactDiagnosticText(value) {
@@ -48,11 +48,25 @@ export function prFailureDiagnostics(root, execution = []) {
       try {
         const path = task.diagnosticPath;
         if (typeof path !== 'string' || dirname(path) !== directory) throw new Error('path');
-        const stat = lstatSync(path);
-        if (!stat.isFile() || stat.size > 64 * 1024 || realpathSync(path) !== path) {
-          throw new Error('file');
+        if (realpathSync(path) !== path) throw new Error('file');
+        const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+        let bytes;
+        try {
+          const stat = fstatSync(fd);
+          if (!stat.isFile() || stat.size > 64 * 1024) throw new Error('file');
+          bytes = Buffer.alloc(64 * 1024 + 1);
+          let length = 0;
+          while (length < bytes.length) {
+            const count = readSync(fd, bytes, length, bytes.length - length, null);
+            if (count === 0) break;
+            length += count;
+          }
+          if (length > 64 * 1024) throw new Error('file');
+          bytes = bytes.subarray(0, length);
+        } finally {
+          closeSync(fd);
         }
-        const diagnostic = JSON.parse(readFileSync(path, 'utf8'));
+        const diagnostic = JSON.parse(bytes.toString('utf8'));
         if (diagnostic.nodeId !== task.nodeId || diagnostic.taskKey !== task.taskKey) {
           throw new Error('binding');
         }
@@ -60,8 +74,8 @@ export function prFailureDiagnostics(root, execution = []) {
         return {
           ...result,
           ...(fileRemediation !== undefined && { remediation: fileRemediation }),
-          stdoutTail: redactDiagnosticText(String(diagnostic.stdoutTail ?? '').slice(-8192)),
-          stderrTail: redactDiagnosticText(String(diagnostic.stderrTail ?? '').slice(-8192)),
+          stdoutTail: redactDiagnosticText(String(diagnostic.stdoutTail ?? '')).slice(-8192),
+          stderrTail: redactDiagnosticText(String(diagnostic.stderrTail ?? '')).slice(-8192),
         };
       } catch {
         return { ...result, diagnostic: 'unavailable' };
