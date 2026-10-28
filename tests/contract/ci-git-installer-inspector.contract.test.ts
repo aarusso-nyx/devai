@@ -6,6 +6,7 @@ import { spawnSync } from 'node:child_process';
 import {
   copyFileSync,
   existsSync,
+  linkSync,
   mkdirSync,
   mkdtempSync,
   realpathSync,
@@ -97,6 +98,60 @@ function installer() {
 }
 
 describe('installer and handoff adversarial cases', () => {
+  it('requests stripped installation without hard-linked Git aliases', async () => {
+    const f = installer();
+    const installations: string[][] = [];
+    const run = async (exe: string, args: string[], options: { cwd?: string }) => {
+      if (exe === 'make' && args[0] === 'install') installations.push(args);
+      await f.run(exe, args, options);
+    };
+    await provision({ ...f, run });
+    expect(installations).toHaveLength(1);
+    expect(installations[0]).toContain('NO_INSTALL_HARDLINKS=YesPlease');
+    expect(installations[0]).toContain('INSTALL_STRIP=-s');
+  });
+
+  it('refuses a hard-linked, oversized or symlinked executable before handoff', async () => {
+    for (const kind of ['hard-link', 'oversized', 'symlink']) {
+      const f = installer();
+      const run = async (exe: string, args: string[], options: { cwd?: string }) => {
+        await f.run(exe, args, options);
+        if (exe !== 'make' || args[0] !== 'install' || !options.cwd) return;
+        const git = join(options.cwd, '..', 'install', 'bin', 'git');
+        if (kind === 'hard-link') linkSync(git, join(f.dir, 'alias'));
+        if (kind === 'oversized') writeFileSync(git, Buffer.alloc(8 * 1024 * 1024 + 1));
+        if (kind === 'symlink') {
+          const alternate = join(f.dir, 'alternate');
+          renameSync(git, alternate);
+          symlinkSync(alternate, git);
+        }
+      };
+      await expect(provision({ ...f, run })).rejects.toThrow();
+      expect(readFileSync(f.env.GITHUB_PATH, 'utf8')).toBe('');
+      expect(readFileSync(f.env.GITHUB_ENV, 'utf8')).toBe('');
+    }
+  });
+
+  it('refuses hard links and oversized executables on subsequent verification', async () => {
+    for (const kind of ['hard-link', 'oversized']) {
+      const f = installer();
+      const result = await provision(f);
+      const environment = {
+        ...f.env,
+        DEVAI_BINDING_PATH: result.bindingPath,
+        PATH: join(result.work, 'install', 'bin'),
+      };
+      await expect(
+        verifyPath({ manifest: f.manifest, env: environment, read: f.read }),
+      ).resolves.toMatchObject({ candidate });
+      if (kind === 'hard-link') linkSync(result.git, join(f.dir, 'alias'));
+      if (kind === 'oversized') writeFileSync(result.git, Buffer.alloc(8 * 1024 * 1024 + 1));
+      await expect(
+        verifyPath({ manifest: f.manifest, env: environment, read: f.read }),
+      ).rejects.toThrow();
+    }
+  });
+
   it('hands off one installed identity and rejects a PATH shadow', async () => {
     const f = installer();
     const result = await provision(f);
