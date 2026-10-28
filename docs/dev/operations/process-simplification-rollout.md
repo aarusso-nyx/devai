@@ -419,3 +419,14 @@ and declared output paths. They do not certify a sealed generated namespace.
 Protected release certification (schema 1.2) additionally requires the protected
 executor's complete namespace capture after execution has stopped. Ordinary RC
 success must never be represented as that protected certification.
+
+The DEVAI candidate certification helper runs `check --rc --run` with a 30-minute
+per-task limit and a 45-minute limit for its unique `test:coverage:rc` node.
+The local helper uses a dedicated packaged entrypoint with fixed limits and checks
+the candidate checkout, control path, project identity, and coverage task before
+execution. These checks prevent accidental scope errors; they are not cryptographic
+proof of repository identity. The helper requires coverage to execute and pass before
+export. Reused coverage is not a fresh execution.
+The signed export does not attest the timeout; retain the unsigned invocation and
+execution log as operational evidence.
+The enclosing run budget must cover the whole task graph and signing.
