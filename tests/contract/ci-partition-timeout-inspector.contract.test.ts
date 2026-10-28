@@ -41,14 +41,14 @@ function findings(job: string, value: unknown) {
   );
 }
 describe('proposed partition job budgets', () => {
-  it('sets only the two Linux partitions to 30 minutes and preserves native and aggregate budgets', () => {
+  it('sets Linux and native jobs to 30 minutes and preserves the aggregate budget', () => {
     const doc = parseDocument(readFileSync(join(root, workflow), 'utf8'));
     expect(doc.getIn(['jobs', 'gate-cli', 'timeout-minutes'])).toBe(30);
     expect(doc.getIn(['jobs', 'gate-rest', 'timeout-minutes'])).toBe(30);
-    expect(doc.getIn(['jobs', 'native-apfs', 'timeout-minutes'])).toBe(15);
+    expect(doc.getIn(['jobs', 'native-apfs', 'timeout-minutes'])).toBe(30);
     expect(doc.getIn(['jobs', 'gate', 'timeout-minutes'])).toBe(10);
   });
-  it('accepts the clean proposed 30/30/15/10 baseline without findings', () => {
+  it('accepts the clean proposed 30/30/30/10 baseline without findings', () => {
     const result = checkWorkflowTree(fixture());
     expect(
       result.findings.filter((f: { file: string }) => f.file === 'pull-request-checks.yml'),
@@ -57,10 +57,19 @@ describe('proposed partition job budgets', () => {
   for (const [job, budget] of [
     ['gate-cli', 30],
     ['gate-rest', 30],
-    ['native-apfs', 15],
+    ['native-apfs', 30],
     ['gate', 10],
   ] as const) {
-    for (const invalid of [undefined, 0, -1, 1.5, budget + 1, String(budget)]) {
+    for (const invalid of [
+      undefined,
+      0,
+      -1,
+      1.5,
+      budget - 1,
+      budget + 1,
+      String(budget),
+      ...(job === 'native-apfs' ? [15] : []),
+    ]) {
       it(`checker returns the timeout-specific finding for ${String(invalid)} in ${job}`, () => {
         const result = findings(job, invalid);
         expect(result).toEqual(
