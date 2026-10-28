@@ -15,7 +15,7 @@
 
 import { spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -146,16 +146,22 @@ function preflight(remote, label, baseRef, pushed) {
     }
   }
 
-  if (!existsSync(join(root, BOOTSTRAP_CLI))) {
-    say(`${BOOTSTRAP_CLI} is missing; running pnpm run release:bootstrap`);
-    const bootstrap = spawnSync('pnpm', ['run', 'release:bootstrap'], {
-      cwd: root,
-      stdio: ['ignore', 'inherit', 'inherit'],
-    });
-    if (bootstrap.status !== 0) {
-      say('pnpm run release:bootstrap failed; the push is refused');
-      return 1;
-    }
+  // The runner is untracked and can survive changes to the candidate's source. Rebuild it
+  // before every affected check so the preflight executes the current implementation.
+  say('refreshing the check runner with pnpm run release:bootstrap');
+  try {
+    rmSync(join(root, '.devai/state/pr-bootstrap/cli.tsbuildinfo'), { force: true });
+  } catch {
+    say('could not invalidate the check runner build state; the push is refused');
+    return 1;
+  }
+  const bootstrap = spawnSync('pnpm', ['run', 'release:bootstrap'], {
+    cwd: root,
+    stdio: ['ignore', 'inherit', 'inherit'],
+  });
+  if (bootstrap.status !== 0) {
+    say('pnpm run release:bootstrap failed; the push is refused');
+    return 1;
   }
 
   // The CI gate's affected invocation (.github/workflows/pull-request-checks.yml), without a
