@@ -5,6 +5,7 @@ type: adr
 status: accepted
 date: 2026-10-28
 authority: Architect
+supersedes: []
 provenance:
   - law/adr/ADR-REL-0035-trust-published-verifier-2-4.md
 affected_rules:
@@ -17,6 +18,11 @@ inspector_acceptance:
 ---
 
 # Bound DEVAI RC coverage execution to 45 minutes
+
+## Status
+
+Accepted under the Owner amendment to mandate #299 for the DEVAI candidate
+certification helper.
 
 ## Context
 
@@ -62,3 +68,22 @@ population, coverage thresholds, isolation and signing are unchanged. This
 record grants no merge, publication, tag, deployment or downstream authority,
 and excludes PORM. Review and integration precede a fresh signed RC; the RC
 result and any later publication must each be observed independently.
+
+## Alternatives Considered
+
+A general per-node CLI timeout would widen the exception beyond the approved
+DEVAI certification route. Leaving the coverage task at 30 minutes would not
+implement the Owner amendment. Both alternatives are rejected.
+
+## Affected Rules
+
+The local release prerequisite helper and its operational documentation apply
+this decision. The runner and dedicated entrypoint implement the fixed budgets
+within that route. No protected provider or historical receipt rule changes.
+
+## Inspector Adversarial Acceptance
+
+Verify the three frontmatter acceptance conditions against the built helper,
+including wrong scope, missing or duplicate coverage, a reused coverage result,
+timeout failure, and the distinction between signed export and unsigned logs.
+Verify the actual enclosing deadline before any authorized RC.
