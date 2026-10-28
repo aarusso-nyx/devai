@@ -13,7 +13,7 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -470,6 +470,46 @@ export function certifyCandidate(config, descriptor) {
   return candidateReceipt;
 }
 
+// A certification receipt identifies its isolated cache; legacy receipts retain the
+// original results directory. Never move or rewrite prior results.
+export function candidateResultsDirectory(repo, receipt) {
+  const base = join(realpathSync(repo), '.devai/state/check-cache/v1');
+  const suppliedReceipt = resolve(receipt);
+  const suppliedReceiptDirectory = dirname(suppliedReceipt);
+  const suppliedCacheRoot = dirname(suppliedReceiptDirectory);
+  const cacheName = basename(suppliedCacheRoot);
+  let parentIsBase = false;
+  try {
+    parentIsBase = realpathSync(dirname(suppliedCacheRoot)) === base;
+  } catch {
+    // Legacy receipts need not be located under the candidate cache.
+  }
+  if (parentIsBase && cacheName.startsWith('rc-certification-')) {
+    const cacheRoot = join(base, cacheName);
+    const receiptDirectory = join(cacheRoot, basename(suppliedReceiptDirectory));
+    const receiptPath = join(receiptDirectory, basename(suppliedReceipt));
+    requireValue(
+      receiptDirectory === join(cacheRoot, 'receipts') &&
+        /^rc-certification-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u.test(
+          cacheName,
+        ) &&
+        cacheRoot === join(base, cacheName) &&
+        /^[0-9a-f]{64}\.json$/u.test(receiptPath.slice(receiptDirectory.length + 1)),
+      'RC_CACHE_INVALID',
+    );
+    requireValue(
+      realpathSync(base) === base &&
+        realpathSync(cacheRoot) === cacheRoot &&
+        realpathSync(receiptPath) === receiptPath &&
+        lstatSync(receiptPath).isFile() &&
+        realpathSync(join(cacheRoot, 'results')) === join(cacheRoot, 'results'),
+      'RC_CACHE_INVALID',
+    );
+    return join(cacheRoot, 'results');
+  }
+  return join(base, 'results');
+}
+
 export function exportCandidate(config, report, candidateReceipt, configPath) {
   requireValue(candidateReceipt, 'CANDIDATE_RECEIPT_REQUIRED');
   const exporter = join(config.packageRoot, 'dist/runtime/evidence-verification/src/export-cli.js');
@@ -481,7 +521,7 @@ export function exportCandidate(config, report, candidateReceipt, configPath) {
     '--receipt',
     candidateReceipt,
     '--results-dir',
-    join(config.repo, '.devai/state/check-cache/v1/results'),
+    candidateResultsDirectory(config.repo, candidateReceipt),
     '--profile',
     'rc',
     '--commit',
