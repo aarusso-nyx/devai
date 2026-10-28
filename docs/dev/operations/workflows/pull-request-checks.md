@@ -48,7 +48,7 @@ of ADR-CHK-0010 supplements those partitions without taking ownership of a plan 
 | ------------- | -------------------- | -------------------------------------- | ---------- | --------------- | ---------- |
 | `gate-cli`    | `gate-cli`           | none                                   | always     | `ubuntu-latest` | 30 minutes |
 | `gate-rest`   | `gate-rest`          | none                                   | always     | `ubuntu-latest` | 30 minutes |
-| `native-apfs` | `native-apfs`        | none                                   | always     | `macos-15`      | 15 minutes |
+| `native-apfs` | `native-apfs`        | none                                   | always     | `macos-15`      | 30 minutes |
 | `gate`        | `devai-release-gate` | `gate-cli`, `gate-rest`, `native-apfs` | `always()` | `ubuntu-latest` | 10 minutes |
 
 - `gate-cli` and `gate-rest` start together.
@@ -79,11 +79,10 @@ step.
 
 ## Native APFS qualification
 
-ADR-CHK-0011 proposes a 30-minute hosted native job budget in place of the
-current 15 minutes. The proposed budget is unverified and requires representative
-hosted duration and outcome evidence; the workflow table above describes the current
-implementation. The proposal preserves the qualification and gate requirements and
-does not change the separate local RC timeout.
+The candidate implements the 30-minute hosted native job budget proposed in
+ADR-CHK-0011, replacing 15 minutes. Its sufficiency remains unverified and requires
+representative hosted duration and outcome evidence. The qualification and gate
+requirements and the separate local RC timeout remain unchanged.
 
 `native-apfs` checks out the exact candidate. On its disposable runner it logs the
 default system Git capability, selects the installed Xcode 26.3 toolchain and requires
