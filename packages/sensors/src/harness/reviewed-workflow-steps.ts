@@ -356,7 +356,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
       },
       {
         path: 'scripts/pr-failure-diagnostics.mjs',
-        sha256: '07eab47fcd5e1c634f622cb764a4edfee044021b2aedd40d870f98477777c587',
+        sha256: 'fe29f6e4ab6812c174f49ebfc9c4a2828c7b799297429ebb525fe99473c52130',
       },
       {
         path: 'scripts/process/ci-partition/bounded-process.mjs',
