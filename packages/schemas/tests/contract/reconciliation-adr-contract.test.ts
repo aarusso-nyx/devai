@@ -9,6 +9,25 @@ import { ROOT, canonicalSha256, readJson, sha256 } from '../fixtures/governance-
 const ADR = 'ADR-EVI-0007';
 const CI_ADR = 'ADR-CHK-0010';
 const ciFile = 'ADR-CHK-0010-required-native-apfs-qualification.md';
+const GIT_ADR = 'ADR-CHK-0011';
+const gitFile = 'ADR-CHK-0011-linux-partition-git-identity.md';
+const gitSubjects = [
+  '.github/workflows/pull-request-checks.yml',
+  'scripts/check-workflows.mjs',
+  'scripts/aggregate-gate-partitions.mjs',
+  'scripts/process/summarize-check-report.mjs',
+  'scripts/process/ci-partition/integrated.mjs',
+  'scripts/process/ci-partition/verified-buffer.mjs',
+  'scripts/process/ci-partition/bounded-process.mjs',
+  'scripts/process/ci-partition/guards.mjs',
+  'scripts/process/ci-partition/git-signing-key.asc',
+  'tests/contract/ci-git-installer-inspector.contract.test.ts',
+  'tests/contract/aggregate-gate-partitions.contract.test.ts',
+  'tests/contract/pull-request-workflow.contract.test.ts',
+  'packages/sensors/tests/unit/alignment-partition-jobs.test.ts',
+  'docs/dev/operations/remote-preflight-contract.md',
+  'docs/dev/operations/workflows/pull-request-checks.md',
+];
 const ciSubjects = [
   '.github/workflows/pull-request-checks.yml',
   'scripts/check-workflows.mjs',
@@ -96,8 +115,10 @@ const prior = historical.records.map((record): AdrRecordFixture => ({
   ...record,
   status: ['ADR-GOV-0027', 'ADR-AUT-0008'].includes(record.adr_id) ? 'accepted' : record.status,
 }));
-const reconciliationPaths = paths.filter((path) => path !== ciFile);
-const reconciliationRecords = records.filter((record) => record.adr_id !== CI_ADR);
+const preGitPaths = paths.filter((path) => path !== gitFile);
+const preGitRecords = records.filter((record) => record.adr_id !== GIT_ADR);
+const reconciliationPaths = preGitPaths.filter((path) => path !== ciFile);
+const reconciliationRecords = preGitRecords.filter((record) => record.adr_id !== CI_ADR);
 
 describe('ADR-EVI-0007 bounded authoring contract', () => {
   it('validates accepted frontmatter, required body sections and exact non-superseding subjects', () => {
@@ -128,9 +149,9 @@ describe('ADR-EVI-0007 bounded authoring contract', () => {
     expect(reconciliationRecords).toHaveLength(134);
     expect(reconciliationRecords.filter((record) => record.adr_id !== ADR)).toEqual(prior);
     expect(reconciliationRecords.filter((record) => record.adr_id === ADR)).toHaveLength(1);
-    expect(paths).toHaveLength(136);
-    expect(records).toHaveLength(135);
-    expect(records.filter((record) => record.adr_id === CI_ADR)).toEqual([
+    expect(preGitPaths).toHaveLength(136);
+    expect(preGitRecords).toHaveLength(135);
+    expect(preGitRecords.filter((record) => record.adr_id === CI_ADR)).toEqual([
       {
         file: `law/adr/${ciFile}`,
         adr_id: CI_ADR,
@@ -188,7 +209,7 @@ describe('ADR-EVI-0007 bounded authoring contract', () => {
 
   it('accounts separately for exact native qualification without changing prior subject lineages', () => {
     const before = resolveAdrFixture(reconciliationRecords, reconciliationPaths.length);
-    const after = resolveAdrFixture(records, paths.length);
+    const after = resolveAdrFixture(preGitRecords, preGitPaths.length);
     expect(after.ok).toBe(true);
     expect(after.errors).toEqual([]);
     expect(after.adrs.filter((record) => record.adr_id !== CI_ADR)).toEqual(before.adrs);
@@ -201,6 +222,35 @@ describe('ADR-EVI-0007 bounded authoring contract', () => {
         .map((subject) => ({ subject, lineage_members: [CI_ADR], effective_head: CI_ADR })),
     );
     expect(after.effective_authorities).toEqual([...before.effective_authorities, CI_ADR].sort());
+  });
+
+  it('accounts for the proposed Git record without granting authority or altering prior lineages', () => {
+    expect(paths).toHaveLength(137);
+    expect(records).toHaveLength(136);
+    expect(records.filter((record) => record.adr_id === GIT_ADR)).toEqual([
+      {
+        file: `law/adr/${gitFile}`,
+        adr_id: GIT_ADR,
+        format: 'v2',
+        title: 'Bind Linux partition plans to the manifest Git version',
+        status: 'proposed',
+        date: '2026-10-27',
+        supersedes: [],
+        affected_rules: gitSubjects,
+      },
+    ]);
+    const before = resolveAdrFixture(preGitRecords, preGitPaths.length);
+    const after = resolveAdrFixture(records, paths.length);
+    expect(before.ok).toBe(true);
+    expect(after.ok).toBe(true);
+    expect(after.errors).toEqual([]);
+    expect(after.adrs.filter((record) => record.adr_id !== GIT_ADR)).toEqual(before.adrs);
+    expect(after.adrs.find((record) => record.adr_id === GIT_ADR)).toMatchObject({
+      effective: false,
+      effective_affected_rules: [],
+    });
+    expect(after.subject_authorities).toEqual(before.subject_authorities);
+    expect(after.effective_authorities).toEqual(before.effective_authorities);
   });
 
   it('repins only the current README exception bytes and retains explicit unqualified runtime boundaries', () => {
