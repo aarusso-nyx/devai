@@ -68,7 +68,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
     files: [
       {
         path: 'scripts/process/release-prerequisites.mjs',
-        sha256: 'd750e25813a407e33ce4483a83ffa0751f86fe9bff861c0c526fa8d9f74ab7de',
+        sha256: '014f1c4c3aeb6cc8488060f5de1d08beb3c8e54a9c76ec9d5e18e1e58baa6c5a',
       },
     ],
   },
@@ -316,7 +316,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
     files: [
       {
         path: 'scripts/process/release-prerequisites.mjs',
-        sha256: 'd750e25813a407e33ce4483a83ffa0751f86fe9bff861c0c526fa8d9f74ab7de',
+        sha256: '014f1c4c3aeb6cc8488060f5de1d08beb3c8e54a9c76ec9d5e18e1e58baa6c5a',
       },
     ],
   },
@@ -339,7 +339,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
     files: [
       {
         path: 'scripts/process/release-prerequisites.mjs',
-        sha256: 'd750e25813a407e33ce4483a83ffa0751f86fe9bff861c0c526fa8d9f74ab7de',
+        sha256: '014f1c4c3aeb6cc8488060f5de1d08beb3c8e54a9c76ec9d5e18e1e58baa6c5a',
       },
     ],
   },
@@ -469,7 +469,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
       },
       {
         path: 'packages/cli/scripts/assemble-package.mjs',
-        sha256: 'a92decdcdb25a5786d61e69646169f06047af8b8b7087f6b2d4bdcb29022816c',
+        sha256: 'c701a520274b03cb332a04983e9bd3c228f28bcea5642b3321530885da803d3d',
       },
       {
         path: 'packages/effects-check/package.json',
