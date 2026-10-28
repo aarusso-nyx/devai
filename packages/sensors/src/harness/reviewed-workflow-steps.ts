@@ -159,9 +159,87 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
     ],
   },
   {
-    sha256: 'c486121aada4d6e6e22633528e550ffaaac884812fb8a92183a0742343bd117c',
+    sha256: '015c07831f9e0db865b48965b15c56e7bb702b6a97124f3b51adcc4a55a49733',
     effect: 'read-only',
     workflow: 'pull-request-checks.yml#gate-cli[2], pull-request-checks.yml#gate-rest[2]',
+    step: 'Provision manifest Git',
+    review:
+      'Downloads the pinned Git source and signature from kernel.org, verifies their digest and signature against the locally pinned key, builds in runner temporary storage, and updates runner environment and path; makes no external write.',
+    files: [
+      {
+        path: 'scripts/process/ci-partition/bounded-process.mjs',
+        sha256: 'df484f6b95653e576cb86ee467bfd65a4a5b2423d15da896c9916e25bc82745e',
+      },
+      {
+        path: 'scripts/process/ci-partition/guards.mjs',
+        sha256: '8056a83f5f3b1527532578b21cd6bff6755d51bde9cdeb1f0580974e495b5f43',
+      },
+      {
+        path: 'scripts/process/ci-partition/integrated.mjs',
+        sha256: '2e2f454182947b1384043b6d72c0dc0f6d671ad7247b00bf1a3acc1f1ff1d300',
+      },
+      {
+        path: 'scripts/process/ci-partition/verified-buffer.mjs',
+        sha256: 'cf923c9c891855b9875b0ef29005d5472619cf6c724f8e76097aa8b9d531d843',
+      },
+    ],
+  },
+  {
+    sha256: '8ce1a886511c09c9836576a0da4e0f2556620733e304a725e4c601d317ebc793',
+    effect: 'read-only',
+    workflow: 'pull-request-checks.yml#gate-cli[3], pull-request-checks.yml#gate-rest[3]',
+    step: 'Verify manifest Git',
+    review:
+      'Verifies the provisioned Git executable, candidate and base against the runner binding; makes no external write.',
+    files: [
+      {
+        path: 'scripts/process/ci-partition/bounded-process.mjs',
+        sha256: 'df484f6b95653e576cb86ee467bfd65a4a5b2423d15da896c9916e25bc82745e',
+      },
+      {
+        path: 'scripts/process/ci-partition/guards.mjs',
+        sha256: '8056a83f5f3b1527532578b21cd6bff6755d51bde9cdeb1f0580974e495b5f43',
+      },
+      {
+        path: 'scripts/process/ci-partition/integrated.mjs',
+        sha256: '2e2f454182947b1384043b6d72c0dc0f6d671ad7247b00bf1a3acc1f1ff1d300',
+      },
+      {
+        path: 'scripts/process/ci-partition/verified-buffer.mjs',
+        sha256: 'cf923c9c891855b9875b0ef29005d5472619cf6c724f8e76097aa8b9d531d843',
+      },
+    ],
+  },
+  {
+    sha256: '41a05090ea3f92e22d51d7d7b58f38407edd46b5267e06ff3a4ed4f1d626a406',
+    effect: 'read-only',
+    workflow: 'pull-request-checks.yml#gate-cli[7], pull-request-checks.yml#gate-rest[7]',
+    step: 'Verify Git before affected checks',
+    review:
+      'Rechecks the provisioned Git executable, candidate and base before affected checks; makes no external write.',
+    files: [
+      {
+        path: 'scripts/process/ci-partition/bounded-process.mjs',
+        sha256: 'df484f6b95653e576cb86ee467bfd65a4a5b2423d15da896c9916e25bc82745e',
+      },
+      {
+        path: 'scripts/process/ci-partition/guards.mjs',
+        sha256: '8056a83f5f3b1527532578b21cd6bff6755d51bde9cdeb1f0580974e495b5f43',
+      },
+      {
+        path: 'scripts/process/ci-partition/integrated.mjs',
+        sha256: '2e2f454182947b1384043b6d72c0dc0f6d671ad7247b00bf1a3acc1f1ff1d300',
+      },
+      {
+        path: 'scripts/process/ci-partition/verified-buffer.mjs',
+        sha256: 'cf923c9c891855b9875b0ef29005d5472619cf6c724f8e76097aa8b9d531d843',
+      },
+    ],
+  },
+  {
+    sha256: 'c486121aada4d6e6e22633528e550ffaaac884812fb8a92183a0742343bd117c',
+    effect: 'read-only',
+    workflow: 'pull-request-checks.yml#gate-cli[4], pull-request-checks.yml#gate-rest[4]',
     step: 'Restore the check runner bootstrap',
     review:
       'Restores the bootstrap runner keyed by the hash of every input it compiles (ADR-CHK-0003); a stale key only recompiles. The following run steps are reviewed with this restore in view.',
@@ -170,7 +248,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
   {
     sha256: '869b6b0cd83816e1ff7cc3ae93ee096bb1b9e38f02aeba1eea72506e77130fd7',
     effect: 'read-only',
-    workflow: 'pull-request-checks.yml#gate-cli[3], pull-request-checks.yml#gate-rest[3]',
+    workflow: 'pull-request-checks.yml#gate-cli[5], pull-request-checks.yml#gate-rest[5]',
     step: 'Compile the check runner bootstrap',
     review:
       'Local verification, build, or binding step: writes only the workspace, runner files, or step outputs, and makes no external write.',
@@ -186,18 +264,35 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
     ],
   },
   {
-    sha256: '9a13ac4faaccd643f196d9da3fc38f590403a70773cf998213ae9497da2535eb',
+    sha256: '8ce34b83c4d28827bb9cd817338caa58cca20cfb4707487bec26161be49175f2',
     effect: 'read-only',
-    workflow: 'pull-request-checks.yml#gate-cli[4]',
+    workflow: 'pull-request-checks.yml#gate-cli[6]',
     step: 'Preflight probes',
     review:
       'Local verification, build, or binding step: writes only the workspace, runner files, or step outputs, and makes no external write.',
-    files: [],
+    files: [
+      {
+        path: 'scripts/process/ci-partition/bounded-process.mjs',
+        sha256: 'df484f6b95653e576cb86ee467bfd65a4a5b2423d15da896c9916e25bc82745e',
+      },
+      {
+        path: 'scripts/process/ci-partition/guards.mjs',
+        sha256: '8056a83f5f3b1527532578b21cd6bff6755d51bde9cdeb1f0580974e495b5f43',
+      },
+      {
+        path: 'scripts/process/ci-partition/integrated.mjs',
+        sha256: '2e2f454182947b1384043b6d72c0dc0f6d671ad7247b00bf1a3acc1f1ff1d300',
+      },
+      {
+        path: 'scripts/process/ci-partition/verified-buffer.mjs',
+        sha256: 'cf923c9c891855b9875b0ef29005d5472619cf6c724f8e76097aa8b9d531d843',
+      },
+    ],
   },
   {
     sha256: 'd6118e1f7242659d27bbcb028a58b5f41f7d7193066240c9bb0477483a925ce2',
     effect: 'read-only',
-    workflow: 'pull-request-checks.yml#gate-cli[5]',
+    workflow: 'pull-request-checks.yml#gate-cli[8]',
     step: 'Affected checks owned by test:cli',
     review:
       'Runs the test:cli side of the partitioned affected plan (ADR-CHK-0007 rule 11) and writes its report under the runner temp directory; makes no external write.',
@@ -211,25 +306,42 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
   {
     sha256: 'b0084ee23bfa8266d898e03d7e81c91972524541000067be939e5d8020e31534',
     effect: 'read-only',
-    workflow: 'pull-request-checks.yml#gate-cli[6]',
+    workflow: 'pull-request-checks.yml#gate-cli[9]',
     step: 'Upload the partition report',
     review:
       "Uploads this partition's report from the runner temp directory as an artifact of the same workflow run (devai-gate-report-cli), which only the aggregator job reads; writes no release surface.",
     files: [],
   },
   {
-    sha256: '33bd02d9f43654b3d6aa81c4f271ecab48c9c41d4c8b152377dd1f9cfbef3c3c',
+    sha256: '3651d6115c5736d04ba3f122ef4a308f9fa6b32b1cfeb5592f4ec03f56417e15',
     effect: 'read-only',
-    workflow: 'pull-request-checks.yml#gate-rest[4]',
+    workflow: 'pull-request-checks.yml#gate-rest[6]',
     step: 'Preflight probes',
     review:
       'Local verification, build, or binding step: writes only the workspace, runner files, or step outputs, and makes no external write.',
-    files: [],
+    files: [
+      {
+        path: 'scripts/process/ci-partition/bounded-process.mjs',
+        sha256: 'df484f6b95653e576cb86ee467bfd65a4a5b2423d15da896c9916e25bc82745e',
+      },
+      {
+        path: 'scripts/process/ci-partition/guards.mjs',
+        sha256: '8056a83f5f3b1527532578b21cd6bff6755d51bde9cdeb1f0580974e495b5f43',
+      },
+      {
+        path: 'scripts/process/ci-partition/integrated.mjs',
+        sha256: '2e2f454182947b1384043b6d72c0dc0f6d671ad7247b00bf1a3acc1f1ff1d300',
+      },
+      {
+        path: 'scripts/process/ci-partition/verified-buffer.mjs',
+        sha256: 'cf923c9c891855b9875b0ef29005d5472619cf6c724f8e76097aa8b9d531d843',
+      },
+    ],
   },
   {
-    sha256: 'b05cd92ce9f6a2cf9fda90e42433e0380c2c59f68272a3c3cf624cdc2433c320',
+    sha256: '13d05fcdf31032882b9115c01d73e3ca730b9f85637a2a35c0f2c8be94bdb58d',
     effect: 'read-only',
-    workflow: 'pull-request-checks.yml#gate-rest[5]',
+    workflow: 'pull-request-checks.yml#gate-rest[8]',
     step: 'Affected checks and profile-selected candidate preflight',
     review:
       'Runs the release profile gate and the side of the partitioned affected plan outside test:cli (ADR-CHK-0007 rule 11), writing its report under the runner temp directory; makes no external write.',
@@ -247,6 +359,22 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
         sha256: '07eab47fcd5e1c634f622cb764a4edfee044021b2aedd40d870f98477777c587',
       },
       {
+        path: 'scripts/process/ci-partition/bounded-process.mjs',
+        sha256: 'df484f6b95653e576cb86ee467bfd65a4a5b2423d15da896c9916e25bc82745e',
+      },
+      {
+        path: 'scripts/process/ci-partition/guards.mjs',
+        sha256: '8056a83f5f3b1527532578b21cd6bff6755d51bde9cdeb1f0580974e495b5f43',
+      },
+      {
+        path: 'scripts/process/ci-partition/integrated.mjs',
+        sha256: '2e2f454182947b1384043b6d72c0dc0f6d671ad7247b00bf1a3acc1f1ff1d300',
+      },
+      {
+        path: 'scripts/process/ci-partition/verified-buffer.mjs',
+        sha256: 'cf923c9c891855b9875b0ef29005d5472619cf6c724f8e76097aa8b9d531d843',
+      },
+      {
         path: 'scripts/process/summarize-check-report.mjs',
         sha256: '61d42e1bc0cdaf3a9e68f7950be0ef49f5797e43a348b26415062f0bae37323f',
       },
@@ -259,7 +387,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
   {
     sha256: '2b445cc112826576ef05d97afa1b7e462232c347423486d331f7ceaa1cfcedbc',
     effect: 'read-only',
-    workflow: 'pull-request-checks.yml#gate-rest[6]',
+    workflow: 'pull-request-checks.yml#gate-rest[9]',
     step: 'Upload the partition report',
     review:
       "Uploads this partition's report from the runner temp directory as an artifact of the same workflow run (devai-gate-report-rest), which only the aggregator job reads; writes no release surface.",
