@@ -73,7 +73,7 @@ Propose a finite 30-minute job timeout for each Linux partition when the source-
 
 Propose changing the hosted `native-apfs` job timeout from 15 to 30 minutes. This is a finite, unverified operational budget, not evidence that the native qualification completes or passes. Qualify it using representative hosted runs and record the full job outcome and duration. A timeout, cancellation, failed qualification, skipped job or missing required result continues to block the required gate. Preserve the native test population, assertions, per-case ceiling, report requirements and aggregate verdict rules. The separate local RC timeout is unchanged. The workflow checker and Inspector tests must enforce the proposed job timeout and existing safeguards without relaxing tests.
 
-The current workflow remains at 15 minutes until an independently reviewed workflow change is authorized and implemented. This proposal itself grants no authority to change the workflow or publish it.
+The candidate workflow implements the 30-minute timeout. Its hosted outcome and sufficiency remain unverified, and this proposed record does not establish acceptance or grant authority to publish it.
 
 ## Inspector Adversarial Acceptance
 
