@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { execFileSync } from 'node:child_process';
-import { lstatSync, readFileSync, realpathSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import { existsSync, lstatSync, readFileSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import { invokeDevaiCli } from './cli-runtime.js';
 import { withDevaiRcCertification } from './services/check-runner/certification-context.js';
@@ -38,7 +39,12 @@ try {
   throw new Error('RC_HOST_SOURCE_SCOPE_INVALID');
 }
 
-const result = await withDevaiRcCertification(() =>
+const baseCache = join(realpathSync(repoRoot), '.devai/state/check-cache/v1');
+if (existsSync(baseCache) && realpathSync(baseCache) !== baseCache)
+  throw new Error('RC_HOST_CACHE_INVALID');
+const cacheRoot = join(baseCache, `rc-certification-${randomUUID()}`);
+if (existsSync(cacheRoot)) throw new Error('RC_HOST_CACHE_EXISTS');
+const result = await withDevaiRcCertification(cacheRoot, () =>
   invokeDevaiCli([
     'check',
     '--rc',
