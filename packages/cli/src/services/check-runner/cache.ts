@@ -224,8 +224,8 @@ export class CheckCache {
       exitCode: execution.status,
       signal: execution.signal,
       errorCode: execution.errorCode ?? null,
-      stdoutTail: redactDiagnosticText(boundedTail(execution.stdout)),
-      stderrTail: redactDiagnosticText(boundedTail(execution.stderr)),
+      stdoutTail: boundedTail(redactDiagnosticText(execution.stdout)),
+      stderrTail: boundedTail(redactDiagnosticText(execution.stderr)),
       ...(remediation !== undefined && remediation.length > 0 && { remediation }),
     };
     const path = join(

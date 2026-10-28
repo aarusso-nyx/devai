@@ -74,7 +74,7 @@ export const SECRET_PATTERNS: readonly RegExp[] = [
   /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/gu,
   /\b(?:Bearer|Basic) [A-Za-z0-9._~+/=-]{8,}/gu,
   /_authToken=\S+/gu,
-  /\b[A-Z][A-Z0-9_]*(?:TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|API_KEY|PRIVATE_KEY|ACCESS_KEY)[A-Z0-9_]*=\S+/gu,
+  /\b[A-Z0-9_]*(?:TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|API_KEY|PRIVATE_KEY|ACCESS_KEY)[A-Z0-9_]*=\S+/gu,
 ];
 
 /** Masks every token-shaped value and secret-named assignment in text. */

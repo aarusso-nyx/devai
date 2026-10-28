@@ -1,3 +1,4 @@
+import { hostedPartitionDiagnostics } from './hosted-partition-diagnostics.js';
 import {
   isReconciliationOwnerOutputInvocation,
   runReconciliationOwnerOutput,
@@ -517,6 +518,10 @@ export function attachActionOutputBoundaries(
         const exit = explicitExit ?? (typeof process.exitCode === 'number' ? process.exitCode : 0);
         if (!streaming) {
           restoreAndEmit(entry, stdout, stderr, exit, originalStdout, originalStderr, originalExit);
+          if (entry.name === 'check' && exit === 1 && stderr === '') {
+            const details = hostedPartitionDiagnostics(process.argv, stdout);
+            if (details !== undefined) originalStderr.call(process.stderr, details);
+          }
           return;
         }
         phase = 'closed';
