@@ -43,7 +43,7 @@ Proposed. This record grants no workflow or publication authority. Implementatio
 
 On run 40569422192, the two Linux partitions observed Git 2.55.0 and 2.56.0. The existing preflight checked Git major while the runner bound the complete observed version into task keys; two Git-dependent task keys and the task-policy digest consequently differed. The aggregate also reported a separate failed CLI test. Passing preflight does not establish identical plan inputs or explain that failure.
 
-## Decision proposed
+## Decision
 
 Before either Linux partition plans or runs affected checks, provision and verify the exact Git version declared by the materialized toolchain manifest. The current version is 2.47.3. A separately reviewed source binding must match that manifest and include an immutable source digest and a developer signing-key fingerprint corroborated against independent publisher information and reviewed under normal repository governance. Verify the source and signature before extraction or execution. Reject a mismatched manifest, uncorroborated key binding, invalid signature, acquisition or installation failure, incorrect version, and path shadowing. Never substitute a system Git on failure. Check exact candidate and base after installation. Do not hand-edit generated configuration.
 
@@ -51,13 +51,25 @@ Preserve the runner's full actual version observation and the aggregate's existi
 
 Preserve existing failure diagnostics, report handling and aggregate semantics; this decision does not redesign those surfaces. Do not alter existing tests or assertions to accommodate this decision.
 
+## Consequences
+
+Provisioning adds cold-start work and depends on the verified source and signing-key binding. Qualification requires hosted evidence; the proposed budget is not proof of a passing partition.
+
+## Alternatives Considered
+
+Accepting different Git versions would leave partition plans with mismatched inputs. Falling back to the system Git would obscure a failed or substituted installation. Neither satisfies the identity requirement.
+
+## Affected Rules
+
+The affected paths are listed in the `affected_rules` front matter.
+
 ## Partition job budget proposed
 
 In PR #439 run 40591180064 attempt 1, the CLI job was cancelled after 20 minutes 14 seconds; its affected step logged an executed PASS for `test:cli` after 1,121,936 ms, while the aggregate failed on the cancelled job. This timing is consistent with the existing 20-minute job budget, but the cancellation actor is not established. The job verdict is not PASS. A cold provisioner adds work whose hosted duration is not yet measured.
 
 Propose a finite 30-minute job timeout for each Linux partition when the source-pinned Git provisioner is integrated. Keep native APFS and aggregate timeouts unchanged. This is a preliminary operational budget, not a measured completion guarantee: qualify it on representative hosted cold runs and revise before integration if evidence requires. Keep the runner's existing individual task timeout, all tests, ownership and report checks unchanged. A cancelled or timed-out partition and a missing report remain failures. The workflow checker and Inspector tests must enforce these bounds and safeguards.
 
-## Acceptance and authority
+## Inspector Adversarial Acceptance
 
 Inspector acceptance requires adversarial acquisition, path, signature and aggregation tests and a hosted Linux build with measured duration, dependencies, exact tool identity and full partition outcomes. Measure the proposed 30-minute job budget on hosted cold runs and retain all checks; this record alone does not prove it is sufficient. The original CLI failure needs its own evidence and repair, not a claim that the identity correction fixes it.
 
