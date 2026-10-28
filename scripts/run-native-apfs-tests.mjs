@@ -14,6 +14,9 @@ if (
   !['24.20.0', '24.22.0'].includes(process.versions.node) ||
   process.versions.uv !== '1.52.1'
 ) {
+  process.stderr.write(
+    `${JSON.stringify({ platform: process.platform, node: process.versions.node, uv: process.versions.uv, filesystem_type: String(filesystem) })}\n`,
+  );
   throw new Error('NATIVE_APFS_QUALIFICATION_HOST_UNSUPPORTED');
 }
 const directory = mkdtempSync(join(temporary, 'devai-native-apfs-qualification-'));
