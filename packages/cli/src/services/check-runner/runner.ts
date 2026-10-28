@@ -73,7 +73,19 @@ type TaskSteps = Generator<TaskExecutionEffect, void, TaskExecutionResult>;
 
 /** The synchronous API and protected asynchronous host share every planning/result rule. */
 export function runCheckTasks(inputOptions: CheckRunnerOptions): CheckRunnerReport {
-  const run = prepareCheckRun(inputOptions, undefined, defaultExecute);
+  return runCheckTasksInternal(inputOptions, false);
+}
+
+/** Fixed local DEVAI certification route; not exposed by the ordinary check CLI. */
+export function runCertificationCheckTasks(inputOptions: CheckRunnerOptions): CheckRunnerReport {
+  return runCheckTasksInternal(inputOptions, true);
+}
+
+function runCheckTasksInternal(
+  inputOptions: CheckRunnerOptions,
+  certification: boolean,
+): CheckRunnerReport {
+  const run = prepareCheckRun(inputOptions, undefined, defaultExecute, certification);
   if (!('descriptorById' in run)) return run;
   run.plan.tasks.forEach((task, position) => {
     const steps = runPlannedTask(run, task, position);
@@ -206,6 +218,7 @@ interface CheckRun {
   /** Validated before any node runs, at every worker count, so refusals do not depend on W. */
   readonly exclusivity: ReadonlyMap<string, TaskExclusivity>;
   readonly timeoutMs: number;
+  readonly certification: boolean;
   readonly now: () => string;
   readonly repositoryState: () => Readonly<{ commit: string; tree: string; clean: boolean }>;
   readonly initialState: Readonly<{ commit: string; tree: string; clean: boolean }>;
@@ -229,6 +242,7 @@ function prepareCheckRun(
   inputOptions: CheckRunnerOptions,
   asyncExecutor: AsyncTaskExecutor | undefined,
   executeDefault: DefaultExecutor,
+  certification = false,
 ): CheckRunnerReport | CheckRun {
   // The preflight target accepts a named base (the freshly fetched origin/main)
   // and binds the exact commit it resolves to before planning.
@@ -241,6 +255,12 @@ function prepareCheckRun(
       : inputOptions,
   );
   const options = request.options;
+  if (
+    certification &&
+    (options.target !== 'rc' || options.operation !== 'run' || options.timeoutMs !== 1_800_000)
+  ) {
+    throw new Error('CHECK_RUNNER_RC_CERTIFICATION_SCOPE');
+  }
   if (options.partition !== undefined) {
     assertPartitionAdmissible(
       options,
@@ -260,6 +280,12 @@ function prepareCheckRun(
   const inputs = prepareCheckRunInputs({ options });
   const { cache, toolchain, environment, toolchainDigest } = inputs;
   const rawPlan = planWithCache(options, cache, toolchain, environment);
+  if (
+    certification &&
+    rawPlan.tasks.filter((task) => task.nodeId === 'test:coverage:rc').length !== 1
+  ) {
+    throw new Error('CHECK_RUNNER_RC_CERTIFICATION_COVERAGE');
+  }
   const releaseBinding = request.binding;
   if (releaseBinding !== undefined) {
     const intent = inputOptions.releaseIntent as { changed_paths?: string[] };
@@ -312,6 +338,7 @@ function prepareCheckRun(
       new Set(descriptor.tasks.map((task) => task.nodeId)),
     ),
     timeoutMs,
+    certification,
     now: options.now ?? (() => new Date().toISOString()),
     repositoryState,
     initialState: repositoryState(),
@@ -342,7 +369,6 @@ function* runPlannedTask(run: CheckRun, task: PlannedTask, position: number): Ta
     options,
     plan,
     descriptorById,
-    timeoutMs,
     now,
     resultDigests,
     taskResults,
@@ -353,6 +379,8 @@ function* runPlannedTask(run: CheckRun, task: PlannedTask, position: number): Ta
     asyncExecutor,
     executeDefault,
   } = run;
+  const timeoutMs =
+    run.certification && task.nodeId === 'test:coverage:rc' ? 2_700_000 : run.timeoutMs;
   const { cache, environment } = run.inputs;
   const role = run.partition?.roles.get(task.nodeId);
   const record = (entry: ExecutedTask): void => {

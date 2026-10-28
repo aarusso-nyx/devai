@@ -337,7 +337,11 @@ try {
   };
   const bundle = await rolldown(hostBundleOptions);
   const privateOutputs = [];
-  for (const name of ['native-linux-plan.js', 'native-linux-replay.js']) {
+  for (const name of [
+    'native-linux-plan.js',
+    'native-linux-replay.js',
+    'devai-rc-certification.js',
+  ]) {
     const helper = await rolldown({ ...hostBundleOptions, input: join(distRoot, name) });
     const result = await helper.write({
       file: join(temporaryRoot, name),
@@ -345,7 +349,15 @@ try {
       codeSplitting: false,
       comments: false,
       sourcemap: false,
-      banner: `import { createRequire as __devaiCreateRequire } from 'node:module';
+      banner:
+        name === 'devai-rc-certification.js'
+          ? `import { createRequire as __devaiCreateRequire } from 'node:module';
+import { fileURLToPath as __devaiFileURLToPath } from 'node:url';
+import { dirname as __devaiDirname } from 'node:path';
+const require = __devaiCreateRequire(import.meta.url);
+const __filename = __devaiFileURLToPath(import.meta.url);
+const __dirname = __devaiDirname(__filename);`
+          : `import { createRequire as __devaiCreateRequire } from 'node:module';
 const require = __devaiCreateRequire(import.meta.url);`,
     });
     privateOutputs.push(...result.output);
@@ -421,7 +433,11 @@ const __dirname = __devaiDirname(__filename);`,
   cpSync(bundlePath, join(runtimeIndex, 'release-host.js'));
   cpSync(bootstrapPath, join(runtimeIndex, 'release-host-bootstrap.js'));
   cpSync(executablePath, join(runtimeIndex, 'bin.js'));
-  for (const name of ['native-linux-plan.js', 'native-linux-replay.js'])
+  for (const name of [
+    'native-linux-plan.js',
+    'native-linux-replay.js',
+    'devai-rc-certification.js',
+  ])
     copyFileSync(join(temporaryRoot, name), join(runtimeIndex, name));
   for (const name of nativeReporters)
     copyFileSync(join(temporaryRoot, name), join(runtimeIndex, name));
