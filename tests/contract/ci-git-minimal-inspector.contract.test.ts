@@ -48,6 +48,7 @@ describe('Git-only partition workflow review', () => {
           verify = steps.items.findIndex((s) => s.get('id') === 'verify-git');
         expect(provision).toBeGreaterThanOrEqual(0);
         expect(verify).toBeGreaterThanOrEqual(0);
+        if (!steps.items[provision] || !steps.items[verify]) throw Error('missing Git step');
         if (mutation === 'omit-provision') steps.items[provision].set('run', 'true');
         if (mutation === 'omit-verify') steps.items[verify].set('run', 'true');
         if (mutation === 'optional') steps.items[verify].set('continue-on-error', true);
@@ -115,6 +116,7 @@ describe('Git-only partition workflow review', () => {
         const j = steps.items.findIndex((s) => s.get('id') === 'affected');
         expect(i).toBeGreaterThanOrEqual(0);
         expect(j).toBeGreaterThanOrEqual(0);
+        if (!steps.items[i] || !steps.items[j]) throw Error('missing verification step');
         if (mutation === 'missing') steps.items[i].set('run', 'true');
         if (mutation === 'softened') steps.items[i].set('continue-on-error', true);
         if (mutation === 'moved')

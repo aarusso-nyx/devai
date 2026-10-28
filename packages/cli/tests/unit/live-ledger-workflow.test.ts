@@ -1017,8 +1017,8 @@ describe('remote preflight workflow', () => {
       name: 'a declared job environment',
       mutate: (source: string) =>
         source.replace(
-          '    timeout-minutes: 20',
-          `    timeout-minutes: 20\n    environment: ${LEDGER_ENVIRONMENT}`,
+          '    timeout-minutes: 30',
+          `    timeout-minutes: 30\n    environment: ${LEDGER_ENVIRONMENT}`,
         ),
       diagnostic: 'CI_PREFLIGHT_ENVIRONMENT_FORBIDDEN',
     },
