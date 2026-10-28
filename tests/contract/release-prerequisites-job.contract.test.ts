@@ -91,11 +91,14 @@ it('devai-ledger-verify.yml: the first job runs release-prerequisites.mjs and ev
   assertFirstJobGatesOnPrerequisites('.github/workflows/devai-ledger-verify.yml');
 });
 
-it('release-prerequisites.mjs certifies with a 30 minute per-task limit (#299)', () => {
-  const source = readFileSync(resolve(ROOT, PREREQUISITES_SCRIPT), 'utf8');
-  expect(source).toContain('const CERTIFICATION_TASK_TIMEOUT_MS = 30 * 60_000;');
-  const certify = source.slice(source.indexOf("'--rc',"));
-  expect(certify.slice(0, 200)).toMatch(
-    /'--run',\s+'--task-timeout-ms',\s+String\(CERTIFICATION_TASK_TIMEOUT_MS\),/u,
+it('certification uses the fixed RC host and preserves the per-task limits (#299)', () => {
+  const helper = readFileSync(resolve(ROOT, PREREQUISITES_SCRIPT), 'utf8');
+  const host = readFileSync(resolve(ROOT, 'packages/cli/src/devai-rc-certification.ts'), 'utf8');
+  const runner = readFileSync(
+    resolve(ROOT, 'packages/cli/src/services/check-runner/runner.ts'),
+    'utf8',
   );
+  expect(helper).toContain("'dist/runtime/index/devai-rc-certification.js'");
+  expect(host).toMatch(/'--rc',\s+'--run',\s+'--task-timeout-ms',\s+'1800000'/u);
+  expect(runner).toMatch(/task.nodeId === 'test:coverage:rc' \? 2_700_000 : run.timeoutMs/u);
 });

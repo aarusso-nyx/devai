@@ -3,9 +3,9 @@ import { chmodSync, mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync }
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 
-const { certificationEnvironment } = await import(
+const { certificationEnvironment, certifyCandidate } = await import(
   pathToFileURL(resolve('scripts/process/release-prerequisites.mjs')).href
 );
 const roots: string[] = [];
@@ -111,3 +111,40 @@ it('redacts malformed private JSON diagnostics', () => {
     /^RUNTIME_ENVIRONMENT_MAP_INVALID$/u,
   );
 });
+
+it.each([
+  ['reused', 'PASS', 'RC_COVERAGE_NOT_FRESH_PASS'],
+  ['executed', 'FAIL', 'RC_COVERAGE_NOT_FRESH_PASS'],
+  ['missing', 'PASS', 'RC_COVERAGE_DISPOSITION_INVALID'],
+])(
+  'rejects coverage disposition %s/%s before returning an exportable receipt',
+  (disposition, outcome, error) => {
+    const f = fixture();
+    const packageRoot = join(f.config.repo, '..', 'package');
+    const runnerPath = join(f.config.repo, 'scripts/process/validation-runner.mjs');
+    const hostPath = join(packageRoot, 'dist/runtime/index/devai-rc-certification.js');
+    mkdirSync(join(f.config.repo, 'scripts/process'), { recursive: true });
+    mkdirSync(join(packageRoot, 'dist/runtime/index'), { recursive: true });
+    writeFileSync(
+      runnerPath,
+      `import { spawnSync } from 'node:child_process';
+const r = spawnSync(process.argv[4], process.argv.slice(5), { encoding: 'utf8' });
+process.stdout.write(r.stdout); process.stderr.write(r.stderr); process.exitCode = r.status;
+`,
+    );
+    const execution =
+      disposition === 'missing' ? [] : [{ nodeId: 'test:coverage:rc', disposition, outcome }];
+    writeFileSync(
+      hostPath,
+      `process.stdout.write(${JSON.stringify(JSON.stringify({ exitCode: 0, receipt: { path: 'receipt.json' }, execution }))});
+`,
+    );
+    const log = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    try {
+      expect(() => certifyCandidate({ ...f.config, packageRoot }, f.descriptor)).toThrow(error);
+      expect(log.mock.calls.map((call) => String(call[0])).join('')).toContain('rc-invocation');
+    } finally {
+      log.mockRestore();
+    }
+  },
+);

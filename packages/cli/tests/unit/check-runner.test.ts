@@ -34,7 +34,10 @@ import {
   type CheckRunnerOptions,
   type TaskExecutionResult,
 } from '../../src/services/check-runner/index.js';
-import { readProtectedCompletedTaskResults } from '../../src/services/check-runner/runner.js';
+import {
+  readProtectedCompletedTaskResults,
+  runCertificationCheckTasks,
+} from '../../src/services/check-runner/runner.js';
 import { resolveTaskExecutable } from '../../src/services/check-runner/executable.js';
 import { createSelfContainedRepositoryFixture } from '../helpers/self-contained-repository-fixture.js';
 
@@ -282,6 +285,83 @@ describe('content-addressed check runner', () => {
     expect(limits.length).toBeGreaterThanOrEqual(2);
     expect(limits[0]).toBe(1_800_000);
     expect(limits).toContain(1234);
+  });
+
+  it('refuses internal certification for non-RC, non-run, or nonstandard limits before execution', () => {
+    const { root } = repository();
+    let executions = 0;
+    for (const options of [
+      { target: 'local' as const, operation: 'run' as const, timeoutMs: 1_800_000 },
+      { target: 'rc' as const, operation: 'plan' as const, timeoutMs: 1_800_000 },
+      { target: 'rc' as const, operation: 'run' as const, timeoutMs: 1234 },
+      { target: 'rc' as const, operation: 'run' as const },
+    ]) {
+      expect(() =>
+        withRunnerScope(() =>
+          runCertificationCheckTasks({
+            repoRoot: root,
+            ...options,
+            toolchain: TOOLCHAIN,
+            environment: {},
+            executeTask: () => {
+              executions += 1;
+              return PASS;
+            },
+          }),
+        ),
+      ).toThrow('CHECK_RUNNER_RC_CERTIFICATION_SCOPE');
+    }
+    expect(executions).toBe(0);
+  });
+
+  it('refuses internal certification when its RC plan lacks the coverage node', () => {
+    const { root } = repository();
+    expect(() =>
+      withRunnerScope(() =>
+        runCertificationCheckTasks({
+          repoRoot: root,
+          target: 'rc',
+          operation: 'run',
+          timeoutMs: 1_800_000,
+          toolchain: TOOLCHAIN,
+          environment: {},
+          executeTask: () => PASS,
+        }),
+      ),
+    ).toThrow('CHECK_RUNNER_RC_CERTIFICATION_COVERAGE');
+  });
+
+  it('uses the extended limit only for the coverage node in the certification runner', () => {
+    const { root } = repository();
+    const doc = descriptor();
+    const coverageDescriptor = {
+      ...doc,
+      tasks: doc.tasks.map((task) =>
+        task.nodeId === 'test:rc' ? { ...task, nodeId: 'test:coverage:rc' } : task,
+      ),
+      profiles: doc.profiles.map((profile) =>
+        profile.profileId === 'rc' ? { ...profile, requiredNodes: ['test:coverage:rc'] } : profile,
+      ),
+    };
+    const limits = new Map<string, number>();
+    withRunnerScope(() =>
+      runCertificationCheckTasks({
+        repoRoot: root,
+        target: 'rc',
+        operation: 'run',
+        timeoutMs: 1_800_000,
+        descriptorDocument: coverageDescriptor,
+        toolchain: TOOLCHAIN,
+        environment: {},
+        executeTask: (_argv, _cwd, timeout, _env, identity) => {
+          limits.set(identity.nodeId, timeout);
+          return PASS;
+        },
+      }),
+    );
+    expect(limits.get('test:coverage:rc')).toBe(2_700_000);
+    expect(limits.get('test:unit')).toBe(1_800_000);
+    expect(limits.get('generate')).toBe(1_800_000);
   });
 
   it('snapshots a Git-free source without traversing excluded directories or directory symlinks', () => {
