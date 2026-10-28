@@ -269,6 +269,59 @@ describe('installer and handoff adversarial cases', () => {
       expect(readdirSync(f.dir).filter((name) => name.startsWith('devai-pr-git-'))).toEqual([]);
     }
   });
+  it.each([
+    ['source-download', 'source-download'],
+    ['source-digest', 'source-digest'],
+    ['signature-download', 'signature-download'],
+    ['signature-verification', 'signature-verification'],
+    ['extraction', 'extraction'],
+    ['build', 'build'],
+    ['installation', 'installation'],
+    ['identity', 'identity'],
+  ])(
+    'identifies %s failure with the fixed %s stage and refuses handoff',
+    async (failure, expected) => {
+      const f = installer();
+      const stages: string[] = [];
+      const marker = '::error::untrusted-diagnostic';
+      const args = {
+        ...f,
+        onStage: (stage: string) => stages.push(stage),
+        fetch: async (url: string, target: string) => {
+          if (failure === 'source-download' && target.endsWith('.xz')) throw Error(marker);
+          if (failure === 'signature-download' && !target.endsWith('.xz')) throw Error(marker);
+          if (failure === 'source-digest' && target.endsWith('.xz'))
+            return writeFileSync(target, 'altered');
+          return f.fetch(url, target);
+        },
+        verify:
+          failure === 'signature-verification'
+            ? async () => {
+                throw Error(marker);
+              }
+            : f.verify,
+        extract:
+          failure === 'extraction'
+            ? async () => {
+                throw Error(marker);
+              }
+            : f.extract,
+        run: async (exe: string, argv: string[], options: { cwd?: string }) => {
+          if (failure === 'build' && exe === 'make' && argv[0] === 'configure') throw Error(marker);
+          if (failure === 'installation' && exe === 'make' && argv[0] === 'install')
+            throw Error(marker);
+          return f.run(exe, argv, options);
+        },
+        read: failure === 'identity' ? async () => marker : f.read,
+      };
+      await expect(provision(args)).rejects.toThrow();
+      expect(stages.at(-1)).toBe(expected);
+      expect(stages).not.toContain(marker);
+      expect(readFileSync(f.env.GITHUB_PATH, 'utf8')).toBe('');
+      expect(readFileSync(f.env.GITHUB_ENV, 'utf8')).toBe('');
+      expect(readdirSync(f.dir).filter((name) => name.startsWith('devai-pr-git-'))).toEqual([]);
+    },
+  );
   it('retains the installation after either handoff append is attempted and fails', async () => {
     for (const failure of ['env', 'path']) {
       const f = installer();
@@ -276,7 +329,11 @@ describe('installer and handoff adversarial cases', () => {
       mkdirSync(unwritable);
       if (failure === 'env') f.env.GITHUB_ENV = unwritable;
       else f.env.GITHUB_PATH = unwritable;
-      await expect(provision(f)).rejects.toThrow();
+      const stages: string[] = [];
+      await expect(
+        provision({ ...f, onStage: (stage: string) => stages.push(stage) }),
+      ).rejects.toThrow();
+      expect(stages.at(-1)).toBe('handoff');
       const work = readdirSync(f.dir).filter((name) => name.startsWith('devai-pr-git-'));
       expect(work).toHaveLength(1);
       if (!work[0]) throw Error('fixture installation missing');
@@ -337,6 +394,20 @@ describe('installer and handoff adversarial cases', () => {
       }),
     ).rejects.toThrow();
   });
+  it('reports a fixed manifest stage without exposing a malicious path', () => {
+    const f = installer();
+    const result = spawnSync(
+      process.execPath,
+      [join(root, 'scripts/process/ci-partition/integrated.mjs'), 'provision'],
+      { cwd: f.dir, encoding: 'utf8', env: { ...process.env, ...f.env } },
+    );
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toBe('Git operation refused (manifest)\n');
+    expect(result.stdout).toBe('');
+    expect(result.stderr).not.toContain(f.dir);
+    expect(readFileSync(f.env.GITHUB_PATH, 'utf8')).toBe('');
+    expect(readFileSync(f.env.GITHUB_ENV, 'utf8')).toBe('');
+  });
   it('does not leak raw failures from its actual command line', () => {
     const f = installer(),
       marker = '::error::private-input';
@@ -350,7 +421,8 @@ describe('installer and handoff adversarial cases', () => {
     );
     expect(result.status).not.toBe(0);
     expect(result.stdout + result.stderr).not.toContain(marker);
-    expect(result.stderr).toContain('Git operation refused');
+    expect(result.stderr).toBe('Git operation refused (event)\n');
+    expect(result.stdout).toBe('');
   });
 });
 
