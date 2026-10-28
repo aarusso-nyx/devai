@@ -362,6 +362,32 @@ describe('content-addressed check runner', () => {
     expect(limits.get('test:coverage:rc')).toBe(2_700_000);
     expect(limits.get('test:unit')).toBe(1_800_000);
     expect(limits.get('generate')).toBe(1_800_000);
+    const baselineIndex = join(
+      root,
+      '.devai/state/check-cache/v1/nodes',
+      `${Buffer.from('test:unit').toString('base64url')}.json`,
+    );
+    const baseline = readFileSync(baselineIndex);
+    const freshLimits = new Map<string, number>();
+    const fresh = withRunnerScope(() =>
+      runCertificationCheckTasks({
+        repoRoot: root,
+        target: 'rc',
+        operation: 'run',
+        timeoutMs: 1_800_000,
+        descriptorDocument: coverageDescriptor,
+        cacheRoot: join(root, '.devai/state/check-cache/v1/rc-certification-test'),
+        toolchain: TOOLCHAIN,
+        environment: {},
+        executeTask: (_argv, _cwd, timeout, _env, identity) => {
+          freshLimits.set(identity.nodeId, timeout);
+          return PASS;
+        },
+      }),
+    );
+    expect([...freshLimits.keys()].sort()).toEqual(['generate', 'test:coverage:rc', 'test:unit']);
+    expect(fresh.execution?.every((entry) => entry.disposition === 'executed')).toBe(true);
+    expect(readFileSync(baselineIndex)).toEqual(baseline);
   });
 
   it('snapshots a Git-free source without traversing excluded directories or directory symlinks', () => {
