@@ -191,7 +191,9 @@ export async function provision({
   verify = verifiedTar,
   extract = boundedProcess,
   deadline = Date.now() + 600000,
+  onStage = () => {},
 }) {
+  onStage('environment');
   if (
     !env.RUNNER_TEMP ||
     /[\r\n]/.test(env.RUNNER_TEMP) ||
@@ -201,8 +203,11 @@ export async function provision({
     !['pull_request', 'merge_group'].includes(env.GITHUB_EVENT_NAME)
   )
     fail();
+  onStage('event');
   const identity = eventIdentity(env.GITHUB_EVENT_PATH, env.GITHUB_EVENT_NAME);
+  onStage('manifest');
   if (JSON.parse(readFileSync(manifest, 'utf8')).runtimes.git !== pin.version) fail();
+  onStage('workspace');
   const work = mkdtempSync(join(env.RUNNER_TEMP, 'devai-pr-git-'));
   chmodSync(work, 0o700);
   const st = lstatSync(work);
@@ -216,17 +221,21 @@ export async function provision({
   // already written cannot point at deleted files. The failed step remains failed.
   let handoffStarted = false;
   try {
+    onStage('source-download');
     await fetch(pin.url, archive, deadline);
+    onStage('source-digest');
     const a = lstatSync(archive);
     if (!a.isFile() || a.size > 16777216) fail();
     if (createHash('sha256').update(readFileSync(archive)).digest('hex') !== pin.sha256) fail();
     const sig = join(work, 'source.tar.sign');
+    onStage('signature-download');
     await fetch(
       'https://www.kernel.org/pub/software/scm/git/git-2.47.3.tar.sign',
       sig,
       deadline,
       65536,
     );
+    onStage('signature-verification');
     const verified = await verify({
       archive,
       signature: sig,
@@ -239,16 +248,20 @@ export async function provision({
       deadline,
     });
     if (!Buffer.isBuffer(verified)) fail();
+    onStage('extraction');
     await run('mkdir', [src], { deadline });
     await extract('tar', ['-xf', '-', '--strip-components=1', '-C', src], {
       input: verified,
       deadline,
       maxOutput: 65536,
     });
+    onStage('build');
     await run('make', ['configure'], { cwd: src, deadline });
     await run('./configure', [`--prefix=${prefix}`, '--without-tcltk'], { cwd: src, deadline });
     await run('make', ['-j2', 'NO_GETTEXT=YesPlease'], { cwd: src, deadline });
+    onStage('installation');
     await run('make', ['install', 'NO_GETTEXT=YesPlease'], { cwd: src, deadline });
+    onStage('identity');
     const git = join(prefix, 'bin', 'git'),
       g = lstatSync(git);
     if (
@@ -280,6 +293,7 @@ export async function provision({
     )
       fail();
     if (!sameGitIdentity(gitBinding, gitIdentity(git))) fail();
+    onStage('handoff');
     const bindingPath = join(work, 'binding.json');
     writeFileSync(
       bindingPath,
@@ -367,9 +381,14 @@ export async function verifyPath({
   return { candidate, base, tree, gitVersion };
 }
 if (process.argv[1] && fileURLToPath(import.meta.url) === realpathSync(process.argv[1])) {
+  let stage = 'dispatch';
   try {
     if (process.argv[2] === 'provision') {
-      const result = await provision();
+      const result = await provision({
+        onStage: (value) => {
+          stage = value;
+        },
+      });
       process.stdout.write('Git provision passed\n');
       process.stdout.write(result.bindingPath + '\n');
     } else if (process.argv[2] === 'verify') {
@@ -380,7 +399,11 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === realpathSync(process.a
       process.stdout.write('Git verification passed\n');
     } else fail();
   } catch {
-    process.stderr.write('Git operation refused\n');
+    process.stderr.write(
+      process.argv[2] === 'provision'
+        ? `Git operation refused (${stage})\n`
+        : 'Git operation refused\n',
+    );
     process.exitCode = 1;
   }
 }
