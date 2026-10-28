@@ -38,6 +38,7 @@ const COPIED = [
 const STUB_CLI = '.devai/state/pr-bootstrap/cli/bin.js';
 const STUB_REPORT = '.devai/state/stub-report.json';
 const STUB_CALLS = '.devai/state/stub-calls.jsonl';
+const STUB_EVENTS = '.devai/state/stub-events';
 
 /**
  * The stand-in check runner. It records every invocation, refuses any call that is not an
@@ -47,6 +48,7 @@ const STUB_CALLS = '.devai/state/stub-calls.jsonl';
 const STUB_SOURCE = `import { appendFileSync, readFileSync } from 'node:fs';
 const args = process.argv.slice(2);
 appendFileSync(${JSON.stringify(STUB_CALLS)}, JSON.stringify(args) + '\\n');
+appendFileSync(${JSON.stringify(STUB_EVENTS)}, 'check\\n');
 const base = args[args.indexOf('--base') + 1];
 if (args[0] !== 'check' || !args.includes('--affected') || !args.includes('--run') || !base) {
   process.stderr.write('stub check runner: unexpected invocation ' + args.join(' ') + '\\n');
@@ -63,6 +65,7 @@ const roots: string[] = [];
  * ~/.gitconfig never reaches the hook; a case may write an opt-in into it.
  */
 let globalConfig = '';
+let fixtureBin = '';
 afterEach(() => {
   while (roots.length > 0) rmSync(roots.pop() ?? '', { recursive: true, force: true });
 });
@@ -80,6 +83,7 @@ function run(cwd: string, command: string, args: readonly string[]): Result {
     env: {
       ...process.env,
       GIT_TERMINAL_PROMPT: '0',
+      PATH: `${fixtureBin}:${process.env.PATH ?? ''}`,
       ...(globalConfig !== '' && { GIT_CONFIG_GLOBAL: globalConfig, GIT_CONFIG_NOSYSTEM: '1' }),
       GIT_AUTHOR_NAME: IDENTITY.name,
       GIT_AUTHOR_EMAIL: IDENTITY.email,
@@ -116,6 +120,19 @@ function fixture(optIn = true): Fixture {
   const dir = mkdtempSync(join(tmpdir(), 'devai-pre-push-'));
   roots.push(dir);
   globalConfig = join(dir, 'global.gitconfig');
+  fixtureBin = join(dir, 'bin');
+  mkdirSync(fixtureBin);
+  writeFileSync(
+    join(fixtureBin, 'pnpm'),
+    `#!/bin/sh
+if [ "$1" != run ] || [ "$2" != release:bootstrap ] || [ "$#" -ne 2 ]; then exit 98; fi
+printf 'bootstrap\\n' >> .devai/state/stub-events
+if [ -e .devai/state/pr-bootstrap/cli.tsbuildinfo ]; then exit 96; fi
+if [ -e .devai/state/bootstrap-fail ]; then exit 42; fi
+cp .devai/state/stub-source ${STUB_CLI}
+`,
+  );
+  chmodSync(join(fixtureBin, 'pnpm'), 0o755);
   writeFileSync(globalConfig, '');
   const remote = join(dir, 'origin.git');
   const work = join(dir, 'work');
@@ -138,7 +155,9 @@ function fixture(optIn = true): Fixture {
   git(work, 'push', '-q', 'origin', 'main');
   const base = git(work, 'rev-parse', 'HEAD');
 
-  put(work, STUB_CLI, STUB_SOURCE);
+  put(work, STUB_CLI, 'process.exit(97);\n');
+  put(work, '.devai/state/pr-bootstrap/cli.tsbuildinfo', 'stale build state');
+  put(work, '.devai/state/stub-source', STUB_SOURCE);
   git(work, 'config', 'core.hooksPath', '.githooks');
   // The opt-in is per worktree, as `pnpm run hooks:install -- --pre-push` writes it.
   git(work, 'config', 'extensions.worktreeConfig', 'true');
@@ -359,6 +378,59 @@ describe('pre-push preflight (TASK-0727)', () => {
       expect(result.output).toContain(offending);
       expect(result.output).toMatch(/allowed types/u);
       expect(calls(work), 'the affected check never starts').toEqual([]);
+      expect(existsSync(join(work, STUB_EVENTS)), 'bootstrap never starts').toBe(false);
+      expect(git(work, 'ls-remote', 'origin', 'refs/heads/feature')).toBe('');
+    },
+    PUSH_TIMEOUT_MS,
+  );
+
+  it(
+    'refreshes an existing stale runner before the check',
+    () => {
+      const { work } = fixture();
+      cleanCommit(work, 'fresh-runner');
+      script(work, 0, PASSING);
+      const result = push(work);
+      expect(result.status, result.output).toBe(0);
+      expect(readFileSync(join(work, STUB_EVENTS), 'utf8')).toBe('bootstrap\ncheck\n');
+      expect(readFileSync(join(work, STUB_CLI), 'utf8')).toBe(STUB_SOURCE);
+      expect(existsSync(join(work, '.devai/state/pr-bootstrap/cli.tsbuildinfo'))).toBe(false);
+      expect(calls(work)).toHaveLength(1);
+    },
+    PUSH_TIMEOUT_MS,
+  );
+
+  it(
+    'refuses a push if stale build state cannot be invalidated',
+    () => {
+      const { work } = fixture();
+      cleanCommit(work, 'build-state-refusal');
+      script(work, 0, PASSING);
+      const buildState = join(work, '.devai/state/pr-bootstrap/cli.tsbuildinfo');
+      rmSync(buildState);
+      mkdirSync(buildState);
+      const result = push(work);
+      expect(result.status, result.output).not.toBe(0);
+      expect(result.output).toContain('could not invalidate the check runner build state');
+      expect(existsSync(join(work, STUB_EVENTS))).toBe(false);
+      expect(calls(work)).toEqual([]);
+      expect(git(work, 'ls-remote', 'origin', 'refs/heads/feature')).toBe('');
+    },
+    PUSH_TIMEOUT_MS,
+  );
+
+  it(
+    'refuses a push when bootstrap fails without executing the existing runner',
+    () => {
+      const { work } = fixture();
+      cleanCommit(work, 'bootstrap-failure');
+      script(work, 0, PASSING);
+      put(work, '.devai/state/bootstrap-fail', 'fail');
+      const result = push(work);
+      expect(result.status, result.output).not.toBe(0);
+      expect(result.output).toContain('release:bootstrap failed');
+      expect(readFileSync(join(work, STUB_EVENTS), 'utf8')).toBe('bootstrap\n');
+      expect(calls(work)).toEqual([]);
       expect(git(work, 'ls-remote', 'origin', 'refs/heads/feature')).toBe('');
     },
     PUSH_TIMEOUT_MS,
