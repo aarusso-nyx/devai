@@ -8,6 +8,12 @@ import { ROOT, canonicalSha256, readJson, sha256 } from '../fixtures/governance-
 
 const ADR = 'ADR-EVI-0007';
 const CI_ADR = 'ADR-CHK-0010';
+const RELEASE_ADR = 'ADR-REL-0036';
+const releaseFile = 'ADR-REL-0036-devai-rc-coverage-time-budget.md';
+const releaseSubjects = [
+  'scripts/process/release-prerequisites.mjs',
+  'docs/dev/operations/process-simplification-rollout.md',
+];
 const ciFile = 'ADR-CHK-0010-required-native-apfs-qualification.md';
 const ciSubjects = [
   '.github/workflows/pull-request-checks.yml',
@@ -96,8 +102,10 @@ const prior = historical.records.map((record): AdrRecordFixture => ({
   ...record,
   status: ['ADR-GOV-0027', 'ADR-AUT-0008'].includes(record.adr_id) ? 'accepted' : record.status,
 }));
-const reconciliationPaths = paths.filter((path) => path !== ciFile);
-const reconciliationRecords = records.filter((record) => record.adr_id !== CI_ADR);
+const ciPaths = paths.filter((path) => path !== releaseFile);
+const ciRecords = records.filter((record) => record.adr_id !== RELEASE_ADR);
+const reconciliationPaths = ciPaths.filter((path) => path !== ciFile);
+const reconciliationRecords = ciRecords.filter((record) => record.adr_id !== CI_ADR);
 
 describe('ADR-EVI-0007 bounded authoring contract', () => {
   it('validates accepted frontmatter, required body sections and exact non-superseding subjects', () => {
@@ -128,8 +136,10 @@ describe('ADR-EVI-0007 bounded authoring contract', () => {
     expect(reconciliationRecords).toHaveLength(134);
     expect(reconciliationRecords.filter((record) => record.adr_id !== ADR)).toEqual(prior);
     expect(reconciliationRecords.filter((record) => record.adr_id === ADR)).toHaveLength(1);
-    expect(paths).toHaveLength(136);
-    expect(records).toHaveLength(135);
+    expect(ciPaths).toHaveLength(136);
+    expect(ciRecords).toHaveLength(135);
+    expect(paths).toHaveLength(137);
+    expect(records).toHaveLength(136);
     expect(records.filter((record) => record.adr_id === CI_ADR)).toEqual([
       {
         file: `law/adr/${ciFile}`,
@@ -188,7 +198,7 @@ describe('ADR-EVI-0007 bounded authoring contract', () => {
 
   it('accounts separately for exact native qualification without changing prior subject lineages', () => {
     const before = resolveAdrFixture(reconciliationRecords, reconciliationPaths.length);
-    const after = resolveAdrFixture(records, paths.length);
+    const after = resolveAdrFixture(ciRecords, ciPaths.length);
     expect(after.ok).toBe(true);
     expect(after.errors).toEqual([]);
     expect(after.adrs.filter((record) => record.adr_id !== CI_ADR)).toEqual(before.adrs);
@@ -201,6 +211,41 @@ describe('ADR-EVI-0007 bounded authoring contract', () => {
         .map((subject) => ({ subject, lineage_members: [CI_ADR], effective_head: CI_ADR })),
     );
     expect(after.effective_authorities).toEqual([...before.effective_authorities, CI_ADR].sort());
+  });
+
+  it('accounts separately for the RC coverage budget record and its exact subject authorities', () => {
+    expect(records.filter((record) => record.adr_id === RELEASE_ADR)).toEqual([
+      {
+        file: `law/adr/${releaseFile}`,
+        adr_id: RELEASE_ADR,
+        format: 'v2',
+        title: 'Bound DEVAI RC coverage execution to 45 minutes',
+        status: 'accepted',
+        date: '2026-10-28',
+        supersedes: [],
+        affected_rules: releaseSubjects,
+      },
+    ]);
+    const before = resolveAdrFixture(ciRecords, ciPaths.length);
+    const after = resolveAdrFixture(records, paths.length);
+    expect(after.ok).toBe(true);
+    expect(after.errors).toEqual([]);
+    expect(after.adrs.filter((record) => record.adr_id !== RELEASE_ADR)).toEqual(before.adrs);
+    expect(
+      after.subject_authorities.filter((row) => !row.lineage_members.includes(RELEASE_ADR)),
+    ).toEqual(before.subject_authorities);
+    expect(
+      after.subject_authorities.filter((row) => row.lineage_members.includes(RELEASE_ADR)),
+    ).toEqual(
+      [...releaseSubjects].sort().map((subject) => ({
+        subject,
+        lineage_members: [RELEASE_ADR],
+        effective_head: RELEASE_ADR,
+      })),
+    );
+    expect(after.effective_authorities).toEqual(
+      [...before.effective_authorities, RELEASE_ADR].sort(),
+    );
   });
 
   it('repins only the current README exception bytes and retains explicit unqualified runtime boundaries', () => {
