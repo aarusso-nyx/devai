@@ -1698,7 +1698,7 @@ function checkPreflightWorkflow(file, workflow, source, findings, pins) {
         finding('CI_PREFLIGHT_TIMEOUT_MISSING', file, `jobs.${name} must declare timeout-minutes`),
       );
     }
-    const jobBudgets = { 'gate-cli': 30, 'gate-rest': 30, 'native-apfs': 15, gate: 10 };
+    const jobBudgets = { 'gate-cli': 30, 'gate-rest': 30, 'native-apfs': 30, gate: 10 };
     if (Object.hasOwn(jobBudgets, name) && job['timeout-minutes'] !== jobBudgets[name]) {
       findings.push(
         finding(
