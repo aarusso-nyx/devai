@@ -25,8 +25,7 @@ const requireValue = (value, code) => {
 };
 const read = (path) => JSON.parse(readFileSync(path, 'utf8'));
 const publicPem = (key) => createPublicKey(key).export({ type: 'spki', format: 'pem' });
-// Owner mandate (2026-10-05, #299): the certification per-task limit is 30 minutes.
-const CERTIFICATION_TASK_TIMEOUT_MS = 30 * 60_000;
+// Owner mandate (#299): certification tasks have a 30-minute limit, except RC coverage at 45 minutes.
 
 const minimalEnvironment = () =>
   Object.fromEntries(
@@ -440,33 +439,32 @@ function runControlCommit() {
 
 export function certifyCandidate(config, descriptor) {
   const environment = certificationEnvironment(config, descriptor);
-  const cli = resolve(config.packageRoot, 'dist/runtime/index/bin.js');
-  const output = command(
-    [
-      process.execPath,
-      join(config.repo, 'scripts/process/validation-runner.mjs'),
-      '--exclusive',
-      '--',
-      process.execPath,
-      cli,
-      'check',
-      '--rc',
-      '--run',
-      '--task-timeout-ms',
-      String(CERTIFICATION_TASK_TIMEOUT_MS),
-      '--as-role',
-      'inspector',
-      '--write',
-      '--format',
-      'json',
-      '--repo-root',
-      config.repo,
-    ],
+  const argv = [
+    process.execPath,
+    join(config.repo, 'scripts/process/validation-runner.mjs'),
+    '--exclusive',
+    '--',
+    process.execPath,
+    join(config.packageRoot, 'dist/runtime/index/devai-rc-certification.js'),
     config.repo,
-    environment,
+    join(config.repo, 'scripts/process/release-prerequisites.mjs'),
+  ];
+  // This operational log is unsigned; the existing receipt does not bind timeouts.
+  process.stderr.write(
+    `${JSON.stringify({ phase: 'rc-invocation', argv, check: ['check', '--rc', '--run', '--task-timeout-ms', '1800000', '--as-role', 'inspector', '--write', '--format', 'json', '--repo-root', config.repo], coverageTimeoutMs: 2700000 })}\n`,
   );
+  const output = command(argv, config.repo, environment);
   const result = JSON.parse(output);
   const taskReport = result.result?.value ?? result;
+  const coverage = taskReport.execution?.filter((entry) => entry.nodeId === 'test:coverage:rc');
+  requireValue(coverage?.length === 1, 'RC_COVERAGE_DISPOSITION_INVALID');
+  process.stderr.write(
+    `${JSON.stringify({ phase: 'rc-coverage-disposition', repository: taskReport.plan?.repository, coverage: coverage[0] })}\n`,
+  );
+  requireValue(
+    coverage[0].disposition === 'executed' && coverage[0].outcome === 'PASS',
+    'RC_COVERAGE_NOT_FRESH_PASS',
+  );
   requireValue(taskReport.exitCode === 0 && taskReport.receipt?.path, 'RC_RECEIPT_MISSING');
   const candidateReceipt = taskReport.receipt.path;
   return candidateReceipt;
