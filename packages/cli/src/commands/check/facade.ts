@@ -14,6 +14,8 @@ import {
   type TaskOperation,
   type TaskTarget,
 } from '../../services/check-runner/index.js';
+import { runCertificationCheckTasks } from '../../services/check-runner/runner.js';
+import { isDevaiRcCertification } from '../../services/check-runner/certification-context.js';
 import { executeCheckMember, type CheckExecutionOptions } from './adapters.js';
 import { resolveCheckPlan, runCheckPlan, type CheckRunReport } from './contracts.js';
 
@@ -284,7 +286,9 @@ export const checkCmd = defineCommand({
                 : 1;
             const report =
               workers === 1
-                ? runCheckTasks(runnerOptions)
+                ? isDevaiRcCertification()
+                  ? runCertificationCheckTasks(runnerOptions)
+                  : runCheckTasks(runnerOptions)
                 : await runCheckTasksAsync({ ...runnerOptions, workers });
             process.stdout.write(
               options.human === true ? renderRunnerHuman(report) : `${JSON.stringify(report)}\n`,
