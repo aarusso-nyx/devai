@@ -70,7 +70,10 @@ function installer() {
   const fetch = async (_url: string, target: string) =>
     writeFileSync(target, target.endsWith('.xz') ? source : 'signature');
   const run = async (exe: string, args: string[], options: { cwd?: string }) => {
-    if (exe === 'mkdir') mkdirSync(args[0]);
+    if (exe === 'mkdir') {
+      if (!args[0]) throw Error('fixture mkdir target missing');
+      mkdirSync(args[0]);
+    }
     if (exe === 'make' && args[0] === 'install') {
       if (!options.cwd) throw Error('fixture build directory missing');
       const bin = join(options.cwd, '..', 'install', 'bin');
@@ -276,6 +279,7 @@ describe('installer and handoff adversarial cases', () => {
       await expect(provision(f)).rejects.toThrow();
       const work = readdirSync(f.dir).filter((name) => name.startsWith('devai-pr-git-'));
       expect(work).toHaveLength(1);
+      if (!work[0]) throw Error('fixture installation missing');
       const binding = join(f.dir, work[0], 'binding.json');
       expect(existsSync(binding)).toBe(true);
       expect(existsSync(join(f.dir, work[0], 'install', 'bin', 'git'))).toBe(true);
@@ -309,6 +313,7 @@ describe('installer and handoff adversarial cases', () => {
       expect(readFileSync(selected, 'utf8')).toHaveLength(5);
       const work = readdirSync(f.dir).filter((name) => name.startsWith('devai-pr-git-'));
       expect(work).toHaveLength(1);
+      if (!work[0]) throw Error('fixture installation missing');
       expect(existsSync(join(f.dir, work[0], 'binding.json'))).toBe(true);
       if (failure === 'env') expect(readFileSync(f.env.GITHUB_PATH, 'utf8')).toBe('');
       else
@@ -377,6 +382,7 @@ describe('real detached-signature verification', () => {
       .find((line) => line.startsWith('fpr:'));
     if (!fingerprintLine) throw Error('fixture fingerprint missing');
     const fingerprint = fingerprintLine.split(':')[9];
+    if (!fingerprint) throw Error('fixture fingerprint missing');
     const plain = join(dir, 'source.tar'),
       archive = join(dir, 'source.tar.xz'),
       signature = join(dir, 'source.sign'),

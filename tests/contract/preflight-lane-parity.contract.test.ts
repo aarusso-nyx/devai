@@ -3,18 +3,14 @@
 // planned node sets for the same base and candidate.
 //
 // The lane (.github/workflows/pull-request-checks.yml) runs in two partition
-// jobs (ADR-CHK-0007 rule 11), and each must reduce to exactly three run steps:
-// install, a bootstrap CLI `check` with the preflight target, and a bootstrap CLI
-// `check` with the affected target and its partition flag; the aggregator runs no
-// check. Each lane check invocation is then replayed here with --task-plan, without
+// jobs (ADR-CHK-0007 rule 11), and each has explicit Git provisioning and
+// verification, install, a bootstrap CLI `check` with the preflight target, and
+// a bootstrap CLI `check` with the affected target and its partition flag; the
+// aggregator runs no check. Each lane check invocation is then replayed here with --task-plan, without
 // its partition flag (a partition never changes the plan), against the repository's
 // own base (HEAD~1) and candidate (HEAD), and compared with the documented local
 // invocations `check --preflight|--affected --task-plan --base <base>`.
-//
-// Red today: the lane still has the verifier-package, bootstrap, release:pr-gate,
-// and step-aggregator run steps and no direct check invocation; the check
-// command rejects `--preflight` as an unknown option; and test-tasks.json
-// declares no `preflight-v1` node.
+
 import { spawn } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -51,7 +47,14 @@ type Workflow = Readonly<{
   jobs?: Readonly<Record<string, { env?: Environment; steps?: readonly WorkflowStep[] }>>;
 }>;
 type LaneStep = Readonly<{
-  kind: 'install' | 'check:preflight' | 'check:affected' | 'other';
+  kind:
+    | 'provision-git'
+    | 'verify-git'
+    | 'verify-affected-git'
+    | 'install'
+    | 'check:preflight'
+    | 'check:affected'
+    | 'other';
   run: string;
   /** Workflow, job, then step env, uninterpolated; later scopes win. */
   env: Environment;
@@ -207,6 +210,16 @@ function laneRunSteps(jobKey?: string): readonly LaneStep[] {
     .map(({ step, env }) => {
       const run = step.run.trim();
       const check = CHECK_INVOCATION.exec(run)?.[1] ?? '';
+      if (
+        step.id === 'provision-git' &&
+        run === 'node scripts/process/ci-partition/integrated.mjs provision'
+      )
+        return { kind: 'provision-git', run, env };
+      if (
+        (step.id === 'verify-git' || step.id === 'verify-affected-git') &&
+        run === 'node scripts/process/ci-partition/integrated.mjs verify'
+      )
+        return { kind: step.id, run, env };
       if (/\bpnpm install --frozen-lockfile\b/u.test(run) && check === '') {
         return { kind: 'install', run, env };
       }
@@ -365,12 +378,19 @@ describe('preflight lane parity (ADR-CHK-0001 IA-003)', () => {
   });
 
   it.each(Object.keys(PARTITION_JOBS))(
-    'reduces the %s lane to install, preflight check, affected check',
+    'reduces the %s lane to Git provisioning and verification, install, and checks',
     (job) => {
       expect(
         laneRunSteps(job).map((step) => step.kind),
         `the run steps of pull-request-checks.yml#${job}`,
-      ).toEqual(['install', 'check:preflight', 'check:affected']);
+      ).toEqual([
+        'provision-git',
+        'verify-git',
+        'install',
+        'check:preflight',
+        'verify-affected-git',
+        'check:affected',
+      ]);
     },
   );
 
