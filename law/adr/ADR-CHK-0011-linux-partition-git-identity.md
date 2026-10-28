@@ -30,7 +30,7 @@ inspector_acceptance:
   - IA-002 -- Partition aggregation retains all candidate, base, plan, policy digest, node ownership and PASS checks; an actual Git version mismatch remains a refusal.
   - IA-003 -- Acquisition refuses altered source and fails closed when the developer signature or the reviewed, independently corroborated signing-key binding is unavailable or invalid.
   - IA-005 -- A hosted Linux trial records toolchain dependencies and end-to-end duration while cancellation, timeout, failed checks and missing reports remain failures.
-  - IA-006 -- The workflow checker and tests verify a finite Linux partition job timeout without modifying per-task timeout, test assertions or aggregate verdict rules.
+  - IA-006 -- The workflow checker and tests verify finite Linux partition and native APFS job timeouts without modifying per-task timeout, test assertions or aggregate verdict rules.
 ---
 
 # Linux partition Git identity
@@ -67,7 +67,13 @@ The affected paths are listed in the `affected_rules` front matter.
 
 In PR #439 run 40591180064 attempt 1, the CLI job was cancelled after 20 minutes 14 seconds; its affected step logged an executed PASS for `test:cli` after 1,121,936 ms, while the aggregate failed on the cancelled job. This timing is consistent with the existing 20-minute job budget, but the cancellation actor is not established. The job verdict is not PASS. A cold provisioner adds work whose hosted duration is not yet measured.
 
-Propose a finite 30-minute job timeout for each Linux partition when the source-pinned Git provisioner is integrated. Keep native APFS and aggregate timeouts unchanged. This is a preliminary operational budget, not a measured completion guarantee: qualify it on representative hosted cold runs and revise before integration if evidence requires. Keep the runner's existing individual task timeout, all tests, ownership and report checks unchanged. A cancelled or timed-out partition and a missing report remain failures. The workflow checker and Inspector tests must enforce these bounds and safeguards.
+Propose a finite 30-minute job timeout for each Linux partition when the source-pinned Git provisioner is integrated. Keep the aggregate timeout unchanged. This is a preliminary operational budget, not a measured completion guarantee: qualify it on representative hosted cold runs and revise before integration if evidence requires. Keep the runner's existing individual task timeout, all tests, ownership and report checks unchanged. A cancelled or timed-out partition and a missing report remain failures. The workflow checker and Inspector tests must enforce these bounds and safeguards.
+
+## Native job budget proposed
+
+Propose changing the hosted `native-apfs` job timeout from 15 to 30 minutes. This is a finite, unverified operational budget, not evidence that the native qualification completes or passes. Qualify it using representative hosted runs and record the full job outcome and duration. A timeout, cancellation, failed qualification, skipped job or missing required result continues to block the required gate. Preserve the native test population, assertions, per-case ceiling, report requirements and aggregate verdict rules. The separate local RC timeout is unchanged. The workflow checker and Inspector tests must enforce the proposed job timeout and existing safeguards without relaxing tests.
+
+The current workflow remains at 15 minutes until an independently reviewed workflow change is authorized and implemented. This proposal itself grants no authority to change the workflow or publish it.
 
 ## Inspector Adversarial Acceptance
 
