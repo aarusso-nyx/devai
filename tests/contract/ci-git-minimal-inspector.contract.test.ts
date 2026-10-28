@@ -131,9 +131,11 @@ describe('Git-only partition workflow review', () => {
       });
     }
   it('preserves each original affected step except for the exact required Git rechecks', () => {
+    // This mainline ancestor has the same baseline blobs as the original review commit.
+    const baselineCommit = '6805553f0790ebfed8b39b96b01710d2d8752e47';
     const baseline = spawnSync(
       'git',
-      ['show', '47e71896:.github/workflows/pull-request-checks.yml'],
+      ['show', `${baselineCommit}:.github/workflows/pull-request-checks.yml`],
       { cwd: root, encoding: 'utf8' },
     );
     expect(baseline.status).toBe(0);
@@ -173,7 +175,7 @@ describe('Git-only partition workflow review', () => {
       'scripts/aggregate-gate-partitions.mjs',
       'scripts/process/summarize-check-report.mjs',
     ]) {
-      const original = spawnSync('git', ['show', `47e71896:${name}`], { cwd: root });
+      const original = spawnSync('git', ['show', `${baselineCommit}:${name}`], { cwd: root });
       expect(original.status).toBe(0);
       expect(readFileSync(join(root, name))).toEqual(original.stdout);
     }
