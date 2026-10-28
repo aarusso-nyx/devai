@@ -46,8 +46,8 @@ of ADR-CHK-0010 supplements those partitions without taking ownership of a plan 
 
 | Job           | Check name           | Needs                                  | Condition  | Runner          | Timeout    |
 | ------------- | -------------------- | -------------------------------------- | ---------- | --------------- | ---------- |
-| `gate-cli`    | `gate-cli`           | none                                   | always     | `ubuntu-latest` | 20 minutes |
-| `gate-rest`   | `gate-rest`          | none                                   | always     | `ubuntu-latest` | 20 minutes |
+| `gate-cli`    | `gate-cli`           | none                                   | always     | `ubuntu-latest` | 30 minutes |
+| `gate-rest`   | `gate-rest`          | none                                   | always     | `ubuntu-latest` | 30 minutes |
 | `native-apfs` | `native-apfs`        | none                                   | always     | `macos-15`      | 15 minutes |
 | `gate`        | `devai-release-gate` | `gate-cli`, `gate-rest`, `native-apfs` | `always()` | `ubuntu-latest` | 10 minutes |
 
@@ -95,13 +95,17 @@ Linux still runs the portable population and the actual unsupported-host refusal
 
 ## What each job runs
 
-`gate-cli` and `gate-rest` share their first five steps:
+`gate-cli` and `gate-rest` share their first seven steps:
 
 1. **Check out exact candidate**: `actions/checkout` at the candidate sha above with
    `fetch-depth: 0` and `persist-credentials: false`.
 2. **Set up pnpm and Node**: the local composite action
    `.github/actions/setup-node-toolchain` with `setup-pnpm: 'true'` and `cache: pnpm`.
-3. **Restore the check runner bootstrap** (`id: bootstrap-cache`): `actions/cache` on
+3. **Provision manifest Git** (`id: provision-git`): run
+   `scripts/process/ci-partition/integrated.mjs provision` to install the manifest Git.
+4. **Verify manifest Git** (`id: verify-git`): run the same script with `verify` to
+   check the installed executable and its selected identity.
+5. **Restore the check runner bootstrap** (`id: bootstrap-cache`): `actions/cache` on
    `.devai/state/pr-bootstrap` and `packages/*/dist`. The key is the digest of:
    - the lockfile;
    - the TypeScript project files;
@@ -111,9 +115,9 @@ Linux still runs the portable population and the actual unsupported-host refusal
 
    The two jobs share the key.
 
-4. **Compile the check runner bootstrap** (`id: install`): `pnpm install --frozen-lockfile`,
+6. **Compile the check runner bootstrap** (`id: install`): `pnpm install --frozen-lockfile`,
    then `pnpm run release:bootstrap` only when the cache missed.
-5. **Preflight probes** (`id: preflight`):
+7. **Preflight probes** (`id: preflight`):
    - It copies the vendored verifier from `packages/cli/vendor/evidence-verification` into
      `$RUNNER_TEMP` and checks it: the package identity, the five `bin` entries, the
      provenance `schemaVersion` and `sourceCommit`, the file population, and every file
@@ -121,7 +125,7 @@ Linux still runs the portable population and the actual unsupported-host refusal
    - It exports `DEVAI_EVIDENCE_POLICY`, `DEVAI_EVIDENCE_VERIFY`, and
      `DEVAI_EVIDENCE_BUNDLE_VERIFY`.
    - Through the bootstrapped runner, it runs `init bind --target . --as-role architect --write`,
-     then `check --preflight --run --base "$DEVAI_PREFLIGHT_BASE" --as-role inspector --write`.
+     then verifies Git again before `check --preflight --run --base "$DEVAI_PREFLIGHT_BASE" --as-role inspector --write`.
    - In `gate-rest` only, it then runs the four gate invariant producers of ADR-SCR-0013,
      each failing the step on its own:
 
@@ -132,26 +136,29 @@ Linux still runs the portable population and the actual unsupported-host refusal
      | `check --only blueprint` on the committed gate fixture        | INV-DEVAI-010   |
      | `sense inventory --slice pack` on the committed packs fixture | INV-HARNESS-010 |
 
-Then each partition job runs its share of the affected plan and uploads its report.
+8. **Verify Git before affected checks** (`id: verify-affected-git`): run the
+   verification script again in each partition job.
 
-6. **`gate-cli`, Affected checks owned by test:cli** (`id: affected`):
+9. **`gate-cli`, Affected checks owned by test:cli** (`id: affected`):
    `check --affected --run --base "$DEVAI_PREFLIGHT_BASE" --partition-include test:cli --as-role inspector --write`.
    It writes the report to `$RUNNER_TEMP/devai-gate-report-cli/report.json`. On failure,
    `scripts/process/summarize-check-report.mjs` names each failing node.
 
    **`gate-rest`, Affected checks and profile-selected candidate preflight**
-   (`id: affected`) runs two commands:
+   (`id: affected`) runs three commands:
    - `pnpm run release:pr-gate -- "$DEVAI_PREFLIGHT_BASE"`: commit-range hygiene, the bump
      floor, and the release profile preflight for a version-changing pull request;
+   - verify Git again before the affected check;
    - `check --affected --run --base "$DEVAI_PREFLIGHT_BASE" --partition-exclude test:cli --as-role inspector --write`.
      It writes the report to `$RUNNER_TEMP/devai-gate-report-rest/report.json`, with the
      same failure summary.
 
-7. **Upload the partition report** (`if: always()`): `actions/upload-artifact` uploads
-   the report as `devai-gate-report-cli` or `devai-gate-report-rest`.
-   - Retention is 7 days.
-   - `if-no-files-found: ignore`: a missing report is caught by the aggregator, never
-     here.
+10. **Upload the partition report** (`if: always()`): `actions/upload-artifact` uploads
+    the report as `devai-gate-report-cli` or `devai-gate-report-rest`.
+
+- Retention is 7 days.
+- `if-no-files-found: ignore`: a missing report is caught by the aggregator, never
+  here.
 
 The partition decides which planned nodes each job owns:
 
