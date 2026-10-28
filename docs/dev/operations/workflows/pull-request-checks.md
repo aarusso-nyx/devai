@@ -79,6 +79,12 @@ step.
 
 ## Native APFS qualification
 
+ADR-CHK-0011 proposes a 30-minute hosted native job budget in place of the
+current 15 minutes. The proposed budget is unverified and requires representative
+hosted duration and outcome evidence; the workflow table above describes the current
+implementation. The proposal preserves the qualification and gate requirements and
+does not change the separate local RC timeout.
+
 `native-apfs` checks out the exact candidate. On its disposable runner it logs the
 default system Git capability, selects the installed Xcode 26.3 toolchain and requires
 `/usr/bin/git` with the unchanged native flags in the stripped environment before
