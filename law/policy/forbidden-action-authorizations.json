@@ -19,6 +19,12 @@
       "commit": "979074f7d93be9c1270ea3a0eb6a4524cbc833ca",
       "authorized_by": "Owner",
       "reason": "Owner reviewed the R-0307 law commit that declares the workflows page entry with its completeness gate under ADR-GOV-0021; it cites .github/workflows/ source refs and changes no workflow file."
+    },
+    {
+      "forbidden_id": "FORBID-CI-WITHOUT-ADR",
+      "commit": "37e775008c61afc4b5c6ee83d080241482dba16c",
+      "authorized_by": "Owner",
+      "reason": "Owner explicitly authorized this exact CI change to pin Git across Linux jobs for the checked source integration."
     }
   ]
 }
