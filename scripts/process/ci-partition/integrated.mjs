@@ -42,7 +42,8 @@ function gitIdentity(path) {
     const atPath = lstatSync(path);
     if (
       !before.isFile() ||
-      before.size > 128 * 1024 * 1024 ||
+      before.nlink !== 1 ||
+      before.size > 8 * 1024 * 1024 ||
       before.dev !== atPath.dev ||
       before.ino !== atPath.ino
     )
@@ -54,7 +55,7 @@ function gitIdentity(path) {
       const count = readSync(fd, bytes, 0, bytes.length, null);
       if (count === 0) break;
       total += count;
-      if (total > 128 * 1024 * 1024) fail();
+      if (total > 8 * 1024 * 1024) fail();
       hash.update(bytes.subarray(0, count));
     }
     const after = fstatSync(fd);
@@ -62,6 +63,7 @@ function gitIdentity(path) {
     if (
       before.dev !== after.dev ||
       before.ino !== after.ino ||
+      before.nlink !== after.nlink ||
       before.size !== after.size ||
       before.mtimeMs !== after.mtimeMs ||
       before.ctimeMs !== after.ctimeMs ||
@@ -260,7 +262,11 @@ export async function provision({
     await run('./configure', [`--prefix=${prefix}`, '--without-tcltk'], { cwd: src, deadline });
     await run('make', ['-j2', 'NO_GETTEXT=YesPlease'], { cwd: src, deadline });
     onStage('installation');
-    await run('make', ['install', 'NO_GETTEXT=YesPlease'], { cwd: src, deadline });
+    await run(
+      'make',
+      ['install', 'NO_GETTEXT=YesPlease', 'NO_INSTALL_HARDLINKS=YesPlease', 'INSTALL_STRIP=-s'],
+      { cwd: src, deadline },
+    );
     onStage('identity');
     const git = join(prefix, 'bin', 'git'),
       g = lstatSync(git);
