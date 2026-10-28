@@ -75,7 +75,7 @@ const NATIVE_QUALIFICATION_PINS = [
   ],
   [
     'scripts/run-native-apfs-tests.mjs',
-    '1f3df9673cb9d80b82c5f632ff4fbb1066aeca8e4b924c893f33a6e85b66ad07',
+    '61e676681663d533c3c0fbc6a755407ccb38b15fb3e8e6700ec96a47a05e5b43',
   ],
 ] as const;
 
