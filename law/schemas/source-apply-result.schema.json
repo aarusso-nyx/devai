@@ -1,6 +1,15 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/source-apply-result.schema.json",
   "title": "Exact source-file application result",
+  "description": "Observed source application target and digest after successful publication.",
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "target": "packages/example/src/index.ts",
+      "sha256": "5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03"
+    }
+  ],
   "type": "object",
   "additionalProperties": false,
   "required": ["target", "sha256"],
