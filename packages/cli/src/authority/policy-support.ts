@@ -126,9 +126,11 @@ export function subjectGroups(entries: readonly RegistryEntry[]) {
   return {
     owner: humanActions(entries, 'owner'),
     architect: humanActions(entries, 'architect'),
-    inspector: humanActions(entries, 'inspector'),
-    engineer: ['round run', 'task finish', 'task start'].filter((actionId) =>
-      entries.some((entry) => entry.name === actionId),
+    // The source verb has explicit Article 6 core selectors. Including it in the legacy
+    // wildcard group would shadow declared adopter test classes and deny existing check calls.
+    inspector: humanActions(entries, 'inspector').filter((id) => id !== 'source apply inspector'),
+    engineer: ['round run', 'source apply engineer', 'task finish', 'task start'].filter(
+      (actionId) => entries.some((entry) => entry.name === actionId),
     ),
     auditor: humanActions(entries, 'auditor'),
     harness: machineActions(entries, 'harness'),
