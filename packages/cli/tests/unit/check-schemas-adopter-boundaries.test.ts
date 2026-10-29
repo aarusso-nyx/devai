@@ -14,6 +14,7 @@ import {
   registerCheckSchemas,
 } from '../../src/commands/check/schemas.js';
 
+const SOURCE_SCHEMAS = ['source-apply-manifest.schema.json', 'source-apply-result.schema.json'];
 const roots: string[] = [];
 const originalStdout = process.stdout.write;
 const originalExitCode = process.exitCode;
@@ -190,9 +191,15 @@ describe('complete schema canon filesystem checks', () => {
       'reconciliation-proof-index-result.schema.json',
       'reconciliation-inventory-result.schema.json',
     ];
-    expect(ROSTER.filter((name) => !resultAdditions.includes(name))).toHaveLength(123);
+    expect(
+      ROSTER.filter((name) => !resultAdditions.includes(name) && !SOURCE_SCHEMAS.includes(name)),
+    ).toHaveLength(123);
+    expect(ROSTER.filter((name) => SOURCE_SCHEMAS.includes(name)).sort()).toEqual(
+      [...SOURCE_SCHEMAS].sort(),
+    );
     for (const name of resultAdditions) expect(ROSTER).toContain(name);
-    expect(ROSTER).toHaveLength(127);
+    expect(ROSTER.filter((name) => !SOURCE_SCHEMAS.includes(name))).toHaveLength(127);
+    expect(ROSTER).toHaveLength(129);
     expect(ROSTER).toContain('reconciliation-owner.schema.json');
     expect(ROSTER as readonly string[]).not.toContain(
       'proof-index-reconciliation-contract.schema.json',
@@ -206,9 +213,10 @@ describe('complete schema canon filesystem checks', () => {
     expect(ROSTER).toContain('native-service-profile.schema.json');
     expect(ROSTER).toContain('native-service-profiles-policy.schema.json');
     expect(ROSTER).toContain('native-service-backends-policy.schema.json');
+    expect(report.canonical_total - SOURCE_SCHEMAS.length).toBe(140);
     expect(report, JSON.stringify(report.findings)).toMatchObject({
       ok: true,
-      canonical_total: 140,
+      canonical_total: 142,
       findings: [],
     });
   });
@@ -229,7 +237,10 @@ describe('complete schema canon filesystem checks', () => {
         );
       const report = checkSchemaCanon(root);
       expect(report.ok).toBe(false);
-      expect(report.canonical_total).toBe(kind === 'unexpected' ? 141 : 139);
+      expect(report.canonical_total - SOURCE_SCHEMAS.length).toBe(
+        kind === 'unexpected' ? 141 : 139,
+      );
+      expect(report.canonical_total).toBe(kind === 'unexpected' ? 143 : 141);
       expect(report.findings).toContainEqual({
         rule: 'recursive-closed-complete-objects',
         path: 'law/schemas',
@@ -317,7 +328,7 @@ describe('check schemas command boundary', () => {
     const result = invokeCommand({ repoRoot: canonFixture() });
     expect(JSON.parse(result.stdout)).toEqual({
       ok: true,
-      canonical_total: 140,
+      canonical_total: 142,
       rules: [
         'recursive-closed-complete-objects',
         'predicate-fragments-valid',
@@ -333,7 +344,7 @@ describe('check schemas command boundary', () => {
 
   it('renders the exact passing human summary', () => {
     const result = invokeCommand({ repoRoot: canonFixture(), human: true });
-    expect(result.stdout).toBe('policy check schemas: OK (140 canonical schemas, 0 findings)\n');
+    expect(result.stdout).toBe('policy check schemas: OK (142 canonical schemas, 0 findings)\n');
     expect(result.exitCode).toBe(EXIT_PASS);
   });
 
@@ -345,7 +356,7 @@ describe('check schemas command boundary', () => {
     const result = invokeCommand({ repoRoot: root, human: true });
     expect(result.stdout).toBe(
       [
-        'policy check schemas: FAIL (140 canonical schemas, 1 findings)',
+        'policy check schemas: FAIL (142 canonical schemas, 1 findings)',
         `  [dereferenced-publish-byte-identity] ${missing}: Bundled publish bytes differ from canonical law bytes.`,
         '',
       ].join('\n'),
