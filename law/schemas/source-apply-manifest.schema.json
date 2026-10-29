@@ -1,6 +1,18 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devai.nyxk.com.br/schemas/source-apply-manifest.schema.json",
   "title": "Exact source-file application manifest",
+  "description": "One source target, expected preimage and exact UTF-8 replacement bytes; authority comes from the invocation and policy.",
+  "schema_version": "1.0.0",
+  "examples": [
+    {
+      "schemaVersion": "1.0.0",
+      "target": "packages/example/src/index.ts",
+      "expected": { "kind": "absent" },
+      "content_utf8": "hello\n",
+      "content_sha256": "5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03"
+    }
+  ],
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "target", "expected", "content_utf8", "content_sha256"],
