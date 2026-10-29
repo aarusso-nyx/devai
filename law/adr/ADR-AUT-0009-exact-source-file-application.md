@@ -16,6 +16,7 @@ provenance:
   - STYNX S10 continuation and bounded upstream source-write implementation preparation on 2026-10-28
 affected_rules:
   - law/policy/action-registry.json
+  - law/schemas/action-registry.schema.json
   - law/schemas/source-apply-manifest.schema.json
   - law/schemas/source-apply-result.schema.json
   - packages/authority/src/boundaries/host-effects.ts
@@ -42,6 +43,7 @@ inspector_acceptance:
   - IA-008 -- A disposable installed adopter reproduces admitted and refused cases under actual bindings; tests distinguish cooperative final-check conflict detection from unsupported filesystem compare-and-swap and hostile parent-swap guarantees.
   - IA-009 -- The two native Inspector source rules do not shadow declared adopter test classes; original backend check allowances and matched rules survive, while the measured native task-start permission narrowing remains explicit and actual task lifecycle checks pass.
   - IA-010 -- Historical pre-B1 and B1 fixtures, hashes and exact action populations remain intact; current tests admit exactly three additional contracts and their reviewed policy deltas without replacing historical evidence.
+  - IA-011 -- The action registry schema admits the three source leaves through exactly one added source domain, rejects unknown domains, and retains all other constraints; historical schema populations remain separately preserved and tested.
 ---
 
 # Role-bound exact source-file application through the runtime
@@ -146,6 +148,15 @@ the implementation actually provides and preserve indeterminate outcomes.
 
 ### Registration and adoption
 
+Add exactly `source` to the action-path domain enum in
+`law/schemas/action-registry.schema.json` at
+`/properties/entries/items/allOf/0/properties/path/prefixItems/0/enum`. The schema must
+admit the three registered source leaves; retaining the old domain set rejected
+the intended registry during affected verification. This addition does not relax
+other domain values, action contracts, effects or subject validation. Preserve
+the exact historical schema population and verify the current population with
+this one additive domain and continued rejection of unregistered domains.
+
 Generate the three existing registry views using the official generator. Add only
 `source apply engineer` to the explicit Engineer subject-group list; Architect
 and Inspector human groups continue deriving from registered allowed roles.
@@ -227,7 +238,8 @@ a stronger future host guarantee but is not silently claimed by this increment.
 
 ## Affected Rules
 
-The frontmatter names the registry, manifest/result schemas, operation-specific
+The frontmatter names the registry and its action-domain schema, manifest/result
+schemas, operation-specific
 boundary, broker, role groups, command implementation, generated views and public
 documentation. The immutable core path mapping and existing accepted ADR bytes
 remain unchanged. Catalogue regeneration and its existing digest bindings must
@@ -235,7 +247,7 @@ follow the official documented renderer as part of integration.
 
 ## Inspector Adversarial Acceptance
 
-Discharge IA-001 through IA-010 with genuine public command and guarded boundary
+Discharge IA-001 through IA-011 with genuine public command and guarded boundary
 execution in disposable fixtures, including a packed installed package. Cover
 wrong roles and paths, real stale byte checks, no-replace races and failures before
 and after publication. Assert preservation rather than synthetic rollback success.
