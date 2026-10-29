@@ -308,7 +308,7 @@ assemble a release package or claim a candidate build result.
 
 ## Exact registry projection authorship
 
-The proposed [ADR-CHK-0012](../../../law/adr/ADR-CHK-0012-verified-registry-projection-authorship.md)
+The accepted [ADR-CHK-0012](../../../law/adr/ADR-CHK-0012-verified-registry-projection-authorship.md)
 reconciles the required registry/generated co-commit with exact role authorship.
 Its bounded prerequisite admits an Architect law commit's three fixed registry
 projections only when the same commit changes `law/policy/action-registry.json`
@@ -322,8 +322,9 @@ preloads, dependencies or configuration. The reviewed checker and admitted Node
 runtime remain trust roots; tool changes require an explicit reviewed rebind.
 Mismatch refuses rather than repairing files or skipping provenance. Existing
 Engineer, focused-regression, committer, merge and co-commit rules remain intact.
-The record remains proposed until accepted through normal review; local passing
-checks do not publish this prerequisite or authorize source-candidate integration.
+The reviewed design is accepted and its implementation integrated. Final-candidate
+qualification, publication and adopter effects remain separate; local passing
+checks do not authorize them.
 
 ## Authority and settings
 
