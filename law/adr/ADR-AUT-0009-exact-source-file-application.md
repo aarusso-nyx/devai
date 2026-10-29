@@ -2,7 +2,7 @@
 id: ADR-AUT-0009
 title: Role-bound exact source-file application through the runtime
 type: adr
-status: proposed
+status: accepted
 date: 2026-10-28
 authority: Architect
 supersedes: []
@@ -17,6 +17,7 @@ provenance:
 affected_rules:
   - law/invariants/INV-CORE-010.json
   - law/policy/action-registry.json
+  - law/policy/adopter-migrations.json
   - law/schemas/action-registry.schema.json
   - law/schemas/source-apply-manifest.schema.json
   - law/schemas/source-apply-result.schema.json
@@ -51,13 +52,17 @@ inspector_acceptance:
 
 ## Status
 
-Proposed for the authorized bounded upstream implementation. This record does
-not claim acceptance, completed qualification, package publication, or adopter
-binding. DEVAI's own source is maintainer-governed under AGENTS.md. An adopter's
-constitution does not create an upstream authoring bootstrap restriction.
+Accepted as the reviewed architectural decision on 2026-10-29 under the
+maintainer-authorized STYNX continuation and bounded upstream implementation.
+The implementation was integrated through #444 at
+`f02cf4326a28960592ba484bb4f5a7f3b0a41081`. This acceptance records the design;
+it does not assert that every adversarial obligation is discharged or authorize
+package publication or adopter binding. DEVAI's own source is maintainer-governed
+under AGENTS.md. An adopter's constitution does not create an upstream authoring
+bootstrap restriction.
 
 The new runtime operation is intended to support ordinary governed source work.
-Existing STYNX product approvals retain their exact scope. This proposal does not
+Existing STYNX product approvals retain their exact scope. This decision does not
 merge STYNX #211, authorize publication, alter release classification, or establish
 formal DEVAI or downstream DETRAN/PORM acceptance.
 
@@ -225,6 +230,15 @@ hand-edit `.devai/config`, copy registrations into an old runtime, substitute
 prospective policy for actual authority, or invoke another verb as a workaround.
 No constitution amendment or external-editor adapter is introduced by this record.
 
+The 2.9.0 candidate migration manifest records the three new actions separately
+from the required authority rebind. Registered `init upgrade` previews and applies
+the package move, rematerializes authority, and reprojects an existing adopter
+policy source and its binding receipt. Project version and selected adapter
+bindings move through the existing upgrade flow; the preview determines the
+actual write set. Native test restrictions and cooperative publication limits
+remain explicit. This is not a configuration-neutral release and does not require
+an invented constitution transition or grant a new external-editor adapter.
+
 ## Consequences
 
 Ordinary role-bound source writes acquire an explicit public runtime path. Each
@@ -262,5 +276,9 @@ Discharge IA-001 through IA-011 with genuine public command and guarded boundary
 execution in disposable fixtures, including a packed installed package. Cover
 wrong roles and paths, real stale byte checks, no-replace races and failures before
 and after publication. Assert preservation rather than synthetic rollback success.
-Retain existing tests and compare the exact action-set changes. No native,
-installed, integration or release pass is asserted by this proposed record.
+Retain existing tests and compare the exact action-set changes. Integrated
+checks and disposable installed role cases informed design acceptance. A complete
+case-by-case evidence mapping remains a qualification obligation; in particular,
+the constructed native-test broker probe alone does not discharge IA-009's actual
+task-lifecycle requirement. Historical installed observations do not certify the
+final 2.9.0 archive. No signed RC, publication or adopter acceptance is asserted.
