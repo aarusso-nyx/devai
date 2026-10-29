@@ -2,7 +2,7 @@
 id: ADR-CHK-0012
 title: Admit exact verified registry projections in the Architect law commit
 type: adr
-status: proposed
+status: accepted
 date: 2026-10-29
 authority: Architect
 supersedes:
@@ -32,10 +32,12 @@ inspector_acceptance:
 
 ## Status
 
-Proposed under the authorized local prerequisite repair. This record grants no
-publication, protected-branch change, adoption or historical rewrite. The original
-source-application candidate is retained while the prerequisite is prepared on
-accepted base `b75d580e5fa1bb39fef079c86b2b133b8775fd34`.
+Accepted as the reviewed architectural decision on 2026-10-29 under the
+maintainer-authorized prerequisite repair. The prerequisite was integrated through
+#443 and is present in the source-application integration #444. This record grants
+no publication, protected-branch change, adoption or historical rewrite. The
+original failed source-application candidate and its evidence remain preserved;
+preparation used accepted base `b75d580e5fa1bb39fef079c86b2b133b8775fd34`.
 
 This forward record changes only the bounded registry-projection admission in
 the commit-author table inherited through ADR-CHK-0009. Its focused-regression
@@ -175,5 +177,8 @@ identities. Include altered source/output, an unchanged sensor projection,
 nonregular and executable modes, substituted verifier/formatter, unrelated paths,
 missing source change, later working-tree repairs and unchanged legacy author
 rules. Retain failure evidence; no skip, broad whitelist, historical exception or
-weakened assertion is authorized. This proposed record asserts no completed
-acceptance, successful push, publication or adopter effect.
+weakened assertion is authorized. The independent 20-case provenance review,
+including malformed UTF-8 and copied-tool corruption, informed design acceptance.
+The complete IA evidence mapping and final-candidate qualification remain explicit
+obligations; architectural acceptance is not a signed RC, publication or adopter
+effect.

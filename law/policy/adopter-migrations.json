@@ -505,6 +505,32 @@
         }
       ],
       "date": "2026-10-25"
+    },
+    {
+      "version": "2.9.0",
+      "status": "unreleased",
+      "changes": [
+        {
+          "id": "MIG-2.9.0-role-bound-source-actions",
+          "kind": "new-action",
+          "summary": "Add preview source apply architect, source apply engineer and source apply inspector for one exact regular-file create or replacement under the matching declared role, explicit write consent and current bound path authority. Existing action contracts remain unchanged. No deletion, general editor adapter, protected path permission or automatic retry is added; cooperative final checks do not provide filesystem compare-and-swap or hostile parent-swap protection.",
+          "decision_records": ["ADR-AUT-0009"],
+          "segments": [],
+          "files": []
+        },
+        {
+          "id": "MIG-2.9.0-source-authority-rebind",
+          "kind": "rebind",
+          "summary": "After installing the exact published package, preview registered init upgrade and apply its reviewed write set with --as-role architect --write. It refreshes the project version and compiled authority policy; where an adopter policy source is bound, it reprojects that same source and refreshes its receipt and authority-extension binding. The new Inspector source rules cover tests/** and packages/*/tests/** without shadowing declared adopter test classes; a constructed Engineer task start request at a native test file is denied. Existing selected host-adapter bindings are refreshed by the ordinary upgrade when needed, as shown in the preview. Constitution pins, adopter declarations and protected histories are not silently changed. This rebind does not authorize product edits, publication or downstream acceptance.",
+          "decision_records": ["ADR-AUT-0009"],
+          "segments": ["adopter-policy", "authority"],
+          "files": [
+            ".devai/config/project.json",
+            ".devai/config/adopter-policy-binding.json",
+            ".devai/config/authority-policy.json"
+          ]
+        }
+      ]
     }
   ]
 }
