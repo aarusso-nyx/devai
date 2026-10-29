@@ -143,7 +143,7 @@ describe('ADR-EVI-0007 bounded authoring contract', () => {
         file: `law/adr/${name}`,
         adr_id: String(fm.id),
         title: String(fm.title),
-        status: fm.status as AdrRecordFixture['status'],
+        status: 'proposed',
         date: fm.date as string | null,
         format: 'v2',
         supersedes: fm.supersedes as string[],
@@ -167,7 +167,7 @@ describe('ADR-EVI-0007 bounded authoring contract', () => {
     >;
     expect(fm).toMatchObject({
       id: 'ADR-CHK-0012',
-      status: 'proposed',
+      status: 'accepted',
       authority: 'Architect',
       supersedes: ['ADR-CHK-0009'],
     });
@@ -203,7 +203,7 @@ describe('ADR-EVI-0007 bounded authoring contract', () => {
     >;
     expect(fm).toMatchObject({
       id: 'ADR-AUT-0009',
-      status: 'proposed',
+      status: 'accepted',
       authority: 'Architect',
       supersedes: [],
     });
@@ -227,6 +227,33 @@ describe('ADR-EVI-0007 bounded authoring contract', () => {
     });
     expect(after.subject_authorities).toEqual(before.subject_authorities);
     expect(after.effective_authorities).toEqual(before.effective_authorities);
+  });
+  it('resolves both accepted records as effective current authority', () => {
+    const additions = [projectionFile, sourceAdrFile].map((name): AdrRecordFixture => {
+      const text = readFileSync(resolve(adrRoot, name), 'utf8');
+      const fm = parseYaml(/^---\n([\s\S]*?)\n---\n/u.exec(text)?.[1] ?? '') as Record<
+        string,
+        unknown
+      >;
+      expect(fm.status).toBe('accepted');
+      return {
+        file: `law/adr/${name}`,
+        adr_id: String(fm.id),
+        title: String(fm.title),
+        status: 'accepted',
+        date: fm.date as string | null,
+        format: 'v2',
+        supersedes: fm.supersedes as string[],
+        affected_rules: fm.affected_rules as string[],
+      };
+    });
+    const after = resolveAdrFixture([...records, ...additions], currentPaths.length);
+    expect(after.ok).toBe(true);
+    expect(after.errors).toEqual([]);
+    for (const id of ['ADR-CHK-0012', 'ADR-AUT-0009']) {
+      expect(after.adrs.find((record) => record.adr_id === id)).toMatchObject({ effective: true });
+      expect(after.effective_authorities).toContain(id);
+    }
   });
   it('validates accepted frontmatter, required body sections and exact non-superseding subjects', () => {
     expect(getValidator('adr-v2.schema.json')(metadata)).toBe(true);
