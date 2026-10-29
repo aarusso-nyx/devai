@@ -24,7 +24,12 @@ const PUBLIC_RUNTIME_ADDITIONS = [
   'reconciliation-proof-index-result.schema.json',
   'reconciliation-inventory-result.schema.json',
 ];
-const ROSTER = LIVE_ROSTER.filter((name) => !PUBLIC_RUNTIME_ADDITIONS.includes(name));
+const SOURCE_RUNTIME_ADDITIONS = [
+  'source-apply-manifest.schema.json',
+  'source-apply-result.schema.json',
+];
+const B1_ROSTER = LIVE_ROSTER.filter((name) => !SOURCE_RUNTIME_ADDITIONS.includes(name));
+const ROSTER = B1_ROSTER.filter((name) => !PUBLIC_RUNTIME_ADDITIONS.includes(name));
 const CANDIDATE = resolve(
   ROOT,
   'docs/dev/operations/u1-b1-recovery-20261024/release-280/b1-design/owner-schema.candidate.json',
@@ -154,7 +159,11 @@ describe('closed reconciliation Owner record schema integration', () => {
   });
   it('adds exactly one runtime roster member without promoting source-only references', () => {
     expect(ROSTER).toHaveLength(122);
-    expect(LIVE_ROSTER).toHaveLength(127);
+    expect(B1_ROSTER).toHaveLength(127);
+    expect(LIVE_ROSTER).toHaveLength(129);
+    expect(LIVE_ROSTER.filter((name) => SOURCE_RUNTIME_ADDITIONS.includes(name)).sort()).toEqual(
+      [...SOURCE_RUNTIME_ADDITIONS].sort(),
+    );
     expect(LIVE_ROSTER.filter((name) => PUBLIC_RUNTIME_ADDITIONS.includes(name)).sort()).toEqual(
       [...PUBLIC_RUNTIME_ADDITIONS].sort(),
     );
@@ -298,10 +307,16 @@ describe('closed reconciliation Owner record schema integration', () => {
       const sourceNames = readdirSync(resolve(ROOT, 'law/schemas'))
         .filter((name) => name.endsWith('.schema.json'))
         .sort();
-      expect(sourceNames.filter((name) => !PUBLIC_RUNTIME_ADDITIONS.includes(name))).toHaveLength(
-        135,
+      expect(
+        sourceNames.filter(
+          (name) =>
+            !PUBLIC_RUNTIME_ADDITIONS.includes(name) && !SOURCE_RUNTIME_ADDITIONS.includes(name),
+        ),
+      ).toHaveLength(135);
+      expect(sourceNames).toHaveLength(142);
+      expect(sourceNames.filter((name) => SOURCE_RUNTIME_ADDITIONS.includes(name)).sort()).toEqual(
+        [...SOURCE_RUNTIME_ADDITIONS].sort(),
       );
-      expect(sourceNames).toHaveLength(140);
       const output = join(fixtureRoot, 'packages/schemas/dist/schemas');
       expect(
         readdirSync(output)

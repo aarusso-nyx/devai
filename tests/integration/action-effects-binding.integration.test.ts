@@ -51,14 +51,24 @@ describe('binding action-effect CLI', () => {
       'sense bootstrap-inventory',
     ];
     const liveActions = Object.keys(output.report.actions);
-    expect(liveActions.filter((action) => addedActions.includes(action)).sort()).toEqual(
+    const sourceActions = [
+      'source apply architect',
+      'source apply engineer',
+      'source apply inspector',
+    ];
+    expect(liveActions.filter((action) => sourceActions.includes(action)).sort()).toEqual(
+      [...sourceActions].sort(),
+    );
+    const b1Actions = liveActions.filter((action) => !sourceActions.includes(action));
+    expect(b1Actions).toHaveLength(74);
+    expect(b1Actions.filter((action) => addedActions.includes(action)).sort()).toEqual(
       addedActions.sort(),
     );
     // Preserve the original 69-action population alongside the five exact additions.
-    expect(liveActions.filter((action) => !addedActions.includes(action))).toHaveLength(69);
+    expect(b1Actions.filter((action) => !addedActions.includes(action))).toHaveLength(69);
     expect(output.report.metrics).toMatchObject({
-      catalog_actions: 74,
-      extracted_actions: 74,
+      catalog_actions: 77,
+      extracted_actions: 77,
       unresolved_edges: 0,
     });
   });
