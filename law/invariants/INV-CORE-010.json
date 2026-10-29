@@ -45,7 +45,13 @@
     "human_approval_required": false
   },
   "tags": ["action-registry", "public-surface", "cli"],
-  "measurable_via": ["catalog actions", "check"],
+  "measurable_via": [
+    "catalog actions",
+    "check",
+    "source apply architect",
+    "source apply engineer",
+    "source apply inspector"
+  ],
   "provenance": ["ADR-REL-0001", "ADR-MDL-0007", "issue #295"],
   "supersedes": null,
   "superseded_by": null
