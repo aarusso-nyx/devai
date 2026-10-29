@@ -19,6 +19,10 @@ const MANIFEST = JSON.parse(
   readFileSync(join(ROOT, 'law/policy/adopter-migrations.json'), 'utf8'),
 ) as Record<string, unknown>;
 const manifest = loadAdopterMigrations();
+const historicalManifest = {
+  ...manifest,
+  releases: manifest.releases.filter((release) => release.version !== '2.9.0'),
+};
 const changes = manifest.releases.flatMap((release) => release.changes);
 const decisionRecords = new Set(
   readdirSync(join(ROOT, 'law/adr'))
@@ -77,7 +81,7 @@ describe('#264: the adopter migration manifest', () => {
       'host-adapters',
       'harness-ci',
     ]);
-    expect(manifest.releases.map((release) => release.version)).toEqual([
+    expect(historicalManifest.releases.map((release) => release.version)).toEqual([
       '1.7.0',
       '1.8.0',
       '1.9.0',
@@ -201,13 +205,12 @@ describe('#264: the adopter migration manifest', () => {
         decision_required: true,
       }),
     ]);
-    expect(plannedReleases(manifest, '2.4.0', '2.5.0').map((release) => release.version)).toEqual([
-      '2.5.0',
-      '2.6.4',
-    ]);
-    expect(plannedReleases(manifest, '2.5.0', '2.5.0').map((release) => release.version)).toEqual([
-      '2.6.4',
-    ]);
+    expect(
+      plannedReleases(historicalManifest, '2.4.0', '2.5.0').map((release) => release.version),
+    ).toEqual(['2.5.0', '2.6.4']);
+    expect(
+      plannedReleases(historicalManifest, '2.5.0', '2.5.0').map((release) => release.version),
+    ).toEqual(['2.6.4']);
   });
 
   it('declares the exact optional 2.6.0 inventory and scoped hook refresh without automatic binding or scaffold changes', () => {
@@ -274,11 +277,11 @@ describe('#264: the adopter migration manifest', () => {
     ]);
     // 2.6.4 was never published: its code ships in 2.7.0, so it stays unreleased and is planned
     // with that code, while the released 2.7.0 is planned only when installed.
-    expect(plannedReleases(manifest, '2.6.0', '2.6.1')).toEqual([shipped, latest]);
-    expect(plannedReleases(manifest, '2.6.1', '2.6.1')).toEqual([latest]);
-    expect(plannedReleases(manifest, '2.6.3', '2.6.4')).toEqual([latest]);
-    expect(plannedReleases(manifest, '2.6.3', '2.7.0')).toEqual([latest, next]);
-    expect(plannedReleases(manifest, '2.6.4', '2.6.4')).toEqual([]);
+    expect(plannedReleases(historicalManifest, '2.6.0', '2.6.1')).toEqual([shipped, latest]);
+    expect(plannedReleases(historicalManifest, '2.6.1', '2.6.1')).toEqual([latest]);
+    expect(plannedReleases(historicalManifest, '2.6.3', '2.6.4')).toEqual([latest]);
+    expect(plannedReleases(historicalManifest, '2.6.3', '2.7.0')).toEqual([latest, next]);
+    expect(plannedReleases(historicalManifest, '2.6.4', '2.6.4')).toEqual([]);
   });
 
   it('declares the released 2.7.0 constitution 1.1.0 move as an Architect decision (ADR-GOV-0026)', () => {
@@ -297,7 +300,7 @@ describe('#264: the adopter migration manifest', () => {
         obligation: expect.objectContaining({ check: 'constitution-version' }),
       }),
     ]);
-    expect(plannedReleases(manifest, '2.7.0', '2.7.0')).toEqual([]);
+    expect(plannedReleases(historicalManifest, '2.7.0', '2.7.0')).toEqual([]);
   });
 
   it('has exactly one entry for every changelog release above the baseline that changed configuration', () => {
@@ -329,10 +332,39 @@ describe('#264: the adopter migration manifest', () => {
       expect(reason).not.toEqual('');
       expect(changelog).toContain(`## ${version} — candidate\n`);
       expect(manifest.releases.find((release) => release.version === version)).toBeUndefined();
-      expect(plannedReleases(manifest, from, version)).toEqual([]);
+      expect(plannedReleases(historicalManifest, from, version)).toEqual([]);
     }
-    expect(resolveCliVersion()).toBe('2.8.1');
-    expect(CONFIGURATION_NEUTRAL_CANDIDATES.has(resolveCliVersion())).toBe(true);
+    expect(resolveCliVersion()).toBe('2.9.0');
+    expect(CONFIGURATION_NEUTRAL_CANDIDATES.has('2.8.1')).toBe(true);
+    expect(CONFIGURATION_NEUTRAL_CANDIDATES.has(resolveCliVersion())).toBe(false);
+  });
+
+  it('declares the non-neutral 2.9.0 candidate and exact authority rebind', () => {
+    const next = manifest.releases.find((release) => release.version === '2.9.0');
+    expect(next).toMatchObject({ version: '2.9.0', status: 'unreleased' });
+    expect(next?.changes).toEqual([
+      expect.objectContaining({
+        id: 'MIG-2.9.0-role-bound-source-actions',
+        kind: 'new-action',
+        decision_records: ['ADR-AUT-0009'],
+        segments: [],
+        files: [],
+      }),
+      expect.objectContaining({
+        id: 'MIG-2.9.0-source-authority-rebind',
+        kind: 'rebind',
+        decision_records: ['ADR-AUT-0009'],
+        segments: ['adopter-policy', 'authority'],
+        files: [
+          '.devai/config/project.json',
+          '.devai/config/adopter-policy-binding.json',
+          '.devai/config/authority-policy.json',
+        ],
+      }),
+    ]);
+    expect(plannedReleases(manifest, '2.8.1', '2.9.0').map((release) => release.version)).toEqual([
+      '2.9.0',
+    ]);
   });
 
   it('covers the installed package version', () => {
@@ -347,7 +379,7 @@ describe('#264: the adopter migration manifest', () => {
     // Across a neutral release no released entry is planned and init upgrade only restamps the
     // version.
     const released = (from: string, installedVersion: string) =>
-      plannedReleases(manifest, from, installedVersion).filter(
+      plannedReleases(historicalManifest, from, installedVersion).filter(
         (release) => release.status === 'released',
       );
     for (const [version, { from }] of CONFIGURATION_NEUTRAL_RELEASES) {
@@ -356,7 +388,7 @@ describe('#264: the adopter migration manifest', () => {
     // #381, #383, #390: released rebinds stay in range; the prospective 2.6.4
     // obligations are also planned above the installed/bound floor (#291).
     const planned = (from: string, installedVersion: string) =>
-      plannedReleases(manifest, from, installedVersion).map((release) => release.version);
+      plannedReleases(historicalManifest, from, installedVersion).map((release) => release.version);
     expect(planned('2.3.0', '2.3.0')).toEqual(['2.6.4']);
     expect(planned('2.3.0', '2.3.1')).toEqual(['2.3.1', '2.6.4']);
     expect(planned('2.3.1', '2.3.1')).toEqual(['2.6.4']);
@@ -375,17 +407,19 @@ describe('#264: the adopter migration manifest', () => {
   });
 
   it('plans an unreleased entry with the code that ships it, and a released one only in range (#291)', () => {
-    const versions = (from: string, installed: string, source = manifest) =>
+    const versions = (from: string, installed: string, source = historicalManifest) =>
       plannedReleases(source, from, installed).map((release) => release.version);
     // While 2.1.0 was unreleased, its conversion shipped in the 2.0.0-stamped package, so a
     // plan at 2.0.0 recorded it.
     const unreleased = parseAdopterMigrations({
       ...MANIFEST,
-      releases: (MANIFEST['releases'] as Record<string, unknown>[]).map((release) => {
-        if (release['version'] !== '2.1.0') return release;
-        const { date: _date, ...rest } = release;
-        return { ...rest, status: 'unreleased' };
-      }),
+      releases: (MANIFEST['releases'] as Record<string, unknown>[])
+        .filter((release) => release['version'] !== '2.9.0')
+        .map((release) => {
+          if (release['version'] !== '2.1.0') return release;
+          const { date: _date, ...rest } = release;
+          return { ...rest, status: 'unreleased' };
+        }),
     });
     expect(versions('2.0.0', '2.0.0', unreleased)).toEqual(['2.1.0', '2.6.4']);
     expect(versions('1.9.0', '2.0.0', unreleased)).toEqual(['2.0.0', '2.1.0', '2.6.4']);

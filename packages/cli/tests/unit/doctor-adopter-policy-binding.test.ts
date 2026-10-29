@@ -29,7 +29,7 @@ const SOURCE = 'law/policy/devai-adoption.json';
 const BINDING = '.devai/config/adopter-policy-binding.json';
 const CONFIG = '.devai/config';
 const SELECTED_RELEASE_VERSION = '2.7.1';
-const CURRENT_PACKAGE_VERSION = '2.8.1';
+const CURRENT_PACKAGE_VERSION = '2.9.0';
 const TARGETS = [
   '.devai/config/project.json',
   '.devai/config/domains.json',
