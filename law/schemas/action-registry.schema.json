@@ -165,7 +165,8 @@
                       "catalog",
                       "triage",
                       "backlog",
-                      "campaign"
+                      "campaign",
+                      "source"
                     ]
                   }
                 ]
