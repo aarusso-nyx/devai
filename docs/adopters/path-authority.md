@@ -164,6 +164,48 @@ Editor and shell writes are outside the runtime: no host-enforcement adapter is 
 them, and Article 6 requires DEVAI to report that boundary rather than imply control, so the
 matrix speaks only for writes the runtime brokers.
 
+### Applying one source file through the runtime
+
+The preview commands `source apply engineer`, `source apply inspector`, and
+`source apply architect` apply one source-file create or replacement using the named role's
+bound path policy. Run from the target checkout with `--manifest <file> --as-role <role> --write`.
+The manifest is a JSON object with `schemaVersion: "1.0.0"`, a normalized repository-relative
+`target`, `expected`, `content_utf8`, and the lowercase SHA-256 of its UTF-8 bytes in
+`content_sha256`. For a new file, `expected` is `{ "kind": "absent" }`; for a replacement it is
+`{ "kind": "file", "sha256": "<current byte digest>", "mode": 420 }`, where `mode` is the
+current ordinary permission bits as a decimal integer (420 is octal 0644). Parents must already
+exist. The command refuses protected state, symbolic links, multiple hard links, stale content
+or permissions, and a role or path the active policy denies. It does not stage or commit Git.
+
+Create uses no-replace publication. Replace writes complete staged bytes and atomically renames
+them after checking the preimage and parent identities. This detects changes observed before the
+final check; it is not a filesystem compare-and-swap, does not exclude other same-user writers,
+and assumes a cooperative checkout whose parent topology stays stable during the operation.
+Arbitrary editor and shell writes remain outside this mediation. If the command reports an
+indeterminate publication or retained staging entry, inspect the target and reported staging
+identity before deciding how to proceed; do not automatically retry.
+
+The Inspector source action has two native test rules at precedence 800:
+`core-inspector-source-tests` for `tests/**`, and
+`core-inspector-source-package-tests` for `packages/*/tests/**`. Both admit only
+Inspector source creates and updates. They do not activate the legacy global wildcard test
+rules. Declared adopter roots keep their test (700) and architecture (750) class ordering,
+including the existing Inspector `check` allowance on `backend/.../tests/...`.
+
+This tightens an existing broker permission: an Engineer `task start` request aimed at a native
+package test was previously allowed through the broad package rule and is now denied. A root
+test request changes from unclassified to denied. These are policy decisions for a supplied
+target, not evidence that the public task-start lifecycle fails: that command provisions task
+resources and has no arbitrary source-file target or content input. The source Engineer action
+does not implement the later constitution's separate focused-regression exception. No new
+`check` grant or blanket Engineer test permission is introduced. See
+[ADR-AUT-0009](../../law/adr/ADR-AUT-0009-exact-source-file-application.md) for the exact scope
+and outstanding qualification obligations.
+
+The new verbs change registry-derived class sets and policy digests. After adopting a qualified
+package containing them, use the supported upgrade and adopter-policy bind flow to refresh the
+binding; do not hand-edit the materialized authority policy.
+
 ## Migration
 
 Adopters without the block change nothing: their source, receipt, and materialized policy are
