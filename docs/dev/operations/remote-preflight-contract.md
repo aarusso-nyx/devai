@@ -306,6 +306,25 @@ tests. Both ordinary and version-changing PRs require
 the floor. Compile-only bootstrap makes the typed runner executable; it does not
 assemble a release package or claim a candidate build result.
 
+## Exact registry projection authorship
+
+The proposed [ADR-CHK-0012](../../../law/adr/ADR-CHK-0012-verified-registry-projection-authorship.md)
+reconciles the required registry/generated co-commit with exact role authorship.
+Its bounded prerequisite admits an Architect law commit's three fixed registry
+projections only when the same commit changes `law/policy/action-registry.json`
+and all three mode-100644 output blobs at that commit match the pinned trusted
+generator and formatter. An unchanged sensor projection need not appear in the
+diff. A generated marker, candidate-selected output list, or an unrelated file
+under packages grants no exception.
+
+Verification uses isolated exact commit blobs and pinned tooling, without ambient
+preloads, dependencies or configuration. The reviewed checker and admitted Node
+runtime remain trust roots; tool changes require an explicit reviewed rebind.
+Mismatch refuses rather than repairing files or skipping provenance. Existing
+Engineer, focused-regression, committer, merge and co-commit rules remain intact.
+The record remains proposed until accepted through normal review; local passing
+checks do not publish this prerequisite or authorize source-candidate integration.
+
 ## Authority and settings
 
 Merge-ready is not release-ready. Main may contain work that passes cheap checks but
