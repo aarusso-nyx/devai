@@ -407,8 +407,11 @@ describe('#264: the adopter migration manifest', () => {
   });
 
   it('plans an unreleased entry with the code that ships it, and a released one only in range (#291)', () => {
-    const versions = (from: string, installed: string, source = historicalManifest) =>
-      plannedReleases(source, from, installed).map((release) => release.version);
+    const versions = (
+      from: string,
+      installed: string,
+      source: Parameters<typeof plannedReleases>[0] = historicalManifest,
+    ) => plannedReleases(source, from, installed).map((release) => release.version);
     // While 2.1.0 was unreleased, its conversion shipped in the 2.0.0-stamped package, so a
     // plan at 2.0.0 recorded it.
     const unreleased = parseAdopterMigrations({
