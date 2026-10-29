@@ -47,6 +47,7 @@ const DOMAIN_ORDER = [
   'release',
   'round',
   'sense',
+  'source',
   'task',
   'triage',
 ] as const;
@@ -240,6 +241,11 @@ async function commandsFor(domain: CommandDomain): Promise<readonly CommandDefin
         senseRecordCmd,
         senseRunSetCmd,
       ];
+    }
+    case 'source': {
+      const { sourceApplyArchitect, sourceApplyEngineer, sourceApplyInspector } =
+        await import('./commands/source/apply.js');
+      return [sourceApplyArchitect, sourceApplyEngineer, sourceApplyInspector];
     }
     case 'task': {
       const {

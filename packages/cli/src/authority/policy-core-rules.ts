@@ -322,6 +322,27 @@ export function buildCoreAuthorityRules(input: {
       rationale: 'Article 6 Inspector test authority.',
     }),
     rule({
+      id: 'core-inspector-source-tests',
+      origin: 'immutable-core',
+      precedence: 800,
+      actionIds: actionIds(entries, (entry) => entry.name === 'source apply inspector'),
+      selector: { ...fsSelector(repositoryId, 'tests/**'), operations: ['create', 'update'] },
+      subjects: human('inspector'),
+      rationale: 'Article 6 Inspector source application in the core tests root.',
+    }),
+    rule({
+      id: 'core-inspector-source-package-tests',
+      origin: 'immutable-core',
+      precedence: 800,
+      actionIds: actionIds(entries, (entry) => entry.name === 'source apply inspector'),
+      selector: {
+        ...fsSelector(repositoryId, 'packages/*/tests/**'),
+        operations: ['create', 'update'],
+      },
+      subjects: human('inspector'),
+      rationale: 'Article 6 Inspector source application in package test roots.',
+    }),
+    rule({
       id: 'core-inspector-tests-plural',
       origin: 'immutable-core',
       precedence: 800,

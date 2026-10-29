@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { hostname } from 'node:os';
 import { createRequire } from 'node:module';
 import { createAuthorityPolicyReview } from './policy-review.js';
+import { parseSourceManifest } from '../commands/source/manifest.js';
 import { parseReconciliationHostInput } from './reconciliation-host-input.js';
 import { reconciliationPackageWitness } from './reconciliation-package-witness.js';
 import { parseAdopterPolicyBinding } from '../services/adopter-policy-binding.js';
@@ -1566,9 +1567,71 @@ export function createAuthorityHostBroker(input: BrokerInput): {
     }
   };
 
+  let sourceOperationUsed = false;
   const applyEffect = (request: AuthorityHostEffectRequest, apply: () => unknown): unknown => {
     assertProtectedReleasePrepareCapacityEffect(issuer);
     assertProtectedReleaseExportCapacityEffect(issuer);
+    const sourceAction = /^source apply (architect|engineer|inspector)$/u.exec(input.entry.name);
+    if (sourceAction || request.symbol === 'publishSourceFileSync') {
+      if (
+        !sourceAction ||
+        request.kind !== 'filesystem' ||
+        request.symbol !== 'publishSourceFileSync' ||
+        input.entry.effects !== 'local-write' ||
+        sourceOperationUsed ||
+        sourceAction[1] !== input.role ||
+        request.arguments.length !== 1
+      ) {
+        throw new Error('SOURCE_OPERATION_FORBIDDEN');
+      }
+      sourceOperationUsed = true;
+      const manifestPath = flagValue(input.argv, '--manifest');
+      if (!manifestPath || input.argv.filter((arg) => arg === '--manifest').length !== 1)
+        throw new Error('SOURCE_MANIFEST_INVALID');
+      const raw = new TextDecoder('utf-8', { fatal: true }).decode(
+        readFileSync(resolve(manifestPath)),
+      );
+      const manifest = parseSourceManifest(raw);
+      const descriptor = Object.freeze({
+        root: repositoryRoot,
+        target: manifest.target,
+        expected: manifest.expected,
+        content: manifest.content_utf8,
+        sha256: manifest.content_sha256,
+      });
+      if (canonicalSha256(request.arguments[0]) !== canonicalSha256(descriptor))
+        throw new Error('SOURCE_OPERATION_BINDING_MISMATCH');
+      const canonicalPath = canonicalRelativePath(
+        repositoryRoot,
+        resolve(repositoryRoot, manifest.target),
+        false,
+      );
+      if (canonicalPath !== manifest.target) throw new Error('SOURCE_OPERATION_TARGET_INVALID');
+      const current = policyFor({ ...input, bootstrap_policy: false }, new Date().toISOString());
+      if (
+        canonicalSha256((current.policy as JsonRecord).provenance) !==
+        canonicalSha256((policy as JsonRecord).provenance)
+      )
+        throw new Error('SOURCE_OPERATION_POLICY_STALE');
+      policy = current.policy;
+      sources = current.sources;
+      return authorizeTarget(
+        {
+          name: input.entry.name,
+          effects: 'local-write',
+          authority_contract: input.entry.authority_contract,
+        },
+        {
+          kind: 'fs',
+          id: `fs:${canonicalPath}`,
+          repository_id: sources.repository_id,
+          canonical_relative_path: canonicalPath,
+          operation: manifest.expected.kind === 'absent' ? 'create' : 'update',
+        },
+        apply,
+        request.symbol,
+      );
+    }
     if (request.kind === 'reconciliation-host' || request.kind === 'proof-index') {
       const operation =
         reconciliationInvocation === undefined

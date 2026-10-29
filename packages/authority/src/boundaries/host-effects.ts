@@ -39,6 +39,7 @@ import {
   publishPrivateNoReplaceSteps,
   type PublishedFileIdentity,
 } from './host-publish.js';
+import { publishSourceFile } from './host-source-publish.js';
 import {
   entryIdentityKey,
   parseEntryIdentityKey,
@@ -325,6 +326,12 @@ export const rmdirSync = guarded('rmdirSync', nodeRmdirSync, 'mutation');
 export const symlinkSync = guarded('symlinkSync', nodeSymlinkSync, 'mutation');
 export const unlinkSync = guarded('unlinkSync', nodeUnlinkSync, 'mutation');
 export const writeFileSync = guarded('writeFileSync', nodeWriteFileSync, 'mutation');
+/** One source target, mediated by the source operation's broker admission. */
+export const publishSourceFileSync = guarded(
+  'publishSourceFileSync',
+  publishSourceFile,
+  'mutation',
+);
 export const writeSync = guarded('writeSync', nodeWriteSync, 'mutation');
 /**
  * Governed atomic no-replace publication (ADR-AUT-0005): one authorized `create` of
