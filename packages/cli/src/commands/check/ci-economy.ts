@@ -64,7 +64,7 @@ const NATIVE_QUALIFICATION_PINS = [
     '.github/actions/setup-node-toolchain/action.yml',
     '3e220549f47d2d5d345a647dc2d06e7ab532fdcf11946efc70ea32d1ccb8abab',
   ],
-  ['package.json', 'e93d921f8aa68f748d4532290056443be3c3167648221fafb3160eecaddb5147'],
+  ['package.json', '29967669ec962e6c1250df3708a31fa1909bb396d1a8f1df759d715153d01b00'],
   [
     'scripts/process/bootstrap-check-runner.mjs',
     'cc2e1f307390ba7db8c0666a0a2ea15780d19c4657d8d3cd656d796b6a63e4e6',
