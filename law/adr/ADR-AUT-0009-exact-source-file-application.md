@@ -15,6 +15,7 @@ provenance:
   - ADR-AUT-0008 (cooperative final checks do not control arbitrary external edits)
   - STYNX S10 continuation and bounded upstream source-write implementation preparation on 2026-10-28
 affected_rules:
+  - law/invariants/INV-CORE-010.json
   - law/policy/action-registry.json
   - law/schemas/action-registry.schema.json
   - law/schemas/source-apply-manifest.schema.json
@@ -147,6 +148,16 @@ be additional reviewed implementation scope. Tests must assert only guarantees
 the implementation actually provides and preserve indeterminate outcomes.
 
 ### Registration and adoption
+
+Add only `source apply architect`, `source apply engineer` and
+`source apply inspector` to `INV-CORE-010.measurable_via`. These public handlers
+exercise that invariant's existing canonical registry-dispatch contract: their
+path, effect, output, error and authority contracts come from the registered
+entry. Preserve its statement, verification obligations, trace, change policy
+and existing claims. This records measurement surfaces, not completed acceptance
+or new authority. `INV-AUTH-002` remains unchanged; the source actions still obey
+its declared-role and non-elevation obligation. No new duplicate invariant or
+exception to its human Architect commit requirement is introduced.
 
 Add exactly `source` to the action-path domain enum in
 `law/schemas/action-registry.schema.json` at
