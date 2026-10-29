@@ -120,6 +120,17 @@ describe('exact native host opt-in is narrower than ordinary binding', () => {
       joint: [],
     });
     // Preserve the original provisioning-only 70-action population and its one-rule upper bound.
+    const sourceActions = [
+      'source apply architect',
+      'source apply engineer',
+      'source apply inspector',
+    ];
+    expect(
+      entries
+        .filter((value) => sourceActions.includes(value.name))
+        .map((value) => value.name)
+        .sort(),
+    ).toEqual([...sourceActions].sort());
     expect(
       entries.filter(
         (value) =>
@@ -128,6 +139,7 @@ describe('exact native host opt-in is narrower than ordinary binding', () => {
             'evidence reconcile materialize',
             'evidence reconcile stage-proof',
             'sense bootstrap-inventory',
+            ...sourceActions,
           ].includes(value.name),
       ),
     ).toHaveLength(70);

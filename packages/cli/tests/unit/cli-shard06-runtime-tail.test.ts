@@ -103,6 +103,11 @@ vi.mock('../../src/commands/audit/scorecard.js', () => ({
 vi.mock('../../src/commands/actions-list.js', () => ({
   actionsList: harness.command('actionsList'),
 }));
+vi.mock('../../src/commands/source/apply.js', () => ({
+  sourceApplyArchitect: harness.command('sourceApplyArchitect'),
+  sourceApplyEngineer: harness.command('sourceApplyEngineer'),
+  sourceApplyInspector: harness.command('sourceApplyInspector'),
+}));
 vi.mock('../../src/commands/check/facade.js', () => ({ checkCmd: harness.command('checkCmd') }));
 vi.mock('../../src/commands/doctor.js', () => ({ doctor: harness.command('doctor') }));
 vi.mock('../../src/commands/evidence/facade.js', () => ({
