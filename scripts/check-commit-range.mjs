@@ -21,9 +21,21 @@
 // and every check here is skipped with a notice.
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, realpathSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import { createRequire } from 'node:module';
-import { join, posix } from 'node:path';
+import { dirname, join, posix } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const GRAMMAR_PATH = 'law/policy/commit-grammar.json';
@@ -543,6 +555,97 @@ export function focusedRegressionJudge(root, sha, changes) {
   };
 }
 
+const REGISTRY_SOURCE = 'law/policy/action-registry.json';
+const REGISTRY_OUTPUTS = new Set([
+  'packages/cli/src/generated/action-registry.ts',
+  'packages/effects-check/src/generated/action-catalog.ts',
+  'packages/sensors/src/generated/action-kinds.ts',
+]);
+
+// Both pins require a reviewed update when the canonical generator or formatter changes.
+const REGISTRY_GENERATOR_SHA256 =
+  '6c6ff06564fa19539adec3c750351b78e4f3383e102dca60799ec87af78a82ea';
+const REGISTRY_FORMATTER_SHA256 =
+  'ec9283d8a414942aeb3d9083a1164842447406877252e43b23ac9250cba89cbe';
+const digest = (bytes) => createHash('sha256').update(bytes).digest('hex');
+
+/** Copy only regular files, hashing sorted relative names and per-file hashes. */
+function copyVerifiedFormatter(source, target) {
+  const hash = createHash('sha256');
+  function copy(directory, relative = '') {
+    for (const name of readdirSync(directory).sort()) {
+      const path = join(directory, name);
+      const nameRelative = relative ? `${relative}/${name}` : name;
+      const stat = lstatSync(path);
+      if (stat.isDirectory()) copy(path, nameRelative);
+      else if (stat.isFile()) {
+        const bytes = readFileSync(path);
+        const destination = join(target, nameRelative);
+        mkdirSync(dirname(destination), { recursive: true });
+        writeFileSync(destination, bytes);
+        hash.update(`${nameRelative}\0`);
+        hash.update(createHash('sha256').update(readFileSync(destination)).digest());
+      } else throw new Error('REGISTRY_FORMATTER_NONREGULAR');
+    }
+  }
+  copy(source);
+  return hash.digest('hex') === REGISTRY_FORMATTER_SHA256;
+}
+
+/** Verify the commit's own regular-file blobs against the pinned base generator, fail closed. */
+export function registryGeneratedJudge(root, base, sha, changes) {
+  let result;
+  return (path) => {
+    if (!REGISTRY_OUTPUTS.has(path) || !['A', 'M'].includes(changes.get(REGISTRY_SOURCE)))
+      return false;
+    if (result !== undefined) return result;
+    result = false;
+    let temporary;
+    try {
+      temporary = mkdtempSync(join(tmpdir(), 'devai-registry-provenance-'));
+      const generator = execFileSync(
+        'git',
+        ['show', `${base}:scripts/generate-action-registry.mjs`],
+        {
+          cwd: root,
+          maxBuffer: 64 * 1024 * 1024,
+        },
+      );
+      if (digest(generator) !== REGISTRY_GENERATOR_SHA256) return false;
+      const formatter = realpathSync(
+        dirname(createRequire(import.meta.url).resolve('prettier/package.json')),
+      );
+      if (!copyVerifiedFormatter(formatter, join(temporary, 'node_modules/prettier'))) return false;
+      const script = join(temporary, 'generate-action-registry.mjs');
+      writeFileSync(script, generator);
+      if (digest(readFileSync(script)) !== REGISTRY_GENERATOR_SHA256) return false;
+      for (const relative of [REGISTRY_SOURCE, ...REGISTRY_OUTPUTS]) {
+        const entry = gitIn(root, ['ls-tree', sha, '--', relative]).trim();
+        if (!/^100644 blob [0-9a-f]+\t/u.test(entry)) return false;
+        const bytes = execFileSync('git', ['show', `${sha}:${relative}`], {
+          cwd: root,
+          maxBuffer: 64 * 1024 * 1024,
+        });
+        // The generator checks decoded strings; reject noncanonical UTF-8 so equality is byte-exact.
+        if (!Buffer.from(bytes.toString('utf8'), 'utf8').equals(bytes)) return false;
+        const target = join(temporary, relative);
+        mkdirSync(dirname(target), { recursive: true });
+        writeFileSync(target, bytes);
+      }
+      execFileSync(process.execPath, [script, temporary, '--check'], {
+        stdio: 'pipe',
+        env: {},
+      });
+      result = true;
+    } catch {
+      result = false;
+    } finally {
+      if (temporary !== undefined) rmSync(temporary, { recursive: true, force: true });
+    }
+    return result;
+  };
+}
+
 /**
  * The authors the ADR-CHK-0008 table, with the test-class row of ADR-CHK-0009, admits for one
  * path, judged with the other paths of the same commit (the law-with-generated pairing); an
@@ -550,7 +653,13 @@ export function focusedRegressionJudge(root, sha, changes) {
  * `focused` is the commit's focused-regression judge; without one the test class admits only the
  * Inspector.
  */
-export function admittedAuthors(path, commitPaths, binding, focused = undefined) {
+export function admittedAuthors(
+  path,
+  commitPaths,
+  binding,
+  focused = undefined,
+  registryGenerated = undefined,
+) {
   const only = (...roles) => new Set(roles);
   if (path === 'scratch/README.md') return only('Architect');
   if (PLACEHOLDERS.has(path)) return only('Engineer');
@@ -572,7 +681,9 @@ export function admittedAuthors(path, commitPaths, binding, focused = undefined)
   if (TEST_CLASS.test(path)) {
     return focused?.(path) === true ? only('Inspector', 'Engineer') : only('Inspector');
   }
-  if (path.startsWith('packages/')) return only('Engineer');
+  if (path.startsWith('packages/')) {
+    return registryGenerated?.(path) === true ? only('Engineer', 'Architect') : only('Engineer');
+  }
   if (ROOT_WORKSPACE.has(path) || /^tsconfig[^/]*\.json$/u.test(path)) return only('Engineer');
   if (path.startsWith('scripts/') || path.startsWith('.githooks/') || path.startsWith('.github/')) {
     return only('Engineer');
@@ -585,7 +696,15 @@ export function admittedAuthors(path, commitPaths, binding, focused = undefined)
 }
 
 /** Provenance findings for one commit of a pull-request range; empty when it is admitted. */
-export function provenanceFindings({ parents, author, committer, paths, binding, focused }) {
+export function provenanceFindings({
+  parents,
+  author,
+  committer,
+  paths,
+  binding,
+  focused,
+  registryGenerated,
+}) {
   const findings = [];
   if (parents > 1) {
     findings.push(
@@ -605,7 +724,7 @@ export function provenanceFindings({ parents, author, committer, paths, binding,
       );
     }
     for (const path of paths) {
-      const admitted = admittedAuthors(path, paths, binding, focused);
+      const admitted = admittedAuthors(path, paths, binding, focused, registryGenerated);
       if (admitted.size === 0) {
         findings.push(`path ${path} is not admitted for any author by the ADR-CHK-0008 table`);
       } else if (!admitted.has(role)) {
@@ -664,6 +783,7 @@ function checkRange(root, base, head) {
       committer: { name: committerName, email: committerEmail },
       paths: [...changes.keys()],
       focused: focusedRegressionJudge(root, sha, changes),
+      registryGenerated: registryGeneratedJudge(root, base, sha, changes),
     });
     if (parentCount > 1) {
       offenders.push({
