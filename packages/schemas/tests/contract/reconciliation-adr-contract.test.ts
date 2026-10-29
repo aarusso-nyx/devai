@@ -80,9 +80,11 @@ const policy = readJson<{
   };
 }>('law/policy/adr-validation.json');
 const adrRoot = resolve(ROOT, 'law/adr');
-const paths = readdirSync(adrRoot)
+const projectionFile = 'ADR-CHK-0012-verified-registry-projection-authorship.md';
+const currentPaths = readdirSync(adrRoot)
   .filter((name) => name.endsWith('.md'))
   .sort();
+const paths = currentPaths.filter((name) => name !== projectionFile);
 const records = paths.flatMap((name): AdrRecordFixture[] => {
   const path = resolve(adrRoot, name);
   const exception = policy.exception_catalog.entries.find((entry) => entry.path === name);
@@ -129,6 +131,42 @@ const reconciliationPaths = preGitPaths.filter((path) => path !== ciFile);
 const reconciliationRecords = preGitRecords.filter((record) => record.adr_id !== CI_ADR);
 
 describe('ADR-EVI-0007 bounded authoring contract', () => {
+  it('accounts separately for the proposed registry projection record without changing authority', () => {
+    expect(currentPaths).toHaveLength(paths.length + 1);
+    expect(currentPaths.filter((name) => name === projectionFile)).toEqual([projectionFile]);
+    const text = readFileSync(resolve(adrRoot, projectionFile), 'utf8');
+    const fm = parseYaml(/^---\n([\s\S]*?)\n---\n/u.exec(text)?.[1] ?? '') as Record<
+      string,
+      unknown
+    >;
+    expect(fm).toMatchObject({
+      id: 'ADR-CHK-0012',
+      status: 'proposed',
+      authority: 'Architect',
+      supersedes: ['ADR-CHK-0009'],
+    });
+    const projection: AdrRecordFixture = {
+      file: `law/adr/${projectionFile}`,
+      adr_id: String(fm.id),
+      title: String(fm.title),
+      status: 'proposed',
+      date: fm.date as string | null,
+      format: 'v2',
+      supersedes: fm.supersedes as string[],
+      affected_rules: fm.affected_rules as string[],
+    };
+    const before = resolveAdrFixture(records, paths.length);
+    const after = resolveAdrFixture([...records, projection], currentPaths.length);
+    expect(after.ok).toBe(true);
+    expect(after.errors).toEqual([]);
+    expect(after.adrs.filter((record) => record.adr_id !== 'ADR-CHK-0012')).toEqual(before.adrs);
+    expect(after.adrs.find((record) => record.adr_id === 'ADR-CHK-0012')).toMatchObject({
+      effective: false,
+      effective_affected_rules: [],
+    });
+    expect(after.subject_authorities).toEqual(before.subject_authorities);
+    expect(after.effective_authorities).toEqual(before.effective_authorities);
+  });
   it('validates accepted frontmatter, required body sections and exact non-superseding subjects', () => {
     expect(getValidator('adr-v2.schema.json')(metadata)).toBe(true);
     expect(metadata).toMatchObject({
