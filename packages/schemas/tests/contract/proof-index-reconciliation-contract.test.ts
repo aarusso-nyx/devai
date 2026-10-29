@@ -11,8 +11,12 @@ const PUBLIC_RUNTIME_ADDITIONS = [
   'reconciliation-proof-index-result.schema.json',
   'reconciliation-inventory-result.schema.json',
 ];
-// Preserve the exact historical population while separately checking promotion.
-const ROSTER = LIVE_ROSTER.filter((name) => !PUBLIC_RUNTIME_ADDITIONS.includes(name));
+const SOURCE_RUNTIME_ADDITIONS = [
+  'source-apply-manifest.schema.json',
+  'source-apply-result.schema.json',
+];
+const B1_ROSTER = LIVE_ROSTER.filter((name) => !SOURCE_RUNTIME_ADDITIONS.includes(name));
+const ROSTER = B1_ROSTER.filter((name) => !PUBLIC_RUNTIME_ADDITIONS.includes(name));
 const schema = readJson(`law/schemas/${NAME}`);
 const ajv = new Ajv2020({ strict: true });
 ajv.addKeyword({ keyword: 'schema_version', schemaType: 'string' });
@@ -34,7 +38,11 @@ describe('source-only proof-index reconciliation reference shape', () => {
   it('compiles in strict mode and accepts its example without entering runtime ROSTER', () => {
     expect(validate(schemaExample(NAME)), JSON.stringify(validate.errors)).toBe(true);
     expect(ROSTER).toHaveLength(122);
-    expect(LIVE_ROSTER).toHaveLength(127);
+    expect(B1_ROSTER).toHaveLength(127);
+    expect(LIVE_ROSTER).toHaveLength(129);
+    expect(LIVE_ROSTER.filter((name) => SOURCE_RUNTIME_ADDITIONS.includes(name)).sort()).toEqual(
+      [...SOURCE_RUNTIME_ADDITIONS].sort(),
+    );
     expect(LIVE_ROSTER.filter((name) => PUBLIC_RUNTIME_ADDITIONS.includes(name)).sort()).toEqual(
       [...PUBLIC_RUNTIME_ADDITIONS].sort(),
     );

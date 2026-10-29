@@ -24,7 +24,15 @@ const ROOT = resolve(import.meta.dirname, '../../../..');
 // ADR-EVI-0007 adds the closed Owner record schema. The read-only B1 plan adds one runtime schema; four bounded B1 action-output schemas bring the current count to 127.
 describe('schema roster', () => {
   it('holds the previous roster and the reviewed sensor task descriptor reference closure', () => {
-    expect(ROSTER).toHaveLength(127);
+    const sourceAdditions = [
+      'source-apply-manifest.schema.json',
+      'source-apply-result.schema.json',
+    ];
+    expect(ROSTER.filter((name) => !sourceAdditions.includes(name))).toHaveLength(127);
+    expect(ROSTER).toHaveLength(129);
+    expect(ROSTER.filter((name) => sourceAdditions.includes(name)).sort()).toEqual(
+      [...sourceAdditions].sort(),
+    );
     expect(ROSTER).toContain('reconciliation-owner.schema.json');
     expect(ROSTER).toContain('test-task-descriptor.schema.json');
     expect(ROSTER).toContain('preflight-probe.schema.json');
