@@ -1,7 +1,7 @@
 # CLI overview
 
-DEVAI presents 74 actions: 41 stable actions, 22 preview actions, and 11 internal plumbing
-actions. Eleven workflow domains organize the public surface. Choose the domain from the outcome you need;
+DEVAI presents 77 actions: 41 stable actions, 25 preview actions, and 11 internal plumbing
+actions. Twelve workflow domains organize the public surface. Choose the domain from the outcome you need;
 then choose one leaf action, suite, preset, kind, slice, tier, round, or task selection inside
 that domain. The hidden `task` and `catalog` surfaces are plumbing, not additional workflows.
 
@@ -13,6 +13,7 @@ does not by itself establish release, deployment, or readiness.
 | If you need to...                                                         | Choose     | Start with                                                                    |
 | ------------------------------------------------------------------------- | ---------- | ----------------------------------------------------------------------------- |
 | plan, apply, or bind adoption                                             | `init`     | `devai init plan --target . --tier tier1 --format json`                       |
+| apply one exact source-file change under a declared role                  | `source`   | `devai source apply engineer --help`                                          |
 | diagnose the repository's declared posture                                | `doctor`   | `devai doctor --repo-root . --format json`                                    |
 | validate a governed rule population                                       | `check`    | `devai check --only cli-reference --repo-root . --format json`                |
 | observe the repository or runtime                                         | `sense`    | `devai sense run type_check --repo-root . --dry-run --format json`            |
@@ -27,7 +28,7 @@ does not by itself establish release, deployment, or readiness.
 The examples above use only the current grammar. They are read-only or dry-run selections;
 replace the example identifiers with identifiers that exist in the target repository.
 
-## Contract shared by all eleven workflows
+## Contract shared by all twelve workflows
 
 For workflow identifier `W`, its exact population is the ordered projection of entries in the
 [action registry](../../../law/policy/action-registry.json) whose status is `stable` or `preview`
@@ -133,6 +134,37 @@ other. Preview or inspect whenever the leaf offers `--dry-run`, plan output, sta
   `devai init upgrade --target . --as-role architect --format json`.
 - **Canonical source and related workflow:** [action registry](../../../law/policy/action-registry.json);
   follow with `doctor`.
+
+### `source` — Exact source-file application
+
+- **Stable identifier and label:** `source`; “Exact source-file application.”
+- **Purpose and exact projection:** create or replace one source file under the declared
+  Architect, Engineer or Inspector role. Its exact population is the registry projection with
+  `W = source`; all three leaves are preview actions.
+- **Prerequisites, tools, inputs, and defaults:** run from the target checkout with a current
+  supported policy binding, `--manifest <file>`, matching `--as-role`, and `--write`. The
+  [manifest schema](../../../law/schemas/source-apply-manifest.schema.json) binds one relative
+  target, expected absence or current hash/mode, UTF-8 content and its SHA-256. Parents must
+  exist. This operation runs no subprocess and does not stage or commit.
+- **Output and verdict:** a successful envelope names the target and content SHA-256 under the
+  [result schema](../../../law/schemas/source-apply-result.schema.json). Invalid input, stale
+  content, unsupported targets or denied authority refuse. An uncertain publication reports
+  failure without rolling back visible files; inspect it before any retry.
+- **Effect, consent, and cost:** `local-write`, explicit write consent and the leaf's exact role;
+  no publication consent. Cost is `fast` for one local file, proportional to its size. No
+  dry-run or multi-file transaction is implied.
+- **Use / do not use:** use for one reviewed source create or replacement. Do not use for
+  protected state, directories, deletion, Git operations or role changes. Native Inspector
+  source paths are `tests/**` and `packages/*/tests/**`; declared adopter roots follow their
+  bound class ladder. Cooperative final checks do not provide filesystem compare-and-swap
+  or control arbitrary editors and same-user writers.
+- **Example:** `devai source apply engineer --manifest change.json --as-role engineer --write`.
+  Inspect `devai source apply engineer --help` before choosing an action.
+- **Canonical source and related workflow:** [action registry](../../../law/policy/action-registry.json),
+  [path authority](../../adopters/path-authority.md#applying-one-source-file-through-the-runtime)
+  and [ADR-AUT-0009](../../../law/adr/ADR-AUT-0009-exact-source-file-application.md); follow with
+  the affected `check` workflow. Preview registration does not establish package release,
+  installed qualification or adopter binding.
 
 ### `doctor` — Declared-posture diagnosis
 
