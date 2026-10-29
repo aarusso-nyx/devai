@@ -11,9 +11,9 @@
   ],
   "counts": {
     "stable": 41,
-    "preview": 22,
+    "preview": 25,
     "internal": 11,
-    "total": 74
+    "total": 77
   },
   "entries": [
     {
@@ -3815,6 +3815,186 @@
         "boundary": {
           "kind": "mutation-adapters",
           "adapter_ids": ["fs-authority-boundary", "remote-authority-boundary"],
+          "final_reverification": true
+        },
+        "readiness": {
+          "requires_binding": true,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "source apply architect",
+      "handler": "source apply architect",
+      "path": ["source", "apply", "architect"],
+      "status": "preview",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "local-write",
+      "authority": "mesh_controller",
+      "description": "Apply one exact ordinary source-file create or replace within the declared architect path authority.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": "law/schemas/source-apply-result.schema.json"
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "source apply architect",
+        "effect": "local-write",
+        "capabilities": ["fs:workspace"],
+        "subject": {
+          "kind": "human",
+          "allowed_roles": ["architect"]
+        },
+        "consent": {
+          "write": true,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "bounded-batches",
+          "planner_id": "source-apply-architect-bounded-plan",
+          "target_kinds": ["fs"],
+          "bounds": {
+            "max_batches": 1,
+            "max_targets_per_batch": 1,
+            "max_total_targets": 1
+          },
+          "recovery": "preserve-and-report"
+        },
+        "boundary": {
+          "kind": "mutation-adapters",
+          "adapter_ids": ["fs-authority-boundary"],
+          "final_reverification": true
+        },
+        "readiness": {
+          "requires_binding": true,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "source apply engineer",
+      "handler": "source apply engineer",
+      "path": ["source", "apply", "engineer"],
+      "status": "preview",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "local-write",
+      "authority": "mesh_controller",
+      "description": "Apply one exact ordinary source-file create or replace within the declared engineer path authority.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": "law/schemas/source-apply-result.schema.json"
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "source apply engineer",
+        "effect": "local-write",
+        "capabilities": ["fs:workspace"],
+        "subject": {
+          "kind": "human",
+          "allowed_roles": ["engineer"]
+        },
+        "consent": {
+          "write": true,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "bounded-batches",
+          "planner_id": "source-apply-engineer-bounded-plan",
+          "target_kinds": ["fs"],
+          "bounds": {
+            "max_batches": 1,
+            "max_targets_per_batch": 1,
+            "max_total_targets": 1
+          },
+          "recovery": "preserve-and-report"
+        },
+        "boundary": {
+          "kind": "mutation-adapters",
+          "adapter_ids": ["fs-authority-boundary"],
+          "final_reverification": true
+        },
+        "readiness": {
+          "requires_binding": true,
+          "independent_acceptance_required": true
+        }
+      }
+    },
+    {
+      "action_id": "source apply inspector",
+      "handler": "source apply inspector",
+      "path": ["source", "apply", "inspector"],
+      "status": "preview",
+      "profiles": ["tier1", "tier2", "tier3"],
+      "effect": "local-write",
+      "authority": "mesh_controller",
+      "description": "Apply one exact ordinary source-file create or replace within the declared inspector path authority.",
+      "output_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "action-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "success_channel": "stdout",
+        "payload_schema": "law/schemas/source-apply-result.schema.json"
+      },
+      "error_contract": {
+        "schemaVersion": "1.0.0",
+        "mode": "structured-error-envelope",
+        "envelope_schema": "law/schemas/action-result.schema.json",
+        "error_schema": "law/schemas/error.schema.json",
+        "error_channel": "stderr"
+      },
+      "authority_contract_version": "1.0.0",
+      "authority_contract": {
+        "schemaVersion": "1.0.0",
+        "action_id": "source apply inspector",
+        "effect": "local-write",
+        "capabilities": ["fs:workspace"],
+        "subject": {
+          "kind": "human",
+          "allowed_roles": ["inspector"]
+        },
+        "consent": {
+          "write": true,
+          "allow_publish": false,
+          "experimental": false
+        },
+        "planner": {
+          "kind": "bounded-batches",
+          "planner_id": "source-apply-inspector-bounded-plan",
+          "target_kinds": ["fs"],
+          "bounds": {
+            "max_batches": 1,
+            "max_targets_per_batch": 1,
+            "max_total_targets": 1
+          },
+          "recovery": "preserve-and-report"
+        },
+        "boundary": {
+          "kind": "mutation-adapters",
+          "adapter_ids": ["fs-authority-boundary"],
           "final_reverification": true
         },
         "readiness": {

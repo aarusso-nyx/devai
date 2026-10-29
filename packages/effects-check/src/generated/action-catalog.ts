@@ -431,6 +431,24 @@ export const ACTION_EFFECT_CONTRACTS = [
     capabilities: ['fs:f5-state', 'fs:proofs', 'proc:dynamic', 'net:sensor-runtime'],
   },
   {
+    action_id: 'source apply architect',
+    public_action_id: 'source apply architect',
+    effect: 'local-write',
+    capabilities: ['fs:workspace'],
+  },
+  {
+    action_id: 'source apply engineer',
+    public_action_id: 'source apply engineer',
+    effect: 'local-write',
+    capabilities: ['fs:workspace'],
+  },
+  {
+    action_id: 'source apply inspector',
+    public_action_id: 'source apply inspector',
+    effect: 'local-write',
+    capabilities: ['fs:workspace'],
+  },
+  {
     action_id: 'task escalate',
     public_action_id: 'task escalate',
     effect: 'harness-write',
