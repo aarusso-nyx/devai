@@ -70,11 +70,19 @@ describe('bare domain/group paths render help instead of the suggester', () => {
           groups.set(key, (groups.get(key) ?? 0) + 1);
         }
       }
+      expect([...groups.keys()].filter((key) => key !== 'source apply').sort()).toEqual([
+        'evidence reconcile',
+        'init apply',
+        'round gap',
+        'round tracking',
+        'task queue',
+      ]);
       expect([...groups.keys()].sort()).toEqual([
         'evidence reconcile',
         'init apply',
         'round gap',
         'round tracking',
+        'source apply',
         'task queue',
       ]);
       for (const key of groups.keys()) {
@@ -83,6 +91,9 @@ describe('bare domain/group paths render help instead of the suggester', () => {
         const combined = r.stdout + r.stderr;
         expect(combined, `devai ${key}`).not.toMatch(/unknown or incomplete command/i);
         expect(r.status, `devai ${key} should exit 0 with help`).toBe(0);
+        if (key === 'source apply') {
+          expect(r.stdout).toMatch(/devai source apply/);
+        }
       }
     },
     90_000,
