@@ -188,13 +188,40 @@ describe('adopter authority extension compiler: reference source', () => {
     expect(typeof derive, 'policy-support.ts must export classWriteVerbs(entries)').toBe(
       'function',
     );
-    const derived = (derive as (entries: readonly RegistryEntry[]) => ClassVerbs)(
-      canonicalRegistry(),
+    const calculate = derive as (entries: readonly RegistryEntry[]) => ClassVerbs;
+    const sourceActions = [
+      'source apply architect',
+      'source apply engineer',
+      'source apply inspector',
+    ];
+    const historical = calculate(
+      canonicalRegistry().filter((entry) => !sourceActions.includes(entry.name)),
     );
-    expect(derived).toEqual(CLASS_WRITE_VERBS);
-    expect(compile(REFERENCE_AUTHORITY, { classWriteVerbs: derived })).toEqual(
+    expect(historical).toEqual(CLASS_WRITE_VERBS);
+    expect(compile(REFERENCE_AUTHORITY, { classWriteVerbs: historical })).toEqual(
       compile(REFERENCE_AUTHORITY),
     );
+    const current: ClassVerbs = {
+      root: ['source apply engineer', 'task start'],
+      test: ['check', 'source apply inspector'],
+      architecture: [
+        'init apply architect',
+        'release export',
+        'round plan',
+        'round seal',
+        'source apply architect',
+      ],
+    };
+    expect(calculate(canonicalRegistry())).toEqual(current);
+    const compiled = compile(REFERENCE_AUTHORITY, { classWriteVerbs: current });
+    for (const rule of compiled.rules) {
+      const expected = rule.rule_id.startsWith('adopter-path-test-')
+        ? current.test
+        : rule.rule_id.startsWith('adopter-path-architecture-')
+          ? current.architecture
+          : current.root;
+      expect(rule.action_ids).toEqual(expected);
+    }
   });
 
   it('takes the class verb sets as an input, so a changed set changes the rules and the digest', () => {

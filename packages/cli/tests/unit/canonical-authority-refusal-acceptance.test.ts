@@ -1,4 +1,4 @@
-import { expectCurrentActionIds } from './historical-action-catalogue.js';
+import { expectCurrentActionIds } from './source-action-catalogue.js';
 // Invariants: INV-DEVAI-001, INV-DEVAI-015, INV-DEVAI-017, INV-DEVAI-020
 // Inspector acceptance: every current action reaches the production authority
 // pre-dispatch boundary and exposes its required refusal in both output formats.
@@ -115,7 +115,7 @@ describe('canonical production authority refusal acceptance', () => {
         .sort();
 
     expect(rule('adopter-engineer-packages')).toMatchObject({
-      action_ids: ['round run', 'task finish', 'task start'],
+      action_ids: ['round run', 'source apply engineer', 'task finish', 'task start'],
     });
     expect(rule('core-round-workspace-container-1')).toMatchObject({
       action_ids: [...new Set([...actionsFor('architect'), ...actionsFor('auditor')])].sort(),

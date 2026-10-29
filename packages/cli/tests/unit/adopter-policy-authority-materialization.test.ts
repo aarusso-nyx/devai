@@ -38,9 +38,15 @@ const REFERENCE_RULE_COUNT = 48;
 
 /** The class verb sets ADR-AUT-0004 IA-004 freezes for the registered action registry. */
 const CLASS_WRITE_VERBS = {
-  root: ['task start'],
-  test: ['check'],
-  architecture: ['init apply architect', 'release export', 'round plan', 'round seal'],
+  root: ['source apply engineer', 'task start'],
+  test: ['check', 'source apply inspector'],
+  architecture: [
+    'init apply architect',
+    'release export',
+    'round plan',
+    'round seal',
+    'source apply architect',
+  ],
 } as const;
 
 const entries: readonly RegistryEntry[] = canonicalRegistry();

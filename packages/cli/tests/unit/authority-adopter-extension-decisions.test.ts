@@ -80,9 +80,15 @@ const ARGV: Readonly<Record<Verb, readonly string[]>> = {
 };
 
 const CLASS_VERBS = {
-  root: ['task start'],
-  test: ['check'],
-  architecture: ['init apply architect', 'release export', 'round plan', 'round seal'],
+  root: ['source apply engineer', 'task start'],
+  test: ['check', 'source apply inspector'],
+  architecture: [
+    'init apply architect',
+    'release export',
+    'round plan',
+    'round seal',
+    'source apply architect',
+  ],
 } as const;
 
 const ALLOW: Decision = { outcome: 'allow' };
@@ -267,6 +273,22 @@ afterAll(() => {
 });
 
 describe('ADR-AUT-0003 fixture binding under the ADR-AUT-0004 class verbs', () => {
+  it('continues to refuse check on native test roots', () => {
+    expect(
+      decideWith('check', 'inspector', at('packages/x/tests/example.test.ts')).decision,
+    ).toEqual(deny('AUTHORITY_ACTION_DENIED'));
+    expect(decideWith('check', 'inspector', at('tests/example.test.ts')).decision).toEqual(
+      deny('AUTHORITY_ACTION_DENIED'),
+    );
+  });
+  it('refuses Engineer task start on the native Inspector test roots', () => {
+    expect(
+      decideWith('task start', 'engineer', at('packages/x/tests/example.test.ts')).decision,
+    ).toEqual(deny('AUTHORITY_ACTION_DENIED'));
+    expect(decideWith('task start', 'engineer', at('tests/example.test.ts')).decision).toEqual(
+      deny('AUTHORITY_ACTION_DENIED'),
+    );
+  });
   it('pins constitution 1.2.0 and binds the reference source', () => {
     expect(
       parseConstitutionVersion(readFileSync(join(repo, '.devai/pin/constitution.md'), 'utf8')),
