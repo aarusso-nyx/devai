@@ -11,6 +11,7 @@ import {
 } from '../../src/define-command.js';
 import { validateLiveAuthorityActionRegistry } from '../../src/authority/index.js';
 import { buildTrustedAuthoritySources, repositoryIdFor } from '../../src/authority/policy.js';
+import { expectCurrentActionIds } from './source-action-catalogue.js';
 import {
   invocationIsNonMutating,
   routeArgv,
@@ -132,10 +133,10 @@ describe('canonical action registry constructor', () => {
     ).toThrow("action 'round close' status differs from the canonical registry");
   });
 
-  it('always constructs the complete 74-action surface without handler registration', () => {
+  it('always constructs the complete 77-action surface without handler registration', () => {
     const first = canonicalRegistry();
     const second = canonicalRegistry();
-    expect(first).toHaveLength(74);
+    expectCurrentActionIds(first.map((entry) => entry.name));
     expect(first.map((entry) => entry.name)).toContain('evidence reconcile plan');
     expect(first.map((entry) => entry.name)).toContain('audit observe');
     expect(first.map((entry) => entry.name)).toContain('triage classify');

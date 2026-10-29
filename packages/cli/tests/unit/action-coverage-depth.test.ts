@@ -6,6 +6,7 @@ import { loadDomains } from '../../../spec/src/spec/domains-loader.js';
 import { executeCheckMember } from '../../src/commands/check/adapters.js';
 import { resolveCheckPlan, runCheckPlan } from '../../src/commands/check/contracts.js';
 import { runActionCoverageCheck } from '../../src/commands/spec/validate-action-coverage.js';
+import { expectCurrentActionIds } from './source-action-catalogue.js';
 
 const repositoryRoot = resolve(import.meta.dirname, '../../../..');
 const domains = loadDomains(join(repositoryRoot, '.devai/config/domains.json'));
@@ -44,12 +45,12 @@ describe('action coverage scope and discovery boundaries', () => {
     expect(result).toMatchObject({
       ok: false,
       scope: 'self',
-      registeredCount: 74,
-      inScopeCount: 74,
+      registeredCount: 77,
+      inScopeCount: 77,
       claimedCount: 0,
       orphanClaims: [],
     });
-    expect(result.unclaimed).toHaveLength(74);
+    expectCurrentActionIds(result.unclaimed);
     expect(result.unclaimed).toContain('release publish');
     expect(result.unclaimed).toContain('sense inventory');
     expect(result).not.toHaveProperty('adopterFacingAuthorities');
@@ -186,7 +187,7 @@ describe('action coverage through check evaluates the detected repository kind',
     const { result } = await dispatchCoverage(value.root);
 
     expect(result.status).toBe('fail');
-    expect(result.value).toMatchObject({ ok: false, scope: 'self', inScopeCount: 74 });
+    expect(result.value).toMatchObject({ ok: false, scope: 'self', inScopeCount: 77 });
   });
 
   it('passes an adopter whose referenced action is claimed by an invariant', async () => {
