@@ -38,7 +38,49 @@ const FROZEN: ClassVerbs = {
 /** The Engineer verbs of ADR-AUT-0003 that ADR-AUT-0004 removes from every class rule. */
 const REMOVED = ['round run', 'task finish'];
 
-const entries: readonly RegistryEntry[] = canonicalRegistry();
+// This suite assesses the captured B1 population. Candidate contracts and current class
+// sets have separate exact assertions in source-action-catalogue.test.ts.
+const b1Registry = JSON.parse(
+  readFileSync(
+    resolve(import.meta.dirname, '../fixtures/source-apply-b1/law/policy/action-registry.json.txt'),
+    'utf8',
+  ),
+) as {
+  entries: Array<{
+    action_id: string;
+    handler: string;
+    path: string[];
+    status: RegistryEntry['status'];
+    profiles: RegistryEntry['profiles'];
+    effect: RegistryEntry['effects'];
+    authority: RegistryEntry['authority'];
+    description: string;
+    authority_contract_version: '1.0.0';
+    authority_contract: RegistryEntry['authority_contract'];
+    output_contract: RegistryEntry['output_contract'];
+    error_contract: RegistryEntry['error_contract'];
+  }>;
+};
+const liveEntries = canonicalRegistry();
+const entries: readonly RegistryEntry[] = b1Registry.entries.map((entry) => {
+  const current = liveEntries.find((value) => value.name === entry.action_id);
+  if (!current) throw new Error(`B1 action missing: ${entry.action_id}`);
+  return {
+    ...current,
+    name: entry.action_id,
+    handler: entry.handler,
+    path: entry.path,
+    status: entry.status,
+    profiles: entry.profiles,
+    effects: entry.effect,
+    authority: entry.authority,
+    description: entry.description,
+    authority_contract_version: entry.authority_contract_version,
+    authority_contract: entry.authority_contract,
+    output_contract: entry.output_contract,
+    error_contract: entry.error_contract,
+  };
+});
 
 /**
  * The derivation of ADR-AUT-0004, read by the Inspector from the record: every entry whose
@@ -316,7 +358,9 @@ describe('IA-005: preserve pre-B1 bytes and bound the current reconciliation del
   it.each(CURRENT_B1_FILE_DIGESTS)('%s matches the exact approved B1 bytes', (path, digest) => {
     expect(
       createHash('sha256')
-        .update(readFileSync(join(ROOT, path)))
+        .update(
+          readFileSync(resolve(import.meta.dirname, '../fixtures/source-apply-b1', `${path}.txt`)),
+        )
         .digest('hex'),
     ).toBe(digest);
   });

@@ -5,9 +5,9 @@ import {
   evidenceReconcileStageProof,
 } from '../../src/commands/evidence/reconciliation-phases.js';
 import { senseBootstrapInventory } from '../../src/commands/sense/bootstrap-inventory.js';
-import { expectCurrentActionIds } from './historical-action-catalogue.js';
+import { expectCurrentActionIds } from './source-action-catalogue.js';
 // Invariants: INV-DEVAI-001, INV-DEVAI-015, INV-DEVAI-017, INV-DEVAI-020
-// Inspector acceptance: the 74 current actions have a one-to-one executable
+// Inspector acceptance: the 77 current actions have a one-to-one executable
 // facade population, and every facade has a bounded, non-silent refusal probe.
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
@@ -66,6 +66,11 @@ import { senseInventoryCmd } from '../../src/commands/sense/inventory.js';
 import { senseMigrateCmd } from '../../src/commands/sense/migrate.js';
 import { senseRecordCmd } from '../../src/commands/sense/record.js';
 import { senseRunSetCmd } from '../../src/commands/sense/run-set.js';
+import {
+  sourceApplyArchitect,
+  sourceApplyEngineer,
+  sourceApplyInspector,
+} from '../../src/commands/source/apply.js';
 import { taskCommands } from '../../src/commands/task/index.js';
 import { triageClassify } from '../../src/commands/triage/classify.js';
 import { ACTION_REGISTRY } from '../../src/generated/action-registry.js';
@@ -87,7 +92,7 @@ const { backlogCommands } = (await import(
 
 interface RefusalProbe {
   readonly args: readonly string[];
-  readonly exit: 1 | 2;
+  readonly exit: 1 | 2 | 4;
 }
 
 const FACADES: readonly FacadeDefinition[] = [
@@ -138,6 +143,9 @@ const FACADES: readonly FacadeDefinition[] = [
   senseMigrateCmd,
   senseRecordCmd,
   senseRunSetCmd,
+  sourceApplyArchitect,
+  sourceApplyEngineer,
+  sourceApplyInspector,
   ...taskCommands,
   triageClassify,
 ] as const;
@@ -215,6 +223,9 @@ const REFUSAL_PROBES: Readonly<Record<string, RefusalProbe>> = {
   'sense migrate': usage([]),
   'sense record': usage([]),
   'sense run': usage([]),
+  'source apply architect': { args: [], exit: 4 },
+  'source apply engineer': { args: [], exit: 4 },
+  'source apply inspector': { args: [], exit: 4 },
   'task escalate': usage([]),
   'task finish': usage([]),
   'task pause': usage([]),
@@ -235,7 +246,7 @@ describe('canonical facade population acceptance', () => {
 
     expectCurrentActionIds(facadeNames);
     expectCurrentActionIds(ACTION_REGISTRY.map((entry) => entry.action_id));
-    expect(new Set(facadeNames).size).toBe(74);
+    expect(new Set(facadeNames).size).toBe(77);
     expect(facadeNames).toEqual(currentBindings);
     expect(Object.keys(REFUSAL_PROBES).sort()).toEqual(currentBindings);
 
@@ -243,7 +254,7 @@ describe('canonical facade population acceptance', () => {
     for (const definition of FACADES) definition.register(cli);
   });
 
-  it('executes a bounded refusal probe for all 74 current facades without external effects', async () => {
+  it('executes a bounded refusal probe for all 77 current facades without external effects', async () => {
     const cli = cac('devai-canonical-facade-refusals');
     for (const definition of FACADES) definition.register(cli);
 

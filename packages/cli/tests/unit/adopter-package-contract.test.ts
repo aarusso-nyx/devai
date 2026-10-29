@@ -1366,11 +1366,17 @@ describe('packed adopter path authority', () => {
   // rule exactly the registered write verbs of its class role, so the probes below decide the
   // packed extension under the verbs the installed registry admits.
   it.each([
-    ['adopter-path-root-', ['task start']],
-    ['adopter-path-test-', ['check']],
+    ['adopter-path-root-', ['source apply engineer', 'task start']],
+    ['adopter-path-test-', ['check', 'source apply inspector']],
     [
       'adopter-path-architecture-',
-      ['init apply architect', 'release export', 'round plan', 'round seal'],
+      [
+        'init apply architect',
+        'release export',
+        'round plan',
+        'round seal',
+        'source apply architect',
+      ],
     ],
   ] as const)('binds every %s rule through the installed bin under %j', (prefix, verbs) => {
     const rules = (adopterJson(POLICY)['rules'] as JsonObject[]).filter((rule) =>

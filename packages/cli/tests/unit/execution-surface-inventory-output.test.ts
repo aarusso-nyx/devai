@@ -1,4 +1,4 @@
-import { expectCurrentActionIds } from './historical-action-catalogue.js';
+import { expectCurrentActionIds } from './source-action-catalogue.js';
 // Invariants: INV-DEVAI-001, INV-DEVAI-015, INV-DEVAI-017, INV-DEVAI-020
 // Execution-surface acceptance: inventory discovery and every current
 // action's machine success/refusal boundary remain complete and structured.
