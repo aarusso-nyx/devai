@@ -7,6 +7,7 @@ const ROOT = resolve(import.meta.dirname, '../../../..');
 
 interface RegistryEntry {
   readonly action_id: string;
+  readonly path: string[];
   readonly authority_contract: {
     capabilities: string[];
     subject: {
@@ -29,6 +30,50 @@ const registrySchema = JSON.parse(
 ) as unknown;
 
 describe('action registry schema', () => {
+  it('preserves the prior domain enum, adds source, and rejects an unknown domain', () => {
+    const schema = registrySchema as {
+      properties: {
+        entries: {
+          items: {
+            allOf: Array<{ properties: { path: { prefixItems: Array<{ enum: string[] }> } } }>;
+          };
+        };
+      };
+    };
+    const domains = schema.properties.entries.items.allOf[0]?.properties.path.prefixItems[0]?.enum;
+    expect(domains).toEqual([
+      'audit',
+      'init',
+      'doctor',
+      'check',
+      'sense',
+      'round',
+      'evidence',
+      'release',
+      'task',
+      'catalog',
+      'triage',
+      'backlog',
+      'campaign',
+      'source',
+    ]);
+    expect(
+      validators.actionRegistry(registry),
+      JSON.stringify(validators.actionRegistry.errors),
+    ).toBe(true);
+    const invalid = structuredClone(registry);
+    const entry = invalid.entries.find(
+      (candidate) => candidate.action_id === 'source apply engineer',
+    );
+    if (entry === undefined) throw new Error('SOURCE_ACTION_MISSING');
+    entry.path[0] = 'unknown-domain';
+    expect(validators.actionRegistry(invalid)).toBe(false);
+    expect(
+      validators.actionRegistry.errors?.some(
+        (error) => error.instancePath.endsWith('/path/0') && error.keyword === 'enum',
+      ),
+    ).toBe(true);
+  });
   it('accepts the current registry and rejects the removed upgrade machine identity', () => {
     expect(
       validators.actionRegistry(registry),
