@@ -15,7 +15,6 @@ import { createHash, createHmac } from 'node:crypto';
 import {
   mkdirSync,
   mkdtempSync,
-  statfsSync,
   realpathSync,
   readFileSync,
   readdirSync,
@@ -225,7 +224,22 @@ async function provisionApi() {
 const ROOT = resolve(import.meta.dirname, '../../../..');
 const external = realpathSync(mkdtempSync(resolve(tmpdir(), 'devai-native-owner-inspector-')));
 const qualifiedNativeFilesystem =
-  process.platform === 'darwin' && statfsSync(external, { bigint: true }).type === 26n;
+  process.platform === 'darwin' &&
+  (() => {
+    try {
+      return (
+        execFileSync('/bin/df', ['-T', 'apfs', external], {
+          env: { PATH: '/usr/bin:/bin', LC_ALL: 'C' },
+          timeout: 1000,
+          maxBuffer: 8192,
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'pipe'],
+        }).trim().length > 0
+      );
+    } catch {
+      return false;
+    }
+  })();
 const nativeIt = it.runIf(qualifiedNativeFilesystem);
 const cleanEnv = {
   PATH: '/usr/bin:/bin',

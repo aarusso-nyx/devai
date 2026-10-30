@@ -9,8 +9,14 @@ const source = readFileSync(scriptPath, 'utf8')
   .replace(/^import .*;\n/gm, '')
   .replace('import.meta.dirname', "'/private/source/scripts'");
 
-type Host = { platform: string; node: string; uv: string; filesystem: bigint };
-const supported: Host = { platform: 'darwin', node: '24.20.0', uv: '1.52.1', filesystem: 26n };
+type Host = { platform: string; node: string; uv: string; filesystem: bigint; apfs: boolean };
+const supported: Host = {
+  platform: 'darwin',
+  node: '24.20.0',
+  uv: '1.52.1',
+  filesystem: 26n,
+  apfs: true,
+};
 
 function runHost(overrides: Partial<Host>) {
   const host = { ...supported, ...overrides };
@@ -43,7 +49,14 @@ function runHost(overrides: Partial<Host>) {
       return '/private/directory';
     },
     appendFileSync: () => {},
-    spawnSync: () => {
+    spawnSync: (program: string) => {
+      if (program === '/bin/df')
+        return {
+          status: host.apfs ? 0 : 1,
+          signal: null,
+          stdout: host.apfs ? 'Filesystem\n/dev/disk on /native\n' : '',
+          stderr: '',
+        };
       spawns++;
       throw new Error('qualification reached');
     },
@@ -60,7 +73,7 @@ function runHost(overrides: Partial<Host>) {
 describe('native APFS host diagnostic', () => {
   it.each([
     ['platform', { platform: 'linux' }],
-    ['filesystem', { filesystem: 1n }],
+    ['filesystem', { filesystem: 26n, apfs: false }],
     ['Node', { node: '24.21.0' }],
     ['libuv', { uv: '1.52.0' }],
   ])(
@@ -80,6 +93,13 @@ describe('native APFS host diagnostic', () => {
       });
       expect(result.stderr).not.toContain('diagnostic-secret');
       expect(result.stderr).not.toContain('/private/');
+    },
+  );
+
+  it.each([26n, 27n, 99n])(
+    'continues qualification for actual APFS with dynamic type %s',
+    (filesystem) => {
+      expect(runHost({ filesystem }).error).toBe('qualification reached');
     },
   );
 
