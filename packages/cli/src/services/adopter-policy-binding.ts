@@ -1,3 +1,9 @@
+import { verifyDocumentationBindingSnapshot } from '../authority/documentation-binding.js';
+import { canonicalRegistry } from '../define-command.js';
+import {
+  documentationImplementationProvenanceValid,
+  type DocumentationImplementationProvenance,
+} from '@devai-nyx/authority';
 import { createHash } from 'node:crypto';
 import { canonicalJson } from '@devai-nyx/utils';
 import { ADOPTER_POLICY_TARGETS, isJsonObject } from './adopter-policy.js';
@@ -21,6 +27,7 @@ export interface AdopterPolicyBinding {
    * `authority` block; optional so receipts written before the field parse.
    */
   readonly authority_extension?: AdopterAuthorityExtensionProvenance;
+  readonly documentation_implementation?: DocumentationImplementationProvenance;
 }
 
 export interface AdopterAuthorityExtensionProvenance {
@@ -70,7 +77,7 @@ export function parseAdopterPolicyBinding(
     'source_digest_sha256',
     'source_path',
   ];
-  const optionalKeys = ['authority_extension', 'retired_keys'];
+  const optionalKeys = ['authority_extension', 'retired_keys', 'documentation_implementation'];
   if (
     bindingKeys.some((key) => !Object.hasOwn(parsed, key)) ||
     Object.keys(parsed).some((key) => !bindingKeys.includes(key) && !optionalKeys.includes(key))
@@ -95,6 +102,11 @@ export function parseAdopterPolicyBinding(
   ) {
     return { reason: 'BINDING_MALFORMED' };
   }
+  if (
+    Object.hasOwn(parsed, 'documentation_implementation') &&
+    !documentationImplementationProvenanceValid(parsed['documentation_implementation'])
+  )
+    return { reason: 'BINDING_MALFORMED' };
   const materialized = parsed['materialized'];
   const digest = /^[a-f0-9]{64}$/u;
   if (
@@ -139,6 +151,10 @@ export function verifyAdopterPolicyBindingSnapshot(input: {
     readonly currentProject: unknown;
     readonly frameworkVersion: string;
     readonly ownedTargets?: readonly string[];
+    readonly documentationConstitution?: {
+      readonly version: string;
+      readonly digest_sha256: string;
+    };
   }) => ReadonlyMap<string, string>;
 }): AdopterPolicyBindingSnapshot {
   const fail = (): never => {
@@ -180,11 +196,22 @@ export function verifyAdopterPolicyBindingSnapshot(input: {
       project['devai_version'] !== input.frameworkVersion
     )
       return fail();
+    verifyDocumentationBindingSnapshot({
+      files,
+      document: policy,
+      bound: binding.documentation_implementation,
+      sourceBytes: source.toString('utf8'),
+      frameworkVersion: input.frameworkVersion,
+      entries: canonicalRegistry(),
+    });
     const expected = input.materialize({
       policy,
       currentProject: project,
       frameworkVersion: input.frameworkVersion,
       ownedTargets: Object.keys(binding.materialized),
+      ...(binding.documentation_implementation === undefined
+        ? {}
+        : { documentationConstitution: binding.documentation_implementation.constitution }),
     });
     const paths = [...expected.keys()].sort();
     if (

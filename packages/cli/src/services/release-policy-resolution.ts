@@ -193,7 +193,14 @@ export function resolveReleasePolicySnapshot(input: {
     if (!candidate.paths.includes(parsedBinding.binding.source_path))
       return fail('rpl-policy-source-unresolved');
     const files = new Map<string, Buffer>();
-    for (const path of [BINDING, parsedBinding.binding.source_path, ...ADOPTER_POLICY_TARGETS]) {
+    for (const path of [
+      BINDING,
+      parsedBinding.binding.source_path,
+      ...ADOPTER_POLICY_TARGETS,
+      ...(parsedBinding.binding.documentation_implementation === undefined
+        ? []
+        : [PIN, '.devai/config/authority-policy.json']),
+    ]) {
       if (candidate.paths.includes(path)) files.set(path, candidate.read(path));
     }
     const binding = verifyAdopterPolicyBindingSnapshot({
@@ -360,6 +367,9 @@ export function resolveReleasePolicySnapshot(input: {
         parsedBinding.binding.source_path,
         ...ADOPTER_POLICY_TARGETS.filter((path) => candidate.paths.includes(path)),
         PIN,
+        ...(parsedBinding.binding.documentation_implementation === undefined
+          ? []
+          : ['.devai/config/authority-policy.json']),
         locks.package_manifest.path,
         ...locks.lockfiles.map((lock) => lock.path),
       ]),

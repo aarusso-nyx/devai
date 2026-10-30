@@ -1,3 +1,7 @@
+import {
+  documentationImplementationOwnsPath,
+  type DocumentationImplementationContext,
+} from '@devai-nyx/authority';
 const ROOT_ARCHITECT_PATHS = new Set(['README.md', 'AGENTS.md', 'CLAUDE.md']);
 const DECISION_REGISTER_PATH = 'law/register/DECISIONS.md';
 
@@ -31,6 +35,7 @@ function isTestAuthorityPath(path: string): boolean {
 export function classifyTranslationPath(
   role: TranslationAuthorityRole,
   path: string,
+  documentation?: DocumentationImplementationContext,
 ): TranslationPathClassification {
   const testPath = isTestAuthorityPath(path);
   const auditorObservation = path === 'work/audit' || path.startsWith('work/audit/');
@@ -79,6 +84,8 @@ export function classifyTranslationPath(
       effect: role === 'owner' ? 'fs:owner-spec' : 'fs:architect-spec',
     };
   }
+  if (path.startsWith('docs/') && documentationImplementationOwnsPath(documentation, path))
+    return { allowed: role === 'engineer', effect: 'fs:plant' };
   if (architectPath) return { allowed: role === 'architect', effect: 'fs:architect-spec' };
   return { allowed: role === 'engineer', effect: 'fs:plant' };
 }

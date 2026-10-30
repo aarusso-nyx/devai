@@ -363,7 +363,13 @@ export function buildStoreRecord(
         : null,
     failure:
       kind === 'failure'
-        ? { code: result?.code ?? 'release-provider-failed', retryable: false }
+        ? {
+            code:
+              result?.code !== undefined && /^release-[a-z0-9-]+$/.test(result.code)
+                ? result.code
+                : 'release-provider-failed',
+            retryable: false,
+          }
         : null,
     unknown:
       kind === 'unknown-provider-result'

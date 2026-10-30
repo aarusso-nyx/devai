@@ -1,3 +1,8 @@
+import {
+  documentationImplementationOwnsPath,
+  type DocumentationImplementationContext,
+} from '@devai-nyx/authority';
+import { loadDocumentationImplementationContext } from '../../authority/documentation-context.js';
 /**
  * The write-scope judgement of a governed task diff: Constitution Article 6 binds every changed
  * path to its role through the static path table, and under constitution 1.1.0 the Engineer also
@@ -30,7 +35,10 @@ import { gte, valid } from 'semver';
 import { importedRepositoryFiles, workspacePackages } from './import-adjacency.js';
 
 /** The Article 6 role that owns a repository-relative path, or undefined when none may. */
-export function article6Role(path: string): string | undefined {
+export function article6Role(
+  path: string,
+  documentation?: DocumentationImplementationContext,
+): string | undefined {
   const normalized = path.split(sep).join('/');
   const segments = normalized.split('/');
   if (segments.length === 1) {
@@ -41,6 +49,11 @@ export function article6Role(path: string): string | undefined {
   if (segments[0] === 'packages' && segments[2] === INSPECTOR_TEST_DIRECTORY_SEGMENT) {
     return 'inspector';
   }
+  if (
+    normalized.startsWith('docs/') &&
+    documentationImplementationOwnsPath(documentation, normalized)
+  )
+    return 'engineer';
   const match = [...STATIC_AUTHORITY_PREFIXES]
     .sort((a, b) => b.prefix.length - a.prefix.length)
     .find((entry) => normalized.startsWith(entry.prefix));
@@ -112,13 +125,17 @@ export interface WriteScopeVerdict {
 
 /** Every changed path outside the task's write scope, and why. */
 export function judgeWriteScope(input: WriteScopeInput): WriteScopeVerdict {
+  const documentation = loadDocumentationImplementationContext(input.headRoot);
   const changes = input.changes.map((change) => ({
     ...change,
     path: change.path.split(sep).join('/'),
   }));
   const sources = new Set(
     changes
-      .filter((change) => change.kind !== 'deleted' && article6Role(change.path) === 'engineer')
+      .filter(
+        (change) =>
+          change.kind !== 'deleted' && article6Role(change.path, documentation) === 'engineer',
+      )
       .map((change) => change.path),
   );
   let workspaces: ReturnType<typeof workspacePackages> | undefined;
@@ -152,7 +169,7 @@ export function judgeWriteScope(input: WriteScopeInput): WriteScopeVerdict {
   };
   const refused: { readonly path: string; readonly violation: string }[] = [];
   for (const change of changes) {
-    const role = article6Role(change.path);
+    const role = article6Role(change.path, documentation);
     if (role === input.discipline) continue;
     const verb =
       input.focusedRegression &&

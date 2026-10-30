@@ -1,3 +1,4 @@
+import { loadDocumentationImplementationContext } from '../../authority/documentation-context.js';
 import { platform } from 'node:os';
 import { dirname, relative, resolve } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
@@ -312,7 +313,9 @@ export async function executeTranslationValidation(
     { path: resultStatePath, operation: 'create' },
     { path: 'record/proofs/chain.json', operation: 'append' },
   ]);
+  const documentation = loadDocumentationImplementationContext(repoRoot);
   const preliminaryFrames = evaluateTranslationFrames({
+    documentation_authority: documentation,
     witness: {
       strategy: witness.strategy,
       touched: witness.touched,
@@ -326,7 +329,7 @@ export async function executeTranslationValidation(
     candidate_executions: candidateExecutions,
     weakening_clean: weakeningClean,
     inventory_delta_modules: diffPaths.length > 0 ? task.target_modules : [],
-    inferred_effects: inferEffects(diffPaths, witness.frame.authority_role),
+    inferred_effects: inferEffects(diffPaths, witness.frame.authority_role, documentation),
     expected_state_changes: expected,
     observed_state_changes: provisionalObserved,
     strategy_coverage: strategyCoverage,
@@ -368,6 +371,7 @@ export async function executeTranslationValidation(
     { path: resultStatePath, operation: 'create' },
   ]);
   const frameEvaluation = evaluateTranslationFrames({
+    documentation_authority: documentation,
     witness: {
       strategy: witness.strategy,
       touched: witness.touched,
@@ -381,7 +385,7 @@ export async function executeTranslationValidation(
     candidate_executions: candidateExecutions,
     weakening_clean: weakeningClean,
     inventory_delta_modules: diffPaths.length > 0 ? task.target_modules : [],
-    inferred_effects: inferEffects(diffPaths, witness.frame.authority_role),
+    inferred_effects: inferEffects(diffPaths, witness.frame.authority_role, documentation),
     expected_state_changes: expected,
     observed_state_changes: observed,
     strategy_coverage: strategyCoverage,

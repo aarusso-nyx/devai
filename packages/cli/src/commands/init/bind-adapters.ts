@@ -51,7 +51,11 @@ import {
 import { DEFAULT_REPO_ROOT, emit, type InitBindOptions } from './shared.js';
 import { fsyncPath } from './durable-fs.js';
 import { acquireUpgradeLock, assertUpgradeLockFree } from './upgrade-lock.js';
-import { classWriteVerbs } from '../../authority/policy-support.js';
+import { classWriteVerbs, authorityBindings } from '../../authority/policy-support.js';
+import {
+  compileDocumentationBinding,
+  verifyDocumentationPath,
+} from '../../authority/documentation-binding.js';
 import { canonicalRegistry } from '../../define-command.js';
 import { parseAdopterPolicyBinding } from '../../services/adopter-policy-binding.js';
 
@@ -399,6 +403,8 @@ export interface AdopterPolicyBindPlan {
   readonly writes: ReadonlyMap<string, string>;
 }
 
+const previousDocumentationPlans = new WeakSet<AdopterPolicyBindPlan>();
+
 /**
  * Plan an adopter-policy bind without writing (ADR-CFG-0002): the projection over the given
  * project.json, the owned keys it retires, the receipt, and the write set measured against
@@ -412,6 +418,7 @@ export function planAdopterPolicyBind(
     readonly currentProject?: JsonObject;
     readonly frameworkVersion?: string;
     readonly constitutionVersion?: string;
+    readonly constitutionText?: string;
   } = {},
 ): AdopterPolicyBindPlan {
   const sourceBytes = readFileSync(sourcePath, 'utf8');
@@ -423,8 +430,11 @@ export function planAdopterPolicyBind(
     (existsSync(projectPath) ? (JSON.parse(readFileSync(projectPath, 'utf8')) as JsonObject) : {});
   const ownedTargets: string[] = [];
   const priorReceipt = readTextIfPresent(join(targetRoot, ADOPTER_POLICY_RECEIPT));
+  let previousDocumentation = false;
   if (priorReceipt !== null) {
     const parsed = parseAdopterPolicyBinding(priorReceipt);
+    previousDocumentation =
+      'binding' in parsed && parsed.binding.documentation_implementation !== undefined;
     for (const [target, code] of [
       ['.devai/config/sensor-inputs.json', 'ADOPTER_POLICY_SENSOR_INPUTS_OWNERSHIP_MISMATCH'],
       [
@@ -455,6 +465,14 @@ export function planAdopterPolicyBind(
     frameworkVersion: options.frameworkVersion ?? resolveCliVersion(),
     targetRoot,
     ownedTargets,
+    ...(options.constitutionText === undefined
+      ? {}
+      : {
+          documentationConstitution: {
+            version: options.constitutionVersion ?? '',
+            digest_sha256: sha256Bytes(options.constitutionText),
+          },
+        }),
     ...(options.constitutionVersion !== undefined && {
       constitutionVersion: options.constitutionVersion,
     }),
@@ -468,8 +486,37 @@ export function planAdopterPolicyBind(
     repositoryId: 'adopter-repository',
     classWriteVerbs: classWriteVerbs(canonicalRegistry()),
   });
+  const documentation =
+    document['documentation_implementation'] === undefined
+      ? undefined
+      : compileDocumentationBinding({
+          root: targetRoot,
+          document,
+          sourceBytes,
+          entries: canonicalRegistry(),
+          bindings: (() => {
+            const bindings = authorityBindings(
+              targetRoot,
+              options.frameworkVersion ?? resolveCliVersion(),
+            );
+            return options.constitutionText === undefined
+              ? bindings
+              : {
+                  ...bindings,
+                  constitution_binding: {
+                    version: options.constitutionVersion ?? bindings.constitution_binding.version,
+                    digest_sha256: sha256Bytes(options.constitutionText),
+                  },
+                };
+          })(),
+        });
+  if (documentation !== undefined)
+    verifyDocumentationPath(targetRoot, relative(targetRoot, sourcePath).split(sep).join('/'));
   const receipt = {
     schemaVersion: '1.0.0',
+    ...(documentation === undefined
+      ? {}
+      : { documentation_implementation: documentation.provenance }),
     policy_id: document['policy_id'],
     policy_version: document['policy_version'],
     source_path: relative(targetRoot, sourcePath).split(sep).join('/'),
@@ -504,20 +551,9 @@ export function planAdopterPolicyBind(
       currentReceipt === jsonBytes({ ...receipt, retired_keys: recordedRetired });
     if (!standing) writes.set(ADOPTER_POLICY_RECEIPT, receiptBytes);
   }
-  return { receipt, resolved, retiredKeys, authorityExtension, writes };
-}
-
-function materializeAdopterPolicy(targetRoot: string, sourceArgument: string, lockToken: string) {
-  const sourcePath = resolveAdopterPolicySource(targetRoot, sourceArgument);
-  const recovery = recoverInterruptedAdopterPolicyBind(targetRoot, lockToken);
-  const { receipt, authorityExtension, writes } = planAdopterPolicyBind(targetRoot, sourcePath);
-  if (writes.size > 0) writeAdopterPolicyPairAtomically(targetRoot, writes);
-  return {
-    receipt_path: ADOPTER_POLICY_RECEIPT,
-    receipt,
-    authorityExtension,
-    ...(recovery !== null ? { recovered_interrupted_bind: recovery } : {}),
-  };
+  const plan = { receipt, resolved, retiredKeys, authorityExtension, writes };
+  if (previousDocumentation) previousDocumentationPlans.add(plan);
+  return plan;
 }
 
 /**
@@ -585,18 +621,42 @@ export function bindAdopterPolicy(
     // this bind happen under it, so neither can roll back the other's live journal.
     const lock = acquireUpgradeLock(targetRoot, 'init bind --adopter-policy');
     try {
-      const { authorityExtension, ...result } = materializeAdopterPolicy(
-        targetRoot,
-        options.adopterPolicy,
-        lock.token,
-      );
-      const artifact = executeAuthorityPolicyMaterialization();
-      const receipt = recordAuthorityExtension(targetRoot, result.receipt, authorityExtension);
-      emit(
-        { ...result, receipt, authority_policy: artifact },
-        options.human === true,
-        `init bind --adopter-policy: ${result.receipt_path}`,
-      );
+      // Preserve the established no-block ordering: resolve, recover, then parse/plan.
+      // The planner already reads the old receipt; no eager admission read is added.
+      const sourcePath = resolveAdopterPolicySource(targetRoot, options.adopterPolicy);
+      const recovery = recoverInterruptedAdopterPolicyBind(targetRoot, lock.token);
+      const plan = planAdopterPolicyBind(targetRoot, sourcePath);
+      const specializing =
+        plan.receipt['documentation_implementation'] !== undefined ||
+        previousDocumentationPlans.has(plan);
+      const apply = () => {
+        if (specializing) {
+          verifyDocumentationPath(
+            targetRoot,
+            relative(targetRoot, resolve(targetRoot, options.adopterPolicy)).split(sep).join('/'),
+          );
+          openBindJournal(targetRoot);
+        }
+        if (plan.writes.size > 0) writeAdopterPolicyPairAtomically(targetRoot, plan.writes);
+        const artifact = executeAuthorityPolicyMaterialization();
+        const receipt = recordAuthorityExtension(targetRoot, plan.receipt, plan.authorityExtension);
+        if (specializing) commitBindJournal(targetRoot);
+        return {
+          receipt_path: ADOPTER_POLICY_RECEIPT,
+          receipt,
+          ...(recovery !== null ? { recovered_interrupted_bind: recovery } : {}),
+          authority_policy: artifact,
+        };
+      };
+      let result;
+      try {
+        result = specializing
+          ? runAuthorityHostEffectsWithRollback(bindJournalTargets(targetRoot), apply)
+          : apply();
+      } finally {
+        if (specializing) releaseBindJournal();
+      }
+      emit(result, options.human === true, `init bind --adopter-policy: ${result.receipt_path}`);
       process.exitCode = EXIT_PASS;
     } finally {
       lock.release();

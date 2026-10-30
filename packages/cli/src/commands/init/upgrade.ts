@@ -419,7 +419,10 @@ export function prepareAdopterUpgrade(
     const bind = planAdopterPolicyBind(targetRoot, sourcePath, {
       currentProject: project,
       frameworkVersion: installed,
-      ...(requestConstitution && { constitutionVersion: canonical.version }),
+      ...(requestConstitution && {
+        constitutionVersion: canonical.version,
+        constitutionText: canonical.text,
+      }),
     });
     for (const [path, bytes] of bind.resolved) set(path, bytes, 'adopter-policy');
     project = JSON.parse(bind.resolved.get(PROJECT) ?? jsonBytes(project)) as JsonObject;

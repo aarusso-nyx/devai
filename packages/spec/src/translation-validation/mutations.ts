@@ -1,3 +1,7 @@
+import {
+  assertDocumentationContextRepository,
+  type DocumentationImplementationContext,
+} from '@devai-nyx/authority';
 import { spawnSync as nodeSpawnSync } from '@devai-nyx/authority';
 import { existsSync, lstatSync, readFileSync } from 'node:fs';
 import { basename, isAbsolute, relative, resolve } from 'node:path';
@@ -76,7 +80,11 @@ interface MutationInvariantRecord {
   };
 }
 
-function validateMutationIntent(repoRoot: string, intent: MutationIntent): void {
+function validateMutationIntent(
+  repoRoot: string,
+  intent: MutationIntent,
+  documentation?: DocumentationImplementationContext,
+): void {
   if (!validators.mutationIntent(intent)) {
     throw new Error(
       `MUTATION_INTENT_INVALID: ${JSON.stringify(validators.mutationIntent.errors ?? [])}`,
@@ -134,7 +142,7 @@ function validateMutationIntent(repoRoot: string, intent: MutationIntent): void 
     }
   }
   for (const path of intent.declared_touched) {
-    const classification = classifyTranslationPath(intent.authority_role, path);
+    const classification = classifyTranslationPath(intent.authority_role, path, documentation);
     if (!classification.allowed) throw new Error(`MUTATION_AUTHORITY_MISMATCH: ${path}`);
     if (!intent.effects_permitted.includes(classification.effect)) {
       throw new Error(`MUTATION_EFFECT_MISMATCH: ${path}`);
@@ -143,6 +151,7 @@ function validateMutationIntent(repoRoot: string, intent: MutationIntent): void 
 }
 
 export async function recordMutationCandidate(input: {
+  readonly documentation_authority?: DocumentationImplementationContext;
   readonly repo_root: string;
   readonly intent: Readonly<Record<string, unknown>>;
   readonly emitted_at: string;
@@ -150,7 +159,8 @@ export async function recordMutationCandidate(input: {
 }): Promise<MutationCandidateRecord> {
   const repoRoot = resolve(input.repo_root);
   const intent = input.intent as unknown as MutationIntent;
-  validateMutationIntent(repoRoot, intent);
+  assertDocumentationContextRepository(input.documentation_authority, repoRoot);
+  validateMutationIntent(repoRoot, intent, input.documentation_authority);
   const head = gitMutation(repoRoot, ['rev-parse', 'HEAD'], { error: 'MUTATION_HEAD_INVALID' });
   if (head !== intent.base_sha) throw new Error('MUTATION_BASE_MISMATCH');
   gitMutation(repoRoot, ['cat-file', '-e', `${intent.base_sha}^{commit}`], {
@@ -194,8 +204,13 @@ export async function recordMutationCandidate(input: {
   ) {
     throw new Error('MUTATION_UNDECLARED_PATH');
   }
+  assertDocumentationContextRepository(input.documentation_authority, repoRoot);
   for (const path of taskPaths) {
-    const classification = classifyTranslationPath(intent.authority_role, path);
+    const classification = classifyTranslationPath(
+      intent.authority_role,
+      path,
+      input.documentation_authority,
+    );
     if (!classification.allowed) throw new Error(`MUTATION_AUTHORITY_MISMATCH: ${path}`);
     if (!intent.effects_permitted.includes(classification.effect)) {
       throw new Error(`MUTATION_EFFECT_MISMATCH: ${path}`);

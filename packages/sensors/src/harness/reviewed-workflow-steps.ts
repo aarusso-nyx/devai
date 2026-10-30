@@ -352,7 +352,347 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
       },
       {
         path: 'scripts/check-commit-range.mjs',
-        sha256: 'e7eccd247334f48bee1c2f01809b2f7df01adff9f9f86eb538c694d507b561ce',
+        sha256: '37870c542dd18b3196fdcac121e3944e94f4506c501f8a35e9714e5cb654d39d',
+      },
+      {
+        path: 'packages/authority/src/adapters.ts',
+        sha256: '5d5ab8e019440ed6c721f8d16b17bb6c3aeeb2c61f36a9057eb01f2cef046f0a',
+      },
+      {
+        path: 'packages/authority/src/boundaries/boundary-runtime-targets.ts',
+        sha256: '2f5d6889c5578681a75dda7c1e21d99badc7afff468ffd39f84fe0a09020aa35',
+      },
+      {
+        path: 'packages/authority/src/boundaries/boundary-runtime.ts',
+        sha256: 'daf606d3db0642a413e7ae6e04e91fa5d131c51b7fbfefb209801adaf89b178d',
+      },
+      {
+        path: 'packages/authority/src/boundaries/host-atomic-effects.ts',
+        sha256: '92d3be45f4d9e541252f16c44d55bb9fb7f009aa583d57bb54d5a3a6c76ffd6c',
+      },
+      {
+        path: 'packages/authority/src/boundaries/host-capacity.ts',
+        sha256: '63bd412aadd7f6a576a70953f7fa6cfd76f9d2c0dfe3ec049278b2605ae43adc',
+      },
+      {
+        path: 'packages/authority/src/boundaries/host-effects.ts',
+        sha256: 'bccbb10bb1b58f826ecb8f35e386b035be15321970d0dd0ed42dce02723b67ce',
+      },
+      {
+        path: 'packages/authority/src/boundaries/host-operation.ts',
+        sha256: '6898d19fda21e9f2bd33be3d904bd0d3140a6e2b54fe327e99c278b15aa12e34',
+      },
+      {
+        path: 'packages/authority/src/boundaries/host-process.ts',
+        sha256: '3d1dc19ee88a6c9ac7d9679f42f21d8336d3c1201ef997f05a2b24b1e1227702',
+      },
+      {
+        path: 'packages/authority/src/boundaries/host-publish.ts',
+        sha256: 'b762526eb9a6127f31fbe0cdc134aba4281321a34c5ab2e62bd6baa4d75e061a',
+      },
+      {
+        path: 'packages/authority/src/boundaries/host-reconciliation-admission.ts',
+        sha256: '318c52a0f5de908e549e79ace095a4720acb190c7389e88a41a673fd2fa60a91',
+      },
+      {
+        path: 'packages/authority/src/boundaries/host-remove.ts',
+        sha256: '88f4b30ce41ac47e9dce98baa52dcce03efeaf6c30eee93519bde6a1a03eae7f',
+      },
+      {
+        path: 'packages/authority/src/boundaries/host-repository-context.ts',
+        sha256: '88b375719336668f31ce0d6e0bf0f31bc158bd1843d4410982f50cc768025988',
+      },
+      {
+        path: 'packages/authority/src/boundaries/host-scope.ts',
+        sha256: 'b020edc440e1c4e6cabf6e12daad1a6fdebd426ca6dddfbfa76c949cc164ea1c',
+      },
+      {
+        path: 'packages/authority/src/boundaries/host-sink-adapters.ts',
+        sha256: '886c392cdc8c1902d26d20e64854c2eb2261e1ce47045ace7a04984a6c64b707',
+      },
+      {
+        path: 'packages/authority/src/boundaries/host-sink-filesystem.ts',
+        sha256: '1e211fa111d8807f6edb35086eef14ca36d555105fd9e0990630cf6b32f8e003',
+      },
+      {
+        path: 'packages/authority/src/boundaries/index.ts',
+        sha256: '799d2e9ada119f6d69aed3c51fea992626d05b68f7809a8de992598d64de227e',
+      },
+      {
+        path: 'packages/authority/src/boundaries/proof-index-codec.ts',
+        sha256: '620d27259e33025eebc511f4b18c81a855110114234ad26ddc6bd832e6e3cf1f',
+      },
+      {
+        path: 'packages/authority/src/boundaries/reconciliation-admission-seed.ts',
+        sha256: 'd912846ddb518a132ed1e2484dfa56f23b8ff2c7a7bc25b2157fb379f25490fe',
+      },
+      {
+        path: 'packages/authority/src/boundaries/reconciliation-checkpoint.ts',
+        sha256: '2a3e8c52787daa9f1cf24fcb2d48249c1816238e2bc21a3da631d12a9783cd7e',
+      },
+      {
+        path: 'packages/authority/src/boundaries/reconciliation-custody-input.ts',
+        sha256: 'd120a2472b4d052dfc54214c9a8cf05db11fc3a475070aa026ae58cf0cbdaf9d',
+      },
+      {
+        path: 'packages/authority/src/boundaries/reconciliation-effect-plan.ts',
+        sha256: '5f7c89d4f5eaf873006dc54a56f3c0895b9b8e2f034ec893fffb0325fc58b984',
+      },
+      {
+        path: 'packages/authority/src/boundaries/reconciliation-host-context.ts',
+        sha256: '972e49e042720bc054c25254fa9537aa31065a51b5318585041cfd19cd29c24b',
+      },
+      {
+        path: 'packages/authority/src/boundaries/reconciliation-host-namespace.ts',
+        sha256: '44e2abbeb68f0b771e8f82e34d745bfc0435bf532cd2ae710118978339588484',
+      },
+      {
+        path: 'packages/authority/src/boundaries/reconciliation-host-operation.ts',
+        sha256: '92fea363e62d8972ccc7f3c295e2d7b2cbfc40d26b59418527e168babc243808',
+      },
+      {
+        path: 'packages/authority/src/boundaries/reconciliation-host-owner.ts',
+        sha256: '4a0d89baaa99d18f51f1049bf577e3c2b5a21a0e35f0adf10fed049c585bf869',
+      },
+      {
+        path: 'packages/authority/src/boundaries/reconciliation-host-provision.ts',
+        sha256: '1416c8c51d6e64229e8adf496caf34628bc88861ef07779faec838afbd132651',
+      },
+      {
+        path: 'packages/authority/src/boundaries/reconciliation-observation.ts',
+        sha256: 'cd6b9bb66da2f008ceb7551bc610fdfbb313d37a385a811a28c5825d4d8c5482',
+      },
+      {
+        path: 'packages/authority/src/boundaries/reconciliation-phase-files.ts',
+        sha256: '45c6a4febb3bae0da7cb629d602bf8db79ef0544f743d64a4753411c07222fbc',
+      },
+      {
+        path: 'packages/authority/src/boundaries/reconciliation-plan.ts',
+        sha256: '140c72ee25cb4d544062310bac0f1f428ee2ec57b79312efcf0ee694a25f0466',
+      },
+      {
+        path: 'packages/authority/src/boundaries/reconciliation-resources.ts',
+        sha256: '864cb540fda9ac911d88d4972da8923f7caffa4b02a7b9a3ec01a98ead75ae62',
+      },
+      {
+        path: 'packages/authority/src/boundaries/reconciliation-selection.ts',
+        sha256: 'f8967b0337b4a912932af748714fe7f1268f21b735131078ec4cadfdbd405093',
+      },
+      {
+        path: 'packages/authority/src/boundaries/release-export-binding.ts',
+        sha256: 'a6e0923c73cd56e680493ecf9cf87e21f06833b3600d3f12dbe4860a8aaebb55',
+      },
+      {
+        path: 'packages/authority/src/boundaries/release-export-certification.ts',
+        sha256: '064cfff88639bf5d0b30f83d3e650910282e9ac8edbab68b87337c14a241ed52',
+      },
+      {
+        path: 'packages/authority/src/boundaries/release-export-mutation.ts',
+        sha256: '5f2d85d8a178c29bb962327cae59c2d56349c1ef68c645c766d918efa97646df',
+      },
+      {
+        path: 'packages/authority/src/boundaries/release-repository-identity.ts',
+        sha256: '5e0322ab36781507c2cc317a66fa8ee88eca33af347a296517ec7cccfe2ea29a',
+      },
+      {
+        path: 'packages/authority/src/boundaries/resource-classification.ts',
+        sha256: 'f165fe7faf0f43ae098a9963489706df265751fad3c2c14548e7fbef5134d214',
+      },
+      {
+        path: 'packages/authority/src/capabilities/database.ts',
+        sha256: '4193452b8a72a4178a6156ac69b1563553a64dea2a44b4104c680c422b685d4a',
+      },
+      {
+        path: 'packages/authority/src/capabilities/path-domains.ts',
+        sha256: '507070751c129f20a4bc62106b73c5983a26b26cca046885f393a62fd96a31e4',
+      },
+      {
+        path: 'packages/authority/src/decision-plan.ts',
+        sha256: 'a3c91fa2be505502c0dcb4a3fc5b69307a702781c8f1e99b1dc0e06ae265f2f5',
+      },
+      {
+        path: 'packages/authority/src/decision.ts',
+        sha256: '0c3a7381e51283c7b804abf8303bc856b1052e5c01d01d9ac239f0c2817f6c4d',
+      },
+      {
+        path: 'packages/authority/src/documentation-implementation.ts',
+        sha256: 'c146ec21fc53265f958deebe1896475c82481f9776a1c8c8b8f1eaafd063b726',
+      },
+      {
+        path: 'packages/authority/src/index.ts',
+        sha256: '37ea35841988fdb3febed5f8a640c7cd20d39ba751895ec02be5576938d3b515',
+      },
+      {
+        path: 'packages/authority/src/paths.ts',
+        sha256: '93bcd18b0882d635973983676295ae275cab54a507fad624481bd138741359bb',
+      },
+      {
+        path: 'packages/authority/src/principals.ts',
+        sha256: '6c0402690b227121f51f03679aa585c7bba5d98d0ced98b2d4a1ea75bf54e9d3',
+      },
+      {
+        path: 'packages/authority/src/runtime/contracts.ts',
+        sha256: 'bc8fe5430ceb6fc72db4912da06c9dc8632a4711705be80f2d39d5a93e452d44',
+      },
+      {
+        path: 'packages/authority/src/runtime/decision-issuer.ts',
+        sha256: '918c0adf55e83ed17e2de4f21db7b5691a149a7aa651767b4107a166a21a4443',
+      },
+      {
+        path: 'packages/authority/src/runtime/declaration.ts',
+        sha256: 'a55baadc6156f169bf5cadf8fa310b841574d022fe1d7f8e29e55e1778f797b6',
+      },
+      {
+        path: 'packages/authority/src/runtime/documentation-context.ts',
+        sha256: 'db5329dee142eb4d03352f772123902a1eef9d5dd9dfb82cd77cf8dc57fadc50',
+      },
+      {
+        path: 'packages/authority/src/runtime/effect-authorization-ledger.ts',
+        sha256: '992a6bd57ba3ad52d4fa89cfd2cf716d5cddbe908c7119c7d31f7ec8802f1958',
+      },
+      {
+        path: 'packages/authority/src/runtime/effect-authorization-types.ts',
+        sha256: 'b6b530ef5e7527384c0e354cc8107521904368f69f693d648d303dcb55931bea',
+      },
+      {
+        path: 'packages/authority/src/runtime/evidence-validator.ts',
+        sha256: '0660d4e03488b9dfbb05bc6132394937fde9ca9ef474afc83590dafb26ab185b',
+      },
+      {
+        path: 'packages/authority/src/runtime/index.ts',
+        sha256: '1998cb3da4c62c3eac9f438e3dba934efaa6c8c35c38e50db238419544b4682f',
+      },
+      {
+        path: 'packages/authority/src/runtime/machine-context.ts',
+        sha256: '095d5379f33d54a287a3e28c71fa71c4e7745d09dcfb926c56b19e22a52d500a',
+      },
+      {
+        path: 'packages/authority/src/runtime/policy-additive-rules.ts',
+        sha256: 'dc747746e53b5af135bf947eb82f4656191207cc495a2ec1db878d2419b8b961',
+      },
+      {
+        path: 'packages/authority/src/runtime/policy-adopter-extension.ts',
+        sha256: '78f420a668bb29d22b3b6493f7603bf63d33d5ca00421924073cdb83cd63f40a',
+      },
+      {
+        path: 'packages/authority/src/runtime/policy-construction.ts',
+        sha256: '3688c14f5b6b0010a6d19266a24aef99aa1777cb7a62ebf7597c7af4f1098323',
+      },
+      {
+        path: 'packages/authority/src/runtime/policy-core-rules.ts',
+        sha256: '47d20e042e368df95081671048b20ffe63703638b7636a7f22334f8bc1947bd2',
+      },
+      {
+        path: 'packages/authority/src/runtime/policy-integrity.ts',
+        sha256: '337b5da7b9ddb24a3766c5e2931309a96029f317052ad10a7479779b6c5aee4e',
+      },
+      {
+        path: 'packages/authority/src/runtime/policy-loader.ts',
+        sha256: 'c3fa930c82efdf0a55252ffb7b737633529c2c1ccc9c94f357d77336d875c7b4',
+      },
+      {
+        path: 'packages/authority/src/runtime/policy-materializer.ts',
+        sha256: '50fe76f79dd299fc31a576da12fbb7c70b0d80ff8dd53d97d6bcf003f43e17d4',
+      },
+      {
+        path: 'packages/authority/src/runtime/policy-resolver.ts',
+        sha256: '537ca8dc8413525417ed9b375b442c37a1030b290ccffa897ad8d857df2d3b8e',
+      },
+      {
+        path: 'packages/authority/src/runtime/policy-sources.ts',
+        sha256: '1183ff2a221292aebec79e8634e7c8a82bd7c4b83d3b5e9d9adf7d3c50b21c2d',
+      },
+      {
+        path: 'packages/authority/src/runtime/reconciliation-clock.ts',
+        sha256: 'd9ab0faba163f45a7d7caf13e2cae5307ccb0ad2be7cb5b7565e1054f1844dd3',
+      },
+      {
+        path: 'packages/authority/src/runtime/reconciliation-owner-record.ts',
+        sha256: 'fd7d944ce09f640ff4040abeae090ad8b694b55e3e285feb46ea59650735cbda',
+      },
+      {
+        path: 'packages/authority/src/runtime/reconciliation-owner-state.ts',
+        sha256: 'b59cce447c545f2bcb8396d384dac39613ca87c1721d0f12e3e16345edb0d2b8',
+      },
+      {
+        path: 'packages/authority/src/types.ts',
+        sha256: '1b2c122d0c4a8139b5a8b012fe5a7d3583ef8f372e7ce052536c794aad8393a2',
+      },
+      {
+        path: 'packages/schemas/src/index.ts',
+        sha256: 'f4cc09a1d5c6c67e8ee8b779b8b39e954251de2e902c080b93d486be728dc7b0',
+      },
+      {
+        path: 'packages/schemas/src/reply-extract.ts',
+        sha256: '034a3ed3475d82e78216f45948b2884eb5535370a629cda1f386b3c094401858',
+      },
+      {
+        path: 'packages/schemas/src/roster.ts',
+        sha256: 'f6a287b1c005d910a11cfbd09f0d836b341b9c0bf756a2ebdc55e3a090e31241',
+      },
+      {
+        path: 'packages/schemas/src/schema-canon.ts',
+        sha256: '71e492a447774069c8c594b75c5ff738b1f2d414872e02a4aec9ec0bfb4083b2',
+      },
+      {
+        path: 'packages/utils/src/canonical-json/index.ts',
+        sha256: '977f097d46922271eaf01a644734a6f5a7c22589bf7af00fd07b37cba64474e5',
+      },
+      {
+        path: 'packages/utils/src/constitution-version.ts',
+        sha256: 'faea825b371fc5f05f8dbfcfc69a206229b80b944a1514c75431a9a73f4514b0',
+      },
+      {
+        path: 'packages/utils/src/counters/index.ts',
+        sha256: '67798d1a1ca3f6a005aa8d739d5e2bdb62a5bc72fb0877762e25dd31d04ad6bd',
+      },
+      {
+        path: 'packages/utils/src/evidence-integrity.ts',
+        sha256: '69604c94acc310fd62d1efe6cd84e7faf57259178a4c9f200edb35a356495373',
+      },
+      {
+        path: 'packages/utils/src/evidence-record.ts',
+        sha256: '4180bee5665bc2cf0dbd5352ac02b87425c1b375337e179562089fc5a4d21708',
+      },
+      {
+        path: 'packages/utils/src/executable-test-file.ts',
+        sha256: '864b78499f36eb159098a0740ee3f268ab71df2f8bbac632235cc7a5ca177fd9',
+      },
+      {
+        path: 'packages/utils/src/exit.ts',
+        sha256: '791fff3ef07163bc5b2ec50e1bf977997bd041eea1c3387a470593acf2e8f627',
+      },
+      {
+        path: 'packages/utils/src/glob-guards/index.ts',
+        sha256: 'fb56da35073fe2c1a396226c4fc3a5bc65aa51a0b6705e12a373a017afcc2b9d',
+      },
+      {
+        path: 'packages/utils/src/index.ts',
+        sha256: '0e3ac05fedf97365219327102e1917977bf523ec236448cd2fa7f39b669fd62d',
+      },
+      {
+        path: 'packages/utils/src/profile/index.ts',
+        sha256: '00b9f931763cb7657cd40611ed874cfc6eacab3dd799639851a7739636d5a401',
+      },
+      {
+        path: 'packages/utils/src/redact.ts',
+        sha256: 'f3d21ebb09a1490a622867c25185a2e84cbae9959ed5afbecc6b4df2bc19533d',
+      },
+      {
+        path: 'packages/utils/src/repository-target.ts',
+        sha256: '2c94640dabc88cebc3fc052175c3f564846dde231ce8eecc65f13611fb1471d1',
+      },
+      {
+        path: 'packages/utils/src/templates/index.ts',
+        sha256: 'c1ccf3d4a0cdadbf7f17a08a4b8e1a3673e9f927e4347bac91fd1d19ceab3411',
+      },
+      {
+        path: 'scripts/check-commit-range.mjs',
+        sha256: '37870c542dd18b3196fdcac121e3944e94f4506c501f8a35e9714e5cb654d39d',
+      },
+      {
+        path: 'scripts/commit-documentation-authority.mjs',
+        sha256: '7c4c2f1f99f53a9e17b5fe410ac863160ceee79b9b463a6f1d146b9e300ab7ec',
       },
       {
         path: 'scripts/pr-failure-diagnostics.mjs',
@@ -381,6 +721,98 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
       {
         path: 'scripts/run-pr-release-gate.mjs',
         sha256: '9986877ced443848d2e1e72cdfb40c13c667469eb0d4e91846e465c4cbda6da1',
+      },
+    ],
+    computed_imports: [
+      {
+        from: 'scripts/commit-documentation-authority.mjs',
+        reason:
+          'Loads the trusted workspace authority index and private bound-policy verifier through createRequire; the complete source import graph includes schemas and utils. Historical trees supply data only. Type-only edges are conservatively retained.',
+        files: [
+          'packages/authority/src/adapters.ts',
+          'packages/authority/src/boundaries/boundary-runtime-targets.ts',
+          'packages/authority/src/boundaries/boundary-runtime.ts',
+          'packages/authority/src/boundaries/host-atomic-effects.ts',
+          'packages/authority/src/boundaries/host-capacity.ts',
+          'packages/authority/src/boundaries/host-effects.ts',
+          'packages/authority/src/boundaries/host-operation.ts',
+          'packages/authority/src/boundaries/host-process.ts',
+          'packages/authority/src/boundaries/host-publish.ts',
+          'packages/authority/src/boundaries/host-reconciliation-admission.ts',
+          'packages/authority/src/boundaries/host-remove.ts',
+          'packages/authority/src/boundaries/host-repository-context.ts',
+          'packages/authority/src/boundaries/host-scope.ts',
+          'packages/authority/src/boundaries/host-sink-adapters.ts',
+          'packages/authority/src/boundaries/host-sink-filesystem.ts',
+          'packages/authority/src/boundaries/index.ts',
+          'packages/authority/src/boundaries/proof-index-codec.ts',
+          'packages/authority/src/boundaries/reconciliation-admission-seed.ts',
+          'packages/authority/src/boundaries/reconciliation-checkpoint.ts',
+          'packages/authority/src/boundaries/reconciliation-custody-input.ts',
+          'packages/authority/src/boundaries/reconciliation-effect-plan.ts',
+          'packages/authority/src/boundaries/reconciliation-host-context.ts',
+          'packages/authority/src/boundaries/reconciliation-host-namespace.ts',
+          'packages/authority/src/boundaries/reconciliation-host-operation.ts',
+          'packages/authority/src/boundaries/reconciliation-host-owner.ts',
+          'packages/authority/src/boundaries/reconciliation-host-provision.ts',
+          'packages/authority/src/boundaries/reconciliation-observation.ts',
+          'packages/authority/src/boundaries/reconciliation-phase-files.ts',
+          'packages/authority/src/boundaries/reconciliation-plan.ts',
+          'packages/authority/src/boundaries/reconciliation-resources.ts',
+          'packages/authority/src/boundaries/reconciliation-selection.ts',
+          'packages/authority/src/boundaries/release-export-binding.ts',
+          'packages/authority/src/boundaries/release-export-certification.ts',
+          'packages/authority/src/boundaries/release-export-mutation.ts',
+          'packages/authority/src/boundaries/release-repository-identity.ts',
+          'packages/authority/src/boundaries/resource-classification.ts',
+          'packages/authority/src/capabilities/database.ts',
+          'packages/authority/src/capabilities/path-domains.ts',
+          'packages/authority/src/decision-plan.ts',
+          'packages/authority/src/decision.ts',
+          'packages/authority/src/documentation-implementation.ts',
+          'packages/authority/src/index.ts',
+          'packages/authority/src/paths.ts',
+          'packages/authority/src/principals.ts',
+          'packages/authority/src/runtime/contracts.ts',
+          'packages/authority/src/runtime/decision-issuer.ts',
+          'packages/authority/src/runtime/declaration.ts',
+          'packages/authority/src/runtime/documentation-context.ts',
+          'packages/authority/src/runtime/effect-authorization-ledger.ts',
+          'packages/authority/src/runtime/effect-authorization-types.ts',
+          'packages/authority/src/runtime/evidence-validator.ts',
+          'packages/authority/src/runtime/index.ts',
+          'packages/authority/src/runtime/machine-context.ts',
+          'packages/authority/src/runtime/policy-additive-rules.ts',
+          'packages/authority/src/runtime/policy-adopter-extension.ts',
+          'packages/authority/src/runtime/policy-construction.ts',
+          'packages/authority/src/runtime/policy-core-rules.ts',
+          'packages/authority/src/runtime/policy-integrity.ts',
+          'packages/authority/src/runtime/policy-loader.ts',
+          'packages/authority/src/runtime/policy-materializer.ts',
+          'packages/authority/src/runtime/policy-resolver.ts',
+          'packages/authority/src/runtime/policy-sources.ts',
+          'packages/authority/src/runtime/reconciliation-clock.ts',
+          'packages/authority/src/runtime/reconciliation-owner-record.ts',
+          'packages/authority/src/runtime/reconciliation-owner-state.ts',
+          'packages/authority/src/types.ts',
+          'packages/schemas/src/index.ts',
+          'packages/schemas/src/reply-extract.ts',
+          'packages/schemas/src/roster.ts',
+          'packages/schemas/src/schema-canon.ts',
+          'packages/utils/src/canonical-json/index.ts',
+          'packages/utils/src/constitution-version.ts',
+          'packages/utils/src/counters/index.ts',
+          'packages/utils/src/evidence-integrity.ts',
+          'packages/utils/src/evidence-record.ts',
+          'packages/utils/src/executable-test-file.ts',
+          'packages/utils/src/exit.ts',
+          'packages/utils/src/glob-guards/index.ts',
+          'packages/utils/src/index.ts',
+          'packages/utils/src/profile/index.ts',
+          'packages/utils/src/redact.ts',
+          'packages/utils/src/repository-target.ts',
+          'packages/utils/src/templates/index.ts',
+        ],
       },
     ],
   },

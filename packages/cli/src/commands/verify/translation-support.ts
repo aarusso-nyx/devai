@@ -1,3 +1,4 @@
+import type { DocumentationImplementationContext } from '@devai-nyx/authority';
 import { createHash } from 'node:crypto';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { classifyTranslationPath } from '#runtime-core';
@@ -209,8 +210,11 @@ export function jsonAtCommit(
 export function inferEffects(
   paths: readonly string[],
   role: TranslationWitness['frame']['authority_role'],
+  documentation?: DocumentationImplementationContext,
 ): readonly string[] {
-  return [...new Set(paths.map((path) => classifyTranslationPath(role, path).effect))].sort();
+  return [
+    ...new Set(paths.map((path) => classifyTranslationPath(role, path, documentation).effect)),
+  ].sort();
 }
 
 export function registeredTraceRef(

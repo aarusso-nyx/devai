@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+import { compileDocumentationImplementationRules } from '../authority/policy-documentation-implementation.js';
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { getValidator } from '@devai-nyx/schemas';
@@ -80,6 +82,7 @@ export interface AdopterPolicyProjectionInput {
    * absent, it is read from `.devai/pin/constitution.md` under `targetRoot`.
    */
   readonly constitutionVersion?: string;
+  readonly documentationConstitution?: { readonly version: string; readonly digest_sha256: string };
   /** Repository root whose bound constitution pin gates an `authority` block. */
   readonly targetRoot?: string;
   /** Targets whose prior binding receipt establishes ownership. */
@@ -159,6 +162,24 @@ export function resolveAdopterPolicyProjection(
     throw new Error(`ADOPTER_POLICY_INVALID:${JSON.stringify(validatePolicy.errors)}`);
   }
   const document = input.policy as JsonObject;
+  if (document['documentation_implementation'] !== undefined) {
+    const constitution =
+      input.documentationConstitution ??
+      (() => {
+        const root = resolve(input.targetRoot ?? '.');
+        const text = readFileSync(join(root, CONSTITUTION_PIN), 'utf8');
+        return {
+          version: boundConstitutionVersion(root),
+          digest_sha256: createHash('sha256').update(text).digest('hex'),
+        };
+      })();
+    compileDocumentationImplementationRules({
+      block: document['documentation_implementation'],
+      constitution,
+      repositoryId: 'adopter-repository',
+      entries: canonicalRegistry(),
+    });
+  }
   // A refused authority block raises its ADOPTER_AUTHORITY_* code before any target is
   // staged. The selectors' repository id is irrelevant to the refusal, so no identity
   // lookup (which may spawn git) is made here.
