@@ -4,10 +4,16 @@
  * taken before the process starts and the tree is compared after it ends, so changes already
  * present at the baseline are not the process's own, and a further change to such a path is.
  * Commits the process made are seen through the moved HEAD. A path's state is what Git tracks:
- * its bytes and executable bit, or a symbolic link's target. Ignored files are not observed;
+ * its bytes and executable bit, a symbolic link's target, or a submodule's checked-out commit. Ignored files are not observed;
  * runtime state, worktrees and scratch space are never charged to the process.
  */
-import { execFileSync, lstatSync, readFileSync, readlinkSync } from '@devai-nyx/authority';
+import {
+  execFileSync,
+  existsSync,
+  lstatSync,
+  readFileSync,
+  readlinkSync,
+} from '@devai-nyx/authority';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import type { WriteChange } from './index.js';
@@ -50,7 +56,10 @@ function dirtyPaths(root: string): string[] {
   ])
     .split('\0')
     .filter(Boolean);
-  return entries.map((entry) => entry.slice(3)).filter((path) => !runtimePath(path));
+  // An untracked nested repository is listed as a directory with a trailing slash.
+  return entries
+    .map((entry) => entry.slice(3).replace(/\/$/u, ''))
+    .filter((path) => !runtimePath(path));
 }
 
 /** A regular file's bytes, for assertion comparison; undefined for a link or an absent path. */
@@ -62,7 +71,7 @@ function fileBytes(root: string, path: string): Buffer | undefined {
   }
 }
 
-function digest(kind: 'file' | 'executable' | 'link', bytes: Buffer | string): string {
+function digest(kind: 'file' | 'executable' | 'link' | 'gitlink', bytes: Buffer | string): string {
   return `${kind}:${createHash('sha256').update(bytes).digest('hex')}`;
 }
 
@@ -71,6 +80,11 @@ function workingDigest(root: string, path: string): Digest {
   try {
     const stat = lstatSync(join(root, path));
     if (stat.isSymbolicLink()) return digest('link', readlinkSync(join(root, path)));
+    if (stat.isDirectory()) {
+      // A submodule (or embedded repository) is tracked as the commit it has checked out.
+      if (!existsSync(join(root, path, '.git'))) return null;
+      return digest('gitlink', git(root, ['-C', path, 'rev-parse', 'HEAD']).trim());
+    }
     if (!stat.isFile()) return null;
     return digest(
       (stat.mode & 0o100) !== 0 ? 'executable' : 'file',
@@ -101,6 +115,8 @@ function committedDigest(root: string, head: string, path: string): Digest {
   } catch {
     return null;
   }
+  const gitlink = /^160000 commit ([0-9a-f]+)\t/u.exec(entry)?.[1];
+  if (gitlink !== undefined) return digest('gitlink', gitlink);
   const mode = /^(\d+) blob /u.exec(entry)?.[1];
   const bytes = mode === undefined ? undefined : committed(root, head, path);
   if (bytes === undefined) return null;

@@ -209,11 +209,26 @@ function registrationBlock(
 }
 
 /**
- * The base statements the head does not preserve, in order. The head may insert statements
- * anywhere; every base statement must reappear, in order, with the same canonical text, except a
- * registration with an inline body, which must reappear with the same key and a body that in
- * turn preserves its own statements. An edit that only adds tests, imports or assertions keeps
- * the list empty, whatever assertion library the existing statements use.
+ * Whether a statement may be inserted into an existing test file: an import declaration that
+ * binds names, or a new test or suite registration. Any other new statement (a return or guard,
+ * a hook, a module mock, a side-effect import) could change what existing tests execute.
+ */
+function insertable(statement: ts.Statement, source: ts.SourceFile): boolean {
+  if (ts.isImportDeclaration(statement)) return statement.importClause !== undefined;
+  if (!ts.isExpressionStatement(statement) || !ts.isCallExpression(statement.expression))
+    return false;
+  const registration = testCall(statement.expression, source);
+  // A new focus marker suppresses pre-existing tests without changing their statements.
+  return registration !== undefined && !registration.markers.includes('only');
+}
+
+/**
+ * The base statements the head does not preserve, and the statements it inserts that it may
+ * not, in order. Every base statement must reappear, in order, with the same canonical text,
+ * except a registration with an inline body, which must reappear with the same key and a body
+ * that in turn satisfies the same rule. The head may insert only import declarations that bind
+ * names and new test or suite registrations (`insertable`). An edit that only adds tests and
+ * imports keeps the list empty, whatever assertion library the existing statements use.
  */
 export function unpreservedStatements(base: string, head: string): readonly string[] {
   const baseFile = ts.createSourceFile('base.ts', base, ts.ScriptTarget.Latest, true);
@@ -223,6 +238,7 @@ export function unpreservedStatements(base: string, head: string): readonly stri
     after: readonly ts.Statement[],
   ): readonly string[] => {
     const lostStatements: string[] = [];
+    const matchedIndices = new Set<number>();
     let next = 0;
     for (const statement of before) {
       const registration = registrationBlock(statement, baseFile);
@@ -244,9 +260,15 @@ export function unpreservedStatements(base: string, head: string): readonly stri
       if (matched < 0) lostStatements.push(text ?? registration?.key ?? '');
       else {
         lostStatements.push(...nested);
+        matchedIndices.add(matched);
         next = matched + 1;
       }
     }
+    after.forEach((statement, index) => {
+      if (!matchedIndices.has(index) && !insertable(statement, headFile)) {
+        lostStatements.push(`inserted: ${canonicalText(statement, headFile)}`);
+      }
+    });
     return lostStatements;
   };
   return compare(baseFile.statements, headFile.statements);

@@ -98,6 +98,14 @@ function routineScopeFailure(
   baseline: WorkspaceBaseline,
 ): Readonly<{ code: string; message: string }> | undefined {
   const { changes, divergent, readBase } = workspaceChanges(executionRoot, baseline);
+  if (divergent.length > 0) {
+    // The candidate commit holds changes the working tree no longer shows, so the tree the scope
+    // judge would read is not the candidate; it is refused before any file is judged.
+    return {
+      code: 'TASK_WRITE_SCOPE_VIOLATION',
+      message: `routine committed changes its working tree no longer holds: ${divergent.slice(0, 20).join(', ')}`,
+    };
+  }
   const scope = judgeWriteScope({
     discipline: task.discipline,
     changes,
@@ -109,14 +117,6 @@ function routineScopeFailure(
     return {
       code: 'TASK_WRITE_SCOPE_VIOLATION',
       message: `routine writes outside the ${task.discipline} paths: ${scope.violations.slice(0, 20).join(', ')}`,
-    };
-  }
-  if (divergent.length > 0) {
-    // The candidate commit holds changes the working tree no longer shows, so the tree the scope
-    // judge read is not the candidate.
-    return {
-      code: 'TASK_WRITE_SCOPE_VIOLATION',
-      message: `routine committed changes its working tree no longer holds: ${divergent.slice(0, 20).join(', ')}`,
     };
   }
   const boundary = declaredBoundary(task);

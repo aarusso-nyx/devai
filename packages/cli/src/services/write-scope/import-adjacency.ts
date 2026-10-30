@@ -13,6 +13,8 @@ import ts from 'typescript';
 const SOURCE_EXTENSIONS = ['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs'];
 /** Export conditions read in order; `development` names the source in this workspace. */
 const ENTRY_CONDITIONS = ['development', 'import', 'default', 'types', 'require'];
+/** A path segment Node refuses in a wildcard export match: empty, `.`, `..` or `node_modules`. */
+const INVALID_SEGMENTS = new Set(['', '.', '..', 'node_modules']);
 
 interface Workspace {
   readonly name: string;
@@ -60,6 +62,48 @@ export function workspacePackages(root: string): readonly Workspace[] {
   });
 }
 
+/**
+ * The `exports` entry for a subpath and the text a wildcard key matched, as Node resolves package
+ * exports: an exact key first, then the single-`*` key with the longest prefix, then the longest
+ * key. A match holding an empty, `.`, `..` or `node_modules` segment resolves to nothing.
+ */
+function subpathEntry(
+  exported: Record<string, unknown>,
+  subpath: string,
+): { readonly entry: unknown; readonly match: string | undefined } {
+  if (Object.hasOwn(exported, subpath) && !subpath.includes('*')) {
+    return { entry: exported[subpath], match: undefined };
+  }
+  let best: { key: string; prefix: string; match: string } | undefined;
+  for (const key of Object.keys(exported)) {
+    const star = key.indexOf('*');
+    if (star === -1 || star !== key.lastIndexOf('*')) continue;
+    const prefix = key.slice(0, star);
+    const suffix = key.slice(star + 1);
+    if (
+      subpath.length < key.length ||
+      !subpath.startsWith(prefix) ||
+      !subpath.endsWith(suffix) ||
+      (best !== undefined &&
+        (prefix.length < best.prefix.length ||
+          (prefix.length === best.prefix.length && key.length <= best.key.length)))
+    ) {
+      continue;
+    }
+    best = { key, prefix, match: subpath.slice(prefix.length, subpath.length - suffix.length) };
+  }
+  if (
+    best === undefined ||
+    // URL-encoded captures are outside this static resolver's supported subset.
+    // Never treat an encoded URL as evidence for a literal percent-named file.
+    best.match.includes('%') ||
+    best.match.split(/[/\\]/u).some((segment) => INVALID_SEGMENTS.has(segment.toLowerCase()))
+  ) {
+    return { entry: undefined, match: undefined };
+  }
+  return { entry: exported[best.key], match: best.match };
+}
+
 /** The entry targets a workspace package exports for a subpath (`.` or `./name`). */
 function exportTargets(manifest: Workspace['manifest'], subpath: string): readonly string[] {
   const exported = manifest.exports;
@@ -71,26 +115,29 @@ function exportTargets(manifest: Workspace['manifest'], subpath: string): readon
     typeof exported === 'object' &&
     !Array.isArray(exported) &&
     !Object.keys(exported).some((key) => key.startsWith('.'));
-  const entry: unknown =
+  const { entry, match } =
     typeof exported === 'string' || conditional
-      ? subpath === '.'
-        ? exported
-        : undefined
-      : (exported as Record<string, unknown>)[subpath];
-  if (typeof entry === 'string') return [entry];
-  if (entry === null || typeof entry !== 'object') return [];
-  const conditions = entry as Record<string, unknown>;
-  return ENTRY_CONDITIONS.flatMap((condition) => {
-    const target = conditions[condition];
-    return typeof target === 'string' ? [target] : [];
-  });
+      ? { entry: subpath === '.' ? exported : undefined, match: undefined }
+      : subpathEntry(exported as Record<string, unknown>, subpath);
+  let targets: readonly string[];
+  if (typeof entry === 'string') targets = [entry];
+  else if (entry === null || typeof entry !== 'object') targets = [];
+  else {
+    const conditions = entry as Record<string, unknown>;
+    targets = ENTRY_CONDITIONS.flatMap((condition) => {
+      const target = conditions[condition];
+      return typeof target === 'string' ? [target] : [];
+    });
+  }
+  return match === undefined ? targets : targets.map((target) => target.replaceAll('*', match));
 }
 
 /**
  * The repository files one specifier of `from` resolves to: a relative specifier against the
  * importing file, a workspace specifier through the exports of the `packages/*` manifest that
- * names it, where an emitted `dist/` target stands for its `src/` source. Any other bare
- * specifier, and a relative one leaving the repository, resolves to nothing.
+ * names it (a wildcard key such as `./dist/*` included), where an emitted `dist/` target stands
+ * for its `src/` source. Any other bare specifier, and a relative one leaving the repository,
+ * resolves to nothing.
  */
 export function resolveImport(
   specifier: string,
