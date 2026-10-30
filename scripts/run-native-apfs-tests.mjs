@@ -8,9 +8,27 @@ import { spawnSync } from 'node:child_process';
 const root = resolve(import.meta.dirname, '..');
 const temporary = realpathSync(tmpdir());
 const filesystem = statfsSync(temporary, { bigint: true }).type;
+// /bin/df filters the actual f_fstypename; Darwin's numeric type is dynamic.
+const apfs =
+  process.platform === 'darwin'
+    ? spawnSync('/bin/df', ['-T', 'apfs', temporary], {
+        env: { PATH: '/usr/bin:/bin', LC_ALL: 'C' },
+        timeout: 1000,
+        maxBuffer: 8192,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+        shell: false,
+      })
+    : null;
 if (
   process.platform !== 'darwin' ||
-  filesystem !== 26n ||
+  !apfs ||
+  apfs.error ||
+  apfs.signal !== null ||
+  apfs.status !== 0 ||
+  typeof apfs.stdout !== 'string' ||
+  !apfs.stdout.trim() ||
+  apfs.stderr !== '' ||
   !['24.20.0', '24.22.0'].includes(process.versions.node) ||
   process.versions.uv !== '1.52.1'
 ) {
