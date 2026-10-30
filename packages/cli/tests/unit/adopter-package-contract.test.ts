@@ -14,6 +14,10 @@ import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { parseConstitutionVersion } from '@devai-nyx/skills';
+import {
+  CURRENT_DOCUMENTATION_CONSTITUTION_SHA256,
+  projectReconciliationConstitution,
+} from '../helpers/constitution-history.js';
 import { canonicalSha256 } from '@devai-nyx/utils';
 import { withAuthorityHostTestScope } from '../../../skills/tests/unit/authority-host-test-scope.js';
 import { buildBootstrapPlan, executeBootstrapPlan } from '../../../skills/src/bootstrap/index.js';
@@ -1247,7 +1251,7 @@ describe('packed adopter path authority', () => {
     );
   });
 
-  it('runs the installed bin at the packed version with the constitution pinned at 1.2.0', () => {
+  it('runs the current installed candidate bin with the exact 1.2.1 constitution', () => {
     const version = installedBin(['--version']);
     const packedVersion = (
       JSON.parse(readFileSync(join(installed, 'package.json'), 'utf8')) as { version: string }
@@ -1255,7 +1259,12 @@ describe('packed adopter path authority', () => {
     expect(version.stdout.trim().startsWith(`devai/${packedVersion} `)).toBe(true);
     expect(
       parseConstitutionVersion(readFileSync(join(adopter, '.devai/pin/constitution.md'), 'utf8')),
-    ).toBe('1.2.0');
+    ).toBe('1.2.1');
+    const current = readFileSync(join(adopter, '.devai/pin/constitution.md'), 'utf8');
+    expect(createHash('sha256').update(current).digest('hex')).toBe(
+      CURRENT_DOCUMENTATION_CONSTITUTION_SHA256,
+    );
+    projectReconciliationConstitution(current);
     expect(readFileSync(join(adopter, '.devai/pin/constitution.md'))).toEqual(
       readFileSync(join(ROOT, 'law/constitution.md')),
     );

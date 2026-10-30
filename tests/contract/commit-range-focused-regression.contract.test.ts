@@ -4,8 +4,9 @@
 // import, a file under `packages/` the same commit changes. Inspector commits on those paths are
 // judged exactly as before. The verb exists from constitution 1.1.0 (ADR-GOV-0026), so a
 // repository whose constitution is older admits only the Inspector there.
+import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -103,7 +104,16 @@ function repository(version = '1.1.0') {
   git(['init', '--quiet', '--initial-branch=main']);
   for (const path of POLICY) {
     mkdirSync(join(cwd, path, '..'), { recursive: true });
-    execFileSync('cp', [join(ROOT, path), join(cwd, path)]);
+    if (path === '.devai/config/adopter-policy-binding.json') {
+      // This generic provenance matrix predates the explicit documentation opt-in.
+      const bytes = readFileSync(
+        join(ROOT, 'tests/fixtures/adopter-binding-pre-selfbinding-35ba43e4.json.fixture'),
+      );
+      expect(createHash('sha256').update(bytes).digest('hex')).toBe(
+        '0d71f515870f56b65f622df0a65baf938e06bb335c930d65f73be146e5629639',
+      );
+      writeFileSync(join(cwd, path), bytes);
+    } else execFileSync('cp', [join(ROOT, path), join(cwd, path)]);
   }
   for (const [path, content] of Object.entries(SEED)) put(path, content);
   put('law/constitution.md', constitution(version));

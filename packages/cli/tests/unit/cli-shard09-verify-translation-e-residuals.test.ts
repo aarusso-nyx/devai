@@ -99,7 +99,7 @@ async function validate(): Promise<Record<string, unknown>> {
 }
 
 beforeAll(() => {
-  fixture = createSelfContainedRepositoryFixture(ROOT);
+  fixture = createSelfContainedRepositoryFixture(ROOT, { bindCurrentDocumentation: true });
   repository = fixture.root;
   writeJson(`law/invariants/${INVARIANT_ID}.json`, {
     schemaVersion: '1.0.0',

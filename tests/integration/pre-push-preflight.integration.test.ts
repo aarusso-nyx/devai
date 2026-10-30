@@ -29,6 +29,7 @@ const COPIED = [
   'scripts/pre-push-preflight.mjs',
   'scripts/process/validation-runner.mjs',
   'scripts/check-commit-range.mjs',
+  'scripts/commit-documentation-authority.mjs',
   'scripts/process/summarize-check-report.mjs',
   'law/policy/commit-grammar.json',
   'law/policy/change-taxonomy.json',

@@ -253,6 +253,19 @@ interface Fixture {
   readonly task: PlannedTask;
 }
 
+// Authentic pre-selfbinding framework policy for these generic historical provider fixtures.
+// Current documentation opt-in proofs are exercised by their dedicated native fixtures.
+function historicalFrameworkAdoptionPolicy(): Buffer {
+  const bytes = readFileSync(
+    resolve(
+      import.meta.dirname,
+      '../fixtures/framework-adoption-pre-selfbinding-35ba43e4.json.fixture',
+    ),
+  );
+  assert.equal(sha256(bytes), 'bea07d2450757501b04c652c9393f3595cc944eae880ea4286efce1b6594dab0');
+  return bytes;
+}
+
 function resolutionFor(
   installed: Fixture['installed'],
   policyPath: string,
@@ -428,7 +441,7 @@ function fixture(
     resolutionFor(
       installed,
       'law/policy/devai-adoption.json',
-      readFileSync(join(ROOT, 'law/policy/devai-adoption.json')),
+      historicalFrameworkAdoptionPolicy(),
       PACKAGE,
       'aarusso-nyx/devai',
     );

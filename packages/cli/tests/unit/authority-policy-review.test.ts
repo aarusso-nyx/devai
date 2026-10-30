@@ -338,11 +338,18 @@ async function productionFixture(
       'dist/runtime/index/broker.js',
       '// SYNTHETIC fixture identity, never a live package\n',
     );
-    put(
-      packageRoot,
-      'dist/law/constitution.md',
-      readFileSync(join(sourceRoot, 'law/constitution.md'), 'utf8'),
+    // Genuine 90632fe72cf0f46e0528ef3c04e925b92e6e7388 law bytes: keep this historical
+    // synthetic 2.7.1 / 1.2.0 transition independent of the current canonical constitution.
+    const historicalCanonical = readFileSync(
+      join(
+        sourceRoot,
+        'packages/cli/tests/fixtures/documentation-authority-current-main-baseline/canonical/law/constitution.md.txt',
+      ),
     );
+    expect(hash(historicalCanonical)).toBe(
+      'd5dfdc972161e0f848dd859be7bbfa510973c5c9a449a0f9e6b8960e4f5ac96a',
+    );
+    put(packageRoot, 'dist/law/constitution.md', historicalCanonical.toString('utf8'));
     put(
       root,
       '.devai/pin/constitution.md',
@@ -369,16 +376,27 @@ async function productionFixture(
       readFileSync(join(sourceRoot, '.devai/constitution.md'), 'utf8'),
     );
     put(root, 'README.md', '# isolated P1 fixture\n');
+    function frozenPreSelfbinding(path: string, digest: string): string {
+      const bytes = readFileSync(join(sourceRoot, path));
+      expect(hash(bytes)).toBe(digest);
+      return bytes.toString('utf8');
+    }
     if (withReceipt) {
       put(
         root,
         '.devai/config/adopter-policy-binding.json',
-        readFileSync(join(sourceRoot, '.devai/config/adopter-policy-binding.json'), 'utf8'),
+        frozenPreSelfbinding(
+          'tests/fixtures/adopter-binding-pre-selfbinding-35ba43e4.json.fixture',
+          '0d71f515870f56b65f622df0a65baf938e06bb335c930d65f73be146e5629639',
+        ),
       );
       put(
         root,
         'law/policy/devai-adoption.json',
-        readFileSync(join(sourceRoot, 'law/policy/devai-adoption.json'), 'utf8'),
+        frozenPreSelfbinding(
+          'packages/cli/tests/fixtures/framework-adoption-pre-selfbinding-35ba43e4.json.fixture',
+          'bea07d2450757501b04c652c9393f3595cc944eae880ea4286efce1b6594dab0',
+        ),
       );
     }
     git(['init', '-q']);

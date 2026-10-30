@@ -165,7 +165,7 @@ async function runAction(options: Options): Promise<{
 }
 
 beforeAll(() => {
-  fixture = createSelfContainedRepositoryFixture(ROOT);
+  fixture = createSelfContainedRepositoryFixture(ROOT, { bindCurrentDocumentation: true });
   repository = fixture.root;
   writeJson(`law/invariants/${INVARIANT_ID}.json`, {
     schemaVersion: '1.0.0',

@@ -1,3 +1,7 @@
+import {
+  assertDocumentationContextRepository,
+  documentationImplementationOwnsPath,
+} from '../../../authority/src/runtime/documentation-context.js';
 // Invariants: INV-DEVAI-001, INV-DEVAI-015, INV-DEVAI-017, INV-DEVAI-020
 import { spawnSync as nodeSpawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -64,6 +68,15 @@ vi.mock('#runtime-core', async (importOriginal) => {
       return { ok: controls.dropOk };
     },
     evaluateTranslationFrames(input: Record<string, unknown>) {
+      const context = input['documentation_authority'] as Parameters<
+        typeof assertDocumentationContextRepository
+      >[0];
+      expect(context).toBeDefined();
+      assertDocumentationContextRepository(context, fixture.root);
+      expect(documentationImplementationOwnsPath(context, 'docs/site/src/pages/index.tsx')).toBe(
+        true,
+      );
+      expect(documentationImplementationOwnsPath(context, 'docs/site/sidebars.ts')).toBe(false);
       controls.evaluations.push(structuredClone(input));
       const strategy = (input['witness'] as { strategy: string }).strategy;
       return {
@@ -270,7 +283,7 @@ function onlyPreliminaryEvaluation(): Record<string, unknown> {
 }
 
 beforeAll(() => {
-  fixture = createSelfContainedRepositoryFixture(ROOT);
+  fixture = createSelfContainedRepositoryFixture(ROOT, { bindCurrentDocumentation: true });
   repository = fixture.root;
   writeJson(
     `law/invariants/${REGRESSION_INVARIANT}.json`,
@@ -606,6 +619,7 @@ describe('translation validation E state and frame boundaries', () => {
     );
 
     expect(evaluation).toEqual({
+      documentation_authority: {},
       witness: {
         strategy: 'structural',
         touched: [SOURCE_PATH],

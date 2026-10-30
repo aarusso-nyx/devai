@@ -1,0 +1,121 @@
+{
+  "purpose": "Current-main plus previously approved docs canonical composition; NOT a historical original90632fe build. No Engineer candidate bytes used.",
+  "base": "90632fe72cf0f46e0528ef3c04e925b92e6e7388",
+  "fixtures": [
+    {
+      "fixture": "packages/cli/tests/fixtures/documentation-authority-current-main-baseline/canonical/law/policy/adopter-defaults/path-authority-classes.json",
+      "source": "packages/cli/tests/fixtures/documentation-authority-baseline/canonical/law/policy/adopter-defaults/path-authority-classes.json",
+      "sha256": "7303f47cd1aec97a48e9bdfeb123843797692811ba5a0be95894a04af42af7c1",
+      "originalFrozenSha256": "7303f47cd1aec97a48e9bdfeb123843797692811ba5a0be95894a04af42af7c1",
+      "sourceKind": "exact-old-approved-frozen-source",
+      "changedFromOld": false
+    },
+    {
+      "fixture": "packages/cli/tests/fixtures/documentation-authority-current-main-baseline/canonical/packages/cli/src/authority/documentation-binding.ts",
+      "source": "packages/cli/tests/fixtures/documentation-authority-baseline/canonical/packages/cli/src/authority/documentation-binding.ts",
+      "sha256": "46b36df6b09869ee646fd4a52fcfcdcf3c7c73dc746b138f31075fd8c56f0bb0",
+      "originalFrozenSha256": "46b36df6b09869ee646fd4a52fcfcdcf3c7c73dc746b138f31075fd8c56f0bb0",
+      "sourceKind": "exact-old-approved-frozen-source",
+      "changedFromOld": false
+    },
+    {
+      "fixture": "packages/cli/tests/fixtures/documentation-authority-current-main-baseline/canonical/packages/cli/src/authority/policy-additive-rules.ts",
+      "source": "packages/cli/tests/fixtures/documentation-authority-baseline/canonical/packages/cli/src/authority/policy-additive-rules.ts",
+      "sha256": "7f0c37cffd48fea39436af1d7234394a03d90bcbcf218cff014f26a428581286",
+      "originalFrozenSha256": "7f0c37cffd48fea39436af1d7234394a03d90bcbcf218cff014f26a428581286",
+      "sourceKind": "exact-old-approved-frozen-source",
+      "changedFromOld": false
+    },
+    {
+      "fixture": "packages/cli/tests/fixtures/documentation-authority-current-main-baseline/canonical/packages/cli/src/authority/policy-adopter-extension.ts",
+      "source": "packages/cli/tests/fixtures/documentation-authority-baseline/canonical/packages/cli/src/authority/policy-adopter-extension.ts",
+      "sha256": "531e85a5f7e55d9094c58d00d8bb1eff50c0daf055b6a6129a678198f23e9c82",
+      "originalFrozenSha256": "531e85a5f7e55d9094c58d00d8bb1eff50c0daf055b6a6129a678198f23e9c82",
+      "sourceKind": "exact-old-approved-frozen-source",
+      "changedFromOld": false
+    },
+    {
+      "fixture": "packages/cli/tests/fixtures/documentation-authority-current-main-baseline/canonical/packages/cli/src/authority/policy-core-rules.ts",
+      "source": "90632fe72cf0f46e0528ef3c04e925b92e6e7388:packages/cli/src/authority/policy-core-rules.ts",
+      "sha256": "e32e10c91a5ef3ea1070212dc47c48ac47a7cbea32a6dd4ed3fae6ea5b4af957",
+      "originalFrozenSha256": "792533e69a9a6eff519811e25ab2d38d169d8ea87d018e990f488a1e44322d33",
+      "sourceKind": "genuine-current-main-git-blob",
+      "changedFromOld": true
+    },
+    {
+      "fixture": "packages/cli/tests/fixtures/documentation-authority-current-main-baseline/canonical/packages/cli/src/authority/policy-documentation-implementation.ts",
+      "source": "packages/cli/tests/fixtures/documentation-authority-baseline/canonical/packages/cli/src/authority/policy-documentation-implementation.ts",
+      "sha256": "7560dd72c004ce14342a3492169abab063603a8dff61c65fa69d759a2c4ba99f",
+      "originalFrozenSha256": "7560dd72c004ce14342a3492169abab063603a8dff61c65fa69d759a2c4ba99f",
+      "sourceKind": "exact-old-approved-frozen-source",
+      "changedFromOld": false
+    },
+    {
+      "fixture": "packages/cli/tests/fixtures/documentation-authority-current-main-baseline/canonical/packages/cli/src/authority/policy-support.ts",
+      "source": "packages/cli/tests/fixtures/documentation-authority-baseline/canonical/packages/cli/src/authority/policy-support.ts",
+      "sha256": "f4914ef10a230ac5aeae0d662919af6a57052476a66d9eb096460049cd9c7ebb",
+      "originalFrozenSha256": "f4914ef10a230ac5aeae0d662919af6a57052476a66d9eb096460049cd9c7ebb",
+      "sourceKind": "exact-old-approved-frozen-source",
+      "changedFromOld": false
+    },
+    {
+      "fixture": "packages/cli/tests/fixtures/documentation-authority-current-main-baseline/canonical/packages/cli/src/authority/policy.ts",
+      "source": "packages/cli/tests/fixtures/documentation-authority-baseline/canonical/packages/cli/src/authority/policy.ts",
+      "sha256": "cd6069e896346bfb7d3a24e2a50b2b0ccd209d5623d66b36667cad52a8d76988",
+      "originalFrozenSha256": "cd6069e896346bfb7d3a24e2a50b2b0ccd209d5623d66b36667cad52a8d76988",
+      "sourceKind": "exact-old-approved-frozen-source",
+      "changedFromOld": false
+    },
+    {
+      "fixture": "packages/cli/tests/fixtures/documentation-authority-current-main-baseline/canonical/packages/cli/src/command-manifest.ts",
+      "source": "90632fe72cf0f46e0528ef3c04e925b92e6e7388:packages/cli/src/command-manifest.ts",
+      "sha256": "b20ff15bb072896dc51444ae06168ffcf0b00df7121d050b0fd3ae5afed67952",
+      "originalFrozenSha256": "5e112ae6785431ae33799bba66b12c7c00959014448d8501de551c734bddfc73",
+      "sourceKind": "genuine-current-main-git-blob",
+      "changedFromOld": true
+    },
+    {
+      "fixture": "packages/cli/tests/fixtures/documentation-authority-current-main-baseline/canonical/packages/cli/src/define-command.ts",
+      "source": "90632fe72cf0f46e0528ef3c04e925b92e6e7388:packages/cli/src/define-command.ts",
+      "sha256": "01ec7445af67ce2624b0a0ca457c84974bba0d7b064772774e10f74f6c4071ba",
+      "originalFrozenSha256": "01ec7445af67ce2624b0a0ca457c84974bba0d7b064772774e10f74f6c4071ba",
+      "sourceKind": "genuine-current-main-git-blob",
+      "changedFromOld": false
+    },
+    {
+      "fixture": "packages/cli/tests/fixtures/documentation-authority-current-main-baseline/canonical/packages/cli/src/generated/action-registry.ts",
+      "source": "90632fe72cf0f46e0528ef3c04e925b92e6e7388:packages/cli/src/generated/action-registry.ts",
+      "sha256": "1e93e6eb5b707a30d53c220fe26436547d25f397e36cde23fa0fa8ca2661131b",
+      "originalFrozenSha256": "e0b037c48a817d471453a99894e230a2c4e43a1c913b0d8d6b7b4dc6b85523de",
+      "sourceKind": "genuine-current-main-git-blob",
+      "changedFromOld": true
+    },
+    {
+      "fixture": "packages/cli/tests/fixtures/documentation-authority-current-main-baseline/canonical/packages/cli/src/services/adopter-policy-binding.ts",
+      "source": "packages/cli/tests/fixtures/documentation-authority-baseline/canonical/packages/cli/src/services/adopter-policy-binding.ts",
+      "sha256": "1b4ae8d7487450f1c1e689495d15980355fcf777372ac08055edc449ef1f72a4",
+      "originalFrozenSha256": "1b4ae8d7487450f1c1e689495d15980355fcf777372ac08055edc449ef1f72a4",
+      "sourceKind": "exact-old-approved-frozen-source",
+      "changedFromOld": false
+    },
+    {
+      "fixture": "packages/cli/tests/fixtures/documentation-authority-current-main-baseline/canonical/packages/cli/src/services/adopter-policy-ownership.ts",
+      "source": "packages/cli/tests/fixtures/documentation-authority-baseline/canonical/packages/cli/src/services/adopter-policy-ownership.ts",
+      "sha256": "f58c119b64891d6810b23a4b7e9a41c1580a902ccec824d722820926e9059b08",
+      "originalFrozenSha256": "f58c119b64891d6810b23a4b7e9a41c1580a902ccec824d722820926e9059b08",
+      "sourceKind": "exact-old-approved-frozen-source",
+      "changedFromOld": false
+    },
+    {
+      "fixture": "packages/cli/tests/fixtures/documentation-authority-current-main-baseline/canonical/packages/cli/src/services/adopter-policy.ts",
+      "source": "packages/cli/tests/fixtures/documentation-authority-baseline/canonical/packages/cli/src/services/adopter-policy.ts",
+      "sha256": "f71bf7977cf5cebfd772fe8fbb78d702fdbe6e7db25cb284590d442bb0316b48",
+      "originalFrozenSha256": "f71bf7977cf5cebfd772fe8fbb78d702fdbe6e7db25cb284590d442bb0316b48",
+      "sourceKind": "exact-old-approved-frozen-source",
+      "changedFromOld": false
+    }
+  ],
+  "dependencyNote": "Current-main RegistryEntry capability vocabulary requires genuine current define-command/command-manifest/generated registry closure. Actual caller registry is passed unchanged to both independent builders. Any output drift beyond exact five core rows must fail.",
+  "old19Immutable": true,
+  "gateOrigin": "Both frozen compiler functions import real current authority supported-constitution gate. This fixture independently preserves source reconstruction, not historical package support semantics."
+}

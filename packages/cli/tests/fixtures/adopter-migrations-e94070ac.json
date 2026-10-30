@@ -1,0 +1,510 @@
+{
+  "$schema": "../schemas/adopter-migrations.schema.json",
+  "schemaVersion": "1.0.0",
+  "id": "adopter-migrations",
+  "authority": "Architect",
+  "baseline": "1.6.0",
+  "segments": [
+    "constitution",
+    "operational-law",
+    "subprocess-effects",
+    "adopter-policy",
+    "authority",
+    "host-adapters",
+    "harness-ci"
+  ],
+  "releases": [
+    {
+      "version": "1.7.0",
+      "status": "released",
+      "date": "2026-09-30",
+      "changes": [
+        {
+          "id": "MIG-1.7.0-owned-key-retirement",
+          "kind": "owned-key-retirement",
+          "summary": "init bind --adopter-policy projects the owned project.json keys from the ownership matrix: a declared key replaces the current value as a whole, and an owned key the source does not declare is retired. A key the earlier deep merge preserved but the source never declared, such as ci_economy.attested_rc, is deleted on the first rebind.",
+          "decision_records": ["ADR-CFG-0002"],
+          "issues": [68],
+          "segments": ["adopter-policy"],
+          "files": [".devai/config/project.json", ".devai/config/adopter-policy-binding.json"],
+          "decision_required": true,
+          "retired_pointers": [
+            "/repo",
+            "/docs",
+            "/docs/ia",
+            "/ci_economy",
+            "/ci_economy/local_evidence",
+            "/ci_economy/attested_rc"
+          ]
+        },
+        {
+          "id": "MIG-1.7.0-scorecard-na-f4-t5",
+          "kind": "changed-default",
+          "summary": "The package scorecard N/A default gains F4:T5, Inventory x Idiomaticity, with its Article 5 reason. An adopter source that declares scorecard_na replaces the default as a whole, so F4:T5 stays scoreable unless the source lists it.",
+          "decision_records": ["ADR-SCR-0002"],
+          "segments": ["operational-law", "adopter-policy"],
+          "files": [".devai/config/scorecard-na.json"],
+          "default": {
+            "policy": "scorecard-na.json",
+            "source_key": "scorecard_na",
+            "added": ["F4:T5"]
+          }
+        },
+        {
+          "id": "MIG-1.7.0-forbidden-actions-maintenance-exemption",
+          "kind": "rebind",
+          "summary": "The canonical forbidden-actions policy exempts validated append-only maintenance of law/policy/forbidden-action-authorizations.json from FORBID-MUTATE-INVARIANTS, so a receipt commit is no longer a finding once operational law is rebound.",
+          "decision_records": ["ADR-GOV-0022"],
+          "issues": [67],
+          "segments": ["operational-law"],
+          "files": [".devai/config/forbidden-actions.json"]
+        },
+        {
+          "id": "MIG-1.7.0-subprocess-effects-read-templates",
+          "kind": "rebind",
+          "summary": "The subprocess effects registry declares the gh run list and governed vitest read templates the harness sensors run; rebinding subprocess effects materializes them byte for byte.",
+          "decision_records": ["ADR-SCR-0005"],
+          "segments": ["subprocess-effects"],
+          "files": [".devai/config/subprocess-effects.json"]
+        },
+        {
+          "id": "MIG-1.7.0-repository-kind-from-receipt",
+          "kind": "new-obligation",
+          "summary": "Check members classify the repository from the bound adopter-policy receipt. A repository without .devai/config/adopter-policy-binding.json is unclassified and fails closed with CHECK_REPOSITORY_KIND_INVALID.",
+          "decision_records": ["ADR-CHK-0005"],
+          "issues": [187],
+          "segments": ["adopter-policy"],
+          "files": [".devai/config/adopter-policy-binding.json"],
+          "obligation": {
+            "check": "adopter-policy-receipt",
+            "requirement": "Bind an adopter policy source under law/policy with init bind --adopter-policy so the receipt names a policy_id in the adopter's own namespace."
+          }
+        }
+      ]
+    },
+    {
+      "version": "1.8.0",
+      "status": "released",
+      "date": "2026-09-30",
+      "changes": [
+        {
+          "id": "MIG-1.8.0-constitution-1-0-2",
+          "kind": "constitution",
+          "summary": "Constitution 1.0.2 amends Article 6 so an adopter may declare client extensions by root and path class; the core path rows are unchanged. Binding it replaces the vendored copy and the project.json pin.",
+          "decision_records": ["ADR-GOV-0024"],
+          "issues": [186],
+          "segments": ["constitution", "authority"],
+          "files": [".devai/pin/constitution.md", ".devai/config/project.json"],
+          "decision_required": true,
+          "constitution": {
+            "from": "1.0.1",
+            "to": "1.0.2"
+          },
+          "obligation": {
+            "check": "constitution-version",
+            "requirement": "Bind the installed constitution with init upgrade --constitution (or init bind --constitution) after the Architect has reviewed the amendment."
+          }
+        },
+        {
+          "id": "MIG-1.8.0-adopter-authority-block",
+          "kind": "opt-in-capability",
+          "summary": "The adopter policy may declare an optional closed authority block naming roots, test selectors and architecture selectors; init bind compiles it into an additive authority extension recorded as authority_extension in the binding receipt. It requires constitution 1.0.2 bound first and changes nothing for a source without the block.",
+          "decision_records": ["ADR-AUT-0003", "ADR-AUT-0004"],
+          "issues": [186],
+          "segments": ["adopter-policy", "authority"],
+          "files": [
+            ".devai/config/adopter-policy-binding.json",
+            ".devai/config/authority-policy.json"
+          ]
+        }
+      ]
+    },
+    {
+      "version": "1.9.0",
+      "status": "released",
+      "date": "2026-10-03",
+      "changes": [
+        {
+          "id": "MIG-1.9.0-thresholds-soft-gate",
+          "kind": "new-obligation",
+          "summary": "The thresholds schema requires the soft_gate block, the scored soft gate constants. Rebinding operational law and the adopter policy materializes the package constants; a source that overrides thresholds.soft_gate must keep them.",
+          "decision_records": ["ADR-MDL-0004"],
+          "segments": ["operational-law", "adopter-policy"],
+          "files": [".devai/config/thresholds.json"],
+          "obligation": {
+            "check": "thresholds-soft-gate",
+            "requirement": "The materialized .devai/config/thresholds.json carries the soft_gate block and validates against law/schemas/thresholds.schema.json."
+          }
+        },
+        {
+          "id": "MIG-1.9.0-proof-anchor-baseline",
+          "kind": "new-obligation",
+          "summary": "evidence verify --scope chain cross-checks every proof line against the chain. The first verification writes the append-only record/proofs/anchor-baseline.json, and legacy proof lines without an anchor need an Architect-authorized historical-gap declaration; they are never re-anchored.",
+          "decision_records": ["ADR-EVI-0002", "ADR-EVI-0005"],
+          "issues": [168, 239],
+          "segments": [],
+          "files": ["record/proofs/anchor-baseline.json"],
+          "decision_required": true,
+          "obligation": {
+            "check": "proof-anchor-baseline",
+            "requirement": "Run evidence verify --scope chain; when it lists unanchored legacy lines, the Architect records one historical-gap declaration naming each line before the next verification."
+          }
+        },
+        {
+          "id": "MIG-1.9.0-subprocess-effects-sensing-templates",
+          "kind": "rebind",
+          "summary": "The subprocess effects registry declares the build template with its argv precedence, the two Pages gh api GET shapes, and the --workflow and --event gh run list forms; rebinding subprocess effects materializes them byte for byte.",
+          "decision_records": ["ADR-AUT-0002", "ADR-SCR-0010"],
+          "segments": ["subprocess-effects"],
+          "files": [".devai/config/subprocess-effects.json"]
+        }
+      ]
+    },
+    {
+      "version": "2.0.0",
+      "status": "released",
+      "date": "2026-10-05",
+      "changes": [
+        {
+          "id": "MIG-2.0.0-experimental-agent-execution",
+          "kind": "opt-in-capability",
+          "summary": "Opt-in experimental agent execution: round dispatch runs agent tasks through host CLI providers only under an unexpired Owner activation record written by the Owner-only round dispatch activate into .devai/state/experimental/activation.json and an explicit --experimental consent. An adopter that writes no activation record sees no change. The Owner-only round dispatch dispose and round dispatch deactivate record the disposition of uncertain work and the withdrawal of an activation (ADR-MDL-0007).",
+          "decision_records": ["ADR-MDL-0005", "ADR-MDL-0006", "ADR-MDL-0007"],
+          "segments": ["authority"],
+          "files": [".devai/config/authority-policy.json"]
+        },
+        {
+          "id": "MIG-2.0.0-campaign-actions",
+          "kind": "new-action",
+          "summary": "Campaign rounds reach the runtime through campaign status, campaign materialize and round ratify; the authority policy is rematerialized from the installed action registry so the new actions are governed.",
+          "decision_records": ["ADR-GOV-0025"],
+          "segments": ["authority"],
+          "files": [".devai/config/authority-policy.json"]
+        },
+        {
+          "id": "MIG-2.0.0-init-upgrade",
+          "kind": "new-action",
+          "summary": "init upgrade plans the move from the bound devai_version to the installed version from this manifest, refuses an undeclared owned-key retirement before any write, and with --write runs the bind segments in canonical order, checks the result with doctor, and records an upgrade receipt.",
+          "decision_records": [],
+          "issues": [264],
+          "segments": ["authority"],
+          "files": [".devai/config/authority-policy.json", ".devai/config/upgrade-receipt.json"]
+        },
+        {
+          "id": "MIG-2.0.0-subprocess-effects-common-dir",
+          "kind": "rebind",
+          "summary": "The subprocess effects registry declares the git rev-parse --git-common-dir read the trusted authority sources run to derive the repository id; rebinding subprocess effects materializes it byte for byte.",
+          "decision_records": [],
+          "issues": [264],
+          "segments": ["subprocess-effects"],
+          "files": [".devai/config/subprocess-effects.json"]
+        },
+        {
+          "id": "MIG-2.0.0-trusted-verifier-pin",
+          "kind": "rebind",
+          "summary": "The trusted local-RC verifier pin moves from @aarusso-nyx/devai@1.5.4 to @aarusso-nyx/devai@1.9.0. A repository that declares ci_economy.attested_rc regenerates the byte-compared verifier workflow from the installed package.",
+          "decision_records": ["ADR-REL-0031", "ADR-CHK-0006"],
+          "issues": [243],
+          "segments": ["harness-ci"],
+          "files": [".github/workflows/devai-local-rc-verify.yml"]
+        }
+      ]
+    },
+    {
+      "version": "2.1.0",
+      "status": "released",
+      "date": "2026-10-07",
+      "changes": [
+        {
+          "id": "MIG-2.1.0-post-merge-local-state",
+          "kind": "rebind",
+          "summary": "The post-merge host adapter keeps its checkout-bound attestation (absolute repository path, hook path, and the HMAC over the checkout key) in the checkout's git directory beside the key, and the tracked .devai/config/post-merge-host-adapter.json becomes a path-free declaration that the adapter is required. init upgrade converts a committed checkout-bound attestation: the checkout that holds its key moves the attestation into its git directory, keeping its installed_at_head while it still verifies, and every other checkout only rewrites the tracked declaration. Commit the declaration; other clones, CI included, report the adapter as not bound in that checkout until it is bound there.",
+          "decision_records": [],
+          "issues": [266, 291],
+          "segments": ["host-adapters"],
+          "files": [".devai/config/post-merge-host-adapter.json"]
+        }
+      ]
+    },
+    {
+      "version": "2.3.0",
+      "status": "released",
+      "date": "2026-10-08",
+      "changes": [
+        {
+          "id": "MIG-2.3.0-subprocess-effects-pr-list",
+          "kind": "rebind",
+          "summary": "The subprocess effects registry declares the read-only gh-pr-list-all template, gh pr list --state all --limit 1000 --json closedAt,headRefName,headRefOid,mergedAt,number,state with every token literal, which harness_green_main reads under outcomeUnit pull-request-final-head. Rebinding subprocess effects materializes it byte for byte.",
+          "decision_records": ["ADR-SCR-0014", "ADR-SCR-0005"],
+          "segments": ["subprocess-effects"],
+          "files": [".devai/config/subprocess-effects.json"]
+        },
+        {
+          "id": "MIG-2.3.0-parallel-check-scheduling",
+          "kind": "opt-in-capability",
+          "summary": "check --run may execute independent plan nodes in parallel. A node runs beside another only when the committed test-task-exclusivity.json, validated by test-task-exclusivity.schema.json, declares both and their exclusive and shared keys do not conflict, so a repository without the file keeps running one node at a time whatever --task-workers or DEVAI_CHECK_TASK_WORKERS says. An adopter that adds the file binds it to the ci class in its own .devai/config/change-taxonomy-binding.json, as the package default now does, or the unclassified-path probe refuses it. test-tasks.json is unchanged and its schema is now closed, so an unknown task property is refused.",
+          "decision_records": ["ADR-CHK-0007", "ADR-CHK-0006"],
+          "segments": ["harness-ci"],
+          "files": ["test-task-exclusivity.json", ".devai/config/change-taxonomy-binding.json"]
+        },
+        {
+          "id": "MIG-2.3.0-green-main-final-head",
+          "kind": "opt-in-capability",
+          "summary": "The harness_green_main declaration in .devai/config/sensor-inputs.json accepts outcomeUnit. The default run keeps one outcome per sampled run; pull-request-final-head counts each merged, closed, or open pull request once, on the latest completed, non-cancelled run of its final head, and needs the gh-pr-list-all template rebound. A declaration without the key reads as before.",
+          "decision_records": ["ADR-SCR-0014"],
+          "segments": ["harness-ci"],
+          "files": [".devai/config/sensor-inputs.json"]
+        }
+      ]
+    },
+    {
+      "version": "2.3.1",
+      "status": "released",
+      "date": "2026-10-09",
+      "changes": [
+        {
+          "id": "MIG-2.3.1-observation-workflow-pins",
+          "kind": "rebind",
+          "summary": "The GitHub Actions host adapter regenerates devai-main-observation.yml with the actions/checkout, actions/setup-node, and actions/upload-artifact pins of the default toolchain manifest, the same pins the attested-RC verifier workflow uses, and with a concurrency group keyed by the commit that never cancels a run in progress. Rebinding the adapter rewrites the workflow and its receipt; the verifier workflow bytes are unchanged. harness_coherence then sees one pin per action across the two generated workflows.",
+          "decision_records": [],
+          "issues": [383],
+          "segments": ["host-adapters"],
+          "files": [
+            ".github/workflows/devai-main-observation.yml",
+            ".devai/config/github-actions-host-adapter.json"
+          ]
+        },
+        {
+          "id": "MIG-2.3.1-subprocess-effects-pnpm-shapes",
+          "kind": "rebind",
+          "summary": "The subprocess effects registry declares pnpm-recursive-typecheck (pnpm -r typecheck) and pnpm-test-perf (pnpm test:perf), local-write shapes the type_check and perf_test sensors may run under sense run, and the npx-tsc-noemit, npx-tsc-noemit-project, and npx-eslint-json mirrors of shapes the broker already admitted. Rebinding subprocess effects materializes them byte for byte; a pnpm workspace may then declare type_check.argv as pnpm -r typecheck.",
+          "decision_records": ["ADR-AUT-0006", "ADR-AUT-0002"],
+          "issues": [381],
+          "segments": ["subprocess-effects"],
+          "files": [".devai/config/subprocess-effects.json"]
+        }
+      ]
+    },
+    {
+      "version": "2.3.2",
+      "status": "released",
+      "date": "2026-10-10",
+      "changes": [
+        {
+          "id": "MIG-2.3.2-observation-install-ignore-scripts",
+          "kind": "rebind",
+          "summary": "The GitHub Actions host adapter regenerates devai-main-observation.yml so its dependency install runs pnpm install --frozen-lockfile --ignore-scripts: the adopter's lifecycle scripts no longer run in the observation job, and harness_coherence proves the generated steps through the reviewed-step registry by step digest. Rebinding the adapter (init upgrade) rewrites the workflow and its receipt. A dependency that needs its install scripts to build must not be required by DEVAI's observation.",
+          "decision_records": [],
+          "issues": [390],
+          "segments": ["host-adapters"],
+          "files": [
+            ".github/workflows/devai-main-observation.yml",
+            ".devai/config/github-actions-host-adapter.json"
+          ]
+        }
+      ]
+    },
+    {
+      "version": "2.4.0",
+      "status": "released",
+      "date": "2026-10-10",
+      "changes": [
+        {
+          "id": "MIG-2.4.0-sensor-inputs-projection",
+          "kind": "opt-in-capability",
+          "summary": "Declare complete sensor_inputs in the adopter policy and rematerialize through the registered adopter-policy binding. The target and receipt are atomic and digest-bound; absent unmanaged targets are preserved, while removing a previously owned block retires its overrides to installed canonical defaults. Exact taskId sensor inputs additionally require an explicit sensorKinds annotation on the reviewed test-task node. Angular route inputs are forwarded to direct sensing and inventory regeneration. Existing argv admission, thresholds and reading history remain unchanged.",
+          "decision_records": ["ADR-SCR-0015", "ADR-CFG-0002", "ADR-AUT-0002"],
+          "segments": ["adopter-policy"],
+          "files": [
+            ".devai/config/sensor-inputs.json",
+            ".devai/config/adopter-policy-binding.json",
+            "test-tasks.json"
+          ]
+        },
+        {
+          "id": "MIG-2.4.0-declared-sensor-task-template",
+          "kind": "rebind",
+          "summary": "Rebind subprocess effects to materialize the declared-sensor-task descriptive template. It grants only an internally verified exact member/task binding, requires explicit local-write consent, retains migration db:write and grants no generic argv or remote effects.",
+          "decision_records": ["ADR-SCR-0015"],
+          "segments": ["subprocess-effects"],
+          "files": [".devai/config/subprocess-effects.json"]
+        }
+      ]
+    },
+    {
+      "version": "2.5.0",
+      "status": "released",
+      "changes": [
+        {
+          "id": "MIG-2.5.0-audit-interface-projections",
+          "kind": "opt-in-capability",
+          "summary": "Declare invariant_producers and reviewed_workflow_steps as complete closed adopter-policy documents, then use registered adopter-policy binding. Each target is independently receipt-owned and atomic, absent unmanaged targets remain untouched, and previously owned removal retires to canonical empty defaults. Exact obligations and reviewed effects require candidate-dependent measurement validation; binding alone grants no execution or readiness.",
+          "decision_records": ["ADR-SCR-0017", "ADR-CFG-0002"],
+          "segments": ["adopter-policy"],
+          "files": [
+            ".devai/config/invariant-producers.json",
+            ".devai/config/reviewed-workflow-steps.json",
+            ".devai/config/adopter-policy-binding.json"
+          ]
+        },
+        {
+          "id": "MIG-2.5.0-complete-test-result-population",
+          "kind": "opt-in-capability",
+          "summary": "A reviewed command-result task may opt into resultPopulation with exact project/transport, selectionEvidence, executable file roster and complete test IDs. Standing requires verified package-owned Vitest/Playwright native collection and final results from the same execution, agreeing with the candidate-tracked census. Results-only, missing provenance, partial output, duplicates, skipped tests or cache replay cannot be executed PASS. Node TAP remains diagnostic UNKNOWN. No extra planner command is admitted.",
+          "decision_records": ["ADR-SCR-0017", "ADR-SCR-0015"],
+          "segments": ["harness-ci", "adopter-policy"],
+          "files": ["test-tasks.json", ".devai/config/invariant-producers.json"]
+        },
+        {
+          "id": "MIG-2.5.0-trusted-verifier-2-4",
+          "kind": "rebind",
+          "summary": "The trusted verifier advances coherently from published @aarusso-nyx/devai@1.9.0 to independently verified published @aarusso-nyx/devai@2.4.0, admitting the supported sensorKinds descriptor annotation. Update only the verifier identity in the schema-validated adopter-owned toolchain manifest, preserving repository-specific pins/runtimes/constants; no current init operation carries that edit. Regenerate generated attested-RC host-adapter workflows through supported binding/upgrade. Separately verify and update effective repository/environment DEVAI_LEDGER_VERIFIER_PROVENANCE_SHA256 to fc79da07d4d4dfa466548337a4944ae1b7e0bfdcf2f1c334b341bb1ad477cd4d; generated workflows and protected values are not hand-edit exceptions.",
+          "decision_records": ["ADR-REL-0035", "ADR-CHK-0006"],
+          "segments": ["operational-law", "host-adapters", "harness-ci"],
+          "files": [
+            ".devai/config/toolchain.json",
+            ".github/workflows/devai-local-rc-verify.yml",
+            ".devai/config/github-actions-host-adapter.json"
+          ],
+          "decision_required": true
+        }
+      ],
+      "date": "2026-10-11"
+    },
+    {
+      "version": "2.6.0",
+      "status": "released",
+      "date": "2026-10-11",
+      "changes": [
+        {
+          "id": "MIG-2.6.0-read-only-workflow-inventory",
+          "kind": "opt-in-capability",
+          "summary": "Use sense inventory --slice workflows to extract exact workflow step occurrences, canonical step digests and complete contained executable/import file digests for independent review. Incomplete or absent workflow populations remain UNKNOWN/REVIEW. Existing slices including all retain their populations. Extraction executes no workflow, writes no policy or evidence and grants no reviewed effect. No rebind is required to use this installed read-only interface.",
+          "decision_records": ["ADR-SCR-0018"],
+          "segments": [],
+          "files": []
+        },
+        {
+          "id": "MIG-2.6.0-selected-post-merge-hook",
+          "kind": "opt-in-capability",
+          "summary": "Refresh installed shared post-merge hook bytes through registered init apply architect --only hooks --hook post-merge, which omits all unrelated bootstrap planning and writes. A validated project identity/authority-selection projection with a nonselected local adapter reports NOT_SELECTED without issuer/receipt/round-close execution; selected post-merge retains every current binding/HMAC/receipt check. Missing, malformed or unknown selection refuses. This does not switch adapter identity, rewrite authority policy or establish simultaneous local enforcement.",
+          "decision_records": ["ADR-AUT-0007"],
+          "segments": [],
+          "files": [".husky/post-merge"]
+        }
+      ]
+    },
+    {
+      "version": "2.6.1",
+      "status": "released",
+      "date": "2026-10-13",
+      "changes": [
+        {
+          "id": "MIG-2.6.1-runtime-repair-identity-refresh",
+          "kind": "rebind",
+          "summary": "This runtime repair patch adds no adopter configuration keys, defaults, interfaces or obligations. After installing the exact published package, normal registered upgrade refreshes the compiled authority policy's framework package and policy version identities to 2.6.1. Existing constitution, authority roots, sensor declarations, prerequisites, execution admission and trusted verifier remain unchanged. Runtime diagnostics do not grant execution or evidence standing.",
+          "decision_records": [],
+          "segments": ["authority"],
+          "files": [".devai/config/authority-policy.json"]
+        }
+      ]
+    },
+    {
+      "version": "2.6.2",
+      "status": "released",
+      "changes": [
+        {
+          "id": "MIG-2.6.2-runtime-repair-identity-refresh",
+          "kind": "rebind",
+          "summary": "This patch admits the exact reviewed task-cache local-write member and verifies prior inventory outputs before repeated regeneration. It adds no adopter configuration keys or new public action. After installing the exact published package, registered upgrade refreshes the compiled authority policy's framework package and policy version identities to 2.6.2 and rebinds the ordinary declared-sensor-task subprocess template with its exact check-cache state capability. Existing constitution, authority roots, sensor declarations, prerequisites, thresholds and trusted verifier remain unchanged; the rebind grants no arbitrary state path, native provenance trace, proof write or evidence standing.",
+          "decision_records": ["ADR-SCR-0017"],
+          "segments": ["authority", "subprocess-effects"],
+          "files": [".devai/config/authority-policy.json", ".devai/config/subprocess-effects.json"]
+        }
+      ],
+      "date": "2026-10-13"
+    },
+    {
+      "version": "2.6.3",
+      "status": "released",
+      "date": "2026-10-19",
+      "changes": [
+        {
+          "id": "MIG-2.6.3-measurement-repair-identity-refresh",
+          "kind": "rebind",
+          "summary": "After installing the exact published package, registered upgrade refreshes compiled authority and framework identities to 2.6.3. Optional contained SQL, source, package and specification populations remain adopter-owned declarations and are never invented or expanded automatically. Complete lint/audit output and finite execution budgets repair measurements without changing thresholds, task consent, native coverage provenance or evidence standing. Existing constitution, authority roots, declared inputs and trusted verifier remain unchanged.",
+          "decision_records": ["ADR-SCR-0005", "ADR-SCR-0015", "ADR-SCR-0017"],
+          "segments": ["authority"],
+          "files": [".devai/config/authority-policy.json"]
+        }
+      ]
+    },
+    {
+      "version": "2.6.4",
+      "status": "unreleased",
+      "changes": [
+        {
+          "id": "MIG-2.6.4-native-reporter-identity-refresh",
+          "kind": "rebind",
+          "summary": "After installing the exact published package, registered upgrade refreshes compiled authority and framework identities to 2.6.4. Native Vitest report custody retains complete raw streams; unrelated tracked internal directory links are bound only as opaque metadata under ADR-SCR-0021. Actual alias reads remain refused. Already validated repository-relative native configuration is executed through its canonical absolute argument, bound with its bytes and preparation in the selection identity; external, linked and swapped configuration remains refused. Collection, nonce, candidate, task and execution-origin verification are preserved. This repair adds no adopter configuration, public action or new evidence standing. Existing constitution, authority roots, declared inputs, thresholds and trusted verifier remain unchanged.",
+          "decision_records": ["ADR-SCR-0017", "ADR-SCR-0021"],
+          "segments": ["authority"],
+          "files": [".devai/config/authority-policy.json"]
+        }
+      ]
+    },
+    {
+      "version": "2.7.0",
+      "status": "released",
+      "date": "2026-10-23",
+      "changes": [
+        {
+          "id": "MIG-2.7.0-constitution-1-1-0",
+          "kind": "constitution",
+          "summary": "Constitution 1.1.0 amends Articles 6, 7 and 10 so the Engineer holds a focused-regression verb on the test class: within a task that changes sources it may add tests that import or target a file the same task changed and modify tests that task added, never delete a test, change another test's assertions, or lower a threshold; a round or task designated independent-assurance withholds the verb. Every other core path row is unchanged. Binding it replaces the vendored copy and the project.json pin.",
+          "decision_records": ["ADR-GOV-0026", "ADR-CHK-0009"],
+          "issues": [412],
+          "segments": ["constitution", "authority"],
+          "files": [".devai/pin/constitution.md", ".devai/config/project.json"],
+          "decision_required": true,
+          "constitution": {
+            "from": "1.0.2",
+            "to": "1.1.0"
+          },
+          "obligation": {
+            "check": "constitution-version",
+            "requirement": "Bind the installed constitution with init upgrade --constitution (or init bind --constitution) after the Architect has reviewed the amendment."
+          }
+        }
+      ]
+    },
+    {
+      "version": "2.8.0",
+      "status": "released",
+      "changes": [
+        {
+          "id": "MIG-2.8.0-constitution-1-2-0",
+          "kind": "constitution",
+          "summary": "Constitution 1.2.0 adds the bounded source-bound canonical-selection and one-proof-entry Git index machine exceptions in Article 6, preserving historical authority rows and role safeguards. Architect review and explicit constitution binding are required. Ordinary upgrade does not provision a reconciliation host, approve a plan, recover proofs, stage the proof index, publish inventory or grant DETRAN execution authority.",
+          "decision_records": ["ADR-GOV-0027", "ADR-EVI-0007"],
+          "segments": ["constitution", "authority"],
+          "files": [
+            ".devai/pin/constitution.md",
+            ".devai/config/project.json",
+            ".devai/config/authority-policy.json"
+          ],
+          "decision_required": true,
+          "constitution": {
+            "from": "1.1.0",
+            "to": "1.2.0"
+          },
+          "obligation": {
+            "check": "constitution-version",
+            "requirement": "Review ADR-GOV-0027 and the exact installed Constitution 1.2.0 bytes and digest, then explicitly request init upgrade --constitution (or init bind --constitution). This does not authorize reconciliation or DETRAN runtime effects."
+          }
+        }
+      ],
+      "date": "2026-10-25"
+    }
+  ]
+}

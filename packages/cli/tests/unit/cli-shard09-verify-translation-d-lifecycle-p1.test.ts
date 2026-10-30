@@ -214,7 +214,11 @@ import { executeTranslationValidation } from '../../src/commands/verify/translat
 
 const ROOT = resolve(import.meta.dirname, '../../../..');
 const WITNESS_PATH = 'scratch/translation-d-lifecycle-p1-witness.json';
-const RECIPE_PATH = 'record/proofs/work/recipe-runs/devai-fix/test/2026-09-12T00-00-00-000Z.json';
+let RECIPE_PATH: string;
+let fixtureClockOffset = 0;
+function fixtureTime(original: string): string {
+  return new Date(Date.parse(original) + fixtureClockOffset).toISOString();
+}
 const TEST_PATH = 'packages/cli/tests/unit/translation-d-lifecycle-p1-fixture.test.js';
 const UNSAFE_OVERLAY_PATH = 'packages/cli/tests/unit/unsafe\\fixture.test.js';
 const SOURCE_PATH = 'packages/cli/src/translation-d-lifecycle-p1-fixture.ts';
@@ -256,7 +260,7 @@ function witness(strategy: Strategy, id = 'TW-dddddddddddddddd'): Record<string,
     stage: 'invariants-tests-to-code',
     base_sha: strategy === 'feature-overlay' ? base : overlay,
     candidate_sha: candidate,
-    emitted_at: '2026-09-12T00:00:00.000Z',
+    emitted_at: fixtureTime('2026-09-12T00:00:00.000Z'),
     strategy,
     implements: [
       {
@@ -326,7 +330,14 @@ function cleanupManagedWorktrees(): void {
 }
 
 beforeAll(() => {
-  fixture = createSelfContainedRepositoryFixture(ROOT);
+  fixture = createSelfContainedRepositoryFixture(ROOT, { bindCurrentDocumentation: true });
+  const policy = JSON.parse(
+    readFileSync(resolve(fixture.root, '.devai/config/authority-policy.json'), 'utf8'),
+  );
+  const boundAt = Date.parse(policy.materialized_at);
+  expect(Number.isFinite(boundAt)).toBe(true);
+  fixtureClockOffset = boundAt + 60 * 60 * 1000 - Date.parse('2026-09-12T00:00:00.000Z');
+  RECIPE_PATH = `record/proofs/work/recipe-runs/devai-fix/test/${fixtureTime('2026-09-12T00:00:00.000Z').replace(/[:.]/gu, '-')}.json`;
   repository = fixture.root;
   writeJson('law/invariants/INV-DEMO-012.json', {
     schemaVersion: '1.0.0',
@@ -391,7 +402,7 @@ beforeAll(() => {
     title: 'Exercise translation D lifecycle',
     target_modules: ['MOD-CLI'],
     target_substrates: ['F2'],
-    created_at: '2026-09-12T00:00:00.000Z',
+    created_at: fixtureTime('2026-09-12T00:00:00.000Z'),
     db_isolation: 'database',
     iteration_count: 0,
     executor: {
@@ -433,7 +444,7 @@ beforeEach(() => {
   controls.leaseWrites = [];
   controls.rmCalls = [];
   vi.useFakeTimers();
-  vi.setSystemTime(new Date('2026-09-12T03:00:00.000Z'));
+  vi.setSystemTime(new Date(fixtureTime('2026-09-12T03:00:00.000Z')));
 });
 
 afterEach(() => {
@@ -495,7 +506,7 @@ describe('verify translation D lifecycle P1 and P2', () => {
       worktree_path: `.devai/worktrees/WT-TV-${suffix}`,
       database: `devai_task_TV_${suffix}`,
       base_sha: overlay,
-      created_at: '2026-09-12T03:00:00.000Z',
+      created_at: fixtureTime('2026-09-12T03:00:00.000Z'),
     });
   });
 
@@ -510,7 +521,7 @@ describe('verify translation D lifecycle P1 and P2', () => {
       worktree_path: `.devai/worktrees/WT-TV-${suffix}`,
       database: `devai_task_TV_${suffix}`,
       base_sha: overlay,
-      created_at: '2026-09-11T00:00:00.000Z',
+      created_at: fixtureTime('2026-09-11T00:00:00.000Z'),
     });
 
     const result = await validate('regression');
