@@ -225,19 +225,20 @@ function readBound(root: string, requireDocumentation = true) {
     fail();
   const materialized = receipt['materialized'];
   if (!record(materialized) || Object.keys(materialized).length === 0) return fail();
-  const targets = new Set(
-    [
-      'project.json',
-      'domains.json',
-      'thresholds.json',
-      'scorecard-na.json',
-      'glob-guards.json',
-      'release-verification.json',
-      'sensor-inputs.json',
-      'invariant-producers.json',
-      'reviewed-workflow-steps.json',
-    ].map((name) => `.devai/config/${name}`),
-  );
+  // The registered projection always emits the first five targets. Optional
+  // source blocks select their corresponding target; previously owned optional
+  // targets may also remain in the receipt after retirement (ADR-CFG-0002).
+  const targets = new Map<string, string | undefined>([
+    ['.devai/config/project.json', undefined],
+    ['.devai/config/domains.json', undefined],
+    ['.devai/config/thresholds.json', undefined],
+    ['.devai/config/scorecard-na.json', undefined],
+    ['.devai/config/glob-guards.json', undefined],
+    ['.devai/config/release-verification.json', 'release_verification'],
+    ['.devai/config/sensor-inputs.json', 'sensor_inputs'],
+    ['.devai/config/invariant-producers.json', 'invariant_producers'],
+    ['.devai/config/reviewed-workflow-steps.json', 'reviewed_workflow_steps'],
+  ]);
   for (const [path, digest] of Object.entries(materialized)) {
     if (
       !targets.has(path) ||
@@ -290,6 +291,15 @@ function readBound(root: string, requireDocumentation = true) {
     (bound !== undefined && sha(sourceBytes) !== bound.source_digest_sha256)
   )
     fail();
+  // Digest verification over a caller-truncated receipt is insufficient. Require
+  // the source projection's complete target set before registering any context.
+  for (const [path, sourceKey] of targets) {
+    if (
+      (sourceKey === undefined || Object.hasOwn(source, sourceKey)) &&
+      !Object.hasOwn(materialized, path)
+    )
+      fail();
+  }
   if (Object.hasOwn(source, 'documentation_implementation') !== (bound !== undefined))
     return fail();
   const files =
