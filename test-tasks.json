@@ -570,6 +570,10 @@
         },
         {
           "kind": "exact",
+          "pattern": "scripts/commit-documentation-authority.mjs"
+        },
+        {
+          "kind": "exact",
           "pattern": "scripts/check-formatting.mjs"
         },
         {
