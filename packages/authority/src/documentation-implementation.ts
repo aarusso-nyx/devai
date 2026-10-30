@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { canonicalJson } from '@devai-nyx/utils';
+import { canonicalJson, isExecutableTestFile } from '@devai-nyx/utils';
 /** Proposed candidate capability; not a claim of constitutional acceptance/publication. */
 export const DOCUMENTATION_IMPLEMENTATION_CAPABILITY = 'documentation-executable-core-v1';
 export const SUPPORTED_DOCUMENTATION_IMPLEMENTATION_CONSTITUTIONS = Object.freeze([
@@ -21,6 +21,7 @@ export interface DocumentationImplementationProvenance {
 
 export function documentationProtectedClass(path: string): 'test' | 'architecture' | undefined {
   if (
+    isExecutableTestFile(path) ||
     /(^|\/)(?:test|tests|e2e)\/|\.(?:test|spec)\.[cm]?[jt]sx?$/u.test(path) ||
     /(^|\/)(?:vitest(?:\.[^/]*)?|jest|playwright|cypress)\.config\.[cm]?[jt]s$/u.test(path)
   )
